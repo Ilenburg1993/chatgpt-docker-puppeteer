@@ -184,7 +184,10 @@ const patchBatchOperationSchema = z.object({
         .min(1)
         .optional()
         .describe('1-based occurrence index to replace when old_string appears more than once.'),
-    expectedHash: z.string().optional().describe('Expected SHA-256 of current file content.'),
+    expectedHash: z
+        .string()
+        .optional()
+        .describe('Expected SHA-256. For repeated same-file operations, repeat the initial file hash to use one group-baseline precondition; distinct hashes keep per-operation virtual-state checks.'),
     allowNoop: z.boolean().optional().describe('Allow old_string and new_string to be identical. Default: false.'),
     diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
     maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
@@ -1063,10 +1066,18 @@ async function applyPatchBatchOperation(operation, index) {
     }
 }
 
+/** @param {Record<string, unknown>} operation */
+function readPatchExpectedHash(operation) {
+    return typeof operation['expectedHash'] === 'string' && operation['expectedHash']
+        ? operation['expectedHash']
+        : null;
+}
+
 /**
  * @param {Record<string, unknown>} operation
+ * @param {{ omitExpectedHash?: boolean }} [options]
  */
-function toLockedPatchBatchOperation(operation) {
+function toLockedPatchBatchOperation(operation, options = {}) {
     return {
         oldString: String(operation['old_string'] ?? ''),
         newString: String(operation['new_string'] ?? ''),
@@ -1077,13 +1088,35 @@ function toLockedPatchBatchOperation(operation) {
         ...(optionalInteger(operation['occurrence_index']) !== undefined
             ? { occurrenceIndex: /** @type {number} */ (optionalInteger(operation['occurrence_index'])) }
             : {}),
-        ...(typeof operation['expectedHash'] === 'string' && operation['expectedHash']
-            ? { expectedHash: operation['expectedHash'] }
+        ...(!options.omitExpectedHash && readPatchExpectedHash(operation)
+            ? { expectedHash: /** @type {string} */ (readPatchExpectedHash(operation)) }
             : {}),
         allowNoop: operation['allowNoop'] === true,
         diffContextLines: optionalInteger(operation['diffContextLines']) ?? 3,
         maxDiffLines: optionalInteger(operation['maxDiffLines']) ?? 160,
         computeDiff: operation['includeDiffPreview'] === true,
+    };
+}
+
+/**
+ * Infer a target-baseline hash only when the first operation supplies a hash and every supplied hash in the group is
+ * identical. Distinct hashes preserve the advanced per-operation virtual-state contract.
+ *
+ * @param {{ operation: Record<string, unknown>; index: number }[]} group
+ */
+function buildLockedPatchBatchGroup(group) {
+    const firstHash = readPatchExpectedHash(group[0]?.operation ?? {});
+    const providedHashes = group
+        .map(({ operation }) => readPatchExpectedHash(operation))
+        .filter((value) => value !== null);
+    const baselineExpectedHash =
+        firstHash && providedHashes.every((value) => value === firstHash) ? firstHash : null;
+    return {
+        expectedHashMode: baselineExpectedHash ? 'group-baseline' : 'per-operation',
+        ...(baselineExpectedHash ? { baselineExpectedHash } : {}),
+        operations: group.map(({ operation }) =>
+            toLockedPatchBatchOperation(operation, { omitExpectedHash: Boolean(baselineExpectedHash) }),
+        ),
     };
 }
 
@@ -1155,9 +1188,13 @@ async function runPatchBatchOperations(operations, dryRun) {
             continue;
         }
 
+        const lockedGroup = buildLockedPatchBatchGroup(group);
         try {
             const patch = await patchResolvedTargetBatch(resolved, {
-                operations: group.map(({ operation }) => toLockedPatchBatchOperation(operation)),
+                operations: lockedGroup.operations,
+                ...(lockedGroup.baselineExpectedHash
+                    ? { baselineExpectedHash: lockedGroup.baselineExpectedHash }
+                    : {}),
                 dryRun,
                 captureRollback: false,
                 ...durabilityOption(first.operation['durability']),
@@ -1196,6 +1233,7 @@ async function runPatchBatchOperations(operations, dryRun) {
                     previousHash: operationResult['previousHash'],
                     noop: operationResult['noop'],
                     groupedSameFile: true,
+                    expectedHashMode: lockedGroup.expectedHashMode,
                     ...maybeDiffPreview(includeDiffPreview, {
                         diff: String(operationResult['diffPreview'] ?? ''),
                         truncated: operationResult['diffPreviewTruncated'] === true,
@@ -1207,16 +1245,40 @@ async function runPatchBatchOperations(operations, dryRun) {
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
-            for (const entry of group) {
+            const errorRecord = /** @type {Record<string, unknown>} */ (
+                error && typeof error === 'object' ? error : {}
+            );
+            const originalCode = typeof errorRecord['code'] === 'string' ? errorRecord['code'] : undefined;
+            const failedGroupOperationIndex = Number.isInteger(errorRecord['operationIndex'])
+                ? Number(errorRecord['operationIndex'])
+                : null;
+            const failedEntry =
+                failedGroupOperationIndex !== null && failedGroupOperationIndex >= 0
+                    ? group[failedGroupOperationIndex]
+                    : undefined;
+            const failedOperationIndex = failedEntry?.index ?? null;
+            const completedOperationCount = Number.isInteger(errorRecord['completedOperationCount'])
+                ? Number(errorRecord['completedOperationCount'])
+                : null;
+            const failurePhase =
+                typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
+            for (const [groupIndex, entry] of group.entries()) {
+                const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
                 results.push({
                     index: entry.index,
                     success: false,
                     path: resolved.relative,
-                    error: message,
-                    code,
+                    error: causal ? message : 'Same-file patch group aborted because another operation failed.',
+                    code: causal ? originalCode : 'ERR_PATCH_BATCH_GROUP_ABORTED',
+                    ...(causal || originalCode === undefined ? {} : { originalCode }),
                     groupedSameFile: true,
                     groupAborted: true,
+                    expectedHashMode: lockedGroup.expectedHashMode,
+                    failedOperationIndex,
+                    failedGroupOperationIndex,
+                    completedOperationCount,
+                    failurePhase,
+                    causalFailure: causal,
                 });
             }
             if (!dryRun) break;
@@ -1634,7 +1696,7 @@ export const repoWriteTools = [
         name: 'repo_apply_patch_batch',
         title: 'Apply repository patch batch',
         description:
-            'Dry-run or apply a bounded exact-string patch batch. Real writes require confirmBatch=true; repeated paths are sequential and atomic per file.',
+            'Dry-run or apply a bounded exact-string patch batch. Real writes require confirmBatch=true; repeated paths are sequential and atomic per file, can reuse one baseline expectedHash, and single-target apply avoids a duplicate preflight read.',
         inputSchema: {
             operations: z
                 .array(patchBatchOperationSchema)
@@ -1649,7 +1711,7 @@ export const repoWriteTools = [
             applyMode: z
                 .enum(['global-preflight', 'per-target-fast'])
                 .optional()
-                .describe('Apply policy. Default global-preflight; per-target-fast skips the duplicate global dry-run.'),
+                .describe('Apply policy. Default global-preflight validates all targets first when there are multiple targets; a single target uses atomic compute-before-write without a duplicate dry-run. per-target-fast applies independent target groups directly.'),
             failureMode: z
                 .enum(['best-effort', 'fail-fast'])
                 .optional()
@@ -1751,8 +1813,10 @@ export const repoWriteTools = [
                 });
             }
 
+            const singleTargetAtomicPreflightElision =
+                effectiveApplyMode === 'global-preflight' && envelope.targetCount === 1;
             let preflight = null;
-            if (effectiveApplyMode === 'global-preflight') {
+            if (effectiveApplyMode === 'global-preflight' && !singleTargetAtomicPreflightElision) {
                 preflight = await runPatchBatchTargetGroups(normalizedOperations, true, {
                     failureMode: 'best-effort',
                     concurrency: targetConcurrency ?? DEFAULT_PATCH_PLAN_CONCURRENCY,
@@ -1816,6 +1880,7 @@ export const repoWriteTools = [
                 failureMode: effectiveFailureMode,
                 operationCount: normalizedOperations.length,
                 targetCount: envelope.targetCount,
+                preflightElided: singleTargetAtomicPreflightElision,
                 appliedCount: succeeded.length,
                 failedCount: failedApply.length,
                 skippedCount: skipped.length,
@@ -1836,6 +1901,10 @@ export const repoWriteTools = [
                 concurrency: applyRun.execution.concurrency,
                 maxInFlight: applyRun.execution.maxInFlight,
                 durationMs: applyRun.execution.durationMs,
+                preflightElided: singleTargetAtomicPreflightElision,
+                preflightElisionReason: singleTargetAtomicPreflightElision
+                    ? 'single-target-atomic-compute-before-write'
+                    : null,
                 preflightSummary: preflight
                     ? {
                           ran: true,

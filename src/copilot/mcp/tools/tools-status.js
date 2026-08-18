@@ -92,7 +92,8 @@ function buildApprovalFrictionProfile(summaries) {
         .map((tool) => tool.name)
         .sort();
     return {
-        hostPolicy: 'plan -> bounded batch/write; remember trusted approvals when the host offers it',
+        hostPolicy:
+            'Prefer direct bounded batch/write when intent is clear; plan only when preview or a separate approval boundary adds information; remember trusted approvals when the host offers it.',
         firstRememberApprovalWave: remember.filter((name) =>
             [
                 'repo_apply_patch',
@@ -106,11 +107,11 @@ function buildApprovalFrictionProfile(summaries) {
             ].includes(name),
         ),
         neverRememberApproval: manual,
-        planFirstWorkflows: [
-            ['repo_patch_batch_plan', 'repo_apply_patch_batch'],
-            ['repo_apply_file_batch_plan', 'repo_apply_file_batch'],
-            ['mcp_validation_plan', 'run_copilot_validator'],
+        directBatchWorkflows: [
+            ['repo_apply_patch_batch', 'repo_patch_batch_plan'],
+            ['repo_apply_file_batch', 'repo_apply_file_batch_plan'],
         ],
+        planFirstWorkflows: [['mcp_validation_plan', 'run_copilot_validator']],
     };
 }
 

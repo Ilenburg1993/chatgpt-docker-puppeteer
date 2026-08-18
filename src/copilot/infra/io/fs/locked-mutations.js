@@ -646,6 +646,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *
  * @param {string} filePath
  * @param {{
+ *     baselineExpectedHash?: string;
  *     operations: Array<{
  *         oldString: string;
  *         newString: string;
@@ -690,6 +691,11 @@ export async function patchTextBatchLocked(filePath, options) {
                     const rawBuffer = typeof rawContent === 'string' ? toOwnedBuffer(rawContent) : rawContent;
                     const initialContent = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
                     const previousHash = sha256(rawBuffer);
+                    try {
+                        assertExpectedSha256Digest(previousHash, options.baselineExpectedHash);
+                    } catch (error) {
+                        throw annotatePatchBatchOperationError(error, 0, 0, 'baseline-hash');
+                    }
                     let currentContent = initialContent;
                     // Hash identity flows with the virtual content. Reusing H(n-1) as the next previousHash preserves
                     // every expectedHash precondition while avoiding a second full-content SHA pass per operation.
@@ -698,51 +704,55 @@ export async function patchTextBatchLocked(filePath, options) {
                     const operations = [];
 
                     for (const [index, operation] of options.operations.entries()) {
-                        const operationPreviousHash = currentHash;
-                        assertExpectedSha256Digest(operationPreviousHash, operation.expectedHash);
-                        const patch = computeTextPatch(currentContent, operation);
-                        const updated = patch.updated;
-                        const operationContentHash = patch.noop ? operationPreviousHash : sha256(updated);
-                        const diffContextLines = operation.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
-                        const shouldComputeDiff = operation.computeDiff === true;
-                        const diff = shouldComputeDiff
-                            ? buildSimpleTextDiffAroundLineRange(currentContent, updated, {
-                                  firstMatchLine: patch.firstMatchLine,
-                                  lastMatchLine: patch.lastMatchLine,
-                                  lineDelta: patch.lineDelta,
-                                  contextLines: diffContextLines,
-                                  replacedOccurrences: patch.replacedOccurrences,
-                              })
-                            : { diff: '', contextLines: diffContextLines, rangeOptimized: false };
-                        const diffPreview = shouldComputeDiff
-                            ? windowTextPreview(diff.diff, {
-                                  maxLines: operation.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
-                                  maxBytes: operation.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
-                              })
-                            : { text: '', truncated: false, lines: 0, bytes: 0 };
-                        operations.push({
-                            index,
-                            occurrences: patch.occurrences,
-                            replacedOccurrences: patch.replacedOccurrences,
-                            previousBytes: patch.previousBytes,
-                            projectedBytes: patch.bytesWritten,
-                            byteDelta: patch.byteDelta,
-                            firstMatchLine: patch.firstMatchLine,
-                            lastMatchLine: patch.lastMatchLine,
-                            lineDelta: patch.lineDelta,
-                            occurrenceIndex: patch.occurrenceIndex,
-                            noop: patch.noop,
-                            previousHash: operationPreviousHash,
-                            contentHash: operationContentHash,
-                            diffPreview: diffPreview.text,
-                            diffPreviewTruncated: diffPreview.truncated,
-                            diffPreviewLines: diffPreview.lines,
-                            diffPreviewBytes: diffPreview.bytes,
-                            diffContextLines: diff.contextLines,
-                            diffRangeOptimized: diff.rangeOptimized === true,
-                        });
-                        currentContent = updated;
-                        currentHash = operationContentHash;
+                        try {
+                            const operationPreviousHash = currentHash;
+                            assertExpectedSha256Digest(operationPreviousHash, operation.expectedHash);
+                            const patch = computeTextPatch(currentContent, operation);
+                            const updated = patch.updated;
+                            const operationContentHash = patch.noop ? operationPreviousHash : sha256(updated);
+                            const diffContextLines = operation.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
+                            const shouldComputeDiff = operation.computeDiff === true;
+                            const diff = shouldComputeDiff
+                                ? buildSimpleTextDiffAroundLineRange(currentContent, updated, {
+                                      firstMatchLine: patch.firstMatchLine,
+                                      lastMatchLine: patch.lastMatchLine,
+                                      lineDelta: patch.lineDelta,
+                                      contextLines: diffContextLines,
+                                      replacedOccurrences: patch.replacedOccurrences,
+                                  })
+                                : { diff: '', contextLines: diffContextLines, rangeOptimized: false };
+                            const diffPreview = shouldComputeDiff
+                                ? windowTextPreview(diff.diff, {
+                                      maxLines: operation.maxDiffLines ?? DEFAULT_PATCH_DIFF_MAX_LINES,
+                                      maxBytes: operation.maxDiffBytes ?? DEFAULT_PATCH_DIFF_MAX_BYTES,
+                                  })
+                                : { text: '', truncated: false, lines: 0, bytes: 0 };
+                            operations.push({
+                                index,
+                                occurrences: patch.occurrences,
+                                replacedOccurrences: patch.replacedOccurrences,
+                                previousBytes: patch.previousBytes,
+                                projectedBytes: patch.bytesWritten,
+                                byteDelta: patch.byteDelta,
+                                firstMatchLine: patch.firstMatchLine,
+                                lastMatchLine: patch.lastMatchLine,
+                                lineDelta: patch.lineDelta,
+                                occurrenceIndex: patch.occurrenceIndex,
+                                noop: patch.noop,
+                                previousHash: operationPreviousHash,
+                                contentHash: operationContentHash,
+                                diffPreview: diffPreview.text,
+                                diffPreviewTruncated: diffPreview.truncated,
+                                diffPreviewLines: diffPreview.lines,
+                                diffPreviewBytes: diffPreview.bytes,
+                                diffContextLines: diff.contextLines,
+                                diffRangeOptimized: diff.rangeOptimized === true,
+                            });
+                            currentContent = updated;
+                            currentHash = operationContentHash;
+                        } catch (error) {
+                            throw annotatePatchBatchOperationError(error, index, operations.length, 'operation');
+                        }
                     }
 
                     const finalNoop = currentContent === initialContent;
@@ -838,6 +848,27 @@ export async function patchTextBatchLocked(filePath, options) {
         );
         throw error;
     }
+}
+
+/**
+ * Preserve the original patch error while attaching precise batch-local failure context.
+ *
+ * @param {unknown} error
+ * @param {number} operationIndex
+ * @param {number} completedOperationCount
+ * @param {'baseline-hash' | 'operation'} failurePhase
+ */
+function annotatePatchBatchOperationError(error, operationIndex, completedOperationCount, failurePhase) {
+    const target =
+        error instanceof Error
+            ? /** @type {Error & { operationIndex?: number; completedOperationCount?: number; failurePhase?: string }} */ (error)
+            : /** @type {Error & { operationIndex?: number; completedOperationCount?: number; failurePhase?: string }} */ (
+                  new Error(String(error), { cause: error })
+              );
+    target.operationIndex = operationIndex;
+    target.completedOperationCount = completedOperationCount;
+    target.failurePhase = failurePhase;
+    return target;
 }
 
 /**

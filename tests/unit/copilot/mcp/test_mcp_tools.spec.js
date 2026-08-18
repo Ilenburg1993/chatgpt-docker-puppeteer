@@ -853,8 +853,8 @@ describe('copilot MCP tools', () => {
         assert.equal('rememberApprovalCandidates' in approvalFrictionProfile, false);
         assert.ok(/** @type {string[]} */ (approvalFrictionProfile['neverRememberApproval']).includes('job_cancel'));
         assert.ok(
-            /** @type {string[][]} */ (approvalFrictionProfile['planFirstWorkflows']).some(
-                (workflow) => workflow[0] === 'repo_patch_batch_plan' && workflow[1] === 'repo_apply_patch_batch',
+            /** @type {string[][]} */ (approvalFrictionProfile['directBatchWorkflows']).some(
+                (workflow) => workflow[0] === 'repo_apply_patch_batch' && workflow[1] === 'repo_patch_batch_plan',
             ),
         );
         assert.ok(

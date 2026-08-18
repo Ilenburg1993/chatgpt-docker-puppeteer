@@ -38,14 +38,17 @@ export const mcpSessionProfileTool = {
             taskRouting: {
                 navigate: ['repo_search_text', 'repo_read_file', 'repo_file_outline', 'repo_symbol_search'],
                 inspectState: ['repo_status', 'git_diff'],
-                patch: ['repo_patch_batch_plan', 'repo_apply_patch_batch'],
+                patch: ['repo_apply_patch_batch', 'repo_patch_batch_plan'],
                 fileBatch: ['repo_apply_file_batch_plan', 'repo_apply_file_batch'],
                 validate: ['mcp_validation_plan', 'run_copilot_validator', 'job_get_summary'],
             },
             preferredWriteWorkflows: [
                 {
                     task: 'patch',
-                    flow: ['repo_patch_batch_plan', 'repo_apply_patch_batch dryRun=false confirmBatch=true'],
+                    flow: [
+                        'repo_apply_patch_batch dryRun=false confirmBatch=true when anchors/intent are already known',
+                        'repo_patch_batch_plan only when a separate preview or approval boundary is useful',
+                    ],
                 },
                 {
                     task: 'file-batch',
@@ -72,7 +75,7 @@ export const mcpSessionProfileTool = {
             approvalGuidance: {
                 rememberTrustedBoundedWritesWhenOffered: true,
                 avoidUnlessExplicitlyNeeded: ['repo_remove_file', 'job_cancel'],
-                strategy: 'plan once, apply in a bounded batch, prefer reversible operations',
+                strategy: 'apply bounded batches directly when intent is clear; plan only when preview adds value; prefer reversible operations',
             },
             performancePolicy: {
                 deepDiagnosticsDefault: false,

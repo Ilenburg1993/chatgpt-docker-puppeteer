@@ -4022,3 +4022,191 @@ Verificação negativa posterior:
 
 A mudança não pretende melhorar hot-path latency diretamente. Ela reduz supply-chain/install surface por um package WASM órfão e, mais importante, corrige um deployment hazard real em instalações `--omit=dev`.
 
+---
+
+# 38. Faixa 31 — Patch Batch V2: baseline preconditions, single-target fast path e failure locality — 2026-08-18
+
+## 38.1 Evidência que abriu a faixa
+
+Snapshot do `mcp_latency_dashboard` depois das faixas 30:
+
+- 39 calls / 0 errors / 15 tools;
+- `repo_apply_patch`: **13 calls**, **33,3% de toda a pressão de chamadas**;
+- average patch handler ~55 ms, portanto o problema não é uma chamada individual lenta;
+- `repo_bulk_inspect` já comprime ~6,75 logical ops/call;
+- validators continuam dominando tempo acumulado, mas isso é trabalho deliberadamente caro e não round-trip de edição.
+
+Durante a própria execução das faixas anteriores, `repo_apply_patch_batch` foi tentado repetidamente e precisou ser decomposto quando same-file grouped preflight encontrou preconditions difíceis de expressar/diagnosticar. Portanto a oportunidade é reduzir **quantidade de chamadas e re-reads**, não acelerar `String.replace`.
+
+## 38.2 Estado atual da primitive
+
+`patchTextBatchLocked()` já possui a fundação correta:
+
+- um resource lock por file;
+- uma leitura inicial;
+- operações aplicadas sequencialmente sobre conteúdo virtual;
+- todos os patches são computados antes da publicação;
+- uma única atomic write se o resultado final não for noop;
+- uma única cache invalidation;
+- hash do estado virtual é encadeado entre operações.
+
+A limitação atual é de contrato/feedback:
+
+1. `expectedHash` em cada operação é comparado ao hash **virtual daquele ponto**;
+2. repetir o SHA obtido numa leitura inicial em todas as operações de um arquivo falha depois da primeira mutação;
+3. `global-preflight` de um único target executa dry-run e depois apply, causando duas leituras do mesmo arquivo;
+4. uma falha intermediária aborta atomicamente o grupo, porém a camada MCP tende a marcar todas as operações com o mesmo erro, sem destacar precisamente a operação causal.
+
+## 38.3 Estado-alvo V2
+
+### Baseline hash por target
+
+Para same-file groups:
+
+- se a **primeira operação** possui `expectedHash` e todo outro `expectedHash` fornecido no grupo é idêntico, o valor é interpretado como **baseline do target**;
+- a primitive valida esse SHA uma vez contra o conteúdo inicial sob lock;
+- os hashes repetidos deixam de ser reinterpretados como virtual-state hashes;
+- preconditions `expectedOccurrences/occurrenceIndex/oldString` continuam sequenciais contra cada estado virtual;
+- se hashes distintos forem fornecidos, preserva-se o modo avançado atual de precondition por operação;
+- se apenas uma operação posterior possuir hash, ele permanece uma precondition virtual daquela operação e não é promovido.
+
+Isso permite ao modelo ler um arquivo uma vez, copiar o mesmo `sha256` para todas as operações e manter proteção contra stale writes sem conhecer antecipadamente os hashes intermediários.
+
+### Single-target preflight elision
+
+Em apply real `global-preflight` com `targetCount===1`:
+
+- não executar um dry-run separado;
+- chamar diretamente a primitive atomic same-target, que computa/valida todas as operações antes de qualquer write;
+- concorrência externa continua protegida por lock + expectedHash + pre-publish snapshot check;
+- multi-target global-preflight permanece inalterado, pois aí a validação prévia de todos os targets possui valor semântico distinto.
+
+Resultado esperado: um same-file batch default passa de **2 reads + 1 write** para **1 read + 1 write**.
+
+### Failure locality
+
+Low-level errors de batch passam a carregar:
+
+- `operationIndex` causal;
+- `completedOperationCount` virtual;
+- código original da falha.
+
+A camada MCP deve marcar:
+
+- operação causal: erro/código original;
+- demais operações do mesmo grupo: `ERR_PATCH_BATCH_GROUP_ABORTED` + `failedOperationIndex`;
+- nenhum conteúdo é publicado em qualquer caso de failure durante o compute phase.
+
+## 38.4 Não-objetivos
+
+- não aumentar agora 64 operations / 32 targets / 1,5 MiB: nenhum limite foi atingido na telemetria;
+- não remover expectedHash por conveniência;
+- não tornar multi-file batch transacional entre arquivos;
+- não enfraquecer lock, path policy, durability ou atomic publish;
+- não criar nova tool MCP: a superfície existente deve ficar melhor, sem inflar `tools/list`.
+
+## 38.5 SLOs e provas
+
+- repeated identical baseline SHA em 3+ same-file edits: dry-run/apply green;
+- hash inicial incorreto: grupo falha antes de qualquer compute/write;
+- hashes encadeados distintos continuam válidos no modo per-operation;
+- erro na operação #2 aponta #2 como causal e #1/#3 como group-aborted; file permanece byte-identical;
+- single-target global-preflight real: uma única leitura da primitive, evidenciada por counter/metadata ou teste instrumentado;
+- multi-target global-preflight conserva comportamento all-target preflight;
+- same-file batch continua one lock/read/write/invalidation;
+- focused MCP + low-level tests, strict typecheck e lint;
+- reload + live probe com 3 operações em um único arquivo temporário e mesmo baseline hash;
+- dashboard posterior deve demonstrar logicalOperations/call maior e permitir preferir batch sem decomposição.
+
+## 38.6 Implementação pré-live
+
+Motor low-level (`patchTextBatchLocked`):
+
+- ganhou `baselineExpectedHash` separado das preconditions virtuais por operação;
+- baseline é validado contra o conteúdo inicial já lido sob o mesmo resource lock;
+- falha de baseline recebe `operationIndex=0`, `completedOperationCount=0`, `failurePhase=baseline-hash`;
+- falhas durante compute sequencial recebem índice local causal, quantidade já computada e `failurePhase=operation`;
+- o erro original/código são preservados;
+- o modo existente de `expectedHash` distinto por operação continua intacto.
+
+Camada MCP (`repo_apply_patch_batch`):
+
+- `buildLockedPatchBatchGroup()` promove para `group-baseline` somente quando a primeira operação tem SHA e todos os SHA fornecidos no grupo são idênticos;
+- hashes repetidos são retirados das operações individuais e enviados uma única vez como baseline do target;
+- grupos com hashes distintos permanecem `per-operation`;
+- rows de sucesso expõem `expectedHashMode`;
+- em failure, somente a operação causal mantém código/mensagem original; as demais recebem `ERR_PATCH_BATCH_GROUP_ABORTED` e carregam `failedOperationIndex`, `failedGroupOperationIndex`, `completedOperationCount`, `failurePhase` e `causalFailure=false`;
+- apply real `global-preflight` com exatamente 1 target define `preflightElided=true` e vai direto ao compute-before-write atômico; multi-target continua executando global preflight;
+- resultado/audit carregam a evidência de elisão; nenhum limite de ops/targets/payload foi ampliado.
+
+Metadata/guidance:
+
+- schema de `expectedHash` explica que o SHA inicial pode ser repetido em operações same-file;
+- `mcp_session_profile`, capabilities guidance e `mcp_tools_status` agora preferem direct bounded batch quando anchors/intenção já são conhecidos;
+- plan é explicitamente condicional a preview/approval boundary com valor adicional;
+- `approvalFrictionProfile` ganhou `directBatchWorkflows` e retirou patch/file batch do conjunto reflexivo `planFirstWorkflows`.
+
+Regressões verdes:
+
+- low-level baseline hash com 3 operações;
+- stale baseline rejeitado antes de publish;
+- operação intermediária #2 localizada, arquivo byte-identical;
+- hashes virtuais distintos preservados;
+- MCP apply real com três operações same-file + mesmo baseline SHA;
+- MCP failure locality com demais rows group-aborted;
+- single-target preflight elided;
+- multi-target global preflight preservado;
+- suíte `test_mcp_tools.spec.js` green após mudança de guidance;
+- strict typecheck green.
+
+A prova live ainda é necessária porque ela validará a composição completa no processo MCP remoto e medirá o novo `logicalOperations/call` em telemetria real.
+
+## 38.7 Prova live executada
+
+Após reload controlado:
+
+- connector smoke: green;
+- OAuth/health/SSE: green;
+- tools: **120/120**;
+- `tools/list`: **122.633 bytes**, contra 122.117 antes; +516 bytes de descrições/schema, sem tool nova.
+
+Probe criado: `src/copilot/patch-batch-v2-live-probe.txt`, conteúdo inicial `alpha beta gamma` e SHA `adf7157c...`.
+
+Uma única chamada `repo_apply_patch_batch` recebeu três operações same-file (`alpha→ALPHA`, `beta→BETA`, `gamma→GAMMA`) com o **mesmo SHA inicial repetido nas três rows**, sem plan prévio:
+
+- success=true;
+- operationCount=3;
+- targetCount=1;
+- appliedCount=3;
+- `preflightElided=true`;
+- reason=`single-target-atomic-compute-before-write`;
+- preflight ran=false;
+- todas as rows: `expectedHashMode=group-baseline`;
+- um único traceId `io-msypzo8e-6ddc0c1b`;
+- hashes virtuais evoluíram entre as operações sem input adicional do caller;
+- somente a última row contabilizou `batchBytesWritten=17`/publicação final;
+- duração MCP: ~**50,3 ms**;
+- conteúdo final confirmado: `ALPHA BETA GAMMA`.
+
+No mesmo arquivo foi executada uma prova de failure locality com baseline válido e anchor inexistente na operação #2:
+
+- success=false, appliedCount=0;
+- duração ~**1,7 ms**;
+- operação global #1/local #1 marcada causal com `ERR_PATCH_NOT_FOUND`;
+- operações #0 e #2: `ERR_PATCH_BATCH_GROUP_ABORTED`, `originalCode=ERR_PATCH_NOT_FOUND`;
+- `completedOperationCount=1`, `failurePhase=operation`;
+- arquivo relido depois da falha permaneceu com o mesmo SHA/conteúdo final anterior, provando zero partial publish.
+
+O probe foi removido após as provas.
+
+Dashboard pós-prova:
+
+- `repo_apply_patch_batch`: 2 calls, 6 logical operations;
+- **3 logicalOperations/call** para o batch;
+- successful batch ~50 ms; failure batch ~2 ms no accounting arredondado;
+- `roundTripAccounting.compressedRoundTrips=4` na pequena janela;
+- para o caso representativo de três edits same-file, 3 chamadas individuais passam a **1 call**, redução de 66,7% nos round-trips de patch;
+- handlers normais permanecem dentro do budget; o warning de dashboard veio apenas do connector smoke de rede (~1,3 s), não do I/O de patch.
+
+A Faixa 31 está operacionalmente fechada: o principal motivo observado para decompor same-file patch batches foi removido sem reduzir stale-write protection, atomicity ou feedback causal.
+
