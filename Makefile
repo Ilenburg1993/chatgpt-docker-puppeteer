@@ -11,8 +11,12 @@
 # • Compatível com Docker / DevContainer do zero
 # • Alinhado com package.json v1.1.4 e scripts de rede/control-plane canônicos
 #
-# Versão: 4.5.0
-# Data:   2026-06-13
+# Versão: 4.5.1
+# Data:   2026-08-18
+# Changelog v4.5.1:
+#   - Converge network-syntax para o validator Node 24 bounded/ShellCheck por arquivo.
+#   - Ativa summary-contracts como gate executável e corrige versões/status de lifecycle.
+#   - Mantém changelog v4.5.0 abaixo para rastreabilidade.
 # Changelog v4.5.0:
 #   - Adiciona comandos canônicos síncronos para MCP Stateful Streamable HTTP.
 #   - Adiciona gates mcp-stateful-* para typecheck, lint, unit, suite fast/full e restart-ready.
@@ -356,7 +360,7 @@ info:
 	@echo "  npm:  $(GREEN)$$($(NPM) --version 2>/dev/null || echo 'não instalado')$(NC)"
 	@echo "  PM2:  $(GREEN)$$($(PM2) --version 2>/dev/null || echo 'não disponível')$(NC)"
 	@echo "  Diretório: $(BOLD)$$(pwd)$(NC)"
-	@echo "  Makefile: $(BOLD)v4.4.0$(NC)"
+	@echo "  Makefile: $(BOLD)v4.5.1$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Pacotes base instalados no projeto:$(NC)"
 	@echo "  • $(GREEN)chalk$(NC) (^5.6.2) - Terminal colors"
@@ -365,9 +369,9 @@ info:
 	@echo ""
 
 version:
-	@echo "Makefile v4.4.0 — DEV / Health-Classified / Network-Control-Plane-Ready"
-	@echo "Data: 2026-05-20"
-	@echo "Stack: devcontainer 5.9.0 | Dockerfile 1.5.0 | post-create 1.2.1 | healthcheck 3.0.0 | package 1.1.4 | network-control-plane 1.1.0"
+	@echo "Makefile v4.5.1 — DEV / Health-Classified / Network-Control-Plane-Ready"
+	@echo "Data: 2026-08-18"
+	@echo "Stack: devcontainer 5.9.1 | Dockerfile 1.5.1 | post-create 1.2.5 | post-attach 5.9.1 | healthcheck 3.0.1 | package 1.1.4 | network-control-plane 1.1.1"
 	@echo "Targets: 135+ | Aliases: 18 | Coverage: package.json scripts v1.1.4"
 
 # =============================================================================
@@ -637,7 +641,7 @@ validate-platform:
 # 5️⃣.5 GITHUB/COPILOT NETWORK CONTROL PLANE
 # =============================================================================
 
-.PHONY: network-help network-status network-summary network-summary-current network-summary-boot network-summary-all network-artifacts network-syntax network-shellcheck network-validate network-validate-soft network-doctor network-doctor-soft network-health network-registry-status
+.PHONY: network-help network-status network-summary network-summary-current network-summary-boot network-summary-all network-artifacts network-syntax network-shellcheck network-contracts-validate network-contracts-explain network-validate network-validate-soft network-doctor network-doctor-soft network-health network-registry-status
 .PHONY: network-state network-state-status network-state-summary network-state-report network-state-events network-state-json network-state-doctor network-state-strict network-control-plane network-control-plane-status network-control-plane-summary network-control-plane-report network-control-plane-events network-control-plane-json network-control-plane-doctor
 .PHONY: network-dns-status network-dns-doctor network-dns-benchmark network-dns-start network-dns-health network-dns-stop network-dns-summary network-dns-lock-diagnose
 .PHONY: network-route-status network-route-doctor network-route-summary network-route-probe network-route-benchmark
@@ -647,7 +651,7 @@ validate-platform:
 
 network-help:
 	@echo ""
-	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network Control Plane — Makefile v4.4.0$(NC)"
+	@echo "$(CYAN)$(BOLD)🌐 GitHub/Copilot Network Control Plane — Makefile v4.5.1$(NC)"
 	@echo "  $(CYAN)make network-status$(NC)                    Lê status passivo de DNS/manager/route/proxy/advisor"
 	@echo "  $(CYAN)make network-summary$(NC)                   Mostra snapshot atual + health"
 	@echo "  $(CYAN)make network-summary-boot$(NC)              Mostra snapshots de lifecycle/boot"
@@ -800,32 +804,30 @@ network-artifacts:
 	@ls -lh /tmp/devcontainer-health.* /tmp/devcontainer-post-create.* /tmp/devcontainer-post-start.* /tmp/devcontainer-post-attach.* /tmp/devcontainer-local-dns-cache.* /tmp/devcontainer-github-api-route.* /tmp/devcontainer-copilot-network.* /tmp/devcontainer-copilot-proxy.* /tmp/devcontainer-copilot-route-advisor.* /tmp/devcontainer-network-control-plane.* 2>/dev/null || true
 
 network-syntax:
-	@echo "$(CYAN)🔎 bash -n hooks/scripts de rede e health$(NC)"
-	@bash -n "$(POST_CREATE_SCRIPT)"
-	@bash -n "$(POST_START_SCRIPT)"
-	@bash -n "$(POST_ATTACH_SCRIPT)"
-	@bash -n "$(HEALTHCHECK_SCRIPT)"
-	@bash -n "$(NETWORK_CONTROL_PLANE_SCRIPT)"
-	@bash -n "$(NETWORK_LOCAL_DNS_SCRIPT)"
-	@bash -n "$(NETWORK_ROUTE_SCRIPT)"
-	@bash -n "$(NETWORK_MANAGER_SCRIPT)"
-	@bash -n "$(NETWORK_PROXY_SCRIPT)"
-	@bash -n "$(NETWORK_ADVISOR_SCRIPT)"
-	@echo "$(GREEN)✅ Sintaxe shell OK$(NC)"
+	@echo "$(CYAN)🔎 Validador bounded dos hooks/scripts Bash de rede e health$(NC)"
+	@node src/copilot/mcp/scripts/validate-devcontainer-shell.js
+	@echo "$(GREEN)✅ Sintaxe/erros ShellCheck severity=error OK$(NC)"
+
+network-contracts-validate:
+	@npm run network:contracts:validate
+
+network-contracts-explain:
+	@npm run network:contracts:explain
 
 network-shellcheck:
 	@echo "$(CYAN)🔎 ShellCheck hooks/scripts de rede e health$(NC)"
 	@command -v shellcheck >/dev/null 2>&1 || { echo "$(RED)❌ shellcheck não instalado$(NC)"; exit 127; }
 	@shellcheck "$(POST_CREATE_SCRIPT)" "$(POST_START_SCRIPT)" "$(POST_ATTACH_SCRIPT)" "$(HEALTHCHECK_SCRIPT)" "$(NETWORK_CONTROL_PLANE_SCRIPT)" \
 		"$(NETWORK_LOCAL_DNS_SCRIPT)" "$(NETWORK_ROUTE_SCRIPT)" "$(NETWORK_MANAGER_SCRIPT)" \
-		"$(NETWORK_PROXY_SCRIPT)" "$(NETWORK_ADVISOR_SCRIPT)"
+		"$(NETWORK_PROXY_SCRIPT)" "$(NETWORK_ADVISOR_SCRIPT)" .devcontainer/scripts/network/lib/*.sh
 	@echo "$(GREEN)✅ ShellCheck OK$(NC)"
 
-network-validate: network-syntax network-shellcheck network-doctor network-state-doctor health-brief
+network-validate: network-syntax network-shellcheck network-contracts-validate network-doctor network-state-doctor health-brief
 	@echo "$(GREEN)✅ Network control plane validado$(NC)"
 
 network-validate-soft: network-syntax
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-shellcheck || true
+	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-contracts-validate || true
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-doctor-soft || true
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" network-state-doctor || true
 	@$(MAKE) -f "$(firstword $(MAKEFILE_LIST))" health-brief || true
@@ -2074,5 +2076,5 @@ mcp-stateful-rollback-env:
 	@printf '%s\n' 'unset COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'
 
 # =============================================================================
-# FIM DO MAKEFILE v4.5.0
+# FIM DO MAKEFILE v4.5.1
 # =============================================================================

@@ -40,13 +40,14 @@ const {
 });
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
-const MAX_REPO_BATCH_REQUESTS = 32;
+const MAX_REPO_BATCH_REQUESTS = 64;
 const DEFAULT_REPO_BATCH_CONCURRENCY = 6;
 const MAX_REPO_BATCH_CONCURRENCY = 8;
-const MAX_REPO_BATCH_INPUT_BYTES = 1024 * 1024;
-const DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES = 1024 * 1024;
+const MAX_REPO_BATCH_INPUT_BYTES = 2 * 1024 * 1024;
+const DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES = 2 * 1024 * 1024;
 const MIN_REPO_BATCH_RESULT_BUDGET_BYTES = 64 * 1024;
-const MAX_REPO_BATCH_RESULT_BUDGET_BYTES = 1536 * 1024;
+const MAX_REPO_BATCH_RESULT_BUDGET_BYTES = 3 * 1024 * 1024;
+const MAX_REPO_SEARCH_CONTEXT_LINES = 48;
 
 const repoReadBatchItemSchema = z.object({
     path: z.string().min(1),
@@ -63,7 +64,7 @@ const repoSearchBatchItemSchema = z.object({
     caseSensitive: z.boolean().optional(),
     includePattern: z.string().optional(),
     excludePattern: z.string().optional(),
-    contextLines: z.number().int().min(0).max(10).optional(),
+    contextLines: z.number().int().min(0).max(MAX_REPO_SEARCH_CONTEXT_LINES).optional(),
     maxResults: z.number().int().min(1).max(500).optional(),
     cursor: z.string().optional(),
 });
@@ -355,9 +356,23 @@ async function runRepoSearchTextCall(input) {
         contextLines: input.contextLines ?? 0,
         ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
     });
+    const targetStat = await statPathValidated(resolved.validatedReadPath);
+    const targetStats = targetStat.stats;
+    const targetIsFile = targetStats.isFile();
+    const targetHashBytes = targetIsFile && targetStats.size <= 5 * 1024 * 1024
+        ? await readBytesValidated(resolved.validatedReadPath)
+        : null;
     const structured = {
         success: true,
         path: resolved.relative,
+        searchTargetMetadata: targetIsFile
+            ? {
+                  type: 'file',
+                  sizeBytes: targetStats.size,
+                  sha256: targetHashBytes?.contentHash ?? null,
+                  hashComputed: Boolean(targetHashBytes),
+              }
+            : { type: targetStats.isDirectory() ? 'directory' : 'other' },
         pattern: effectivePattern,
         query: input.query ?? null,
         contextLines: input.contextLines ?? 0,
@@ -589,7 +604,7 @@ export const repoReadTools = [
                 .min(1)
                 .max(MAX_REPO_BATCH_REQUESTS)
                 .optional()
-                .describe('Batch up to 32 read requests using path/startLine/endLine/hashMode; do not mix with single mode.'),
+                .describe('Batch up to 64 read requests using path/startLine/endLine/hashMode; do not mix with single mode.'),
             batchFailureMode: z
                 .enum(['best-effort', 'fail-fast'])
                 .optional()
@@ -607,7 +622,7 @@ export const repoReadTools = [
                 .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .optional()
-                .describe('Aggregate structured result budget. Default 1 MiB; hard max 1.5 MiB.'),
+                .describe('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({
@@ -723,7 +738,7 @@ export const repoReadTools = [
         name: 'repo_bulk_inspect',
         title: 'Bulk repository inspect',
         description:
-            'Mix up to 32 read, search and stat operations in one bounded read-only call with per-item failure isolation.',
+            'Mix up to 64 read, search and stat operations in one bounded read-only call with per-item failure isolation.',
         inputSchema: {
             operations: z
                 .array(repoBulkInspectItemSchema)
@@ -744,7 +759,7 @@ export const repoReadTools = [
                 .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .optional()
-                .describe('Aggregate structured result budget. Default 1 MiB; hard max 1.5 MiB.'),
+                .describe('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations, failureMode, concurrency, resultBudgetBytes }) => {
@@ -952,9 +967,9 @@ export const repoReadTools = [
                 .number()
                 .int()
                 .min(0)
-                .max(10)
+                .max(MAX_REPO_SEARCH_CONTEXT_LINES)
                 .optional()
-                .describe('Lines of context around each match. Default: 0.'),
+                .describe('Lines of context around each match. Default: 0; hard max: 48 to reduce search→read round trips.'),
             maxResults: z.number().int().min(1).max(500).optional().describe('Maximum matches returned.'),
             cursor: z.string().optional().describe('Cursor returned by a previous repo_search_text call.'),
             batch: z
@@ -962,7 +977,7 @@ export const repoReadTools = [
                 .min(1)
                 .max(MAX_REPO_BATCH_REQUESTS)
                 .optional()
-                .describe('Batch up to 32 search requests using the normal fields; do not mix with single mode.'),
+                .describe('Batch up to 64 search requests using the normal fields; do not mix with single mode.'),
             batchFailureMode: z
                 .enum(['best-effort', 'fail-fast'])
                 .optional()
@@ -980,7 +995,7 @@ export const repoReadTools = [
                 .min(MIN_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .max(MAX_REPO_BATCH_RESULT_BUDGET_BYTES)
                 .optional()
-                .describe('Aggregate structured result budget. Default 1 MiB; hard max 1.5 MiB.'),
+                .describe('Aggregate structured result budget. Default 2 MiB; hard max 3 MiB.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({

@@ -23,6 +23,11 @@ import {
     getResultExecutionHint,
     getResultSizeHint,
     normalizeMcpToolDefinitions,
+    readMcpHttpToolTimingMetadata,
+    recordMcpHttpToolHandlerEnd,
+    recordMcpHttpToolHandlerStart,
+    recordMcpToolInteractionEnd,
+    recordMcpToolInteractionStart,
     recordMcpToolMetric,
 } from '#copilot/mcp/control-plane';
 import {
@@ -39,6 +44,7 @@ import {
     maintenanceTools,
     mcpAppsSdkReadinessTool,
     mcpAutonomyPowerScoreTool,
+    mcpClientLatencyEvidenceTool,
     mcpCloudflareConfigAuditTool,
     mcpCloudflareEdgeAuditTool,
     mcpCloudflareEdgeBackupCreateTool,
@@ -61,7 +67,10 @@ import {
     mcpDevcontainerNetworkPostureAuditTool,
     mcpGoldenPromptsTool,
     mcpHostBlockDiagnosticsTool,
+    mcpLatencyAttributionTool,
     mcpLatencyDashboardTool,
+    mcpLatencyPulseTool,
+    mcpOpenAiEndpointLatencyTool,
     mcpToolPayloadAuditTool,
     mcpOAuthFrictionAuditTool,
     mcpPostRestartReadinessTool,
@@ -327,7 +336,11 @@ function buildCanonicalMcpToolList() {
         projectDoctorTool,
         ...jobTools,
         ...llmBLiveTools,
+        mcpClientLatencyEvidenceTool,
+        mcpLatencyAttributionTool,
         mcpLatencyDashboardTool,
+        mcpLatencyPulseTool,
+        mcpOpenAiEndpointLatencyTool,
         mcpToolPayloadAuditTool,
         ...maintenanceTools,
         delegateToRepoAutonomyRunnerTool,
@@ -481,7 +494,9 @@ function buildMcpRegisterToolOptions(tool) {
  */
 async function guardedToolHandler(tool, args, options, registryPolicy) {
     const startedAt = Date.now();
+    safeRecordMcpToolInteractionStart(tool.name, startedAt);
     const callId = randomUUID();
+    safeRecordMcpHttpToolHandlerStart(tool.name, callId, startedAt);
     const runtimeContext = getMcpToolRuntimeContext(tool);
     const risk = runtimeContext.risk;
     const requiredScopes = runtimeContext.requiredScopes;
@@ -508,10 +523,17 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         activePhase = 'idle';
         activePhaseStartedAt = Date.now();
     };
+    const httpTimingMetadata = readMcpHttpToolTimingMetadata();
+    const latencyExperimentMetadata = buildLatencyPulseAuditMetadata(tool.name, args);
     await safeAppendMcpAuditEvent({
         event: 'tool_call_started',
         callId,
         tool: tool.name,
+        ...(httpTimingMetadata?.edgeColo ? { edgeColo: httpTimingMetadata.edgeColo } : {}),
+        ...(httpTimingMetadata
+            ? { originRequestReceivedAt: new Date(httpTimingMetadata.requestReceivedAt).toISOString() }
+            : {}),
+        ...latencyExperimentMetadata,
         readOnly: tool.annotations.readOnlyHint === true,
         destructive: tool.annotations.destructiveHint === true,
         openWorld: tool.annotations.openWorldHint === true,
@@ -661,6 +683,9 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             });
         }
         throw error;
+    } finally {
+        safeRecordMcpHttpToolHandlerEnd();
+        safeRecordMcpToolInteractionEnd(tool.name);
     }
 }
 
@@ -1243,6 +1268,39 @@ function normalizePlainObject(value) {
 }
 
 /**
+ * Persist only explicitly bounded experiment labels for the no-I/O latency pulse.
+ * Raw IPs, URLs and arbitrary input fields are intentionally excluded.
+ *
+ * @param {string} toolName
+ * @param {Record<string, unknown>} args
+ * @returns {Record<string, unknown>}
+ */
+function buildLatencyPulseAuditMetadata(toolName, args) {
+    if (toolName !== 'mcp_latency_pulse') return {};
+    /** @param {unknown} value */
+    const safeLabel = (value) => {
+        const normalized = String(value ?? '').trim();
+        return /^[A-Za-z0-9._:-]{1,64}$/u.test(normalized) ? normalized : null;
+    };
+    const seriesId = safeLabel(args['seriesId']);
+    const networkLabel = safeLabel(args['networkLabel']);
+    const modelLabel = safeLabel(args['modelLabel']);
+    const conversationLabel = safeLabel(args['conversationLabel']);
+    const clientLabel = safeLabel(args['clientLabel']);
+    const vpnLabel = safeLabel(args['vpnLabel']);
+    const step = Number(args['step']);
+    return {
+        ...(seriesId ? { latencySeriesId: seriesId } : {}),
+        ...(Number.isInteger(step) && step >= 0 && step <= 1000 ? { latencyStep: step } : {}),
+        ...(networkLabel ? { latencyNetworkLabel: networkLabel } : {}),
+        ...(modelLabel ? { latencyModelLabel: modelLabel } : {}),
+        ...(conversationLabel ? { latencyConversationLabel: conversationLabel } : {}),
+        ...(clientLabel ? { latencyClientLabel: clientLabel } : {}),
+        ...(vpnLabel ? { latencyVpnLabel: vpnLabel } : {}),
+    };
+}
+
+/**
  * @param {number} startedAt
  * @returns {number}
  */
@@ -1259,6 +1317,42 @@ async function safeAppendMcpAuditEvent(event) {
         await appendMcpAuditEvent(event);
     } catch {
         // Telemetry failures must not break a tool call.
+    }
+}
+
+/** @param {string} toolName @param {string} callId @param {number} observedAt @returns {void} */
+function safeRecordMcpHttpToolHandlerStart(toolName, callId, observedAt) {
+    try {
+        recordMcpHttpToolHandlerStart(toolName, callId, observedAt);
+    } catch {
+        // HTTP boundary timing failures must not break a tool call.
+    }
+}
+
+/** @returns {void} */
+function safeRecordMcpHttpToolHandlerEnd() {
+    try {
+        recordMcpHttpToolHandlerEnd();
+    } catch {
+        // HTTP boundary timing failures must not break a tool call.
+    }
+}
+
+/** @param {string} toolName @param {number} observedAt @returns {void} */
+function safeRecordMcpToolInteractionStart(toolName, observedAt) {
+    try {
+        recordMcpToolInteractionStart(toolName, observedAt);
+    } catch {
+        // Interaction metrics failures must not break a tool call.
+    }
+}
+
+/** @param {string} toolName @returns {void} */
+function safeRecordMcpToolInteractionEnd(toolName) {
+    try {
+        recordMcpToolInteractionEnd(toolName);
+    } catch {
+        // Interaction metrics failures must not break a tool call.
     }
 }
 

@@ -14,9 +14,12 @@ import {
     errorResult,
     estimateStructuredTextResultBytes,
     getMcpWorkspaceRoot,
+    normalizeFocusedUnitTestFiles,
+    canRunCopilotValidatorInline,
     okResult,
     readOnlyAnnotations,
     resolveWritePath,
+    runCopilotValidatorInline,
     toWorkspaceRelativePath,
     withResultExecutionHint,
     withResultSizeHint,
@@ -46,10 +49,10 @@ const {
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;
 const QUARANTINE_DIR = path.join(getMcpWorkspaceRoot(), 'src/copilot/.ai/quarantine');
-const MAX_BATCH_FILE_OPERATIONS = 32;
-const MAX_PATCH_BATCH_OPERATIONS = 64;
-const MAX_PATCH_BATCH_TARGETS = 32;
-const MAX_PATCH_BATCH_INPUT_BYTES = 1536 * 1024;
+const MAX_BATCH_FILE_OPERATIONS = 64;
+const MAX_PATCH_BATCH_OPERATIONS = 128;
+const MAX_PATCH_BATCH_TARGETS = 64;
+const MAX_PATCH_BATCH_INPUT_BYTES = 3 * 1024 * 1024;
 const DEFAULT_PATCH_PLAN_CONCURRENCY = 4;
 const DEFAULT_PATCH_FAST_CONCURRENCY = 4;
 const MAX_PATCH_TARGET_CONCURRENCY = 8;
@@ -167,6 +170,22 @@ const quarantineMetadataSchema = z.object({
     transaction: quarantineTransactionSchema.nullable().optional(),
 });
 
+const POST_PATCH_VALIDATOR_NAMES = /** @type {const} */ ([
+    'typecheck',
+    'lint',
+    'unit-focused',
+    'devcontainer-shell',
+    'network-contracts',
+]);
+const MAX_POST_PATCH_VALIDATORS = 4;
+const postPatchValidationRequestSchema = z.object({
+    validator: z.enum(POST_PATCH_VALIDATOR_NAMES),
+    testFile: z.string().min(1).max(1024).optional(),
+    timeoutMs: z.number().int().min(1_000).max(3_600_000).optional(),
+    waitMs: z.number().int().min(0).max(120_000).optional(),
+    failureTailBytes: z.number().int().min(1_000).max(12_000).optional(),
+});
+
 const patchBatchOperationSchema = z.object({
     path: z.string().min(1).describe('Workspace-relative file path.'),
     old_string: z.string().min(1).describe('Exact text to replace.'),
@@ -196,6 +215,87 @@ const patchBatchOperationSchema = z.object({
         .optional()
         .describe('Include textual diffPreview in each operation result. Default: false.'),
 });
+
+/**
+ * Validate post-patch validator configuration before any file is modified.
+ *
+ * @param {Array<{ validator: string; testFile?: string; timeoutMs?: number; waitMs?: number; failureTailBytes?: number }>} requests
+ */
+function normalizePostPatchValidationRequests(requests) {
+    return requests.map((request) => {
+        if (request.validator === 'unit-focused') {
+            if (!request.testFile) throw new Error('postValidate unit-focused requires testFile.');
+            normalizeFocusedUnitTestFiles([request.testFile]);
+        } else if (request.testFile) {
+            throw new Error('postValidate testFile is valid only with unit-focused.');
+        }
+        return {
+            validator: /** @type {import('../control-plane/jobs.js').CopilotValidatorName} */ (request.validator),
+            ...(request.testFile ? { testFile: request.testFile } : {}),
+            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+            ...(request.waitMs === undefined ? {} : { waitMs: request.waitMs }),
+            ...(request.failureTailBytes === undefined ? {} : { failureTailBytes: request.failureTailBytes }),
+        };
+    });
+}
+
+/**
+ * @param {ReturnType<typeof normalizePostPatchValidationRequests>} requests
+ */
+async function runPostPatchValidations(requests) {
+    const startedAt = Date.now();
+    const results = [];
+    for (const [index, request] of requests.entries()) {
+        try {
+            const result = await runCopilotValidatorInline(request.validator, {
+                ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+                ...(request.waitMs === undefined ? {} : { waitMs: request.waitMs }),
+                ...(request.failureTailBytes === undefined ? {} : { failureTailBytes: request.failureTailBytes }),
+                ...(request.testFile ? { testFiles: [request.testFile] } : {}),
+            });
+            const job = result.job;
+            results.push({
+                index,
+                validator: request.validator,
+                ...(request.testFile ? { testFile: request.testFile } : {}),
+                passed: result.passed,
+                completedWithinWait: result.completedWithinWait,
+                waitMs: result.waitMs,
+                job: {
+                    id: job.id,
+                    status: job.status,
+                    exitCode: job.exitCode,
+                    timedOut: job.timedOut,
+                    startedAt: new Date(job.startedAt).toISOString(),
+                    endedAt: job.endedAt === null ? null : new Date(job.endedAt).toISOString(),
+                    durationMs: (job.endedAt ?? Date.now()) - job.startedAt,
+                    logFile: job.logFile,
+                },
+                ...(result.failureOutputTail ? { failureOutputTail: result.failureOutputTail } : {}),
+            });
+        } catch (error) {
+            results.push({
+                index,
+                validator: request.validator,
+                ...(request.testFile ? { testFile: request.testFile } : {}),
+                passed: false,
+                completedWithinWait: true,
+                error: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+    const failedCount = results.filter((result) => result.passed !== true).length;
+    return {
+        requestedCount: requests.length,
+        ran: true,
+        skipped: false,
+        skippedReason: null,
+        allPassed: failedCount === 0,
+        failedCount,
+        durationMs: Date.now() - startedAt,
+        results,
+    };
+}
 
 const batchOperationSchema = z.discriminatedUnion('type', [
     z.object({
@@ -1854,7 +1954,7 @@ export const repoWriteTools = [
                 .array(patchBatchOperationSchema)
                 .min(1)
                 .max(MAX_PATCH_BATCH_OPERATIONS)
-                .describe('Patch operations to validate in order. This tool never writes; max 64 operations / 32 targets.'),
+                .describe('Patch operations to validate in order. This tool never writes; max 128 operations / 64 targets.'),
             targetConcurrency: z
                 .number()
                 .int()
@@ -1947,7 +2047,7 @@ export const repoWriteTools = [
                 .array(patchBatchOperationSchema)
                 .min(1)
                 .max(MAX_PATCH_BATCH_OPERATIONS)
-                .describe('Patch operations to validate or apply; max 64 operations / 32 targets / 1.5 MiB input.'),
+                .describe('Patch operations to validate or apply; max 128 operations / 64 targets / 3 MiB input.'),
             dryRun: z.boolean().optional().describe('Validate all operations without writing. Default: true.'),
             confirmBatch: z
                 .boolean()
@@ -1976,6 +2076,16 @@ export const repoWriteTools = [
                 .boolean()
                 .optional()
                 .describe('Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.'),
+            postValidate: z
+                .array(postPatchValidationRequestSchema)
+                .min(1)
+                .max(MAX_POST_PATCH_VALIDATORS)
+                .optional()
+                .describe('Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan and never starts jobs.'),
+            postValidateOnPartial: z
+                .boolean()
+                .optional()
+                .describe('Run postValidate even after partial patch application. Default false; otherwise validation is skipped on partial apply.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -1988,9 +2098,26 @@ export const repoWriteTools = [
             targetConcurrency,
             resultMode,
             includePreflightDetails,
+            postValidate,
+            postValidateOnPartial,
             durability,
         }) => {
             const isDryRun = resolveBatchDryRun(dryRun, confirmBatch);
+            let postValidationRequests;
+            try {
+                postValidationRequests = normalizePostPatchValidationRequests(postValidate ?? []);
+            } catch (error) {
+                return errorResult('Invalid postValidate configuration; no files were modified.', {
+                    code: 'ERR_POST_PATCH_VALIDATION_CONFIG',
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+            if (postValidationRequests.length > 0 && !canRunCopilotValidatorInline()) {
+                return errorResult('postValidate is disabled inside test runners; no files were modified.', {
+                    code: 'ERR_POST_PATCH_VALIDATION_RECURSION_GUARD',
+                    requestedCount: postValidationRequests.length,
+                });
+            }
             const normalizedOperations = /** @type {Record<string, unknown>[]} */ (
                 operations.map((/** @type {Record<string, unknown>} */ operation) => ({
                     ...operation,
@@ -2052,6 +2179,13 @@ export const repoWriteTools = [
                     resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
                     detailsAvailable: true,
                     targetSummaries,
+                    postValidation: {
+                        requestedCount: postValidationRequests.length,
+                        ran: false,
+                        skipped: postValidationRequests.length > 0,
+                        skippedReason: postValidationRequests.length > 0 ? 'dry-run-does-not-start-validator-jobs' : null,
+                        validators: postValidationRequests.map((request) => request.validator),
+                    },
                     operations: outputOperations,
                     failures: outputFailures,
                     applied: [],
@@ -2163,11 +2297,9 @@ export const repoWriteTools = [
                 resultSurface.resultMode === 'detailed'
                     ? applied
                     : succeeded.map((operation) => compactPatchBatchSuccessRow(operation));
+            const patchFullyApplied = failedApply.length === 0 && skipped.length === 0;
             await appendMcpAuditEvent({
-                event:
-                    failedApply.length === 0 && skipped.length === 0
-                        ? 'repo_apply_patch_batch_applied'
-                        : 'repo_apply_patch_batch_partial_failure',
+                event: patchFullyApplied ? 'repo_apply_patch_batch_applied' : 'repo_apply_patch_batch_partial_failure',
                 tool: 'repo_apply_patch_batch',
                 executionId: applyRun.execution.executionId,
                 applyMode: effectiveApplyMode,
@@ -2180,8 +2312,43 @@ export const repoWriteTools = [
                 failedCount: failedApply.length,
                 skippedCount: skipped.length,
             });
+            let postValidation = {
+                requestedCount: postValidationRequests.length,
+                ran: false,
+                skipped: false,
+                skippedReason: /** @type {string | null} */ (null),
+                allPassed: /** @type {boolean | null} */ (null),
+                failedCount: 0,
+                durationMs: 0,
+                results: /** @type {Record<string, unknown>[]} */ ([]),
+            };
+            if (postValidationRequests.length > 0) {
+                if (!patchFullyApplied && postValidateOnPartial !== true) {
+                    postValidation = {
+                        ...postValidation,
+                        skipped: true,
+                        skippedReason: 'partial-patch-apply',
+                    };
+                } else {
+                    postValidation = await runPostPatchValidations(postValidationRequests);
+                }
+                await appendMcpAuditEvent({
+                    event: 'repo_apply_patch_batch_post_validation',
+                    tool: 'repo_apply_patch_batch',
+                    executionId: applyRun.execution.executionId,
+                    patchFullyApplied,
+                    requestedCount: postValidation.requestedCount,
+                    ran: postValidation.ran,
+                    skipped: postValidation.skipped,
+                    skippedReason: postValidation.skippedReason ?? null,
+                    allPassed: postValidation.allPassed,
+                    failedCount: postValidation.failedCount,
+                    durationMs: postValidation.durationMs,
+                });
+            }
             const structured = {
-                success: failedApply.length === 0 && skipped.length === 0,
+                success: patchFullyApplied,
+                workflowSuccess: patchFullyApplied && postValidation.allPassed !== false,
                 partial,
                 dryRun: false,
                 applyMode: effectiveApplyMode,
@@ -2198,6 +2365,7 @@ export const repoWriteTools = [
                 concurrency: applyRun.execution.concurrency,
                 maxInFlight: applyRun.execution.maxInFlight,
                 durationMs: applyRun.execution.durationMs,
+                workflowDurationMs: applyRun.execution.durationMs + postValidation.durationMs,
                 requestedResultMode: resultSurface.requestedResultMode,
                 resultMode: resultSurface.resultMode,
                 resultModeForcedByDiffPreview: resultSurface.forcedByDiffPreview,
@@ -2215,24 +2383,34 @@ export const repoWriteTools = [
                       }
                     : { ran: false, success: null, executionId: null, failedCount: 0, durationMs: 0 },
                 preflight: includePreflightDetails === true ? preflight?.operations ?? [] : [],
+                postValidation,
                 applied: outputApplied,
                 failures: outputFailures,
                 skipped,
             };
-            const text =
+            const patchText =
                 structured.success
                     ? `Applied ${succeeded.length} patch operation(s) across ${envelope.targetCount} target(s).`
                     : `Patch batch completed partially: ${succeeded.length} applied, ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s), ${skipped.length} skipped.`;
+            const validationText =
+                postValidation.requestedCount === 0
+                    ? ''
+                    : postValidation.skipped
+                      ? ` Post-validation skipped (${postValidation.skippedReason}); patch results above are unchanged.`
+                      : postValidation.allPassed
+                        ? ` Post-validation passed ${postValidation.requestedCount}/${postValidation.requestedCount} requested validator(s) in the same call.`
+                        : ` Post-validation reported ${postValidation.failedCount} non-passing validator(s); patches remain applied and must not be retried blindly.`;
+            const text = `${patchText}${validationText}`;
             const result = withResultSizeHint(okResult(structured, text), {
                 bytes: estimateStructuredTextResultBytes(structured, text),
                 strategy: 'conservative-estimate',
                 source: 'repo_apply_patch_batch',
             });
             return withResultExecutionHint(result, {
-                logicalOperations: normalizedOperations.length,
-                failedOperations: failedApply.length,
-                skippedOperations: skipped.length,
-                mode: `patch-apply:${effectiveApplyMode}:${effectiveFailureMode}`,
+                logicalOperations: normalizedOperations.length + (postValidation.ran ? postValidation.requestedCount : 0),
+                failedOperations: failedApply.length + (postValidation.ran ? postValidation.failedCount : 0),
+                skippedOperations: skipped.length + (postValidation.skipped ? postValidation.requestedCount : 0),
+                mode: `patch-apply:${effectiveApplyMode}:${effectiveFailureMode}${postValidation.ran ? ':post-validated' : ''}`,
             });
         },
     },

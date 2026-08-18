@@ -32,6 +32,7 @@ import {
     readMcpWorkspaceSmokeSummary,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
@@ -506,6 +507,7 @@ export const mcpRuntimeHealthTool = {
         const startupMaintenance = readMcpStartupMaintenanceState();
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const statefulPolicy = readStatefulRuntimePolicySnapshot();
+        const statefulRuntime = readMcpHttpSessionRuntimeState();
         const compileCache = getCopilotNodeCompileCacheHealth();
         const warnings = [];
         const critical = [];
@@ -586,6 +588,7 @@ export const mcpRuntimeHealthTool = {
                         lastSmokeAgeMinutes: connectorSmoke.ageMinutes,
                     },
                     statefulPolicy,
+                    statefulRuntime,
                     nodeRuntime: {
                         nodeVersion: process.version,
                         compileCache: {
@@ -666,6 +669,7 @@ export const mcpRuntimeHealthTool = {
                     ignoredForOperationalReadiness: permanentMode,
                 },
                 statefulPolicy,
+                statefulRuntime,
                 nodeRuntime: {
                     nodeVersion: process.version,
                     compileCache,

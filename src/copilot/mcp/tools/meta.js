@@ -9,7 +9,7 @@ import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } fro
 import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 59;
+const CAPABILITIES_VERSION = 61;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -124,7 +124,11 @@ const RUNTIME_TOOLS = [
     'mcp_maintenance_plan',
     'mcp_maintenance_apply_safe_fixes',
     'project_doctor',
+    'mcp_client_latency_evidence',
+    'mcp_latency_attribution',
     'mcp_latency_dashboard',
+    'mcp_latency_pulse',
+    'mcp_openai_endpoint_latency',
     'mcp_runtime_health',
     'mcp_session_profile',
     'mcp_smoke_workspace',

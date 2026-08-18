@@ -53,6 +53,7 @@ describe('copilot MCP registry', () => {
             'mcp_autonomy_power_score',
             'mcp_capabilities_summary',
             'mcp_cleanup_ai_artifacts',
+            'mcp_client_latency_evidence',
             'mcp_cloudflare_config_audit',
             'mcp_cloudflare_edge_audit',
             'mcp_cloudflare_edge_backup_create',
@@ -77,11 +78,14 @@ describe('copilot MCP registry', () => {
             'mcp_golden_prompts',
             'mcp_host_block_diagnostics',
             'mcp_last_validation_summary',
+            'mcp_latency_attribution',
             'mcp_latency_dashboard',
+            'mcp_latency_pulse',
             'mcp_maintenance_apply_safe_fixes',
             'mcp_maintenance_plan',
             'mcp_oauth_friction_audit',
             'mcp_oauth_issuer_diagnostics',
+            'mcp_openai_endpoint_latency',
             'mcp_post_restart_readiness',
             'mcp_reload_plan',
             'mcp_reload_schedule',
@@ -150,6 +154,7 @@ describe('copilot MCP registry', () => {
         });
         const names = new Set(tools.map((tool) => tool.name));
 
+        assert.equal(names.has('mcp_latency_attribution'), false);
         assert.equal(names.has('mcp_latency_dashboard'), true);
         assert.equal(names.has('claude_connector_profile'), true);
         assert.equal(names.has('repo_read_file'), true);
@@ -215,7 +220,14 @@ describe('copilot MCP registry', () => {
     it('uses explicit annotations on every initial tool', () => {
         const tools = getCanonicalMcpTools();
 
-        const expectedOpenWorld = new Set(['git_push_plan', 'git_push', 'git_publish_changes', 'llmb_live_test_run']);
+        const expectedOpenWorld = new Set([
+            'git_push_plan',
+            'git_push',
+            'git_publish_changes',
+            'llmb_live_test_run',
+            'mcp_latency_attribution',
+            'mcp_openai_endpoint_latency',
+        ]);
         const statefulReadOnly = new Set(['repo_working_set']);
         for (const tool of tools) {
             assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);

@@ -379,19 +379,23 @@ describe('copilot MCP tools', () => {
         }
     });
 
-    it('repo_search_text accepts context lines and cursor metadata', async () => {
+    it('repo_search_text accepts expanded context and returns patch-ready file metadata', async () => {
         const tool = findTool('repo_search_text');
         const result = await tool.handler({
             pattern: 'Copilot MCP Server',
             path: 'src/copilot/mcp/README.md',
-            contextLines: 2,
+            contextLines: 32,
             maxResults: 5,
         });
         assert.equal(result.isError, undefined);
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
-        assert.equal(structured['contextLines'], 2);
+        assert.equal(structured['contextLines'], 32);
         assert.equal(structured['cursor'], null);
         assert.ok('nextCursor' in structured);
+        const metadata = /** @type {Record<string, unknown>} */ (structured['searchTargetMetadata']);
+        assert.equal(metadata['type'], 'file');
+        assert.equal(metadata['hashComputed'], true);
+        assert.match(String(metadata['sha256'] ?? ''), /^[a-f0-9]{64}$/u);
     });
 
     it('repo_search_text accepts query as a client-friendly alias for pattern', async () => {
@@ -1222,6 +1226,47 @@ describe('copilot MCP tools', () => {
             assert.equal(fast.structuredContent?.['skippedCount'], 0);
             assert.equal(await readFile(fileA, 'utf8'), 'ALPHA\n');
             assert.equal(await readFile(fileB, 'utf8'), 'beta\n');
+        } finally {
+            await rm(fixtureDir, { recursive: true, force: true });
+        }
+    });
+
+    it('patch batch can run allowlisted post-validation in the same call and rejects invalid validation config before writes', async () => {
+        const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
+        await mkdir(jobsDir, { recursive: true });
+        const fixtureDir = await mkdtemp(join(jobsDir, 'mcp-patch-post-validate-'));
+        const file = join(fixtureDir, 'target.txt');
+        const relativeFile = relative(process.cwd(), file).replaceAll('\\', '/');
+        await writeFile(file, 'alpha\n', 'utf8');
+        try {
+            const applyTool = findTool('repo_apply_patch_batch');
+            const invalid = await applyTool.handler({
+                operations: [{ path: relativeFile, old_string: 'alpha', new_string: 'ALPHA' }],
+                confirmBatch: true,
+                postValidate: [
+                    {
+                        validator: 'typecheck',
+                        testFile: 'tests/unit/copilot/mcp/test_mcp_metrics.spec.js',
+                    },
+                ],
+            });
+            assert.equal(invalid.isError, true);
+            assert.equal(invalid.structuredContent?.['code'], 'ERR_POST_PATCH_VALIDATION_CONFIG');
+            assert.equal(await readFile(file, 'utf8'), 'alpha\n');
+
+            const recursive = await applyTool.handler({
+                operations: [{ path: relativeFile, old_string: 'alpha', new_string: 'ALPHA' }],
+                confirmBatch: true,
+                postValidate: [
+                    {
+                        validator: 'unit-focused',
+                        testFile: 'tests/unit/copilot/mcp/test_mcp_metrics.spec.js',
+                    },
+                ],
+            });
+            assert.equal(recursive.isError, true);
+            assert.equal(recursive.structuredContent?.['code'], 'ERR_POST_PATCH_VALIDATION_RECURSION_GUARD');
+            assert.equal(await readFile(file, 'utf8'), 'alpha\n');
         } finally {
             await rm(fixtureDir, { recursive: true, force: true });
         }

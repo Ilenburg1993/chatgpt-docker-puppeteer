@@ -2,7 +2,7 @@
 # =============================================================================
 # post-create.sh — Inicialização Estrutural do DevContainer (CANÔNICO)
 #
-# Version: v1.2.4 (shared endpoint-registry trust boundary + contract sync)
+# Version: v1.2.5 (final-only lifecycle truth + contract validator integration)
 #
 # PRINCÍPIO:
 #   Este script NÃO é conveniência de setup. É verificação estrutural.
@@ -641,7 +641,7 @@ fi
 
 case "${1:-}" in
     --version)
-        printf '%s v%s\n' 'post-create.sh' '1.2.4'
+        printf '%s v%s\n' 'post-create.sh' '1.2.5'
         exit 0
         ;;
     --help)
@@ -668,14 +668,14 @@ set +o posix 2> /dev/null || true
 # Identidade canônica do script (imutável)
 # ---------------------------------------------------------------------------
 SCRIPT_NAME="post-create.sh"
-SCRIPT_VERSION="1.2.4"
+SCRIPT_VERSION="1.2.5"
 readonly SCRIPT_NAME SCRIPT_VERSION
 
 # Matriz canônica sincronizada com devcontainer.json v5.9.1 / Dockerfile v1.5.1.
-EXPECTED_POST_CREATE_VERSION="v1.2.4"
+EXPECTED_POST_CREATE_VERSION="v1.2.5"
 EXPECTED_POST_START_VERSION="v3.0.3"
-EXPECTED_POST_ATTACH_VERSION="v5.9.0"
-EXPECTED_HEALTHCHECK_VERSION="v3.0.0"
+EXPECTED_POST_ATTACH_VERSION="v5.9.1"
+EXPECTED_HEALTHCHECK_VERSION="v3.0.1"
 EXPECTED_SYNC_LOCAL_AUTH_VERSION="v2.0.0"
 EXPECTED_NSS_GATEKEEPER_VERSION="v2.1.2"
 EXPECTED_LOCAL_DNS_VERSION="v1.8.1"
@@ -686,7 +686,7 @@ EXPECTED_LOCAL_PROXY_VERSION="v1.4.0"
 EXPECTED_NETWORK_CONTROL_PLANE_VERSION="v1.1.1"
 EXPECTED_ENDPOINT_REGISTRY_VERSION="v1.2.0"
 EXPECTED_PACKAGE_VERSION="v1.1.4"
-EXPECTED_MAKEFILE_VERSION="v4.4.0"
+EXPECTED_MAKEFILE_VERSION="v4.5.1"
 EXPECTED_DEVCONTAINER_VERSION="v5.9.1"
 EXPECTED_DOCKERFILE_VERSION="v1.5.1"
 readonly EXPECTED_POST_CREATE_VERSION EXPECTED_POST_START_VERSION EXPECTED_POST_ATTACH_VERSION EXPECTED_HEALTHCHECK_VERSION EXPECTED_SYNC_LOCAL_AUTH_VERSION
@@ -2060,6 +2060,19 @@ if ((SCRIPT_VERSION_MISMATCHES > 0)) && [[ "${STRICT_VERSION_AUDIT}" == "true" ]
 fi
 log "Script audit concluído: status=${SCRIPT_AUDIT_STATUS}; warnings=${SCRIPT_AUDIT_WARNINGS}; version_mismatches=${SCRIPT_VERSION_MISMATCHES}; report=${HOOK_AUDIT_REPORT}"
 
+# Status estrutural final é derivado ANTES de publicar qualquer artifact final.
+# O mesmo valor alimenta manifesto/status/summary/report/events para impedir
+# janelas em que .initialized anuncie um estado mais otimista que o run real.
+POST_CREATE_STRUCTURAL_STATUS="ready-ok"
+if [[ "${SCRIPT_AUDIT_STATUS:-OK}" != "OK" || "${ENDPOINT_REGISTRY_STATUS:-ok}" != "ok" || "${PACKAGE_STATUS:-ok}" != "ok" || "${MAKEFILE_STATUS:-ok}" != "ok" || "${DEVCONTAINER_JSON_STATUS:-ok}" != "ok" || "${DOCKERFILE_STATUS:-ok}" != "ok" || "${TOOLCHAIN_CONTRACT_STATUS:-ok}" != "ok" ]]; then
+    POST_CREATE_STRUCTURAL_STATUS="ready-degraded"
+fi
+POST_CREATE_MANIFEST_INTEGRITY="canonical"
+if [[ "${POST_CREATE_STRUCTURAL_STATUS}" != "ready-ok" ]]; then
+    POST_CREATE_MANIFEST_INTEGRITY="degraded"
+fi
+readonly POST_CREATE_STRUCTURAL_STATUS POST_CREATE_MANIFEST_INTEGRITY
+
 # =============================================================================
 # SECTION 12 — Manifesto persistente (opcional; atômico; sem segredos)
 # =============================================================================
@@ -2167,22 +2180,14 @@ else
             "ssh_contract_status=${SSH_CONTRACT_STATUS}" \
             "ssh_contract_version=${SSH_CONTRACT_VERSION}" \
             "" \
-            "status=ready" \
-            "integrity=canonical"
+            "status=${POST_CREATE_STRUCTURAL_STATUS}" \
+            "integrity=${POST_CREATE_MANIFEST_INTEGRITY}"
     } > "${STATE_SWAP}"
 
     mv -f "${STATE_SWAP}" "${STATE_FILE}"
     chmod 444 "${STATE_FILE}" 2> /dev/null || true
     log "✅ Manifesto persistido em ${STATE_FILE}"
 fi
-
-# Status derivado para consumo humano/máquina: post-create pode concluir com
-# readiness estrutural degradada quando há mismatch/advisory não-fatal.
-POST_CREATE_STRUCTURAL_STATUS="ready-ok"
-if [[ "${SCRIPT_AUDIT_STATUS:-OK}" != "OK" || "${ENDPOINT_REGISTRY_STATUS:-ok}" != "ok" || "${PACKAGE_STATUS:-ok}" != "ok" || "${MAKEFILE_STATUS:-ok}" != "ok" || "${DEVCONTAINER_JSON_STATUS:-ok}" != "ok" || "${DOCKERFILE_STATUS:-ok}" != "ok" || "${TOOLCHAIN_CONTRACT_STATUS:-ok}" != "ok" ]]; then
-    POST_CREATE_STRUCTURAL_STATUS="ready-degraded"
-fi
-readonly POST_CREATE_STRUCTURAL_STATUS
 
 # =============================================================================
 # SECTION 12.5 — Runtime artifacts próprios do post-create (passivos)

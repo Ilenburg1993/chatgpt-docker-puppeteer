@@ -14,11 +14,16 @@ import {
     cancelJob,
     getResultExecutionHint,
     normalizeFocusedUnitTestFiles,
+    parseCgroupMemoryEvents,
+    parseCgroupMemoryLimit,
     pruneCompletedJobRecords,
+    readCopilotValidatorCapacityState,
+    readValidatorResourceSnapshot,
     readJobOutput,
     resolveFocusedUnitTestCommand,
     resolveJobTimeoutMs,
     resolveValidatorCommand,
+    resolveValidatorVitestMaxWorkers,
 } from '#copilot/mcp/control-plane';
 import { resolveSafeValidationSuite } from '#copilot/mcp/scripts';
 import { jobTools } from '#copilot/mcp/tools';
@@ -60,6 +65,14 @@ describe('copilot MCP jobs', () => {
         assert.deepEqual(resolveValidatorCommand('devcontainer-shell'), {
             command: 'node',
             args: ['src/copilot/mcp/scripts/validate-devcontainer-shell.js'],
+        });
+        assert.deepEqual(resolveValidatorCommand('network-contracts'), {
+            command: 'node',
+            args: [
+                'src/copilot/mcp/scripts/network-summary-contracts.js',
+                'validate',
+                '.devcontainer/scripts/network/contracts/summary-contracts.jsonc',
+            ],
         });
         assert.deepEqual(resolveValidatorCommand('suite-mcp-fast'), {
             command: 'node',
@@ -153,6 +166,44 @@ describe('copilot MCP jobs', () => {
             () => resolveSafeValidationSuite(/** @type {any} */ ('admin-command')),
             /Unsupported validation suite/,
         );
+    });
+
+    it('parses cgroup memory evidence without widening the persisted key surface', () => {
+        assert.deepEqual(parseCgroupMemoryEvents('low 1\nhigh 2\nmax 3\noom 4\noom_kill 5\noom_group_kill 6\nunknown 99\n'), {
+            low: 1,
+            high: 2,
+            max: 3,
+            oom: 4,
+            oom_kill: 5,
+            oom_group_kill: 6,
+        });
+        assert.equal(parseCgroupMemoryLimit('max\n'), null);
+        assert.equal(parseCgroupMemoryLimit('1073741824\n'), 1_073_741_824);
+        assert.equal(parseCgroupMemoryLimit('not-a-number'), null);
+    });
+
+    it('captures a bounded validator resource snapshot without subprocesses', async () => {
+        const snapshot = await readValidatorResourceSnapshot();
+        assert.match(snapshot.observedAt, /^\d{4}-\d{2}-\d{2}T/u);
+        assert.ok(snapshot.mcpProcessRssBytes > 0);
+        assert.ok(snapshot.systemTotalBytes > 0);
+        assert.ok(snapshot.systemFreeBytes >= 0);
+        assert.ok(snapshot.availableParallelism >= 1);
+        assert.equal(snapshot.loadAverage.length, 3);
+        assert.ok(snapshot.cgroup.memoryCurrentBytes === null || snapshot.cgroup.memoryCurrentBytes >= 0);
+        assert.ok(snapshot.cgroup.memoryMaxBytes === null || snapshot.cgroup.memoryMaxBytes >= 0);
+    });
+
+    it('bounds validator resource policy for WSL-safe execution', () => {
+        assert.equal(resolveValidatorVitestMaxWorkers({}), 2);
+        assert.equal(resolveValidatorVitestMaxWorkers({ COPILOT_VALIDATOR_VITEST_MAX_WORKERS: '1' }), 1);
+        assert.equal(resolveValidatorVitestMaxWorkers({ COPILOT_VALIDATOR_VITEST_MAX_WORKERS: '99' }), 2);
+        const capacity = readCopilotValidatorCapacityState();
+        assert.match(capacity.runtimeEpoch, /^[0-9a-f-]{36}$/iu);
+        assert.ok(capacity.ownerPid > 0);
+        assert.equal(capacity.maxActive, 1);
+        assert.equal(capacity.vitestMaxWorkers, 2);
+        assert.equal(capacity.activeCount, 0);
     });
 
     it('normalizes job timeouts inside supported bounds', () => {
@@ -313,6 +364,7 @@ describe('copilot MCP jobs', () => {
         const details = /** @type {Record<string, unknown>} */ (rejected.structuredContent?.['details']);
         const allowed = /** @type {string[]} */ (details['allowedValidators']);
         assert.ok(allowed.includes('devcontainer-shell'));
+        assert.ok(allowed.includes('network-contracts'));
         assert.ok(allowed.includes('unit-focused'));
         assert.equal(allowed.includes('future-unsafe-command'), false);
     });
@@ -333,7 +385,7 @@ describe('copilot MCP jobs', () => {
         assert.equal(unexpectedFile.structuredContent?.['code'], 'ERR_UNEXPECTED_FOCUSED_TEST_FILE');
     });
 
-    it('run_copilot_validator defaults focused validation to bounded inline completion without a follow-up poll', async () => {
+    it('run_copilot_validator blocks nested validator subprocesses inside Vitest', async () => {
         const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
         assert.ok(tool);
         const result = await tool.handler({
@@ -341,16 +393,13 @@ describe('copilot MCP jobs', () => {
             testFile: 'tests/unit/copilot/infra/test_bulk_executor.spec.js',
         });
 
-        assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent?.['success'], true);
-        assert.equal(result.structuredContent?.['completedWithinWait'], true);
-        const job = /** @type {Record<string, unknown>} */ (result.structuredContent?.['job']);
-        assert.equal(job['status'], 'completed');
-        assert.equal(job['passed'], true);
-        assert.match(String(result.structuredContent?.['nextAction'] ?? ''), /No job_get_summary/u);
-    }, 45_000);
+        assert.equal(result.isError, true);
+        assert.equal(result.structuredContent?.['code'], 'ERR_VALIDATOR_NESTED_RUNNER_BLOCKED');
+        const details = /** @type {Record<string, unknown>} */ (result.structuredContent?.['details']);
+        assert.match(String(details['error'] ?? ''), /test runners/i);
+    });
 
-    it('run_copilot_validator batches focused gates and isolates one invalid item', async () => {
+    it('run_copilot_validator batches remain serialized and isolate invalid-path from nested-runner failures', async () => {
         const tool = jobTools.find((candidate) => candidate.name === 'run_copilot_validator');
         assert.ok(tool);
         const result = await tool.handler({
@@ -370,23 +419,22 @@ describe('copilot MCP jobs', () => {
         assert.equal(result.structuredContent?.['success'], false);
         assert.equal(result.structuredContent?.['batch'], true);
         assert.equal(result.structuredContent?.['requestCount'], 2);
-        assert.equal(result.structuredContent?.['succeededCount'], 1);
-        assert.equal(result.structuredContent?.['failedCount'], 1);
+        assert.equal(result.structuredContent?.['succeededCount'], 0);
+        assert.equal(result.structuredContent?.['failedCount'], 2);
         assert.equal(result.structuredContent?.['skippedCount'], 0);
         assert.equal(result.structuredContent?.['concurrency'], 1);
         assert.deepEqual(getResultExecutionHint(result), {
             logicalOperations: 2,
-            failedOperations: 1,
+            failedOperations: 2,
             skippedOperations: 0,
             mode: 'validator-batch:best-effort:c1',
         });
         const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
         assert.equal(rows[0]?.['success'], false);
         assert.equal(rows[0]?.['code'], 'ERR_INVALID_FOCUSED_TEST_FILE');
-        assert.equal(rows[1]?.['success'], true);
-        const validJob = /** @type {Record<string, unknown>} */ (rows[1]?.['job']);
-        assert.equal(validJob['passed'], true);
-    }, 45_000);
+        assert.equal(rows[1]?.['success'], false);
+        assert.equal(rows[1]?.['code'], 'ERR_VALIDATOR_NESTED_RUNNER_BLOCKED');
+    });
 
     it('job_list returns a structured job array', async () => {
         const tool = jobTools.find((candidate) => candidate.name === 'job_list');

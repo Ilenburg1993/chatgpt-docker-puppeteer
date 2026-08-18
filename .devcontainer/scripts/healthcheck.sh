@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # healthcheck.sh — Canonical DevContainer Health Classifier
-# Version: v3.0.0
+# Version: v3.0.1
 #
 # Purpose:
 #   Fast, conservative health classifier for this DevContainer. Designed for
@@ -41,7 +41,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 
 SCRIPT_NAME="healthcheck.sh"
 readonly SCRIPT_NAME
-SCRIPT_VERSION="3.0.0"
+SCRIPT_VERSION="3.0.1"
 readonly SCRIPT_VERSION
 
 EXIT_HEALTHY=0
@@ -822,7 +822,7 @@ inspect_observational_component() {
 inspect_network_semantics() {
     local dns_enabled dns_runtime dns_resolver dns_points dns_prev_stale dns_status manager_overall proxy_action advisor_configured route_verify route_status
 
-    dns_enabled="$(cfg_bool "${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-false}" false)"
+    dns_enabled="$(cfg_bool "${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-true}" true)"
     if [[ -r "${LOCAL_DNS_SUMMARY_FILE}" ]]; then
         dns_status="$(status_from_files "${LOCAL_DNS_STATUS_FILE}" "${LOCAL_DNS_SUMMARY_FILE}" status)"
         dns_runtime="$(kv_or "${LOCAL_DNS_SUMMARY_FILE}" runtime_effective unknown)"

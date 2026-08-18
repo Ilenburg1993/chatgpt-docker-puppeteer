@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # PHASE 0 — GUARDA DE EXECUÇÃO (FAIL-SAFE ABSOLUTO)
-# CANONICAL v5.9.0
+# CANONICAL v5.9.1
 #
 # Contrato:
 # - post-attach NUNCA pode falhar
@@ -81,7 +81,7 @@ trap - ERR EXIT INT TERM 2> /dev/null || true
 
 # Versão canônica do hook (fonte única da verdade)
 readonly SCRIPT_NAME="post-attach"
-readonly SCRIPT_VERSION="5.9.0"
+readonly SCRIPT_VERSION="5.9.1"
 
 # ---------------------------------------------------------------------------
 # CLI options parser
@@ -104,7 +104,7 @@ post-attach.sh [--brief] [--help] [--version]
 --help     display this help text and exit
 --version  print script version and exit
 
-This hook is passive/read-only. It displays the latest post-start/network
+This hook is network-read-only. It may refresh local UX artifacts/markers, but it never mutates network state. It displays the latest post-start/network
 snapshots, the optional network-control-plane aggregate and cached
 benchmark/recommendation artifacts without starting services, route-fix, proxy
 compare jobs, route advisor jobs, DNS probes or long-running benchmarks. It
@@ -1341,7 +1341,7 @@ print_endpoint_registry_snapshot "${ENDPOINT_REGISTRY_FILE}"
 print_network_control_plane_snapshot "${NETWORK_CONTROL_PLANE_STATUS_FILE}" "${NETWORK_CONTROL_PLANE_SUMMARY_FILE}" "${NETWORK_CONTROL_PLANE_STATE_JSON_FILE}" "${NETWORK_CONTROL_PLANE_EVENTS_FILE}"
 
 # DNS cache local
-DNS_CACHE_ENABLED="${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-false}"
+DNS_CACHE_ENABLED="$(cfg_bool "${DEVCONTAINER_ENABLE_LOCAL_DNS_CACHE:-true}" true)"
 DNS_STATUS="$(status_snapshot_or "${LOCAL_DNS_STATUS_FILE}" "${LOCAL_DNS_SUMMARY_FILE}" status unknown)"
 
 if [[ -r "${LOCAL_DNS_SUMMARY_FILE}" ]]; then

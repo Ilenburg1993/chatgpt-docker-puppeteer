@@ -235,7 +235,7 @@ export function buildDevcontainerNetworkFindings(dns, control, controlRuntime = 
 function buildNextActions(findings) {
     if (findings.critical.length > 0) return ['Run npm run network:dns:doctor before Cloudflare transport/origin tuning.'];
     if (findings.warnings.length > 0) return ['Resolve DevContainer network observability warnings before changing tunnel protocol or origin parameters.'];
-    return ['Collect Cloudflare tunnel latency p50/p95/p99 baseline, then run controlled QUIC versus HTTP/2 versus auto transport benchmark only if spontaneous drops remain.'];
+    return ['Current authoritative DevContainer network posture is healthy/advisory-only. Do not retune DNS or Cloudflare transport solely for inter-tool latency; use mcp_latency_attribution and controlled pulse evidence first.'];
 }
 
 /** @returns {Promise<Record<string, unknown>>} */

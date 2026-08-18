@@ -14,13 +14,12 @@
 // valid JSON after comment stripping. Do not put secrets here.
 // =============================================================================
 {
-  "$schema": "https://example.invalid/devcontainer/network/summary-contracts.schema.json",
   "schemaVersion": "1.0.0",
   "name": "devcontainer-network-summary-contracts",
   "canonicalPath": ".devcontainer/scripts/network/contracts/summary-contracts.jsonc",
   "generatedAt": "2026-08-18",
-  "status": "canonical-draft",
-  "scope": "Contracts for key=value status/summary/action artifacts emitted by the DevContainer GitHub/Copilot network control plane.",
+  "status": "canonical",
+  "scope": "Versioned contracts for key=value status/summary/action artifacts emitted by the DevContainer Network Control Plane and its provider/transport-specific components.",
   "designPrinciples": [
     "Contracts are read/write agreements, not runtime probes.",
     "post-create emits structural baseline only; post-start emits runtime orchestration; post-attach emits passive UX; network-control-plane emits consolidated truth.",
@@ -211,7 +210,7 @@
       "path": "/tmp/devcontainer-post-create.status",
       "format": "keyValueStatus",
       "producer": ".devcontainer/scripts/post-create.sh",
-      "producerVersion": "v1.2.4",
+      "producerVersion": "v1.2.5",
       "role": "structural-gate-status",
       "statusKey": "status",
       "requiredKeys": ["status", "script_version", "script_audit_status", "endpoint_registry_status", "created_at"],
@@ -229,7 +228,7 @@
       "path": "/tmp/devcontainer-post-create.summary",
       "format": "keyValueSummary",
       "producer": ".devcontainer/scripts/post-create.sh",
-      "producerVersion": "v1.2.4",
+      "producerVersion": "v1.2.5",
       "role": "structural-baseline",
       "statusKey": "status",
       "expectedSummaryKind": "post-create-structural",
@@ -325,7 +324,7 @@
       "path": "/tmp/devcontainer-post-attach.summary",
       "format": "keyValueSummary",
       "producer": ".devcontainer/scripts/post-attach.sh",
-      "producerVersion": "v5.9.0",
+      "producerVersion": "v5.9.1",
       "role": "interactive-ux-passive-snapshot",
       "statusKey": "status",
       "requiredKeys": ["status", "script_version", "completed_at"],
@@ -350,7 +349,7 @@
       "path": "/tmp/devcontainer-health.status",
       "format": "singleTokenStatus",
       "producer": ".devcontainer/scripts/healthcheck.sh",
-      "producerVersion": "v3.0.0",
+      "producerVersion": "v3.0.1",
       "role": "health-classifier-status",
       "statusKey": "status",
       "requiredKeys": ["<single-token-status-line>"],
@@ -365,7 +364,7 @@
       "path": "/tmp/devcontainer-health.summary",
       "format": "keyValueSummary",
       "producer": ".devcontainer/scripts/healthcheck.sh",
-      "producerVersion": "v3.0.0",
+      "producerVersion": "v3.0.1",
       "role": "health-classifier-summary",
       "statusKey": "status",
       "requiredKeys": ["status", "docker_status", "script_version", "endpoint_registry_status", "completed_at"],
@@ -800,7 +799,19 @@
   ],
   "validatorProfile": {
     "name": "summary-contracts-v1",
-    "recommendedCommand": "node scripts/tools/network-summary-contracts.mjs validate .devcontainer/scripts/network/contracts/summary-contracts.jsonc",
+    "implementationStatus": "active",
+    "owner": "src/copilot/mcp/scripts/network-summary-contracts.js",
+    "recommendedCommand": "node src/copilot/mcp/scripts/network-summary-contracts.js validate .devcontainer/scripts/network/contracts/summary-contracts.jsonc",
+    "explainerCommand": "node src/copilot/mcp/scripts/network-summary-contracts.js explain .devcontainer/scripts/network/contracts/summary-contracts.jsonc",
+    "requiredChecks": [
+      "JSONC comments and trailing commas parse without collapsing duplicate object keys",
+      "object keys, artifact paths, requiredKeys, acceptedStatusValues and invariants are unique in their declared scope",
+      "artifact paths are absolute and unique",
+      "referenced file formats exist in common.fileFormats",
+      "workspace producer files exist and producerVersion uses vX.Y.Z",
+      "validator commands point to the active canonical Node 24 implementation",
+      "no secret-bearing requiredKeys are declared"
+    ],
     "fallbackShellChecks": [
       "grep -R $'\\r' /tmp/devcontainer-*.summary /tmp/devcontainer-*.status 2>/dev/null must be empty",
       "awk -F= 'NF<2 && $0 !~ /^$/ { bad++ } END { exit bad?1:0 }' /tmp/devcontainer-*.summary",
@@ -826,8 +837,8 @@
     "from": "implicit per-script summaries",
     "to": "explicit summary-contracts.jsonc v1.0.0",
     "nextSteps": [
-      "Add package scripts network:contracts:validate and network:contracts:explain.",
-      "Add Makefile targets network-contracts-validate and network-contracts-explain.",
+      "Keep package scripts network:contracts:validate and network:contracts:explain aligned with validatorProfile.",
+      "Keep Makefile targets network-contracts-validate and network-contracts-explain aligned with the package scripts.",
       "Teach network-control-plane-state.sh to optionally read this contract in doctor mode without requiring Node.",
       "Teach post-create.sh to audit presence of this contract but not require runtime artifacts during post-create.",
       "Later generate TypeScript validators from this JSONC contract."

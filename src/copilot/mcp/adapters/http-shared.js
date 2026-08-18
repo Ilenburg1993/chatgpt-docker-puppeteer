@@ -19,7 +19,7 @@
 
 import { startIoExternalWatch } from '#copilot/infra/public/io';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 import { resolve } from 'node:path';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
@@ -32,7 +32,14 @@ import {
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
-import { readMcpMetricsSnapshot, recordMcpHttpTransportMode } from '../control-plane/metrics.js';
+import {
+    activateMcpHttpRequestActivity,
+    activateMcpHttpToolRequestTiming,
+    readMcpMetricsSnapshot,
+    recordMcpHttpRequestRpcMethod,
+    recordMcpHttpTransportMode,
+    runWithMcpHttpToolTimingContext,
+} from '../control-plane/metrics.js';
 import {
     readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
     readMcpHttpStatefulSessionPolicy,
@@ -41,6 +48,7 @@ import {
     readMcpStartupMaintenanceState,
     scheduleMcpStartupMaintenance,
 } from '../control-plane/startup-maintenance.js';
+import { scheduleOpenAiEndpointLatencyMonitor } from '../control-plane/openai-endpoint-monitor.js';
 import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
 import { createCopilotMcpServer } from '../server.js';
 import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-body.js';
@@ -343,12 +351,30 @@ export function configureHttp2ServerTiming(http2Server, env = process.env) {
  */
 export function createMcpHttpRequestHandler(options) {
     return async (req, res) => {
+        const requestReceivedAt = Date.now();
+        const requestTimingId = randomUUID();
+        const edgeColo = readCloudflareRayColo(readHeader(req, 'cf-ray'));
+        return runWithMcpHttpToolTimingContext(
+            { requestId: requestTimingId, receivedAt: requestReceivedAt, edgeColo },
+            async () => {
         try {
             setDefaultSecurityHeaders(req, res, options);
             const protocolSample = options.protocolState.lastRequest;
             if (protocolSample) setMcpHttpProtocolResponseHeaders(res, protocolSample);
 
             const url = buildRequestUrl(req, options);
+            const finishRequestActivity = activateMcpHttpRequestActivity({
+                httpMethod: req.method ?? 'UNKNOWN',
+                routeClass: classifyMcpHttpRoute(url.pathname, req.method),
+            });
+            if (finishRequestActivity) {
+                const finishActivity = () => {
+                    const response = /** @type {import('node:http').ServerResponse} */ (/** @type {unknown} */ (res));
+                    finishRequestActivity(response.statusCode);
+                };
+                res.once('finish', finishActivity);
+                res.once('close', finishActivity);
+            }
             const corsPolicy = readCorsRoutePolicy(url.pathname);
             const requestOrigin = readHeader(req, 'origin');
 
@@ -466,6 +492,16 @@ export function createMcpHttpRequestHandler(options) {
                             return;
                         }
                         parsedMcpBody = bodyResult.body;
+                        recordMcpHttpRequestRpcMethod(readMcpJsonRpcMethodLabel(parsedMcpBody));
+                        const toolCallName = readMcpToolCallName(parsedMcpBody);
+                        if (toolCallName !== undefined) {
+                            const finishToolRequestTiming = activateMcpHttpToolRequestTiming(toolCallName);
+                            if (finishToolRequestTiming) {
+                                const finishTimingOnce = () => finishToolRequestTiming();
+                                res.once('finish', finishTimingOnce);
+                                res.once('close', finishTimingOnce);
+                            }
+                        }
                         const postSessionContract = classifyMcpPostSessionRequirement({
                             method: req.method,
                             sessionId: readHeader(req, 'mcp-session-id') ?? null,
@@ -533,6 +569,8 @@ export function createMcpHttpRequestHandler(options) {
                 safeEnd(res);
             }
         }
+            },
+        );
     };
 }
 
@@ -544,6 +582,7 @@ export function notifyMcpHttpStarted() {
     startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
     scheduleMcpAuthJwksWarmup();
     scheduleMcpStartupMaintenance();
+    scheduleOpenAiEndpointLatencyMonitor();
 }
 
 /**
@@ -1281,6 +1320,78 @@ export function readHeader(req, name) {
     const value = req.headers[name.toLowerCase()];
     if (Array.isArray(value)) return value.length === 1 ? value[0] : undefined;
     return typeof value === 'string' ? value : undefined;
+}
+
+/**
+ * Extract only the non-sensitive Cloudflare colo suffix from CF-Ray.
+ * The full Ray ID is deliberately discarded and never enters MCP metrics.
+ *
+ * @param {string | undefined} value
+ * @returns {string | null}
+ */
+function readCloudflareRayColo(value) {
+    if (!value) return null;
+    const suffix = value.trim().split('-').at(-1)?.trim().toUpperCase() ?? '';
+    return /^[A-Z0-9]{3,8}$/u.test(suffix) ? suffix : null;
+}
+
+/** @param {string} pathname @param {string | undefined} method */
+function classifyMcpHttpRoute(pathname, method) {
+    if (pathname === '/' || pathname === '/health') return 'health';
+    if (pathname === '/chatgpt-connector.json') return 'connector-profile';
+    if (pathname.startsWith('/.well-known/')) return 'oauth-metadata';
+    if (pathname === '/oauth/token') return 'oauth-token';
+    if (pathname === '/oauth/authorize') return 'oauth-authorize';
+    if (pathname === '/oauth/jwks.json') return 'oauth-jwks';
+    if (pathname === '/oauth/status') return 'oauth-status';
+    if (pathname.startsWith('/oauth/')) return 'oauth-other';
+    if (pathname === MCP_PATH) return String(method ?? '').toUpperCase() === 'GET' ? 'mcp-stream' : 'mcp';
+    return 'other';
+}
+
+/**
+ * Return a sanitized JSON-RPC method label without retaining params or arbitrary
+ * payload data. Mixed batches are represented only as `batch:mixed`.
+ * @param {unknown} body
+ * @returns {string | null}
+ */
+function readMcpJsonRpcMethodLabel(body) {
+    const messages = Array.isArray(body) ? body : [body];
+    const methods = new Set();
+    for (const message of messages) {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) continue;
+        const method = String(/** @type {Record<string, unknown>} */ (message)['method'] ?? '').trim();
+        if (/^[A-Za-z0-9_.:/-]{1,80}$/u.test(method)) methods.add(method);
+        else if (method) methods.add('other');
+    }
+    if (methods.size === 0) return null;
+    if (methods.size === 1) return methods.values().next().value ?? null;
+    return 'batch:mixed';
+}
+
+/**
+ * Return the tool name for a JSON-RPC tools/call body. `undefined` means the
+ * request is not a tools/call; `null` means it is a tools/call whose name is not
+ * structurally available yet. Batch tool calls are labeled conservatively.
+ *
+ * @param {unknown} body
+ * @returns {string | null | undefined}
+ */
+function readMcpToolCallName(body) {
+    const messages = Array.isArray(body) ? body : [body];
+    /** @type {Record<string, unknown>[]} */
+    const toolCalls = [];
+    for (const message of messages) {
+        if (!message || typeof message !== 'object' || Array.isArray(message)) continue;
+        const record = /** @type {Record<string, unknown>} */ (message);
+        if (record['method'] === 'tools/call') toolCalls.push(record);
+    }
+    if (toolCalls.length === 0) return undefined;
+    if (toolCalls.length > 1) return 'batch-tools-call';
+    const params = toolCalls[0]?.['params'];
+    if (!params || typeof params !== 'object' || Array.isArray(params)) return null;
+    const name = /** @type {Record<string, unknown>} */ (params)['name'];
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
 }
 
 /**

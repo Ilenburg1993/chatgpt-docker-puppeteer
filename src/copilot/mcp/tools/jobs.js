@@ -16,6 +16,7 @@ import {
     listJobs,
     okResult,
     readJobOutput,
+    readCopilotValidatorCapacityState,
     readOnlyAnnotations,
     spawnValidatorJob,
     waitForJobCompletion,
@@ -48,10 +49,53 @@ const validatorRequestSchema = z.object({
     failureTailBytes: validatorFailureTailBytesSchema.optional(),
 });
 const MAX_VALIDATOR_BATCH_REQUESTS = 8;
-const MAX_VALIDATOR_BATCH_CONCURRENCY = 2;
+const MAX_VALIDATOR_BATCH_CONCURRENCY = 1;
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
-const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused', 'devcontainer-shell']);
+const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused', 'devcontainer-shell', 'network-contracts']);
+
+/** @param {unknown} value */
+function compactValidatorResourceSnapshot(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const snapshot = /** @type {Record<string, unknown>} */ (value);
+    const cgroup =
+        snapshot['cgroup'] && typeof snapshot['cgroup'] === 'object' && !Array.isArray(snapshot['cgroup'])
+            ? /** @type {Record<string, unknown>} */ (snapshot['cgroup'])
+            : null;
+    const events =
+        cgroup?.['events'] && typeof cgroup['events'] === 'object' && !Array.isArray(cgroup['events'])
+            ? /** @type {Record<string, unknown>} */ (cgroup['events'])
+            : null;
+    const loads = Array.isArray(snapshot['loadAverage']) ? snapshot['loadAverage'] : [];
+    return {
+        observedAt: snapshot['observedAt'] ?? null,
+        mcpProcessRssBytes: snapshot['mcpProcessRssBytes'] ?? null,
+        systemFreeRatio: snapshot['systemFreeRatio'] ?? null,
+        load1m: loads[0] ?? null,
+        load5m: loads[1] ?? null,
+        availableParallelism: snapshot['availableParallelism'] ?? null,
+        cgroupMemoryCurrentBytes: cgroup?.['memoryCurrentBytes'] ?? null,
+        cgroupMemoryMaxBytes: cgroup?.['memoryMaxBytes'] ?? null,
+        cgroupMemoryUsageRatio: cgroup?.['memoryUsageRatio'] ?? null,
+        cgroupOom: events?.['oom'] ?? null,
+        cgroupOomKill: events?.['oom_kill'] ?? null,
+    };
+}
+
+/** @param {ReturnType<typeof compactValidatorResourceSnapshot>} before @param {ReturnType<typeof compactValidatorResourceSnapshot>} after */
+function summarizeValidatorResourceDelta(before, after) {
+    if (!before || !after) return null;
+    const numberDelta = (/** @type {unknown} */ left, /** @type {unknown} */ right) =>
+        typeof left === 'number' && typeof right === 'number' ? Math.round((right - left) * 1_000_000) / 1_000_000 : null;
+    return {
+        mcpProcessRssBytes: numberDelta(before.mcpProcessRssBytes, after.mcpProcessRssBytes),
+        systemFreeRatio: numberDelta(before.systemFreeRatio, after.systemFreeRatio),
+        cgroupMemoryCurrentBytes: numberDelta(before.cgroupMemoryCurrentBytes, after.cgroupMemoryCurrentBytes),
+        cgroupMemoryUsageRatio: numberDelta(before.cgroupMemoryUsageRatio, after.cgroupMemoryUsageRatio),
+        cgroupOom: numberDelta(before.cgroupOom, after.cgroupOom),
+        cgroupOomKill: numberDelta(before.cgroupOomKill, after.cgroupOomKill),
+    };
+}
 
 /**
  * @param {import('../control-plane/jobs.js').PublicJobRecord} job
@@ -61,6 +105,8 @@ function summarizeJob(job) {
     const durationMs = job.endedAt === null ? Date.now() - job.startedAt : job.endedAt - job.startedAt;
     const runtimeAttached = 'runtimeAttached' in job ? job.runtimeAttached : null;
     const orphaned = job.status === 'running' && runtimeAttached === false;
+    const resourceBefore = compactValidatorResourceSnapshot(job.resourceBefore);
+    const resourceAfter = compactValidatorResourceSnapshot(job.resourceAfter);
     return {
         id: job.id,
         validator: job.validator,
@@ -69,6 +115,15 @@ function summarizeJob(job) {
         running: job.status === 'running' && !orphaned,
         orphaned,
         runtimeAttached,
+        runtimeSameEpoch: job.runtimeSameEpoch ?? null,
+        ownerRuntimeEpoch: job.ownerRuntimeEpoch ?? null,
+        ownerPid: job.ownerPid ?? null,
+        childPid: job.childPid ?? null,
+        resource: {
+            before: resourceBefore,
+            after: resourceAfter,
+            delta: summarizeValidatorResourceDelta(resourceBefore, resourceAfter),
+        },
         startedAt: new Date(job.startedAt).toISOString(),
         endedAt: job.endedAt === null ? null : new Date(job.endedAt).toISOString(),
         durationMs: Math.max(0, durationMs),
@@ -102,6 +157,7 @@ const EFFECTIVE_CHECKS_BY_VALIDATOR = {
     'unit-copilot': ['unit-copilot'],
     'unit-focused': ['unit-focused'],
     'devcontainer-shell': ['devcontainer-shell'],
+    'network-contracts': ['network-contracts'],
     'suite-mcp-fast': ['typecheck', 'unit-mcp'],
     'suite-mcp-full': ['typecheck', 'lint', 'unit-mcp'],
     'suite-copilot-fast': ['typecheck', 'lint', 'unit-copilot'],
@@ -242,9 +298,20 @@ async function executeValidatorRequest(request) {
                 : `Validator ${validator} is still running after ${effectiveWaitMs}ms; job ${job.id}.`,
         );
     } catch (error) {
+        const explicitCode =
+            error &&
+            typeof error === 'object' &&
+            'code' in error &&
+            typeof error.code === 'string' &&
+            error.code.startsWith('ERR_VALIDATOR_')
+                ? error.code
+                : null;
         return errorResult('Validator job was rejected.', {
-            code: focused ? 'ERR_INVALID_FOCUSED_TEST_FILE' : 'ERR_VALIDATOR_JOB_REJECTED',
+            code: explicitCode ?? (focused ? 'ERR_INVALID_FOCUSED_TEST_FILE' : 'ERR_VALIDATOR_JOB_REJECTED'),
             error: error instanceof Error ? error.message : String(error),
+            ...(error && typeof error === 'object' && 'activeJobId' in error
+                ? { activeJobId: error.activeJobId ?? null }
+                : {}),
         });
     }
 }
@@ -406,7 +473,7 @@ export const jobTools = [
                 .min(1)
                 .max(MAX_VALIDATOR_BATCH_CONCURRENCY)
                 .optional()
-                .describe('Validators in flight. Default: 1 to avoid CPU thrashing; maximum: 2.'),
+                .describe('Validators in flight. Serialized at 1 to avoid CPU/memory thrashing inside WSL/DevContainer.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -639,6 +706,7 @@ export const jobTools = [
             const effectiveChecks = buildEffectiveValidationChecks(jobs);
             const base = {
                 success: true,
+                validatorCapacity: readCopilotValidatorCapacityState(),
                 runningCount: running.length,
                 orphanedCount: orphaned.length,
                 latestCount: latest.length,

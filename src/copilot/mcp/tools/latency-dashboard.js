@@ -13,6 +13,7 @@ import {
     readMcpMetricsSnapshot,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 import { z } from 'zod';
 
 const DEFAULT_MIN_SAMPLE_CALLS = 5;
@@ -21,6 +22,9 @@ const DEFAULT_AUTHORIZATION_AVERAGE_WARN_MS = 250;
 const DEFAULT_HANDLER_AVERAGE_WARN_MS = 750;
 const DEFAULT_RESULT_SIZE_AVERAGE_WARN_MS = 250;
 const DEFAULT_ERROR_RATE_WARN = 0.001;
+const DEFAULT_SILENT_EXTERNAL_GAP_P50_WARN_MS = 3_000;
+const DEFAULT_SILENT_EXTERNAL_GAP_P95_WARN_MS = 8_000;
+const MIN_EXTERNAL_GAP_SAMPLES_FOR_SLO = 3;
 const MAX_ROWS = 12;
 
 /**
@@ -31,6 +35,8 @@ const MAX_ROWS = 12;
  *     handlerAverageWarnMs: number;
  *     resultSizeAverageWarnMs: number;
  *     errorRateWarn: number;
+ *     silentExternalGapP50WarnMs: number;
+ *     silentExternalGapP95WarnMs: number;
  * }} LatencyDashboardBudgets
  */
 
@@ -50,6 +56,20 @@ export const mcpLatencyDashboardTool = {
             .max(10_000)
             .optional()
             .describe('Minimum total calls before strict SLO status is meaningful.'),
+        silentExternalGapP50WarnMs: z
+            .number()
+            .int()
+            .min(100)
+            .max(120000)
+            .optional()
+            .describe('Interaction SLO warning threshold for p50 origin-silent gap. Defaults to 3000ms.'),
+        silentExternalGapP95WarnMs: z
+            .number()
+            .int()
+            .min(100)
+            .max(120000)
+            .optional()
+            .describe('Interaction SLO warning threshold for p95 origin-silent gap. Defaults to 8000ms.'),
         includeTools: z
             .boolean()
             .optional()
@@ -94,6 +114,7 @@ export const mcpLatencyDashboardTool = {
         const includeTools = options['includeTools'] === true;
         const rankingRows = includeTools ? maxRows : 1;
         const metrics = readMcpMetricsSnapshot();
+        const sessionRuntime = readMcpHttpSessionRuntimeState();
         const toolRows = includeTools ? buildToolRows(metrics.tools, maxRows) : [];
         const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, rankingRows);
         const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, rankingRows);
@@ -108,6 +129,8 @@ export const mcpLatencyDashboardTool = {
         const dashboard = {
             timestamp: new Date().toISOString(),
             status: assessment.status,
+            originStatus: assessment.originStatus,
+            interactionStatus: assessment.interactionStatus,
             sample: {
                 calls: metrics.totals.calls,
                 errors: metrics.totals.errors,
@@ -141,6 +164,7 @@ export const mcpLatencyDashboardTool = {
             critical: assessment.critical,
             warnings: assessment.warnings,
             passed: assessment.passed,
+            sessionRuntime,
             ...(includeTools
                 ? {
                       slowestTools: toolRows,
@@ -152,9 +176,44 @@ export const mcpLatencyDashboardTool = {
                   }
                 : {}),
             phaseTotals,
+            originHttpBoundary: {
+                authority: 'observed-at-http-origin-request-response-boundary',
+                activeRequests: metrics.interaction.originBoundary.activeRequests,
+                requestCount: metrics.interaction.originBoundary.requestCount,
+                burstCount: metrics.interaction.originBoundary.burstCount,
+                overlapCount: metrics.interaction.originBoundary.overlapCount,
+                externalGaps: metrics.interaction.originBoundary.externalGaps,
+                preHandler: metrics.interaction.originBoundary.preHandler,
+                postHandler: metrics.interaction.originBoundary.postHandler,
+                lastCompletedEdgeColo: metrics.interaction.originBoundary.lastCompletedEdgeColo,
+                edgeColoCounts: metrics.interaction.originBoundary.edgeColoCounts,
+                externalGapsByEdgeColo: metrics.interaction.originBoundary.externalGapsByEdgeColo,
+                requestActivity: metrics.interaction.originBoundary.requestActivity,
+                discreteAuxiliaryTiming: metrics.interaction.originBoundary.discreteAuxiliaryTiming,
+                lastTransition: metrics.interaction.originBoundary.lastTransition,
+                maxTransition: metrics.interaction.originBoundary.maxTransition,
+                note:
+                    'externalGaps measures prior tools/call response finish → next tools/call request arrival; preHandler and postHandler isolate the work inside the origin around the guarded handler.',
+            },
+            interToolGap: {
+                authority: 'observed-at-origin-boundary-external-segment-proxy',
+                burstCount: metrics.interaction.burstCount,
+                activeCalls: metrics.interaction.activeCalls,
+                ...metrics.interaction.gaps,
+                lastTransition: metrics.interaction.lastTransition,
+                maxTransition: metrics.interaction.maxTransition,
+                note:
+                    'Quiescent gap between completed and next-started tool bursts. Excludes active MCP handler time; includes response return, client/model/orchestrator work, dispatch/transit, and potentially normal reasoning.',
+            },
             byteAccounting,
             roundTripAccounting: {
                 ...roundTripAccounting,
+                silentExternalGapP50Ms: metrics.interaction.originBoundary.silentExternalGaps.p50Ms,
+                estimatedAmortizedSilentMsAtP50:
+                    (metrics.interaction.originBoundary.silentExternalGaps.p50Ms ?? 0) *
+                    roundTripAccounting.compressedRoundTrips,
+                estimateCaveat:
+                    'Counterfactual estimate only: compressed logical operations are not guaranteed to have required one model→tool round trip each. Use it to rank batching opportunities, not as measured time saved.',
                 ...(includeTools ? { topCompressedTools } : {}),
             },
             nextActions: buildNextActions(assessment, metrics.totals.calls, budgets),
@@ -234,6 +293,24 @@ function readLatencyDashboardBudgets(options) {
             DEFAULT_RESULT_SIZE_AVERAGE_WARN_MS,
         ),
         errorRateWarn: readPositiveEnvNumber('COPILOT_MCP_LATENCY_ERROR_RATE_WARN', DEFAULT_ERROR_RATE_WARN),
+        silentExternalGapP50WarnMs: readBoundedInteger(
+            options['silentExternalGapP50WarnMs'],
+            readPositiveEnvInteger(
+                'COPILOT_MCP_LATENCY_SILENT_EXTERNAL_GAP_P50_WARN_MS',
+                DEFAULT_SILENT_EXTERNAL_GAP_P50_WARN_MS,
+            ),
+            100,
+            120_000,
+        ),
+        silentExternalGapP95WarnMs: readBoundedInteger(
+            options['silentExternalGapP95WarnMs'],
+            readPositiveEnvInteger(
+                'COPILOT_MCP_LATENCY_SILENT_EXTERNAL_GAP_P95_WARN_MS',
+                DEFAULT_SILENT_EXTERNAL_GAP_P95_WARN_MS,
+            ),
+            100,
+            120_000,
+        ),
     };
 }
 
@@ -554,7 +631,7 @@ function buildRoundTripAccounting(tools, maxRows) {
  * @param {ReturnType<typeof readMcpMetricsSnapshot>} metrics
  * @param {Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>} phaseTotals
  * @param {LatencyDashboardBudgets} budgets
- * @returns {{ status: 'ok' | 'degraded' | 'insufficient-data'; summary: Record<string, unknown>; critical: string[]; warnings: string[]; passed: string[] }}
+ * @returns {{ status: 'ok' | 'degraded' | 'insufficient-data'; originStatus: 'ok' | 'degraded' | 'insufficient-data'; interactionStatus: 'ok' | 'degraded' | 'insufficient-data'; summary: Record<string, unknown>; critical: string[]; warnings: string[]; passed: string[] }}
  */
 function assessLatencySnapshot(metrics, phaseTotals, budgets) {
     /** @type {string[]} */
@@ -582,6 +659,46 @@ function assessLatencySnapshot(metrics, phaseTotals, budgets) {
     assessPhaseBudget(phaseTotals, 'handler', budgets.handlerAverageWarnMs, warnings, passed);
     assessPhaseBudget(phaseTotals, 'resultSize', budgets.resultSizeAverageWarnMs, warnings, passed);
 
+    const originWarningsBeforeInteraction = warnings.length;
+    const silentGaps = metrics.interaction.originBoundary.silentExternalGaps;
+    const externalGapSampleCount = silentGaps.count;
+    if (externalGapSampleCount >= MIN_EXTERNAL_GAP_SAMPLES_FOR_SLO) {
+        if ((silentGaps.p50Ms ?? 0) > budgets.silentExternalGapP50WarnMs) {
+            warnings.push(
+                `Silent external gap p50 above interaction budget: ${silentGaps.p50Ms}ms > ${budgets.silentExternalGapP50WarnMs}ms.`,
+            );
+        } else {
+            passed.push(
+                `Silent external gap p50 within interaction budget: ${silentGaps.p50Ms}ms <= ${budgets.silentExternalGapP50WarnMs}ms.`,
+            );
+        }
+        if ((silentGaps.p95Ms ?? 0) > budgets.silentExternalGapP95WarnMs) {
+            warnings.push(
+                `Silent external gap p95 above interaction budget: ${silentGaps.p95Ms}ms > ${budgets.silentExternalGapP95WarnMs}ms.`,
+            );
+        } else {
+            passed.push(
+                `Silent external gap p95 within interaction budget: ${silentGaps.p95Ms}ms <= ${budgets.silentExternalGapP95WarnMs}ms.`,
+            );
+        }
+    } else {
+        passed.push(
+            `Interaction SLO awaiting ${MIN_EXTERNAL_GAP_SAMPLES_FOR_SLO} external-gap samples; currently ${externalGapSampleCount}.`,
+        );
+    }
+
+    const originStatus =
+        calls < budgets.minSampleCalls
+            ? 'insufficient-data'
+            : originWarningsBeforeInteraction > 0 || critical.length > 0
+              ? 'degraded'
+              : 'ok';
+    const interactionStatus =
+        externalGapSampleCount < MIN_EXTERNAL_GAP_SAMPLES_FOR_SLO
+            ? 'insufficient-data'
+            : warnings.length > originWarningsBeforeInteraction
+              ? 'degraded'
+              : 'ok';
     return {
         status:
             calls < budgets.minSampleCalls
@@ -589,12 +706,17 @@ function assessLatencySnapshot(metrics, phaseTotals, budgets) {
                 : warnings.length > 0 || critical.length > 0
                   ? 'degraded'
                   : 'ok',
+        originStatus,
+        interactionStatus,
         summary: {
             totalCalls: calls,
             totalErrors: metrics.totals.errors,
             errorRate: roundRatio(errorRate),
             observedTools: metrics.totals.tools,
             slowestAverageToolMs: slowTool,
+            silentExternalGapP50Ms: silentGaps.p50Ms,
+            silentExternalGapP95Ms: silentGaps.p95Ms,
+            auxiliaryCoverageRatio: metrics.interaction.originBoundary.auxiliaryCoverage.overallCoverageRatio,
         },
         critical,
         warnings,
@@ -618,7 +740,7 @@ function assessPhaseBudget(phaseTotals, phase, budgetMs, warnings, passed) {
 }
 
 /**
- * @param {{ status: string; critical: string[]; warnings: string[] }} assessment
+ * @param {{ status: string; originStatus: string; interactionStatus: string; critical: string[]; warnings: string[] }} assessment
  * @param {number} calls
  * @param {LatencyDashboardBudgets} budgets
  * @returns {string[]}
@@ -630,6 +752,13 @@ function buildNextActions(assessment, calls, budgets) {
         return [
             'Run the golden prompts and common read-only tools until the latency sample is meaningful.',
             'Then compare mcp_latency_dashboard with mcp_cloudflare_metrics_snapshot and mcp_tunnel_status.',
+        ];
+    }
+    if (assessment.interactionStatus === 'degraded' && assessment.originStatus === 'ok') {
+        return [
+            'Run mcp_latency_attribution or a controlled mcp_latency_pulse series: the origin is locally healthy while end-to-end interaction gaps exceed budget.',
+            'Prefer bounded batch/composite operations that safely amortize model→tool round trips; shaving milliseconds from already-fast handlers cannot recover multi-second silent gaps.',
+            'Do not restart or retune Cloudflare solely from this signal; require tunnel/self-loop/edge evidence before changing transport.',
         ];
     }
     if (assessment.warnings.length > 0) {

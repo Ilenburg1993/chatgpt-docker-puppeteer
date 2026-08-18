@@ -8,18 +8,19 @@
  * @module copilot/mcp/scripts/latency-benchmark
  */
 
+import { connect as connectHttp2, constants as http2Constants } from 'node:http2';
 import { pathToFileURL } from 'node:url';
 import { readBoundedResponseBytes } from '#copilot/infra/public/http-response';
+import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
 
 const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
-const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';
 const DEFAULT_SAMPLES = 10;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_BENCHMARK_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /**
- * @typedef {{ ok: boolean; status?: number; durationMs: number; ttfbMs?: number; downloadMs?: number; bytes?: number; contentLengthHeader?: number | null; contentEncoding?: string | null; cfCacheStatus?: string | null; age?: string | null; cfRay?: string | null; originProtocolMode?: string | null; originHttpVersion?: string | null; originAlpn?: string | null; error?: string }} LatencySample
+ * @typedef {{ ok: boolean; httpOk?: boolean; expectedStatusMatched?: boolean; status?: number; durationMs: number; ttfbMs?: number; downloadMs?: number; bytes?: number; contentLengthHeader?: number | null; contentEncoding?: string | null; cfCacheStatus?: string | null; age?: string | null; cfRay?: string | null; originProtocolMode?: string | null; originHttpVersion?: string | null; originAlpn?: string | null; transport?: string; tlsVerification?: string; error?: string }} LatencySample
  *
  * @typedef {{ name: string; samples: LatencySample[]; summary: LatencySummary; ttfbSummary?: LatencySummary; downloadSummary?: LatencySummary }} LatencyProbeReport
  *
@@ -41,12 +42,18 @@ const MAX_BENCHMARK_RESPONSE_BYTES = 8 * 1024 * 1024;
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function runMcpLatencyBenchmark(options = {}) {
+    const tunnelConfig = readCloudflareTunnelConfig();
     const publicMcpUrl = normalizeMcpUrl(
-        options.publicMcpUrl ?? process.env['COPILOT_MCP_LATENCY_PUBLIC_URL'] ?? DEFAULT_PUBLIC_MCP_URL,
+        options.publicMcpUrl ??
+            process.env['COPILOT_MCP_LATENCY_PUBLIC_URL'] ??
+            tunnelConfig.publicMcpUrl ??
+            DEFAULT_PUBLIC_MCP_URL,
     );
     const localMcpUrl = normalizeMcpUrl(
-        options.localMcpUrl ?? process.env['COPILOT_MCP_LATENCY_LOCAL_URL'] ?? DEFAULT_LOCAL_MCP_URL,
+        options.localMcpUrl ?? process.env['COPILOT_MCP_LATENCY_LOCAL_URL'] ?? tunnelConfig.localMcpUrl,
     );
+    const localOriginServerName = tunnelConfig.originServerName ?? tunnelConfig.publicHostname;
+    const directOriginH2 = localMcpUrl.startsWith('https://127.0.0.1') || localMcpUrl.startsWith('https://localhost');
     const samples = readPositiveInteger(
         options.samples ?? process.env['COPILOT_MCP_LATENCY_SAMPLES'],
         DEFAULT_SAMPLES,
@@ -66,7 +73,16 @@ export async function runMcpLatencyBenchmark(options = {}) {
     const probes = [
         {
             name: 'local.health',
-            run: () => timedFetch(`${localBaseUrl}/health`, { method: 'GET' }, timeoutMs),
+            run: () =>
+                directOriginH2
+                    ? timedHttp2OriginRequest(
+                          `${localBaseUrl}/health`,
+                          { method: 'GET' },
+                          timeoutMs,
+                          localOriginServerName,
+                          [200],
+                      )
+                    : timedFetch(`${localBaseUrl}/health`, { method: 'GET' }, timeoutMs, [200]),
         },
         {
             name: 'public.protected_resource',
@@ -80,17 +96,27 @@ export async function runMcpLatencyBenchmark(options = {}) {
         },
         {
             name: 'local.mcp_tools_list',
-            run: () => timedJsonRpc(localMcpUrl, 1, 'tools/list', {}, timeoutMs),
+            run: () =>
+                directOriginH2
+                    ? timedHttp2OriginRequest(
+                          localMcpUrl,
+                          buildJsonRpcRequest(1, 'tools/list', {}),
+                          timeoutMs,
+                          localOriginServerName,
+                          [200, 401],
+                      )
+                    : timedJsonRpc(localMcpUrl, 1, 'tools/list', {}, timeoutMs, { acceptedStatuses: [200, 401] }),
         },
         {
             name: 'public.mcp_tools_list',
-            run: () => timedJsonRpc(publicMcpUrl, 2, 'tools/list', {}, timeoutMs),
+            run: () => timedJsonRpc(publicMcpUrl, 2, 'tools/list', {}, timeoutMs, { acceptedStatuses: [200, 401] }),
         },
         {
             name: 'public.mcp_tools_list_json_accept',
             run: () =>
                 timedJsonRpc(publicMcpUrl, 3, 'tools/list', {}, timeoutMs, {
                     accept: 'application/json',
+                    acceptedStatuses: [200, 401],
                 }),
         },
         {
@@ -98,6 +124,7 @@ export async function runMcpLatencyBenchmark(options = {}) {
             run: () =>
                 timedJsonRpc(publicMcpUrl, 4, 'tools/list', {}, timeoutMs, {
                     acceptEncoding: 'identity',
+                    acceptedStatuses: [200, 401],
                 }),
         },
     ];
@@ -140,9 +167,10 @@ export async function runMcpLatencyBenchmark(options = {}) {
  * @param {string} url
  * @param {RequestInit} init
  * @param {number} timeoutMs
+ * @param {number[]} [acceptedStatuses]
  * @returns {Promise<LatencySample>}
  */
-async function timedFetch(url, init, timeoutMs) {
+async function timedFetch(url, init, timeoutMs, acceptedStatuses) {
     const startedAt = performance.now();
     try {
         const response = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
@@ -153,8 +181,11 @@ async function timedFetch(url, init, timeoutMs) {
         });
         const completedAt = performance.now();
         const contentLength = response.headers.get('content-length');
+        const expectedStatusMatched = acceptedStatuses?.includes(response.status) ?? response.ok;
         return {
-            ok: response.ok,
+            ok: expectedStatusMatched,
+            httpOk: response.ok,
+            expectedStatusMatched,
             status: response.status,
             durationMs: Math.round(completedAt - startedAt),
             ttfbMs: Math.round(headersAt - startedAt),
@@ -179,28 +210,179 @@ async function timedFetch(url, init, timeoutMs) {
 }
 
 /**
+ * Direct canonical HTTPS/H2 origin timing probe. The Node client does not trust
+ * Cloudflare Origin CA by default, so certificate verification is disabled only
+ * for this loopback latency diagnostic; SNI is still set to the configured
+ * origin server name. Security posture is validated separately by Cloudflare
+ * remote/origin audits where noTLSVerify must remain false.
+ *
+ * @param {string} url
+ * @param {RequestInit} init
+ * @param {number} timeoutMs
+ * @param {string} servername
+ * @param {number[]} [acceptedStatuses]
+ * @returns {Promise<LatencySample>}
+ */
+async function timedHttp2OriginRequest(url, init, timeoutMs, servername, acceptedStatuses) {
+    const startedAt = performance.now();
+    const parsed = new URL(url);
+    return new Promise((resolve) => {
+        let settled = false;
+        let headersAt = 0;
+        let totalBytes = 0;
+        /** @type {Record<string, string | string[] | undefined>} */
+        let responseHeaders = {};
+        const session = connectHttp2(parsed.origin, {
+            servername,
+            rejectUnauthorized: false,
+        });
+        /** @param {LatencySample} sample */
+        const finish = (sample) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            try {
+                session.close();
+                session.destroy();
+            } catch {
+                // Best-effort diagnostic cleanup.
+            }
+            resolve(sample);
+        };
+        const timer = setTimeout(() => {
+            finish({
+                ok: false,
+                durationMs: Math.round(performance.now() - startedAt),
+                transport: 'direct-origin-http2',
+                tlsVerification: 'disabled-loopback-latency-diagnostic',
+                error: `Direct origin H2 probe timed out after ${timeoutMs}ms.`,
+            });
+        }, timeoutMs);
+        session.once('error', (error) => {
+            finish({
+                ok: false,
+                durationMs: Math.round(performance.now() - startedAt),
+                transport: 'direct-origin-http2',
+                tlsVerification: 'disabled-loopback-latency-diagnostic',
+                error: error instanceof Error ? error.message : String(error),
+            });
+        });
+        session.once('connect', () => {
+            const requestHeaders = new Headers(init.headers);
+            /** @type {Record<string, string>} */
+            const h2Headers = {
+                [http2Constants.HTTP2_HEADER_METHOD]: String(init.method ?? 'GET').toUpperCase(),
+                [http2Constants.HTTP2_HEADER_PATH]: `${parsed.pathname}${parsed.search}`,
+            };
+            for (const [key, value] of requestHeaders.entries()) h2Headers[key] = value;
+            const body = typeof init.body === 'string' ? init.body : null;
+            if (body !== null && !('content-length' in h2Headers)) {
+                h2Headers['content-length'] = String(Buffer.byteLength(body));
+            }
+            const request = session.request(h2Headers);
+            request.once('response', (headers) => {
+                headersAt = performance.now();
+                responseHeaders = /** @type {Record<string, string | string[] | undefined>} */ (headers);
+            });
+            request.on('data', (chunk) => {
+                const bytes = Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+                totalBytes += bytes;
+                if (totalBytes > MAX_BENCHMARK_RESPONSE_BYTES) {
+                    request.close(http2Constants.NGHTTP2_CANCEL);
+                    finish({
+                        ok: false,
+                        durationMs: Math.round(performance.now() - startedAt),
+                        transport: 'direct-origin-http2',
+                        tlsVerification: 'disabled-loopback-latency-diagnostic',
+                        error: `Direct origin H2 response exceeded ${MAX_BENCHMARK_RESPONSE_BYTES} bytes.`,
+                    });
+                }
+            });
+            request.once('end', () => {
+                const completedAt = performance.now();
+                const status = Number(responseHeaders[http2Constants.HTTP2_HEADER_STATUS] ?? 0);
+                const httpOk = status >= 200 && status < 300;
+                const expectedStatusMatched = acceptedStatuses?.includes(status) ?? httpOk;
+                /** @param {string} name @returns {string | null} */
+                const headerValue = (name) => {
+                    const value = responseHeaders[name];
+                    return Array.isArray(value) ? (value[0] ?? null) : typeof value === 'string' ? value : null;
+                };
+                finish({
+                    ok: expectedStatusMatched,
+                    httpOk,
+                    expectedStatusMatched,
+                    status,
+                    durationMs: Math.round(completedAt - startedAt),
+                    ...(headersAt > 0
+                        ? {
+                              ttfbMs: Math.round(headersAt - startedAt),
+                              downloadMs: Math.max(0, Math.round(completedAt - headersAt)),
+                          }
+                        : {}),
+                    bytes: totalBytes,
+                    contentLengthHeader: Number(headerValue('content-length') ?? NaN) || null,
+                    contentEncoding: headerValue('content-encoding'),
+                    cfCacheStatus: headerValue('cf-cache-status'),
+                    age: headerValue('age'),
+                    cfRay: null,
+                    originProtocolMode: headerValue('x-mcp-origin-protocol-mode'),
+                    originHttpVersion: headerValue('x-mcp-origin-http-version'),
+                    originAlpn: 'h2',
+                    transport: 'direct-origin-http2',
+                    tlsVerification: 'disabled-loopback-latency-diagnostic',
+                });
+            });
+            request.once('error', (error) => {
+                finish({
+                    ok: false,
+                    durationMs: Math.round(performance.now() - startedAt),
+                    transport: 'direct-origin-http2',
+                    tlsVerification: 'disabled-loopback-latency-diagnostic',
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            });
+            if (body === null) request.end();
+            else request.end(body);
+        });
+    });
+}
+
+/**
  * @param {string} mcpUrl
  * @param {number} id
  * @param {string} method
  * @param {Record<string, unknown>} params
  * @param {number} timeoutMs
- * @param {{ accept?: string; acceptEncoding?: string }} [options]
+ * @param {{ accept?: string; acceptEncoding?: string; acceptedStatuses?: number[] }} [options]
  * @returns {Promise<LatencySample>}
  */
 async function timedJsonRpc(mcpUrl, id, method, params, timeoutMs, options = {}) {
     return timedFetch(
         mcpUrl,
-        {
-            method: 'POST',
-            headers: {
-                accept: options.accept ?? 'application/json, text/event-stream',
-                'content-type': 'application/json',
-                ...(options.acceptEncoding ? { 'accept-encoding': options.acceptEncoding } : {}),
-            },
-            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        },
+        buildJsonRpcRequest(id, method, params, options),
         timeoutMs,
+        options.acceptedStatuses,
     );
+}
+
+/**
+ * @param {number} id
+ * @param {string} method
+ * @param {Record<string, unknown>} params
+ * @param {{ accept?: string; acceptEncoding?: string }} [options]
+ * @returns {RequestInit}
+ */
+function buildJsonRpcRequest(id, method, params, options = {}) {
+    return {
+        method: 'POST',
+        headers: {
+            accept: options.accept ?? 'application/json, text/event-stream',
+            'content-type': 'application/json',
+            ...(options.acceptEncoding ? { 'accept-encoding': options.acceptEncoding } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    };
 }
 
 /**

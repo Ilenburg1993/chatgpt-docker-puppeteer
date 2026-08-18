@@ -8,6 +8,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readFile, readdir, realpath } from 'node:fs/promises';
+import { availableParallelism, freemem, loadavg, totalmem } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { appendTextLocked, writeFileAtomic } from '#copilot/infra/public/io';
@@ -22,6 +23,13 @@ const MAX_IN_MEMORY_JOB_RECORDS = 200;
 const MAX_JOB_MANIFEST_BYTES = 128 * 1024;
 const MAX_JOB_OUTPUT_TAIL_BYTES = 1024 * 1024;
 const MAX_FOCUSED_UNIT_TEST_FILES = 12;
+const MAX_ACTIVE_VALIDATOR_PROCESSES = 1;
+const DEFAULT_VALIDATOR_VITEST_MAX_WORKERS = 2;
+const VALIDATOR_RUNTIME_EPOCH = randomUUID();
+const CGROUP_V2_MEMORY_CURRENT = '/sys/fs/cgroup/memory.current';
+const CGROUP_V2_MEMORY_MAX = '/sys/fs/cgroup/memory.max';
+const CGROUP_V2_MEMORY_EVENTS = '/sys/fs/cgroup/memory.events';
+let validatorSpawnReserved = false;
 const FOCUSED_UNIT_TEST_PREFIX = 'tests/unit/copilot/';
 const FOCUSED_UNIT_TEST_SUFFIX = '.spec.js';
 /** @type {ReadonlyArray<CopilotValidatorName>} */
@@ -32,6 +40,7 @@ export const COPILOT_VALIDATOR_NAMES = Object.freeze([
     'unit-copilot',
     'unit-focused',
     'devcontainer-shell',
+    'network-contracts',
     'suite-mcp-fast',
     'suite-mcp-full',
     'suite-copilot-fast',
@@ -51,10 +60,21 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  *     | 'unit-copilot'
  *     | 'unit-focused'
  *     | 'devcontainer-shell'
+ *     | 'network-contracts'
  *     | 'suite-mcp-fast'
  *     | 'suite-mcp-full'
  *     | 'suite-copilot-fast'} CopilotValidatorName
  *
+ *
+ * @typedef {object} ValidatorResourceSnapshot
+ * @property {string} observedAt
+ * @property {number} mcpProcessRssBytes
+ * @property {number} systemFreeBytes
+ * @property {number} systemTotalBytes
+ * @property {number | null} systemFreeRatio
+ * @property {[number, number, number]} loadAverage
+ * @property {number} availableParallelism
+ * @property {{ memoryCurrentBytes: number | null; memoryMaxBytes: number | null; memoryUsageRatio: number | null; events: Record<string, number> | null }} cgroup
  *
  * @typedef {object} JobRecord
  * @property {string} id
@@ -70,10 +90,16 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  * @property {boolean} timedOut
  * @property {string} logFile
  * @property {string} manifestFile
+ * @property {string} [ownerRuntimeEpoch]
+ * @property {number} [ownerPid]
+ * @property {number | null} [childPid]
+ * @property {ValidatorResourceSnapshot | null} [resourceBefore]
+ * @property {ValidatorResourceSnapshot | null} [resourceAfter]
  * @property {import('node:child_process').ChildProcess | null} process
  *
  * @typedef {Omit<JobRecord, 'process'> & {
  *     runtimeAttached: boolean | null;
+ *     runtimeSameEpoch: boolean | null;
  * }} PublicJobRecord
  */
 
@@ -256,6 +282,15 @@ export function resolveValidatorCommand(validator, options = {}) {
             return resolveFocusedUnitTestCommand(options.testFiles);
         case 'devcontainer-shell':
             return { command: 'node', args: ['src/copilot/mcp/scripts/validate-devcontainer-shell.js'] };
+        case 'network-contracts':
+            return {
+                command: 'node',
+                args: [
+                    'src/copilot/mcp/scripts/network-summary-contracts.js',
+                    'validate',
+                    '.devcontainer/scripts/network/contracts/summary-contracts.jsonc',
+                ],
+            };
         case 'suite-mcp-fast':
             return {
                 command: 'node',
@@ -305,36 +340,66 @@ export async function spawnValidatorJob(validator, options = {}) {
     const artifacts = resolveJobArtifactPaths(id);
     if (!artifacts) throw new Error('Generated validator job id is invalid.');
     const { logFile, manifestFile } = artifacts;
-    await mkdir(MCP_JOBS_DIR, { recursive: true });
-    await writeFileAtomic(
-        logFile,
-        `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`,
-        { encoding: 'utf8', mode: 0o600, failIfExists: true, riskClass: 'medium' },
-    );
+    if (!canRunCopilotValidatorInline()) {
+        throw Object.assign(
+            new Error('Validator subprocess fan-out is disabled inside test runners; run the integration check from the normal MCP runtime instead.'),
+            { code: 'ERR_VALIDATOR_NESTED_RUNNER_BLOCKED' },
+        );
+    }
+    const activeJob = [...JOBS.values()].find((record) => record.status === 'running' && record.process !== null) ?? null;
+    if (validatorSpawnReserved || activeJob) {
+        throw Object.assign(
+            new Error(
+                activeJob
+                    ? `Validator capacity is busy with ${activeJob.validator} (${activeJob.id}).`
+                    : 'Validator capacity is reserved by another spawn in progress.',
+            ),
+            {
+                code: 'ERR_VALIDATOR_CAPACITY_BUSY',
+                activeJobId: activeJob?.id ?? null,
+                activeValidator: activeJob?.validator ?? null,
+                maxActive: MAX_ACTIVE_VALIDATOR_PROCESSES,
+            },
+        );
+    }
+    validatorSpawnReserved = true;
+    try {
+        await mkdir(MCP_JOBS_DIR, { recursive: true });
+        await writeFileAtomic(
+            logFile,
+            `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`,
+            { encoding: 'utf8', mode: 0o600, failIfExists: true, riskClass: 'medium' },
+        );
 
-    const child = spawn(command.command, command.args, {
-        cwd: getMcpWorkspaceRoot(),
-        env: withCopilotNodeCompileCacheEnv({ ...process.env, NO_COLOR: '' }),
-        stdio: ['ignore', 'pipe', 'pipe'],
-    });
+        const resourceBefore = await readValidatorResourceSnapshot();
+        const child = spawn(command.command, command.args, {
+            cwd: getMcpWorkspaceRoot(),
+            env: buildValidatorChildEnv(),
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
 
-    /** @type {JobRecord} */
-    const record = {
-        id,
-        validator,
-        status: 'running',
-        startedAt: Date.now(),
-        endedAt: null,
-        exitCode: null,
-        signal: null,
-        command: command.command,
-        args: command.args,
-        timeoutMs,
-        timedOut: false,
-        logFile,
-        manifestFile,
-        process: child,
-    };
+        /** @type {JobRecord} */
+        const record = {
+            id,
+            validator,
+            status: 'running',
+            startedAt: Date.now(),
+            endedAt: null,
+            exitCode: null,
+            signal: null,
+            command: command.command,
+            args: command.args,
+            timeoutMs,
+            timedOut: false,
+            logFile,
+            manifestFile,
+            ownerRuntimeEpoch: VALIDATOR_RUNTIME_EPOCH,
+            ownerPid: process.pid,
+            childPid: child.pid ?? null,
+            resourceBefore,
+            resourceAfter: null,
+            process: child,
+        };
     JOBS.set(id, record);
     pruneCompletedJobRecords(JOBS);
     await persistJobRecord(record);
@@ -354,31 +419,31 @@ export async function spawnValidatorJob(validator, options = {}) {
 
     attachJobOutputStream(record, child.stdout, 'stdout', logFile);
     attachJobOutputStream(record, child.stderr, 'stderr', logFile);
-    child.on('close', (code, signal) => {
-        clearTimeout(timeout);
-        record.endedAt = Date.now();
-        record.exitCode = code;
-        record.signal = signal;
-        record.process = null;
-        if (record.status === 'cancelled' || record.timedOut) {
-            void enqueueJobIo(record, 'finalize interrupted job', async () => {
+        child.on('close', (code, signal) => {
+            clearTimeout(timeout);
+            record.endedAt = Date.now();
+            record.exitCode = code;
+            record.signal = signal;
+            record.process = null;
+            const interrupted = record.status === 'cancelled' || record.timedOut;
+            if (!interrupted) record.status = code === 0 ? 'completed' : 'failed';
+            void enqueueJobIo(record, interrupted ? 'finalize interrupted job' : 'finalize job', async () => {
+                record.resourceAfter = await readValidatorResourceSnapshot();
+                if (!interrupted) {
+                    await appendJobLog(
+                        logFile,
+                        `\n[job:${record.status}] exitCode=${String(code)} signal=${String(signal)}\n`,
+                    );
+                }
                 await persistJobRecord(record);
                 pruneCompletedJobRecords(JOBS);
             });
-            return;
-        }
-        record.status = code === 0 ? 'completed' : 'failed';
-        void enqueueJobIo(record, 'finalize job', async () => {
-            await appendJobLog(
-                logFile,
-                `\n[job:${record.status}] exitCode=${String(code)} signal=${String(signal)}\n`,
-            );
-            await persistJobRecord(record);
-            pruneCompletedJobRecords(JOBS);
         });
-    });
 
-    return publicJobRecord(record);
+        return publicJobRecord(record);
+    } finally {
+        validatorSpawnReserved = false;
+    }
 }
 
 /**
@@ -417,6 +482,154 @@ export async function readJobOutput(id, tailBytes = 24_000) {
     if (!record) return { job: null, output: '' };
     const output = await readJobLogTail(id, tailBytes);
     return { job: publicJobRecord(record), output };
+}
+
+/**
+ * Prevent validator subprocess fan-out from inside Vitest/test runners.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function canRunCopilotValidatorInline(env = process.env) {
+    return !env['VITEST'] && env['NODE_ENV'] !== 'test';
+}
+
+export function resolveValidatorVitestMaxWorkers(env = process.env) {
+    const candidate = Number(env['COPILOT_VALIDATOR_VITEST_MAX_WORKERS'] ?? env['VITEST_MAX_WORKERS']);
+    if (Number.isInteger(candidate) && candidate >= 1 && candidate <= 4) return candidate;
+    return DEFAULT_VALIDATOR_VITEST_MAX_WORKERS;
+}
+
+function buildValidatorChildEnv() {
+    return withCopilotNodeCompileCacheEnv({
+        ...process.env,
+        NO_COLOR: '',
+        VITEST_MAX_WORKERS: String(resolveValidatorVitestMaxWorkers()),
+    });
+}
+
+const CGROUP_MEMORY_EVENT_KEYS = Object.freeze(['low', 'high', 'max', 'oom', 'oom_kill', 'oom_group_kill']);
+
+/** @param {string} text */
+export function parseCgroupMemoryEvents(text) {
+    /** @type {Record<string, number>} */
+    const events = {};
+    for (const line of String(text ?? '').split(/\r?\n/u)) {
+        const [key, rawValue, ...rest] = line.trim().split(/\s+/u);
+        if (!key || rawValue === undefined || rest.length > 0 || !CGROUP_MEMORY_EVENT_KEYS.includes(key)) continue;
+        const value = Number(rawValue);
+        if (Number.isSafeInteger(value) && value >= 0) events[key] = value;
+    }
+    return events;
+}
+
+/** @param {string} text */
+export function parseCgroupMemoryLimit(text) {
+    const normalized = String(text ?? '').trim();
+    if (!normalized || normalized === 'max') return null;
+    const value = Number(normalized);
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+/** @param {string} filePath */
+async function readOptionalCgroupText(filePath) {
+    try {
+        return await readFile(filePath, 'utf8');
+    } catch {
+        return null;
+    }
+}
+
+/** @returns {Promise<ValidatorResourceSnapshot>} */
+export async function readValidatorResourceSnapshot() {
+    const [currentText, maxText, eventsText] = await Promise.all([
+        readOptionalCgroupText(CGROUP_V2_MEMORY_CURRENT),
+        readOptionalCgroupText(CGROUP_V2_MEMORY_MAX),
+        readOptionalCgroupText(CGROUP_V2_MEMORY_EVENTS),
+    ]);
+    const memoryCurrentBytes = currentText === null ? null : parseCgroupMemoryLimit(currentText);
+    const memoryMaxBytes = maxText === null ? null : parseCgroupMemoryLimit(maxText);
+    const systemTotalBytes = totalmem();
+    const systemFreeBytes = freemem();
+    const systemFreeRatio = systemTotalBytes > 0 ? roundResourceRatio(systemFreeBytes / systemTotalBytes) : null;
+    const memoryUsageRatio =
+        memoryCurrentBytes !== null && memoryMaxBytes !== null && memoryMaxBytes > 0
+            ? roundResourceRatio(memoryCurrentBytes / memoryMaxBytes)
+            : null;
+    const loads = loadavg();
+    return {
+        observedAt: new Date().toISOString(),
+        mcpProcessRssBytes: process.memoryUsage().rss,
+        systemFreeBytes,
+        systemTotalBytes,
+        systemFreeRatio,
+        loadAverage: [loads[0] ?? 0, loads[1] ?? 0, loads[2] ?? 0],
+        availableParallelism: availableParallelism(),
+        cgroup: {
+            memoryCurrentBytes,
+            memoryMaxBytes,
+            memoryUsageRatio,
+            events: eventsText === null ? null : parseCgroupMemoryEvents(eventsText),
+        },
+    };
+}
+
+/** @param {number} value */
+function roundResourceRatio(value) {
+    return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+export function readCopilotValidatorCapacityState() {
+    const active = [...JOBS.values()]
+        .filter((record) => record.status === 'running' && record.process !== null)
+        .map((record) => ({ id: record.id, validator: record.validator, startedAt: record.startedAt }));
+    return {
+        runtimeEpoch: VALIDATOR_RUNTIME_EPOCH,
+        ownerPid: process.pid,
+        maxActive: MAX_ACTIVE_VALIDATOR_PROCESSES,
+        vitestMaxWorkers: resolveValidatorVitestMaxWorkers(),
+        spawnReserved: validatorSpawnReserved,
+        activeCount: active.length,
+        active,
+    };
+}
+
+/**
+ * Run one canonical allowlisted validator and wait for a bounded completion window.
+ * This is the shared primitive used by higher-level composite workflows that
+ * need validation feedback without paying another model→tool round trip.
+ *
+ * @param {CopilotValidatorName} validator
+ * @param {{ timeoutMs?: number; waitMs?: number; failureTailBytes?: number; testFiles?: string[] }} [options]
+ */
+export async function runCopilotValidatorInline(validator, options = {}) {
+    if (!canRunCopilotValidatorInline()) {
+        throw new Error('Inline validator fan-out is disabled inside test runners to prevent recursive Node/Vitest process trees.');
+    }
+    if (!isCopilotValidatorName(validator)) throw new Error(`Unsupported validator: ${String(validator)}`);
+    const focused = validator === 'unit-focused';
+    if (focused && !options.testFiles) throw new Error('unit-focused requires explicit testFiles.');
+    if (!focused && options.testFiles) throw new Error('testFiles are valid only for unit-focused.');
+    const job = await spawnValidatorJob(validator, {
+        ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+        ...(focused ? { testFiles: options.testFiles } : {}),
+    });
+    const waitMs = Math.max(0, Math.min(120_000, Math.floor(Number(options.waitMs ?? 30_000))));
+    const waited = await waitForJobCompletion(job.id, waitMs);
+    if (!waited) throw new Error(`Validator job ${job.id} disappeared while waiting.`);
+    const completedWithinWait = waited.status !== 'running';
+    const passed = waited.status === 'completed' && waited.exitCode === 0;
+    const shouldReadFailureTail = completedWithinWait && !passed && waited.status === 'failed';
+    const failureOutput = shouldReadFailureTail
+        ? await readJobOutput(job.id, Math.max(1_000, Math.min(12_000, Number(options.failureTailBytes ?? 4_000))))
+        : { output: '' };
+    return {
+        validator,
+        passed,
+        completedWithinWait,
+        waitMs,
+        job: waited,
+        ...(failureOutput.output ? { failureOutputTail: failureOutput.output } : {}),
+    };
 }
 
 /**
@@ -495,6 +708,8 @@ function publicJobRecord(record) {
     return {
         ...publicRecord,
         runtimeAttached: record.status === 'running' ? record.process !== null : null,
+        runtimeSameEpoch:
+            typeof record.ownerRuntimeEpoch === 'string' ? record.ownerRuntimeEpoch === VALIDATOR_RUNTIME_EPOCH : null,
     };
 }
 

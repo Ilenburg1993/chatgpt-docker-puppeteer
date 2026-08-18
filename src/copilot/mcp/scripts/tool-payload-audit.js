@@ -15,7 +15,7 @@ import { pathToFileURL } from 'node:url';
 import { registerCanonicalMcpTools } from '../registry.js';
 
 const DEFAULT_TOP = 20;
-const DEFAULT_MAX_ENVELOPE_BYTES = 128 * 1024;
+const DEFAULT_MAX_ENVELOPE_BYTES = 160 * 1024;
 
 /**
  * @param {{ top?: number; maxEnvelopeBytes?: number }} [options]

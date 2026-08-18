@@ -1,127 +1,237 @@
-# DevContainer Network Control Plane — diagnóstico profundo, estado-alvo e roadmap de transformação
+# CHATGPT ↔ MCP END-TO-END INTERACTION LATENCY & NETWORK CONTROL PLANE
 
-**Data de referência:** 2026-08-18  
-**Status:** canônico para a frente de rede / DevContainer / NCP / conectividade ChatGPT–OpenAI–MCP  
-**Branch observada:** `main`  
-**HEAD observado no início desta consolidação:** `64d80411d` — `perf(mcp): unlock atomic target batch progress`  
-**Upstream observado:** `origin/main` alinhado com `HEAD` antes de qualquer nova publicação desta frente  
-**Escopo primário:** `.devcontainer/`, `src/copilot/mcp/`, contratos/operadores associados e integrações adjacentes estritamente necessárias para conectividade e observabilidade  
-**Relação com o roadmap mestre:** este documento aprofunda e especializa a frente de rede iniciada em `src/copilot/docs/WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md`; para decisões especificamente relacionadas ao Network Control Plane, conectividade ChatGPT/OpenAI, Cloudflare/MCP, DNS, proxy, provider reachability e lifecycle DevContainer, este documento passa a ser a referência arquitetônica mais detalhada.  
-**Princípio de migração:** evolução interna, aditiva, compatível, observável e reversível. **Não criar uma segunda pilha OpenAI/ChatGPT em paralelo à infraestrutura existente.**
+## Diagnóstico causal, estado atual, estado-alvo e roadmap — 2026-08-18
+
+> **Status:** documento canônico especializado para latência de interação ChatGPT ↔ MCP, Network Control Plane, DevContainer, Cloudflare Tunnel e superfícies OpenAI/ChatGPT.
+>
+> **Escopo:** `/workspaces/chatgpt-docker-puppeteer`, com foco em `.devcontainer/**`, `src/copilot/**`, MCP HTTP/OAuth/stateful runtime, Cloudflare Tunnel, rede do DevContainer e circuitos externos relevantes.
+>
+> **Branch observada:** `main`.
+>
+> **HEAD observado nesta revisão:** `b4c4feb53`.
+>
+> **Relação com o roadmap mestre:** este documento aprofunda a dimensão de conectividade/latência do projeto e deve permanecer coerente com `src/copilot/docs/WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md`.
+>
+> **Mudança de tese desta revisão:** o objeto arquitetural não é mais apenas um *Network Control Plane*. As medições demonstraram que o principal problema percebido ocorre, na maior parte das janelas observadas, **fora da execução do MCP e fora do round-trip ordinário do Cloudflare Tunnel**. O estado-alvo passa a ser um **Interaction Latency Control Plane (ILCP)**, do qual o Network Control Plane (NCP) é um subsistema.
 
 ---
 
-# 0. Sumário executivo
+# 1. Síntese executiva
 
-A infraestrutura atual de rede do projeto é sofisticada, porém historicamente assimétrica. Ela nasceu em grande parte para investigar e melhorar conectividade com GitHub e GitHub Copilot; ao longo do tempo acumulou DNS local com fail-safe e rollback, benchmarking, split-DNS, route-fix com histerese, proxy local, endpoint registry, advisor passivo, artifacts de estado, hooks de lifecycle, agregador de Network Control Plane, métricas Cloudflare, auditoria remota e tools MCP de observabilidade.
+A investigação de 18 de agosto de 2026 alterou materialmente a compreensão do problema de desempenho.
 
-O problema principal não é ausência de mecanismos. O problema é que mecanismos potencialmente gerais ainda carregam semântica específica de GitHub/Copilot e, por isso, não representam de forma suficientemente rigorosa o circuito que hoje mais importa operacionalmente:
+O sintoma central relatado é uma demora muito grande **entre tools**: depois que uma tool termina e antes que a próxima tool seja efetivamente despachada ao MCP. A observação subjetiva de que o sistema pode ficar muito mais rápido em certos horários também foi corroborada por histórico persistido: o p50 de gaps reconstruídos varia de aproximadamente **5,5 s em janelas rápidas** para aproximadamente **14–15 s em janelas lentas**, sem mudança proporcional no custo local das tools.
+
+A instrumentação nova permite decompor o circuito de forma muito mais rigorosa:
 
 ```text
-usuário / cliente ChatGPT
-    ↕
-infraestrutura OpenAI / chatgpt.com
-    ↕
-endpoint MCP público https://mcp.aurelin.org/mcp
-    ↕
-Cloudflare edge / tunnel
-    ↕
-cloudflared no DevContainer
-    ↕
-origin local HTTPS + HTTP/2 127.0.0.1:3333
-    ↕
-MCP server / workspace / tools
+tool anterior retorna
+        │
+        ▼
+T0  handler end
+        │  origin post-handler: ~ms
+        ▼
+T1  HTTP response finish no origin MCP
+        │
+        │  ┌───────────────────────────────────────────────┐
+        │  │ gap externo                                  │
+        │  │                                               │
+        │  │ requests auxiliares observáveis: ~1–2%       │
+        │  │ silêncio no origin: ~98%                     │
+        │  └───────────────────────────────────────────────┘
+        │
+        ▼
+T2  próxima HTTP tools/call chega ao origin
+        │  origin pre-handler: ~ms
+        ▼
+T3  guard/registry/authorization
+        │
+        ▼
+T4  handler da próxima tool
 ```
 
-Além desse circuito, o DevContainer possui egress para GitHub, Copilot, OpenAI API e outros providers. Esses caminhos compartilham substrato — DNS, TCP, TLS, proxy, container, host, WSL, Docker — mas **não são o mesmo leg e não podem servir como prova uns dos outros**.
+Os resultados mais importantes da janela controlada mais recente foram:
 
-O estado atual apresenta cinco problemas arquitetônicos dominantes:
+| dimensão | valor representativo | leitura causal |
+|---|---:|---|
+| `mcp_latency_pulse` handler | ~0–1 ms | workload da tool não explica a demora |
+| handler médio MCP na attribution | dezenas de ms | origin local saudável |
+| `preHandler` | ~4–8 ms | parsing/SDK/dispatch local não explicam segundos |
+| `postHandler` | ~4–19 ms | serialização/finalização local não explicam segundos |
+| gap externo p50 | ~5–10 s em séries controladas; ~9,8 s no histórico natural 24h | atraso dominante fora do origin |
+| gap externo p95 | frequentemente 8–30+ s conforme workload/janela | cauda muito alta fora do origin |
+| **gap silencioso p50** | **~5–8 s em janelas controladas recentes** | quase todo o tempo não contém trabalho discreto observável no MCP |
+| cobertura auxiliar | **~0,2–2%** | initialize/OAuth/etc. são secundários |
+| **tempo até o primeiro trabalho discreto p50** | **~6,87 s em amostra madura recente** | ~97% do gap ocorre antes do próximo `initialize` |
+| cauda após o trabalho discreto p50 | **~83 ms** | handshake/notifications→`tools/call` são rápidos |
+| primeiro RPC discreto | **`initialize`** | atraso dominante antecede a própria negociação da nova sessão |
+| pulse `thinking=medium` | **p50 5,59 s; média 5,47 s; n=7 estabilizados** | multi-segundo persiste em medium |
+| pulse `thinking=high` | **p50 6,43 s; média 5,93 s; n=7 estabilizados** | ~15% pior na mediana; sinal contributivo, não explicação suficiente |
+| `chatgpt.com` endpoint TTFB | **p50 83 ms; p95 121 ms** | rota DevContainer→endpoint muito menor que pre-dispatch silence |
+| `ws.chatgpt.com` endpoint TTFB | **p50 240 ms; p95 614 ms** | endpoint apresenta alguma variabilidade, ainda subsegundo na amostra |
+| `api.openai.com` endpoint TTFB | **p50 274 ms; p95 414 ms** | também muito abaixo do atraso de vários segundos |
+| public MCP self-loop p50 | ~0,16–0,30 s | caminho ordinário Cloudflare é dezenas de vezes menor |
+| razão gap/self-loop | ~30–60× em amostras recentes | tunnel/origin ordinário insuficiente para explicar o gap |
+| edge colo | quase sempre `GRU` | troca de colo não explica variação observada |
+| QUIC RTT | dezenas de ms | muito abaixo do atraso percebido |
+| HA cloudflared | 4 | tunnel operacional |
+| connector smoke | verde | OAuth/tools-list/SSE/health funcionais |
+| tools | 123 projetadas; default server 250 | contagem não é evidência da causa local |
 
-1. **acoplamento provider-specific:** partes do que hoje se chama “Network Control Plane” ainda significam, semanticamente, “Network/Copilot Control Plane”;
-2. **autoridade mal tipada:** artifacts stale, counters cumulativos e dados de ação/benchmark podem ser confundidos com estado runtime atual;
-3. **substrato e provider misturados:** uma indisponibilidade GitHub/Copilot pode contaminar a interpretação da saúde do resolver ou do plano geral;
-4. **duplicação de contratos e parsing:** scripts Bash grandes reimplementam helpers, defaults, registry parsing, sanitização, freshness, locks e status synthesis;
-5. **observabilidade incompleta do caminho ChatGPT:** HTTPS reachability é insuficiente para representar WebSocket/long-lived connections, e um probe local jamais prova sozinho o leg OpenAI→MCP.
-
-A arquitetura-alvo é um **único Network Control Plane provider-neutral**, construído por evolução do sistema atual, com:
-
-- **substrato neutro:** DNS, egress, proxy/tunnel primitives, lifecycle, ownership, locks e artifacts;
-- **registry declarativo versionado** de endpoints/probes com provider, product, scope, leg, transport, authority e mutation eligibility;
-- separação explícita entre **observer**, **policy gate** e **actuator**;
-- components provider-specific preservados como capabilities inferiores ao NCP, por exemplo `github-api-route-fix.sh`;
-- **envelope normalizado de estado v2** com compatibilidade temporária para summaries v1;
-- `openai-chatgpt` como foco operacional de primeira classe, sem converter OpenAI em dependência central do substrato;
-- Cloudflare/MCP tratado como **transport/circuit**, e não como provider de aplicação;
-- superfície MCP compacta, aproveitando as tools existentes em vez de proliferar uma tool por provider;
-- temporalidade e recuperação de conexão como parte do modelo de estado;
-- políticas de DNS e proxy compatíveis com VPN, split-horizon DNS e ambientes corporativos;
-- fault injection cruzado entre substrate/provider/transport;
-- publicação Git somente depois de validar modes, paths, untracked e ausência de segredos/artifacts acidentais.
-
-A transformação deve seguir a sequência:
+A classificação causal atual do `mcp_latency_attribution` permanece:
 
 ```text
-investigação / contratos
-  → correção de trust boundaries
-    → neutralização do substrato
-      → envelope NCP v2
-        → migração GitHub/Copilot
-          → OpenAI/ChatGPT first-class
-            → correlação MCP/Cloudflare
-              → fault injection / rollout
-                → deprecação compatível
+likely-pre-mcp-or-upstream-chatgpt
 ```
 
----
+A confiança chega a **high** quando há amostra suficiente após o restart; imediatamente depois de um novo epoch ela pode cair temporariamente para `medium` até acumular ≥3 transições silenciosas. A classe causal, porém, tem permanecido estável porque handler/origin/tunnel continuam muito menores que o atraso pré-dispatch.
 
-# 1. Método, proveniência e regra de verdade
+com razões observadas como:
 
-## 1.1. Estados que nunca devem ser confundidos
+- `high-origin-http-external-gap`;
+- `predominantly-silent-external-gap`;
+- `pre-discrete-session-work-silence-dominates`;
+- `per-call-stateful-session-initialize-churn`;
+- `high-inter-tool-quiescent-gap`;
+- `origin-external-gap-much-larger-than-public-self-loop`;
+- `reported-slowness-not-explained-by-local-mcp-or-tunnel`.
 
-Toda intervenção nesta frente deve distinguir explicitamente:
+A tese operacional passa a ser:
 
-1. **estado versionado (`HEAD`)**;
-2. **mudanças locais já existentes na worktree antes da intervenção atual**;
-3. **novas mudanças produzidas por esta frente**;
-4. **estado runtime live**, que pode estar executando código diferente do `HEAD` ou do worktree;
-5. **estado remoto**, como Cloudflare edge/tunnel e ChatGPT connector;
-6. **estado documental externo**, como recomendações atuais da OpenAI.
+> **O principal imposto temporal atualmente observado é um imposto por round-trip modelo/host → tool, não um imposto de execução da tool.**
 
-Nenhuma dessas camadas é autoridade universal para as outras.
+Isso não significa que “rede não importa”. Significa que a arquitetura deve distinguir:
 
-## 1.2. Regra de autoridade
+1. **rede e origin que controlamos**;
+2. **rede cliente ↔ OpenAI**;
+3. **rede OpenAI ↔ Cloudflare/MCP**;
+4. **orquestração/model scheduling/tool planning**;
+5. **contexto/conversa/modelo**, que não são observáveis diretamente do workspace.
 
-Qualquer conclusão operacional deve poder responder:
+Consequência de engenharia:
 
-- **quem observou?**
-- **qual leg observou?**
-- **quando observou?**
-- **qual versão/schema produziu o dado?**
-- **o dado é medição, configuração, inferência ou documentação?**
-- **o dado ainda está dentro do seu freshness budget?**
-- **ele pode autorizar mutação ou é apenas advisory?**
+> Quando um novo round-trip custa tipicamente vários segundos de silêncio externo, uma tool que executa 5–20 operações seguras em lote pode produzir ganhos de ordem de grandeza maiores do que reduzir um handler local de 30 ms para 10 ms.
 
-A ausência dessas respostas é tratada como gap de contrato, não como detalhe de UX.
+Logo, o roadmap agora tem duas grandes linhas simultâneas:
 
-## 1.3. Princípio de não reescrita cega
-
-A base contém mais de 1 MiB de shell ligado a lifecycle/rede. Uma reescrita monolítica teria alto risco de regressão e baixa auditabilidade. A estratégia correta é:
-
-- extrair primitives realmente compartilhadas;
-- corrigir invariantes em owners canônicos;
-- migrar producers/consumers gradualmente;
-- manter compatibilidade explícita;
-- medir antes/depois;
-- remover legado apenas quando nenhum consumer conhecido depender dele.
+- **atribuição causal e experimentação end-to-end**;
+- **amortização segura de round-trips sob nosso controle**.
 
 ---
 
-# 2. Investigação concluída — arquivos e superfícies auditadas
+# 2. O que mudou em relação à arquitetura anterior
 
-## 2.1. Scripts Bash lidos integralmente
+A versão anterior deste documento era correta ao tratar o DevContainer Network Control Plane como infraestrutura crítica, mas implicitamente dava peso excessivo à hipótese de que a lentidão percebida estivesse no caminho DNS/proxy/Cloudflare/MCP.
 
-A arquitetura foi formulada após leitura integral dos scripts diretamente associados ao lifecycle e à rede, sobretudo os `.sh`:
+A nova instrumentação falsificou grande parte dessa hipótese.
 
+O NCP continua necessário para:
+
+- DNS;
+- proxy;
+- GitHub/Copilot;
+- OpenAI reachability;
+- Cloudflare Tunnel;
+- observabilidade de transporte;
+- recuperação de falhas;
+- `authority` e freshness;
+- correlação de eventos de WSL/Docker/tunnel;
+- suporte ao problema raro de “aguardando conexão”.
+
+Mas o NCP deixa de ser o plano superior.
+
+O estado-alvo passa a ser:
+
+```text
+Interaction Latency Control Plane (ILCP)
+├── Origin/MCP execution plane
+├── Connector/session plane
+├── Network Control Plane (NCP)
+│   ├── DNS substrate
+│   ├── proxy
+│   ├── provider reachability
+│   ├── Cloudflare tunnel
+│   └── edge/transport evidence
+├── Historical evidence plane
+├── Experiment/A-B plane
+└── External-unobservable plane
+    ├── ChatGPT host/control plane
+    ├── model inference / reasoning
+    ├── scheduler / queue
+    ├── tool planner / policy
+    ├── conversation context
+    └── client ↔ OpenAI WebSocket path
+```
+
+O ILCP não tenta “observar o invisível”. Seu objetivo é reduzir progressivamente a região não observada por exclusão causal, produzindo uma fronteira explícita de autoridade.
+
+---
+
+# 3. Princípios de autoridade e epistemologia operacional
+
+## 3.1 Estados de autoridade
+
+Cada evidência deve ser marcada como uma destas classes:
+
+- `observed-in-origin-process`;
+- `observed-at-http-origin-request-response-boundary`;
+- `reconstructed-from-persisted-origin-audit-events`;
+- `observed-container-public-mcp-self-loop-reference`;
+- `observed-from-local-cloudflared-metrics`;
+- `observed-from-container`;
+- `observed-from-client`;
+- `official-provider-documentation`;
+- `official-aggregate-status-not-individual-session-health`;
+- `configured`;
+- `inferred`;
+- `cached-observation`;
+- `stale-observation`;
+- `not-observable-from-workspace`.
+
+## 3.2 Regra de não-colapso causal
+
+Nunca transformar:
+
+```text
+“não vejo falha local”
+```
+
+em:
+
+```text
+“sei exatamente qual serviço interno da OpenAI está lento”.
+```
+
+O máximo permitido é:
+
+```text
+“o atraso foi medido antes da próxima request chegar ao nosso origin,
+while origin/tunnel/self-loop permaneciam saudáveis”.
+```
+
+Isso é evidência forte de localização **externa ao origin**, não telemetria do scheduler da OpenAI.
+
+## 3.3 Regra de falsificação
+
+Uma hipótese só sobe de prioridade quando possui:
+
+1. assinatura esperada;
+2. métrica observável;
+3. teste diferencial ou temporal;
+4. possibilidade de produzir evidência contrária.
+
+Hipóteses não falsificáveis devem ser rotuladas explicitamente como tais.
+
+---
+
+# 4. Superfícies investigadas
+
+A investigação acumulada desta frente leu e/ou modificou as seguintes famílias:
+
+## 4.1 DevContainer e network lifecycle
+
+- `.devcontainer/devcontainer.json`;
+- `.devcontainer/Dockerfile`;
 - `.devcontainer/nss-gatekeeper.sh`;
 - `.devcontainer/scripts/healthcheck.sh`;
 - `.devcontainer/scripts/network-control-plane-state.sh`;
@@ -135,848 +245,1287 @@ A arquitetura foi formulada após leitura integral dos scripts diretamente assoc
 - `.devcontainer/scripts/network/github-copilot-network-manager.sh`;
 - `.devcontainer/scripts/network/local-copilot-proxy.sh`;
 - `.devcontainer/scripts/network/local-dns-cache.sh`;
-- `scripts/ops/copilot-network-diagnose.sh`;
-- `src/copilot/mcp/cloudflare/install-cloudflared.sh`;
-- `scripts/check-devcontainer-sync.sh`.
-
-## 2.2. Configuração, contratos e operator surfaces auditados
-
-Também foram cruzados:
-
-- `.devcontainer/devcontainer.json`;
-- `.devcontainer/Dockerfile`;
 - `.devcontainer/scripts/network/contracts/summary-contracts.jsonc`;
 - `.devcontainer/scripts/network/endpoints.github-copilot.tsv`;
-- `package.json`;
-- `Makefile`;
-- `.vscode/settings.json` no estado local atual;
-- documentação operacional e roadmaps pertinentes.
+- `scripts/ops/copilot-network-diagnose.sh`.
 
-## 2.3. Consumidores e owners MCP auditados
+## 4.2 MCP / HTTP / OAuth / state
 
-- `src/copilot/mcp/tools/devcontainer-network-posture.js`;
+- `src/copilot/mcp/server.js`;
 - `src/copilot/mcp/registry.js`;
 - `src/copilot/mcp/tool-surface.js`;
+- `src/copilot/mcp/adapters/http-shared.js`;
+- `src/copilot/mcp/adapters/http-stateful-router.js`;
+- `src/copilot/mcp/control-plane/metrics.js`;
+- `src/copilot/mcp/control-plane/audit.js`;
 - `src/copilot/mcp/control-plane/jobs.js`;
-- `src/copilot/mcp/tools/jobs.js`;
-- `src/copilot/mcp/tools/meta.js`;
-- `src/copilot/mcp/cloudflare/metrics-histograms.js`;
-- `src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js`;
-- `src/copilot/mcp/tools/connection.js`;
-- `src/copilot/mcp/connection/profile.js`;
-- `src/copilot/mcp/openai/secure-tunnel-readiness.js`;
-- `src/copilot/mcp/openai/index.js`;
-- `src/copilot/mcp/openai/secure-tunnel-cli.js`.
+- `src/copilot/mcp/control-plane/session-runtime.js`;
+- `src/copilot/mcp/control-plane/session-store.js`;
+- `src/copilot/mcp/tools/runtime-health.js`;
+- `src/copilot/mcp/tools/latency-dashboard.js`;
+- `src/copilot/mcp/tools/latency-attribution.js`;
+- `src/copilot/mcp/scripts/latency-benchmark.js`;
+- testes focados correspondentes.
 
-## 2.4. Model Gateway / OpenAI abstractions auditadas
+## 4.3 Cloudflare
 
-- `src/copilot/model-gateway/providers/endpoints/openai.js`;
-- `src/copilot/model-gateway/providers/endpoints/index.js`;
-- `src/copilot/model-gateway/providers/endpoints/source-records.js`;
-- `src/copilot/model-gateway/providers/specs/openai.js`;
-- `src/copilot/model-gateway/providers/provider-adapter-registry.js`;
-- `src/copilot/model-gateway/providers/openai-provider-family-adapter.js`;
-- `src/copilot/model-gateway/providers/openai-compatible-adapter.js`.
+- `src/copilot/mcp/cloudflare/**`;
+- `metrics-histograms.js`;
+- remote audit;
+- edge audit;
+- config audit;
+- tunnel origin plan;
+- transport benchmark;
+- `http-latency-analytics.js`;
+- logs/metrics do `cloudflared`.
 
-Conclusão: Model Gateway e NCP possuem interesses adjacentes, mas não devem formar dependência circular. O primeiro conhece **provider runtime/model endpoints**; o segundo conhece **network substrate/transport reachability**.
+## 4.4 Evidência oficial externa
 
-## 2.5. Testes auditados
+Fontes primárias consultadas nesta revisão incluem:
 
-- `tests/unit/copilot/mcp/test_mcp_jobs.spec.js`;
-- `tests/unit/copilot/mcp/test_mcp_registry.spec.js`;
-- `tests/unit/copilot/mcp/test_mcp_network_resilience_semantics.spec.js`;
-- demais tests/references relevantes encontrados durante o cruzamento de contratos.
-
-## 2.6. Documentação canônica e análises históricas auditadas
-
-- `src/copilot/docs/WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md`, lido integralmente na investigação anterior desta mesma trilha;
-- `src/copilot/mcp/README.md`;
-- `src/copilot/model-gateway/README.md`;
-- `src/copilot/docs/INDEX.md`;
-- documentos locais ainda não versionados ligados a auditoria, tracing e Model Gateway.
-
----
-
-# 3. Fotografia Git e worktree em 2026-08-18
-
-## 3.1. Últimos commits observados
-
-```text
-64d80411d perf(mcp): unlock atomic target batch progress
-f4bbe3f0d fix(io): converge working set file removals
-8269656f0 perf(mcp): compact working set result flow
-c6a190db1 perf(io): diversify bounded working set selection
-0f4399c40 perf(mcp): compact patch batch result surfaces
-ef66875b7 perf(io): collapse same-file patch round trips
-a29bb018f chore(copilot): harden runtime dependency graph
-5ac2f670a perf(index): filter startup replay by index domain
-918d9fa93 perf(index): replay journal across startup checkpoints
-99eaf8187 fix(mcp): complete widget submission metadata
-5fe0ba7f8 perf(runtime): share Node 24 compile cache across MCP and terminal
-d145d8166 perf(io): compose bounded working sets across cache parser and index
-```
-
-Essa sequência confirma que a frente imediatamente anterior concentrou-se em IO, batching, working set, index e liberdade operacional do MCP. A frente de rede deve aproveitar essas primitives em vez de construir mecanismos paralelos.
-
-## 3.2. Worktree observada antes da criação deste documento
-
-Arquivos modificados incluíam:
-
-- `.devcontainer/Dockerfile`;
-- `.devcontainer/devcontainer.json`;
-- `.devcontainer/scripts/network-control-plane-state.sh`;
-- `.devcontainer/scripts/network/contracts/summary-contracts.jsonc`;
-- `.devcontainer/scripts/network/local-dns-cache.sh`;
-- `.devcontainer/scripts/post-create.sh`;
-- `.devcontainer/scripts/post-start.sh`;
-- `.vscode/settings.json`;
-- `src/copilot/mcp/cloudflare/metrics-histograms.js`;
-- `src/copilot/mcp/control-plane/jobs.js`;
-- `src/copilot/mcp/registry.js`;
-- `src/copilot/mcp/scripts/scheduled-transport-benchmark-runner.js`;
-- `src/copilot/mcp/tool-surface.js`;
-- `src/copilot/mcp/tools/devcontainer-network-posture.js`;
-- `src/copilot/mcp/tools/jobs.js`;
-- `src/copilot/mcp/tools/meta.js`;
-- `tests/unit/copilot/mcp/test_mcp_jobs.spec.js`;
-- `tests/unit/copilot/mcp/test_mcp_registry.spec.js`.
-
-Untracked observados:
-
-- `DOCUMENTAÇÃO/tracing-background-task-display-report.md`;
-- `audit_externa_src_copilot`;
-- `src/DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/LLM-B-TOOL-OPS-ANALISE-PROFUNDA-2026-06-14.md`;
-- `src/DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/model-gateway-route-switch-study.md`;
-- `tests/unit/copilot/mcp/test_mcp_network_resilience_semantics.spec.js`;
-- `workspaces/chatgpt-docker-puppeteer/catalog-analysis.md`;
-- `workspaces/chatgpt-docker-puppeteer/manual-provider-investigation.md`.
-
-## 3.3. Achado crítico de Git metadata: executable-bit regressions
-
-O diff atual mostra alterações como:
-
-```text
-old mode 100755
-new mode 100644
-```
-
-em arquivos como:
-
-- `.devcontainer/Dockerfile`;
-- `.devcontainer/devcontainer.json`;
-- `.devcontainer/scripts/network/local-dns-cache.sh`;
-- `.devcontainer/scripts/post-create.sh`;
-- `.devcontainer/scripts/post-start.sh`.
-
-Para scripts `.sh`, perder `+x` pode quebrar lifecycle hooks, comandos diretos e assumptions de execução após clone/rebuild. Mesmo quando um hook chama `bash script.sh`, o mode drift continua sendo alteração não intencional de metadata e pode afetar outros consumers.
-
-**Regra de publicação:** nenhuma sincronização total da worktree deve ocorrer antes de revisar e restaurar intencionalmente os modes canônicos.
-
-## 3.4. Achado de path-placement: diretório `workspaces/` dentro do repo
-
-Existe:
-
-```text
-workspaces/chatgpt-docker-puppeteer/catalog-analysis.md
-workspaces/chatgpt-docker-puppeteer/manual-provider-investigation.md
-```
-
-O workspace real já é `/workspaces/chatgpt-docker-puppeteer`. Logo, esse path interno parece ter sido criado a partir de um path absoluto/mental reproduzido como relativo.
-
-Os conteúdos são documentação legítima, mas **a localização é provavelmente acidental**. Antes de publicar, deve-se decidir destino canônico sob `src/DOCUMENTAÇÃO/...`, `src/copilot/docs/...` ou outra árvore documental existente.
-
-## 3.5. Achado de classificação: `audit_externa_src_copilot`
-
-É um arquivo Markdown sem extensão, ~51 KiB, contendo auditoria técnica de `src/copilot/infra` e `tools/file`. A leitura não revelou segredo evidente. O problema é de naming/placement:
-
-- nome sem extensão;
-- localização na raiz;
-- escopo documental compatível com a árvore `src/DOCUMENTAÇÃO/...`.
-
-Deve ser normalizado antes de uma publicação “all worktree”.
-
-## 3.6. Secret scan preliminar dos untracked
-
-Busca bounded por padrões `sk-`, token, secret, password, api key e bearer nos principais untracked e `.vscode/settings.json` não encontrou ocorrência suspeita. Isso **não substitui** o gate final de segredo, mas reduz a probabilidade de exposição óbvia nesses arquivos.
+- OpenAI Help — Network recommendations for ChatGPT errors on web and apps:
+  - `https://help.openai.com/en/articles/9247338`
+  - `https://help.openai.com/pt-br/articles/9247338-recomendações-de-rede-para-erros-do-chatgpt-na-web-e-em-apps`
+- OpenAI Help — Troubleshooting ChatGPT Error Messages:
+  - `https://help.openai.com/en/articles/7996703`
+- Cloudflare Tunnel — firewall/connectivity:
+  - `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/tunnel-with-firewall/`
+- Cloudflare Tunnel — run parameters:
+  - `https://developers.cloudflare.com/tunnel/advanced/run-parameters/`
+- Cloudflare Tunnel — troubleshooting:
+  - `https://developers.cloudflare.com/tunnel/troubleshooting/`
+- Cloudflare Tunnel — origin parameters:
+  - `https://developers.cloudflare.com/tunnel/advanced/origin-parameters/`.
 
 ---
 
-# 4. Fotografia live do circuito MCP/Cloudflare após reconnect
+# 5. Modelo temporal end-to-end
 
-## 4.1. Configuração atual
+## 5.1 Timeline observável
 
-Observado após reconnect:
-
-```text
-mode: named-permanent
-public MCP: https://mcp.aurelin.org/mcp
-auth: OAuth
-cloudflared edge transport: QUIC
-origin: https://127.0.0.1:3333
-origin transport: HTTP/2
-origin TLS verification: enabled
-origin server name: mcp.aurelin.org
-HA connections: 4
-```
-
-Remote audit atual: **ok**.
-
-## 4.2. Métricas atuais
-
-Snapshot observado:
+Para cada `tools/call`, o origin passa a observar:
 
 ```text
-cloudflared version: 2026.5.2
-remote active HA connections: 4
-local metrics haConnections: 4
-QUIC RTT: ~24 ms
-RPC client p95: ~1170 ms
-requestErrors: 9
-requests: 55
-cumulative requestErrorRate: ~0.163636
-response codes:
-  200: 29
-  202: 11
-  302: 1
-  400: 2
-  415: 1
+A. previous handler end
+B. previous response finish
+C. auxiliary request intervals
+D. next tools/call request arrival
+E. pre-handler end / guarded dispatch
+F. handler end
+G. response finish
 ```
 
-A taxa cumulativa de `requestErrors` não é uma taxa de falha do último intervalo. Ela precisa ser correlacionada com delta de counters, smoke, HA, origin logs e response-code deltas.
-
-## 4.3. Evento de reconnect observado
-
-No log houve um burst concentrado em aproximadamente:
+Definições:
 
 ```text
-2026-08-18T17:07:34Z
+originPostHandler = B - A
+externalGap       = D - B
+auxiliaryCoverage = union(requestIntervals ∩ [B,D])
+silentExternalGap = externalGap - auxiliaryCoverage
+originPreHandler  = E - D
+handler           = F - E
+nextPostHandler   = G - F
 ```
 
-com:
+## 5.2 Por que `silentExternalGap` é a métrica central
 
-- `accept stream listener encountered a failure while serving`;
-- `control stream encountered a failure while serving`;
-- quatro `Connection terminated` / falhas equivalentes;
-- reconexão das quatro sessões HA entre ~17:07:35Z e ~17:07:38Z.
+Antes dessa instrumentação, um gap de 10 s poderia esconder:
 
-Depois da recuperação:
+- `tools/list`;
+- initialize;
+- OAuth refresh;
+- metadata;
+- SSE reconnect;
+- outros requests do connector.
 
-- remote tunnel = healthy;
-- 4/4 conexões;
-- QUIC presente;
-- remote audit = green;
-- nenhum origin error acionável;
-- somente `context canceled` classificados como benign lifecycle cancellations.
+Agora isso é quantificado.
 
-Esse evento é altamente compatível com o restart/reconnect deliberado informado pelo operador. Ele demonstra, porém, uma propriedade importante: **o modelo de saúde deve representar interruption → recovery**, e não apenas “houve erro recente”.
+Na janela recente:
 
-## 4.4. Smoke
+```text
+externalGap p50        ≈ 8.5 s
+silentExternalGap p50  ≈ 8.3 s
+auxiliaryCoverage p50  ≈ 0.15 s
+overall coverage       ≈ 1.8%
+```
 
-O último connector smoke persistido estava ~33 minutos antigo, ainda dentro do budget de 60 minutos usado pelo runtime e com `ok=true`.
+Logo, aproximadamente 98% do intervalo não contém trabalho HTTP/MCP observável no origin.
 
-O estado atual não exige concluir que houve falha após o reconnect; os gates pós-mudança passaram. Todavia, para incident response ideal, um reconnect de tunnel deveria poder registrar um **recovery epoch** e opcionalmente invalidar/baixar a autoridade de smoke anterior quando a topologia mudou materialmente.
+Essa observação é mais forte do que simplesmente dizer “handler é rápido”.
 
 ---
 
-# 5. “Aguardando conexão” — modelo causal completo
+# 6. Experimento controlado `mcp_latency_pulse`
 
-A mensagem “aguardando conexão” no cliente ChatGPT não pode ser atribuída automaticamente ao MCP ou ao Cloudflare. Há pelo menos cinco legs independentes.
+A tool `mcp_latency_pulse` existe para remover o workload como confounder.
 
-## 5.1. Leg A — cliente ChatGPT ↔ infraestrutura OpenAI
+Características:
 
-```text
-app/web ChatGPT
-  ↕ TLS / WebSocket / HTTP
-chatgpt.com / ws.chatgpt.com / infraestrutura OpenAI
-```
+- sem I/O de repositório;
+- sem parsing de arquivos;
+- sem consulta externa;
+- payload mínimo;
+- resultado mínimo;
+- handler tipicamente ~0–1 ms.
 
-Possíveis causas:
-
-- Wi‑Fi/ISP local;
-- perda momentânea de rota;
-- proxy corporativo;
-- inspeção TLS;
-- timeout de WebSocket;
-- bloqueio/intermitência em `ws.chatgpt.com`;
-- suspensão do aplicativo/background networking;
-- instabilidade do serviço OpenAI.
-
-**Importante:** este leg pode produzir “aguardando conexão” mesmo se o nosso MCP estiver perfeito.
-
-## 5.2. Leg B — OpenAI backend ↔ endpoint MCP público
+Série controlada observada:
 
 ```text
-infra OpenAI
-  → https://mcp.aurelin.org/mcp
+~9.9 s
+~5.2 s
+~5.0 s
+~7.9 s
+~7.9 s
+~8.4 s
+~5.0 s
+~5.3 s
 ```
 
-Esse leg não é provado por um `curl` local. Evidências adequadas:
-
-- connector smoke real;
-- tools/list/tool execution observadas pelo cliente;
-- edge/tunnel request logs/metrics;
-- OAuth discovery e callback reais.
-
-## 5.3. Leg C — Cloudflare edge ↔ cloudflared
+Série adicional:
 
 ```text
-Cloudflare edge
-  ↔ QUIC/HTTP2 tunnel
-cloudflared
+~10.4 s
+~6.3 s
+~8.5 s
 ```
 
-Possíveis causas:
+Conclusão:
 
-- QUIC path disruption;
-- UDP/NAT timeout;
-- reconnect do daemon;
-- restart intencional;
-- edge migration;
-- route/ISP changes;
-- event loop/runtime kill externo.
+> A variação de vários segundos sobrevive quando a tool executada é praticamente constante e trivial.
 
-A arquitetura já mantém 4 HA connections, reduzindo blast radius de uma conexão individual.
+Isso enfraquece fortemente as hipóteses de:
 
-## 5.4. Leg D — cloudflared ↔ origin local
-
-```text
-cloudflared
-  → HTTPS/H2 127.0.0.1:3333
-MCP origin
-```
-
-Possíveis causas:
-
-- origin restart;
-- TLS mismatch;
-- port not listening;
-- event-loop saturation;
-- process crash;
-- container pressure;
-- request cancellation normal.
-
-`context canceled` isolado não deve ser promovido automaticamente a origin failure.
-
-## 5.5. Leg E — Windows/WSL/Docker/DevContainer
-
-```text
-Windows host
-  → WSL2 VM
-    → Docker Desktop / engine
-      → container
-        → cloudflared + MCP
-```
-
-Uma queda do WSL derruba simultaneamente origin, cloudflared e qualquer observabilidade local. Esse evento já ocorreu historicamente neste projeto e deve ser first-class no diagnóstico.
-
-## 5.6. Estado-alvo para “aguardando conexão”
-
-O sistema deve produzir uma classificação como:
-
-```text
-client_openai_leg: unknown / suspected / healthy-from-client-evidence
-openai_mcp_leg: healthy / degraded / unknown
-cloudflare_tunnel_leg: healthy / recovering / degraded
-origin_leg: healthy / degraded
-host_container_leg: healthy / degraded / restarted
-correlation_confidence: low / medium / high
-```
-
-A ferramenta nunca deve responder “o problema foi Cloudflare” apenas porque houve um tunnel error em janela semelhante.
+- I/O do repo;
+- parser;
+- tamanho do arquivo;
+- handler específico;
+- result payload;
+- serialização local.
 
 ---
 
-# 6. Documentação OpenAI atual e implicações arquitetônicas
+# 7. Histórico longitudinal e efeito horário
 
-## 6.1. Fontes oficiais consultadas
+O audit append-only já existente (`src/copilot/.ai/audit/mcp-tool-calls.jsonl`) permite reconstrução retroativa de gaps.
 
-Em 2026-08-18 foram verificadas fontes oficiais, incluindo:
+A análise bounded:
 
-- `https://help.openai.com/en/articles/9247338-network-recommendations-for-chatgpt-errors-on-web-and-apps`;
-- `https://help.openai.com/en/articles/12111596-ip-allowlisting-for-chatgpt`;
-- `https://platform.openai.com/docs/api-reference/realtime`;
-- `https://platform.openai.com/docs/quickstart`;
-- `https://developers.openai.com/`.
+- lê apenas tail limitado;
+- ignora linha parcial;
+- preserva concorrência;
+- separa idle >60 s;
+- reconstrói bursts;
+- gera janelas 15 min / 1 h / 6 h / 24 h;
+- produz buckets horários;
+- produz baseline p25;
+- identifica pulsos controlados.
 
-## 6.2. Implicação 1 — HTTPS não é suficiente
+Janelas observadas demonstraram variação temporal relevante:
 
-ChatGPT utiliza conexões persistentes/WebSocket em cenários relevantes. A documentação oficial cita `ws.chatgpt.com` e TCP/443, além de alertar para problemas com proxies e inspeção TLS.
+- hora rápida: p50 ≈ **5,47 s**;
+- hora lenta: p50 ≈ **14,65 s**;
+- diversas janelas entre ~8 e ~13 s.
 
-Logo, o registry futuro deve representar:
+Isso é compatível com:
 
-- DNS;
-- TCP;
-- TLS;
-- HTTP;
+- carga upstream;
+- scheduler/model queue;
+- diferenças de modelo/turno;
+- diferenças de workload;
+- diferenças de contexto;
+- diferenças regionais.
+
+Não é prova causal isolada porque o workload histórico varia.
+
+O `mcp_latency_pulse` é, daqui em diante, o controle para remover esse confounder.
+
+---
+
+# 8. Hipótese de degradação por conversa/sessão longa
+
+Foi criada uma heurística limitada de *active work cluster*:
+
+- um cluster termina após >30 min sem tool burst;
+- gaps são classificados por idade do cluster:
+  - 0–30m;
+  - 30–60m;
+  - 1–2h;
+  - 2–4h;
+  - 4h+.
+
+Resultado representativo:
+
+| idade heurística | p50 |
+|---|---:|
+| 0–30m | ~9,9 s |
+| 30–60m | ~12,7 s |
+| 1–2h | ~13,5 s |
+| 2–4h | ~11,5 s |
+| 4h+ | ~8,7 s |
+
+`late/early ≈ 0,93`.
+
+Conclusão:
+
+> O audit MCP **não sustenta uma degradação monotônica simples em função da duração contínua de trabalho**.
+
+Isso **não** falsifica a hipótese de contexto de conversa longa, porque o workspace não observa:
+
+- token count real da conversa;
+- tamanho do prompt interno;
+- contexto comprimido;
+- tool result ingestion do host;
+- cache de contexto do modelo;
+- tempo de inferência/model scheduling.
+
+A OpenAI atualmente recomenda, para ChatGPT lento ou preso, testar **novo chat** quando a conversa é longa, além de rede/browser/VPN. Essa recomendação torna o A/B “conversa nova vs conversa longa” um experimento legítimo do lado cliente.
+
+---
+
+# 9. Stateful MCP: nova descoberta de churn por tool call
+
+## 9.1 O servidor está realmente stateful
+
+O runtime observado mostra:
+
+```text
+enabled=true
+requested=true
+statelessCompat=false
+TTL=600000 ms
+maxSessions=256
+statelessFallbackRequests=0
+```
+
+Logo, não existe uma regressão simples para stateless.
+
+## 9.2 O cliente/host inicializa uma sessão nova por chamada
+
+A activity timeline demonstrou, aproximadamente 1:1:
+
+```text
+initialize
+notifications/initialized
+tools/call
+```
+
+por tool call.
+
+Exemplo observado:
+
+```text
+8 tools/call
+8 initialize
+8 notifications/initialized
+```
+
+## 9.3 Acúmulo live
+
+Após restart:
+
+```text
+activeSessions = 2
+registered = 2
+terminated = 0
+```
+
+Depois de três pulses + uma leitura adicional:
+
+```text
+activeSessions = 6
+registered = 6
+terminated = 0
+expired = 0
+```
+
+Depois:
+
+```text
+activeSessions = 8
+registered = 8
+terminated = 0
+```
+
+Conclusão:
+
+> O host cria uma nova sessão stateful por call e não termina imediatamente a anterior.
+
+## 9.4 Por que isso não explica a latência principal
+
+O initialize/notifications/SSE observado consome normalmente da ordem de **centenas de milissegundos**, enquanto o `silentExternalGap` consome vários segundos.
+
+Logo:
+
+- **causa principal da latência:** não;
+- **overhead real:** sim;
+- **risco de capacidade:** potencialmente;
+- **fonte de ruído operacional:** sim.
+
+## 9.5 Política correta
+
+Não reduzir TTL cegamente.
+
+O runtime faz sweep de expirados em novos initializes, portanto não existe leak ilimitado; existe uma janela deslizante definida pelo TTL.
+
+O ILCP agora projeta:
+
+```text
+registrationsPerMinute
+projectedSessionsAtTtl
+projectedCapacityRatio
+```
+
+Na janela controlada pós-reload observada em 2026-08-18:
+
+```text
+activeSessions           = 7
+registrationsPerMinute   ≈ 10,23
+projectedSessionsAtTtl   ≈ 102,3
+maxSessions              = 256
+projectedCapacityRatio   ≈ 0,40
+projectionStatus         = headroom-ok
+```
+
+Logo, **não existe evidência atual para baixar TTL ou elevar `maxSessions` como remediação**. O churn deve continuar monitorado, mas o headroom projetado é suficiente na taxa observada.
+
+Essas projeções devem ser usadas antes de decidir:
+
+- TTL;
+- maxSessions;
+- reclaim adaptativo;
+- mudança de compatibilidade.
+
+Preferência de mitigação:
+
+1. reutilização pelo cliente, se possível;
+2. terminação explícita pelo cliente;
+3. reclaim somente de sessões comprovadamente abandonadas;
+4. TTL experimental controlado;
+5. aumentar `maxSessions` apenas se necessário e com budget de memória/state store.
+
+---
+
+# 10. Network Control Plane atual
+
+## 10.1 DNS
+
+Estado observado:
+
+- dnsmasq local operacional;
+- `resolv.conf` apontando para `127.0.0.1`;
+- warmup operacional;
+- sem evidência de resolução quebrada para o circuito MCP;
+- proxy global off.
+
+O NCP agregado ainda pode aparecer degradado quando artifacts antigos de GitHub/Copilot são stale. Isso deve ser corrigido semanticamente: artifact stale não pode governar runtime atual.
+
+## 10.2 Cloudflare Tunnel
+
+Config canônica:
+
+```text
+public  = https://mcp.aurelin.org/mcp
+mode    = named-permanent
+auth    = OAuth
+edge    = Cloudflare
+cf→origin protocol = HTTP/2 quando solicitado
+origin  = https://127.0.0.1:3333
+SNI     = mcp.aurelin.org
+transport cloudflared→edge = QUIC atualmente
+HA      = 4
+```
+
+## 10.3 Public self-loop
+
+Probe:
+
+```text
+container → mcp.aurelin.org → Cloudflare → tunnel → origin → container
+```
+
+Resultados recentes:
+
+```text
+p50 ≈ 0,18–0,30 s
+```
+
+Versus gap externo:
+
+```text
+p50 ≈ 6–12+ s
+```
+
+Esse A/B é uma das evidências mais fortes contra o tunnel ordinário como gargalo dominante.
+
+## 10.4 Edge colo
+
+Requests atuais chegam majoritariamente em `GRU`.
+
+A latência externa varia de múltiplos segundos **mantendo `GRU`**.
+
+Logo, mudança de colo não é necessária para produzir o problema.
+
+Isso enfraquece:
+
+- anycast colo switching;
+- rota do edge como causa dominante;
+- mudança aleatória de IP do origin como remediação primária.
+
+## 10.5 Cloudflare rules
+
+Auditorias confirmaram regra específica do hostname MCP que desliga ou neutraliza features inadequadas para uma API dinâmica:
+
+- Browser Integrity Check;
+- Rocket Loader;
+- Email Obfuscation;
+- buffering de response;
+- cache em paths dinâmicos.
+
+WAF/rulesets atuais não exibiram bloqueio/challenge capaz de explicar o padrão de silêncio observado.
+
+## 10.6 Benchmark controlado QUIC ↔ AUTO ↔ HTTP/2
+
+O runner fixo executou cinco smokes canônicos idênticos por perfil e restaurou automaticamente o controle QUIC.
+
+Resultados:
+
+| perfil | p50 smoke | p95 smoke | HA | smokes |
+|---|---:|---:|---:|---|
+| QUIC | 7765 ms | 8042 ms | 4 | 5/5 verdes |
+| AUTO | 7860 ms | 7949 ms | 4 | 5/5 verdes |
+| HTTP/2 | 7591 ms | 8016 ms | 4 | 5/5 verdes |
+
+Diferença p95 em relação ao controle QUIC:
+
+```text
+AUTO   ≈ -1,16%
+HTTP/2 ≈ -0,32%
+```
+
+Todos os perfis foram comparáveis e passaram os hard gates. Os deltas brutos de `cloudflared requestErrors` permaneceram `review-required`, não veto, porque smokes, response codes e HA ficaram saudáveis.
+
+Conclusão:
+
+> **QUIC vs TCP/HTTP2 não produz diferença de ordem de grandeza compatível com os gaps silenciosos de múltiplos segundos.**
+
+Isso enfraquece fortemente hipóteses de UDP/QUIC/MTU como causa central do fenômeno atual. QUIC permanece o controle porque está saudável; HTTP/2 permanece rollback/baseline TCP, não “correção de latência”.
+
+## 10.7 GraphQL analytics
+
+Foi criada uma capability read-only para consultar Cloudflare HTTP Analytics.
+
+O plano/token atual não expõe os timing fields desejados (`EdgeTimeToFirstByteMs` etc.) na superfície consultada.
+
+Isso deve ser tratado como:
+
+```text
+capability gap
+```
+
+não como:
+
+```text
+network failure
+```
+
+Melhoria futura opcional: introspecção de schema e escolha dinâmica de campos disponíveis.
+
+---
+
+# 11. OpenAI/ChatGPT: fatos de rede que importam
+
+A documentação atual da OpenAI explicita que ChatGPT utiliza WebSocket seguro além de HTTPS em algumas superfícies.
+
+Destinos documentados incluem:
+
+```text
+wss://ws.chatgpt.com
+wss://chatgpt.com/
+```
+
+A OpenAI recomenda verificar:
+
+- TCP 443;
+- WebSocket Upgrade;
+- VPN;
+- proxy;
+- TLS inspection / SSL decryption;
+- secure web gateways;
+- WebSocket idle timeout;
+- frame/message size limits;
+- mudança para outra rede;
+- hotspot celular;
+- outro dispositivo/browser;
+- conversa nova quando a conversa longa apresenta lentidão;
+- HAR/console com timestamps em casos persistentes.
+
+Esses fatos geram experimentos legítimos do lado cliente, mas não devem ser confundidos com telemetria do origin MCP.
+
+## 11.1 Três relógios que não podem mais ser confundidos
+
+A investigação passou a separar explicitamente três famílias de tempo:
+
+### A. ChatGPT UI TTFT
+
+```text
+submit do usuário → primeiro token do assistente renderizado/streamed no cliente
+```
+
+- é o TTFT que melhor descreve a sensação de “começou a responder?”;
+- **não é observável diretamente pelo origin MCP**;
+- requer timestamp do cliente, HAR ou observer local;
+- agora possui contrato próprio de evidência sanitizada em `mcp_client_latency_evidence`;
+- o histórico não armazena prompt, completion, HAR bruto, URL, cookie, token nem IP.
+
+### B. OpenAI/ChatGPT endpoint TTFB visto do DevContainer
+
+```text
+request HTTPS nova no DevContainer → primeiros headers HTTP do endpoint fixo
+```
+
+O novo observador `mcp_openai_endpoint_latency` mede, no mesmo request:
+
+```text
+DNS → TCP → TLS → TTFB → body/end → total
+```
+
+Targets fechados:
+
+```text
+chatgpt.com
+ws.chatgpt.com
+api.openai.com
+```
+
+Authority:
+
+```text
+observed-from-devcontainer-to-fixed-openai-endpoints
+```
+
+Esse TTFB é um **canary de caminho/rede/edge**, não inferência de modelo e não TTFT da UI.
+
+Primeiro baseline live no modo thinking high:
+
+| target | DNS p50 | TCP p50 | TLS p50 | TTFB p50 | TTFB p95 | edge |
+|---|---:|---:|---:|---:|---:|---|
+| `chatgpt.com` | 5 ms | 25 ms | 28 ms | **83 ms** | 121 ms | GRU |
+| `ws.chatgpt.com` | 4 ms | 24 ms | 25 ms | **240 ms** | 614 ms | GRU |
+| `api.openai.com` | 3 ms | 29 ms | 27 ms | **274 ms** | 414 ms | GRU |
+
+Os status HTTP `403/404/401` observados são semanticamente aceitáveis como prova de reachability não autenticada dos endpoints correspondentes; o observador mede o caminho até a primeira resposta, não sucesso de produto/autorização.
+
+### C. MCP pre-dispatch / pre-session delay
+
+```text
+response finish da tool anterior → primeiro trabalho discreto do ciclo seguinte
+```
+
+Em amostra madura:
+
+```text
+external gap p50                    ≈ 7,08 s
+first discrete work delay p50       ≈ 6,87 s
+first discrete / external ratio     ≈ 97,1%
+primeiro RPC discreto               = initialize
+tail após trabalho discreto p50     ≈ 83 ms
+```
+
+Logo:
+
+> **o atraso dominante medido no tool loop surge antes até mesmo de o próximo `initialize` alcançar o MCP.**
+
+Essa métrica não é TTFT, mas é hoje o melhor relógio server-side para localizar o imposto entre tools.
+
+## 11.2 Persistência e baseline dos endpoints OpenAI
+
+Novo histórico bounded:
+
+```text
+src/copilot/.ai/mcp/openai-endpoint-latency.jsonl
+```
+
+Propriedades:
+
+- conexão HTTPS fresca por sample;
+- nenhuma resposta/body persistida;
+- nenhum IP bruto persistido;
+- colo Cloudflare reduzido ao sufixo seguro;
+- até 1000 snapshots por default;
+- tail de leitura bounded;
+- baseline de 24h;
+- regressão TTFB somente quando simultaneamente `>=2x` e `>=150 ms` sobre baseline, evitando alarmes por ruído pequeno.
+
+## 11.3 Evidência TTFT de cliente
+
+Novo histórico bounded:
+
+```text
+src/copilot/.ai/mcp/client-latency-evidence.jsonl
+```
+
+Amostras podem carregar somente:
+
+- `source = manual|har|client-observer`;
+- `ttftMs`;
+- `firstToolDispatchMs` opcional;
+- `turnCompleteMs` opcional;
+- `thinkingMode`;
+- labels sanitizados de modelo/rede/conversa/client/VPN/série.
+
+O resumo produz p25/p50/p95 e comparação high↔medium, mas só marca a comparação como direcionalmente suficiente quando há pelo menos cinco amostras em cada grupo.
+
+## 11.4 API streaming TTFT
+
+É uma quarta métrica possível:
+
+```text
+request autenticada ao modelo → primeiro delta/chunk de output
+```
+
+Ela exige uma chamada real de modelo e pode consumir quota/custo. Portanto:
+
+- não deve ser executada escondida dentro de health checks;
+- deve usar model/endpoint/prompt fixos e allowlisted;
+- deve exigir opt-in explícito de uso;
+- deve ser analisada separadamente do TTFT da UI do ChatGPT.
+
+---
+
+# 12. Catálogo causal — HYP-001 a HYP-055
+
+Legenda:
+
+- **CONFIRMADA-PRIMÁRIA:** evidência forte de contribuição dominante;
+- **CONFIRMADA-SECUNDÁRIA:** existe, mas explica pequena fração;
+- **ENFRAQUECIDA:** evidência atual vai contra a hipótese como causa principal;
+- **FORTEMENTE ENFRAQUECIDA:** múltiplos experimentos contradizem;
+- **PLAUSÍVEL:** compatível, ainda sem observabilidade suficiente;
+- **NÃO OBSERVÁVEL:** workspace não tem autoridade direta;
+- **A TESTAR:** há experimento concreto ainda não executado.
+
+## 12.1 Origin / tool execution
+
+### HYP-001 — handler das tools é lento
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **assinatura esperada:** handler p50/p95 acompanha demora percebida.
+- **evidência:** pulses com handler ~0–1 ms ainda exibem 5–10 s.
+- **mitigação:** manter otimizações locais, mas não tratá-las como solução do gap.
+
+### HYP-002 — parsing/SDK dispatch do MCP é lento
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **métrica:** `preHandler`.
+- **evidência:** poucos milissegundos.
+
+### HYP-003 — serialização/finalização da resposta é lenta
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **métrica:** `postHandler`.
+- **evidência:** poucos milissegundos.
+
+### HYP-004 — I/O do repositório é o gargalo principal
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** pulse sem I/O mantém o problema.
+
+### HYP-005 — parser/index/cache locais dominam
+
+- **status:** FORTEMENTE ENFRAQUECIDA para o gap entre tools.
+- **nota:** continuam relevantes ao custo **dentro** de tools pesadas.
+
+### HYP-006 — validator CPU contention domina
+
+- **status:** ENFRAQUECIDA como causa geral.
+- **teste futuro:** comparar pulses com validator idle vs ativo.
+- **mitigação:** validators sequenciais/bounded continuam corretos.
+
+## 12.2 Tool schema / payload / count
+
+### HYP-007 — quantidade total de tools é a causa local principal
+
+- **status:** ENFRAQUECIDA.
+- **evidência:** runtime local e pulse não dependem da listagem total durante cada call.
+- **ressalva:** o host/model pode pagar custo interno de tool selection sobre o schema; isso é NÃO OBSERVÁVEL do workspace.
+- **ação:** manter default 250 como headroom; não usar redução de tools como “cura” sem A/B.
+
+### HYP-008 — tamanho do payload de `tools/list` domina cada call
+
+- **status:** ENFRAQUECIDA.
+- **evidência:** não houve `tools/list` entre pulses.
+- **ação:** budget elevado proporcionalmente, mas fora da hipótese central.
+
+### HYP-009 — tamanho do resultado da tool domina
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** pulse com resultado mínimo continua lento.
+
+### HYP-010 — context ingestion do host após resultados grandes
+
+- **status:** PLAUSÍVEL.
+- **assinatura:** gaps maiores após results grandes, controlando modelo/horário.
+- **experimento:** bucket de gap por result bytes da call anterior.
+- **mitigação:** compact results, local persistence, references/hints.
+
+## 12.3 Connector/session
+
+### HYP-011 — `tools/list` é repetido entre cada tool
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** pulse chain registrou `initialize` e `notifications/initialized`, não `tools/list` por call.
+
+### HYP-012 — OAuth refresh domina
+
+- **status:** ENFRAQUECIDA.
+- **evidência:** coverage auxiliar pequena; authorization local cache saudável.
+
+### HYP-013 — nova sessão MCP por tool call
+
+- **status:** CONFIRMADA-SECUNDÁRIA.
+- **evidência:** initialize/tool ≈ 1; sessions 2→6→8.
+- **custo:** ~centenas de ms, não segundos.
+- **mitigação:** observar/reduzir churn sem quebrar compatibilidade.
+
+### HYP-014 — sessões acumuladas esgotam capacidade
+
+- **status:** A TESTAR / projetável.
+- **métrica:** `registrationsPerMinute × TTL / maxSessions`.
+- **ação:** capacity projection first; nenhuma mudança cega de TTL.
+
+### HYP-015 — session-store SQLite é o gargalo
+
+- **status:** ENFRAQUECIDA.
+- **assinatura:** initialize/touch teria duração material.
+- **evidência:** coverage auxiliar baixa.
+
+### HYP-016 — SSE reconnect churn explica o gap
+
+- **status:** ENFRAQUECIDA como causa dominante.
+- **evidência:** activity union explica ~1–2%.
+
+## 12.4 Cloudflare / origin transport
+
+### HYP-017 — Cloudflare Tunnel ordinário é lento
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** self-loop ~0,2–0,3 s; gap externo dezenas de vezes maior.
+
+### HYP-018 — QUIC RTT alto explica segundos
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** RTT ~dezenas de ms.
+
+### HYP-019 — UDP/QUIC/MTU causa stalls
+
+- **status:** FORTEMENTE ENFRAQUECIDA como causa central.
+- **evidência:** packet-too-big drops não aparecem; tunnel permanece 4 HA; benchmark com 5 smokes por perfil produziu p95 8042 ms (QUIC), 7949 ms (AUTO) e 8016 ms (HTTP/2), diferenças de ~1% ou menos.
+- **conclusão:** a troca de protocolo não altera a ordem de grandeza do workload e não explica silent gaps de 6–17 s.
+- **ação:** manter QUIC enquanto saudável e H2 como rollback/baseline.
+
+### HYP-020 — troca de edge colo causa variação
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** variação grande mantendo `GRU`.
+
+### HYP-021 — BIC/WAF/browser features degradam MCP
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** rule específica neutraliza features relevantes.
+
+### HYP-022 — cache/buffering Cloudflare introduz latência
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** cache bypass e buffering none no path relevante.
+
+### HYP-023 — origin TLS/H2 handshake é dominante
+
+- **status:** ENFRAQUECIDA.
+- **evidência:** self-loop inclui esse circuito e permanece subsegundo.
+
+### HYP-024 — OpenAI→Cloudflare path é ruim, mas container→Cloudflare não
+
+- **status:** PLAUSÍVEL.
+- **autoridade:** não observável diretamente sem edge analytics/logs adicionais.
+- **experimento:** Cloudflare request analytics/logpush, se plano permitir; comparar colos/TTFB.
+
+## 12.5 DNS / proxy / DevContainer
+
+### HYP-025 — DNS local lento causa gap
+
+- **status:** FORTEMENTE ENFRAQUECIDA para tools/call.
+- **evidência:** próxima call nem chega ao origin durante o silêncio.
+
+### HYP-026 — dnsmasq ownership conflict degrada
+
+- **status:** corrigida anteriormente; não suportada atualmente.
+
+### HYP-027 — proxy global do DevContainer interfere
+
+- **status:** FORTEMENTE ENFRAQUECIDA.
+- **evidência:** proxy off.
+
+### HYP-028 — WSL/Docker queda parcial causa o sintoma
+
+- **status:** PLAUSÍVEL para “aguardando conexão” abrupto, não para gap persistente com health verde.
+- **assinatura:** origin/tunnel indisponível, recovery epoch, smoke falhando.
+
+## 12.6 ChatGPT/OpenAI host/model plane
+
+### HYP-029 — model inference/reasoning entre tools consome segundos
+
+- **status:** PLAUSÍVEL, PRIORIDADE MÁXIMA ENTRE AS CAUSAS NÃO OBSERVÁVEIS.
+- **autoridade:** NÃO OBSERVÁVEL diretamente.
+- **evidência de localização:** em amostra recente, `externalGap p50≈7,08 s`, `first discrete auxiliary delay p50≈6,87 s`, razão ≈97%; o primeiro RPC discreto foi `initialize` e a cauda posterior ficou ≈83 ms p50.
+- **interpretação:** o atraso acontece majoritariamente **antes de o host iniciar a próxima negociação MCP**, portanto reasoning/scheduling/planning ganham peso relativo.
+- **mitigação:** menos round-trips; modelo/configuração A/B quando possível.
+
+### HYP-030 — scheduler/queue da OpenAI varia por carga
+
+- **status:** PLAUSÍVEL, PRIORIDADE MÁXIMA ENTRE AS CAUSAS NÃO OBSERVÁVEIS.
+- **evidência indireta:** forte variação horária + pulses triviais que continuam variando vários segundos antes do primeiro `initialize`.
+- **experimento:** pulses recorrentes por horário/modelo, com labels experimentais persistidos no audit.
+
+### HYP-031 — tool planner/policy evaluation do host é caro
+
+- **status:** PLAUSÍVEL, ALTA PRIORIDADE.
+- **evidência de localização:** ~94–97% do gap recente precede o primeiro `initialize`, compatível com deliberação/tool-selection anterior à abertura da sessão MCP.
+- **experimento:** A/B com superfície reduzida vs completa, sem assumir causalidade antes da medição.
+- **nota:** isso é diferente de dizer que “250 tools são o problema”; count/schema só podem ser promovidos causalmente por A/B controlado.
+
+### HYP-032 — schema complexity pesa mais que contagem
+
+- **status:** PLAUSÍVEL.
+- **experimento:** mesma quantidade de tools com descriptors compactos vs ricos, se houver harness isolado.
+
+### HYP-033 — contexto de conversa longa aumenta reasoning/selection
+
+- **status:** PLAUSÍVEL.
+- **evidência:** OpenAI recomenda novo chat em cenários de lentidão; heurística MCP não mede tokens reais.
+- **experimento:** pulse em conversa nova vs conversa longa, mesmo modelo/horário/rede.
+
+### HYP-034 — modelo/configuração de thinking possui maior inter-tool latency
+
+- **status:** PLAUSÍVEL, com primeiro sinal quantitativo.
+- **experimento executado:** `thinking-medium-20260818` vs `thinking-high-20260818`, pulse trivial, n=7 estabilizados por condição.
+- **medium:** média ≈5,47 s; p50≈5,59 s; p95≈7,33 s.
+- **high:** média ≈5,93 s; p50≈6,43 s; p95≈7,17 s.
+- **leitura:** high foi ≈15% pior na mediana e ≈8% pior na média, mas o p95 foi praticamente igual e a amostra é pequena. Portanto thinking high pode contribuir, porém **não é suficiente para explicar o piso multissegundo**, que persiste nos dois modos.
+- **próximo experimento:** séries intercaladas ABAB, maior n, mesma janela/rede/conversa, descartando explicitamente o primeiro pulse de warmup após troca de modo.
+
+### HYP-035 — tier/account/load balancing altera scheduling
+
+- **status:** NÃO OBSERVÁVEL diretamente.
+- **ação:** histórico comparativo somente; evitar alegação causal forte.
+
+### HYP-036 — serviço interno da OpenAI tem degradação sem status global
+
+- **status:** PLAUSÍVEL.
+- **nota:** Statuspage é agregada e não prova saúde individual.
+
+## 12.7 Client ↔ OpenAI
+
+### HYP-037 — WebSocket cliente está instável
+
+- **status:** PLAUSÍVEL para spinner/stall/turn-level; menos convincente para silêncio server→MCP dentro de um turno.
+- **fonte:** OpenAI documenta `ws.chatgpt.com` e problemas de proxies/TLS inspection.
+- **experimento:** HAR/console + hotspot.
+
+### HYP-038 — VPN/proxy do cliente introduz stalls
+
+- **status:** A TESTAR.
+- **experimento:** VPN off vs on, mantendo restante constante.
+
+### HYP-039 — secure DNS / security filter do cliente interfere
+
+- **status:** A TESTAR.
+- **fonte:** OpenAI recomenda desabilitar secure DNS/Web Protect em troubleshooting.
+
+### HYP-040 — browser extension interfere
+
+- **status:** A TESTAR para UI/browser.
+- **experimento:** incognito/clean profile.
+
+### HYP-041 — aplicativo desktop vs browser possui diferença
+
+- **status:** A TESTAR.
+- **experimento:** mesmo modelo/conversa/rede, pulse sequence equivalente.
+
+## 12.8 IP / ISP / route
+
+### HYP-042 — trocar IP público do origin melhora muito
+
+- **status:** ENFRAQUECIDA como ação primária.
+- **razão:** self-loop atual já é subsegundo; origin IP não é o endpoint público do usuário, pois o tunnel é outbound.
+- **experimento permitido:** reconectar WAN/ISP somente em janela A/B, medir self-loop/HA/colo/pulse.
+
+### HYP-043 — trocar IP/rede do cliente melhora ChatGPT
+
+- **status:** A TESTAR; legitimada por documentação OpenAI.
+- **experimento:** Wi-Fi atual ↔ hotspot celular.
+- **métricas:** pulse p50/p95, UI stall, WebSocket/HAR.
+
+### HYP-044 — ISP/ASN do cliente possui peering ruim com OpenAI
+
+- **status:** PLAUSÍVEL.
+- **experimento:** hotspot de operadora distinta / VPN de teste bem controlada.
+
+### HYP-045 — IPv6 do cliente possui rota pior que IPv4
+
+- **status:** PLAUSÍVEL.
+- **experimento:** A/B IPv4-only vs dual-stack apenas se seguro e reversível.
+
+### HYP-046 — MTU/fragmentação na rede cliente
+
+- **status:** PLAUSÍVEL para WebSocket/stalls; ENFRAQUECIDA para tunnel atual.
+- **experimento:** path-MTU diagnóstico, não tuning aleatório.
+
+### HYP-047 — NAT/router doméstico causa WebSocket idle reset
+
+- **status:** PLAUSÍVEL para sessões longas.
+- **experimento:** hotspot direto vs roteador atual.
+
+### HYP-048 — IP do cliente foi classificado/limitado
+
+- **status:** BAIXA PRIORIDADE sem mensagens de “atividade incomum”.
+- **fonte:** OpenAI reconhece que VPN/proxy/IP podem participar de detecção de tráfego incomum.
+
+## 12.9 Workstation/runtime
+
+### HYP-049 — CPU/GPU/VS Code do cliente bloqueiam resposta da UI
+
+- **status:** PLAUSÍVEL para rendering/UI, não para chegada server-side ao MCP.
+- **experimento:** comparar browser/app/CPU load; origin timestamps continuam separando.
+
+### HYP-050 — pressão de memória/WSL provoca jitter indireto
+
+- **status:** PLAUSÍVEL para tools locais pesadas; ENFRAQUECIDA para pulse com origin quiet.
+- **experimento:** correlacionar host/WSL health com gaps; distinguir crash/recovery de silêncio upstream.
+
+## 12.10 TTFT / endpoint path / warmup
+
+### HYP-051 — a rota DevContainer → `chatgpt.com` é a causa do gap de 5–10 s
+
+- **status:** FORTEMENTE ENFRAQUECIDA na amostra atual.
+- **evidência:** `chatgpt.com` TTFB p50≈83 ms, enquanto pre-session silence chega a vários segundos; `ws.chatgpt.com`≈240 ms e `api.openai.com`≈274 ms também ficaram subsegundo.
+- **limite:** isso não mede o caminho de rede do cliente ChatGPT nem o tráfego interno da OpenAI.
+
+### HYP-052 — degradação de endpoint TTFB acompanha janelas lentas
+
+- **status:** A TESTAR LONGITUDINALMENTE.
+- **instrumentação:** histórico `openai-endpoint-latency.jsonl`, baseline 24h e regressão `>=2x && >=150ms`.
+- **assinatura:** TTFB/TLS sobe ao mesmo tempo que pulse/pre-dispatch.
+- **mitigação se confirmada:** A/B rede/IP/ISP/IPv4-vs-IPv6 e investigação de edge/peering antes de qualquer tuning do MCP.
+
+### HYP-053 — TTFT da UI sobe enquanto endpoint TTFB fica normal
+
+- **status:** PLAUSÍVEL e altamente discriminante.
+- **interpretação:** favorece client/app/model scheduling/context/tool planning sobre caminho básico DevContainer→endpoint.
+- **instrumentação:** `mcp_client_latency_evidence` + endpoint observer + pulse rotulado.
+
+### HYP-054 — primeiro call após restart/reconnect/troca de thinking sofre warmup/transição
+
+- **status:** CONFIRMADA-SECUNDÁRIA como padrão experimental.
+- **evidência:** primeiro pulse após mudança para high apresentou ~52,5 s e foi excluído do baseline estabilizado; transições pós-reload também produzem outliers.
+- **regra:** sempre separar `warmup sample` da distribuição estacionária.
+
+### HYP-055 — rota/IP do cliente e rota do DevContainer divergem materialmente
+
+- **status:** PLAUSÍVEL.
+- **razão:** o endpoint observer prova apenas `DevContainer→OpenAI`; o cliente ChatGPT pode usar outro ISP/ASN, DNS, proxy, VPN, TLS inspection e WebSocket path.
+- **experimento:** combinar TTFT de cliente + networkLabel + hotspot/VPN A/B com endpoint TTFB simultâneo.
+
+---
+
+# 13. Matriz específica: “trocar IP poderia influenciar?”
+
+A resposta precisa separar **qual IP**.
+
+## 13.1 IP/rota do origin onde roda cloudflared
+
+Pode influenciar:
+
+- peering do cloudflared com Cloudflare;
+- colo escolhido;
+- UDP 7844;
+- NAT/MTU;
+- estabilidade QUIC;
+- RTT do tunnel.
+
+Mas os dados atuais mostram:
+
+```text
+self-loop ~0,2–0,3 s
+QUIC RTT ~dezenas de ms
+HA=4
+mesmo GRU com gaps muito diferentes
+```
+
+Portanto a expectativa de ganho ao trocar IP do origin é baixa **para o problema principal atual**.
+
+Não deve ser feito como “tentativa aleatória”.
+
+## 13.2 IP/rota do cliente que usa ChatGPT
+
+Pode influenciar:
+
+- rota para OpenAI;
 - WebSocket;
-- UDP quando um produto específico exigir e quando fizer sentido observar.
+- proxy/VPN/security inspection;
+- DNS;
+- peering ISP↔OpenAI/Cloudflare;
+- NAT/idle timeout;
+- geolocalização/região de serviço.
 
-## 6.3. Implicação 2 — allowlist facts não são probe list
+A OpenAI recomenda explicitamente comparar Wi-Fi com hotspot celular para determinar se o problema é de rede.
 
-A documentação OpenAI lista diversos domínios necessários ao produto. Isso não significa que todos devam virar probes ativos.
+Este A/B é prioritário porque mede uma região hoje `not-observable-from-workspace`.
 
-Separar:
+## 13.3 Protocolo experimental recomendado
 
-- **external allowlist facts**;
-- **canonical probe targets**;
-- **provider runtime endpoints**;
-- **third-party product dependencies**;
-- **WebSocket capabilities**.
-
-## 6.4. Implicação 3 — não pinning de IP genérico OpenAI
-
-O route-fix GitHub usa lógica provider-specific, ranges e `/etc/hosts`. Nada na investigação justifica copiar esse modelo para OpenAI.
-
-Regra: **não criar um `openai-route-fix` genérico por analogia.**
-
----
-
-# 7. Arquitetura atual — mapa real
-
-## 7.1. Lifecycle dominante
+Alterar **uma dimensão por vez**:
 
 ```text
-DevContainer create
-  └─ post-create.sh
-      ├─ auditoria estrutural
-      ├─ versions/contracts
-      ├─ registry audit
-      ├─ artifacts estruturais
-      └─ readiness baseline
-
-DevContainer start
-  └─ post-start.sh
-      ├─ NSS / identidade
-      ├─ local-dns-cache.sh
-      ├─ local-copilot-proxy.sh
-      ├─ advisor/cache
-      ├─ github-copilot-network-manager.sh
-      ├─ github-api-route-fix.sh
-      ├─ diagnósticos
-      └─ network-control-plane-state.sh
-
-VS Code attach
-  └─ post-attach.sh
-      ├─ reconciliação leve
-      └─ UX/status
-
-healthcheck
-  └─ healthcheck.sh
-      ├─ runtime fundamentals
-      └─ network/provider checks misturados
+A: rede atual / sem VPN
+B: hotspot celular / sem VPN
+C: rede atual / VPN off→on somente se A/B justificar
+D: IPv4-only somente se A/B anterior sugerir route issue
 ```
 
-## 7.2. Componentes atuais e papel ideal
+Em cada condição:
 
-| Componente | Papel atual | Papel ideal |
-|---|---|---|
-| `local-dns-cache.sh` | resolver/cache + benchmark + split + rollback | substrate observer/actuator |
-| `github-copilot-network-manager.sh` | registry + probes + recommendations | provider observer/orchestrator |
-| `copilot-route-advisor.sh` | recomendações passivas | provider observer |
-| `github-api-route-fix.sh` | pin/histerese GitHub `/etc/hosts` | provider-specific actuator |
-| `local-copilot-proxy.sh` | tinyproxy local + proxy env | scoped transport actuator |
-| `network-control-plane-state.sh` | agregador | provider-neutral state projector |
-| `post-start.sh` | super-orquestrador | lifecycle coordinator fino |
-| `post-create.sh` | structural gate + matrix | bootstrap/contract validator |
-| `post-attach.sh` | UX/status | projection consumer |
-| `healthcheck.sh` | health geral + Copilot checks | substrate health + compact NCP view |
-| MCP posture tool | lê artifacts e interpreta | canonical NCP consumer |
+- mesma conversa ou conversa nova conforme o experimento;
+- mesmo modelo;
+- série de 10–20 `mcp_latency_pulse`;
+- registrar p50/p95;
+- registrar `silentExternalGap`;
+- registrar edge colo;
+- registrar self-loop;
+- registrar horário;
+- registrar UI/WebSocket stall.
 
-## 7.3. Cadeia producer → artifact → consumer → decision
+Sem esse controle, “mudei IP e pareceu melhor” não é evidência suficiente.
+
+---
+
+# 14. Estado-alvo: Interaction Latency Control Plane
+
+## 14.1 Objetivo
+
+Transformar cada percepção de lentidão em uma decomposição observável:
 
 ```text
-component
-  → /tmp/<component>.summary|status|events
-    → lifecycle / health / NCP / MCP
-      → novo finding/status
-        → operador ou actuator
+perceived latency
+├── local origin
+│   ├── preHandler
+│   ├── authorization
+│   ├── handler
+│   └── postHandler
+├── connector/session auxiliary work
+│   ├── initialize
+│   ├── notifications
+│   ├── tools/list
+│   ├── OAuth
+│   └── SSE
+├── network-controlled
+│   ├── DNS
+│   ├── proxy
+│   ├── Cloudflare HA
+│   ├── QUIC/H2
+│   ├── self-loop
+│   └── edge colo
+├── silent external interval
+└── external-unobservable
+    ├── host scheduling
+    ├── model inference
+    ├── tool planning
+    ├── queue
+    ├── conversation context
+    └── client network/WebSocket
 ```
 
-Hoje cada camada ainda pode reinterpretar o mesmo fato com parser/default/semântica próprios. O estado-alvo reduz esse espaço de interpretação.
+## 14.2 SLO dual
 
----
-
-# 8. Bugs confirmados e problemas concretos
-
-## B-001 — manager materializa registry antes da validação integral — **ALTA**
-
-`github-copilot-network-manager.sh` resolve/monta endpoints antes de concluir todos os invariantes do registry.
-
-**Risco:** registry posteriormente classificado como inválido ainda influencia execução.
-
-**Invariante alvo:**
+O dashboard deve manter duas verdades:
 
 ```text
-read → validate all → freeze/materialize → consume
+originStatus
+interactionStatus
 ```
 
-Mutação/recomendação sensível deve falhar closed.
-
-## B-002 — proxy pode consumir registry inválido — **ALTA**
-
-Para um actuator com potencial efeito global via proxy environment, um registry formalmente inválido não pode ser fonte de configuração.
-
-## B-003 — advisor pode recomendar com dataset formalmente inválido — **MÉDIA**
-
-Por ser passivo, a severidade é menor, mas a semântica ainda é incoerente.
-
-## B-004 — defaults DNS divergentes entre observadores — **ALTA**
-
-Dockerfile/devcontainer/post-start convergem em default enabled; outros hooks/health historicamente possuíam fallback diferente quando env não chegava.
-
-**Resultado:** mesmo runtime pode ser classificado de modo diferente por observer.
-
-## B-005 — post-create pode publicar verdade prematura — **ALTA**
-
-Artifacts/manifest podem registrar readiness mais otimista antes da conclusão de todos os gates.
-
-**Alvo:** final status só é autoridade depois do pipeline estrutural terminar.
-
-## B-006 — DNS substrate acoplado a GitHub reachability — **ALTA**
-
-Provider outage não pode provocar rollback de um resolver comprovadamente funcional.
-
-## B-007 — takeover do dnsmasq precisa ownership mais forte — **ALTA**
-
-Socket/PID/process-name isolados não bastam para provar que um processo é nosso.
-
-**Ownership alvo:** PID + start identity + executable + cmdline/config + marker + fingerprint + socket.
-
-## B-008 — proxy Copilot pode ter blast radius global — **ALTA**
-
-O script é Copilot-specific em intenção, mas `HTTP_PROXY`/`HTTPS_PROXY` podem alterar qualquer processo proxy-aware.
-
-## B-009 — NCP atual ainda considera Copilot componente estruturalmente central — **MÉDIA/ALTA**
-
-Provider desabilitado deveria gerar `skipped/not-applicable`, não degradação do plano inteiro.
-
-## B-010 — helper `sanitize_oneline` diverge entre scripts — **BAIXA, sintoma sistêmico**
-
-Há normalização inconsistente de CR/LF e helpers copiados.
-
-## B-011 — post-attach usa “read-only” de forma ambígua — **BAIXA**
-
-É network-read-only, mas ainda pode escrever state/UX artifacts.
-
-## B-012 — Makefile possui drift de metadados de versão — **BAIXA**
-
-Reduz confiança em operator UX e release metadata.
-
-## B-013 — contrato referencia validator/comando inexistente ou não canônico — **MÉDIA**
-
-`summary-contracts.jsonc` precisa apontar para validation path realmente implementado.
-
-## B-014 — `$schema` placeholder reduz valor do contrato — **BAIXA/MÉDIA**
-
-Contrato aparenta formalização maior que a validação efetivamente disponível.
-
-## B-015 — executable-bit removido na worktree — **ALTA / BLOQUEADOR DE COMMIT**
-
-Diffs mostram `100755 → 100644` em scripts executáveis. Deve ser corrigido antes de publicação.
-
-## B-016 — árvore `workspaces/...` criada dentro do próprio repo — **MÉDIA / BLOQUEADOR DE COMMIT TOTAL**
-
-Conteúdo parece legítimo, path parece acidental.
-
-## B-017 — arquivo documental raiz sem extensão — **BAIXA/MÉDIA**
-
-`audit_externa_src_copilot` deve receber nome/path canônico antes de publicação.
-
-## B-018 — `cloudflared_tunnel_request_errors` tratado historicamente como gate duro — **ALTA, parcialmente corrigido localmente**
-
-Counters do cloudflared podem crescer com lifecycle/cancellations. A worktree já contém evolução para `requestErrors` advisory + response-code deltas.
-
-## B-019 — response code parser não usava label canônico `status_code` e sobrescrevia samples — **MÉDIA, corrigido localmente**
-
-A worktree passa a priorizar `status_code` e acumular samples duplicados por connection index.
-
-## B-020 — NCP path drift `scripts/network/network-control-plane-state.sh` — **ALTA, corrigido localmente**
-
-Config apontava para path inexistente enquanto o script canônico está em `.devcontainer/scripts/network-control-plane-state.sh`.
-
-A worktree contém self-healing em `post-create`/`post-start` e metadata atualizada.
-
-## B-021 — versão esperada do NCP estava stale — **MÉDIA, corrigido localmente**
-
-Path fix isolado teria exposto mismatch 1.0.0/1.1.x. Worktree alinha versões.
-
-## B-022 — próprio dnsmasq gerenciado era reportado como conflito de porta — **MÉDIA, corrigido localmente**
-
-Worktree passa a distinguir listener gerenciado de conflito real.
-
-## B-023 — artifact stale podia governar route state atual — **ALTA, corrigido localmente**
-
-Worktree introduz `route_authority_state` e impede artifact stale de ser runtime authority.
-
-## B-024 — schema cache do host pode ficar stale em sessão longa — **MÉDIA operacional**
-
-Hot reload do backend não garante re-hidratação do schema de tools já carregado pelo harness ChatGPT. Isso já foi observado com enum de validators.
-
-**Alvo:** descriptors future-proof, backend allowlist autoritativa, mudanças de shape minimizadas.
-
-## B-025 — reconnect burst não possui epoch/recovery semantics unificado — **MÉDIA**
-
-Há evidência de tunnel interruption e recovery, mas não um objeto normalizado que diga “recovered at T, prior errors historical relative to recovery”.
-
----
-
-# 9. Gaps arquitetônicos
-
-## G-001 — endpoint registry sem provider/product/scope/leg
-
-TSV atual não possui dimensões suficientes para um NCP geral.
-
-## G-002 — ausência de envelope comum versionado
-
-Contracts existem, mas summaries ainda são heterogêneos.
-
-## G-003 — observer/actuator não é primitive formal
-
-Separação existe por convenção, não por contrato executável.
-
-## G-004 — authority não é first-class em todo artifact
-
-Falta distinguir configured/observed/inferred/cached/stale/external/not-observable.
-
-## G-005 — substrate/provider/product/transport não formam hierarquia explícita
-
-Isso permite que falhas de aplicação contaminem infraestrutura.
-
-## G-006 — WebSocket/long-lived connection não é representável no registry atual
-
-Crítico para ChatGPT e útil para outras integrações.
-
-## G-007 — política de DNS corporativo/split-horizon não é primeira classe
-
-Mechanisms existem, mas defaults públicos podem preceder a intenção de rede.
-
-## G-008 — parsing/validation do registry duplicado em Bash
-
-Manager/advisor/proxy/post-create não compartilham um owner único.
-
-## G-009 — compatibilidade v1→v2 não possui projection generator comum
-
-Sem isso, legado tende a ser mantido por cópia manual.
-
-## G-010 — fault injection de rede não é sistemático
-
-Faltam cenários cruzados provider/substrate/transport.
-
-## G-011 — não há recovery epoch canônico
-
-Erros “recentes” anteriores a um recovery comprovado podem permanecer visualmente ameaçadores.
-
-## G-012 — não há correlação de host/WSL/container lifecycle com tunnel lifecycle
-
-Um WSL crash parece, de baixo para cima, múltiplas falhas independentes quando na realidade existe uma causa comum.
-
-## G-013 — não há classificação específica de client↔OpenAI leg
-
-O repo não controla esse leg, mas deveria saber declarar **não observável** em vez de inferir.
-
-## G-014 — não há publicação Git “all worktree” com normalization gate
-
-A toolchain já permite staging explícito, mas ainda é necessário processo arquitetônico que classifique chmod/path/artifact antes de staging total.
-
----
-
-# 10. Estado-alvo — um único Network Control Plane
-
-## 10.1. Topologia lógica
+Exemplo correto:
 
 ```text
-                         ┌──────────────────────────────────────┐
-                         │        Network Control Plane         │
-                         │ normalize / correlate / recommend    │
-                         └─────────────────┬────────────────────┘
-                                           │
-             ┌─────────────────────────────┼─────────────────────────────┐
-             │                             │                             │
-     ┌───────▼────────┐            ┌───────▼────────┐            ┌──────▼─────────┐
-     │ substrate      │            │ providers      │            │ transports      │
-     │ DNS/egress     │            │ GitHub/OpenAI  │            │ MCP/Cloudflare  │
-     │ proxy/lifecycle│            │ Copilot/etc.   │            │ Secure Tunnel   │
-     └───────┬────────┘            └───────┬────────┘            └──────┬─────────┘
-             │                             │                             │
-        safe actuators              product observers              correlation only
-                                           │
-                                provider-specific actuators
-                                ex.: GitHub API route-fix
+originStatus      = ok
+interactionStatus = degraded
 ```
 
-## 10.2. O NCP não é um “universal network optimizer”
+quando:
 
-Ele deve:
+- handler = 20 ms;
+- silent external p50 = 8 s.
 
-- observar;
-- normalizar;
-- correlacionar;
-- recomendar;
-- autorizar actuators apenas quando policy permitir.
+## 14.3 SLO inicial
 
-Ele não deve automaticamente:
-
-- pin IPs;
-- trocar DNS;
-- ativar proxy;
-- mudar Cloudflare;
-- matar processos;
-- assumir que um provider é crítico.
-
----
-
-# 11. Modelo canônico de dimensões
-
-Todo sinal relevante deve poder carregar:
+Defaults atuais:
 
 ```text
-schema_version
-contract_version
-summary_kind
-component
-scope
-provider
-product
-leg
-transport
-probe_kind
-status
-reason
-enabled
-effective
-authority
-observed_at
-source_observed_at
-age_ms
-stale
-recovery_epoch
-mutation_class
-container_fingerprint
-registry_version
-compat_mode
+silent p50 warn = 3000 ms
+silent p95 warn = 8000 ms
+min external samples = 3
 ```
 
-Nem todo artifact preenche tudo. Ausência deve ser `not-applicable`/`unknown` tipada, não campo inventado.
+Esses valores são thresholds operacionais iniciais, não “leis naturais”. Devem ser calibrados com baseline controlado por modelo/horário.
 
 ---
 
-# 12. Taxonomia de scopes
+# 15. Estratégia de mitigação em ordem de retorno esperado
 
-Proposta inicial:
+## 15.1 Nível 1 — amortizar round-trips
+
+Maior retorno potencial.
+
+Quando:
 
 ```text
-substrate:dns
-substrate:egress
-substrate:proxy
-substrate:host-runtime
-provider:github
-product:github-api
-provider:copilot
-product:github-copilot
-provider:openai
-product:openai-api
-product:chatgpt
-transport:mcp-local-origin
-transport:mcp-cloudflare
-transport:mcp-openai-secure-tunnel
-client:chatgpt-openai
+silent p50 ≈ 8 s
 ```
 
----
+uma sequência de cinco chamadas independentes pode pagar ~40 s de imposto externo mesmo se os handlers somados levarem <100 ms.
 
-# 13. Modelo de legs
+Portanto:
+
+- `repo_bulk_inspect`;
+- reads multi-file;
+- searches em batch;
+- patch batches;
+- validators em batch;
+- working-set composition;
+- operações que retornem suficiente feedback para a próxima decisão;
+- “macro tools” limitadas por trust boundary;
+- stateful execution envelopes quando seguros.
+
+A regra não é “faça tools gigantes”.
+
+A regra é:
+
+> **comprimir round-trips sem aumentar ambiguidade, blast radius ou perda de feedback.**
+
+### 15.1.1 Ranking real de transições que mais pagam o imposto externo
+
+O audit de 24 h agora agrega pares sequenciais por `totalGapMs`. A janela mais recente mostrou:
+
+| transição | ocorrências | gap acumulado | p50 |
+|---|---:|---:|---:|
+| `repo_read_file → repo_apply_patch_batch` | 110 | ~2247 s | ~19,36 s |
+| `repo_apply_patch → repo_apply_patch` | 136 | ~1694 s | ~11,86 s |
+| `repo_read_file → repo_apply_patch` | 96 | ~1562 s | ~13,65 s |
+| `repo_apply_patch_batch → repo_apply_patch_batch` | 69 | ~1501 s | ~21,09 s |
+| `repo_read_file → repo_search_text` | 91 | ~1210 s | ~10,53 s |
+| `repo_search_text → repo_read_file` | 149 | ~1133 s | ~6,64 s |
+| `repo_read_file → repo_read_file` | 106 | ~954 s | ~7,03 s |
+| `repo_apply_patch → run_copilot_validator` | 77 | ~874 s | ~10,08 s |
+| `repo_apply_patch_batch → run_copilot_validator` | 68 | ~826 s | ~11,41 s |
+| `repo_file_stats → repo_apply_patch` | 25 | ~523 s | ~20,12 s |
+
+Isso prova que o ganho local de maior ROI está em **reduzir ciclos inspeção→nova inspeção e fragmentação patch→patch**, não apenas tornar cada handler mais rápido.
+
+### 15.1.2 Transformações de I/O já aplicadas a partir desse ranking
+
+`repo-read.js`:
 
 ```text
-container -> dns-resolver
-container -> generic-internet
-container -> github
-container -> github-copilot
-container -> api.openai.com
-container -> chatgpt-equivalent-endpoint
-client -> chatgpt/openai
-openai -> public-mcp
-cloudflare-edge -> cloudflared
-cloudflared -> local-origin
-host -> wsl
-wsl -> docker
-container -> cloudflare-edge
-secure-tunnel-client -> openai
+batch requests           32 → 64
+batch input hard max     1 MiB → 2 MiB
+default result budget    1 MiB → 2 MiB
+hard result budget       1.5 MiB → 3 MiB
+search context max       10 → 48 linhas
 ```
 
-**Regra:** uma medição em um leg nunca prova automaticamente outro leg.
-
----
-
-# 14. Modelo de authority
-
-Valores mínimos:
-
-- `observed` — medição direta;
-- `configured` — configuração declarada;
-- `inferred` — conclusão derivada;
-- `cached-observation` — medição passada dentro do freshness budget;
-- `stale-observation` — preservada apenas para forense;
-- `external-documentation` — requisito vindo de fonte externa;
-- `client-evidence` — evidência retornada pelo cliente;
-- `remote-control-plane` — Cloudflare/OpenAI remote API quando aplicável;
-- `not-observable-here` — leg fora da posição do observer.
-
----
-
-# 15. Modelo temporal e recovery epoch
-
-## 15.1. Problema
-
-“Erro nos últimos N minutos” é insuficiente quando houve restart/recovery dentro de N.
-
-## 15.2. Estado-alvo
-
-Cada componente de transporte deve poder declarar:
+Além disso, `repo_search_text` dirigido a **um único arquivo ≤5 MiB** passa a retornar metadata patch-ready:
 
 ```text
-last_failure_at
-last_recovery_at
-recovery_epoch
-consecutive_healthy_samples
-active_since
-errors_since_recovery
+searchTargetMetadata.type
+searchTargetMetadata.sizeBytes
+searchTargetMetadata.sha256
+searchTargetMetadata.hashComputed
 ```
 
-## 15.3. Regra
+Isso permite eliminar muitos `search/file_stats → patch` round-trips sem enfraquecer `expectedHash`.
 
-Um erro anterior ao `last_recovery_at`, sem recorrência posterior, continua disponível para forense, mas perde autoridade para classificar o estado presente.
+`repo-write.js`:
 
-Isso formaliza o que a worktree já começa a fazer com route artifact stale e `requestErrors` advisory.
+```text
+file batch operations    32 → 64
+patch batch operations   64 → 128
+patch batch targets      32 → 64
+patch batch input max    1.5 MiB → 3 MiB
+```
+
+Esses limites continuam bounded. A mudança **não** assume que payload maior é mais rápido; ela aceita um pouco mais de trabalho local quando isso evita devolver o controle ao host/modelo e pagar outro silent gap de vários segundos.
+
+## 15.2 Nível 2 — reduzir output desnecessário
+
+Ainda útil porque contexto pode afetar o host:
+
+- compact por default;
+- details opt-in;
+- persistir diagnósticos localmente;
+- refs/hints;
+- bounded tails;
+- evitar repetir payload já conhecido.
+
+## 15.3 Nível 3 — session churn
+
+- observar capacity projection;
+- manter maxSessions headroom;
+- não aumentar max apenas por reflexo;
+- considerar TTL experimental;
+- estudar se headers/session semantics podem estimular reuse sem incompatibilidade.
+
+## 15.4 Nível 4 — client network A/B
+
+- hotspot;
+- VPN off;
+- clean browser/app;
+- HAR;
+- WebSocket;
+- DNS/security filter.
+
+## 15.5 Nível 5 — model/context A/B
+
+- conversa nova vs longa;
+- mesmo modelo;
+- modelos diferentes;
+- horário rápido vs lento;
+- séries `mcp_latency_pulse`.
+
+## 15.6 Nível 6 — transport tuning
+
+Somente se evidência mostrar regressão:
+
+- QUIC ↔ H2;
+- auto;
+- MTU;
+- edge;
+- restart.
+
+Não usar restart como remediação padrão para gap silencioso.
 
 ---
 
-# 16. Endpoint/probe registry v2
+# 16. Network Control Plane provider-neutral — estado-alvo preservado
 
-## 16.1. Pipeline obrigatório
+O NCP continua provider-neutral.
 
-```text
-read bytes
-  → validate header/schema/version
-  → validate every row
-  → validate uniqueness/cross-row invariants
-  → materialize immutable records
-  → filter enabled scopes/providers
-  → execute observers
-  → publish evidence
-  → optional actuator consumes only eligible evidence
-```
-
-## 16.2. Campos propostos
-
-Para manter compatibilidade com Bash, TSV ainda é opção forte:
+Dimensões mínimas do registry v2:
 
 ```text
 provider
 product
 scope
 leg
-url
-id
+url/id
 probeKind
 transport
 capability
@@ -991,1197 +1540,929 @@ freshnessSeconds
 enabledByDefault
 ```
 
-## 16.3. Validação
+Pipeline obrigatório:
 
-O registry é inválido se houver:
+```text
+read
+→ validate all
+→ cross-row invariants
+→ immutable materialize
+→ filter
+→ observe
+→ publish evidence
+→ optional policy gate
+→ optional actuator
+```
 
-- versão/header incorretos;
-- número de campos incorreto;
-- ID duplicado;
-- URL/scheme incompatível;
-- transport desconhecido;
-- expected outcome impossível;
-- actuator eligibility em probe que não pode autorizar mutação;
-- provider/product sem scope coerente.
+Nenhum consumidor pode usar registry parcialmente validado.
 
 ---
 
-# 17. DNS — estado-alvo
+# 17. DNS substrate — estado-alvo
 
-## 17.1. Princípios
+Princípios:
 
-1. resolver health é provider-neutral;
-2. provider outage não causa rollback do resolver;
-3. inherited resolver deve ser preservado por default quando saudável;
-4. split-DNS/VPN têm precedência sobre benchmark público;
-5. takeover exige ownership forte;
-6. qualquer rewrite de `resolv.conf` exige backup/preflight/post-proof/rollback;
-7. warmup é performance hint;
-8. benchmark é recommendation;
-9. public upstream não deve ser hardcoded sem policy explícita.
+1. substrate health deve ser neutral;
+2. inherited resolver deve ser preferido quando válido;
+3. preservar VPN/split-DNS;
+4. public DNS fallback deve ser explícito;
+5. provider reachability não define saúde do DNS substrate;
+6. ownership de listener deve ser comprovado por processo/socket;
+7. warmup é performance hint, não autoridade de health.
 
-## 17.2. Proof chain
+Sequência de prova:
 
 ```text
 process/socket ownership
-  → local dnsmasq query
-  → neutral canary
-  → inherited/split domain canary
-  → provider observations
-  → substrate state
+→ query local dnsmasq
+→ neutral canary
+→ inherited/split domains
+→ provider observations
 ```
-
-## 17.3. Upstream policies
-
-```text
-inherit-first
-public-fallback
-benchmark-select
-split-preserving
-explicit-static
-```
-
-Cada upstream deve declarar origem:
-
-```text
-docker
-host
-vpn
-configured-public
-benchmark
-operator
-```
-
-## 17.4. Docker runArgs
-
-A presença de `--dns=1.1.1.1` / `--dns=8.8.8.8` deve ser tratada como **decisão arquitetural**, não convenience.
-
-Remoção só após:
-
-- instrumentar inherited resolvers;
-- recreate real;
-- VPN/split scenario;
-- failover scenario;
-- confirmar que dnsmasq recebe upstream útil.
 
 ---
 
 # 18. Proxy — estado-alvo
 
-## 18.1. Decisão pendente
+Se o proxy continuar específico de Copilot:
 
-Duas arquiteturas são coerentes.
+- não exportar `HTTP_PROXY/HTTPS_PROXY` globalmente;
+- provider-scoped;
+- allowlist alinhada ao registry;
+- blast radius mínimo.
 
-### A. Provider-scoped proxy
+Se houver evidência para proxy genérico:
 
-Preferível se o proxy existe apenas para Copilot:
+- renomear semanticamente;
+- política explícita por host/provider;
+- compatibility aliases somente quando necessários.
 
-- não exportar proxy global;
-- injetar apenas nos consumers Copilot;
-- host policy derivada de registry validado.
-
-### B. Generic egress proxy
-
-Só justificar se múltiplos consumers tiverem benefício comprovado:
-
-- rename semântico;
-- policy explícita;
-- provider observations independentes;
-- compat aliases.
-
-## 18.2. Regra de segurança
-
-Ativar proxy para Copilot não pode silenciosamente alterar tráfego OpenAI/MCP/Git sem policy explícita.
+OpenAI não deve receber `/etc/hosts` pinning ou proxy routing específico sem evidência oficial/provider-specific.
 
 ---
 
-# 19. GitHub route-fix — especialização preservada
+# 19. Cloudflare — estado-alvo
 
-`github-api-route-fix.sh` depende de facts GitHub específicos:
+Manter:
 
-- `api.github.com`;
-- `/meta`;
-- ranges GitHub;
-- histerese;
-- `/etc/hosts`.
+- named permanent tunnel;
+- OAuth;
+- HA=4;
+- origin HTTPS;
+- H2 origin quando validado;
+- QUIC como controle enquanto saudável;
+- H2 como rollback/baseline TCP;
+- request error **delta** por janela, não contador cumulativo como veto;
+- smoke pós-mudança;
+- remote config audit;
+- recovery epoch.
 
-Arquitetura correta:
+Adicionar/fortalecer:
 
-```text
-NCP evidence(provider=github)
-  → policy gate
-    → actuator capability github-api-route-fix
-      → provider-actuator summary
-        → NCP aggregation
-```
-
-Não existe obrigação de que todo provider possua actuator equivalente.
-
----
-
-# 20. OpenAI API, ChatGPT e MCP — separação rigorosa
-
-## 20.1. OpenAI API
-
-Leg observável do container:
-
-```text
-container → DNS → TCP/TLS → api.openai.com
-```
-
-O Model Gateway já conhece `https://api.openai.com/v1` como provider endpoint. O NCP não deve copiar lógica de modelos ou autenticação.
-
-## 20.2. ChatGPT product reachability
-
-O container pode testar reachability equivalente, mas isso é:
-
-```text
-authority=observed-from-container
-```
-
-Nunca:
-
-```text
-chatgpt-client-proven=true
-```
-
-## 20.3. ChatGPT WebSocket
-
-Registry deve suportar capability WebSocket bounded. O teste precisa ser:
-
-- sem auth sensível;
-- sem payload destrutivo;
-- timeout curto;
-- capaz de distinguir DNS/TCP/TLS/upgrade failure.
-
-Se não existir probe seguro, registrar apenas requirement documental.
-
-## 20.4. OpenAI → MCP
-
-Provar por:
-
-- connector smoke real;
-- tools/list/tool call;
-- Cloudflare request/edge metrics;
-- OAuth flow;
-- client evidence.
-
-Não por probe local equivalente.
-
-## 20.5. Secure MCP Tunnel
-
-É transporte opcional e deve entrar como:
-
-```text
-transport:mcp-openai-secure-tunnel
-```
-
-não como provider health.
+- transport benchmark periódico sob demanda;
+- safe edge-colo telemetry;
+- self-loop reference;
+- auxiliary request timeline;
+- correlação com silent gap;
+- capability-detected GraphQL analytics;
+- diferenciação de benign cancellations de actionable errors.
 
 ---
 
-# 21. Cloudflare/MCP — estado-alvo
+# 20. Bugs atuais e dívida — B-001 a B-044
 
-## 21.1. Topologia atual saudável
+Os bugs B-001..B-025 históricos continuam válidos quando ainda não corrigidos. Os mais importantes eram:
 
-O estado live atual mostra:
+- registry consumido antes de validação completa;
+- defaults DNS divergentes;
+- optimistic truth em lifecycle;
+- DNS substrate acoplado a provider reachability;
+- proxy global com blast radius excessivo;
+- NCP sem provider-neutral dimensions;
+- stale route artifacts com authority excessiva;
+- path/version drift;
+- managed dnsmasq tratado como conflito;
+- request-error semantics e response-code parsing;
+- schema cache do host;
+- ausência de recovery epoch.
 
-- named tunnel;
-- hostname permanente;
-- DNS CNAME correto;
-- 4 HA connections;
-- QUIC ativo;
-- HTTPS origin;
-- HTTP/2 origin;
-- TLS verification;
-- SNI correto;
-- connect timeout reduzido;
-- keepalive pinado;
-- remote audit sem gaps.
+Nova dívida desta investigação:
 
-Isso deve ser preservado enquanto a frente NCP evolui.
+### B-026 — latência externa não era medida no boundary HTTP
 
-## 21.2. Request error semantics
+- **estado:** `[~]` implementado localmente; validar/publicar.
 
-Counters cumulativos são telemetria, não gate isolado.
+### B-027 — auxiliary connector traffic era invisível
 
-Hard gates adequados:
+- **estado:** `[~]` implementado localmente.
 
-- smoke;
-- 4 HA quando essa for a topologia esperada;
-- metrics readable;
-- origin health;
-- remote config sync;
-- p95 budget;
-- transport-specific fatal signals.
+### B-028 — silêncio externo não tinha distribuição própria
 
-`requestErrors delta != 0` = review/advisory, não veto automático.
+- **estado:** `[~]` implementado localmente.
 
-## 21.3. Context canceled
+### B-029 — dashboard podia dizer `ok` com 6–10 s entre calls
 
-`context canceled` pode refletir request lifecycle normal. Deve ser correlacionado com:
+- **estado:** `[~]` corrigido localmente com `originStatus`/`interactionStatus`.
 
-- HTTP response;
-- client disconnect;
-- smoke result;
-- origin process health;
-- connection epoch.
+### B-030 — stateful session churn não era observado
 
----
+- **estado:** `[~]` counters e projection adicionados localmente.
 
-# 22. Summary contract v2
+### B-031 — cliente cria aproximadamente uma sessão por tools/call
 
-## 22.1. Evoluir o catálogo existente
+- **estado:** `[!]` comportamento externo confirmado; mitigação ainda não decidida.
 
-Não criar um segundo arquivo concorrente ao `summary-contracts.jsonc`.
+### B-032 — `tools/list`/OAuth eram suspeitos sem coverage temporal
 
-Promover o catálogo existente a provider-neutral.
+- **estado:** `[x]` hipótese quantificada; coverage ~1–2%.
 
-## 22.2. Envelope conceitual
+### B-033 — faltava workload trivial controlado
 
-```text
-schema_version=2
-contract_version=2
-summary_kind=network-component
-component=local-dns-cache
-scope=substrate:dns
-provider=none
-product=none
-leg=container->dns-resolver
-transport=dns
-status=ok
-reason=local-probe-and-neutral-canary-proven
-authority=observed
-enabled=true
-effective=true
-observed_at=...
-age_ms=0
-stale=false
-recovery_epoch=...
-mutation_class=global-resolver
-registry_version=2
-compat_mode=v1-projection
-```
+- **estado:** `[~]` `mcp_latency_pulse` implementado e projetado.
 
-## 22.3. Compatibilidade
+### B-034 — Cloudflare analytics assumia field disponível
 
-Durante migração:
+- **estado:** `[~]` capability failure é tratada como não-fatal; introspecção ainda opcional.
 
-- producer escreve v2;
-- mantém keys v1 necessárias;
-- consumer prefere v2;
-- fallback legacy explícito;
-- telemetria registra fallback;
-- remoção somente após zero consumers conhecidos.
+### B-035 — histórico não separava workload de horário
 
----
+- **estado:** `[~]` pulse fornece futuro baseline controlado; histórico antigo continua confounded.
 
-# 23. Observer, policy gate e actuator
+### B-036 — NCP stale GitHub artifacts podem degradar aggregate health
 
-## 23.1. Observer
+- **estado:** `[x]` o refresh atual publica `status=advisory`, `warnings=[]`, `critical=[]` e marca artifact antigo como `stale-summary-not-authoritative`; evidência histórica permanece visível sem governar runtime atual.
 
-Permitido:
+### B-037 — batching value não considerava external round-trip tax
 
-- ler config/artifacts;
-- DNS resolution;
-- bounded TCP/TLS/HTTP/WS probe;
-- medir latência;
-- publicar findings.
+- **estado:** `[~]` dashboard passa a expor estimativa contrafactual.
 
-Proibido:
+### B-038 — não há session capacity projection consolidada no diagnóstico
 
-- editar hosts;
-- editar resolver;
-- matar processo;
-- exportar proxy global;
-- alterar Cloudflare.
+- **estado:** `[~]` implementação local em andamento/validada por gates focados.
 
-## 23.2. Policy gate
+### B-039 — client network experiments não têm protocolo persistido
 
-Combina:
+- **estado:** `[ ]` criar runbook / evidence record.
 
-```text
-validated configuration
-+ fresh evidence
-+ correct scope/leg
-+ authority class
-+ actuator capability
-+ explicit policy
-= eligible mutation
-```
+### B-040 — falta correlation ID end-to-end fornecido pelo host
 
-## 23.3. Actuator
+- **estado:** `[!]` impossível resolver integralmente sem suporte upstream; manter boundary evidence.
 
-Precisa declarar:
+### B-041 — OpenAI/ChatGPT endpoint path não possuía baseline permanente por fase
 
-- `mutation_class`;
-- lock;
-- preconditions;
-- ownership proof;
-- evidence inputs;
-- rollback;
-- idempotency;
-- post-proof;
-- failure mode;
-- blast radius.
+- **estado:** `[~]` corrigido localmente com `openai-endpoint-latency.js` + histórico bounded + tool especializada.
+
+### B-042 — TTFT, endpoint TTFB e MCP pre-dispatch eram semanticamente misturáveis
+
+- **estado:** `[x]` taxonomia e authorities separadas; client TTFT agora possui evidence store próprio.
+
+### B-043 — endpoint latency dependia de chamada manual
+
+- **estado:** `[~]` monitor periódico non-blocking implementado: startup delay, ciclo 5 min, sem overlap, readiness-independent.
+
+### B-044 — primeiro sample pós-restart/reconnect/thinking-change contaminava baseline estacionário
+
+- **estado:** `[x]` warmup/outlier passa a ser explicitamente separado nos protocolos; exemplo high inicial ≈52,5 s não foi usado na comparação estabilizada.
+
+### B-045 — WSL caiu abruptamente durante janela com validators concorrentes
+
+- **evento:** por volta de `2026-08-18T22:08Z` (`19:08` BRT), o WSL desapareceu e derrubou Docker/DevContainer/MCP/cloudflared em conjunto;
+- **evidência preservada:** jobs `2130fc2d-08ed-486a-96d9-fd4fab69b22b` (`test_mcp_tools.spec.js`) e `3fcf74b6-e7b3-4878-9ccb-29c46ada6d93` (`test_mcp_metrics.spec.js`) ficaram com `status=running`, `runtimeAttached=false`, `endedAt=null`, `exitCode=null`, `signal=null` após o reboot;
+- **log:** ambos foram interrompidos antes de término normal; `test_mcp_tools` sequer chegou a imprimir o início normal da suite, portanto não há evidência de que o novo teste `postValidate` tenha alcançado o ponto de spawn interno;
+- **causalidade:** **INDETERMINADA**. Concorrência/fan-out de validators é amplificador plausível, mas não há prova de OOM nem de que o composite causou diretamente a queda;
+- **limitação:** logs de kernel/Windows anteriores ao reboot não estão disponíveis via workspace atual, portanto a causa raiz de WSL não pode ser reconstruída com autoridade suficiente.
+
+### B-046 — harness permitia fan-out de validators pesados e nesting dentro de Vitest
+
+- **estado:** `[~]` hardening local implementado e focadamente validado;
+- `batchConcurrency` efetivo reduzido a 1;
+- capacidade global do runtime: máximo 1 subprocess validator anexado;
+- reserva atômica de spawn evita corrida entre requests simultâneos;
+- subprocess validator é bloqueado quando `VITEST`/`NODE_ENV=test` está ativo;
+- `repo_apply_patch_batch.postValidate` falha antes do write em test runner;
+- Vitest iniciado pelo job manager recebe `VITEST_MAX_WORKERS=2` por padrão, com override explícito bounded;
+- dashboard passa a expor `validatorCapacity`.
 
 ---
 
-# 24. Segurança
+# 21. Gaps arquiteturais — G-001 a G-031
 
-## 24.1. Segredos
+Gaps históricos relevantes:
 
-Nunca serializar:
+- registry sem dimensões provider/product/scope/leg;
+- summary envelope sem v2 universal;
+- authority não first-class em todas superfícies;
+- observer/gate/actuator insuficientemente formalizados;
+- sem substrate→provider→product→transport hierarchy;
+- sem WebSocket semantics;
+- sem VPN/split-DNS first-class;
+- sem fault-injection matrix;
+- sem recovery epoch universal.
 
-- API keys;
-- tunnel tokens;
-- OAuth tokens/codes;
-- cookies;
-- bearer tokens;
-- proxy credentials.
+Novos gaps:
 
-Pode registrar:
+### G-015 — sem timestamp/model queue fornecido pela OpenAI
 
-```text
-configured=true
-source=ENV_NAME
-```
+`not-observable-from-workspace`.
 
-sem valor.
+### G-016 — sem token/context size real da conversa
 
-## 24.2. Process ownership
+`not-observable-from-workspace`.
 
-Para dnsmasq/tinyproxy:
+### G-017 — sem model/tool-planner latency metadata
 
-```text
-pid
-proc start identity
-exe realpath
-cmdline
-config path/fingerprint
-runtime marker
-socket binding
-```
+`not-observable-from-workspace`.
 
-## 24.3. Artifact safety
+### G-018 — sem host-provided session reuse policy
 
-- atomic writes;
-- restrictive mode;
-- symlink refusal quando necessário;
-- bounded histories;
-- timestamps;
-- fingerprints;
-- locks com timeout;
-- stale lock handling seguro.
+Apenas inferível pelo tráfego observado.
 
----
+### G-019 — sem baseline pulse recorrente por modelo/horário
 
-# 25. MCP tool surface — estado-alvo
+Criar série persistida.
 
-## 25.1. Não proliferar tools
+### G-020 — client network evidence ingestion era inexistente
 
-Preservar como núcleo:
+Parcialmente fechado: `mcp_client_latency_evidence` aceita TTFT e labels sanitizados de rede/modelo/conversa/client/VPN. Captura automática do timestamp no cliente continua dependente de observer/HAR externo.
 
-- `mcp_devcontainer_network_posture_audit`;
-- `mcp_devcontainer_network_control_plane_refresh`.
+### G-021 — sem A/B model/context runner no ChatGPT host
 
-## 25.2. Refresh bounded
+Fora do MCP; documentar experimentos reproduzíveis.
 
-A tool de refresh local já evoluiu para uma primitive segura:
+### G-022 — Cloudflare plan não expõe timing analytics desejados
 
-- command fixo;
-- script canônico;
-- args fixos;
-- timeout;
-- maxBuffer;
-- nenhum path/comando fornecido pelo caller;
-- nenhum probe externo.
+Capability gap.
 
-Isso é o padrão a preservar.
+### G-023 — sem IP/ASN experiment record
 
-## 25.3. Posture v2
+Criar evidence schema.
 
-Formato-alvo:
+### G-024 — sem round-trip tax budget no design de novas tools
 
-```json
-{
-  "substrate": {
-    "dns": {},
-    "egress": {},
-    "proxy": {},
-    "hostRuntime": {}
-  },
-  "providers": {
-    "github": {},
-    "copilot": {},
-    "openai": {}
-  },
-  "products": {
-    "github-api": {},
-    "github-copilot": {},
-    "openai-api": {},
-    "chatgpt": {}
-  },
-  "transports": {
-    "mcp-cloudflare": {},
-    "mcp-openai-secure-tunnel": {}
-  },
-  "clientLegs": {
-    "chatgpt-openai": {
-      "authority": "not-observable-here"
-    }
-  },
-  "findings": {},
-  "recovery": {},
-  "compatibility": {}
-}
-```
+Adicionar critério arquitetural.
+
+### G-025 — sem stateful-session churn budget
+
+Adicionar max projected capacity ratio / alarm.
+
+### G-026 — sem distinção formal entre user-perceived SLO e origin SLO em todos dashboards
+
+Propagar a nova semântica.
+
+### G-027 — MCP não observa automaticamente o ChatGPT UI TTFT
+
+O gap só fecha com client observer/HAR/manual evidence; é proibido inferir UI TTFT a partir de endpoint TTFB ou pre-dispatch.
+
+### G-028 — correlação endpoint-TTFB ↔ pre-dispatch ainda não possui série histórica suficiente
+
+O monitor resolve coleta futura; o correlation score só deve ganhar autoridade após número mínimo de pares temporalmente próximos.
+
+### G-029 — API streaming TTFT canary ainda não implementado
+
+Deve ser explicitamente opt-in, fixed model/prompt, allowlisted e cost-aware; nunca parte automática de health/readiness.
+
+### G-030 — causa raiz de crash WSL não possui evidence channel first-class
+
+Hoje o workspace consegue observar consequência (`runtimeAttached=false`, tunnel/origin desaparecem), mas não possui ingestão de eventos Windows/WSL como `LxssManager`, `Hyper-V`, WSL kernel OOM, Docker Desktop VM reset ou host memory pressure. Criar um canal sanitizado de evidence do host é desejável; sem ele, crash comum-causa continua parcialmente não observável.
+
+### G-031 — validator resource budget não era first-class
+
+Majoritariamente fechado no runtime MCP: max active, spawn reservation, Vitest worker cap, `runtimeEpoch` e snapshots before/after de memória/load/cgroup agora existem e são persistidos no manifest. Continua pendente correlacionar essa evidência com eventos externos Windows/WSL/Docker para distinguir definitivamente OOM/VM reset/crash externo.
 
 ---
 
-# 26. Node 24+ — papel na evolução
+# 22. Architecture Decision Records — ADR-ILCP
 
-O NCP não precisa permanecer integralmente em Bash apenas por herança histórica.
+### ADR-ILCP-001 — Silent external gap é métrica primária
 
-## 26.1. Onde Bash continua ideal
+`response-finish → next-request-arrival`, descontada a união temporal de requests auxiliares.
 
-- lifecycle hooks;
-- process/socket primitives;
-- resolver manipulation;
-- early bootstrap;
-- situações em que Node ainda não é confiável/levantado.
+### ADR-ILCP-002 — NCP é subsistema, não causa presumida
 
-## 26.2. Onde Node 24 pode reduzir complexidade
+Rede deve ser medida antes de ser modificada.
 
-- validation do registry;
-- schema validation;
-- normalized envelope parsing;
-- report projection;
-- JSON/JSONC handling;
-- test fixtures;
-- correlation engine;
-- transport metrics analysis.
+### ADR-ILCP-003 — Origin e interaction SLO são separados
 
-## 26.3. Regra
+Nunca retornar “ok” agregado ocultando multi-second silent gaps.
 
-Não mover mecanismo crítico de boot para Node apenas por elegância. Primeiro identificar se ele roda em um ponto onde Node 24 é garantido pelo image contract.
+### ADR-ILCP-004 — Pulse trivial é benchmark de controle
 
-## 26.4. Benefícios concretos
+Toda análise temporal/model/network deve incluir workload constante quando possível.
 
-- parser mais seguro que shell word splitting;
-- `AbortSignal.timeout()`/bounded operations;
-- `node:dns/promises`;
-- TLS/HTTP/WebSocket client primitives;
-- melhor typed result envelopes;
-- tests mais expressivos;
-- menor duplicação de KV parsing.
+### ADR-ILCP-005 — Tool count/payload não são culpados sem A/B host-side
+
+Limites de 250/maior payload são headroom; reduzir por superstição é proibido.
+
+### ADR-ILCP-006 — Round-trip amortization é prioridade arquitetural
+
+Batching seguro tem retorno proporcional ao imposto externo observado.
+
+### ADR-ILCP-007 — Auxiliary activity é medida por cobertura temporal
+
+Não apenas contagem.
+
+### ADR-ILCP-008 — Session churn é tratado separadamente de silent gap
+
+Overhead/capacity ≠ causa dominante automaticamente.
+
+### ADR-ILCP-009 — TTL/maxSessions só mudam por projection + canary
+
+Nunca tuning reativo.
+
+### ADR-ILCP-010 — Cloudflare transport só muda por benchmark controlado
+
+QUIC/H2/auto devem ser A/B com restore automático.
+
+### ADR-ILCP-011 — Client network A/B é first-class evidence
+
+Hotspot, VPN, browser/app e HAR devem ter protocolo reproduzível.
+
+### ADR-ILCP-012 — Statuspage é evidência agregada, não session health
+
+Fresh structured degradation vence banner genérico; stale não governa.
+
+### ADR-ILCP-013 — Safe colo logging
+
+Persistir apenas colo, nunca CF-Ray completo/IP em telemetria padrão.
+
+### ADR-ILCP-014 — GraphQL analytics é capability-detected
+
+Unavailable fields não degradam MCP health.
+
+### ADR-ILCP-015 — Restart não é remediação de silent gap
+
+Só reiniciar quando evidence aponta origin/tunnel lifecycle.
+
+### ADR-ILCP-016 — TTFT, endpoint TTFB e pre-dispatch são clocks independentes
+
+Nenhum pode ser usado como proxy automático do outro. A causalidade vem da convergência/divergência longitudinal entre eles.
+
+### ADR-ILCP-017 — Endpoint monitor é permanente, barato e não bloqueante
+
+Um sample por target a cada 5 min, após delay de startup, sem overlap e sem tornar readiness dependente da internet externa.
+
+### ADR-ILCP-018 — Client TTFT evidence é sanitizada
+
+Persistir apenas tempos e labels fechados; nunca prompt, completion, HAR body, cookies, tokens, URLs de navegação ou IP bruto.
+
+### ADR-ILCP-019 — Paid model TTFT canary exige opt-in explícito
+
+Nenhum health check pode consumir quota de modelo silenciosamente.
+
+### ADR-ILCP-020 — validators são serializados por segurança de host
+
+O runtime MCP permite no máximo um subprocess validator ativo. Solicitações concorrentes recebem feedback de capacidade em vez de competir silenciosamente por CPU/memória.
+
+### ADR-ILCP-021 — test runner nunca inicia outro validator subprocess
+
+`VITEST`/`NODE_ENV=test` é uma fronteira explícita: configuração/path ainda podem ser testados, mas criação de `npx vitest`, `tsc`, `eslint` ou suites filhas é bloqueada. Integração real deve ser provada a partir do MCP runtime normal, não de dentro da suite que o está testando.
 
 ---
 
-# 27. Operator UX
-
-## 27.1. Names provider-neutral
-
-Introduzir gradualmente:
-
-```text
-network:status
-network:summary
-network:doctor
-network:registry:status
-network:dns:status
-network:provider:github:status
-network:provider:openai:status
-network:transport:mcp:status
-```
-
-## 27.2. Compat aliases
-
-Manter aliases Copilot durante migração.
-
-## 27.3. Um diagnóstico principal
-
-`scripts/ops/copilot-network-diagnose.sh` deve futuramente convergir para wrapper/provider filter do diagnóstico genérico.
-
----
-
-# 28. Roadmap booleano completo
+# 23. Roadmap consolidado — FAIXAS A–U
 
 Legenda:
 
-- `[x]` concluído/provado nesta trilha;
-- `[~]` parcialmente implementado na worktree, ainda não publicado/fechado;
+- `[x]` concluído/publicado;
+- `[~]` implementado localmente ou parcialmente validado;
 - `[ ]` pendente;
-- `[!]` blocker/gate obrigatório.
+- `[!]` bloqueado por superfície externa/capability.
 
----
+## FAIXA A — normalização e publicação
 
-## FAIXA A — investigação, verdade e baseline
+### A0 — baseline
 
-### Fase A0 — investigação integral
+- [x] ler completamente network/lifecycle core;
+- [x] registrar topologia DevContainer/MCP/Cloudflare;
+- [x] registrar autoridade/freshness;
+- [x] reconstruir documento canônico para ILCP.
 
-- [x] **A0.1** Ler roadmap mestre integralmente.
-- [x] **A0.2** Ler scripts Bash centrais integralmente.
-- [x] **A0.3** Ler lifecycle hooks integralmente.
-- [x] **A0.4** Ler registry/contracts/configuração.
-- [x] **A0.5** Ler consumers MCP.
-- [x] **A0.6** Ler abstrações OpenAI/Model Gateway adjacentes.
-- [x] **A0.7** Auditar último HEAD e commits recentes.
-- [x] **A0.8** Auditar worktree modificada/untracked.
-- [x] **A0.9** Auditar estado live Cloudflare/MCP após reconnect.
-- [x] **A0.10** Revisar documentação oficial atual da OpenAI.
-- [x] **A0.11** Construir modelo causal do raro “aguardando conexão”.
-- [x] **A0.12** Criar este documento canônico.
+### A1 — worktree
 
-**Gate A0:** concluído.
+- [ ] reexecutar `repo_status`/diff após esta revisão;
+- [ ] classificar todos untracked;
+- [ ] verificar executable bits `.sh`;
+- [ ] final secret scan;
+- [ ] excluir `.ai`/state/generated da publicação;
+- [ ] validar `.vscode` user-specific settings;
+- [ ] staging explícito por paths;
+- [ ] commit/push somente após gates.
 
-### Fase A1 — normalização pré-publicação da worktree
+## FAIXA B — registry trust boundary
 
-- [x] **A1.1** Restaurar/confirmar executable bits canônicos. O `git_stage` governado detectou e reparou exatamente três drifts `0644 → 0755` ainda registrados como `100755` em HEAD: `local-dns-cache.sh`, `post-create.sh` e `post-start.sh`.
-- [x] **A1.2** Classificar todos os untracked.
-- [x] **A1.3** Mover `workspaces/...` para destino documental correto ou excluir se duplicado. Os dois relatórios foram preservados e movidos para `src/DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/`.
-- [x] **A1.4** Renomear/mover `audit_externa_src_copilot` para path canônico. O relatório foi preservado como `AUDITORIA-EXTERNA-INFRA-IO-TOOLS-FILE-2026-06-14.md`.
-- [x] **A1.5** Revisar `.vscode/settings.json` e separar preference local de configuração repo-wide. As três mudanças atuais foram mantidas deliberadamente: browser user tools, Copilot local index e GPU acceleration `off` como postura estável para o problema de renderização observado neste ambiente.
-- [x] **A1.6** Secret scan final de todos os paths candidatos ao staging. Os 32 paths então existentes foram varridos individualmente contra padrões de API key/token/private key/bearer sem matches; o runner shell criado em seguida não contém segredo materializado.
-- [x] **A1.7** Validar que não há artifacts `/tmp`, state, tokens ou generated dumps sendo versionados.
-- [x] **A1.8** Produzir staging plan explícito de toda a worktree normalizada. O plano final enumerou 33 arquivos e nenhum path implícito/glob.
+- [x] validator central do registry implementado em frente anterior;
+- [x] fail-closed para consumidores críticos principais;
+- [ ] completar dimensões v2 provider/product/scope/leg;
+- [ ] garantir immutable materialization universal;
+- [ ] medir compat legacy usage.
 
-**Gate A1:** concluído em 2026-08-18. O staging explícito foi aplicado sem stage escape e reparou os três executable-bit drifts antes de `git add`.
+## FAIXA C — summary contract / lifecycle truth
 
----
+- [~] summary contracts existentes;
+- [ ] promover envelope v2 universal;
+- [ ] compat v1 explícita;
+- [ ] recovery epoch;
+- [ ] remover optimistic truth remanescente.
 
-## FAIXA B — primitives e trust boundaries
+## FAIXA D — DNS substrate neutral
 
-### Fase B0 — shared Bash primitives
-
-- [ ] **B0.1** Criar `network-common.sh` mínimo. Adiado deliberadamente até haver pelo menos dois/ três helpers comprovadamente estáveis além do registry; não criar uma “god library”.
-- [ ] **B0.2** Centralizar boolean/env parsing.
-- [ ] **B0.3** Centralizar timestamp/age/freshness.
-- [ ] **B0.4** Centralizar safe one-line normalization.
-- [ ] **B0.5** Centralizar bounded list/CSV parsing.
-- [x] **B0.6** Evitar abstrações prematuras de helpers usados por apenas um owner. O primeiro shared owner ficou especializado em endpoint registry, sem absorver host policy, lifecycle, DNS ou mutação.
-- [x] **B0.7** Adicionar nova library à allowlist `devcontainer-shell`. `network/lib/endpoint-registry.sh` é validada junto aos demais scripts; gate passou 13/13.
-
-### Fase B1 — canonical registry validator
-
-- [x] **B1.1** Definir owner único de validation: `.devcontainer/scripts/network/lib/endpoint-registry.sh` v1.0.0.
-- [x] **B1.2** Validar header/version. O contrato v1 exige declaração compatível com `v1.2.0` e distingue `missing`/`mismatch`.
-- [x] **B1.3** Validar row field count e registry não vazio.
-- [x] **B1.4** Validar IDs/capabilities e unicidade de IDs/URLs.
-- [x] **B1.5** Validar HTTPS URL/scheme e forma estrutural sem introduzir allowlist provider-specific no owner neutro.
-- [x] **B1.6** Validar criticality e expected unauthenticated HTTP outcomes.
-- [x] **B1.7** Expor materialização protegida. `network_endpoint_registry_materialize_urls_v1` e `network_endpoint_registry_expected_http_v1` recusam uso (`64`) se o mesmo arquivo não for o último auditado integralmente como `ok` naquela shell.
-
-### Fase B2 — consumers fail-closed
-
-- [x] **B2.1** Manager: `validate → materialize → consume`; registry globalmente inválido nunca alimenta `ENDPOINTS`, e o observer cai para defaults com `endpoint_source=default-registry-<status>`. Host policy GitHub/Copilot permanece separada e local.
-- [x] **B2.2** Proxy: invalid/missing enabled registry não gera config/actuation. `start/restart/probe/benchmark/...` falham antes de tinyproxy; `stop/status/env/doctor` permanecem disponíveis para recuperação.
-- [x] **B2.3** Advisor: invalid registry é non-authoritative e cai para defaults; expected HTTP e URLs só são lidos após o audit compartilhado.
-- [x] **B2.4** Post-create: removidos cinco helpers TSV duplicados; um único audit compartilhado projeta os campos de compatibilidade estrutural.
-
-**Gate B:** concluído em 2026-08-18. Provas finais: `devcontainer-shell` 13/13 (`dd4080cd-ce35-4715-a658-ab5b92828e1e`), contrato/consumer focused test com 6 casos (`335a4de0-6964-4010-b666-864e8485339a`), typecheck estrito (`9838610e-e1a1-470b-aad3-682002b80baf`) e lint (`663e2f2e-b67d-4fd9-aca1-b22d31aa0cbd`) — todos verdes após cleanup e version sync. Releases desta onda: manager v1.7.0, advisor v1.2.0, proxy v1.4.0 e post-create v1.2.4.
-
----
-
-## FAIXA C — contratos e lifecycle
-
-### Fase C0 — summary contract v2
-
-- [ ] **C0.1** Promover `summary-contracts.jsonc` para schema v2.
-- [ ] **C0.2** Introduzir common envelope.
-- [ ] **C0.3** Introduzir `authority`.
-- [ ] **C0.4** Introduzir `scope/provider/product/leg/transport`.
-- [ ] **C0.5** Introduzir `observed_at/age/stale`.
-- [ ] **C0.6** Introduzir `recovery_epoch` quando aplicável.
-- [ ] **C0.7** Corrigir `$schema` placeholder.
-- [ ] **C0.8** Implementar/alinhar validator real do contract catalog.
-
-### Fase C1 — compatibilidade v1
-
-- [ ] **C1.1** Definir projection v2→v1.
-- [ ] **C1.2** Marcar `compat_mode`.
-- [ ] **C1.3** Instrumentar legacy reads.
-- [ ] **C1.4** Remover legado somente após zero consumers.
-
-### Fase C2 — lifecycle truth
-
-- [ ] **C2.1** Post-create: status final-only.
-- [ ] **C2.2** Separar orchestration state de component state.
-- [ ] **C2.3** Reduzir hardcoded version matrix.
-- [ ] **C2.4** Unificar defaults de DNS em create/start/attach/health.
-- [ ] **C2.5** Formalizar network-read-only em post-attach.
-
----
-
-## FAIXA D — neutralização do DNS/substrato
-
-### Fase D0 — proof neutral
-
-- [ ] **D0.1** Separar DNS health de provider probes.
-- [ ] **D0.2** Introduzir neutral canary.
-- [ ] **D0.3** Introduzir split/inherited canary.
-- [ ] **D0.4** Provider probes passam a downstream observations.
-- [ ] **D0.5** Rollback somente por substrate proof failure.
-
-### Fase D1 — upstream policy
-
-- [ ] **D1.1** Inventariar inherited resolvers.
-- [ ] **D1.2** Registrar origem de upstream.
-- [ ] **D1.3** Tornar `inherit-first` policy explícita.
-- [ ] **D1.4** Preservar VPN/split-horizon.
-- [ ] **D1.5** Tornar public fallback explícito.
-- [ ] **D1.6** Benchmark-select opt-in.
-
-### Fase D2 — ownership
-
-- [ ] **D2.1** Ownership record forte do dnsmasq.
-- [ ] **D2.2** Fail-safe no takeover.
-- [ ] **D2.3** PID-reuse test.
-- [ ] **D2.4** Foreign socket-owner test.
-
-### Fase D3 — Docker DNS rollout
-
-- [ ] **D3.1** Instrumentar estado antes de alterar runArgs.
-- [ ] **D3.2** Recreate test sem public DNS hardcode.
-- [ ] **D3.3** VPN/split test.
-- [ ] **D3.4** Falha de inherited DNS test.
-- [ ] **D3.5** Só então decidir remover `--dns` hardcoded.
-
----
+- [x] managed dnsmasq ownership semantics corrigidas;
+- [~] neutral health implementado parcialmente;
+- [ ] inherited/split-DNS canary completo;
+- [ ] eliminar provider reachability como autoridade de substrate;
+- [ ] revisar Docker explicit DNS somente após A/B VPN/split.
 
 ## FAIXA E — NCP provider-neutral
 
-### Fase E0 — registry v2
+- [~] NCP aggregate existe;
+- [ ] registry v2;
+- [ ] provider matrices;
+- [ ] provider optionality;
+- [ ] stale artifacts deixam de degradar runtime atual.
 
-- [ ] **E0.1** Definir schema final.
-- [ ] **E0.2** Migrar GitHub/Copilot first.
-- [ ] **E0.3** Manter legacy registry projection.
-- [ ] **E0.4** Source/freshness metadata.
+## FAIXA F — OpenAI/ChatGPT network posture
 
-### Fase E1 — aggregator v2
+- [x] endpoints fixos de reachability;
+- [x] authority `observed-from-container`;
+- [x] client leg explicitamente `not-observable-from-workspace`;
+- [x] WebSocket facts oficiais registrados;
+- [x] observer por fases DNS/TCP/TLS/TTFB/total para `chatgpt.com`, `ws.chatgpt.com`, `api.openai.com`;
+- [x] baseline histórico bounded de endpoint implementado;
+- [x] attribution consome medição atual + baseline quando disponível;
+- [x] contrato de client TTFT evidence implementado;
+- [ ] acumular baseline endpoint durante várias horas/dias;
+- [ ] HAR/client observer produzir primeiras amostras de TTFT real.
 
-- [ ] **E1.1** Substrate matrix.
-- [ ] **E1.2** Provider matrix.
-- [ ] **E1.3** Product matrix.
-- [ ] **E1.4** Transport matrix.
-- [ ] **E1.5** Client/non-observable matrix.
-- [ ] **E1.6** Recovery epochs.
-- [ ] **E1.7** Flattened compatibility projection.
+## FAIXA G — Cloudflare correlation
 
-### Fase E2 — provider optionality
+- [x] response-code parser corrigido;
+- [x] requestErrors cumulativo reclassificado como advisory;
+- [x] safe edge colo;
+- [x] public self-loop reference;
+- [~] GraphQL capability audit;
+- [ ] recovery epoch;
+- [ ] stale smoke invalidation após topology epoch.
 
-- [ ] **E2.1** Copilot disabled = not-applicable.
-- [ ] **E2.2** GitHub disabled = not-applicable.
-- [ ] **E2.3** OpenAI provider absence não degrada DNS.
-- [ ] **E2.4** Transport health independente de provider catalog.
+## FAIXA H — proxy
 
-**Gate E:** NCP pode ficar `healthy` com Copilot explicitamente desabilitado.
+- [ ] mapear todos consumers `HTTP_PROXY/HTTPS_PROXY`;
+- [ ] decidir provider-scoped vs generic;
+- [ ] rollout sem blast global.
 
----
+## FAIXA I — MCP autonomy/tool projection
 
-## FAIXA F — OpenAI/ChatGPT first-class
-
-### Fase F0 — external facts
-
-- [ ] **F0.1** Criar metadata de fonte/data para facts OpenAI.
-- [ ] **F0.2** Separar allowlist facts de active probes.
-- [ ] **F0.3** Definir freshness de documentação externa.
-
-### Fase F1 — OpenAI API
-
-- [ ] **F1.1** DNS reachability.
-- [ ] **F1.2** TCP/TLS reachability.
-- [ ] **F1.3** HTTP semantics somente se estáveis e seguras.
-- [ ] **F1.4** Não duplicar model/auth logic do Gateway.
-
-### Fase F2 — ChatGPT product
-
-- [ ] **F2.1** HTTPS reachability from container.
-- [ ] **F2.2** Representar WebSocket requirement.
-- [ ] **F2.3** Implementar bounded WS probe somente se semanticamente seguro.
-- [ ] **F2.4** Guidance para TLS inspection/proxy timeout.
-- [ ] **F2.5** Marcar `authority=observed-from-container`.
-
-### Fase F3 — client/OpenAI leg
-
-- [ ] **F3.1** Modelar `not-observable-here`.
-- [ ] **F3.2** Consumir client evidence quando disponível.
-- [ ] **F3.3** Nunca inferir client health de provider egress local.
-
----
-
-## FAIXA G — MCP/Cloudflare correlation
-
-### Fase G0 — tunnel recovery model
-
-- [~] **G0.1** `requestErrors` passou a advisory na worktree.
-- [~] **G0.2** response-code delta parser corrigido na worktree.
-- [ ] **G0.3** Introduzir recovery epoch para cloudflared.
-- [ ] **G0.4** Classificar errors-before-recovery como historical.
-- [ ] **G0.5** Correlacionar HA reconnect timestamps.
-
-### Fase G1 — connector evidence
-
-- [ ] **G1.1** Correlacionar smoke com recovery epoch.
-- [ ] **G1.2** Rebaixar smoke anterior a topology-changing restart quando necessário.
-- [ ] **G1.3** Correlacionar OAuth discovery.
-- [ ] **G1.4** Correlacionar real tools/list/tool call evidence.
-
-### Fase G2 — rare “aguardando conexão” diagnostics
-
-- [ ] **G2.1** Produzir multi-leg report.
-- [ ] **G2.2** Não culpar MCP quando client leg unknown.
-- [ ] **G2.3** Detectar common-cause host/container restart.
-- [ ] **G2.4** Diferenciar intentional reload de spontaneous outage.
-- [ ] **G2.5** Expor confidence score.
-
----
-
-## FAIXA H — proxy e transport policy
-
-### Fase H0 — blast-radius inventory
-
-- [ ] **H0.1** Mapear consumers reais de HTTP_PROXY/HTTPS_PROXY.
-- [ ] **H0.2** Mapear noProxy/host behavior.
-- [ ] **H0.3** Testar OpenAI/GitHub/Git sob proxy.
-
-### Fase H1 — decisão arquitetônica
-
-- [ ] **H1.1** Escolher provider-scoped ou generic proxy.
-- [ ] **H1.2** Definir host policy.
-- [ ] **H1.3** Definir compat aliases.
-
-### Fase H2 — rollout
-
-- [ ] **H2.1** Migrar sem alterar tráfego não alvo.
-- [ ] **H2.2** Cross-provider blast radius test.
-
----
-
-## FAIXA I — MCP projection e autonomia operacional
-
-### Fase I0 — posture v2
-
-- [ ] **I0.1** Parser do envelope normalizado.
-- [ ] **I0.2** Legacy fallback explícito.
-- [ ] **I0.3** Findings por scope/authority.
-- [ ] **I0.4** Recovery projection.
-
-### Fase I1 — bounded refresh
-
-- [~] **I1.1** Tool passiva já implementada localmente.
-- [ ] **I1.2** Validar no novo schema.
-- [ ] **I1.3** Retornar v2 state no mesmo round-trip.
-
-### Fase I2 — validators
-
-- [x] **I2.1** `devcontainer-shell` implementado e provado localmente: runner Node 24, allowlist fixa, ShellCheck `--shell=bash --severity=error` por arquivo, concorrência 4, timeout individual 20 s, process-group kill e diagnóstico incremental. O gate real concluiu 12/12 scripts em aproximadamente 10 s.
-- [x] **I2.2** backend allowlist future-proof implementada localmente; o schema MCP aceita string bounded e o server mantém enforcement da allowlist runtime.
-- [ ] **I2.3** Garantir que novas shared shell libs entram na syntax allowlist automaticamente ou via catálogo canônico.
-
----
+- [x] default max tools 250;
+- [x] payload/list diagnostic budget ampliado proporcionalmente;
+- [x] `mcp_latency_attribution`;
+- [x] `mcp_latency_pulse`;
+- [~] schema host cache/reconnect semantics;
+- [ ] usar descriptor version/epoch para diagnosticar projection stale automaticamente quando possível.
 
 ## FAIXA J — fault injection
 
-### Fase J0 — registry faults
+- [ ] DNS fail/recover;
+- [ ] tunnel restart/recovery epoch;
+- [ ] QUIC blocked → H2 fallback;
+- [ ] OAuth refresh failure;
+- [ ] stateful capacity pressure;
+- [ ] WSL crash common-cause recovery;
+- [ ] stale artifact injection.
 
-- [ ] **J0.1** Truncated registry.
-- [ ] **J0.2** Duplicate ID.
-- [ ] **J0.3** Bad header/version.
-- [ ] **J0.4** Invalid URL/transport.
+## FAIXA K — publicação/sincronização
 
-### Fase J1 — DNS faults
+- [ ] full diff review;
+- [ ] focused validators;
+- [ ] optional mcp-fast suite quando release gate justificar;
+- [ ] explicit stage plan;
+- [ ] commit plan;
+- [ ] commit;
+- [ ] push;
+- [ ] `HEAD==origin/main`;
+- [ ] clean worktree.
 
-- [ ] **J1.1** GitHub down + DNS healthy.
-- [ ] **J1.2** OpenAI down + DNS healthy.
-- [ ] **J1.3** neutral canary down.
-- [ ] **J1.4** split resolver present.
-- [ ] **J1.5** public DNS blocked.
-- [ ] **J1.6** foreign process owns target socket.
-- [ ] **J1.7** stale PID reused.
+## FAIXA L — HTTP origin boundary attribution
 
-### Fase J2 — transport faults
+- [~] request arrival timestamp;
+- [~] response finish timestamp;
+- [~] preHandler;
+- [~] postHandler;
+- [~] handler;
+- [~] external gap;
+- [~] edge colo;
+- [ ] persist compact boundary summary por epoch quando necessário.
 
-- [ ] **J2.1** HTTPS healthy + WebSocket blocked.
-- [ ] **J2.2** QUIC interrupted + auto recovery.
-- [ ] **J2.3** one HA connection drops.
-- [ ] **J2.4** all HA reconnect.
-- [ ] **J2.5** origin restart.
-- [ ] **J2.6** TLS mismatch.
+## FAIXA M — silent gap / auxiliary activity
 
-### Fase J3 — circuit correlation faults
+- [x] sanitized route-class tracking;
+- [x] sanitized JSON-RPC method tracking;
+- [x] `mcp-stream` separado de trabalho discreto;
+- [x] interval-union coverage sem dupla contagem;
+- [x] silent gap distribution;
+- [x] auxiliary coverage ratio;
+- [x] primeiro trabalho discreto / tail-silence decomposition;
+- [x] primeira assinatura live: `firstDelay/externalGap≈94–97%`, primeiro RPC=`initialize`;
+- [x] dashboard interaction SLO separado de origin SLO;
+- [ ] historical silent-gap reconstruction após dados suficientes;
+- [ ] correlation por route/RPC método em janela temporal persistida.
 
-- [ ] **J3.1** Cloudflare healthy + connector smoke fails.
-- [ ] **J3.2** connector healthy + local OpenAI probe fails.
-- [ ] **J3.3** WSL crash common-cause.
-- [ ] **J3.4** ChatGPT client disconnect with MCP healthy.
+## FAIXA N — controlled pulse baseline
 
----
+- [x] pulse tool registrada;
+- [x] primeiras séries controladas;
+- [x] histórico reconhece pulse→pulse;
+- [x] audit suporta labels sanitizados `seriesId/network/model/conversation/client/vpn` sem IP bruto;
+- [x] histórico agrupa `controlledPulseSeries24h` somente dentro da mesma série/condição;
+- [ ] baseline por hora durante vários dias;
+- [ ] baseline por modelo;
+- [ ] baseline por conversa nova/longa;
+- [ ] baseline por rede cliente;
+- [ ] anomaly score sobre pulse histórico.
 
-## FAIXA K — publicação e sincronização total
+## FAIXA O — stateful session churn/capacity
 
-### Fase K0 — pre-publish
+- [x] churn 1 initialize/tool confirmado;
+- [x] active session accumulation confirmado;
+- [x] runtime counters em health/dashboard/attribution;
+- [x] capacity projection implementada;
+- [x] janela curta atual projeta `~0,37–0,40` de capacidade e `headroom-ok`;
+- [ ] validar projection em janela >TTL;
+- [ ] medir expired/terminated após 10–20 min;
+- [ ] canary TTL menor somente se projection justificar;
+- [ ] investigar se host suporta reuse sob outra session negotiation;
+- [ ] definir headroom SLO.
 
-- [!] **K0.1** Corrigir executable bits.
-- [!] **K0.2** Resolver paths/names dos untracked.
-- [!] **K0.3** Secret scan final.
-- [!] **K0.4** Rodar validators focados relevantes.
-- [!] **K0.5** Revisar diff completo.
-- [!] **K0.6** Confirmar que `.vscode/settings.json` deve mesmo ser repo-wide.
-- [!] **K0.7** Confirmar ausência de state/generated artifacts.
+## FAIXA P — round-trip amortization
 
-### Fase K1 — staging
+- [x] `repo_bulk_inspect` e diversas batch surfaces já existem;
+- [x] dashboard estima silent-tax contrafactual por round-trip comprimido;
+- [x] top sequential tool transitions extraídas por `totalGapMs`;
+- [x] top 10 fluxos de maior ROI identificados;
+- [x] `repo_search_text` context max ampliado 10→48 para reduzir `search→read`;
+- [x] search em arquivo pequeno retorna SHA-256 patch-ready para reduzir `stats→patch`;
+- [x] read/search/bulk batches ampliados 32→64 e budget até 3 MiB;
+- [x] patch batches ampliados até 128 operações/64 targets/3 MiB;
+- [~] `repo_apply_patch_batch + postValidate` implementado localmente como composite bounded; guards anti-nesting/capacity adicionados após incidente WSL; projeção do host desta conversa ainda anuncia schema antigo e impede prova externa do novo argumento até refresh/reconnect;
+- [x] partial failure feedback preservado nas surfaces batch existentes;
+- [x] result budgets permanecem bounded;
+- [ ] benchmark antes/depois usando número de tool calls e wall-clock percebido em workflow real.
 
-- [ ] **K1.1** `git_stage_plan` com paths explícitos.
-- [ ] **K1.2** Conferir arquivo a arquivo.
-- [ ] **K1.3** Verificar staged diff/modes.
+## FAIXA Q — client/model/context experiments
 
-### Fase K2 — commit
+- [x] infraestrutura de labels experimentais sanitizados persistida no audit do pulse;
+- [x] parser/histórico compara séries sem guardar IP bruto;
+- [x] primeiro A/B `thinking=medium` vs `thinking=high` executado;
+- [x] medium estabilizado: n=7, média≈5,47 s, p50≈5,59 s, p95≈7,33 s;
+- [x] high estabilizado: n=7, média≈5,93 s, p50≈6,43 s, p95≈7,17 s;
+- [~] sinal high≈15% pior na mediana, ainda insuficiente para causalidade forte;
+- [ ] repetir thinking ABAB com n maior e mesma janela;
+- [ ] conversa nova vs longa;
+- [ ] modelo A vs B;
+- [ ] janela rápida vs lenta;
+- [ ] browser/app A/B;
+- [ ] clean profile/incognito quando aplicável;
+- [ ] VPN off/on somente como A/B;
+- [ ] HAR timestamp capture;
+- [x] persist experiment metadata sem dados sensíveis.
 
-- [ ] **K2.1** Commit plan.
-- [ ] **K2.2** Commit coerente e auditável.
-- [ ] **K2.3** Confirmar HEAD.
+## FAIXA R — IP/network/ASN experiments
 
-### Fase K3 — push
+- [ ] Wi-Fi atual vs hotspot celular;
+- [ ] ISP/ASN distinto quando possível;
+- [ ] client public IP hash/label opcional, nunca IP bruto no audit padrão;
+- [ ] IPv4 vs dual-stack somente se evidência justificar;
+- [ ] route/MTU canary;
+- [x] QUIC vs H2/AUTO transport benchmark executado;
+- [x] resultado consolidado: diferenças p95 ~1% ou menos, insuficientes para explicar o gap;
+- [ ] origin WAN IP A/B apenas baixa prioridade.
 
-- [ ] **K3.1** Push plan.
-- [ ] **K3.2** Push para `origin/main` sem force.
-- [ ] **K3.3** Confirmar `main == origin/main`.
-- [ ] **K3.4** Confirmar worktree clean.
+## FAIXA S — longitudinal evidence / upstream integration
 
----
+- [ ] dashboard histórico inclui interaction SLO;
+- [ ] pulse anomaly detector;
+- [x] time-of-day gap buckets disponíveis no audit reconstruction;
+- [ ] recovery/topology epoch;
+- [x] client TTFT evidence store/tool implementado;
+- [x] attribution projeta client TTFT evidence separadamente;
+- [!] OpenAI scheduler/model queue timestamps — dependência upstream;
+- [!] real conversation token/context metric — dependência upstream;
+- [!] host tool-planner timing — dependência upstream.
 
-# 29. Ordem imediata recomendada após este documento
+## FAIXA T — fixed OpenAI endpoint latency baseline
 
-1. **Não iniciar pelo OpenAI probe.**
-2. Normalizar worktree e publicação somente quando os blockers de mode/path estiverem resolvidos.
-3. Fechar as mudanças locais de rede já iniciadas e seus testes.
-4. Criar shared registry validation e corrigir validate-before-consume.
-5. Evoluir contracts/envelope.
-6. Neutralizar DNS health.
-7. Tornar NCP provider-aware/optional.
-8. Migrar GitHub/Copilot para o modelo novo.
-9. Adicionar OpenAI/ChatGPT como scopes first-class.
-10. Correlacionar MCP/Cloudflare/recovery.
-11. Só depois alterar defaults globais de DNS/proxy.
+- [x] targets fechados `chatgpt.com`, `ws.chatgpt.com`, `api.openai.com`;
+- [x] conexão fresca e decomposição DNS/TCP/TLS/TTFB/server-wait/total;
+- [x] edge colo sanitizado;
+- [x] nenhum body/IP/token persistido;
+- [x] history JSONL bounded;
+- [x] baseline 24h e regression rule implementados;
+- [x] primeiro baseline live: TTFB p50 83/240/274 ms respectivamente;
+- [x] persistência automática provada: monitor executou sozinho (`runs=1`, `failures=0`) e attribution leu `snapshotsRead=1` sem chamada manual à tool de endpoint;
+- [ ] baseline ≥24h com dezenas de snapshots;
+- [ ] correlação temporal endpoint-TTFB ↔ pulse/pre-dispatch;
+- [ ] A/B por `networkLabel` do cliente sem confundir rotas.
 
-Essa ordem maximiza informação e minimiza blast radius.
+## FAIXA U — TTFT real e evidence fusion
 
----
+- [x] taxonomia UI TTFT vs endpoint TTFB vs MCP pre-dispatch definida;
+- [x] `mcp_client_latency_evidence` implementada com source/labels fechados;
+- [x] high-vs-medium summary exige ≥5 amostras por grupo para flag de suficiência;
+- [ ] obter primeira amostra UI TTFT de fonte client-observer/HAR;
+- [ ] repetir ≥10 amostras high e ≥10 medium no mesmo cliente/rede;
+- [ ] conversa fresh vs long com TTFT + pulse simultâneos;
+- [ ] hotspot vs Wi-Fi com TTFT + pulse + endpoint TTFB;
+- [ ] desenhar canary API streaming TTFT opt-in, fixed prompt/model e custo explícito;
+- [ ] nunca executar canary pago dentro de health/readiness automático.
 
-# 30. Gates de validação
+## FAIXA V — WSL / validator resource resilience
 
-| Mudança | Gate mínimo | Gate adicional |
-|---|---|---|
-| shared Bash helper | `devcontainer-shell` / ShellCheck Bash severity=error bounded | focused parser/runner unit |
-| registry validation | fixtures valid/invalid | consumer integration |
-| manager/proxy/advisor | devcontainer-shell | invalid registry fault |
-| summary contract | parser/schema test | producer/consumer integration |
-| DNS semantics | syntax + unit | provider outage injection |
-| lifecycle | sync check | recreate/start/attach smoke |
-| MCP JS | unit-focused | strict typecheck + lint focal |
-| Cloudflare metrics | semantic unit | live window correlation |
-| OpenAI probes | no-secret bounded test | false-positive analysis |
-| WebSocket | bounded timeout | HTTPS-vs-WS fault case |
-| resolver defaults | recreate | VPN/split-DNS test |
-| proxy | process/socket | cross-provider blast radius |
-| publication | full diff + modes | clean worktree after push |
-
-Validadores amplos permanecem escalation-only.
-
----
-
-# 31. Rollback
-
-## 31.1. Código
-
-- commits pequenos por invariant;
-- compat aliases;
-- v1 e v2 coexistem durante migração;
-- comportamento global separado de refactor;
-- nenhuma remoção massiva no mesmo commit que introduz replacement.
-
-## 31.2. DNS
-
-- backup;
-- preflight;
-- post-proof;
-- rollback atômico;
-- não depender de provider externo para restaurar resolver.
-
-## 31.3. Route fix
-
-Preservar rollback específico do GitHub actuator.
-
-## 31.4. Proxy
-
-Stop/revert deve funcionar offline.
-
-## 31.5. NCP
-
-Falha do agregador nunca deve mutar rede.
-
-## 31.6. Git publication
-
-Antes de commit total:
-
-- staging explícito;
-- modes revisados;
-- paths revisados;
-- untracked normalizados;
-- no force push.
-
----
-
-# 32. Definition of Done
-
-A frente só está concluída quando:
-
-- [ ] existe um único NCP provider-neutral;
-- [ ] nenhum provider é obrigatório para substrate health;
-- [ ] todos os registry consumers validam antes de consumir;
-- [ ] DNS health independe de GitHub/OpenAI reachability;
-- [ ] inherited/split-DNS é first-class;
-- [ ] takeover de dnsmasq exige ownership forte;
-- [ ] proxy possui escopo inequívoco;
-- [ ] GitHub route-fix permanece especializado;
-- [ ] OpenAI API, ChatGPT e OpenAI→MCP são legs distintos;
-- [ ] WebSocket é representável;
-- [ ] authority é first-class;
-- [ ] stale evidence nunca governa runtime atual silenciosamente;
-- [ ] recovery epoch existe para transports relevantes;
-- [ ] “aguardando conexão” pode ser descrito por multi-leg report;
-- [ ] client↔OpenAI unknown não é confundido com MCP failure;
-- [ ] MCP posture consome envelope canônico;
-- [ ] refresh permanece bounded;
-- [ ] lifecycle hooks compartilham defaults coerentes;
-- [ ] artifacts possuem schema/freshness/authority;
-- [ ] fault injection cobre falhas cruzadas;
-- [ ] executable bits canônicos estão preservados;
-- [ ] nenhuma árvore/path acidental é publicada;
-- [ ] worktree pode ser sincronizada integralmente com `main` sem segredo/generated artifact;
-- [ ] testes focados e release gates pertinentes passam.
+- [x] incidente de queda WSL registrado com causalidade explicitamente indeterminada;
+- [x] jobs órfãos identificados como consequência de process-namespace loss;
+- [x] `batchConcurrency` de validators serializado em 1;
+- [x] capacidade global de subprocess validator limitada a 1;
+- [x] reserva de spawn impede corrida entre chamadas simultâneas;
+- [x] validator subprocess proibido dentro de Vitest/test runner;
+- [x] `postValidate` possui recursion guard pré-write;
+- [x] Vitest de validator limitado a 2 workers por default;
+- [x] `validatorCapacity` provado live: `runtimeEpoch=c9d1c7f9-1814-4912-9a7c-ab0675da2e10`, owner PID `26558`, `maxActive=1`, `vitestMaxWorkers=2`, `activeCount=0`;
+- [x] snapshot de memória/load/cgroup persistido imediatamente antes e depois de cada validator;
+- [x] runtime epoch first-class: jobs novos carregam `ownerRuntimeEpoch` e `runtimeSameEpoch`; manifests antigos permanecem legíveis e não são reclassificados artificialmente;
+- [x] canary focado pós-reload provou telemetria: job `a08006c2-3ffe-46a4-8531-ff5f3350ac72`, child PID `26917`, `oom=0`, `oom_kill=0`, RSS MCP estável ≈456 MB e delta cgroup ≈+0,5 MB durante ~2,1 s;
+- [x] ausência de `resourceAfter` passa a ser evidência explícita de interrupção abrupta quando `resourceBefore` existe;
+- [ ] estudar ingestão sanitizada de eventos Windows/WSL/Docker para OOM/crash/reset;
+- [ ] executar stress canary controlado somente após evidence channel do host; nunca reproduzir queda por força bruta.
 
 ---
 
-# 33. ADRs
+# 24. Protocolos experimentais obrigatórios
 
-## ADR-NCP-001 — um plano, vários providers
-
-**Decisão:** OpenAI/ChatGPT será integrado ao mesmo NCP; nenhuma pilha paralela.
-
-## ADR-NCP-002 — provider health não domina substrate health
-
-**Decisão:** GitHub/OpenAI outage não significa DNS failure.
-
-## ADR-NCP-003 — GitHub route-fix continua especializado
-
-**Decisão:** não generalizar `/etc/hosts`/CIDRs para OpenAI.
-
-## ADR-NCP-004 — auth é adjacente
-
-**Decisão:** NCP registra presença/configuração, nunca segredo; OAuth permanece no auth control plane.
-
-## ADR-NCP-005 — Model Gateway e NCP não importam runtime um do outro
-
-**Decisão:** compartilhar facts/convenções apenas por contrato estável.
-
-## ADR-NCP-006 — passive MCP refresh continua bounded
-
-**Decisão:** nenhuma execução shell arbitrária será adicionada para conveniência.
-
-## ADR-NCP-007 — external facts possuem provenance
-
-**Decisão:** allowlists OpenAI têm fonte/data/freshness.
-
-## ADR-NCP-008 — artifact stale é histórico
-
-**Decisão:** stale state não governa runtime atual.
-
-## ADR-NCP-009 — recovery é first-class
-
-**Decisão:** erros anteriores a recovery comprovado perdem autoridade presente.
-
-## ADR-NCP-010 — client ChatGPT leg pode ser `not-observable-here`
-
-**Decisão:** declarar limites de observabilidade é melhor que inferir.
-
-## ADR-NCP-011 — Node 24 entra onde reduz parsing/contract complexity
-
-**Decisão:** não substituir boot Bash indiscriminadamente.
-
-## ADR-NCP-012 — publicação Git total exige normalization gate
-
-**Decisão:** “commit tudo” não significa `git add -A` cego.
-
----
-
-# 34. Traceabilidade finding → transformação → prova
-
-| Finding | Transformação | Prova |
-|---|---|---|
-| B-001 | manager validate-before-consume | invalid registry fixture |
-| B-002 | proxy fail-closed | config não emitida |
-| B-003 | advisor fail-closed/reduced authority | invalid advisor fixture |
-| B-004 | canonical defaults | lifecycle sync test |
-| B-005 | final-only manifest | degraded post-create fixture |
-| B-006 | neutral DNS proof | provider outage + DNS success |
-| B-007 | strong ownership | foreign owner / PID reuse |
-| B-008 | scoped proxy | cross-provider test |
-| B-009 | provider optionality | Copilot disabled NCP healthy |
-| B-015 | restore modes | git diff summary clean |
-| B-016 | path normalization | no nested workspace artifact |
-| B-018/19 | advisory + response deltas | semantic unit + live window |
-| B-020/21 | canonical path/version | self-heal audit |
-| B-022 | managed port semantics | DNS finding test |
-| B-023 | temporal authority | stale/fresh route fixtures |
-| B-025 | recovery epoch | reconnect fault injection |
-| G-006 | WS transport | HTTPS healthy + WS blocked |
-| G-012 | host correlation | WSL crash scenario |
-| G-013 | not-observable client leg | posture projection |
-
----
-
-# 35. Riscos deliberadamente não resolvidos ainda
-
-1. remover public DNS hardcode de `runArgs` sem recreate test;
-2. generalizar proxy antes de mapear consumers;
-3. criar active WebSocket probe sem confirmar semântica segura;
-4. alterar Cloudflare edge apenas para “otimizar” sem evidência;
-5. criar OpenAI IP pinning;
-6. inferir cliente ChatGPT health do container;
-7. publicar untracked em paths evidentemente acidentais;
-8. versionar scripts após perda involuntária de executable bit.
-
----
-
-# 36. Estado das mudanças locais já em curso
-
-A subfrente local foi consolidada como unidade de estabilização candidata a baseline e está integralmente staged no momento desta atualização:
-
-- `[x]` Dockerfile/devcontainer version sync staged;
-- `[x]` canonical NCP path self-healing staged;
-- `[x]` NCP 1.1.1 temporal authority para route artifact staged;
-- `[x]` DNS 1.8.1 managed listener semantics staged;
-- `[x]` Cloudflare response-code parsing staged;
-- `[x]` requestErrors advisory semantics staged;
-- `[x]` `devcontainer-shell` validator redesenhado e provado 12/12;
-- `[x]` validator backend allowlist future-proof staged;
-- `[x]` passive NCP refresh MCP tool staged;
-- `[x]` focused resilience semantic tests verdes;
-- `[x]` atomic writer passou a preservar POSIX mode em replacement;
-- `[x]` Git staging governado ganhou proteção observável contra perda acidental de x-bit em scripts HEAD-executable com shebang preservado;
-- `[x]` executable mode regressions reparadas fisicamente antes do staging;
-- `[x]` new/untracked placement normalizado sem perda documental;
-- `[x]` secret scan dos candidatos ao baseline sem matches materiais.
-
-Esta unidade deve ser publicada e sincronizada antes de iniciar a grande migração provider-neutral das Faixas B–H.
-
----
-
-# 37. Estratégia de commit/push futuro
-
-O objetivo de manter `main`, `origin/main` e worktree totalmente sincronizados é correto, mas a sincronização deve ocorrer apenas depois dos blockers de integridade.
-
-Fluxo recomendado:
+## EXP-01 — pulse temporal
 
 ```text
-classify all files
-  → normalize modes
-  → normalize untracked paths/names
-  → secret/generated scan
-  → focused validators
-  → full diff review
-  → git_stage_plan(explicit paths)
-  → staged diff review
-  → commit plan
-  → commit
-  → push plan
-  → push origin/main
-  → verify HEAD == origin/main
-  → verify worktree clean
+10–20 pulses
+mesmo modelo
+mesma conversa
+mesma rede
+registrar horário
 ```
 
-O commit pode ser amplo se todas as mudanças formarem um baseline coerente, mas não deve esconder path mistakes ou chmod drift.
+Comparar p50/p95 `silentExternalGap`.
 
----
+## EXP-02 — conversa nova vs longa
 
-# 38. Conclusão arquitetônica
+Alterar somente conversa.
 
-A base atual é valiosa demais para ser substituída e específica demais para permanecer como está. O caminho correto é uma **generalização interna disciplinada**.
+Objetivo: testar context pressure real do host.
 
-O sistema já possui quase todas as primitives difíceis:
-
-- bounded tools;
-- atomic IO;
-- locks;
-- summaries;
-- metrics;
-- health projections;
-- Cloudflare remote audit;
-- provider registry concepts;
-- lifecycle hooks;
-- rollback;
-- test infrastructure;
-- Node 24 runtime;
-- MCP observability.
-
-O trabalho daqui em diante é principalmente de **semântica, autoridade, redução de duplicação e composição correta**.
-
-O NCP ideal não responderá simplesmente “a rede está boa” ou “o Copilot está ruim”. Ele deverá ser capaz de dizer, por exemplo:
+## EXP-03 — client network
 
 ```text
-substrate:dns                  healthy / observed
-substrate:host-runtime         healthy / observed
-provider:openai                healthy-from-container / observed
-product:chatgpt                partial / observed-from-container
-client:chatgpt-openai          unknown / not-observable-here
-transport:mcp-cloudflare       recovered / observed + remote-control-plane
-transport:mcp-local-origin     healthy / observed
-openai->public-mcp             healthy / client-evidence + connector-smoke
-recent tunnel failure          historical-before-recovery
-confidence                     high for MCP path, unknown for client path
+A = rede atual
+B = hotspot celular
 ```
 
-Essa granularidade é o que permitirá reduzir de fato o raro “aguardando conexão”: não apenas tentar evitar toda interrupção — impossível em sistemas distribuídos —, mas minimizar causas controláveis, acelerar recuperação, impedir falsos positivos e identificar corretamente a camada responsável quando um evento ocorrer.
+Mesmo modelo/conversa; repetir pulse.
+
+## EXP-04 — VPN
+
+Somente após baseline sem VPN.
+
+Nunca combinar troca de VPN + rede + modelo no mesmo experimento.
+
+## EXP-05 — Cloudflare transport
+
+```text
+QUIC control
+HTTP/2
+AUTO
+```
+
+Cinco smokes idênticos por perfil, HA=4, request-error delta, restore automático.
+
+## EXP-06 — session TTL
+
+Executar somente se capacity projection justificar.
+
+Não confundir melhoria de capacity com melhoria de silent gap.
+
+## EXP-07 — batching
+
+Mesmo objetivo lógico:
+
+```text
+A = N chamadas simples
+B = 1 bounded batch
+```
+
+Medir:
+
+- total calls;
+- handler total;
+- silent gap total;
+- wall-clock;
+- payload total;
+- failure semantics.
+
+## EXP-08 — endpoint TTFB permanente
+
+Durante uma janela lenta e uma janela rápida, comparar os snapshots automáticos de:
+
+```text
+chatgpt.com
+ws.chatgpt.com
+api.openai.com
+```
+
+Usar DNS/TCP/TLS/TTFB/server-wait/total. Só promover `endpoint-path-regression` se houver baseline suficiente e regressão material.
+
+## EXP-09 — thinking mode ABAB
+
+```text
+A1 = medium, 10–20 pulses após warmup
+B1 = high,   10–20 pulses após warmup
+A2 = medium, repetir
+B2 = high,   repetir
+```
+
+Fixar conversa, modelo, rede, client e VPN. Descartar o primeiro pulse após cada troca como transição/warmup. Comparar p50/p95 e bootstrap/intervalo quando n permitir.
+
+## EXP-10 — TTFT de cliente
+
+Para cada condição:
+
+```text
+T0 = submit do usuário
+T1 = primeiro token renderizado/streamed
+TTFT = T1 - T0
+```
+
+Registrar somente `ttftMs`, source e labels sanitizados em `mcp_client_latency_evidence`. Coletar endpoint TTFB e pulse/pre-dispatch na mesma janela para evidence fusion.
+
+## EXP-11 — Wi-Fi ↔ hotspot com clocks separados
+
+Em A/B de rede do cliente, coletar simultaneamente:
+
+- UI TTFT;
+- pulse/pre-dispatch;
+- endpoint TTFB do DevContainer;
+- self-loop MCP;
+- edge colo;
+- WebSocket/HAR quando disponível.
+
+Isso permite distinguir mudança na rota do cliente de mudança no backend/model plane.
+
+## EXP-12 — validator resource canary
+
+Resource telemetry básica já existe e foi provada. Qualquer canary adicional deve permanecer conservador até existir evidence channel do host. Sequência segura:
+
+```text
+1 validator focused
+→ observar memória/load/cgroup
+→ aguardar conclusão
+→ verificar MCP/tunnel/WSL health
+```
+
+Não executar dois validators pesados em paralelo. Não executar validator dentro de Vitest. O objetivo é provar headroom, não procurar o limite de crash.
 
 ---
 
-# 39. Log desta frente
+# 25. Segurança e privacidade da telemetria
 
-## 2026-08-18 — investigação profunda e arquitetura
+Não persistir por default:
 
-- [x] retomada após reconnect;
-- [x] confirmação de `main` em `64d80411d` e upstream alinhado antes desta criação;
-- [x] leitura/auditoria integral das superfícies críticas já listadas;
-- [x] auditoria de diffs locais;
-- [x] identificação de chmod regressions;
-- [x] identificação de nested `workspaces/` path;
-- [x] leitura dos principais untracked;
-- [x] secret-pattern scan preliminar dos untracked principais;
-- [x] auditoria live do connector atual;
-- [x] auditoria live Cloudflare post-change;
-- [x] observação do burst de reconnect em 17:07:34Z e recuperação 4/4;
-- [x] consolidação de `requestErrors` como sinal cumulativo/advisory;
-- [x] incorporação dos requisitos oficiais atuais de ChatGPT/OpenAI;
-- [x] definição do NCP provider-neutral;
-- [x] definição do roadmap A–K com fases/subfases booleanas;
-- [x] criação deste documento.
+- bearer token;
+- OAuth token;
+- cookie;
+- raw Authorization;
+- IP do usuário;
+- CF-Ray completo;
+- URL com query sensível;
+- request body arbitrário;
+- conversation content.
 
-**Próximo passo arquitetonicamente permitido:** normalizar e estabilizar a worktree atual; só depois iniciar as transformações amplas das Faixas B–J.
+Persistir apenas labels sanitizados quando necessário:
+
+- route class;
+- JSON-RPC method;
+- edge colo;
+- status;
+- duration;
+- opaque internal call id já existente;
+- hashes quando explicitamente necessários.
+
+A telemetria deve ser suficiente para causalidade sem virar uma nova superfície de dados sensíveis.
 
 ---
 
-# 40. Regra de manutenção deste documento
+# 26. Node 24+ — papel no estado-alvo
 
-Atualizar este arquivo quando houver mudança arquitetural relevante. Cada faixa implementada deve registrar:
+Manter Bash para:
 
-- arquivos alterados;
-- invariant adquirido;
-- compatibilidade mantida/removida;
-- teste/gate executado;
-- evidência live quando necessária;
-- risco residual;
-- próximo bloco.
+- early boot;
+- lifecycle;
+- resolver/process/socket;
+- mutações de sistema.
 
-Não transformar o documento em log de cada patch. Sua função é preservar **verdade arquitetônica, estado-alvo, decisões, gates e sequência de migração**.
+Usar Node 24+ para:
+
+- AsyncLocalStorage request context;
+- schema/registry validation;
+- HTTP/H2 diagnostics;
+- bounded analytics;
+- percentile/histogram;
+- JSONC/contracts;
+- audit reconstruction;
+- concurrency-safe interval union;
+- session projections;
+- tests.
+
+A compile cache Node 24 já está ativa e não aparece como gargalo relevante nesta frente.
+
+---
+
+# 27. Definition of Done do ILCP
+
+Esta frente só pode ser considerada madura quando:
+
+- [ ] uma percepção de lentidão é automaticamente decomposta em origin vs auxiliary vs silent external;
+- [ ] dashboard não produz falso `ok` quando interaction SLO está ruim;
+- [ ] pulse baseline possui histórico por horário/modelo;
+- [ ] endpoint OpenAI/ChatGPT monitor possui baseline ≥24h e dezenas de snapshots;
+- [ ] client UI TTFT possui amostra reproduzível e authority explícita;
+- [ ] TTFT/TTFB/pre-dispatch nunca são agregados como se fossem a mesma métrica;
+- [ ] client-network A/B foi executado pelo menos uma vez;
+- [ ] QUIC/H2 benchmark possui resultado consolidado;
+- [ ] session churn possui capacity headroom comprovado;
+- [ ] NCP stale artifacts não degradam runtime atual;
+- [ ] top round-trip workflows foram amortizados com batch seguro;
+- [ ] recovery epoch diferencia falha passada de estado atual;
+- [ ] nenhuma remediação mutante é acionada por artifact stale;
+- [ ] documentos e tool descriptions refletem authority corretamente;
+- [ ] full focused validation fica verde;
+- [x] validator harness não cria nested subprocesses em test runner e mantém `maxActive=1`;
+- [~] resource telemetry distingue pressão no runtime/cgroup e preserva `oom/oom_kill` before/after; distinguir crash externo/WSL reset com alta autoridade ainda requer evidence channel do host;
+- [ ] worktree publicável sem secrets/generated state;
+- [ ] `main == origin/main` após publicação.
+
+---
+
+# 28. Conclusão arquitetural
+
+A descoberta central desta revisão é simples, mas altera profundamente a prioridade do projeto:
+
+> **A maior parte do tempo perdido entre tools não está atualmente dentro das tools, dentro do origin MCP, nem dentro de uma viagem ordinária pelo Cloudflare Tunnel.**
+
+A série controlada, o boundary HTTP e a nova coverage timeline mostram que o origin pode permanecer silencioso por **vários segundos** entre uma resposta terminada e a próxima `tools/call` chegar. Requests auxiliares de initialize/session existem e constituem uma ineficiência real, mas explicam apenas uma pequena fração do tempo.
+
+Por isso, o projeto deve abandonar duas tentações:
+
+1. culpar automaticamente o número de tools/payload;
+2. tentar curar toda lentidão com restart/tuning de network local.
+
+O caminho correto é:
+
+```text
+medir
+→ separar autoridade
+→ falsificar hipóteses
+→ executar A/B controlado
+→ reduzir round-trips sob nosso controle
+→ manter network transport saudável
+→ preservar evidência do que permanece externo
+```
+
+A vantagem estratégica do workspace é que, mesmo sem acesso à telemetria interna da OpenAI, podemos tornar a região de incerteza cada vez menor.
+
+A partir desta revisão, toda transformação de desempenho deve responder explicitamente a uma pergunta:
+
+> **ela reduz tempo dentro do origin, reduz número de round-trips, melhora uma rota comprovadamente degradada, ou apenas move complexidade sem atacar o silent external gap?**
+
+Se não houver resposta mensurável, a transformação não deve ser promovida como otimização de latência.
+
+---
+
+# 29. Log de revisão — 2026-08-18
+
+Nesta revisão foram incorporados ao estado arquitetural:
+
+- default de tools elevado para 250 como headroom;
+- budget de payload/list ampliado proporcionalmente;
+- `mcp_latency_attribution`;
+- HTTP origin-boundary timing;
+- `mcp_latency_pulse`;
+- reconstrução histórica de gaps;
+- hourly variation;
+- active-work-cluster heuristic;
+- safe edge colo;
+- public MCP self-loop;
+- Cloudflare GraphQL capability probe;
+- auxiliary request timeline;
+- interval-union coverage;
+- silent external gap;
+- origin vs interaction SLO;
+- per-call stateful session churn;
+- active-session counters;
+- capacity projection;
+- round-trip amortization framing;
+- protocolo de experimentos client/IP/network/model/context.
+
+O documento deve ser atualizado sempre que uma das hipóteses HYP-001..HYP-050 mudar de estado por nova evidência.

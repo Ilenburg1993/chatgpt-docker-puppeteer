@@ -18,6 +18,7 @@ export * from './error-taxonomy.js';
 export * from './mcp-passthrough-plan.js';
 export * from './metrics.js';
 export * from './metrics-histograms.js';
+export * from './http-latency-analytics.js';
 export * from './origin-request-profile.js';
 export * from './plan-capabilities-audit.js';
 export * from './remote-api.js';
