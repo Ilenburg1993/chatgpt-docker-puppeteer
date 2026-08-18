@@ -2744,6 +2744,354 @@ Correção:
 
 Essa correção reforça um princípio do Estado-Alvo V2: **convergência não é apenas voltar a ter uma row; é convergir para exatamente o mesmo conjunto semântico que o build canônico produziria.**
 
+---
+
+# Parte X — Nova investigação profunda: Node 24+, scanner, libraries, scopes e Context Plane
+
+## 29. Estado reconciliado após `03a250d0a`
+
+Baseline de entrada desta rodada:
+
+- `main == origin/main == 03a250d0a2f0c458ed0cd0d2630c98bd6d5ecd2e`;
+- runtime MCP real: **Node v24.15.0 / Linux**;
+- 119/119 tools, `CAPABILITIES_VERSION=50`;
+- `repo_search_text` típico recente ~24 ms; `repo_read_file` ~17 ms; `repo_index_search` ~4 ms; patch single ~56 ms;
+- o custo cumulativo dominante recente continua sendo validators/processos externos, não read/search normais;
+- Safety Reconcile V2 permanece abaixo do antigo sweep de hashes (~0,5–0,65 s sobre ~1,4k candidatos, zero hashes no fast path recente);
+- read response cache mantém trust window default 0 e fingerprint rico;
+- durability possui `file-and-directory | file | none`, default estrito;
+- derived index auto-refresh está bounded e domain-aware.
+
+A consequência arquitetural é importante: **não há evidência para acrescentar cache indiscriminado ao hot path de read/write**. A nova rodada deve atacar trabalho duplicado, coerência externa, payload/context e composição de working sets.
+
+## 29.1 Node 24 — capacidades nativas confirmadas
+
+Investigação contra a documentação oficial do Node 24 e o runtime real confirmou:
+
+1. `fs.watch({ recursive:true })` possui suporte Linux desde Node 19.1; portanto o comentário/caminho de `pinned-files` que trata recursive watch como macOS/Windows-only está obsoleto no nosso Node 24.15;
+2. `fs.promises.glob()` é estável em Node 24 e suporta `withFileTypes`, `exclude` e `followSymlinks`;
+3. `path.matchesGlob()` é estável em Node 24.8+;
+4. `crypto.hash()` é one-shot, estável no runtime atual e é recomendado pelo próprio Node para payload prontamente disponível de até aproximadamente 5 MiB, exatamente a faixa dominante dos hashes internos desta arquitetura;
+5. module compile cache está maduro em Node 24.15 (`enableCompileCache`, `getCompileCacheDir`, `flushCompileCache` e status estáveis);
+6. o projeto **já ativou compile cache** cedo no MCP e o propaga para safe validation; portanto essa frente deve ser completada, não reimplementada.
+
+### 29.1.1 Regra Node-native first
+
+Estado-alvo:
+
+> Preferir primitive nativa estável do Node 24 quando ela satisfaz nosso contrato; biblioteca externa só entra quando entrega semântica necessária ausente ou ganho comprovado por benchmark representativo.
+
+Isso não significa remover bibliotecas úteis por princípio. Significa retirar dependência conceitual desnecessária.
+
+## 29.2 Revisão de libraries/dependencies
+
+### Manter
+
+- `better-sqlite3`: continua adequado ao índice local; os antigos scans literais síncronos foram removidos do caminho canônico;
+- `@babel/parser`: ainda necessário para AST/símbolos; worker pool atual não mostra pressão suficiente para justificar Piscina;
+- `lru-cache`: política de tamanho/eviction já madura e observável;
+- `p-limit`: Node não oferece hoje um limiter equivalente simples; está corretamente usado em scan/prefetch/index;
+- `ignore`: mantém semântica de `.gitignore`, que `path.matchesGlob` não substitui.
+
+### Benchmarkar antes de substituir
+
+- `minimatch`: hoje só é importado pelo glob canônico de `src/copilot`; Node 24 possui `path.matchesGlob`, porém nosso contrato inclui plain-segment compatibility, braces, globstar, extglob, character classes, dot files e tratamento literal de `!/#`. Não trocar sem matriz de equivalência e benchmark;
+- scanner `readdir/lstat`: comparar apenas em benchmark com `fs.promises.glob`/`opendir`/`rg --files`; scanner rico ainda precisa de policy, stats, fingerprint, redaction e forma de árvore, portanto native glob não é substituição automática.
+
+### Não adicionar agora
+
+- `chokidar`: recursive `fs.watch` existe no Node 24; watcher externo pode ser implementado como acelerador best-effort nativo. As caveats oficiais de Docker/virtualização exigem fallback por fingerprint/journal mesmo com Chokidar;
+- `fast-glob`: Node 24 já fornece glob estável; não há lacuna demonstrada que justifique nova dependência;
+- Piscina/worker-pool library: o parser já tem pool próprio bounded e a telemetria recente não mostra queue/timeout/failure pressure;
+- `stream-json` / serializers especializados: só reavaliar se JSON grande/serialização voltar a aparecer como gargalo medido.
+
+### Revisar/remover
+
+- `xxhash-wasm`: não há import de produção em `src/`; permanece apenas como dependência histórica/documentação. Não usar para preconditions de segurança; avaliar remoção em fase de hygiene se package-lock puder ser atualizado de forma governada.
+
+## 29.3 Scanner — novo gargalo estrutural identificado
+
+`scanDirectory()` hoje pode pagar, por arquivo:
+
+1. `evaluateIoPathPolicyAsync()` → `realpath` para garantir containment/symlink safety;
+2. `lstat` para fingerprint rico;
+3. `buildFileFingerprint()` → **novo `realpath` do mesmo arquivo**.
+
+Após a remoção do sweep de SHA e do second-stat no Safety Reconcile V2, esse duplicate-realpath passa a ser candidato forte para o custo residual de ~0,5–0,65 s.
+
+### Estado-alvo
+
+- manter **uma** avaliação async de policy por entry quando necessária;
+- reutilizar `policy.realPath` como canonical path do fingerprint;
+- nunca enfraquecer symlink containment apenas para evitar syscall;
+- medir contador `realpathReuses`/`realpathComputations` no scan para prova causal;
+- preservar fallback a `buildFileFingerprint()` independente para callers sem policy evidence.
+
+## 29.4 Coherence Plane externo — watcher como acelerador, não autoridade
+
+O sistema já possui:
+
+- invalidation bus local;
+- journal cross-process para writers canônicos;
+- rich fingerprint + stale probe para detectar alterações externas;
+- derived index auto-refresh.
+
+Falta um acelerador para alterações **não canônicas**: editor, Git checkout, processos externos.
+
+### Estado-alvo
+
+Adicionar `External Watch Plane` opcional/best-effort sobre `src/copilot`:
+
+- Node `fs.watch(..., { recursive:true, persistent:false })` no Linux/Node 24;
+- debounce/coalescing bounded por normalized path;
+- evento nunca é prova de segurança nem de conteúdo; apenas chama a invalidação canônica;
+- fallback existente de rich fingerprint/journal permanece obrigatório;
+- `filename=null`, watcher error, overflow/unsupported não tornam o runtime degraded por si só; marcam watcher unavailable/degraded e preservam fallback;
+- evitar indexar `.ai`, `.git`, `node_modules` e demais domínios protegidos;
+- counters: events, coalesced, invalidated, nullFilename, errors, lastEventAt, maxBatch;
+- benchmark/soak antes de reduzir qualquer stale-probe interval.
+
+O mesmo conhecimento corrige `pinned-files`: no Node 24 Linux, preferir um watcher recursivo, eliminando fan-out manual de first-level subwatchers.
+
+## 29.5 Hash Plane V3 — `crypto.hash` one-shot
+
+O helper canônico `sha256()` ainda usa `createHash().update().digest()` mesmo para strings/Buffers já integralmente em memória.
+
+Estado-alvo:
+
+- usar `node:crypto.hash('sha256', data, 'hex')` para o helper one-shot canônico;
+- manter `createHash` apenas onde houver streaming/incremental hashing real;
+- contrato SHA-256 permanece idêntico; nenhuma precondition muda;
+- provar igualdade em strings, Buffer, Uint8Array, UTF-8 e payload grande dentro do threshold;
+- benchmarkar em workload representativo antes de atribuir ganho percentual.
+
+## 29.6 Compile Cache V2
+
+Já implementado:
+
+- MCP CLI chama `enableCopilotNodeCompileCache()` cedo;
+- helper propaga `NODE_COMPILE_CACHE`/portable para subprocessos de safe validation;
+- o runtime real Node 24.15 suporta a API estável.
+
+Lacunas a investigar/fechar:
+
+- terminal/LLM-B não ativa explicitamente o helper no entrypoint;
+- jobs MCP comuns herdam `process.env` do MCP, mas isso deve ser provado por teste/health;
+- `flushCompileCache()` não é usado: pode ser vantajoso após boot/warm graph, antes de filhos recorrentes, sem esperar exit do processo;
+- health deve mostrar compile cache enabled/status/directory/portable sem expor path sensível desnecessário.
+
+## 29.7 Scope / Working Set — auditoria da LLM-B
+
+A LLM-B possui sete tools:
+
+- `workspace_scope_declare`;
+- `workspace_scope_list`;
+- `workspace_scope_refresh`;
+- `workspace_scope_invalidate_path`;
+- `workspace_scope_context`;
+- `workspace_scope_find_symbol`;
+- `workspace_scope_close`.
+
+A infra compartilhada `io-session-scope` faz mais do que um filtro de arquivos:
+
+1. scan/select de paths;
+2. prefetch de L1;
+3. parse simbólico em background;
+4. symbol index por sessão;
+5. invalidation automática pelo bus;
+6. refresh de paths stale;
+7. contexto resumido (`files/symbols/topExports`);
+8. LRU-like eviction por `MAX_ACTIVE_SCOPES`.
+
+### Problemas encontrados antes de qualquer exposição MCP
+
+1. contrato `maxFiles` está inconsistente: comentários/tool o chamam advisory, mas `warmFromDirectory()` aplica `slice(0,effectiveMaxFiles)` e portanto é **hard selection limit**;
+2. `indexMode='auto'` pode executar um `buildIoIndexForDirectory()` completo após scan+prefetch+parse, duplicando derived-state work que o índice global já pode ter pago;
+3. scope context atual é pequeno, mas pouco informativo para investigação profunda: não fornece manifest bounded de paths/outline/import relationships;
+4. sete novas tools MCP aumentariam `tools/list` e decisão do modelo desnecessariamente;
+5. escopo process-local precisa de lifecycle e identificação segura se usado pelo MCP stateful runtime.
+
+### Estado-alvo: Working Set V2 compartilhado
+
+- manter `io-session-scope` como engine compartilhada LLM-B/MCP;
+- corrigir semântica de maxFiles/limits;
+- evitar full index rebuild por scope quando índice global já cobre/fresh;
+- trabalhar por snapshots/hashes já existentes, sem reread/parser duplicado;
+- gerar manifest compacto: files, stale, symbols, top exports, imports/related paths e budgets;
+- MCP expõe **uma única tool composta**, proposta `repo_working_set`, com ação `open|context|find|refresh|close`, em vez de sete nomes;
+- `open` gera scopeId opaco/unguessable ou liga ao contexto de sessão MCP; não aceitar collision-prone sessionId arbitrário como autoridade;
+- máximo de scopes, files, bytes de contexto, lifetime e eviction explícitos;
+- invalidation e close nunca apagam L1 global; removem somente estado derivado do working set;
+- medir se um workflow real reduz calls/read/outline/search antes de manter a tool anunciada por default.
+
+## 29.8 Context Plane — capabilities summary ainda excessivo
+
+Medição recente:
+
+- `mcp_capabilities_summary`: ~32,8 KiB em uma única chamada;
+- handler ~1 ms: gargalo é **context/wire payload**, não CPU.
+
+Causa:
+
+- nomes das 119 tools são retornados por grupos;
+- os mesmos nomes reaparecem em `advertisedTools`;
+- toda `IO_GUIDANCE` é retornada no default.
+
+Estado-alvo:
+
+- default decision surface: versions, contagens por grupo, security/auth summary, deprecated/experimental counts, 5–8 guidance items essenciais;
+- `includeDetails=true`: grupos completos, advertised names e guidance integral;
+- internal delegation usa summary compacto salvo necessidade explícita;
+- SLO default <8 KiB structured sem perder decisões operacionais.
+
+## 29.9 Estado-Alvo V3 consolidado
+
+### Invariantes
+
+1. uma operação lógica deve pagar policy/realpath/hash/parse no máximo uma vez quando a evidência pode ser encadeada com segurança;
+2. watcher acelera freshness, nunca substitui fingerprint/journal;
+3. Node-native stable > nova dependência, salvo benchmark/semântica contrária;
+4. derived state deve convergir sem entrar no critical path de write;
+5. working set deve **compor** caches/index/parser existentes, não criar uma quarta cópia de conteúdo;
+6. contexto default é decision-oriented; detalhes ficam opt-in;
+7. segurança lógica, symlink containment, hash preconditions e crash durability continuam separadas e explícitas;
+8. qualquer mudança de tool surface precisa justificar bytes adicionais de `tools/list`.
+
+### SLOs V3
+
+- full reconcile unchanged de `src/copilot`: alvo <450 ms neste ambiente, sem reduzir segurança;
+- `repo_search_text` literal hot: manter <100 ms;
+- `repo_read_file` small/medium hot: manter <50 ms;
+- capabilities summary default: <8 KiB structured;
+- external watch invalidation p50: <250 ms quando watcher saudável;
+- working-set context: <16 KiB default, bounded;
+- scope refresh de poucos paths: O(changed paths), nunca O(scope inteiro) por default;
+- zero dependência de watcher para correctness;
+- zero duplicação conhecida de realpath/hash/parser no mesmo pipeline causal.
+
+---
+
+# Faixa 30 — Roadmap de implementação V3
+
+## Fase 30.1 — P0: Scan Identity Chaining
+
+### 30.1.1 Duplicate realpath
+
+- [x] capturar `policy.realPath` no scanner;
+- [x] permitir fingerprint receber canonical path já validado;
+- [x] preservar fallback independente;
+- [x] adicionar counters `fingerprintRealpathReuses/fingerprintRealpathComputations` e regressões dos ramos reuse/fallback;
+- [ ] acrescentar regressão scanner-specific para symlink-outside (a policy canônica já possui regressão própria);
+- [x] benchmark full reconcile antes/depois.
+
+### 30.1.2 Gitignore matcher cache
+
+- [ ] medir custo antes;
+- [ ] se relevante, cache bounded por workspace + fingerprint/mtime;
+- [ ] invalidar via canonical invalidation/external watch.
+
+## Fase 30.2 — P0: Hash One-shot Node 24
+
+- [x] migrar helper SHA in-memory para `crypto.hash`;
+- [x] testes de identidade SHA-256;
+- [x] manter `createHash` apenas nos callers que ainda usam hashing incremental/streaming próprio;
+- [ ] benchmark hash sizes 1 KiB / 64 KiB / 1 MiB / 5 MiB antes de atribuir ganho percentual.
+
+## Fase 30.3 — P0: Context Payload V2
+
+- [x] compactar `mcp_capabilities_summary` default;
+- [x] `includeDetails=true` para full manifest/guidance;
+- [x] evitar duplicação `groups + advertisedTools` no default;
+- [x] delegations usam compact summary;
+- [x] SLO <8 KiB: **3.713 bytes** observados no runtime real.
+
+## Fase 30.4 — P1: Native Watch / External Coherence
+
+### 30.4.1 Pinned files
+
+- [x] atualizar premissa Linux Node 24;
+- [x] tentar um recursive watcher por root em qualquer plataforma suportada pelo runtime;
+- [x] fallback somente em erro/unsupported real, não por platform hardcode;
+- [x] regressão end-to-end de add/change em arquivo nested.
+
+### 30.4.2 I/O external watch plane
+
+- [x] módulo bounded/best-effort;
+- [x] recursive `fs.watch`, debounce e coalescing;
+- [x] invalidation bus canônico;
+- [x] filtros de domínio hidden/denylist;
+- [x] health/counters;
+- [x] teste filesystem real de alteração nested fora do writer canônico;
+- [x] deduplicação temporal contra a mesma mutação já coberta por invalidation canônica;
+- [x] nenhum relaxamento de stale probe: rich fingerprint/journal continuam fallback de correctness.
+
+## Fase 30.5 — P1: Working Set / Scope V2
+
+### 30.5.1 Corrigir infra compartilhada
+
+- [ ] corrigir contrato `maxFiles`;
+- [ ] separar `selectedFiles/candidateFiles/hardLimitReached`;
+- [ ] parser reuse por snapshot/contentHash;
+- [ ] não rebuildar L2 se cobertura existente puder ser reutilizada;
+- [ ] refresh paralelo bounded para changed paths;
+- [ ] stats de bytes/memory/eviction.
+
+### 30.5.2 MCP compact surface
+
+- [ ] investigar binding com MCP stateful session;
+- [ ] preferir uma `repo_working_set` composta;
+- [ ] open/context/find/refresh/close;
+- [ ] scopeId opaco se transport binding não estiver disponível ao handler;
+- [ ] benchmark calls/bytes vs workflow sem working set;
+- [ ] anunciar por default somente se ganho real.
+
+## Fase 30.6 — P1: Compile Cache V2
+
+- [ ] provar env em validator/job children;
+- [ ] ativar cedo no terminal/LLM-B;
+- [ ] avaliar `flushCompileCache()` depois do boot/warm graph;
+- [ ] medir cold/warm process startup;
+- [ ] expor health compacto.
+
+## Fase 30.7 — P2: Native Glob Experiment
+
+- [ ] matriz de equivalência `minimatch` vs `path.matchesGlob` para todos os contratos atuais;
+- [ ] benchmark matcher puro;
+- [ ] benchmark candidate enumeration `readdir` vs `fs.promises.glob` vs `rg --files`;
+- [ ] não trocar scanner rico sem prova de semântica e ganho;
+- [ ] se native matcher cobrir tudo, remover runtime dependency de minimatch desta camada.
+
+## Fase 30.8 — P2: Dependency Hygiene
+
+- [ ] confirmar `xxhash-wasm` sem consumer de produção;
+- [ ] remover somente com package/package-lock governados e gates completos;
+- [ ] mover qualquer dependency importada em runtime para `dependencies` apropriadas;
+- [ ] revisar custo/supply-chain sem confundir install-size com hot-path latency.
+
+## Fase 30.9 — P2: Journal/checkpoint high-watermark
+
+- [ ] retomar sequence persistida no checkpoint;
+- [ ] detectar gaps explicitamente;
+- [ ] combinar Git + journal + fingerprint;
+- [ ] reduzir safety work sem tornar journal autoridade única.
+
+## Fase 30.10 — Gates da Faixa 30
+
+A cada sublote:
+
+1. teste causal focado;
+2. strict typecheck;
+3. lint antes de publish;
+4. reload apenas quando runtime source exigir;
+5. um `mcp_connector_smoke_refresh` pós-reload;
+6. benchmark live antes/depois quando houver claim de performance;
+7. stage/publish apenas de paths explícitos;
+8. `.vscode/settings.json` e untracked antigos continuam fora.
+
+Ordem inicial autorizada por evidência:
+
+> **30.1 duplicate-realpath → 30.2 crypto.hash → 30.3 capabilities compact → 30.4 pinned/watch → 30.5 Working Set V2 → demais fases evidence-gated.**
+
 Refinamento posterior necessário para preservar liberdade de indexação explícita:
 
 - um `repo_index_build` manual em outro scope **não** passa a redefinir o domínio canônico do scheduler;
@@ -2766,4 +3114,128 @@ Prova live após o reload final:
 - o arquivo temporário foi removido imediatamente após a prova.
 
 O cleanup histórico, portanto, é deliberadamente seletivo: corrige a contaminação causada pelo scheduler antigo sem transformar o domínio canônico numa proibição de indexes ad hoc.
+
+---
+
+# 31. Execução da Faixa 30.A — Node 24 fast paths, Context Plane e External Coherence
+
+## 31.1 Scan Identity Chaining
+
+A investigação do scanner mostrou uma duplicação estrutural que só ficou dominante depois do Safety Reconcile V2: cada arquivo podia pagar um `realpath` na policy assíncrona e outro em `buildFileFingerprint()`.
+
+Implementação:
+
+- `evaluateIoPathPolicyAsync()` continua sendo a autoridade para containment/symlink safety;
+- o `policy.realPath` aprovado é encadeado para o fingerprint;
+- `buildFileFingerprint()` aceita `canonicalPath`, mas mantém o `realpath` independente quando essa evidence não existe;
+- `scanDirectory()` reporta `fingerprintRealpathReuses` e `fingerprintRealpathComputations`.
+
+Prova unitária: scanner green e fallback independente preservado.
+
+Prova live, mesmo scope `src/copilot`, **1.445 candidates / 1.445 unchanged / 0 hashes / 0 second-stats**:
+
+- geração anterior: ~496–651 ms;
+- após identity chaining: **275 ms**;
+- redução observada: ~44,6% contra 496 ms e ~57,8% contra 651 ms.
+
+O ganho não veio de relaxar policy; veio de pagar a mesma identidade canônica apenas uma vez.
+
+## 31.2 Hash Plane Node 24
+
+O helper SHA-256 one-shot compartilhado migrou de `createHash().update().digest()` para `node:crypto.hash('sha256', payload, 'hex')` no runtime Node 24.15.
+
+Regressões cobrem:
+
+- vetores conhecidos vazio/`abc`;
+- string ASCII e Unicode;
+- `Buffer` e `Uint8Array`;
+- payload de 1 MiB;
+- equivalência bit-a-bit com a implementação legada.
+
+Nenhum contrato de precondition/cache/rollback mudou. Benchmark multi-size permanece pendente antes de qualquer claim percentual de CPU.
+
+## 31.3 Capabilities Context Plane V2
+
+`mcp_capabilities_summary` deixou de retornar por default nomes das 119 tools duas vezes e toda a guidance operacional.
+
+Novo default:
+
+- versions;
+- `advertisedToolCount` + `groupCounts`;
+- security/auth summary;
+- deprecated/experimental counts;
+- oito regras operacionais essenciais;
+- `detailsAvailable=true`.
+
+`includeDetails=true` preserva o manifest completo e toda `IO_GUIDANCE`; delegation runner passa a consumir o summary compacto por default.
+
+Prova live:
+
+- antes: ~**32.799 bytes** por retorno default;
+- depois: **3.713 bytes**;
+- redução: **~88,7%**;
+- handler permanece ~0–2 ms;
+- `CAPABILITIES_VERSION=51`;
+- `tools/list`: ~119.654 → **119.810 bytes** (+156 bytes), mantendo 119/119 tools.
+
+Logo, a mudança troca ~156 bytes persistentes de schema por ~29 KiB economizados a cada chamada do summary default.
+
+## 31.4 Recursive Watch Node 24 em pinned files
+
+O `PinnedFilesLoader` continha um pressuposto obsoleto: Linux era forçado para watchers não recursivos + fan-out de subdiretórios de primeiro nível.
+
+No Node 24/Linux atual:
+
+- tenta-se `fs.watch(root, { recursive:true, persistent:false })` primeiro;
+- fallback bounded só é criado quando a própria chamada recursiva falha;
+- erro posterior do watcher continua best-effort e não derruba o boot;
+- regressão real de arquivo nested prova add/change hot reload.
+
+## 31.5 External Coherence Plane
+
+Foi introduzido `io/invalidation/external-watch.js` como **acelerador best-effort**, nunca como authority:
+
+- root MCP: `src/copilot`;
+- recursive `fs.watch`, `persistent:false`;
+- hidden/denylist filtrados antes da fila;
+- pending bounded, batch bounded, high-water e error/drop counters;
+- hints entram no mesmo invalidation bus já consumido por L1/parser/scope/index;
+- journal cross-process e rich fingerprint continuam responsáveis por correctness quando watcher não entrega evento.
+
+A primeira versão (75 ms debounce) revelou um efeito live útil: um único create canônico gerou **2 auto-refresh batches / 2 requests**, porque o mesmo write era visto pelo invalidation normal e pelo watcher.
+
+A arquitetura foi então refinada:
+
+1. o bus mantém uma janela bounded das invalidações recém-despachadas, apenas como hint de deduplicação;
+2. o watcher preserva o timestamp do evento de filesystem;
+3. se uma invalidation canônica posterior já cobre exatamente aquele evento, o watcher incrementa `canonicalSuppressed` e não republíca;
+4. evento externo realmente posterior continua elegível;
+5. debounce default do watcher passou a **125 ms**, que com o debounce de 50 ms do bus ainda mantém o alvo externo nominal abaixo de 250 ms.
+
+Prova live final com create+delete do mesmo probe temporário:
+
+- após create: auto-refresh **1 batch / 1 request / 1 indexed**, `canonicalSuppressed=1`, watcher `invalidated=0`;
+- após delete: totais **2 batches / 2 requests**, `canonicalSuppressed=2`, exatamente uma convergência por mutação;
+- watcher permaneceu `enabled=true`, `watching=true`, **0 errors / 0 drops**;
+- dezenas de eventos de `.ai/jobs`/startup foram filtrados e não chegaram ao coherence plane útil;
+- probe removido ao fim.
+
+A propriedade central fica explícita: **watcher reduz a janela de descoberta de writes externos sem cobrar um segundo ciclo derivado dos writes que o próprio Copilot já conhece.**
+
+## 31.6 Gates 30.A
+
+Gates executados durante o sublote:
+
+- scanner unit: green;
+- hash identity unit: green;
+- MCP tools/meta: green;
+- MCP registry: green;
+- pinned-files watcher: green;
+- external watcher: green;
+- invalidation bus: green;
+- runtime metrics: green;
+- strict typecheck repetido após cada fronteira e green no estado mais recente;
+- reloads controlados com connector smoke 119/119, OAuth/SSE green.
+
+Próxima faixa operacional: **30.5 Working Set / Scope V2**, começando pela correção da infra compartilhada antes de anunciar qualquer nova tool MCP.
 

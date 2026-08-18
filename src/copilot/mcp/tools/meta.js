@@ -6,9 +6,10 @@
  */
 
 import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 const PROTOCOL_VERSION = 'workspace-mcp/0.3.0';
-const CAPABILITIES_VERSION = 50;
+const CAPABILITIES_VERSION = 51;
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
     MCP_AUTH_SCOPES.write,
@@ -234,6 +235,17 @@ const IO_GUIDANCE = [
     'LLM-B remains a separate runtime process, but the MCP exposes an allowlisted control/test plane over its canonical live harness.',
 ];
 
+const DEFAULT_IO_GUIDANCE = Object.freeze([
+    'Start broad work with mcp_session_profile and mcp_tools_status; request the full capabilities manifest only when needed.',
+    'Batch independent reads/searches with repo_read_file.batch, repo_search_text.batch or repo_bulk_inspect to reduce round-trips.',
+    'Use repo_apply_patch_batch for several exact edits; repeated paths remain sequential and atomic per file.',
+    'Use repo_read_file.sha256 as expectedHash for safe write/patch calls and keep file-and-directory durability as the normal default.',
+    'Use repo_search_text for completeness-oriented filesystem search; use repo_index_search explicitly for convergent FTS/discovery.',
+    'Prefer focused validator batches; escalate to broad suites only for cross-cutting or release risk.',
+    'After a controlled MCP reload, use mcp_connector_smoke_refresh as the single normal post-restart gate.',
+    'Use git_publish_changes for governed stage+commit+upstream push over an explicit path set.',
+]);
+
 /**
  * @returns {{
  *     read: string[];
@@ -268,31 +280,49 @@ export function getAdvertisedMcpToolNames() {
 }
 
 /**
+ * @param {{ includeDetails?: boolean }} [options]
  * @returns {Record<string, unknown>}
  */
-export function buildMcpCapabilitiesSummary() {
+export function buildMcpCapabilitiesSummary(options = {}) {
     const groups = getMcpCapabilityGroups();
+    const advertisedTools = getAdvertisedMcpToolNames();
     const auth = readMcpAuthConfig();
     const maxPowerDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
-    return {
+    const groupCounts = Object.fromEntries(Object.entries(groups).map(([name, tools]) => [name, tools.length]));
+    const authProfile = {
+        mode: auth.mode,
+        enforcement: auth.enforcement,
+        authorizationServersConfigured: auth.authorizationServers.length > 0,
+        initialScopes: [...auth.initialScopes],
+        maxPowerDefault,
+    };
+    const compact = {
         success: true,
-        ...groups,
         protocolVersion: PROTOCOL_VERSION,
         capabilitiesVersion: CAPABILITIES_VERSION,
-        advertisedToolCount: getAdvertisedMcpToolNames().length,
-        advertisedTools: getAdvertisedMcpToolNames(),
+        advertisedToolCount: advertisedTools.length,
+        groupCounts,
+        deprecatedCount: DEPRECATED_TOOLS.length,
+        experimentalCount: EXPERIMENTAL_TOOLS.length,
+        securityPolicy: { ...SECURITY_POLICY },
+        metadataProfile: {
+            outputSchemaPolicy: 'specific-only',
+            oauthSecuritySchemes: true,
+        },
+        authProfile,
+        guidanceCount: IO_GUIDANCE.length,
+        ioGuidance: [...DEFAULT_IO_GUIDANCE],
+        detailsAvailable: true,
+    };
+    if (options.includeDetails !== true) return compact;
+    return {
+        ...compact,
+        ...groups,
+        advertisedTools,
         deprecated: [...DEPRECATED_TOOLS],
         experimental: [...EXPERIMENTAL_TOOLS],
-        securityPolicy: { ...SECURITY_POLICY },
         annotationProfile: { ...ANNOTATION_PROFILE },
         metadataProfile: { ...METADATA_PROFILE },
-        authProfile: {
-            mode: auth.mode,
-            enforcement: auth.enforcement,
-            authorizationServersConfigured: auth.authorizationServers.length > 0,
-            initialScopes: [...auth.initialScopes],
-            maxPowerDefault,
-        },
         ioGuidance: [...IO_GUIDANCE],
     };
 }
@@ -304,9 +334,11 @@ export const metaTools = [
     {
         name: 'mcp_capabilities_summary',
         title: 'MCP capabilities summary',
-        description: 'Return a concise categorized summary of the MCP tools exposed for this repo.',
-        inputSchema: {},
+        description: 'Return a compact capability decision surface; request details only for the full tool manifest and guidance.',
+        inputSchema: {
+            includeDetails: z.boolean().optional().describe('Include full grouped tool names and complete IO guidance. Default: false.'),
+        },
         annotations: readOnlyAnnotations(),
-        handler: async () => okResult(buildMcpCapabilitiesSummary()),
+        handler: async ({ includeDetails }) => okResult(buildMcpCapabilitiesSummary({ includeDetails: includeDetails === true })),
     },
 ];

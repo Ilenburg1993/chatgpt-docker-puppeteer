@@ -16,6 +16,7 @@ import { getIoLockStats } from './io-locks.js';
 import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
 import { getIoInvalidationBusStats } from './io/invalidation/bus.js';
+import { getIoExternalWatchStats } from './io/invalidation/external-watch.js';
 import {
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
@@ -63,14 +64,41 @@ function readParserHealthStats() {
 }
 
 function readCoherenceHealthStats() {
+    const externalWatch = safeCall(getIoExternalWatchStats, {
+        starts: 0,
+        reuses: 0,
+        stops: 0,
+        events: 0,
+        queued: 0,
+        coalesced: 0,
+        canonicalSuppressed: 0,
+        filtered: 0,
+        nullFilename: 0,
+        dropped: 0,
+        invalidated: 0,
+        errors: 1,
+        flushes: 0,
+        highWater: 0,
+        lastEventAtMs: null,
+        lastFlushAtMs: null,
+        lastError: 'external-watch-health-unavailable',
+        enabled: false,
+        watching: false,
+        rootKnown: false,
+        pending: 0,
+        debounceMs: 0,
+        maxBatch: 0,
+        maxPending: 0,
+    });
     try {
-        return getIoInvalidationBusStats();
+        return { ...getIoInvalidationBusStats(), externalWatch };
     } catch (error) {
         return {
             error: isError(error) ? /** @type {Error} */ (error).message : String(error),
             hooks: 0,
             pending: 0,
             debounceMs: 0,
+            externalWatch,
             crossProcess: {
                 enabled: false,
                 initialized: false,

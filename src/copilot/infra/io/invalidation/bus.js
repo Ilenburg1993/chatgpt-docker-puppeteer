@@ -26,6 +26,9 @@ const INVALIDATION_DEBOUNCE_MS = Number(process.env['IO_INVALIDATION_DEBOUNCE_MS
 
 /** @type {Map<string, ReturnType<typeof normalizeIoInvalidationEvent>>} */
 const _pendingInvalidations = new Map();
+/** @type {Map<string, { source: string; atMs: number }>} */
+const _recentInvalidations = new Map();
+const MAX_RECENT_INVALIDATIONS = 2048;
 
 /** @type {NodeJS.Timeout | null} */
 let _debounceTimer = null;
@@ -51,6 +54,13 @@ function mergeInvalidationEvent(previous, next) {
  * @param {{ replicate?: boolean }} [options]
  */
 function dispatchInvalidation(filePath, normalized, options = {}) {
+    _recentInvalidations.delete(filePath);
+    _recentInvalidations.set(filePath, { source: normalized.source, atMs: Date.now() });
+    while (_recentInvalidations.size > MAX_RECENT_INVALIDATIONS) {
+        const oldest = _recentInvalidations.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        _recentInvalidations.delete(oldest);
+    }
     for (const hook of [..._hooks]) {
         try {
             hook(filePath, normalized);
@@ -134,6 +144,16 @@ export function publishIoInvalidation(filePath, event = {}) {
 }
 
 /**
+ * Última invalidation despachada para um path. Usado apenas para deduplicar hints best-effort de fs.watch; não é
+ * evidence de freshness nem substitui fingerprint/journal.
+ *
+ * @param {string} filePath
+ */
+export function getRecentIoInvalidation(filePath) {
+    return _recentInvalidations.get(filePath) ?? null;
+}
+
+/**
  * Snapshot compacto da fila local e do journal cross-process.
  */
 export function getIoInvalidationBusStats() {
@@ -153,6 +173,7 @@ export function getIoInvalidationBusStats() {
 export function resetIoInvalidationBusForTest() {
     _hooks.length = 0;
     _pendingInvalidations.clear();
+    _recentInvalidations.clear();
     if (_debounceTimer) {
         clearTimeout(_debounceTimer);
         _debounceTimer = null;

@@ -132,6 +132,8 @@ export async function scanDirectory(rootPath, options = {}) {
     );
     let scannedEntries = 0;
     let blockedEntries = 0;
+    let fingerprintRealpathReuses = 0;
+    let fingerprintRealpathComputations = 0;
     let hardLimitReached = false;
     publishIoLifecycleEvent('scan', 'start', {
         traceId,
@@ -165,6 +167,8 @@ export async function scanDirectory(rootPath, options = {}) {
             if (matchesAnyPattern(absolutePath, workspaceRoot, excludePatterns)) return null;
             const relativePath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
             if (respectGitignore && relativePath && gitignore.ignores(relativePath)) return null;
+            /** @type {string | null} */
+            let validatedRealPath = null;
             if (redactProtectedPaths) {
                 const policy = await evaluateIoPathPolicyAsync(absolutePath, {
                     workspaceRoot: normalizeWorkspaceRoot(workspaceRoot),
@@ -176,6 +180,7 @@ export async function scanDirectory(rootPath, options = {}) {
                     blockedEntries += 1;
                     return null;
                 }
+                validatedRealPath = policy.realPath;
             }
             let type = dirent.isFile()
                 ? /** @type {const} */ ('file')
@@ -209,7 +214,14 @@ export async function scanDirectory(rootPath, options = {}) {
             });
             if (type === 'file' && stats) entry.size = stats.size;
             if (includeFingerprint && type === 'file' && stats) {
-                entry.fingerprint = await buildFileFingerprint(absolutePath, stats, limit);
+                entry.fingerprint = await buildFileFingerprint(
+                    absolutePath,
+                    stats,
+                    limit,
+                    validatedRealPath ? { canonicalPath: validatedRealPath } : {},
+                );
+                if (validatedRealPath) fingerprintRealpathReuses += 1;
+                else fingerprintRealpathComputations += 1;
                 options.signal?.throwIfAborted();
             }
             scannedEntries += 1;
@@ -272,6 +284,8 @@ export async function scanDirectory(rootPath, options = {}) {
                 concurrency,
                 batchSize,
                 fingerprint: includeFingerprint,
+                fingerprintRealpathReuses,
+                fingerprintRealpathComputations,
             },
         });
         publishIoOperation(io, { success: true });

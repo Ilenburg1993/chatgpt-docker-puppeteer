@@ -799,32 +799,35 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['diff'], 'string');
     });
 
-    it('mcp_capabilities_summary groups the tool surface', async () => {
+    it('mcp_capabilities_summary is compact by default and preserves an opt-in full manifest', async () => {
         const tool = findTool('mcp_capabilities_summary');
         const result = await tool.handler({});
         assert.equal(result.isError, undefined);
         const structured = /** @type {Record<string, unknown>} */ (result.structuredContent);
-        assert.ok(Array.isArray(structured['read']));
-        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_root_tree'));
-        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_symbol_search'));
-        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_find_symbol_usages'));
-        assert.ok(/** @type {string[]} */ (structured['read']).includes('repo_bulk_inspect'));
-        assert.ok(Array.isArray(structured['index']));
-        assert.ok(/** @type {string[]} */ (structured['index']).includes('repo_index_status'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('delegate_to_repo_autonomy_runner'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_golden_prompts'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_maintenance_plan'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_session_profile'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tools_status'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_tunnel_status'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_connector_smoke_refresh'));
-        assert.ok(/** @type {string[]} */ (structured['runtime']).includes('mcp_post_restart_readiness'));
-        assert.ok(/** @type {string[]} */ (structured['validation']).includes('mcp_validation_dashboard'));
-        assert.ok(/** @type {string[]} */ (structured['validation']).includes('job_get_summary'));
-        assert.equal(typeof structured['annotationProfile'], 'object');
+        const groupCounts = /** @type {Record<string, unknown>} */ (structured['groupCounts']);
+        assert.ok(Number(groupCounts['read'] ?? 0) > 0);
+        assert.ok(Number(groupCounts['runtime'] ?? 0) > 0);
+        assert.equal(structured['detailsAvailable'], true);
+        assert.equal('read' in structured, false);
+        assert.equal('advertisedTools' in structured, false);
+        assert.ok(Buffer.byteLength(JSON.stringify(structured), 'utf8') < 8 * 1024);
         const authProfile = /** @type {Record<string, unknown>} */ (structured['authProfile']);
         assert.equal(authProfile['maxPowerDefault'], true);
         assert.ok(/** @type {string[]} */ (authProfile['initialScopes']).includes('repo:admin'));
+
+        const detailedResult = await tool.handler({ includeDetails: true });
+        const detailed = /** @type {Record<string, unknown>} */ (detailedResult.structuredContent);
+        assert.ok(Array.isArray(detailed['read']));
+        assert.ok(/** @type {string[]} */ (detailed['read']).includes('repo_root_tree'));
+        assert.ok(/** @type {string[]} */ (detailed['read']).includes('repo_symbol_search'));
+        assert.ok(Array.isArray(detailed['index']));
+        assert.ok(/** @type {string[]} */ (detailed['index']).includes('repo_index_status'));
+        assert.ok(/** @type {string[]} */ (detailed['runtime']).includes('mcp_session_profile'));
+        assert.ok(/** @type {string[]} */ (detailed['validation']).includes('mcp_validation_dashboard'));
+        assert.ok(Array.isArray(detailed['advertisedTools']));
+        assert.equal(typeof detailed['annotationProfile'], 'object');
+        assert.ok(Array.isArray(detailed['ioGuidance']));
+        assert.ok(/** @type {string[]} */ (detailed['ioGuidance']).length > /** @type {string[]} */ (structured['ioGuidance']).length);
     });
 
     it('mcp_tools_status exposes annotation and approval planning metadata', async () => {

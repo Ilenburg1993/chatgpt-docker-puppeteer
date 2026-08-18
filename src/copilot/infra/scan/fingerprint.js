@@ -22,6 +22,7 @@ export function classifyStats(stats) {
  * @param {string} absolutePath
  * @param {import('node:fs').Stats} stats
  * @param {<T>(fn: () => Promise<T>) => Promise<T>} limit
+ * @param {{ canonicalPath?: string }} [options]
  * @returns {Promise<{
  *     realpath: string;
  *     mtimeMs: number;
@@ -31,8 +32,11 @@ export function classifyStats(stats) {
  *     ino: number;
  * }>}
  */
-export async function buildFileFingerprint(absolutePath, stats, limit) {
-    const canonicalPath = await limit(() => realpath(absolutePath)).catch(() => absolutePath);
+export async function buildFileFingerprint(absolutePath, stats, limit, options = {}) {
+    const canonicalPath =
+        typeof options.canonicalPath === 'string' && options.canonicalPath
+            ? options.canonicalPath
+            : await limit(() => realpath(absolutePath)).catch(() => absolutePath);
     return {
         realpath: canonicalPath,
         mtimeMs: stats.mtimeMs,

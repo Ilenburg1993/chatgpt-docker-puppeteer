@@ -175,59 +175,97 @@ export class PinnedFilesLoader extends EventEmitter {
      * @returns {Promise<void>}
      */
     async #startWatchers() {
-        // BUG-CRIT-07 (fix): fs.watch com recursive só funciona em macOS/Windows nativamente.
-        // Em Linux (DevContainer), usar recursive: true nos dirs e monitorar subdirs manualmente.
-        const supportsRecursive = process.platform === 'darwin' || process.platform === 'win32';
         for (const dir of this.#dirs) {
             try {
                 await access(dir);
             } catch {
                 continue;
             }
-            try {
-                const watchOpts = supportsRecursive ? { persistent: false, recursive: true } : { persistent: false };
-                const watcher = watch(dir, watchOpts, (_eventType, filename) => {
-                    if (!filename) return;
-                    if (!SUPPORTED_EXTENSIONS.some((ext) => filename.endsWith(ext))) return;
-                    const filePath = join(dir, filename);
-                    this.#scheduleReload(filePath);
-                });
-                // GAP-Q02 fix: listener de erro para evitar crash se o diretório for removido
-                watcher.on('error', (/** @type {Error} */ err) => {
-                    log('WARN', `[PinnedFilesLoader] Watcher erro em ${dir}: ${err.message}`);
-                    this.#watchers.delete(dir);
-                });
-                this.#watchers.set(dir, watcher);
 
-                // BUG-CRIT-07 (fix): em Linux, monitorar subdirs de primeiro nível também
-                if (!supportsRecursive) {
-                    try {
-                        const entries = await readdir(dir);
-                        for (const entry of entries) {
-                            const subPath = join(dir, entry);
-                            const info = await stat(subPath);
-                            if (!info.isDirectory()) continue;
-                            const subWatcher = watch(subPath, { persistent: false }, (_evtType, fname) => {
-                                if (!fname) return;
-                                if (!SUPPORTED_EXTENSIONS.some((ext) => fname.endsWith(ext))) return;
-                                this.#scheduleReload(join(subPath, fname));
-                            });
-                            subWatcher.on('error', (/** @type {Error} */ e) =>
-                                log('WARN', `[PinnedFilesLoader] Watcher subdir erro ${subPath}: ${e.message}`),
-                            );
-                            this.#watchers.set(subPath, subWatcher);
-                        }
-                    } catch (e) {
-                        logSwallowed(e, 'config.pinnedFiles.watchSubdirs');
-                    }
-                }
-            } catch (err) {
-                log(
-                    'WARN',
-                    `[PinnedFilesLoader] Não foi possível monitorar ${dir}: ${/** @type {Error} */ (err).message}`,
-                );
-            }
+            // Node 19.1+ suporta fs.watch recursive também em Linux. No Node 24 do projeto, tentamos a primitive nativa
+            // primeiro e só mantemos o fan-out manual como fallback para filesystems/plataformas que rejeitem a opção.
+            if (this.#tryStartRecursiveWatcher(dir)) continue;
+            await this.#startFallbackWatchers(dir);
         }
+    }
+
+    /**
+     * @param {string} dir
+     * @returns {boolean}
+     */
+    #tryStartRecursiveWatcher(dir) {
+        try {
+            const watcher = watch(dir, { persistent: false, recursive: true }, (_eventType, filename) => {
+                if (!filename) return;
+                const relativeName = String(filename);
+                if (!SUPPORTED_EXTENSIONS.some((ext) => relativeName.endsWith(ext))) return;
+                this.#scheduleReload(join(dir, relativeName));
+            });
+            this.#registerWatcher(dir, watcher, 'recursive');
+            return true;
+        } catch (err) {
+            log(
+                'DEBUG',
+                `[PinnedFilesLoader] Watch recursivo indisponível em ${dir}; usando fallback bounded: ${toError(err).message}`,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * @param {string} dir
+     * @returns {Promise<void>}
+     */
+    async #startFallbackWatchers(dir) {
+        try {
+            const rootWatcher = watch(dir, { persistent: false }, (_eventType, filename) => {
+                if (!filename) return;
+                const name = String(filename);
+                if (!SUPPORTED_EXTENSIONS.some((ext) => name.endsWith(ext))) return;
+                this.#scheduleReload(join(dir, name));
+            });
+            this.#registerWatcher(dir, rootWatcher, 'fallback-root');
+
+            const entries = await readdir(dir);
+            for (const entry of entries) {
+                const subPath = join(dir, entry);
+                let info;
+                try {
+                    info = await stat(subPath);
+                } catch (err) {
+                    logSwallowed(err, 'config.pinnedFiles.watchSubdirStat');
+                    continue;
+                }
+                if (!info.isDirectory()) continue;
+                try {
+                    const subWatcher = watch(subPath, { persistent: false }, (_eventType, filename) => {
+                        if (!filename) return;
+                        const name = String(filename);
+                        if (!SUPPORTED_EXTENSIONS.some((ext) => name.endsWith(ext))) return;
+                        this.#scheduleReload(join(subPath, name));
+                    });
+                    this.#registerWatcher(subPath, subWatcher, 'fallback-subdir');
+                } catch (err) {
+                    logSwallowed(err, 'config.pinnedFiles.watchSubdir');
+                }
+            }
+        } catch (err) {
+            log('WARN', `[PinnedFilesLoader] Não foi possível monitorar ${dir}: ${toError(err).message}`);
+        }
+    }
+
+    /**
+     * @param {string} key
+     * @param {import('node:fs').FSWatcher} watcher
+     * @param {'recursive' | 'fallback-root' | 'fallback-subdir'} mode
+     * @returns {void}
+     */
+    #registerWatcher(key, watcher, mode) {
+        watcher.on('error', (/** @type {Error} */ err) => {
+            log('WARN', `[PinnedFilesLoader] Watcher ${mode} erro em ${key}: ${err.message}`);
+            if (this.#watchers.get(key) === watcher) this.#watchers.delete(key);
+        });
+        this.#watchers.set(key, watcher);
     }
 
     /**

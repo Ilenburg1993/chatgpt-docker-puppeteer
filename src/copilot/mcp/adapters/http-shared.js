@@ -17,9 +17,11 @@
  * @module copilot/mcp/adapters/http-shared
  */
 
+import { startIoExternalWatch } from '#copilot/infra/public/io';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
+import { resolve } from 'node:path';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
 import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
@@ -29,6 +31,7 @@ import {
 } from '../control-plane/auth-jwks-warmup.js';
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
+import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
 import { readMcpMetricsSnapshot, recordMcpHttpTransportMode } from '../control-plane/metrics.js';
 import {
     readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
@@ -537,6 +540,7 @@ export function createMcpHttpRequestHandler(options) {
  * @returns {void}
  */
 export function notifyMcpHttpStarted() {
+    startIoExternalWatch(resolve(getMcpWorkspaceRoot(), 'src/copilot'));
     startMcpIndexAutoBuildInBackground({ reason: 'mcp-http-start' });
     scheduleMcpAuthJwksWarmup();
     scheduleMcpStartupMaintenance();

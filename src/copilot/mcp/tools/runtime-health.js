@@ -337,6 +337,7 @@ function summarizeIoCache(cache) {
     const l1 = recordOrEmpty(cache['l1']);
     const coherence = recordOrEmpty(cache['coherence']);
     const crossProcess = recordOrEmpty(coherence['crossProcess']);
+    const externalWatch = recordOrEmpty(coherence['externalWatch']);
     const aggregate = recordOrEmpty(cache['aggregate']);
     return {
         l1: {
@@ -349,6 +350,18 @@ function summarizeIoCache(cache) {
             gapDetections: crossProcess['gapDetections'] ?? 0,
             writeErrors: crossProcess['writeErrors'] ?? 0,
             readErrors: crossProcess['readErrors'] ?? 0,
+            externalWatch: {
+                enabled: externalWatch['enabled'] ?? false,
+                watching: externalWatch['watching'] ?? false,
+                events: externalWatch['events'] ?? 0,
+                invalidated: externalWatch['invalidated'] ?? 0,
+                canonicalSuppressed: externalWatch['canonicalSuppressed'] ?? 0,
+                filtered: externalWatch['filtered'] ?? 0,
+                dropped: externalWatch['dropped'] ?? 0,
+                errors: externalWatch['errors'] ?? 0,
+                pending: externalWatch['pending'] ?? 0,
+                lastEventAtMs: externalWatch['lastEventAtMs'] ?? null,
+            },
         },
         validatedReadPath: cache['validatedReadPath'] ?? null,
         validatedMutablePath: cache['validatedMutablePath'] ?? null,

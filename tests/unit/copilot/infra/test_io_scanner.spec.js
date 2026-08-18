@@ -57,6 +57,25 @@ describe('infra/io-scanner', () => {
         expect(typeof entry?.fingerprint?.ctimeMs).toBe('number');
         expect(Number.isFinite(entry?.fingerprint?.dev)).toBe(true);
         expect(Number.isFinite(entry?.fingerprint?.ino)).toBe(true);
+        expect(result.io.advisoryLimits).toMatchObject({
+            fingerprintRealpathReuses: 1,
+            fingerprintRealpathComputations: 0,
+        });
+    });
+
+    it('mantém realpath independente do fingerprint quando policy evidence não é solicitada', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'standalone.txt');
+        await writeFile(file, 'standalone', 'utf8');
+
+        const result = await scanDirectory(dir, { fingerprint: true, redactProtectedPaths: false });
+        const entry = result.entries.find((item) => item.name === 'standalone.txt');
+
+        expect(entry?.fingerprint?.realpath).toBe(await realpath(file));
+        expect(result.io.advisoryLimits).toMatchObject({
+            fingerprintRealpathReuses: 0,
+            fingerprintRealpathComputations: 1,
+        });
     });
 
     it('publica eventos de lifecycle scan.start e scan.complete', async () => {

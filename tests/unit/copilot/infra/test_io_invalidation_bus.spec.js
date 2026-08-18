@@ -1,11 +1,17 @@
 // @ts-check
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+    getRecentIoInvalidation,
     publishIoInvalidation,
     registerIoInvalidationHook,
+    resetIoInvalidationBusForTest,
 } from '../../../../src/copilot/infra/io/invalidation/bus.js';
+
+afterEach(() => {
+    resetIoInvalidationBusForTest();
+});
 
 describe('infra/io/invalidation bus', () => {
     it('publica evento normalizado para hooks registrados', () => {
@@ -19,6 +25,15 @@ describe('infra/io/invalidation bus', () => {
         unregister();
 
         expect(seen).toEqual([{ filePath: '/tmp/a.txt', recursive: true, source: 'test' }]);
+    });
+
+    it('expõe invalidation recém-despachada apenas como hint de deduplicação', () => {
+        publishIoInvalidation('/tmp/recent.txt', { source: 'canonical-test' });
+        const recent = getRecentIoInvalidation('/tmp/recent.txt');
+
+        expect(recent?.source).toBe('canonical-test');
+        expect(typeof recent?.atMs).toBe('number');
+        expect(getRecentIoInvalidation('/tmp/missing.txt')).toBeNull();
     });
 
     it('unregister remove hook sem afetar publicações posteriores', () => {
