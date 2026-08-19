@@ -65,6 +65,7 @@ const LATENCY_SURFACE_TOOL_NAMES = new Set([
     'mcp_latency_dashboard',
     'mcp_latency_pulse',
     'mcp_openai_endpoint_latency',
+    'mcp_round_trip_analytics',
     'mcp_runtime_health',
     'mcp_tunnel_status',
     'mcp_connector_smoke_refresh',

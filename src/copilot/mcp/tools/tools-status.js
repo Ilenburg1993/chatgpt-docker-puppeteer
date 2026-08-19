@@ -5,7 +5,15 @@
  * @module copilot/mcp/tools/tools-status
  */
 
-import { MCP_AUTH_SCOPES, okResult, readMcpAuthConfig, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import {
+    MCP_AUTH_SCOPES,
+    MCP_TOOL_EXECUTION_LIMITS,
+    MCP_TOOL_EXECUTION_LIMITS_VERSION,
+    okResult,
+    readMcpAuthConfig,
+    readMcpSchemaConvergenceState,
+    readOnlyAnnotations,
+} from '#copilot/mcp/control-plane';
 
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
@@ -110,8 +118,10 @@ function buildApprovalFrictionProfile(summaries) {
         directBatchWorkflows: [
             ['repo_apply_patch_batch', 'repo_patch_batch_plan'],
             ['repo_apply_file_batch', 'repo_apply_file_batch_plan'],
+            ['run_copilot_validator', 'mcp_validation_plan'],
         ],
-        planFirstWorkflows: [['mcp_validation_plan', 'run_copilot_validator']],
+        planFirstWorkflows: [],
+        escalationOnlyPlans: ['mcp_validation_plan'], 
     };
 }
 
@@ -200,7 +210,31 @@ export const mcpToolsStatusTool = {
             hostApprovalProfile: {
                 oauthGrantsAllRepoScopesByDefault: maxPowerRepoScopesByDefault,
                 writeActionsMayStillPrompt: true,
-                preferredStrategy: 'plan once, apply a bounded batch, validate only when causal evidence requires it',
+                preferredStrategy:
+                    'Use the direct bounded one-shot tool when intent is clear; use plan tools only when preview, escalation, or a separate approval boundary adds information.',
+            },
+            executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
+            executionLimits: MCP_TOOL_EXECUTION_LIMITS,
+            schemaConvergence: readMcpSchemaConvergenceState(),
+            publicationWorkflow: {
+                preferred: 'git_publish_changes',
+                happyPath:
+                    'When the Git index starts clean and explicit changed paths are known, publish with one governed git_publish_changes call (stage → commit → optional upstream push → final verification).',
+                granularFallbackOnlyFor: [
+                    'preexisting-staged-index',
+                    'merge-or-rebase-state',
+                    'upstream-or-head-drift',
+                    'explicit-preview-or-forensics',
+                    'partial-publish-failure',
+                ],
+                avoidRoutineSequence: [
+                    'git_stage_plan',
+                    'git_stage',
+                    'git_commit_plan',
+                    'git_commit',
+                    'git_push_plan',
+                    'git_push',
+                ],
             },
             approvalFrictionProfile: buildApprovalFrictionProfile(summaries),
             wirePayloadAudit,

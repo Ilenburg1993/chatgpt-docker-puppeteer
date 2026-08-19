@@ -14,6 +14,7 @@ import {
     errorResult,
     estimateStructuredTextResultBytes,
     getMcpWorkspaceRoot,
+    MCP_TOOL_EXECUTION_LIMITS,
     normalizeFocusedUnitTestFiles,
     canRunCopilotValidatorInline,
     okResult,
@@ -49,13 +50,15 @@ const {
 const DEFAULT_DIFF_CONTEXT_LINES = 3;
 const DEFAULT_MAX_DIFF_LINES = 2000;
 const QUARANTINE_DIR = path.join(getMcpWorkspaceRoot(), 'src/copilot/.ai/quarantine');
-const MAX_BATCH_FILE_OPERATIONS = 64;
-const MAX_PATCH_BATCH_OPERATIONS = 128;
-const MAX_PATCH_BATCH_TARGETS = 64;
-const MAX_PATCH_BATCH_INPUT_BYTES = 3 * 1024 * 1024;
-const DEFAULT_PATCH_PLAN_CONCURRENCY = 4;
-const DEFAULT_PATCH_FAST_CONCURRENCY = 4;
-const MAX_PATCH_TARGET_CONCURRENCY = 8;
+const { maxOperations: MAX_BATCH_FILE_OPERATIONS } = MCP_TOOL_EXECUTION_LIMITS.repoFileBatch;
+const {
+    maxBatchOperations: MAX_PATCH_BATCH_OPERATIONS,
+    maxBatchTargets: MAX_PATCH_BATCH_TARGETS,
+    maxBatchInputBytes: MAX_PATCH_BATCH_INPUT_BYTES,
+    defaultPlanConcurrency: DEFAULT_PATCH_PLAN_CONCURRENCY,
+    defaultFastConcurrency: DEFAULT_PATCH_FAST_CONCURRENCY,
+    maxTargetConcurrency: MAX_PATCH_TARGET_CONCURRENCY,
+} = MCP_TOOL_EXECUTION_LIMITS.repoPatch;
 
 /**
  * Use the opaque validated mutable capability when the upstream path adapter supplied one; keep the canonical string
@@ -1113,12 +1116,14 @@ async function planPatchBatchOperation(operation, index) {
     } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
         const details = patchBatchErrorDetails(error);
+        const semantics = patchFailureSemantics(code, details, 'target');
         return {
             index,
             success: false,
             path: resolved.relative,
             error: error instanceof Error ? error.message : String(error),
             code,
+            ...semantics,
             ...(Object.keys(details).length > 0 ? { details } : {}),
             nextAction: patchBatchNextAction(code, details),
         };
@@ -1197,12 +1202,14 @@ async function applyPatchBatchOperation(operation, index) {
     } catch (error) {
         const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
         const details = patchBatchErrorDetails(error);
+        const semantics = patchFailureSemantics(code, details, 'target');
         return {
             index,
             success: false,
             path: resolved.relative,
             error: error instanceof Error ? error.message : String(error),
             code,
+            ...semantics,
             ...(Object.keys(details).length > 0 ? { details } : {}),
             nextAction: patchBatchNextAction(code, details),
         };
@@ -1300,6 +1307,66 @@ function patchBatchErrorDetails(error) {
         : {};
 }
 
+/**
+ * Classify a patch failure independently from transport success. This metadata is advisory for recovery planning and
+ * never weakens the mutation precondition that produced the error.
+ *
+ * @param {unknown} code
+ * @param {Record<string, unknown>} [details]
+ * @param {'operation' | 'target' | 'dependency-group'} [failureScope]
+ */
+function patchFailureSemantics(code, details = {}, failureScope = 'target') {
+    const normalizedCode = typeof code === 'string' ? code : 'ERR_PATCH_UNKNOWN';
+    const convergenceCandidate = details['convergenceCandidate'] === true;
+    let failureClass = 'unknown';
+    let retryability = 'caller-refresh';
+    let mutationState = 'none';
+    let recoveryRequired = true;
+
+    if (normalizedCode === 'ERR_PATCH_NOT_FOUND') {
+        failureClass = 'stale-context';
+        retryability = convergenceCandidate ? 'manual-decision' : 'caller-refresh';
+        mutationState = convergenceCandidate ? 'already-converged-candidate' : 'none';
+        recoveryRequired = !convergenceCandidate;
+    } else if (
+        normalizedCode === 'ERR_PATCH_AMBIGUOUS_MATCH' ||
+        normalizedCode === 'ERR_PATCH_EXPECTED_OCCURRENCES' ||
+        normalizedCode === 'ERR_PATCH_OCCURRENCE_INDEX_OUT_OF_RANGE'
+    ) {
+        failureClass = 'ambiguous-context';
+        retryability = 'manual-decision';
+    } else if (normalizedCode === 'EEXPECTEDHASH' || normalizedCode === 'ERR_PATH_DENIED') {
+        failureClass = 'integrity';
+        retryability = normalizedCode === 'EEXPECTEDHASH' ? 'caller-refresh' : 'manual-decision';
+    } else if (normalizedCode === 'ERR_PATCH_BATCH_GROUP_ABORTED') {
+        failureClass = 'dependency-abort';
+        retryability = 'non-retryable';
+        recoveryRequired = false;
+    } else if (normalizedCode === 'ERR_PATCH_NOOP') {
+        failureClass = 'already-converged';
+        retryability = 'non-retryable';
+        mutationState = 'already-converged';
+        recoveryRequired = false;
+    } else if (
+        normalizedCode === 'ERR_PATCH_CONFLICTING_MODE' ||
+        normalizedCode === 'ERR_PATCH_INVALID_OLD_STRING' ||
+        normalizedCode === 'ERR_PATCH_INVALID_NEW_STRING' ||
+        normalizedCode === 'ERR_PATCH_INVALID_OCCURRENCE_INDEX'
+    ) {
+        failureClass = 'shape-config';
+        retryability = 'non-retryable';
+    }
+
+    return {
+        failureClass,
+        failureScope,
+        retryability,
+        mutationState,
+        recoveryRequired,
+        ...(convergenceCandidate ? { convergenceCandidate: true } : {}),
+    };
+}
+
 /** @param {unknown} code @param {Record<string, unknown>} [details] */
 function patchBatchNextAction(code, details = {}) {
     if (code === 'ERR_PATCH_AMBIGUOUS_MATCH') {
@@ -1313,7 +1380,22 @@ function patchBatchNextAction(code, details = {}) {
     }
     if (code === 'EEXPECTEDHASH') return 'Refresh only this target hash and retry; other independent targets need not be repeated.';
     if (code === 'ERR_PATH_DENIED') return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
-    if (code === 'ERR_PATCH_NOT_FOUND') return 'Refresh only this target or refine old_string; other independent targets need not be repeated.';
+    if (code === 'ERR_PATCH_NOT_FOUND') {
+        if (details['convergenceCandidate'] === true) {
+            return 'Do not repeat the unchanged patch: new_string is already present exactly once. Treat this as a convergence candidate, or review intent using currentHash without rereading solely for diagnosis.';
+        }
+        if (Number(details['lineEndingNormalizedOccurrenceCount'] ?? 0) > 0) {
+            return `old_string matches after line-ending normalization; retry with newlineStyle=${String(details['newlineStyle'] ?? 'current')} using the returned currentHash. No full reread is required solely to diagnose this mismatch.`;
+        }
+        if (Number(details['whitespaceNormalizedOccurrenceCount'] ?? 0) > 0) {
+            return 'old_string matches after bounded whitespace normalization. Use candidateLines/currentHash to refine an exact anchor; avoid a full reread solely for diagnosis.';
+        }
+        const candidateLines = Array.isArray(details['candidateLines']) ? details['candidateLines'] : [];
+        if (candidateLines.length > 0) {
+            return `Exact old_string is stale, but related fragments exist near candidateLines=${JSON.stringify(candidateLines)}. Inspect only that bounded region if needed, then retry this target; independent targets need not be repeated.`;
+        }
+        return 'Refresh only this target or refine old_string; other independent targets need not be repeated.';
+    }
     return 'Retry only the failed target after inspecting its causal error.';
 }
 
@@ -1343,6 +1425,12 @@ function compactPatchBatchFailureRows(rows) {
             path: causal['path'] ?? null,
             code: causal['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION',
             error: causal['error'] ?? causal['reason'] ?? 'Patch target failed.',
+            failureClass: causal['failureClass'] ?? 'unknown',
+            failureScope: causal['failureScope'] ?? 'target',
+            retryability: causal['retryability'] ?? 'caller-refresh',
+            mutationState: causal['mutationState'] ?? 'none',
+            recoveryRequired: causal['recoveryRequired'] !== false,
+            ...(causal['convergenceCandidate'] === true ? { convergenceCandidate: true } : {}),
             affectedOperationIndices: ordered.map((row) => Number(row['index'] ?? 0)),
             affectedOperationCount: ordered.length,
             abortedOperationCount: ordered.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
@@ -1360,9 +1448,21 @@ function summarizePatchBatchFailures(rows) {
     const reported = compactPatchBatchFailureRows(rows);
     /** @type {Record<string, number>} */
     const causalByCode = {};
+    /** @type {Record<string, number>} */
+    const failureClassCounts = {};
+    /** @type {Record<string, number>} */
+    const retryabilityCounts = {};
+    let recoveryRequiredTargetCount = 0;
+    let convergenceCandidateCount = 0;
     for (const row of reported) {
         const code = String(row['code'] ?? 'ERR_PATCH_BATCH_TARGET_EXECUTION');
         causalByCode[code] = (causalByCode[code] ?? 0) + 1;
+        const failureClass = String(row['failureClass'] ?? 'unknown');
+        failureClassCounts[failureClass] = (failureClassCounts[failureClass] ?? 0) + 1;
+        const retryability = String(row['retryability'] ?? 'caller-refresh');
+        retryabilityCounts[retryability] = (retryabilityCounts[retryability] ?? 0) + 1;
+        if (row['recoveryRequired'] !== false) recoveryRequiredTargetCount += 1;
+        if (row['convergenceCandidate'] === true) convergenceCandidateCount += 1;
     }
     return {
         failedOperationCount: rows.length,
@@ -1370,6 +1470,10 @@ function summarizePatchBatchFailures(rows) {
         causalFailureCount: reported.length,
         abortedOperationCount: rows.filter((row) => row['code'] === 'ERR_PATCH_BATCH_GROUP_ABORTED').length,
         causalByCode,
+        failureClassCounts,
+        retryabilityCounts,
+        recoveryRequiredTargetCount,
+        convergenceCandidateCount,
     };
 }
 
@@ -1565,12 +1669,19 @@ async function runPatchBatchOperations(operations, dryRun) {
             const details = patchBatchErrorDetails(error);
             for (const [groupIndex, entry] of group.entries()) {
                 const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
+                const rowCode = causal ? originalCode : 'ERR_PATCH_BATCH_GROUP_ABORTED';
+                const semantics = patchFailureSemantics(
+                    rowCode,
+                    causal ? details : {},
+                    group.length > 1 ? 'dependency-group' : 'target',
+                );
                 results.push({
                     index: entry.index,
                     success: false,
                     path: resolved.relative,
                     error: causal ? message : 'Same-file patch group aborted because another operation failed.',
-                    code: causal ? originalCode : 'ERR_PATCH_BATCH_GROUP_ABORTED',
+                    code: rowCode,
+                    ...semantics,
                     ...(causal || originalCode === undefined ? {} : { originalCode }),
                     groupedSameFile: true,
                     groupAborted: true,
@@ -2264,6 +2375,21 @@ export const repoWriteTools = [
                         applied: [],
                         failures: outputFailures,
                     };
+                    await appendMcpAuditEvent({
+                        event: 'repo_apply_patch_batch_preflight_blocked',
+                        tool: 'repo_apply_patch_batch',
+                        applyMode: effectiveApplyMode,
+                        operationCount: normalizedOperations.length,
+                        targetCount: envelope.targetCount,
+                        causalFailureCount: failureSummary.causalFailureCount,
+                        failedTargetCount: failureSummary.failedTargetCount,
+                        abortedOperationCount: failureSummary.abortedOperationCount,
+                        recoveryRequiredTargetCount: failureSummary.recoveryRequiredTargetCount,
+                        convergenceCandidateCount: failureSummary.convergenceCandidateCount,
+                        causalByCode: failureSummary.causalByCode,
+                        failureClassCounts: failureSummary.failureClassCounts,
+                        retryabilityCounts: failureSummary.retryabilityCounts,
+                    });
                     const text = `Global preflight found ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s); no files modified.`;
                     const result = withResultSizeHint(okResult(structured, text), {
                         bytes: estimateStructuredTextResultBytes(structured, text),
@@ -2311,6 +2437,16 @@ export const repoWriteTools = [
                 appliedCount: succeeded.length,
                 failedCount: failedApply.length,
                 skippedCount: skipped.length,
+                partial,
+                workflowSuccess: patchFullyApplied,
+                causalFailureCount: failureSummary.causalFailureCount,
+                failedTargetCount: failureSummary.failedTargetCount,
+                abortedOperationCount: failureSummary.abortedOperationCount,
+                recoveryRequiredTargetCount: failureSummary.recoveryRequiredTargetCount,
+                convergenceCandidateCount: failureSummary.convergenceCandidateCount,
+                causalByCode: failureSummary.causalByCode,
+                failureClassCounts: failureSummary.failureClassCounts,
+                retryabilityCounts: failureSummary.retryabilityCounts,
             });
             let postValidation = {
                 requestedCount: postValidationRequests.length,
@@ -2961,6 +3097,8 @@ export const repoWriteTools = [
                 });
                 const structured = {
                     success: true,
+                    workflowSuccess: true,
+                    mutationState: patch.noop ? 'already-converged' : 'fully-applied',
                     path: resolved.relative,
                     dryRun: patch.dryRun,
                     occurrences: patch.occurrences,
@@ -3002,9 +3140,26 @@ export const repoWriteTools = [
                     source: 'repo_apply_patch',
                 });
             } catch (error) {
+                const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+                const details = patchBatchErrorDetails(error);
+                const semantics = patchFailureSemantics(code, details, 'target');
+                await appendMcpAuditEvent({
+                    event: 'repo_apply_patch_failed',
+                    tool: 'repo_apply_patch',
+                    path: resolved.relative,
+                    code: typeof code === 'string' ? code : 'ERR_PATCH_UNKNOWN',
+                    failureClass: semantics.failureClass,
+                    retryability: semantics.retryability,
+                    mutationState: semantics.mutationState,
+                    recoveryRequired: semantics.recoveryRequired,
+                    convergenceCandidate: semantics.convergenceCandidate === true,
+                });
                 return errorResult(error instanceof Error ? error.message : String(error), {
                     path: resolved.relative,
-                    code: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
+                    code,
+                    ...semantics,
+                    ...(Object.keys(details).length > 0 ? { details } : {}),
+                    nextAction: patchBatchNextAction(code, details),
                 });
             }
         },

@@ -6,7 +6,13 @@
  */
 
 import { z } from 'zod';
-import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import {
+    MCP_TOOL_EXECUTION_LIMITS,
+    MCP_TOOL_EXECUTION_LIMITS_VERSION,
+    okResult,
+    readMcpSchemaConvergenceState,
+    readOnlyAnnotations,
+} from '#copilot/mcp/control-plane';
 
 const HOST_BLOCK_TEMPLATE = {
     timestamp: '<ISO timestamp>',
@@ -60,6 +66,23 @@ function classifyByEvidence(input) {
     const mcpAuditEventPresent = optionalBoolean(input.mcpAuditEventPresent);
     const schemaErrorPresent = optionalBoolean(input.schemaErrorPresent);
     const toolResultIsError = optionalBoolean(input.toolResultIsError);
+    const schemaConvergence = readMcpSchemaConvergenceState();
+
+    if (
+        mcpReachedServer === false &&
+        schemaErrorPresent === true &&
+        schemaConvergence.status !== 'converged-observed'
+    ) {
+        return {
+            code: 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION',
+            layer: 'chatgpt-host-schema',
+            confidence: 'high',
+            severity: 'medium',
+            reason:
+                'The host rejected the input before MCP while this server generation has not observed a fresh tools/list. The client-visible schema is likely stale relative to server capability truth.',
+            recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary'],
+        };
+    }
 
     if (mcpReachedServer === false) {
         if (cloudflareRayIdPresent === true || httpStatus === 502 || httpStatus === 503 || httpStatus === 504) {
@@ -255,9 +278,23 @@ export const mcpHostBlockDiagnosticsTool = {
             toolResultIsError,
         });
         const classification = evidenceClassification ?? classifyHostBlock({ toolName, hostMessage, operationKind, argsShape });
+        const schemaConvergence = readMcpSchemaConvergenceState();
+        const projectionDiagnosis = {
+            status:
+                classification.code === 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION'
+                    ? 'likely-stale-client-projection'
+                    : schemaConvergence.status === 'converged-observed'
+                      ? 'server-observed-client-relist'
+                      : 'unverified-client-projection',
+            executionLimitsVersion: MCP_TOOL_EXECUTION_LIMITS_VERSION,
+            executionLimits: MCP_TOOL_EXECUTION_LIMITS,
+            schemaConvergence,
+            hostRefreshRequired: classification.code === 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION',
+        };
         return okResult({
             success: true,
             classification,
+            projectionDiagnosis,
             observed: {
                 toolName: toolName ?? null,
                 operationKind: operationKind ?? null,
@@ -274,8 +311,10 @@ export const mcpHostBlockDiagnosticsTool = {
             auditTemplate: HOST_BLOCK_TEMPLATE,
             nextSteps: [
                 'Prefer the recommendedAlternatives list before retrying the blocked tool.',
-                'If the blocked action is a write, run the corresponding *_plan tool first.',
-                'If the block is network/tunnel related, refresh the temporary Cloudflare URL and update the ChatGPT connector.',
+                classification.code === 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION'
+                    ? 'Do not add a plan call just to work around schema rejection. Compare mcp_tools_status capability truth, then refresh/reconnect the client projection when needed; use compatibility-safe legacy arguments meanwhile.'
+                    : 'Use a *_plan tool only when preview, destructive-risk review, or a separate approval boundary adds information; plan is not a generic recovery step.',
+                'If the block is network/tunnel related, verify the permanent connector/tunnel state before changing transport or DNS.',
                 'Record the auditTemplate fields in the external ChatGPT audit report.',
             ],
         });

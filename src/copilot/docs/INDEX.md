@@ -35,6 +35,7 @@ quando a remoção puder ser reversível.
 
 - `WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md` — roadmap mestre mais recente para MCP, I/O, latência, liberdade operacional, tool surface, round-trips e evolução do workspace. É a referência de coordenação geral desta onda.
 - `DEVCONTAINER_NETWORK_CONTROL_PLANE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md` — referência especializada canônica para DevContainer, Network Control Plane, DNS, GitHub/Copilot/OpenAI/ChatGPT reachability, Cloudflare/MCP, autoridade temporal, lifecycle e roadmap provider-neutral. Em decisões dessa frente, prevalece sobre roadmaps de rede anteriores, sempre subordinado ao código/testes validados.
+- `WORKSPACE_MCP_ROUND_TRIP_PREFLIGHT_RECOVERY_AUTONOMY_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md` — autoridade especializada ativa para round-trip economics, preflight adaptativo, fail-rich recovery, tool-schema convergence, compatibility envelopes, analytics incremental e composição one-shot de workflows. Complementa o ILCP: o ILCP mede onde o tempo é perdido; este roadmap governa como reduzir devoluções evitáveis ao host/modelo sem enfraquecer safety.
 - `WORKSPACE_SRC_COPILOT_DIAGNOSTICO_ESTADO_ALVO_E_ROADMAP_2026-08-14.md` — diagnóstico amplo predecessor. Permanece útil para contexto e decisões ainda não superseded, mas deve ser reconciliado com os documentos de 17–18 de agosto antes de orientar nova implementação.
 
 ## 3. Mapas arquiteturais canônicos

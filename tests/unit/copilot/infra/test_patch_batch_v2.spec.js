@@ -41,6 +41,23 @@ describe('Patch Batch V2 low-level contract', () => {
         await expect(readFile(file, 'utf8')).resolves.toBe('ALPHA BETA GAMMA');
     });
 
+    it('keeps an explicit no-op inside a same-file sequence without aborting later operations', async () => {
+        const initial = 'alpha beta gamma';
+        const file = await createTempFile('noop-sequence.txt', initial);
+        const result = await patchTextBatchLocked(file, {
+            operations: [
+                { oldString: 'alpha', newString: 'alpha', allowNoop: true },
+                { oldString: 'beta', newString: 'BETA' },
+                { oldString: 'gamma', newString: 'GAMMA' },
+            ],
+        });
+        expect(result.operations[0]?.['noop']).toBe(true);
+        expect(result.operations[0]?.['previousHash']).toBe(sha256(initial));
+        expect(result.operations[0]?.['contentHash']).toBe(sha256(initial));
+        expect(result.operationCount).toBe(3);
+        await expect(readFile(file, 'utf8')).resolves.toBe('alpha BETA GAMMA');
+    });
+
     it('rejects a stale baseline before compute or publish', async () => {
         const initial = 'alpha beta gamma';
         const file = await createTempFile('stale.txt', initial);
@@ -78,6 +95,12 @@ describe('Patch Batch V2 low-level contract', () => {
             operationIndex: 1,
             completedOperationCount: 1,
             failurePhase: 'operation',
+            details: {
+                currentHash: sha256('ALPHA beta gamma'),
+                currentBytes: Buffer.byteLength('ALPHA beta gamma', 'utf8'),
+                desiredTextPresent: false,
+                convergenceCandidate: false,
+            },
         });
         await expect(readFile(file, 'utf8')).resolves.toBe(initial);
     });

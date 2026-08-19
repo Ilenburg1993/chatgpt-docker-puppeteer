@@ -15,6 +15,7 @@ import {
     errorResult,
     getMcpWorkspaceRoot,
     estimateStructuredTextResultBytes,
+    MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     readOnlyAnnotations,
     withResultExecutionHint,
@@ -40,14 +41,16 @@ const {
 });
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
-const MAX_REPO_BATCH_REQUESTS = 64;
-const DEFAULT_REPO_BATCH_CONCURRENCY = 6;
-const MAX_REPO_BATCH_CONCURRENCY = 8;
-const MAX_REPO_BATCH_INPUT_BYTES = 2 * 1024 * 1024;
-const DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES = 2 * 1024 * 1024;
-const MIN_REPO_BATCH_RESULT_BUDGET_BYTES = 64 * 1024;
-const MAX_REPO_BATCH_RESULT_BUDGET_BYTES = 3 * 1024 * 1024;
-const MAX_REPO_SEARCH_CONTEXT_LINES = 48;
+const {
+    maxBatchRequests: MAX_REPO_BATCH_REQUESTS,
+    defaultBatchConcurrency: DEFAULT_REPO_BATCH_CONCURRENCY,
+    maxBatchConcurrency: MAX_REPO_BATCH_CONCURRENCY,
+    maxBatchInputBytes: MAX_REPO_BATCH_INPUT_BYTES,
+    defaultBatchResultBudgetBytes: DEFAULT_REPO_BATCH_RESULT_BUDGET_BYTES,
+    minBatchResultBudgetBytes: MIN_REPO_BATCH_RESULT_BUDGET_BYTES,
+    maxBatchResultBudgetBytes: MAX_REPO_BATCH_RESULT_BUDGET_BYTES,
+    maxSearchContextLines: MAX_REPO_SEARCH_CONTEXT_LINES,
+} = MCP_TOOL_EXECUTION_LIMITS.repoRead;
 
 const repoReadBatchItemSchema = z.object({
     path: z.string().min(1),

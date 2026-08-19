@@ -818,6 +818,16 @@ describe('copilot MCP tools', () => {
         const authProfile = /** @type {Record<string, unknown>} */ (structured['authProfile']);
         assert.equal(authProfile['maxPowerDefault'], true);
         assert.ok(/** @type {string[]} */ (authProfile['initialScopes']).includes('repo:admin'));
+        assert.equal(structured['executionLimitsVersion'], 1);
+        const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
+        assert.equal(executionLimits['repoRead']?.['maxBatchRequests'], 64);
+        assert.equal(executionLimits['repoRead']?.['maxSearchContextLines'], 48);
+        assert.equal(executionLimits['repoPatch']?.['maxBatchOperations'], 128);
+        assert.equal(executionLimits['repoPatch']?.['maxBatchTargets'], 64);
+        assert.equal(executionLimits['repoPatch']?.['maxBatchInputBytes'], 3 * 1024 * 1024);
+        assert.equal(executionLimits['repoPatch']?.['defaultApplyMode'], 'per-target-fast');
+        assert.equal(executionLimits['repoPatch']?.['defaultFailureMode'], 'best-effort');
+        assert.equal(executionLimits['validator']?.['maxBatchConcurrency'], 1);
 
         const detailedResult = await tool.handler({ includeDetails: true });
         const detailed = /** @type {Record<string, unknown>} */ (detailedResult.structuredContent);
@@ -831,7 +841,12 @@ describe('copilot MCP tools', () => {
         assert.ok(Array.isArray(detailed['advertisedTools']));
         assert.equal(typeof detailed['annotationProfile'], 'object');
         assert.ok(Array.isArray(detailed['ioGuidance']));
-        assert.ok(/** @type {string[]} */ (detailed['ioGuidance']).length > /** @type {string[]} */ (structured['ioGuidance']).length);
+        const ioGuidance = /** @type {string[]} */ (detailed['ioGuidance']);
+        assert.ok(ioGuidance.length > /** @type {string[]} */ (structured['ioGuidance']).length);
+        assert.ok(ioGuidance.some((entry) => entry.includes('up to 64 independent operations')));
+        assert.ok(ioGuidance.some((entry) => entry.includes('up to 128 exact-string patches across up to 64 targets')));
+        assert.ok(ioGuidance.some((entry) => entry.includes('concurrency is intentionally capped at 1')));
+        assert.equal(ioGuidance.some((entry) => entry.includes('use 2 only for genuinely independent gates')), false);
     });
 
     it('mcp_tools_status exposes annotation and approval planning metadata', async () => {
@@ -861,10 +876,14 @@ describe('copilot MCP tools', () => {
                 (workflow) => workflow[0] === 'repo_apply_patch_batch' && workflow[1] === 'repo_patch_batch_plan',
             ),
         );
+        assert.deepEqual(approvalFrictionProfile['planFirstWorkflows'], []);
         assert.ok(
-            /** @type {string[][]} */ (approvalFrictionProfile['planFirstWorkflows']).some(
-                (workflow) => workflow[0] === 'mcp_validation_plan' && workflow[1] === 'run_copilot_validator',
+            /** @type {string[][]} */ (approvalFrictionProfile['directBatchWorkflows']).some(
+                (workflow) => workflow[0] === 'run_copilot_validator' && workflow[1] === 'mcp_validation_plan',
             ),
+        );
+        assert.ok(
+            /** @type {string[]} */ (approvalFrictionProfile['escalationOnlyPlans']).includes('mcp_validation_plan'),
         );
         assert.ok(
             /** @type {string[]} */ (approvalFrictionProfile['firstRememberApprovalWave']).includes(
@@ -884,8 +903,24 @@ describe('copilot MCP tools', () => {
         assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
         assert.equal(metadataCoverage['securityComplete'], true);
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
+        assert.equal(structured['executionLimitsVersion'], 1);
+        const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
+        assert.equal(executionLimits['repoPatch']?.['maxBatchOperations'], 128);
+        assert.equal(executionLimits['repoPatch']?.['defaultApplyMode'], 'per-target-fast');
+        assert.equal(executionLimits['validator']?.['maxBatchConcurrency'], 1);
+        assert.equal(executionLimits['validator']?.['acceptedInputMaxConcurrency'], 2);
+        const schemaConvergence = /** @type {Record<string, unknown>} */ (structured['schemaConvergence']);
+        assert.equal(typeof schemaConvergence['runtimeEpoch'], 'string');
+        assert.equal(typeof schemaConvergence['status'], 'string');
         const hostApprovalProfile = /** @type {Record<string, unknown>} */ (structured['hostApprovalProfile']);
         assert.equal(hostApprovalProfile['oauthGrantsAllRepoScopesByDefault'], true);
+        assert.match(String(hostApprovalProfile['preferredStrategy']), /direct bounded one-shot/u);
+        const publicationWorkflow = /** @type {Record<string, unknown>} */ (structured['publicationWorkflow']);
+        assert.equal(publicationWorkflow['preferred'], 'git_publish_changes');
+        assert.match(String(publicationWorkflow['happyPath']), /one governed git_publish_changes call/u);
+        assert.ok(
+            /** @type {string[]} */ (publicationWorkflow['granularFallbackOnlyFor']).includes('preexisting-staged-index'),
+        );
         const wirePayloadAudit = /** @type {Record<string, unknown>} */ (structured['wirePayloadAudit']);
         assert.equal(wirePayloadAudit['detailsTool'], 'mcp_tool_payload_audit');
         assert.equal('fieldTotals' in wirePayloadAudit, false);
@@ -968,6 +1003,10 @@ describe('copilot MCP tools', () => {
         assert.equal(summary['largestResultPayload']?.['name'], 'hot-reader');
         const roundTrips = /** @type {Record<string, unknown>} */ (structured['roundTripAccounting']);
         assert.equal('topCompressedTools' in roundTrips, false);
+        const indexedRoundTrips = /** @type {Record<string, unknown>} */ (structured['roundTripAnalytics']);
+        assert.equal(typeof indexedRoundTrips['available'], 'boolean');
+        assert.equal(typeof indexedRoundTrips['authority'], 'string');
+        assert.ok(Array.isArray(indexedRoundTrips['topTransitions']));
         assert.equal(roundTrips['logicalOperations'], 6);
         assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 6 * 1024);
         resetMcpMetricsForTests();
@@ -1102,6 +1141,31 @@ describe('copilot MCP tools', () => {
         assert.equal(typeof result.structuredContent?.['auditTemplate'], 'object');
     });
 
+    it('mcp_host_block_diagnostics identifies likely stale client schema before MCP', async () => {
+        const tool = findTool('mcp_host_block_diagnostics');
+        const result = await tool.handler({
+            toolName: 'repo_apply_patch_batch',
+            operationKind: 'bounded-write',
+            argsShape: 'batchConcurrency/maxOperations field rejected by projected schema',
+            hostMessage: 'Input did not match tool schema',
+            mcpReachedServer: false,
+            schemaErrorPresent: true,
+            mcpAuditEventPresent: false,
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['classification']?.['code'], 'LIKELY_STALE_CLIENT_SCHEMA_PROJECTION');
+        assert.equal(result.structuredContent?.['classification']?.['layer'], 'chatgpt-host-schema');
+        const projection = /** @type {Record<string, unknown>} */ (result.structuredContent?.['projectionDiagnosis']);
+        assert.equal(projection['status'], 'likely-stale-client-projection');
+        assert.equal(projection['hostRefreshRequired'], true);
+        assert.equal(projection['executionLimitsVersion'], 1);
+        const limits = /** @type {Record<string, Record<string, unknown>>} */ (projection['executionLimits']);
+        assert.equal(limits['repoPatch']?.['maxBatchOperations'], 128);
+        assert.equal(limits['validator']?.['maxBatchConcurrency'], 1);
+        const nextSteps = /** @type {string[]} */ (result.structuredContent?.['nextSteps']);
+        assert.ok(nextSteps.some((step) => step.includes('Do not add a plan call')));
+    });
+
     it('mcp_host_block_diagnostics separates OAuth reauth from host precall blocks', async () => {
         const tool = findTool('mcp_host_block_diagnostics');
         const result = await tool.handler({
@@ -1224,8 +1288,40 @@ describe('copilot MCP tools', () => {
             assert.equal(fast.structuredContent?.['appliedCount'], 1);
             assert.equal(fast.structuredContent?.['failedCount'], 1);
             assert.equal(fast.structuredContent?.['skippedCount'], 0);
+            const failureSummary = /** @type {Record<string, unknown>} */ (fast.structuredContent?.['failureSummary']);
+            assert.deepEqual(failureSummary['causalByCode'], { ERR_PATCH_NOT_FOUND: 1 });
+            assert.deepEqual(failureSummary['failureClassCounts'], { 'stale-context': 1 });
+            assert.deepEqual(failureSummary['retryabilityCounts'], { 'caller-refresh': 1 });
+            assert.equal(failureSummary['recoveryRequiredTargetCount'], 1);
+            const failures = /** @type {Array<Record<string, unknown>>} */ (fast.structuredContent?.['failures']);
+            assert.equal(failures.length, 1);
+            assert.equal(failures[0]?.['failureClass'], 'stale-context');
+            assert.equal(failures[0]?.['failureScope'], 'target');
+            assert.equal(failures[0]?.['retryability'], 'caller-refresh');
+            const failureDetails = /** @type {Record<string, unknown>} */ (failures[0]?.['details']);
+            assert.equal(typeof failureDetails['currentHash'], 'string');
+            assert.equal(failureDetails['currentBytes'], Buffer.byteLength('beta\n', 'utf8'));
             assert.equal(await readFile(fileA, 'utf8'), 'ALPHA\n');
             assert.equal(await readFile(fileB, 'utf8'), 'beta\n');
+
+            await writeFile(fileB, 'desired-state-value\n', 'utf8');
+            const singlePatch = findTool('repo_apply_patch');
+            const converged = await singlePatch.handler({
+                path: relativeB,
+                old_string: 'stale-state-value',
+                new_string: 'desired-state-value',
+            });
+            assert.equal(converged.isError, true);
+            const convergedEnvelope = /** @type {Record<string, unknown>} */ (converged.structuredContent?.['details']);
+            assert.equal(convergedEnvelope['failureClass'], 'stale-context');
+            assert.equal(convergedEnvelope['retryability'], 'manual-decision');
+            assert.equal(convergedEnvelope['mutationState'], 'already-converged-candidate');
+            assert.equal(convergedEnvelope['recoveryRequired'], false);
+            const convergedEvidence = /** @type {Record<string, unknown>} */ (convergedEnvelope['details']);
+            assert.equal(convergedEvidence['desiredTextPresent'], true);
+            assert.equal(convergedEvidence['convergenceCandidate'], true);
+            assert.equal(convergedEvidence['desiredOccurrenceCount'], 1);
+            assert.equal(typeof convergedEvidence['currentHash'], 'string');
         } finally {
             await rm(fixtureDir, { recursive: true, force: true });
         }

@@ -46,6 +46,7 @@ export * from './repo-status.js';
 export * from './repo-write.js';
 export * from './repo-working-set.js';
 export * from './restart-control.js';
+export * from './round-trip-analytics.js';
 export * from './runtime-health.js';
 export * from './session-profile.js';
 export * from './smoke-workspace.js';

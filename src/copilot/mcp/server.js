@@ -11,7 +11,11 @@
  * @module copilot/mcp/server
  */
 
-import { logMcp } from '#copilot/mcp/control-plane';
+import {
+    logMcp,
+    readMcpSchemaConvergenceState,
+    recordMcpDescriptorObservation,
+} from '#copilot/mcp/control-plane';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createHash } from 'node:crypto';
 import { registerCopilotAppsSdkResources } from './tools/apps-sdk-resources.js';
@@ -155,7 +159,7 @@ export function createCopilotMcpServer(options = {}) {
         throw new Error(`MCP server descriptor validation failed: ${validation.errors.slice(0, 5).join('; ')}`);
     }
 
-    updateServerFactoryRuntime(tools, validation, manifest);
+    updateServerFactoryRuntime(tools, validation, manifest, profile);
     logServerFactoryProfileOnce(profile, tools.length, validation, manifest);
     return server;
 }
@@ -220,7 +224,7 @@ export function readCopilotMcpServerPolicy(env = process.env) {
             DEFAULT_INSTRUCTIONS,
             MAX_SERVER_INSTRUCTIONS_LENGTH,
         ),
-        toolsListChanged: readBooleanEnv(env, 'COPILOT_MCP_SERVER_TOOLS_LIST_CHANGED', false),
+        toolsListChanged: readBooleanEnv(env, 'COPILOT_MCP_SERVER_TOOLS_LIST_CHANGED', true),
         strictDescriptorValidation: readBooleanEnv(env, 'COPILOT_MCP_SERVER_STRICT_DESCRIPTOR_VALIDATION', false),
         strictToolRiskValidation: readBooleanEnv(env, 'COPILOT_MCP_SERVER_STRICT_TOOL_RISK_VALIDATION', false),
         startupLogEnabled: readBooleanEnv(env, 'COPILOT_MCP_SERVER_FACTORY_STARTUP_LOG', true),
@@ -241,6 +245,7 @@ export function getCopilotMcpServerFactoryStatus() {
             protocolVersion: COPILOT_MCP_PROTOCOL_VERSION,
         },
         runtime: { ...serverFactoryRuntime },
+        schemaConvergence: readMcpSchemaConvergenceState(),
         defaultServerInfo: COPILOT_MCP_SERVER_INFO,
         currentProfile: redactProfileForStatus(readCopilotMcpServerProfile()),
         registry: getCanonicalMcpRegistryState(),
@@ -552,9 +557,10 @@ function validateOpenAiToolMeta(tool, warnings, name) {
  * @param {import('./registry.js').McpToolDefinition[]} tools
  * @param {ToolDescriptorValidation} validation
  * @param {Record<string, unknown>} manifest
+ * @param {CopilotMcpServerProfile} profile
  * @returns {void}
  */
-function updateServerFactoryRuntime(tools, validation, manifest) {
+function updateServerFactoryRuntime(tools, validation, manifest, profile) {
     const descriptorFingerprint = String(manifest['descriptorFingerprint'] ?? '');
     const previous = serverFactoryRuntime.lastDescriptorFingerprint;
     serverFactoryRuntime.created += 1;
@@ -567,6 +573,11 @@ function updateServerFactoryRuntime(tools, validation, manifest) {
     serverFactoryRuntime.descriptorFingerprintChanged = Boolean(previous && previous !== descriptorFingerprint);
     serverFactoryRuntime.lastDescriptorManifest = manifest;
     serverFactoryRuntime.lastSurfaceState = getCanonicalMcpToolSurfaceState();
+    recordMcpDescriptorObservation({
+        fingerprint: descriptorFingerprint,
+        toolCount: tools.length,
+        listChangedAdvertised: profile.policy.toolsListChanged,
+    });
 }
 
 /**

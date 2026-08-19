@@ -28,6 +28,8 @@ import {
     readMcpHttpStatefulSessionPolicy,
     readMcpIndexAutoBuildState,
     readMcpMetricsSnapshot,
+    readMcpRoundTripAnalyticsMonitorState,
+    readMcpSchemaConvergenceState,
     readMcpStartupMaintenanceState,
     readMcpWorkspaceSmokeSummary,
     readOnlyAnnotations,
@@ -508,6 +510,8 @@ export const mcpRuntimeHealthTool = {
         const lastWorkspaceSmoke = readMcpWorkspaceSmokeSummary();
         const statefulPolicy = readStatefulRuntimePolicySnapshot();
         const statefulRuntime = readMcpHttpSessionRuntimeState();
+        const schemaConvergence = readMcpSchemaConvergenceState();
+        const roundTripAnalyticsMonitor = readMcpRoundTripAnalyticsMonitorState();
         const compileCache = getCopilotNodeCompileCacheHealth();
         const warnings = [];
         const critical = [];
@@ -589,6 +593,8 @@ export const mcpRuntimeHealthTool = {
                     },
                     statefulPolicy,
                     statefulRuntime,
+                    schemaConvergence,
+                    roundTripAnalyticsMonitor,
                     nodeRuntime: {
                         nodeVersion: process.version,
                         compileCache: {

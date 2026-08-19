@@ -195,6 +195,155 @@ export async function readMcpAuditEventTail(options = {}) {
 }
 
 /**
+ * Read a bounded, newline-aligned audit slice beginning at an exact byte offset.
+ * The returned nextOffset always points immediately after the last complete newline, so callers can checkpoint it
+ * without reparsing or skipping a partial JSON line. The file identity lets derived indexes detect rotation/replacement.
+ *
+ * @param {{ offset?: number; maxBytes?: number; maxEvents?: number }} [options]
+ */
+export async function readMcpAuditEventSlice(options = {}) {
+    const requestedOffset = Math.max(0, Math.floor(Number(options.offset ?? 0) || 0));
+    const maxBytes = boundedInteger(options.maxBytes, 4 * 1024 * 1024, 64 * 1024, 16 * 1024 * 1024);
+    const maxEvents = boundedInteger(options.maxEvents, 50_000, 100, 200_000);
+    const auditFile = getMcpAuditFile();
+    try {
+        await mcpAuditWriter.flush();
+        const stats = await lstat(auditFile);
+        if (stats.isSymbolicLink() || !stats.isFile()) {
+            return {
+                ok: false,
+                fileIdentity: null,
+                fileBytes: Number(stats.size ?? 0),
+                requestedOffset,
+                startOffset: 0,
+                nextOffset: 0,
+                bytesRead: 0,
+                complete: true,
+                resetRequired: true,
+                parsedEvents: 0,
+                invalidLines: 0,
+                events: [],
+                error: 'MCP audit path is not a regular file.',
+            };
+        }
+        const fileBytes = Number(stats.size ?? 0);
+        const fileIdentity = `${String(stats.dev ?? 0)}:${String(stats.ino ?? 0)}`;
+        const resetRequired = requestedOffset > fileBytes;
+        const startOffset = resetRequired ? 0 : requestedOffset;
+        const bytesToRead = Math.min(maxBytes, Math.max(0, fileBytes - startOffset));
+        if (bytesToRead <= 0) {
+            return {
+                ok: true,
+                fileIdentity,
+                fileBytes,
+                requestedOffset,
+                startOffset,
+                nextOffset: startOffset,
+                bytesRead: 0,
+                complete: startOffset >= fileBytes,
+                resetRequired,
+                parsedEvents: 0,
+                invalidLines: 0,
+                events: [],
+                error: null,
+            };
+        }
+
+        const buffer = Buffer.allocUnsafe(bytesToRead);
+        const handle = await open(auditFile, 'r');
+        try {
+            await handle.read(buffer, 0, bytesToRead, startOffset);
+        } finally {
+            await handle.close();
+        }
+
+        let completeBytes = bytesToRead;
+        const reachedEof = startOffset + bytesToRead >= fileBytes;
+        if (!reachedEof) {
+            const lastNewline = buffer.lastIndexOf(0x0a);
+            completeBytes = lastNewline >= 0 ? lastNewline + 1 : 0;
+        }
+        const text = completeBytes > 0 ? buffer.subarray(0, completeBytes).toString('utf8') : '';
+        /** @type {Record<string, unknown>[]} */
+        const events = [];
+        /** @type {Array<{ sourceOffset: number; event: Record<string, unknown> }>} */
+        const entries = [];
+        let invalidLines = 0;
+        let lineOffset = startOffset;
+        for (const rawLine of text.split('\n')) {
+            const lineBytes = Buffer.byteLength(rawLine, 'utf8') + 1;
+            const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+            if (line.trim()) {
+                try {
+                    const value = JSON.parse(line);
+                    if (value && typeof value === 'object' && !Array.isArray(value)) {
+                        if (events.length < maxEvents) {
+                            const event = /** @type {Record<string, unknown>} */ (value);
+                            events.push(event);
+                            entries.push({ sourceOffset: lineOffset, event });
+                        }
+                    } else invalidLines += 1;
+                } catch {
+                    invalidLines += 1;
+                }
+            }
+            lineOffset += lineBytes;
+        }
+        const nextOffset = startOffset + completeBytes;
+        return {
+            ok: true,
+            fileIdentity,
+            fileBytes,
+            requestedOffset,
+            startOffset,
+            nextOffset,
+            bytesRead: completeBytes,
+            complete: nextOffset >= fileBytes,
+            resetRequired,
+            parsedEvents: events.length,
+            invalidLines,
+            events,
+            entries,
+            error: null,
+        };
+    } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+        if (code === 'ENOENT') {
+            return {
+                ok: true,
+                fileIdentity: null,
+                fileBytes: 0,
+                requestedOffset,
+                startOffset: 0,
+                nextOffset: 0,
+                bytesRead: 0,
+                complete: true,
+                resetRequired: requestedOffset > 0,
+                parsedEvents: 0,
+                invalidLines: 0,
+                events: [],
+                error: null,
+            };
+        }
+        return {
+            ok: false,
+            fileIdentity: null,
+            fileBytes: 0,
+            requestedOffset,
+            startOffset: 0,
+            nextOffset: 0,
+            bytesRead: 0,
+            complete: false,
+            resetRequired: false,
+            parsedEvents: 0,
+            invalidLines: 0,
+            events: [],
+            error: error instanceof Error ? error.message : String(error),
+        };
+    }
+}
+
+/**
  * Flush all queued MCP audit events and wait for prior persistence.
  *
  * @returns {Promise<void>}

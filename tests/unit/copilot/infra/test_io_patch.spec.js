@@ -44,6 +44,53 @@ describe('infra/io/patch', () => {
         }
     });
 
+    it('devolve recovery evidence bounded quando old_string está stale', () => {
+        const content = '\ufeffheader\r\nconst valueName = 2;\r\nfooter\r\n';
+        try {
+            computeTextPatch(content, {
+                oldString: 'const  valueName = 2;\n',
+                newString: 'const valueName = 3;',
+            });
+            throw new Error('patch deveria falhar');
+        } catch (error) {
+            expect(error).toMatchObject({
+                code: 'ERR_PATCH_NOT_FOUND',
+                details: {
+                    newlineStyle: 'crlf',
+                    utf8Bom: true,
+                    recoveryScan: 'full-bounded',
+                    desiredTextPresent: false,
+                    convergenceCandidate: false,
+                    lineEndingNormalizedOccurrenceCount: 0,
+                    whitespaceNormalizedOccurrenceCount: 1,
+                    candidateLines: [2],
+                },
+            });
+        }
+    });
+
+    it('reconhece desired text já presente como candidato de convergência sem mutar', () => {
+        const content = 'header\nconst valueName = 2;\nfooter\n';
+        try {
+            computeTextPatch(content, {
+                oldString: 'const valueName = 1;',
+                newString: 'const valueName = 2;',
+            });
+            throw new Error('patch deveria falhar');
+        } catch (error) {
+            expect(error).toMatchObject({
+                code: 'ERR_PATCH_NOT_FOUND',
+                details: {
+                    desiredTextPresent: true,
+                    convergenceCandidate: true,
+                    desiredOccurrenceCount: 1,
+                    desiredOccurrenceCountExact: true,
+                    desiredOccurrenceLines: [2],
+                },
+            });
+        }
+    });
+
     it('interrompe a contagem quando expectedOccurrences já divergiu', () => {
         try {
             computeTextPatch('same '.repeat(10_000), {

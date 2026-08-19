@@ -14,6 +14,7 @@ import {
     errorResult,
     isCopilotValidatorName,
     listJobs,
+    MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     readJobOutput,
     readCopilotValidatorCapacityState,
@@ -48,8 +49,11 @@ const validatorRequestSchema = z.object({
     waitMs: validatorWaitMsSchema.optional(),
     failureTailBytes: validatorFailureTailBytesSchema.optional(),
 });
-const MAX_VALIDATOR_BATCH_REQUESTS = 8;
-const MAX_VALIDATOR_BATCH_CONCURRENCY = 1;
+const {
+    maxBatchRequests: MAX_VALIDATOR_BATCH_REQUESTS,
+    maxBatchConcurrency: MAX_VALIDATOR_BATCH_CONCURRENCY,
+    acceptedInputMaxConcurrency: MAX_VALIDATOR_ACCEPTED_INPUT_CONCURRENCY,
+} = MCP_TOOL_EXECUTION_LIMITS.validator;
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
 const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused', 'devcontainer-shell', 'network-contracts']);
@@ -471,9 +475,11 @@ export const jobTools = [
                 .number()
                 .int()
                 .min(1)
-                .max(MAX_VALIDATOR_BATCH_CONCURRENCY)
+                .max(MAX_VALIDATOR_ACCEPTED_INPUT_CONCURRENCY)
                 .optional()
-                .describe('Validators in flight. Serialized at 1 to avoid CPU/memory thrashing inside WSL/DevContainer.'),
+                .describe(
+                    'Compatibility input accepts 1-2 for stale clients, but execution is always serialized at 1 to protect WSL/DevContainer headroom.',
+                ),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -517,7 +523,7 @@ export const jobTools = [
                             );
                         },
                         {
-                            concurrency: batchConcurrency ?? 1,
+                            concurrency: MAX_VALIDATOR_BATCH_CONCURRENCY,
                             failureMode: batchFailureMode ?? 'best-effort',
                             maxItems: MAX_VALIDATOR_BATCH_REQUESTS,
                             maxInputBytes: 64 * 1024,
@@ -538,6 +544,10 @@ export const jobTools = [
                         failedCount: execution.failedCount,
                         skippedCount: execution.skippedCount,
                         concurrency: execution.concurrency,
+                        requestedConcurrency: batchConcurrency ?? 1,
+                        effectiveConcurrency: execution.concurrency,
+                        compatibilityNormalized:
+                            batchConcurrency !== undefined && batchConcurrency !== execution.concurrency,
                         maxInFlight: execution.maxInFlight,
                         durationMs: execution.durationMs,
                         results,

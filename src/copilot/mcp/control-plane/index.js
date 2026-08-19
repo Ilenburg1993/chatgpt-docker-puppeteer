@@ -25,6 +25,9 @@ export * from './openai-endpoint-monitor.js';
 export * from './paths.js';
 export * from './reload-state.js';
 export * from './result.js';
+export * from './round-trip-analytics.js';
+export * from './round-trip-analytics-monitor.js';
+export * from './schema-convergence.js';
 export {
     createDefaultMcpHttpSessionRuntimeWithSqliteStore,
     createMcpHttpSessionRuntime,
@@ -43,5 +46,6 @@ export {
 export * from './smoke-state.js';
 export * from './startup-maintenance.js';
 export * from './stream-registry.js';
+export * from './tool-capabilities.js';
 export * from './tool-metadata.js';
 export * from './ttl-cache.js';

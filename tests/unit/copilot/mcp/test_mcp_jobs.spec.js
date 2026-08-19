@@ -413,6 +413,7 @@ describe('copilot MCP jobs', () => {
                     testFile: 'tests/unit/copilot/infra/test_bulk_executor.spec.js',
                 },
             ],
+            batchConcurrency: 2,
         });
 
         assert.equal(result.isError, undefined);
@@ -423,6 +424,9 @@ describe('copilot MCP jobs', () => {
         assert.equal(result.structuredContent?.['failedCount'], 2);
         assert.equal(result.structuredContent?.['skippedCount'], 0);
         assert.equal(result.structuredContent?.['concurrency'], 1);
+        assert.equal(result.structuredContent?.['requestedConcurrency'], 2);
+        assert.equal(result.structuredContent?.['effectiveConcurrency'], 1);
+        assert.equal(result.structuredContent?.['compatibilityNormalized'], true);
         assert.deepEqual(getResultExecutionHint(result), {
             logicalOperations: 2,
             failedOperations: 2,

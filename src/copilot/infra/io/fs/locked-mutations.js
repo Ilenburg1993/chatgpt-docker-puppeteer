@@ -707,7 +707,16 @@ export async function patchTextBatchLocked(filePath, options) {
                         try {
                             const operationPreviousHash = currentHash;
                             assertExpectedSha256Digest(operationPreviousHash, operation.expectedHash);
-                            const patch = computeTextPatch(currentContent, operation);
+                            let patch;
+                            try {
+                                patch = computeTextPatch(currentContent, operation);
+                            } catch (error) {
+                                throw annotatePatchRecoveryState(
+                                    error,
+                                    operationPreviousHash,
+                                    utf8ByteLength(currentContent, 'patch batch recovery current content'),
+                                );
+                            }
                             const updated = patch.updated;
                             const operationContentHash = patch.noop ? operationPreviousHash : sha256(updated);
                             const diffContextLines = operation.diffContextLines ?? DEFAULT_PATCH_DIFF_CONTEXT_LINES;
@@ -851,6 +860,22 @@ export async function patchTextBatchLocked(filePath, options) {
 }
 
 /**
+ * Attach the exact locked/virtual state identity that produced a patch failure without rereading the file.
+ *
+ * @param {unknown} error
+ * @param {string} currentHash
+ * @param {number} currentBytes
+ */
+function annotatePatchRecoveryState(error, currentHash, currentBytes) {
+    if (!error || typeof error !== 'object') return error;
+    const target = /** @type {Error & { details?: Record<string, unknown> }} */ (error);
+    const details =
+        target.details && typeof target.details === 'object' && !Array.isArray(target.details) ? target.details : {};
+    target.details = { ...details, currentHash, currentBytes };
+    return target;
+}
+
+/**
  * Preserve the original patch error while attaching precise batch-local failure context.
  *
  * @param {unknown} error
@@ -916,7 +941,12 @@ export async function patchTextLocked(filePath, options) {
                     const content = typeof rawContent === 'string' ? rawContent : decodeUtf8Buffer(rawContent);
                     const previousHash = assertExpectedSha256(rawBuffer, options.expectedHash) ?? sha256(rawBuffer);
                     const patchStartedAt = nowIoMs();
-                    const patch = computeTextPatch(content, options);
+                    let patch;
+                    try {
+                        patch = computeTextPatch(content, options);
+                    } catch (error) {
+                        throw annotatePatchRecoveryState(error, previousHash, rawBuffer.byteLength);
+                    }
                     const patchMs = elapsedMs(patchStartedAt);
                     void readMs;
                     void patchMs;

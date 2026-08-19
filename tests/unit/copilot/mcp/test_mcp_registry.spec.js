@@ -90,6 +90,7 @@ describe('copilot MCP registry', () => {
             'mcp_reload_plan',
             'mcp_reload_schedule',
             'mcp_reload_status',
+            'mcp_round_trip_analytics',
             'mcp_run_safe_validation_suite',
             'mcp_runtime_health',
             'mcp_session_profile',

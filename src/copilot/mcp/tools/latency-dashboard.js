@@ -11,6 +11,7 @@ import {
     okResult,
     readMcpLatencyDashboardHistory,
     readMcpMetricsSnapshot,
+    readMcpRoundTripAnalyticsSnapshot,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
 import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
@@ -115,6 +116,11 @@ export const mcpLatencyDashboardTool = {
         const rankingRows = includeTools ? maxRows : 1;
         const metrics = readMcpMetricsSnapshot();
         const sessionRuntime = readMcpHttpSessionRuntimeState();
+        const indexedRoundTrip = readMcpRoundTripAnalyticsSnapshot({
+            windowMs: 24 * 60 * 60 * 1000,
+            top: includeTools ? maxRows : 5,
+            includeSynthetic: false,
+        });
         const toolRows = includeTools ? buildToolRows(metrics.tools, maxRows) : [];
         const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, rankingRows);
         const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, rankingRows);
@@ -206,6 +212,7 @@ export const mcpLatencyDashboardTool = {
                     'Quiescent gap between completed and next-started tool bursts. Excludes active MCP handler time; includes response return, client/model/orchestrator work, dispatch/transit, and potentially normal reasoning.',
             },
             byteAccounting,
+            roundTripAnalytics: indexedRoundTrip,
             roundTripAccounting: {
                 ...roundTripAccounting,
                 silentExternalGapP50Ms: metrics.interaction.originBoundary.silentExternalGaps.p50Ms,

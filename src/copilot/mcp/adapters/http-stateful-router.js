@@ -12,6 +12,7 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'node:crypto';
 import { logMcp } from '../control-plane/audit.js';
+import { maybeSendMcpToolsListChangedNotification } from '../control-plane/schema-convergence.js';
 import { resolveMcpSessionAuthBinding } from '../control-plane/auth.js';
 import { createMcpInMemoryEventStore, createSqliteMcpEventStore, parseMcpEventId } from '../control-plane/event-store.js';
 import {
@@ -360,6 +361,11 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
             /** @type {import('node:http').ServerResponse} */ (options.res),
             options.parsedMcpBody,
         );
+        if (initializedSessionId) {
+            // Do not hold initialize open for schema convergence; the helper captures failures and reserves one attempt
+            // per descriptor revision so ChatGPT session churn cannot create notification fan-out.
+            void maybeSendMcpToolsListChangedNotification(server);
+        }
     } catch (error) {
         if (initializedSessionId) runtime.terminate(initializedSessionId, 'runtime_error');
         else {

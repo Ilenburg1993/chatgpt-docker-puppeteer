@@ -32,6 +32,7 @@ import {
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
 import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
+import { recordMcpToolsListObserved } from '../control-plane/schema-convergence.js';
 import {
     activateMcpHttpRequestActivity,
     activateMcpHttpToolRequestTiming,
@@ -49,6 +50,7 @@ import {
     scheduleMcpStartupMaintenance,
 } from '../control-plane/startup-maintenance.js';
 import { scheduleOpenAiEndpointLatencyMonitor } from '../control-plane/openai-endpoint-monitor.js';
+import { scheduleMcpRoundTripAnalyticsMonitor } from '../control-plane/round-trip-analytics-monitor.js';
 import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
 import { createCopilotMcpServer } from '../server.js';
 import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-body.js';
@@ -492,7 +494,13 @@ export function createMcpHttpRequestHandler(options) {
                             return;
                         }
                         parsedMcpBody = bodyResult.body;
-                        recordMcpHttpRequestRpcMethod(readMcpJsonRpcMethodLabel(parsedMcpBody));
+                        const rpcMethod = readMcpJsonRpcMethodLabel(parsedMcpBody);
+                        recordMcpHttpRequestRpcMethod(rpcMethod);
+                        if (rpcMethod === 'tools/list') {
+                            recordMcpToolsListObserved({
+                                protocolVersion: readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
+                            });
+                        }
                         const toolCallName = readMcpToolCallName(parsedMcpBody);
                         if (toolCallName !== undefined) {
                             const finishToolRequestTiming = activateMcpHttpToolRequestTiming(toolCallName);
@@ -583,6 +591,7 @@ export function notifyMcpHttpStarted() {
     scheduleMcpAuthJwksWarmup();
     scheduleMcpStartupMaintenance();
     scheduleOpenAiEndpointLatencyMonitor();
+    scheduleMcpRoundTripAnalyticsMonitor();
 }
 
 /**
