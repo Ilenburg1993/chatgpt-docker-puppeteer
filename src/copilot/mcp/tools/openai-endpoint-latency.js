@@ -24,12 +24,12 @@ export const mcpOpenAiEndpointLatencyTool = {
     description:
         'Measure fixed OpenAI/ChatGPT endpoints from the DevContainer using fresh HTTPS connections, decompose DNS/TCP/TLS/TTFB/total latency, compare against bounded local history, and optionally persist a sanitized snapshot. It never measures ChatGPT UI TTFT or accepts arbitrary URLs.',
     inputSchema: {
-        sampleCount: z.number().int().min(1).max(10).optional().describe('Samples per fixed endpoint. Default: 3.'),
-        timeoutMs: z.number().int().min(500).max(10_000).optional().describe('Per-request timeout. Default: 3000ms.'),
-        persistSnapshot: z.boolean().optional().describe('Persist the compact sanitized snapshot. Default: true.'),
-        historyLimit: z.number().int().min(1).max(2_000).optional().describe('Historical snapshots read for baseline. Default: 200.'),
-        maxHistorySnapshots: z.number().int().min(1).max(10_000).optional().describe('Maximum persisted snapshots retained. Default: 1000.'),
-        includeSamples: z.boolean().optional().describe('Include individual sanitized samples. Default: false.'),
+        sampleCount: z.number().int().min(1).max(10).optional()['describe']('Samples per fixed endpoint. Default: 3.'),
+        timeoutMs: z.number().int().min(500).max(10_000).optional()['describe']('Per-request timeout. Default: 3000ms.'),
+        persistSnapshot: z.boolean().optional()['describe']('Persist the compact sanitized snapshot. Default: true.'),
+        historyLimit: z.number().int().min(1).max(2_000).optional()['describe']('Historical snapshots read for baseline. Default: 200.'),
+        maxHistorySnapshots: z.number().int().min(1).max(10_000).optional()['describe']('Maximum persisted snapshots retained. Default: 1000.'),
+        includeSamples: z.boolean().optional()['describe']('Include individual sanitized samples. Default: false.'),
     },
     annotations: openWorldBoundedWriteAnnotations(),
     handler: async ({ sampleCount, timeoutMs, persistSnapshot, historyLimit, maxHistorySnapshots, includeSamples } = {}) => {

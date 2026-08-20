@@ -21,7 +21,7 @@ const SADI_CONFIG = {
 /**
  * Debug logging (ativado via env var SADI_DEBUG=true)
  */
-const DEBUG = process.env.SADI_DEBUG === 'true';
+const DEBUG = process.env['SADI_DEBUG'] === 'true';
 function debug(/** @type {any} */ msg, /** @type {any} */ ...args) {
     if (DEBUG) log.debug(`[SADI:DEBUG] ${msg}`, ...args);
 }
@@ -66,7 +66,7 @@ const detectionCache = new Map();
  * acesso a APIs do browser.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
+const sadiLogic = (/** @type {Record<string, string[]>} */ _terms, /** @type {string[]} */ _svgSigs) => {
     const SADI = {
         /**
          * Busca recursiva atravessando barreiras de Shadow DOM e IFrames.
@@ -83,7 +83,6 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                     accumulator.push(nodes[i]);
                 }
             } catch (/** @type {any} */ _) {
-                const _ce = /** @type {any} */ (_);
                 return accumulator;
             }
 
@@ -99,7 +98,6 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                         SADI.query(selector, f.contentDocument, onlyFrames, accumulator);
                     }
                 } catch (/** @type {any} */ _) {
-                    const _ce = /** @type {any} */ (_);
                     // Ignore cross-origin frame access errors
                 }
             }
@@ -134,7 +132,6 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                         srcPath = `[src*="${CSS.escape(url.pathname)}"]`;
                     }
                 } catch (/** @type {any} */ _) {
-                    const _ce = /** @type {any} */ (_);
                     // Ignore URL parse errors
                 }
             }
@@ -205,7 +202,6 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                         }
                     }
                 } catch (/** @type {any} */ _) {
-                    const _ce = /** @type {any} */ (_);
                     // Ignore DOM access errors
                 }
             }
@@ -275,7 +271,6 @@ const sadiLogic = (/** @type {any} */ terms, /** @type {any} */ svgSigs) => {
                     }
                 }
             } catch (/** @type {any} */ _) {
-                const _ce = /** @type {any} */ (_);
                 path.push('barrier');
             }
 
@@ -370,7 +365,6 @@ async function findFrameByPath(/** @type {any} */ page, /** @type {any} */ frame
             }
             return framePath.includes(f.name());
         } catch (/** @type {any} */ _) {
-            const _ce = /** @type {any} */ (_);
             return false;
         }
     });
@@ -818,7 +812,6 @@ async function validateCandidateInteractivity(/** @type {any} */ page, /** @type
                     try {
                         el.focus();
                     } catch (/** @type {any} */ _) {
-                        const _ce = /** @type {any} */ (_);
                         return false;
                     }
                     const active = SADI.getActiveElement();

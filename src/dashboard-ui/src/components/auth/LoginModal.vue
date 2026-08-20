@@ -36,8 +36,7 @@
     </Modal>
 </template>
 
-<script setup>
-// @ts-check
+<script setup lang="ts">
 import { useAuth } from '@/composables/useAuth.js';
 import { useNotifications } from '@/composables/useNotifications.js';
 import { reactive, ref } from 'vue';
@@ -48,17 +47,12 @@ import Modal from '../ui/Modal.vue';
 /**
  * Props do componente LoginModal
  */
-const props = defineProps({
-    open: {
-        type: Boolean,
-        default: false,
-    },
-});
+defineProps<{ open?: boolean }>();
 
 /**
  * Emits do componente LoginModal
  */
-const emit = defineEmits(['update:open', 'login-success']);
+const emit = defineEmits<{ 'update:open': [open: boolean]; 'login-success': [] }>();
 
 /**
  * Estado reativo do formulário

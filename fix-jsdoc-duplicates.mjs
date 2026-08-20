@@ -1,5 +1,7 @@
 import fs from 'fs';
 
+/** @typedef {{ code: number, message: string, file?: string, line: number }} DiagnosticEntry */
+/** @type {{ errors: DiagnosticEntry[] }} */
 const report = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
 // Filtrar apenas TS1223 (@returns duplicados)
@@ -10,11 +12,12 @@ const jsdocErrors = report.errors.filter(
 console.log(`🔧 Corrigindo ${jsdocErrors.length} @returns duplicados\n`);
 
 // Agrupar por arquivo
+/** @type {Record<string, DiagnosticEntry[]>} */
 const byFile = {};
 for (const err of jsdocErrors) {
     if (!err.file) continue;
-    if (!byFile[err.file]) byFile[err.file] = [];
-    byFile[err.file].push(err);
+    const errors = byFile[err.file] ?? (byFile[err.file] = []);
+    errors.push(err);
 }
 
 let fixed = 0;
@@ -38,7 +41,7 @@ for (const [file, errors] of Object.entries(byFile)) {
             // Verificar se há outro @returns próximo
             let foundDuplicate = false;
             for (let i = Math.max(0, lineIdx - 10); i < Math.min(lines.length, lineIdx + 10); i++) {
-                if (i !== lineIdx && lines[i] && lines[i].includes('@returns')) {
+                if (i !== lineIdx && lines[i]?.includes('@returns')) {
                     foundDuplicate = true;
                     // Remover a segunda ocorrência (manter a primeira)
                     if (i > lineIdx) {

@@ -214,6 +214,6 @@ describe('infra/io-scanner', () => {
         expect(serialized).toContain('b.js');
         expect(serialized).not.toContain('c.md');
         expect(serialized).not.toContain('node_modules');
-        expect(result.io.advisoryLimits?.globEngine).toBe('minimatch-v10');
+        expect(result.io.advisoryLimits?.['globEngine']).toBe('minimatch-v10');
     });
 });

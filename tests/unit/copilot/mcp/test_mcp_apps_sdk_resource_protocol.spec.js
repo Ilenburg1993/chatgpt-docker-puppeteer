@@ -42,10 +42,11 @@ describe('MCP Apps resource protocol', () => {
         const read = await client.readResource({ uri: COMPANY_KNOWLEDGE_WIDGET_URI });
         assert.equal(read.contents.length, 1);
         const content = read.contents[0];
+        assert.ok(content && 'text' in content);
         assert.equal(content?.uri, COMPANY_KNOWLEDGE_WIDGET_URI);
         assert.equal(content?.mimeType, 'text/html;profile=mcp-app');
-        assert.equal(typeof content?.text, 'string');
-        assert.match(String(content?.text ?? ''), /ui\/notifications\/tool-result/u);
+        assert.equal(typeof content.text, 'string');
+        assert.match(String(content.text ?? ''), /ui\/notifications\/tool-result/u);
         const contentMeta = /** @type {Record<string, any>} */ (content?._meta ?? {});
         assert.equal(contentMeta['openai/widgetDomain'], contentMeta['ui']?.['domain']);
         assert.match(String(contentMeta['ui']?.['domain'] ?? ''), /^https:\/\//u);

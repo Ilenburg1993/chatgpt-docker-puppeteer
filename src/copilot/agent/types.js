@@ -168,8 +168,8 @@
  * @typedef {Object} AgentTask
  * @property {string} id - ID único da tarefa
  * @property {string} message - Mensagem a enviar ao modelo
- * @property {function(string): void} resolve - Callback de resolução
- * @property {function(Error): void} reject - Callback de erro
+ * @property {(value: string) => void} resolve - Callback de resolução
+ * @property {(error: Error) => void} reject - Callback de erro
  * @property {number} enqueuedAt - Timestamp em ms
  * @property {number | null} [timeoutMs] - Timeout informativo; null desabilita bloqueio local.
  * @property {'user_queue' | 'dialog_boot'} [origin] - Origem operacional da task. `dialog_boot` não pode ser

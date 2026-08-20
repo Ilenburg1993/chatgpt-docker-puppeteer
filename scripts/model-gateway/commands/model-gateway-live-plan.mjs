@@ -3,12 +3,18 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
+import { buildModelGatewayLiveReadiness } from './model-gateway-live-readiness.mjs';
 
 const ROOT = REPO_ROOT;
 const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-live-plan');
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
+
+/** @typedef {Awaited<ReturnType<typeof buildModelGatewayLiveReadiness>>} LiveReadiness */
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--local-private-strict] [--out-dir DIR]
@@ -19,15 +25,6 @@ providers, run models or execute probes.
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 function nowStamp() {
     return new Date().toISOString().replace(/[:.]/gu, '-');
@@ -41,6 +38,7 @@ function planRunId(stamp) {
     return stamp.replace(/[^a-zA-Z0-9._:-]+/gu, '-');
 }
 
+/** @returns {LiveReadiness} */
 function runReadiness() {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS.liveReadiness, '--json'], {
         cwd: ROOT,
@@ -49,7 +47,7 @@ function runReadiness() {
     if (result.status !== 0) {
         throw new Error(`model-gateway live readiness failed: ${result.stderr || result.stdout || result.status}`);
     }
-    return JSON.parse(result.stdout);
+    return /** @type {LiveReadiness} */ (JSON.parse(result.stdout));
 }
 
 function runLocalPrivateStrictSelection() {
@@ -68,10 +66,15 @@ function runLocalPrivateStrictSelection() {
     };
 }
 
+/**
+ * @param {LiveReadiness} readiness
+ * @param {string} id
+ */
 function readinessCheck(readiness, id) {
     return Array.isArray(readiness.checks) ? readiness.checks.find((check) => check.id === id) : null;
 }
 
+/** @param {LiveReadiness} readiness */
 function effectiveOverlaySummary(readiness) {
     return readiness?.selection?.effectiveStrict?.runtimeAccountOverlaySummary ?? {
         total: 0,
@@ -83,6 +86,7 @@ function effectiveOverlaySummary(readiness) {
     };
 }
 
+/** @param {Record<string, unknown> | null | undefined} counts */
 function countMapText(counts) {
     return Object.entries(counts ?? {})
         .sort(([left], [right]) => left.localeCompare(right))
@@ -90,18 +94,27 @@ function countMapText(counts) {
         .join(',') || '-';
 }
 
+/**
+ * @param {Record<string, unknown> | null | undefined} counts
+ * @param {string} key
+ */
 function countMapValue(counts, key) {
     const value = counts && typeof counts === 'object' ? counts[key] : null;
     return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
+/** @param {LiveReadiness | ReturnType<typeof buildPlan>['readiness']} readiness */
 function terminalLiveRouteMatrix(readiness) {
-    const routes =
-        readiness?.terminalLiveRuntimeSelectorPlan?.selectedRoutes ??
-        readiness?.selection?.terminalLiveRuntimeSelectorPlan?.selectedRoutes;
+    const routes = 'selection' in readiness
+        ? readiness.selection.terminalLiveRuntimeSelectorPlan?.selectedRoutes
+        : readiness.terminalLiveRuntimeSelectorPlan?.selectedRoutes;
     return Array.isArray(routes) ? routes : [];
 }
 
+/**
+ * @param {LiveReadiness} readiness
+ * @param {{ allowActiveOverlays?: boolean, localPrivateStrict?: boolean }} [options]
+ */
 function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict = false } = {}) {
     const generatedAt = new Date().toISOString();
     const runId = planRunId(generatedAt.replace(/[:.]/gu, '-'));
@@ -263,6 +276,8 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             purpose: 'Verify catalog, SQLite, selection and runtime selector gates still pass after the live phase.',
         },
     ];
+    const nextCommand = phases[0]?.command;
+    if (!nextCommand) throw new Error('model-gateway live plan has no executable phase');
     return {
         schema: 'model-gateway-live-plan',
         ok: prerequisites.every((item) => item.ok),
@@ -292,30 +307,43 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         prerequisites,
         phases,
         postPhases,
-        nextCommand: phases[0].command,
+        nextCommand,
     };
 }
 
+/** @param {Record<string, unknown>} route */
 function renderTerminalLiveRoute(route) {
-    const runtimeHealth = route.runtimeHealth ?? {};
-    const probes = Object.entries(runtimeHealth.probeStatuses ?? {})
+    const runtimeHealth = route['runtimeHealth'] && typeof route['runtimeHealth'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (route['runtimeHealth'])
+        : {};
+    const probeStatuses = runtimeHealth['probeStatuses'] && typeof runtimeHealth['probeStatuses'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (runtimeHealth['probeStatuses'])
+        : {};
+    const preferredProbeProofs = runtimeHealth['preferredProbeProofs'] && typeof runtimeHealth['preferredProbeProofs'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (runtimeHealth['preferredProbeProofs'])
+        : {};
+    const blockingProbeFailures = runtimeHealth['blockingProbeFailures'] && typeof runtimeHealth['blockingProbeFailures'] === 'object'
+        ? /** @type {Record<string, unknown>} */ (runtimeHealth['blockingProbeFailures'])
+        : {};
+    const probes = Object.entries(probeStatuses)
         .map(([kind, status]) => `${kind}:${status}`)
         .join(',') || '-';
-    const preferred = Object.entries(runtimeHealth.preferredProbeProofs ?? {})
+    const preferred = Object.entries(preferredProbeProofs)
         .map(([kind, ok]) => `${kind}:${ok ? 'ok' : 'missing'}`)
         .join(',') || '-';
-    const blocking = Object.entries(runtimeHealth.blockingProbeFailures ?? {})
+    const blocking = Object.entries(blockingProbeFailures)
         .filter(([, failed]) => failed)
         .map(([kind]) => kind)
         .join(',') || '-';
     return [
-        `- ${route.profileId}: ${route.providerId ?? '-'} / ${route.providerModel ?? '-'} · routeProfile=${route.routeProfile ?? '-'} · healthProfile=${runtimeHealth.healthRouteProfile ?? '-'} · exact=${runtimeHealth.exactRouteProfileMatch ? 'true' : 'false'} · profileless=${runtimeHealth.profilelessHealth ? 'true' : 'false'}`,
+        `- ${route['profileId']}: ${route['providerId'] ?? '-'} / ${route['providerModel'] ?? '-'} · routeProfile=${route['routeProfile'] ?? '-'} · healthProfile=${runtimeHealth['healthRouteProfile'] ?? '-'} · exact=${runtimeHealth['exactRouteProfileMatch'] ? 'true' : 'false'} · profileless=${runtimeHealth['profilelessHealth'] ? 'true' : 'false'}`,
         `  - probes: ${probes}`,
         `  - preferred: ${preferred}`,
         `  - blockingFailures: ${blocking}`,
     ];
 }
 
+/** @param {ReturnType<typeof buildPlan>} plan */
 function renderMarkdown(plan) {
     const terminalLiveRoutes = terminalLiveRouteMatrix(plan.readiness);
     const lines = [
@@ -369,6 +397,10 @@ function renderMarkdown(plan) {
     return `${lines.join('\n')}\n`;
 }
 
+/**
+ * @param {ReturnType<typeof buildPlan>} plan
+ * @param {string} outDir
+ */
 async function writePlanArtifacts(plan, outDir) {
     const stamp = nowStamp();
     await mkdir(outDir, { recursive: true });

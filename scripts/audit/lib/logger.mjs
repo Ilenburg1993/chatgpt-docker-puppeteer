@@ -51,10 +51,10 @@ export function createAuditLogger(options) {
             ...event,
         });
         if (validationErrors.length > 0) {
-            payload.level = payload.level === 'error' ? 'error' : 'warn';
-            payload.validation_errors = validationErrors;
-            if (!payload.message) {
-                payload.message = `Invalid audit event payload: ${validationErrors.join('; ')}`;
+            payload['level'] = payload['level'] === 'error' ? 'error' : 'warn';
+            payload['validation_errors'] = validationErrors;
+            if (!payload['message']) {
+                payload['message'] = `Invalid audit event payload: ${validationErrors.join('; ')}`;
             }
         }
 
@@ -65,10 +65,10 @@ export function createAuditLogger(options) {
         }
 
         if (logFormat === 'console') {
-            const level = payload.level || 'info';
-            const phase = payload.phase ? `[${payload.phase}]` : '';
-            const step = payload.step_id ? `(${payload.step_id})` : '';
-            const message = payload.message || payload.event_type || 'event';
+            const level = payload['level'] || 'info';
+            const phase = payload['phase'] ? `[${payload['phase']}]` : '';
+            const step = payload['step_id'] ? `(${payload['step_id']})` : '';
+            const message = payload['message'] || payload['event_type'] || 'event';
             if (level === 'error') {
                 console.error(`[audit][${level}]${phase}${step} ${message}`);
             } else {
@@ -77,7 +77,7 @@ export function createAuditLogger(options) {
             return;
         }
 
-        if (logLevel === 'debug' || payload.level !== 'debug') {
+        if (logLevel === 'debug' || payload['level'] !== 'debug') {
             console.log(JSON.stringify(payload));
         }
     }
@@ -161,7 +161,7 @@ function validateEvent(event) {
     if (!event || typeof event !== 'object') {
         return ['event payload must be an object'];
     }
-    if (!event.event_type) {
+    if (!event['event_type']) {
         errors.push('event_type is required');
         return errors;
     }
@@ -182,19 +182,19 @@ function validateEvent(event) {
         AUDIT_EVENT_TYPES.STEP_OUTPUT_TRUNCATED,
     ]);
 
-    if (requiresPhase.has(event.event_type) && !event.phase) {
+    if (requiresPhase.has(event['event_type']) && !event['phase']) {
         errors.push('phase is required for this event_type');
     }
-    if (requiresStep.has(event.event_type) && !event.step_id) {
+    if (requiresStep.has(event['event_type']) && !event['step_id']) {
         errors.push('step_id is required for this event_type');
     }
     if (
-        event.event_type === AUDIT_EVENT_TYPES.RUN_STARTED ||
-        event.event_type === AUDIT_EVENT_TYPES.RUN_FINISHED ||
-        event.event_type === AUDIT_EVENT_TYPES.RUN_ABORTED ||
-        event.event_type === AUDIT_EVENT_TYPES.RUN_FATAL
+        event['event_type'] === AUDIT_EVENT_TYPES.RUN_STARTED ||
+        event['event_type'] === AUDIT_EVENT_TYPES.RUN_FINISHED ||
+        event['event_type'] === AUDIT_EVENT_TYPES.RUN_ABORTED ||
+        event['event_type'] === AUDIT_EVENT_TYPES.RUN_FATAL
     ) {
-        if (!event.status) {
+        if (!event['status']) {
             errors.push('status is required for run lifecycle events');
         }
     }

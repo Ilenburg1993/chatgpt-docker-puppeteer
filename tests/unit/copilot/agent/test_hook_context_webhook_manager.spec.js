@@ -273,7 +273,7 @@ describe('F44 — buildHookSystemContext', () => {
 
     it('inclui session.json com sanitização', async () => {
         let callNum = 0;
-        mocks.fsAccess.mockImplementation(async (/** @type {string} */ path) => {
+        mocks.fsAccess.mockImplementation(async (/** @type {string} */ _path) => {
             callNum++;
             if (callNum <= 2) return; // briefing exists + session.json exists
             throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });

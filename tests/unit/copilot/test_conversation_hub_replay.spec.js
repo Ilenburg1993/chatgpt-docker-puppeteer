@@ -14,15 +14,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
-import { ConversationHub } from '../../../src/copilot/conversation-hub/hub.js';
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /**
  * Aplica migrations copilot em banco in-memory.
@@ -56,21 +53,13 @@ let testDb;
 /** @type {ConversationStore} */
 let store;
 
-/** @type {ConversationHub} */
-let hub;
-
 beforeAll(() => {
-    const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
 
     store = new ConversationStore();
     store.init(testDb);
 
-    // Usar hub com store diretamente via init() (sem io = standalone)
-    hub = new ConversationHub();
-    // ConversationHub.init() usa store singleton — inicializamos manualmente
-    // para controlar o DB in-memory
 });
 
 afterAll(() => {
@@ -213,7 +202,6 @@ describe('F35.5 — HubOrchestrator standalone flow', () => {
     let orchDb;
 
     beforeAll(() => {
-        const Database = require('better-sqlite3');
         orchDb = new Database(':memory:');
         applyCopilotMigrations(orchDb);
         orchStore = new ConversationStore();

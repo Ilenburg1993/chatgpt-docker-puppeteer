@@ -19,12 +19,12 @@ let httpServer = null;
 /**
  * Host de bind. Default seguro para container: 0.0.0.0 Pode ser sobrescrito via ENV em cenários especiais.
  */
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env['HOST'] || '0.0.0.0';
 
 /**
  * Limite máximo de escalonamento de porta. Evita subir fora da faixa forwardada do devcontainer.
  */
-const MAX_PORT_OFFSET = Number.parseInt(process.env.PORT_HUNT_LIMIT || '5', 10);
+const MAX_PORT_OFFSET = Number.parseInt(process.env['PORT_HUNT_LIMIT'] || '5', 10);
 
 /* ---------------------------------------------------------------------------
    SSL/TLS CONFIGURATION
@@ -38,18 +38,18 @@ const MAX_PORT_OFFSET = Number.parseInt(process.env.PORT_HUNT_LIMIT || '5', 10);
  */
 function getSSLOptions() {
     // Forçar HTTPS em produção, opcional em desenvolvimento
-    const forceHTTPS = process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === 'true';
+    const forceHTTPS = process.env['NODE_ENV'] === 'production' || process.env['FORCE_HTTPS'] === 'true';
 
     if (!forceHTTPS) {
         return null; // Usar HTTP
     }
 
-    const sslKeyPath = process.env.SSL_KEY_PATH || path.join(process.cwd(), 'ssl', 'key.pem');
-    const sslCertPath = process.env.SSL_CERT_PATH || path.join(process.cwd(), 'ssl', 'cert.pem');
+    const sslKeyPath = process.env['SSL_KEY_PATH'] || path.join(process.cwd(), 'ssl', 'key.pem');
+    const sslCertPath = process.env['SSL_CERT_PATH'] || path.join(process.cwd(), 'ssl', 'cert.pem');
 
     // Verificar se certificados existem
     if (!fs.existsSync(sslKeyPath) || !fs.existsSync(sslCertPath)) {
-        if (process.env.NODE_ENV === 'production') {
+        if (process.env['NODE_ENV'] === 'production') {
             throw new Error(`[ENGINE] Certificados SSL obrigatórios em produção: ${sslKeyPath}, ${sslCertPath}`);
         } else {
             log('WARN', '[ENGINE] Certificados SSL não encontrados, gerando auto-assinados para desenvolvimento');
@@ -110,7 +110,7 @@ function start(port, attempt = 0) {
         }
 
         // Configure server timeouts (prevent hanging connections)
-        const requestTimeout = Number(process.env.SERVER_REQUEST_TIMEOUT || 120000);
+        const requestTimeout = Number(process.env['SERVER_REQUEST_TIMEOUT'] || 120000);
         httpServer.setTimeout(requestTimeout);
 
         log('INFO', `[Server] Request timeout set to ${requestTimeout}ms`);
@@ -175,7 +175,7 @@ async function stop(gracefulTimeout = 30000) {
             notifyShutdown(gracefulTimeout);
         }
     } catch (/** @type {any} */ err) {
-        const _e = /** @type {any} */ (err);
+
         // Socket.IO pode não estar inicializado
         log('DEBUG', '[ENGINE] Socket.IO shutdown notification skipped (not initialized)');
     }

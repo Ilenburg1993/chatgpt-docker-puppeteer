@@ -50,6 +50,18 @@ if (repair) {
     });
 }
 
+/**
+ * @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['auditStoredPayloadRedaction']>> | {
+ *   schema: string,
+ *   ok: boolean,
+ *   tableCount: number,
+ *   leakCount: number,
+ *   scannedStringCount: number,
+ *   sampleCount: number,
+ *   error: string,
+ *   tables: Record<string, { samples: { path: string, redactedSnippet: string }[] }>
+ * }}
+ */
 let sqliteAudit;
 try {
     sqliteAudit = await sqliteStore.auditStoredPayloadRedaction({

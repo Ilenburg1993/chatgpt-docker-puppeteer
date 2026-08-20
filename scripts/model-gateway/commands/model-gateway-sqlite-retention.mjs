@@ -6,12 +6,18 @@ import {
 } from '../../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
+/** @param {string} name */
 const hasFlag = (name) => args.includes(name);
+/** @param {string} name */
 const valueFor = (name) => {
     const prefix = `${name}=`;
     const found = args.find((arg) => arg.startsWith(prefix));
     return found ? found.slice(prefix.length).trim() : null;
 };
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 const numberFor = (name, fallback) => {
     const raw = valueFor(name);
     if (raw === null) return fallback;

@@ -38,14 +38,17 @@ function _asArray(value) {
  * @returns {any}
  */
 function _derivePatchDraftFromContext(job, contextPack) {
-    const context = contextPack?.context || {};
+    const context = contextPack?.['context'] || {};
     const mcpTools = context.mcp_tools || {};
     const payloads = context.mcp_tool_payloads || {};
-    const scope = job?.scope_json && typeof job.scope_json === 'object' ? job.scope_json : {};
+    const scope = job?.['scope_json'] && typeof job['scope_json'] === 'object' ? job['scope_json'] : {};
 
     const targetFile = String(scope.filePath || scope.file_path || 'src/main.js');
     const ragResults = _asArray(payloads?.rag_search?.result?.structuredContent?.data?.results);
-    const ragFirst = ragResults[0] || null;
+    const ragFirst = ragResults[0];
+    const ragRecord = ragFirst && typeof ragFirst === 'object' && !Array.isArray(ragFirst)
+        ? /** @type {Record<string, unknown>} */ (ragFirst)
+        : null;
     const referencesCount = Number(mcpTools?.lsp_references?.locations_count || 0);
     const diagnosticsCount = Number(mcpTools?.lsp_diagnostics?.diagnostics_count || 0);
     const symbolsCount = Number(mcpTools?.lsp_document_symbols?.symbols_count || 0);
@@ -66,14 +69,11 @@ function _derivePatchDraftFromContext(job, contextPack) {
             rag_degraded: payloads?.rag_search?.result?.structuredContent?.data?.degraded ?? null,
         },
         context_budget: mcpTools?.budget || null,
-        rag_anchor: ragFirst
+        rag_anchor: ragRecord
             ? {
-                  chunk_id: /** @type {Record<string, any>} */ (ragFirst).chunk_id || null,
-                  score: /** @type {Record<string, any>} */ (ragFirst).score ?? null,
-                  path:
-                      /** @type {Record<string, any>} */ (ragFirst).path ||
-                      /** @type {Record<string, any>} */ (ragFirst).file_path ||
-                      null,
+                  chunk_id: ragRecord['chunk_id'] ?? null,
+                  score: ragRecord['score'] ?? null,
+                  path: ragRecord['path'] ?? ragRecord['file_path'] ?? null,
               }
             : null,
         recommended_next_actions: [
@@ -174,7 +174,7 @@ export class AuditAgentRuntime {
         this.logger = options.logger || null;
         this.maxConcurrentJobs = Math.max(
             1,
-            Number(options.maxConcurrentJobs || process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1),
+            Number(options.maxConcurrentJobs || process.env['AUDIT_AGENT_MAX_CONCURRENT_JOBS'] || 1),
         );
         this.store = options.store || null;
         this.contextBuilder = options.contextBuilder || null;
@@ -209,7 +209,7 @@ export class AuditAgentRuntime {
             this.store.saveJob(job);
         } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] saveJob failed', {
-                id: job?.id,
+                id: job?.['id'],
                 error: error instanceof Error ? error.message : String(error),
             });
         }
@@ -225,7 +225,7 @@ export class AuditAgentRuntime {
             this.store.onRunStart(job);
         } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] onRunStart failed', {
-                id: job?.id,
+                id: job?.['id'],
                 error: error instanceof Error ? error.message : String(error),
             });
         }
@@ -241,7 +241,7 @@ export class AuditAgentRuntime {
             this.store.onRunFinish(job);
         } catch (/** @type {any} */ error) {
             this._log('WARN', '[audit-agent] onRunFinish failed', {
-                id: job?.id,
+                id: job?.['id'],
                 error: error instanceof Error ? error.message : String(error),
             });
         }
@@ -289,20 +289,20 @@ export class AuditAgentRuntime {
         let skipped = 0;
         const rows = Array.isArray(this.store.listJobs({ limit })) ? this.store.listJobs({ limit }) : [];
         for (const row of /** @type {Record<string, any>[]} */ (rows)) {
-            if (!row?.id) {
+            if (!row?.['id']) {
                 skipped += 1;
                 continue;
             }
-            if (this.jobs.has(row.id)) {
+            if (this.jobs.has(row['id'])) {
                 skipped += 1;
                 continue;
             }
             const job = /** @type {Record<string, any>} */ ({
                 ...row,
-                history: Array.isArray(row.history) ? row.history : [],
+                history: Array.isArray(row['history']) ? row['history'] : [],
                 current_run_id: null,
             });
-            this.jobs.set(job.id, job);
+            this.jobs.set(job['id'], job);
             hydrated += 1;
         }
         return { hydrated, skipped };
@@ -336,7 +336,7 @@ export class AuditAgentRuntime {
             error_json: null,
             history: /** @type {any[]} */ ([]),
         });
-        job.history.push({ ts, event: 'created', status: job.status });
+        job['history'].push({ ts, event: 'created', status: job['status'] });
         this.jobs.set(id, job);
         this._persistJob(job);
         return { ...job };
@@ -437,34 +437,34 @@ export class AuditAgentRuntime {
      */
     async _processJob(job) {
         const startTs = this.now();
-        job.status = AUDIT_JOB_STATUS.RUNNING;
-        job.started_at_ms = job.started_at_ms || startTs;
-        job.updated_at_ms = startTs;
-        job.attempt_seq = (Number(job.attempt_seq) || 0) + 1;
-        job.current_run_id = `ajrun_${randomUUID()}`;
-        job.current_step = 'collect_context';
-        job.history.push({ ts: startTs, event: 'running', status: job.status, attempt_seq: job.attempt_seq });
+        job['status'] = AUDIT_JOB_STATUS.RUNNING;
+        job['started_at_ms'] = job['started_at_ms'] || startTs;
+        job['updated_at_ms'] = startTs;
+        job['attempt_seq'] = (Number(job['attempt_seq']) || 0) + 1;
+        job['current_run_id'] = `ajrun_${randomUUID()}`;
+        job['current_step'] = 'collect_context';
+        job['history'].push({ ts: startTs, event: 'running', status: job['status'], attempt_seq: job['attempt_seq'] });
         this._persistJob(job);
         this._persistRunStart(job);
 
         let contextPack = null;
         const ts1 = this.now();
-        job.current_step = 'deterministic_checks';
-        job.history.push({ ts: ts1, event: 'step', step: job.current_step });
+        job['current_step'] = 'deterministic_checks';
+        job['history'].push({ ts: ts1, event: 'step', step: job['current_step'] });
         this._persistJob(job);
 
         const ts2 = this.now();
-        job.current_step = 'triage';
-        job.history.push({ ts: ts2, event: 'step', step: job.current_step });
+        job['current_step'] = 'triage';
+        job['history'].push({ ts: ts2, event: 'step', step: job['current_step'] });
         this._persistJob(job);
 
         if (
             this.contextBuilder &&
             typeof this.contextBuilder.collectQuickContext === 'function' &&
-            (job.kind === AUDIT_JOB_KIND.QUICK_AUDIT ||
-                job.kind === AUDIT_JOB_KIND.BUG_HUNT ||
-                job.kind === AUDIT_JOB_KIND.PATCH_SUGGEST ||
-                job.kind === AUDIT_JOB_KIND.RUNTIME_PROBE)
+            (job['kind'] === AUDIT_JOB_KIND.QUICK_AUDIT ||
+                job['kind'] === AUDIT_JOB_KIND.BUG_HUNT ||
+                job['kind'] === AUDIT_JOB_KIND.PATCH_SUGGEST ||
+                job['kind'] === AUDIT_JOB_KIND.RUNTIME_PROBE)
         ) {
             try {
                 contextPack = await this.contextBuilder.collectQuickContext(job);
@@ -489,13 +489,13 @@ export class AuditAgentRuntime {
             }
         }
 
-        const patchLike = job.kind === AUDIT_JOB_KIND.PATCH_SUGGEST || job.kind === AUDIT_JOB_KIND.BUG_HUNT;
+        const patchLike = job['kind'] === AUDIT_JOB_KIND.PATCH_SUGGEST || job['kind'] === AUDIT_JOB_KIND.BUG_HUNT;
         /** @type {Record<string, any> | null} */
         let llmTriage = null;
         if (this.triageClient && typeof this.triageClient.runTriage === 'function') {
             const tsTriage = this.now();
-            job.current_step = 'triage_llm';
-            job.history.push({ ts: tsTriage, event: 'step', step: job.current_step });
+            job['current_step'] = 'triage_llm';
+            job['history'].push({ ts: tsTriage, event: 'step', step: job['current_step'] });
             this._persistJob(job);
             try {
                 llmTriage = /** @type {Record<string, any>} */ (await this.triageClient.runTriage(job, contextPack));
@@ -511,8 +511,8 @@ export class AuditAgentRuntime {
         let llmPatchAuthor = null;
         if (patchLike && this.patchAuthorClient && typeof this.patchAuthorClient.runPatchAuthor === 'function') {
             const tsPatch = this.now();
-            job.current_step = 'patch_author_llm';
-            job.history.push({ ts: tsPatch, event: 'step', step: job.current_step });
+            job['current_step'] = 'patch_author_llm';
+            job['history'].push({ ts: tsPatch, event: 'step', step: job['current_step'] });
             this._persistJob(job);
             try {
                 llmPatchAuthor = /** @type {Record<string, any>} */ (
@@ -529,21 +529,21 @@ export class AuditAgentRuntime {
 
         // Handle diagnostic jobs (DIAGNOSTIC_HEALTH, DIAGNOSTIC_SYSTEM, etc.)
         const isDiagnosticJob =
-            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_HEALTH ||
-            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_SYSTEM ||
-            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_MODELS ||
-            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_VERIFY ||
-            job.kind === AUDIT_JOB_KIND.DIAGNOSTIC_REPORT;
+            job['kind'] === AUDIT_JOB_KIND.DIAGNOSTIC_HEALTH ||
+            job['kind'] === AUDIT_JOB_KIND.DIAGNOSTIC_SYSTEM ||
+            job['kind'] === AUDIT_JOB_KIND.DIAGNOSTIC_MODELS ||
+            job['kind'] === AUDIT_JOB_KIND.DIAGNOSTIC_VERIFY ||
+            job['kind'] === AUDIT_JOB_KIND.DIAGNOSTIC_REPORT;
 
         /** @type {Record<string, any> | null} */
         let diagnosticResult = null;
         if (isDiagnosticJob && this.diagnosticClient && typeof this.diagnosticClient.runDiagnostic === 'function') {
             const tsDiag = this.now();
-            job.current_step = 'diagnostic_execution';
-            job.history.push({ ts: tsDiag, event: 'step', step: job.current_step });
+            job['current_step'] = 'diagnostic_execution';
+            job['history'].push({ ts: tsDiag, event: 'step', step: job['current_step'] });
             this._persistJob(job);
             try {
-                diagnosticResult = await this.diagnosticClient.runDiagnostic(job.kind, job.scope_json);
+                diagnosticResult = await this.diagnosticClient.runDiagnostic(job['kind'], job['scope_json']);
             } catch (/** @type {any} */ error) {
                 diagnosticResult = {
                     success: false,
@@ -553,8 +553,8 @@ export class AuditAgentRuntime {
         }
 
         const endTs = this.now();
-        job.current_step = patchLike ? 'waiting_approval' : isDiagnosticJob ? 'diagnostic_completed' : 'completed';
-        job.result_json = {
+        job['current_step'] = patchLike ? 'waiting_approval' : isDiagnosticJob ? 'diagnostic_completed' : 'completed';
+        job['result_json'] = {
             skeleton: true,
             patch_proposal_pending: patchLike,
             is_diagnostic: isDiagnosticJob,
@@ -567,83 +567,83 @@ export class AuditAgentRuntime {
             diagnostic_result: diagnosticResult || null,
         };
         if (patchLike) {
-            job.status = AUDIT_JOB_STATUS.WAITING_APPROVAL;
+            job['status'] = AUDIT_JOB_STATUS.WAITING_APPROVAL;
         } else {
-            job.status = AUDIT_JOB_STATUS.COMPLETED;
-            job.completed_at_ms = endTs;
+            job['status'] = AUDIT_JOB_STATUS.COMPLETED;
+            job['completed_at_ms'] = endTs;
             this._completed += 1;
         }
-        job.updated_at_ms = endTs;
-        job.history.push({ ts: endTs, event: 'done', status: job.status, step: job.current_step });
+        job['updated_at_ms'] = endTs;
+        job['history'].push({ ts: endTs, event: 'done', status: job['status'], step: job['current_step'] });
         this._persistJob(job);
         /** @type {unknown[]} */
         const findingsToPersist = Array.isArray(contextPack?.findings) ? [...contextPack.findings] : [];
-        if (llmTriage?.ok) {
+        if (llmTriage?.['ok']) {
             findingsToPersist.push({
                 severity: 'info',
                 category: 'triage',
                 title: 'Triage LLM executada via Inference Gateway',
                 source: 'audit-agent-llm',
-                dedup_key: `triage_llm:${job.id}:ok`,
+                dedup_key: `triage_llm:${job['id']}:ok`,
                 evidence: {
-                    model: llmTriage.model || null,
-                    profile_name: llmTriage.profile_name || null,
-                    provider: llmTriage.provider || 'inference-gateway',
-                    parsed: llmTriage.parsed || null,
-                    raw_response: llmTriage.raw_response || null,
+                    model: llmTriage['model'] || null,
+                    profile_name: llmTriage['profile_name'] || null,
+                    provider: llmTriage['provider'] || 'inference-gateway',
+                    parsed: llmTriage['parsed'] || null,
+                    raw_response: llmTriage['raw_response'] || null,
                 },
             });
-        } else if (llmTriage && !llmTriage.skipped) {
+        } else if (llmTriage && !llmTriage['skipped']) {
             findingsToPersist.push({
                 severity: 'info',
                 category: 'triage',
                 title: 'Triage LLM não executada com sucesso (seguindo sem bloqueio)',
                 source: 'audit-agent-llm',
-                dedup_key: `triage_llm:${job.id}:fail`,
+                dedup_key: `triage_llm:${job['id']}:fail`,
                 evidence: llmTriage,
             });
         }
-        if (llmPatchAuthor?.ok) {
+        if (llmPatchAuthor?.['ok']) {
             findingsToPersist.push({
                 severity: 'info',
                 category: 'patch_author',
                 title: 'Patch author LLM executado via Inference Gateway',
                 source: 'audit-agent-llm',
-                dedup_key: `patch_author_llm:${job.id}:ok`,
+                dedup_key: `patch_author_llm:${job['id']}:ok`,
                 evidence: {
-                    model: llmPatchAuthor.model || null,
-                    profile_name: llmPatchAuthor.profile_name || null,
-                    provider: llmPatchAuthor.provider || 'inference-gateway',
-                    parsed: llmPatchAuthor.parsed || null,
+                    model: llmPatchAuthor['model'] || null,
+                    profile_name: llmPatchAuthor['profile_name'] || null,
+                    provider: llmPatchAuthor['provider'] || 'inference-gateway',
+                    parsed: llmPatchAuthor['parsed'] || null,
                 },
             });
-        } else if (llmPatchAuthor && !llmPatchAuthor.skipped) {
+        } else if (llmPatchAuthor && !llmPatchAuthor['skipped']) {
             findingsToPersist.push({
                 severity: 'info',
                 category: 'patch_author',
                 title: 'Patch author LLM nao executado com sucesso (seguindo sem bloqueio)',
                 source: 'audit-agent-llm',
-                dedup_key: `patch_author_llm:${job.id}:fail`,
+                dedup_key: `patch_author_llm:${job['id']}:fail`,
                 evidence: llmPatchAuthor,
             });
         }
-        this._persistFindings(job.id, findingsToPersist);
+        this._persistFindings(job['id'], findingsToPersist);
         if (patchLike) {
             const defaultPatch = _derivePatchDraftFromContext(job, contextPack);
             /** @type {unknown[]} */
             const patches = [];
             if (
-                llmPatchAuthor?.ok &&
-                llmPatchAuthor.patch_proposal &&
-                typeof llmPatchAuthor.patch_proposal === 'object'
+                llmPatchAuthor?.['ok'] &&
+                llmPatchAuthor['patch_proposal'] &&
+                typeof llmPatchAuthor['patch_proposal'] === 'object'
             ) {
-                patches.push(llmPatchAuthor.patch_proposal);
+                patches.push(llmPatchAuthor['patch_proposal']);
             }
             if (Array.isArray(contextPack?.patches) && contextPack.patches.length > 0) {
                 patches.push(...contextPack.patches);
             }
             if (patches.length === 0) patches.push(defaultPatch);
-            this._persistPatchProposals(job.id, patches);
+            this._persistPatchProposals(job['id'], patches);
         }
         this._persistRunFinish(job);
     }

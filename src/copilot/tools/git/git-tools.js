@@ -79,9 +79,8 @@ const gitDiffTool = buildTool({
                 staged: z
                     .boolean()
                     .optional()
-                    .default(false)
-                    .describe('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
-                path: z.string().optional().describe('Caminho específico para ver diff'),
+                    .default(false)['describe']('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
+                path: z.string().optional()['describe']('Caminho específico para ver diff'),
             })
         )
     ),
@@ -104,12 +103,11 @@ const gitCommitTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                message: z.string().describe('Mensagem do commit (formato: "tipo: descrição")'),
+                message: z.string()['describe']('Mensagem do commit (formato: "tipo: descrição")'),
                 paths: z
                     .array(z.string())
-                    .optional()
-                    .describe('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
-                all: z.boolean().optional().default(false).describe('Se true, executa git add -A (adiciona tudo)'),
+                    .optional()['describe']('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
+                all: z.boolean().optional().default(false)['describe']('Se true, executa git add -A (adiciona tudo)'),
             })
         )
     ),
@@ -162,12 +160,11 @@ const gitPushTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                remote: z.string().optional().default('origin').describe('Remote de destino (padrão: origin)'),
+                remote: z.string().optional().default('origin')['describe']('Remote de destino (padrão: origin)'),
                 setUpstream: z
                     .boolean()
                     .optional()
-                    .default(false)
-                    .describe('Se true, define branch upstream (--set-upstream)'),
+                    .default(false)['describe']('Se true, define branch upstream (--set-upstream)'),
             })
         )
     ),
@@ -191,9 +188,9 @@ const gitCreateBranchTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                name: z.string().describe('Nome do branch (ex: "feat/nova-feature")'),
-                base: z.string().optional().describe('Commit ou branch base (omitir = usa HEAD atual)'),
-                checkout: z.boolean().optional().default(true).describe('Se false, apenas cria sem fazer checkout'),
+                name: z.string()['describe']('Nome do branch (ex: "feat/nova-feature")'),
+                base: z.string().optional()['describe']('Commit ou branch base (omitir = usa HEAD atual)'),
+                checkout: z.boolean().optional().default(true)['describe']('Se false, apenas cria sem fazer checkout'),
             })
         )
     ),
@@ -224,8 +221,8 @@ const gitLogTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                n: z.number().int().min(1).optional().default(10).describe('Número sugerido de commits a retornar'),
-                oneline: z.boolean().optional().default(true).describe('Se true, formato compacto (--oneline)'),
+                n: z.number().int().min(1).optional().default(10)['describe']('Número sugerido de commits a retornar'),
+                oneline: z.boolean().optional().default(true)['describe']('Se true, formato compacto (--oneline)'),
             })
         )
     ),

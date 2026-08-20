@@ -12,9 +12,9 @@ import {
     recordMcpToolMetric,
     resetMcpIndexAutoBuildStateForTests,
     resetMcpMetricsForTests,
-    resetMcpStartupMaintenanceForTests,
     resetMcpWorkspaceSmokeSummaryForTests,
 } from '#copilot/mcp/control-plane';
+import { resetMcpStartupMaintenanceForTests } from '#copilot/mcp/control-plane/startup-maintenance.js';
 import { mcpRuntimeHealthTool } from '#copilot/mcp/tools';
 
 describe('copilot MCP runtime metrics', () => {
@@ -116,21 +116,21 @@ describe('copilot MCP runtime metrics', () => {
         const result = await mcpRuntimeHealthTool.handler({});
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
-        assert.equal(result.structuredContent.ok, true);
-        assert.equal(typeof result.structuredContent.workspaceRoot, 'string');
-        assert.ok(result.structuredContent.operationalSignals);
-        assert.ok(result.structuredContent.operationalSignals.indexAutoBuild);
-        assert.equal(typeof result.structuredContent.operationalSignals.nodeRuntime?.nodeVersion, 'string');
+        assert.equal(result.structuredContent['success'], true);
+        assert.equal(result.structuredContent['ok'], true);
+        assert.equal(typeof result.structuredContent['workspaceRoot'], 'string');
+        assert.ok(result.structuredContent['operationalSignals']);
+        assert.ok(result.structuredContent['operationalSignals'].indexAutoBuild);
+        assert.equal(typeof result.structuredContent['operationalSignals'].nodeRuntime?.nodeVersion, 'string');
         assert.equal(
-            typeof result.structuredContent.operationalSignals.nodeRuntime?.compileCache?.enabled,
+            typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.enabled,
             'boolean',
         );
         assert.equal(
-            typeof result.structuredContent.operationalSignals.nodeRuntime?.compileCache?.directoryKnown,
+            typeof result.structuredContent['operationalSignals'].nodeRuntime?.compileCache?.directoryKnown,
             'boolean',
         );
-        assert.deepEqual(result.structuredContent.operationalSignals.startupMaintenance, {
+        assert.deepEqual(result.structuredContent['operationalSignals'].startupMaintenance, {
             scheduled: false,
             running: false,
             completed: false,
@@ -143,7 +143,7 @@ describe('copilot MCP runtime metrics', () => {
             detachedLiveRunsReaped: 0,
             detachedLiveRunReaperFailures: 0,
         });
-        assert.ok(result.structuredContent.indexStats);
+        assert.ok(result.structuredContent['indexStats']);
         const metrics = /** @type {{
             totals: { calls: number };
             phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
@@ -163,7 +163,7 @@ describe('copilot MCP runtime metrics', () => {
                 workerFailures?: number;
             };
             aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
-        }} */ (result.structuredContent.metrics);
+        }} */ (result.structuredContent['metrics']);
         assert.equal(metrics.totals.calls, 2);
         assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
         assert.equal(typeof metrics.ioCache?.coherence?.['gapDetections'], 'number');
@@ -196,9 +196,9 @@ describe('copilot MCP runtime metrics', () => {
             lastMs: 8,
         });
         assert.equal(metrics.slowestTool?.name, 'repo_status');
-        assert.equal(result.structuredContent.metrics?.['slowestTools'], undefined);
-        assert.equal(result.structuredContent.metrics?.['slowestPhases'], undefined);
-        assert.equal(result.structuredContent.metrics?.['ioCacheBenchmark'], undefined);
+        assert.equal(result.structuredContent['metrics']?.['slowestTools'], undefined);
+        assert.equal(result.structuredContent['metrics']?.['slowestPhases'], undefined);
+        assert.equal(result.structuredContent['metrics']?.['ioCacheBenchmark'], undefined);
         assert.ok(Buffer.byteLength(JSON.stringify(result.structuredContent)) < 6 * 1024);
 
         const detailed = await mcpRuntimeHealthTool.handler({ includeDetails: true });

@@ -3,6 +3,7 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 import { wireAgentModelGatewayTurnBoundaryPromotion } from '../../../../src/copilot/agent/lifecycle/model-gateway-turn-boundary.js';
+import { createBackgroundTaskHarness } from '../helpers/background-task-harness.js';
 
 class TestHost extends EventEmitter {
     switchRoute = vi.fn();
@@ -11,13 +12,10 @@ class TestHost extends EventEmitter {
 describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
     it('promove após dialog.turn_end sem exigir nova chamada da LLM-B', async () => {
         const host = new TestHost();
-        const tracked = [];
+        const tasks = createBackgroundTaskHarness();
         const ctx = {
             getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
-            trackBackgroundTask: async (task, meta) => {
-                tracked.push({ task, meta });
-                await task;
-            },
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn().mockImplementation(async ({ switchRoute }) => {
             await switchRoute(
@@ -47,7 +45,7 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
 
         host.emit('dialog.turn_end', { durationMs: 100 });
         await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
-        await Promise.all(tracked.map((entry) => entry.task));
+        await tasks.awaitAll();
 
         expect(promote).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -64,26 +62,23 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
                 forceApplyDeferred: true,
             }),
         );
-        expect(tracked[0].meta).toMatchObject({ label: 'model-gateway.deferred-route-promotion' });
+        expect(tasks.get().meta).toMatchObject({ label: 'model-gateway.deferred-route-promotion' });
         dispose();
     });
 
     it('não consulta o ledger sem sessão SDK viva', async () => {
         const host = new TestHost();
-        const tracked = [];
+        const tasks = createBackgroundTaskHarness();
         const ctx = {
             getSessionSnapshot: () => null,
-            trackBackgroundTask: async (task) => {
-                tracked.push(task);
-                await task;
-            },
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn();
         const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote, turnBoundarySettleMs: 0 });
 
         host.emit('dialog.turn_end', {});
-        await vi.waitFor(() => expect(tracked).toHaveLength(1));
-        await Promise.all(tracked);
+        await vi.waitFor(() => expect(tasks.tracked).toHaveLength(1));
+        await tasks.awaitAll();
 
         expect(promote).not.toHaveBeenCalled();
         dispose();
@@ -91,15 +86,12 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
 
     it('adiar promoção quando o turn_end abre ask_user até o turno pós-resposta concluir', async () => {
         const host = new TestHost();
-        const tracked = [];
+        const tasks = createBackgroundTaskHarness();
         let pendingQuestion = false;
         const ctx = {
             getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
             hasPendingQuestion: () => pendingQuestion,
-            trackBackgroundTask: async (task) => {
-                tracked.push(task);
-                await task;
-            },
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn().mockResolvedValue({
             sessionId: 'session-stable',
@@ -120,29 +112,26 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         host.emit('question.pending', { question: 'continuar?' });
         pendingQuestion = false;
         host.emit('question.answered', { answer: 'SIM', hadPending: true });
-        await vi.waitFor(() => expect(tracked).toHaveLength(1));
-        await Promise.all(tracked.splice(0));
+        await vi.waitFor(() => expect(tasks.tracked).toHaveLength(1));
+        await tasks.drain();
 
         expect(promote).not.toHaveBeenCalled();
 
         host.emit('dialog.turn_end', { durationMs: 20 });
         await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
-        await Promise.all(tracked);
+        await tasks.awaitAll();
 
         dispose();
     });
 
     it('adia promoção quando uma continuação já está enfileirada no limite do turno', async () => {
         const host = new TestHost();
-        const tracked = [];
+        const tasks = createBackgroundTaskHarness();
         let queueDepth = 0;
         const ctx = {
             getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
             getDialogTurnQueueDepth: () => queueDepth,
-            trackBackgroundTask: async (task) => {
-                tracked.push(task);
-                await task;
-            },
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn().mockResolvedValue({
             sessionId: 'session-stable',
@@ -160,30 +149,27 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
 
         host.emit('dialog.turn_end', { durationMs: 100 });
         queueDepth = 1;
-        await vi.waitFor(() => expect(tracked).toHaveLength(1));
-        await Promise.all(tracked.splice(0));
+        await vi.waitFor(() => expect(tasks.tracked).toHaveLength(1));
+        await tasks.drain();
 
         expect(promote).not.toHaveBeenCalled();
 
         queueDepth = 0;
         host.emit('dialog.turn_end', { durationMs: 20 });
         await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
-        await Promise.all(tracked);
+        await tasks.awaitAll();
 
         dispose();
     });
 
     it('aguarda a recuperação pós-tools terminar antes de reanexar a rota', async () => {
         const host = new TestHost();
-        const tracked = [];
+        const tasks = createBackgroundTaskHarness();
         let processing = false;
         const ctx = {
             getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
             isProcessing: () => processing,
-            trackBackgroundTask: async (task) => {
-                tracked.push(task);
-                await task;
-            },
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn().mockResolvedValue({
             sessionId: 'session-stable',
@@ -201,28 +187,25 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
 
         host.emit('dialog.turn_end', { semanticOutcome: 'tool_only' });
         processing = true;
-        await vi.waitFor(() => expect(tracked).toHaveLength(1));
-        await Promise.all(tracked.splice(0));
+        await vi.waitFor(() => expect(tasks.tracked).toHaveLength(1));
+        await tasks.drain();
 
         expect(promote).not.toHaveBeenCalled();
 
         processing = false;
         host.emit('dialog.turn_end', { semanticOutcome: 'public_reply' });
         await vi.waitFor(() => expect(promote).toHaveBeenCalledTimes(1));
-        await Promise.all(tracked);
+        await tasks.awaitAll();
 
         dispose();
     });
 
     it('propaga falha de promoção para a telemetria da tarefa em background', async () => {
         const host = new TestHost();
-        const tracked = [];
+        const tasks = createBackgroundTaskHarness({ awaitInsideTracker: false });
         const ctx = {
             getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
-            trackBackgroundTask: (task, meta) => {
-                tracked.push({ task, meta });
-                return Promise.resolve();
-            },
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn().mockResolvedValue({
             sessionId: 'session-stable',
@@ -239,20 +222,21 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
         });
 
         host.emit('dialog.turn_end', {});
-        await vi.waitFor(() => expect(tracked).toHaveLength(1));
+        await vi.waitFor(() => expect(tasks.tracked).toHaveLength(1));
 
-        await expect(tracked[0].task).rejects.toThrow(
+        await expect(tasks.get().task).rejects.toThrow(
             'MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_FAILED: SAME_SESSION_ROUTE_SWITCH_NOT_VERIFIED',
         );
-        expect(tracked[0].meta).toMatchObject({ label: 'model-gateway.deferred-route-promotion' });
+        expect(tasks.get().meta).toMatchObject({ label: 'model-gateway.deferred-route-promotion' });
         dispose();
     });
 
     it('remove o listener ao descartar o scheduler', async () => {
         const host = new TestHost();
+        const tasks = createBackgroundTaskHarness();
         const ctx = {
             getSessionSnapshot: () => ({ sessionId: 'session-stable' }),
-            trackBackgroundTask: async (task) => void (await task),
+            trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn();
         const dispose = wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, { promote, turnBoundarySettleMs: 0 });

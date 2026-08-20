@@ -38,11 +38,11 @@ describe('mcp/cloudflare/edge-policy-diff', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(result.mode).toBe('plan-only-diff');
-        expect(result.appliesChanges).toBe(false);
-        expect(result.mutationReady).toBe(true);
-        expect(result.summary).toMatchObject({ diffCount: 3, criticalDiffs: 0 });
-        expect(result.diffs).toEqual(
+        expect(result['mode']).toBe('plan-only-diff');
+        expect(result['appliesChanges']).toBe(false);
+        expect(result['mutationReady']).toBe(true);
+        expect(result['summary']).toMatchObject({ diffCount: 3, criticalDiffs: 0 });
+        expect(result['diffs']).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ id: 'cache-bypass-missing', severity: 'warning' }),
                 expect.objectContaining({ id: 'oauth-token-rate-limit-missing', severity: 'advisory' }),
@@ -76,8 +76,8 @@ describe('mcp/cloudflare/edge-policy-diff', () => {
         );
 
         expect(result.ok).toBe(false);
-        expect(result.mutationReady).toBe(false);
-        expect(result.diffs).toEqual(
+        expect(result['mutationReady']).toBe(false);
+        expect(result['diffs']).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ id: 'mcp-interactive-or-blocking-rule-present', severity: 'critical' }),
             ]),

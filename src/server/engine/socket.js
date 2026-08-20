@@ -42,7 +42,7 @@ function getDashboardSocketPolicy() {
     return {
         authRequired: parseBooleanEnv('DASHBOARD_SOCKET_AUTH_REQUIRED', true),
         commandsEnabled: parseBooleanEnv('DASHBOARD_COMMANDS_ENABLED', false),
-        commandRole: String(process.env.DASHBOARD_COMMAND_ROLE || 'admin').trim() || 'admin',
+        commandRole: String(process.env['DASHBOARD_COMMAND_ROLE'] || 'admin').trim() || 'admin',
         emitTaskUpdatedCompat: parseBooleanEnv('DASHBOARD_EMIT_TASK_UPDATED_COMPAT', false),
     };
 }
@@ -63,7 +63,7 @@ function normalizeOrigins(/** @type {any} */ originsLike) {
 }
 
 function refreshAllowedOrigins() {
-    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env.DASHBOARD_ORIGIN].filter(Boolean);
+    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env['DASHBOARD_ORIGIN']].filter(Boolean);
     const merged = new Set([...defaults, ...normalizeOrigins(CONFIG.ALLOWED_ORIGINS)]);
     dashboardAllowedOrigins = merged;
 }
@@ -593,21 +593,21 @@ export const getIO = () => ioInstance;
  * Constante/valor exportado: on.
  *
  * @param {string | symbol} eventName
- * @param {function(...unknown): void} handler
+ * @param {(...args: unknown[]) => void} handler
  */
 export const on = (eventName, handler) => internalEmitter.on(eventName, handler);
 /**
  * Constante/valor exportado: once.
  *
  * @param {string | symbol} eventName
- * @param {function(...unknown): void} handler
+ * @param {(...args: unknown[]) => void} handler
  */
 export const once = (eventName, handler) => internalEmitter.once(eventName, handler);
 /**
  * Constante/valor exportado: off.
  *
  * @param {string | symbol} eventName
- * @param {function(...unknown): void} handler
+ * @param {(...args: unknown[]) => void} handler
  */
 export const off = (eventName, handler) => internalEmitter.off(eventName, handler);
 /**
@@ -646,8 +646,8 @@ export const sendToClient = (clientId, eventName, data) => {
 export const connectExternal = async (port = 3008) => {
     const { io: ioClient } = await import('socket.io-client');
     const url = `http://localhost:${port}`;
-    const connectTimeoutMs = Number(process.env.SPLIT_CONNECT_TIMEOUT_MS || 5000) || 5000;
-    const handshakeTimeoutMs = Number(process.env.SPLIT_HANDSHAKE_TIMEOUT_MS || 5000) || 5000;
+    const connectTimeoutMs = Number(process.env['SPLIT_CONNECT_TIMEOUT_MS'] || 5000) || 5000;
+    const handshakeTimeoutMs = Number(process.env['SPLIT_HANDSHAKE_TIMEOUT_MS'] || 5000) || 5000;
 
     log('INFO', `[HUB] Conectando a servidor externo: ${url}`);
 
@@ -660,8 +660,8 @@ export const connectExternal = async (port = 3008) => {
     });
 
     const handshakeIdentity = {
-        robot_id: process.env.ROBOT_ID || `maestro-${process.pid}`,
-        instance_id: process.env.NODE_APP_INSTANCE || String(process.pid),
+        robot_id: process.env['ROBOT_ID'] || `maestro-${process.pid}`,
+        instance_id: process.env['NODE_APP_INSTANCE'] || String(process.pid),
         role: ActorRole.MAESTRO,
         version: PROTOCOL_VERSION,
         capabilities: ['split-mode', 'external-socket'],

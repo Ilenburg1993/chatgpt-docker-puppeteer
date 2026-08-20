@@ -5,9 +5,9 @@ import puppeteer from 'puppeteer-core';
     console.log('🚀 Teste rápido: connect-only (puppeteer-core)...');
 
     const browserURL =
-        process.env.CHROME_WS_ENDPOINT ||
-        process.env.CHROME_URL ||
-        `http://localhost:${process.env.CHROME_PROXY_PORT || 9224}`;
+        process.env['CHROME_WS_ENDPOINT'] ||
+        process.env['CHROME_URL'] ||
+        `http://localhost:${process.env['CHROME_PROXY_PORT'] || 9224}`;
     const browser = await puppeteer.connect(
         /** @type {any} */ ({
             browserURL,

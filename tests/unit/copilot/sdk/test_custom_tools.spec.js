@@ -256,8 +256,8 @@ describe('F39 — registerCustomTool', () => {
         await Promise.all([first, second]);
 
         expect(mockWriteFileAtomicTrusted).toHaveBeenCalledTimes(2);
-        const firstSnapshot = String(mockWriteFileAtomicTrusted.mock.calls[0]?.[1]);
-        const secondSnapshot = String(mockWriteFileAtomicTrusted.mock.calls[1]?.[1]);
+        const firstSnapshot = String(/** @type {unknown[]} */ (mockWriteFileAtomicTrusted.mock.calls[0] ?? [])[1]);
+        const secondSnapshot = String(/** @type {unknown[]} */ (mockWriteFileAtomicTrusted.mock.calls[1] ?? [])[1]);
         expect(firstSnapshot).toContain('first_tool');
         expect(firstSnapshot).not.toContain('second_tool');
         expect(secondSnapshot).toContain('first_tool');

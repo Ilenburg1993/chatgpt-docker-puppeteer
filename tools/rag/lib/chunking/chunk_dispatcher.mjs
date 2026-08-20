@@ -56,7 +56,7 @@ function detectAliasTag(/** @type {any} */ relPath) {
 }
 
 function isAstChunkingEnabled() {
-    return String(process.env.RAG_AST_CHUNK_ENABLED || 'true') !== 'false';
+    return String(process.env['RAG_AST_CHUNK_ENABLED'] || 'true') !== 'false';
 }
 
 function buildHeaderText(

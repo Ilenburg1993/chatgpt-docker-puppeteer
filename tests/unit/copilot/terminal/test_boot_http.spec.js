@@ -1,12 +1,12 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, vi } from 'vitest';
 
 import { runTerminalHttpServerPhase } from '../../../../src/copilot/terminal/terminal-phases/boot-http.js';
 
+/** @param {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext['startCopilotServer']} startCopilotServer */
 function makeCtx(startCopilotServer) {
     return /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
         bootConfig: {

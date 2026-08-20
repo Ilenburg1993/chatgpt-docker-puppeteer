@@ -199,7 +199,7 @@ ativa:
 2. Adicionar script em `package.json`:
 
 ```json
-"typecheck:strict:src.meu-modulo": "tsc -p config/typing/strict/tsconfig.strict.src.meu-modulo.json"
+"typecheck:strict:src.meu-modulo": "npm run -s tsc7 -- -p config/typing/strict/tsconfig.strict.src.meu-modulo.json"
 ```
 
 3. Adicionar ao `typecheck:strict:all` na cadeia de scripts.

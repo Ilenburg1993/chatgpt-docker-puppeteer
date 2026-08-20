@@ -245,8 +245,9 @@
   // ===========================================================================
   // Subfase 07.1) CodeLens e outline
   "editor.codeLens": true,
-  "geminicodeassist.outlines.automaticOutlineGeneration": true,
-  "gitlens.codeLens.enabled": true,
+  "geminicodeassist.outlines.automaticOutlineGeneration": false,
+  "gitlens.codeLens.enabled": false,
+  "gitlens.currentLine.enabled": false,
   "outline.showFiles": true,
   "outline.showFunctions": true,
   "outline.showModules": true,
@@ -278,6 +279,11 @@
   "eslint.enable": true,
   "eslint.format.enable": false,
   "eslint.lintTask.enable": true,
+  // O servidor ESLint do editor usa uma derivação sem projectService para não manter um segundo grafo TypeScript
+  // residente. CLI/CI continuam usando eslint.config.mjs canônico e todas as regras type-aware.
+  "eslint.options": {
+    "overrideConfigFile": "eslint.editor.config.mjs"
+  },
   "eslint.problems.shortenToSingleLine": true,
   "eslint.quiet": false,
   "eslint.rules.customizations": [
@@ -330,7 +336,6 @@
   "javascript.preferences.importModuleSpecifier": "shortest",
   "javascript.preferences.importModuleSpecifierEnding": "js",
   "javascript.preferences.quoteStyle": "single",
-  "javascript.referencesCodeLens.enabled": true,
   "javascript.suggest.autoImports": true,
   "javascript.suggest.completeFunctionCalls": true,
   "javascript.suggest.completeJSDocs": true,
@@ -350,77 +355,41 @@
   "js/ts.implicitProjectConfig.target": "ES2024",
 
   // ===========================================================================
-  // FASE 12) TYPESCRIPT — LANGUAGE FEATURES / TSSERVER
-  // Preferências de TypeScript, tsserver e diagnósticos.
+  // FASE 12) JS/TS — LANGUAGE FEATURES / TYPESCRIPT 7 NATIVO
+  // O DevContainer instala o cliente oficial TypeScript 7 (ID histórico `TypeScriptTeam.native-preview`) e ativa `js/ts.experimental.useTsgo`
+  // atomicamente no primeiro/rebuild. Esse caminho usa o servidor LSP nativo do TypeScript 7.
+  // As preferências `js/ts.*` abaixo configuram recursos editoriais suportados pelo cliente nativo;
+  // não constituem autorização para iniciar o daemon MCP local.
   //
-  // ARQUITETURA DO TSSERVER (VS Code):
-  //   • useSyntaxServer "auto" → inicia syntax server imediato (hover + coloração)
-  //     e promove ao semantic server completo em seguida (diagnósticos + navegação).
-  //     ⚠️  "always" desabilita TODO o servidor semântico — sem erros, sem go-to-def.
-  //   • nodePath "node" → tsserver usa o Node.js 24 do sistema (não o Electron interno).
-  //     Garante alinhamento com o runtime ESM do projeto.
-  //   • maxTsServerMemory 6144 → 6 GB para o heap do servidor TS. Cobre repositórios
-  //     grandes com multi-lane (tsconfig.node + tools + browser + strict).
-  //   • watchOptions "useFsEvents" → inotify nativo (ext4 bind-mount). Sem polling.
-  //     excludeDirectories reduz watches em ~60% (node_modules + cache + logs etc.).
+  // Não configure `js/ts.tsdk.path` para node_modules/typescript/lib: `typescript` neste repo é
+  // deliberadamente o pacote de compatibilidade TS6 exigido pelo typescript-eslint, enquanto o
+  // compiler principal TS7 está exposto como `tsc` por `@typescript/native`.
+  //
+  // Opções históricas `tsserver.*` permanecem apenas como preferências inertes/compatíveis do
+  // VS Code; o serviço selecionado e suportado neste workspace é o TypeScript 7 nativo.
   // ===========================================================================
-  // Subfase 12.1) TypeScript
-  "typescript.disableAutomaticTypeAcquisition": false,
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "typescript.implementationsCodeLens.enabled": true,
-  "typescript.implementationsCodeLens.showOnAllClassMethods": true,
-  "typescript.implementationsCodeLens.showOnInterfaceMethods": true,
-  "typescript.inlayHints.enumMemberValues.enabled": true,
-  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
-  "typescript.inlayHints.parameterNames.enabled": "literals",
-  "typescript.inlayHints.parameterTypes.enabled": true,
-  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
-  "typescript.inlayHints.variableTypes.enabled": true,
-  "typescript.preferences.importModuleSpecifier": "shortest",
-  "typescript.preferences.importModuleSpecifierEnding": "js",
-  "typescript.preferences.preferTypeOnlyAutoImports": true,
-  "typescript.preferences.includePackageJsonAutoImports": "on",
-  "typescript.preferences.useLabelDetailsInCompletionEntries": true,
-  "typescript.referencesCodeLens.enabled": true,
-  "typescript.referencesCodeLens.showOnAllFunctions": true,
-  "typescript.reportStyleChecksAsWarnings": true,
-  "typescript.suggest.autoImports": true,
-  "typescript.suggest.completeFunctionCalls": true,
-  "typescript.surveys.enabled": false,
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.tsserver.enableTracing": false,
-  "typescript.tsserver.experimental.enableProjectDiagnostics": true,
-  "typescript.tsserver.log": "off",
-  "typescript.tsserver.maxTsServerMemory": 6144,
-  // "auto" = syntax server imediato + semantic server completo em paralelo (correto).
-  // "always" desabilita o semantic server — NUNCA usar em projeto com checkJs/strict.
-  "typescript.tsserver.nodePath": "node",
-  "typescript.tsserver.useSyntaxServer": "auto",
-  "typescript.tsserver.watchOptions": {
-    "fallbackPolling": "dynamicPriorityPolling",
-    "watchDirectory": "useFsEvents",
-    "watchFile": "useFsEvents",
-    // Exclui diretórios pesados do file watcher do tsserver (reduz inotify watches ~60%).
-    // node_modules é excluído por maxNodeModuleJsDepth=0 no tsconfig, mas o watcher
-    // precisa ser configurado separadamente.
-    "excludeDirectories": [
-      "**/node_modules",
-      "**/.cache",
-      "**/logs",
-      "**/dist",
-      "**/build",
-      "**/backups",
-      "**/respostas",
-      "**/profile",
-      "**/artifacts",
-      "**/monitoring",
-      "**/tmp",
-      "**/.git"
-    ]
-  },
-  "typescript.workspaceSymbols.scope": "allOpenProjects",
-  "typescript.updateImportsOnFileMove.enabled": "always",
-  "typescript.validate.enable": true,
+  "js/ts.implementationsCodeLens.enabled": false,
+  "js/ts.referencesCodeLens.enabled": false,
+  "js/ts.inlayHints.enumMemberValues.enabled": true,
+  "js/ts.inlayHints.functionLikeReturnTypes.enabled": true,
+  "js/ts.inlayHints.parameterNames.enabled": "literals",
+  "js/ts.inlayHints.parameterTypes.enabled": true,
+  "js/ts.inlayHints.propertyDeclarationTypes.enabled": true,
+  "js/ts.inlayHints.variableTypes.enabled": true,
+  "js/ts.preferences.importModuleSpecifierEnding": "js",
+  "js/ts.preferences.includePackageJsonAutoImports": "auto",
+  "js/ts.preferences.preferTypeOnlyAutoImports": true,
+  "js/ts.preferGoToSourceDefinition": true,
+  "js/ts.suggest.completeFunctionCalls": true,
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+  "js/ts.tsserver.automaticTypeAcquisition.enabled": false,
+  "js/ts.tsserver.experimental.enableProjectDiagnostics": false,
+  "js/ts.tsserver.maxMemory": 3072,
+  "js/ts.tsserver.useSyntaxServer": "never",
+  "js/ts.tsserver.watchOptions": "vscode",
+  "js/ts.tsserver.tracing.enabled": false,
+  "js/ts.workspaceSymbols.excludeLibrarySymbols": true,
+  "js/ts.workspaceSymbols.scope": "currentProject",
 
   // ===========================================================================
   // FASE 13) JSON — FORMAT / VALIDATE / SCHEMAS
@@ -1009,10 +978,6 @@
   "kilo-code.preventCompletionWithOpenTodos": true,
   "makefile.configureOnOpen": false,
   "notebook.defaultFormatter": "esbenp.prettier-vscode",
-  "git-graph.repository.sign.tags": false,
-  "git-graph.repository.useMailmap": false,
-  "git-graph.date.format": "Date & Time",
-  "git-graph.dialog.addTag.pushToRemote": true,
   "github.copilot.chat.reviewSelection.instructions": [
     {
       "file": ".copilot-review-instructions.md"
@@ -1022,28 +987,6 @@
     "C:\\",
     "D:\\"
   ],
-  "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
-  "js/ts.tsserver.useSyntaxServer": "always",
-  "js/ts.tsserver.maxMemory": 6144,
-  "js/ts.preferences.preferTypeOnlyAutoImports": true,
-  "js/ts.preferences.importModuleSpecifierEnding": "js",
-  "js/ts.preferences.includePackageJsonAutoImports": "on",
-  "js/ts.updateImportsOnFileMove.enabled": "always",
-  "js/ts.preferGoToSourceDefinition": true,
-  "js/ts.suggest.completeFunctionCalls": true,
-  "js/ts.implementationsCodeLens.enabled": true,
-  "js/ts.implementationsCodeLens.showOnAllClassMethods": true,
-  "js/ts.implementationsCodeLens.showOnInterfaceMethods": true,
-  "js/ts.referencesCodeLens.enabled": true,
-  "js/ts.referencesCodeLens.showOnAllFunctions": true,
-  "js/ts.inlayHints.propertyDeclarationTypes.enabled": true,
-  "js/ts.inlayHints.parameterTypes.enabled": true,
-  "js/ts.inlayHints.functionLikeReturnTypes.enabled": true,
-  "js/ts.inlayHints.enumMemberValues.enabled": true,
-  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
-  "js/ts.inlayHints.variableTypes.enabled": true,
-  "js/ts.inlayHints.parameterNames.enabled": "literals",
-  "js/ts.tsdk.path": "node_modules/typescript/lib",
   "remoteHub.richNavigation.enabled": true,
   "remoteHub.richNavigation.indexMode": {},
   "remote.tunnels.tunnelCredentialCommand": null,
@@ -1109,7 +1052,6 @@
   "github.copilot.chat.gpt5AlternativePatch": true,
   "github.copilot.chat.inlineEdits.triggerOnEditorChangeAfterSeconds": 20,
   "github.copilot.chat.useResponsesApiTruncation": true,
-  "js/ts.tsserver.tracing.enabled": false,
   "chat.agent.sandbox.enabled": "off",
   "workbench.browser.openLocalhostLinks": true,
   "workbench.browser.showInTitleBar": true,

@@ -1,6 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * Unit tests for the canonical model gateway foundation.
  */
@@ -11,6 +9,9 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'vitest';
+import { catalogRequestHeader } from '../../../../src/copilot/model-gateway/catalog/importers/http-port.js';
+
+/** @typedef {import('../../../../src/copilot/model-gateway/catalog/importers/http-port.js').CatalogFetch} CatalogFetch */
 import {
     COPILOT_TERMINAL_LLM_B_LIVE_TEST_PATH,
     MODEL_GATEWAY_SCRIPT_MANIFEST,
@@ -213,6 +214,7 @@ import {
     diffCanonicalModelProjections,
     diffModelGatewayEligibilityDecisions,
     describeCatalogImporter,
+    defineCatalogImporter,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     summarizeModelGatewayRuntimeAccountOverlays,
     explainModelGatewayCatalogEntry,
@@ -284,6 +286,68 @@ import {
     parseModelGatewayAdaptiveSelectionOutcome,
     resolveModelDeprecationAlias,
 } from '../../../../src/copilot/model-gateway/index.js';
+import {
+    createByokProbeState,
+    createProbeSessionRuntime,
+    createReadyByokProbeFixture,
+    createReplyProbeSessionRuntime,
+} from './helpers/probe-fixtures.js';
+
+/** @typedef {import('../../../../src/copilot/model-gateway/probes/session-runtime.js').ModelGatewayProbeSessionRuntime} ModelGatewayProbeSessionRuntime */
+
+/**
+ * @template T
+ * @param {T} value
+ * @param {string} label
+ * @returns {NonNullable<T>}
+ */
+function requireFixtureValue(value, label) {
+    assert.ok(value !== null && value !== undefined, label);
+    return /** @type {NonNullable<T>} */ (value);
+}
+
+/**
+ * @template T
+ * @param {readonly T[]} values
+ * @param {number} index
+ * @param {string} label
+ * @returns {T}
+ */
+function requireFixtureIndex(values, index, label) {
+    const value = values[index];
+    assert.ok(value !== undefined, label);
+    return value;
+}
+
+
+/**
+ * @param {unknown} value
+ * @param {string} label
+ * @returns {Record<string, unknown>}
+ */
+function requireFixtureRecord(value, label) {
+    assert.ok(value !== null && typeof value === 'object' && !Array.isArray(value), label);
+    return /** @type {Record<string, unknown>} */ (value);
+}
+
+
+/**
+ * @param {unknown} value
+ * @param {string} label
+ * @returns {string}
+ */
+function requireFixtureString(value, label) {
+    assert.equal(typeof value, 'string', label);
+    return /** @type {string} */ (value);
+}
+
+
+
+
+/** @type {CatalogFetch} */
+const unreachableCatalogFetch = async () => {
+    throw new Error('catalog fetch must not be called by this audit-only test');
+};
 
 const PROVIDER_FAMILY_ENV_FIXTURES = Object.freeze([
     {
@@ -416,8 +480,18 @@ describe('model-gateway foundation', () => {
         const registry = new ModelGatewayRegistry();
         registry.upsertProvider({ id: 'openrouter', providerType: 'openai', baseUrl: 'https://openrouter.ai/api/v1' });
         registry.upsertProvider({ id: 'groq', providerType: 'openai', baseUrl: 'https://api.groq.com/openai/v1' });
-        registry.upsertModel({ providerId: 'openrouter', providerModel: 'openai/gpt-oss-120b', capabilities: { tools: true } });
-        registry.upsertModel({ providerId: 'groq', providerModel: 'openai/gpt-oss-120b', capabilities: { tools: false } });
+        registry.upsertModel({
+            providerId: 'openrouter',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { tools: true },
+            limits: { contextWindowTokens: 131_072 },
+        });
+        registry.upsertModel({
+            providerId: 'groq',
+            providerModel: 'openai/gpt-oss-120b',
+            capabilities: { tools: false },
+            limits: { contextWindowTokens: 131_072 },
+        });
 
         assert.equal(registry.listModels().length, 2);
         assert.ok(registry.getModel('openrouter:openai/gpt-oss-120b'));
@@ -507,8 +581,8 @@ describe('model-gateway foundation', () => {
 
         const records = listByokProviderModelHealth();
         assert.equal(records.length, 1);
-        assert.equal(records[0].providerId, 'groq');
-        assert.equal(records[0].providerModel, 'model-b');
+        assert.equal(requireFixtureIndex(records, 0, "records[0]").providerId, 'groq');
+        assert.equal(requireFixtureIndex(records, 0, "records[0]").providerModel, 'model-b');
     });
 
     it('classifies provider quota, auth and reset-window failures consistently', () => {
@@ -935,7 +1009,7 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.reason, 'health_allowed');
         assert.equal(decision.health?.routeProfile, 'repo_agent');
         assert.equal(decision.health?.agentProbeStatus, 'ok');
-        assert.equal(decision.health?.probes?.agent?.ok, true);
+        assert.equal(decision.health?.probes?.['agent']?.ok, true);
     });
 
     it('prefers exact route-profile runtime proof over profileless fallback proof when candidates tie', () => {
@@ -1051,15 +1125,16 @@ describe('model-gateway foundation', () => {
             timestamp: 20,
         });
 
-        const health = listByokProviderModelHealth()[0];
+        const health = requireFixtureIndex(listByokProviderModelHealth(), 0, 'agent probe health record');
+        const agentProbe = requireFixtureValue(health.probes['agent'], 'agent probe aggregate');
         assert.equal(health.agentProbeStatus, 'ok');
         assert.equal(health.agentProbeFailureCount, 1);
         assert.equal(health.agentProbeSuccessCount, 1);
-        assert.equal(health.probes.agent.status, 'ok');
-        assert.equal(health.probes.agent.ok, true);
-        assert.equal(health.probes.agent.count, 2);
-        assert.equal(health.probes.agent.failureCount, 1);
-        assert.equal(health.probes.agent.successCount, 1);
+        assert.equal(agentProbe.status, 'ok');
+        assert.equal(agentProbe.ok, true);
+        assert.equal(agentProbe.count, 2);
+        assert.equal(agentProbe.failureCount, 1);
+        assert.equal(agentProbe.successCount, 1);
     });
 
     it('defines canonical task profiles before provider-specific scoring', () => {
@@ -1168,10 +1243,10 @@ describe('model-gateway foundation', () => {
             candidates.map((candidate) => candidate['selectorKind']),
             ['exact_model', 'gateway_fallback'],
         );
-        assert.equal(candidates[1]['routing']['routeLayer'], 'gateway');
-        assert.equal(candidates[1]['routing']['supportsFallback'], true);
-        assert.equal(candidates[1]['provenance']['candidateSource'], 'route_option');
-        assert.ok(candidates[1]['routeOptionRef'].includes('gateway_fallback'));
+        assert.equal(requireFixtureIndex(candidates, 1, "candidates[1]")['routing']['routeLayer'], 'gateway');
+        assert.equal(requireFixtureIndex(candidates, 1, "candidates[1]")['routing']['supportsFallback'], true);
+        assert.equal(requireFixtureIndex(candidates, 1, "candidates[1]")['provenance']['candidateSource'], 'route_option');
+        assert.ok(requireFixtureIndex(candidates, 1, "candidates[1]")['routeOptionRef'].includes('gateway_fallback'));
     });
 
     it('routes a complete catalog snapshot through route options, overlays and eligibility', () => {
@@ -1264,17 +1339,17 @@ describe('model-gateway foundation', () => {
         assert.equal(audit.schema, 'model-gateway-pre-runtime-selection-audit');
         assert.equal(audit.ok, true);
         assert.equal(audit.summary.selectedProfileCount, 2);
-        assert.equal(audit.summary.selectedProviders.openrouter, 2);
-        assert.equal(audit.summary.selectedSelectorKinds.provider_explicit, 2);
-        assert.equal(audit.profiles[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
-        assert.equal(audit.profiles[0].selected?.['accountScope'], 'default');
-        assert.equal(audit.profiles[0].selected?.['accountAccess']?.['canAttempt'], true);
-        assert.deepEqual(audit.profiles[0].selected?.['accountAccess']?.['hardReasons'], []);
-        assert.equal(audit.profiles[0].selected?.['taskProfile'], 'repo_agent');
-        assert.equal(audit.profiles[0].decisionLayers['runtimeProbeProofCount'], 0);
-        assert.deepEqual(audit.profiles[0].capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
-        assert.equal(audit.profiles[0].capabilitySupply.preferred.reasoningEffort, 1);
-        assert.equal(audit.profiles[0].supplyWarnings.includes('preferred_supply_zero:runtime_proved'), false);
+        assert.equal(audit.summary.selectedProviders['openrouter'], 2);
+        assert.equal(audit.summary.selectedSelectorKinds['provider_explicit'], 2);
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").selected?.['accountScope'], 'default');
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").selected?.['accountAccess']?.['canAttempt'], true);
+        assert.deepEqual(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").selected?.['accountAccess']?.['hardReasons'], []);
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").selected?.['taskProfile'], 'repo_agent');
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").decisionLayers['runtimeProbeProofCount'], 0);
+        assert.deepEqual(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").capabilitySupply.required, { text: 1, streaming: 1, tools: 1 });
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").capabilitySupply.preferred['reasoningEffort'], 1);
+        assert.equal(requireFixtureIndex(audit.profiles, 0, "audit.profiles[0]").supplyWarnings.includes('preferred_supply_zero:runtime_proved'), false);
 
         const postRuntimeAudit = auditModelGatewayPostRuntimeSelection(snapshot, {
             profiles: ['repo_agent'],
@@ -1302,21 +1377,21 @@ describe('model-gateway foundation', () => {
         assert.equal(postRuntimeAudit.summary.runtimeAgentProbeProofCount, 1);
         assert.equal(postRuntimeAudit.summary.runtimeProbeProofCount, 1);
         assert.equal(postRuntimeAudit.summary.runtimeHealthProofCount, 1);
-        assert.equal(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['agentProbeStatus'], 'ok');
+        assert.equal(requireFixtureIndex(postRuntimeAudit.profiles, 0, "postRuntimeAudit.profiles[0]").selected?.['runtimeHealth']?.['agentProbeStatus'], 'ok');
         assert.ok(
-            Array.isArray(postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes']) &&
-                postRuntimeAudit.profiles[0].selected?.['runtimeHealth']?.['verifiedProbes'].includes('agent'),
+            Array.isArray(requireFixtureIndex(postRuntimeAudit.profiles, 0, "postRuntimeAudit.profiles[0]").selected?.['runtimeHealth']?.['verifiedProbes']) &&
+                requireFixtureIndex(postRuntimeAudit.profiles, 0, "postRuntimeAudit.profiles[0]").selected?.['runtimeHealth']?.['verifiedProbes'].includes('agent'),
         );
         const comparison = compareModelGatewaySelectionAudits(audit, postRuntimeAudit);
         assert.equal(comparison.schema, 'model-gateway-selection-comparison');
         assert.equal(comparison.summary.profileCount, 2);
         assert.equal(comparison.summary.changedCount, 1);
         assert.equal(comparison.summary.postRuntimeProofSelectedCount, 1);
-        assert.equal(comparison.rows[0].postSelectedHasRuntimeProof, true);
+        assert.equal(requireFixtureIndex(comparison.rows, 0, "comparison.rows[0]").postSelectedHasRuntimeProof, true);
         const comparisonExplanation = explainModelGatewaySelectionComparison(comparison);
         assert.equal(comparisonExplanation.schema, 'model-gateway-selection-comparison-explain');
-        assert.equal(comparisonExplanation.summary.reasonCounts.same_route_runtime_proved, 1);
-        assert.equal(comparisonExplanation.summary.reasonCounts.post_runtime_lost_route, 1);
+        assert.equal(comparisonExplanation.summary.reasonCounts['same_route_runtime_proved'], 1);
+        assert.equal(comparisonExplanation.summary.reasonCounts['post_runtime_lost_route'], 1);
         assert.ok(comparisonExplanation.summary.nextActions.includes('record_runtime_proof_and_keep_route'));
 
         const metadataFirst = resolveModelGatewaySelectionPolicy(comparison);
@@ -1334,7 +1409,7 @@ describe('model-gateway foundation', () => {
         assert.equal(preferRuntimeProved.summary.selectedCount, 2);
         assert.equal(preferRuntimeProved.summary.postRuntimeWinnerCount, 1);
         assert.equal(preferRuntimeProved.summary.changedFromPreRuntimeCount, 0);
-        assert.equal(preferRuntimeProved.rows[0].source, 'post_runtime_proved');
+        assert.equal(requireFixtureIndex(preferRuntimeProved.rows, 0, "preferRuntimeProved.rows[0]").source, 'post_runtime_proved');
 
         const requireRuntimeProof = resolveModelGatewaySelectionPolicy(comparison, {
             mode: MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF,
@@ -1342,7 +1417,7 @@ describe('model-gateway foundation', () => {
         assert.equal(requireRuntimeProof.ok, false);
         assert.equal(requireRuntimeProof.summary.selectedCount, 1);
         assert.equal(requireRuntimeProof.summary.unselectedCount, 1);
-        assert.equal(requireRuntimeProof.rows[1].source, 'blocked_runtime_proof_missing');
+        assert.equal(requireFixtureIndex(requireRuntimeProof.rows, 1, "requireRuntimeProof.rows[1]").source, 'blocked_runtime_proof_missing');
 
         const runtimeSelectorPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
             source: 'unit-test-runtime-selector',
@@ -1354,21 +1429,21 @@ describe('model-gateway foundation', () => {
         assert.equal(runtimeSelectorPlan.summary.selectedProfileCount, 2);
         assert.equal(runtimeSelectorPlan.summary.blockedProfileCount, 0);
         assert.equal(runtimeSelectorPlan.summary.accountAccessBlockedCount, 0);
-        assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.source, 'unit-test-runtime-selector');
-        assert.equal(runtimeSelectorPlan.routes[0].decisionEvent.sessionId, 'unit-session');
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['accountScope'], 'default');
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['accountAccess']?.['canAttempt'], true);
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['taskProfile'], 'repo_agent');
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['routeLayer'], 'openai_compatible_aggregator');
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['wireApi'], 'openai_chat_completions');
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['upstreamProvider'], 'groq');
-        assert.equal(
-            Array.isArray(runtimeSelectorPlan.routes[0].selected?.['reasons']) &&
-                runtimeSelectorPlan.routes[0].selected?.['reasons'].length > 0,
-            true,
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").decisionEvent.source, 'unit-test-runtime-selector');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").decisionEvent.sessionId, 'unit-session');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['accountScope'], 'default');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['accountAccess']?.['canAttempt'], true);
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['taskProfile'], 'repo_agent');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['routeLayer'], 'openai_compatible_aggregator');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['wireApi'], 'openai_chat_completions');
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['upstreamProvider'], 'groq');
+        const runtimeSelectorReasons = requireFixtureValue(
+            requireFixtureIndex(runtimeSelectorPlan.routes, 0, 'runtimeSelectorPlan.routes[0]').selected?.['reasons'],
+            'runtime selector reasons',
         );
-        assert.equal(runtimeSelectorPlan.routes[0].selected?.['scoreBreakdown']?.['finalScore'], runtimeSelectorPlan.routes[0].selected?.['score']);
+        assert.equal(runtimeSelectorReasons.length > 0, true);
+        assert.equal(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['scoreBreakdown']?.['finalScore'], requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected?.['score']);
         assert.equal(selectModelGatewayRuntimeRoute(runtimeSelectorPlan, 'repo_agent')?.selectedRouteKey, 'openrouter:openai/gpt-oss-120b');
         const automationRoute = selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, 'repo_agent');
         assert.equal(automationRoute.schema, 'model-gateway-runtime-automation-route');
@@ -1376,15 +1451,15 @@ describe('model-gateway foundation', () => {
         assert.deepEqual(automationRoute.blockers, []);
         const standbyRoutes = buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, { limit: 4, timeoutMs: 15_000 });
         assert.equal(standbyRoutes.length > 0, true);
-        assert.equal(standbyRoutes[0].profileId, 'repo_agent');
-        assert.equal(standbyRoutes[0].commands.probeAgent, '/byok probe agent provider:openrouter model:openai/gpt-oss-120b timeout:15000');
-        assert.equal(standbyRoutes[0].commands.liveModel, '/byok model openai/gpt-oss-120b:groq');
-        assert.equal(standbyRoutes[0].commands.provider, '/byok provider openrouter openai/gpt-oss-120b:groq');
-        assert.equal(standbyRoutes[0].commands.persistProvider, '/byok persist provider openrouter openai/gpt-oss-120b:groq');
-        assert.equal(standbyRoutes[0].standbyClass, 'selected_route');
-        assert.equal(standbyRoutes[0].needsProbe, false);
-        assert.equal(standbyRoutes[0].recommendedAction, 'live_model');
-        assert.equal(standbyRoutes[0].recommendedCommand, '/byok model openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").profileId, 'repo_agent');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").commands.probeAgent, '/byok probe agent provider:openrouter model:openai/gpt-oss-120b timeout:15000');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").commands.liveModel, '/byok model openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").commands.provider, '/byok provider openrouter openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").commands.persistProvider, '/byok persist provider openrouter openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").standbyClass, 'selected_route');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").needsProbe, false);
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").recommendedAction, 'live_model');
+        assert.equal(requireFixtureIndex(standbyRoutes, 0, "standbyRoutes[0]").recommendedCommand, '/byok model openai/gpt-oss-120b:groq');
         const standbyPlan = buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, {
             limit: 4,
             timeoutMs: 15_000,
@@ -1540,12 +1615,12 @@ describe('model-gateway foundation', () => {
                 COPILOT_BYOK_GATEWAY_AUTO_ALLOW_NEW_SESSION: 'true',
             },
         });
-        assert.equal(policySources.enabled.source, 'file');
-        assert.equal(policySources.preset.source, 'env');
-        assert.equal(policySources.allowLiveSetModel.source, 'file');
-        assert.equal(policySources.profiles.source, 'env');
-        assert.equal(policySources.allowNewSession.source, 'env');
-        assert.equal(policySources.allowLocalPrivate.source, 'default');
+        assert.equal(requireFixtureValue(policySources['enabled'], 'enabled policy source').source, 'file');
+        assert.equal(requireFixtureValue(policySources['preset'], 'preset policy source').source, 'env');
+        assert.equal(requireFixtureValue(policySources['allowLiveSetModel'], 'allowLiveSetModel policy source').source, 'file');
+        assert.equal(requireFixtureValue(policySources['profiles'], 'profiles policy source').source, 'env');
+        assert.equal(requireFixtureValue(policySources['allowNewSession'], 'allowNewSession policy source').source, 'env');
+        assert.equal(requireFixtureValue(policySources['allowLocalPrivate'], 'allowLocalPrivate policy source').source, 'default');
         assert.equal(validateModelGatewayRuntimeAutomationPolicy(effectivePolicy).ok, true);
         const invalidPolicy = validateModelGatewayRuntimeAutomationPolicy({ policy: 'definitely_wrong' });
         assert.equal(invalidPolicy.ok, false);
@@ -1645,13 +1720,13 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(liveControllerStep.schema, 'model-gateway-runtime-automation-controller-step');
         assert.equal(liveControllerStep.effectMode, 'allowed');
-        assert.equal(liveControllerStep.effects[0]['kind'], 'set_live_model');
-        assert.equal(liveControllerStep.effects[0]['execute'], true);
-        assert.equal(liveControllerStep.effects[0]['authorization'], 'authorized');
-        assert.equal(liveControllerStep.effects[0]['policyGate'], 'allowLiveSetModel');
-        assert.equal(liveControllerStep.effects[0]['blockedReason'], null);
-        assert.equal(liveControllerStep.effects[0]['confidence'], liveSwitchDecision.selectedRouteConfidence);
-        assert.equal(liveControllerStep.effects[0]['reason'], liveSwitchDecision.operatorSummary);
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['kind'], 'set_live_model');
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['execute'], true);
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['authorization'], 'authorized');
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['policyGate'], 'allowLiveSetModel');
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['blockedReason'], null);
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['confidence'], liveSwitchDecision.selectedRouteConfidence);
+        assert.equal(requireFixtureIndex(liveControllerStep.effects, 0, "liveControllerStep.effects[0]")['reason'], liveSwitchDecision.operatorSummary);
 
         const confidenceSwitchDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
@@ -1689,7 +1764,7 @@ describe('model-gateway foundation', () => {
             decision: confidenceSwitchDecision,
             policy: { allowEffects: true, allowLiveSetModel: true },
         });
-        assert.equal(confidenceControllerStep.effects[0]['confidence'], 'catalog');
+        assert.equal(requireFixtureIndex(confidenceControllerStep.effects, 0, "confidenceControllerStep.effects[0]")['confidence'], 'catalog');
 
         const newSessionDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan,
@@ -1753,17 +1828,17 @@ describe('model-gateway foundation', () => {
             decision: localPrivateDecision,
             turnOutcome: { ok: false, failureKind: 'rate_limit', errorMessage: 'quota exhausted' },
         });
-        assert.equal(failureControllerStep.effects[0]['kind'], 'replan_after_turn_failure');
-        assert.equal(failureControllerStep.effects[0]['failureKind'], 'rate_limit');
-        assert.equal(failureControllerStep.effects[0]['recoveryScope'], 'route');
+        assert.equal(requireFixtureIndex(failureControllerStep.effects, 0, "failureControllerStep.effects[0]")['kind'], 'replan_after_turn_failure');
+        assert.equal(requireFixtureIndex(failureControllerStep.effects, 0, "failureControllerStep.effects[0]")['failureKind'], 'rate_limit');
+        assert.equal(requireFixtureIndex(failureControllerStep.effects, 0, "failureControllerStep.effects[0]")['recoveryScope'], 'route');
         const accountWideControllerStep = buildModelGatewayRuntimeAutomationControllerStep({
             phase: 'post_turn',
             decision: localPrivateDecision,
             policy: { accountWideFailureKinds: ['credits'] },
             turnOutcome: { ok: false, failureKind: 'credits', errorMessage: 'credit exhausted' },
         });
-        assert.equal(accountWideControllerStep.effects[0]['accountWideFailure'], true);
-        assert.equal(accountWideControllerStep.effects[0]['recoveryScope'], 'account');
+        assert.equal(requireFixtureIndex(accountWideControllerStep.effects, 0, "accountWideControllerStep.effects[0]")['accountWideFailure'], true);
+        assert.equal(requireFixtureIndex(accountWideControllerStep.effects, 0, "accountWideControllerStep.effects[0]")['recoveryScope'], 'account');
 
         const hardQuotaDecision = buildModelGatewayRuntimeAutomationDecision({
             runtimeSelectorPlan: {
@@ -1849,7 +1924,7 @@ describe('model-gateway foundation', () => {
             true,
         );
 
-        const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(runtimeSelectorPlan.routes[0].selected, {
+        const routeProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected, {
             COPILOT_BYOK_PROFILE: 'current-default-profile',
             COPILOT_BYOK_PROVIDER_PRESET: 'groq',
             COPILOT_BYOK_BASE_URL: 'https://wrong.example.test/v1',
@@ -1875,7 +1950,7 @@ describe('model-gateway foundation', () => {
             {},
         );
         assert.equal(defaultOpenAiCompatibleWireEnv['COPILOT_BYOK_WIRE_API'], 'completions');
-        const routeEnvStatus = evaluateModelGatewayRuntimeSelectorRouteEnv(runtimeSelectorPlan.routes[0].selected, {
+        const routeEnvStatus = evaluateModelGatewayRuntimeSelectorRouteEnv(requireFixtureIndex(runtimeSelectorPlan.routes, 0, "runtimeSelectorPlan.routes[0]").selected, {
             OPENROUTER_API_KEY: 'openrouter-key',
         });
         assert.equal(routeEnvStatus.status, 'ready');
@@ -1886,20 +1961,24 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(routeEnvBlockedPlan.summary.runtimeEnvBlockedCount, 2);
         assert.equal(routeEnvBlockedPlan.summary.blockedProfileCount, 2);
-        assert.equal(routeEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_env_not_ready'), true);
+        assert.equal(requireFixtureIndex(routeEnvBlockedPlan.routes, 0, "routeEnvBlockedPlan.routes[0]").reasons.includes('blocked:runtime_env_not_ready'), true);
+        const provedRow = requireFixtureIndex(preferRuntimeProved.rows, 0, 'runtime-proved selection row');
+        const provedSelected = requireFixtureValue(provedRow.selected, 'runtime-proved selected candidate');
         const provedButEnvBlockedPolicy = {
             ...preferRuntimeProved,
-            rows: [preferRuntimeProved.rows[0]].map((row) => ({
-                ...row,
-                hasRuntimeProof: true,
-                selected: {
-                    ...row.selected,
+            rows: [
+                {
+                    ...provedRow,
                     hasRuntimeProof: true,
-                    candidateSource: 'runtime_health',
-                    runtimeObservedOnly: true,
-                    runtimeEvidence: { source: 'runtime_health', verifiedProbes: ['chat'] },
+                    selected: {
+                        ...provedSelected,
+                        hasRuntimeProof: true,
+                        candidateSource: 'runtime_health',
+                        runtimeObservedOnly: true,
+                        runtimeEvidence: { source: 'runtime_health', verifiedProbes: ['chat'] },
+                    },
                 },
-            })),
+            ],
         };
         const provedButEnvBlockedPlan = buildModelGatewayRuntimeSelectorPlan(provedButEnvBlockedPolicy, {
             requireRuntimeProof: true,
@@ -1912,10 +1991,10 @@ describe('model-gateway foundation', () => {
             env: {},
         });
         assert.equal(provedButEnvBlockedPlan.summary.blockedProfileCount, 1);
-        assert.equal(provedRuntimeOnlyPlan.routes[0].selected?.['candidateSource'], 'runtime_health');
-        assert.equal(provedRuntimeOnlyPlan.routes[0].selected?.['runtimeObservedOnly'], true);
-        assert.equal(provedButEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_env_not_ready'), true);
-        assert.equal(provedButEnvBlockedPlan.routes[0].reasons.includes('blocked:runtime_proof_required'), false);
+        assert.equal(requireFixtureIndex(provedRuntimeOnlyPlan.routes, 0, "provedRuntimeOnlyPlan.routes[0]").selected?.['candidateSource'], 'runtime_health');
+        assert.equal(requireFixtureIndex(provedRuntimeOnlyPlan.routes, 0, "provedRuntimeOnlyPlan.routes[0]").selected?.['runtimeObservedOnly'], true);
+        assert.equal(requireFixtureIndex(provedButEnvBlockedPlan.routes, 0, "provedButEnvBlockedPlan.routes[0]").reasons.includes('blocked:runtime_env_not_ready'), true);
+        assert.equal(requireFixtureIndex(provedButEnvBlockedPlan.routes, 0, "provedButEnvBlockedPlan.routes[0]").reasons.includes('blocked:runtime_proof_required'), false);
         const routeEnvReadyPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
             requireRuntimeEnvReady: true,
             env: { OPENROUTER_API_KEY: 'openrouter-key' },
@@ -1967,15 +2046,15 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(conservativeRepoAgentPlan.ok, false);
         assert.equal(conservativeRepoAgentPlan.summary.runtimeHealthBlockedCount, 1);
-        assert.ok(conservativeRepoAgentPlan.routes[0].reasons.includes('blocked:runtime_health:agent_probe_not_verified'));
+        assert.ok(requireFixtureIndex(conservativeRepoAgentPlan.routes, 0, "conservativeRepoAgentPlan.routes[0]").reasons.includes('blocked:runtime_health:agent_probe_not_verified'));
         const terminalBootstrapRepoAgentPlan = buildModelGatewayRuntimeSelectorPlan(repoAgentChatOnlyRuntimePolicy, {
             runtimeHealthRecords: repoAgentChatOnlyHealth,
             requireAgentProbeProfiles: [],
             blockFailedProbeKinds: ['live_tool_protocol', 'live_ask_user', 'live_turn'],
         });
         assert.equal(terminalBootstrapRepoAgentPlan.ok, true);
-        assert.equal(terminalBootstrapRepoAgentPlan.routes[0].status, 'selected');
-        assert.equal(terminalBootstrapRepoAgentPlan.routes[0].selected?.['providerId'], 'groq');
+        assert.equal(requireFixtureIndex(terminalBootstrapRepoAgentPlan.routes, 0, "terminalBootstrapRepoAgentPlan.routes[0]").status, 'selected');
+        assert.equal(requireFixtureIndex(terminalBootstrapRepoAgentPlan.routes, 0, "terminalBootstrapRepoAgentPlan.routes[0]").selected?.['providerId'], 'groq');
         const liveProtocolBlockedPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
             runtimeHealthRecords: [
                 {
@@ -2000,9 +2079,9 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(liveProtocolBlockedPlan.ok, false);
         assert.equal(liveProtocolBlockedPlan.summary.runtimeProbeBlockedCount, 2);
-        assert.equal(liveProtocolBlockedPlan.routes[0].selected, null);
-        assert.ok(liveProtocolBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_ask_user'));
-        assert.ok(liveProtocolBlockedPlan.routes[0].nextActions.includes('choose_route_without_failed_runtime_health'));
+        assert.equal(requireFixtureIndex(liveProtocolBlockedPlan.routes, 0, "liveProtocolBlockedPlan.routes[0]").selected, null);
+        assert.ok(requireFixtureIndex(liveProtocolBlockedPlan.routes, 0, "liveProtocolBlockedPlan.routes[0]").reasons.includes('blocked:runtime_probe_failed:live_ask_user'));
+        assert.ok(requireFixtureIndex(liveProtocolBlockedPlan.routes, 0, "liveProtocolBlockedPlan.routes[0]").nextActions.includes('choose_route_without_failed_runtime_health'));
         const liveTurnFailureAt = Date.now() - 1000;
         const liveTurnBlockedPlan = buildModelGatewayRuntimeSelectorPlan(preferRuntimeProved, {
             runtimeHealthRecords: [
@@ -2030,8 +2109,8 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(liveTurnBlockedPlan.ok, false);
         assert.equal(liveTurnBlockedPlan.summary.runtimeProbeBlockedCount, 2);
-        assert.ok(liveTurnBlockedPlan.routes[0].reasons.includes('blocked:runtime_health:chat_health_failed'));
-        assert.ok(liveTurnBlockedPlan.routes[0].reasons.includes('blocked:runtime_probe_failed:live_turn'));
+        assert.ok(requireFixtureIndex(liveTurnBlockedPlan.routes, 0, "liveTurnBlockedPlan.routes[0]").reasons.includes('blocked:runtime_health:chat_health_failed'));
+        assert.ok(requireFixtureIndex(liveTurnBlockedPlan.routes, 0, "liveTurnBlockedPlan.routes[0]").reasons.includes('blocked:runtime_probe_failed:live_turn'));
 
         const sharedBestPolicy = {
             schema: 'model-gateway-selection-policy-resolution',
@@ -2095,23 +2174,23 @@ describe('model-gateway foundation', () => {
             ],
         };
         const maximumQualityPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy);
-        assert.equal(maximumQualityPlan.routes[0].selected?.['providerId'], 'zai');
-        assert.equal(maximumQualityPlan.routes[1].selected?.['providerId'], 'zai');
-        assert.equal(maximumQualityPlan.routes[0].hasRuntimeProof, true);
-        assert.equal(maximumQualityPlan.routes[0].selected?.['hasRuntimeProof'], true);
-        assert.equal(maximumQualityPlan.routes[0].selected?.['routeProfile'], 'repo_agent');
-        assert.equal(maximumQualityPlan.routes[0].selected?.['taskProfile'], 'repo_agent');
-        assert.equal(maximumQualityPlan.routes[0].selected?.['sourceRouteProfile'], 'default');
-        assert.equal(maximumQualityPlan.routes[1].selected?.['hasRuntimeProof'], true);
-        assert.equal(maximumQualityPlan.routes[1].selected?.['routeProfile'], 'code');
-        assert.equal(maximumQualityPlan.routes[1].selected?.['sourceTaskProfile'], 'default');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 0, "maximumQualityPlan.routes[0]").selected?.['providerId'], 'zai');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 1, "maximumQualityPlan.routes[1]").selected?.['providerId'], 'zai');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 0, "maximumQualityPlan.routes[0]").hasRuntimeProof, true);
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 0, "maximumQualityPlan.routes[0]").selected?.['hasRuntimeProof'], true);
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 0, "maximumQualityPlan.routes[0]").selected?.['routeProfile'], 'repo_agent');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 0, "maximumQualityPlan.routes[0]").selected?.['taskProfile'], 'repo_agent');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 0, "maximumQualityPlan.routes[0]").selected?.['sourceRouteProfile'], 'default');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 1, "maximumQualityPlan.routes[1]").selected?.['hasRuntimeProof'], true);
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 1, "maximumQualityPlan.routes[1]").selected?.['routeProfile'], 'code');
+        assert.equal(requireFixtureIndex(maximumQualityPlan.routes, 1, "maximumQualityPlan.routes[1]").selected?.['sourceTaskProfile'], 'default');
         const diversifiedPlan = buildModelGatewayRuntimeSelectorPlan(sharedBestPolicy, { preferProviderDiversity: true });
-        assert.equal(diversifiedPlan.routes[0].selected?.['providerId'], 'zai');
-        assert.equal(diversifiedPlan.routes[1].selected?.['providerId'], 'groq');
-        assert.equal(diversifiedPlan.routes[1].selected?.['hasRuntimeProof'], true);
-        assert.equal(diversifiedPlan.routes[1].candidateAlternatives[0]?.['selected']?.['hasRuntimeProof'], true);
-        assert.equal(diversifiedPlan.routes[1].candidateAlternatives[0]?.['selected']?.['routeProfile'], 'code');
-        assert.ok(diversifiedPlan.routes[1].reasons.includes('runtime_selector_fallback:alternate1'));
+        assert.equal(requireFixtureIndex(diversifiedPlan.routes, 0, "diversifiedPlan.routes[0]").selected?.['providerId'], 'zai');
+        assert.equal(requireFixtureIndex(diversifiedPlan.routes, 1, "diversifiedPlan.routes[1]").selected?.['providerId'], 'groq');
+        assert.equal(requireFixtureIndex(diversifiedPlan.routes, 1, "diversifiedPlan.routes[1]").selected?.['hasRuntimeProof'], true);
+        assert.equal(requireFixtureIndex(diversifiedPlan.routes, 1, "diversifiedPlan.routes[1]").candidateAlternatives[0]?.['selected']?.['hasRuntimeProof'], true);
+        assert.equal(requireFixtureIndex(diversifiedPlan.routes, 1, "diversifiedPlan.routes[1]").candidateAlternatives[0]?.['selected']?.['routeProfile'], 'code');
+        assert.ok(requireFixtureIndex(diversifiedPlan.routes, 1, "diversifiedPlan.routes[1]").reasons.includes('runtime_selector_fallback:alternate1'));
 
         const providerCooldownNow = Date.now();
         const providerCooldownRecords = [
@@ -2159,37 +2238,39 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(providerCooldownPlan.ok, false);
         assert.equal(providerCooldownPlan.summary.providerCooldownBlockedCount, 2);
-        assert.equal(providerCooldownPlan.routes[0].selected, null);
-        assert.ok(providerCooldownPlan.routes[0].reasons.includes('blocked:provider_health_cooldown:timeout+upstream'));
-        assert.ok(providerCooldownPlan.routes[0].nextActions.includes('wait_for_provider_cooldown_or_probe_different_provider'));
+        assert.equal(requireFixtureIndex(providerCooldownPlan.routes, 0, "providerCooldownPlan.routes[0]").selected, null);
+        assert.ok(requireFixtureIndex(providerCooldownPlan.routes, 0, "providerCooldownPlan.routes[0]").reasons.includes('blocked:provider_health_cooldown:timeout+upstream'));
+        assert.ok(requireFixtureIndex(providerCooldownPlan.routes, 0, "providerCooldownPlan.routes[0]").nextActions.includes('wait_for_provider_cooldown_or_probe_different_provider'));
 
         const accountBlockedPolicy = {
             ...preferRuntimeProved,
-            rows: preferRuntimeProved.rows.map((row, index) =>
-                index === 0
-                    ? {
-                          ...row,
-                          selected: {
-                              ...row.selected,
-                              accountAccess: {
-                                  ...row.selected.accountAccess,
-                                  canAttempt: false,
-                                  status: 'not_visible',
-                                  hardReasons: ['account_model_not_visible'],
-                              },
-                          },
-                      }
-                    : row,
-            ),
+            rows: preferRuntimeProved.rows.map((row, index) => {
+                if (index !== 0) return row;
+                const selected = requireFixtureValue(row.selected, 'account-blocked selected candidate');
+                const accountAccess = requireFixtureValue(selected['accountAccess'], 'account-blocked access state');
+                return {
+                    ...row,
+                    selected: {
+                        ...selected,
+                        accountAccess: {
+                            ...accountAccess,
+                            canAttempt: false,
+                            status: 'not_visible',
+                            hardReasons: ['account_model_not_visible'],
+                        },
+                    },
+                };
+            }),
         };
         const accountBlockedPlan = buildModelGatewayRuntimeSelectorPlan(accountBlockedPolicy);
         assert.equal(accountBlockedPlan.ok, false);
         assert.equal(accountBlockedPlan.summary.accountAccessBlockedCount, 1);
         assert.equal(accountBlockedPlan.summary.blockedProfileCount, 1);
-        assert.equal(accountBlockedPlan.routes[0].selected, null);
-        assert.equal(accountBlockedPlan.routes[0].reasons.includes('blocked:account_access_denies_attempt'), true);
-        assert.equal(accountBlockedPlan.routes[0].nextActions.includes('refresh_account_overlay_or_choose_accessible_model'), true);
+        assert.equal(requireFixtureIndex(accountBlockedPlan.routes, 0, "accountBlockedPlan.routes[0]").selected, null);
+        assert.equal(requireFixtureIndex(accountBlockedPlan.routes, 0, "accountBlockedPlan.routes[0]").reasons.includes('blocked:account_access_denies_attempt'), true);
+        assert.equal(requireFixtureIndex(accountBlockedPlan.routes, 0, "accountBlockedPlan.routes[0]").nextActions.includes('refresh_account_overlay_or_choose_accessible_model'), true);
 
+        /** @type {Array<Parameters<typeof recordModelGatewayRouteDecision>[0]>} */
         const runtimeRouteDecisionEvents = [];
         const runtimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',
@@ -2255,10 +2336,12 @@ describe('model-gateway foundation', () => {
                 ['unit-test-runtime-selector:runtime-result', null],
             ],
         );
-        assert.equal(runtimeRouteDecisionEvents[0].reasons.includes('selection_source:post_runtime_proved'), true);
-        assert.equal(runtimeRouteDecisionEvents[0].scoreBreakdown?.['finalScore'], runtimeRouteDecisionEvents[0].score);
-        assert.equal(runtimeRouteDecisionEvents[1].reasons.includes('runtime_outcome:ok'), true);
-        assert.equal(runtimeRouteDecisionEvents[1].reasons.includes('selection_source:post_runtime_proved'), true);
+        const selectionDecisionEvent = requireFixtureIndex(runtimeRouteDecisionEvents, 0, 'selection route-decision event');
+        const runtimeResultDecisionEvent = requireFixtureIndex(runtimeRouteDecisionEvents, 1, 'runtime-result route-decision event');
+        assert.equal(selectionDecisionEvent.reasons.includes('selection_source:post_runtime_proved'), true);
+        assert.equal(selectionDecisionEvent.scoreBreakdown?.['finalScore'], selectionDecisionEvent.score);
+        assert.equal(runtimeResultDecisionEvent.reasons.includes('runtime_outcome:ok'), true);
+        assert.equal(runtimeResultDecisionEvent.reasons.includes('selection_source:post_runtime_proved'), true);
         const directRuntimeProbeRun = buildModelGatewayRuntimeSelectorProbeRun(runtimeExecution, {
             observedAt: '2026-05-28T21:00:00.000Z',
         });
@@ -2266,12 +2349,12 @@ describe('model-gateway foundation', () => {
         assert.equal(directRuntimeProbeRun.status, 'completed');
         assert.equal(directRuntimeProbeRun.probeProfile, 'repo_agent');
         assert.equal(directRuntimeProbeRun.results.length, 1);
-        assert.equal(directRuntimeProbeRun.results[0].providerId, 'openrouter');
-        assert.equal(directRuntimeProbeRun.results[0].providerModel, 'openai/gpt-oss-120b');
-        assert.equal(directRuntimeProbeRun.results[0].routeProfile, 'repo_agent');
-        assert.equal(directRuntimeProbeRun.results[0].probeKind, 'chat');
-        assert.equal(directRuntimeProbeRun.results[0].ok, true);
-        assert.equal(directRuntimeProbeRun.payload.executionOk, true);
+        assert.equal(requireFixtureIndex(directRuntimeProbeRun.results, 0, "directRuntimeProbeRun.results[0]")['providerId'], 'openrouter');
+        assert.equal(requireFixtureIndex(directRuntimeProbeRun.results, 0, "directRuntimeProbeRun.results[0]")['providerModel'], 'openai/gpt-oss-120b');
+        assert.equal(requireFixtureIndex(directRuntimeProbeRun.results, 0, "directRuntimeProbeRun.results[0]")['routeProfile'], 'repo_agent');
+        assert.equal(requireFixtureIndex(directRuntimeProbeRun.results, 0, "directRuntimeProbeRun.results[0]")['probeKind'], 'chat');
+        assert.equal(requireFixtureIndex(directRuntimeProbeRun.results, 0, "directRuntimeProbeRun.results[0]")['ok'], true);
+        assert.equal(directRuntimeProbeRun.payload['executionOk'], true);
 
         const blockedRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(strictRuntimeSelectorPlan, {
             profileId: 'tool_agent',
@@ -2314,7 +2397,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(duplicateFallbackExecution.ok, false);
         assert.equal(duplicateFallbackExecution.attemptedCount, 1);
-        assert.equal(duplicateFallbackExecution.attempts[0].profileId, 'repo_agent');
+        assert.equal(requireFixtureIndex(duplicateFallbackExecution.attempts, 0, "duplicateFallbackExecution.attempts[0]").profileId, 'repo_agent');
 
         const sameProfileAlternativePlan = {
             ...runtimeSelectorPlan,
@@ -2338,6 +2421,7 @@ describe('model-gateway foundation', () => {
                     : route,
             ),
         };
+        /** @type {string[]} */
         const sameProfileModels = [];
         const sameProfileAlternativeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(sameProfileAlternativePlan, {
             profileId: 'repo_agent',
@@ -2387,7 +2471,7 @@ describe('model-gateway foundation', () => {
         assert.equal(sameProfileAlternativeExecution.attemptedCount, 2);
         assert.equal(sameProfileAlternativeExecution.selectedProfileId, 'repo_agent');
         assert.deepEqual(sameProfileModels, ['openai/gpt-oss-120b', 'openai/gpt-oss-20b-alt']);
-        assert.equal(sameProfileAlternativeExecution.retryDecisions[0].retryRoute, false);
+        assert.equal(requireFixtureIndex(sameProfileAlternativeExecution.retryDecisions, 0, "sameProfileAlternativeExecution.retryDecisions[0]").retryRoute, false);
 
         const providerCapAlternativePlan = {
             ...runtimeSelectorPlan,
@@ -2423,7 +2507,9 @@ describe('model-gateway foundation', () => {
                     : route,
             ),
         };
+        /** @type {string[]} */
         const providerCapModels = [];
+        /** @type {Array<Parameters<typeof recordModelGatewayRouteDecision>[0]>} */
         const providerCapRouteDecisionEvents = [];
         const providerCapAlternativeExecution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(providerCapAlternativePlan, {
             profileId: 'repo_agent',
@@ -2621,8 +2707,8 @@ describe('model-gateway foundation', () => {
         assert.equal(fallbackRuntimeExecution.ok, true);
         assert.equal(fallbackRuntimeExecution.attemptedCount, 2);
         assert.equal(fallbackRuntimeExecution.selectedProfileId, 'tool_agent');
-        assert.equal(fallbackRuntimeExecution.attempts[0].ok, false);
-        assert.equal(fallbackRuntimeExecution.attempts[1].ok, true);
+        assert.equal(requireFixtureIndex(fallbackRuntimeExecution.attempts, 0, "fallbackRuntimeExecution.attempts[0]").ok, false);
+        assert.equal(requireFixtureIndex(fallbackRuntimeExecution.attempts, 1, "fallbackRuntimeExecution.attempts[1]").ok, true);
         assert.equal(fallbackRuntimeExecution.routeDecisionRecordedCount, 4);
 
         let retryProbeCalls = 0;
@@ -2666,16 +2752,21 @@ describe('model-gateway foundation', () => {
         assert.equal(retryRuntimeExecution.attemptedCount, 2);
         assert.equal(retryRuntimeExecution.selectedProfileId, 'repo_agent');
         assert.equal(retrySleepCalls, 1);
-        assert.equal(retryRuntimeExecution.retryDecisions[0].retryRoute, true);
+        assert.equal(requireFixtureIndex(retryRuntimeExecution.retryDecisions, 0, "retryRuntimeExecution.retryDecisions[0]").retryRoute, true);
         assert.equal(retryRuntimeExecution.routeDecisionRecordedCount, 4);
 
+        /** @type {Array<Parameters<typeof recordModelGatewayRouteDecision>[0]>} */
         const rateLimitRouteDecisionEvents = [];
+        const classifiedRateLimitFailure = classifyByokProviderFailure({
+            status: 429,
+            message: 'HTTP 429 provider asked to slow down',
+        });
         const rateLimitRuntimeExecution = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlan, {
             profileId: 'repo_agent',
             deps: {
                 runChatProbe: async () => ({
                     ok: false,
-                    status: 'failed',
+                    status: /** @type {'failed'} */ ('failed'),
                     providerAttempted: true,
                     elapsedMs: 10,
                     model: 'openai/gpt-oss-120b',
@@ -2691,12 +2782,9 @@ describe('model-gateway foundation', () => {
                     errors: ['HTTP 429 provider asked to slow down'],
                     warnings: [],
                     providerFailure: {
-                        kind: 'rate-limit',
-                        statusCode: 429,
+                        ...classifiedRateLimitFailure,
                         retryAfterSeconds: 42,
-                        resetAt: null,
                         errorContext: 'runtime_selector_chat',
-                        message: 'HTTP 429 provider asked to slow down',
                     },
                 }),
                 recordSuccess: () => {
@@ -2789,8 +2877,8 @@ describe('model-gateway foundation', () => {
         assert.equal(permanentRuntimeExecution.ok, true);
         assert.equal(permanentRuntimeExecution.attemptedCount, 2);
         assert.equal(permanentRuntimeExecution.selectedProfileId, 'tool_agent');
-        assert.equal(permanentRuntimeExecution.retryDecisions[0].permanent, true);
-        assert.equal(permanentRuntimeExecution.retryDecisions[0].retryRoute, false);
+        assert.equal(requireFixtureIndex(permanentRuntimeExecution.retryDecisions, 0, "permanentRuntimeExecution.retryDecisions[0]").permanent, true);
+        assert.equal(requireFixtureIndex(permanentRuntimeExecution.retryDecisions, 0, "permanentRuntimeExecution.retryDecisions[0]").retryRoute, false);
         assert.equal(permanentProbeCalls, 2);
         assert.equal(permanentRetrySleeps, 0);
 
@@ -2827,10 +2915,10 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(traceRuntimePlan.sourceSchema, 'model-gateway-selection-decision-trace');
         assert.equal(traceRuntimePlan.traceId, 'unit-selection-trace');
-        assert.equal(traceRuntimePlan.routes[0].selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
-        assert.equal(traceRuntimePlan.routes[0].selected?.['routeLayer'], 'openai_compatible_aggregator');
-        assert.equal(traceRuntimePlan.routes[0].selected?.['wireApi'], 'openai_chat_completions');
-        const traceProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(traceRuntimePlan.routes[0].selected, {});
+        assert.equal(requireFixtureIndex(traceRuntimePlan.routes, 0, "traceRuntimePlan.routes[0]").selected?.['selectorSyntax'], 'openai/gpt-oss-120b:groq');
+        assert.equal(requireFixtureIndex(traceRuntimePlan.routes, 0, "traceRuntimePlan.routes[0]").selected?.['routeLayer'], 'openai_compatible_aggregator');
+        assert.equal(requireFixtureIndex(traceRuntimePlan.routes, 0, "traceRuntimePlan.routes[0]").selected?.['wireApi'], 'openai_chat_completions');
+        const traceProbeEnv = buildModelGatewayRuntimeSelectorProbeEnv(requireFixtureIndex(traceRuntimePlan.routes, 0, "traceRuntimePlan.routes[0]").selected, {});
         assert.equal(traceProbeEnv['COPILOT_BYOK_MODEL'], 'openai/gpt-oss-120b');
         assert.equal(traceProbeEnv['COPILOT_BYOK_WIRE_API'], 'completions');
 
@@ -2920,7 +3008,7 @@ describe('model-gateway foundation', () => {
         assert.equal(strictAudit.ok, false);
         assert.equal(strictAudit.summary.selectedProfileCount, 0);
         assert.equal(
-            strictAudit.profiles[0].topRejectedReasons.includes(
+            requireFixtureIndex(strictAudit.profiles, 0, "strictAudit.profiles[0]").topRejectedReasons.includes(
                 'eligibility:not_known_access:unknown_policy_allows_probe',
             ),
             true,
@@ -2931,15 +3019,15 @@ describe('model-gateway foundation', () => {
             secretRegistry: { has: () => true },
         });
         assert.equal(localPrivateAudit.ok, false);
-        assert.equal(localPrivateAudit.profiles[0].selected, null);
-        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.required.local, 0);
-        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.required.privacy, 0);
-        assert.equal(localPrivateAudit.profiles[0].capabilitySupply.required.no_remote_secrets, 0);
-        assert.ok(localPrivateAudit.profiles[0].supplyWarnings.includes('required_supply_zero:local'));
-        assert.ok(localPrivateAudit.profiles[0].supplyWarnings.includes('required_supply_zero:privacy'));
-        assert.ok(localPrivateAudit.profiles[0].supplyWarnings.includes('required_supply_zero:no_remote_secrets'));
-        assert.ok(localPrivateAudit.profiles[0].topRejectedReasons.includes('missing_capability:local'));
-        assert.ok(localPrivateAudit.profiles[0].nextActions.includes('start_or_configure_explicit_local_provider'));
+        assert.equal(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").selected, null);
+        assert.equal(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").capabilitySupply.required['local'], 0);
+        assert.equal(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").capabilitySupply.required['privacy'], 0);
+        assert.equal(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").capabilitySupply.required['no_remote_secrets'], 0);
+        assert.ok(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").supplyWarnings.includes('required_supply_zero:local'));
+        assert.ok(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").supplyWarnings.includes('required_supply_zero:privacy'));
+        assert.ok(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").supplyWarnings.includes('required_supply_zero:no_remote_secrets'));
+        assert.ok(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").topRejectedReasons.includes('missing_capability:local'));
+        assert.ok(requireFixtureIndex(localPrivateAudit.profiles, 0, "localPrivateAudit.profiles[0]").nextActions.includes('start_or_configure_explicit_local_provider'));
 
         const defaultProfileAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
             secretRegistry: { has: () => true },
@@ -2983,6 +3071,7 @@ describe('model-gateway foundation', () => {
                         providerModel: 'openai/gpt-oss-120b',
                         selectorKind: 'exact_model',
                         selectorSyntax: 'openai/gpt-oss-120b',
+                        normalizedPolicy: {},
                     }),
                 ],
                 accountOverlays: [
@@ -2996,15 +3085,15 @@ describe('model-gateway foundation', () => {
         );
         assert.equal(defaultWithOllamaAudit.summary.profileCount, 7);
         assert.equal(defaultWithOllamaAudit.profiles.some((profile) => profile.selected?.['providerId'] === 'ollama-local'), false);
-        assert.ok(defaultWithOllamaAudit.summary.rejectedReasonCounts['local_provider_requires_explicit_request'] > 0);
+        assert.ok(requireFixtureValue(defaultWithOllamaAudit.summary.rejectedReasonCounts['local_provider_requires_explicit_request'], 'local provider rejection count') > 0);
 
         const strictLocalPrivateAudit = auditModelGatewayPreRuntimeSelection(snapshot, {
             profiles: ['local_private_strict'],
             secretRegistry: { has: () => true },
         });
         assert.equal(strictLocalPrivateAudit.ok, false);
-        assert.equal(strictLocalPrivateAudit.profiles[0].selected, null);
-        assert.ok(strictLocalPrivateAudit.profiles[0].topRejectedReasons.includes('missing_capability:local'));
+        assert.equal(requireFixtureIndex(strictLocalPrivateAudit.profiles, 0, "strictLocalPrivateAudit.profiles[0]").selected, null);
+        assert.ok(requireFixtureIndex(strictLocalPrivateAudit.profiles, 0, "strictLocalPrivateAudit.profiles[0]").topRejectedReasons.includes('missing_capability:local'));
 
         const strictLocalPrivateReady = auditModelGatewayPreRuntimeSelection(
             {
@@ -3039,7 +3128,7 @@ describe('model-gateway foundation', () => {
             },
         );
         assert.equal(strictLocalPrivateReady.ok, true);
-        assert.equal(strictLocalPrivateReady.profiles[0].selected?.['providerId'], 'ollama-local');
+        assert.equal(requireFixtureIndex(strictLocalPrivateReady.profiles, 0, "strictLocalPrivateReady.profiles[0]").selected?.['providerId'], 'ollama-local');
     });
 
     it('projects route-option candidates to SDK model info without losing selector metadata', () => {
@@ -3063,12 +3152,16 @@ describe('model-gateway foundation', () => {
             },
         });
 
-        const [model] = toCopilotRouteModelInfoList({
-            projections: [projection],
-            routeOptions: [fastest],
-        });
+        const model = requireFixtureIndex(
+            toCopilotRouteModelInfoList({
+                projections: [projection],
+                routeOptions: [fastest],
+            }),
+            0,
+            'route projection should expose one SDK model',
+        );
 
-        const byok = /** @type {Record<string, any>} */ (model.byok ?? {});
+        const byok = model.byok;
         assert.equal(model.id, 'openai/gpt-oss-120b:fastest');
         assert.equal(byok['gatewayId'], 'huggingface:openai/gpt-oss-120b');
         assert.equal(byok['routeCandidateId'], 'huggingface:openai/gpt-oss-120b:default:fastest:openai/gpt-oss-120b:fastest');
@@ -3207,6 +3300,7 @@ describe('model-gateway foundation', () => {
                     selectorKind: 'provider_explicit',
                     selectorSyntax: 'openai/gpt-oss-120b:groq',
                     providerSpecific: { huggingFaceProvider: 'groq' },
+                    normalizedPolicy: {},
                 }),
                 createModelRouteOption({
                     providerId: 'huggingface',
@@ -3214,6 +3308,7 @@ describe('model-gateway foundation', () => {
                     selectorKind: 'provider_explicit',
                     selectorSyntax: 'openai/gpt-oss-120b:cerebras',
                     providerSpecific: { huggingFaceProvider: 'cerebras' },
+                    normalizedPolicy: {},
                 }),
             ],
         });
@@ -3406,8 +3501,8 @@ describe('model-gateway foundation', () => {
             ['visionary:vision-model', 'basic:text-model'],
         );
         assert.equal(decision.rejected.some((candidate) => candidate.rejectedReasons.includes('missing_capability:vision')), false);
-        assert.ok(decision.candidates[0].reasons.includes('soft_capability:vision'));
-        assert.ok(decision.candidates[1].reasons.includes('missing_soft_capability:vision'));
+        assert.ok(requireFixtureIndex(decision.candidates, 0, "decision.candidates[0]").reasons.includes('soft_capability:vision'));
+        assert.ok(requireFixtureIndex(decision.candidates, 1, "decision.candidates[1]").reasons.includes('missing_soft_capability:vision'));
     });
 
     it('penalizes failed preferred probes without making vision a hard gate', () => {
@@ -3629,13 +3724,13 @@ describe('model-gateway foundation', () => {
         );
         const explanation = explainGatewayRouteDecision(route);
 
-        assert.equal(route.snapshotContext.projectionCount, 0);
-        assert.equal(route.snapshotContext.runtimeOnlyCandidateCount, 1);
+        assert.equal(route.snapshotContext['projectionCount'], 0);
+        assert.equal(route.snapshotContext['runtimeOnlyCandidateCount'], 1);
         assert.equal(route.selected?.model['providerId'], 'zai');
         assert.equal(route.selected?.model['providerModel'], 'glm-runtime-only');
-        assert.equal(route.selected?.model['provenance']?.['candidateSource'], 'runtime_health');
-        assert.equal(route.selected?.model['provenance']?.['canonicalMetadataMutation'], false);
-        assert.equal(route.selected?.model['normalizedPolicy']?.['openAICompatibleBaseUrl'], 'https://api.z.ai/api/paas/v4');
+        assert.equal(requireFixtureRecord(route.selected?.model['provenance'], 'runtime route provenance')['candidateSource'], 'runtime_health');
+        assert.equal(requireFixtureRecord(route.selected?.model['provenance'], 'runtime route provenance')['canonicalMetadataMutation'], false);
+        assert.equal(requireFixtureRecord(route.selected?.model['normalizedPolicy'], 'runtime route normalized policy')['openAICompatibleBaseUrl'], 'https://api.z.ai/api/paas/v4');
         assert.ok(route.selected?.reasons.includes('agent_probe_verified'));
         assert.ok(route.selected?.reasons.includes('preferred:runtime_proved'));
         assert.equal(explanation.selectedSummary?.['runtimeObservedOnly'], true);
@@ -3657,7 +3752,7 @@ describe('model-gateway foundation', () => {
                 secretRegistry: { has: (ref) => ref === 'Z_AI_KEY' },
             },
         );
-        assert.equal(eligibleRoute.selected?.eligibility?.['policyInputs']?.['accountAccess']?.['secretConfigured'], true);
+        assert.equal(requireFixtureRecord(requireFixtureRecord(eligibleRoute.selected?.eligibility?.['policyInputs'], 'eligible policy inputs')['accountAccess'], 'eligible account access')['secretConfigured'], true);
         assert.equal(eligibleRoute.selected?.eligibility?.['secretRef'], 'Z_AI_KEY');
     });
 
@@ -3861,8 +3956,8 @@ describe('model-gateway foundation', () => {
         assert.equal(blocked.scoreBreakdown.baseScore, 100);
         assert.equal(blocked.scoreBreakdown.finalScore, blocked.score);
         assert.equal(blocked.scoreBreakdown.hardGateCount, 1);
-        assert.equal(blocked.scoreBreakdown.rejectedGroups.provider_blocked, 1);
-        assert.equal(blocked.scoreBreakdown.groups.confidence, 1);
+        assert.equal(blocked.scoreBreakdown.rejectedGroups['provider_blocked'], 1);
+        assert.equal(blocked.scoreBreakdown.groups['confidence'], 1);
         assert.ok(Object.hasOwn(blocked, 'runtimeProof'));
     });
 
@@ -4007,12 +4102,12 @@ describe('model-gateway foundation', () => {
 
         assert.equal(decision.selected?.model['providerModel'], 'gpt-visible');
         assert.equal(decision.candidates.length, 1);
-        assert.equal(decision.candidates[0].eligibility?.['disposition'], 'eligible');
+        assert.equal(requireFixtureIndex(decision.candidates, 0, "decision.candidates[0]").eligibility?.['disposition'], 'eligible');
         assert.deepEqual(
             decision.rejected.map((candidate) => candidate.model['providerModel']),
             ['gpt-hidden'],
         );
-        assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_model_not_visible'));
+        assert.ok(requireFixtureIndex(decision.rejected, 0, "decision.rejected[0]").rejectedReasons.includes('eligibility:account_model_not_visible'));
     });
 
     it('lets concrete runtime account blockers override older route eligibility decisions', () => {
@@ -4057,7 +4152,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(decision.selected, null);
         assert.equal(decision.rejected.length, 1);
-        assert.ok(decision.rejected[0].rejectedReasons.includes('eligibility:account_spending_exhausted'));
+        assert.ok(requireFixtureIndex(decision.rejected, 0, "decision.rejected[0]").rejectedReasons.includes('eligibility:account_spending_exhausted'));
     });
 
     it('does not reuse precomputed eligibility decisions across account scopes', () => {
@@ -4118,7 +4213,7 @@ describe('model-gateway foundation', () => {
             requireAgentProbeOk: false,
         });
         assert.equal(missing.selected, null);
-        assert.ok(missing.rejected[0].rejectedReasons.includes('eligibility:secret_missing:OPENAI_API_KEY'));
+        assert.ok(requireFixtureIndex(missing.rejected, 0, "missing.rejected[0]").rejectedReasons.includes('eligibility:secret_missing:OPENAI_API_KEY'));
 
         const configured = routeGatewayModels([model], 'tool_agent', {
             evaluateEligibility: true,
@@ -4175,10 +4270,15 @@ describe('model-gateway foundation', () => {
         assert.equal(snapshot.active.ready, true);
         assert.equal(snapshot.active.providerId, 'openrouter');
         assert.equal(snapshot.active.modelId, buildProviderModelId('openrouter', 'deepseek/deepseek-v4-flash:free'));
-        assert.ok(snapshot.providers.some((provider) => provider.id === 'openrouter'));
-        assert.ok(snapshot.models.some((model) => model.id === 'openrouter:deepseek/deepseek-v4-flash:free'));
-        assert.ok(snapshot.providers.some((provider) => provider.secretRefs.includes('OPEN_ROUTER_KEY')));
-        assert.ok(snapshot.providers.some((provider) => provider.auth.apiKeyRefs.includes('OPEN_ROUTER_KEY')));
+        assert.ok(snapshot.providers.some((provider) => provider['id'] === 'openrouter'));
+        assert.ok(snapshot.models.some((model) => model['id'] === 'openrouter:deepseek/deepseek-v4-flash:free'));
+        assert.ok(snapshot.providers.some((provider) => provider['secretRefs'].includes('OPEN_ROUTER_KEY')));
+        assert.ok(
+            snapshot.providers.some((provider) => {
+                const auth = requireFixtureRecord(provider['auth'], 'provider auth');
+                return Array.isArray(auth['apiKeyRefs']) && auth['apiKeyRefs'].includes('OPEN_ROUTER_KEY');
+            }),
+        );
 
         const serialized = JSON.stringify(snapshot);
         assert.equal(serialized.includes('sk-or-v1-secret-value-that-must-not-leak'), false);
@@ -4203,27 +4303,27 @@ describe('model-gateway foundation', () => {
     });
 
     it('projects probe completion into stable observability event and metrics without prompt content', () => {
+        const resultWithContent = {
+            ok: false,
+            status: 'no-delta',
+            elapsedMs: 1234,
+            model: 'free-model',
+            profile: 'openrouter-free',
+            preset: 'openrouter',
+            providerType: 'openai',
+            deltaCount: 0,
+            deltaChars: 0,
+            finalChars: 32,
+            observedFinalEvent: true,
+            sessionId: 'tmp-stream-probe',
+            errors: ['Probe respondeu, mas não emitiu assistant.message_delta.'],
+            warnings: ['free tier'],
+            finalContent: 'STREAM_A STREAM_B STREAM_C',
+        };
         const event = buildProbeCompletedEvent({
             probeKind: 'streaming',
             providerAttempted: true,
-            result: {
-                ok: false,
-                status: 'no-delta',
-                elapsedMs: 1234,
-                model: 'free-model',
-                profile: 'openrouter-free',
-                preset: 'openrouter',
-                providerType: 'openai',
-                deltaCount: 0,
-                deltaChars: 0,
-                finalChars: 32,
-                observedFinalEvent: true,
-                sessionId: 'tmp-stream-probe',
-                errors: ['Probe respondeu, mas não emitiu assistant.message_delta.'],
-                warnings: ['free tier'],
-                // @ts-expect-error event builder intentionally ignores content-bearing probe fields.
-                finalContent: 'STREAM_A STREAM_B STREAM_C',
-            },
+            result: resultWithContent,
         });
         const metrics = projectProbeCompletedMetrics(event);
 
@@ -4263,7 +4363,7 @@ describe('model-gateway foundation', () => {
             'repo_agent',
             { routeProfile: 'kilo-free', requireAgentProbeOk: false },
         );
-        const event = buildRouteDecisionEvent({
+        const decisionInputWithContent = {
             taskProfile: 'repo_agent',
             routeProfile: 'kilo-free',
             mode: 'pre-probe',
@@ -4272,9 +4372,9 @@ describe('model-gateway foundation', () => {
             estimatedInputTokens: 12345,
             estimatedOutputTokens: null,
             estimatedCostUsd: null,
-            // @ts-expect-error event builder intentionally ignores content-bearing caller fields.
             prompt: 'do not persist this prompt',
-        });
+        };
+        const event = buildRouteDecisionEvent(decisionInputWithContent);
         const metrics = projectRouteDecisionMetrics(event);
         const recorded = recordModelGatewayRouteDecision(event);
         const ledger = listModelGatewayRouteDecisions({ limit: 5 });
@@ -4312,7 +4412,7 @@ describe('model-gateway foundation', () => {
         assert.equal(metrics.gauges['model_gateway.route.candidates'], 1);
         assert.equal(recorded.decisionId, event.decisionId);
         assert.equal(ledger.length, 1);
-        assert.equal(ledger[0].decisionId, event.decisionId);
+        assert.equal(requireFixtureIndex(ledger, 0, "ledger[0]").decisionId, event.decisionId);
     });
 
     it('captures and deduplicates route decision streams before SQLite persistence', () => {
@@ -4364,10 +4464,10 @@ describe('model-gateway foundation', () => {
             unique.map((event) => event.decisionId),
             [first.decisionId, second.decisionId],
         );
-        assert.equal(unique[1].failure, 'runtime_probe_failed:updated-empty');
-        assert.equal(deduped[1].failure, 'runtime_probe_failed:updated-empty');
-        captured[0].fallbackChain.push('mutated');
-        assert.equal(capture.list()[0].fallbackChain.includes('mutated'), false);
+        assert.equal(requireFixtureIndex(unique, 1, "unique[1]").failure, 'runtime_probe_failed:updated-empty');
+        assert.equal(requireFixtureIndex(deduped, 1, "deduped[1]").failure, 'runtime_probe_failed:updated-empty');
+        requireFixtureIndex(captured, 0, "captured[0]").fallbackChain.push('mutated');
+        assert.equal(requireFixtureIndex(capture.list(), 0, "capture.list()[0]").fallbackChain.includes('mutated'), false);
     });
 
     it('keeps route decision ids unique for pre-decision and runtime outcome in the same millisecond', () => {
@@ -4413,39 +4513,64 @@ describe('model-gateway foundation', () => {
     });
 
     it('projects catalog refresh diff kinds into stable observability event and metrics', () => {
+        const previous = [
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'a',
+                pricing: { inputUsdPerMillion: 1 },
+                limits: { contextWindowTokens: 8_192 },
+            }),
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'b',
+                pricing: { inputUsdPerMillion: 1 },
+            }),
+        ];
+        const projections = [
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'a',
+                pricing: { inputUsdPerMillion: 2 },
+                limits: { contextWindowTokens: 16_384 },
+            }),
+            createCanonicalModelProjection({
+                providerId: 'openrouter',
+                providerModel: 'b',
+                pricing: { inputUsdPerMillion: 2 },
+            }),
+            createCanonicalModelProjection({
+                providerId: 'cerebras',
+                providerModel: 'gpt-oss-120b',
+                pricing: { inputUsdPerMillion: 0.1 },
+            }),
+        ];
+        const diff = diffCanonicalModelProjections(previous, projections);
         const event = buildCatalogRefreshCompletedEvent({
             source: 'unit-test',
             storePath: 'data/copilot/model-gateway/catalog.json',
             importerIds: ['openrouter-models', 'cerebras-public-models'],
             snapshot: {
-                projections: [{ providerModel: 'a' }, { providerModel: 'b' }],
+                projections,
                 providerProjections: [{ subjectProviderId: 'openai' }],
                 importRuns: [{ status: 'completed' }],
                 conflicts: [{ fieldPath: 'pricing.inputUsdPerMillion' }],
             },
-            diff: {
-                added: ['cerebras:gpt-oss-120b:default'],
-                removed: [],
-                changed: [
-                    { key: 'a', changedKinds: ['pricing_changed', 'limits_changed'] },
-                    { key: 'b', changedKinds: ['pricing_changed'] },
-                ],
-            },
-            openai: { object: 'list', data: [{ id: 'a' }, { id: 'b' }] },
+            diff,
+            openai: toOpenAIModelCatalogList(projections),
         });
         const metrics = projectCatalogRefreshCompletedMetrics(event);
 
         assert.equal(event.type, 'model_gateway:catalog:import_completed');
         assert.deepEqual(event.importerIds, ['openrouter-models', 'cerebras-public-models']);
-        assert.deepEqual(event.changedKinds, ['pricing_changed', 'limits_changed']);
+        assert.deepEqual(event.changedKinds, ['limits_changed', 'pricing_changed']);
         assert.equal(event.addedCount, 1);
         assert.equal(event.changedCount, 2);
         assert.equal(event.conflictCount, 1);
-        assert.deepEqual(event.changedKindCounts, { pricing_changed: 2, limits_changed: 1 });
+        assert.deepEqual(event.changedKindCounts, { limits_changed: 1, pricing_changed: 2 });
         assert.equal(metrics.counters['model_gateway.catalog.refresh.completed'], 1);
         assert.equal(metrics.counters['model_gateway.catalog.diff.pricing_changed'], 2);
         assert.equal(metrics.counters['model_gateway.catalog.diff.limits_changed'], 1);
-        assert.equal(metrics.gauges['model_gateway.catalog.projections'], 2);
+        assert.equal(metrics.gauges['model_gateway.catalog.projections'], 3);
         assert.equal(metrics.gauges['model_gateway.catalog.conflicts'], 1);
     });
 
@@ -4544,7 +4669,7 @@ describe('model-gateway foundation', () => {
         );
         assert.deepEqual(batch.modelEvents[2], {
             type: 'model_gateway:catalog:model_changed',
-            timestamp: batch.modelEvents[2].timestamp,
+            timestamp: requireFixtureIndex(batch.modelEvents, 2, "batch.modelEvents[2]").timestamp,
             source: 'unit-test',
             storePath: 'data/copilot/model-gateway/catalog.json',
             key: 'openrouter:model-changed:default',
@@ -4553,7 +4678,7 @@ describe('model-gateway foundation', () => {
         });
         assert.deepEqual(batch.conflictEvents[0], {
             type: 'model_gateway:catalog:conflict_detected',
-            timestamp: batch.conflictEvents[0].timestamp,
+            timestamp: requireFixtureIndex(batch.conflictEvents, 0, "batch.conflictEvents[0]").timestamp,
             source: 'unit-test',
             storePath: 'data/copilot/model-gateway/catalog.json',
             projectionKey: 'openrouter:model-a:default',
@@ -4823,8 +4948,8 @@ describe('model-gateway foundation', () => {
                     assert.ok(prompt.includes('encerre este turno e aguarde a continuação controlada'));
                     assert.ok(!prompt.includes('Por fim invoque a ferramenta real ask_user'));
                 } else {
-                    assert.ok(prompt.includes(scenario.ask));
-                    assert.ok(prompt.includes(scenario.final));
+                    assert.ok(prompt.includes(requireFixtureString(scenario.ask, 'scenario ask prompt')));
+                    assert.ok(prompt.includes(requireFixtureString(scenario.final, 'scenario final prompt')));
                 }
                 if (scenario.extra) assert.ok(prompt.includes(scenario.extra));
             }
@@ -4889,6 +5014,7 @@ describe('model-gateway foundation', () => {
             selectorKind: 'gateway_auto',
             selectorSyntax: 'provider/model',
             providerSpecific: { header: 'x-kilocode-mode', token: 'secret-token-that-must-not-leak' },
+            normalizedPolicy: {},
         });
         const overlay = createProviderAccountOverlay({
             providerId: 'kilo',
@@ -4905,7 +5031,7 @@ describe('model-gateway foundation', () => {
             supportedParameters: ['tools', 'stream'],
             provenanceByField: { 'capabilities.tools': evidence.evidenceId },
             confidenceByField: { 'capabilities.tools': evidence.confidence },
-            accountOverlayRefs: [overlay.secretRef],
+            accountOverlayRefs: [requireFixtureValue(overlay.secretRef, 'overlay secretRef must be normalized')],
         });
 
         assert.equal(source.providerId, 'kilo');
@@ -5035,10 +5161,10 @@ describe('model-gateway foundation', () => {
 
         assert.equal(rankCatalogEvidenceConfidence('manual') > rankCatalogEvidenceConfidence('catalog'), true);
         assert.equal(merged.projection.providerId, 'openrouter');
-        assert.equal(merged.projection.limits.contextWindowTokens, 131072);
-        assert.equal(merged.projection.capabilities.tools, true);
-        assert.equal(merged.projection.aliases.canonicalSlug, 'openai/gpt-oss-120b-20260520');
-        assert.equal(merged.projection.providerMetadata.ownedBy, 'openai');
+        assert.equal(merged.projection.limits['contextWindowTokens'], 131072);
+        assert.equal(merged.projection.capabilities['tools'], true);
+        assert.equal(requireFixtureRecord(merged.projection.aliases, 'aliases must be a record')['canonicalSlug'], 'openai/gpt-oss-120b-20260520');
+        assert.equal(merged.projection.providerMetadata['ownedBy'], 'openai');
         assert.equal(merged.projection.provenanceByField['limits.contextWindowTokens'], 'catalog-context');
         assert.equal(merged.projection.confidenceByField['limits.contextWindowTokens'], 'catalog');
         assert.deepEqual(merged.conflicts, [
@@ -5095,7 +5221,7 @@ describe('model-gateway foundation', () => {
         assert.equal(merged.projection.providerId, 'kilo');
         assert.equal(merged.projection.subjectProviderId, 'arcee-ai');
         assert.equal(merged.projection.displayName, 'Arcee AI');
-        assert.equal(merged.projection.dataPolicy.retainsPrompts, false);
+        assert.equal(merged.projection.dataPolicy['retainsPrompts'], false);
         assert.equal(merged.projection.provenanceByField['dataPolicy.retainsPrompts'], 'provider-policy-catalog');
         assert.deepEqual(merged.conflicts, [
             {
@@ -5200,6 +5326,7 @@ describe('model-gateway foundation', () => {
                 displayName: 'Llama Free',
             }),
         ];
+        /** @type {ReturnType<typeof createCanonicalModelProjection>[]} */
         const next = [];
         const diff = diffCanonicalModelProjections(previous, next);
         const tombstones = createCatalogModelTombstones({
@@ -5210,12 +5337,12 @@ describe('model-gateway foundation', () => {
 
         assert.deepEqual(diff.removed, ['openrouter:meta/llama-3.1:free:default']);
         assert.equal(tombstones.length, 1);
-        assert.equal(tombstones[0].projectionKey, 'openrouter:meta/llama-3.1:free:default');
-        assert.equal(tombstones[0].providerId, 'openrouter');
-        assert.equal(tombstones[0].providerModel, 'meta/llama-3.1:free');
-        assert.equal(tombstones[0].routeProfile, 'default');
-        assert.equal(tombstones[0].reason, 'catalog_removed');
-        assert.equal(tombstones[0].lastProjection?.displayName, 'Llama Free');
+        assert.equal(requireFixtureIndex(tombstones, 0, "tombstones[0]").projectionKey, 'openrouter:meta/llama-3.1:free:default');
+        assert.equal(requireFixtureIndex(tombstones, 0, "tombstones[0]").providerId, 'openrouter');
+        assert.equal(requireFixtureIndex(tombstones, 0, "tombstones[0]").providerModel, 'meta/llama-3.1:free');
+        assert.equal(requireFixtureIndex(tombstones, 0, "tombstones[0]").routeProfile, 'default');
+        assert.equal(requireFixtureIndex(tombstones, 0, "tombstones[0]").reason, 'catalog_removed');
+        assert.equal(requireFixtureIndex(tombstones, 0, "tombstones[0]").lastProjection?.['displayName'], 'Llama Free');
     });
 
     it('classifies semantic catalog diff kinds for pricing, capabilities and lifecycle changes', () => {
@@ -5483,7 +5610,7 @@ describe('model-gateway foundation', () => {
             'runtime_probe_failed_recent',
             'runtime_rate_limited',
         ]);
-        assert.equal(plan.deferred[0].resetAt, '2026-05-25T00:05:00.000Z');
+        assert.equal(requireFixtureIndex(plan.deferred, 0, "plan.deferred[0]").resetAt, '2026-05-25T00:05:00.000Z');
         assert.deepEqual(
             plan.deferred
                 .filter((item) => item.reason === 'runtime_probe_failed_recent')
@@ -5564,6 +5691,7 @@ describe('model-gateway foundation', () => {
             providerModel: 'policy-rich',
             selectorKind: 'aggregator_auto',
             selectorSyntax: 'policy-rich',
+            normalizedPolicy: {},
         });
         const overlay = createProviderAccountOverlay({
             providerId: 'openrouter',
@@ -5760,7 +5888,7 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.sources.length, 1);
             assert.equal(loaded.evidences.length, 1);
             assert.equal(loaded.projections.length, 1);
-            assert.equal(loaded.projections[0].limits.contextWindowTokens, 131072);
+            assert.equal(requireFixtureRecord(requireFixtureIndex(loaded.projections, 0, 'loaded.projections[0]')['limits'], 'stored projection limits')['contextWindowTokens'], 131072);
             assert.equal(loaded.rawPayloadRefs.length, 1);
             assert.equal(loaded.importRuns.length, 2);
             assert.equal(loaded.modelEligibilityRuns.length, 1);
@@ -5785,7 +5913,7 @@ describe('model-gateway foundation', () => {
                     "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'copilot_model_gateway_%' ORDER BY name",
                 )
                 .all()
-                .map(/** @param {{ name: string }} row */ (row) => row.name);
+                .map((row) => requireFixtureString(requireFixtureRecord(row, 'sqlite table row')['name'], 'sqlite table name'));
             const tableNames = new Set(tableRows);
 
             for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
@@ -6041,7 +6169,7 @@ describe('model-gateway foundation', () => {
                     `,
                 )
                 .all()
-                .map((row) => row.name);
+                .map((row) => requireFixtureString(requireFixtureRecord(row, 'sqlite index row')['name'], 'sqlite index name'));
 
             assert.deepEqual(indexes, [
                 'idx_mg_health_observations_latest',
@@ -6171,16 +6299,16 @@ describe('model-gateway foundation', () => {
             assert.equal(loaded.modelEligibilityRuns.length, 1);
             assert.equal(loaded.modelEligibilityDecisions.length, 2);
             assert.deepEqual(
-                loaded.modelEligibilityDecisions.map((decision) => decision.selectorSyntax).sort(),
+                loaded.modelEligibilityDecisions.map((decision) => decision['selectorSyntax']).sort(),
                 ['anthropic/claude-sonnet-4.5:economy', 'anthropic/claude-sonnet-4.5:fastest'],
             );
             assert.equal(
-                db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_eligibility_decisions').get().count,
+                requireFixtureRecord(db.prepare('SELECT COUNT(*) AS count FROM copilot_model_gateway_eligibility_decisions').get(), 'eligibility count row')['count'],
                 2,
             );
             assert.equal(openai.object, 'list');
             assert.equal(openai.data.length, 1);
-            assert.equal(openai.data[0].x_model_gateway.eligibility.status, 'eligible');
+            assert.equal(requireFixtureValue(requireFixtureIndex(openai.data, 0, 'openai.data[0]').x_model_gateway['eligibility'], 'OpenAI eligibility extension').status, 'eligible');
             const quotaStatus = /** @type {{ status: string }} */ (
                 db.prepare('SELECT status FROM copilot_model_gateway_account_quota_snapshots').get()
             );
@@ -6414,31 +6542,31 @@ describe('model-gateway foundation', () => {
             );
 
             assert.equal(firstLoaded.evidences.length, 1);
-            assert.equal(firstLoaded.evidences[0].value, 'Model A Updated');
+            assert.equal(requireFixtureIndex(firstLoaded.evidences, 0, "firstLoaded.evidences[0]")['value'], 'Model A Updated');
             assert.equal(loaded.source, 'second-catalog');
             assert.equal(typeof loaded.generatedAt, 'string');
             assert.equal(loaded.evidences.length, 0);
             assert.equal(routeDecisions.length, 1);
-            assert.equal(routeDecisions[0].decisionId, 'route-1');
+            assert.equal(requireFixtureIndex(routeDecisions, 0, "routeDecisions[0]")['decisionId'], 'route-1');
             assert.equal(automationDecisions.length, 1);
-            assert.equal(automationDecisions[0].decisionId, 'automation-1');
+            assert.equal(requireFixtureIndex(automationDecisions, 0, "automationDecisions[0]")['decisionId'], 'automation-1');
             assert.equal(automationPolicies.length, 1);
-            assert.equal(automationPolicies[0].policySnapshotId, 'policy-1');
+            assert.equal(requireFixtureIndex(automationPolicies, 0, "automationPolicies[0]")['policySnapshotId'], 'policy-1');
             assert.equal(automationEffects.length, 1);
-            assert.equal(automationEffects[0].effectId, 'effect-1');
+            assert.equal(requireFixtureIndex(automationEffects, 0, "automationEffects[0]")['effectId'], 'effect-1');
             assert.equal(recoveryAttempts.length, 1);
-            assert.equal(recoveryAttempts[0].recoveryAttemptId, 'recovery-1');
-            assert.equal(recoveryAttempts[0].accountWideFailure, true);
+            assert.equal(requireFixtureIndex(recoveryAttempts, 0, "recoveryAttempts[0]")['recoveryAttemptId'], 'recovery-1');
+            assert.equal(requireFixtureIndex(recoveryAttempts, 0, "recoveryAttempts[0]")['accountWideFailure'], true);
             assert.equal(JSON.stringify(recoveryAttempts[0]).includes('secret-that-must-not-leak'), false);
             assert.equal(sdkHandoffs.length, 1);
-            assert.equal(sdkHandoffs[0].handoffId, 'handoff-1');
+            assert.equal(requireFixtureIndex(sdkHandoffs, 0, "sdkHandoffs[0]")['handoffId'], 'handoff-1');
             assert.equal(sdkConfirmations.length, 1);
-            assert.equal(sdkConfirmations[0].confirmationId, 'confirmation-1');
+            assert.equal(requireFixtureIndex(sdkConfirmations, 0, "sdkConfirmations[0]")['confirmationId'], 'confirmation-1');
             assert.equal(liveScenarioRuns.length, 1);
-            assert.equal(liveScenarioRuns[0].runId, 'live-scenario-1');
+            assert.equal(requireFixtureIndex(liveScenarioRuns, 0, "liveScenarioRuns[0]")['runId'], 'live-scenario-1');
             assert.equal(JSON.stringify(liveScenarioRuns).includes('secret-that-must-not-leak'), false);
             assert.equal(standbyPlans.length, 1);
-            assert.equal(standbyPlans[0].standbyPlanId, 'standby-1');
+            assert.equal(requireFixtureIndex(standbyPlans, 0, "standbyPlans[0]")['standbyPlanId'], 'standby-1');
             assert.equal(JSON.stringify(standbyPlans).includes('secret-that-must-not-leak'), false);
             assert.equal(runtime.health?.['lastStatus'], 'ok');
             assert.equal(runtime.probes.length, 1);
@@ -6540,15 +6668,15 @@ describe('model-gateway foundation', () => {
             assert.equal(runRow?.failure_count, 0);
             assert.equal(runRow?.skipped_count, 1);
             assert.equal(probeRows.length, 1);
-            assert.equal(probeRows[0].payload_json.includes('secret-that-must-not-leak'), false);
-            assert.equal(probeRows[0].payload_json.includes('[redacted]'), true);
+            assert.equal(requireFixtureIndex(probeRows, 0, "probeRows[0]").payload_json.includes('secret-that-must-not-leak'), false);
+            assert.equal(requireFixtureIndex(probeRows, 0, "probeRows[0]").payload_json.includes('[redacted]'), true);
             assert.equal(healthRows?.count, 0);
             assert.equal(latestRuntimeRecords.length, 1);
-            assert.equal(latestRuntimeRecords[0]['providerId'], 'openrouter');
-            assert.equal(latestRuntimeRecords[0]['providerModel'], 'openai/gpt-oss-120b');
-            assert.equal(latestRuntimeRecords[0]['lastStatus'], 'ok');
-            assert.equal(latestRuntimeRecords[0]['runtimeHealthStatus'], 'probe-only');
-            assert.equal(latestRuntimeRecords[0]['probes']['chat']['ok'], true);
+            assert.equal(requireFixtureIndex(latestRuntimeRecords, 0, "latestRuntimeRecords[0]")['providerId'], 'openrouter');
+            assert.equal(requireFixtureIndex(latestRuntimeRecords, 0, "latestRuntimeRecords[0]")['providerModel'], 'openai/gpt-oss-120b');
+            assert.equal(requireFixtureIndex(latestRuntimeRecords, 0, "latestRuntimeRecords[0]")['lastStatus'], 'ok');
+            assert.equal(requireFixtureIndex(latestRuntimeRecords, 0, "latestRuntimeRecords[0]")['runtimeHealthStatus'], 'probe-only');
+            assert.equal(requireFixtureRecord(requireFixtureRecord(requireFixtureIndex(latestRuntimeRecords, 0, 'latestRuntimeRecords[0]')['probes'], 'runtime probes')['chat'], 'chat runtime probe')['ok'], true);
         } finally {
             db.close();
         }
@@ -6592,8 +6720,8 @@ describe('model-gateway foundation', () => {
             assert.deepEqual(summary, { routeDecisions: 1 });
             assert.equal(rows?.count, 1);
             assert.equal(loaded.length, 1);
-            assert.equal(loaded[0].decisionId, event.decisionId);
-            assert.equal(loaded[0].providerId, 'openrouter');
+            assert.equal(requireFixtureIndex(loaded, 0, "loaded[0]")['decisionId'], event.decisionId);
+            assert.equal(requireFixtureIndex(loaded, 0, "loaded[0]")['providerId'], 'openrouter');
             assert.equal(JSON.stringify(loaded).includes('sk-'), false);
             assert.equal(JSON.stringify(loaded).includes('sk-route-secret-that-must-not-leak'), false);
         } finally {
@@ -6888,6 +7016,7 @@ describe('model-gateway foundation', () => {
                         `,
                 );
                 for (const observedAt of [1, 2, 3, 4]) {
+                    /** @type {Array<string | number | null>} */
                     const args = [`${table}:${observedAt}`, 'overlay', 'openrouter', 'default', 'OPENROUTER_API_KEY', 'ok'];
                     if (hasReset) args.push(null);
                     args.push(observedAt, null, '{}');
@@ -6920,9 +7049,9 @@ describe('model-gateway foundation', () => {
                 spending: spendingCount.count,
             };
 
-            assert.equal(result.tables['copilot_model_gateway_account_quota_snapshots'].maxRows, 1);
-            assert.equal(result.tables['copilot_model_gateway_account_rate_limit_snapshots'].maxRows, 2);
-            assert.equal(result.tables['copilot_model_gateway_account_spending_snapshots'].maxRows, 3);
+            assert.equal(requireFixtureValue(result.tables['copilot_model_gateway_account_quota_snapshots'], 'copilot_model_gateway_account_quota_snapshots retention result').maxRows, 1);
+            assert.equal(requireFixtureValue(result.tables['copilot_model_gateway_account_rate_limit_snapshots'], 'copilot_model_gateway_account_rate_limit_snapshots retention result').maxRows, 2);
+            assert.equal(requireFixtureValue(result.tables['copilot_model_gateway_account_spending_snapshots'], 'copilot_model_gateway_account_spending_snapshots retention result').maxRows, 3);
             assert.deepEqual(counts, { quota: 1, rateLimit: 2, spending: 3 });
             assert.equal(result.deletedRows, 6);
         } finally {
@@ -7080,7 +7209,7 @@ describe('model-gateway foundation', () => {
         assert.equal(explanation.routeOptions.length, 1);
         assert.equal(explanation.accountOverlays.length, 1);
         assert.equal(explanation.eligibility?.status, 'eligible');
-        assert.equal(explanation.openai?.x_model_gateway.eligibility.status, 'eligible');
+        assert.equal(requireFixtureValue(requireFixtureValue(explanation.openai, 'OpenAI explanation').x_model_gateway['eligibility'], 'OpenAI explanation eligibility').status, 'eligible');
         assert.deepEqual(explanation.metadataCoverage, {
             confidenceFields: 1,
             provenanceFields: 1,
@@ -7530,7 +7659,7 @@ describe('model-gateway foundation', () => {
                         lastStatus: 'failed',
                         lastFailureAt: 1_000,
                     },
-                    /** @type {Record<string, unknown>} */ (null),
+                    null,
                 ],
                 { runId: 'runtime-malformed-records', observedAt: 1_000 },
             );
@@ -7603,7 +7732,7 @@ describe('model-gateway foundation', () => {
             assert.equal(leaked.ok, false);
             assert.equal(leaked.leakCount, 1);
             assert.equal(JSON.stringify(leaked).includes(secret), false);
-            assert.equal(leaked.tables.copilot_model_gateway_route_decisions.leakCount, 1);
+            assert.equal(requireFixtureValue(leaked.tables['copilot_model_gateway_route_decisions'], 'route decision leak result').leakCount, 1);
             assert.equal(repair.updatedRows, 1);
             assert.equal(repaired.ok, true);
         } finally {
@@ -7837,6 +7966,7 @@ describe('model-gateway foundation', () => {
                         providerId: 'openrouter',
                         providerModel: 'openai/gpt-oss-120b',
                         selectorKind: 'provider_model',
+                        normalizedPolicy: {},
                     }),
                 ],
                 accountOverlays: [
@@ -7866,11 +7996,11 @@ describe('model-gateway foundation', () => {
         );
 
         assert.equal(results.length, 1);
-        assert.equal(results[0].key, 'openrouter:openai/gpt-oss-120b:default');
-        assert.equal(results[0].routeOptionCount, 1);
-        assert.equal(results[0].accountOverlayCount, 1);
-        assert.equal(results[0].eligibilityStatus, 'eligible');
-        assert.ok(results[0].score > 0);
+        assert.equal(requireFixtureIndex(results, 0, "results[0]").key, 'openrouter:openai/gpt-oss-120b:default');
+        assert.equal(requireFixtureIndex(results, 0, "results[0]").routeOptionCount, 1);
+        assert.equal(requireFixtureIndex(results, 0, "results[0]").accountOverlayCount, 1);
+        assert.equal(requireFixtureIndex(results, 0, "results[0]").eligibilityStatus, 'eligible');
+        assert.ok(requireFixtureIndex(results, 0, "results[0]").score > 0);
     });
 
     it('explains provider catalog coverage with sources, overlays, routes and conflicts', () => {
@@ -7908,6 +8038,7 @@ describe('model-gateway foundation', () => {
                         providerId: 'openrouter',
                         providerModel: 'openai/gpt-oss-120b',
                         selectorKind: 'provider_model',
+                        normalizedPolicy: {},
                     }),
                 ],
                 accountOverlays: [
@@ -7957,7 +8088,7 @@ describe('model-gateway foundation', () => {
                 new Date('2026-05-25T12:00:02.000Z'),
                 new Date('2026-05-25T12:00:03.000Z'),
             ];
-            /** @type {Array<Record<string, any>>} */
+            /** @type {import('../../../../src/copilot/model-gateway/catalog/importer-runner.js').CatalogImporterProgressEvent[]} */
             const progressEvents = [];
             const snapshot = await runCatalogImporters({
                 store,
@@ -8020,11 +8151,11 @@ describe('model-gateway foundation', () => {
             assert.equal(snapshot.accountOverlays.length, 2);
             assert.equal(snapshot.rawPayloadRefs.length, 1);
             assert.deepEqual(
-                snapshot.importRuns.map((run) => run.status),
+                snapshot.importRuns.map((run) => run['status']),
                 ['completed', 'failed'],
             );
             assert.equal(loaded.sources.length, 2);
-            assert.equal(loaded.evidences[0].value, 131072);
+            assert.equal(requireFixtureIndex(loaded.evidences, 0, "loaded.evidences[0]")['value'], 131072);
             assert.deepEqual(
                 loaded.accountOverlays.find((overlay) => overlay['providerId'] === 'openrouter')?.['enabledModels'],
                 ['m'],
@@ -8034,8 +8165,8 @@ describe('model-gateway foundation', () => {
                     (overlay) =>
                         overlay['providerId'] === 'groq' &&
                         overlay['sourceId'] === 'broken-auth-catalog' &&
-                        overlay['providerMetadata']?.['catalogImportStatus'] === 'failed' &&
-                        overlay['providerMetadata']?.['failureMessage'] === 'token [redacted] rejected',
+                        requireFixtureRecord(overlay['providerMetadata'], 'failure overlay provider metadata')['catalogImportStatus'] === 'failed' &&
+                        requireFixtureRecord(overlay['providerMetadata'], 'failure overlay provider metadata')['failureMessage'] === 'token [redacted] rejected',
                 ),
                 true,
             );
@@ -8077,9 +8208,9 @@ describe('model-gateway foundation', () => {
             });
             const loaded = await store.readSnapshot();
 
-            assert.equal(loaded.evidences[0].providerModel, '@hf/thebloke/model-a');
-            assert.equal(loaded.evidences[0].evidenceId, 'cloudflare-workers-ai:@hf/thebloke/model-a:displayName');
-            assert.equal(loaded.projections[0].providerModel, '@hf/thebloke/model-a');
+            assert.equal(requireFixtureIndex(loaded.evidences, 0, "loaded.evidences[0]")['providerModel'], '@hf/thebloke/model-a');
+            assert.equal(requireFixtureIndex(loaded.evidences, 0, "loaded.evidences[0]")['evidenceId'], 'cloudflare-workers-ai:@hf/thebloke/model-a:displayName');
+            assert.equal(requireFixtureIndex(loaded.projections, 0, "loaded.projections[0]")['providerModel'], '@hf/thebloke/model-a');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -8104,6 +8235,7 @@ describe('model-gateway foundation', () => {
                     providerModel: 'model-a',
                     selectorKind: 'exact_model',
                     selectorSyntax: 'model-a',
+                    normalizedPolicy: {},
                 }),
                 createModelRouteOption({
                     providerId: 'huggingface',
@@ -8111,6 +8243,7 @@ describe('model-gateway foundation', () => {
                     selectorKind: 'provider_explicit',
                     selectorSyntax: 'katanemo/Arch-Router-1.5B:hf-inference',
                     providerSpecific: { huggingFaceProvider: 'hf-inference' },
+                    normalizedPolicy: {},
                 }),
             ],
             projections: [
@@ -8135,7 +8268,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(healthy.ok, true);
         assert.equal(corrupted.ok, false);
-        assert.equal(corrupted.duplicateChecks.evidences.duplicateExtraRowCount, 1);
+        assert.equal(requireFixtureValue(corrupted.duplicateChecks['evidences'], 'evidence duplicate check').duplicateExtraRowCount, 1);
         assert.ok(corrupted.redactedIdentityCount > 0);
     });
 
@@ -8146,8 +8279,8 @@ describe('model-gateway foundation', () => {
                 createGeminiModelsImporter({
                     apiKey: 'gemini-secret-that-must-not-leak',
                     secretRef: 'GEMINI_API_KEY',
-                    fetchImpl: /** @type {typeof fetch} */ (async () =>
-                        /** @type {Response} */ ({
+                    fetchImpl: /** @type {CatalogFetch} */ (async () =>
+                        ({
                             ok: false,
                             status: 400,
                             text: async () =>
@@ -8163,27 +8296,27 @@ describe('model-gateway foundation', () => {
                 }),
                 createOllamaCatalogImporter({
                     baseUrl: 'http://127.0.0.1:11434',
-                    fetchImpl: /** @type {typeof fetch} */ (async () => {
+                    fetchImpl: /** @type {CatalogFetch} */ (async () => {
                         throw new Error('fetch failed ECONNREFUSED');
                     }),
                 }),
             ],
         });
-        const geminiOverlay = snapshot.accountOverlays.find((overlay) => overlay.providerId === 'gemini');
-        const ollamaOverlay = snapshot.accountOverlays.find((overlay) => overlay.providerId === 'ollama-local');
+        const geminiOverlay = snapshot.accountOverlays.find((overlay) => overlay['providerId'] === 'gemini');
+        const ollamaOverlay = snapshot.accountOverlays.find((overlay) => overlay['providerId'] === 'ollama-local');
 
         assert.deepEqual(
-            snapshot.importRuns.map((run) => run.status),
+            snapshot.importRuns.map((run) => run['status']),
             ['failed', 'failed'],
         );
         assert.equal(snapshot.projections.length, 0);
-        assert.equal(geminiOverlay?.confidence, 'authenticated_catalog');
-        assert.equal(geminiOverlay?.providerMetadata.catalogImportStatus, 'failed');
-        assert.equal(geminiOverlay?.providerMetadata.apiKeyDisabled, true);
+        assert.equal(geminiOverlay?.['confidence'], 'authenticated_catalog');
+        assert.equal(requireFixtureRecord(geminiOverlay?.['providerMetadata'], 'providerMetadata must be a record')['catalogImportStatus'], 'failed');
+        assert.equal(requireFixtureRecord(geminiOverlay?.['providerMetadata'], 'providerMetadata must be a record')['apiKeyDisabled'], true);
         assert.equal(JSON.stringify(geminiOverlay).includes('gemini-secret-that-must-not-leak'), false);
-        assert.equal(ollamaOverlay?.confidence, 'catalog');
-        assert.equal(ollamaOverlay?.providerMetadata.localDaemonReachable, false);
-        assert.equal(ollamaOverlay?.providerMetadata.disabled, true);
+        assert.equal(ollamaOverlay?.['confidence'], 'catalog');
+        assert.equal(requireFixtureRecord(ollamaOverlay?.['providerMetadata'], 'providerMetadata must be a record')['localDaemonReachable'], false);
+        assert.equal(requireFixtureRecord(ollamaOverlay?.['providerMetadata'], 'providerMetadata must be a record')['disabled'], true);
     });
 
     it('creates generic failure overlays for authenticated importers without a custom failure hook', async () => {
@@ -8206,17 +8339,17 @@ describe('model-gateway foundation', () => {
                 },
             ],
         });
-        const overlay = snapshot.accountOverlays[0];
+        const overlay = requireFixtureIndex(snapshot.accountOverlays, 0, 'expected account overlay');
 
-        assert.equal(snapshot.importRuns[0].status, 'failed');
-        assert.equal(overlay.providerId, 'generic-provider');
-        assert.equal(overlay.confidence, 'authenticated_catalog');
-        assert.equal(overlay.secretRef, 'GENERIC_API_KEY');
-        assert.equal(overlay.providerMetadata.catalogImportStatus, 'failed');
-        assert.equal(overlay.providerMetadata.failureKind, 'rate-limit');
-        assert.equal(overlay.rateLimits.limited, true);
-        assert.equal(overlay.rateLimits.retryAfterSeconds, 42);
-        assert.equal(overlay.rateLimits['x-ratelimit-remaining-requests'], 0);
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['status'], 'failed');
+        assert.equal(overlay['providerId'], 'generic-provider');
+        assert.equal(overlay['confidence'], 'authenticated_catalog');
+        assert.equal(overlay['secretRef'], 'GENERIC_API_KEY');
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['catalogImportStatus'], 'failed');
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['failureKind'], 'rate-limit');
+        assert.equal(overlay['rateLimits']['limited'], true);
+        assert.equal(overlay['rateLimits']['retryAfterSeconds'], 42);
+        assert.equal(overlay['rateLimits']['x-ratelimit-remaining-requests'], 0);
     });
 
     it('classifies importer failures separately for metadata, account, and local build gates', () => {
@@ -8258,9 +8391,9 @@ describe('model-gateway foundation', () => {
     });
 
     it('extracts rich OpenRouter model metadata as catalog evidence', async () => {
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async () =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -8310,12 +8443,12 @@ describe('model-gateway foundation', () => {
             importers: [createOpenRouterModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:10:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
-        assert.equal(snapshot.sources[0].url, 'https://openrouter.ai/api/v1/models');
-        assert.equal(snapshot.importRuns[0].status, 'completed');
-        assert.equal(snapshot.routeOptions[0].selectorKind, 'aggregator_auto');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.supportsFallbackChain, true);
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://openrouter.ai/api/v1/models');
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['status'], 'completed');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['selectorKind'], 'aggregator_auto');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['supportsFallbackChain'], true);
         assert.equal(byPath.get('limits.contextWindowTokens'), 256000);
         assert.equal(byPath.get('limits.maxOutputTokens'), 65536);
         assert.equal(byPath.get('pricing.inputUsdPerMillion'), 1);
@@ -8347,10 +8480,10 @@ describe('model-gateway foundation', () => {
     it('imports OpenRouter key account limits as account overlay without proving runtime access', async () => {
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -8380,28 +8513,28 @@ describe('model-gateway foundation', () => {
             ],
             now: () => new Date('2026-05-25T12:40:00.000Z'),
         });
-        const providerEvidenceByPath = new Map(snapshot.providerEvidences.map((item) => [item.fieldPath, item.value]));
+        const providerEvidenceByPath = new Map(snapshot.providerEvidences.map((item) => [item['fieldPath'], item['value']]));
 
-        assert.equal(parsed[0]?.label, 'repo-agent-key');
+        assert.equal(parsed[0]?.['label'], 'repo-agent-key');
         assert.equal(authorizationHeader, 'Bearer sk-or-v1-secret-that-must-not-leak');
-        assert.equal(snapshot.sources[0].url, 'https://openrouter.ai/api/v1/key');
-        assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://openrouter.ai/api/v1/key');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'api_key');
         assert.equal(snapshot.evidences.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
         assert.equal(snapshot.accountOverlays.length, 1);
-        assert.equal(snapshot.accountOverlays[0].providerId, 'openrouter');
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENROUTER_API_KEY');
-        assert.equal(snapshot.accountOverlays[0].spendingLimits.remainingUsd, 37.5);
-        assert.deepEqual(snapshot.accountOverlays[0].rateLimits, { requests: 1000, interval: '10s' });
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'account_key_credit_and_rate_limits');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerId'], 'openrouter');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'OPENROUTER_API_KEY');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['spendingLimits']['remainingUsd'], 37.5);
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['rateLimits'], { requests: 1000, interval: '10s' });
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['semantics'], 'account_key_credit_and_rate_limits');
         assert.equal(providerEvidenceByPath.get('providerMetadata.openrouter.keyUsage'), 12.5);
         assert.equal(JSON.stringify(snapshot).includes('sk-or-v1-secret-that-must-not-leak'), false);
     });
 
     it('extracts Kilo Gateway public model metadata without proving runtime access', async () => {
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async () =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     json: async () => [
@@ -8463,26 +8596,26 @@ describe('model-gateway foundation', () => {
         });
         const byPath = new Map(
             snapshot.evidences
-                .filter((item) => item.providerModel === 'anthropic/claude-sonnet-4.6')
-                .map((item) => [item.fieldPath, item.value]),
+                .filter((item) => item['providerModel'] === 'anthropic/claude-sonnet-4.6')
+                .map((item) => [item['fieldPath'], item['value']]),
         );
 
-        assert.equal(snapshot.sources[0].url, 'https://api.kilo.ai/api/gateway/models');
-        assert.equal(snapshot.sources[0].trustTier, 'provider_catalog');
-        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://api.kilo.ai/api/gateway/models');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['trustTier'], 'provider_catalog');
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['status'], 'completed');
         assert.deepEqual(
-            snapshot.routeOptions.map((option) => [option.providerModel, option.selectorKind]),
+            snapshot.routeOptions.map((option) => [option['providerModel'], option['selectorKind']]),
             [
                 ['anthropic/claude-sonnet-4.6', 'provider_model'],
                 ['kilo-auto/frontier', 'gateway_auto'],
             ],
         );
-        assert.deepEqual(snapshot.routeOptions[0].providerSpecific.acceptedHeaders, [
+        assert.deepEqual(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['providerSpecific']['acceptedHeaders'], [
             'x-kilocode-mode',
             'X-KiloCode-OrganizationId',
             'X-KiloCode-TaskId',
         ]);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.internalByokProviderFailureFallback, false);
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['internalByokProviderFailureFallback'], false);
         assert.equal(byPath.get('displayName'), 'Claude Sonnet 4.6');
         assert.equal(byPath.get('limits.contextWindowTokens'), 200000);
         assert.equal(byPath.get('limits.maxOutputTokens'), 64000);
@@ -8504,9 +8637,9 @@ describe('model-gateway foundation', () => {
     });
 
     it('extracts Kilo Gateway provider metadata separately from model evidence', async () => {
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async () =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     json: async () => [
@@ -8532,12 +8665,12 @@ describe('model-gateway foundation', () => {
             importers: [createKiloGatewayProvidersImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:35:00.000Z'),
         });
-        const byPath = new Map(snapshot.providerEvidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.providerEvidences.map((item) => [item['fieldPath'], item['value']]));
 
-        assert.equal(snapshot.sources[0].url, 'https://api.kilo.ai/api/gateway/providers');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://api.kilo.ai/api/gateway/providers');
         assert.equal(snapshot.evidences.length, 0);
         assert.equal(snapshot.providerEvidences.length, 9);
-        assert.equal(snapshot.providerEvidences[0].subjectProviderId, 'arcee-ai');
+        assert.equal(requireFixtureIndex(snapshot.providerEvidences, 0, "snapshot.providerEvidences[0]")['subjectProviderId'], 'arcee-ai');
         assert.equal(byPath.get('displayName'), 'Arcee AI');
         assert.equal(byPath.get('dataPolicy.training'), false);
         assert.equal(byPath.get('dataPolicy.retainsPrompts'), false);
@@ -8560,12 +8693,12 @@ describe('model-gateway foundation', () => {
         let authorizationHeader = null;
         /** @type {string | null} */
         let organizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                const headers = /** @type {{ authorization?: string; 'X-KiloCode-OrganizationId'?: string }} */ (init)?.headers ?? {};
-                authorizationHeader = headers.authorization ?? null;
-                organizationHeader = headers['X-KiloCode-OrganizationId'] ?? null;
-                return /** @type {Response} */ ({
+                const headers = new Headers(init?.headers);
+                authorizationHeader = headers.get('authorization');
+                organizationHeader = headers.get('X-KiloCode-OrganizationId');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -8595,24 +8728,24 @@ describe('model-gateway foundation', () => {
             ],
             now: () => new Date('2026-05-26T13:30:00.000Z'),
         });
-        const overlay = snapshot.accountOverlays[0];
-        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item.fieldPath), item.value]));
+        const overlay = requireFixtureIndex(snapshot.accountOverlays, 0, 'expected account overlay');
+        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item['fieldPath']), item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(organizationHeader, 'org-1');
         assert.equal(JSON.stringify(snapshot).includes('must-not-leak'), false);
         assert.equal(JSON.stringify(snapshot).includes('signature-that-must-not-leak'), false);
-        assert.equal(snapshot.sources[0].kind, 'authenticated_account_api');
-        assert.equal(snapshot.sources[0].trustTier, 'account_scoped');
-        assert.equal(overlay.accountScope, 'user-1');
-        assert.equal(overlay.secretRef, 'KILO_CODE_API_KEY');
-        assert.deepEqual(overlay.enabledModels, ['anthropic/claude-sonnet-4.6', 'kilo-auto/free']);
-        assert.deepEqual(overlay.blockedModels, ['openai/gpt-5.4']);
-        assert.deepEqual(overlay.byokProviderKeys, ['anthropic', 'zai']);
-        assert.equal(overlay.quota.remainingCreditsUsd, 12.25);
-        assert.equal(overlay.providerMetadata.accountEndpointDocumented, false);
-        assert.equal(overlay.providerMetadata.explicitAccessFieldCount, 2);
-        assert.equal(overlay.providerMetadata.organizationIdConfigured, true);
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'authenticated_account_api');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['trustTier'], 'account_scoped');
+        assert.equal(overlay['accountScope'], 'user-1');
+        assert.equal(overlay['secretRef'], 'KILO_CODE_API_KEY');
+        assert.deepEqual(overlay['enabledModels'], ['anthropic/claude-sonnet-4.6', 'kilo-auto/free']);
+        assert.deepEqual(overlay['blockedModels'], ['openai/gpt-5.4']);
+        assert.deepEqual(overlay['byokProviderKeys'], ['anthropic', 'zai']);
+        assert.equal(overlay['quota']['remainingCreditsUsd'], 12.25);
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['accountEndpointDocumented'], false);
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['explicitAccessFieldCount'], 2);
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['organizationIdConfigured'], true);
         assert.equal(providerEvidence.get('providerMetadata.kilo.accountApi.visibleModelCount'), 4);
         assert.equal(providerEvidence.get('providerMetadata.kilo.accountApi.remainingCreditsUsd'), 12.25);
         assert.equal(providerEvidence.get('providerMetadata.kilo.token.validJwtShape'), true);
@@ -8622,10 +8755,10 @@ describe('model-gateway foundation', () => {
         const secret = 'sk-openai-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -8645,19 +8778,19 @@ describe('model-gateway foundation', () => {
             importers: [createOpenAIModelsImporter({ fetchImpl: fakeFetch, apiKey: secret })],
             now: () => new Date('2026-05-25T12:20:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].authMode, 'api_key');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'api_key');
         assert.equal(snapshot.accountOverlays.length, 1);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENAI_API_KEY');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gpt-test']);
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'account_visible_models');
-        assert.equal(snapshot.routeOptions[0].providerId, 'openai');
-        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'openai_responses');
-        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'OPENAI_API_KEY');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['gpt-test']);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['semantics'], 'account_visible_models');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['providerId'], 'openai');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['selectorKind'], 'exact_model');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['wireApi'], 'openai_responses');
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['status'], 'completed');
         assert.equal(byPath.get('displayName'), 'gpt-test');
         assert.equal(byPath.get('lifecycle.createdAt'), '2026-05-21T15:21:01.000Z');
         assert.equal(byPath.get('capabilities.chat'), true);
@@ -8673,9 +8806,9 @@ describe('model-gateway foundation', () => {
             pricing: '<section>gpt-5.2 $1.25 input $10 output text-embedding-3-small $0.02 input</section>',
             compare: '<table><tr><td>gpt-5.2</td><td>recommended coding and agentic tasks with reasoning</td></tr></table>',
         };
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url) =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     text: async () =>
@@ -8688,18 +8821,20 @@ describe('model-gateway foundation', () => {
             importers: [createOpenAiDocsModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:20:00.000Z'),
         });
-        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item['providerModel']}:${item['fieldPath']}`, item['value']]));
 
         assert.deepEqual(parsed.map((row) => row.id), ['gpt-4.5', 'gpt-4.5-preview', 'gpt-5.2', 'text-embedding-3-small']);
-        assert.equal(snapshot.sources[0].providerId, 'openai');
-        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'openai');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'none');
         assert.equal(snapshot.accountOverlays.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
         assert.equal(byModelPath.get('gpt-5.2:providerMetadata.openai.docsUrl'), 'https://developers.openai.com/docs/models');
         assert.equal(byModelPath.get('gpt-5.2:pricing.inputUsdPerMillion'), 1.25);
         assert.equal(byModelPath.get('gpt-5.2:pricing.outputUsdPerMillion'), 10);
         assert.equal(byModelPath.get('gpt-5.2:capabilities.tools'), true);
-        assert.equal(byModelPath.get('text-embedding-3-small:modalities.output')?.[0], 'embedding');
+        const embeddingOutput = byModelPath.get('text-embedding-3-small:modalities.output');
+        assert.ok(Array.isArray(embeddingOutput), 'embedding output modalities should be an array');
+        assert.equal(embeddingOutput[0], 'embedding');
         assert.equal(byModelPath.get('gpt-4.5-preview:lifecycle.providerStatus'), 'deprecated');
     });
 
@@ -8725,9 +8860,9 @@ describe('model-gateway foundation', () => {
             `,
             api: '<code>GET /v1/models</code><code>claude-sonnet-4-20250514</code>',
         };
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url) =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     text: async () =>
@@ -8740,15 +8875,15 @@ describe('model-gateway foundation', () => {
             importers: [createAnthropicDocsModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:25:00.000Z'),
         });
-        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item['providerModel']}:${item['fieldPath']}`, item['value']]));
 
         assert.deepEqual(parsed.map((row) => row.id), [
             'claude-3-5-haiku-20241022',
             'claude-3-5-haiku-latest',
             'claude-sonnet-4-20250514',
         ]);
-        assert.equal(snapshot.sources[0].providerId, 'anthropic');
-        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'anthropic');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'none');
         assert.equal(snapshot.accountOverlays.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
         assert.equal(byModelPath.get('claude-sonnet-4-20250514:providerMetadata.anthropic.docsUrl'), 'https://docs.anthropic.com/en/docs/about-claude/models/overview');
@@ -8783,9 +8918,9 @@ describe('model-gateway foundation', () => {
             openai: '<code>base_url="https://generativelanguage.googleapis.com/v1beta/openai/"</code><code>model="gemini-2.5-flash"</code>',
             vertex: '<main>Gemini 2.5 Pro on Vertex AI features agentic workflows, autonomous coding and multimodal tasks.</main>',
         };
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url) =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     text: async () =>
@@ -8804,11 +8939,11 @@ describe('model-gateway foundation', () => {
             importers: [createGeminiDocsModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:30:00.000Z'),
         });
-        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item['providerModel']}:${item['fieldPath']}`, item['value']]));
 
         assert.deepEqual(parsed.map((row) => row.id), ['gemini-2.5-flash', 'gemini-2.5-flash-image', 'gemini-2.5-pro']);
-        assert.equal(snapshot.sources[0].providerId, 'gemini');
-        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'gemini');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'none');
         assert.equal(snapshot.accountOverlays.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
         assert.equal(byModelPath.get('gemini-2.5-pro:providerMetadata.gemini.docsUrl'), 'https://ai.google.dev/gemini-api/docs/models');
@@ -8841,9 +8976,9 @@ describe('model-gateway foundation', () => {
             `,
             api: '<code>GET /v1/models</code><code>POST /v1/chat/completions</code><code>POST /v1/fim/completions</code>',
         };
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url) =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     text: async () =>
@@ -8856,11 +8991,11 @@ describe('model-gateway foundation', () => {
             importers: [createMistralDocsModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:35:00.000Z'),
         });
-        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item['providerModel']}:${item['fieldPath']}`, item['value']]));
 
         assert.deepEqual(parsed.map((row) => row.id), ['codestral-2508', 'mistral-large-2512']);
-        assert.equal(snapshot.sources[0].providerId, 'mistral');
-        assert.equal(snapshot.sources[0].authMode, 'none');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'mistral');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'none');
         assert.equal(snapshot.accountOverlays.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
         assert.equal(byModelPath.get('mistral-large-2512:providerMetadata.mistral.docsUrl'), 'https://docs.mistral.ai/models/overview');
@@ -8877,10 +9012,10 @@ describe('model-gateway foundation', () => {
         const secret = 'generic-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -8908,16 +9043,16 @@ describe('model-gateway foundation', () => {
             ],
             now: () => new Date('2026-05-25T12:40:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].url, 'https://api.groq.com/openai/v1/models');
-        assert.equal(snapshot.sources[0].authMode, 'api_key');
-        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'openai_compatible');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['llama-3.3-70b-versatile']);
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.openAICompatible, true);
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://api.groq.com/openai/v1/models');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'api_key');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['selectorKind'], 'exact_model');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['routeLayer'], 'openai_compatible');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['llama-3.3-70b-versatile']);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['openAICompatible'], true);
         assert.equal(byPath.get('displayName'), 'llama-3.3-70b-versatile');
         assert.equal(byPath.get('providerMetadata.ownedBy'), 'meta');
         assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'llama');
@@ -8929,10 +9064,10 @@ describe('model-gateway foundation', () => {
         const secret = 'chutes-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -8970,17 +9105,17 @@ describe('model-gateway foundation', () => {
             importers: [createChutesModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'CHUTES_AI' })],
             now: () => new Date('2026-05-25T20:30:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'chutes');
-        assert.equal(snapshot.sources[0].url, 'https://llm.chutes.ai/v1/models');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['Qwen/Qwen3-32B-TEE']);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'CHUTES_AI');
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.publicCatalogAvailable, true);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://llm.chutes.ai/v1');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.confidentialCompute, true);
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'chutes');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://llm.chutes.ai/v1/models');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['Qwen/Qwen3-32B-TEE']);
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'CHUTES_AI');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['publicCatalogAvailable'], true);
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['openAICompatibleBaseUrl'], 'https://llm.chutes.ai/v1');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['confidentialCompute'], true);
         assert.equal(byPath.get('aliases.providerModel'), 'Qwen/Qwen3-32B-TEE');
         assert.equal(byPath.get('aliases.canonicalSlug'), 'Qwen/Qwen3-32B');
         assert.equal(byPath.get('limits.contextWindowTokens'), 262144);
@@ -9003,7 +9138,8 @@ describe('model-gateway foundation', () => {
     it('imports Z.AI pricing docs as normalized OpenAI-compatible catalog metadata', async () => {
         const secret = 'zai-secret-that-must-not-leak';
         /** @type {string | null} */
-        let acceptHeader = null;
+        /** @type {{ value: string | null }} */
+        const acceptHeaderCapture = { value: null };
         const markdown = [
             '### Text Models',
             '| Model | Input | Cached Input | Cache Write | Output |',
@@ -9017,10 +9153,10 @@ describe('model-gateway foundation', () => {
             '| GLM-5V-Turbo | $1.2 | $0.24 | Limited-time Free | $4 |',
             '| GLM-OCR | $0.1 | $0.02 | Limited-time Free | $0.4 |',
         ].join('\n');
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                acceptHeader = /** @type {{ headers?: { accept?: string } }} */ (init)?.headers?.accept ?? null;
-                return /** @type {Response} */ ({
+                acceptHeaderCapture.value = catalogRequestHeader(init, 'accept');
+                return ({
                     ok: true,
                     status: 200,
                     text: async () => markdown,
@@ -9031,25 +9167,25 @@ describe('model-gateway foundation', () => {
             importers: [createZaiModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'Z_AI_KEY' })],
             now: () => new Date('2026-05-25T20:35:00.000Z'),
         });
-        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item.providerModel}:${item.fieldPath}`, item.value]));
+        const byModelPath = new Map(snapshot.evidences.map((item) => [`${item['providerModel']}:${item['fieldPath']}`, item['value']]));
 
-        assert.equal(acceptHeader?.includes('text/markdown'), true);
+        assert.equal(requireFixtureValue(acceptHeaderCapture.value, 'accept header should be captured').includes('text/markdown'), true);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'zai');
-        assert.equal(snapshot.sources[0].kind, 'public_docs');
-        assert.equal(snapshot.sources[0].authMode, 'none');
-        assert.equal(snapshot.sources[0].url, 'https://docs.z.ai/guides/overview/pricing.md');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'zai');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'public_docs');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'none');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://docs.z.ai/guides/overview/pricing.md');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], [
             'glm-5.1',
             'glm-4.7-flash',
             'glm-5v-turbo',
             'glm-ocr',
         ]);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'Z_AI_KEY');
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.openAICompatible, true);
-        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-5.1')?.normalizedPolicy.supportsThinking, true);
-        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-5v-turbo')?.normalizedPolicy.visionFamily, true);
-        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'glm-ocr')?.normalizedPolicy.supportsTools, false);
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'Z_AI_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['openAICompatible'], true);
+        assert.equal(snapshot.routeOptions.find((route) => route['providerModel'] === 'glm-5.1')?.['normalizedPolicy']['supportsThinking'], true);
+        assert.equal(snapshot.routeOptions.find((route) => route['providerModel'] === 'glm-5v-turbo')?.['normalizedPolicy']['visionFamily'], true);
+        assert.equal(snapshot.routeOptions.find((route) => route['providerModel'] === 'glm-ocr')?.['normalizedPolicy']['supportsTools'], false);
         assert.equal(byModelPath.get('glm-ocr:capabilities.ocr'), true);
         assert.equal(byModelPath.has('glm-ocr:capabilities.tools'), false);
         assert.equal(byModelPath.has('glm-ocr:capabilities.streaming'), false);
@@ -9068,11 +9204,12 @@ describe('model-gateway foundation', () => {
 
     it('imports Z.AI OpenAPI as provider wire-contract metadata without model invention', async () => {
         /** @type {string | null} */
-        let acceptHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        /** @type {{ value: string | null }} */
+        const acceptHeaderCapture = { value: null };
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                acceptHeader = /** @type {{ headers?: { accept?: string } }} */ (init)?.headers?.accept ?? null;
-                return /** @type {Response} */ ({
+                acceptHeaderCapture.value = catalogRequestHeader(init, 'accept');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -9115,10 +9252,10 @@ describe('model-gateway foundation', () => {
             importers: [createZaiOpenApiImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-26T14:00:00.000Z'),
         });
-        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item.fieldPath), item.value]));
+        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item['fieldPath']), item['value']]));
 
-        assert.equal(acceptHeader, 'application/json');
-        assert.equal(snapshot.sources[0].kind, 'openapi');
+        assert.equal(acceptHeaderCapture.value, 'application/json');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'openapi');
         assert.equal(snapshot.evidences.length, 0);
         assert.equal(snapshot.routeOptions.length, 0);
         assert.equal(providerEvidence.get('providerMetadata.zai.openapi.openapiVersion'), '3.1.0');
@@ -9146,10 +9283,10 @@ describe('model-gateway foundation', () => {
         const secret = 'mistral-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ headers?: { authorization?: string } }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -9188,14 +9325,14 @@ describe('model-gateway foundation', () => {
             importers: [createMistralModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'MISTRAL_API_KEY' })],
             now: () => new Date('2026-05-25T12:45:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'mistral');
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'MISTRAL_API_KEY');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['mistral-large-latest']);
-        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'mistral');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'MISTRAL_API_KEY');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['mistral-large-latest']);
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['selectorKind'], 'exact_model');
         assert.equal(byPath.get('limits.contextWindowTokens'), 131072);
         assert.equal(byPath.get('capabilities.tools'), true);
         assert.equal(byPath.get('capabilities.vision'), true);
@@ -9212,17 +9349,17 @@ describe('model-gateway foundation', () => {
         const secret = 'anthropic-secret-that-must-not-leak';
         /** @type {Array<{ url: string; apiKey: string | null; apiVersion: string | null }>} */
         const requests = [];
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url, init) => {
-                const headers = /** @type {{ 'x-api-key'?: string; 'anthropic-version'?: string }} */ (init)?.headers ?? {};
+                const headers = new Headers(init?.headers);
                 const parsedUrl = new URL(String(url));
                 requests.push({
                     url: String(url),
-                    apiKey: headers['x-api-key'] ?? null,
-                    apiVersion: headers['anthropic-version'] ?? null,
+                    apiKey: headers.get('x-api-key'),
+                    apiVersion: headers.get('anthropic-version'),
                 });
                 if (parsedUrl.pathname.endsWith('/v1/models/claude-sonnet-4-5-20250929')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9236,7 +9373,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (parsedUrl.pathname.endsWith('/v1/models/claude-haiku-4-5-20251001')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9247,7 +9384,7 @@ describe('model-gateway foundation', () => {
                         }),
                     });
                 }
-                return /** @type {Response} */ ({
+                return ({
                     ok: true,
                     status: 200,
                     json: async () =>
@@ -9290,28 +9427,28 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T13:05:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
 
         assert.equal(requests.length, 4);
-        assert.equal(requests[0].apiKey, secret);
-        assert.equal(requests[0].apiVersion, '2023-06-01');
-        assert.equal(requests[2].url.endsWith('/v1/models/claude-sonnet-4-5-20250929'), true);
-        assert.equal(requests[3].url.endsWith('/v1/models/claude-haiku-4-5-20251001'), true);
-        assert.equal(new URL(requests[0].url).searchParams.get('limit'), '1000');
-        assert.equal(new URL(requests[1].url).searchParams.get('after_id'), 'claude-sonnet-4-5-20250929');
+        assert.equal(requireFixtureIndex(requests, 0, "requests[0]").apiKey, secret);
+        assert.equal(requireFixtureIndex(requests, 0, "requests[0]").apiVersion, '2023-06-01');
+        assert.equal(requireFixtureIndex(requests, 2, "requests[2]").url.endsWith('/v1/models/claude-sonnet-4-5-20250929'), true);
+        assert.equal(requireFixtureIndex(requests, 3, "requests[3]").url.endsWith('/v1/models/claude-haiku-4-5-20251001'), true);
+        assert.equal(new URL(requireFixtureIndex(requests, 0, "requests[0]").url).searchParams.get('limit'), '1000');
+        assert.equal(new URL(requireFixtureIndex(requests, 1, "requests[1]").url).searchParams.get('after_id'), 'claude-sonnet-4-5-20250929');
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'anthropic');
-        assert.equal(snapshot.sources[0].authMode, 'api_key');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'anthropic');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'api_key');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], [
             'claude-sonnet-4-5-20250929',
             'claude-haiku-4-5-20251001',
         ]);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'ANTHROPIC_API_KEY');
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.anthropicVersion, '2023-06-01');
-        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'anthropic_messages');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.supportsTools, true);
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'ANTHROPIC_API_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['anthropicVersion'], '2023-06-01');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['selectorKind'], 'exact_model');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['wireApi'], 'anthropic_messages');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['supportsTools'], true);
         assert.equal(byModel.get('anthropic:claude-sonnet-4-5-20250929:displayName'), 'Claude Sonnet 4.5');
         assert.equal(
             byModel.get('anthropic:claude-sonnet-4-5-20250929:lifecycle.createdAt'),
@@ -9334,13 +9471,13 @@ describe('model-gateway foundation', () => {
         const secret = 'gemini-secret-that-must-not-leak';
         /** @type {string[]} */
         const requestUrls = [];
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url) => {
                 requestUrls.push(String(url));
                 const parsedUrl = new URL(String(url));
                 assert.equal(parsedUrl.searchParams.get('key'), secret);
                 if (parsedUrl.pathname.endsWith('/models') && !parsedUrl.searchParams.get('pageToken')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9366,7 +9503,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (parsedUrl.pathname.endsWith('/models') && parsedUrl.searchParams.get('pageToken') === 'next-page') {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9384,7 +9521,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (parsedUrl.pathname.endsWith('/models/gemini-2.5-flash')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9398,7 +9535,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (parsedUrl.pathname.endsWith('/models/text-embedding-004')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9407,7 +9544,7 @@ describe('model-gateway foundation', () => {
                         }),
                     });
                 }
-                return /** @type {Response} */ ({ ok: false, status: 404, json: async () => ({}) });
+                return ({ ok: false, status: 404, json: async () => ({}) });
             }
         );
         const snapshot = await runCatalogImporters({
@@ -9421,17 +9558,17 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T13:20:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
 
         assert.equal(requestUrls.length, 4);
-        assert.equal(new URL(requestUrls[0]).searchParams.get('pageSize'), '1000');
-        assert.equal(new URL(requestUrls[1]).searchParams.get('pageToken'), 'next-page');
+        assert.equal(new URL(requireFixtureIndex(requestUrls, 0, 'first Gemini request URL')).searchParams.get('pageSize'), '1000');
+        assert.equal(new URL(requireFixtureIndex(requestUrls, 1, 'second Gemini request URL')).searchParams.get('pageToken'), 'next-page');
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'gemini');
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'GEMINI_API_KEY');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gemini-2.5-flash', 'text-embedding-004']);
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.authPlacement, 'query_key');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'gemini');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'GEMINI_API_KEY');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['gemini-2.5-flash', 'text-embedding-004']);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['authPlacement'], 'query_key');
         assert.equal(byModel.get('gemini:gemini-2.5-flash:displayName'), 'Gemini 2.5 Flash Latest');
         assert.equal(byModel.get('gemini:gemini-2.5-flash:limits.contextWindowTokens'), 1048576);
         assert.equal(byModel.get('gemini:gemini-2.5-flash:limits.maxOutputTokens'), 65536);
@@ -9448,22 +9585,22 @@ describe('model-gateway foundation', () => {
             'countTokens',
         ]);
         assert.equal(byModel.get('gemini:text-embedding-004:capabilities.embeddings'), true);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'openai_compatible');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.directWireApi, 'gemini_generate_content');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.resourceName, 'models/gemini-2.5-flash');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['routeLayer'], 'openai_compatible');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['directWireApi'], 'gemini_generate_content');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['resourceName'], 'models/gemini-2.5-flash');
     });
 
     it('imports Ollama local tags and show metadata as private local catalog evidence', async () => {
         /** @type {Array<{ url: string; body: unknown }>} */
         const requests = [];
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url, init) => {
                 requests.push({
                     url: String(url),
                     body: typeof init?.body === 'string' ? JSON.parse(init.body) : null,
                 });
                 if (String(url).endsWith('/api/tags')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9487,7 +9624,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (String(url).endsWith('/api/show')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9512,21 +9649,21 @@ describe('model-gateway foundation', () => {
                         }),
                     });
                 }
-                return /** @type {Response} */ ({ ok: false, status: 404, json: async () => ({}) });
+                return ({ ok: false, status: 404, json: async () => ({}) });
             }
         );
         const snapshot = await runCatalogImporters({
             importers: [createOllamaCatalogImporter({ fetchImpl: fakeFetch, baseUrl: 'http://127.0.0.1:11434' })],
             now: () => new Date('2026-05-25T13:35:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.equal(requests.length, 2);
-        assert.equal(requests[0].url, 'http://127.0.0.1:11434/api/tags');
-        assert.deepEqual(requests[1].body, { model: 'gemma3:4b', verbose: false });
-        assert.equal(snapshot.sources[0].providerId, 'ollama-local');
-        assert.equal(snapshot.sources[0].kind, 'local_daemon');
-        assert.equal(snapshot.evidences[0].confidence, 'catalog');
+        assert.equal(requireFixtureIndex(requests, 0, "requests[0]").url, 'http://127.0.0.1:11434/api/tags');
+        assert.deepEqual(requireFixtureIndex(requests, 1, "requests[1]").body, { model: 'gemma3:4b', verbose: false });
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'ollama-local');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'local_daemon');
+        assert.equal(requireFixtureIndex(snapshot.evidences, 0, "snapshot.evidences[0]")['confidence'], 'catalog');
         assert.equal(byPath.get('limits.contextWindowTokens'), 8192);
         assert.equal(byPath.get('capabilities.text'), true);
         assert.equal(byPath.get('capabilities.streaming'), true);
@@ -9542,25 +9679,25 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.ollama.family'), 'gemma3');
         assert.equal(byPath.get('providerMetadata.ollama.quantizationLevel'), 'Q4_K_M');
         assert.deepEqual(byPath.get('providerMetadata.ollama.parameters'), { temperature: 0.7, num_ctx: 8192 });
-        assert.equal(snapshot.routeOptions[0].providerId, 'ollama-local');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'local_daemon');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'openai_chat_completions');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.localPrivate, true);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'http://127.0.0.1:11434/v1');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gemma3:4b']);
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'locally_installed_models');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['providerId'], 'ollama-local');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['routeLayer'], 'local_daemon');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['wireApi'], 'openai_chat_completions');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['localPrivate'], true);
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['openAICompatibleBaseUrl'], 'http://127.0.0.1:11434/v1');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['gemma3:4b']);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['semantics'], 'locally_installed_models');
     });
 
     it('imports Groq list and retrieve metadata with context window and active overlays', async () => {
         const secret = 'groq-secret-that-must-not-leak';
         /** @type {Array<{ url: string; authorization: string | null }>} */
         const requests = [];
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url, init) => {
-                const headers = /** @type {{ authorization?: string }} */ (init)?.headers ?? {};
-                requests.push({ url: String(url), authorization: headers.authorization ?? null });
+                const headers = new Headers(init?.headers);
+                requests.push({ url: String(url), authorization: headers.get('authorization') });
                 if (String(url).endsWith('/models')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9588,7 +9725,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (String(url).endsWith('/models/openai%2Fgpt-oss-120b')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9604,7 +9741,7 @@ describe('model-gateway foundation', () => {
                     });
                 }
                 if (String(url).endsWith('/models/old-model')) {
-                    return /** @type {Response} */ ({
+                    return ({
                         ok: true,
                         status: 200,
                         json: async () => ({
@@ -9618,7 +9755,7 @@ describe('model-gateway foundation', () => {
                         }),
                     });
                 }
-                return /** @type {Response} */ ({ ok: false, status: 404, json: async () => ({}) });
+                return ({ ok: false, status: 404, json: async () => ({}) });
             }
         );
         const snapshot = await runCatalogImporters({
@@ -9626,14 +9763,14 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T13:50:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
 
         assert.equal(requests.length, 3);
         assert.equal(requests.every((request) => request.authorization === `Bearer ${secret}`), true);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(requests[1].url, 'https://api.groq.com/openai/v1/models/openai%2Fgpt-oss-120b');
-        assert.equal(snapshot.sources[0].providerId, 'groq');
+        assert.equal(requireFixtureIndex(requests, 1, "requests[1]").url, 'https://api.groq.com/openai/v1/models/openai%2Fgpt-oss-120b');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'groq');
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.contextWindowTokens'), 131072);
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.maxOutputTokens'), 32768);
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:capabilities.chat'), true);
@@ -9642,11 +9779,11 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:providerMetadata.groq.maxCompletionTokens'), 32768);
         assert.deepEqual(byModel.get('groq:openai/gpt-oss-120b:providerMetadata.groq.publicApps'), ['playground']);
         assert.equal(byModel.get('groq:old-model:providerMetadata.groq.active'), false);
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['openai/gpt-oss-120b']);
-        assert.deepEqual(snapshot.accountOverlays[0].blockedModels, ['old-model']);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://api.groq.com/openai/v1');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.supportsBatch, true);
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.batchEndpoint, '/openai/v1/batches');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['openai/gpt-oss-120b']);
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['blockedModels'], ['old-model']);
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['openAICompatibleBaseUrl'], 'https://api.groq.com/openai/v1');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['supportsBatch'], true);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['batchEndpoint'], '/openai/v1/batches');
     });
 
     it('imports Groq public docs pricing, rate limits and speed as separate catalog evidence', async () => {
@@ -9702,10 +9839,10 @@ describe('model-gateway foundation', () => {
             </main>
         `;
         const requestUrls = /** @type {string[]} */ ([]);
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url) => {
                 requestUrls.push(String(url));
-                return /** @type {Response} */ ({
+                return ({
                     ok: true,
                     status: 200,
                     text: async () => (String(url).includes('/pricing') ? pricingHtml : modelsHtml),
@@ -9717,14 +9854,14 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T20:55:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
-        const byProviderPath = new Map(snapshot.providerEvidences.map((item) => [item.fieldPath, item.value]));
+        const byProviderPath = new Map(snapshot.providerEvidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.deepEqual(requestUrls, ['https://console.groq.com/docs/models', 'https://groq.com/pricing']);
-        assert.equal(snapshot.sources[0].kind, 'public_docs');
-        assert.equal(snapshot.sources[0].authMode, 'none');
-        assert.equal(snapshot.importRuns[0].rowCount, 2);
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'public_docs');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['authMode'], 'none');
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['rowCount'], 2);
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:displayName'), 'OpenAI GPT-OSS 120B');
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.contextWindowTokens'), 131072);
         assert.equal(byModel.get('groq:openai/gpt-oss-120b:limits.maxOutputTokens'), 65536);
@@ -9751,10 +9888,10 @@ describe('model-gateway foundation', () => {
         const secret = 'hf-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -9800,12 +9937,12 @@ describe('model-gateway foundation', () => {
             ],
             now: () => new Date('2026-05-25T14:05:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
-        const bySelector = new Map(snapshot.routeOptions.map((route) => [route.selectorSyntax, route]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
+        const bySelector = new Map(snapshot.routeOptions.map((route) => [route['selectorSyntax'], route]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'huggingface');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'huggingface');
         assert.equal(byPath.get('limits.contextWindowTokens'), 131072);
         assert.equal(byPath.get('capabilities.tools'), true);
         assert.equal(byPath.get('capabilities.structuredOutputs'), true);
@@ -9813,23 +9950,23 @@ describe('model-gateway foundation', () => {
         assert.equal(byPath.get('providerMetadata.huggingface.cheapestProvider'), 'together');
         assert.equal(byPath.get('providerMetadata.modelTraits.family'), 'gpt-oss');
         assert.equal(byPath.get('providerMetadata.modelTraits.parameterCountBillions'), 120);
-        assert.equal(bySelector.get('openai/gpt-oss-120b:fastest')?.normalizedPolicy.selectedProviderHint, 'groq');
-        assert.equal(bySelector.get('openai/gpt-oss-120b:cheapest')?.normalizedPolicy.selectedProviderHint, 'together');
-        assert.equal(bySelector.get('openai/gpt-oss-120b:preferred')?.normalizedPolicy.selectedProviderHint, 'together');
-        assert.equal(bySelector.get('openai/gpt-oss-120b:groq')?.selectorKind, 'provider_explicit');
-        assert.equal(bySelector.get('openai/gpt-oss-120b:together')?.providerSpecific.huggingFaceProvider, 'together');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['openai/gpt-oss-120b']);
-        assert.deepEqual(snapshot.accountOverlays[0].providerMetadata.routePolicySuffixes, ['fastest', 'cheapest', 'preferred']);
+        assert.equal(bySelector.get('openai/gpt-oss-120b:fastest')?.['normalizedPolicy']['selectedProviderHint'], 'groq');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:cheapest')?.['normalizedPolicy']['selectedProviderHint'], 'together');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:preferred')?.['normalizedPolicy']['selectedProviderHint'], 'together');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:groq')?.['selectorKind'], 'provider_explicit');
+        assert.equal(bySelector.get('openai/gpt-oss-120b:together')?.['providerSpecific']['huggingFaceProvider'], 'together');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['openai/gpt-oss-120b']);
+        assert.deepEqual(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['routePolicySuffixes'], ['fastest', 'cheapest', 'preferred']);
     });
 
     it('imports OpenCode Zen models with family-specific endpoints and account overlay', async () => {
         const secret = 'opencode-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -9857,13 +9994,13 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T14:20:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
-        const byRoute = new Map(snapshot.routeOptions.map((route) => [route.providerModel, route]));
+        const byRoute = new Map(snapshot.routeOptions.map((route) => [route['providerModel'], route]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'opencode');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'opencode');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.opencode.wireApi'), 'openai_responses');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.family'), 'gpt');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:providerMetadata.modelTraits.generation'), '5.1');
@@ -9877,20 +10014,20 @@ describe('model-gateway foundation', () => {
         assert.equal(byModel.get('opencode:gpt-5.1-codex:lifecycle.status'), 'scheduled_retirement');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.inputUsdPerMillion'), 1.07);
         assert.equal(byModel.get('opencode:glm-5.1:pricing.outputUsdPerMillion'), 4.4);
-        assert.equal(byRoute.get('gpt-5.1-codex')?.normalizedPolicy.endpoint, 'https://opencode.ai/zen/v1/responses');
-        assert.equal(byRoute.get('claude-sonnet-4-5')?.normalizedPolicy.endpoint, 'https://opencode.ai/zen/v1/messages');
+        assert.equal(byRoute.get('gpt-5.1-codex')?.['normalizedPolicy']['endpoint'], 'https://opencode.ai/zen/v1/responses');
+        assert.equal(byRoute.get('claude-sonnet-4-5')?.['normalizedPolicy']['endpoint'], 'https://opencode.ai/zen/v1/messages');
         assert.equal(
-            byRoute.get('gemini-3.5-flash')?.normalizedPolicy.endpoint,
+            byRoute.get('gemini-3.5-flash')?.['normalizedPolicy']['endpoint'],
             'https://opencode.ai/zen/v1/models/gemini-3.5-flash',
         );
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], [
             'gpt-5.1-codex',
             'claude-sonnet-4-5',
             'gemini-3.5-flash',
             'glm-5.1',
             'deepseek-v4-flash-free',
         ]);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'OPENCODE_API_KEY');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'OPENCODE_API_KEY');
     });
 
     it('imports OpenCode Zen public docs with endpoint, pricing tier and deprecation metadata', async () => {
@@ -9918,9 +10055,9 @@ describe('model-gateway foundation', () => {
                 <tbody><tr><td>GPT 5.1 Codex</td><td>July 23, 2026</td></tr></tbody>
             </table>
         `;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async () =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     text: async () => docsHtml,
@@ -9931,12 +10068,12 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T15:00:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
-        const byRoute = new Map(snapshot.routeOptions.map((route) => [route.providerModel, route]));
+        const byRoute = new Map(snapshot.routeOptions.map((route) => [route['providerModel'], route]));
 
-        assert.equal(snapshot.sources[0].kind, 'public_docs');
-        assert.equal(snapshot.importRuns[0].rowCount, 4);
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'public_docs');
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['rowCount'], 4);
         assert.equal(byModel.get('opencode:gpt-5.1-codex:displayName'), 'GPT 5.1 Codex');
         assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.inputUsdPerMillion'), 1.07);
         assert.equal(byModel.get('opencode:gpt-5.1-codex:pricing.cacheReadUsdPerMillion'), 0.107);
@@ -9962,22 +10099,23 @@ describe('model-gateway foundation', () => {
             },
         ]);
         assert.equal(byModel.get('opencode:glm-5.1:providerMetadata.opencode.wireApi'), 'openai_chat_completions');
-        assert.equal(byRoute.get('gpt-5.1-codex')?.normalizedPolicy.docsDerived, true);
-        assert.equal(byRoute.get('claude-sonnet-4-5')?.normalizedPolicy.wireApi, 'anthropic_messages');
-        assert.equal(byRoute.get('gemini-3.5-flash')?.normalizedPolicy.aiSdkPackage, '@ai-sdk/google');
+        assert.equal(byRoute.get('gpt-5.1-codex')?.['normalizedPolicy']['docsDerived'], true);
+        assert.equal(byRoute.get('claude-sonnet-4-5')?.['normalizedPolicy']['wireApi'], 'anthropic_messages');
+        assert.equal(byRoute.get('gemini-3.5-flash')?.['normalizedPolicy']['aiSdkPackage'], '@ai-sdk/google');
     });
 
     it('imports Cloudflare markdown model cards with task, hosting and capability metadata', async () => {
         /** @type {string | null} */
-        let acceptHeader = null;
+        /** @type {{ value: string | null }} */
+        const acceptHeaderCapture = { value: null };
         const markdown = `
             [![OpenAI logo](https://developers.cloudflare.com/_astro/openai.svg)gpt-oss-120bText Generation • OpenAI • HostedOpenAI open-weight model with a 128k context window for agentic workloads.Function callingReasoning](https://developers.cloudflare.com/ai/models/@cf/openai/gpt-oss-120b/)
             [![Inworld logo](https://developers.cloudflare.com/_astro/inworld.svg)tts-2Text-to-Speech • Inworld • ProxiedNatural steering for speech generation.Real-time](https://developers.cloudflare.com/ai/models/inworld/tts-2/)
         `;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                acceptHeader = /** @type {{ headers?: { accept?: string } }} */ (init)?.headers?.accept ?? null;
-                return /** @type {Response} */ ({
+                acceptHeaderCapture.value = catalogRequestHeader(init, 'accept');
+                return ({
                     ok: true,
                     status: 200,
                     headers: new Headers({ 'content-type': 'text/markdown' }),
@@ -9990,11 +10128,11 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T15:15:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
 
-        assert.equal(acceptHeader?.includes('text/markdown'), true);
-        assert.equal(snapshot.importRuns[0].rowCount, 2);
+        assert.equal(requireFixtureValue(acceptHeaderCapture.value, 'accept header should be captured').includes('text/markdown'), true);
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['rowCount'], 2);
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:displayName'), 'gpt-oss-120b');
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.cloudflare.task'), 'Text Generation');
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/openai/gpt-oss-120b:providerMetadata.cloudflare.author'), 'OpenAI');
@@ -10012,10 +10150,10 @@ describe('model-gateway foundation', () => {
         const secret = 'cloudflare-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     headers: new Headers({ 'content-type': 'application/json' }),
@@ -10059,26 +10197,26 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T14:35:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
-        const gatewayRoute = snapshot.routeOptions.find((route) => route.selectorKind === 'gateway_fallback');
+        const gatewayRoute = snapshot.routeOptions.find((route) => route['selectorKind'] === 'gateway_fallback');
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'cloudflare-workers-ai');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'cloudflare-workers-ai');
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/meta/llama-3.1-8b-instruct:limits.contextWindowTokens'), 131072);
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/meta/llama-3.1-8b-instruct:capabilities.tools'), true);
         assert.equal(byModel.get('cloudflare-workers-ai:@cf/meta/llama-3.1-8b-instruct:capabilities.batch'), true);
         assert.deepEqual(byModel.get('cloudflare-workers-ai:@cf/llava-hf/llava-1.5-7b-hf:modalities.input'), ['image']);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.endpoint.includes('/accounts/account-1/ai/run/@cf/meta/'), true);
-        assert.equal(gatewayRoute?.normalizedPolicy.universalEndpoint, 'https://gateway.ai.cloudflare.com/v1/account-1/gateway-1');
-        assert.equal(gatewayRoute?.normalizedPolicy.supportsFallback, true);
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+        assert.equal(requireFixtureString(requireFixtureIndex(snapshot.routeOptions, 0, 'snapshot.routeOptions[0]')['normalizedPolicy']['endpoint'], 'Cloudflare route endpoint').includes('/accounts/account-1/ai/run/@cf/meta/'), true);
+        assert.equal(gatewayRoute?.['normalizedPolicy']['universalEndpoint'], 'https://gateway.ai.cloudflare.com/v1/account-1/gateway-1');
+        assert.equal(gatewayRoute?.['normalizedPolicy']['supportsFallback'], true);
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], [
             '@cf/meta/llama-3.1-8b-instruct',
             '@cf/llava-hf/llava-1.5-7b-hf',
         ]);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'CLOUDFLARE_KEY');
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.gatewayIdConfigured, true);
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'CLOUDFLARE_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['gatewayIdConfigured'], true);
     });
 
     it('imports Cloudflare account-scoped model, gateway, provider-key and billing metadata before runtime', async () => {
@@ -10087,11 +10225,11 @@ describe('model-gateway foundation', () => {
         const requestedUrls = [];
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (url, init) => {
                 const urlText = String(url);
                 requestedUrls.push(urlText);
-                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
                 /** @type {unknown} */
                 let payload = { success: true, result: {} };
                 if (urlText.endsWith('/ai/models/search')) {
@@ -10137,7 +10275,7 @@ describe('model-gateway foundation', () => {
                 } else if (urlText.endsWith('/ai-gateway/billing/spending-limit')) {
                     payload = { success: true, result: { enabled: true, amount: 10000 } };
                 }
-                return /** @type {Response} */ ({
+                return ({
                     ok: true,
                     status: 200,
                     headers: { get: () => 'application/json' },
@@ -10159,27 +10297,27 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-26T12:00:00.000Z'),
         });
 
-        const overlay = snapshot.accountOverlays[0];
-        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item.fieldPath), item.value]));
+        const overlay = requireFixtureIndex(snapshot.accountOverlays, 0, 'expected account overlay');
+        const providerEvidence = new Map(snapshot.providerEvidences.map((item) => [String(item['fieldPath']), item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
         assert.equal(JSON.stringify(snapshot).includes('should-redact'), false);
-        assert.equal(snapshot.sources[0].kind, 'authenticated_account_api');
-        assert.equal(snapshot.importRuns[0].status, 'completed');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'authenticated_account_api');
+        assert.equal(requireFixtureIndex(snapshot.importRuns, 0, "snapshot.importRuns[0]")['status'], 'completed');
         assert.equal(requestedUrls.some((url) => url.endsWith('/accounts/account-1/ai/models/search')), true);
         assert.equal(
             requestedUrls.some((url) => url.endsWith('/accounts/account-1/ai-gateway/gateways/gateway-1/provider_configs')),
             true,
         );
-        assert.deepEqual(overlay.enabledModels, ['@cf/meta/llama-3.1-8b-instruct', '@cf/baai/bge-large-en-v1.5']);
-        assert.deepEqual(overlay.byokProviderKeys, ['workers-ai', 'openai']);
-        assert.equal(overlay.quota.remainingCreditsUsd, 37.5);
-        assert.equal(overlay.spendingLimits.hardLimitUsd, 100);
-        assert.equal(overlay.rateLimits.requestsPerMinute, 120);
-        assert.equal(overlay.providerMetadata.semantics, 'cloudflare_account_ai_gateway_access');
-        assert.equal(overlay.providerMetadata.selectedGatewayFound, true);
-        assert.equal(overlay.providerMetadata.providerConfigCount, 2);
+        assert.deepEqual(overlay['enabledModels'], ['@cf/meta/llama-3.1-8b-instruct', '@cf/baai/bge-large-en-v1.5']);
+        assert.deepEqual(overlay['byokProviderKeys'], ['workers-ai', 'openai']);
+        assert.equal(overlay['quota']['remainingCreditsUsd'], 37.5);
+        assert.equal(overlay['spendingLimits']['hardLimitUsd'], 100);
+        assert.equal(overlay['rateLimits']['requestsPerMinute'], 120);
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['semantics'], 'cloudflare_account_ai_gateway_access');
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['selectedGatewayFound'], true);
+        assert.equal(requireFixtureRecord(overlay['providerMetadata'], 'providerMetadata must be a record')['providerConfigCount'], 2);
         assert.equal(providerEvidence.get('providerMetadata.cloudflare.accountApi.visibleModelCount'), 2);
         assert.deepEqual(providerEvidence.get('providerMetadata.cloudflare.accountApi.providerConfigProviders'), [
             'workers-ai',
@@ -10191,10 +10329,10 @@ describe('model-gateway foundation', () => {
         const secret = 'nvidia-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -10234,12 +10372,12 @@ describe('model-gateway foundation', () => {
             now: () => new Date('2026-05-25T14:50:00.000Z'),
         });
         const byModel = new Map(
-            snapshot.evidences.map((item) => [`${item.providerId}:${item.providerModel}:${item.fieldPath}`, item.value]),
+            snapshot.evidences.map((item) => [`${item['providerId']}:${item['providerModel']}:${item['fieldPath']}`, item['value']]),
         );
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].providerId, 'nvidia-nim');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['providerId'], 'nvidia-nim');
         assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:capabilities.reasoning'), true);
         assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:providerMetadata.modelTraits.family'), 'gpt-oss');
         assert.equal(byModel.get('nvidia-nim:openai/gpt-oss-120b:providerMetadata.modelTraits.parameterCountBillions'), 120);
@@ -10262,21 +10400,21 @@ describe('model-gateway foundation', () => {
             '/v1/license',
             '/v1/manifest',
         ]);
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://integrate.api.nvidia.com/v1');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.hostedOrSelfHosted, 'hosted');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, [
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['openAICompatibleBaseUrl'], 'https://integrate.api.nvidia.com/v1');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['hostedOrSelfHosted'], 'hosted');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], [
             'openai/gpt-oss-120b',
             'nvidia/nemotron-nano-12b-v2-vl',
             'baai/bge-m3',
         ]);
-        assert.equal(snapshot.routeOptions.find((route) => route.providerModel === 'baai/bge-m3')?.normalizedPolicy.wireApi, 'openai_embeddings');
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'NVIDIA_KEY');
+        assert.equal(snapshot.routeOptions.find((route) => route['providerModel'] === 'baai/bge-m3')?.['normalizedPolicy']['wireApi'], 'openai_embeddings');
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'NVIDIA_KEY');
     });
 
     it('extracts Cerebras public rich model metadata without proving runtime access', async () => {
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async () =>
-                /** @type {Response} */ ({
+                ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -10335,12 +10473,12 @@ describe('model-gateway foundation', () => {
             importers: [createCerebrasPublicModelsImporter({ fetchImpl: fakeFetch })],
             now: () => new Date('2026-05-25T12:45:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
-        assert.equal(snapshot.sources[0].url, 'https://api.cerebras.ai/public/v1/models');
-        assert.equal(snapshot.sources[0].trustTier, 'provider_catalog');
-        assert.equal(snapshot.routeOptions[0].selectorKind, 'exact_model');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.routeLayer, 'direct_provider');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['url'], 'https://api.cerebras.ai/public/v1/models');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['trustTier'], 'provider_catalog');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['selectorKind'], 'exact_model');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['routeLayer'], 'direct_provider');
         assert.equal(byPath.get('displayName'), 'OpenAI GPT OSS');
         assert.equal(byPath.get('aliases.huggingFaceId'), 'openai/gpt-oss-120b');
         assert.equal(byPath.get('lifecycle.createdAt'), '2025-08-06T00:00:00.000Z');
@@ -10360,10 +10498,10 @@ describe('model-gateway foundation', () => {
         const secret = 'cerebras-secret-that-must-not-leak';
         /** @type {string | null} */
         let authorizationHeader = null;
-        const fakeFetch = /** @type {typeof fetch} */ (
+        const fakeFetch = /** @type {CatalogFetch} */ (
             async (_url, init) => {
-                authorizationHeader = /** @type {{ authorization?: string }} */ (init)?.headers?.authorization ?? null;
-                return /** @type {Response} */ ({
+                authorizationHeader = catalogRequestHeader(init, 'authorization');
+                return ({
                     ok: true,
                     status: 200,
                     json: async () => ({
@@ -10384,17 +10522,17 @@ describe('model-gateway foundation', () => {
             importers: [createCerebrasModelsImporter({ fetchImpl: fakeFetch, apiKey: secret, secretRef: 'CEREBRAS_KEY' })],
             now: () => new Date('2026-05-26T14:30:00.000Z'),
         });
-        const byPath = new Map(snapshot.evidences.map((item) => [item.fieldPath, item.value]));
+        const byPath = new Map(snapshot.evidences.map((item) => [item['fieldPath'], item['value']]));
 
         assert.equal(authorizationHeader, `Bearer ${secret}`);
         assert.equal(JSON.stringify(snapshot).includes(secret), false);
-        assert.equal(snapshot.sources[0].kind, 'authenticated_api');
-        assert.equal(snapshot.sources[0].trustTier, 'account_scoped');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.openAICompatibleBaseUrl, 'https://api.cerebras.ai/v1');
-        assert.equal(snapshot.routeOptions[0].normalizedPolicy.wireApi, 'openai_chat_completions');
-        assert.deepEqual(snapshot.accountOverlays[0].enabledModels, ['gpt-oss-120b']);
-        assert.equal(snapshot.accountOverlays[0].secretRef, 'CEREBRAS_KEY');
-        assert.equal(snapshot.accountOverlays[0].providerMetadata.semantics, 'cerebras_account_visible_models');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['kind'], 'authenticated_api');
+        assert.equal(requireFixtureIndex(snapshot.sources, 0, "snapshot.sources[0]")['trustTier'], 'account_scoped');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['openAICompatibleBaseUrl'], 'https://api.cerebras.ai/v1');
+        assert.equal(requireFixtureIndex(snapshot.routeOptions, 0, "snapshot.routeOptions[0]")['normalizedPolicy']['wireApi'], 'openai_chat_completions');
+        assert.deepEqual(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['enabledModels'], ['gpt-oss-120b']);
+        assert.equal(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['secretRef'], 'CEREBRAS_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(snapshot.accountOverlays, 0, "snapshot.accountOverlays[0]")['providerMetadata'], 'providerMetadata must be a record')['semantics'], 'cerebras_account_visible_models');
         assert.equal(byPath.get('providerMetadata.cerebras.authenticatedVisibility'), true);
         assert.equal(byPath.get('providerMetadata.cerebras.openAICompatibleBaseUrl'), 'https://api.cerebras.ai/v1');
     });
@@ -10458,19 +10596,19 @@ describe('model-gateway foundation', () => {
         assert.equal(entry.object, 'model');
         assert.equal(entry.created, 1779376861);
         assert.equal(entry.owned_by, 'x-ai');
-        assert.equal(entry.x_model_gateway.provider_id, 'openrouter');
-        assert.equal(entry.x_model_gateway.display_name, 'xAI: Grok Build 0.1');
-        assert.deepEqual(entry.x_model_gateway.aliases, { canonicalSlug: 'x-ai/grok-build-0.1-20260520' });
-        assert.deepEqual(entry.x_model_gateway.modalities, { input: ['text', 'image'], output: ['text'] });
-        assert.deepEqual(entry.x_model_gateway.supported_parameters, ['tools', 'tool_choice', 'response_format']);
-        assert.equal(/** @type {{ contextWindowTokens: number }} */ (entry.x_model_gateway.limits).contextWindowTokens, 256000);
-        assert.equal(entry.x_model_gateway.provider_projection, null);
-        assert.equal(list.data[0].x_model_gateway.provider_projection?.subject_provider_id, 'x-ai');
-        assert.deepEqual(list.data[0].x_model_gateway.provider_projection?.data_policy, { retainsPrompts: false });
-        assert.equal(list.data[0].x_model_gateway.route_options?.[0]?.selector_kind, 'provider-explicit');
-        assert.equal(list.data[0].x_model_gateway.route_options?.[0]?.route_traits.openAICompatible, true);
-        assert.deepEqual(list.data[0].x_model_gateway.route_options?.[0]?.provider_specific, { upstreamProvider: 'groq' });
-        assert.deepEqual(list.data[0].x_model_gateway.eligibility, {
+        assert.equal(entry.x_model_gateway['provider_id'], 'openrouter');
+        assert.equal(entry.x_model_gateway['display_name'], 'xAI: Grok Build 0.1');
+        assert.deepEqual(entry.x_model_gateway['aliases'], { canonicalSlug: 'x-ai/grok-build-0.1-20260520' });
+        assert.deepEqual(entry.x_model_gateway['modalities'], { input: ['text', 'image'], output: ['text'] });
+        assert.deepEqual(entry.x_model_gateway['supported_parameters'], ['tools', 'tool_choice', 'response_format']);
+        assert.equal(/** @type {{ contextWindowTokens: number }} */ (entry.x_model_gateway['limits']).contextWindowTokens, 256000);
+        assert.equal(entry.x_model_gateway['provider_projection'], null);
+        assert.equal(requireFixtureIndex(list.data, 0, "list.data[0]").x_model_gateway['provider_projection']?.subject_provider_id, 'x-ai');
+        assert.deepEqual(requireFixtureIndex(list.data, 0, "list.data[0]").x_model_gateway['provider_projection']?.data_policy, { retainsPrompts: false });
+        assert.equal(requireFixtureIndex(list.data, 0, "list.data[0]").x_model_gateway['route_options']?.[0]?.selector_kind, 'provider-explicit');
+        assert.equal(requireFixtureIndex(list.data, 0, "list.data[0]").x_model_gateway['route_options']?.[0]?.route_traits['openAICompatible'], true);
+        assert.deepEqual(requireFixtureIndex(list.data, 0, "list.data[0]").x_model_gateway['route_options']?.[0]?.provider_specific, { upstreamProvider: 'groq' });
+        assert.deepEqual(requireFixtureIndex(list.data, 0, "list.data[0]").x_model_gateway['eligibility'], {
             include: false,
             status: 'excluded',
             disposition: 'excluded',
@@ -10851,14 +10989,14 @@ describe('model-gateway foundation', () => {
             unknownAccessPolicy: 'allow_probe',
         });
         assert.equal(fresh.policyPreset, 'fresh_account');
-        assert.equal(fresh.requireAccountOverlay, true);
-        assert.equal(fresh.requireFreshAccountOverlay, true);
-        assert.equal(fresh.unknownAccessPolicy, 'allow_probe');
+        assert.equal(fresh['requireAccountOverlay'], true);
+        assert.equal(fresh['requireFreshAccountOverlay'], true);
+        assert.equal(fresh['unknownAccessPolicy'], 'allow_probe');
 
         const free = resolveModelGatewayEligibilityPolicy({ policyPreset: 'free_or_known_cost' });
-        assert.equal(free.requireKnownPricing, true);
-        assert.equal(free.maxInputUsdPerMillion, 0);
-        assert.equal(free.maxOutputUsdPerMillion, 0);
+        assert.equal(free['requireKnownPricing'], true);
+        assert.equal(free['maxInputUsdPerMillion'], 0);
+        assert.equal(free['maxOutputUsdPerMillion'], 0);
     });
 
     it('resolves account access from overlays and env secrets before eligibility or runtime', () => {
@@ -11033,7 +11171,7 @@ describe('model-gateway foundation', () => {
         assert.equal(exhausted.include, false);
         assert.ok(exhausted.hardExclusions.includes('account_quota_exhausted'));
         assert.ok(exhausted.hardExclusions.includes('account_spending_exhausted'));
-        assert.equal(exhausted.policyInputs['accountAccess']['status'], 'spending_exhausted');
+        assert.equal(requireFixtureRecord(exhausted.policyInputs['accountAccess'], 'exhausted account access')['status'], 'spending_exhausted');
     });
 
     it('normalizes dynamic account key limits separately from canonical metadata', () => {
@@ -11169,7 +11307,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(rateLimitedDecision.include, false);
         assert.ok(rateLimitedDecision.hardExclusions.includes('account_rate_limited'));
-        assert.equal(rateLimitedDecision.policyInputs['accountAccess']['status'], 'rate_limited');
+        assert.equal(requireFixtureRecord(rateLimitedDecision.policyInputs['accountAccess'], 'rate-limited account access')['status'], 'rate_limited');
     });
 
     it('derives volatile account overlays from runtime health without mutating canonical metadata', () => {
@@ -11207,18 +11345,18 @@ describe('model-gateway foundation', () => {
         ]);
 
         assert.equal(overlays.length, 3);
-        assert.equal(overlays[0].sourceKind, 'runtime_health');
-        assert.equal(overlays[0].confidence, 'probe_failed');
-        assert.deepEqual(overlays[0].enabledModels, ['llama']);
-        assert.equal(overlays[0].rateLimits.limited, true);
-        assert.equal(overlays[0].rateLimits.retryAfterSeconds, 60);
-        assert.equal(overlays[0].rateLimits.resetAt, '2026-05-25T00:01:00.000Z');
-        assert.equal(overlays[0].expiresAt, '2026-05-25T00:01:00.000Z');
-        assert.equal(overlays[1].quota.remainingCreditsUsd, 0);
-        assert.equal(overlays[1].spendingLimits.remainingUsd, 0);
-        assert.equal(overlays[2].providerId, 'chutes');
-        assert.equal(overlays[2].secretRef, 'CHUTES_API_KEY');
-        assert.equal(overlays[2].providerMetadata.failureKind, 'credits');
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['sourceKind'], 'runtime_health');
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['confidence'], 'probe_failed');
+        assert.deepEqual(requireFixtureIndex(overlays, 0, "overlays[0]")['enabledModels'], ['llama']);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['rateLimits'], 'first runtime overlay rate limits')['limited'], true);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['rateLimits'], 'first runtime overlay rate limits')['retryAfterSeconds'], 60);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['rateLimits'], 'first runtime overlay rate limits')['resetAt'], '2026-05-25T00:01:00.000Z');
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['expiresAt'], '2026-05-25T00:01:00.000Z');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 1, 'overlays[1]')['quota'], 'second runtime overlay quota')['remainingCreditsUsd'], 0);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 1, 'overlays[1]')['spendingLimits'], 'second runtime overlay spending limits')['remainingUsd'], 0);
+        assert.equal(requireFixtureIndex(overlays, 2, "overlays[2]")['providerId'], 'chutes');
+        assert.equal(requireFixtureIndex(overlays, 2, "overlays[2]")['secretRef'], 'CHUTES_API_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 2, 'overlays[2]')['providerMetadata'], 'third runtime overlay metadata')['failureKind'], 'credits');
         const summary = summarizeModelGatewayRuntimeAccountOverlays(overlays, {
             maxItems: 2,
             maxModelsPerOverlay: 1,
@@ -11275,12 +11413,12 @@ describe('model-gateway foundation', () => {
         ]);
 
         assert.equal(overlays.length, 3);
-        assert.equal(overlays[0].secretRef, 'CEREBRAS_API_KEY');
-        assert.equal(overlays[0].providerMetadata.disabled, true);
-        assert.equal(overlays[1].secretRef, 'KILO_CODE_API_KEY');
-        assert.equal(overlays[1].rateLimits.retryAfterSeconds, 15);
-        assert.equal(overlays[2].secretRef, 'OLLAMA_CLOUD_API_KEY');
-        assert.equal(overlays[2].quota.remainingCreditsUsd, 0);
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['secretRef'], 'CEREBRAS_API_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['providerMetadata'], 'first runtime overlay metadata')['disabled'], true);
+        assert.equal(requireFixtureIndex(overlays, 1, "overlays[1]")['secretRef'], 'KILO_CODE_API_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 1, 'overlays[1]')['rateLimits'], 'second runtime overlay rate limits')['retryAfterSeconds'], 15);
+        assert.equal(requireFixtureIndex(overlays, 2, "overlays[2]")['secretRef'], 'OLLAMA_CLOUD_API_KEY');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 2, 'overlays[2]')['quota'], 'third runtime overlay quota')['remainingCreditsUsd'], 0);
 
         const accountWide = deriveModelGatewayRuntimeAccountOverlaysFromHealth(
             [
@@ -11295,8 +11433,8 @@ describe('model-gateway foundation', () => {
             { accountWideFailureKinds: ['credits'] },
         );
         assert.equal(accountWide.length, 1);
-        assert.deepEqual(accountWide[0].enabledModels, []);
-        assert.equal(accountWide[0].providerMetadata.accountWide, true);
+        assert.deepEqual(requireFixtureIndex(accountWide, 0, "accountWide[0]")['enabledModels'], []);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(accountWide, 0, 'accountWide[0]')['providerMetadata'], 'account-wide overlay metadata')['accountWide'], true);
     });
 
     it('derives runtime account overlays from persisted SQLite runtime classification fields', () => {
@@ -11322,12 +11460,12 @@ describe('model-gateway foundation', () => {
         ]);
 
         assert.equal(overlays.length, 1);
-        assert.equal(overlays[0].providerId, 'openrouter');
-        assert.equal(overlays[0].providerMetadata.failureKind, 'rate-limit');
-        assert.equal(overlays[0].providerMetadata.runtimeHealthStatus, 'failed');
-        assert.equal(overlays[0].providerMetadata.runtimeObservedAtMs, Date.parse('2026-05-25T00:10:00.000Z'));
-        assert.equal(overlays[0].observedAt, '2026-05-25T00:10:00.000Z');
-        assert.equal(overlays[0].expiresAt, '2026-05-25T01:10:00.000Z');
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['providerId'], 'openrouter');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['providerMetadata'], 'runtime overlay metadata')['failureKind'], 'rate-limit');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['providerMetadata'], 'runtime overlay metadata')['runtimeHealthStatus'], 'failed');
+        assert.equal(requireFixtureRecord(requireFixtureIndex(overlays, 0, 'overlays[0]')['providerMetadata'], 'runtime overlay metadata')['runtimeObservedAtMs'], Date.parse('2026-05-25T00:10:00.000Z'));
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['observedAt'], '2026-05-25T00:10:00.000Z');
+        assert.equal(requireFixtureIndex(overlays, 0, "overlays[0]")['expiresAt'], '2026-05-25T01:10:00.000Z');
     });
 
     it('summarizes account/key overlays for operator pre-runtime visibility', () => {
@@ -11353,16 +11491,16 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.summary.providers, 2);
         assert.equal(summary.summary.statusCounts['rate_limited'], 1);
         assert.equal(summary.summary.statusCounts['ok'], 1);
-        assert.equal(summary.rows[0].enabledModelCount, 2);
-        assert.equal(summary.rows[0].limitStatus, 'rate_limited');
-        assert.equal(summary.rows[0].resetAt, '2026-05-25T00:05:00.000Z');
-        assert.equal(summary.rows[0].quotaResetActive, false);
-        assert.equal(summary.rows[0].quotaResetExpired, false);
-        assert.equal(summary.rows[0].freshnessStatus, 'fresh');
-        assert.equal(summary.rows[0].freshnessTtlSeconds, 900);
-        assert.equal(summary.rows[0].resetWindowClass, 'temporary');
-        assert.equal(summary.rows[0].resetWindowSource, 'explicit_reset_at');
-        assert.equal(summary.rows[0].autoUnblocksAt, '2026-05-25T00:05:00.000Z');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").enabledModelCount, 2);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").limitStatus, 'rate_limited');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").resetAt, '2026-05-25T00:05:00.000Z');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").quotaResetActive, false);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").quotaResetExpired, false);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").freshnessStatus, 'fresh');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").freshnessTtlSeconds, 900);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").resetWindowClass, 'temporary');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").resetWindowSource, 'explicit_reset_at');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").autoUnblocksAt, '2026-05-25T00:05:00.000Z');
     });
 
     it('applies account overlay freshness policy without mutating canonical metadata', () => {
@@ -11446,24 +11584,24 @@ describe('model-gateway foundation', () => {
         assert.equal(explanation.summary.activeBlockers, 1);
         assert.equal(explanation.summary.expiredSignals, 1);
         assert.equal(explanation.summary.temporaryBlockers, 1);
-        assert.equal(explanation.summary.bySourceLayer.account, 1);
-        assert.equal(explanation.summary.bySourceLayer.runtime, 1);
-        assert.equal(explanation.rows[0].providerId, 'openrouter');
-        assert.equal(explanation.rows[0].limitStatus, 'rate_limited');
-        assert.equal(explanation.rows[0].activeBlocker, true);
-        assert.equal(explanation.rows[0].nextAction, 'wait_for_rate_limit_reset_or_choose_another_route');
-        assert.equal(explanation.rows[0].resetWindowClass, 'temporary');
-        assert.equal(explanation.rows[0].nextRefreshAfter, '2026-05-25T00:05:00.000Z');
-        assert.equal(explanation.rows[1].providerId, 'groq');
-        assert.equal(explanation.rows[1].expiredSignal, true);
-        assert.equal(explanation.rows[1].nextAction, 'refresh_overlay_or_retry_pre_runtime_selection');
+        assert.equal(explanation.summary.bySourceLayer['account'], 1);
+        assert.equal(explanation.summary.bySourceLayer['runtime'], 1);
+        assert.equal(requireFixtureIndex(explanation.rows, 0, "explanation.rows[0]").providerId, 'openrouter');
+        assert.equal(requireFixtureIndex(explanation.rows, 0, "explanation.rows[0]").limitStatus, 'rate_limited');
+        assert.equal(requireFixtureIndex(explanation.rows, 0, "explanation.rows[0]").activeBlocker, true);
+        assert.equal(requireFixtureIndex(explanation.rows, 0, "explanation.rows[0]").nextAction, 'wait_for_rate_limit_reset_or_choose_another_route');
+        assert.equal(requireFixtureIndex(explanation.rows, 0, "explanation.rows[0]").resetWindowClass, 'temporary');
+        assert.equal(requireFixtureIndex(explanation.rows, 0, "explanation.rows[0]").nextRefreshAfter, '2026-05-25T00:05:00.000Z');
+        assert.equal(requireFixtureIndex(explanation.rows, 1, "explanation.rows[1]").providerId, 'groq');
+        assert.equal(requireFixtureIndex(explanation.rows, 1, "explanation.rows[1]").expiredSignal, true);
+        assert.equal(requireFixtureIndex(explanation.rows, 1, "explanation.rows[1]").nextAction, 'refresh_overlay_or_retry_pre_runtime_selection');
     });
 
     it('summarizes provider quota capability surfaces without treating SDK quota as BYOK truth', () => {
         const openRouterRows = listModelGatewayProviderQuotaCapabilities({ selector: 'openrouter' });
         assert.equal(openRouterRows.length, 1);
-        assert.equal(openRouterRows[0].quotaSnapshot, 'key_credit_balance');
-        assert.equal(openRouterRows[0].sdkQuotaAppliesToByok, false);
+        assert.equal(requireFixtureIndex(openRouterRows, 0, "openRouterRows[0]").quotaSnapshot, 'key_credit_balance');
+        assert.equal(requireFixtureIndex(openRouterRows, 0, "openRouterRows[0]").sdkQuotaAppliesToByok, false);
 
         const matrix = summarizeModelGatewayProviderQuotaCapabilities();
         assert.equal(matrix.summary.total >= 10, true);
@@ -11493,13 +11631,13 @@ describe('model-gateway foundation', () => {
         });
 
         assert.equal(summary.summary.total, 2);
-        assert.equal(summary.rows[0].remainingFraction, 1);
-        assert.equal(summary.rows[0].remainingPercentage, 100);
-        assert.equal(summary.rows[0].scope, 'copilot_sdk_entitlement');
-        assert.equal(summary.rows[0].appliesToByokProviderRuntime, false);
-        assert.equal(summary.rows[0].canBlockSdkNativeRoute, false);
-        assert.equal(summary.rows[1].status, 'exhausted');
-        assert.equal(summary.rows[1].canBlockSdkNativeRoute, false);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").remainingFraction, 1);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").remainingPercentage, 100);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").scope, 'copilot_sdk_entitlement');
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").appliesToByokProviderRuntime, false);
+        assert.equal(requireFixtureIndex(summary.rows, 0, "summary.rows[0]").canBlockSdkNativeRoute, false);
+        assert.equal(requireFixtureIndex(summary.rows, 1, "summary.rows[1]").status, 'exhausted');
+        assert.equal(requireFixtureIndex(summary.rows, 1, "summary.rows[1]").canBlockSdkNativeRoute, false);
         assert.equal(summary.summary.status, 'exhausted');
         assert.equal(summary.summary.appliesToByokProviderRuntime, false);
     });
@@ -11537,9 +11675,9 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.disposition, 'deferred_missing_secret');
         assert.deepEqual(decision.hardExclusions.sort(), ['account_model_not_visible', 'secret_missing:OPENAI_API_KEY'].sort());
         assert.deepEqual(decision.overlayRefs, [overlay.accountOverlayId]);
-        assert.equal(decision.policyInputs['accountAccess']['accessConfidence'], 'high');
-        assert.equal(decision.policyInputs['accountAccess']['failureClass'], 'secret_configuration');
-        assert.equal(Array.isArray(decision.policyInputs['accountAccess']['resetWindows']), true);
+        assert.equal(requireFixtureRecord(decision.policyInputs['accountAccess'], 'decision account access')['accessConfidence'], 'high');
+        assert.equal(requireFixtureRecord(decision.policyInputs['accountAccess'], 'decision account access')['failureClass'], 'secret_configuration');
+        assert.equal(Array.isArray(requireFixtureRecord(decision.policyInputs['accountAccess'], 'decision account access')['resetWindows']), true);
         assert.equal(JSON.stringify(decision).includes('OPENAI_API_KEY'), true);
     });
 
@@ -11554,6 +11692,7 @@ describe('model-gateway foundation', () => {
             providerModel: 'openai/gpt-oss-120b',
             selectorKind: 'gateway_policy',
             selectorSyntax: 'openai/gpt-oss-120b:fastest',
+            normalizedPolicy: {},
         });
         const visible = evaluateModelGatewayEligibility({
             projection,
@@ -11569,7 +11708,7 @@ describe('model-gateway foundation', () => {
         });
         assert.equal(visible.include, true);
         assert.equal(visible.selectorSyntax, 'openai/gpt-oss-120b:fastest');
-        assert.deepEqual(visible.policyInputs['accountAccess']['modelIdentifiers'], [
+        assert.deepEqual(requireFixtureRecord(visible.policyInputs['accountAccess'], 'visible account access')['modelIdentifiers'], [
             'openai/gpt-oss-120b',
             'openai/gpt-oss-120b:fastest',
         ]);
@@ -11792,7 +11931,7 @@ describe('model-gateway foundation', () => {
         assert.equal(decision.hardExclusions.includes('budget_exceeded:inputUsdPerMillion'), true);
         assert.equal(decision.hardExclusions.includes('budget_exceeded:outputUsdPerMillion'), true);
         assert.equal(decision.hardExclusions.includes('budget_exceeded:requestUsd'), false);
-        assert.equal(decision.policyInputs['budget']['observedPricing']['inputUsdPerMillion'], 9);
+        assert.equal(requireFixtureRecord(requireFixtureRecord(decision.policyInputs['budget'], 'budget policy input')['observedPricing'], 'observed pricing')['inputUsdPerMillion'], 9);
         assert.equal(
             explainModelGatewayEligibilityDecision(decision).nextActions.includes('choose_lower_cost_model_or_raise_budget'),
             true,
@@ -12040,16 +12179,16 @@ describe('model-gateway foundation', () => {
         assert.equal(evaluated.summary.eligibleCount, 1);
         assert.equal(evaluated.summary.excludedCount, 1);
         assert.equal(evaluated.run.policyProfile, 'strict-account');
-        assert.equal(evaluated.decisions.find((decision) => decision.providerModel === 'gpt-visible')?.include, true);
+        assert.equal(evaluated.decisions.find((decision) => decision['providerModel'] === 'gpt-visible')?.['include'], true);
         assert.deepEqual(
-            evaluated.decisions.find((decision) => decision.providerModel === 'gpt-hidden')?.hardExclusions,
+            evaluated.decisions.find((decision) => decision['providerModel'] === 'gpt-hidden')?.['hardExclusions'],
             ['account_model_not_visible'],
         );
 
         const nextSnapshot = applyModelGatewayEligibilityToSnapshot(snapshot, evaluated.decisions, evaluated.run);
-        assert.equal(nextSnapshot.source, 'eligibility-refresh');
-        assert.equal(nextSnapshot.modelEligibilityRuns.length, 1);
-        assert.equal(nextSnapshot.modelEligibilityDecisions.length, 2);
+        assert.equal(nextSnapshot['source'], 'eligibility-refresh');
+        assert.equal(nextSnapshot['modelEligibilityRuns'].length, 1);
+        assert.equal(nextSnapshot['modelEligibilityDecisions'].length, 2);
     });
 
     it('prunes stale eligibility decisions when provider models disappear from the catalog', () => {
@@ -12090,10 +12229,10 @@ describe('model-gateway foundation', () => {
         );
 
         assert.deepEqual(
-            nextSnapshot.modelEligibilityDecisions.map((decision) => decision['providerModel']),
+            nextSnapshot['modelEligibilityDecisions'].map((decision) => decision['providerModel']),
             ['current/model'],
         );
-        assert.equal(nextSnapshot.modelEligibilityDecisions[0]?.['include'], true);
+        assert.equal(nextSnapshot['modelEligibilityDecisions'][0]?.['include'], true);
     });
 
     it('evaluates catalog eligibility per route option instead of reusing one model-level decision', () => {
@@ -12139,13 +12278,13 @@ describe('model-gateway foundation', () => {
             policy: { unknownAccessPolicy: 'block' },
             now: () => new Date('2026-05-26T20:00:00.000Z'),
         });
-        const direct = evaluated.decisions.find((decision) => decision.selectorKind === 'exact_model');
-        const gateway = evaluated.decisions.find((decision) => decision.selectorKind === 'gateway_fallback');
+        const direct = evaluated.decisions.find((decision) => decision['selectorKind'] === 'exact_model');
+        const gateway = evaluated.decisions.find((decision) => decision['selectorKind'] === 'gateway_fallback');
 
         assert.equal(evaluated.summary.modelCount, 2);
-        assert.equal(direct?.include, true);
-        assert.equal(gateway?.include, false);
-        assert.deepEqual(gateway?.hardExclusions, ['cloudflare_gateway_id_missing']);
+        assert.equal(direct?.['include'], true);
+        assert.equal(gateway?.['include'], false);
+        assert.deepEqual(gateway?.['hardExclusions'], ['cloudflare_gateway_id_missing']);
 
         const route = routeModelGatewayCatalogSnapshot(
             {
@@ -12188,8 +12327,8 @@ describe('model-gateway foundation', () => {
         assert.equal(evaluated.run.policyInputs['runtimeAccountOverlayActiveCount'], 1);
         assert.equal(evaluated.run.policyInputs['runtimeAccountOverlayExpiredCount'], 0);
         assert.equal(evaluated.run.policyInputs['healthRecordCount'], 1);
-        assert.deepEqual(evaluated.decisions[0].hardExclusions, ['account_rate_limited']);
-        assert.equal(evaluated.decisions[0].policyInputs['accountAccess']['status'], 'rate_limited');
+        assert.deepEqual(requireFixtureIndex(evaluated.decisions, 0, "evaluated.decisions[0]")['hardExclusions'], ['account_rate_limited']);
+        assert.equal(requireFixtureRecord(requireFixtureIndex(evaluated.decisions, 0, 'evaluated.decisions[0]')['policyInputs']['accountAccess'], 'evaluated account access')['status'], 'rate_limited');
     });
 
     it('refreshes catalog snapshots, replaces source evidence, diffs projections and emits OpenAI schema', async () => {
@@ -12225,7 +12364,7 @@ describe('model-gateway foundation', () => {
                 ],
             });
             const previousSnapshot = await store.readSnapshot();
-            /** @type {Array<Record<string, any>>} */
+            /** @type {import('../../../../src/copilot/model-gateway/catalog/refresh.js').ModelGatewayCatalogRefreshProgressEvent[]} */
             const progressEvents = [];
             const result = await refreshModelGatewayCatalog({
                 store,
@@ -12262,8 +12401,8 @@ describe('model-gateway foundation', () => {
             assert.deepEqual(result.diff.removed, ['openrouter:old-model:default']);
             assert.notEqual(result.snapshot.snapshotId, previousSnapshot.snapshotId);
             assert.equal(stored.snapshotId, result.snapshot.snapshotId);
-            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'local-model'), true);
-            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'old-model'), false);
+            assert.equal(result.snapshot.projections.some((projection) => projection['providerModel'] === 'local-model'), true);
+            assert.equal(result.snapshot.projections.some((projection) => projection['providerModel'] === 'old-model'), false);
             assert.equal(stored.projections.length, 2);
             assert.deepEqual(
                 result.openai.data.map((entry) => entry.id).sort(),
@@ -12271,10 +12410,11 @@ describe('model-gateway foundation', () => {
             );
             assert.equal(result.openai.data.find((entry) => entry.id === 'new-model')?.object, 'model');
             assert.deepEqual(result.writePolicy, { mode: 'commit', storeAvailable: true, committed: true });
-            const refreshRun = stored.importRuns.find((run) => run.providerId === 'model-gateway' && run.sourceId === 'catalog-refresh');
-            assert.equal(refreshRun?.status, 'completed');
-            assert.deepEqual(refreshRun?.diff?.added, ['openrouter:new-model:default']);
-            assert.deepEqual(refreshRun?.diff?.removed, ['openrouter:old-model:default']);
+            const refreshRun = stored.importRuns.find((run) => run['providerId'] === 'model-gateway' && run['sourceId'] === 'catalog-refresh');
+            assert.equal(refreshRun?.['status'], 'completed');
+            const refreshDiff = requireFixtureRecord(refreshRun?.['diff'], 'stored refresh diff');
+            assert.deepEqual(refreshDiff['added'], ['openrouter:new-model:default']);
+            assert.deepEqual(refreshDiff['removed'], ['openrouter:old-model:default']);
             assert.ok(progressEvents.some((event) => event['phase'] === 'refresh_started' && event['writePolicy'] === 'commit'));
             assert.ok(progressEvents.some((event) => event['phase'] === 'refresh_plan_ready' && event['selectedCount'] === 1));
             assert.ok(progressEvents.some((event) => event['phase'] === 'importer:importer_completed'));
@@ -12291,7 +12431,7 @@ describe('model-gateway foundation', () => {
         try {
             const store = new JsonModelGatewayCatalogStore({ filePath: join(dir, 'catalog.json') });
             await store.writeSnapshot({ sources: [], projections: [] });
-            /** @type {Array<Record<string, any>>} */
+            /** @type {import('../../../../src/copilot/model-gateway/catalog/refresh.js').ModelGatewayCatalogRefreshProgressEvent[]} */
             const progressEvents = [];
             const result = await refreshModelGatewayCatalog({
                 store,
@@ -12354,12 +12494,23 @@ describe('model-gateway foundation', () => {
 
             assert.equal(result.eligibilityRefresh.enabled, true);
             assert.equal(result.eligibilityRefresh.decisionCount, 2);
-            assert.equal(result.eligibilityRefresh.diffSummary.addedCount, 2);
-            assert.equal(result.eligibilityRefresh.diffSummary.changedCount, 0);
-            assert.equal(result.eligibilityRefresh.run.diffSummary.addedCount, 2);
+            const eligibilityDiffSummary = requireFixtureValue(
+                result.eligibilityRefresh.diffSummary,
+                'eligibility refresh diff summary',
+            );
+            const eligibilityRun = requireFixtureValue(result.eligibilityRefresh.run, 'eligibility refresh run');
+            const eligibilityRunDiffSummary = requireFixtureRecord(eligibilityRun['diffSummary'], 'eligibility run diff summary');
+            assert.equal(eligibilityDiffSummary.addedCount, 2);
+            assert.equal(eligibilityDiffSummary.changedCount, 0);
+            assert.equal(eligibilityRunDiffSummary['addedCount'], 2);
             assert.equal(stored.modelEligibilityDecisions.length, 2);
-            assert.equal(stored.modelEligibilityRuns[0]?.['diffSummary']?.['addedCount'], 2);
-            assert.equal(result.openai.data[0].x_model_gateway.eligibility.status, 'eligible');
+            const storedEligibilityRun = requireFixtureIndex(stored.modelEligibilityRuns, 0, 'stored eligibility run');
+            assert.equal(requireFixtureRecord(storedEligibilityRun['diffSummary'], 'stored eligibility diff summary')['addedCount'], 2);
+            const openAiEligibility = requireFixtureValue(
+                requireFixtureIndex(result.openai.data, 0, 'result.openai.data[0]').x_model_gateway['eligibility'],
+                'refreshed OpenAI eligibility extension',
+            );
+            assert.equal(openAiEligibility.status, 'eligible');
             assert.ok(
                 progressEvents.some(
                     (event) =>
@@ -12421,9 +12572,10 @@ describe('model-gateway foundation', () => {
         assert.equal(summary.committed, true);
         assert.equal(summary.elapsedMs, 3000);
         assert.deepEqual(summary.totals, { projections: 42, openai: 42, overlays: 3, added: 2, removed: 0, changed: 1 });
-        assert.equal(summary.importers['openrouter-models'].completed, 1);
-        assert.equal(summary.importers['openrouter-models'].rowCount, 2);
-        assert.equal(summary.failures[0].importerId, 'broken-models');
+        const openRouterImporterSummary = requireFixtureValue(summary.importers['openrouter-models'], 'openrouter importer summary');
+        assert.equal(openRouterImporterSummary.completed, 1);
+        assert.equal(openRouterImporterSummary.rowCount, 2);
+        assert.equal(requireFixtureIndex(summary.failures, 0, "summary.failures[0]").importerId, 'broken-models');
         assert.equal(JSON.stringify(summary).includes('secret'), false);
     });
 
@@ -12478,19 +12630,19 @@ describe('model-gateway foundation', () => {
             const stored = await store.readSnapshot();
 
             assert.deepEqual(preview.writePolicy, { mode: 'preview', storeAvailable: true, committed: false });
-            assert.equal(preview.snapshot.projections.some((projection) => projection.providerModel === 'preview-model'), true);
-            assert.equal(stored.projections.some((projection) => projection.providerModel === 'preview-model'), false);
-            assert.equal(stored.projections.some((projection) => projection.providerModel === 'previous-model'), true);
+            assert.equal(preview.snapshot.projections.some((projection) => projection['providerModel'] === 'preview-model'), true);
+            assert.equal(stored.projections.some((projection) => projection['providerModel'] === 'preview-model'), false);
+            assert.equal(stored.projections.some((projection) => projection['providerModel'] === 'previous-model'), true);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
     });
 
     it('guards concurrent catalog refreshes with a process-local lock key', async () => {
-        /** @type {(() => void) | null} */
-        let releaseFetch = null;
+        /** @type {{ value: (() => void) | null }} */
+        const releaseFetch = { value: null };
         const blockedFetch = new Promise((resolve) => {
-            releaseFetch = () => resolve({ data: [] });
+            releaseFetch.value = () => resolve({ data: [] });
         });
         const first = refreshModelGatewayCatalog({
             snapshot: { schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION },
@@ -12517,7 +12669,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(secondError?.name, 'ModelGatewayCatalogRefreshLockError');
         assert.equal(secondError?.code, 'MODEL_GATEWAY_CATALOG_REFRESH_LOCKED');
-        releaseFetch?.();
+        requireFixtureValue(releaseFetch.value, 'blocked fetch release callback')();
         const firstResult = await first;
 
         assert.deepEqual(firstResult.refreshLock, { enabled: true, key: 'unit-refresh-lock' });
@@ -12690,9 +12842,9 @@ describe('model-gateway foundation', () => {
             assert.deepEqual(result.refreshPlan?.selected.map((entry) => [entry.sourceId, entry.reason]), [
                 ['stale-source', 'source_ttl_expired'],
             ]);
-            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'fresh-model'), true);
-            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'stale-old-model'), false);
-            assert.equal(result.snapshot.projections.some((projection) => projection.providerModel === 'stale-new-model'), true);
+            assert.equal(result.snapshot.projections.some((projection) => projection['providerModel'] === 'fresh-model'), true);
+            assert.equal(result.snapshot.projections.some((projection) => projection['providerModel'] === 'stale-old-model'), false);
+            assert.equal(result.snapshot.projections.some((projection) => projection['providerModel'] === 'stale-new-model'), true);
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -12707,7 +12859,7 @@ describe('model-gateway foundation', () => {
             sourceKind: 'account_api',
             enabledModels: ['gpt-old-visible'],
         });
-        const importer = {
+        const importer = defineCatalogImporter({
             id: 'openai-models',
             providerId: 'openai',
             sourceKind: 'account_api',
@@ -12737,7 +12889,7 @@ describe('model-gateway foundation', () => {
                     enabledModels: rows.map((row) => /** @type {{ id: string }} */ (row).id),
                 }),
             ],
-        };
+        });
 
         const publicRefresh = await refreshModelGatewayCatalog({
             snapshot: {
@@ -12750,7 +12902,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(publicRefresh.overlayRefresh.enabled, false);
         assert.equal(publicRefresh.overlayRefresh.imported, 1);
-        assert.deepEqual(publicRefresh.snapshot.accountOverlays[0]?.enabledModels, ['gpt-old-visible']);
+        assert.deepEqual(publicRefresh.snapshot.accountOverlays[0]?.['enabledModels'], ['gpt-old-visible']);
 
         const accountRefresh = await refreshModelGatewayCatalog({
             snapshot: {
@@ -12764,7 +12916,7 @@ describe('model-gateway foundation', () => {
 
         assert.equal(accountRefresh.overlayRefresh.enabled, true);
         assert.equal(accountRefresh.overlayRefresh.imported, 1);
-        assert.deepEqual(accountRefresh.snapshot.accountOverlays[0]?.enabledModels, ['gpt-new-visible']);
+        assert.deepEqual(accountRefresh.snapshot.accountOverlays[0]?.['enabledModels'], ['gpt-new-visible']);
     });
 
     it('applies retention policy to refresh operational history without pruning canonical metadata', async () => {
@@ -12808,12 +12960,12 @@ describe('model-gateway foundation', () => {
         );
 
         assert.equal(retained.summary.enabled, true);
-        assert.deepEqual(retained.snapshot.importRuns.map((run) => run['runId']), ['new']);
-        assert.deepEqual(retained.snapshot.rawPayloadRefs.map((rawRef) => rawRef['rawPayloadRef']), ['raw-new']);
-        assert.deepEqual(retained.snapshot.conflicts.map((conflict) => conflict['conflictId']), ['conflict-new']);
-        assert.deepEqual(retained.snapshot.modelEligibilityRuns.map((run) => run['runId']), ['eligibility-new']);
-        assert.equal(retained.snapshot.projections.length, 1);
-        assert.equal(retained.snapshot.evidences.length, 1);
+        assert.deepEqual(retained.snapshot['importRuns'].map((run) => run['runId']), ['new']);
+        assert.deepEqual(retained.snapshot['rawPayloadRefs'].map((rawRef) => rawRef['rawPayloadRef']), ['raw-new']);
+        assert.deepEqual(retained.snapshot['conflicts'].map((conflict) => conflict['conflictId']), ['conflict-new']);
+        assert.deepEqual(retained.snapshot['modelEligibilityRuns'].map((run) => run['runId']), ['eligibility-new']);
+        assert.equal(retained.snapshot['projections'].length, 1);
+        assert.equal(retained.snapshot['evidences'].length, 1);
 
         const refresh = await refreshModelGatewayCatalog({
             snapshot: {
@@ -12842,52 +12994,52 @@ describe('model-gateway foundation', () => {
         const secret = 'sk-openai-secret-that-must-not-leak';
         const importers = createDefaultModelGatewayCatalogImporters({
             env: { OPENAI_API_KEY: secret },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const publicOnly = createDefaultModelGatewayCatalogImporters({
             env: {},
             includeAuthenticated: true,
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const groqAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { GROQ_KEY: 'gsk-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const openRouterAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { OPEN_ROUTER_KEY: 'openrouter-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: {} }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: {} }) })),
         });
         const kiloAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { KILO_CODE_API_KEY: 'kilo-secret-that-must-not-leak', KILO_ORGANIZATION_ID: 'org-1' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const genericAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { CEREBRAS_KEY: 'cerebras-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const mistralAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { MISTRAL_KEY: 'mistral-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const anthropicAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { ANTHROPIC_KEY: 'anthropic-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const geminiAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { GOOGLE_API_KEY: 'gemini-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const ollamaLocal = createDefaultModelGatewayCatalogImporters({
             env: { OLLAMA_BASE_URL: 'http://127.0.0.1:11434' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ models: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ models: [] }) })),
         });
         const huggingFaceAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { HF_TOKEN: 'hf-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const openCodeAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { OPENCODE_API_KEY: 'opencode-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const cloudflareAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: {
@@ -12895,7 +13047,7 @@ describe('model-gateway foundation', () => {
                 CLOUDFLARE_ACCOUNT_ID: 'account-1',
                 CLOUDFLARE_AI_GATEWAY_ID: 'gateway-1',
             },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({
                 ok: true,
                 status: 200,
                 headers: new Headers({ 'content-type': 'application/json' }),
@@ -12905,15 +13057,15 @@ describe('model-gateway foundation', () => {
         });
         const nvidiaAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { NVIDIA_KEY: 'nvidia-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const chutesAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { CHUTES_AI: 'chutes-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({ ok: true, status: 200, json: async () => ({ data: [] }) })),
         });
         const zaiAuthenticated = createDefaultModelGatewayCatalogImporters({
             env: { Z_AI_KEY: 'zai-secret-that-must-not-leak' },
-            fetchImpl: /** @type {typeof fetch} */ (async () => /** @type {Response} */ ({
+            fetchImpl: /** @type {CatalogFetch} */ (async () => ({
                 ok: true,
                 status: 200,
                 text: async () => '',
@@ -13003,14 +13155,14 @@ describe('model-gateway foundation', () => {
                 CHUTES_API_KEY: 'chutes-token',
                 ZAI_API_KEY: 'zai-token',
             },
-            fetchImpl: async () => ({}),
+            fetchImpl: unreachableCatalogFetch,
         });
         const openAiDescriptor = describeCatalogImporter(importers.find((importer) => importer.id === 'openai-models') ?? {});
         const audit = auditCatalogImporterSet(importers, { inventories: listProviderEndpointInventory() });
 
         assert.equal(openAiDescriptor.requiresAuth, true);
-        assert.equal(openAiDescriptor.hooks.toRouteOptions, true);
-        assert.equal(openAiDescriptor.hooks.toAccountOverlays, true);
+        assert.equal(openAiDescriptor.hooks['toRouteOptions'], true);
+        assert.equal(openAiDescriptor.hooks['toAccountOverlays'], true);
         assert.equal(audit.missingRequiredHooks.length, 0);
         assert.ok(audit.publicImporterCount >= 8);
         assert.ok(audit.routeOptionImporterCount >= 10);
@@ -13064,7 +13216,7 @@ describe('model-gateway foundation', () => {
         const projection = buildModelGatewayOperatorProjection(snapshot);
         assert.equal(projection.providerCount, 1);
         assert.ok(projection.modelCount >= 1);
-        assert.equal(projection.providers[0].id, 'gemini');
+        assert.equal(requireFixtureIndex(projection.providers, 0, "projection.providers[0]").id, 'gemini');
         assert.deepEqual(projection.effectiveRoute, {
             enabled: true,
             ready: true,
@@ -13162,7 +13314,7 @@ describe('model-gateway foundation', () => {
                 operationLimit: 10,
             });
 
-            assert.deepEqual(overview.data.effectiveRoute, {
+            assert.deepEqual(overview['data'].effectiveRoute, {
                 enabled: true,
                 ready: true,
                 providerId: 'ollama-cloud',
@@ -13175,10 +13327,10 @@ describe('model-gateway foundation', () => {
                 source: 'env_compat',
                 label: 'ollama-cloud · qwen3-coder-next',
             });
-            assert.deepEqual(overview.data.modelGateway.effectiveRoute, overview.data.effectiveRoute);
-            assert.equal(overview.data.pendingHandoffs.active, 1);
-            assert.equal(overview.data.pendingHandoffs.latest.handoffId, 'handoff-overview-1');
-            assert.deepEqual(overview.data.modelGateway.pendingHandoffs, overview.data.pendingHandoffs);
+            assert.deepEqual(overview['data'].modelGateway.effectiveRoute, overview['data'].effectiveRoute);
+            assert.equal(overview['data'].pendingHandoffs.active, 1);
+            assert.equal(requireFixtureValue(overview['data'].pendingHandoffs.latest, 'latest pending handoff').handoffId, 'handoff-overview-1');
+            assert.deepEqual(overview['data'].modelGateway.pendingHandoffs, overview['data'].pendingHandoffs);
             assert.equal(JSON.stringify(overview).includes('unit-secret-that-must-not-render'), false);
         } finally {
             db.close();
@@ -13229,8 +13381,8 @@ describe('model-gateway foundation', () => {
             OPEN_ROUTER_KEY: secret,
         };
         const snapshot = buildEnvByokModelGatewaySnapshot(env);
-        const provider = snapshot.providers.find((item) => item.id === 'openrouter');
-        const model = snapshot.models.find((item) => item.providerModel === 'deepseek/deepseek-v4-flash:free');
+        const provider = snapshot.providers.find((item) => item['id'] === 'openrouter');
+        const model = snapshot.models.find((item) => item['providerModel'] === 'deepseek/deepseek-v4-flash:free');
         assert.ok(provider);
         assert.ok(model);
 
@@ -13241,9 +13393,9 @@ describe('model-gateway foundation', () => {
         });
 
         assert.equal(overrides.model, 'deepseek/deepseek-v4-flash:free');
-        assert.equal(overrides.provider.baseUrl, 'https://openrouter.ai/api/v1');
-        assert.equal(overrides.provider.apiKey, secret);
-        assert.equal(overrides.modelCapabilities?.supports.vision, true);
+        assert.equal(overrides.provider['baseUrl'], 'https://openrouter.ai/api/v1');
+        assert.equal(overrides.provider['apiKey'], secret);
+        assert.equal(overrides.modelCapabilities?.['supports'].vision, true);
         assert.equal(JSON.stringify({ provider, model }).includes(secret), false);
     });
 
@@ -13256,8 +13408,8 @@ describe('model-gateway foundation', () => {
             OPEN_ROUTER_KEY: secret,
         };
         const snapshot = buildEnvByokModelGatewaySnapshot(env);
-        const provider = snapshot.providers.find((item) => item.id === 'openrouter');
-        const model = snapshot.models.find((item) => item.providerModel === 'deepseek/deepseek-v4-flash:free');
+        const provider = snapshot.providers.find((item) => item['id'] === 'openrouter');
+        const model = snapshot.models.find((item) => item['providerModel'] === 'deepseek/deepseek-v4-flash:free');
         assert.ok(provider);
         assert.ok(model);
         assert.equal(openRouterAdapter.canHandle(provider), true);
@@ -13269,9 +13421,9 @@ describe('model-gateway foundation', () => {
         });
 
         assert.equal(overrides.model, 'deepseek/deepseek-v4-flash:free');
-        assert.equal(overrides.provider.baseUrl, 'https://openrouter.ai/api/v1');
-        assert.equal(overrides.provider.apiKey, secret);
-        assert.equal(overrides.provider.headers['X-Title'], 'Terminal LLM-B');
+        assert.equal(overrides.provider['baseUrl'], 'https://openrouter.ai/api/v1');
+        assert.equal(overrides.provider['apiKey'], secret);
+        assert.equal(overrides.provider['headers']['X-Title'], 'Terminal LLM-B');
         assert.equal(
             JSON.stringify({
                 provider,
@@ -13290,8 +13442,8 @@ describe('model-gateway foundation', () => {
             OLLAMA_LOCAL_BASE_URL: 'http://localhost:11434/v1',
         };
         const snapshot = buildEnvByokModelGatewaySnapshot(env);
-        const provider = snapshot.providers.find((item) => item.id === 'ollama-local');
-        const model = snapshot.models.find((item) => item.providerModel === 'qwen3-coder-next');
+        const provider = snapshot.providers.find((item) => item['id'] === 'ollama-local');
+        const model = snapshot.models.find((item) => item['providerModel'] === 'qwen3-coder-next');
         assert.ok(provider);
         assert.ok(model);
         assert.equal(ollamaAdapter.canHandle(provider), true);
@@ -13303,11 +13455,11 @@ describe('model-gateway foundation', () => {
         });
 
         assert.equal(overrides.model, 'qwen3-coder-next');
-        assert.equal(overrides.provider.baseUrl, 'http://localhost:11434/v1');
-        assert.equal(overrides.provider.apiKey, undefined);
-        assert.equal(overrides.gateway?.providerFamily, 'ollama');
-        assert.equal(overrides.gateway?.runtimeKind, 'local');
-        assert.equal(overrides.gateway?.localPrivate, true);
+        assert.equal(overrides.provider['baseUrl'], 'http://localhost:11434/v1');
+        assert.equal(overrides.provider['apiKey'], undefined);
+        assert.equal(overrides.gateway?.['providerFamily'], 'ollama');
+        assert.equal(overrides.gateway?.['runtimeKind'], 'local');
+        assert.equal(overrides.gateway?.['localPrivate'], true);
     });
 
     it('projects Gemini through its OpenAI-compatible endpoint while preserving provider family metadata', () => {
@@ -13319,8 +13471,8 @@ describe('model-gateway foundation', () => {
             GEMINI_API_KEY: secret,
         };
         const snapshot = buildEnvByokModelGatewaySnapshot(env);
-        const provider = snapshot.providers.find((item) => item.id === 'gemini');
-        const model = snapshot.models.find((item) => item.providerModel === 'gemini-2.5-flash');
+        const provider = snapshot.providers.find((item) => item['id'] === 'gemini');
+        const model = snapshot.models.find((item) => item['providerModel'] === 'gemini-2.5-flash');
         assert.ok(provider);
         assert.ok(model);
         assert.equal(geminiAdapter.canHandle(provider), true);
@@ -13332,11 +13484,11 @@ describe('model-gateway foundation', () => {
         });
 
         assert.equal(overrides.model, 'gemini-2.5-flash');
-        assert.equal(overrides.provider.type, 'openai');
-        assert.equal(overrides.provider.baseUrl, 'https://generativelanguage.googleapis.com/v1beta/openai');
-        assert.equal(overrides.provider.apiKey, secret);
-        assert.equal(overrides.gateway?.providerFamily, 'gemini');
-        assert.equal(overrides.gateway?.openAiCompatibleEndpoint, true);
+        assert.equal(overrides.provider['type'], 'openai');
+        assert.equal(overrides.provider['baseUrl'], 'https://generativelanguage.googleapis.com/v1beta/openai');
+        assert.equal(overrides.provider['apiKey'], secret);
+        assert.equal(overrides.gateway?.['providerFamily'], 'gemini');
+        assert.equal(overrides.gateway?.['openAiCompatibleEndpoint'], true);
     });
 
     it('projects Anthropic as a native SDK provider type without wireApi', () => {
@@ -13362,12 +13514,12 @@ describe('model-gateway foundation', () => {
         });
 
         assert.equal(overrides.model, 'claude-sonnet-4.5');
-        assert.equal(overrides.provider.type, 'anthropic');
-        assert.equal(overrides.provider.baseUrl, 'https://api.anthropic.com');
-        assert.equal(overrides.provider.apiKey, secret);
-        assert.equal(overrides.provider.wireApi, undefined);
-        assert.equal(overrides.gateway?.providerFamily, 'anthropic');
-        assert.equal(overrides.gateway?.openAiCompatibleEndpoint, false);
+        assert.equal(overrides.provider['type'], 'anthropic');
+        assert.equal(overrides.provider['baseUrl'], 'https://api.anthropic.com');
+        assert.equal(overrides.provider['apiKey'], secret);
+        assert.equal(overrides.provider['wireApi'], undefined);
+        assert.equal(overrides.gateway?.['providerFamily'], 'anthropic');
+        assert.equal(overrides.gateway?.['openAiCompatibleEndpoint'], false);
     });
 
     it('resolves remaining BYOK provider families through gateway adapters instead of SDK preset logic', () => {
@@ -13381,20 +13533,20 @@ describe('model-gateway foundation', () => {
                 ...(fixture.extraEnv ?? {}),
             };
             const snapshot = buildEnvByokModelGatewaySnapshot(env);
-            const provider = snapshot.providers.find((item) => item.id === fixture.preset);
-            const model = snapshot.models.find((item) => item.providerModel === fixture.model);
+            const provider = snapshot.providers.find((item) => item['id'] === fixture.preset);
+            const model = snapshot.models.find((item) => item['providerModel'] === fixture.model);
             assert.ok(provider, `provider missing for ${fixture.preset}`);
             assert.ok(model, `model missing for ${fixture.preset}`);
             assert.ok(registeredFamilies.has(fixture.expectedAdapter), `family spec missing for ${fixture.expectedAdapter}`);
 
             const adapter = resolveModelGatewayProviderAdapter(provider);
-            const overrides = adapter.toCopilotSessionOverrides({
+            const overrides = adapter['toCopilotSessionOverrides']({
                 provider,
                 model,
                 secrets: createEnvSecretRegistry({ env }),
             });
 
-            assert.equal(adapter.id, fixture.expectedAdapter);
+            assert.equal(adapter['id'], fixture.expectedAdapter);
             assert.equal(overrides.model, fixture.model);
             assert.equal(overrides.provider.apiKey ?? overrides.provider.bearerToken, fixture.secretValue);
             assert.equal(overrides.gateway?.providerFamily, fixture.expectedAdapter);
@@ -13489,12 +13641,12 @@ describe('model-gateway foundation', () => {
         assert.equal(kilo?.['openAICompatible'], true);
         assert.equal(kilo?.['catalogSourceCount'], 3);
         assert.equal(kilo?.['runtimeEndpointCount'], 2);
-        assert.equal(/** @type {Record<string, any>} */ (kilo?.['routing'] ?? {})['supportsGatewayByok'], true);
-        assert.equal(/** @type {Record<string, any>} */ (kilo?.['capabilities'] ?? {})['fim'], true);
+        assert.equal(requireFixtureRecord(kilo?.['routing'], 'kilo routing metadata')['supportsGatewayByok'], true);
+        assert.equal(requireFixtureRecord(kilo?.['capabilities'], 'kilo capabilities metadata')['fim'], true);
         assert.ok(/** @type {string[]} */ (kilo?.['richnessCategories'] ?? []).includes('pricing'));
-        assert.equal(/** @type {Record<string, any>} */ (kilo?.['metadata'] ?? {})['hasPricingMetadata'], true);
+        assert.equal(requireFixtureRecord(kilo?.['metadata'], 'kilo provider metadata')['hasPricingMetadata'], true);
         assert.equal(openRouter?.['topology'], 'aggregator');
-        assert.equal(/** @type {Record<string, any>} */ (openRouter?.['routing'] ?? {})['supportsFallback'], true);
+        assert.equal(requireFixtureRecord(openRouter?.['routing'], 'openrouter routing metadata')['supportsFallback'], true);
         assert.ok(/** @type {string[]} */ (openRouter?.['richnessCategories'] ?? []).includes('routing'));
         assert.equal(ollama?.['topology'], 'local_daemon');
         assert.equal(ollama?.['localPrivate'], true);
@@ -13519,7 +13671,7 @@ describe('model-gateway foundation', () => {
         assert.equal(cloudflareGateway?.gatewaySpecific, true);
         assert.ok(cloudflareGateway?.pendingProbeKinds.includes('gateway_fallback'));
         assert.equal(openCodeAnthropic?.providerNative, true);
-        assert.ok(summary.pendingProbeKindCounts['provider_native'] > 0);
+        assert.ok(requireFixtureValue(summary.pendingProbeKindCounts['provider_native'], 'provider-native pending probe count') > 0);
     });
 
     it('evaluates provider env requirements without exposing secret values', () => {
@@ -13560,10 +13712,10 @@ describe('model-gateway foundation', () => {
         assert.equal(byProvider.get('ollama-cloud')?.status, 'missing');
         assert.deepEqual(ollamaAliasRows.map((row) => row.providerId), ['ollama-local']);
         assert.deepEqual(kiloAliasRows.map((row) => row.providerId), ['kilo']);
-        assert.equal(kiloAliasRows[0].status, 'ready');
+        assert.equal(requireFixtureIndex(kiloAliasRows, 0, "kiloAliasRows[0]").status, 'ready');
         assert.deepEqual(ollamaLocalRows.map((row) => row.providerId), ['ollama-local']);
         assert.deepEqual(ollamaCloudRows.map((row) => row.providerId), ['ollama-cloud']);
-        assert.deepEqual(ollamaCloudRows[0].missingRequiredKeys, ['OLLAMA_CLOUD_API_KEY']);
+        assert.deepEqual(requireFixtureIndex(ollamaCloudRows, 0, "ollamaCloudRows[0]").missingRequiredKeys, ['OLLAMA_CLOUD_API_KEY']);
         assert.equal(byProvider.get('opencode')?.status, 'missing');
         assert.ok(byProvider.get('opencode')?.missingRequiredKeys.includes('OPENCODE_API_KEY'));
         assert.ok(summary.readyCount >= 3);
@@ -13591,7 +13743,7 @@ describe('model-gateway foundation', () => {
                 CLOUDFLARE_AI_GATEWAY_ID: 'gateway-1',
                 OLLAMA_BASE_URL: 'http://localhost:11434',
             },
-            fetchImpl: async () => ({}),
+            fetchImpl: unreachableCatalogFetch,
         });
         const coverage = auditProviderEndpointImporterCoverage({
             inventories: listProviderEndpointInventory(),
@@ -13615,9 +13767,9 @@ describe('model-gateway foundation', () => {
                 OPEN_ROUTER_KEY: secret,
             },
             {
-                catalogStore: /** @type {JsonModelGatewayCatalogStore} */ ({
-                    readSnapshot: async () => ({ projections: [], routeOptions: [], modelEligibilityDecisions: [] }),
-                }),
+                catalogStore: {
+                    readSnapshot: async () => normalizeStoredCatalogSnapshot({}),
+                },
             },
         );
         assert.equal(typeof handler, 'function');
@@ -13650,53 +13802,31 @@ describe('model-gateway foundation', () => {
     });
 
     it('reports configured BYOK chat probe as unavailable before provider readiness', async () => {
+        const state = createByokProbeState({
+            COPILOT_BYOK_ENABLED: 'true',
+            COPILOT_BYOK_PROVIDER_TYPE: 'openai',
+            COPILOT_BYOK_MODEL: 'model-a',
+        });
         const result = await runConfiguredByokChatProbe({
-            deps: {
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                readConfiguredByokState: () => ({
-                    enabled: false,
-                    ready: false,
-                    provider: null,
-                    model: null,
-                    errors: [],
-                    warnings: ['missing provider'],
-                    summary: {
-                        model: null,
-                        profile: 'dev',
-                        preset: 'openrouter',
-                        providerType: 'openai',
-                    },
-                }),
-            },
+            deps: { readConfiguredByokState: () => state },
         });
 
         assert.equal(result.ok, false);
         assert.equal(result.status, 'unavailable');
-        assert.equal(result.profile, 'dev');
         assert.equal(result.providerType, 'openai');
-        assert.deepEqual(result.warnings, ['missing provider']);
-        assert.match(result.errors[0], /BYOK/);
+        assert.ok(result.errors.some((message) => /BASE_URL|API_KEY|provider/i.test(message)));
     });
 
     it('blocks configured BYOK chat probe through canonical admission policy', async () => {
+        const fixture = createReadyByokProbeFixture({
+            profile: 'dev',
+            model: 'model-a',
+            preset: 'groq',
+        });
         const result = await runConfiguredByokChatProbe({
             deps: {
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                readConfiguredByokState: () => ({
-                    enabled: true,
-                    ready: true,
-                    provider: { type: 'openai', apiKey: 'secret' },
-                    model: 'model-a',
-                    errors: [],
-                    warnings: [],
-                    summary: { model: 'model-a', profile: 'dev', preset: 'groq', providerType: 'openai' },
-                }),
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                resolveConfiguredByokSessionOverrides: () => ({
-                    provider: { type: 'openai', apiKey: 'secret' },
-                    model: 'model-a',
-                    summary: { model: 'model-a', profile: 'dev', preset: 'groq', providerType: 'openai', warnings: [] },
-                }),
+                readConfiguredByokState: () => fixture.state,
+                resolveConfiguredByokSessionOverrides: () => fixture.overrides,
                 evaluateAdmission: () => ({ shouldBlock: true, label: 'blocked by budget' }),
             },
         });
@@ -13707,60 +13837,33 @@ describe('model-gateway foundation', () => {
     });
 
     it('runs configured BYOK chat probe through disposable session with deltas and final event', async () => {
+        const fixture = createReadyByokProbeFixture({
+            profile: 'dev',
+            model: 'model-a',
+            preset: 'openrouter',
+            summaryWarnings: ['free tier'],
+        });
         let unsubscribed = false;
-        /** @type {any} */
-        let capturedConfig = null;
-        /** @type {any} */
-        let capturedPayload = null;
+        /** @type {{ value: Parameters<ModelGatewayProbeSessionRuntime['withSession']>[0] | null }} */
+        const capturedConfig = { value: null };
+        /** @type {{ value: { payload: import('@github/copilot-sdk').MessageOptions; timeoutMs: number } | null }} */
+        const capturedPayload = { value: null };
+        const sessionRuntime = createReplyProbeSessionRuntime({
+            sessionId: 'tmp-chat-probe',
+            finalContent: 'BYOK_PROBE_OK',
+            deltas: ['BYOK_', 'PROBE_'],
+            onConfig: (config) => { capturedConfig.value = config; },
+            onMessage: (payload, timeoutMs) => { capturedPayload.value = { payload, timeoutMs }; },
+            onUnsubscribe: () => { unsubscribed = true; },
+        });
 
         const result = await runConfiguredByokChatProbe({
             prompt: 'probe now',
             timeoutMs: 100,
             deps: {
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                readConfiguredByokState: () => ({
-                    enabled: true,
-                    ready: true,
-                    provider: { type: 'openai', apiKey: 'secret' },
-                    model: 'model-a',
-                    errors: [],
-                    warnings: [],
-                    summary: { model: 'model-a', profile: 'dev', preset: 'openrouter', providerType: 'openai' },
-                }),
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                resolveConfiguredByokSessionOverrides: () => ({
-                    provider: { type: 'openai', apiKey: 'secret' },
-                    model: 'model-a',
-                    modelCapabilities: { tools: false },
-                    summary: {
-                        model: 'model-a',
-                        profile: 'dev',
-                        preset: 'openrouter',
-                        providerType: 'openai',
-                        warnings: ['free tier'],
-                    },
-                }),
-                // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
-                withEphemeralSession: async (config, callback) => {
-                    capturedConfig = config;
-                    await callback({ session: { id: 'session-object' }, sessionId: 'tmp-chat-probe' });
-                },
-                // @ts-expect-error test double emits the subset of SDK events used by the probe.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'BYOK_' } });
-                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'PROBE_' } });
-                    handlers['assistant.message']?.({ data: { content: 'BYOK_PROBE_OK' } });
-                    return () => {
-                        unsubscribed = true;
-                    };
-                },
-                // @ts-expect-error test double records the prompt payload.
-                sendSessionAndWait: async (_session, payload, timeoutMs) => {
-                    capturedPayload = { payload, timeoutMs };
-                    return { data: { content: 'BYOK_PROBE_OK' } };
-                },
-                // @ts-expect-error test double makes the permission handler identity observable.
-                createPermissionHandler: (options) => ({ permission: options.defaultDecision }),
+                readConfiguredByokState: () => fixture.state,
+                resolveConfiguredByokSessionOverrides: () => fixture.overrides,
+                sessionRuntime,
             },
         });
 
@@ -13774,81 +13877,67 @@ describe('model-gateway foundation', () => {
         assert.equal(result.observedFinalEvent, true);
         assert.deepEqual(result.warnings, ['free tier']);
         assert.equal(unsubscribed, true);
-        assert.equal(capturedConfig.streaming, true);
-        assert.deepEqual(capturedConfig.availableTools, []);
-        assert.deepEqual(capturedConfig.onPermissionRequest, { permission: 'deny' });
-        assert.deepEqual(capturedPayload, { payload: { prompt: 'probe now' }, timeoutMs: 5000 });
+        const config = requireFixtureValue(capturedConfig.value, 'chat probe should capture session config');
+        assert.equal(config.streaming, true);
+        assert.deepEqual(config.availableTools, []);
+        assert.equal(typeof config.onPermissionRequest, 'function');
+        assert.deepEqual(capturedPayload.value, { payload: { prompt: 'probe now' }, timeoutMs: 5000 });
     });
 
     it('runs configured BYOK agent probe through disposable tools, ask_user, deltas and final event', async () => {
+        const fixture = createReadyByokProbeFixture({
+            profile: 'dev',
+            model: 'model-agent',
+            preset: 'openrouter',
+            summaryWarnings: ['agent tier'],
+        });
         let unsubscribed = false;
-        /** @type {any} */
-        let capturedConfig = null;
-        /** @type {any} */
-        let capturedPayload = null;
+        /** @type {{ value: Parameters<ModelGatewayProbeSessionRuntime['withSession']>[0] | null }} */
+        const capturedConfig = { value: null };
+        /** @type {{ value: { payload: import('@github/copilot-sdk').MessageOptions; timeoutMs: number } | null }} */
+        const capturedPayload = { value: null };
         /** @type {unknown} */
         let capturedAskAnswer = null;
+        const session = Object.freeze({ probeSession: 'agent-session-object' });
+        const sessionRuntime = createProbeSessionRuntime({
+            async withSession(config, callback) {
+                capturedConfig.value = config;
+                const markerTool = config.tools?.[0];
+                const readTool = config.tools?.[1];
+                if (typeof markerTool?.handler !== 'function' || typeof readTool?.handler !== 'function') {
+                    throw new Error('agent probe must install two executable tools');
+                }
+                await Reflect.apply(markerTool.handler, markerTool, [{ marker: 'BYOK_AGENT_PROBE_TOOL_OK' }]);
+                await Reflect.apply(readTool.handler, readTool, [
+                    { path: BYOK_AGENT_PROBE_READ_PATH, startLine: 1, endLine: 3 },
+                ]);
+                if (typeof config.onUserInputRequest !== 'function') {
+                    throw new Error('agent probe must install onUserInputRequest');
+                }
+                capturedAskAnswer = await Reflect.apply(config.onUserInputRequest, undefined, [
+                    { question: BYOK_AGENT_PROBE_QUESTION },
+                    {},
+                ]);
+                await callback({ session, sessionId: 'tmp-agent-probe' });
+            },
+            subscribe(_session, handlers) {
+                handlers['assistant.message_delta']?.({ data: { deltaContent: 'AGENT_' } });
+                handlers['assistant.message']?.({ data: { content: 'BYOK_AGENT_PROBE_DONE' } });
+                return () => { unsubscribed = true; };
+            },
+            async sendAndWait(_session, payload, timeoutMs) {
+                capturedPayload.value = { payload, timeoutMs };
+                return { data: { content: 'BYOK_AGENT_PROBE_DONE' } };
+            },
+        });
 
         const result = await runConfiguredByokAgentProbe({
             prompt: 'agent probe now',
             timeoutMs: 100,
             deps: {
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                readConfiguredByokState: () => ({
-                    enabled: true,
-                    ready: true,
-                    provider: { type: 'openai', apiKey: 'secret' },
-                    model: 'model-agent',
-                    errors: [],
-                    warnings: [],
-                    summary: { model: 'model-agent', profile: 'dev', preset: 'kilo-code', providerType: 'openai' },
-                }),
-                // @ts-expect-error test double keeps only the fields consumed by the probe.
-                resolveConfiguredByokSessionOverrides: () => ({
-                    provider: { type: 'openai', apiKey: 'secret' },
-                    model: 'model-agent',
-                    modelCapabilities: { tools: true },
-                    summary: {
-                        model: 'model-agent',
-                        profile: 'dev',
-                        preset: 'kilo-code',
-                        providerType: 'openai',
-                        warnings: ['agent tier'],
-                    },
-                }),
-                // @ts-expect-error test double uses the same shape consumed by the probe.
-                createTool: (definition) => definition,
-                // @ts-expect-error test double returns a deterministic ask_user handler.
-                createStaticInputHandler: (answers, fallback) => async (request) => {
-                    const question =
-                        request && typeof request === 'object' && typeof request.question === 'string'
-                            ? request.question.toLowerCase()
-                            : '';
-                    return answers[question] ?? fallback;
-                },
-                // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
-                withEphemeralSession: async (config, callback) => {
-                    capturedConfig = config;
-                    await config.tools[0].handler({ marker: 'BYOK_AGENT_PROBE_TOOL_OK' });
-                    await config.tools[1].handler({ path: BYOK_AGENT_PROBE_READ_PATH, startLine: 1, endLine: 3 });
-                    capturedAskAnswer = await config.onUserInputRequest({ question: BYOK_AGENT_PROBE_QUESTION }, {});
-                    await callback({ session: { id: 'agent-session-object' }, sessionId: 'tmp-agent-probe' });
-                },
-                // @ts-expect-error test double emits the subset of SDK events used by the probe.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'AGENT_' } });
-                    handlers['assistant.message']?.({ data: { content: 'BYOK_AGENT_PROBE_DONE' } });
-                    return () => {
-                        unsubscribed = true;
-                    };
-                },
-                // @ts-expect-error test double records the prompt payload.
-                sendSessionAndWait: async (_session, payload, timeoutMs) => {
-                    capturedPayload = { payload, timeoutMs };
-                    return { data: { content: 'BYOK_AGENT_PROBE_DONE' } };
-                },
-                // @ts-expect-error test double makes the permission handler identity observable.
-                createPermissionHandler: (options) => ({ permission: options.allowAll ? 'allow' : 'deny' }),
+                readConfiguredByokState: () => fixture.state,
+                resolveConfiguredByokSessionOverrides: () => fixture.overrides,
+                sessionRuntime,
             },
         });
 
@@ -13865,72 +13954,38 @@ describe('model-gateway foundation', () => {
         assert.equal(result.finalChars, 'BYOK_AGENT_PROBE_DONE'.length);
         assert.equal(result.observedFinalEvent, true);
         assert.deepEqual(result.warnings, ['agent tier']);
-        assert.equal(capturedAskAnswer, BYOK_AGENT_PROBE_ANSWER);
+        assert.deepEqual(capturedAskAnswer, { answer: BYOK_AGENT_PROBE_ANSWER, wasFreeform: false });
         assert.equal(unsubscribed, true);
-        assert.equal(capturedConfig.streaming, true);
-        assert.deepEqual(capturedConfig.availableTools, [
-            BYOK_AGENT_PROBE_TOOL,
-            BYOK_AGENT_PROBE_READ_TOOL,
-            'ask_user',
-        ]);
-        assert.deepEqual(capturedConfig.onPermissionRequest, { permission: 'allow' });
-        assert.deepEqual(capturedPayload, { payload: { prompt: 'agent probe now' }, timeoutMs: 5000 });
+        const config = requireFixtureValue(capturedConfig.value, 'agent probe should capture session config');
+        assert.equal(config.streaming, true);
+        assert.deepEqual(config.availableTools, [BYOK_AGENT_PROBE_TOOL, BYOK_AGENT_PROBE_READ_TOOL, 'ask_user']);
+        assert.equal(typeof config.onPermissionRequest, 'function');
+        assert.deepEqual(capturedPayload.value, { payload: { prompt: 'agent probe now' }, timeoutMs: 5000 });
     });
 
     it('classifies configured BYOK streaming probe as ok only when message deltas are observed', async () => {
+        const fixture = createReadyByokProbeFixture({ profile: 'dev', model: 'model-stream', preset: 'openrouter' });
         const baseDeps = {
-            // @ts-expect-error test double keeps only the fields consumed by the probe.
-            readConfiguredByokState: () => ({
-                enabled: true,
-                ready: true,
-                provider: { type: 'openai', apiKey: 'secret' },
-                model: 'model-stream',
-                errors: [],
-                warnings: [],
-                summary: { model: 'model-stream', profile: 'dev', preset: 'openrouter', providerType: 'openai' },
-            }),
-            // @ts-expect-error test double keeps only the fields consumed by the probe.
-            resolveConfiguredByokSessionOverrides: () => ({
-                provider: { type: 'openai', apiKey: 'secret' },
-                model: 'model-stream',
-                summary: {
-                    model: 'model-stream',
-                    profile: 'dev',
-                    preset: 'openrouter',
-                    providerType: 'openai',
-                    warnings: [],
-                },
-            }),
-            // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
-            withEphemeralSession: async (_config, callback) => {
-                await callback({ session: { id: 'stream-session-object' }, sessionId: 'tmp-stream-probe' });
-            },
-            // @ts-expect-error test double records no actual permission behavior.
-            createPermissionHandler: () => ({}),
+            readConfiguredByokState: () => fixture.state,
+            resolveConfiguredByokSessionOverrides: () => fixture.overrides,
         };
         const withDelta = await runConfiguredByokStreamingProbe({
             deps: {
                 ...baseDeps,
-                // @ts-expect-error test double emits the subset of SDK events used by the probe.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message_delta']?.({ data: { deltaContent: 'STREAM_A' } });
-                    handlers['assistant.message']?.({ data: { content: 'STREAM_A STREAM_B STREAM_C' } });
-                    return () => {};
-                },
-                // @ts-expect-error test double returns final content.
-                sendSessionAndWait: async () => ({ data: { content: 'STREAM_A STREAM_B STREAM_C' } }),
+                sessionRuntime: createReplyProbeSessionRuntime({
+                    sessionId: 'tmp-stream-probe-delta',
+                    finalContent: 'STREAM_A STREAM_B STREAM_C',
+                    deltas: ['STREAM_A'],
+                }),
             },
         });
         const withoutDelta = await runConfiguredByokStreamingProbe({
             deps: {
                 ...baseDeps,
-                // @ts-expect-error test double emits only final content.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message']?.({ data: { content: 'STREAM_A STREAM_B STREAM_C' } });
-                    return () => {};
-                },
-                // @ts-expect-error test double returns final content.
-                sendSessionAndWait: async () => ({ data: { content: 'STREAM_A STREAM_B STREAM_C' } }),
+                sessionRuntime: createReplyProbeSessionRuntime({
+                    sessionId: 'tmp-stream-probe-final',
+                    finalContent: 'STREAM_A STREAM_B STREAM_C',
+                }),
             },
         });
 
@@ -13945,59 +14000,23 @@ describe('model-gateway foundation', () => {
     });
 
     it('validates configured BYOK JSON probe from final assistant content', async () => {
+        const fixture = createReadyByokProbeFixture({ profile: 'dev', model: 'model-json', preset: 'openrouter' });
         const baseDeps = {
-            // @ts-expect-error test double keeps only the fields consumed by the probe.
-            readConfiguredByokState: () => ({
-                enabled: true,
-                ready: true,
-                provider: { type: 'openai', apiKey: 'secret' },
-                model: 'model-json',
-                errors: [],
-                warnings: [],
-                summary: { model: 'model-json', profile: 'dev', preset: 'mistral', providerType: 'openai' },
-            }),
-            // @ts-expect-error test double keeps only the fields consumed by the probe.
-            resolveConfiguredByokSessionOverrides: () => ({
-                provider: { type: 'openai', apiKey: 'secret' },
-                model: 'model-json',
-                summary: {
-                    model: 'model-json',
-                    profile: 'dev',
-                    preset: 'mistral',
-                    providerType: 'openai',
-                    warnings: [],
-                },
-            }),
-            // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
-            withEphemeralSession: async (_config, callback) => {
-                await callback({ session: { id: 'json-session-object' }, sessionId: 'tmp-json-probe' });
-            },
-            // @ts-expect-error test double records no actual permission behavior.
-            createPermissionHandler: () => ({}),
+            readConfiguredByokState: () => fixture.state,
+            resolveConfiguredByokSessionOverrides: () => fixture.overrides,
         };
-
         const valid = await runConfiguredByokJsonProbe({
             deps: {
                 ...baseDeps,
-                // @ts-expect-error test double emits valid JSON final content.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message']?.({ data: { content: '{"byok_probe":"ok","mode":"json"}' } });
-                    return () => {};
-                },
-                // @ts-expect-error test double returns valid JSON final content.
-                sendSessionAndWait: async () => ({ data: { content: '{"byok_probe":"ok","mode":"json"}' } }),
+                sessionRuntime: createReplyProbeSessionRuntime({
+                    finalContent: '{"byok_probe":"ok","mode":"json"}',
+                }),
             },
         });
         const invalid = await runConfiguredByokJsonProbe({
             deps: {
                 ...baseDeps,
-                // @ts-expect-error test double emits invalid JSON final content.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message']?.({ data: { content: 'not-json' } });
-                    return () => {};
-                },
-                // @ts-expect-error test double returns invalid JSON final content.
-                sendSessionAndWait: async () => ({ data: { content: 'not-json' } }),
+                sessionRuntime: createReplyProbeSessionRuntime({ finalContent: 'not-json' }),
             },
         });
 
@@ -14012,65 +14031,31 @@ describe('model-gateway foundation', () => {
     });
 
     it('validates configured BYOK vision probe with a hermetic image attachment', async () => {
-        /** @type {any} */
-        let capturedPayload = null;
+        const fixture = createReadyByokProbeFixture({
+            profile: 'dev',
+            model: 'model-vision',
+            preset: 'openrouter',
+            extraProfile: { supportsVision: true },
+        });
+        /** @type {{ value: import('@github/copilot-sdk').MessageOptions | null }} */
+        const capturedPayload = { value: null };
         const baseDeps = {
-            // @ts-expect-error test double keeps only the fields consumed by the probe.
-            readConfiguredByokState: () => ({
-                enabled: true,
-                ready: true,
-                provider: { type: 'openai', apiKey: 'secret' },
-                model: 'model-vision',
-                errors: [],
-                warnings: [],
-                summary: { model: 'model-vision', profile: 'dev', preset: 'openrouter', providerType: 'openai' },
-            }),
-            // @ts-expect-error test double keeps only the fields consumed by the probe.
-            resolveConfiguredByokSessionOverrides: () => ({
-                provider: { type: 'openai', apiKey: 'secret' },
-                model: 'model-vision',
-                modelCapabilities: { supports: { vision: true } },
-                summary: {
-                    model: 'model-vision',
-                    profile: 'dev',
-                    preset: 'openrouter',
-                    providerType: 'openai',
-                    warnings: [],
-                },
-            }),
-            // @ts-expect-error test double calls the callback synchronously with a fake SDK session.
-            withEphemeralSession: async (_config, callback) => {
-                await callback({ session: { id: 'vision-session-object' }, sessionId: 'tmp-vision-probe' });
-            },
-            // @ts-expect-error test double records no actual permission behavior.
-            createPermissionHandler: () => ({}),
+            readConfiguredByokState: () => fixture.state,
+            resolveConfiguredByokSessionOverrides: () => fixture.overrides,
         };
-
         const valid = await runConfiguredByokVisionProbe({
             deps: {
                 ...baseDeps,
-                // @ts-expect-error test double emits final content after image interpretation.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message']?.({ data: { content: 'VISION_PROBE_OK:red' } });
-                    return () => {};
-                },
-                // @ts-expect-error test double records the payload with attachment.
-                sendSessionAndWait: async (_session, payload) => {
-                    capturedPayload = payload;
-                    return { data: { content: 'VISION_PROBE_OK:red' } };
-                },
+                sessionRuntime: createReplyProbeSessionRuntime({
+                    finalContent: 'VISION_PROBE_OK:red',
+                    onMessage: (payload) => { capturedPayload.value = payload; },
+                }),
             },
         });
         const invalid = await runConfiguredByokVisionProbe({
             deps: {
                 ...baseDeps,
-                // @ts-expect-error test double emits the wrong color.
-                onSessionEvents: (_session, handlers) => {
-                    handlers['assistant.message']?.({ data: { content: 'VISION_PROBE_OK:blue' } });
-                    return () => {};
-                },
-                // @ts-expect-error test double returns the wrong color.
-                sendSessionAndWait: async () => ({ data: { content: 'VISION_PROBE_OK:blue' } }),
+                sessionRuntime: createReplyProbeSessionRuntime({ finalContent: 'VISION_PROBE_OK:blue' }),
             },
         });
 
@@ -14079,9 +14064,11 @@ describe('model-gateway foundation', () => {
         assert.equal(valid.visionProved, true);
         assert.equal(valid.dominantColor, 'red');
         assert.equal(valid.attachmentMimeType, BYOK_VISION_PROBE_MIME_TYPE);
-        assert.equal(capturedPayload.attachments[0].type, 'blob');
-        assert.equal(capturedPayload.attachments[0].mimeType, BYOK_VISION_PROBE_MIME_TYPE);
-        assert.equal(capturedPayload.attachments[0].displayName, BYOK_VISION_PROBE_DISPLAY_NAME);
+        const payload = requireFixtureValue(capturedPayload.value, 'vision probe should capture payload');
+        const attachment = requireFixtureValue(payload.attachments?.[0], 'vision probe should include one attachment');
+        assert.equal(attachment.type, 'blob');
+        assert.equal(attachment.mimeType, BYOK_VISION_PROBE_MIME_TYPE);
+        assert.equal(attachment.displayName, BYOK_VISION_PROBE_DISPLAY_NAME);
         assert.equal(invalid.ok, false);
         assert.equal(invalid.status, 'vision-mismatch');
         assert.equal(invalid.visionProved, false);

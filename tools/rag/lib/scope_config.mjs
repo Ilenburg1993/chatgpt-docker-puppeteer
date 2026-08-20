@@ -38,7 +38,7 @@ function parseGlobList(/** @type {any} */ rawValue) {
 }
 
 function uniqueSorted(/** @type {any} */ list) {
-    return [...new Set(list)].sort(/** @type {any} */ (a, b) => a.localeCompare(b));
+    return [...new Set(list)].sort((a, b) => a.localeCompare(b));
 }
 
 function toScopeHashPayload(/** @type {any} */ scope) {
@@ -57,14 +57,14 @@ function buildScopeHash(/** @type {any} */ scope) {
 }
 
 export function resolveRagScopeConfig(/** @type {any} */ input = {}) {
-    const profile = normalizeProfile(input.profile ?? process.env.RAG_PROFILE_DEFAULT ?? 'core');
-    const docsMode = normalizeDocsMode(input.docsMode ?? process.env.RAG_DOCS_MODE ?? 'include');
-    const includeGlobs = uniqueSorted(parseGlobList(input.includeGlobs ?? process.env.RAG_INCLUDE_GLOBS));
-    const excludeGlobsBase = parseGlobList(input.excludeGlobs ?? process.env.RAG_EXCLUDE_GLOBS);
+    const profile = normalizeProfile(input.profile ?? process.env['RAG_PROFILE_DEFAULT'] ?? 'core');
+    const docsMode = normalizeDocsMode(input.docsMode ?? process.env['RAG_DOCS_MODE'] ?? 'include');
+    const includeGlobs = uniqueSorted(parseGlobList(input.includeGlobs ?? process.env['RAG_INCLUDE_GLOBS']));
+    const excludeGlobsBase = parseGlobList(input.excludeGlobs ?? process.env['RAG_EXCLUDE_GLOBS']);
     const excludeGlobs =
         docsMode === 'exclude' ? uniqueSorted([...excludeGlobsBase, ...DOC_GLOBS]) : uniqueSorted(excludeGlobsBase);
     const maxFileBytes = parsePositiveInt(
-        input.maxFileBytes ?? process.env.RAG_INDEX_MAX_FILE_BYTES,
+        input.maxFileBytes ?? process.env['RAG_INDEX_MAX_FILE_BYTES'],
         DEFAULT_MAX_FILE_BYTES,
     );
 

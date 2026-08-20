@@ -56,12 +56,12 @@ async function getTelemetryAggregator() {
 }
 
 function isDashboardAuthRequired() {
-    return process.env.DASHBOARD_AUTH_REQUIRED !== 'false';
+    return process.env['DASHBOARD_AUTH_REQUIRED'] !== 'false';
 }
 
 function getDashboardAuthCredentials() {
-    const username = String(process.env.DASHBOARD_AUTH_USERNAME || '').trim();
-    const password = String(process.env.DASHBOARD_AUTH_PASSWORD || '');
+    const username = String(process.env['DASHBOARD_AUTH_USERNAME'] || '').trim();
+    const password = String(process.env['DASHBOARD_AUTH_PASSWORD'] || '');
 
     if (!username) {
         throw new Error('DASHBOARD_AUTH_USERNAME ausente');
@@ -217,9 +217,9 @@ router.post('/auth/login', authLimiter, async (req, res) => {
  * também deve remover o token do localStorage.
  */
 router.post('/auth/logout', authenticate, (req, res) => {
-    const username = req.user?.username || 'unknown';
-    const jti = req.user?.jti;
-    const exp = req.user?.exp;
+    const username = req.user?.['username'] || 'unknown';
+    const jti = req.user?.['jti'];
+    const exp = req.user?.['exp'];
 
     // Revogar token na blocklist se tiver jti
     if (jti) {
@@ -290,7 +290,7 @@ router.get('/telemetry/history/:metric', async (req, res) => {
     try {
         const telemetryAggregator = await getTelemetryAggregator();
         const metric = req.params.metric;
-        const samples = parseInt(String(req.query.samples), 10) || 60;
+        const samples = parseInt(String(req.query['samples']), 10) || 60;
         const history = telemetryAggregator.getHistory(metric, samples);
 
         if (history.error) {

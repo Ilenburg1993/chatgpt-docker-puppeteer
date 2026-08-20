@@ -31,10 +31,10 @@ describe('copilot MCP session tools', () => {
         const result = await listTool.handler({});
 
         assert.equal(result.isError, undefined);
-        assert.deepEqual(result.structuredContent.sessions, [
+        assert.deepEqual(result.structuredContent['sessions'], [
             { sessionId: 'sdk-1', model: 'auto', createdAt: 123, messagesCount: 4 },
         ]);
-        const first = /** @type {Record<string, unknown>[]} */ (result.structuredContent.sessions)[0];
+        const first = /** @type {Record<string, unknown>[]} */ (result.structuredContent['sessions'])[0];
         assert.equal(Object.prototype.hasOwnProperty.call(first, 'session'), false);
     });
 
@@ -49,7 +49,7 @@ describe('copilot MCP session tools', () => {
         const result = await getTool.handler({ sessionId: 'sdk-2' });
 
         assert.equal(result.isError, undefined);
-        assert.deepEqual(result.structuredContent.session, {
+        assert.deepEqual(result.structuredContent['session'], {
             sessionId: 'sdk-2',
             model: 'gpt-test',
             createdAt: 456,
@@ -63,6 +63,6 @@ describe('copilot MCP session tools', () => {
         const result = await getTool.handler({ sessionId: 'missing' });
 
         assert.equal(result.isError, true);
-        assert.equal(result.structuredContent.success, false);
+        assert.equal(result.structuredContent['success'], false);
     });
 });

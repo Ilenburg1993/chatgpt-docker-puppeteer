@@ -35,7 +35,7 @@ function parsePositiveIntEnv(name, fallback) {
  * }}
  */
 export function getInferenceEnvBootstrapPolicy() {
-    const allowedModelsRaw = String(process.env.OLLAMA_LOCAL_ALLOWED_MODELS || '').trim();
+    const allowedModelsRaw = String(process.env['OLLAMA_LOCAL_ALLOWED_MODELS'] || '').trim();
     const allowedModels = allowedModelsRaw
         ? allowedModelsRaw
               .split(',')
@@ -47,7 +47,7 @@ export function getInferenceEnvBootstrapPolicy() {
         timeoutMs: parsePositiveIntEnv('AUDIT_AGENT_LLM_TIMEOUT_MS', 120000),
         maxParallel: parsePositiveIntEnv('AUDIT_AGENT_MAX_PARALLEL_LLM_CALLS', 1),
         maxTokens: (() => {
-            const n = Number(process.env.OLLAMA_MAX_TOKENS);
+            const n = Number(process.env['OLLAMA_MAX_TOKENS']);
             return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
         })(),
         allowedModels,

@@ -144,7 +144,7 @@ describe('RAG Error Scenarios', () => {
                 async health() {
                     return { ok: true, hasModel: true, models: ['flaky-model'] };
                 },
-                async embed(/** @type {any} */ text) {
+                async embed(/** @type {string} */ _text) {
                     attempts++;
                     if (attempts <= 2) {
                         throw new Error('TEMPORARY_ERROR');

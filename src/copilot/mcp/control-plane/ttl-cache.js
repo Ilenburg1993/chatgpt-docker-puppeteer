@@ -27,7 +27,6 @@ const ttlCacheRegistry = new Set();
  */
 
 /**
- * @template T
  * @typedef {object} TtlCacheOptions
  * @property {string} name
  * @property {number} ttlMs
@@ -40,7 +39,7 @@ const ttlCacheRegistry = new Set();
  */
 export class TtlCache {
     /**
-     * @param {TtlCacheOptions<T>} options
+     * @param {TtlCacheOptions} options
      */
     constructor(options) {
         this.name = options.name;
@@ -194,7 +193,7 @@ export class TtlCache {
 
 /**
  * @template T
- * @param {TtlCacheOptions<T>} options
+ * @param {TtlCacheOptions} options
  * @returns {TtlCache<T>}
  */
 export function createTtlCache(options) {

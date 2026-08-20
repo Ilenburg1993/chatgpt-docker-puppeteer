@@ -33,15 +33,15 @@ describe('mcp/cloudflare/edge-snapshot', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(result.mode).toBe('read-only-snapshot');
-        expect(result.appliesChanges).toBe(false);
-        expect(result.readiness).toMatchObject({
+        expect(result['mode']).toBe('read-only-snapshot');
+        expect(result['appliesChanges']).toBe(false);
+        expect(result['readiness']).toMatchObject({
             remoteTunnelOk: true,
             edgeAuditOk: true,
             edgeDiffOk: true,
             mutationReady: true,
             criticalCount: 0,
         });
-        expect(result.suggestedFileName).toBe('cloudflare-edge-snapshot-2026-05-24T17-30-00-000Z.json');
+        expect(result['suggestedFileName']).toBe('cloudflare-edge-snapshot-2026-05-24T17-30-00-000Z.json');
     });
 });

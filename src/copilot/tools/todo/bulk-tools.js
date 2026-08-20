@@ -27,12 +27,12 @@ export const todoBulkUpdateTool = buildTool({
         'Aplica a mesma mudança a todas as tarefas do array de IDs fornecido. ' +
         'Use para completar um sprint, repriorizar um conjunto ou etiquetar em lote.',
     parameters: z.object({
-        ids: z.array(zId).min(1).describe('Lista de IDs de tarefas a atualizar'),
-        status: zStatus.optional().describe('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
-        priority: zPriority.optional().describe('Nova prioridade a aplicar a todas'),
-        add_tags: z.array(z.string()).optional().describe('Tags a adicionar a todas'),
-        remove_tags: z.array(z.string()).optional().describe('Tags a remover de todas'),
-        completed_by: z.string().optional().describe('Identificador de quem concluiu (agente, usuário, etc.)'),
+        ids: z.array(zId).min(1)['describe']('Lista de IDs de tarefas a atualizar'),
+        status: zStatus.optional()['describe']('Novo status a aplicar a todas (máquina de estados ignorada em bulk)'),
+        priority: zPriority.optional()['describe']('Nova prioridade a aplicar a todas'),
+        add_tags: z.array(z.string()).optional()['describe']('Tags a adicionar a todas'),
+        remove_tags: z.array(z.string()).optional()['describe']('Tags a remover de todas'),
+        completed_by: z.string().optional()['describe']('Identificador de quem concluiu (agente, usuário, etc.)'),
     }),
     handler: async (
         /**
@@ -105,9 +105,8 @@ export const todoClearCompletedTool = buildTool({
         status_filter: z
             .enum(['done', 'cancelled', 'both'])
             .optional()
-            .default('both')
-            .describe('Quais status limpar: done | cancelled | both'),
-        dry_run: z.boolean().optional().default(false).describe('Se true, simula a remoção sem persistir'),
+            .default('both')['describe']('Quais status limpar: done | cancelled | both'),
+        dry_run: z.boolean().optional().default(false)['describe']('Se true, simula a remoção sem persistir'),
     }),
     handler: async (/** @type {{ status_filter?: 'done' | 'cancelled' | 'both'; dry_run?: boolean }} */ args) => {
         const filter = args.status_filter ?? 'both';
@@ -195,17 +194,15 @@ export const todoImportTool = buildTool({
                     status: zStatus.optional(),
                     priority: zPriority.optional(),
                     tags: z.array(z.string()).optional(),
-                    due_date: z.string().datetime({ offset: true }).optional(),
+                    due_date: z.string()['datetime']({ offset: true }).optional(),
                     notes: z.string().optional(),
                     metadata: z.record(z.string(), z.unknown()).optional(),
                 }),
             )
-            .min(1)
-            .describe('Array de tarefas a importar'),
+            .min(1)['describe']('Array de tarefas a importar'),
         default_priority: zPriority
             .optional()
-            .default('medium')
-            .describe('Prioridade padrão para tarefas sem priority'),
+            .default('medium')['describe']('Prioridade padrão para tarefas sem priority'),
     }),
     handler: async (
         /**

@@ -23,6 +23,15 @@ const CONFIDENCE_PRECEDENCE = Object.freeze({
     manual: 90,
 });
 
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
 /**
  * @param {unknown} confidence
  * @returns {number}
@@ -33,8 +42,8 @@ export function rankCatalogEvidenceConfidence(confidence) {
 }
 
 /**
- * @param {Record<string, any>} left
- * @param {Record<string, any>} right
+ * @param {Record<string, unknown>} left
+ * @param {Record<string, unknown>} right
  * @returns {number}
  */
 function compareEvidence(left, right) {
@@ -76,27 +85,32 @@ function splitSafeFieldPath(fieldPath) {
 }
 
 /**
- * @param {Record<string, any>} target
+ * @param {Record<string, unknown>} target
  * @param {string} fieldPath
  * @param {unknown} value
  * @returns {void}
  */
 function setNestedValue(target, fieldPath, value) {
     const segments = splitSafeFieldPath(fieldPath);
+    /** @type {Record<string, unknown>} */
     let cursor = target;
     for (const segment of segments.slice(0, -1)) {
         const existing = cursor[segment];
-        if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
-            cursor[segment] = {};
+        if (isRecord(existing)) {
+            cursor = existing;
+            continue;
         }
-        cursor = cursor[segment];
+        /** @type {Record<string, unknown>} */
+        const nested = {};
+        cursor[segment] = nested;
+        cursor = nested;
     }
     cursor[segments.at(-1) ?? fieldPath] = value;
 }
 
 /**
- * @param {Record<string, any>[]} evidences
- * @returns {Map<string, Record<string, any>[]>}
+ * @param {Record<string, unknown>[]} evidences
+ * @returns {Map<string, Record<string, unknown>[]>}
  */
 function groupEvidenceByField(evidences) {
     const groups = new Map();
@@ -111,11 +125,11 @@ function groupEvidenceByField(evidences) {
 }
 
 /**
- * @param {Record<string, any>[]} evidences
+ * @param {Record<string, unknown>[]} evidences
  * @param {{ providerId?: string; providerModel?: string; routeProfile?: string | null; displayName?: string }} [base]
  * @returns {{
  *     projection: ReturnType<typeof createCanonicalModelProjection>;
- *     selectedEvidence: Record<string, Record<string, any>>;
+ *     selectedEvidence: Record<string, Record<string, unknown>>;
  *     conflicts: Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>;
  * }}
  */
@@ -124,16 +138,16 @@ export function mergeModelMetadataEvidence(evidences, base = {}) {
     const providerId = String(base.providerId ?? first['providerId'] ?? '');
     const providerModel = String(base.providerModel ?? first['providerModel'] ?? '');
     const routeProfile = base.routeProfile ?? first['routeProfile'] ?? null;
-    /** @type {Parameters<typeof createCanonicalModelProjection>[0] & Record<string, any>} */
+    /** @type {Parameters<typeof createCanonicalModelProjection>[0] & Record<string, unknown>} */
     const projectionInput = {
         providerId,
         providerModel,
-        routeProfile,
+        ...(typeof routeProfile === 'string' && routeProfile ? { routeProfile } : {}),
         ...(base.displayName ? { displayName: base.displayName } : {}),
         provenanceByField: {},
         confidenceByField: {},
     };
-    /** @type {Record<string, Record<string, any>>} */
+    /** @type {Record<string, Record<string, unknown>>} */
     const selectedEvidence = {};
     /** @type {Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>} */
     const conflicts = [];
@@ -173,11 +187,11 @@ export function mergeModelMetadataEvidence(evidences, base = {}) {
 }
 
 /**
- * @param {Record<string, any>[]} evidences
+ * @param {Record<string, unknown>[]} evidences
  * @param {{ providerId?: string; subjectProviderId?: string; displayName?: string }} [base]
  * @returns {{
  *     projection: ReturnType<typeof createCanonicalProviderProjection>;
- *     selectedEvidence: Record<string, Record<string, any>>;
+ *     selectedEvidence: Record<string, Record<string, unknown>>;
  *     conflicts: Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>;
  * }}
  */
@@ -185,7 +199,7 @@ export function mergeProviderMetadataEvidence(evidences, base = {}) {
     const first = evidences[0] ?? {};
     const providerId = String(base.providerId ?? first['providerId'] ?? '');
     const subjectProviderId = String(base.subjectProviderId ?? first['subjectProviderId'] ?? '');
-    /** @type {Parameters<typeof createCanonicalProviderProjection>[0] & Record<string, any>} */
+    /** @type {Parameters<typeof createCanonicalProviderProjection>[0] & Record<string, unknown>} */
     const projectionInput = {
         providerId,
         subjectProviderId,
@@ -193,7 +207,7 @@ export function mergeProviderMetadataEvidence(evidences, base = {}) {
         provenanceByField: {},
         confidenceByField: {},
     };
-    /** @type {Record<string, Record<string, any>>} */
+    /** @type {Record<string, Record<string, unknown>>} */
     const selectedEvidence = {};
     /** @type {Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>} */
     const conflicts = [];

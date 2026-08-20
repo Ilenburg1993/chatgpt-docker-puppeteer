@@ -27,7 +27,7 @@ function optionalString(value) {
 }
 
 /**
- * @param {Record<string, any>} importer
+ * @param {Record<string, unknown>} importer
  * @returns {{ id: string; providerId: string; sourceKind: string; requiresAuth: boolean; url: string | null; command: string | null; envRequirements: string[]; refreshPolicy: string | null; ttlSeconds: number | null; hooks: Record<string, boolean> }}
  */
 export function describeCatalogImporter(importer) {
@@ -55,8 +55,8 @@ export function describeCatalogImporter(importer) {
 }
 
 /**
- * @param {Record<string, any>[]} importers
- * @param {{ inventories?: readonly Record<string, any>[] }} [options]
+ * @param {Record<string, unknown>[]} importers
+ * @param {{ inventories?: readonly Record<string, unknown>[] }} [options]
  * @returns {{
  *   importerCount: number;
  *   providerCount: number;

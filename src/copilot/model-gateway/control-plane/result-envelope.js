@@ -8,9 +8,10 @@
 export const MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION = 'model-gateway.tool-result.v1';
 
 /**
+ * @template TData
  * @param {object} input
  * @param {string} input.operation
- * @param {unknown} input.data
+ * @param {TData} input.data
  * @param {boolean} [input.ok]
  * @param {string} [input.status]
  * @param {boolean} [input.dryRun]
@@ -18,7 +19,7 @@ export const MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION = 'model-gateway.
  * @param {Array<{ code: string; message: string; retryable: boolean }>} [input.errors]
  * @param {string[]} [input.nextActions]
  * @param {Date | number | string} [input.observedAt]
- * @returns {Record<string, unknown>}
+ * @returns {{ schemaVersion: typeof MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION; operation: string; ok: boolean; status: string; dryRun: boolean; data: TData; warnings: string[]; errors: Array<{ code: string; message: string; retryable: boolean }>; nextActions: string[]; observedAt: string }}
  */
 export function createModelGatewayControlPlaneResult(input) {
     const observedAt =

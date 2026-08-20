@@ -156,7 +156,7 @@ const SpecSchemaV5 = z.object({
                                 'loop', // Repete step N vezes
                                 'spawn_subtask', // Cria nova task (fork)
                             ]),
-                            config: z.any(), // Step-specific config
+                            config: z.record(z.string(), z.unknown()).default({}), // Step-specific config
                             dependencies: z.array(z.string()).default([]), // Step IDs que devem completar primeiro
                             on_failure: z.enum(['retry', 'skip', 'abort']).default('abort'),
                         }),

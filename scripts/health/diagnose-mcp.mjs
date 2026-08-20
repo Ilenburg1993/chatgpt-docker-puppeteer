@@ -2,8 +2,8 @@
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
 
-const DEFAULT_BASE = process.env.MCP_DIAG_URL || 'http://localhost:3008';
-const LSP_ENABLED = String(process.env.LSP_ENABLED || 'true') !== 'false';
+const DEFAULT_BASE = process.env['MCP_DIAG_URL'] || 'http://localhost:3008';
+const LSP_ENABLED = String(process.env['LSP_ENABLED'] || 'false') === 'true';
 
 const REQUIRED_CORE_TOOLS = [
     'rag_search',
@@ -195,10 +195,10 @@ async function main() {
         lspFunctionalIssues = ['LSP tools missing from tools/list'];
     }
 
-    const githubProxyEnabled = String(process.env.MCP_GITHUB_PROXY_ENABLED || '') === 'true';
+    const githubProxyEnabled = String(process.env['MCP_GITHUB_PROXY_ENABLED'] || '') === 'true';
     let githubToolsOk = true;
     if (githubProxyEnabled && toolNames.length > 0) {
-        const prefix = String(process.env.MCP_GITHUB_TOOL_PREFIX || 'mcp_github__');
+        const prefix = String(process.env['MCP_GITHUB_TOOL_PREFIX'] || 'mcp_github__');
         const count = toolNames.filter((/** @type {any} */ name) => String(name).startsWith(prefix)).length;
         githubToolsOk = count > 0;
     }

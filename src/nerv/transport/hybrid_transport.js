@@ -51,7 +51,6 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
     // Circuit Breaker State
     let circuitState = CIRCUIT_STATES.CLOSED;
     let failureCount = 0;
-    let _lastFailureTime = 0;
     let nextAttemptTime = 0;
 
     // Circuit Breaker Configuration
@@ -72,8 +71,6 @@ function createHybridTransport({ mode = CONNECTION_MODES.LOCAL, socketAdapter = 
             telemetry.emit('circuit_breaker_success', { state: circuitState });
         } else {
             failureCount++;
-            _lastFailureTime = now;
-
             if (failureCount >= FAILURE_THRESHOLD) {
                 circuitState = CIRCUIT_STATES.OPEN;
                 nextAttemptTime = now + TIMEOUT_MS;

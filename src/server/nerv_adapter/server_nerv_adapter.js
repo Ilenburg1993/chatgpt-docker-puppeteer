@@ -24,6 +24,31 @@ const PRIVATE_EVENTS = new Set([ActionCode.KERNEL_INTERNAL_ERROR, ActionCode.SEC
  */
 const SHUTDOWN_BROADCAST_DELAY_MS = 1500;
 
+/**
+ * @typedef {object} DashboardCommandRequest
+ * @property {string} [command]
+ * @property {unknown} [payload]
+ * @property {string} [clientId]
+ * @property {string | null} [correlationId]
+ *
+ * @typedef {object} DashboardStatusRequest
+ * @property {string} [requestType]
+ * @property {string} [clientId]
+ *
+ * @typedef {object} ServerNERVHandlers
+ * @property {((envelope: ServerNERVEnvelope) => void) | null} nervReceive
+ * @property {((data: DashboardCommandRequest) => void) | null} dashboardCommand
+ * @property {((data: DashboardStatusRequest) => void) | null} dashboardStatus
+ * @property {((clientId: string) => void) | null} clientConnected
+ * @property {((clientId: string) => void) | null} clientDisconnected
+ *
+ * @typedef {Record<string, unknown> & {
+ *     causality?: { msg_id?: string };
+ *     identity?: { actor?: string; target?: string | null };
+ *     protocol?: { version?: string; timestamp?: number };
+ * }} ServerNERVEnvelope
+ */
+
 /* ==========================================================================
    CLASSE ADAPTER
 ========================================================================== */
@@ -80,7 +105,7 @@ class ServerNERVAdapter {
         /**
          * Handlers registrados — necessários para cleanup.
          */
-        /** @type {{ [key: string]: any }} */
+        /** @type {ServerNERVHandlers} */
         this._handlers = {
             nervReceive: null,
             dashboardCommand: null,
@@ -105,7 +130,7 @@ class ServerNERVAdapter {
      * Registra listener NERV → broadcast dashboard. Apenas EVENT é propagado.
      */
     _setupNERVListeners() {
-        this._handlers.nervReceive = (/** @type {any} */ envelope) => {
+        this._handlers['nervReceive'] = (envelope) => {
             if (this._shutdown) return;
 
             if (getMessageType(envelope) !== MessageType.EVENT) return;
@@ -115,7 +140,7 @@ class ServerNERVAdapter {
             });
         };
 
-        this.nerv.onReceive(this._handlers.nervReceive);
+        this.nerv.onReceive(this._handlers['nervReceive']);
 
         log('DEBUG', '[ServerNERVAdapter] Listener NERV registrado');
     }
@@ -128,32 +153,32 @@ class ServerNERVAdapter {
      * Registra listeners Socket → comandos dashboard.
      */
     _setupSocketListeners() {
-        this._handlers.dashboardCommand = (/** @type {any} */ data) => {
+        this._handlers['dashboardCommand'] = (data) => {
             this._handleDashboardCommand(data).catch((err) => {
                 log('ERROR', `[ServerNERVAdapter] comando dashboard falhou: ${err.message}`);
             });
         };
 
-        this._handlers.dashboardStatus = (/** @type {any} */ data) => {
+        this._handlers['dashboardStatus'] = (data) => {
             this._handleStatusRequest(data).catch((err) => {
                 log('ERROR', `[ServerNERVAdapter] status request falhou: ${err.message}`);
             });
         };
 
-        this._handlers.clientConnected = (/** @type {any} */ clientId) => {
+        this._handlers['clientConnected'] = (clientId) => {
             this.stats.clientsConnected++;
             log('INFO', `[ServerNERVAdapter] Cliente conectado: ${clientId}`);
         };
 
-        this._handlers.clientDisconnected = (/** @type {any} */ clientId) => {
+        this._handlers['clientDisconnected'] = (clientId) => {
             this.stats.clientsConnected = Math.max(0, this.stats.clientsConnected - 1);
             log('INFO', `[ServerNERVAdapter] Cliente desconectado: ${clientId}`);
         };
 
-        this.socketHub.on('dashboard:command', this._handlers.dashboardCommand);
-        this.socketHub.on('dashboard:status_request', this._handlers.dashboardStatus);
-        this.socketHub.on('client:connected', this._handlers.clientConnected);
-        this.socketHub.on('client:disconnected', this._handlers.clientDisconnected);
+        this.socketHub.on('dashboard:command', this._handlers['dashboardCommand']);
+        this.socketHub.on('dashboard:status_request', this._handlers['dashboardStatus']);
+        this.socketHub.on('client:connected', this._handlers['clientConnected']);
+        this.socketHub.on('client:disconnected', this._handlers['clientDisconnected']);
 
         log('DEBUG', '[ServerNERVAdapter] Listeners Socket registrados');
     }
@@ -211,7 +236,7 @@ class ServerNERVAdapter {
     /**
      * Traduz comando dashboard → ActionCode NERV.
      */
-    async _handleDashboardCommand(/** @type {any} */ data = {}) {
+    async _handleDashboardCommand(/** @type {DashboardCommandRequest} */ data = {}) {
         const { command, payload, clientId, correlationId: requestedCorrelationId } = data;
 
         if (!command) return;
@@ -291,7 +316,7 @@ class ServerNERVAdapter {
    STATUS REQUEST HANDLER
 ========================================================================== */
 
-    async _handleStatusRequest(/** @type {any} */ data = {}) {
+    async _handleStatusRequest(/** @type {DashboardStatusRequest} */ data = {}) {
         const { requestType, clientId } = data;
         const correlationId = `status-${Date.now()}`;
 
@@ -315,7 +340,7 @@ class ServerNERVAdapter {
    EVENT BROADCAST
 ========================================================================== */
 
-    async _broadcastEvent(/** @type {any} */ envelope) {
+    async _broadcastEvent(/** @type {ServerNERVEnvelope} */ envelope) {
         const actionCode = getActionCode(envelope);
         if (!actionCode || PRIVATE_EVENTS.has(/** @type {any} */ (actionCode))) return;
 
@@ -374,8 +399,8 @@ class ServerNERVAdapter {
         /* ---- remove listeners ---- */
 
         try {
-            if (this._handlers.nervReceive && this.nerv.offReceive) {
-                this.nerv.offReceive(this._handlers.nervReceive);
+            if (this._handlers['nervReceive'] && this.nerv.offReceive) {
+                this.nerv.offReceive(this._handlers['nervReceive']);
             }
         } catch (/** @type {any} */ err) {
             const _e = /** @type {any} */ (err);
@@ -386,10 +411,10 @@ class ServerNERVAdapter {
         }
 
         if (this.socketHub.off) {
-            this.socketHub.off('dashboard:command', this._handlers.dashboardCommand);
-            this.socketHub.off('dashboard:status_request', this._handlers.dashboardStatus);
-            this.socketHub.off('client:connected', this._handlers.clientConnected);
-            this.socketHub.off('client:disconnected', this._handlers.clientDisconnected);
+            this.socketHub.off('dashboard:command', this._handlers['dashboardCommand']);
+            this.socketHub.off('dashboard:status_request', this._handlers['dashboardStatus']);
+            this.socketHub.off('client:connected', this._handlers['clientConnected']);
+            this.socketHub.off('client:disconnected', this._handlers['clientDisconnected']);
         }
 
         /* ---- notifica clientes ---- */

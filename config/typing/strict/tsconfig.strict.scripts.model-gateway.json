@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.tools.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.scripts.model-gateway.tsbuildinfo",
+    "noEmit": true
+  },
+  "include": [
+    "../../../src/types/**/*.d.ts",
+    "../../../scripts/model-gateway/**/*"
+  ]
+}

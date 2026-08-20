@@ -59,8 +59,7 @@ export const StructuredMessageSchema = z
     .object({
         /** Versão do protocolo (para evolução futura) */
         version: z
-            .string()
-            .regex(/^\d+\.\d+(\.\d+)?$/, 'version deve ser semver (ex: 1.0 ou 1.0.0)')
+            .string()['regex'](/^\d+\.\d+(\.\d+)?$/, 'version deve ser semver (ex: 1.0 ou 1.0.0)')
             .default('1.0'),
 
         /** Resumo do estado atual ou briefing relevante */
@@ -121,10 +120,7 @@ export const StructuredMessageSchema = z
                 }),
             )
             .optional(),
-    })
-    // UPG-PROP-03 (fix): .strict() rejeita campos desconhecidos enviados pelo LLM — evita campos
-    // proprietários sendo silenciosamente ignorados e garante fidelidade ao protocolo v1.0.
-    .strict();
+    })['strict']();
 
 /**
  * Schema para parsing de respostas LLM-B — usa `.passthrough()` para tolerar campos adicionais.

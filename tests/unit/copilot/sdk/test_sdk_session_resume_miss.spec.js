@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file usa mocks não tipados
 /**
  * Testes — isExpectedResumeMiss (sdk/session/lifecycle.js)
  *
@@ -7,7 +6,7 @@
  * após expansão dos padrões suportados (HTTP 404/410 + variações SDK).
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks obrigatórios antes do import do módulo ────────────────────────
 

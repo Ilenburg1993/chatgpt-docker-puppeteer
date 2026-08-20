@@ -20,7 +20,7 @@ import { log } from '../ports/logging/index.js';
 
 /**
  * @typedef {{
- *   getSessionSnapshot: () => import('#copilot/sdk/types').CopilotSession | null;
+ *   getSessionSnapshot: () => { sessionId: string } | null;
  *   trackBackgroundTask: (
  *     task: Promise<unknown>,
  *     meta?: { label?: string; description?: string },

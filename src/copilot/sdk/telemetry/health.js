@@ -11,11 +11,10 @@
  */
 
 import { log as appLog } from '../logger.js';
+import { assertRpcClient } from '../rpc/guards.js';
 import { accountGetQuota, ping } from '../rpc/server.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
- *
  * @typedef {import('../rpc/server.js').PingResult} PingResult
  *
  * @typedef {import('../rpc/server.js').AccountQuotaResult} AccountQuotaResult
@@ -56,19 +55,6 @@ import { accountGetQuota, ping } from '../rpc/server.js';
  * }} FullHealthResult
  */
 
-// ─── Validação ─────────────────────────────────────────────────────────────────
-
-/**
- * @param {unknown} client
- * @param {string} caller
- * @returns {asserts client is CopilotClient}
- */
-function assertClient(client, caller) {
-    if (!client || typeof client !== 'object' || !('rpc' in client)) {
-        throw new TypeError(`[sdk/health/${caller}] CopilotClient inválido ou não conectado.`);
-    }
-}
-
 /**
  * Extrai mensagem de erro priorizando `error.cause.message` quando disponível (ex.: wrappers `SdkOperationError`).
  *
@@ -98,11 +84,11 @@ function getErrorMessage(err) {
 /**
  * Verifica conectividade via ping. Mede latência e verifica protocol version.
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<PingCheck>}
  */
 export async function pingCheck(client) {
-    assertClient(client, 'pingCheck');
+    assertRpcClient(client, 'pingCheck');
     const start = Date.now();
     try {
         const result = await ping(client, 'health-check');
@@ -131,11 +117,11 @@ export async function pingCheck(client) {
  * Verifica autenticação executando uma chamada que exige auth válida. Usa `account.getQuota()` como proxy — se retorna
  * dados, auth está OK.
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<AuthCheck>}
  */
 export async function getAuthStatus(client) {
-    assertClient(client, 'getAuthStatus');
+    assertRpcClient(client, 'getAuthStatus');
     try {
         await accountGetQuota(client);
         appLog('DEBUG', '[sdk/health] auth: authenticated');
@@ -150,11 +136,11 @@ export async function getAuthStatus(client) {
 /**
  * Verifica quota disponível. Retorna snapshots e flag de exaustão.
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<QuotaCheck>}
  */
 export async function getQuota(client) {
-    assertClient(client, 'getQuota');
+    assertRpcClient(client, 'getQuota');
     try {
         const result = await accountGetQuota(client);
         const snapshots = result.quotaSnapshots;
@@ -181,11 +167,11 @@ export async function getQuota(client) {
  * - **degraded**: ping OK mas auth ou quota com problemas
  * - **unhealthy**: ping falhou (servidor inacessível)
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<FullHealthResult>}
  */
 export async function fullHealthCheck(client) {
-    assertClient(client, 'fullHealthCheck');
+    assertRpcClient(client, 'fullHealthCheck');
 
     const [pingResult, authResult, quotaResult] = await Promise.all([
         pingCheck(client),
@@ -219,7 +205,7 @@ export async function fullHealthCheck(client) {
 /**
  * Sugar: retorna `true` se o server está acessível (ping OK).
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<boolean>}
  */
 export async function isServerReachable(client) {

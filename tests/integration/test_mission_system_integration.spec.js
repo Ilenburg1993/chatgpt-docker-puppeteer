@@ -4,6 +4,7 @@ import { MissionManager } from '#missions/mission_manager';
 import { createNERV } from '#nerv/nerv';
 import fs from 'fs/promises';
 import assert from 'node:assert';
+import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
@@ -22,11 +23,10 @@ describe('Mission System Integration (E2E)', () => {
     /** @type {any} */ let nerv;
     /** @type {any} */ let kernel;
     /** @type {any} */ let missionManager;
-    const testMissionsDir = path.join(import.meta.dirname, '../../missions-test');
+    /** @type {string} */ let testMissionsDir;
 
     before(async () => {
-        // Setup: Cria diretório temporário para missões de teste
-        await fs.mkdir(testMissionsDir, { recursive: true });
+        testMissionsDir = await fs.mkdtemp(path.join(os.tmpdir(), 'maestro-missions-system-'));
     });
 
     after(async () => {

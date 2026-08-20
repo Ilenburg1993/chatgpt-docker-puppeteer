@@ -79,7 +79,7 @@ export const mcpReloadPlanTool = {
     description:
         'Plan a detached restart of the managed MCP HTTP origin plus Cloudflare tunnel using only allowlisted transport profiles.',
     inputSchema: {
-        profile: restartProfileSchema.optional().describe('Default current. quic/h2/auto are the only executable profiles.'),
+        profile: restartProfileSchema.optional()['describe']('Default current. quic/h2/auto are the only executable profiles.'),
         delayMs: z.number().int().min(MIN_DELAY_MS).max(MAX_DELAY_MS).optional(),
         reason: z.string().max(240).optional(),
     },

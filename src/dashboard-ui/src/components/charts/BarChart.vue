@@ -4,9 +4,9 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import { BarController, BarElement, CategoryScale, Chart, Legend, LinearScale, Title, Tooltip } from 'chart.js';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch, type PropType } from 'vue';
 
 // Register Chart.js components
 Chart.register(BarController, BarElement, LinearScale, CategoryScale, Title, Tooltip, Legend);
@@ -15,12 +15,12 @@ export default {
     name: 'BarChart',
     props: {
         data: {
-            type: Array,
+            type: Array as PropType<number[]>,
             required: true,
             default: () => [],
         },
         labels: {
-            type: Array,
+            type: Array as PropType<string[]>,
             required: true,
             default: () => [],
         },
@@ -29,7 +29,7 @@ export default {
             default: 'Value',
         },
         colors: {
-            type: Array,
+            type: Array as PropType<string[]>,
             default: () => ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'],
         },
         horizontal: {
@@ -42,16 +42,17 @@ export default {
         },
     },
     setup(props) {
-        const chartCanvas = ref(null);
-        let chartInstance = null;
+        const chartCanvas = ref<HTMLCanvasElement | null>(null);
+        let chartInstance: Chart<'bar', number[], string> | null = null;
 
         const createChart = () => {
             if (!chartCanvas.value) return;
 
             const ctx = chartCanvas.value.getContext('2d');
+            if (!ctx) return;
 
             // Generate colors for each bar
-            const backgroundColors = props.data.map((_, i) => props.colors[i % props.colors.length]);
+            const backgroundColors = props.data.map((_, i) => props.colors[i % props.colors.length] ?? '#3498db');
 
             chartInstance = new Chart(ctx, {
                 type: 'bar',
@@ -107,11 +108,13 @@ export default {
         const updateChart = () => {
             if (!chartInstance) return;
 
-            const backgroundColors = props.data.map((_, i) => props.colors[i % props.colors.length]);
+            const backgroundColors = props.data.map((_, i) => props.colors[i % props.colors.length] ?? '#3498db');
 
             chartInstance.data.labels = props.labels;
-            chartInstance.data.datasets[0].data = props.data;
-            chartInstance.data.datasets[0].backgroundColor = backgroundColors;
+            const dataset = chartInstance.data.datasets[0];
+            if (!dataset) return;
+            dataset.data = props.data;
+            dataset.backgroundColor = backgroundColors;
             chartInstance.update('none');
         };
 

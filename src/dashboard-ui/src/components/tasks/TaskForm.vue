@@ -1,25 +1,17 @@
-<script setup>
+<script setup lang="ts">
+import type { DashboardTask } from '@/types/dashboard';
 import { reactive, ref, watch } from 'vue';
 import { useNotifications } from '../../composables/useNotifications.js';
 import Button from '../ui/Button.vue';
 import Modal from '../ui/Modal.vue';
 
-const props = defineProps({
-    open: {
-        type: Boolean,
-        default: false,
-    },
-    task: {
-        type: Object,
-        default: null,
-    },
-    mode: {
-        type: String,
-        default: 'create', // 'create' or 'edit'
-    },
-});
+const props = withDefaults(
+    defineProps<{ open?: boolean; task?: DashboardTask | null; mode?: 'create' | 'edit' }>(),
+    { open: false, task: null, mode: 'create' },
+);
 
-const emit = defineEmits(['update:open', 'submit']);
+type TaskFormPayload = Omit<DashboardTask, 'id'>;
+const emit = defineEmits<{ 'update:open': [open: boolean]; submit: [task: TaskFormPayload] }>();
 
 const form = reactive({
     prompt: '',
@@ -45,7 +37,7 @@ const agentOptions = [
     { value: 'gemini', label: 'Gemini' },
 ];
 
-const modelOptions = {
+const modelOptions: Record<string, Array<{ value: string; label: string }>> = {
     chatgpt: [
         { value: 'gpt-4', label: 'GPT-4' },
         { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
@@ -61,11 +53,11 @@ watch(
     () => props.open,
     (newVal) => {
         if (newVal && props.task && props.mode === 'edit') {
-            form.prompt = props.task.spec?.payload?.user_message || '';
-            form.agent = props.task.meta?.agent || 'chatgpt';
-            form.model = props.task.spec?.payload?.model || 'gpt-4';
-            form.priority = props.task.meta?.priority || 5;
-            form.context = props.task.spec?.payload?.context ? JSON.stringify(props.task.spec.payload.context) : '';
+            form.prompt = props.task['spec']?.payload?.user_message || '';
+            form.agent = props.task['meta']?.agent || 'chatgpt';
+            form.model = props.task['spec']?.payload?.model || 'gpt-4';
+            form.priority = props.task['meta']?.priority || 5;
+            form.context = props.task['spec']?.payload?.context ? JSON.stringify(props.task['spec'].payload.context) : '';
         } else if (newVal && props.mode === 'create') {
             resetForm();
         }
@@ -141,9 +133,8 @@ const handleSubmit = async () => {
 
         emit('submit', taskData);
         handleClose();
-    } catch (error) {
-        const errorMessage =
-            error?.response?.data?.message || error?.message || 'Erro ao enviar formulário. Tente novamente.';
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Erro ao enviar formulário. Tente novamente.';
         showError(errorMessage);
     } finally {
         loading.value = false;
@@ -207,7 +198,7 @@ const handleClose = () => {
                         class="w-full px-3 py-2 bg-background-tertiary border rounded-lg text-foreground focus:border-primary focus:outline-none"
                         :class="errors.model ? 'border-error' : 'border-border'"
                     >
-                        <option v-for="option in modelOptions[form.agent]" :key="option.value" :value="option.value">
+                        <option v-for="option in modelOptions[form.agent] || []" :key="option.value" :value="option.value">
                             {{ option.label }}
                         </option>
                     </select>

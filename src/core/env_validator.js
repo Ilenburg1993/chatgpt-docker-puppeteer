@@ -336,7 +336,7 @@ const ENV_SCHEMA = {
     LSP_ENABLED: {
         level: 'WARN',
         validator: (/** @type {any} */ val) => ['true', 'false'].includes(String(val)),
-        default: 'true',
+        default: 'false',
         message: 'Must be true or false',
     },
     LSP_TOOL_TIMEOUT_MS: {
@@ -573,10 +573,10 @@ export function validateEnv(options = {}) {
     }
 
     // Additional cross-variable validations (timeout cascade)
-    const ollamaTimeout = parseInt(resolvedEnv.OLLAMA_GENERATE_TIMEOUT || '60000', 10);
-    const toolTimeout = parseInt(resolvedEnv.TOOL_EXECUTION_TIMEOUT || '75000', 10);
-    const mcpTimeout = parseInt(resolvedEnv.MCP_TOOL_TIMEOUT || '90000', 10);
-    const serverTimeout = parseInt(resolvedEnv.SERVER_REQUEST_TIMEOUT || '120000', 10);
+    const ollamaTimeout = parseInt(resolvedEnv['OLLAMA_GENERATE_TIMEOUT'] || '60000', 10);
+    const toolTimeout = parseInt(resolvedEnv['TOOL_EXECUTION_TIMEOUT'] || '75000', 10);
+    const mcpTimeout = parseInt(resolvedEnv['MCP_TOOL_TIMEOUT'] || '90000', 10);
+    const serverTimeout = parseInt(resolvedEnv['SERVER_REQUEST_TIMEOUT'] || '120000', 10);
 
     if (toolTimeout <= ollamaTimeout) {
         warnings.push({
@@ -603,11 +603,11 @@ export function validateEnv(options = {}) {
     }
 
     // Ollama non-embedding routing policy validation
-    const cloudEnabled = String(resolvedEnv.OLLAMA_CLOUD_ENABLED || 'true') === 'true';
-    const nonEmbeddingRuntime = String(resolvedEnv.OLLAMA_NON_EMBEDDING_RUNTIME || 'auto');
-    const localFallbackEnabled = String(resolvedEnv.OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK || 'true') === 'true';
-    const localModelProfile = String(resolvedEnv.OLLAMA_LOCAL_MODEL_PROFILE || 'light');
-    const localAllowedModelsRaw = String(resolvedEnv.OLLAMA_LOCAL_ALLOWED_MODELS || '').trim();
+    const cloudEnabled = String(resolvedEnv['OLLAMA_CLOUD_ENABLED'] || 'true') === 'true';
+    const nonEmbeddingRuntime = String(resolvedEnv['OLLAMA_NON_EMBEDDING_RUNTIME'] || 'auto');
+    const localFallbackEnabled = String(resolvedEnv['OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK'] || 'true') === 'true';
+    const localModelProfile = String(resolvedEnv['OLLAMA_LOCAL_MODEL_PROFILE'] || 'light');
+    const localAllowedModelsRaw = String(resolvedEnv['OLLAMA_LOCAL_ALLOWED_MODELS'] || '').trim();
 
     if (nonEmbeddingRuntime === 'cloud' && !cloudEnabled && !localFallbackEnabled) {
         errors.push({
@@ -637,9 +637,10 @@ export function validateEnv(options = {}) {
         });
     }
 
-    // LSP policy validation
-    const lspEnabled = String(resolvedEnv.LSP_ENABLED || 'true') === 'true';
-    const lspMutationsEnabled = String(resolvedEnv.LSP_MUTATIONS_ENABLED || 'false') === 'true';
+    // LSP policy validation. Agent-side LSP is intentionally opt-in: TypeScript 7 native is the canonical editor
+    // language service and duplicating a second semantic graph costs hundreds of MiB to >1 GiB on this workspace.
+    const lspEnabled = String(resolvedEnv['LSP_ENABLED'] || 'false') === 'true';
+    const lspMutationsEnabled = String(resolvedEnv['LSP_MUTATIONS_ENABLED'] || 'false') === 'true';
     if (!lspEnabled && lspMutationsEnabled) {
         warnings.push({
             key: 'LSP_MUTATIONS_ENABLED',
@@ -649,10 +650,10 @@ export function validateEnv(options = {}) {
     }
 
     // Upstream MCP dependency validation
-    const upstreamsJson = String(resolvedEnv.MCP_UPSTREAMS_JSON || '').trim();
+    const upstreamsJson = String(resolvedEnv['MCP_UPSTREAMS_JSON'] || '').trim();
 
-    if (!upstreamsJson && resolvedEnv.MCP_UPSTREAM_ENABLED === 'true') {
-        const url = String(resolvedEnv.MCP_UPSTREAM_URL || '').trim();
+    if (!upstreamsJson && resolvedEnv['MCP_UPSTREAM_ENABLED'] === 'true') {
+        const url = String(resolvedEnv['MCP_UPSTREAM_URL'] || '').trim();
         if (!url) {
             errors.push({
                 key: 'MCP_UPSTREAM_URL',
@@ -663,8 +664,8 @@ export function validateEnv(options = {}) {
     }
 
     // GitHub proxy preset validation
-    if (resolvedEnv.MCP_GITHUB_PROXY_ENABLED === 'true') {
-        const token = String(resolvedEnv.GITHUB_PERSONAL_ACCESS_TOKEN || '').trim();
+    if (resolvedEnv['MCP_GITHUB_PROXY_ENABLED'] === 'true') {
+        const token = String(resolvedEnv['GITHUB_PERSONAL_ACCESS_TOKEN'] || '').trim();
         if (!token) {
             warnings.push({
                 key: 'GITHUB_PERSONAL_ACCESS_TOKEN',

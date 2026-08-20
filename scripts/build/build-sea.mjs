@@ -40,8 +40,6 @@ if (!existsSync(releaseDir)) {
 
 console.log('📋 Criando executável informativo...');
 
-// Detectar ambiente para recomendações contextuais
-const _isProduction = process.env.NODE_ENV === 'production';
 const hasDistBuild = existsSync(join(rootDir, 'dist/main.js'));
 const recommendedCommand = hasDistBuild ? 'npm run daemon:start:prod' : 'npm run daemon:start';
 

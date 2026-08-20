@@ -102,7 +102,7 @@ function getErrorMessage(error) {
  * @returns {string}
  */
 export function getOllamaHost() {
-    return process.env.OLLAMA_HOST || 'http://localhost:11434';
+    return process.env['OLLAMA_HOST'] || 'http://localhost:11434';
 }
 
 /**
@@ -111,8 +111,8 @@ export function getOllamaHost() {
  * @returns {string}
  */
 export function getGatewayUrl() {
-    const host = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-    const port = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+    const host = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+    const port = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
     return `http://${host}:${port}`;
 }
 
@@ -123,7 +123,7 @@ export function getGatewayUrl() {
  * @returns {number}
  */
 export function getHealthCheckTimeout(defaultTimeout = 30000) {
-    const envTimeout = process.env.DIAGNOSTIC_DEFAULT_TIMEOUT_MS;
+    const envTimeout = process.env['DIAGNOSTIC_DEFAULT_TIMEOUT_MS'];
     if (envTimeout === undefined || envTimeout === null) {
         return defaultTimeout;
     }
@@ -173,9 +173,9 @@ export async function checkOllamaHealth(depth = 'quick') {
             const data = await response.json();
             result.models = (Array.isArray(data.models) ? data.models : []).map(
                 /** @param {Record<string, unknown>} m */ (m) => ({
-                    name: m.name,
-                    size: m.size,
-                    modified_at: m.modified_at,
+                    name: m['name'],
+                    size: m['size'],
+                    modified_at: m['modified_at'],
                 }),
             );
 
@@ -339,13 +339,13 @@ export function calculateOverallStatus(ollama, gateway, system) {
     const systemState = system && typeof system === 'object' ? /** @type {Record<string, unknown>} */ (system) : {};
     /** @type {string[]} */
     const statuses = [
-        ollamaState.connected ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.UNHEALTHY,
-        typeof systemState.status === 'string' ? systemState.status : HEALTH_STATUS.UNKNOWN,
+        ollamaState['connected'] ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.UNHEALTHY,
+        typeof systemState['status'] === 'string' ? systemState['status'] : HEALTH_STATUS.UNKNOWN,
     ];
 
     // Gateway é opcional, então só considera se estiver conectado
-    if (gatewayState.connected !== undefined) {
-        statuses.push(gatewayState.connected ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED);
+    if (gatewayState['connected'] !== undefined) {
+        statuses.push(gatewayState['connected'] ? HEALTH_STATUS.HEALTHY : HEALTH_STATUS.DEGRADED);
     }
 
     if (statuses.includes(HEALTH_STATUS.UNHEALTHY)) {

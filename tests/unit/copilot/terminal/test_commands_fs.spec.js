@@ -23,6 +23,7 @@ function mockCtx() {
     };
 }
 
+/** @param {string} output */
 function expectNoAnsi(output) {
     expect(output).not.toContain('\x1b[');
 }

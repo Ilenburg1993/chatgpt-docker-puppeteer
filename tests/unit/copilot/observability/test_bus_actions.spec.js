@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
@@ -123,33 +122,36 @@ describe('bus-actions (FAIXA-L15)', () => {
         });
 
         it('registra eventos de erro no ErrorTracker quando disponível', () => {
-            /** @type {any[]} */
+            /** @type {Array<{ err: unknown; opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined }>} */
             const tracked = [];
             const ea = createErrorAlerterAction({
                 bus,
                 onAlert: () => {},
-                errorTracker: /** @type {any} */ ({
-                    trackError: (err, opts) => tracked.push({ err, opts }),
-                }),
+                errorTracker: {
+                    trackError: (err, opts) => { tracked.push({ err, opts }); },
+                },
             });
 
             bus.emit({ type: 'hook:error_occurred', timestamp: Date.now(), errorMessage: 'falhou' });
 
             assert.equal(tracked.length, 1);
-            assert.equal(tracked[0]?.opts.source, 'event-bus');
-            assert.equal(tracked[0]?.opts.metadata.type, 'hook:error_occurred');
+            const firstTracked = tracked[0];
+            assert.ok(firstTracked?.opts);
+            assert.equal(firstTracked.opts.source, 'event-bus');
+            assert.ok(firstTracked.opts.metadata);
+            assert.equal(firstTracked.opts.metadata['type'], 'hook:error_occurred');
             ea.unsub();
         });
 
         it('não polui ErrorTracker com hook model_call recuperável', () => {
-            /** @type {any[]} */
+            /** @type {Array<{ err: unknown; opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined }>} */
             const tracked = [];
             const ea = createErrorAlerterAction({
                 bus,
                 onAlert: () => {},
-                errorTracker: /** @type {any} */ ({
-                    trackError: (err, opts) => tracked.push({ err, opts }),
-                }),
+                errorTracker: {
+                    trackError: (err, opts) => { tracked.push({ err, opts }); },
+                },
             });
 
             bus.emit({
@@ -165,14 +167,14 @@ describe('bus-actions (FAIXA-L15)', () => {
         });
 
         it('não cria erro sintético event-bus para agent:task:error', () => {
-            /** @type {any[]} */
+            /** @type {Array<{ err: unknown; opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined }>} */
             const tracked = [];
             const ea = createErrorAlerterAction({
                 bus,
                 onAlert: () => {},
-                errorTracker: /** @type {any} */ ({
-                    trackError: (err, opts) => tracked.push({ err, opts }),
-                }),
+                errorTracker: {
+                    trackError: (err, opts) => { tracked.push({ err, opts }); },
+                },
             });
 
             bus.emit({ type: 'agent:task:error', timestamp: Date.now(), error: new Error('falha causal') });

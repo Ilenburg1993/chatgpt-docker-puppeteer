@@ -55,18 +55,18 @@ function _parseJson(raw, fallback = null) {
 function _rowToRun(row) {
     if (!row) return null;
     return {
-        id: String(row.id),
-        job_id: String(row.job_id),
-        attempt_seq: Number(row.attempt_seq) || 0,
-        status: String(row.status || ''),
-        executor: String(row.executor || 'audit-agent'),
-        llm_model: row.llm_model ? String(row.llm_model) : null,
-        llm_provider: row.llm_provider ? String(row.llm_provider) : null,
-        token_usage_json: _parseJson(row.token_usage_json, null),
-        metrics_json: _parseJson(row.metrics_json, null),
-        error_json: _parseJson(row.error_json, null),
-        started_at_ms: Number(row.started_at_ms) || 0,
-        completed_at_ms: row.completed_at_ms == null ? null : Number(row.completed_at_ms),
+        id: String(row['id']),
+        job_id: String(row['job_id']),
+        attempt_seq: Number(row['attempt_seq']) || 0,
+        status: String(row['status'] || ''),
+        executor: String(row['executor'] || 'audit-agent'),
+        llm_model: row['llm_model'] ? String(row['llm_model']) : null,
+        llm_provider: row['llm_provider'] ? String(row['llm_provider']) : null,
+        token_usage_json: _parseJson(row['token_usage_json'], null),
+        metrics_json: _parseJson(row['metrics_json'], null),
+        error_json: _parseJson(row['error_json'], null),
+        started_at_ms: Number(row['started_at_ms']) || 0,
+        completed_at_ms: row['completed_at_ms'] == null ? null : Number(row['completed_at_ms']),
     };
 }
 

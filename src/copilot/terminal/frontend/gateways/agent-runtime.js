@@ -97,6 +97,16 @@ export function readTerminalRuntimeState(runtimeId) {
 }
 
 /**
+ * Minimal runtime projection consumed by BYOK request-budget estimation.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {ReturnType<typeof readTerminalRuntimeState>['contextWindow']}
+ */
+export function readTerminalRuntimeContextWindow(runtimeId) {
+    return readTerminalRuntimeState(runtimeId).contextWindow;
+}
+
+/**
  * @param {string | null | undefined} [runtimeId]
  * @returns {ReturnType<typeof readAgentRuntimeControlState>}
  */

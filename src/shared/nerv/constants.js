@@ -25,6 +25,7 @@ const PROTOCOL_VERSION = '2.0.0';
  *
  * Define O QUE a mensagem É. Conjunto fechado. Nunca extensível.
  */
+/** @typedef {(typeof MessageType)[keyof typeof MessageType]} MessageType */
 const MessageType = Object.freeze({
     COMMAND: 'COMMAND', // Intenção declarada de ação futura
     EVENT: 'EVENT', // Observação registrada de algo ocorrido
@@ -36,6 +37,7 @@ const MessageType = Object.freeze({
  *
  * Define SOBRE O QUE a mensagem fala. Extensível apenas por adição explícita. Nunca redefine o tipo ontológico.
  */
+/** @typedef {(typeof ActionCode)[keyof typeof ActionCode]} ActionCode */
 const ActionCode = Object.freeze({
     // ---- TASK / EXECUTION ----
     TASK_START: 'TASK_START',
@@ -166,6 +168,7 @@ const ActionCode = Object.freeze({
  *
  * Define QUEM emite a mensagem. Não define soberania. Não define decisão.
  */
+/** @typedef {(typeof ActorRole)[keyof typeof ActorRole]} ActorRole */
 const ActorRole = Object.freeze({
     KERNEL: 'KERNEL',
     SERVER: 'SERVER',
@@ -180,6 +183,7 @@ const ActorRole = Object.freeze({
  *
  * Estados técnicos do cliente IPC. Não possuem semântica de mundo.
  */
+/** @typedef {(typeof ChannelState)[keyof typeof ChannelState]} ChannelState */
 const ChannelState = Object.freeze({
     INACTIVE: 'INACTIVE',
     HANDSHAKE: 'HANDSHAKE',
@@ -193,6 +197,7 @@ const ChannelState = Object.freeze({
  *
  * Códigos auxiliares puramente técnicos. Nunca utilizados para decisão de negócio.
  */
+/** @typedef {(typeof TechnicalCode)[keyof typeof TechnicalCode]} TechnicalCode */
 const TechnicalCode = Object.freeze({
     BUFFERED: 'BUFFERED',
     REPLAYED: 'REPLAYED',
@@ -207,6 +212,7 @@ const TechnicalCode = Object.freeze({
  * Decisões internas do orchestrator loop após execução de uma task. Conjunto fechado. Representa a próxima ação sobre a
  * task/workflow.
  */
+/** @typedef {(typeof OrchestrationAction)[keyof typeof OrchestrationAction]} OrchestrationAction */
 const OrchestrationAction = Object.freeze({
     /** Reexecutar a task com feedback injetado */
     RETRY: 'RETRY',
@@ -222,6 +228,7 @@ const OrchestrationAction = Object.freeze({
  * Comandos de controle de tasks via HTTP API. Extensivel apenas por adição explícita (requer atualizar
  * task_control_service).
  */
+/** @typedef {(typeof TaskControlCommand)[keyof typeof TaskControlCommand]} TaskControlCommand */
 const TaskControlCommand = Object.freeze({
     PAUSE: 'PAUSE',
     RESUME: 'RESUME',

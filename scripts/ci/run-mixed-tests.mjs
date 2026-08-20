@@ -32,15 +32,16 @@ function isVitestFile(filePath) {
 /**
  * @param {string} cmd
  * @param {string[]} args
+ * @param {NodeJS.ProcessEnv} [envOverrides]
  */
-function runCommand(cmd, args) {
+function runCommand(cmd, args, envOverrides = {}) {
     const printable = `${cmd} ${args.join(' ')}`;
     console.log(`\n[test-runner] Running: ${printable}`);
 
     const compileCacheDir =
-        process.env.NODE_COMPILE_CACHE ||
-        (process.env.XDG_CACHE_HOME
-            ? join(process.env.XDG_CACHE_HOME, 'node-compile')
+        process.env['NODE_COMPILE_CACHE'] ||
+        (process.env['XDG_CACHE_HOME']
+            ? join(process.env['XDG_CACHE_HOME'], 'node-compile')
             : join(homedir(), '.cache', 'node-compile'));
     const result = spawnSync(cmd, args, {
         stdio: 'inherit',
@@ -48,6 +49,7 @@ function runCommand(cmd, args) {
         env: {
             ...process.env,
             NODE_COMPILE_CACHE: compileCacheDir,
+            ...envOverrides,
         },
     });
 
@@ -55,10 +57,21 @@ function runCommand(cmd, args) {
 }
 
 /**
+ * Lê inteiro positivo de ambiente sem permitir que um valor inválido desative os limites do runner.
+ *
+ * @param {string} name
+ * @param {number} fallback
+ */
+function positiveEnvInteger(name, fallback) {
+    const parsed = Number.parseInt(process.env[name] || '', 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
  * @param {string[]} files
  * @param {number} chunkSize
  */
-function chunkFiles(files, chunkSize = 120) {
+function chunkFiles(files, chunkSize) {
     /** @type {string[][]} */
     const chunks = [];
     for (let index = 0; index < files.length; index += chunkSize) {
@@ -95,21 +108,44 @@ console.log(
     `[test-runner] Discovered ${uniqueFiles.length} spec files (${nodeTestFiles.length} node:test, ${vitestFiles.length} vitest).`,
 );
 
+const nodeTestConcurrency = positiveEnvInteger('TEST_NODE_CONCURRENCY', 4);
+const nodeTestShardSize = positiveEnvInteger('TEST_NODE_SHARD_SIZE', 40);
+const vitestShardSize = positiveEnvInteger('TEST_VITEST_SHARD_SIZE', 80);
+const vitestMaxWorkers = String(positiveEnvInteger('TEST_VITEST_MAX_WORKERS', 4));
+
+console.log(
+    `[test-runner] Limits: nodeConcurrency=${nodeTestConcurrency}, nodeShardSize=${nodeTestShardSize}, ` +
+        `vitestShardSize=${vitestShardSize}, vitestMaxWorkers=${vitestMaxWorkers}.`,
+);
+
 let exitCode = 0;
 
-for (const chunk of chunkFiles(nodeTestFiles)) {
+for (const chunk of chunkFiles(nodeTestFiles, nodeTestShardSize)) {
     if (chunk.length === 0) continue;
-    const status = runCommand('node', ['--strip-types', '--test', ...chunk]);
+    const status = runCommand('node', [
+        '--strip-types',
+        '--test',
+        `--test-concurrency=${nodeTestConcurrency}`,
+        ...chunk,
+    ]);
     if (status !== 0) exitCode = status;
 }
 
-if (genericVitestFiles.length > 0) {
-    const status = runCommand('npx', ['vitest', 'run', '--config', 'vitest.config.js', ...genericVitestFiles]);
+for (const chunk of chunkFiles(genericVitestFiles, vitestShardSize)) {
+    if (chunk.length === 0) continue;
+    const status = runCommand(
+        'npx',
+        ['vitest', 'run', '--config', 'vitest.config.js', `--maxWorkers=${vitestMaxWorkers}`, ...chunk],
+    );
     if (status !== 0) exitCode = status;
 }
 
-if (copilotVitestFiles.length > 0) {
-    const status = runCommand('npx', ['vitest', 'run', '--config', 'vitest.copilot.config.js', ...copilotVitestFiles]);
+for (const chunk of chunkFiles(copilotVitestFiles, vitestShardSize)) {
+    if (chunk.length === 0) continue;
+    const status = runCommand(
+        'node',
+        ['scripts/ci/run-vitest-copilot.mjs', `--maxWorkers=${vitestMaxWorkers}`, ...chunk],
+    );
     if (status !== 0) exitCode = status;
 }
 

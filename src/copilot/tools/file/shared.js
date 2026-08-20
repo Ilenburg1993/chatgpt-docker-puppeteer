@@ -4,8 +4,9 @@ import { DEFAULT_BLOCKED_READ_PATH_PATTERNS, evaluateIoPathPolicyAsync } from '#
 import {
     createValidatedMutableWorkspacePath,
     createValidatedReadWorkspacePath,
-} from '../../infra/io/policy/validated-path.js';
-import { hasNullByte, normalizeWorkspaceRoot } from '#copilot/infra/public/policy';
+    hasNullByte,
+    normalizeWorkspaceRoot,
+} from '#copilot/infra/public/policy';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { log } from '../infra/logger.js';

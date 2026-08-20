@@ -9,7 +9,7 @@
  */
 
 import { container, toError } from '#copilot/core';
-import { METRICS_STORE, startSpanImmediate } from '#copilot/observability';
+import { METRICS_STORE, startSpanImmediate, toOtelException } from '#copilot/observability';
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,7 +55,7 @@ async function runGit(args, opts = {}) {
         span?.setAttribute('duration_ms', elapsed);
         span?.setAttribute('status_code', 2);
         span?.setStatus({ code: 2, message: toError(err).message });
-        span?.recordException(err);
+        span?.recordException(toOtelException(err));
         container.resolve(METRICS_STORE).recordToolCall(`bridge.git.${method}`, elapsed, false);
         container.resolve(METRICS_STORE).recordCounter('copilot.bridge.errors_total');
         throw err;

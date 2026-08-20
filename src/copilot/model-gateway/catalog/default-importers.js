@@ -54,7 +54,7 @@ function readEnvSecret(env, keys) {
 /**
  * @param {object} [options]
  * @param {Record<string, string | undefined>} [options.env]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./importers/http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {boolean} [options.includePublic]
  * @param {boolean} [options.includeAuthenticated]
  * @returns {import('./importer-runner.js').CatalogImporter[]}
@@ -63,6 +63,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const env = options.env ?? process.env;
     const includePublic = options.includePublic ?? true;
     const includeAuthenticated = options.includeAuthenticated ?? true;
+    const fetchOptions = options.fetchImpl === undefined ? {} : { fetchImpl: options.fetchImpl };
     const cloudflareSecret = readEnvSecret(env, ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']);
     const openRouterSecret = readEnvSecret(env, ['OPENROUTER_API_KEY', 'OPEN_ROUTER_KEY']);
     const openAiSecret = readEnvSecret(env, ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY']);
@@ -81,46 +82,47 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const importers = [];
     if (includePublic) {
         importers.push(
-            createOpenRouterModelsImporter({ fetchImpl: options.fetchImpl }),
-            createKiloGatewayModelsImporter({ fetchImpl: options.fetchImpl }),
-            createKiloGatewayProvidersImporter({ fetchImpl: options.fetchImpl }),
-            createCerebrasPublicModelsImporter({ fetchImpl: options.fetchImpl }),
-            createOpenAiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
-            createAnthropicDocsModelsImporter({ fetchImpl: options.fetchImpl }),
-            createGeminiDocsModelsImporter({ fetchImpl: options.fetchImpl }),
-            createMistralDocsModelsImporter({ fetchImpl: options.fetchImpl }),
-            createGroqDocsModelsImporter({ fetchImpl: options.fetchImpl }),
-            createOpenCodeZenDocsImporter({ fetchImpl: options.fetchImpl }),
-            createZaiOpenApiImporter({ fetchImpl: options.fetchImpl }),
+            createOpenRouterModelsImporter({ ...fetchOptions }),
+            createKiloGatewayModelsImporter({ ...fetchOptions }),
+            createKiloGatewayProvidersImporter({ ...fetchOptions }),
+            createCerebrasPublicModelsImporter({ ...fetchOptions }),
+            createOpenAiDocsModelsImporter({ ...fetchOptions }),
+            createAnthropicDocsModelsImporter({ ...fetchOptions }),
+            createGeminiDocsModelsImporter({ ...fetchOptions }),
+            createMistralDocsModelsImporter({ ...fetchOptions }),
+            createGroqDocsModelsImporter({ ...fetchOptions }),
+            createOpenCodeZenDocsImporter({ ...fetchOptions }),
+            createZaiOpenApiImporter({ ...fetchOptions }),
             createCloudflareWorkersAiCatalogImporter({
-                fetchImpl: options.fetchImpl,
-                apiToken: includeAuthenticated ? cloudflareSecret?.value : undefined,
-                secretRef: includeAuthenticated ? cloudflareSecret?.key : undefined,
-                accountId: env['CLOUDFLARE_ACCOUNT_ID'],
-                gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'],
+                ...fetchOptions,
+                ...(includeAuthenticated && cloudflareSecret
+                    ? { apiToken: cloudflareSecret.value, secretRef: cloudflareSecret.key }
+                    : {}),
+                ...(env['CLOUDFLARE_ACCOUNT_ID'] === undefined ? {} : { accountId: env['CLOUDFLARE_ACCOUNT_ID'] }),
+                ...(env['CLOUDFLARE_AI_GATEWAY_ID'] === undefined ? {} : { gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'] }),
             }),
         );
         if (!includeAuthenticated || !huggingFaceSecret) {
-            importers.push(createHuggingFaceInferenceProvidersImporter({ fetchImpl: options.fetchImpl }));
+            importers.push(createHuggingFaceInferenceProvidersImporter({ ...fetchOptions }));
         }
         if (!includeAuthenticated || !openCodeSecret) {
-            importers.push(createOpenCodeZenModelsImporter({ fetchImpl: options.fetchImpl }));
+            importers.push(createOpenCodeZenModelsImporter({ ...fetchOptions }));
         }
         if (!includeAuthenticated || !chutesSecret) {
-            importers.push(createChutesModelsImporter({ fetchImpl: options.fetchImpl }));
+            importers.push(createChutesModelsImporter({ ...fetchOptions }));
         }
         if (!includeAuthenticated || !zaiSecret) {
-            importers.push(createZaiModelsImporter({ fetchImpl: options.fetchImpl }));
+            importers.push(createZaiModelsImporter({ ...fetchOptions }));
         }
     }
     const ollamaBaseUrl = readEnvSecret(env, ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL']);
     if (includePublic && ollamaBaseUrl) {
-        importers.push(createOllamaCatalogImporter({ fetchImpl: options.fetchImpl, baseUrl: ollamaBaseUrl.value }));
+        importers.push(createOllamaCatalogImporter({ ...fetchOptions, baseUrl: ollamaBaseUrl.value }));
     }
     if (includeAuthenticated && openAiSecret) {
         importers.push(
             createOpenAIModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: openAiSecret.value,
                 secretRef: openAiSecret.key,
             }),
@@ -129,7 +131,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && cerebrasSecret) {
         importers.push(
             createCerebrasModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: cerebrasSecret.value,
                 secretRef: cerebrasSecret.key,
             }),
@@ -138,7 +140,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && openRouterSecret) {
         importers.push(
             createOpenRouterKeyAccountImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: openRouterSecret.value,
                 secretRef: openRouterSecret.key,
             }),
@@ -147,29 +149,30 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && kiloSecret) {
         importers.push(
             createKiloGatewayAccountImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: kiloSecret.value,
                 secretRef: kiloSecret.key,
-                organizationId: env['KILO_ORGANIZATION_ID'],
-                organizationIdRef: env['KILO_ORGANIZATION_ID'] ? 'KILO_ORGANIZATION_ID' : undefined,
+                ...(env['KILO_ORGANIZATION_ID'] === undefined
+                    ? {}
+                    : { organizationId: env['KILO_ORGANIZATION_ID'], organizationIdRef: 'KILO_ORGANIZATION_ID' }),
             }),
         );
     }
     if (includeAuthenticated && cloudflareSecret && env['CLOUDFLARE_ACCOUNT_ID']) {
         importers.push(
             createCloudflareWorkersAiAccountImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiToken: cloudflareSecret.value,
                 secretRef: cloudflareSecret.key,
                 accountId: env['CLOUDFLARE_ACCOUNT_ID'],
-                gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'],
+                ...(env['CLOUDFLARE_AI_GATEWAY_ID'] === undefined ? {} : { gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'] }),
             }),
         );
     }
     if (includeAuthenticated && mistralSecret) {
         importers.push(
             createMistralModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: mistralSecret.value,
                 secretRef: mistralSecret.key,
             }),
@@ -178,7 +181,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && anthropicSecret) {
         importers.push(
             createAnthropicModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: anthropicSecret.value,
                 secretRef: anthropicSecret.key,
             }),
@@ -187,7 +190,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && geminiSecret) {
         importers.push(
             createGeminiModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: geminiSecret.value,
                 secretRef: geminiSecret.key,
             }),
@@ -196,7 +199,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && groqSecret) {
         importers.push(
             createGroqModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: groqSecret.value,
                 secretRef: groqSecret.key,
             }),
@@ -205,7 +208,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && huggingFaceSecret) {
         importers.push(
             createHuggingFaceInferenceProvidersImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: huggingFaceSecret.value,
                 secretRef: huggingFaceSecret.key,
             }),
@@ -214,7 +217,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && openCodeSecret) {
         importers.push(
             createOpenCodeZenModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: openCodeSecret.value,
                 secretRef: openCodeSecret.key,
             }),
@@ -223,7 +226,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && nvidiaSecret) {
         importers.push(
             createNvidiaNimModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: nvidiaSecret.value,
                 secretRef: nvidiaSecret.key,
             }),
@@ -232,7 +235,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && chutesSecret) {
         importers.push(
             createChutesModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: chutesSecret.value,
                 secretRef: chutesSecret.key,
             }),
@@ -241,7 +244,7 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     if (includeAuthenticated && zaiSecret) {
         importers.push(
             createZaiModelsImporter({
-                fetchImpl: options.fetchImpl,
+                ...fetchOptions,
                 apiKey: zaiSecret.value,
                 secretRef: zaiSecret.key,
             }),

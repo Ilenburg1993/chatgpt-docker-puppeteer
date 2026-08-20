@@ -66,24 +66,20 @@ export function sanitizeBriefingContent(raw) {
 export const SessionJsonSchema = z
     .object({
         close_key: z
-            .string()
-            .regex(/^[a-zA-Z0-9_-]{1,64}$/)
+            .string()['regex'](/^[a-zA-Z0-9_-]{1,64}$/)
             .optional(),
         strict_turn_close: z.boolean().optional(),
         current_turn: z
             .object({
                 number: z.number().int().min(0),
-            })
-            .passthrough()
+            })['passthrough']()
             .optional(),
         compliance: z
             .object({
                 consecutive_unauthorized: z.number().int().min(0).max(9999),
-            })
-            .passthrough()
+            })['passthrough']()
             .optional(),
-    })
-    .passthrough();
+    })['passthrough']();
 
 // ─── buildHookSystemContext ──────────────────────────────────────────────────
 

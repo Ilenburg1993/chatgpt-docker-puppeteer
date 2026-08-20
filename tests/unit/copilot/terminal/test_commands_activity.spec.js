@@ -1,8 +1,48 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { describe, expect, it, vi } from 'vitest';
+
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/now.js').readTerminalActivityProjection>} ActivityProjection */
+/** @typedef {Pick<ActivityProjection, 'current' | 'history' | 'turnTrace'> & { streamDiagnostics?: unknown }} ActivityProjectionOverrides */
+
+/** @returns {ActivityProjection['streamDiagnostics']} */
+function emptyStreamDiagnosticsFixture() {
+    return {
+        counters: {
+            deltaAccepted: 0,
+            deltaNormalized: 0,
+            deltaSuppressed: 0,
+            deltaCausalAccepted: 0,
+            deltaTemporalFallbackSuppressed: 0,
+            deltaCausalDuplicateSuppressed: 0,
+            deltaCumulativeNormalized: 0,
+            deltaCumulativeSuppressed: 0,
+            deltaOverlapNormalized: 0,
+            deltaDuplicateSuppressed: 0,
+            deltaHumanEchoSuppressed: 0,
+            deltaDisplayOff: 0,
+            finalAlreadyStreamed: 0,
+            finalSuffix: 0,
+            finalMismatch: 0,
+            finalNoVisibleStream: 0,
+            finalEmpty: 0,
+        },
+        recent: [],
+        totals: { deltaDecisions: 0, finalDecisions: 0, suppressedRatio: 0, normalizedRatio: 0 },
+    };
+}
+
+/**
+ * @param {ActivityProjectionOverrides} overrides
+ * @returns {ActivityProjection}
+ */
+function activityProjectionFixture(overrides) {
+    return {
+        ...overrides,
+        streamDiagnostics: emptyStreamDiagnosticsFixture(),
+    };
+}
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/now.js', () => ({
     readTerminalActivityProjection: vi.fn(() => ({
@@ -241,7 +281,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('humaniza fase de modelo sem vazar enum cru', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'model',
                 label: 'Troca de modelo solicitada',
@@ -282,7 +322,7 @@ describe('terminal/commands/activity', () => {
                 lastFlushAt: null,
                 lastDeltaAt: null,
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -294,7 +334,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('não chama trace concluído recente de turno atual quando não há current ativo', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'idle',
                 label: 'Pronto',
@@ -341,7 +381,7 @@ describe('terminal/commands/activity', () => {
                     },
                 ],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -352,7 +392,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('chama trace implícito local de atividade operacional, não turno de conversa', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'tool',
                 label: 'Arquivo: busca concluída',
@@ -400,7 +440,7 @@ describe('terminal/commands/activity', () => {
                 lastFlushAt: null,
                 lastDeltaAt: null,
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -411,7 +451,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('preserva trace operacional recente quando o SDK separa tools e ask_user em turnos distintos', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'idle',
                 label: 'Pronto',
@@ -493,7 +533,7 @@ describe('terminal/commands/activity', () => {
                     },
                 ],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -507,7 +547,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('não duplica ask_user como ferramenta quando a interação humana já aparece no resumo', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'idle',
                 label: 'Pronto',
@@ -566,7 +606,7 @@ describe('terminal/commands/activity', () => {
                     },
                 ],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '40');
@@ -580,7 +620,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('prioriza falhas operacionais recentes em vez de reads triviais posteriores', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'idle',
                 label: 'Pronto',
@@ -668,7 +708,7 @@ describe('terminal/commands/activity', () => {
                     },
                 ],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '40');
@@ -679,7 +719,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('humaniza fases internas na timeline padrão', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'system',
                 label: 'Uso BYOK sem Premium Request',
@@ -776,7 +816,7 @@ describe('terminal/commands/activity', () => {
                 current: null,
                 recent: [],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -804,7 +844,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('mostra fase de conversa como estado humano em vez de turno cru', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'turn',
                 label: 'Pending messages alteradas',
@@ -822,7 +862,7 @@ describe('terminal/commands/activity', () => {
                 current: null,
                 recent: [],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -834,7 +874,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('diferencia subestados de question no estado atual', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'question',
                 label: 'Resposta registrada',
@@ -852,7 +892,7 @@ describe('terminal/commands/activity', () => {
                 current: null,
                 recent: [],
             },
-        });
+        }));
         const responseCtx = mockCtx();
 
         cmdActivity({ println: responseCtx.println }, '5');
@@ -860,7 +900,7 @@ describe('terminal/commands/activity', () => {
         expect(responseCtx.output()).toMatch(/Estado\s+continuação/u);
         expect(responseCtx.output()).not.toMatch(/Estado\s+pergunta/u);
 
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'question',
                 label: 'Permissão SDK solicitada',
@@ -878,7 +918,7 @@ describe('terminal/commands/activity', () => {
                 current: null,
                 recent: [],
             },
-        });
+        }));
         const permissionCtx = mockCtx();
 
         cmdActivity({ println: permissionCtx.println }, '5');
@@ -888,7 +928,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('preserva nomes de protocolo em detalhes livres da intenção', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'idle',
                 label: 'Pronto',
@@ -920,7 +960,7 @@ describe('terminal/commands/activity', () => {
                 current: null,
                 recent: [],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, 'detail 5');
@@ -932,7 +972,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('trata confirmação cruzada SDK/IO do mesmo arquivo como uma operação única', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'idle',
                 label: 'Pronto',
@@ -979,7 +1019,7 @@ describe('terminal/commands/activity', () => {
                 },
                 recent: [],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -991,7 +1031,7 @@ describe('terminal/commands/activity', () => {
     });
 
     it('mantém eventos de boot no default quando ainda não existe evento operacional melhor', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce({
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
             current: {
                 phase: 'boot',
                 label: 'Inicializando terminal',
@@ -1023,7 +1063,7 @@ describe('terminal/commands/activity', () => {
                 current: null,
                 recent: [],
             },
-        });
+        }));
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');

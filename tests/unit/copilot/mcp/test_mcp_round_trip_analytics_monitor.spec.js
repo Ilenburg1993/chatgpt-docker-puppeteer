@@ -14,8 +14,8 @@ describe('MCP round-trip analytics monitor', () => {
     it('runs one non-overlapping incremental sync and reschedules after success', async () => {
         /** @type {Array<() => void>} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((fn) => {
-            callbacks.push(/** @type {() => void} */ (fn));
+        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
+            callbacks.push(fn);
             return /** @type {NodeJS.Timeout} */ ({ unref() {} });
         });
         let calls = 0;
@@ -63,8 +63,8 @@ describe('MCP round-trip analytics monitor', () => {
     it('records a failed sync without throwing and still schedules the next cycle', async () => {
         /** @type {Array<() => void>} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((fn) => {
-            callbacks.push(/** @type {() => void} */ (fn));
+        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
+            callbacks.push(fn);
             return /** @type {NodeJS.Timeout} */ ({ unref() {} });
         });
         scheduleMcpRoundTripAnalyticsMonitor({

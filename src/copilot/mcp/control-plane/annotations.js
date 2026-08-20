@@ -76,3 +76,18 @@ export function destructiveAnnotations() {
         idempotentHint: false,
     };
 }
+
+/**
+ * Arbitrary terminal/process and equivalent actions that can both mutate local state and contact external systems.
+ * This annotation does not weaken OAuth/host approval; it accurately advertises the broad execution boundary.
+ *
+ * @returns {ToolAnnotations}
+ */
+export function openWorldDestructiveAnnotations() {
+    return {
+        readOnlyHint: false,
+        openWorldHint: true,
+        destructiveHint: true,
+        idempotentHint: false,
+    };
+}

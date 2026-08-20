@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../config/typing/strict/tsconfig.strict.src.copilot.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": ["./**/*"],
+  "exclude": ["./.ai/**", "./docs/**", "./**/*.md"]
+}

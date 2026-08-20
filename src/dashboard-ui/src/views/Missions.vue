@@ -1,10 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
+import type { BadgeVariant } from '@/types/dashboard';
 import { Plus, RefreshCw } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -15,7 +16,7 @@ useSsotRealtime();
 
 const creating = ref(false);
 const showCreate = ref(false);
-const actionFeedback = ref(null);
+const actionFeedback = ref<{ message: string; type: 'success' | 'error' } | null>(null);
 const createForm = ref({
     title: '',
     description: '',
@@ -25,7 +26,7 @@ const createForm = ref({
 
 const items = computed(() => store.items || []);
 
-function statusVariant(status) {
+function statusVariant(status: string | undefined): BadgeVariant {
     const s = String(status || '').toUpperCase();
     if (s === 'RUNNING') return 'info';
     if (s === 'PAUSED') return 'warning';
@@ -35,9 +36,9 @@ function statusVariant(status) {
     return 'default';
 }
 
-let feedbackTimer = null;
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
-function showFeedback(message, type = 'success') {
+function showFeedback(message: string, type: 'success' | 'error' = 'success') {
     actionFeedback.value = { message, type };
     if (feedbackTimer) clearTimeout(feedbackTimer);
     feedbackTimer = setTimeout(() => {
@@ -49,8 +50,8 @@ function showFeedback(message, type = 'success') {
 async function refresh() {
     try {
         await store.fetchFirstPage({ limit: 100 });
-    } catch (err) {
-        showFeedback(`Falha ao carregar missões: ${err?.message || String(err)}`, 'error');
+    } catch (err: unknown) {
+        showFeedback(`Falha ao carregar missões: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }
 }
 
@@ -77,8 +78,8 @@ async function createMission() {
         createForm.value = { title: '', description: '', autonomy_mode: 'USER_ONLY', reason: '' };
         showFeedback('Missão criada com sucesso.');
         await refresh();
-    } catch (err) {
-        showFeedback(`Falha ao criar missão: ${err?.message || String(err)}`, 'error');
+    } catch (err: unknown) {
+        showFeedback(`Falha ao criar missão: ${err instanceof Error ? err.message : String(err)}`, 'error');
     } finally {
         creating.value = false;
     }
@@ -202,13 +203,13 @@ onUnmounted(() => {
                     <div class="flex items-center gap-2 flex-wrap justify-end flex-shrink-0">
                         <Badge size="sm" :variant="statusVariant(m.status)">{{ m.status }}</Badge>
                         <Badge size="sm" class="text-[10px]">{{ m.autonomy_mode }}</Badge>
-                        <Badge v-if="m.counts?.proposed > 0" size="sm">prop: {{ m.counts.proposed }}</Badge>
-                        <Badge v-if="m.counts?.pending > 0" size="sm">pend: {{ m.counts.pending }}</Badge>
-                        <Badge v-if="m.counts?.running > 0" size="sm" variant="info">run: {{ m.counts.running }}</Badge>
-                        <Badge v-if="m.counts?.done > 0" size="sm" variant="success">done: {{ m.counts.done }}</Badge>
-                        <Badge v-if="m.counts?.failed > 0" size="sm" variant="error">fail: {{ m.counts.failed }}</Badge>
-                        <Badge v-if="m.counts?.blocked > 0" size="sm" variant="warning"
-                            >blk: {{ m.counts.blocked }}</Badge
+                        <Badge v-if="(m.counts?.proposed ?? 0) > 0" size="sm">prop: {{ m.counts?.proposed }}</Badge>
+                        <Badge v-if="(m.counts?.pending ?? 0) > 0" size="sm">pend: {{ m.counts?.pending }}</Badge>
+                        <Badge v-if="(m.counts?.running ?? 0) > 0" size="sm" variant="info">run: {{ m.counts?.running }}</Badge>
+                        <Badge v-if="(m.counts?.done ?? 0) > 0" size="sm" variant="success">done: {{ m.counts?.done }}</Badge>
+                        <Badge v-if="(m.counts?.failed ?? 0) > 0" size="sm" variant="error">fail: {{ m.counts?.failed }}</Badge>
+                        <Badge v-if="(m.counts?.blocked ?? 0) > 0" size="sm" variant="warning"
+                            >blk: {{ m.counts?.blocked }}</Badge
                         >
                     </div>
                 </div>

@@ -65,7 +65,7 @@ server.setRequestHandler(/** @type {any} */ ('tools/call'), async (request) => {
 
     const controller = new AbortController();
     activeRequests.set(requestId, controller);
-    const timeoutMs = Number(process.env.MCP_TOOL_TIMEOUT || 90000);
+    const timeoutMs = Number(process.env['MCP_TOOL_TIMEOUT'] || 90000);
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
@@ -182,8 +182,8 @@ server.setRequestHandler(/** @type {any} */ ('resources/read'), async (request) 
                             storage,
                             expand_health: {
                                 enabled: true,
-                                default_lines: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
-                                max_lines: Number(process.env.RAG_EXPAND_MAX_LINES || 240),
+                                default_lines: Number(process.env['RAG_EXPAND_DEFAULT_LINES'] || 40),
+                                max_lines: Number(process.env['RAG_EXPAND_MAX_LINES'] || 240),
                             },
                         },
                         null,

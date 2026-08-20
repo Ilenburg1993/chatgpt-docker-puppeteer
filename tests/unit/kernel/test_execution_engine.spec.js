@@ -249,7 +249,7 @@ describe('Kernel Execution Engine - Motor de Execução', () => {
         it('deve notificar mudanças de estado', () => {
             let notificado = false;
 
-            const observador = (/** @type {any} */ oldState, /** @type {any} */ newState) => {
+            const observador = (/** @type {string} */ _oldState, /** @type {string} */ _newState) => {
                 notificado = true;
             };
 

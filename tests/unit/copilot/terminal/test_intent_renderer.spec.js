@@ -59,8 +59,8 @@ describe('terminal/events/intent-renderer', () => {
         expect(output).not.toContain('call=');
         expect(output).not.toContain('toolu_bdrk');
 
-        expect(readTerminalIntentHistory(1)[0]?.toolCallId).toBe('toolu_bdrk_019v9X862pjamNysAemC1UAW');
-        expect(readTerminalTranscriptTurns(1)[0]?.content).not.toContain('tool=report_intent_local');
+        expect(readTerminalIntentHistory()[0]?.toolCallId).toBe('toolu_bdrk_019v9X862pjamNysAemC1UAW');
+        expect(readTerminalTranscriptTurns()[0]?.content).not.toContain('tool=report_intent_local');
         expect(dialogMocks.broadcastSse).toHaveBeenCalledWith(
             'assistant.intent',
             expect.objectContaining({ toolCallId: 'toolu_bdrk_019v9X862pjamNysAemC1UAW' }),

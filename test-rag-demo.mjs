@@ -5,8 +5,8 @@
 import express from 'express';
 import { applyRoutes } from './src/server/api/router.js';
 
-process.env.MCP_ENABLED = 'true';
-process.env.NODE_ENV = 'development';
+process.env['MCP_ENABLED'] = 'true';
+process.env['NODE_ENV'] = 'development';
 
 console.log('\n🚀 Iniciando servidor de demonstração RAG v4.0...\n');
 
@@ -175,8 +175,8 @@ const server = app.listen(3008, async () => {
 
         process.exit(0);
     } catch (error) {
-        console.error('\n❌ Erro na demonstração:', error.message);
-        console.error(error.stack);
+        console.error('\n❌ Erro na demonstração:', error instanceof Error ? error.message : String(error));
+        if (error instanceof Error) console.error(error.stack);
         process.exit(1);
     } finally {
         server.close();

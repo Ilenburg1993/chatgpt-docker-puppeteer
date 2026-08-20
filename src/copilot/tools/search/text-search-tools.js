@@ -79,21 +79,20 @@ export const searchInFilesTool = buildTool({
         'Busca texto ou regex em arquivos do workspace usando o plano canônico de I/O/search. ' +
         'Retorna correspondências com número de linha e contexto.',
     parameters: z.object({
-        pattern: z.string().describe('Padrão de busca (texto literal ou regex)'),
-        path: z.string().optional().default('.').describe('Diretório ou arquivo onde buscar (relativo ao workspace)'),
-        isRegex: z.boolean().optional().default(false).describe('Se true, trata pattern como expressão regular'),
-        caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas'),
-        includePattern: z.string().optional().describe('Filtro de arquivos a incluir (ex: *.js, *.ts)'),
-        excludePattern: z.string().optional().describe('Filtro de arquivos a excluir (ex: node_modules, dist)'),
+        pattern: z.string()['describe']('Padrão de busca (texto literal ou regex)'),
+        path: z.string().optional().default('.')['describe']('Diretório ou arquivo onde buscar (relativo ao workspace)'),
+        isRegex: z.boolean().optional().default(false)['describe']('Se true, trata pattern como expressão regular'),
+        caseSensitive: z.boolean().optional().default(false)['describe']('Busca sensível a maiúsculas'),
+        includePattern: z.string().optional()['describe']('Filtro de arquivos a incluir (ex: *.js, *.ts)'),
+        excludePattern: z.string().optional()['describe']('Filtro de arquivos a excluir (ex: node_modules, dist)'),
         contextLines: z
             .number()
             .int()
             .min(0)
             .optional()
-            .default(2)
-            .describe('Linhas de contexto ao redor de cada match.'),
-        maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de resultados.'),
-        cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
+            .default(2)['describe']('Linhas de contexto ao redor de cada match.'),
+        maxResults: z.number().int().min(1).optional()['describe']('Número máximo sugerido de resultados.'),
+        cursor: z.string().optional()['describe']('Cursor numérico retornado por chamada anterior.'),
     }),
     handler: async ({
         pattern,
@@ -202,29 +201,25 @@ export const findSymbolUsagesTool = buildTool({
         'Retorna lista estruturada de matches: arquivo, linha e trecho. ' +
         'Ideal para análise de impacto e rastreamento de dependências antes de refatorações.',
     parameters: z.object({
-        symbol: z.string().min(1).describe('Nome do símbolo a buscar (ex: "bindAgentInfoProvider", "AgentContext")'),
-        path: z.string().optional().default('.').describe('Diretório de busca (relativo ao workspace). Default: raiz.'),
+        symbol: z.string().min(1)['describe']('Nome do símbolo a buscar (ex: "bindAgentInfoProvider", "AgentContext")'),
+        path: z.string().optional().default('.')['describe']('Diretório de busca (relativo ao workspace). Default: raiz.'),
         includePattern: z
             .string()
             .optional()
-            .default('*.{js,ts,mjs,cjs}')
-            .describe('Glob de arquivos a incluir. Default: arquivos JS/TS.'),
-        excludePattern: z.string().optional().describe('Glob de arquivos a excluir (ex: "node_modules,dist").'),
+            .default('*.{js,ts,mjs,cjs}')['describe']('Glob de arquivos a incluir. Default: arquivos JS/TS.'),
+        excludePattern: z.string().optional()['describe']('Glob de arquivos a excluir (ex: "node_modules,dist").'),
         wholeWord: z
             .boolean()
             .optional()
-            .default(true)
-            .describe('Se true, busca somente o símbolo como palavra inteira (\\bsymbol\\b). Default: true.'),
+            .default(true)['describe']('Se true, busca somente o símbolo como palavra inteira (\\bsymbol\\b). Default: true.'),
         caseSensitive: z
             .boolean()
             .optional()
-            .default(true)
-            .describe('Busca sensível a maiúsculas. Default: true para símbolos.'),
-        maxResults: z.number().int().min(1).optional().describe('Máximo de matches a retornar.'),
+            .default(true)['describe']('Busca sensível a maiúsculas. Default: true para símbolos.'),
+        maxResults: z.number().int().min(1).optional()['describe']('Máximo de matches a retornar.'),
         cursor: z
             .string()
-            .optional()
-            .describe(
+            .optional()['describe'](
                 'Cursor de paginação retornado em chamada anterior (campo nextCursor). ' +
                     'Omitir para iniciar da primeira página.',
             ),

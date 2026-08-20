@@ -24,7 +24,6 @@ function classifyStreamingStatus(chatResult) {
 
 /**
  * @param {Parameters<typeof runConfiguredByokChatProbe>[0]} [options]
- * @returns {Promise<any>}
  */
 export async function runConfiguredByokStreamingProbe(options = {}) {
     const chatResult = await runConfiguredByokChatProbe({

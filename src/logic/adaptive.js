@@ -204,7 +204,7 @@ function updateStats(
         return;
     }
 
-    const alpha = stats.count < 20 ? 0.4 : Number(CONFIG.ADAPTIVE_ALPHA || 0.15);
+    const alpha = stats.count < 20 ? 0.4 : Number(CONFIG['ADAPTIVE_ALPHA'] || 0.15);
     const diff = value - stats.avg;
     const oldAvg = stats.avg;
 
@@ -227,13 +227,13 @@ function shouldCircuitBreak(/** @type {{ avg: number; count: number }} */ stats)
 }
 
 function decayIfNeeded(/** @type {Record<string, any>} */ profile, /** @type {number} */ now) {
-    const age = now - profile.last_update;
+    const age = now - profile['last_update'];
     if (age > TARGET_INACTIVE_THRESHOLD_MS) {
         // Decay exponencial: mais velho = menos confiança
         const decayFactor = Math.max(0.1, Math.exp(-age / (7 * TARGET_INACTIVE_THRESHOLD_MS)));
-        profile.ttft.count = Math.floor(profile.ttft.count * decayFactor);
-        profile.stream.count = Math.floor(profile.stream.count * decayFactor);
-        profile.echo.count = Math.floor(profile.echo.count * decayFactor);
+        profile['ttft'].count = Math.floor(profile['ttft'].count * decayFactor);
+        profile['stream'].count = Math.floor(profile['stream'].count * decayFactor);
+        profile['echo'].count = Math.floor(profile['echo'].count * decayFactor);
         log('INFO', `[ADAPTIVE] Decay aplicado: age=${Math.round(age / 3600000)}h, factor=${decayFactor.toFixed(2)}`);
     }
 }

@@ -1,5 +1,10 @@
 # Roadmap de Execução — Tipagem e JSDoc
 
+> **Roadmap corrente da migração TypeScript 7:**
+> [`../PLANOS/MIGRACAO_TYPESCRIPT_7_WORKSPACE_ROADMAP_2026-08-19.md`](../PLANOS/MIGRACAO_TYPESCRIPT_7_WORKSPACE_ROADMAP_2026-08-19.md).
+> Este documento preserva o histórico full-strict anterior; em caso de divergência de baseline ou
+> prioridade, prevalece o roadmap TS7 de 19 de agosto de 2026.
+
 > **Última revisão**: 8 de março de 2026 **Branch ativa**: `feat/typing-fullstrict-roadmap` **PR
 > ativa**: <https://github.com/Ilenburg1993/chatgpt-docker-puppeteer/pull/99>
 >

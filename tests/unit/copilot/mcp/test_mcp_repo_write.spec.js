@@ -49,7 +49,7 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
+        assert.equal(result.structuredContent['success'], true);
         assert.deepEqual(getValidatedMutableWorkspacePathStats(), {
             issued: 1,
             accepted: 1,
@@ -90,10 +90,10 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
-        assert.equal(result.structuredContent.bytesWritten, 6);
-        assert.match(String(result.structuredContent.diffPreview), /-before/);
-        assert.match(String(result.structuredContent.diffPreview), /\+after/);
+        assert.equal(result.structuredContent['success'], true);
+        assert.equal(result.structuredContent['bytesWritten'], 6);
+        assert.match(String(result.structuredContent['diffPreview']), /-before/);
+        assert.match(String(result.structuredContent['diffPreview']), /\+after/);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'after\n');
     });
 
@@ -108,8 +108,8 @@ describe('copilot MCP repo write tools', () => {
             includeDiffPreview: true,
         });
         assert.equal(created.isError, undefined);
-        assert.equal(created.structuredContent.success, true);
-        assert.match(String(created.structuredContent.diffPreview), /\+new file/);
+        assert.equal(created.structuredContent['success'], true);
+        assert.match(String(created.structuredContent['diffPreview']), /\+new file/);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'new file\n');
 
         const duplicate = await createFileTool.handler({
@@ -117,7 +117,7 @@ describe('copilot MCP repo write tools', () => {
             content: 'again\n',
         });
         assert.equal(duplicate.isError, true);
-        assert.equal(duplicate.structuredContent.success, false);
+        assert.equal(duplicate.structuredContent['success'], false);
     });
 
     it('accepts explicit durability profiles while keeping strict as the implicit default', async () => {
@@ -150,10 +150,10 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
-        assert.equal(result.structuredContent.replacedOccurrences, 1);
-        assert.match(String(result.structuredContent.diffPreview), /-beta/);
-        assert.match(String(result.structuredContent.diffPreview), /\+BETA/);
+        assert.equal(result.structuredContent['success'], true);
+        assert.equal(result.structuredContent['replacedOccurrences'], 1);
+        assert.match(String(result.structuredContent['diffPreview']), /-beta/);
+        assert.match(String(result.structuredContent['diffPreview']), /\+BETA/);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'alpha\nBETA\ngamma\n');
     });
 
@@ -171,7 +171,7 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
+        assert.equal(result.structuredContent['success'], true);
         assert.equal(await fs.readFile(destination, 'utf8'), 'move me\n');
         await assert.rejects(() => fs.access(source));
         assert.deepEqual(getValidatedMutableWorkspacePathStats(), {
@@ -196,7 +196,7 @@ describe('copilot MCP repo write tools', () => {
         const result = await moveFileTool.handler({ source, destination, dryRun: true });
 
         assert.equal(result.isError, true);
-        assert.match(String(result.structuredContent?.error ?? result.content?.[0]?.text ?? ''), /blocked|denied|negado/i);
+        assert.match(String(result.structuredContent?.['error'] ?? result.content?.[0]?.text ?? ''), /blocked|denied|negado/i);
         assert.equal(await fs.readFile(source, 'utf8'), 'opaque native-extension fixture\n');
         await assert.rejects(() => fs.access(destination));
         const stats = getValidatedMutableWorkspacePathStats();
@@ -216,8 +216,8 @@ describe('copilot MCP repo write tools', () => {
 
         const removed = await removeFileTool.handler({ path: filePath, confirm: true });
         assert.equal(removed.isError, undefined);
-        assert.equal(removed.structuredContent.success, true);
-        assert.equal(removed.structuredContent.deleted, true);
+        assert.equal(removed.structuredContent['success'], true);
+        assert.equal(removed.structuredContent['deleted'], true);
         await assert.rejects(() => fs.access(filePath));
     });
 
@@ -231,11 +231,11 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(plan.isError, undefined);
-        assert.equal(plan.structuredContent.success, true);
-        assert.equal(plan.structuredContent.plannedTool, 'repo_apply_file_batch');
-        assert.equal(plan.structuredContent.dryRun, true);
-        assert.equal(plan.structuredContent.operationCount, 1);
-        assert.equal(plan.structuredContent.nextCall.tool, 'repo_apply_file_batch');
+        assert.equal(plan.structuredContent['success'], true);
+        assert.equal(plan.structuredContent['plannedTool'], 'repo_apply_file_batch');
+        assert.equal(plan.structuredContent['dryRun'], true);
+        assert.equal(plan.structuredContent['operationCount'], 1);
+        assert.equal(plan.structuredContent['nextCall'].tool, 'repo_apply_file_batch');
         await assert.rejects(() => fs.access(created));
     });
 
@@ -254,8 +254,8 @@ describe('copilot MCP repo write tools', () => {
             ],
         });
         assert.equal(dryRun.isError, undefined);
-        assert.equal(dryRun.structuredContent.success, true);
-        assert.equal(dryRun.structuredContent.dryRun, true);
+        assert.equal(dryRun.structuredContent['success'], true);
+        assert.equal(dryRun.structuredContent['dryRun'], true);
         await assert.rejects(() => fs.access(created));
 
         const missingConfirm = await applyFileBatchTool.handler({
@@ -263,7 +263,7 @@ describe('copilot MCP repo write tools', () => {
             dryRun: false,
         });
         assert.equal(missingConfirm.isError, true);
-        assert.equal(missingConfirm.structuredContent.code, 'ERR_BATCH_CONFIRM_REQUIRED');
+        assert.equal(missingConfirm.structuredContent['code'], 'ERR_BATCH_CONFIRM_REQUIRED');
 
         const applied = await applyFileBatchTool.handler({
             operations: [
@@ -274,13 +274,13 @@ describe('copilot MCP repo write tools', () => {
             confirmBatch: true,
         });
         assert.equal(applied.isError, undefined);
-        assert.equal(applied.structuredContent.success, true);
-        assert.equal(applied.structuredContent.operationCount, 2);
-        assert.equal(applied.structuredContent.applyMode, 'sequential-fast');
-        assert.equal(applied.structuredContent.applyModeReason, 'adaptive-safe-sequential');
-        assert.equal(applied.structuredContent.preflightSummary.ran, false);
-        assert.equal(applied.structuredContent.preflightSummary.plannedCount, 0);
-        assert.deepEqual(applied.structuredContent.planned, []);
+        assert.equal(applied.structuredContent['success'], true);
+        assert.equal(applied.structuredContent['operationCount'], 2);
+        assert.equal(applied.structuredContent['applyMode'], 'sequential-fast');
+        assert.equal(applied.structuredContent['applyModeReason'], 'adaptive-safe-sequential');
+        assert.equal(applied.structuredContent['preflightSummary'].ran, false);
+        assert.equal(applied.structuredContent['preflightSummary'].plannedCount, 0);
+        assert.deepEqual(applied.structuredContent['planned'], []);
         assert.equal(await fs.readFile(created, 'utf8'), 'batched\n');
         assert.equal(await fs.readFile(moved, 'utf8'), 'move in batch\n');
     });
@@ -295,8 +295,8 @@ describe('copilot MCP repo write tools', () => {
 
         const dryRun = await applyFileBatchTool.handler({ operations });
         assert.equal(dryRun.isError, undefined);
-        assert.equal(dryRun.structuredContent.operations[0].currentMode, '0644');
-        assert.equal(dryRun.structuredContent.operations[0].targetMode, '0755');
+        assert.equal(dryRun.structuredContent['operations'][0].currentMode, '0644');
+        assert.equal(dryRun.structuredContent['operations'][0].targetMode, '0755');
         assert.equal((await fs.stat(script)).mode & 0o777, 0o644);
 
         const applied = await applyFileBatchTool.handler({
@@ -306,9 +306,9 @@ describe('copilot MCP repo write tools', () => {
             applyMode: 'global-preflight',
         });
         assert.equal(applied.isError, undefined);
-        assert.equal(applied.structuredContent.applied[0].metadataOnly, true);
-        assert.equal(applied.structuredContent.applied[0].previousMode, '0644');
-        assert.equal(applied.structuredContent.applied[0].mode, '0755');
+        assert.equal(applied.structuredContent['applied'][0].metadataOnly, true);
+        assert.equal(applied.structuredContent['applied'][0].previousMode, '0644');
+        assert.equal(applied.structuredContent['applied'][0].mode, '0755');
         assert.equal((await fs.stat(script)).mode & 0o777, 0o755);
     });
 
@@ -329,7 +329,7 @@ describe('copilot MCP repo write tools', () => {
             applyMode: 'global-preflight',
         });
         assert.equal(conservative.isError, true);
-        const conservativeDetails = conservative.structuredContent.details;
+        const conservativeDetails = conservative.structuredContent['details'];
         assert.equal(conservativeDetails.phase, 'preflight');
         assert.equal(conservativeDetails.partial, false);
         assert.equal(conservativeDetails.failureIndex, 1);
@@ -343,7 +343,7 @@ describe('copilot MCP repo write tools', () => {
             confirmBatch: true,
         });
         assert.equal(fast.isError, true);
-        const fastDetails = fast.structuredContent.details;
+        const fastDetails = fast.structuredContent['details'];
         assert.equal(fastDetails.phase, 'apply');
         assert.equal(fastDetails.applyMode, 'sequential-fast');
         assert.equal(fastDetails.applyModeReason, 'adaptive-safe-sequential');
@@ -366,11 +366,11 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
-        assert.equal(result.structuredContent.applyMode, 'global-preflight');
-        assert.equal(result.structuredContent.applyModeReason, 'adaptive-destructive-gate');
-        assert.deepEqual(result.structuredContent.conservativeOperationIndices, [0]);
-        assert.equal(result.structuredContent.preflightSummary.ran, true);
+        assert.equal(result.structuredContent['success'], true);
+        assert.equal(result.structuredContent['applyMode'], 'global-preflight');
+        assert.equal(result.structuredContent['applyModeReason'], 'adaptive-destructive-gate');
+        assert.deepEqual(result.structuredContent['conservativeOperationIndices'], [0]);
+        assert.equal(result.structuredContent['preflightSummary'].ran, true);
         assert.equal(await pathExists(removable), false);
     });
 
@@ -387,19 +387,19 @@ describe('copilot MCP repo write tools', () => {
         ];
         const plan = await applyFileBatchPlanTool.handler({ operations });
         assert.equal(plan.isError, undefined);
-        assert.equal(plan.structuredContent.success, true);
-        assert.equal(plan.structuredContent.operations[1].virtualSource, true);
+        assert.equal(plan.structuredContent['success'], true);
+        assert.equal(plan.structuredContent['operations'][1].virtualSource, true);
 
         const dryRun = await applyFileBatchTool.handler({ operations });
         assert.equal(dryRun.isError, undefined);
-        assert.equal(dryRun.structuredContent.success, true);
-        assert.equal(dryRun.structuredContent.operations[1].virtualSource, true);
+        assert.equal(dryRun.structuredContent['success'], true);
+        assert.equal(dryRun.structuredContent['operations'][1].virtualSource, true);
         await assert.rejects(() => fs.access(created));
         await assert.rejects(() => fs.access(moved));
 
         const applied = await applyFileBatchTool.handler({ operations, dryRun: false, confirmBatch: true });
         assert.equal(applied.isError, undefined);
-        assert.equal(applied.structuredContent.success, true);
+        assert.equal(applied.structuredContent['success'], true);
         assert.equal(await pathExists(created), false);
         assert.equal(await fs.readFile(moved, 'utf8'), 'created then moved\\n');
     });
@@ -415,32 +415,32 @@ describe('copilot MCP repo write tools', () => {
 
         const quarantined = await quarantineFileTool.handler({ path: filePath });
         assert.equal(quarantined.isError, undefined);
-        assert.equal(quarantined.structuredContent.success, true);
-        assert.equal(quarantined.structuredContent.status, 'quarantined');
+        assert.equal(quarantined.structuredContent['success'], true);
+        assert.equal(quarantined.structuredContent['status'], 'quarantined');
         assert.equal(await pathExists(filePath), false);
-        const metadataPath = path.resolve(String(quarantined.structuredContent.metadataPath));
+        const metadataPath = path.resolve(String(quarantined.structuredContent['metadataPath']));
         assert.equal((await fs.stat(metadataPath)).mode & 0o777, 0o600);
 
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
         const listed = await listQuarantineTool.handler({ status: 'quarantined', limit: 20 });
         assert.equal(listed.isError, undefined);
-        const listedItems = /** @type {{ quarantineId?: string }[]} */ (listed.structuredContent.items);
+        const listedItems = /** @type {{ quarantineId?: string }[]} */ (listed.structuredContent['items']);
         assert.ok(listedItems.some((item) => item.quarantineId === quarantineId));
 
         const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
         assert.equal(inspected.isError, undefined);
-        assert.equal(inspected.structuredContent.restorable, true);
-        assert.equal(typeof inspected.structuredContent.dataSha256, 'string');
+        assert.equal(inspected.structuredContent['restorable'], true);
+        assert.equal(typeof inspected.structuredContent['dataSha256'], 'string');
 
         const restored = await restoreQuarantinedFileTool.handler({ quarantineId });
         assert.equal(restored.isError, undefined);
-        assert.equal(restored.structuredContent.success, true);
-        assert.equal(restored.structuredContent.destination.endsWith('quarantine.txt'), true);
+        assert.equal(restored.structuredContent['success'], true);
+        assert.equal(restored.structuredContent['destination'].endsWith('quarantine.txt'), true);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'recover me\n');
 
         const secondRestore = await restoreQuarantinedFileTool.handler({ quarantineId });
         assert.equal(secondRestore.isError, true);
-        assert.equal(secondRestore.structuredContent.code, 'ERR_QUARANTINE_NOT_RESTORABLE');
+        assert.equal(secondRestore.structuredContent['code'], 'ERR_QUARANTINE_NOT_RESTORABLE');
     });
 
     it('rolls a quarantine move back when the final metadata commit fails', async () => {
@@ -462,7 +462,7 @@ describe('copilot MCP repo write tools', () => {
 
         const result = await quarantineFileTool.handler({ path: filePath });
         assert.equal(result.isError, true);
-        assert.equal(result.structuredContent.code, 'EIO');
+        assert.equal(result.structuredContent['code'], 'EIO');
         assert.equal(await fs.readFile(filePath, 'utf8'), 'still here\n');
 
         const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
@@ -484,7 +484,7 @@ describe('copilot MCP repo write tools', () => {
 
         const quarantined = await quarantineFileTool.handler({ path: source });
         assert.equal(quarantined.isError, undefined);
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
 
         let writeCount = 0;
         repoWriteTestHarness.setQuarantineMetadataWriter(async (metadata, metadataPath) => {
@@ -504,14 +504,14 @@ describe('copilot MCP repo write tools', () => {
             confirmOverwrite: true,
         });
         assert.equal(result.isError, true);
-        assert.equal(result.structuredContent.code, 'EIO');
+        assert.equal(result.structuredContent['code'], 'EIO');
         assert.equal(await fs.readFile(destination, 'utf8'), 'previous destination\n');
 
         repoWriteTestHarness.resetQuarantineMetadataWriter();
         const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
         assert.equal(inspected.isError, undefined);
-        assert.equal(inspected.structuredContent.restorable, true);
-        assert.equal(inspected.structuredContent.metadata.status, 'quarantined');
+        assert.equal(inspected.structuredContent['restorable'], true);
+        assert.equal(inspected.structuredContent['metadata'].status, 'quarantined');
         const quarantineEntries = await fs.readdir(path.join(process.cwd(), 'src/copilot/.ai/quarantine'));
         assert.equal(
             quarantineEntries.some((entry) => entry.includes(`${quarantineId}.restore-backup-`)),
@@ -527,7 +527,7 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(source, 'restore once\n', 'utf8');
 
         const quarantined = await quarantineFileTool.handler({ path: source });
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
         const results = await Promise.all([
             restoreQuarantinedFileTool.handler({ quarantineId }),
             restoreQuarantinedFileTool.handler({ quarantineId }),
@@ -535,7 +535,7 @@ describe('copilot MCP repo write tools', () => {
 
         assert.equal(results.filter((result) => result.isError !== true).length, 1);
         const failed = results.find((result) => result.isError === true);
-        assert.equal(failed?.structuredContent.code, 'ERR_QUARANTINE_NOT_RESTORABLE');
+        assert.equal(failed?.structuredContent['code'], 'ERR_QUARANTINE_NOT_RESTORABLE');
         assert.equal(await fs.readFile(source, 'utf8'), 'restore once\n');
     });
 
@@ -543,7 +543,7 @@ describe('copilot MCP repo write tools', () => {
         assert.ok(inspectQuarantinedFileTool);
         const result = await inspectQuarantinedFileTool.handler({ quarantineId: '../quarantine-item' });
         assert.equal(result.isError, true);
-        assert.equal(result.structuredContent.code, 'ERR_QUARANTINE_NOT_FOUND');
+        assert.equal(result.structuredContent['code'], 'ERR_QUARANTINE_NOT_FOUND');
     });
 
     it('rejects forged quarantine backup paths without deleting their target', async () => {
@@ -556,8 +556,8 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(protectedFile, 'protected\n', 'utf8');
 
         const quarantined = await quarantineFileTool.handler({ path: source });
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
-        const metadataPath = path.resolve(String(quarantined.structuredContent.metadataPath));
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
+        const metadataPath = path.resolve(String(quarantined.structuredContent['metadataPath']));
         const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
         metadata.status = 'restored';
         metadata.restoredAt = new Date().toISOString();
@@ -572,7 +572,7 @@ describe('copilot MCP repo write tools', () => {
 
         const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
         assert.equal(inspected.isError, true);
-        assert.equal(inspected.structuredContent.code, 'ERR_QUARANTINE_NOT_FOUND');
+        assert.equal(inspected.structuredContent['code'], 'ERR_QUARANTINE_NOT_FOUND');
         assert.equal(await fs.readFile(protectedFile, 'utf8'), 'protected\n');
     });
 
@@ -587,19 +587,19 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(target, 'target\n', 'utf8');
 
         const quarantined = await quarantineFileTool.handler({ path: source });
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
-        const quarantinePath = path.resolve(String(quarantined.structuredContent.quarantinePath));
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
+        const quarantinePath = path.resolve(String(quarantined.structuredContent['quarantinePath']));
         await fs.rm(quarantinePath);
         await fs.symlink(target, quarantinePath);
 
         const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
         assert.equal(inspected.isError, undefined);
-        assert.equal(inspected.structuredContent.dataExists, false);
-        assert.equal(inspected.structuredContent.restorable, false);
+        assert.equal(inspected.structuredContent['dataExists'], false);
+        assert.equal(inspected.structuredContent['restorable'], false);
 
         const restored = await restoreQuarantinedFileTool.handler({ quarantineId });
         assert.equal(restored.isError, true);
-        assert.equal(restored.structuredContent.code, 'ERR_QUARANTINE_DATA_INVALID');
+        assert.equal(restored.structuredContent['code'], 'ERR_QUARANTINE_DATA_INVALID');
         assert.equal(await fs.readFile(target, 'utf8'), 'target\n');
     });
 
@@ -611,13 +611,13 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(source, 'original\n', 'utf8');
 
         const quarantined = await quarantineFileTool.handler({ path: source });
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
-        const quarantinePath = path.resolve(String(quarantined.structuredContent.quarantinePath));
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
+        const quarantinePath = path.resolve(String(quarantined.structuredContent['quarantinePath']));
         await fs.writeFile(quarantinePath, 'tampered\n', 'utf8');
 
         const restored = await restoreQuarantinedFileTool.handler({ quarantineId });
         assert.equal(restored.isError, true);
-        assert.equal(restored.structuredContent.code, 'ERR_QUARANTINE_DATA_INVALID');
+        assert.equal(restored.structuredContent['code'], 'ERR_QUARANTINE_DATA_INVALID');
         assert.equal(await pathExists(source), false);
     });
 
@@ -630,9 +630,9 @@ describe('copilot MCP repo write tools', () => {
         await fs.writeFile(source, 'journal content\n', 'utf8');
 
         const quarantined = await quarantineFileTool.handler({ path: source });
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
-        const quarantinePath = path.resolve(String(quarantined.structuredContent.quarantinePath));
-        const metadataPath = path.resolve(String(quarantined.structuredContent.metadataPath));
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
+        const quarantinePath = path.resolve(String(quarantined.structuredContent['quarantinePath']));
+        const metadataPath = path.resolve(String(quarantined.structuredContent['metadataPath']));
         const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
         metadata.status = 'restoring';
         metadata.restoredAt = new Date().toISOString();
@@ -648,9 +648,9 @@ describe('copilot MCP repo write tools', () => {
 
         const inspected = await inspectQuarantinedFileTool.handler({ quarantineId });
         assert.equal(inspected.isError, undefined);
-        assert.equal(inspected.structuredContent.metadata.status, 'restored');
-        assert.equal(inspected.structuredContent.metadata.transaction, null);
-        assert.equal(inspected.structuredContent.dataExists, false);
+        assert.equal(inspected.structuredContent['metadata'].status, 'restored');
+        assert.equal(inspected.structuredContent['metadata'].transaction, null);
+        assert.equal(inspected.structuredContent['dataExists'], false);
         assert.equal(await fs.readFile(destination, 'utf8'), 'journal content\n');
     });
 
@@ -665,11 +665,11 @@ describe('copilot MCP repo write tools', () => {
 
         const quarantined = await quarantineFileTool.handler({ path: source });
         assert.equal(quarantined.isError, undefined);
-        const quarantineId = String(quarantined.structuredContent.quarantineId);
+        const quarantineId = String(quarantined.structuredContent['quarantineId']);
 
         const blocked = await restoreQuarantinedFileTool.handler({ quarantineId, destinationPath: destination });
         assert.equal(blocked.isError, true);
-        assert.equal(blocked.structuredContent.code, 'EEXIST');
+        assert.equal(blocked.structuredContent['code'], 'EEXIST');
         assert.equal(await fs.readFile(destination, 'utf8'), 'existing\n');
 
         const missingConfirm = await restoreQuarantinedFileTool.handler({
@@ -678,7 +678,7 @@ describe('copilot MCP repo write tools', () => {
             overwrite: true,
         });
         assert.equal(missingConfirm.isError, true);
-        assert.equal(missingConfirm.structuredContent.code, 'ERR_RESTORE_CONFIRM_OVERWRITE_REQUIRED');
+        assert.equal(missingConfirm.structuredContent['code'], 'ERR_RESTORE_CONFIRM_OVERWRITE_REQUIRED');
 
         const restored = await restoreQuarantinedFileTool.handler({
             quarantineId,
@@ -704,9 +704,9 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, undefined);
-        assert.equal(result.structuredContent.success, true);
-        assert.equal(result.structuredContent.dryRun, true);
-        assert.equal(result.structuredContent.bytesWritten, 0);
+        assert.equal(result.structuredContent['success'], true);
+        assert.equal(result.structuredContent['dryRun'], true);
+        assert.equal(result.structuredContent['bytesWritten'], 0);
         assert.equal(await fs.readFile(filePath, 'utf8'), 'one\ntwo\n');
     });
 
@@ -722,8 +722,8 @@ describe('copilot MCP repo write tools', () => {
         });
 
         assert.equal(result.isError, true);
-        assert.equal(result.structuredContent.success, false);
-        assert.match(String(result.structuredContent.error), /Acesso negado|outside/i);
+        assert.equal(result.structuredContent['success'], false);
+        assert.match(String(result.structuredContent['error']), /Acesso negado|outside/i);
     });
 });
 

@@ -1,81 +1,89 @@
 #!/usr/bin/env node
 // @ts-check
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import { parse, printParseErrorCode } from 'jsonc-parser';
+import {
+    VSCODE_DEVCONTAINER_EXTENSIONS,
+    VSCODE_HOST_ONLY_EXTENSIONS,
+    VSCODE_OPTIONAL_EXTENSIONS,
+    VSCODE_UNWANTED_EXTENSIONS,
+} from '../config/vscode/extensions.mjs';
 
-/**
- * Remove comentários do formato JSONC para converter para JSON válido.
- *
- * @param {string} content - Conteúdo JSONC como string.
- * @returns {any} Objeto JSON resultante após remoção dos comentários.
- */
-function parseJSONC(content) {
-    const lines = content.split('\n').filter((line) => {
-        const trimmed = line.trim();
-        return !trimmed.startsWith('//');
-    });
-    return JSON.parse(lines.join('\n'));
+const strictRuntime = process.argv.includes('--strict-runtime');
+
+/** @param {string} file */
+function readJsonc(file) {
+    const text = fs.readFileSync(file, 'utf8');
+    /** @type {import('jsonc-parser').ParseError[]} */
+    const errors = [];
+    const value = parse(text, errors, { allowTrailingComma: true, disallowComments: false });
+    if (errors.length) {
+        throw new Error(
+            `${file}: JSONC inválido (${errors.map((entry) => `${printParseErrorCode(entry.error)}@${entry.offset}`).join(', ')})`,
+        );
+    }
+    return value;
 }
 
-/**
- * Script principal para verificar o status das extensões do VS Code. Lê o arquivo .vscode/extensions.json e compara com
- * as extensões instaladas. Exibe estatísticas e sai com código 1 se houver extensões faltando. Side-effects: Lê
- * arquivos do sistema, executa comando 'code', imprime resultados no console.
- */
-function main() {
+/** @param {string[]} actual @param {readonly string[]} expected */
+function setDiff(actual, expected) {
+    const expectedSet = new Set(expected.map((value) => value.toLowerCase()));
+    const actualSet = new Set(actual.map((value) => value.toLowerCase()));
+    return {
+        missing: expected.filter((value) => !actualSet.has(value.toLowerCase())),
+        extra: actual.filter((value) => !expectedSet.has(value.toLowerCase())),
+    };
+}
+
+/** @returns {string[] | null} */
+function readInstalledExtensions() {
     try {
-        // Ler extensões recomendadas
-        const extensionsFile = fs.readFileSync('.vscode/extensions.json', 'utf-8');
-        const config = parseJSONC(extensionsFile);
-
-        // Obter extensões instaladas
-        let installed = /** @type {string[]} */ ([]);
-        try {
-            const output = execSync('code --list-extensions', { encoding: 'utf-8' });
-            installed = output
-                .split('\n')
-                .filter((e) => e.trim())
-                .map((e) => e.toLowerCase());
-        } catch (_error) {
-            console.log('⚠️  Aviso: Não foi possível obter lista de extensões instaladas');
-            installed = [];
-        }
-
-        const recommended = config.recommendations || [];
-        const unwanted = config.unwantedRecommendations || [];
-
-        // Calcular estatísticas
-        const installedCount = recommended.filter((/** @type {string} */ ext) =>
-            installed.includes(ext.toLowerCase()),
-        ).length;
-
-        const missingCount = recommended.length - installedCount;
-        const percentage = Math.round((installedCount / recommended.length) * 100);
-
-        // Output
-        console.log('📊 VS Code Extensions Status\n');
-        console.log(`✅ Recommended: ${recommended.length}`);
-        console.log(`❌ Unwanted: ${unwanted.length}`);
-        console.log(`📦 Installed: ${installedCount} / ${recommended.length} (${percentage}%)`);
-        console.log(`⚠️  Missing: ${missingCount}`);
-
-        if (missingCount > 0) {
-            console.log('\n💡 Para instalar extensões faltando:');
-            console.log('   1. Abra o Command Palette: Ctrl+Shift+P (Windows/Linux) ou Cmd+Shift+P (Mac)');
-            console.log('   2. Digite: "Extensions: Show Recommended Extensions"');
-            console.log('   3. Clique em "Install" nas extensões desejadas');
-            console.log('\n   Ou instale via DevContainer rebuild (auto-install)');
-            process.exit(1);
-        } else {
-            console.log('\n✅ Todas as extensões recomendadas estão instaladas!');
-            process.exit(0);
-        }
-    } catch (error) {
-        const _ce = /** @type {any} */ (error);
-        console.error('❌ Erro ao verificar extensões:', _ce.message);
-        process.exit(1);
+        const output = execFileSync('code', ['--list-extensions'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        return output.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+    } catch {
+        return null;
     }
 }
 
-// Executar função principal
-main();
+const devcontainer = readJsonc('.devcontainer/devcontainer.json');
+const recommendations = readJsonc('.vscode/extensions.json');
+const configured = /** @type {string[]} */ (devcontainer?.customizations?.vscode?.extensions ?? []);
+const recommended = /** @type {string[]} */ (recommendations?.recommendations ?? []);
+const unwanted = /** @type {string[]} */ (recommendations?.unwantedRecommendations ?? []);
+
+const projectionChecks = [
+    ['DevContainer auto-install', setDiff(configured, VSCODE_DEVCONTAINER_EXTENSIONS)],
+    ['Workspace recommendations', setDiff(recommended, VSCODE_DEVCONTAINER_EXTENSIONS)],
+    ['Workspace unwanted', setDiff(unwanted, VSCODE_UNWANTED_EXTENSIONS)],
+];
+let failed = false;
+for (const [label, diff] of projectionChecks) {
+    const typedDiff = /** @type {{missing: string[]; extra: string[]}} */ (diff);
+    if (!typedDiff.missing.length && !typedDiff.extra.length) continue;
+    failed = true;
+    console.error(`✗ ${label} divergiu do catálogo canônico`);
+    if (typedDiff.missing.length) console.error(`  missing: ${typedDiff.missing.join(', ')}`);
+    if (typedDiff.extra.length) console.error(`  extra: ${typedDiff.extra.join(', ')}`);
+}
+if (!failed) console.log(`✓ Configuração sincronizada: ${configured.length} extensões no auto-install.`);
+
+const installed = readInstalledExtensions();
+if (installed) {
+    const installedLower = new Set(installed.map((value) => value.toLowerCase()));
+    const missingCore = VSCODE_DEVCONTAINER_EXTENSIONS.filter((value) => !installedLower.has(value.toLowerCase()));
+    const installedUnwanted = VSCODE_UNWANTED_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
+    const installedHostOnly = VSCODE_HOST_ONLY_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
+    console.log(
+        `Runtime: ${installed.length} instaladas; ${missingCore.length} core ausentes; ${installedUnwanted.length} unwanted ainda presentes; ${installedHostOnly.length} host-only no remoto.`,
+    );
+    if (missingCore.length) console.warn(`  core ausentes: ${missingCore.join(', ')}`);
+    if (installedUnwanted.length) console.warn(`  unwanted presentes: ${installedUnwanted.join(', ')}`);
+    if (installedHostOnly.length) console.warn(`  host-only presentes no remoto: ${installedHostOnly.join(', ')}`);
+    if (strictRuntime && (missingCore.length || installedUnwanted.length || installedHostOnly.length)) failed = true;
+} else {
+    console.warn('Runtime: VS Code CLI indisponível; verificação de instalação foi omitida.');
+}
+
+console.log(`Optional on-demand: ${VSCODE_OPTIONAL_EXTENSIONS.length}.`);
+process.exit(failed ? 1 : 0);

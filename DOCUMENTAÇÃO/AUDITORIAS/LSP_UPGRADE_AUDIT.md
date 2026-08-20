@@ -1,5 +1,9 @@
 # Auditoria e Propostas de Upgrade – tsserver / LSP 🛠️
 
+> **Documento histórico, superado em 19 de agosto de 2026.** O estado canônico usa o LSP nativo
+> do TypeScript 7 diretamente no editor. O wrapper MCP preservado foi migrado para
+> `src/integration/lsp/tsgo-lsp-daemon.mjs` e permanece desligado por padrão.
+
 Este documento revisa a implementação atual do daemon LSP
 (`src/integration/lsp/tsserver-daemon.mjs`), avalia sua cobertura funcional e propõe melhorias ou
 atualizações.

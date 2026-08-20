@@ -10,12 +10,12 @@
 
 const DEFAULT_ROUTE_DECISION_LEDGER_LIMIT = 200;
 
-/** @type {Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>} */
+/** @type {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>} */
 const ROUTE_DECISION_LEDGER = [];
 
 /**
- * @param {ReturnType<import('./events.js').buildRouteDecisionEvent>} event
- * @returns {ReturnType<import('./events.js').buildRouteDecisionEvent>}
+ * @param {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>} event
+ * @returns {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>}
  */
 function cloneRouteDecisionEvent(event) {
     return {
@@ -27,8 +27,8 @@ function cloneRouteDecisionEvent(event) {
 }
 
 /**
- * @param {ReturnType<import('./events.js').buildRouteDecisionEvent>} event
- * @returns {ReturnType<import('./events.js').buildRouteDecisionEvent>}
+ * @param {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>} event
+ * @returns {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>}
  */
 export function recordModelGatewayRouteDecision(event) {
     const record = Object.freeze(cloneRouteDecisionEvent(event));
@@ -41,7 +41,7 @@ export function recordModelGatewayRouteDecision(event) {
 
 /**
  * @param {{ limit?: number }} [options]
- * @returns {Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>}
+ * @returns {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>}
  */
 export function listModelGatewayRouteDecisions(options = {}) {
     const limit =
@@ -56,12 +56,12 @@ export function listModelGatewayRouteDecisions(options = {}) {
  * payload for each id. This is useful for scripts that capture pre-decision and runtime outcome events before writing
  * them to SQLite in one batch.
  *
- * @param {Array<ReturnType<import('./events.js').buildRouteDecisionEvent> | null | undefined>} events
- * @returns {Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>}
+ * @param {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent> | null | undefined>} events
+ * @returns {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>}
  */
 export function dedupeModelGatewayRouteDecisionEvents(events) {
     const validEvents = events.filter(
-        /** @returns {event is ReturnType<import('./events.js').buildRouteDecisionEvent>} */
+        /** @returns {event is ReturnType<typeof import('./events.js').buildRouteDecisionEvent>} */
         (event) => event !== null && event !== undefined && typeof event.decisionId === 'string',
     );
     return [
@@ -79,13 +79,13 @@ export function dedupeModelGatewayRouteDecisionEvents(events) {
  * @param {{ delegate?: typeof recordModelGatewayRouteDecision }} [options]
  * @returns {{
  *   record: typeof recordModelGatewayRouteDecision;
- *   list: () => Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>;
- *   listUnique: () => Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>;
+ *   list: () => Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>;
+ *   listUnique: () => Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>;
  *   count: () => number;
  * }}
  */
 export function createModelGatewayRouteDecisionCapture(options = {}) {
-    /** @type {Array<ReturnType<import('./events.js').buildRouteDecisionEvent>>} */
+    /** @type {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>} */
     const events = [];
     const delegate = typeof options.delegate === 'function' ? options.delegate : null;
     return Object.freeze({

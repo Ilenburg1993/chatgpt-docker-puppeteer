@@ -89,6 +89,7 @@ afterEach(() => {
     vi.clearAllMocks();
 });
 
+/** @param {{ structuredContent?: unknown }} result */
 function structured(result) {
     return /** @type {Record<string, any>} */ (result.structuredContent);
 }

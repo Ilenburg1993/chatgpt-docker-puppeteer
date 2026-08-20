@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file usa mocks não tipados
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#copilot/infra/public/indexing', async (importOriginal) => {
     // formatters e paginators são funções puras — usamos a implementação real
-    const actual = await importOriginal();
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         buildIoIndexForDirectory: mocks.buildIoIndexForDirectory,

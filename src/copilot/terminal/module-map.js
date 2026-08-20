@@ -99,6 +99,15 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         summary: 'Lifecycle fatal de boot, sinais e shutdown por falha de bootstrap.',
     },
     {
+        path: 'bootstrap-runtime.js',
+        kind: 'file',
+        role: 'boot',
+        tier: 'secondary',
+        risk: 'watch',
+        public: false,
+        summary: 'Composição testável do runtime de bootstrap antes da entrada no REPL.',
+    },
+    {
         path: 'dev-watch.js',
         kind: 'file',
         role: 'dev-tooling',

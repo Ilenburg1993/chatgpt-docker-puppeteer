@@ -1,38 +1,30 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import assert from 'node:assert';
 
 console.log('[TEST] ChromeProxyService v2.0 - Starting tests...\n');
 
-// Mock logger to avoid dependency issues
-const mockLogger = {
-    log: () => {},
-    info: () => {},
-    warn: () => {},
-    error: () => {},
-    debug: () => {},
-};
-
-// Mock config
-const mockConfig = {
-    CHROME_PROXY_PORT: 9224,
-    CHROME_HOST: 'host.docker.internal',
-    CHROME_PORT: 9225,
-    CHROME_PROXY_BIND: '0.0.0.0',
-};
-
-import Module from 'node:module';
-const originalRequire = Module.prototype.require;
-Module.prototype.require = function (id) {
-    if (id.includes('core/logger') || id === '@core/logger') {
-        return mockLogger;
-    }
-    if (id.includes('core/config') || id === '@core/config') {
-        return mockConfig;
-    }
-    return originalRequire.apply(this, arguments);
-};
-
 import ChromeProxyService from '#infra/proxy/chromeProxyService';
+
+/** @typedef {{
+ *     state: string;
+ *     onFailure: () => void;
+ *     call: <T>(operation: () => Promise<T>) => Promise<T>;
+ * }} CircuitBreakerTestPort */
+
+/** @typedef {{
+ *     circuitBreaker: CircuitBreakerTestPort;
+ *     rewriteWebSocketURL: (data: string, host: string) => string;
+ *     _getCORSHeaders: (request: { headers: { origin?: string } }) => Record<string, string>;
+ *     cache: { version: string | null; versionExpires: number };
+ *     stats: { cacheHits: number; cacheMisses: number };
+ *     _incrementMetric: (metric: { inc: (...args: unknown[]) => void }, labels: Record<string, unknown>) => void;
+ *     config: { PUBLIC_IP: string };
+ *     _getDockerInternalIP: () => string | null;
+ * }} ChromeProxyTestPort */
+
+/** @param {unknown} error @returns {string} */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
 
 /* ==========================================================================
    Test 1: Config Validation
@@ -43,10 +35,11 @@ try {
     console.log('❌ Should have thrown error for invalid PROXY_PORT');
     process.exit(1);
 } catch (err) {
-    if (err.message.includes('Invalid PROXY_PORT')) {
+    const message = errorMessage(err);
+    if (message.includes('Invalid PROXY_PORT')) {
         console.log('✅ Config validation works correctly\n');
     } else {
-        console.log('❌ Wrong error:', err.message);
+        console.log('❌ Wrong error:', message);
         process.exit(1);
     }
 }
@@ -56,10 +49,11 @@ try {
     console.log('❌ Should have thrown error for out-of-range port');
     process.exit(1);
 } catch (err) {
-    if (err.message.includes('Invalid PROXY_PORT')) {
+    const message = errorMessage(err);
+    if (message.includes('Invalid PROXY_PORT')) {
         console.log('✅ Port range validation works\n');
     } else {
-        console.log('❌ Wrong error:', err.message);
+        console.log('❌ Wrong error:', message);
         process.exit(1);
     }
 }
@@ -69,10 +63,11 @@ try {
     console.log('❌ Should have thrown error for empty ALLOWED_ORIGINS');
     process.exit(1);
 } catch (err) {
-    if (err.message.includes('ALLOWED_ORIGINS')) {
+    const message = errorMessage(err);
+    if (message.includes('ALLOWED_ORIGINS')) {
         console.log('✅ ALLOWED_ORIGINS validation works\n');
     } else {
-        console.log('❌ Wrong error:', err.message);
+        console.log('❌ Wrong error:', message);
         process.exit(1);
     }
 }
@@ -84,15 +79,16 @@ console.log('Test 2: Circuit breaker behavior');
 
 // Import CircuitBreaker from the module (we need to extract it)
 // For now, we'll test it through the service
-let service = new ChromeProxyService({
+const service = new ChromeProxyService({
     PROXY_PORT: 9224,
     CHROME_PORT: 9225,
     CHROME_HOST: 'host.docker.internal',
     PUBLIC_IP: 'localhost',
 });
+const testService = /** @type {ChromeProxyTestPort} */ (/** @type {unknown} */ (service));
 
 // Access circuit breaker
-const cb = service.circuitBreaker;
+const cb = testService.circuitBreaker;
 assert.strictEqual(cb.state, 'CLOSED', 'Initial state should be CLOSED');
 console.log('✅ Circuit breaker starts in CLOSED state');
 
@@ -110,10 +106,11 @@ console.log('✅ Circuit breaker opens after threshold failures');
         console.log('❌ Should have thrown error when circuit is OPEN');
         process.exit(1);
     } catch (err) {
-        if (err.message.includes('Circuit breaker')) {
+        const message = errorMessage(err);
+        if (message.includes('Circuit breaker')) {
             console.log('✅ Circuit breaker rejects calls when OPEN\n');
         } else {
-            console.log('❌ Wrong error:', err.message);
+            console.log('❌ Wrong error:', message);
             process.exit(1);
         }
     }
@@ -128,7 +125,7 @@ const data = JSON.stringify({
     webSocketDebuggerUrl: 'ws://host.docker.internal:9225/devtools/page/abc123',
 });
 
-const rewritten = service.rewriteWebSocketURL(data, 'localhost:9224');
+const rewritten = testService.rewriteWebSocketURL(data, 'localhost:9224');
 const parsed = JSON.parse(rewritten);
 
 if (parsed.webSocketDebuggerUrl.includes('localhost') && parsed.webSocketDebuggerUrl.includes('9224')) {
@@ -154,7 +151,7 @@ const arrayData = JSON.stringify([
     },
 ]);
 
-const rewrittenArray = service.rewriteWebSocketURL(arrayData, 'localhost:9224');
+const rewrittenArray = testService.rewriteWebSocketURL(arrayData, 'localhost:9224');
 const parsedArray = JSON.parse(rewrittenArray);
 
 if (
@@ -178,7 +175,7 @@ const mockReq = {
     },
 };
 
-const corsHeaders = service._getCORSHeaders(mockReq);
+const corsHeaders = testService._getCORSHeaders(mockReq);
 assert.strictEqual(corsHeaders['Access-Control-Allow-Origin'], 'http://localhost:3008');
 assert.strictEqual(corsHeaders['Access-Control-Allow-Credentials'], 'true');
 console.log('✅ CORS whitelist works for allowed origin');
@@ -189,7 +186,7 @@ const mockReqUnknown = {
     },
 };
 
-const corsHeadersUnknown = service._getCORSHeaders(mockReqUnknown);
+const corsHeadersUnknown = testService._getCORSHeaders(mockReqUnknown);
 assert.notStrictEqual(corsHeadersUnknown['Access-Control-Allow-Origin'], 'http://evil.com');
 console.log('✅ CORS blocks unknown origins\n');
 
@@ -197,20 +194,20 @@ console.log('✅ CORS blocks unknown origins\n');
    Test 5: Cache Behavior
 ========================================================================== */
 console.log('Test 5: Cache behavior');
-assert.strictEqual(service.cache.version, null, 'Cache should start empty');
-assert.strictEqual(service.stats.cacheHits, 0, 'Cache hits should be 0');
-assert.strictEqual(service.stats.cacheMisses, 0, 'Cache misses should be 0');
+assert.strictEqual(testService.cache.version, null, 'Cache should start empty');
+assert.strictEqual(testService.stats.cacheHits, 0, 'Cache hits should be 0');
+assert.strictEqual(testService.stats.cacheMisses, 0, 'Cache misses should be 0');
 
 // Simulate cache population
-service.cache.version = JSON.stringify({ Browser: 'Chrome/120.0' });
-service.cache.versionExpires = Date.now() + 30000;
+testService.cache.version = JSON.stringify({ Browser: 'Chrome/120.0' });
+testService.cache.versionExpires = Date.now() + 30000;
 
-assert.notStrictEqual(service.cache.version, null, 'Cache should be populated');
+assert.notStrictEqual(testService.cache.version, null, 'Cache should be populated');
 console.log('✅ Cache can be populated');
 
 // Test cache expiration
-service.cache.versionExpires = Date.now() - 1000; // Expired
-const isExpired = Date.now() > service.cache.versionExpires;
+testService.cache.versionExpires = Date.now() - 1000; // Expired
+const isExpired = Date.now() > testService.cache.versionExpires;
 assert.strictEqual(isExpired, true, 'Cache should detect expiration');
 console.log('✅ Cache expiration detection works\n');
 
@@ -227,10 +224,10 @@ const mockMetric = {
 };
 
 try {
-    service._incrementMetric(mockMetric, {});
+    testService._incrementMetric(mockMetric, {});
     console.log('✅ Metrics errors are handled gracefully (no crash)\n');
 } catch (err) {
-    console.log('❌ Metrics helper should not throw:', err.message);
+    console.log('❌ Metrics helper should not throw:', errorMessage(err));
     process.exit(1);
 }
 
@@ -238,7 +235,7 @@ try {
    Test 7: PUBLIC_IP Detection
 ========================================================================== */
 console.log('Test 7: PUBLIC_IP detection');
-const detectedIP = service.config.PUBLIC_IP;
+const detectedIP = testService.config.PUBLIC_IP;
 assert.notStrictEqual(detectedIP, null, 'PUBLIC_IP should be detected');
 assert.notStrictEqual(detectedIP, undefined, 'PUBLIC_IP should be defined');
 console.log(`✅ PUBLIC_IP detected: ${detectedIP}\n`);
@@ -247,7 +244,7 @@ console.log(`✅ PUBLIC_IP detected: ${detectedIP}\n`);
    Test 8: Docker Internal IP Detection
 ========================================================================== */
 console.log('Test 8: Docker internal IP detection');
-const dockerIP = service._getDockerInternalIP();
+const dockerIP = testService._getDockerInternalIP();
 if (dockerIP) {
     assert.ok(dockerIP.startsWith('172.'), 'Docker IP should start with 172.');
     console.log(`✅ Docker internal IP detected: ${dockerIP}\n`);

@@ -19,7 +19,7 @@ import { CreateSessionBodySchema, ResumeSessionBodySchema } from './session-sche
  *
  * @typedef {import('#copilot/sdk/types').SessionListFilter} SessionListFilter
  *
- * @typedef {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>} SdkRouteDeps
+ * @typedef {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>} SdkRouteDeps
  */
 
 const router = Router();

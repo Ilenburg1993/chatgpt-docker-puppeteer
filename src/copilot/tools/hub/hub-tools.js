@@ -70,12 +70,10 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
     parameters: z.object({
         title: z
             .string()
-            .optional()
-            .describe('Título descritivo da conversa (ex: "Análise de arquitetura Sprint Hub")'),
+            .optional()['describe']('Título descritivo da conversa (ex: "Análise de arquitetura Sprint Hub")'),
         metadata: z
             .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-            .optional()
-            .describe('Metadados extras em JSON (apenas primitivos: string, number, boolean, null)'),
+            .optional()['describe']('Metadados extras em JSON (apenas primitivos: string, number, boolean, null)'),
     }),
     handler: async (/** @type {{ title?: string; metadata?: Record<string, unknown> }} */ { title, metadata }) => {
         try {
@@ -109,28 +107,24 @@ const hubSendMessageTool = buildTool({
 A mensagem e a resposta são salvas no SQLite. O usuário observa a conversa em tempo real via Socket.io.
 Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta estruturada em JSON.`,
     parameters: z.object({
-        hubSessionId: z.string().describe('ID da hub_session (obtido via hub_create_session)'),
-        message: z.string().describe('Mensagem a enviar para LLM-B'),
-        context: z.string().optional().describe('Contexto adicional para o protocolo StructuredMessage'),
-        intent: z.string().optional().describe('Intenção explícita da mensagem para o protocolo StructuredMessage'),
+        hubSessionId: z.string()['describe']('ID da hub_session (obtido via hub_create_session)'),
+        message: z.string()['describe']('Mensagem a enviar para LLM-B'),
+        context: z.string().optional()['describe']('Contexto adicional para o protocolo StructuredMessage'),
+        intent: z.string().optional()['describe']('Intenção explícita da mensagem para o protocolo StructuredMessage'),
         priority: z
             .enum(['low', 'medium', 'high', 'critical'])
             .optional()
-            .default('medium')
-            .describe('Prioridade da mensagem'),
+            .default('medium')['describe']('Prioridade da mensagem'),
         responseType: z
             .enum(['diagnostic', 'plan', 'code', 'question', 'acknowledgment', 'error'])
-            .optional()
-            .describe('Tipo de resposta esperado de LLM-B'),
+            .optional()['describe']('Tipo de resposta esperado de LLM-B'),
         useStructured: z
             .boolean()
             .optional()
-            .default(true)
-            .describe('Se true, usa chatStructured() com protocolo StructuredMessage'),
+            .default(true)['describe']('Se true, usa chatStructured() com protocolo StructuredMessage'),
         timeoutMs: z
             .union([z.number(), z.null()])
-            .optional()
-            .describe(
+            .optional()['describe'](
                 'Timeout por inatividade em ms para aguardar resposta de LLM-B. Use 0/null para watchdog-only (sem timeout absoluto).',
             ),
     }),
@@ -234,7 +228,7 @@ const hubPollUserMessagesTool = buildTool({
 LLM-A deve chamar esta tool periodicamente para processar inputs do usuário durante conversas longas.
 As mensagens são marcadas como lidas após esta chamada.`,
     parameters: z.object({
-        hubSessionId: z.string().describe('ID da hub_session'),
+        hubSessionId: z.string()['describe']('ID da hub_session'),
     }),
     handler: async (/** @type {{ hubSessionId: string }} */ { hubSessionId }) => {
         try {
@@ -271,10 +265,10 @@ const hubReadHistoryTool = buildTool({
 Útil para LLM-A retomar contexto após restart ou em sessões longas.
 Retorna turns ordenados por número de turno (mais antigos primeiro).`,
     parameters: z.object({
-        hubSessionId: z.string().describe('ID da hub_session'),
-        limit: z.number().optional().default(20).describe('Máximo de turns a retornar (default: 20)'),
-        offset: z.number().optional().default(0).describe('Offset para paginação'),
-        after: z.number().optional().describe('Retornar apenas turns com id > after (para polling incremental)'),
+        hubSessionId: z.string()['describe']('ID da hub_session'),
+        limit: z.number().optional().default(20)['describe']('Máximo de turns a retornar (default: 20)'),
+        offset: z.number().optional().default(0)['describe']('Offset para paginação'),
+        after: z.number().optional()['describe']('Retornar apenas turns com id > after (para polling incremental)'),
     }),
     handler: async (
         /** @type {{ hubSessionId: string; limit?: number; offset?: number; after?: number }} */
@@ -322,8 +316,8 @@ const hubListSessionsTool = buildTool({
     description: `Lista as hub_sessions de conversa disponíveis no ConversationHub.
 Útil para LLM-A identificar sessões ativas ou retomar conversas anteriores.`,
     parameters: z.object({
-        limit: z.number().optional().default(10).describe('Máximo de sessões a retornar'),
-        status: z.enum(['active', 'closed', 'error']).optional().describe('Filtrar por status (omitir para todas)'),
+        limit: z.number().optional().default(10)['describe']('Máximo de sessões a retornar'),
+        status: z.enum(['active', 'closed', 'error']).optional()['describe']('Filtrar por status (omitir para todas)'),
     }),
     handler: async (/** @type {{ limit?: number; status?: 'active' | 'closed' | 'error' }} */ { limit, status }) => {
         try {

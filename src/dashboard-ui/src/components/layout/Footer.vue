@@ -1,11 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { useSocket } from '@/composables/useSocket';
 import { onMounted, onUnmounted, ref } from 'vue';
 
 const { isConnected } = useSocket();
 const version = ref('2.0.0');
 const uptime = ref('--');
-let uptimeTimer = null;
+let uptimeTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
     uptimeTimer = setInterval(() => {

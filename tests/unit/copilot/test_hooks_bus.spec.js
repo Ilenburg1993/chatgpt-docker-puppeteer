@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/test_hooks_bus.spec.js
  *
@@ -79,7 +78,7 @@ describe('HookBus — emissão e escuta', () => {
         const eventBus = createEventBus();
         /** @type {any[]} */
         const events = [];
-        eventBus.on('hook:error_occurred', (evt) => events.push(evt));
+        eventBus.on('hook:error_occurred', (evt) => { events.push(evt); });
         bus.setEventBus(eventBus);
 
         bus.emitHook(
@@ -106,7 +105,7 @@ describe('attachBus — envolve SessionHooks', () => {
         /** @type {any} */
         const hooks = {
             onPreToolUse: async (
-                /** @type {import('../../../src/copilot/hooks/types.js').PreToolUseHookInput} */ input,
+                /** @type {import('../../../src/copilot/hooks/types.js').PreToolUseHookInput} */ _input,
                 /** @type {import('../../../src/copilot/hooks/types.js').InvocationContext} */ _inv,
             ) => {
                 origCalls.push('called');
@@ -126,8 +125,9 @@ describe('attachBus — envolve SessionHooks', () => {
             {
                 toolName: 'bash',
                 toolArgs: {},
-                timestamp: Date.now(),
-                cwd: process.cwd(),
+                sessionId: 's1',
+                timestamp: new Date(),
+                workingDirectory: process.cwd(),
             },
             { sessionId: 's1' },
         );

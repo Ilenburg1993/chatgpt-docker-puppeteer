@@ -1,24 +1,15 @@
-<script setup>
+<script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { cva } from 'class-variance-authority';
 import { computed } from 'vue';
 
-const props = defineProps({
-    variant: {
-        type: String,
-        default: 'default',
-        validator: (v) => ['default', 'success', 'warning', 'error', 'info'].includes(v),
-    },
-    size: {
-        type: String,
-        default: 'md',
-        validator: (v) => ['sm', 'md', 'lg'].includes(v),
-    },
-    class: {
-        type: String,
-        default: '',
-    },
-});
+type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
+type BadgeSize = 'sm' | 'md' | 'lg';
+
+const props = withDefaults(
+    defineProps<{ variant?: BadgeVariant; size?: BadgeSize; class?: string }>(),
+    { variant: 'default', size: 'md', class: '' },
+);
 
 const badgeVariants = cva('inline-flex items-center justify-center rounded-md font-medium', {
     variants: {

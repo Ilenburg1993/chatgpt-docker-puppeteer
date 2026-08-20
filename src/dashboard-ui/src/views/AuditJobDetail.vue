@@ -132,15 +132,15 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useAudit } from '@/composables/useAudit';
 import { onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 
 const route = useRoute();
-const { job, findings, patches, loading, error, getJob, runJob, cancelJob, listFindings } = useAudit();
+const { job, findings, patches, loading, error, getJob, runJob, cancelJob } = useAudit();
 
-const jobId = route.params.id;
+const jobId = route.params['id'];
 
 onMounted(async () => {
     await getJob(jobId);
@@ -160,8 +160,8 @@ async function handleCreatePatchJob() {
     // Navigate to create new patch
 }
 
-function statusClass(status) {
-    const classes = {
+function statusClass(status: string) {
+    const classes: Record<string, string> = {
         pending: 'bg-yellow-100 text-yellow-800',
         running: 'bg-blue-100 text-blue-800',
         completed: 'bg-green-100 text-green-800',
@@ -171,8 +171,8 @@ function statusClass(status) {
     return classes[status] || 'bg-gray-100 text-gray-800';
 }
 
-function patchStatusClass(status) {
-    const classes = {
+function patchStatusClass(status: string) {
+    const classes: Record<string, string> = {
         draft: 'bg-gray-100 text-gray-800',
         pending: 'bg-yellow-100 text-yellow-800',
         approved: 'bg-green-100 text-green-800',
@@ -182,8 +182,8 @@ function patchStatusClass(status) {
     return classes[status] || 'bg-gray-100 text-gray-800';
 }
 
-function severityClass(severity) {
-    const classes = {
+function severityClass(severity: string) {
+    const classes: Record<string, string> = {
         critical: 'border-red-300 bg-red-50',
         error: 'border-red-200 bg-red-50',
         warning: 'border-yellow-300 bg-yellow-50',
@@ -192,7 +192,7 @@ function severityClass(severity) {
     return classes[severity] || 'border-gray-200';
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | number | Date | null | undefined) {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('pt-BR');
 }

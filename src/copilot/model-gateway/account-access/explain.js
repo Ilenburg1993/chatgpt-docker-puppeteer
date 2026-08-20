@@ -23,7 +23,7 @@ function stringList(value) {
 }
 
 /**
- * @param {Record<string, any>} access
+ * @param {Record<string, unknown>} access
  * @returns {string}
  */
 function accountAccessKey(access) {
@@ -111,7 +111,7 @@ function actionableUnknownContext(status, hardReasons, softReasons) {
 }
 
 /**
- * @param {Record<string, any>} access
+ * @param {Record<string, unknown>} access
  * @returns {{
  *   key: string;
  *   status: string;

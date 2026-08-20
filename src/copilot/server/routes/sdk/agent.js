@@ -53,10 +53,10 @@ const _agentTracker = new SseConnectionTracker('agent/stream');
  * @property {import('#copilot/observability/metrics.js').MetricsStore} metrics - Store de métricas.
  * @property {() => Promise<import('#copilot/sdk/types').CopilotClient>} getClient - Factory do SDK client.
  * @property {() => import('#copilot/sdk/types').ConnectionState} [getClientState] - Estado local da conexão SDK.
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSystemPrompt']} sdkSystemPrompt
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSystemPrompt']} sdkSystemPrompt
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
  * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.

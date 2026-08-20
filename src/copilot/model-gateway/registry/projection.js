@@ -12,25 +12,35 @@ import {
     summarizeGatewayRuntimeProofFreshness,
 } from '../routing/index.js';
 
+
 /**
- * @param {Record<string, any>} model
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {Record<string, unknown>} model
  * @returns {string[]}
  */
 function modelTags(model) {
-    const capabilities = model['capabilities'] ?? {};
-    const limits = model['limits'] ?? {};
+    const capabilities = isRecord(model['capabilities']) ? model['capabilities'] : {};
+    const limits = isRecord(model['limits']) ? model['limits'] : {};
+    const verification = isRecord(model['verification']) ? model['verification'] : {};
     return [
         capabilities['streaming'] ? 'streaming' : null,
         capabilities['tools'] ? 'tools' : null,
         capabilities['vision'] ? 'vision' : null,
         capabilities['reasoningEffort'] ? 'reasoning' : null,
         typeof limits['contextWindowTokens'] === 'number' ? `ctx=${limits['contextWindowTokens']}` : null,
-        model['verification']?.confidence ? `confidence=${model['verification'].confidence}` : null,
+        typeof verification['confidence'] === 'string' ? `confidence=${verification['confidence']}` : null,
     ].filter((item) => item !== null);
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {{ routeProfile?: string | null }} [options]
  * @returns {{ source: 'runtime'; chat: 'ok' | 'failed' | 'unknown'; agent: 'ok' | 'failed' | 'unknown'; proved: boolean; historicalProved: boolean; stale: boolean; proofAgeMs: number | null; proofMaxAgeMs: number; lastChatAt: number | null; lastAgentAt: number | null }}
  */
@@ -80,7 +90,7 @@ function runtimeHealthTags(runtime) {
 }
 
 /**
- * @param {{ active?: Record<string, any>; source?: string }} snapshot
+ * @param {{ active?: Record<string, unknown>; source?: string }} snapshot
  * @returns {{
  *     enabled: boolean;
  *     ready: boolean;
@@ -96,7 +106,7 @@ function runtimeHealthTags(runtime) {
  * }}
  */
 export function buildModelGatewayEffectiveRouteProjection(snapshot) {
-    const active = snapshot.active && typeof snapshot.active === 'object' ? snapshot.active : {};
+    const active = isRecord(snapshot.active) ? snapshot.active : {};
     const providerId = typeof active['providerId'] === 'string' && active['providerId'].trim() ? active['providerId'] : null;
     const providerModel =
         typeof active['providerModel'] === 'string' && active['providerModel'].trim()
@@ -131,7 +141,7 @@ export function buildModelGatewayEffectiveRouteProjection(snapshot) {
 }
 
 /**
- * @param {{ providers: Record<string, any>[]; models: Record<string, any>[]; active?: Record<string, any>; source?: string; generatedAt?: string }} snapshot
+ * @param {{ providers: Record<string, unknown>[]; models: Record<string, unknown>[]; active?: Record<string, unknown>; source?: string; generatedAt?: string }} snapshot
  * @param {{
  *     routeProfile?: string | null;
  *     activeRoute?: Record<string, unknown> | null;
@@ -139,7 +149,7 @@ export function buildModelGatewayEffectiveRouteProjection(snapshot) {
  * @returns {{
  *     source: string;
  *     generatedAt: string | null;
- *     active: Record<string, any>;
+ *     active: Record<string, unknown>;
  *     providerCount: number;
  *     modelCount: number;
  *     enabledModelCount: number;
@@ -152,7 +162,7 @@ export function buildModelGatewayOperatorProjection(snapshot, options = {}) {
     const providers = Array.isArray(snapshot.providers) ? snapshot.providers : [];
     const models = Array.isArray(snapshot.models) ? snapshot.models : [];
     const runtimeRoute =
-        options.activeRoute && typeof options.activeRoute === 'object' ? options.activeRoute : null;
+        isRecord(options.activeRoute) ? options.activeRoute : null;
     const active =
         runtimeRoute &&
         typeof runtimeRoute['providerId'] === 'string' &&

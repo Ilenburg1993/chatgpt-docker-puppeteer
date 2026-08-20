@@ -183,7 +183,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useAudit } from '@/composables/useAudit';
 import { onMounted, ref } from 'vue';
 
@@ -239,7 +239,7 @@ async function loadTabData() {
     }
 }
 
-async function handleToggleBackend(id, enabled) {
+async function handleToggleBackend(id: string, enabled: boolean) {
     try {
         await toggleInferenceBackend(id, enabled);
         await listInferenceBackends();
@@ -248,7 +248,7 @@ async function handleToggleBackend(id, enabled) {
     }
 }
 
-async function handleToggleModel(id, enabled) {
+async function handleToggleModel(id: string, enabled: boolean) {
     try {
         await toggleInferenceModel(id, enabled);
         await listInferenceModels();

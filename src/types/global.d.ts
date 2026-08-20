@@ -164,45 +164,6 @@ declare class ToolRegistry {
 }
 
 // ============================================================
-// Puppeteer Module (complete)
-// ============================================================
-
-declare module 'puppeteer' {
-    export function executablePath(): string;
-
-    export interface ConnectOptions {
-        browserWSEndpoint?: string;
-        browserURL?: string;
-        timeout?: number;
-        [key: string]: unknown;
-    }
-
-    export interface LaunchOptions {
-        headless?: boolean;
-        executablePath?: string;
-        args?: string[];
-        [key: string]: unknown;
-    }
-
-    export class Browser {
-        close(): Promise<void>;
-        pages(): Promise<Page[]>;
-        wsEndpoint(): string;
-        [key: string]: unknown;
-    }
-
-    export class Page {
-        evaluate<T>(fn: (...args: unknown[]) => T, ...args: unknown[]): Promise<T>;
-        $<T>(selector: string): Promise<T | null>;
-        $$<T>(selector: string): Promise<T[]>;
-        waitForSelector(selector: string, options?: unknown): Promise<unknown>;
-        url(): string;
-        close(): Promise<void>;
-        [key: string]: unknown;
-    }
-}
-
-// ============================================================
 // Puppeteer Extra
 // ============================================================
 
@@ -231,6 +192,7 @@ declare module 'zod' {
         optional(): ZodType<T | undefined>;
         nullable(): ZodType<T | null>;
         default(value: T): ZodType<T>;
+        describe(description: string): this;
         [key: string]: any;
     }
 
@@ -318,12 +280,12 @@ declare module 'zod' {
         coerce: any;
 
         // Palavras reservadas do TypeScript (usando computed property names)
-        'enum'<T extends readonly [string, ...string[]]>(values: T): ZodEnum<T[number]>;
-        'enum'<T extends readonly [string, ...string[]]>(values: T, params?: unknown): ZodEnum<T[number]>;
-        'function'<Args extends ZodTuple, Returns extends ZodType>(args: Args, returns: Returns): ZodFunction;
-        'void'(): ZodType<void>;
-        'undefined'(): ZodType<undefined>;
-        'null'(): ZodType<null>;
+        enum<T extends readonly [string, ...string[]]>(values: T): ZodEnum<T[number]>;
+        enum<T extends readonly [string, ...string[]]>(values: T, params?: unknown): ZodEnum<T[number]>;
+        function<Args extends ZodTuple, Returns extends ZodType>(args: Args, returns: Returns): ZodFunction;
+        void(): ZodType<void>;
+        undefined(): ZodType<undefined>;
+        null(): ZodType<null>;
 
         // Permitir qualquer outra propriedade/método (signatures dinâmicas)
         [key: string]: any;

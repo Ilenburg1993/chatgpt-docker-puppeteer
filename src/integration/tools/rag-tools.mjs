@@ -198,7 +198,7 @@ async function ragSearchHandler({
                 query,
                 topK: validTopK,
                 fetch_topk: result.fetch_topk || validTopK,
-                profile: result.profile || profile || process.env.RAG_PROFILE_DEFAULT || 'core',
+                profile: result.profile || profile || process.env['RAG_PROFILE_DEFAULT'] || 'core',
                 mode,
                 intent_scope: result.intent_scope || intent_scope,
                 backend: result.backend || 'hybrid',
@@ -467,7 +467,7 @@ Examples:
                     profile: {
                         type: 'string',
                         enum: ['core', 'dev', 'full'],
-                        default: process.env.RAG_PROFILE_DEFAULT || 'core',
+                        default: process.env['RAG_PROFILE_DEFAULT'] || 'core',
                         description: 'Optional: RAG scope profile',
                     },
                     mode: {
@@ -536,12 +536,12 @@ Examples:
                     },
                     before_lines: {
                         type: 'number',
-                        default: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
+                        default: Number(process.env['RAG_EXPAND_DEFAULT_LINES'] || 40),
                         description: 'Number of lines to include before base range',
                     },
                     after_lines: {
                         type: 'number',
-                        default: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
+                        default: Number(process.env['RAG_EXPAND_DEFAULT_LINES'] || 40),
                         description: 'Number of lines to include after base range',
                     },
                     mode: {

@@ -8,6 +8,8 @@
  * @module copilot/model-gateway/eligibility/contracts
  */
 
+import { sanitizeJsonRecord, sanitizeJsonValue } from '../contracts/sanitized-json.js';
+
 export const MODEL_GATEWAY_ELIGIBILITY_SCHEMA_VERSION = 1;
 
 export const MODEL_GATEWAY_ELIGIBILITY_DISPOSITION = Object.freeze({
@@ -95,37 +97,39 @@ function stringList(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {unknown}
+ * Eligibility records use a narrower textual redaction policy than catalog audit records, but the structural JSON
+ * transformation is identical and therefore shares the same generic sanitizer contract.
+ *
+ * @param {string} value
+ * @returns {string}
  */
-function sanitizeJsonValue(value) {
-    if (typeof value === 'string') return value.replace(/(bearer|token|secret|api[_-]?key)\s+[\w.:/-]+/giu, '$1 [redacted]');
-    if (Array.isArray(value)) return value.map(sanitizeJsonValue);
-    if (isRecord(value)) {
-        return Object.fromEntries(
-            Object.entries(value).map(([key, item]) => [
-                key,
-                /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(key)
-                    ? '[redacted]'
-                    : sanitizeJsonValue(item),
-            ]),
-        );
-    }
-    if (value === undefined) return null;
-    return value;
+function sanitizeEligibilityString(value) {
+    return value.replace(/(bearer|token|secret|api[_-]?key)\s+[\w.:/-]+/giu, '$1 [redacted]');
 }
 
 /**
+ * @template {Record<string, unknown>} T
+ * @param {T | undefined} value
+ * @returns {Record<string, unknown> & Partial<import('../contracts/sanitized-json.js').SanitizedRecord<T>>}
+ */
+function sanitizeOptionalEligibilityRecord(value) {
+    return /** @type {Record<string, unknown> & Partial<import('../contracts/sanitized-json.js').SanitizedRecord<T>>} */ (
+        isRecord(value) ? sanitizeJsonRecord(value, sanitizeEligibilityString) : {}
+    );
+}
+
+/**
+ * @template {Record<string, unknown>} TPolicyInputs
  * @param {object} input
  * @param {string} input.providerId
  * @param {string} input.providerModel
- * @param {string} [input.routeProfile]
- * @param {string} [input.selectorKind]
- * @param {string} [input.selectorSyntax]
- * @param {string} [input.accountScope]
- * @param {string} [input.secretRef]
- * @param {string} [input.policyProfile]
- * @param {string} [input.taskProfile]
+ * @param {string | undefined} [input.routeProfile]
+ * @param {string | undefined} [input.selectorKind]
+ * @param {string | undefined} [input.selectorSyntax]
+ * @param {string | undefined} [input.accountScope]
+ * @param {string | undefined} [input.secretRef]
+ * @param {string | undefined} [input.policyProfile]
+ * @param {string | undefined} [input.taskProfile]
  * @param {boolean} input.include
  * @param {string} [input.disposition]
  * @param {string[]} [input.hardExclusions]
@@ -135,10 +139,9 @@ function sanitizeJsonValue(value) {
  * @param {string[]} [input.evidenceRefs]
  * @param {string[]} [input.overlayRefs]
  * @param {string[]} [input.routeOptionRefs]
- * @param {Record<string, unknown>} [input.policyInputs]
+ * @param {TPolicyInputs} [input.policyInputs]
  * @param {string | number | Date} [input.observedAt]
  * @param {string | number | Date | null} [input.expiresAt]
- * @returns {object}
  */
 export function createModelEligibilityDecision(input) {
     const providerId = optionalString(input.providerId);
@@ -169,7 +172,7 @@ export function createModelEligibilityDecision(input) {
         evidenceRefs: stringList(input.evidenceRefs),
         overlayRefs: stringList(input.overlayRefs),
         routeOptionRefs: stringList(input.routeOptionRefs),
-        policyInputs: isRecord(input.policyInputs) ? sanitizeJsonValue(input.policyInputs) : {},
+        policyInputs: sanitizeOptionalEligibilityRecord(input.policyInputs),
         observedAt: normalizeIsoDate(input.observedAt) ?? new Date().toISOString(),
         expiresAt: normalizeIsoDate(input.expiresAt),
         redactionStatus: 'sanitized',
@@ -177,12 +180,15 @@ export function createModelEligibilityDecision(input) {
 }
 
 /**
+ * @template {Record<string, unknown>} TPolicyInputs
+ * @template TDiff
+ * @template TDiffSummary
  * @param {object} input
  * @param {string} input.runId
  * @param {string} [input.status]
- * @param {string} [input.policyProfile]
- * @param {string} [input.taskProfile]
- * @param {string} [input.accountScope]
+ * @param {string | undefined} [input.policyProfile]
+ * @param {string | undefined} [input.taskProfile]
+ * @param {string | undefined} [input.accountScope]
  * @param {string | number | Date} [input.startedAt]
  * @param {string | number | Date} [input.completedAt]
  * @param {number} [input.modelCount]
@@ -190,10 +196,9 @@ export function createModelEligibilityDecision(input) {
  * @param {number} [input.unknownCount]
  * @param {number} [input.excludedCount]
  * @param {string[]} [input.errors]
- * @param {Record<string, unknown>} [input.policyInputs]
- * @param {unknown} [input.diff]
- * @param {unknown} [input.diffSummary]
- * @returns {object}
+ * @param {TPolicyInputs} [input.policyInputs]
+ * @param {TDiff} [input.diff]
+ * @param {TDiffSummary} [input.diffSummary]
  */
 export function createModelEligibilityRun(input) {
     const runId = optionalString(input.runId);
@@ -214,9 +219,9 @@ export function createModelEligibilityRun(input) {
         unknownCount: nonNegativeInteger(input.unknownCount),
         excludedCount: nonNegativeInteger(input.excludedCount),
         errors: stringList(input.errors),
-        policyInputs: isRecord(input.policyInputs) ? sanitizeJsonValue(input.policyInputs) : {},
-        diff: sanitizeJsonValue(input.diff ?? null),
-        diffSummary: sanitizeJsonValue(input.diffSummary ?? null),
+        policyInputs: sanitizeOptionalEligibilityRecord(input.policyInputs),
+        diff: sanitizeJsonValue(input.diff ?? null, sanitizeEligibilityString),
+        diffSummary: sanitizeJsonValue(input.diffSummary ?? null, sanitizeEligibilityString),
         redactionStatus: 'sanitized',
     };
 }

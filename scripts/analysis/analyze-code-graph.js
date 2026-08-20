@@ -2,7 +2,7 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import ts from './typescript-compat.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
 const TSCONFIG = path.join(ROOT, 'tsconfig.node.json');
@@ -35,7 +35,6 @@ console.log(`📦 Files: ${parsedConfig.fileNames.length}\n`);
 
 // Create TypeScript program
 const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
-const _typeChecker = program.getTypeChecker();
 
 // Data structures for analysis
 const dependencyGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependencies]
@@ -100,7 +99,6 @@ function getModuleCategory(filePath) {
  * @param {any} sourceFile
  */
 function extractDependencies(sourceFile) {
-    const _filePath = normalizePath(sourceFile.fileName);
     /** @type {string[]} */
     const deps = [];
 
@@ -137,7 +135,6 @@ function extractDependencies(sourceFile) {
  * @param {any} sourceFile
  */
 function extractNervEvents(sourceFile) {
-    const _filePath = normalizePath(sourceFile.fileName);
     /** @type {{ emits: string[]; listens: string[] }} */
     const events = { emits: [], listens: [] };
 
@@ -281,7 +278,7 @@ function resolveImport(fromFile, importPath) {
 function findOrphans() {
     /** @type {string[]} */
     const orphans = [];
-    dependencyGraph.forEach((deps, file) => {
+    dependencyGraph.forEach((_deps, file) => {
         const dependents = reverseGraph.get(file) || [];
         if (dependents.length === 0 && !file.startsWith('src/main.js') && !file.startsWith('tests/')) {
             orphans.push(file);
@@ -413,15 +410,19 @@ if (options.exportDot) {
     dot += '  node [shape=box, style=rounded];\n\n';
 
     dependencyGraph.forEach((deps, file) => {
-        const _color = getModuleCategory(path.join(ROOT, file));
-        const _colorMap = {
+        const category = getModuleCategory(path.join(ROOT, file));
+        const colorMap = /** @type {Record<string, string>} */ ({
             NERV: 'lightblue',
             KERNEL: 'lightgreen',
             DRIVER: 'lightyellow',
             SERVER: 'lightpink',
             INFRA: 'lightgray',
             CORE: 'orange',
-        };
+        });
+        const color = colorMap[category];
+        if (color) {
+            dot += `  "${file}" [style="rounded,filled", fillcolor="${color}"];\n`;
+        }
 
         deps.forEach((dep) => {
             const resolvedDep = resolveImport(file, dep);

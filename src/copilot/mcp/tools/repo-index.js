@@ -346,20 +346,18 @@ export const repoIndexTools = [
         inputSchema: {
             path: z
                 .string()
-                .optional()
-                .describe('Workspace-relative directory path. Default: src/copilot. Empty string uses the default.'),
-            recursive: z.boolean().optional().describe('Index recursively. Default: true.'),
-            depth: z.number().int().positive().max(50).optional().describe('Advisory scan depth. Default: 20.'),
-            respectGitignore: z.boolean().optional().describe('Respect .gitignore. Default: true.'),
-            include: z.array(z.string().min(1)).optional().describe('Include glob filters for scan candidates.'),
-            exclude: z.array(z.string().min(1)).optional().describe('Exclude glob filters for scan candidates.'),
-            extensions: z.array(z.string().min(1)).optional().describe('Textual file extensions to index.'),
-            concurrency: z.number().int().positive().max(32).optional().describe('Advisory indexing concurrency.'),
-            maxFiles: z.number().int().positive().max(25_000).optional().describe('Maximum candidate files to index.'),
+                .optional()['describe']('Workspace-relative directory path. Default: src/copilot. Empty string uses the default.'),
+            recursive: z.boolean().optional()['describe']('Index recursively. Default: true.'),
+            depth: z.number().int().positive().max(50).optional()['describe']('Advisory scan depth. Default: 20.'),
+            respectGitignore: z.boolean().optional()['describe']('Respect .gitignore. Default: true.'),
+            include: z.array(z.string().min(1)).optional()['describe']('Include glob filters for scan candidates.'),
+            exclude: z.array(z.string().min(1)).optional()['describe']('Exclude glob filters for scan candidates.'),
+            extensions: z.array(z.string().min(1)).optional()['describe']('Textual file extensions to index.'),
+            concurrency: z.number().int().positive().max(32).optional()['describe']('Advisory indexing concurrency.'),
+            maxFiles: z.number().int().positive().max(25_000).optional()['describe']('Maximum candidate files to index.'),
             pruneMissing: z
                 .boolean()
-                .optional()
-                .describe('Remove missing files from the indexed slice. Default: safe auto-prune.'),
+                .optional()['describe']('Remove missing files from the indexed slice. Default: safe auto-prune.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -403,15 +401,14 @@ export const repoIndexTools = [
         description:
             'Search the shared FTS5 index when available, with cursor pagination and include/exclude glob filters.',
         inputSchema: {
-            query: z.string().min(1).describe('Text query for the FTS5 index.'),
+            query: z.string().min(1)['describe']('Text query for the FTS5 index.'),
             path: z
                 .string()
-                .optional()
-                .describe('Workspace-relative file or directory prefix. Default: entire indexed workspace.'),
-            maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
-            cursor: z.string().optional().describe('Cursor returned by a previous repo_index_search call.'),
-            includePattern: z.string().optional().describe('Include glob filter, for example *.ts.'),
-            excludePattern: z.string().optional().describe('Exclude glob filter, for example node_modules.'),
+                .optional()['describe']('Workspace-relative file or directory prefix. Default: entire indexed workspace.'),
+            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+            cursor: z.string().optional()['describe']('Cursor returned by a previous repo_index_search call.'),
+            includePattern: z.string().optional()['describe']('Include glob filter, for example *.ts.'),
+            excludePattern: z.string().optional()['describe']('Exclude glob filter, for example node_modules.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ query, path, maxResults, cursor, includePattern, excludePattern }) => {
@@ -471,10 +468,10 @@ export const repoIndexTools = [
         description:
             'Search persisted symbols in the shared local index. Use after repo_index_build for fast navigation.',
         inputSchema: {
-            symbol: z.string().min(1).describe('Symbol name or substring.'),
-            maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
-            cursor: z.string().optional().describe('Cursor returned by a previous repo_index_find_symbol call.'),
-            exactMatch: z.boolean().optional().describe('Require exact symbol name. Default: false.'),
+            symbol: z.string().min(1)['describe']('Symbol name or substring.'),
+            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+            cursor: z.string().optional()['describe']('Cursor returned by a previous repo_index_find_symbol call.'),
+            exactMatch: z.boolean().optional()['describe']('Require exact symbol name. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ symbol, maxResults, cursor, exactMatch }) => {
@@ -524,10 +521,10 @@ export const repoIndexTools = [
         title: 'Find repository imports',
         description: 'Find imports or dynamic imports by module source in the shared local index.',
         inputSchema: {
-            source: z.string().min(1).describe('Imported module/source substring, for example react, zod, or ./utils.'),
-            maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
-            cursor: z.string().optional().describe('Cursor returned by a previous repo_find_imports call.'),
-            exactSource: z.boolean().optional().describe('Require exact import source. Default: false.'),
+            source: z.string().min(1)['describe']('Imported module/source substring, for example react, zod, or ./utils.'),
+            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+            cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_imports call.'),
+            exactSource: z.boolean().optional()['describe']('Require exact import source. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ source, maxResults, cursor, exactSource }) => {
@@ -579,26 +576,23 @@ export const repoIndexTools = [
         inputSchema: {
             path: z
                 .string()
-                .optional()
-                .describe(
+                .optional()['describe'](
                     'Workspace-relative file or directory path. Default: src/copilot. Empty string uses default.',
                 ),
-            recursive: z.boolean().optional().describe('Scan directories recursively. Default: true.'),
-            depth: z.number().int().positive().max(50).optional().describe('Directory scan depth. Default: 20.'),
+            recursive: z.boolean().optional()['describe']('Scan directories recursively. Default: true.'),
+            depth: z.number().int().positive().max(50).optional()['describe']('Directory scan depth. Default: 20.'),
             respectGitignore: z
                 .boolean()
-                .optional()
-                .describe('Reserved for compatibility; directory scans use the current indexed rows.'),
-            includeDynamic: z.boolean().optional().describe('Also validate dynamic import() sources. Default: true.'),
+                .optional()['describe']('Reserved for compatibility; directory scans use the current indexed rows.'),
+            includeDynamic: z.boolean().optional()['describe']('Also validate dynamic import() sources. Default: true.'),
             maxFiles: z
                 .number()
                 .int()
                 .positive()
                 .max(5000)
-                .optional()
-                .describe('Maximum files to parse. Default: 500.'),
-            maxResults: z.number().int().positive().max(500).optional().describe('Maximum returned rows. Default: 50.'),
-            cursor: z.string().optional().describe('Cursor returned by a previous repo_find_orphan_imports call.'),
+                .optional()['describe']('Maximum files to parse. Default: 500.'),
+            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+            cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_orphan_imports call.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, recursive, depth, includeDynamic, maxFiles, maxResults, cursor }) => {
@@ -800,7 +794,7 @@ export const repoIndexTools = [
         title: 'Invalidate repository index path',
         description: 'Invalidate a workspace file or directory in the shared local IO index after edits.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file or directory path to invalidate.'),
+            path: z.string().min(1)['describe']('Workspace-relative file or directory path to invalidate.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ path }) => {

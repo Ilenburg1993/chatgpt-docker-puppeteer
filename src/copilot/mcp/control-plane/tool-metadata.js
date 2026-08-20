@@ -5,6 +5,8 @@
  * @module copilot/mcp/control-plane/tool-metadata
  */
 
+import { z } from 'zod';
+
 import { securitySchemesForMcpTool } from './auth.js';
 
 /**
@@ -13,6 +15,14 @@ import { securitySchemesForMcpTool } from './auth.js';
 
 const NOAUTH = /** @type {const} */ ({ type: 'noauth' });
 const MAX_TOOL_INVOCATION_STATUS_LENGTH = 64;
+
+export const MCP_BASELINE_OUTPUT_SCHEMA_VERSION = 1;
+export const MCP_BASELINE_OUTPUT_SCHEMA = z.object({})['passthrough']();
+
+/** @param {unknown} schema @returns {boolean} */
+export function isBaselineMcpOutputSchema(schema) {
+    return schema === MCP_BASELINE_OUTPUT_SCHEMA;
+}
 
 const TOOL_INVOCATION_LABELS = new Map([
     ['repo_status', 'Status do repo'],
@@ -37,6 +47,9 @@ const TOOL_INVOCATION_LABELS = new Map([
     ['repo_quarantine_file', 'Quarentenando arquivo'],
     ['repo_quarantine_file_plan', 'Planejando quarentena'],
     ['repo_restore_quarantined_file', 'Restaurando arquivo'],
+    ['terminal_exec', 'Executando terminal'],
+    ['terminal_session_control', 'Controlando terminal'],
+    ['terminal_session_read', 'Lendo terminal'],
     ['repo_remove_file', 'Removendo arquivo'],
     ['repo_apply_file_batch', 'Aplicando lote de arquivos'],
     ['repo_apply_file_batch_plan', 'Planejando lote de arquivos'],
@@ -135,6 +148,7 @@ export function normalizeMcpToolDefinition(tool) {
     const securitySchemes = tool.securitySchemes ?? defaultSecuritySchemesForTool(tool);
     return {
         ...tool,
+        outputSchema: tool.outputSchema ?? MCP_BASELINE_OUTPUT_SCHEMA,
         securitySchemes,
         _meta: buildToolMeta({ ...tool, securitySchemes }),
     };

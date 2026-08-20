@@ -245,10 +245,9 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
 
             const recursos = { available: true };
 
-            const decision = {
-                action: 'EXECUTE',
-                immediate: true,
-            };
+            const decision = recursos.available && task.priority >= 8
+                ? { action: 'EXECUTE', immediate: true }
+                : { action: 'DEFER', immediate: false };
 
             assert.strictEqual(decision.action, 'EXECUTE');
         });
@@ -261,10 +260,9 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
 
             const recursos = { available: false };
 
-            const decision = {
-                action: 'DEFER',
-                reason: 'NO_RESOURCES',
-            };
+            const decision = !recursos.available || task.priority < 5
+                ? { action: 'DEFER', reason: !recursos.available ? 'NO_RESOURCES' : 'LOW_PRIORITY' }
+                : { action: 'EXECUTE', reason: 'RESOURCES_AVAILABLE' };
 
             assert.strictEqual(decision.action, 'DEFER');
         });
@@ -276,10 +274,9 @@ describe('Kernel Policy Engine - Motor de Políticas', () => {
                 maxRetries: 3,
             };
 
-            const decision = {
-                action: 'CANCEL',
-                reason: 'MAX_RETRIES_EXCEEDED',
-            };
+            const decision = task.attempts > task.maxRetries
+                ? { action: 'CANCEL', reason: 'MAX_RETRIES_EXCEEDED' }
+                : { action: 'RETRY', reason: 'RETRIES_AVAILABLE' };
 
             assert.strictEqual(decision.action, 'CANCEL');
         });

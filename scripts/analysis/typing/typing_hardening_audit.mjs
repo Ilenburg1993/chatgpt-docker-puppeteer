@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import ts from 'typescript';
+import ts from '../typescript-compat.mjs';
 import { analyzeJSDocCoverage, collectJsSourceFiles } from '../jsdoc_coverage_engine.mjs';
 import { runStrictLaneAudit } from './strict_lane_audit.mjs';
 

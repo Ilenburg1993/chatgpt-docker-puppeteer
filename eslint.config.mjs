@@ -10,7 +10,7 @@ import tseslint from 'typescript-eslint';
  * globalmente
  *
  * 1. base — parser TS + recommended (sem type-info): todos os .js/.mjs
- * 2. src-type-checked — regras type-aware via TSServer (projectService)
+ * 2. src-type-checked — regras type-aware via projeto TypeScript explícito
  * 3. core — zonas críticas: regras estritas + type-checked
  * 4. backend — Node.js geral (mais permissivo que core)
  * 5. browser — contexto Puppeteer/page.evaluate (globals.browser)
@@ -18,14 +18,13 @@ import tseslint from 'typescript-eslint';
  * 7. scripts — automação / configs (warnings, type-check desabilitado)
  * 8. cjs — configs CommonJS (ex.: pm2/ecosystem)
  *
- * ─── typescript-eslint (projectService → TSServer) ─────────────────────────── A integração TSServer acontece via
- * `parserOptions.projectService: true` nas zonas type-checked. O ESLint instancia um Language Service interno que lê o
- * tsconfig.node.json (preferido) e usa a mesma infra de type-checking que o compilador TypeScript — sem cache
- * compartilhado com o VS Code TSServer nem com o tsserver-daemon.mjs (src/integration/lsp/tsserver-daemon.mjs).
+ * ─── typescript-eslint (projeto TS explícito) ──────────────────────────────────────────────────────
+ * O lint type-aware usa `parserOptions.project: ['./tsconfig.node.json']`. Um projeto único e explícito evita que o
+ * Project Service reclassifique arquivos entre projetos configurados/inferidos durante uma varredura ampla. O parser
+ * continua usando a dependência TS6 localizada exigida pelo typescript-eslint; compilação e editor usam TS7 nativo.
  *
- * O trio de "sistemas TypeScript" no projeto: A) VS Code TSServer — editor, IntelliSense, hover (settings.json) B)
- * tsserver-daemon — MCP tools, lsp_definition/references/etc. via agentes C) ESLint + tseslint — análise estática com
- * type-info em CI e pre-commit
+ * Os consumidores TypeScript no projeto: A) VS Code TS7 nativo — editor, IntelliSense e hover; B) `tsc` TS7 nativo —
+ * validação estrutural; C) ESLint + tseslint + TS6 compatível — análise type-aware em CI e pre-commit.
  *
  * ─── Convenções ───────────────────────────────────────────────────────────────
  *
@@ -211,15 +210,15 @@ export default tseslint.config(
     },
 
     // ======================================================
-    // 2. Type-checked (src/ geral) — via projectService → TSServer
+    // 2. Type-checked (src/ geral) — projeto TypeScript explícito
     //    Regras que requerem informação de tipo ficam aqui.
-    //    O ESLint instanciará um LanguageService próprio lendo tsconfig.node.json.
+    //    O ESLint constrói um programa único a partir de tsconfig.node.json.
     //    NOTA: aumenta o tempo de lint; uso intencional apenas para src/.
     // ======================================================
     {
         files: ['src/**/*.{js,mjs}'],
         ignores: [
-            // browser context: usa globals.browser, não precisa de type-check TSServer
+            // browser context: usa globals.browser, não precisa de type-check do projeto Node
             'src/driver/**',
             'src/shared/page_stability/**',
             'src/shared/biomechanics/**',
@@ -229,7 +228,7 @@ export default tseslint.config(
         extends: tseslint.configs.recommendedTypeChecked,
         languageOptions: {
             parserOptions: {
-                projectService: true,
+                project: ['./tsconfig.node.json'],
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -363,8 +362,7 @@ export default tseslint.config(
     },
 
     // ======================================================
-    // 6b. Tests legacy — arquivos de teste históricos
-    //    @ts-nocheck é padrão nesses arquivos, não deve ser erro.
+    // 6b. Tests legacy — historical runtime fixtures; TypeScript remains fully enabled.
     // ======================================================
     {
         files: ['tests/legacy/**/*.{js,mjs}'],
@@ -379,7 +377,6 @@ export default tseslint.config(
             },
         },
         rules: {
-            '@typescript-eslint/ban-ts-comment': 'off',
             '@typescript-eslint/no-unused-vars': 'off',
             'prefer-const': 'off',
             'prefer-rest-params': 'off',

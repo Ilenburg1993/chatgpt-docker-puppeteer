@@ -136,12 +136,10 @@ const MAX_QUARANTINE_ID_LENGTH = 192;
 const quarantineIdSchema = z
     .string()
     .min(1)
-    .max(MAX_QUARANTINE_ID_LENGTH)
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, 'quarantineId must be a safe basename');
+    .max(MAX_QUARANTINE_ID_LENGTH)['regex'](/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, 'quarantineId must be a safe basename');
 const durabilitySchema = z
     .enum(['file-and-directory', 'file', 'none'])
-    .optional()
-    .describe(
+    .optional()['describe'](
         'Crash-durability profile. Default file-and-directory. file skips parent-directory fsync; none also skips file flush. Atomic publish, locks, path policy and hash preconditions remain enforced.',
     );
 
@@ -161,14 +159,13 @@ const quarantineMetadataSchema = z.object({
     originalPath: z.string().min(1).max(4096),
     quarantinePath: z.string().min(1).max(4096),
     metadataPath: z.string().min(1).max(4096),
-    createdAt: z.string().datetime(),
+    createdAt: z.string()['datetime'](),
     status: z.enum(['quarantining', 'quarantined', 'restoring', 'restored']),
-    restoredAt: z.string().datetime().nullable(),
+    restoredAt: z.string()['datetime']().nullable(),
     restoredPath: z.string().min(1).max(4096).nullable(),
     sourceBytes: z.number().int().nonnegative(),
     sourceHash: z
-        .string()
-        .regex(/^[a-f0-9]{64}$/)
+        .string()['regex'](/^[a-f0-9]{64}$/)
         .nullable(),
     transaction: quarantineTransactionSchema.nullable().optional(),
 });
@@ -190,33 +187,29 @@ const postPatchValidationRequestSchema = z.object({
 });
 
 const patchBatchOperationSchema = z.object({
-    path: z.string().min(1).describe('Workspace-relative file path.'),
-    old_string: z.string().min(1).describe('Exact text to replace.'),
-    new_string: z.string().describe('Replacement text. Use an empty string to delete matched text.'),
-    replace_all: z.boolean().optional().describe('Replace every occurrence of old_string. Default: false.'),
+    path: z.string().min(1)['describe']('Workspace-relative file path.'),
+    old_string: z.string().min(1)['describe']('Exact text to replace.'),
+    new_string: z.string()['describe']('Replacement text. Use an empty string to delete matched text.'),
+    replace_all: z.boolean().optional()['describe']('Replace every occurrence of old_string. Default: false.'),
     expected_occurrences: z
         .number()
         .int()
         .min(1)
-        .optional()
-        .describe('Require an exact occurrence count before applying.'),
+        .optional()['describe']('Require an exact occurrence count before applying.'),
     occurrence_index: z
         .number()
         .int()
         .min(1)
-        .optional()
-        .describe('1-based occurrence index to replace when old_string appears more than once.'),
+        .optional()['describe']('1-based occurrence index to replace when old_string appears more than once.'),
     expectedHash: z
         .string()
-        .optional()
-        .describe('Expected SHA-256. For repeated same-file operations, repeat the initial file hash to use one group-baseline precondition; distinct hashes keep per-operation virtual-state checks.'),
-    allowNoop: z.boolean().optional().describe('Allow old_string and new_string to be identical. Default: false.'),
-    diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
-    maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+        .optional()['describe']('Expected SHA-256. For repeated same-file operations, repeat the initial file hash to use one group-baseline precondition; distinct hashes keep per-operation virtual-state checks.'),
+    allowNoop: z.boolean().optional()['describe']('Allow old_string and new_string to be identical. Default: false.'),
+    diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
+    maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
     includeDiffPreview: z
         .boolean()
-        .optional()
-        .describe('Include textual diffPreview in each operation result. Default: false.'),
+        .optional()['describe']('Include textual diffPreview in each operation result. Default: false.'),
 });
 
 /**
@@ -300,37 +293,36 @@ async function runPostPatchValidations(requests) {
     };
 }
 
-const batchOperationSchema = z.discriminatedUnion('type', [
+const batchOperationSchema = z['discriminatedUnion']('type', [
     z.object({
         type: z.literal('create_file'),
-        path: z.string().min(1).describe('Workspace-relative file path to create.'),
-        content: z.string().optional().describe('Initial UTF-8 content. Default: empty string.'),
-        createParentDirs: z.boolean().optional().describe('Create parent directories. Default: true.'),
+        path: z.string().min(1)['describe']('Workspace-relative file path to create.'),
+        content: z.string().optional()['describe']('Initial UTF-8 content. Default: empty string.'),
+        createParentDirs: z.boolean().optional()['describe']('Create parent directories. Default: true.'),
         durability: durabilitySchema,
     }),
     z.object({
         type: z.literal('move_file'),
-        source: z.string().min(1).describe('Workspace-relative existing source file.'),
-        destination: z.string().min(1).describe('Workspace-relative destination path.'),
-        overwrite: z.boolean().optional().describe('Overwrite destination if it exists. Default: false.'),
-        confirmOverwrite: z.boolean().optional().describe('Must be true when overwrite=true.'),
+        source: z.string().min(1)['describe']('Workspace-relative existing source file.'),
+        destination: z.string().min(1)['describe']('Workspace-relative destination path.'),
+        overwrite: z.boolean().optional()['describe']('Overwrite destination if it exists. Default: false.'),
+        confirmOverwrite: z.boolean().optional()['describe']('Must be true when overwrite=true.'),
     }),
     z.object({
         type: z.literal('quarantine_file'),
-        path: z.string().min(1).describe('Workspace-relative file path to move into reversible quarantine.'),
+        path: z.string().min(1)['describe']('Workspace-relative file path to move into reversible quarantine.'),
     }),
     z.object({
         type: z.literal('set_executable'),
-        path: z.string().min(1).describe('Workspace-relative regular file whose executable bits should be toggled.'),
-        executable: z.boolean().describe('When true, add POSIX executable bits; when false, remove only executable bits.'),
+        path: z.string().min(1)['describe']('Workspace-relative regular file whose executable bits should be toggled.'),
+        executable: z.boolean()['describe']('When true, add POSIX executable bits; when false, remove only executable bits.'),
     }),
     z.object({
         type: z.literal('remove_file'),
         path: z
             .string()
-            .min(1)
-            .describe('Workspace-relative file path to delete. Prefer quarantine_file when possible.'),
-        confirm: z.boolean().optional().describe('Must be true for remove_file when dryRun=false.'),
+            .min(1)['describe']('Workspace-relative file path to delete. Prefer quarantine_file when possible.'),
+        confirm: z.boolean().optional()['describe']('Must be true for remove_file when dryRun=false.'),
     }),
 ]);
 
@@ -2064,15 +2056,13 @@ export const repoWriteTools = [
             operations: z
                 .array(patchBatchOperationSchema)
                 .min(1)
-                .max(MAX_PATCH_BATCH_OPERATIONS)
-                .describe('Patch operations to validate in order. This tool never writes; max 128 operations / 64 targets.'),
+                .max(MAX_PATCH_BATCH_OPERATIONS)['describe']('Patch operations to validate in order. This tool never writes; max 128 operations / 64 targets.'),
             targetConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_PATCH_TARGET_CONCURRENCY)
-                .optional()
-                .describe('Parallel target groups during planning. Default: 4; same-file operations remain sequential.'),
+                .optional()['describe']('Parallel target groups during planning. Default: 4; same-file operations remain sequential.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations, targetConcurrency }) => {
@@ -2157,46 +2147,37 @@ export const repoWriteTools = [
             operations: z
                 .array(patchBatchOperationSchema)
                 .min(1)
-                .max(MAX_PATCH_BATCH_OPERATIONS)
-                .describe('Patch operations to validate or apply; max 128 operations / 64 targets / 3 MiB input.'),
-            dryRun: z.boolean().optional().describe('Validate all operations without writing. Default: true.'),
+                .max(MAX_PATCH_BATCH_OPERATIONS)['describe']('Patch operations to validate or apply; max 128 operations / 64 targets / 3 MiB input.'),
+            dryRun: z.boolean().optional()['describe']('Validate all operations without writing. Default: true.'),
             confirmBatch: z
                 .boolean()
-                .optional()
-                .describe('Must be true when dryRun=false because this applies multiple patches.'),
+                .optional()['describe']('Must be true when dryRun=false because this applies multiple patches.'),
             applyMode: z
                 .enum(['global-preflight', 'per-target-fast'])
-                .optional()
-                .describe('Apply policy. Default per-target-fast applies independent target groups directly with atomic compute-before-write per file. global-preflight is opt-in and blocks all writes when any preview target already fails.'),
+                .optional()['describe']('Apply policy. Default per-target-fast applies independent target groups directly with atomic compute-before-write per file. global-preflight is opt-in and blocks all writes when any preview target already fails.'),
             failureMode: z
                 .enum(['best-effort', 'fail-fast'])
-                .optional()
-                .describe('Target failure policy during apply. Defaults best-effort for the default per-target-fast mode; global-preflight defaults fail-fast after its preview gate.'),
+                .optional()['describe']('Target failure policy during apply. Defaults best-effort for the default per-target-fast mode; global-preflight defaults fail-fast after its preview gate.'),
             targetConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_PATCH_TARGET_CONCURRENCY)
-                .optional()
-                .describe('Parallel independent targets. Defaults 4 in per-target-fast; global-preflight apply uses 1 unless explicitly raised.'),
+                .optional()['describe']('Parallel independent targets. Defaults 4 in per-target-fast; global-preflight apply uses 1 unless explicitly raised.'),
             resultMode: z
                 .enum(['compact', 'detailed'])
-                .optional()
-                .describe('Successful operation result detail. Default compact; detailed preserves full per-operation hashes/line/byte metadata. includeDiffPreview forces detailed.'),
+                .optional()['describe']('Successful operation result detail. Default compact; detailed preserves full per-operation hashes/line/byte metadata. includeDiffPreview forces detailed.'),
             includePreflightDetails: z
                 .boolean()
-                .optional()
-                .describe('Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.'),
+                .optional()['describe']('Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.'),
             postValidate: z
                 .array(postPatchValidationRequestSchema)
                 .min(1)
                 .max(MAX_POST_PATCH_VALIDATORS)
-                .optional()
-                .describe('Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan and never starts jobs.'),
+                .optional()['describe']('Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan and never starts jobs.'),
             postValidateOnPartial: z
                 .boolean()
-                .optional()
-                .describe('Run postValidate even after partial patch application. Default false; otherwise validation is skipped on partial apply.'),
+                .optional()['describe']('Run postValidate even after partial patch application. Default false; otherwise validation is skipped on partial apply.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -2281,7 +2262,7 @@ export const repoWriteTools = [
                     inputBytes: envelope.inputBytes,
                     failedCount: failed.length,
                     reportedFailureCount: outputFailures.length,
-                    failureSummary,
+                    ...(failed.length > 0 ? { failureSummary } : {}),
                     skippedCount: dryRunResult.execution.skippedCount,
                     concurrency: dryRunResult.execution.concurrency,
                     durationMs: dryRunResult.execution.durationMs,
@@ -2496,7 +2477,7 @@ export const repoWriteTools = [
                 appliedCount: succeeded.length,
                 failedCount: failedApply.length,
                 reportedFailureCount: outputFailures.length,
-                failureSummary,
+                ...(failedApply.length > 0 ? { failureSummary } : {}),
                 skippedCount: skipped.length,
                 concurrency: applyRun.execution.concurrency,
                 maxInFlight: applyRun.execution.maxInFlight,
@@ -2559,8 +2540,7 @@ export const repoWriteTools = [
             operations: z
                 .array(batchOperationSchema)
                 .min(1)
-                .max(MAX_BATCH_FILE_OPERATIONS)
-                .describe('Ordered file operations to validate and preview.'),
+                .max(MAX_BATCH_FILE_OPERATIONS)['describe']('Ordered file operations to validate and preview.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations }) => {
@@ -2609,24 +2589,19 @@ export const repoWriteTools = [
             operations: z
                 .array(batchOperationSchema)
                 .min(1)
-                .max(MAX_BATCH_FILE_OPERATIONS)
-                .describe('Ordered file operations. Later operations can depend on earlier ones.'),
+                .max(MAX_BATCH_FILE_OPERATIONS)['describe']('Ordered file operations. Later operations can depend on earlier ones.'),
             dryRun: z
                 .boolean()
-                .optional()
-                .describe('Validate and preview all operations without writing. Default: true.'),
+                .optional()['describe']('Validate and preview all operations without writing. Default: true.'),
             confirmBatch: z
                 .boolean()
-                .optional()
-                .describe('Must be true when applying file operations; confirmBatch=true also survives adapters that omit dryRun=false.'),
+                .optional()['describe']('Must be true when applying file operations; confirmBatch=true also survives adapters that omit dryRun=false.'),
             applyMode: z
                 .enum(['global-preflight', 'sequential-fast'])
-                .optional()
-                .describe('Adaptive default: sequential-fast for create/move-without-overwrite/quarantine sequences; global-preflight when remove_file or overwrite move is present. Explicit value overrides the adaptive choice.'),
+                .optional()['describe']('Adaptive default: sequential-fast for create/move-without-overwrite/quarantine sequences; global-preflight when remove_file or overwrite move is present. Explicit value overrides the adaptive choice.'),
             includePreflightDetails: z
                 .boolean()
-                .optional()
-                .describe('Include full successful preflight rows in a real apply response. Default: false.'),
+                .optional()['describe']('Include full successful preflight rows in a real apply response. Default: false.'),
         },
         annotations: destructiveAnnotations(),
         handler: async ({ operations, dryRun, confirmBatch, applyMode, includePreflightDetails }) => {
@@ -2797,16 +2772,15 @@ export const repoWriteTools = [
         description:
             'Replace the full content of an existing UTF-8 workspace file. Returns hashes and a unified diff preview.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative existing file path.'),
-            content: z.string().describe('Full replacement content.'),
-            expectedHash: z.string().optional().describe('Expected SHA-256 of current file content.'),
-            dryRun: z.boolean().optional().describe('Return diff and hashes without writing. Default: false.'),
-            diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
-            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            path: z.string().min(1)['describe']('Workspace-relative existing file path.'),
+            content: z.string()['describe']('Full replacement content.'),
+            expectedHash: z.string().optional()['describe']('Expected SHA-256 of current file content.'),
+            dryRun: z.boolean().optional()['describe']('Return diff and hashes without writing. Default: false.'),
+            diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
             includeDiffPreview: z
                 .boolean()
-                .optional()
-                .describe('Include textual diffPreview in the tool result. Default: false.'),
+                .optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -2905,15 +2879,14 @@ export const repoWriteTools = [
         description:
             'Create a new UTF-8 workspace file. It fails if the file already exists and returns a creation diff preview.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path to create.'),
-            content: z.string().optional().describe('Initial UTF-8 content. Default: empty string.'),
-            createParentDirs: z.boolean().optional().describe('Create parent directories. Default: true.'),
-            dryRun: z.boolean().optional().describe('Validate and return diff without writing. Default: false.'),
-            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path to create.'),
+            content: z.string().optional()['describe']('Initial UTF-8 content. Default: empty string.'),
+            createParentDirs: z.boolean().optional()['describe']('Create parent directories. Default: true.'),
+            dryRun: z.boolean().optional()['describe']('Validate and return diff without writing. Default: false.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
             includeDiffPreview: z
                 .boolean()
-                .optional()
-                .describe('Include textual diffPreview in the tool result. Default: false.'),
+                .optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -3001,34 +2974,30 @@ export const repoWriteTools = [
         description:
             'Apply a controlled exact-string patch to one workspace file. Returns hashes, line/byte deltas and a unified diff preview.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path.'),
-            old_string: z.string().min(1).describe('Exact text to replace. It must match once by default.'),
-            new_string: z.string().describe('Replacement text. Use an empty string to delete matched text.'),
-            replace_all: z.boolean().optional().describe('Replace every occurrence of old_string. Default: false.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path.'),
+            old_string: z.string().min(1)['describe']('Exact text to replace. It must match once by default.'),
+            new_string: z.string()['describe']('Replacement text. Use an empty string to delete matched text.'),
+            replace_all: z.boolean().optional()['describe']('Replace every occurrence of old_string. Default: false.'),
             expected_occurrences: z
                 .number()
                 .int()
                 .min(1)
-                .optional()
-                .describe('Require an exact occurrence count before applying.'),
+                .optional()['describe']('Require an exact occurrence count before applying.'),
             occurrence_index: z
                 .number()
                 .int()
                 .min(1)
-                .optional()
-                .describe('1-based occurrence index to replace when old_string appears more than once.'),
-            expectedHash: z.string().optional().describe('Expected SHA-256 of current file content.'),
-            dryRun: z.boolean().optional().describe('Validate and return diff without writing. Default: false.'),
+                .optional()['describe']('1-based occurrence index to replace when old_string appears more than once.'),
+            expectedHash: z.string().optional()['describe']('Expected SHA-256 of current file content.'),
+            dryRun: z.boolean().optional()['describe']('Validate and return diff without writing. Default: false.'),
             allowNoop: z
                 .boolean()
-                .optional()
-                .describe('Allow old_string and new_string to be identical. Default: false.'),
-            diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
-            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
+                .optional()['describe']('Allow old_string and new_string to be identical. Default: false.'),
+            diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
             includeDiffPreview: z
                 .boolean()
-                .optional()
-                .describe('Include textual diffPreview in the tool result. Default: false.'),
+                .optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -3170,14 +3139,13 @@ export const repoWriteTools = [
         description:
             'Move or rename one workspace file. Destination overwrite is disabled unless overwrite and confirmOverwrite are both true.',
         inputSchema: {
-            source: z.string().min(1).describe('Workspace-relative existing source file.'),
-            destination: z.string().min(1).describe('Workspace-relative destination path.'),
-            overwrite: z.boolean().optional().describe('Overwrite destination if it exists. Default: false.'),
+            source: z.string().min(1)['describe']('Workspace-relative existing source file.'),
+            destination: z.string().min(1)['describe']('Workspace-relative destination path.'),
+            overwrite: z.boolean().optional()['describe']('Overwrite destination if it exists. Default: false.'),
             confirmOverwrite: z
                 .boolean()
-                .optional()
-                .describe('Must be true when overwrite is true because destination replacement is destructive.'),
-            dryRun: z.boolean().optional().describe('Validate without moving. Default: false.'),
+                .optional()['describe']('Must be true when overwrite is true because destination replacement is destructive.'),
+            dryRun: z.boolean().optional()['describe']('Validate without moving. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ source, destination, overwrite, confirmOverwrite, dryRun }) => {
@@ -3262,8 +3230,8 @@ export const repoWriteTools = [
         title: 'List quarantined repository files',
         description: 'List files currently known to the MCP quarantine area, including restored and restorable items.',
         inputSchema: {
-            status: z.enum(['quarantined', 'restored', 'all']).optional().describe('Filter by status. Default: all.'),
-            limit: z.number().int().min(1).max(200).optional().describe('Maximum items returned. Default: 50.'),
+            status: z.enum(['quarantined', 'restored', 'all']).optional()['describe']('Filter by status. Default: all.'),
+            limit: z.number().int().min(1).max(200).optional()['describe']('Maximum items returned. Default: 50.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ status, limit }) => {
@@ -3286,7 +3254,7 @@ export const repoWriteTools = [
         description: 'Inspect metadata and current stored-object state for one item created by repo_quarantine_file.',
         inputSchema: {
             quarantineId: quarantineIdSchema.describe('quarantineId returned by repo_quarantine_file.'),
-            includeHash: z.boolean().optional().describe('Compute SHA-256 for stored data if present. Default: true.'),
+            includeHash: z.boolean().optional()['describe']('Compute SHA-256 for stored data if present. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ quarantineId, includeHash }) => {
@@ -3319,8 +3287,8 @@ export const repoWriteTools = [
         description:
             'Move one workspace file to a reversible MCP quarantine area instead of deleting it. Returns a quarantineId for restore.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path to quarantine.'),
-            dryRun: z.boolean().optional().describe('Validate without moving. Default: false.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path to quarantine.'),
+            dryRun: z.boolean().optional()['describe']('Validate without moving. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ path: inputPath, dryRun }) => {
@@ -3394,13 +3362,12 @@ export const repoWriteTools = [
             'Restore a file previously moved by repo_quarantine_file. Destination defaults to the original path and overwrite requires explicit confirmation.',
         inputSchema: {
             quarantineId: quarantineIdSchema.describe('quarantineId returned by repo_quarantine_file.'),
-            destinationPath: z.string().optional().describe('Optional workspace-relative restore path.'),
-            overwrite: z.boolean().optional().describe('Overwrite destination if it exists. Default: false.'),
+            destinationPath: z.string().optional()['describe']('Optional workspace-relative restore path.'),
+            overwrite: z.boolean().optional()['describe']('Overwrite destination if it exists. Default: false.'),
             confirmOverwrite: z
                 .boolean()
-                .optional()
-                .describe('Must be true when overwrite is true because destination replacement is destructive.'),
-            dryRun: z.boolean().optional().describe('Validate without restoring. Default: false.'),
+                .optional()['describe']('Must be true when overwrite is true because destination replacement is destructive.'),
+            dryRun: z.boolean().optional()['describe']('Validate without restoring. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ quarantineId, destinationPath, overwrite, confirmOverwrite, dryRun }) => {
@@ -3509,9 +3476,9 @@ export const repoWriteTools = [
         description:
             'Delete one workspace file. Requires confirm=true and always returns prior hash/size; rollback snapshot metadata is available only when automatic I/O rollback is explicitly enabled.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path to delete.'),
-            confirm: z.boolean().optional().describe('Must be true to delete.'),
-            dryRun: z.boolean().optional().describe('Validate without deleting. Default: false.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path to delete.'),
+            confirm: z.boolean().optional()['describe']('Must be true to delete.'),
+            dryRun: z.boolean().optional()['describe']('Validate without deleting. Default: false.'),
         },
         annotations: destructiveAnnotations(),
         handler: async ({ path, confirm, dryRun }) => {

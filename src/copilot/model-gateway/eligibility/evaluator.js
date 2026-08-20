@@ -121,7 +121,7 @@ function keyToken(value) {
 }
 
 /**
- * @param {Record<string, any>} pricing
+ * @param {Record<string, unknown>} pricing
  * @param {readonly string[]} keys
  * @returns {number | null}
  */
@@ -134,7 +134,7 @@ function pricingNumber(pricing, keys) {
 }
 
 /**
- * @param {Record<string, any>} policy
+ * @param {Record<string, unknown>} policy
  * @returns {Record<string, number | boolean>}
  */
 function budgetPolicyInputs(policy) {
@@ -149,8 +149,8 @@ function budgetPolicyInputs(policy) {
 }
 
 /**
- * @param {Record<string, any>} pricing
- * @param {Record<string, any>} policy
+ * @param {Record<string, unknown>} pricing
+ * @param {Record<string, unknown>} policy
  * @returns {{ hard: string[]; soft: string[]; reasons: string[]; observed: Record<string, number> }}
  */
 function evaluateBudgetPolicy(pricing, policy) {
@@ -204,8 +204,8 @@ function modelListIncludes(providerModel, models) {
 }
 
 /**
- * @param {Record<string, any>} routeOption
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} routeOption
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function readProviderId(routeOption, projection) {
@@ -213,8 +213,8 @@ function readProviderId(routeOption, projection) {
 }
 
 /**
- * @param {Record<string, any>} routeOption
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} routeOption
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function readProviderModel(routeOption, projection) {
@@ -227,24 +227,24 @@ function readProviderModel(routeOption, projection) {
 }
 
 /**
- * @param {Record<string, any>} routeOption
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} routeOption
+ * @returns {Record<string, unknown>}
  */
 function routePolicy(routeOption) {
     return isRecord(routeOption['normalizedPolicy']) ? routeOption['normalizedPolicy'] : {};
 }
 
 /**
- * @param {Record<string, any>} routeOption
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} routeOption
+ * @returns {Record<string, unknown>}
  */
 function routeProviderSpecific(routeOption) {
     return isRecord(routeOption['providerSpecific']) ? routeOption['providerSpecific'] : {};
 }
 
 /**
- * @param {Record<string, any>} routeOption
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} routeOption
+ * @returns {Record<string, unknown>}
  */
 function routeTraits(routeOption) {
     const policy = routePolicy(routeOption);
@@ -252,8 +252,8 @@ function routeTraits(routeOption) {
 }
 
 /**
- * @param {Record<string, any>} routeOption
- * @param {Record<string, any>} routePolicyRecord
+ * @param {Record<string, unknown>} routeOption
+ * @param {Record<string, unknown>} routePolicyRecord
  * @returns {{ routeLayer: string | null; wireApi: string | null; upstreamProvider: string | null }}
  */
 function routeEligibilityContext(routeOption, routePolicyRecord) {
@@ -294,16 +294,16 @@ function blockedBySet(blockSet, value) {
 }
 
 /**
- * @param {Record<string, any>} projection
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} projection
+ * @returns {Record<string, unknown>}
  */
 function lifecycle(projection) {
     return isRecord(projection['lifecycle']) ? projection['lifecycle'] : {};
 }
 
 /**
- * @param {Record<string, any>[]} overlays
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>[]} overlays
+ * @returns {Record<string, unknown>}
  */
 function mergedOverlayMetadata(overlays) {
     return Object.assign(
@@ -325,7 +325,7 @@ function errorContextText(value) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @param {number} nowMs
  * @returns {boolean}
  */
@@ -353,14 +353,13 @@ function isFatalHealth(health, nowMs) {
 
 /**
  * @param {object} input
- * @param {Record<string, any>} input.projection
- * @param {Record<string, any>} [input.routeOption]
- * @param {Record<string, any>[]} [input.accountOverlays]
- * @param {{ has(ref: string): boolean }} [input.secretRegistry]
- * @param {Record<string, any>} [input.policy]
- * @param {Record<string, any>} [input.health]
- * @param {string | number | Date} [input.now]
- * @returns {ReturnType<typeof createModelEligibilityDecision>}
+ * @param {Record<string, unknown>} input.projection
+ * @param {Record<string, unknown> | undefined} [input.routeOption]
+ * @param {Record<string, unknown>[]} [input.accountOverlays]
+ * @param {{ has(ref: string): boolean } | undefined} [input.secretRegistry]
+ * @param {Record<string, unknown>} [input.policy]
+ * @param {Record<string, unknown> | undefined} [input.health]
+ * @param {string | number | Date | undefined} [input.now]
  */
 export function evaluateModelGatewayEligibility(input) {
     const projection = isRecord(input.projection) ? input.projection : {};
@@ -369,7 +368,7 @@ export function evaluateModelGatewayEligibility(input) {
     const providerId = readProviderId(routeOption, projection);
     const providerModel = readProviderModel(routeOption, projection);
     const selectorSyntax = optionalString(routeOption['selectorSyntax']) ?? optionalString(projection['selectorSyntax']) ?? providerModel;
-    const policy = /** @type {Record<string, any>} */ (resolveModelGatewayEligibilityPolicy(input.policy));
+    const policy = /** @type {Record<string, unknown>} */ (resolveModelGatewayEligibilityPolicy(input.policy));
     const accountScope = optionalString(policy['accountScope']);
     const hard = [];
     const soft = [];
@@ -387,8 +386,12 @@ export function evaluateModelGatewayEligibility(input) {
         requireAccountOverlay: policy['requireAccountOverlay'] === true,
         requireFreshAccountOverlay: policy['requireFreshAccountOverlay'] === true,
         allowExpiredAccountOverlay: policy['allowExpiredAccountOverlay'] === true,
-        unknownAccessPolicy: policy['unknownAccessPolicy'],
-        treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'],
+        ...(optionalString(policy['unknownAccessPolicy']) !== null
+            ? { unknownAccessPolicy: optionalString(policy['unknownAccessPolicy']) ?? 'allow_probe' }
+            : {}),
+        ...(typeof policy['treatEnabledModelsAsClosed'] === 'boolean'
+            ? { treatEnabledModelsAsClosed: policy['treatEnabledModelsAsClosed'] }
+            : {}),
         localPrivate: truthy(routeTraitsRecord['localPrivate']),
         now: input.now,
     });

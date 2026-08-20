@@ -1,31 +1,25 @@
-<script setup>
+<script setup lang="ts">
+import type { BadgeVariant, DashboardTask } from '@/types/dashboard';
 import { ChevronDown, ChevronUp, Edit, Eye, Trash2, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
 import Badge from '../ui/Badge.vue';
 import Button from '../ui/Button.vue';
 
-const props = defineProps({
-    tasks: {
-        type: Array,
-        required: true,
-    },
-    loading: {
-        type: Boolean,
-        default: false,
-    },
-    compact: {
-        type: Boolean,
-        default: false,
-    },
+const props = withDefaults(defineProps<{ tasks: DashboardTask[]; loading?: boolean; compact?: boolean }>(), {
+    loading: false,
+    compact: false,
 });
 
-const emit = defineEmits(['view', 'edit', 'delete', 'cancel']);
+const emit = defineEmits<{
+    view: [task: DashboardTask];
+    edit: [task: DashboardTask];
+    delete: [task: DashboardTask];
+    cancel: [task: DashboardTask];
+}>();
 
-const router = useRouter();
-
-const sortKey = ref('');
-const sortOrder = ref('asc');
+type SortKey = '' | 'meta.id' | 'unified_status' | 'priority';
+const sortKey = ref<SortKey>('');
+const sortOrder = ref<'asc' | 'desc'>('asc');
 const currentPage = ref(1);
 const pageSize = ref(10);
 
@@ -35,13 +29,18 @@ const sortedTasks = computed(() => {
     if (!sortKey.value) return props.tasks;
 
     return [...props.tasks].sort((a, b) => {
-        let aVal = a[sortKey.value];
-        let bVal = b[sortKey.value];
-
-        if (sortKey.value === 'priority') {
-            aVal = a.meta?.priority || 0;
-            bVal = b.meta?.priority || 0;
-        }
+        const aVal =
+            sortKey.value === 'priority'
+                ? a.meta?.priority || 0
+                : sortKey.value === 'meta.id'
+                  ? a.meta?.id || ''
+                  : a.unified_status || '';
+        const bVal =
+            sortKey.value === 'priority'
+                ? b.meta?.priority || 0
+                : sortKey.value === 'meta.id'
+                  ? b.meta?.id || ''
+                  : b.unified_status || '';
 
         if (sortOrder.value === 'asc') {
             return aVal > bVal ? 1 : -1;
@@ -61,7 +60,7 @@ const totalPages = computed(() => {
     return Math.ceil(props.tasks.length / pageSize.value);
 });
 
-const sortBy = (key) => {
+const sortBy = (key: Exclude<SortKey, ''>) => {
     if (sortKey.value === key) {
         sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
     } else {
@@ -70,8 +69,8 @@ const sortBy = (key) => {
     }
 };
 
-const getStatusVariant = (status) => {
-    const variants = {
+const getStatusVariant = (status?: string): BadgeVariant => {
+    const variants: Record<string, BadgeVariant> = {
         RUNNING: 'info',
         PENDING: 'default',
         DONE: 'success',
@@ -79,34 +78,34 @@ const getStatusVariant = (status) => {
         CANCELLED: 'warning',
         PAUSED: 'warning',
     };
-    return variants[status] || 'default';
+    return variants[String(status || '')] || 'default';
 };
 
-const getPriorityLabel = (priority) => {
+const getPriorityLabel = (priority: number) => {
     if (priority >= 8) return 'HIGH';
     if (priority >= 5) return 'MEDIUM';
     return 'LOW';
 };
 
-const getPriorityVariant = (priority) => {
+const getPriorityVariant = (priority: number): BadgeVariant => {
     if (priority >= 8) return 'error';
     if (priority >= 5) return 'warning';
     return 'default';
 };
 
-const handleView = (task) => {
+const handleView = (task: DashboardTask) => {
     emit('view', task);
 };
 
-const handleEdit = (task) => {
+const handleEdit = (task: DashboardTask) => {
     emit('edit', task);
 };
 
-const handleDelete = (task) => {
+const handleDelete = (task: DashboardTask) => {
     emit('delete', task);
 };
 
-const handleCancel = (task) => {
+const handleCancel = (task: DashboardTask) => {
     emit('cancel', task);
 };
 </script>
@@ -215,7 +214,7 @@ const handleCancel = (task) => {
                                     <X :size="16" />
                                 </button>
                                 <button
-                                    v-if="['DONE', 'FAILED', 'CANCELLED'].includes(task.unified_status)"
+                                    v-if="['DONE', 'FAILED', 'CANCELLED'].includes(String(task.unified_status || ''))"
                                     @click="handleDelete(task)"
                                     class="p-1.5 rounded hover:bg-background-tertiary text-error hover:text-error transition-colors"
                                     title="Delete task"

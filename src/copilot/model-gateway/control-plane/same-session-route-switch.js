@@ -12,6 +12,34 @@ import { createHash, randomUUID } from 'node:crypto';
 
 export const MODEL_GATEWAY_SAME_SESSION_ROUTE_SWITCH_DEFAULT_TIMEOUT_MS = 45_000;
 
+
+/**
+ * @typedef {Record<string, unknown> & {
+ *   schemaVersion: string;
+ *   operationId: string;
+ *   idempotencyKey: string;
+ *   sessionId: string;
+ *   previousRoute: Record<string, unknown>;
+ *   targetRoute: Record<string, unknown>;
+ *   state: string;
+ *   verified: boolean;
+ *   rollback: unknown;
+ *   error: string | null;
+ *   requiresNewSession: boolean;
+ *   reconciliationRequired: boolean;
+ *   timeoutMs: number;
+ *   transitions: Array<Record<string, unknown>>;
+ *   createdAt: string;
+ *   updatedAt: string;
+ *   deferred?: boolean;
+ *   deferReason?: string;
+ *   deferDetails?: Record<string, unknown>;
+ *   promotionAuthorization?: unknown;
+ *   retryable?: boolean;
+ *   replayed?: boolean;
+ * }} ModelGatewaySameSessionRouteSwitchResult
+ */
+
 /**
  * @param {string} idempotencyKey
  */
@@ -43,19 +71,21 @@ function withTimeout(task, timeoutMs, phase) {
 }
 
 /**
+ * @template TSession
  * @param {object} input
  * @param {string} input.sessionId
  * @param {Record<string, unknown>} input.previousRoute
  * @param {Record<string, unknown>} input.targetRoute
  * @param {string} [input.idempotencyKey]
  * @param {number} [input.timeoutMs]
- * @param {(route: Record<string, unknown>, sessionId: string) => Promise<{ sessionId: string; session: unknown }>} input.reattach
- * @param {(session: unknown, route: Record<string, unknown>) => Promise<boolean>} input.verify
- * @param {(session: unknown, route: Record<string, unknown>) => Promise<void>} input.commit
+ * @param {(route: Record<string, unknown>, sessionId: string) => Promise<{ sessionId: string; session: TSession }>} input.reattach
+ * @param {(session: TSession, route: Record<string, unknown>) => Promise<boolean>} input.verify
+ * @param {(session: TSession, route: Record<string, unknown>) => Promise<void>} input.commit
  * @param {(operation: Record<string, unknown>) => Promise<void>} [input.record]
  * @param {() => number} [input.now]
  * @param {string} [input.deferReason]
  * @param {Record<string, unknown>} [input.deferDetails]
+ * @returns {Promise<ModelGatewaySameSessionRouteSwitchResult>}
  */
 export async function executeModelGatewaySameSessionRouteSwitch(input) {
     const now = input.now ?? Date.now;
@@ -69,7 +99,7 @@ export async function executeModelGatewaySameSessionRouteSwitch(input) {
     const record = input.record ?? (async () => undefined);
     /** @type {Array<Record<string, unknown>>} */
     const transitions = [];
-    /** @type {Record<string, unknown>} */
+    /** @type {ModelGatewaySameSessionRouteSwitchResult} */
     const operation = {
         schemaVersion: 'model-gateway.same-session-route-switch.v1',
         operationId,

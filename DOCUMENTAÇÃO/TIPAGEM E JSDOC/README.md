@@ -22,6 +22,7 @@ trabalhar com tipagem e JSDoc neste repositório:
 
 | Arquivo                       | Papel                                                                  |
 | ----------------------------- | ---------------------------------------------------------------------- |
+| `../PLANOS/MIGRACAO_TYPESCRIPT_7_WORKSPACE_ROADMAP_2026-08-19.md` | Roadmap ativo da migração TS7 do workspace |
 | `PADROES.md`                  | Padrões JSDoc e tipagem TS — o "como fazer" obrigatório                |
 | `ROADMAP.md`                  | Roadmap de execução ativo (fases, erros, checklist)                    |
 | `SCRIPTS-E-AUTOMACAO.md`      | Scripts de análise, comandos npm, automações disponíveis               |

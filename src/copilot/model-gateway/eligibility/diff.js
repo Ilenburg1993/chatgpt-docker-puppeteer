@@ -35,7 +35,7 @@ function stableJson(value) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>[]}
+ * @returns {Record<string, unknown>[]}
  */
 function records(value) {
     return Array.isArray(value) ? value.filter(isRecord) : [];
@@ -64,8 +64,8 @@ function classifyEligibilityChangedFields(fields) {
 }
 
 /**
- * @param {Record<string, any>[]} previous
- * @param {Record<string, any>[]} next
+ * @param {Record<string, unknown>[]} previous
+ * @param {Record<string, unknown>[]} next
  * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[]; previousDisposition: string | null; nextDisposition: string | null; previousInclude: boolean | null; nextInclude: boolean | null }> }}
  */
 export function diffModelGatewayEligibilityDecisions(previous, next) {

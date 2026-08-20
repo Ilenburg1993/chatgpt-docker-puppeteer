@@ -1047,6 +1047,7 @@ class TargetDriver extends EventEmitter {
      * @param {string} event - Nome do evento
      * @param {...any} args - Argumentos do evento
      * @returns {boolean} Se evento foi emitido
+     * @override
      */
     emit(event, ...args) {
         if (this.destroyed && event !== EVENTS.DESTROYED) {

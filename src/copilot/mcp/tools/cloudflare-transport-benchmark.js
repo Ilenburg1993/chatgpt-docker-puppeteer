@@ -25,8 +25,8 @@ export const mcpCloudflareTransportBenchmarkPlanTool = {
     description:
         'Build a read-only plan for a controlled Cloudflare Tunnel transport benchmark across quic, auto and http2 profiles.',
     inputSchema: {
-        includeMetricsBaseline: z.boolean().optional().describe('Include a current cloudflared metrics baseline.'),
-        timeoutMs: z.number().int().min(500).max(10000).optional().describe('Metrics fetch timeout in milliseconds.'),
+        includeMetricsBaseline: z.boolean().optional()['describe']('Include a current cloudflared metrics baseline.'),
+        timeoutMs: z.number().int().min(500).max(10000).optional()['describe']('Metrics fetch timeout in milliseconds.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async ({ includeMetricsBaseline, timeoutMs }) =>

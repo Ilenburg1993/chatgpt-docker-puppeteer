@@ -25,50 +25,50 @@ import * as driverFactory from '../factory.js';
  */
 const ADAPTER_CONFIG = {
     /** Timeout máximo para execução de task (ms) - Default: 5 minutos */
-    EXECUTE_TASK_TIMEOUT_MS: parseInt(process.env.ADAPTER_EXECUTE_TIMEOUT || '300000', 10),
+    EXECUTE_TASK_TIMEOUT_MS: parseInt(process.env['ADAPTER_EXECUTE_TIMEOUT'] || '300000', 10),
 
     /** Timeout para shutdown gracioso (ms) - Default: 30 segundos */
-    SHUTDOWN_TIMEOUT_MS: parseInt(process.env.ADAPTER_SHUTDOWN_TIMEOUT || '30000', 10),
+    SHUTDOWN_TIMEOUT_MS: parseInt(process.env['ADAPTER_SHUTDOWN_TIMEOUT'] || '30000', 10),
 
     /** Intervalo para health check periódico (ms) - Default: 1 minuto */
-    HEALTH_CHECK_INTERVAL_MS: parseInt(process.env.ADAPTER_HEALTH_INTERVAL || '60000', 10),
+    HEALTH_CHECK_INTERVAL_MS: parseInt(process.env['ADAPTER_HEALTH_INTERVAL'] || '60000', 10),
 
     /** Máximo de drivers ativos simultaneamente - Default: 10 */
-    MAX_ACTIVE_DRIVERS: parseInt(process.env.ADAPTER_MAX_DRIVERS || '10', 10),
+    MAX_ACTIVE_DRIVERS: parseInt(process.env['ADAPTER_MAX_DRIVERS'] || '10', 10),
 
     /** Tamanho do buffer de telemetria para batch emit - Default: 1000 */
-    TELEMETRY_BUFFER_SIZE: parseInt(process.env.ADAPTER_TELEMETRY_BUFFER || '1000', 10),
+    TELEMETRY_BUFFER_SIZE: parseInt(process.env['ADAPTER_TELEMETRY_BUFFER'] || '1000', 10),
 
     /** Intervalo de flush de telemetria (ms) - Default: 1000 (env: ADAPTER_TELEMETRY_FLUSH_INTERVAL) */
-    TELEMETRY_FLUSH_INTERVAL_MS: parseInt(process.env.ADAPTER_TELEMETRY_FLUSH_INTERVAL || '1000', 10),
+    TELEMETRY_FLUSH_INTERVAL_MS: parseInt(process.env['ADAPTER_TELEMETRY_FLUSH_INTERVAL'] || '1000', 10),
 
     /** Intervalo para warning de modo degradado (ms) - Default: 1 minuto */
-    DEGRADED_MODE_WARNING_INTERVAL_MS: parseInt(process.env.ADAPTER_DEGRADED_WARNING || '60000', 10),
+    DEGRADED_MODE_WARNING_INTERVAL_MS: parseInt(process.env['ADAPTER_DEGRADED_WARNING'] || '60000', 10),
 
     /** Máximo de tentativas para retry de eventos NERV - Default: 3 */
-    EVENT_RETRY_MAX_ATTEMPTS: parseInt(process.env.ADAPTER_EVENT_RETRY || '3', 10),
+    EVENT_RETRY_MAX_ATTEMPTS: parseInt(process.env['ADAPTER_EVENT_RETRY'] || '3', 10),
 
     /** Backoff entre retries de eventos (ms) - Default: 100ms */
-    EVENT_RETRY_BACKOFF_MS: parseInt(process.env.ADAPTER_EVENT_BACKOFF || '100', 10),
+    EVENT_RETRY_BACKOFF_MS: parseInt(process.env['ADAPTER_EVENT_BACKOFF'] || '100', 10),
 
     /** Circuit breaker: threshold de falhas - Default: 5 */
-    CIRCUIT_BREAKER_THRESHOLD: parseInt(process.env.ADAPTER_CIRCUIT_THRESHOLD || '5', 10),
+    CIRCUIT_BREAKER_THRESHOLD: parseInt(process.env['ADAPTER_CIRCUIT_THRESHOLD'] || '5', 10),
 
     /** Circuit breaker: timeout para HALF_OPEN (ms) - Default: 1 minuto */
-    CIRCUIT_BREAKER_TIMEOUT_MS: parseInt(process.env.ADAPTER_CIRCUIT_TIMEOUT || '60000', 10),
+    CIRCUIT_BREAKER_TIMEOUT_MS: parseInt(process.env['ADAPTER_CIRCUIT_TIMEOUT'] || '60000', 10),
 
     // ✅ U5: Smart Retry Configuration
     /** Máximo de retries para tasks - Default: 3 */
-    MAX_RETRY_ATTEMPTS: parseInt(process.env.ADAPTER_MAX_RETRIES || '3', 10),
+    MAX_RETRY_ATTEMPTS: parseInt(process.env['ADAPTER_MAX_RETRIES'] || '3', 10),
 
     /** Backoff inicial para retry (ms) - Default: 1000ms (1s → 2s → 4s) */
-    RETRY_BACKOFF_MS: parseInt(process.env.ADAPTER_RETRY_BACKOFF || '1000', 10),
+    RETRY_BACKOFF_MS: parseInt(process.env['ADAPTER_RETRY_BACKOFF'] || '1000', 10),
 
     /** Heartbeat interval (ms) - Default: 10s */
-    TASK_HEARTBEAT_INTERVAL_MS: parseInt(process.env.ADAPTER_TASK_HEARTBEAT_INTERVAL_MS || '10000', 10),
+    TASK_HEARTBEAT_INTERVAL_MS: parseInt(process.env['ADAPTER_TASK_HEARTBEAT_INTERVAL_MS'] || '10000', 10),
 
     /** Max HTML bytes to store in diagnostic artifact (default: 1MB) */
-    DIAGNOSTIC_HTML_MAX_BYTES: parseInt(process.env.ADAPTER_DIAGNOSTIC_HTML_MAX_BYTES || '1000000', 10),
+    DIAGNOSTIC_HTML_MAX_BYTES: parseInt(process.env['ADAPTER_DIAGNOSTIC_HTML_MAX_BYTES'] || '1000000', 10),
 };
 
 // ============================================================================
@@ -999,10 +999,10 @@ class DriverNERVAdapter extends EventEmitter {
     }
 
     /**
-     * @param {any} payload
+     * @param {unknown} _payload
      * @param {any} [correlationId]
      */
-    async _performHealthCheck(payload, correlationId) {
+    async _performHealthCheck(_payload, correlationId) {
         let browserPoolHealth;
         let healthStatus = STATUS_VALUES.HEALTHY;
 
@@ -1463,9 +1463,9 @@ class DriverNERVAdapter extends EventEmitter {
                 ext: 'png',
                 mime: 'image/png',
             });
-            storage.screenshot_file = stored.storageUri;
+            storage['screenshot_file'] = stored.storageUri;
         } catch (/** @type {any} */ _) {
-            storage.screenshot_file = null;
+            storage['screenshot_file'] = null;
         }
 
         // HTML (best-effort, truncated)
@@ -1480,9 +1480,9 @@ class DriverNERVAdapter extends EventEmitter {
                 ext: 'html',
                 mime: 'text/html',
             });
-            storage.html_file = stored.storageUri;
+            storage['html_file'] = stored.storageUri;
         } catch (/** @type {any} */ _) {
-            storage.html_file = null;
+            storage['html_file'] = null;
         }
 
         const meta = {
@@ -1512,9 +1512,9 @@ class DriverNERVAdapter extends EventEmitter {
                 relPath: `${base}/meta.json`,
                 mime: 'application/json',
             });
-            storage.meta_json_file = stored.storageUri;
+            storage['meta_json_file'] = stored.storageUri;
         } catch (/** @type {any} */ _) {
-            storage.meta_json_file = null;
+            storage['meta_json_file'] = null;
         }
 
         const summary = {
@@ -1810,7 +1810,7 @@ class DriverNERVAdapter extends EventEmitter {
      * @param {any[]} listeners
      */
     async _finallyCleanup(taskId, page, driver, listeners) {
-        const hotPoolEnabled = String(process.env.DRIVER_HOT_POOL_ENABLED ?? 'true').toLowerCase() !== 'false';
+        const hotPoolEnabled = String(process.env['DRIVER_HOT_POOL_ENABLED'] ?? 'true').toLowerCase() !== 'false';
         const isHotPath = Boolean(hotPoolEnabled && this.browserPool && driver && driver._isHot);
         const withTimeout =
             typeof this._withTimeout === 'function'

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildAiArtifactsReport, cleanupAiArtifacts } from '../../../../src/copilot/mcp/control-plane/ai-artifacts.js';
 
+/** @type {string[]} */
 const roots = [];
 
 afterEach(async () => {

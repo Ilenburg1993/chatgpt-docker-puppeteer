@@ -7,8 +7,8 @@ const CONFIG_FILES = {
     'config.json': {
         required: true,
         schema: {
-            BROWSER_MODE: ['launcher', 'remote'],
-            CYCLE_DELAY: { type: 'number', min: 100 },
+            BROWSER_MODE: ['launcher', 'connect', 'wsEndpoint', 'executablePath', 'auto', 'external'],
+            CYCLE_DELAY: { type: 'number', min: 0, optional: true },
             allowedDomains: { type: 'array' },
         },
     },
@@ -136,6 +136,9 @@ class ConfigValidator {
         if (spec.schema) {
             for (const [key, constraint] of Object.entries(spec.schema)) {
                 if (!(key in data)) {
+                    if (typeof constraint === 'object' && constraint.optional === true) {
+                        continue;
+                    }
                     this.errors.push(`Missing key "${key}" in ${filename}`);
                     continue;
                 }
@@ -182,7 +185,7 @@ class ConfigValidator {
      * ou inválidas.
      */
     validateEnvironment() {
-        const env = process.env.NODE_ENV || 'development';
+        const env = process.env['NODE_ENV'] || 'development';
         const required = /** @type {any} */ (REQUIRED_ENV_VARS)[env] || [];
 
         this.log('INFO', `Validating environment variables for: ${env}`);
@@ -196,15 +199,15 @@ class ConfigValidator {
         }
 
         // Validate PORT is a number
-        if (process.env.PORT && isNaN(parseInt(process.env.PORT, 10))) {
+        if (process.env['PORT'] && isNaN(parseInt(process.env['PORT'], 10))) {
             this.errors.push('PORT must be a valid number');
         }
 
         // Validate CHROME_WS_ENDPOINT format
-        if (process.env.CHROME_WS_ENDPOINT) {
+        if (process.env['CHROME_WS_ENDPOINT']) {
             if (
-                !process.env.CHROME_WS_ENDPOINT.startsWith('ws://') &&
-                !process.env.CHROME_WS_ENDPOINT.startsWith('wss://')
+                !process.env['CHROME_WS_ENDPOINT'].startsWith('ws://') &&
+                !process.env['CHROME_WS_ENDPOINT'].startsWith('wss://')
             ) {
                 this.errors.push('CHROME_WS_ENDPOINT must start with ws:// or wss://');
             }

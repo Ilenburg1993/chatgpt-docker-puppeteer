@@ -26,7 +26,7 @@ function stringList(value) {
 }
 
 /**
- * @param {Record<string, any>} decision
+ * @param {Record<string, unknown>} decision
  * @returns {string}
  */
 function decisionKey(decision) {
@@ -110,7 +110,7 @@ function actionableContext(hardExclusions, softPenalties) {
 }
 
 /**
- * @param {Record<string, any>} decision
+ * @param {Record<string, unknown>} decision
  * @returns {{
  *   key: string;
  *   include: boolean;

@@ -60,7 +60,7 @@ function isDirectEntryExecution(importMetaUrl, argvFile = process.argv[1]) {
 function isPm2ExecPathMatch(importMetaUrl, env = process.env) {
     const entryFile = resolveEntrypointFile(importMetaUrl);
     if (!entryFile) return false;
-    const pmExecPath = normalizePath(env.pm_exec_path || env.PM2_EXEC_PATH || '');
+    const pmExecPath = normalizePath(env['pm_exec_path'] || env['PM2_EXEC_PATH'] || '');
     if (!pmExecPath) return false;
     return pmExecPath === entryFile;
 }

@@ -85,7 +85,7 @@ function createMockObservability() {
  * @returns {any}
  */
 function routeDeps(overrides = {}) {
-    const agent = overrides.agent ?? createMockAgent();
+    const agent = overrides['agent'] ?? createMockAgent();
     return {
         sdkSystemPrompt: {
             readAgentSdkSystemPromptProjection: async () => ({

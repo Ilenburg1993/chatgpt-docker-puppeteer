@@ -51,8 +51,8 @@ function now() {
 /**
  * @typedef {object} CreateReconnectDeps
  * @property {any} telemetry
- * @property {function(): void} start
- * @property {function(): void} stop
+ * @property {() => void} start
+ * @property {() => void} stop
  * @property {any} [policy]
  */
 /**

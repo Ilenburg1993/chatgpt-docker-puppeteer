@@ -39,31 +39,27 @@ export const todoListTool = withSkipPermission(
         parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
             /** @type {unknown} */ (
                 z.object({
-                    status: zStatus.optional().describe('Filtrar por status específico'),
-                    priority: zPriority.optional().describe('Filtrar por prioridade específica'),
-                    tag: z.string().optional().describe('Filtrar tarefas que contenham esta tag'),
+                    status: zStatus.optional()['describe']('Filtrar por status específico'),
+                    priority: zPriority.optional()['describe']('Filtrar por prioridade específica'),
+                    tag: z.string().optional()['describe']('Filtrar tarefas que contenham esta tag'),
                     parent_id: z
                         .string()
                         .nullable()
-                        .optional()
-                        .describe('null = apenas raiz; string = subtarefas deste pai; omitido = todas'),
+                        .optional()['describe']('null = apenas raiz; string = subtarefas deste pai; omitido = todas'),
                     text: z
                         .string()
-                        .optional()
-                        .describe('Busca de texto em título, descrição e notas (case-insensitive)'),
-                    overdue_only: z.boolean().optional().describe('Se true, retorna apenas tarefas vencidas'),
+                        .optional()['describe']('Busca de texto em título, descrição e notas (case-insensitive)'),
+                    overdue_only: z.boolean().optional()['describe']('Se true, retorna apenas tarefas vencidas'),
                     limit: z
                         .number()
                         .int()
                         .min(1)
-                        .optional()
-                        .describe('Quantidade sugerida de resultados; omitido retorna todos.'),
+                        .optional()['describe']('Quantidade sugerida de resultados; omitido retorna todos.'),
                     offset: z
                         .number()
                         .int()
                         .min(0)
-                        .optional()
-                        .describe('Offset de paginação para avançar na lista de resultados.'),
+                        .optional()['describe']('Offset de paginação para avançar na lista de resultados.'),
                 })
             )
         ),
@@ -128,17 +124,15 @@ export const todoSearchTool = withSkipPermission(
                 z.object({
                     query: z
                         .string()
-                        .min(1)
-                        .describe('Texto de busca. Múltiplos termos separados por espaço (AND implícito)'),
-                    status: zStatus.optional().describe('Filtrar por status após a busca'),
-                    priority: zPriority.optional().describe('Filtrar por prioridade após a busca'),
+                        .min(1)['describe']('Texto de busca. Múltiplos termos separados por espaço (AND implícito)'),
+                    status: zStatus.optional()['describe']('Filtrar por status após a busca'),
+                    priority: zPriority.optional()['describe']('Filtrar por prioridade após a busca'),
                     limit: z
                         .number()
                         .int()
                         .min(1)
-                        .optional()
-                        .describe('Quantidade sugerida de resultados; omitido retorna todos.'),
-                    offset: z.number().int().min(0).optional().describe('Offset de paginação para avançar na busca.'),
+                        .optional()['describe']('Quantidade sugerida de resultados; omitido retorna todos.'),
+                    offset: z.number().int().min(0).optional()['describe']('Offset de paginação para avançar na busca.'),
                 })
             )
         ),
@@ -212,13 +206,11 @@ export const todoStatsTool = withSkipPermission(
             include_recent: z
                 .boolean()
                 .optional()
-                .default(true)
-                .describe('Se true, inclui lista das 5 tarefas mais recentes'),
+                .default(true)['describe']('Se true, inclui lista das 5 tarefas mais recentes'),
             include_top_priority: z
                 .boolean()
                 .optional()
-                .default(true)
-                .describe('Se true, inclui lista das 5 tarefas de maior prioridade pendentes'),
+                .default(true)['describe']('Se true, inclui lista das 5 tarefas de maior prioridade pendentes'),
         }),
         handler: async (/** @type {{ include_recent?: boolean; include_top_priority?: boolean }} */ args) => {
             const store = await readStore();

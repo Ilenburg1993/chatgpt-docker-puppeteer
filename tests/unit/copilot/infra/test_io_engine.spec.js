@@ -202,7 +202,7 @@ describe('infra/io-engine', () => {
                 io: expect.any(Object),
             }),
         );
-        expect(writeResult.io.advisoryLimits?.durability).toEqual(writeResult.durability);
+        expect(writeResult.io.advisoryLimits?.['durability']).toEqual(writeResult.durability);
     });
 
     it.skipIf(process.platform === 'win32')('preserva permissões POSIX existentes quando atomic replace não recebe mode explícito', async () => {
@@ -275,7 +275,7 @@ describe('infra/io-engine', () => {
 
         expect(result.created).toBe(false);
         expect(result.createdPath).toBeUndefined();
-        expect(result.io.advisoryLimits?.created).toBe(false);
+        expect(result.io.advisoryLimits?.['created']).toBe(false);
     });
 
     it('removePathLocked exige confirmação exata antes de remoção recursiva', async () => {
@@ -293,7 +293,7 @@ describe('infra/io-engine', () => {
         await expect(readFile(join(target, 'nested', 'keep.txt'), 'utf8')).resolves.toBe('keep');
 
         const result = await removePathLocked(target, { recursive: true, force: true, recursiveConfirmation: target });
-        expect(result.io.advisoryLimits?.recursiveConfirmed).toBe(true);
+        expect(result.io.advisoryLimits?.['recursiveConfirmed']).toBe(true);
         await expect(stat(target)).rejects.toMatchObject({ code: 'ENOENT' });
     });
 
@@ -416,7 +416,7 @@ describe('infra/io-engine', () => {
         expect(result.fileTotalLines).toBe(5);
         expect(result.cacheFingerprintStrategy).toBe('byte-line-index');
         expect(result.io.engine).toBe('io-engine.fs.createReadStream.textChunks.byteSeek');
-        expect(result.io.advisoryLimits?.limitMode).toBe('informative');
+        expect(result.io.advisoryLimits?.['limitMode']).toBe('informative');
     });
 
     it('readTextChunks usa byte seek com UTF-8 multibyte sem cortar caracteres', async () => {
@@ -488,9 +488,9 @@ describe('infra/io-engine', () => {
         expect(result.destinationPreviousSnapshotTruncated).toBe(false);
         expect(result.fileSync).toMatchObject({ attempted: true, ok: true });
         expect(result.destinationDirectorySync).toMatchObject({ attempted: true, ok: true });
-        expect(result.io.advisoryLimits?.fileSync).toEqual(result.fileSync);
-        expect(result.io.advisoryLimits?.destinationDirectorySync).toEqual(result.destinationDirectorySync);
-        expect(result.io.advisoryLimits?.capacityPreflight).toEqual(result.capacityPreflight);
+        expect(result.io.advisoryLimits?.['fileSync']).toEqual(result.fileSync);
+        expect(result.io.advisoryLimits?.['destinationDirectorySync']).toEqual(result.destinationDirectorySync);
+        expect(result.io.advisoryLimits?.['capacityPreflight']).toEqual(result.capacityPreflight);
         await expect(readFile(destination, 'utf8')).resolves.toBe('source-content');
     });
 
@@ -774,7 +774,7 @@ describe('infra/io-engine', () => {
         expect(result.destinationDirectorySync).toMatchObject({ attempted: true, ok: true });
         expect(result.sourceDirectorySync).toBeNull();
         expect(result.capacityPreflight).toBeNull();
-        expect(result.io.advisoryLimits?.destinationDirectorySync).toEqual(result.destinationDirectorySync);
+        expect(result.io.advisoryLimits?.['destinationDirectorySync']).toEqual(result.destinationDirectorySync);
         await expect(readFile(destination, 'utf8')).resolves.toBe('incoming');
         await expect(readFile(source, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });

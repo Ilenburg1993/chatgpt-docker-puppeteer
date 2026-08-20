@@ -45,18 +45,18 @@ describe('AdaptiveThrottler', () => {
 
     it('builds throttler from environment knobs', () => {
         const prev = {
-            enabled: process.env.RAG_THROTTLE_ENABLED,
-            metric: process.env.RAG_THROTTLE_METRIC,
-            target: process.env.RAG_THROTTLE_TARGET_CPU,
-            minDelay: process.env.RAG_THROTTLE_MIN_DELAY_MS,
-            maxDelay: process.env.RAG_THROTTLE_MAX_DELAY_MS,
+            enabled: process.env['RAG_THROTTLE_ENABLED'],
+            metric: process.env['RAG_THROTTLE_METRIC'],
+            target: process.env['RAG_THROTTLE_TARGET_CPU'],
+            minDelay: process.env['RAG_THROTTLE_MIN_DELAY_MS'],
+            maxDelay: process.env['RAG_THROTTLE_MAX_DELAY_MS'],
         };
         try {
-            process.env.RAG_THROTTLE_ENABLED = 'true';
-            process.env.RAG_THROTTLE_METRIC = 'system';
-            process.env.RAG_THROTTLE_TARGET_CPU = '68';
-            process.env.RAG_THROTTLE_MIN_DELAY_MS = '45';
-            process.env.RAG_THROTTLE_MAX_DELAY_MS = '3500';
+            process.env['RAG_THROTTLE_ENABLED'] = 'true';
+            process.env['RAG_THROTTLE_METRIC'] = 'system';
+            process.env['RAG_THROTTLE_TARGET_CPU'] = '68';
+            process.env['RAG_THROTTLE_MIN_DELAY_MS'] = '45';
+            process.env['RAG_THROTTLE_MAX_DELAY_MS'] = '3500';
 
             const throttler = createRagAdaptiveThrottler({ mode: 'incremental' });
             const stats = throttler.getStats();
@@ -67,16 +67,16 @@ describe('AdaptiveThrottler', () => {
             assert.strictEqual(stats.minDelay, 45);
             assert.strictEqual(stats.maxDelay, 3500);
         } finally {
-            if (prev.enabled === undefined) delete process.env.RAG_THROTTLE_ENABLED;
-            else process.env.RAG_THROTTLE_ENABLED = prev.enabled;
-            if (prev.metric === undefined) delete process.env.RAG_THROTTLE_METRIC;
-            else process.env.RAG_THROTTLE_METRIC = prev.metric;
-            if (prev.target === undefined) delete process.env.RAG_THROTTLE_TARGET_CPU;
-            else process.env.RAG_THROTTLE_TARGET_CPU = prev.target;
-            if (prev.minDelay === undefined) delete process.env.RAG_THROTTLE_MIN_DELAY_MS;
-            else process.env.RAG_THROTTLE_MIN_DELAY_MS = prev.minDelay;
-            if (prev.maxDelay === undefined) delete process.env.RAG_THROTTLE_MAX_DELAY_MS;
-            else process.env.RAG_THROTTLE_MAX_DELAY_MS = prev.maxDelay;
+            if (prev.enabled === undefined) delete process.env['RAG_THROTTLE_ENABLED'];
+            else process.env['RAG_THROTTLE_ENABLED'] = prev.enabled;
+            if (prev.metric === undefined) delete process.env['RAG_THROTTLE_METRIC'];
+            else process.env['RAG_THROTTLE_METRIC'] = prev.metric;
+            if (prev.target === undefined) delete process.env['RAG_THROTTLE_TARGET_CPU'];
+            else process.env['RAG_THROTTLE_TARGET_CPU'] = prev.target;
+            if (prev.minDelay === undefined) delete process.env['RAG_THROTTLE_MIN_DELAY_MS'];
+            else process.env['RAG_THROTTLE_MIN_DELAY_MS'] = prev.minDelay;
+            if (prev.maxDelay === undefined) delete process.env['RAG_THROTTLE_MAX_DELAY_MS'];
+            else process.env['RAG_THROTTLE_MAX_DELAY_MS'] = prev.maxDelay;
         }
     });
 });

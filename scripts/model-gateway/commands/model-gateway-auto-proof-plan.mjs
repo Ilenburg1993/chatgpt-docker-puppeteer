@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
-import { buildModelGatewayRuntimeProofCommands } from '#copilot/model-gateway';
+import { buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeSelectorPlan } from '#copilot/model-gateway';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader, readPositiveIntArg } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -17,22 +20,16 @@ terminal. It converts blocked runtime-selector alternatives into explicit /byok 
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 function readPositiveInt(name, fallback) {
-    const value = Number.parseInt(readArg(name), 10);
-    return Number.isFinite(value) && value > 0 ? value : fallback;
+    return readPositiveIntArg(readArg, name, fallback);
 }
 
-function runtimeSelectorArgs(profile) {
+function runtimeSelectorArgs(/** @type {string} */ profile) {
     const forwarded = ['--json', `--profile=${profile}`];
     for (const flag of [
         '--fallback-profiles',
@@ -47,7 +44,8 @@ function runtimeSelectorArgs(profile) {
     return forwarded;
 }
 
-function readRuntimeSelectorPlan(profile) {
+/** @returns {{ ok?: boolean; runtimeSelectorPlan?: ReturnType<typeof buildModelGatewayRuntimeSelectorPlan> }} */
+function readRuntimeSelectorPlan(/** @type {string} */ profile) {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS.runtimeSelector, ...runtimeSelectorArgs(profile)], {
         cwd: REPO_ROOT,
         encoding: 'utf8',

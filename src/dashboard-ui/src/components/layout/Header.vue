@@ -1,11 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { useUiPreferences } from '@/composables/useUiPreferences';
 import { Bell, LogIn, LogOut, Menu, Search, User } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 import { useAuth } from '../../composables/useAuth.js';
 import LoginModal from '../auth/LoginModal.vue';
 
-const emit = defineEmits(['toggleSidebar']);
+const emit = defineEmits<{ toggleSidebar: [] }>();
 
 const searchQuery = ref('');
 const notifications = ref(3);
@@ -28,6 +28,10 @@ const handleLogoutClick = async () => {
 
 const handleLoginSuccess = () => {
     showLoginModal.value = false;
+};
+
+const handlePresetChange = (event: Event) => {
+    setPreset((event.target as HTMLSelectElement).value);
 };
 
 onMounted(() => {
@@ -80,7 +84,7 @@ onMounted(() => {
                 <span class="text-xs text-slate-400">Preset</span>
                 <select
                     :value="preset"
-                    @change="setPreset($event.target.value)"
+                    @change="handlePresetChange"
                     class="px-2 py-1.5 text-xs rounded-lg bg-slate-800/70 border border-slate-700/60 text-slate-200"
                 >
                     <option value="dense">dense</option>

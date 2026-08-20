@@ -52,7 +52,7 @@ function criarBrowserMock() {
         close: sinon.stub().resolves(),
         isConnected: sinon.stub().returns(true),
         version: sinon.stub().resolves('Chrome/120.0.0.0'),
-        wsEndpoint: sinon.stub().returns(`ws://localhost:${process.env.CHROME_PROXY_PORT || 9224}`),
+        wsEndpoint: sinon.stub().returns(`ws://localhost:${process.env['CHROME_PROXY_PORT'] || 9224}`),
 
         // Referência à página para asserções
         _pagina: pagina,
@@ -60,10 +60,10 @@ function criarBrowserMock() {
         // Helpers
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            self.newPage.resetHistory();
-            self.pages.resetHistory();
-            self.close.resetHistory();
-            self._pagina.limpar();
+            self['newPage'].resetHistory();
+            self['pages'].resetHistory();
+            self['close'].resetHistory();
+            self['_pagina'].limpar();
         },
     };
 }
@@ -92,10 +92,10 @@ function criarBrowserPoolMock() {
         // Helpers
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            self.acquire.resetHistory();
-            self.release.resetHistory();
-            self.closeAll.resetHistory();
-            self._browser.limpar();
+            self['acquire'].resetHistory();
+            self['release'].resetHistory();
+            self['closeAll'].resetHistory();
+            self['_browser'].limpar();
         },
     };
 }
@@ -114,8 +114,8 @@ function criarConnectionOrchestratorMock() {
 
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            self.connect.resetHistory();
-            self.disconnect.resetHistory();
+            self['connect'].resetHistory();
+            self['disconnect'].resetHistory();
         },
     };
 }

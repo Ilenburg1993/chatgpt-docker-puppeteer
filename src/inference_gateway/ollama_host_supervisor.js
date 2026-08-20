@@ -63,19 +63,19 @@ export class OllamaHostSupervisor {
     constructor(options = {}) {
         this.baseUrl =
             options.baseUrl ||
-            process.env.OLLAMA_LOCAL_BASE_URL ||
-            process.env.OLLAMA_BASE_URL ||
+            process.env['OLLAMA_LOCAL_BASE_URL'] ||
+            process.env['OLLAMA_BASE_URL'] ||
             'http://host.docker.internal:11434';
         this.fetch = options.fetch || globalThis.fetch;
-        this.pollMs = parseIntPos(options.pollMs ?? process.env.OLLAMA_HEALTH_POLL_MS, 5000);
-        this.requestTimeoutMs = parseIntPos(options.requestTimeoutMs ?? process.env.OLLAMA_HEALTH_TIMEOUT, 5000);
-        this.circuitEnabled = parseBool(options.circuitEnabled ?? process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED, true);
+        this.pollMs = parseIntPos(options.pollMs ?? process.env['OLLAMA_HEALTH_POLL_MS'], 5000);
+        this.requestTimeoutMs = parseIntPos(options.requestTimeoutMs ?? process.env['OLLAMA_HEALTH_TIMEOUT'], 5000);
+        this.circuitEnabled = parseBool(options.circuitEnabled ?? process.env['OLLAMA_CIRCUIT_BREAKER_ENABLED'], true);
         this.circuitThreshold = parseIntPos(
-            options.circuitThreshold ?? process.env.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD,
+            options.circuitThreshold ?? process.env['OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD'],
             5,
         );
         this.circuitTimeoutMs = parseIntPos(
-            options.circuitTimeoutMs ?? process.env.OLLAMA_CIRCUIT_BREAKER_TIMEOUT,
+            options.circuitTimeoutMs ?? process.env['OLLAMA_CIRCUIT_BREAKER_TIMEOUT'],
             60000,
         );
         this.retryEnabled = parseBool(options.retryEnabled, true);

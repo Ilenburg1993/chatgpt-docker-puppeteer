@@ -5,11 +5,30 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
+import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
 import { probeJsonWithRetry, readSmokeBearerToken } from '#copilot/mcp/cloudflare/cli-probe.js';
 import { runCloudflareSmoke } from '#copilot/mcp/cloudflare/cli-smoke.js';
 
 /** @type {http.Server[]} */
 const servers = [];
+
+/**
+ * @param {string} publicMcpUrl
+ * @param {string} [smokeStateFile='/tmp/cloudflare-smoke-test.json']
+ * @returns {ReturnType<typeof readCloudflareTunnelConfig>}
+ */
+function smokeConfig(publicMcpUrl, smokeStateFile = '/tmp/cloudflare-smoke-test.json') {
+    return readCloudflareTunnelConfig({
+        COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
+        COPILOT_MCP_CLOUDFLARE_ZONE: 'example.com',
+        COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME: 'mcp.example.com',
+        COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: 'https://mcp.example.com/mcp',
+        COPILOT_MCP_ORIGIN_TRANSPORT: 'http',
+        COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'http://127.0.0.1:3008',
+        COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE: smokeStateFile,
+        COPILOT_MCP_SMOKE_URL: publicMcpUrl,
+    });
+}
 
 afterEach(async () => {
     await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
@@ -30,7 +49,7 @@ describe('Cloudflare CLI probe retry', () => {
             response.end(JSON.stringify({ ok: true, path: request.url }));
         });
         servers.push(server);
-        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(undefined)));
         const address = server.address();
         assert.ok(address && typeof address === 'object');
 
@@ -54,7 +73,7 @@ describe('Cloudflare CLI probe retry', () => {
     it('fails authenticated smoke before network access when the bearer token is missing', async () => {
         await assert.rejects(
             runCloudflareSmoke({
-                config: /** @type {any} */ ({ publicMcpUrl: 'https://example.invalid/mcp' }),
+                config: smokeConfig('https://example.invalid/mcp'),
                 authenticated: true,
                 env: {},
             }),
@@ -96,13 +115,13 @@ describe('Cloudflare CLI probe retry', () => {
             }, 60);
         });
         servers.push(server);
-        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(undefined)));
         const address = server.address();
         assert.ok(address && typeof address === 'object');
         baseUrl = `http://127.0.0.1:${address.port}`;
 
         const report = await runCloudflareSmoke({
-            config: /** @type {any} */ ({ publicMcpUrl: `${baseUrl}/mcp`, smokeStateFile: '/definitely/not/writable/smoke.json' }),
+            config: smokeConfig(`${baseUrl}/mcp`, '/definitely/not/writable/smoke.json'),
             authenticated: false,
             env: {
                 COPILOT_MCP_PUBLIC_URL: `${baseUrl}/mcp`,
@@ -113,14 +132,14 @@ describe('Cloudflare CLI probe retry', () => {
             },
         });
 
-        assert.equal(report.ok, true);
+        assert.equal(report['ok'], true);
         assert.ok(maxActiveRequests >= 3, `expected >=3 concurrent requests, observed ${maxActiveRequests}`);
-        assert.deepEqual(report.timings, {
+        assert.deepEqual(report['timings'], {
             strategy: 'parallel-health-resource-tools-then-auth-metadata',
-            discoveryParallelMs: report.timings.discoveryParallelMs,
-            authorizationServerMs: report.timings.authorizationServerMs,
-            totalMs: report.timings.totalMs,
+            discoveryParallelMs: report['timings'].discoveryParallelMs,
+            authorizationServerMs: report['timings'].authorizationServerMs,
+            totalMs: report['timings'].totalMs,
         });
-        assert.equal(typeof report.timings.totalMs, 'number');
+        assert.equal(typeof report['timings'].totalMs, 'number');
     });
 });

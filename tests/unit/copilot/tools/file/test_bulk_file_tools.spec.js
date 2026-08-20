@@ -7,6 +7,7 @@ import { describe, it } from 'vitest';
 
 import { readFilesBatchTool } from '../../../../../src/copilot/tools/file/read/index.js';
 import { patchFilesBatchTool } from '../../../../../src/copilot/tools/file/write/index.js';
+import { isToolExecutionFailureResponse } from '../../../../../src/copilot/tools/infra/tool-feedback.js';
 import {
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
@@ -20,7 +21,7 @@ async function createFixture() {
     return mkdtemp(join(jobsDir, 'local-bulk-tools-'));
 }
 
-function relativePath(path) {
+function relativePath(/** @type {string} */ path) {
     return relative(process.cwd(), path).replaceAll('\\', '/');
 }
 
@@ -42,16 +43,19 @@ describe('local LLM-B bulk file tools', () => {
                 concurrency: 3,
             });
 
+            assert.ok(!isToolExecutionFailureResponse(result));
             assert.equal(result.success, false);
             assert.equal(result.requestCount, 3);
             assert.equal(result.succeededCount, 2);
             assert.equal(result.failedCount, 1);
             assert.equal(result.skippedCount, 0);
-            assert.equal(result.results[0]?.success, true);
-            assert.match(String(result.results[0]?.content ?? ''), /alpha/u);
+            const first = result.results[0];
+            assert.ok(first && first.success === true && 'content' in first);
+            assert.match(String(first.content ?? ''), /alpha/u);
             assert.equal(result.results[1]?.success, false);
-            assert.equal(result.results[2]?.success, true);
-            assert.match(String(result.results[2]?.content ?? ''), /two/u);
+            const third = result.results[2];
+            assert.ok(third && third.success === true && 'content' in third);
+            assert.match(String(third.content ?? ''), /two/u);
             const readStats = getValidatedReadWorkspacePathStats();
             assert.equal(readStats.issued, 3);
             assert.equal(readStats.accepted, 3);
@@ -74,6 +78,7 @@ describe('local LLM-B bulk file tools', () => {
                 failureMode: 'best-effort',
                 targetConcurrency: 1,
             });
+            assert.ok(!isToolExecutionFailureResponse(result));
             assert.equal(result.success, true);
             const stats = getValidatedMutableWorkspacePathStats();
             assert.equal(stats.issued, 1);
@@ -102,6 +107,7 @@ describe('local LLM-B bulk file tools', () => {
                 failureMode: 'best-effort',
                 targetConcurrency: 2,
             });
+            assert.ok(!isToolExecutionFailureResponse(sameTargetFailure));
             assert.equal(sameTargetFailure.success, false);
             assert.equal(await readFile(a, 'utf8'), 'alpha\nomega\n');
 
@@ -114,6 +120,7 @@ describe('local LLM-B bulk file tools', () => {
                 failureMode: 'best-effort',
                 targetConcurrency: 2,
             });
+            assert.ok(!isToolExecutionFailureResponse(crossTargetPartial));
             assert.equal(crossTargetPartial.success, false);
             assert.equal(crossTargetPartial.partial, true);
             assert.equal(crossTargetPartial.succeededCount, 1);

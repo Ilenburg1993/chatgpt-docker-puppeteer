@@ -34,6 +34,17 @@ import { log } from '../logger.js';
  */
 
 /**
+ * Executable local tool. Unlike the SDK's declaration-capable `Tool`, project factories guarantee a handler at runtime.
+ * The wrapper is async even when the source callback is synchronous, so callers have one stable invocation contract.
+ *
+ * @template [TArgs=unknown]
+ * @template [TResult=unknown]
+ * @typedef {Omit<import('@github/copilot-sdk').Tool<TArgs>, 'handler'> & {
+ *   handler: (args: TArgs, invocation?: import('@github/copilot-sdk').ToolInvocation) => Promise<TResult>;
+ * }} ExecutableTool
+ */
+
+/**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
  */
@@ -160,12 +171,12 @@ export { BuiltInTools, ToolSet, convertMcpCallToolResult, defineTool };
 
 /**
  * @template [T=unknown] Default is `unknown`
+ * @template [TResult=unknown] Default is `unknown`
  * @typedef {object} CreateToolOptions
  * @property {string} name - Nome único da ferramenta (snake_case)
  * @property {string} description - Descrição legível para o modelo
  * @property {ToolParameterInput<T>} [parameters] - Zod schema (ZodType/ZodSchema) ou JSON Schema plano
- * @property {import('@github/copilot-sdk').ToolHandler<T>
- *     | ((args: T, invocation?: unknown) => Promise<unknown> | unknown)} handler
+ * @property {(args: T, invocation?: import('@github/copilot-sdk').ToolInvocation) => Promise<TResult> | TResult} handler
  *   - Callback executor
  *
  * @property {boolean} [skipPermission=false] - Pular verificação de permissão (default: false). Default is `false`
@@ -260,7 +271,50 @@ function isPlainRecord(value) {
 }
 
 /**
- * Normaliza `toolTelemetry` para o shape 1.0 do SDK: `Record<string, Record<string, unknown> | undefined>`.
+ * @typedef {import('@github/copilot-sdk/extension').JsonValue} JsonValue
+ */
+
+/**
+ * Converte um valor desconhecido para o subconjunto JSON aceito pelo SDK. Valores não JSON são descartados; objetos
+ * cíclicos e profundidade excessiva também são rejeitados para manter telemetry bounded e deterministicamente
+ * serializável.
+ *
+ * @param {unknown} value
+ * @param {WeakSet<object>} [seen]
+ * @param {number} [depth]
+ * @returns {JsonValue | undefined}
+ */
+function normalizeJsonValue(value, seen = new WeakSet(), depth = 0) {
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+    if (depth >= 32 || typeof value !== 'object') return undefined;
+    if (seen.has(value)) return undefined;
+    seen.add(value);
+    try {
+        if (Array.isArray(value)) {
+            /** @type {JsonValue[]} */
+            const result = [];
+            for (const item of value) {
+                const normalized = normalizeJsonValue(item, seen, depth + 1);
+                if (normalized !== undefined) result.push(normalized);
+            }
+            return result;
+        }
+        if (!isPlainRecord(value)) return undefined;
+        /** @type {{ [key: string]: JsonValue }} */
+        const result = {};
+        for (const [key, item] of Object.entries(value)) {
+            const normalized = normalizeJsonValue(item, seen, depth + 1);
+            if (normalized !== undefined) result[key] = normalized;
+        }
+        return result;
+    } finally {
+        seen.delete(value);
+    }
+}
+
+/**
+ * Normaliza `toolTelemetry` para o shape atual do SDK: `Record<string, Record<string, JsonValue> | undefined>`.
  *
  * @param {unknown} telemetry
  * @returns {import('@github/copilot-sdk').ToolTelemetry | undefined}
@@ -273,8 +327,12 @@ export function normalizeToolTelemetry(telemetry) {
         if (!key) continue;
         if (value === undefined) {
             normalized[key] = undefined;
-        } else if (isPlainRecord(value)) {
-            normalized[key] = { ...value };
+            continue;
+        }
+        if (!isPlainRecord(value)) continue;
+        const jsonValue = normalizeJsonValue(value);
+        if (jsonValue && !Array.isArray(jsonValue) && typeof jsonValue === 'object') {
+            normalized[key] = jsonValue;
         }
     }
     return Object.keys(normalized).length > 0 ? normalized : undefined;
@@ -293,10 +351,11 @@ function isToolResultObject(result) {
 }
 
 /**
+ * @template TResult
  * @param {string} toolName
- * @param {unknown} result
+ * @param {TResult} result
  * @param {number} durationMs
- * @returns {unknown}
+ * @returns {TResult}
  */
 function withSdkToolTelemetry(toolName, result, durationMs) {
     if (!isToolResultObject(result)) return result;
@@ -307,13 +366,13 @@ function withSdkToolTelemetry(toolName, result, durationMs) {
         durationMs,
         resultType: result.resultType,
     };
-    return {
+    return /** @type {TResult} */ ({
         ...result,
         toolTelemetry: {
             ...(existing ?? {}),
             copilot,
         },
-    };
+    });
 }
 
 /**
@@ -362,6 +421,20 @@ function defineToolSafe(name, config) {
 }
 
 /**
+ * @template TArgs
+ * @template TResult
+ * @param {string} name
+ * @param {import('@github/copilot-sdk').Tool<TArgs>} tool
+ * @returns {ExecutableTool<TArgs, TResult>}
+ */
+function requireExecutableTool(name, tool) {
+    if (typeof tool?.handler !== 'function') {
+        throw new TypeError(`[sdk/tools] createTool: SDK returned '${name}' without an executable handler`);
+    }
+    return /** @type {ExecutableTool<TArgs, TResult>} */ (tool);
+}
+
+/**
  * Cria uma Custom Tool via SDK `defineTool`, com logging de invocação e normalização automática de Zod schemas.
  *
  * @example
@@ -378,8 +451,9 @@ function defineToolSafe(name, config) {
  *     ```;
  *
  * @template [T=unknown] Default is `unknown`
- * @param {CreateToolOptions<T>} options
- * @returns {import('@github/copilot-sdk').Tool<T>}
+ * @template [TResult=unknown] Default is `unknown`
+ * @param {CreateToolOptions<T, TResult>} options
+ * @returns {ExecutableTool<T, TResult>}
  */
 export function createTool({
     name,
@@ -398,7 +472,7 @@ export function createTool({
 
     const jsonSchema = normalizeToolParametersSchema(/** @type {ToolParameterInput | undefined} */ (parameters), name);
 
-    /** @type {import('@github/copilot-sdk').ToolHandler<T>} */
+    /** @type {(args: T, invocation?: import('@github/copilot-sdk').ToolInvocation) => Promise<TResult>} */
     const wrappedHandler = async (args, invocation) => {
         log('DEBUG', `[sdk/tools] Invocando '${name}' (session=${invocation?.sessionId ?? 'n/a'})`);
         const startedAt = Date.now();
@@ -406,13 +480,13 @@ export function createTool({
         return withSdkToolTelemetry(name, result, Date.now() - startedAt);
     };
 
-    return defineToolSafe(name, {
+    return requireExecutableTool(name, defineToolSafe(name, {
         description,
         ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
         handler: wrappedHandler,
         skipPermission,
         ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-    });
+    }));
 }
 
 /**
@@ -448,8 +522,9 @@ export function createDeclarationTool({
  * Cria uma tool síncrona (sem async no handler) — variante de conveniência.
  *
  * @template [T=unknown] Default is `unknown`
- * @param {CreateToolOptions<T>} options
- * @returns {import('@github/copilot-sdk').Tool<T>}
+ * @template [TResult=unknown] Default is `unknown`
+ * @param {CreateToolOptions<T, TResult>} options
+ * @returns {ExecutableTool<T, TResult>}
  */
 export function createToolSync({
     name,
@@ -466,7 +541,7 @@ export function createToolSync({
         throw new TypeError('[sdk/tools] createToolSync: handler (function) é obrigatório');
     }
 
-    /** @type {import('@github/copilot-sdk').ToolHandler<T>} */
+    /** @type {(args: T, invocation?: import('@github/copilot-sdk').ToolInvocation) => Promise<TResult>} */
     const wrappedHandler = async (args, invocation) => {
         log('DEBUG', `[sdk/tools] Invocando '${name}' (session=${invocation?.sessionId ?? 'n/a'})`);
         const startedAt = Date.now();
@@ -476,11 +551,11 @@ export function createToolSync({
 
     const jsonSchema = normalizeToolParametersSchema(/** @type {ToolParameterInput | undefined} */ (parameters), name);
 
-    return defineToolSafe(name, {
+    return requireExecutableTool(name, defineToolSafe(name, {
         description,
         ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
         handler: wrappedHandler,
         skipPermission,
         ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-    });
+    }));
 }

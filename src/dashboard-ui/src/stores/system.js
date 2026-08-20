@@ -12,6 +12,15 @@
 import { formatHttpError, http } from '@/lib/http';
 import { defineStore } from 'pinia';
 
+/**
+ * @typedef {object} SystemComponent
+ * @property {string} status
+ * @property {string} message
+ * @property {Record<string, unknown>=} metrics
+ * @property {number=} uptime
+ * @property {string | number=} checked_at
+ */
+
 /** Constante/valor exportado: useSystemStore. */
 export const useSystemStore = defineStore('system', {
     state: () => ({
@@ -19,12 +28,12 @@ export const useSystemStore = defineStore('system', {
         overallStatus: 'unknown', // healthy, warning, critical, error, unknown
 
         // Componentes do sistema
-        components: {
+        components: /** @type {Record<string, SystemComponent>} */ ({
             api: { status: 'unknown', message: '' },
             queue: { status: 'unknown', message: '' },
             memory: { status: 'unknown', message: '' },
             kernel: { status: 'unknown', message: '' },
-        },
+        }),
 
         // Alertas ativos
         alerts: /** @type {any[]} */ ([]),

@@ -145,10 +145,37 @@ function createMockHost() {
  * @typedef {ReturnType<typeof createMockHost>} MockDialogLoopHost
  */
 
+/** @typedef {Awaited<ReturnType<typeof executeTurnImpl>>} DialogTurnSemanticResult */
+
+/**
+ * @param {string} [reply='REPLY: ok']
+ * @param {Partial<DialogTurnSemanticResult>} [overrides]
+ * @returns {DialogTurnSemanticResult}
+ */
+function semanticTurnResult(reply = 'REPLY: ok', overrides = {}) {
+    return {
+        reply,
+        outcome: 'public_reply',
+        replySource: 'loop.reply',
+        diagnostics: {
+            dispatched: true,
+            assistantMessageCount: 1,
+            deltaChars: 0,
+            deltaEligible: false,
+            pendingProtocolKind: null,
+            pendingHumanInput: false,
+            toolSignalCount: 0,
+            lastDeltaSeq: 0,
+            lastToolSignalSeq: 0,
+        },
+        ...overrides,
+    };
+}
+
 describe('DialogLoopManager', () => {
     /** @type {DialogLoopManager} */
     let dlm;
-    /** @type {any} */
+    /** @type {MockDialogLoopHost} */
     let host;
 
     beforeEach(() => {
@@ -159,7 +186,11 @@ describe('DialogLoopManager', () => {
             dialogPaused: false,
             dialogLoopActive: false,
         });
-        vi.mocked(readAgentRuntimeDialogBootstrapState).mockReturnValue({ dialogPaused: false, prMetrics: null });
+        vi.mocked(readAgentRuntimeDialogBootstrapState).mockReturnValue({
+            dialogPaused: false,
+            usageMetrics: { boots: 0, resumesWithAdditionalModelCall: 0, resumesWithoutAdditionalModelCall: 0, totalModelCalls: 0 },
+            prMetrics: null,
+        });
         dlm = new DialogLoopManager({ bootTimeoutMs: 500, watchdogIntervalMs: 60000, watchdogStallMs: 120000 });
         host = createMockHost();
         dlm.attach(host);
@@ -347,7 +378,7 @@ describe('DialogLoopManager', () => {
             host.hasPendingQuestion.mockImplementation(() => pending);
             vi.mocked(executeTurnImpl).mockImplementationOnce(async () => {
                 pending = true;
-                return 'REPLY: ok';
+                return semanticTurnResult();
             });
             mockWaitForAgentSdkEvent.mockResolvedValueOnce({});
             await dlm.start('Hello');
@@ -365,7 +396,7 @@ describe('DialogLoopManager', () => {
             host.hasPendingQuestion.mockImplementation(() => pending);
             vi.mocked(executeTurnImpl).mockImplementationOnce(async () => {
                 pending = false;
-                return 'REPLY: ok';
+                return semanticTurnResult();
             });
             mockWaitForAgentSdkEvent.mockResolvedValueOnce({});
             await dlm.start('Hello');
@@ -387,7 +418,7 @@ describe('DialogLoopManager', () => {
 
         it('sendTurn() rejeita enquanto stop() esta drenando', async () => {
             await dlm.start('Hello');
-            /** @type {(value: string) => void} */
+            /** @type {(value: DialogTurnSemanticResult) => void} */
             let release = () => {};
             vi.mocked(executeTurnImpl).mockImplementationOnce(
                 () =>
@@ -401,7 +432,7 @@ describe('DialogLoopManager', () => {
 
             await expect(dlm.sendTurn('second')).rejects.toThrow(/não está ativo/);
 
-            release('done');
+            release(semanticTurnResult('done'));
             await firstTurn;
             await stopPromise;
         });
@@ -423,7 +454,7 @@ describe('DialogLoopManager', () => {
 
         it('ignora READY durante stop em andamento para não rearmar watchdog nem late recovery', async () => {
             await dlm.start('Hello');
-            /** @type {((v: string) => void) | undefined} */
+            /** @type {((v: DialogTurnSemanticResult) => void) | undefined} */
             let resolveTurn;
             vi.mocked(executeTurnImpl).mockImplementationOnce(
                 () =>
@@ -441,7 +472,7 @@ describe('DialogLoopManager', () => {
             dlm.handleProtocolInput({ question: 'READY: late while stopping' });
 
             expect(readySpy).not.toHaveBeenCalled();
-            resolveTurn?.('REPLY: done');
+            resolveTurn?.(semanticTurnResult('REPLY: done'));
             await turnPromise;
             await stopPromise;
         });

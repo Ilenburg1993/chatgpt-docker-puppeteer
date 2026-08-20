@@ -20,8 +20,6 @@ import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
-import { getCanonicalMcpTools } from '../registry.js';
 
 export const OAUTH_SMOKE_IMPLEMENTATION_NAME = 'copilot-mcp-oauth-smoke';
 export const OAUTH_SMOKE_IMPLEMENTATION_VERSION = '1.3.0';
@@ -66,6 +64,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     runPrivateKeyJwt?: boolean;
  *     runNegativeResourceChecks?: boolean;
  *     verboseTools?: boolean;
+ *     localToolNames?: string[];
  * }} OAuthSmokeOptions
  *
  *
@@ -78,6 +77,7 @@ const CLIENT_ASSERTION_TYPE_JWT_BEARER = 'urn:ietf:params:oauth:client-assertion
  *     runPrivateKeyJwt: boolean;
  *     runNegativeResourceChecks: boolean;
  *     verboseTools: boolean;
+ *     localToolNames: string[];
  * }} OAuthSmokeRuntimeOptions
  *
  *
@@ -387,6 +387,7 @@ function readSmokeRuntimeOptions(options) {
             true,
         ),
         verboseTools: readBooleanOption(options.verboseTools, 'COPILOT_MCP_OAUTH_SMOKE_VERBOSE_TOOLS', false),
+        localToolNames: [...new Set(options.localToolNames ?? [])].sort((left, right) => left.localeCompare(right)),
     };
 }
 
@@ -2095,9 +2096,7 @@ function summarizeSseProbe(probe) {
  */
 function summarizeAuthenticatedToolsList(probe, runtime) {
     const remoteToolNames = extractMcpToolNames(probe.body);
-    const localToolNames = getCanonicalMcpTools()
-        .map((tool) => tool.name)
-        .sort((left, right) => left.localeCompare(right));
+    const localToolNames = runtime.localToolNames;
     const missingLocalTools = localToolNames.filter((toolName) => !remoteToolNames.includes(toolName));
     const unexpectedRemoteTools = remoteToolNames.filter((toolName) => !localToolNames.includes(toolName));
     const toolsMatchLocalRegistry = missingLocalTools.length === 0 && unexpectedRemoteTools.length === 0;
@@ -2365,10 +2364,4 @@ function failure(error, status) {
 function isLoopbackHostname(hostname) {
     const normalized = hostname.toLowerCase().replace(/^\[/u, '').replace(/\]$/u, '').replace(/\.$/u, '');
     return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-    const report = await runMcpOAuthSmoke();
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-    if (!report['ok']) process.exitCode = 1;
 }

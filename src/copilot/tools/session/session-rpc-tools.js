@@ -152,8 +152,7 @@ const sessionModeSetTool = buildTool({
         /** @type {unknown} */ (
             z.object({
                 mode: z
-                    .enum(['interactive', 'plan', 'autopilot'])
-                    .describe('Novo modo: "interactive" | "plan" | "autopilot"'),
+                    .enum(['interactive', 'plan', 'autopilot'])['describe']('Novo modo: "interactive" | "plan" | "autopilot"'),
             })
         )
     ),
@@ -200,7 +199,7 @@ const sessionPlanUpdateTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ content: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                content: z.string().describe('Conteúdo Markdown do plano a ser gravado no plan.md'),
+                content: z.string()['describe']('Conteúdo Markdown do plano a ser gravado no plan.md'),
             })
         )
     ),
@@ -290,7 +289,7 @@ const sessionAgentSelectTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                name: z.string().describe('Nome do agente a selecionar. Use "" para voltar ao agente padrão.'),
+                name: z.string()['describe']('Nome do agente a selecionar. Use "" para voltar ao agente padrão.'),
             })
         )
     ),
@@ -379,15 +378,13 @@ const reloadAgentProcessTool = buildTool({
             z.object({
                 reason: z
                     .string()
-                    .optional()
-                    .describe('Motivo do reload, para logging (padrão: "agent_reload")'),
+                    .optional()['describe']('Motivo do reload, para logging (padrão: "agent_reload")'),
                 delay_ms: z
                     .number()
                     .int()
                     .min(0)
                     .max(5000)
-                    .optional()
-                    .describe('Delay em ms antes de process.exit(0) para garantir entrega da resposta (padrão: 500ms)'),
+                    .optional()['describe']('Delay em ms antes de process.exit(0) para garantir entrega da resposta (padrão: 500ms)'),
             })
         )
     ),

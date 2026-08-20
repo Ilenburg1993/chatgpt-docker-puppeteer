@@ -49,6 +49,7 @@ vi.mock('../../../../../src/copilot/tools/infra/logger.js', () => ({
  *     readFile: import('vitest').Mock;
  *     link: import('vitest').Mock;
  *     open: import('vitest').Mock;
+ *     chmod: import('vitest').Mock;
  * }}
  */
 const fsMock = {
@@ -68,6 +69,7 @@ const fsMock = {
         sync: async () => undefined,
         close: async () => undefined,
     })),
+    chmod: vi.fn(),
 };
 
 vi.mock('node:fs/promises', () => fsMock);
@@ -86,6 +88,7 @@ vi.mock('../../../../../src/copilot/tools/infra/tool-factory.js', () => ({
 
 // crypto mock para atomicWrite
 vi.mock('node:crypto', () => ({
+    hash: vi.fn(() => 'mock-sha256'),
     createHash: vi.fn(() => {
         /** @type {{ update: import('vitest').Mock; digest: import('vitest').Mock }} */
         const hash = {
@@ -157,6 +160,7 @@ beforeEach(() => {
         close: async () => undefined,
     }));
     fsMock.stat.mockResolvedValue(stableStats(0));
+    fsMock.chmod.mockResolvedValue(undefined);
     mocks.streamPayloads.clear();
 });
 
@@ -195,7 +199,7 @@ describe('F35 — write_file_content (F181-F182)', () => {
 
         const result = await handler({ path: 'file.txt', content: 'hello', encoding: 'utf8' });
 
-        expect(result).toMatchObject({ success: true, path: '/workspace/file.txt' });
+        expect(result, JSON.stringify(result)).toMatchObject({ success: true, path: '/workspace/file.txt' });
         expect(result.io?.operation).toBe('write');
         expect(result.operation).toMatchObject({
             operationId: 'op-test-id',

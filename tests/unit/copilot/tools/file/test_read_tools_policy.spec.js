@@ -81,7 +81,7 @@ afterEach(() => {
 
 describe('tools/file policy-driven finite limits', () => {
     it('read_file_content explicita truncamento quando max content bytes é finito', async () => {
-        process.env.COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES = '48';
+        process.env['COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES'] = '48';
         const handler = await loadToolHandler('read_file_content');
 
         const result = await handler({ path: longFile, encoding: 'utf8' });
@@ -94,7 +94,7 @@ describe('tools/file policy-driven finite limits', () => {
     });
 
     it('list_directory aplica limite explícito de entries quando configurado', async () => {
-        process.env.COPILOT_FILE_TOOLS_MAX_LIST_ENTRIES = '2';
+        process.env['COPILOT_FILE_TOOLS_MAX_LIST_ENTRIES'] = '2';
         const handler = await loadToolHandler('list_directory');
 
         const result = await handler({ path: tmpDir, recursive: false, depth: 3, showHidden: false });
@@ -107,7 +107,7 @@ describe('tools/file policy-driven finite limits', () => {
     });
 
     it('diff_files explicita truncamento quando max diff output bytes é finito', async () => {
-        process.env.COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES = '64';
+        process.env['COPILOT_FILE_TOOLS_MAX_DIFF_OUTPUT_BYTES'] = '64';
         const handler = await loadToolHandler('diff_files');
 
         const result = await handler({ path_a: diffFileA, path_b: diffFileB, context_lines: 3 });

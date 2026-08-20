@@ -29,11 +29,6 @@ const requiredCanonicalDocs = [
     'DOCUMENTAÇÃO/PLANOS/TYPING_CANON_LIFECYCLE.md',
 ];
 
-const _requiredReferenceSkills = new Set([
-    '.github/skills/typing-node24-esm-tsserver',
-    '.github/skills/schema-contract-governance',
-]);
-
 const requiredCodexStubs = [
     '.codex/skills/jsdoc-authoring/SKILL.md',
     '.codex/skills/typescript-typing/SKILL.md',

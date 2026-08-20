@@ -158,7 +158,7 @@ function validatePorts() {
 async function runValidations() {
     // Detecta ambiente baseado em NODE_ENV ou presença de dist/main.js
     const hasDistBuild = existsSync(join(projectRoot, 'dist/main.js'));
-    const isProduction = process.env.NODE_ENV === 'production' && hasDistBuild;
+    const isProduction = process.env['NODE_ENV'] === 'production' && hasDistBuild;
 
     console.log(`🚀 Validação Pré-Voo - Ambiente ${isProduction ? 'de Produção' : 'de Desenvolvimento'}\n`);
 

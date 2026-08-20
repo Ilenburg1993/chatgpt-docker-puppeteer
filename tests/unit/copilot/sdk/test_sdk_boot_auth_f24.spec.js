@@ -226,6 +226,7 @@ describe('F115 — keepalive usa client.ping() como recurso primário', () => {
         // O MockClient não terá sido chamado ainda (setInterval não dispara em 50ms com intervalMs=9_999_999)
         // Mas a estrutura está correta — o teste verifica compatibilidade de interface
         expect(mockClient.ping).toBeDefined();
+        expect(keepaliveCalledWith).toBeNull();
     });
 });
 

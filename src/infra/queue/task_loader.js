@@ -40,7 +40,7 @@ async function loadNextTask(targetFilter = null) {
         // A. Auto-Cura de Zumbis (Tarefas presas em RUNNING por crash do sistema)
         if (task.state.status === STATUS_VALUES.RUNNING && task.state.started_at) {
             const startedAt = Date.parse(task.state.started_at);
-            const recoveryThreshold = Number(CONFIG.RUNNING_RECOVERY_MS) || 600000; // Default 10min
+            const recoveryThreshold = Number(CONFIG['RUNNING_RECOVERY_MS']) || 600000; // Default 10min
 
             if (!isNaN(startedAt) && now - startedAt > recoveryThreshold) {
                 // Clone-on-Write: Isolamento para não sujar o cache prematuramente

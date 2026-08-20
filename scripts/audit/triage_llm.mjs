@@ -6,10 +6,12 @@ import { rankRootCauses } from './triage/root_cause_ranker.mjs';
 import { buildTestPlan } from './triage/test_planner.mjs';
 
 /**
- * @import {AuditFindingV3} from "./lib/schema.mjs"
+ * @import {AuditFindingV3} from './lib/schema.mjs'
  */
 
-const MCP_URL = process.env.MCP_DIAG_URL ? `${process.env.MCP_DIAG_URL}/api/mcp` : 'http://localhost:3008/api/mcp';
+const MCP_URL = process.env['MCP_DIAG_URL']
+    ? `${process.env['MCP_DIAG_URL']}/api/mcp`
+    : 'http://localhost:3008/api/mcp';
 
 /** @typedef {Record<string, any>} CallMcpParams */
 /**
@@ -326,7 +328,7 @@ export async function triageFindings(findings, options = {}) {
 
                 ragData = ragSearch?.result?.structuredContent?.data || null;
 
-                if (working.file) {
+                if (working.file && String(process.env['LSP_ENABLED'] || 'false').toLowerCase() === 'true') {
                     const lspDiag = await callMcp(
                         'tools/call',
                         {

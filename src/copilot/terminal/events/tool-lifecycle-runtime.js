@@ -682,7 +682,7 @@ function shouldDeferExternalCompletionUntilPostToolUse(presentation, result) {
 /**
  * @param {import('../state/tool-call-registry.js').ToolCallEntry | null | undefined} entry
  * @param {string | null | undefined} toolCallId
- * @param {ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>} registry
+ * @param {ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>} registry
  * @returns {boolean}
  */
 function shouldPrintToolNarration(entry, toolCallId, registry) {
@@ -695,7 +695,7 @@ function shouldPrintToolNarration(entry, toolCallId, registry) {
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: Record<string, unknown>;
  * }} input
  * @returns {void}
@@ -774,7 +774,7 @@ export function handleTerminalNativeToolStart({ registry, evt }) {
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: Record<string, unknown>;
  * }} input
  * @returns {void}
@@ -850,7 +850,7 @@ export function handleTerminalNativeToolProgress({ registry, evt }) {
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: Record<string, unknown>;
  * }} input
  * @returns {void}
@@ -903,7 +903,7 @@ export function handleTerminalNativeToolPartialResult({ registry, evt }) {
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: Record<string, unknown>;
  * }} input
  * @returns {void}
@@ -1068,7 +1068,7 @@ export function handleTerminalToolUserRequested(evt) {
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: { toolName?: string; requestId?: string; toolCallId?: string; data?: Record<string, unknown> };
  *     verboseNarration?: boolean;
  * }} input
@@ -1148,7 +1148,7 @@ export function handleTerminalExternalToolRequested({ registry, evt, verboseNarr
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: {
  *         toolName?: string;
  *         requestId?: string;
@@ -1276,7 +1276,7 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
  * `{ success:false, exitCode:7 }`. A tela humana deve refletir o resultado real da tool.
  *
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     evt: Record<string, unknown>;
  * }} input
  * @returns {void}
@@ -1355,7 +1355,7 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
 
 /**
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry> | null;
  *     entry: import('./io-activity-events.js').TerminalIoActivityEntry;
  *     correlated?: import('../state/tool-call-registry.js').ToolCallEntry | null;
  * }} input
@@ -1378,7 +1378,7 @@ export function handleTerminalIoToolLifecycle({ registry, entry, correlated = nu
  * pode manter `/activity` preso em uma tool fantasma depois de `assistant.turn_end`.
  *
  * @param {{
- *     registry: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>;
+ *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
  *     reason?: string;
  * }} input
  * @returns {number}

@@ -6,13 +6,17 @@ const bridgeMocks = vi.hoisted(() => ({
     formatBranch: vi.fn(() => ''),
     formatLog: vi.fn(() => ''),
     formatStatus: vi.fn(() => ''),
-    gitBranch: vi.fn(async () => []),
+    gitBranch: vi.fn(
+        async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitBranch>>} */ ([]),
+    ),
     gitDiff: vi.fn(async () => ''),
-    gitLog: vi.fn(async () => []),
+    gitLog: vi.fn(async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitLog>>} */ ([])),
     gitPull: vi.fn(async () => ''),
     gitStash: vi.fn(async () => ''),
     gitStashList: vi.fn(async () => ''),
-    gitStatus: vi.fn(async () => []),
+    gitStatus: vi.fn(
+        async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitStatus>>} */ ([]),
+    ),
 }));
 
 vi.mock('#copilot/bridges', () => bridgeMocks);
@@ -86,6 +90,7 @@ describe('terminal/commands/git', () => {
     it('renderiza log e branches sem formatadores ANSI compartilhados', async () => {
         bridgeMocks.gitLog.mockResolvedValueOnce([
             {
+                hash: 'abc1234567890',
                 abbrevHash: 'abc1234',
                 subject: 'Improve terminal UX',
                 authorName: 'Codex',

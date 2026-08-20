@@ -8,6 +8,16 @@ import {
     SqliteModelGatewayCatalogStore,
 } from '../../../../src/copilot/model-gateway/index.js';
 
+/**
+ * @param {Record<string, unknown> | null | undefined} stored
+ * @returns {Record<string, unknown>}
+ */
+function requireStoredOperation(stored) {
+    const operation = stored?.['operation'];
+    expect(operation && typeof operation === 'object' && !Array.isArray(operation)).toBe(true);
+    return /** @type {Record<string, unknown>} */ (operation);
+}
+
 describe('model gateway same-session route switch', () => {
     it('adia reattach durante turno ativo sem chamar a camada de reconnect', async () => {
         const { default: Database } = await import('better-sqlite3');
@@ -51,7 +61,7 @@ describe('model gateway same-session route switch', () => {
                 attempted: false,
                 reason: 'target_route_not_applied',
             });
-            expect(operation.transitions.map((transition) => transition.state)).toEqual([
+            expect(operation.transitions.map((transition) => transition['state'])).toEqual([
                 'planned',
                 'deferred_until_turn_boundary',
             ]);
@@ -60,8 +70,8 @@ describe('model gateway same-session route switch', () => {
             const stored = await store.readSdkSessionHandoffRecord(
                 createModelGatewaySameSessionRouteSwitchOperationId(idempotencyKey),
             );
-            expect(stored?.operation?.state).toBe('deferred_until_turn_boundary');
-            expect(stored?.operation?.deferDetails).toEqual({ dialogLoopActive: true });
+            expect(requireStoredOperation(stored)['state']).toBe('deferred_until_turn_boundary');
+            expect(requireStoredOperation(stored)['deferDetails']).toEqual({ dialogLoopActive: true });
         } finally {
             db.close();
         }
@@ -128,8 +138,8 @@ describe('model gateway same-session route switch', () => {
             const stored = await store.readSdkSessionHandoffRecord(
                 createModelGatewaySameSessionRouteSwitchOperationId(idempotencyKey),
             );
-            expect(stored?.operation?.state).toBe('deferred_until_turn_boundary');
-            expect(stored?.operation?.sessionId).toBe('current-sdk-session');
+            expect(requireStoredOperation(stored)['state']).toBe('deferred_until_turn_boundary');
+            expect(requireStoredOperation(stored)['sessionId']).toBe('current-sdk-session');
         } finally {
             db.close();
         }
@@ -193,7 +203,7 @@ describe('model gateway same-session route switch', () => {
             expect(committed.sessionId).toBe('sdk-session-1');
             expect(reattachCalled).toBe(true);
             expect(committedRoute).toMatchObject(targetRoute);
-            expect(committed.transitions.map((transition) => transition.state)).toEqual([
+            expect(committed.transitions.map((transition) => transition['state'])).toEqual([
                 'planned',
                 'reattach_requested',
                 'reattached',
@@ -204,8 +214,8 @@ describe('model gateway same-session route switch', () => {
             const stored = await store.readSdkSessionHandoffRecord(
                 createModelGatewaySameSessionRouteSwitchOperationId(idempotencyKey),
             );
-            expect(stored?.operation?.state).toBe('committed');
-            expect(stored?.operation?.sessionId).toBe('sdk-session-1');
+            expect(requireStoredOperation(stored)['state']).toBe('committed');
+            expect(requireStoredOperation(stored)['sessionId']).toBe('sdk-session-1');
         } finally {
             db.close();
         }

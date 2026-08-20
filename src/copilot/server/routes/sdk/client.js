@@ -36,17 +36,17 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  *
  * @typedef {object} ClientRouterDeps
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['getClient']} getClient - Factory do SDK
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['getClient']} getClient - Factory do SDK
  *   client.
  * @property {() => string} getClientState - Estado de conexão.
  * @property {() => Promise<void | Error[]>} stopClient - Para o client.
  * @property {() => Promise<void>} forceStopClient - Para o client forçadamente.
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools - Ferramentas
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools - Ferramentas
  *   estáticas.
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
  * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.

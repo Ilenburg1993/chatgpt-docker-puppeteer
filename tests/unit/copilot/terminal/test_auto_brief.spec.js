@@ -7,9 +7,9 @@ const { readTerminalByokProjection, readTerminalStatusProjection } = vi.hoisted(
         summary: {
             enabled: false,
             ready: false,
-            preset: null,
-            providerType: null,
-            model: null,
+            preset: /** @type {string | null} */ (null),
+            providerType: /** @type {string | null} */ (null),
+            model: /** @type {string | null} */ (null),
             auth: {
                 bearerTokenConfigured: false,
                 apiKeyConfigured: false,

@@ -193,7 +193,7 @@ export async function cmdGit({ println }, args) {
         const plain = args.includes('--plain') || args.includes('--no-external');
         const file = args.find((a) => !a.startsWith('-') && a !== 'diff');
         println(terminalThemeRow('Git', 'gerando diff', { role: 'muted' }));
-        const diff = await gitDiff({ staged, file }).catch(() => '');
+        const diff = await gitDiff({ staged, ...(file === undefined ? {} : { file }) }).catch(() => '');
         if (!diff) {
             println(terminalThemeRow('Diff', 'sem diferenças', { role: 'muted' }));
             return;

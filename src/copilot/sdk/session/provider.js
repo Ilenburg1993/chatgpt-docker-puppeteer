@@ -72,8 +72,15 @@ const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
  */
 
 /**
+ * BYOK model metadata is a first-class runtime extension over the SDK's ModelInfo. The SDK only requires the base
+ * fields, while terminal routing/discovery also consumes the provider-specific metadata attached by createByokModelInfo.
+ *
+ * @typedef {import('../types.js').ModelInfo & { byok: ReturnType<typeof buildByokModelMetadata> }} ByokModelInfo
+ */
+
+/**
  * @typedef {object} ByokModelDiscoveryResult
- * @property {import('../types.js').ModelInfo[]} models
+ * @property {ByokModelInfo[]} models
  * @property {ByokModelDiscoverySource} source
  * @property {string | null} endpoint
  * @property {boolean} fromCache
@@ -165,7 +172,7 @@ export const BYOK_ENV_KEYS = Object.freeze([
     'OPENCODE_DEFAULT_MODEL',
 ]);
 
-/** @type {Map<string, { expiresAt: number; models: import('../types.js').ModelInfo[] }>} */
+/** @type {Map<string, { expiresAt: number; models: ByokModelInfo[] }>} */
 const BYOK_MODEL_DISCOVERY_CACHE = new Map();
 
 /** @type {readonly string[]} */
@@ -1298,7 +1305,7 @@ function supportsSdkReasoningEffortForByokModel(model) {
  * @param {string | Record<string, unknown>} item
  * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
  * @param {'static' | 'remote'} [source]
- * @returns {import('../types.js').ModelInfo}
+ * @returns {ByokModelInfo}
  */
 function createByokModelInfo(item, caps, source = 'static') {
     const id = typeof item === 'string' ? item : modelIdFromUnknown(item);
@@ -1306,6 +1313,7 @@ function createByokModelInfo(item, caps, source = 'static') {
     const objectItem = typeof item === 'string' ? { id } : item;
     const metadata = buildByokModelMetadata(id, objectItem, caps, source);
     const supportsSdkReasoningEffort = metadata.supportsReasoning && supportsSdkReasoningEffortForByokModel(id);
+    /** @type {import('../types.js').ModelInfo} */
     const info = {
         id,
         name: optionalString(objectItem['name']) ?? id,
@@ -1316,13 +1324,13 @@ function createByokModelInfo(item, caps, source = 'static') {
         policy: { state: 'enabled', terms: renderByokModelTerms(metadata) },
         billing: { multiplier: 0 },
     };
-    return /** @type {import('../types.js').ModelInfo} */ (Object.assign(info, { byok: metadata }));
+    return Object.assign(info, { byok: metadata });
 }
 
 /**
  * @param {unknown} payload
  * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
- * @returns {import('../types.js').ModelInfo[]}
+ * @returns {ByokModelInfo[]}
  */
 function normalizeDiscoveredModels(payload, caps) {
     const root = asPlainObject(payload);
@@ -1334,7 +1342,7 @@ function normalizeDiscoveredModels(payload, caps) {
             ? root['models']
             : [];
     const seen = new Set();
-    /** @type {import('../types.js').ModelInfo[]} */
+    /** @type {ByokModelInfo[]} */
     const models = [];
     for (const item of rawItems) {
         const id = modelIdFromUnknown(item);
@@ -1615,7 +1623,7 @@ export function readConfiguredByokSummary(env = process.env) {
  * @param {number | null} [fallback.tokensPerMinute]
  * @param {number | null} [fallback.requestsPerMinute]
  * @param {number | null} [fallback.dailyRequests]
- * @returns {import('../types.js').ModelInfo[]}
+ * @returns {ByokModelInfo[]}
  */
 export function readConfiguredByokModelsFromEnv(env = process.env, fallback = {}) {
     const effectiveEnv = resolveProfileEnv(env).env;

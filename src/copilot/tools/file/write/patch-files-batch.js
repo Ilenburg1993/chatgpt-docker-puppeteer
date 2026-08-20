@@ -69,8 +69,7 @@ export const patchFilesBatchTool = buildTool({
         targetConcurrency: z.number().int().min(1).max(MAX_PATCH_CONCURRENCY).optional().default(4),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()
-            .describe('Perfil de persistência após crash; default file-and-directory. Atomicidade e preconditions permanecem ativas.'),
+            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Atomicidade e preconditions permanecem ativas.'),
     }),
     handler: async ({ operations, dryRun, failureMode, targetConcurrency, durability }) => {
         const inputBytes = estimatePatchInputBytes(operations);
@@ -83,18 +82,19 @@ export const patchFilesBatchTool = buildTool({
             };
         }
 
-        /** @type {{ path: string; entries: { operation: z.infer<typeof patchOperationSchema>; index: number }[] }[]} */
+        /** @type {{ path: string; entries: { operation: ReturnType<typeof patchOperationSchema.parse>; index: number }[] }[]} */
         const groups = [];
         /** @type {Map<string, typeof groups[number]>} */
         const byPath = new Map();
         for (const [index, operation] of operations.entries()) {
             const parsed = patchOperationSchema.safeParse(operation);
-            if (!parsed.success) {
+            if (parsed.success === false) {
+                const parseError = parsed.error;
                 return {
                     success: false,
                     code: 'ERR_PATCH_FILES_BATCH_INVALID_ITEM',
                     index,
-                    error: parsed.error.message,
+                    error: parseError instanceof Error ? parseError.message : String(parseError),
                 };
             }
             const key = parsed.data.path;

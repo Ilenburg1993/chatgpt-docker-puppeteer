@@ -107,10 +107,10 @@ describe('DialogProtocol', () => {
 
     describe('MESSAGE_KIND', () => {
         it('contém as 4 classificações esperadas', () => {
-            expect(MESSAGE_KIND.READY).toBe('ready');
-            expect(MESSAGE_KIND.REPLY).toBe('reply');
-            expect(MESSAGE_KIND.STOPPED).toBe('stopped');
-            expect(MESSAGE_KIND.QUESTION).toBe('question');
+            expect(MESSAGE_KIND['READY']).toBe('ready');
+            expect(MESSAGE_KIND['REPLY']).toBe('reply');
+            expect(MESSAGE_KIND['STOPPED']).toBe('stopped');
+            expect(MESSAGE_KIND['QUESTION']).toBe('question');
         });
     });
 

@@ -36,7 +36,7 @@ function _safeDelayMs(payload) {
 /** @param {any} taskId @returns {any} */
 function _storagePointers(taskId) {
     const artifactsRoot = path.resolve(
-        process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || PATHS.ARTIFACTS,
+        process.env['MAESTRO_ARTIFACTS_DIR'] || process.env['ARTIFACTS_DIR'] || PATHS.ARTIFACTS,
     );
     const basePath = path.join(artifactsRoot, 'responses', taskId, 'latest');
     return {
@@ -91,9 +91,9 @@ function _registerDiagnosticArtifacts({ storage, actor = 'system' } = {}) {
     if (!pointers) return ids;
 
     const mapping = [
-        ['screenshot', pointers.screenshot_file, 'diagnostic_screenshot'],
-        ['html', pointers.html_file, 'diagnostic_html'],
-        ['meta', pointers.meta_json_file, 'diagnostic_meta'],
+        ['screenshot', pointers['screenshot_file'], 'diagnostic_screenshot'],
+        ['html', pointers['html_file'], 'diagnostic_html'],
+        ['meta', pointers['meta_json_file'], 'diagnostic_meta'],
     ];
 
     for (const [k, p, kind] of mapping) {
@@ -144,10 +144,10 @@ function _registerResponseArtifacts({ storage, actor = 'system' } = {}) {
     if (!pointers) return ids;
 
     const mapping = [
-        ['text', pointers.text_file],
-        ['md', pointers.markdown_file],
-        ['json', pointers.json_file],
-        ['html', pointers.html_file],
+        ['text', pointers['text_file']],
+        ['md', pointers['markdown_file']],
+        ['json', pointers['json_file']],
+        ['html', pointers['html_file']],
     ];
 
     for (const [k, p] of mapping) {
@@ -218,9 +218,9 @@ class TaskStateProjector {
         this.workerId = workerId || null;
         this._unsub = null;
 
-        const base = Number(CONFIG?.all?.TASK_TIMEOUT_MS || 1800000) || 1800000;
+        const base = Number(CONFIG?.all?.['TASK_TIMEOUT_MS'] || 1800000) || 1800000;
         this.runningLockTtlMs = Math.max(60000, base + 60000);
-        this.admissionLockTtlMs = Math.max(60000, Number(CONFIG?.all?.TASK_ADMISSION_LOCK_TTL_MS || 300000) || 300000);
+        this.admissionLockTtlMs = Math.max(60000, Number(CONFIG?.all?.['TASK_ADMISSION_LOCK_TTL_MS'] || 300000) || 300000);
     }
 
     /**
@@ -332,7 +332,7 @@ class TaskStateProjector {
         }
 
         const payload = asRecord(getPayload(envelope));
-        const payloadDetails = asRecord(payload.details);
+        const payloadDetails = asRecord(payload['details']);
         const taskId = getTaskIdFromPayload(payload);
         if (!taskId) return;
 
@@ -501,10 +501,10 @@ class TaskStateProjector {
                 execute_after_ms: executeAfterMs,
                 result_json: {
                     driver_queue: {
-                        queue_position: payload.queuePosition ?? null,
-                        queue_size: payload.queueSize ?? null,
-                        active_drivers: payload.activeDrivers ?? null,
-                        next_action: payload.next_action ?? payload.nextAction ?? null,
+                        queue_position: payload['queuePosition'] ?? null,
+                        queue_size: payload['queueSize'] ?? null,
+                        active_drivers: payload['activeDrivers'] ?? null,
+                        next_action: payload['next_action'] ?? payload['nextAction'] ?? null,
                         ts_ms: now,
                     },
                 },
@@ -562,10 +562,10 @@ class TaskStateProjector {
         }
 
         if (actionCode === ActionCode.DRIVER_TASK_COMPLETED) {
-            const result = payload.result;
+            const result = payload['result'];
             const text = typeof result === 'string' ? result : JSON.stringify(result ?? null);
             const storage =
-                payload.storage && typeof payload.storage === 'object' ? payload.storage : _storagePointers(taskId);
+                payload['storage'] && typeof payload['storage'] === 'object' ? payload['storage'] : _storagePointers(taskId);
 
             const artifactIds = _registerResponseArtifacts({ storage, actor: 'system' });
 
@@ -575,10 +575,10 @@ class TaskStateProjector {
                     const updated = updateAttempt(attemptId, {
                         status: 'DONE',
                         ended_at_ms: now,
-                        response_text_artifact_id: artifactIds.text,
-                        response_md_artifact_id: artifactIds.md,
-                        response_v2_json_artifact_id: artifactIds.json,
-                        response_html_artifact_id: artifactIds.html,
+                        response_text_artifact_id: artifactIds['text'],
+                        response_md_artifact_id: artifactIds['md'],
+                        response_v2_json_artifact_id: artifactIds['json'],
+                        response_html_artifact_id: artifactIds['html'],
                     });
                     if (!updated) {
                         upsertAttempt({
@@ -589,10 +589,10 @@ class TaskStateProjector {
                             worker_id: null,
                             created_at_ms: now,
                             ended_at_ms: now,
-                            response_text_artifact_id: artifactIds.text,
-                            response_md_artifact_id: artifactIds.md,
-                            response_v2_json_artifact_id: artifactIds.json,
-                            response_html_artifact_id: artifactIds.html,
+                            response_text_artifact_id: artifactIds['text'],
+                            response_md_artifact_id: artifactIds['md'],
+                            response_v2_json_artifact_id: artifactIds['json'],
+                            response_html_artifact_id: artifactIds['html'],
                         });
                     }
                 }
@@ -632,7 +632,7 @@ class TaskStateProjector {
                     tsMs: now,
                     actorType: 'system',
                     eventType: 'ATTEMPT_COMPLETED',
-                    payload: { taskId, actionCode, hasArtifacts: Boolean(artifactIds.text || artifactIds.md) },
+                    payload: { taskId, actionCode, hasArtifacts: Boolean(artifactIds['text'] || artifactIds['md']) },
                     dedupKey: `attempt-done:${attemptId}:${now}`,
                 });
             } catch (/** @type {any} */ _) {
@@ -650,13 +650,13 @@ class TaskStateProjector {
                 completed_at_ms: now,
                 last_correlation_id: correlationId,
                 latest_attempt_id: attemptId,
-                latest_response_v2_json_artifact_id: artifactIds.json,
+                latest_response_v2_json_artifact_id: artifactIds['json'],
                 result_json: {
                     storage,
-                    storage_format: payload.storage_format ?? null,
+                    storage_format: payload['storage_format'] ?? null,
                     preview_text: text.slice(0, 2000),
                     output_length: text.length,
-                    timings: payload.timings ?? null,
+                    timings: payload['timings'] ?? null,
                 },
             });
 
@@ -670,7 +670,7 @@ class TaskStateProjector {
             // - If user paused, keep PAUSED (don't turn it into CANCELLED).
             // - Otherwise treat as CANCELLED.
             let nextStatus = 'CANCELLED';
-            const reason = payload.reason ? String(payload.reason) : '';
+            const reason = payload['reason'] ? String(payload['reason']) : '';
             if (reason === 'USER_PAUSED') {
                 nextStatus = 'PAUSED';
             } else {
@@ -691,7 +691,7 @@ class TaskStateProjector {
                     const updated = updateAttempt(attemptId, {
                         status: 'ABORTED',
                         ended_at_ms: now,
-                        error: payload.reason ? String(payload.reason) : 'USER_ABORT',
+                        error: payload['reason'] ? String(payload['reason']) : 'USER_ABORT',
                     });
                     if (!updated) {
                         upsertAttempt({
@@ -702,7 +702,7 @@ class TaskStateProjector {
                             worker_id: null,
                             created_at_ms: now,
                             ended_at_ms: now,
-                            error: payload.reason ? String(payload.reason) : 'USER_ABORT',
+                            error: payload['reason'] ? String(payload['reason']) : 'USER_ABORT',
                         });
                     }
                 }
@@ -740,7 +740,7 @@ class TaskStateProjector {
             this._safeUpdateTask(taskId, {
                 status: nextStatus,
                 ...(nextStatus === 'PAUSED' ? { paused_at_ms: now } : { cancelled_at_ms: now }),
-                last_error: payload.reason ? String(payload.reason) : 'USER_ABORT',
+                last_error: payload['reason'] ? String(payload['reason']) : 'USER_ABORT',
                 last_correlation_id: correlationId,
                 latest_attempt_id: attemptId,
             });
@@ -750,13 +750,13 @@ class TaskStateProjector {
 
         if (actionCode === ActionCode.DRIVER_TASK_FAILED || actionCode === ActionCode.DRIVER_ERROR) {
             const errText =
-                (typeof payload.error === 'string' && payload.error) ||
-                (typeof payload.reason === 'string' && payload.reason) ||
-                (typeof payload.err === 'string' && payload.err) ||
+                (typeof payload['error'] === 'string' && payload['error']) ||
+                (typeof payload['reason'] === 'string' && payload['reason']) ||
+                (typeof payload['err'] === 'string' && payload['err']) ||
                 'Driver failure';
 
-            const doNotUnlock = Boolean(payload.do_not_unlock ?? payload.doNotUnlock);
-            const doNotChangeStatus = Boolean(payload.do_not_change_status ?? payload.doNotChangeStatus);
+            const doNotUnlock = Boolean(payload['do_not_unlock'] ?? payload['doNotUnlock']);
+            const doNotChangeStatus = Boolean(payload['do_not_change_status'] ?? payload['doNotChangeStatus']);
 
             // Special case: duplicate dispatch while the task is already running elsewhere.
             // We close the attempt, but must not mutate task status nor unlock its lease.
@@ -814,22 +814,22 @@ class TaskStateProjector {
                 markStaleAttemptIgnored('task_failed_or_error');
                 try {
                     if (attemptId) {
-                        const reasonCode = payload.reason_code || payload.reasonCode || payload.reason || null;
-                        const causeLayer = payload.cause_layer || payload.causeLayer || null;
+                        const reasonCode = payload['reason_code'] || payload['reasonCode'] || payload['reason'] || null;
+                        const causeLayer = payload['cause_layer'] || payload['causeLayer'] || null;
                         const diagStorage = /** @type {any} */ (
-                            payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null
+                            payloadDetails['diagnostic_storage'] || payloadDetails['diagnosticStorage'] || null
                         );
                         const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
                         const diagJson = JSON.stringify(diagIds);
-                        const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
+                        const summary = payloadDetails['diagnosis_summary'] || payloadDetails['diagnosisSummary'] || null;
                         const summaryJson = summary ? JSON.stringify(summary).slice(0, 10000) : null;
 
                         updateAttempt(attemptId, {
                             status: 'FAILED',
                             ended_at_ms: now,
                             error: errText.slice(0, 2000),
-                            reason_class: payload.reason_class || payload.reasonClass || null,
-                            count_attempt: (payload.count_attempt ?? payload.countAttempt) ? 1 : 0,
+                            reason_class: payload['reason_class'] || payload['reasonClass'] || null,
+                            count_attempt: (payload['count_attempt'] ?? payload['countAttempt']) ? 1 : 0,
                             reason_code: reasonCode ? String(reasonCode) : null,
                             cause_layer: causeLayer ? String(causeLayer) : null,
                             diagnostic_artifacts_json: diagJson,
@@ -865,30 +865,30 @@ class TaskStateProjector {
                 return;
             }
 
-            const retryable = Boolean(payload.retryable);
-            const nextAction = payload.next_action || payload.nextAction || null;
+            const retryable = Boolean(payload['retryable']);
+            const nextAction = payload['next_action'] || payload['nextAction'] || null;
             const delayMs = _safeDelayMs(payload);
-            const reasonClass = payload.reason_class || payload.reasonClass || null;
+            const reasonClass = payload['reason_class'] || payload['reasonClass'] || null;
 
-            const reasonCode = payload.reason_code || payload.reasonCode || payload.reason || null;
+            const reasonCode = payload['reason_code'] || payload['reasonCode'] || payload['reason'] || null;
             const normalizedReasonCode = reasonCode ? String(reasonCode).toUpperCase() : null;
             // Policy: TASK_ERROR generally consumes attempts.
             // Exception: operational LLM timeout is treated as transient (no strategic attempt consumption).
-            let countAttempt = Boolean(payload.count_attempt ?? payload.countAttempt ?? false);
+            let countAttempt = Boolean(payload['count_attempt'] ?? payload['countAttempt'] ?? false);
             if (reasonClass === 'TASK_ERROR' && normalizedReasonCode !== 'LLM_TIMEOUT') {
                 countAttempt = true;
             }
-            const causeLayer = payload.cause_layer || payload.causeLayer || null;
+            const causeLayer = payload['cause_layer'] || payload['causeLayer'] || null;
 
             const diagStorage = /** @type {any} */ (
-                payloadDetails.diagnostic_storage || payloadDetails.diagnosticStorage || null
+                payloadDetails['diagnostic_storage'] || payloadDetails['diagnosticStorage'] || null
             );
             const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
             const diagJson = JSON.stringify(diagIds);
-            const summary = payloadDetails.diagnosis_summary || payloadDetails.diagnosisSummary || null;
+            const summary = payloadDetails['diagnosis_summary'] || payloadDetails['diagnosisSummary'] || null;
             const summaryJson = summary ? JSON.stringify(summary).slice(0, 10000) : null;
 
-            const details = payload.details ?? null;
+            const details = payload['details'] ?? null;
             const detailsJson = details ? JSON.stringify(details).slice(0, 10000) : null;
 
             // USER_ACTION_REQUIRED → BLOCKED
@@ -896,7 +896,7 @@ class TaskStateProjector {
                 this._safeUpdateTask(taskId, {
                     status: 'BLOCKED',
                     stage: TASK_STAGES.READY,
-                    blocked_reason: String(payload.reason || 'USER_ACTION_REQUIRED').slice(0, 200),
+                    blocked_reason: String(payload['reason'] || 'USER_ACTION_REQUIRED').slice(0, 200),
                     blocked_at_ms: now,
                     blocked_details_json: detailsJson,
                     last_error: errText.slice(0, 2000),

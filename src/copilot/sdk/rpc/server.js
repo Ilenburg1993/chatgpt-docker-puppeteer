@@ -21,6 +21,7 @@
 import { toSdkOperationError } from '../errors.js';
 import { isExperimentalEnabled } from '../feature-flags.js';
 import { log as appLog } from '../logger.js';
+import { assertRpcClient } from './guards.js';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
@@ -77,22 +78,7 @@ import { log as appLog } from '../logger.js';
  * @typedef {{ sessionId?: string; [k: string]: unknown }} SessionForkResult
  */
 
-// ─── Validação ─────────────────────────────────────────────────────────────────
-
-/**
- * Valida que o client existe e possui a propriedade `rpc`.
- *
- * @param {unknown} client
- * @param {string} caller
- * @returns {asserts client is CopilotClient}
- */
-function assertClient(client, caller) {
-    if (!client || typeof client !== 'object' || !('rpc' in client)) {
-        throw new TypeError(
-            `[sdk/server-rpc/${caller}] CopilotClient inválido ou não conectado. Verifique getClient().`,
-        );
-    }
-}
+// ─── Validação compartilhada em ./guards.js ──────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PING
@@ -101,12 +87,12 @@ function assertClient(client, caller) {
 /**
  * Envia ping ao servidor e retorna echo + timestamp + protocolVersion.
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {string} [message] - Mensagem opcional para echo
  * @returns {Promise<PingResult>}
  */
 export async function ping(client, message) {
-    assertClient(client, 'ping');
+    assertRpcClient(client, 'ping');
     /** @type {Record<string, unknown>} */
     const params = {};
     if (message) params['message'] = message;
@@ -128,11 +114,11 @@ export async function ping(client, message) {
 /**
  * Lista todos os modelos disponíveis com metadata completa.
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<ModelsListResult>}
  */
 export async function modelsList(client) {
-    assertClient(client, 'models.list');
+    assertRpcClient(client, 'models.list');
     appLog('DEBUG', '[sdk/server-rpc] models.list');
     try {
         return /** @type {ModelsListResult} */ (/** @type {unknown} */ (await client.rpc.models.list({})));
@@ -148,12 +134,12 @@ export async function modelsList(client) {
 /**
  * Lista todas as tools disponíveis (built-in + MCP).
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {{ model?: string }} [options] - Filtro opcional por modelo
  * @returns {Promise<ToolsListResult>}
  */
 export async function toolsList(client, options) {
-    assertClient(client, 'tools.list');
+    assertRpcClient(client, 'tools.list');
     /** @type {Record<string, unknown>} */
     const params = {};
     if (options?.model) params['model'] = options.model;
@@ -173,11 +159,11 @@ export async function toolsList(client, options) {
 /**
  * Retorna snapshot de quota da conta por tipo (chat, completions, premium_interactions).
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<AccountQuotaResult>}
  */
 export async function accountGetQuota(client) {
-    assertClient(client, 'account.getQuota');
+    assertRpcClient(client, 'account.getQuota');
     appLog('DEBUG', '[sdk/server-rpc] account.getQuota');
     try {
         return /** @type {AccountQuotaResult} */ (/** @type {unknown} */ (await client.rpc.account.getQuota({})));
@@ -191,11 +177,11 @@ export async function accountGetQuota(client) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {Promise<McpConfigListResult>}
  */
 export async function mcpConfigList(client) {
-    assertClient(client, 'mcp.config.list');
+    assertRpcClient(client, 'mcp.config.list');
     try {
         return /** @type {McpConfigListResult} */ (/** @type {unknown} */ (await client.rpc.mcp.config.list()));
     } catch (error) {
@@ -204,12 +190,12 @@ export async function mcpConfigList(client) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {Record<string, unknown>} params
  * @returns {Promise<ServerMutationResult>}
  */
 export async function mcpConfigAdd(client, params) {
-    assertClient(client, 'mcp.config.add');
+    assertRpcClient(client, 'mcp.config.add');
     try {
         await client.rpc.mcp.config.add(/** @type {any} */ (params));
         return { success: true };
@@ -219,12 +205,12 @@ export async function mcpConfigAdd(client, params) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {Record<string, unknown>} params
  * @returns {Promise<ServerMutationResult>}
  */
 export async function mcpConfigUpdate(client, params) {
-    assertClient(client, 'mcp.config.update');
+    assertRpcClient(client, 'mcp.config.update');
     try {
         await client.rpc.mcp.config.update(/** @type {any} */ (params));
         return { success: true };
@@ -234,12 +220,12 @@ export async function mcpConfigUpdate(client, params) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {{ name: string }} params
  * @returns {Promise<ServerMutationResult>}
  */
 export async function mcpConfigRemove(client, params) {
-    assertClient(client, 'mcp.config.remove');
+    assertRpcClient(client, 'mcp.config.remove');
     try {
         await client.rpc.mcp.config.remove(params);
         return { success: true };
@@ -249,12 +235,12 @@ export async function mcpConfigRemove(client, params) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {{ names: string[] }} params
  * @returns {Promise<ServerMutationResult>}
  */
 export async function mcpConfigEnable(client, params) {
-    assertClient(client, 'mcp.config.enable');
+    assertRpcClient(client, 'mcp.config.enable');
     try {
         await client.rpc.mcp.config.enable(params);
         return { success: true };
@@ -264,12 +250,12 @@ export async function mcpConfigEnable(client, params) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {{ names: string[] }} params
  * @returns {Promise<ServerMutationResult>}
  */
 export async function mcpConfigDisable(client, params) {
-    assertClient(client, 'mcp.config.disable');
+    assertRpcClient(client, 'mcp.config.disable');
     try {
         await client.rpc.mcp.config.disable(params);
         return { success: true };
@@ -279,12 +265,12 @@ export async function mcpConfigDisable(client, params) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {Record<string, unknown>} [params]
  * @returns {Promise<McpDiscoverResult>}
  */
 export async function mcpDiscover(client, params = {}) {
-    assertClient(client, 'mcp.discover');
+    assertRpcClient(client, 'mcp.discover');
     try {
         return /** @type {McpDiscoverResult} */ (await client.rpc.mcp.discover(/** @type {any} */ (params)));
     } catch (error) {
@@ -297,12 +283,12 @@ export async function mcpDiscover(client, params = {}) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {{ disabledSkills: string[] }} params
  * @returns {Promise<ServerMutationResult>}
  */
 export async function skillsConfigSetDisabledSkills(client, params) {
-    assertClient(client, 'skills.config.setDisabledSkills');
+    assertRpcClient(client, 'skills.config.setDisabledSkills');
     try {
         await client.rpc.skills.config.setDisabledSkills(params);
         return { success: true };
@@ -312,12 +298,12 @@ export async function skillsConfigSetDisabledSkills(client, params) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {Record<string, unknown>} [params]
  * @returns {Promise<SkillsDiscoverResult>}
  */
 export async function skillsDiscover(client, params = {}) {
-    assertClient(client, 'skills.discover');
+    assertRpcClient(client, 'skills.discover');
     try {
         return /** @type {SkillsDiscoverResult} */ (await client.rpc.skills.discover(/** @type {any} */ (params)));
     } catch (error) {
@@ -326,7 +312,7 @@ export async function skillsDiscover(client, params = {}) {
 }
 
 /**
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @param {Record<string, unknown>} params
  * @returns {Promise<SessionForkResult>}
  */
@@ -334,7 +320,7 @@ export async function sessionsFork(client, params) {
     if (!isExperimentalEnabled('sessions')) {
         throw new Error("[sdk/server-rpc/sessions.fork] requer feature flag 'sessions' habilitada.");
     }
-    assertClient(client, 'sessions.fork');
+    assertRpcClient(client, 'sessions.fork');
     try {
         return /** @type {SessionForkResult} */ (await client.rpc.sessions.fork(/** @type {any} */ (params)));
     } catch (error) {
@@ -349,7 +335,7 @@ export async function sessionsFork(client, params) {
 /**
  * Cria façade ergonômico agrupando todos os RPCs server-scoped.
  *
- * @param {CopilotClient} client
+ * @param {unknown} client
  * @returns {{
  *     ping: (message?: string) => Promise<PingResult>;
  *     models: { list: () => Promise<ModelsListResult> };
@@ -374,7 +360,7 @@ export async function sessionsFork(client, params) {
  * }}
  */
 export function createServerRpcFacade(client) {
-    assertClient(client, 'createServerRpcFacade');
+    assertRpcClient(client, 'createServerRpcFacade');
     return {
         ping: (message) => ping(client, message),
         models: { list: () => modelsList(client) },

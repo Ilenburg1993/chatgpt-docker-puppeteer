@@ -4,6 +4,7 @@ import { MissionStateManager } from '#missions/mission_state_manager';
 import { CHUNKING_STRATEGY, ContextManager } from '#orchestrator/context_manager';
 import fs from 'fs/promises';
 import assert from 'node:assert';
+import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 
@@ -14,7 +15,7 @@ describe('Context Flow Integration Tests', () => {
 
     // Mock dependencies
     const mockKernel = {
-        executeTask: async (/** @type {any} */ task, /** @type {any} */ correlationId) => {
+        executeTask: async (/** @type {{ meta: { id: string } }} */ task, /** @type {string} */ _correlationId) => {
             // Mock: retorna sucesso
             return { status: 'queued', task_id: task.meta.id };
         },
@@ -28,8 +29,7 @@ describe('Context Flow Integration Tests', () => {
     };
 
     before(async () => {
-        testMissionsDir = path.join(import.meta.dirname, '../../missions-test-context');
-        await fs.mkdir(testMissionsDir, { recursive: true });
+        testMissionsDir = await fs.mkdtemp(path.join(os.tmpdir(), 'maestro-missions-context-'));
 
         // Cria ContextManager compartilhado
         contextManager = new ContextManager({

@@ -9,19 +9,20 @@
  * @module copilot/model-gateway/providers/gemini-adapter
  */
 
-import { OpenAICompatibleAdapter } from './openai-compatible-adapter.js';
+import { OpenAICompatibleAdapter, providerRecord } from './openai-compatible-adapter.js';
 
 export const GEMINI_PROVIDER_ID = 'gemini';
 export const GEMINI_OPENAI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
 /**
- * @param {Record<string, any>} provider
+ * @param {Record<string, unknown>} provider
  * @returns {boolean}
  */
 function isGeminiProvider(provider) {
+    const provenance = providerRecord(provider['provenance']);
     return (
         provider['id'] === GEMINI_PROVIDER_ID ||
-        provider['provenance']?.['preset'] === GEMINI_PROVIDER_ID ||
+        provenance['preset'] === GEMINI_PROVIDER_ID ||
         String(provider['baseUrl'] ?? '').includes('generativelanguage.googleapis.com')
     );
 }
@@ -31,20 +32,16 @@ export class GeminiAdapter extends OpenAICompatibleAdapter {
     id = GEMINI_PROVIDER_ID;
 
     /**
-     * @param {Record<string, any>} provider
+     * @param {Record<string, unknown>} provider
      * @returns {boolean}
+     * @override
      */
     canHandle(provider) {
         return isGeminiProvider(provider);
     }
 
     /**
-     * @param {{
-     *     provider: Record<string, any>;
-     *     model: Record<string, any>;
-     *     secrets: import('../secrets/env-secret-registry.js').EnvSecretRegistry;
-     * }} input
-     * @returns {{ model: string; provider: Record<string, any>; modelCapabilities?: Record<string, any>; gateway?: Record<string, any> }}
+     * @param {import('./openai-compatible-adapter.js').ModelGatewayProviderAdapterInput} input
      * @override
      */
     toCopilotSessionOverrides(input) {

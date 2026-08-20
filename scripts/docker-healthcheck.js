@@ -15,7 +15,7 @@
 import http from 'node:http';
 
 /** @type {number} */
-const port = Number(process.env.PORT) || 3008;
+const port = Number(process.env['PORT']) || 3008;
 
 /** @type {http.RequestOptions} */
 const options = {

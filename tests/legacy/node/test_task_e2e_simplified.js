@@ -1,4 +1,3 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { loadResponse, saveResponse } from '#infra/storage/response_adapter';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,35 +28,43 @@ function cleanupTestDirs() {
     }
 }
 
-function createMockResponseV2(text) {
+function createMockResponseV2(/** @type {string} */ text) {
     return {
-        text,
-        markdown: `# Response\n\n${text}`,
-        json: { answer: text },
-        html: `<div><p>${text}</p></div>`,
-        metadata: {
-            format_version: 2,
-            generated_at: new Date().toISOString(),
-            source: 'test',
+        content: {
+            text,
+            markdown: `# Response\n\n${text}`,
+            json: { answer: text },
+            html: `<div><p>${text}</p></div>`,
         },
+        generation: { model: 'test', completed_at: new Date().toISOString() },
+        preview: { text },
+        validation: null,
     };
 }
 
-function createMinimalTask(taskId) {
+function createMinimalTask(/** @type {string} */ taskId) {
     return {
         meta: { id: taskId },
-        result: {},
+        result: /** @type {{
+         *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
+         *     generation?: unknown;
+         *     preview?: unknown;
+         *     validation?: unknown;
+         *     file_path?: string;
+         *     raw_output_preview?: string;
+         *     finish_reason?: string;
+         * }} */ ({}),
     };
 }
 
-async function runTest(name, testFn) {
+async function runTest(/** @type {string} */ name, /** @type {() => Promise<void>} */ testFn) {
     try {
         await testFn();
         console.log(`✅ ${name}`);
         testsPassed++;
     } catch (error) {
         console.error(`❌ ${name}`);
-        console.error(`   ${error.message}`);
+        console.error(`   ${error instanceof Error ? error.message : String(error)}`);
         testsFailed++;
     }
 }
@@ -65,7 +72,7 @@ async function runTest(name, testFn) {
 /**
  * Função exportada: runAllTests.
  *
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));
@@ -86,25 +93,24 @@ async function runAllTests() {
 
         // Test 2: Response V2 - 4 format save
         await runTest('OUTPUT: Save response (4 formats)', async () => {
-            const paths = await import('#infra/fs/paths').then((m) => m.default ?? m);
-            const originalDir = paths.RESPONSE;
-            // [ESM-SKIP] paths.RESPONSE = RESPONSES_DIR; // ESM export is read-only
-
             const taskId = 'test-4-formats';
             const task = createMinimalTask(taskId);
             const response = createMockResponseV2('Test response');
 
-            await saveResponse(taskId, response, task);
+            const saved = await saveResponse(taskId, response, task);
 
-            const files = ['txt', 'md', 'json', 'html'].map((ext) => path.join(RESPONSES_DIR, `${taskId}.${ext}`));
+            const files = [
+                saved.storage.textFile,
+                saved.storage.markdownFile,
+                saved.storage.jsonFile,
+                saved.storage.htmlFile,
+            ];
 
             for (const file of files) {
-                if (!fs.existsSync(file)) {
+                if (typeof file !== 'string' || !fs.existsSync(file)) {
                     throw new Error(`File not created: ${file}`);
                 }
             }
-
-            // [ESM-SKIP] paths.RESPONSE = originalDir; // ESM export is read-only
         });
 
         // Test 3: task.result population
@@ -118,7 +124,7 @@ async function runAllTests() {
 
             await saveResponse(taskId, response, task);
 
-            if (!task.result.response_text || task.result.response_format !== 'v2') {
+            if (!task.result.storage?.text_file || task.result.finish_reason !== 'success') {
                 throw new Error('task.result not populated correctly');
             }
 
@@ -136,7 +142,7 @@ async function runAllTests() {
 
             await saveResponse(taskId, v1Response, task);
 
-            if (task.result.response_format !== 'v1' || !task.result.response_converted_from_v1) {
+            if (!task.result.storage?.text_file || task.result.raw_output_preview !== v1Response) {
                 throw new Error('V1 compatibility failed');
             }
 
@@ -155,7 +161,7 @@ async function runAllTests() {
             await saveResponse(taskId, response, task);
 
             const mdContent = await loadResponse(taskId, 'markdown');
-            if (!mdContent.includes('Load test') || !mdContent.startsWith('# Response')) {
+            if (typeof mdContent !== 'string' || !mdContent.includes('Load test') || !mdContent.startsWith('# Response')) {
                 throw new Error('Markdown loading failed');
             }
 
@@ -174,8 +180,11 @@ async function runAllTests() {
             await saveResponse(taskId, response, task);
 
             const jsonContent = await loadResponse(taskId, 'json');
-            const parsed = JSON.parse(jsonContent);
-            if (parsed.answer !== 'JSON test') {
+            if (!jsonContent || typeof jsonContent !== 'object') {
+                throw new Error('JSON loading returned an invalid payload');
+            }
+            const parsed = /** @type {{ content?: { json?: { answer?: string } } }} */ (jsonContent);
+            if (parsed.content?.json?.answer !== 'JSON test') {
                 throw new Error('JSON loading failed');
             }
 
@@ -217,25 +226,29 @@ async function runAllTests() {
             const response = createMockResponseV2('E2E test');
 
             // Save
-            await saveResponse(taskId, response, task);
+            const saved = await saveResponse(taskId, response, task);
 
             // Verify 4 files
-            const files = ['txt', 'md', 'json', 'html'];
-            for (const ext of files) {
-                const file = path.join(RESPONSES_DIR, `${taskId}.${ext}`);
-                if (!fs.existsSync(file)) {
-                    throw new Error(`File missing: ${ext}`);
+            const files = [
+                saved.storage.textFile,
+                saved.storage.markdownFile,
+                saved.storage.jsonFile,
+                saved.storage.htmlFile,
+            ];
+            for (const file of files) {
+                if (typeof file !== 'string' || !fs.existsSync(file)) {
+                    throw new Error(`File missing: ${file}`);
                 }
             }
 
             // Verify task.result
-            if (!task.result.response_text) {
+            if (!task.result.storage?.text_file) {
                 throw new Error('task.result not filled');
             }
 
             // Load
             const txtContent = await loadResponse(taskId, 'text');
-            if (!txtContent.includes('E2E test')) {
+            if (typeof txtContent !== 'string' || !txtContent.includes('E2E test')) {
                 throw new Error('Load failed');
             }
 

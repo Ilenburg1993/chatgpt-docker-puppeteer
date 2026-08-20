@@ -54,7 +54,7 @@ router.get('/:id/content', async (req, res) => {
             return fail(res, req, 404, { code: 'ARTIFACT_UNAVAILABLE', error: 'Artefato indisponível' });
         }
 
-        const disposition = req.query.disposition ? String(req.query.disposition) : 'inline';
+        const disposition = req.query['disposition'] ? String(req.query['disposition']) : 'inline';
         const safeDisposition = disposition === 'attachment' ? 'attachment' : 'inline';
 
         res.setHeader('Content-Type', String(row.mime || 'application/octet-stream'));
@@ -91,7 +91,7 @@ router.get('/:id/text', async (req, res) => {
             return fail(res, req, 404, { code: 'ARTIFACT_NOT_FOUND', error: 'Artefato não encontrado' });
         }
 
-        const maxChars = Math.max(1000, Math.min(Number(req.query.max_chars) || 50000, 500000));
+        const maxChars = Math.max(1000, Math.min(Number(req.query['max_chars']) || 50000, 500000));
         const text = await readText(artifactId);
         if (text === null) {
             return fail(res, req, 404, { code: 'ARTIFACT_UNAVAILABLE', error: 'Artefato indisponível' });

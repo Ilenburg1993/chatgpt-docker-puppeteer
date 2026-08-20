@@ -54,7 +54,7 @@ describe('observability/event-collector redaction', () => {
         await new Promise((resolve) => setImmediate(resolve));
 
         assert.equal(fsMocks.appendFile.mock.calls.length, 1);
-        const persisted = String(fsMocks.appendFile.mock.calls[0]?.[1] ?? '');
+        const persisted = String(/** @type {unknown[]} */ (fsMocks.appendFile.mock.calls[0] ?? [])[1] ?? '');
         assert.equal(persisted.includes(githubToken), false);
         assert.equal(persisted.includes(byokToken), false);
         assert.match(persisted, /\[redacted\]/);

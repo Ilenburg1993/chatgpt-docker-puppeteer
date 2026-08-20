@@ -3,6 +3,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { promoteModelGatewayDeferredRouteSwitchAtTurnBoundary } from '../../../../src/copilot/model-gateway/control-plane/deferred-route-promotion.js';
 
+/**
+ * @param {string} id
+ * @param {string} providerModel
+ * @param {string} requestedAt
+ */
 function handoff(id, providerModel, requestedAt) {
     return {
         handoffId: id,

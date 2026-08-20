@@ -270,17 +270,17 @@ function mockCtx() {
 describe('commands/diagnose', () => {
     it('inclui health, issues e status transversais do agente', async () => {
         const previousEnv = {
-            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
-            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
-            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
-            COPILOT_BYOK_API_KEY: process.env.COPILOT_BYOK_API_KEY,
-            OPEN_ROUTER_KEY: process.env.OPEN_ROUTER_KEY,
+            COPILOT_BYOK_ENABLED: process.env['COPILOT_BYOK_ENABLED'],
+            COPILOT_BYOK_PROVIDER_PRESET: process.env['COPILOT_BYOK_PROVIDER_PRESET'],
+            COPILOT_BYOK_MODEL: process.env['COPILOT_BYOK_MODEL'],
+            COPILOT_BYOK_API_KEY: process.env['COPILOT_BYOK_API_KEY'],
+            OPEN_ROUTER_KEY: process.env['OPEN_ROUTER_KEY'],
         };
-        process.env.COPILOT_BYOK_ENABLED = 'true';
-        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'openrouter';
-        process.env.COPILOT_BYOK_MODEL = 'deepseek/deepseek-v4-flash:free';
-        process.env.COPILOT_BYOK_API_KEY = 'test-diagnose-byok-key-that-must-not-render';
-        process.env.OPEN_ROUTER_KEY = 'test-diagnose-byok-key-that-must-not-render';
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'openrouter';
+        process.env['COPILOT_BYOK_MODEL'] = 'deepseek/deepseek-v4-flash:free';
+        process.env['COPILOT_BYOK_API_KEY'] = 'test-diagnose-byok-key-that-must-not-render';
+        process.env['OPEN_ROUTER_KEY'] = 'test-diagnose-byok-key-that-must-not-render';
         const ctx = mockCtx();
 
         try {

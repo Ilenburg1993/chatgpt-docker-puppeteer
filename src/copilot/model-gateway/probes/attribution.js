@@ -6,7 +6,7 @@
  * Modern probes set `providerAttempted` exactly at the `sendSessionAndWait` boundary. The status fallback exists only
  * for older persisted/test shapes and intentionally treats preflight/unavailable results as not attempted.
  *
- * @param {Record<string, any> | null | undefined} probe
+ * @param {Record<string, unknown> | null | undefined} probe
  * @returns {boolean}
  */
 export function didConfiguredByokProbeAttemptProvider(probe) {
@@ -19,7 +19,7 @@ export function didConfiguredByokProbeAttemptProvider(probe) {
 /**
  * Describe the failure scope without misattributing an SDK/session bootstrap failure to the selected BYOK provider.
  *
- * @param {Record<string, any> | null | undefined} probe
+ * @param {Record<string, unknown> | null | undefined} probe
  * @returns {'provider' | 'controller_substrate' | 'preflight' | null}
  */
 export function classifyConfiguredByokProbeFailureScope(probe) {

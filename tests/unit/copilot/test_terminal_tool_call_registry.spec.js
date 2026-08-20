@@ -191,6 +191,7 @@ describe('createToolCallRegistry', () => {
             const matched = registry.attachIoActivity({
                 timestamp: 10,
                 success: true,
+                dryRun: false,
                 operation: 'read',
                 target: 'package.json',
                 targets: ['package.json'],

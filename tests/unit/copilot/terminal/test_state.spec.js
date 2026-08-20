@@ -262,7 +262,7 @@ describe('state next-turn request headers', () => {
         const headers = getNextTurnRequestHeaders();
         expect(headers).toEqual({ Authorization: 'Bearer test', 'X-Mode': 'byok' });
 
-        if (headers) headers.Authorization = 'mutado';
+        if (headers) headers['Authorization'] = 'mutado';
         expect(getNextTurnRequestHeaders()).toEqual({ Authorization: 'Bearer test', 'X-Mode': 'byok' });
     });
 

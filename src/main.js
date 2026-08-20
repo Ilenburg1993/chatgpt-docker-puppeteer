@@ -156,7 +156,7 @@ function resolveAuthority() {
     const arg = process.argv.slice(2).find((a) => a.startsWith('--authority=') || a.startsWith('--server-authority='));
     const rawFromArg = arg ? arg.split('=')[1] : undefined;
 
-    const raw = rawFromArg ?? process.env.SERVER_AUTHORITY ?? Authority.SERVER_AUTHORITIES.STANDALONE;
+    const raw = rawFromArg ?? process.env['SERVER_AUTHORITY'] ?? Authority.SERVER_AUTHORITIES.STANDALONE;
     const allowed = Object.values(Authority.SERVER_AUTHORITIES);
     let authority = null;
 
@@ -179,7 +179,7 @@ function resolveAuthority() {
  *
  * Hierarquia de resolução:
  *
- * 1. process.env.SERVER_MODE (override runtime)
+ * 1. process.env['SERVER_MODE'] (override runtime)
  * 2. CONFIG.SERVER_MODE (configuração padrão)
  * 3. Fallback: SERVER_MODES.INTEGRATED
  *
@@ -197,7 +197,7 @@ function resolveAuthority() {
  * - Não modifica estado global
  */
 function resolveServerMode() {
-    const raw = process.env.SERVER_MODE ?? CONFIG.SERVER_MODE ?? SERVER_MODES.INTEGRATED;
+    const raw = process.env['SERVER_MODE'] ?? CONFIG['SERVER_MODE'] ?? SERVER_MODES.INTEGRATED;
 
     const mode = String(raw).toLowerCase().trim();
 
@@ -261,15 +261,18 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
     }
 
     const maxAttempts = readPositiveInt(
-        process.env.SPLIT_CONNECT_MAX_ATTEMPTS ?? process.env.BOOT_RETRY_MAX_ATTEMPTS,
+        process.env['SPLIT_CONNECT_MAX_ATTEMPTS'] ?? process.env['BOOT_RETRY_MAX_ATTEMPTS'],
         10,
     );
     const baseDelayMs = readPositiveInt(
-        process.env.SPLIT_CONNECT_RETRY_BASE_MS ?? process.env.BOOT_RETRY_BASE_MS,
+        process.env['SPLIT_CONNECT_RETRY_BASE_MS'] ?? process.env['BOOT_RETRY_BASE_MS'],
         1000,
     );
-    const maxDelayMs = readPositiveInt(process.env.SPLIT_CONNECT_RETRY_MAX_MS ?? process.env.BOOT_RETRY_MAX_MS, 8000);
-    const waitForHealth = process.env.SPLIT_WAIT_HEALTH === 'true';
+    const maxDelayMs = readPositiveInt(
+        process.env['SPLIT_CONNECT_RETRY_MAX_MS'] ?? process.env['BOOT_RETRY_MAX_MS'],
+        8000,
+    );
+    const waitForHealth = process.env['SPLIT_WAIT_HEALTH'] === 'true';
     let attempt = 0;
     try {
         const socketHub = await retryWithBackoff(
@@ -295,7 +298,6 @@ async function connectSplitExternalWithRetry(socketModule, externalPort) {
         log('INFO', `[BOOT] Conexão split estabelecida na tentativa ${attempt}/${maxAttempts}`);
         return socketHub;
     } catch (/** @type {any} */ err) {
-        const _e = /** @type {any} */ (err);
         throw new Error(
             `Falha ao conectar servidor externo em modo split após ${maxAttempts} tentativas (porta=${externalPort})`,
             { cause: err },
@@ -398,7 +400,7 @@ async function boot() {
         // → Conflito: PM2 gerencia processos separados, mas integrated tenta iniciar server inline
         // → Resultado: 2 servidores HTTP competindo pela mesma porta (EADDRINUSE)
         const SERVER_MODE = resolveServerMode();
-        const runningUnderPM2 = Boolean(process.env.pm_id);
+        const runningUnderPM2 = Boolean(process.env['pm_id']);
 
         if (runningUnderPM2 && SERVER_MODE === SERVER_MODES.INTEGRATED) {
             log('FATAL', '');
@@ -438,8 +440,8 @@ async function boot() {
         const nerv = await /** @type {any} */ (createNERV)({
             mode: /** @type {any} */ (CONNECTION_MODES.HYBRID), // local EventEmitter + Socket.io adapter
             correlation: true, // Event sourcing
-            bufferSize: process.env.NERV_BUFFER_SIZE || CONFIG.NERV_BUFFER_SIZE || 1000,
-            telemetry: process.env.NERV_TELEMETRY !== 'false' && CONFIG.NERV_TELEMETRY !== false,
+            bufferSize: process.env['NERV_BUFFER_SIZE'] || CONFIG['NERV_BUFFER_SIZE'] || 1000,
+            telemetry: process.env['NERV_TELEMETRY'] !== 'false' && CONFIG['NERV_TELEMETRY'] !== false,
         });
 
         // BUG-010: Validação pós-instantiation para NERV
@@ -496,7 +498,7 @@ async function boot() {
                         CHROME_PORT: CONFIG.CHROME_PORT,
                         PROXY_PORT: proxyPort,
                         PROXY_BIND: CONFIG.CHROME_PROXY_BIND,
-                        LOG_LEVEL: CONFIG.LOG_LEVEL || 'INFO',
+                        LOG_LEVEL: CONFIG['LOG_LEVEL'] || 'INFO',
                         // Signal lifecycle is centralized in src/main.js
                         AUTO_HANDLE_SIGNALS: false,
                     });
@@ -580,15 +582,14 @@ async function boot() {
                     discoveryUnsub = null;
                     log('DEBUG', '[BOOT] Discovery listener removido');
                 } catch (/** @type {any} */ e) {
-                    const _e = /** @type {any} */ (e);
                     /* noop */
                 }
             }
         };
 
         // Timeout aumentado de 5s → 30s (server boot pode ser lento em cold start)
-        const discoveryTimeoutMs = Number(process.env.SERVER_DISCOVERY_TIMEOUT ?? 30000);
-        const discoveryCleanupTimeoutMs = Number(process.env.SERVER_DISCOVERY_CLEANUP_TIMEOUT ?? 60000);
+        const discoveryTimeoutMs = Number(process.env['SERVER_DISCOVERY_TIMEOUT'] ?? 30000);
+        const discoveryCleanupTimeoutMs = Number(process.env['SERVER_DISCOVERY_CLEANUP_TIMEOUT'] ?? 60000);
 
         try {
             discoveryUnsub =
@@ -610,7 +611,6 @@ async function boot() {
                                   );
                                   cleanupDiscoveryListener(); // Remove listener após descoberta
                               } catch (/** @type {any} */ e) {
-                                  const _e = /** @type {any} */ (e);
                                   /* ignore */
                               }
                           },
@@ -651,10 +651,10 @@ async function boot() {
 
         const browserPoolResult = await /** @type {any} */ (initializeBrowserPoolResilient)(
             {
-                poolSize: readPositiveInt(process.env.BROWSER_POOL_SIZE ?? CONFIG.BROWSER_POOL_SIZE, 3),
+                poolSize: readPositiveInt(process.env['BROWSER_POOL_SIZE'] ?? CONFIG.BROWSER_POOL_SIZE, 3),
                 allocationStrategy: (() => {
                     const strategyRaw = String(
-                        process.env.ALLOCATION_STRATEGY ?? CONFIG.ALLOCATION_STRATEGY ?? 'round-robin',
+                        process.env['ALLOCATION_STRATEGY'] ?? CONFIG.ALLOCATION_STRATEGY ?? 'round-robin',
                     )
                         .toLowerCase()
                         .trim();
@@ -662,21 +662,21 @@ async function boot() {
                     return validStrategies.has(strategyRaw) ? strategyRaw : 'round-robin';
                 })(),
                 healthCheckInterval: readPositiveInt(
-                    process.env.HEALTH_CHECK_INTERVAL ?? CONFIG.HEALTH_CHECK_INTERVAL,
+                    process.env['HEALTH_CHECK_INTERVAL'] ?? CONFIG.HEALTH_CHECK_INTERVAL,
                     30000,
                 ),
-                pageTtlMs: readPositiveInt(process.env.BROWSER_PAGE_TTL_MS ?? CONFIG.BROWSER_PAGE_TTL_MS, 3600000),
+                pageTtlMs: readPositiveInt(process.env['BROWSER_PAGE_TTL_MS'] ?? CONFIG.BROWSER_PAGE_TTL_MS, 3600000),
                 allocateMaxAttempts: readPositiveInt(
-                    process.env.BROWSER_ALLOCATE_MAX_ATTEMPTS ?? CONFIG.BROWSER_ALLOCATE_MAX_ATTEMPTS,
-                    Math.max(3, readPositiveInt(process.env.BROWSER_POOL_SIZE ?? CONFIG.BROWSER_POOL_SIZE, 3) * 3),
+                    process.env['BROWSER_ALLOCATE_MAX_ATTEMPTS'] ?? CONFIG.BROWSER_ALLOCATE_MAX_ATTEMPTS,
+                    Math.max(3, readPositiveInt(process.env['BROWSER_POOL_SIZE'] ?? CONFIG.BROWSER_POOL_SIZE, 3) * 3),
                 ),
                 browserEndpoint,
             },
             {
                 nerv, // ✅ Injeta NERV para Circuit Breaker
-                allowDegradedMode: process.env.ALLOW_DEGRADED_MODE !== 'false',
-                autoRetry: process.env.AUTO_RETRY_CHROME !== 'false',
-                maxAutoRetries: Number.parseInt(process.env.MAX_AUTO_RETRIES ?? '2', 10),
+                allowDegradedMode: process.env['ALLOW_DEGRADED_MODE'] !== 'false',
+                autoRetry: process.env['AUTO_RETRY_CHROME'] !== 'false',
+                maxAutoRetries: Number.parseInt(process.env['MAX_AUTO_RETRIES'] ?? '2', 10),
             },
         );
 
@@ -711,9 +711,9 @@ async function boot() {
 
         const { ContextManager } = await import('./orchestrator/context_manager.js');
         const contextManager = new ContextManager({
-            strategy: process.env.CONTEXT_STRATEGY || CONFIG.CONTEXT_STRATEGY || 'sliding_window',
-            maxTokens: process.env.CONTEXT_MAX_TOKENS || CONFIG.CONTEXT_MAX_TOKENS || 100000,
-            summarizationPolicy: process.env.SUMMARIZATION_POLICY || CONFIG.SUMMARIZATION_POLICY || 'on_overflow',
+            strategy: process.env['CONTEXT_STRATEGY'] || CONFIG['CONTEXT_STRATEGY'] || 'sliding_window',
+            maxTokens: process.env['CONTEXT_MAX_TOKENS'] || CONFIG['CONTEXT_MAX_TOKENS'] || 100000,
+            summarizationPolicy: process.env['SUMMARIZATION_POLICY'] || CONFIG['SUMMARIZATION_POLICY'] || 'on_overflow',
         });
 
         // BUG-010: Validação pós-instantiation
@@ -741,7 +741,7 @@ async function boot() {
             },
             policy: {},
             loop: {
-                baseIntervalMs: process.env.KERNEL_CYCLE_INTERVAL || CONFIG.KERNEL_CYCLE_INTERVAL || 50, // 50ms = 20 Hz
+                baseIntervalMs: process.env['KERNEL_CYCLE_INTERVAL'] || CONFIG['KERNEL_CYCLE_INTERVAL'] || 50, // 50ms = 20 Hz
             },
         });
 
@@ -834,7 +834,7 @@ async function boot() {
             ]);
 
             // BUG-009: Timeout wrapper para prevenir hang no SSOT init
-            const SSOT_INIT_TIMEOUT = Number(process.env.SSOT_INIT_TIMEOUT_MS || 30000);
+            const SSOT_INIT_TIMEOUT = Number(process.env['SSOT_INIT_TIMEOUT_MS'] || 30000);
             log('DEBUG', `[BOOT] SSOT init timeout configurado: ${SSOT_INIT_TIMEOUT}ms`);
 
             await Promise.race([
@@ -865,35 +865,35 @@ async function boot() {
 
                     taskControlWatcher = new TaskControlWatcher({
                         nerv,
-                        intervalMs: Number(process.env.TASK_CONTROL_INTERVAL_MS || 500) || 500,
+                        intervalMs: Number(process.env['TASK_CONTROL_INTERVAL_MS'] || 500) || 500,
                     });
 
                     queueWorker = new QueueWorker({
                         kernel,
                         workerId,
-                        intervalMs: Number(process.env.QUEUE_WORKER_INTERVAL_MS || 250) || 250,
-                        lockTtlMs: Number(process.env.QUEUE_WORKER_LOCK_TTL_MS || 60000) || 60000,
-                        maxConcurrentTasks: Number(process.env.QUEUE_MAX_CONCURRENT_TASKS || 2) || 2,
+                        intervalMs: Number(process.env['QUEUE_WORKER_INTERVAL_MS'] || 250) || 250,
+                        lockTtlMs: Number(process.env['QUEUE_WORKER_LOCK_TTL_MS'] || 60000) || 60000,
+                        maxConcurrentTasks: Number(process.env['QUEUE_MAX_CONCURRENT_TASKS'] || 2) || 2,
                     });
 
                     missionRunner = new MissionRunner({
-                        intervalMs: Number(process.env.MISSION_RUNNER_INTERVAL_MS || 1000) || 1000,
+                        intervalMs: Number(process.env['MISSION_RUNNER_INTERVAL_MS'] || 1000) || 1000,
                     });
 
                     missionPlannerProcessor = new MissionPlannerProcessor({
-                        intervalMs: Number(process.env.MISSION_PLANNER_INTERVAL_MS || 1500) || 1500,
+                        intervalMs: Number(process.env['MISSION_PLANNER_INTERVAL_MS'] || 1500) || 1500,
                     });
                     attemptWatchdog = new AttemptWatchdog({
                         nerv,
-                        intervalMs: Number(process.env.ATTEMPT_WATCHDOG_INTERVAL_MS || 1500) || 1500,
-                        dispatchedStuckMs: Number(process.env.ATTEMPT_DISPATCHED_STUCK_MS || 30000) || 30000,
-                        rescheduleDelayMs: Number(process.env.ATTEMPT_WATCHDOG_RESCHEDULE_DELAY_MS || 1000) || 1000,
+                        intervalMs: Number(process.env['ATTEMPT_WATCHDOG_INTERVAL_MS'] || 1500) || 1500,
+                        dispatchedStuckMs: Number(process.env['ATTEMPT_DISPATCHED_STUCK_MS'] || 30000) || 30000,
+                        rescheduleDelayMs: Number(process.env['ATTEMPT_WATCHDOG_RESCHEDULE_DELAY_MS'] || 1000) || 1000,
                     });
 
                     heartbeatWatchdog = new HeartbeatWatchdog({
                         workerId: `${workerId}-hb`,
-                        intervalMs: Number(process.env.HEARTBEAT_WATCHDOG_INTERVAL_MS || 60000) || 60000, // 1min default
-                        staleThresholdMs: Number(process.env.HEARTBEAT_STALE_THRESHOLD_MS || 180000) || 180000, // 3min default
+                        intervalMs: Number(process.env['HEARTBEAT_WATCHDOG_INTERVAL_MS'] || 60000) || 60000, // 1min default
+                        staleThresholdMs: Number(process.env['HEARTBEAT_STALE_THRESHOLD_MS'] || 180000) || 180000, // 3min default
                     });
                     // eslint-disable-next-line @typescript-eslint/await-thenable
                     await heartbeatWatchdog.start();
@@ -908,8 +908,8 @@ async function boot() {
                     taskOrchestrationWorker = new TaskOrchestrationWorker({
                         browserPool,
                         workerId,
-                        intervalMs: Number(process.env.TASK_ORCHESTRATION_INTERVAL_MS || 1250) || 1250,
-                        batchSize: Number(process.env.TASK_ORCHESTRATION_BATCH_SIZE || 50) || 50,
+                        intervalMs: Number(process.env['TASK_ORCHESTRATION_INTERVAL_MS'] || 1250) || 1250,
+                        batchSize: Number(process.env['TASK_ORCHESTRATION_BATCH_SIZE'] || 50) || 50,
                     });
 
                     agentLoop = new AgentLoop({
@@ -923,13 +923,14 @@ async function boot() {
                         taskOrchestrationWorker,
                         intervals: {
                             kernelMs:
-                                Number(process.env.KERNEL_CYCLE_INTERVAL || CONFIG.KERNEL_CYCLE_INTERVAL || 50) || 50,
-                            queueMs: Number(process.env.QUEUE_WORKER_INTERVAL_MS || 250) || 250,
-                            controlMs: Number(process.env.TASK_CONTROL_INTERVAL_MS || 500) || 500,
-                            missionMs: Number(process.env.MISSION_RUNNER_INTERVAL_MS || 1000) || 1000,
-                            plannerMs: Number(process.env.MISSION_PLANNER_INTERVAL_MS || 1500) || 1500,
-                            watchdogMs: Number(process.env.ATTEMPT_WATCHDOG_INTERVAL_MS || 1500) || 1500,
-                            orchestrationMs: Number(process.env.TASK_ORCHESTRATION_INTERVAL_MS || 1250) || 1250,
+                                Number(process.env['KERNEL_CYCLE_INTERVAL'] || CONFIG['KERNEL_CYCLE_INTERVAL'] || 50) ||
+                                50,
+                            queueMs: Number(process.env['QUEUE_WORKER_INTERVAL_MS'] || 250) || 250,
+                            controlMs: Number(process.env['TASK_CONTROL_INTERVAL_MS'] || 500) || 500,
+                            missionMs: Number(process.env['MISSION_RUNNER_INTERVAL_MS'] || 1000) || 1000,
+                            plannerMs: Number(process.env['MISSION_PLANNER_INTERVAL_MS'] || 1500) || 1500,
+                            watchdogMs: Number(process.env['ATTEMPT_WATCHDOG_INTERVAL_MS'] || 1500) || 1500,
+                            orchestrationMs: Number(process.env['TASK_ORCHESTRATION_INTERVAL_MS'] || 1250) || 1250,
                         },
                     });
                     // eslint-disable-next-line @typescript-eslint/await-thenable
@@ -980,7 +981,7 @@ async function boot() {
         //   disabled   → Maestro não usa camada server/socket
         //
         // Fonte única:
-        //   process.env.SERVER_MODE ou CONFIG.SERVER_MODE
+        //   process.env['SERVER_MODE'] ou CONFIG.SERVER_MODE
         // ----------------------------------------------------------------------
 
         // SERVER_MODE já foi resolvido na Fase 1 (validação PM2+integrated)
@@ -1004,7 +1005,7 @@ async function boot() {
         // ----------------------------------------------------------------------
         if (SERVER_MODE === 'split') {
             const externalPortRaw =
-                process.env.SERVER_PORT ??
+                process.env['SERVER_PORT'] ??
                 CONFIG.SERVER_PORT ??
                 (discoveredServerInfo && (discoveredServerInfo.server_port || discoveredServerInfo.port)) ??
                 3008;
@@ -1046,7 +1047,6 @@ async function boot() {
                             return true;
                         }
                     } catch (/** @type {any} */ e) {
-                        const _e = /** @type {any} */ (e);
                         /* fallback */
                     }
                     if (typeof socketHub.emit === 'function') {
@@ -1207,14 +1207,14 @@ async function boot() {
                 try {
                     const serverApp = await import('./server/engine/app.js').then((m) => m.default ?? m);
                     serverApp.locals = serverApp.locals || {};
-                    serverApp.locals.runtimeReadiness = {
+                    serverApp.locals['runtimeReadiness'] = {
                         nerv: Boolean(nerv),
                         kernel: Boolean(kernel),
                         browserPool: systemMode === 'degraded' ? false : Boolean(browserPool),
                         serverAdapter: Boolean(serverAdapter),
                     };
                     // Campos minimamente exigidos para considerar o processo pronto
-                    serverApp.locals.requiredReadiness = serverApp.locals.requiredReadiness || ['nerv', 'kernel'];
+                    serverApp.locals['requiredReadiness'] = serverApp.locals['requiredReadiness'] || ['nerv', 'kernel'];
                     log('DEBUG', '[BOOT] runtimeReadiness definido no app HTTP');
                 } catch (/** @type {any} */ err) {
                     const _e = /** @type {any} */ (err);
@@ -1803,45 +1803,45 @@ const _signalHandlers = {
  */
 function cleanupSignalHandlers() {
     try {
-        if (_signalHandlers.sigterm) {
-            process.removeListener('SIGTERM', _signalHandlers.sigterm);
-            _signalHandlers.sigterm = null;
+        if (_signalHandlers['sigterm']) {
+            process.removeListener('SIGTERM', _signalHandlers['sigterm']);
+            _signalHandlers['sigterm'] = null;
         }
-        if (_signalHandlers.sigint) {
-            process.removeListener('SIGINT', _signalHandlers.sigint);
-            _signalHandlers.sigint = null;
+        if (_signalHandlers['sigint']) {
+            process.removeListener('SIGINT', _signalHandlers['sigint']);
+            _signalHandlers['sigint'] = null;
         }
-        if (_signalHandlers.sighup) {
-            process.removeListener('SIGHUP', _signalHandlers.sighup);
-            _signalHandlers.sighup = null;
+        if (_signalHandlers['sighup']) {
+            process.removeListener('SIGHUP', _signalHandlers['sighup']);
+            _signalHandlers['sighup'] = null;
         }
-        if (_signalHandlers.sigusr2) {
-            process.removeListener('SIGUSR2', _signalHandlers.sigusr2);
-            _signalHandlers.sigusr2 = null;
+        if (_signalHandlers['sigusr2']) {
+            process.removeListener('SIGUSR2', _signalHandlers['sigusr2']);
+            _signalHandlers['sigusr2'] = null;
         }
-        if (_signalHandlers.sigquit) {
-            process.removeListener('SIGQUIT', _signalHandlers.sigquit);
-            _signalHandlers.sigquit = null;
+        if (_signalHandlers['sigquit']) {
+            process.removeListener('SIGQUIT', _signalHandlers['sigquit']);
+            _signalHandlers['sigquit'] = null;
         }
-        if (_signalHandlers.sigbreak) {
-            process.removeListener('SIGBREAK', _signalHandlers.sigbreak);
-            _signalHandlers.sigbreak = null;
+        if (_signalHandlers['sigbreak']) {
+            process.removeListener('SIGBREAK', _signalHandlers['sigbreak']);
+            _signalHandlers['sigbreak'] = null;
         }
-        if (_signalHandlers.sigpipe) {
-            process.removeListener('SIGPIPE', _signalHandlers.sigpipe);
-            _signalHandlers.sigpipe = null;
+        if (_signalHandlers['sigpipe']) {
+            process.removeListener('SIGPIPE', _signalHandlers['sigpipe']);
+            _signalHandlers['sigpipe'] = null;
         }
-        if (_signalHandlers.sigchld) {
-            process.removeListener('SIGCHLD', _signalHandlers.sigchld);
-            _signalHandlers.sigchld = null;
+        if (_signalHandlers['sigchld']) {
+            process.removeListener('SIGCHLD', _signalHandlers['sigchld']);
+            _signalHandlers['sigchld'] = null;
         }
-        if (_signalHandlers.uncaughtException) {
-            process.removeListener('uncaughtException', _signalHandlers.uncaughtException);
-            _signalHandlers.uncaughtException = null;
+        if (_signalHandlers['uncaughtException']) {
+            process.removeListener('uncaughtException', _signalHandlers['uncaughtException']);
+            _signalHandlers['uncaughtException'] = null;
         }
-        if (_signalHandlers.unhandledRejection) {
-            process.removeListener('unhandledRejection', _signalHandlers.unhandledRejection);
-            _signalHandlers.unhandledRejection = null;
+        if (_signalHandlers['unhandledRejection']) {
+            process.removeListener('unhandledRejection', _signalHandlers['unhandledRejection']);
+            _signalHandlers['unhandledRejection'] = null;
         }
         log('DEBUG', '[SHUTDOWN] Signal handlers removidos');
     } catch (/** @type {any} */ err) {
@@ -1953,33 +1953,33 @@ function setupSignalHandlers(context) {
        Sinais de término operacional
     ----------------------------------------------------------- */
 
-    _signalHandlers.sigterm = () => triggerShutdown('SIGTERM');
-    _signalHandlers.sigint = () => triggerShutdown('SIGINT');
-    _signalHandlers.sigusr2 = () => triggerShutdown('SIGUSR2');
-    _signalHandlers.sigquit = () => triggerShutdown('SIGQUIT');
-    _signalHandlers.sigbreak = () => triggerShutdown('SIGBREAK');
+    _signalHandlers['sigterm'] = () => triggerShutdown('SIGTERM');
+    _signalHandlers['sigint'] = () => triggerShutdown('SIGINT');
+    _signalHandlers['sigusr2'] = () => triggerShutdown('SIGUSR2');
+    _signalHandlers['sigquit'] = () => triggerShutdown('SIGQUIT');
+    _signalHandlers['sigbreak'] = () => triggerShutdown('SIGBREAK');
 
-    process.on('SIGTERM', _signalHandlers.sigterm);
-    process.on('SIGINT', _signalHandlers.sigint);
-    registerOptionalSignal('SIGUSR2', 'sigusr2', _signalHandlers.sigusr2);
+    process.on('SIGTERM', _signalHandlers['sigterm']);
+    process.on('SIGINT', _signalHandlers['sigint']);
+    registerOptionalSignal('SIGUSR2', 'sigusr2', _signalHandlers['sigusr2']);
     if (process.platform === 'win32') {
-        process.on('SIGBREAK', _signalHandlers.sigbreak);
+        process.on('SIGBREAK', _signalHandlers['sigbreak']);
     } else {
-        process.on('SIGQUIT', _signalHandlers.sigquit);
+        process.on('SIGQUIT', _signalHandlers['sigquit']);
     }
 
     /* -----------------------------------------------------------
        Sinais opcionais de subprocesso (não encerram processo)
     ----------------------------------------------------------- */
 
-    _signalHandlers.sigpipe = () => {
+    _signalHandlers['sigpipe'] = () => {
         if (_shutdownPromise) {
             return;
         }
         log('DEBUG', '[SIGNAL] SIGPIPE recebido — ignorando para manter processo ativo');
     };
 
-    _signalHandlers.sigchld = () => {
+    _signalHandlers['sigchld'] = () => {
         if (_shutdownPromise) {
             return;
         }
@@ -1987,18 +1987,18 @@ function setupSignalHandlers(context) {
     };
 
     if (process.platform === 'win32') {
-        _signalHandlers.sigpipe = null;
-        _signalHandlers.sigchld = null;
+        _signalHandlers['sigpipe'] = null;
+        _signalHandlers['sigchld'] = null;
     } else {
-        registerOptionalSignal('SIGPIPE', 'sigpipe', _signalHandlers.sigpipe);
-        registerOptionalSignal('SIGCHLD', 'sigchld', _signalHandlers.sigchld);
+        registerOptionalSignal('SIGPIPE', 'sigpipe', _signalHandlers['sigpipe']);
+        registerOptionalSignal('SIGCHLD', 'sigchld', _signalHandlers['sigchld']);
     }
 
     /* -----------------------------------------------------------
        Reload de configuração (não encerra)
     ----------------------------------------------------------- */
 
-    _signalHandlers.sighup = async () => {
+    _signalHandlers['sighup'] = async () => {
         if (_shutdownPromise) {
             log('WARN', '[SIGNAL] SIGHUP ignorado — shutdown em andamento');
             return;
@@ -2008,7 +2008,7 @@ function setupSignalHandlers(context) {
             log('INFO', '[SIGNAL] SIGHUP — reload de configuração');
 
             // BUG-012: Adiciona timeout no reload
-            const CONFIG_RELOAD_TIMEOUT_MS = Number(process.env.CONFIG_RELOAD_TIMEOUT_MS ?? 5000);
+            const CONFIG_RELOAD_TIMEOUT_MS = Number(process.env['CONFIG_RELOAD_TIMEOUT_MS'] ?? 5000);
             const reloadPromise = CONFIG.reload('sys-sighup');
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(
@@ -2025,20 +2025,23 @@ function setupSignalHandlers(context) {
         }
     };
 
-    registerOptionalSignal('SIGHUP', 'sighup', _signalHandlers.sighup);
+    registerOptionalSignal('SIGHUP', 'sighup', _signalHandlers['sighup']);
 
     /* -----------------------------------------------------------
        Falhas fatais — crash path coordenado
     ----------------------------------------------------------- */
 
-    _signalHandlers.uncaughtException = (/** @type {any} */ error) => {
+    _signalHandlers['uncaughtException'] = (/** @type {Error} */ error) => {
         log('FATAL', `[CRASH] Uncaught Exception: ${error.message}`);
         log('ERROR', `[CRASH] Stack: ${error.stack}`);
 
         void triggerShutdown('uncaught-exception', { error });
     };
 
-    _signalHandlers.unhandledRejection = (/** @type {any} */ reason, /** @type {any} */ promise) => {
+    _signalHandlers['unhandledRejection'] = (
+        /** @type {unknown} */ reason,
+        /** @type {Promise<unknown>} */ promise,
+    ) => {
         log('FATAL', `[CRASH] Unhandled Rejection: ${reason}`);
         log('ERROR', `[CRASH] Promise: ${promise}`);
 
@@ -2047,8 +2050,8 @@ function setupSignalHandlers(context) {
         void triggerShutdown('unhandled-rejection', { error });
     };
 
-    process.on('uncaughtException', _signalHandlers.uncaughtException);
-    process.on('unhandledRejection', _signalHandlers.unhandledRejection);
+    process.on('uncaughtException', _signalHandlers['uncaughtException']);
+    process.on('unhandledRejection', _signalHandlers['unhandledRejection']);
 }
 
 function __resetShutdownStateForTests() {

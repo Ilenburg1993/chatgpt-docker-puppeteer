@@ -42,11 +42,10 @@ export const mcpCloudflareMcpPassthroughApplyTool = {
     description:
         'Plan or apply the single scoped MCP passthrough http_config_settings rule. Defaults to dryRun and requires confirmApply=true for real mutation.',
     inputSchema: {
-        dryRun: z.boolean().optional().describe('Plan only. Default: true.'),
+        dryRun: z.boolean().optional()['describe']('Plan only. Default: true.'),
         confirmApply: z
             .boolean()
-            .optional()
-            .describe('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
+            .optional()['describe']('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async ({ dryRun, confirmApply }) =>

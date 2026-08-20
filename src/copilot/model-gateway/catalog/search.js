@@ -8,6 +8,7 @@
  * @module copilot/model-gateway/catalog/search
  */
 
+import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { normalizeRuntimeAgenticCapabilityTaxonomy } from './normalizers.js';
 
 /**
@@ -124,7 +125,7 @@ function scoreProjectionText(projection, terms) {
 }
 
 /**
- * @param {ReturnType<typeof import('./json-catalog-store.js').normalizeStoredCatalogSnapshot>} snapshot
+ * @param {unknown} snapshot
  * @param {object} [options]
  * @param {string} [options.query]
  * @param {string} [options.providerId]
@@ -143,20 +144,21 @@ function scoreProjectionText(projection, terms) {
  *   routeOptionCount: number;
  *   accountOverlayCount: number;
  *   eligibilityStatus: string;
- *   projection: Record<string, any>;
+ *   projection: Record<string, unknown>;
  * }>}
  */
 export function searchModelGatewayCatalogEntries(snapshot, options = {}) {
+    const catalog = normalizeStoredCatalogSnapshot(snapshot);
     const terms = (optionalString(options.query) ?? '')
         .toLowerCase()
         .split(/\s+/u)
         .filter(Boolean);
     const providerFilter = optionalString(options.providerId)?.toLowerCase() ?? null;
     const limit = Math.min(Math.max(Math.floor(options.limit ?? 20), 1), 200);
-    const decisions = snapshot.modelEligibilityDecisions.filter(isRecord);
-    const routeOptions = snapshot.routeOptions.filter(isRecord);
-    const accountOverlays = snapshot.accountOverlays.filter(isRecord);
-    return snapshot.projections
+    const decisions = catalog.modelEligibilityDecisions.filter(isRecord);
+    const routeOptions = catalog.routeOptions.filter(isRecord);
+    const accountOverlays = catalog.accountOverlays.filter(isRecord);
+    return catalog.projections
         .filter(isRecord)
         .map((projection) => {
             const textScore = scoreProjectionText(projection, terms);

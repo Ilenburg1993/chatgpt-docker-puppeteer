@@ -177,13 +177,13 @@ describe('sdk/client › getClient', () => {
     it('startClient é alias explícito de start/getClient', async () => {
         const client = await startClient();
         expect(client).toBeDefined();
-        expect(client.getState()).toBe('connected');
+        expect(getClientState()).toBe('connected');
     });
 
     it('cria e retorna client conectado', async () => {
         const client = await getClient();
         expect(client).toBeDefined();
-        expect(client.getState()).toBe('connected');
+        expect(getClientState()).toBe('connected');
     });
 
     it('chamadas concorrentes retornam mesma promise', async () => {

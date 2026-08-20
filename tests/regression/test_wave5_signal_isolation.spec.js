@@ -34,8 +34,8 @@ function getFreePort() {
 }
 
 test('wave5: chrome proxy installs and removes signal handlers deterministically', async () => {
-    const previousNervIntegration = process.env.NERV_INTEGRATION;
-    process.env.NERV_INTEGRATION = 'false';
+    const previousNervIntegration = process.env['NERV_INTEGRATION'];
+    process.env['NERV_INTEGRATION'] = 'false';
 
     promClient.register.clear();
 
@@ -72,9 +72,9 @@ test('wave5: chrome proxy installs and removes signal handlers deterministically
         promClient.register.clear();
 
         if (previousNervIntegration === undefined) {
-            delete process.env.NERV_INTEGRATION;
+            delete process.env['NERV_INTEGRATION'];
         } else {
-            process.env.NERV_INTEGRATION = previousNervIntegration;
+            process.env['NERV_INTEGRATION'] = previousNervIntegration;
         }
     }
 });

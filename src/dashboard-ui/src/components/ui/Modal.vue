@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-vue-next';
 import {
@@ -11,36 +11,23 @@ import {
     DialogTitle,
 } from 'radix-vue';
 
-const props = defineProps({
-    open: {
-        type: Boolean,
-        default: false,
-    },
-    title: {
-        type: String,
-        default: '',
-    },
-    description: {
-        type: String,
-        default: '',
-    },
-    size: {
-        type: String,
-        default: 'md',
-        validator: (v) => ['sm', 'md', 'lg', 'xl'].includes(v),
-    },
-});
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
-const emit = defineEmits(['update:open']);
+const props = withDefaults(
+    defineProps<{ open?: boolean; title?: string; description?: string; size?: ModalSize }>(),
+    { open: false, title: '', description: '', size: 'md' },
+);
 
-const sizeClasses = {
+const emit = defineEmits<{ 'update:open': [open: boolean] }>();
+
+const sizeClasses: Record<ModalSize, string> = {
     sm: 'max-w-md',
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
 };
 
-const handleOpenChange = (open) => {
+const handleOpenChange = (open: boolean) => {
     emit('update:open', open);
 };
 </script>
@@ -68,11 +55,11 @@ const handleOpenChange = (open) => {
                 <div class="flex flex-col space-y-4 p-6">
                     <div class="flex items-start justify-between">
                         <div class="space-y-1.5">
-                            <DialogTitle v-if="title || $slots.title" class="text-xl font-semibold text-foreground">
+                            <DialogTitle v-if="title || $slots['title']" class="text-xl font-semibold text-foreground">
                                 <slot name="title">{{ title }}</slot>
                             </DialogTitle>
                             <DialogDescription
-                                v-if="description || $slots.description"
+                                v-if="description || $slots['description']"
                                 class="text-sm text-foreground-muted"
                             >
                                 <slot name="description">{{ description }}</slot>
@@ -90,7 +77,7 @@ const handleOpenChange = (open) => {
                         <slot />
                     </div>
 
-                    <div v-if="$slots.footer" class="flex justify-end gap-2 pt-4 border-t border-border">
+                    <div v-if="$slots['footer']" class="flex justify-end gap-2 pt-4 border-t border-border">
                         <slot name="footer" />
                     </div>
                 </div>

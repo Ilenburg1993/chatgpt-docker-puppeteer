@@ -24,10 +24,10 @@ function makeMissionManager(
     const stateManager = {
         baseDir: path.join(process.cwd(), 'tmp', 'missions-wave15'),
         async initialize() {},
-        async getMission(/** @type {any} */ missionId) {
+        async getMission(/** @type {string} */ _missionId) {
             return JSON.parse(JSON.stringify(stateRef.value));
         },
-        async updateMission(/** @type {any} */ missionId, /** @type {any} */ updates) {
+        async updateMission(/** @type {string} */ _missionId, /** @type {Record<string, unknown>} */ updates) {
             stateRef.value = { ...stateRef.value, ...updates };
             return JSON.parse(JSON.stringify(stateRef.value));
         },
@@ -93,10 +93,10 @@ function makeMissionManager(
     });
 }
 
-test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)', async (t) => {
+test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)', async () => {
     const dbPath = makeDbPath();
-    process.env.MAESTRO_DB_PATH = dbPath;
-    process.env.MISSION_STEP_DISPATCH_MODE = 'ssot_queue';
+    process.env['MAESTRO_DB_PATH'] = dbPath;
+    process.env['MISSION_STEP_DISPATCH_MODE'] = 'ssot_queue';
 
     const db = getDb();
     db.exec(`
@@ -109,7 +109,7 @@ test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)'
     `);
 
     after(() => {
-        delete process.env.MISSION_STEP_DISPATCH_MODE;
+        delete process.env['MISSION_STEP_DISPATCH_MODE'];
         try {
             closeDb();
         } catch (_) {}
@@ -156,13 +156,13 @@ test('wave15: MissionManager usa enqueue SSOT por padrão (sem dispatch direto)'
     assert.equal(row.status, 'PENDING');
 });
 
-test('wave15: MissionManager mantém fallback legacy_direct por env', async (t) => {
-    process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
-    process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED = 'true';
+test('wave15: MissionManager mantém fallback legacy_direct por env', async () => {
+    process.env['MISSION_STEP_DISPATCH_MODE'] = 'legacy_direct';
+    process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] = 'true';
 
     after(() => {
-        delete process.env.MISSION_STEP_DISPATCH_MODE;
-        delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
+        delete process.env['MISSION_STEP_DISPATCH_MODE'];
+        delete process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'];
     });
 
     let kernelCalls = 0;

@@ -13,10 +13,10 @@ import jwt from 'jsonwebtoken';
 import { io as ioClient } from 'socket.io-client';
 import * as socketHub from '#server/engine/socket';
 
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'wave16r_dashboard_command_disabled_secret_123456789';
-process.env.DASHBOARD_SOCKET_AUTH_REQUIRED = 'true';
-process.env.DASHBOARD_COMMANDS_ENABLED = 'false';
-process.env.DASHBOARD_COMMAND_ROLE = 'admin';
+process.env['JWT_SECRET'] = process.env['JWT_SECRET'] || 'wave16r_dashboard_command_disabled_secret_123456789';
+process.env['DASHBOARD_SOCKET_AUTH_REQUIRED'] = 'true';
+process.env['DASHBOARD_COMMANDS_ENABLED'] = 'false';
+process.env['DASHBOARD_COMMAND_ROLE'] = 'admin';
 
 const app = express();
 const server = http.createServer(app);
@@ -26,7 +26,7 @@ socketHub.init(server);
 
 const token = jwt.sign(
   { id: 'admin', username: 'admin', role: 'admin', jti: 'jti-wave16r' },
-  process.env.JWT_SECRET,
+  process.env['JWT_SECRET'],
   { algorithm: 'HS256', expiresIn: '1h' }
 );
 

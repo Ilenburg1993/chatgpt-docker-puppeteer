@@ -41,7 +41,7 @@ export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
  */
 
 /**
- * @param {ReturnType<import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
+ * @param {ReturnType<typeof import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
  * @param {{
  *     status?: 'planned' | 'applied' | 'failed' | 'dry-run';
  *     traceId?: string | null;
@@ -65,7 +65,7 @@ export async function completeAndAuditMutation(operation, result, auditContext) 
 }
 
 /**
- * @param {ReturnType<import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
+ * @param {ReturnType<typeof import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
  * @param {unknown} error
  * @param {{
  *     tool: string;

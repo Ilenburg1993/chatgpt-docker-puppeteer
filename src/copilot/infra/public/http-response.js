@@ -11,6 +11,18 @@ export const DEFAULT_HTTP_RESPONSE_MAX_BYTES = 2 * 1024 * 1024;
 export const MAX_HTTP_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;
 
 /**
+ * Minimal structural response consumed by the bounded body readers. Native `Response` satisfies this contract, while
+ * tests/adapters may provide only the body capabilities they actually implement.
+ *
+ * @typedef {object} ReadableHttpResponse
+ * @property {Pick<Headers, 'get'>} [headers]
+ * @property {Pick<ReadableStream<Uint8Array>, 'getReader'> | null} [body]
+ * @property {() => Promise<ArrayBuffer>} [arrayBuffer]
+ * @property {() => Promise<string>} [text]
+ * @property {() => Promise<unknown>} [json]
+ */
+
+/**
  * @typedef {{
  *   maxBytes?: number;
  *   defaultMaxBytes?: number;
@@ -50,7 +62,7 @@ function resolveResponseLimit(options) {
 }
 
 /**
- * @param {Response} response
+ * @param {ReadableHttpResponse} response
  * @param {BoundedResponseOptions} [options]
  * @returns {Promise<Buffer>}
  */
@@ -106,7 +118,7 @@ export async function readBoundedResponseBytes(response, options = {}) {
 }
 
 /**
- * @param {Response} response
+ * @param {ReadableHttpResponse} response
  * @param {BoundedResponseOptions} [options]
  * @returns {Promise<string>}
  */
@@ -119,7 +131,7 @@ export async function readBoundedResponseText(response, options = {}) {
 }
 
 /**
- * @param {Response} response
+ * @param {ReadableHttpResponse} response
  * @param {BoundedResponseOptions} [options]
  * @returns {Promise<unknown>}
  */

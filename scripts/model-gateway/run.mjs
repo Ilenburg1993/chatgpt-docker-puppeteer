@@ -39,7 +39,7 @@ if (!scriptId || scriptId === '--help' || scriptId === '-h') {
     process.exit(scriptId ? 0 : 2);
 }
 
-const scriptPath = MODEL_GATEWAY_SCRIPT_PATHS[scriptId];
+const scriptPath = MODEL_GATEWAY_SCRIPT_MANIFEST.find((entry) => entry.id === scriptId)?.scriptPath;
 if (!scriptPath) {
     process.stderr.write(`Unknown model-gateway script id: ${scriptId}\n\n`);
     printHelp();

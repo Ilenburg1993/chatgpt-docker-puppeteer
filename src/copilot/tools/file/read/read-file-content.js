@@ -147,79 +147,66 @@ export const readFileContentTool = buildTool({
         'that need optimistic safety. Use readStrategy=stream for large line windows and encoding=base64 only for binary ' +
         'files. Summarize returned ranges, truncation and nextCursor instead of pasting huge content back to the user.',
     parameters: z.object({
-        path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
+        path: z.string()['describe']('Caminho do arquivo (relativo ao workspace ou absoluto dentro de /workspaces/)'),
         startLine: z
             .number()
             .int()
             .min(1)
-            .optional()
-            .describe('Linha inicial (1-based). Se omitido, lê desde o início.'),
+            .optional()['describe']('Linha inicial (1-based). Se omitido, lê desde o início.'),
         endLine: z
             .number()
             .int()
             .min(1)
-            .optional()
-            .describe('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
+            .optional()['describe']('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
         cursor: z
             .string()
-            .optional()
-            .describe('Cursor retornado por chamada anterior. Em utf8 representa a próxima linha; em base64, byte offset.'),
+            .optional()['describe']('Cursor retornado por chamada anterior. Em utf8 representa a próxima linha; em base64, byte offset.'),
         maxLines: z
             .number()
             .int()
             .min(1)
-            .optional()
-            .describe('Máximo de linhas a retornar em utf8 quando endLine não for definido.'),
+            .optional()['describe']('Máximo de linhas a retornar em utf8 quando endLine não for definido.'),
         maxBytes: z
             .number()
             .int()
             .min(1)
-            .optional()
-            .describe('Máximo de bytes de saída para esta chamada. Default segue COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES.'),
+            .optional()['describe']('Máximo de bytes de saída para esta chamada. Default segue COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES.'),
         encoding: z
             .enum(['utf8', 'base64'])
             .optional()
-            .default('utf8')
-            .describe('Codificação de saída. Use base64 para arquivos binários.'),
+            .default('utf8')['describe']('Codificação de saída. Use base64 para arquivos binários.'),
         readStrategy: z
             .enum(['cached', 'stream'])
             .optional()
-            .default('cached')
-            .describe('cached forma/reusa cache full-file; stream pagina por readline sem hidratar cache full-file.'),
+            .default('cached')['describe']('cached forma/reusa cache full-file; stream pagina por readline sem hidratar cache full-file.'),
         streamHighWaterMark: z
             .number()
             .int()
             .min(1024)
             .max(16 * 1024 * 1024)
-            .optional()
-            .describe('Buffer interno do read stream em bytes quando readStrategy=stream. Default: Node/fs padrão.'),
+            .optional()['describe']('Buffer interno do read stream em bytes quando readStrategy=stream. Default: Node/fs padrão.'),
         includeMetadata: z
             .boolean()
             .optional()
-            .default(true)
-            .describe('Inclui bloco metadata com stat, cache, cursor, bytes, linhas e hashes quando solicitados.'),
+            .default(true)['describe']('Inclui bloco metadata com stat, cache, cursor, bytes, linhas e hashes quando solicitados.'),
         includeHash: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Inclui SHA-256 do arquivo completo e do conteúdo retornado em metadata.'),
+            .default(false)['describe']('Inclui SHA-256 do arquivo completo e do conteúdo retornado em metadata.'),
         includeReadThrough: z
             .union([z.boolean(), z.enum(['off', 'auto', 'force'])])
             .optional()
-            .default('auto')
-            .describe(
+            .default('auto')['describe'](
                 "Controla aquecimento de contexto relacionado: 'off' desativa, 'auto' usa heurística de tamanho, 'force' tenta sempre em utf8/cached. Boolean legado: true=auto, false=off.",
             ),
         includeCacheStats: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Inclui snapshot de stats L1 do cache de IO no metadata. Útil para auditoria/debug.'),
+            .default(false)['describe']('Inclui snapshot de stats L1 do cache de IO no metadata. Útil para auditoria/debug.'),
         quietLog: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Suprime log informativo de leitura quando a superfície chamadora já renderiza a operação.'),
+            .default(false)['describe']('Suprime log informativo de leitura quando a superfície chamadora já renderiza a operação.'),
     }),
     handler: async ({
         path: filePath,

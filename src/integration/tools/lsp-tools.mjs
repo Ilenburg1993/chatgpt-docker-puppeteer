@@ -1,5 +1,5 @@
 // @ts-check
-import { getTsserverDaemon, startTsserverDaemon } from '../lsp/tsserver-daemon.mjs';
+import { getTsserverDaemon, startTsserverDaemon } from '../lsp/tsserver-process-daemon.mjs';
 
 function formatListResult(/** @type {any} */ title, /** @type {any} */ list, /** @type {any} */ maxPreview = 10) {
     let text = `# ${title}\n\n`;
@@ -99,6 +99,9 @@ async function lspApplyCodeActionHandler(/** @type {any} */ params, /** @type {a
  * @returns {Promise<void>}
  */
 export async function registerLspTools(/** @type {any} */ registry) {
+    if (String(process.env['LSP_ENABLED'] || 'false').toLowerCase() !== 'true') {
+        return;
+    }
     registry.register(
         'lsp_definition',
         {

@@ -21,8 +21,8 @@ import { setupMCPHandler } from '../../../src/server/handlers/mcp-handler.js';
 
 // Setup test server
 before(async () => {
-    process.env.MCP_ENABLED = 'true';
-    process.env.NODE_ENV = 'test';
+    process.env['MCP_ENABLED'] = 'true';
+    process.env['NODE_ENV'] = 'test';
 
     app = express();
     app.use(express.json());
@@ -83,7 +83,7 @@ describe('MCP Endpoint Discovery', () => {
         assert.ok(data.tools.includes('rag_search'));
         assert.ok(data.tools.includes('rag_expand'));
         assert.ok(data.tools.includes('ollama_models'));
-        if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+        if (String(process.env['LSP_ENABLED'] || 'false') === 'true') {
             assert.ok(data.tools.includes('lsp_definition'));
         }
     });
@@ -158,7 +158,7 @@ describe('MCP Protocol - tools/list', () => {
         assert.ok(toolNames.includes('ollama_generate'));
         assert.ok(toolNames.includes('ollama_embed'));
         assert.ok(toolNames.includes('ollama_models'));
-        if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+        if (String(process.env['LSP_ENABLED'] || 'false') === 'true') {
             assert.ok(toolNames.includes('lsp_definition'));
         }
     });

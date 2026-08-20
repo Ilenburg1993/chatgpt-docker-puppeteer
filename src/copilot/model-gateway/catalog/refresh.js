@@ -52,7 +52,7 @@ import {
  * @property {number} [changedCount]
  * @property {boolean} [committed]
  * @property {boolean} [storeAvailable]
- * @property {Record<string, any>} [importer]
+ * @property {Record<string, unknown>} [importer]
  * @property {string[]} [selectedSourceIds]
  * @property {string[]} [skippedSourceIds]
  */
@@ -77,7 +77,7 @@ function emitRefreshProgress(onProgress, event) {
 }
 
 /**
- * @template {Record<string, any>} T
+ * @template {Record<string, unknown>} T
  * @param {T[]} records
  * @param {T[]} additions
  * @param {(record: T) => string} key
@@ -90,7 +90,7 @@ function upsertMany(records, additions, key) {
 }
 
 /**
- * @param {Record<string, any>} evidence
+ * @param {Record<string, unknown>} evidence
  * @returns {string}
  */
 function projectionGroupKey(evidence) {
@@ -102,7 +102,7 @@ function projectionGroupKey(evidence) {
 }
 
 /**
- * @param {Record<string, any>} evidence
+ * @param {Record<string, unknown>} evidence
  * @returns {string}
  */
 function providerProjectionGroupKey(evidence) {
@@ -113,7 +113,7 @@ function providerProjectionGroupKey(evidence) {
 }
 
 /**
- * @param {Record<string, any>} overlay
+ * @param {Record<string, unknown>} overlay
  * @returns {string}
  */
 function accountOverlayKey(overlay) {
@@ -130,11 +130,11 @@ function accountOverlayKey(overlay) {
 }
 
 /**
- * @param {Record<string, any>[]} evidences
- * @returns {{ projections: Record<string, any>[]; conflicts: Record<string, any>[] }}
+ * @param {Record<string, unknown>[]} evidences
+ * @returns {{ projections: Record<string, unknown>[]; conflicts: Record<string, unknown>[] }}
  */
 function buildProjectionsFromEvidence(evidences) {
-    /** @type {Map<string, Record<string, any>[]>} */
+    /** @type {Map<string, Record<string, unknown>[]>} */
     const groups = new Map();
     for (const evidence of evidences) {
         const key = projectionGroupKey(evidence);
@@ -142,9 +142,9 @@ function buildProjectionsFromEvidence(evidences) {
         group.push(evidence);
         groups.set(key, group);
     }
-    /** @type {Record<string, any>[]} */
+    /** @type {Record<string, unknown>[]} */
     const projections = [];
-    /** @type {Record<string, any>[]} */
+    /** @type {Record<string, unknown>[]} */
     const conflicts = [];
     for (const [key, group] of groups.entries()) {
         const merged = mergeModelMetadataEvidence(group);
@@ -164,11 +164,11 @@ function buildProjectionsFromEvidence(evidences) {
 }
 
 /**
- * @param {Record<string, any>[]} evidences
- * @returns {{ providerProjections: Record<string, any>[]; providerConflicts: Record<string, any>[] }}
+ * @param {Record<string, unknown>[]} evidences
+ * @returns {{ providerProjections: Record<string, unknown>[]; providerConflicts: Record<string, unknown>[] }}
  */
 function buildProviderProjectionsFromEvidence(evidences) {
-    /** @type {Map<string, Record<string, any>[]>} */
+    /** @type {Map<string, Record<string, unknown>[]>} */
     const groups = new Map();
     for (const evidence of evidences) {
         const key = providerProjectionGroupKey(evidence);
@@ -176,9 +176,9 @@ function buildProviderProjectionsFromEvidence(evidences) {
         group.push(evidence);
         groups.set(key, group);
     }
-    /** @type {Record<string, any>[]} */
+    /** @type {Record<string, unknown>[]} */
     const providerProjections = [];
-    /** @type {Record<string, any>[]} */
+    /** @type {Record<string, unknown>[]} */
     const providerConflicts = [];
     for (const [key, group] of groups.entries()) {
         const merged = mergeProviderMetadataEvidence(group);
@@ -196,8 +196,10 @@ function buildProviderProjectionsFromEvidence(evidences) {
 }
 
 /**
+ * @template TRaw
+ * @template TRow
  * @param {object} [input]
- * @param {import('./importer-runner.js').CatalogImporter[]} [input.importers]
+ * @param {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} [input.importers]
  * @param {unknown} [input.snapshot]
  * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>; writeSnapshot(snapshot: object): Promise<void> }} [input.store]
  * @param {() => Date} [input.now]
@@ -205,23 +207,13 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
- * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, any>; healthRecords?: Record<string, any>[] }} [input.eligibility]
+ * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, unknown>; healthRecords?: Record<string, unknown>[] }} [input.eligibility]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
  * @param {string | false} [input.lockKey]
  * @param {(event: ModelGatewayCatalogRefreshProgressEvent) => void} [input.onProgress]
- * @returns {Promise<{
- *     snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
- *     diff: ReturnType<typeof diffCanonicalModelProjections>;
- *     openai: ReturnType<typeof toOpenAIModelCatalogList>;
- *     refreshPlan?: ReturnType<typeof planModelGatewayCatalogRefresh>;
- *     overlayRefresh: { enabled: boolean; imported: number; retained: number; total: number };
- *     eligibilityRefresh: { enabled: boolean; run: Record<string, any> | null; decisionCount: number; diff: ReturnType<typeof diffModelGatewayEligibilityDecisions> | null; diffSummary: ReturnType<typeof summarizeModelGatewayEligibilityDiff> | null };
- *     retention: ReturnType<typeof applyModelGatewayCatalogRetention>['summary'];
- *     writePolicy: { mode: string; storeAvailable: boolean; committed: boolean };
- *     refreshLock: { enabled: boolean; key: string | null };
- * }>}
+
  */
 export async function refreshModelGatewayCatalog(input = {}) {
     const resolvedLockKey = input.lockKey === false
@@ -240,8 +232,10 @@ export async function refreshModelGatewayCatalog(input = {}) {
 }
 
 /**
+ * @template TRaw
+ * @template TRow
  * @param {object} [input]
- * @param {import('./importer-runner.js').CatalogImporter[]} [input.importers]
+ * @param {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} [input.importers]
  * @param {unknown} [input.snapshot]
  * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>; writeSnapshot(snapshot: object): Promise<void> }} [input.store]
  * @param {() => Date} [input.now]
@@ -249,12 +243,11 @@ export async function refreshModelGatewayCatalog(input = {}) {
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
- * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, any>; healthRecords?: Record<string, any>[] }} [input.eligibility]
+ * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, unknown>; healthRecords?: Record<string, unknown>[] }} [input.eligibility]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
  * @param {(event: ModelGatewayCatalogRefreshProgressEvent) => void} [input.onProgress]
- * @returns {Promise<Omit<Awaited<ReturnType<typeof refreshModelGatewayCatalog>>, 'refreshLock'>>}
  */
 async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const now = input.now ?? (() => new Date());
@@ -284,8 +277,8 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
             importers: input.importers ?? [],
             sources: previous.sources,
             now: () => startedAt,
-            force: input.force,
-            sourceIds: input.sourceIds,
+            ...(input.force === undefined ? {} : { force: input.force }),
+            ...(input.sourceIds === undefined ? {} : { sourceIds: input.sourceIds }),
         })
         : null;
     emitRefreshProgress(input.onProgress, {
@@ -300,7 +293,7 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const imported = await runCatalogImporters({
         importers: refreshPlan?.selectedImporters ?? input.importers ?? [],
         now,
-        rawPayloadStoragePolicy: input.rawPayloadStoragePolicy,
+        ...(input.rawPayloadStoragePolicy === undefined ? {} : { rawPayloadStoragePolicy: input.rawPayloadStoragePolicy }),
         onProgress: (event) => emitRefreshProgress(input.onProgress, {
             ...event,
             phase: `importer:${event.phase}`,
@@ -405,14 +398,14 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         : null;
     const eligibilityDiffSummary = eligibilityDiff ? summarizeModelGatewayEligibilityDiff(eligibilityDiff) : null;
     const eligibilityRun = evaluatedEligibility
-        ? createModelEligibilityRun(/** @type {Parameters<typeof createModelEligibilityRun>[0]} */ ({
-              .../** @type {Record<string, any>} */ (evaluatedEligibility.run),
+        ? createModelEligibilityRun({
+              ...evaluatedEligibility.run,
               diff: eligibilityDiff,
               diffSummary: eligibilityDiffSummary,
-          }))
+          })
         : null;
-    const snapshotWithEligibility = evaluatedEligibility
-        ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, /** @type {Record<string, any>} */ (eligibilityRun))
+    const snapshotWithEligibility = evaluatedEligibility && eligibilityRun
+        ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, eligibilityRun)
         : nextSnapshot;
     if (evaluatedEligibility) {
         emitRefreshProgress(input.onProgress, {
@@ -497,6 +490,5 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         removedCount: output.diff.removed.length,
         changedCount: output.diff.changed.length,
     });
-    if (refreshPlan) return { ...output, refreshPlan };
-    return output;
+    return { ...output, refreshPlan };
 }

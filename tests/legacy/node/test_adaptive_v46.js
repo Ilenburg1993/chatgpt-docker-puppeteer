@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
-import adaptive from '#logic/adaptive';
+import * as adaptive from '#logic/adaptive';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -8,6 +7,7 @@ import path from 'node:path';
    SETUP & TEARDOWN
 -------------------------------------------------------------------------- */
 const STATE_FILE = path.join(import.meta.dirname, '..', 'logs', 'adaptive_state.json');
+/** @type {string | null} */
 let originalState = null;
 
 async function setup() {
@@ -29,31 +29,43 @@ async function teardown() {
 /* --------------------------------------------------------------------------
    HELPERS
 -------------------------------------------------------------------------- */
-function assertEqual(actual, expected, message) {
+function assertEqual(/** @type {unknown} */ actual, /** @type {unknown} */ expected, /** @type {string} */ message) {
     if (actual !== expected) {
         throw new Error(`${message}: expected ${expected}, got ${actual}`);
     }
 }
 
-function assertGreater(actual, threshold, message) {
+function assertGreater(/** @type {number} */ actual, /** @type {number} */ threshold, /** @type {string} */ message) {
     if (actual <= threshold) {
         throw new Error(`${message}: expected > ${threshold}, got ${actual}`);
     }
 }
 
-function assertLess(actual, threshold, message) {
+function assertLess(/** @type {number} */ actual, /** @type {number} */ threshold, /** @type {string} */ message) {
     if (actual >= threshold) {
         throw new Error(`${message}: expected < ${threshold}, got ${actual}`);
     }
 }
 
-async function sleep(ms) {
+async function sleep(/** @type {number} */ ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * @param {import('#logic/adaptive').AdaptiveSnapshot} snapshot
+ * @param {string} target
+ * @returns {import('#logic/adaptive').AdaptiveTargetProfile}
+ */
+function requireProfile(snapshot, target) {
+    const profile = snapshot.targets[target];
+    if (!profile) throw new Error(`Perfil adaptativo ausente: ${target}`);
+    return profile;
 }
 
 /* --------------------------------------------------------------------------
    TESTES
 -------------------------------------------------------------------------- */
+/** @type {Array<{ name: string; run: () => Promise<void> }>} */
 const tests = [];
 
 // Test 1: Variância Converge Corretamente (Welford's Algorithm)
@@ -67,7 +79,7 @@ tests.push({
         }
 
         const snapshot = adaptive.getSnapshot();
-        const profile = snapshot.targets['test-variance'];
+        const profile = requireProfile(snapshot, 'test-variance');
         const std = Math.sqrt(profile.ttft.var);
 
         // Após 100 samples, avg deve estar próximo de 1000 (±10%)
@@ -88,12 +100,6 @@ tests.push({
     async run() {
         // Teste simplificado: verificar lógica de circuit breaker
         // Criar mock de stats com avg alto
-        const mockStats = {
-            avg: 150000, // 150s - acima do threshold de 120s
-            var: 10000,
-            count: 10,
-        };
-
         // shouldCircuitBreak deveria retornar true
         // Como a função é privada, vamos testar indiretamente via getAdjustedTimeout
         // usando um target que já tem avg alto
@@ -110,7 +116,7 @@ tests.push({
         }
 
         const snapshot = adaptive.getSnapshot();
-        const profile = snapshot.targets[targetName];
+        const profile = requireProfile(snapshot, targetName);
         console.log(`  Final avg: ${profile.stream.avg}ms (count=${profile.stream.count})`);
 
         // Se avg > 120000, circuit breaker deve ativar
@@ -198,7 +204,7 @@ tests.push({
         }
 
         const snapshot = adaptive.getSnapshot();
-        const stats = snapshot.targets['test-percentile'].stream;
+        const stats = requireProfile(snapshot, 'test-percentile').stream;
 
         const p50 = adaptive.getPercentileTimeout(stats, 50);
         const p95 = adaptive.getPercentileTimeout(stats, 95);
@@ -225,7 +231,7 @@ tests.push({
         const after = Date.now();
 
         const snapshot = adaptive.getSnapshot();
-        const profile = snapshot.targets['test-timestamp'];
+        const profile = requireProfile(snapshot, 'test-timestamp');
 
         assertGreater(profile.last_update, before, 'last_update mínimo');
         assertLess(profile.last_update, after, 'last_update máximo');
@@ -253,8 +259,9 @@ async function runTests() {
             await test.run();
             console.log('✅');
             passed++;
-        } catch (e) {
-            console.log(`❌\n   Error: ${e.message}`);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.log(`❌\n   Error: ${message}`);
             failed++;
         }
     }

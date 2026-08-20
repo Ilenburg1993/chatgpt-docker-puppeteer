@@ -5,7 +5,7 @@ const DEFAULT_TIMEOUT_MS = 15000;
 
 /** Constante/valor exportado: http. */
 export const http = axios.create({
-    timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS,
+    timeout: Number(import.meta.env['VITE_API_TIMEOUT_MS'] || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS,
     withCredentials: true,
 });
 
@@ -31,8 +31,7 @@ http.interceptors.response.use(
             if (requestId) {
                 error.request_id = requestId;
             }
-        } catch (/** @type {any} */ _rawE) {
-            const e = /** @type {any} */ (_rawE);
+        } catch {
             // ignore
         }
         return Promise.reject(error);

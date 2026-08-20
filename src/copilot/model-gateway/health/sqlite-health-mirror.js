@@ -32,7 +32,7 @@ function errorMessage(value) {
 
 /**
  * @param {object} input
- * @param {{ writeRuntimeHealthRecords(records: Record<string, unknown>[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {{ writeRuntimeHealthRecords(records: readonly unknown[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
  * @param {Record<string, unknown>[]} [input.records]
  * @param {string | number | Date} [input.observedAt]
  * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number; records: number }>}
@@ -55,7 +55,7 @@ export async function mirrorByokProviderHealthToSqlite(input) {
  * runtime facts durable in both operational stores before readiness/live tooling reads them.
  *
  * @param {object} input
- * @param {{ writeRuntimeHealthRecords(records: Record<string, unknown>[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {{ writeRuntimeHealthRecords(records: readonly unknown[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
  * @param {Record<string, unknown>[]} [input.records]
  * @param {string | number | Date} [input.observedAt]
  * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number; records: number; flushed: boolean }>}
@@ -103,7 +103,7 @@ export async function flushAndMirrorByokProviderHealthToSqlite(input) {
  * edge and materializes the latest redacted facts into SQLite for explain/readiness/selection layers.
  *
  * @param {object} input
- * @param {{ writeRuntimeHealthRecords(records: Record<string, unknown>[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {{ writeRuntimeHealthRecords(records: readonly unknown[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
  * @param {number} [input.debounceMs]
  * @param {boolean} [input.enabled]
  * @param {(error: unknown) => void} [input.onError]

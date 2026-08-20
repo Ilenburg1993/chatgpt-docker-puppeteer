@@ -64,8 +64,8 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
     const artifactsDir = makeArtifactsDir();
 
     before(() => {
-        process.env.MAESTRO_DB_PATH = dbPath;
-        process.env.MAESTRO_ARTIFACTS_DIR = artifactsDir;
+        process.env['MAESTRO_DB_PATH'] = dbPath;
+        process.env['MAESTRO_ARTIFACTS_DIR'] = artifactsDir;
         getDb(); // migrations
     });
 
@@ -257,7 +257,7 @@ describe('SSOT Orchestration Worker (ITERATIVE/MULTI_STEP)', { concurrency: 1 },
                         strategy: 'MULTI_STEP',
                         workflow_config: {
                             steps: [
-                                { id: 's0', action: 'execute_prompt', name: 'Step 0' },
+                                { id: 's0', action: 'execute_prompt', name: 'Step 0', config: {} },
                                 {
                                     id: 's1',
                                     action: 'execute_prompt',

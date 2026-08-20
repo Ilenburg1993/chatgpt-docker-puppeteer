@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file uses untyped mocks extensively
 /**
  * Testes — Faixa 6: sdk/session-lifecycle.js
  *
@@ -8,7 +6,7 @@
  */
 
 import { SdkOperationError } from '#copilot/sdk/errors';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockLog } = vi.hoisted(() => ({
     mockLog: vi.fn(),
@@ -231,8 +229,7 @@ describe('sdk/session-lifecycle', () => {
 
         it('rejeita para model não-string', async () => {
             const s = fakeSession();
-            // @ts-expect-error -- testing invalid argument type
-            await expect(setSessionModel(s, 42)).rejects.toThrow(TypeError);
+            await expect(Reflect.apply(setSessionModel, undefined, [s, 42])).rejects.toThrow(TypeError);
         });
 
         it('rejeita para sessão inválida', async () => {

@@ -36,7 +36,7 @@ const mocks = vi.hoisted(() => ({
         pendingQuestionShadowRemainingMs: null,
         lastPrInfo: null,
     },
-    activitySnapshot: {
+    activitySnapshot: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/state/activity-state.js').readTerminalActivitySnapshot>} */ ({
         phase: 'tool',
         label: 'Executando tool',
         detail: 'lendo arquivo',
@@ -47,7 +47,7 @@ const mocks = vi.hoisted(() => ({
         startedAt: 1,
         updatedAt: 2,
         ageMs: 1000,
-    },
+    }),
 }));
 
 vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({

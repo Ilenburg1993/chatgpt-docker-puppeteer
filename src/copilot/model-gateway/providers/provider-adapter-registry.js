@@ -16,30 +16,32 @@ import { openAICompatibleAdapter } from './openai-compatible-adapter.js';
 import { openAIProviderFamilyAdapters } from './openai-provider-family-adapter.js';
 import { openRouterAdapter } from './openrouter-adapter.js';
 
+/** @typedef {import('./openai-compatible-adapter.js').OpenAICompatibleAdapter} OpenAICompatibleAdapter */
+
 export class ProviderAdapterRegistry {
-    /** @type {Array<Record<string, any>>} */
+    /** @type {OpenAICompatibleAdapter[]} */
     #adapters;
 
     /**
-     * @param {Array<Record<string, any>>} adapters
+     * @param {OpenAICompatibleAdapter[]} adapters
      */
     constructor(adapters) {
         this.#adapters = [...adapters];
     }
 
     /**
-     * @returns {Array<Record<string, any>>}
+     * @returns {OpenAICompatibleAdapter[]}
      */
     list() {
         return [...this.#adapters];
     }
 
     /**
-     * @param {Record<string, any>} provider
-     * @returns {Record<string, any>}
+     * @param {Record<string, unknown>} provider
+     * @returns {OpenAICompatibleAdapter}
      */
     resolve(provider) {
-        const adapter = this.#adapters.find((candidate) => candidate['canHandle']?.(provider));
+        const adapter = this.#adapters.find((candidate) => candidate.canHandle(provider));
         return adapter ?? openAICompatibleAdapter;
     }
 }
@@ -58,8 +60,8 @@ export function createDefaultProviderAdapterRegistry() {
 export const defaultProviderAdapterRegistry = createDefaultProviderAdapterRegistry();
 
 /**
- * @param {Record<string, any>} provider
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} provider
+ * @returns {OpenAICompatibleAdapter}
  */
 export function resolveModelGatewayProviderAdapter(provider) {
     return defaultProviderAdapterRegistry.resolve(provider);

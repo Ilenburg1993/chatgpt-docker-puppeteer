@@ -5,14 +5,14 @@ import { inferenceGateway } from './gateway.js';
 import { loadInferencePoliciesFromDb } from './persistence.js';
 import { createInferenceGatewayServer } from './server.js';
 
-const enabled = String(process.env.INFERENCE_GATEWAY_ENABLED || 'false').toLowerCase() === 'true';
+const enabled = String(process.env['INFERENCE_GATEWAY_ENABLED'] || 'false').toLowerCase() === 'true';
 if (!enabled) {
     console.log('[inference-gateway] disabled (INFERENCE_GATEWAY_ENABLED=false)');
     process.exit(0);
 }
 
-const host = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-const port = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+const host = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+const port = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
 
 function reloadPolicies() {
     try {

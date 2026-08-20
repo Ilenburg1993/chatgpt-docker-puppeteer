@@ -53,7 +53,7 @@ echo "$LD_PRELOAD"`;
     writeFileSync(tmpFile, scriptContent);
 
     // ensure HOME is available and merge with provided env
-    const fullEnv = { ...process.env, HOME: process.env.HOME || '', ...env };
+    const fullEnv = { ...process.env, HOME: process.env['HOME'] || '', ...env };
 
     try {
         // execute the temp script directly
@@ -101,7 +101,7 @@ PASSWD_HERE
 fi
 cat "$PASSWD_FILE"`;
             const result = execSync(`bash -c '${script}'`, {
-                env: { ...process.env, HOME: process.env.HOME },
+                env: { ...process.env, HOME: process.env['HOME'] },
             }).toString();
             assert(result.includes(`${currentUser}:x:${currentUid}`));
         } finally {

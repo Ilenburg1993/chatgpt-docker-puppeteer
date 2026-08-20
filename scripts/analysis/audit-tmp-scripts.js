@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const TMP_DIR = '/tmp';
-const _SCRIPTS_DIR = path.join(import.meta.dirname);
 const AUTO_CLEANUP = process.argv.includes('--auto-cleanup');
 
 // Classification rules based on filename and content patterns

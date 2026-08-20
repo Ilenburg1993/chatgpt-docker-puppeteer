@@ -78,7 +78,7 @@ async function deleteResponse(taskId) {
             await fs.unlink(filepath);
         }
     } catch (/** @type {any} */ _) {
-        const _ce = /** @type {any} */ (_);
+
         // Falha no delete não deve interromper o fluxo principal (Best-effort)
     }
 }

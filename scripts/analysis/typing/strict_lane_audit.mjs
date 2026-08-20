@@ -77,8 +77,8 @@ function getCoveredFiles(laneFile) {
         const laneDir = dirname(resolve(laneFile));
         /** @type {Record<string, unknown>} */
         const config = JSON.parse(readFileSync(laneFile, 'utf8'));
-        const files = /** @type {string[]} */ (config.files ?? []);
-        const includes = /** @type {string[]} */ (config.include ?? []);
+        const files = /** @type {string[]} */ (config['files'] ?? []);
+        const includes = /** @type {string[]} */ (config['include'] ?? []);
 
         for (const f of files) {
             covered.add(relative(ROOT, resolve(laneDir, f)));

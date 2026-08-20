@@ -11,17 +11,23 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { pathToFileURL } from 'node:url';
-import { registerCanonicalMcpTools } from '../registry.js';
+import { MCP_TOOL_EXECUTION_LIMITS } from '../control-plane/tool-capabilities.js';
 
 const DEFAULT_TOP = 20;
-const DEFAULT_MAX_ENVELOPE_BYTES = 160 * 1024;
+const DEFAULT_MAX_ENVELOPE_BYTES = MCP_TOOL_EXECUTION_LIMITS.toolsList.maxEnvelopeBytes;
 
 /**
- * @param {{ top?: number; maxEnvelopeBytes?: number }} [options]
+ * @param {{
+ *     tools: import('../registry.js').McpToolDefinition[];
+ *     top?: number;
+ *     maxEnvelopeBytes?: number;
+ * }} options
  * @returns {Promise<Record<string, unknown>>}
  */
-export async function buildToolPayloadAudit(options = {}) {
+export async function buildToolPayloadAudit(options) {
+    if (!Array.isArray(options?.tools)) {
+        throw new TypeError('[mcp/tool-payload-audit] options.tools deve conter a superfície canônica de ferramentas.');
+    }
     const top = readPositiveInteger(options.top ?? process.env['COPILOT_MCP_TOOL_PAYLOAD_TOP'], DEFAULT_TOP, 1, 200);
     const maxEnvelopeBytes = readPositiveInteger(
         options.maxEnvelopeBytes ?? process.env['COPILOT_MCP_TOOL_PAYLOAD_MAX_BYTES'],
@@ -29,7 +35,7 @@ export async function buildToolPayloadAudit(options = {}) {
         1024,
         16 * 1024 * 1024,
     );
-    const tools = await listWireMcpTools();
+    const tools = await listWireMcpTools(options.tools);
     const toolRows = tools
         .map((tool) => {
             const totalBytes = jsonBytes(tool);
@@ -124,11 +130,26 @@ export async function buildToolPayloadAudit(options = {}) {
  * Ask the real MCP SDK for tools/list through an in-memory transport. This avoids serializing internal Zod state and
  * stays aligned with the SDK's schema conversion, omitted fields, and execution metadata.
  *
+ * @param {import('../registry.js').McpToolDefinition[]} tools
  * @returns {Promise<Awaited<ReturnType<Client['listTools']>>['tools']>}
  */
-async function listWireMcpTools() {
+async function listWireMcpTools(tools) {
     const server = new McpServer({ name: 'copilot-mcp-tool-payload-audit', version: '1.0.0' });
-    registerCanonicalMcpTools(server);
+    for (const tool of tools) {
+        server.registerTool(
+            tool.name,
+            /** @type {Parameters<McpServer['registerTool']>[1]} */ ({
+                title: tool.title,
+                description: tool.description,
+                inputSchema: tool.inputSchema,
+                annotations: tool.annotations,
+                ...(tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
+                ...(tool.securitySchemes !== undefined ? { securitySchemes: tool.securitySchemes } : {}),
+                ...(tool._meta !== undefined ? { _meta: tool._meta } : {}),
+            }),
+            async (args) => tool.handler(args),
+        );
+    }
     const client = new Client({ name: 'copilot-mcp-tool-payload-audit-client', version: '1.0.0' });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     try {
@@ -246,8 +267,4 @@ function percentile(values, quantile) {
 function readPositiveInteger(value, fallback, minimum, maximum) {
     const parsed = Number(value ?? fallback);
     return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? Math.floor(parsed) : fallback;
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-    process.stdout.write(`${JSON.stringify(await buildToolPayloadAudit(), null, 2)}\n`);
 }

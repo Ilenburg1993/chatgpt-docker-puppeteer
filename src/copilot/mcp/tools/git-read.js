@@ -35,8 +35,8 @@ export const gitReadTools = [
         title: 'Git diff',
         description: 'Return a unified Git diff for the workspace or for one path.',
         inputSchema: {
-            staged: z.boolean().optional().describe('If true, return staged changes only.'),
-            path: z.string().optional().describe('Optional workspace-relative path to diff.'),
+            staged: z.boolean().optional()['describe']('If true, return staged changes only.'),
+            path: z.string().optional()['describe']('Optional workspace-relative path to diff.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ staged, path }) => {
@@ -59,7 +59,7 @@ export const gitReadTools = [
         title: 'Git log',
         description: 'Return recent Git commits for the workspace.',
         inputSchema: {
-            limit: z.number().int().min(1).max(50).optional().describe('Maximum commits to return. Default: 10.'),
+            limit: z.number().int().min(1).max(50).optional()['describe']('Maximum commits to return. Default: 10.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ limit }) => {

@@ -16,9 +16,9 @@ function makeDbPath() {
     );
 }
 
-test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando informado', async (t) => {
+test('wave15: releaseTaskLock exige causalidade com expectedAttemptId quando informado', async () => {
     const dbPath = makeDbPath();
-    process.env.MAESTRO_DB_PATH = dbPath;
+    process.env['MAESTRO_DB_PATH'] = dbPath;
     const db = getDb();
     db.exec(`
         DELETE FROM task_dependencies;

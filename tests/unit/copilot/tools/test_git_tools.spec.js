@@ -78,16 +78,6 @@ function mockGitOutput(stdout = '', stderr = '') {
     execFileMockImpl.mockImplementation(() => ({ stdout, stderr }));
 }
 
-function mockGitError(stderr = 'error', code = 1, stdout = '') {
-    execFileMockImpl.mockImplementation(() => {
-        const err = new Error(stderr);
-        /** @type {any} */ (err).stderr = stderr;
-        /** @type {any} */ (err).stdout = stdout;
-        /** @type {any} */ (err).code = code;
-        throw err;
-    });
-}
-
 /**
  * Configura sequência de respostas do git (para commands que chamam safeGitArgs múltiplas vezes).
  *

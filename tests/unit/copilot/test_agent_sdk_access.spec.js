@@ -571,7 +571,6 @@ describe('sdk-access facade', () => {
     });
 
     it('startAgentSdkQuotaMonitor cria e inicia o monitor vanilla pela façade canônica', () => {
-        const start = vi.fn();
         const monitor = startAgentSdkQuotaMonitor({
             client: /** @type {any} */ ({ rpc: {} }),
             intervalMs: 60_000,

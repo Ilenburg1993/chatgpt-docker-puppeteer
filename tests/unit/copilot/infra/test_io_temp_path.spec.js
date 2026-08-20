@@ -32,6 +32,7 @@ function localHostId() {
     return generated.hostId;
 }
 
+/** @param {string} hostId @param {number} pid @param {string} token @param {string} [role] */
 function managedEntry(hostId, pid, token, role = 'move') {
     return `.orphan.bin.${hostId}.${pid}.${token}.${role}.tmp`;
 }

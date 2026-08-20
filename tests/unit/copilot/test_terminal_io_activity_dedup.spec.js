@@ -56,7 +56,7 @@ vi.mock('../../../src/copilot/terminal/state/ui-preferences.js', () => ({
 }));
 
 vi.mock('../../../src/copilot/terminal/events/tool-lifecycle-runtime.js', () => ({
-    handleTerminalIoToolLifecycle: ({ entry }) => {
+    handleTerminalIoToolLifecycle: (/** @type {{ entry: { operation: string } }} */ { entry }) => {
         mocks.broadcastSse('tool.lifecycle', { type: 'io_op', operation: entry.operation });
     },
 }));

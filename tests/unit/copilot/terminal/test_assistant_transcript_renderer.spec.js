@@ -25,6 +25,7 @@ describe('terminal/events/assistant-transcript-renderer', () => {
 
     it('omite detalhe duplicado quando o título já explica a mensagem', () => {
         terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
+        /** @type {string[]} */
         const writes = [];
         const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
             writes.push(String(chunk));
@@ -52,6 +53,7 @@ describe('terminal/events/assistant-transcript-renderer', () => {
 
     it('remove bloco inicial de thinking vazado do transcript público e do histórico exportável', () => {
         terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
+        /** @type {string[]} */
         const writes = [];
         const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
             writes.push(String(chunk));
@@ -95,6 +97,7 @@ describe('terminal/events/assistant-transcript-renderer', () => {
 
     it('suprime sufixo tardio quando o transcript completo recente já cobriu o conteúdo', () => {
         terminalAssistantTranscriptRendererTestHarness.clearRecentTranscriptHashes();
+        /** @type {string[]} */
         const writes = [];
         const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
             writes.push(String(chunk));

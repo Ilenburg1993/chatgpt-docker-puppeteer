@@ -55,7 +55,7 @@ import { createTtlCache } from './ttl-cache.js';
  * @property {boolean} publicOauthDiagnosticsEnabled
  *
  * @typedef {object} McpAuthContext
- * @property {string | undefined} bearerToken
+ * @property {string | null | undefined} bearerToken
  * @property {Record<string, string | string[] | undefined>} [headers]
  * @property {string} [method]
  * @property {string} [url]

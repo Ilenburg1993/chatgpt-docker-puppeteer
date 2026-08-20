@@ -9,7 +9,7 @@ import path from 'path';
 
 // the script uses cwd and --root so we can run in a tmpdir
 
-test('make-skill creates directory and package alias', async (t) => {
+test('make-skill creates directory and package alias', async (_t) => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'skilltest-'));
     // create a minimal package.json so alias update works
     const pkgPath = path.join(tmp, 'package.json');

@@ -102,7 +102,6 @@ export async function findProjectRoot(/** @type {any} */ startDir = process.cwd(
             await fs.access(candidate);
             return current;
         } catch (_) {
-            const _ce = /** @type {any} */ (_);
             const parent = path.dirname(current);
             if (parent === current) return startDir;
             current = parent;
@@ -110,7 +109,7 @@ export async function findProjectRoot(/** @type {any} */ startDir = process.cwd(
     }
 }
 
-function globToRegExp(/** @type {any} */ pattern) {
+function globToRegExp(/** @type {string} */ pattern) {
     const escaped = pattern
         .replace(/[.+^${}()|[\]\\]/g, '\\$&')
         .replace(/\*\*/g, '::DOUBLE_STAR::')
@@ -120,19 +119,19 @@ function globToRegExp(/** @type {any} */ pattern) {
     return new RegExp(`^${escaped}$`);
 }
 
-function compileGlobs(/** @type {any} */ globs = []) {
+function compileGlobs(/** @type {unknown[]} */ globs = []) {
     return globs
         .map((/** @type {any} */ g) => String(g || '').trim())
         .filter(Boolean)
-        .map((/** @type {any} */ g) => /** @type {any} */ ({ raw: g, re: globToRegExp(g) }));
+        .map((g) => ({ raw: g, re: globToRegExp(g) }));
 }
 
-function matchesAny(/** @type {any} */ relPath, /** @type {any} */ compiledGlobs) {
+function matchesAny(/** @type {string} */ relPath, /** @type {{ raw: string; re: RegExp }[]} */ compiledGlobs) {
     if (!compiledGlobs || compiledGlobs.length === 0) return false;
     return compiledGlobs.some((/** @type {any} */ { re }) => re.test(relPath));
 }
 
-function normalizeRelPathInput(/** @type {any} */ relPath) {
+function normalizeRelPathInput(/** @type {unknown} */ relPath) {
     return String(relPath || '')
         .trim()
         .replace(/\\/g, '/')
@@ -141,7 +140,8 @@ function normalizeRelPathInput(/** @type {any} */ relPath) {
 
 function buildCompiledGlobs(/** @type {any} */ { profile = 'full', includeGlobs = [], excludeGlobs = [] } = {}) {
     const profileName = String(profile || 'full');
-    const profileGlobs = /** @type {any} */ (RAG_SCAN_PROFILES)[profileName] ?? RAG_SCAN_PROFILES.full;
+    const profileGlobs =
+        /** @type {Record<string, string[]>} */ (RAG_SCAN_PROFILES)[profileName] ?? RAG_SCAN_PROFILES.full;
     const compiledInclude = compileGlobs([...profileGlobs, ...(includeGlobs || [])]);
     const compiledExclude = compileGlobs(excludeGlobs || []);
     return {
@@ -156,7 +156,7 @@ export function isRagIndexableRelPath(/** @type {any} */ relPath, /** @type {any
     if (!normalized) return false;
     if (isDenied(normalized)) return false;
     if (!isAllowedByExt(normalized)) return false;
-    const docsMode = resolveDocsMode(options.docsMode ?? process.env.RAG_DOCS_MODE ?? 'include');
+    const docsMode = resolveDocsMode(options.docsMode ?? process.env['RAG_DOCS_MODE'] ?? 'include');
     if (docsMode === 'exclude' && isDocLikePath(normalized)) return false;
     if (docsMode === 'only' && !isDocLikePath(normalized)) return false;
 
@@ -211,7 +211,7 @@ export async function scanWorkspace(
         includeGlobs = [],
         excludeGlobs = [],
         maxFileBytes = 2_000_000,
-        docsMode = process.env.RAG_DOCS_MODE || 'include',
+        docsMode = process.env['RAG_DOCS_MODE'] || 'include',
     } = {},
 ) {
     const root = path.resolve(rootDir);
@@ -220,7 +220,6 @@ export async function scanWorkspace(
         const raw = await fs.readFile(path.join(root, '.gitignore'), 'utf8');
         ig.add(raw);
     } catch (_) {
-        const _ce = /** @type {any} */ (_);
         // no .gitignore
     }
 
@@ -239,10 +238,9 @@ export async function scanWorkspace(
         try {
             entries = await fs.readdir(fullDir, { withFileTypes: true });
         } catch (_) {
-            const _ce = /** @type {any} */ (_);
             return;
         }
-        entries.sort(/** @type {any} */ (a, b) => a.name.localeCompare(b.name));
+        entries.sort((a, b) => a.name.localeCompare(b.name));
 
         for (const ent of entries) {
             const relPath = relDir ? path.posix.join(relDir, ent.name) : ent.name;
@@ -269,7 +267,6 @@ export async function scanWorkspace(
             try {
                 stat = await fs.stat(fullPath);
             } catch (_) {
-                const _ce = /** @type {any} */ (_);
                 continue;
             }
             if (stat.size > maxFileBytes) continue;
@@ -285,13 +282,12 @@ export async function scanWorkspace(
                     buffer: buf,
                 });
             } catch (_) {
-                const _ce = /** @type {any} */ (_);
                 continue;
             }
         }
     }
 
     await walk('');
-    results.sort(/** @type {any} */ (a, b) => a.relPath.localeCompare(b.relPath));
+    results.sort((a, b) => a.relPath.localeCompare(b.relPath));
     return results;
 }

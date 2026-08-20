@@ -10,7 +10,7 @@ import { warmMcpRemoteJwks } from './auth.js';
 
 const DEFAULT_JWKS_WARMUP_DELAY_MS = 2_000;
 
-/** @type {NodeJS.Timeout | null} */
+/** @type {{ unref?: () => void } | NodeJS.Timeout | number | null} */
 let warmupTimer = null;
 let warmupState = createInitialState();
 
@@ -24,7 +24,7 @@ let warmupState = createInitialState();
  *     delayMs?: number;
  *     enabled?: boolean;
  *     env?: NodeJS.ProcessEnv;
- *     setTimeoutFn?: typeof setTimeout;
+ *     setTimeoutFn?: (callback: () => void, delayMs: number) => { unref?: () => void };
  *     warmupRunner?: (options?: { env?: NodeJS.ProcessEnv }) => Promise<McpAuthJwksWarmupResult>;
  *     logFn?: McpAuthJwksWarmupLogFn;
  * }} [options]
@@ -53,7 +53,7 @@ export function scheduleMcpAuthJwksWarmup(options = {}) {
         warmupTimer = null;
         void runWarmup(warmupRunner, env, logFn);
     }, delayMs);
-    warmupTimer?.unref?.();
+    if (warmupTimer && typeof warmupTimer === 'object') warmupTimer.unref?.();
     return true;
 }
 
@@ -68,7 +68,8 @@ export function readMcpAuthJwksWarmupState() {
  * @returns {void}
  */
 export function resetMcpAuthJwksWarmupForTests() {
-    if (warmupTimer) clearTimeout(warmupTimer);
+    if (typeof warmupTimer === 'number') clearTimeout(warmupTimer);
+    else if (warmupTimer && typeof warmupTimer === 'object' && Symbol.toPrimitive in warmupTimer) clearTimeout(/** @type {NodeJS.Timeout} */ (warmupTimer));
     warmupTimer = null;
     warmupState = createInitialState();
 }

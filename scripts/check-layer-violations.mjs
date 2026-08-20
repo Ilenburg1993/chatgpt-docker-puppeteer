@@ -161,8 +161,6 @@ function resolveTarget(spec, fileModule) {
 
     // Relative imports que saem do módulo
     if (spec.startsWith('../')) {
-        // Conta quantos níveis sobe
-        const _ups = spec.split('/').filter((s) => s === '..').length;
         // Se sobe 1+ vezes a partir do módulo, pode estar entrando em outro módulo
         // Heurística: se o relative import contém referência a outro módulo de primeiro nível
         const afterUps = spec.replace(/^(\.\.\/)+/, '');

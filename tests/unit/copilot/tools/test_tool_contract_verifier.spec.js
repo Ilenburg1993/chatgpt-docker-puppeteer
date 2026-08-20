@@ -79,7 +79,7 @@ describe('tool-contract-verifier', () => {
         expect(report.autonomySkipPermissionCount).toBe(1);
         expect(report.decisionCount).toBe(1);
         expect(report.permissionMode).toBe('approve_all');
-        expect(report.metadataByName.patch_file).toMatchObject({
+        expect(report.metadataByName['patch_file']).toMatchObject({
             operation: 'patch',
             risk: 'high',
             sideEffect: 'filesystem',

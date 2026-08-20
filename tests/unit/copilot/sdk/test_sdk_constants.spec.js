@@ -173,6 +173,7 @@ describe('SESSION_EVENTS', () => {
 
     it('todos os valores são strings não-vazias', () => {
         for (const [key, value] of Object.entries(SESSION_EVENTS)) {
+            expect(key.length).toBeGreaterThan(0);
             expect(typeof value).toBe('string');
             expect(value.length).toBeGreaterThan(0);
         }
@@ -236,12 +237,13 @@ describe('SESSION_EVENTS', () => {
         const generated = [
             ...new Set(
                 [...sessionEventsDts.matchAll(/export interface \w+Event \{[\s\S]*?\n\}/g)].flatMap((eventBlock) =>
-                    [...eventBlock[0].matchAll(/\n\s*type:\s*"([^"]+)"/g)].map((match) => match[1]),
+                    [...eventBlock[0].matchAll(/\n\s*type:\s*"([^"]+)"/g)].map((match) => match[1] ?? ''),
                 ),
             ),
         ].sort();
         const local = [...new Set(Object.values(SESSION_EVENTS))].sort();
-        const missing = generated.filter((eventType) => !local.includes(eventType));
+        const localSet = new Set(/** @type {string[]} */ (local));
+        const missing = generated.filter((eventType) => !localSet.has(eventType));
 
         expect(generated).toHaveLength(113);
         expect(missing).toEqual([]);

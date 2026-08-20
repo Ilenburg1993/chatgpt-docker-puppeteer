@@ -123,7 +123,7 @@ async function handleIssue(println, args) {
         printGhStatus(println, 'buscando issues');
         const issueResult = await listIssues({
             state: /** @type {'open' | 'closed' | 'all'} */ (stateArg),
-            label,
+            ...(label === undefined ? {} : { label }),
         }).catch(() => ({
             items: [],
             hasMore: false,

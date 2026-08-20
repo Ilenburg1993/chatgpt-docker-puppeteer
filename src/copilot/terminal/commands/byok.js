@@ -153,8 +153,8 @@ import {
     listTerminalSdkSessionInventory,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
-    readTerminalConfigProjection,
-    readTerminalRuntimeState,
+    readTerminalByokRuntimeConfigProjection,
+    readTerminalRuntimeContextWindow,
 } from '../frontend/index.js';
 import {
     terminalThemeDivider,
@@ -198,12 +198,7 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
  */
 
 /**
- * @typedef {Awaited<ReturnType<typeof runConfiguredByokChatProbe>>
- *     | Awaited<ReturnType<typeof runConfiguredByokAgentProbe>>
- *     | Awaited<ReturnType<typeof runConfiguredByokStreamingProbe>>
- *     | Awaited<ReturnType<typeof runConfiguredByokJsonProbe>>
- *     | Awaited<ReturnType<typeof runConfiguredByokVisionProbe>>} ByokProbeResult
- *
+ * @typedef {import('../../model-gateway/control-plane/probe-execution.js').ModelGatewayExecutableProbeResult} ByokProbeResult
  * @typedef {'chat' | 'agent' | 'streaming' | 'json' | 'vision'} ByokProbeMode
  */
 
@@ -503,7 +498,7 @@ function booleanField(record, key, fallback) {
  * agent é a etapa que deve derrubar um falso positivo antes da promoção para a sessão viva.
  *
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function toGatewayRouteCandidate(model) {
     const meta = getByokModelMetadata(model);
@@ -611,7 +606,7 @@ function toGatewayRouteCandidate(model) {
 }
 
 /**
- * @param {Record<string, any>} candidate
+ * @param {Record<string, unknown>} candidate
  * @returns {string}
  */
 function gatewayRouteCandidateModelKey(candidate) {
@@ -622,9 +617,9 @@ function gatewayRouteCandidateModelKey(candidate) {
 }
 
 /**
- * @param {Record<string, any>[]} candidates
- * @param {Record<string, any> | null} catalogSnapshot
- * @returns {Record<string, any>[]}
+ * @param {Record<string, unknown>[]} candidates
+ * @param {Record<string, unknown> | null} catalogSnapshot
+ * @returns {Record<string, unknown>[]}
  */
 function enrichGatewayRouteCandidatesWithRouteOptions(candidates, catalogSnapshot) {
     if (!catalogSnapshot) return candidates;
@@ -645,7 +640,7 @@ function enrichGatewayRouteCandidatesWithRouteOptions(candidates, catalogSnapsho
         const matches = routeCandidatesByModel.get(gatewayRouteCandidateModelKey(candidate)) ?? [];
         if (matches.length === 0) return [candidate];
         return matches.map(
-            /** @param {Record<string, any>} routeCandidate */ (routeCandidate) => ({
+            /** @param {Record<string, unknown>} routeCandidate */ (routeCandidate) => ({
                 ...candidate,
                 routeProfile: routeCandidate['routeProfile'],
                 selectorKind: routeCandidate['selectorKind'],
@@ -705,7 +700,7 @@ function renderByokProfileCostTag(profileName) {
 }
 
 /**
- * @param {ReturnType<typeof readTerminalRuntimeState> | null} runtimeState
+ * @param {ReturnType<typeof readTerminalRuntimeContextWindow>} contextState
  * @returns {{
  *     estimatedRequestTokens: number;
  *     contextTokens: number;
@@ -713,8 +708,7 @@ function renderByokProfileCostTag(profileName) {
  *     utilization: number | null;
  * } | null}
  */
-function estimateCurrentByokRequestBudget(runtimeState) {
-    const contextState = runtimeState?.contextWindow ?? null;
+function estimateCurrentByokRequestBudget(contextState) {
     if (!contextState) return null;
     const tokenLimit = finitePositiveNumber(/** @type {{ tokenLimit?: unknown }} */ (contextState).tokenLimit);
     const directTokens = finitePositiveNumber(/** @type {{ tokens?: unknown }} */ (contextState).tokens);
@@ -735,7 +729,7 @@ function estimateCurrentByokRequestBudget(runtimeState) {
  */
 function readCurrentByokRequestBudget() {
     try {
-        return estimateCurrentByokRequestBudget(readTerminalRuntimeState());
+        return estimateCurrentByokRequestBudget(readTerminalRuntimeContextWindow());
     } catch {
         return null;
     }
@@ -1919,8 +1913,8 @@ async function persistByokRouteDecisionToSqlite(decisionEvent) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
- * @param {Record<string, any>} diff
+ * @param {Record<string, unknown>} snapshot
+ * @param {Record<string, unknown>} diff
  * @param {number} limit
  * @returns {Parameters<typeof recommendCatalogDiffProbes>[0]}
  */
@@ -2281,7 +2275,7 @@ function optionalCount(value) {
 
 /**
  * @param {ReturnType<typeof readTerminalByokProjection>} projection
- * @param {ReturnType<typeof readTerminalConfigProjection>['modelGatewayProjection'] | null} runtimeProjection
+ * @param {ReturnType<typeof readTerminalByokRuntimeConfigProjection>['modelGatewayProjection'] | null} runtimeProjection
  * @returns {Record<string, unknown> | null}
  */
 function resolveByokGatewayActiveRoute(projection, runtimeProjection) {
@@ -2319,7 +2313,7 @@ function renderByokGatewayActiveRouteLabel(route) {
 async function renderStatus(projection, println) {
     const { summary } = projection;
     const statusCapabilities = resolveByokStatusCapabilities(projection);
-    const runtimeConfig = readTerminalConfigProjection();
+    const runtimeConfig = readTerminalByokRuntimeConfigProjection();
     println('');
     println(terminalThemeHeadline('tool', 'BYOK status'));
     println(terminalThemeDivider(66));
@@ -2511,7 +2505,7 @@ async function renderByokModelSwitchSummary(projection, println) {
     );
     try {
         const inventory = await listTerminalSdkSessionInventory();
-        const runtimeConfig = readTerminalConfigProjection();
+        const runtimeConfig = readTerminalByokRuntimeConfigProjection();
         const binding = classifyTerminalByokSdkBinding(
             summary,
             inventory.persistedByokBinding,
@@ -2759,7 +2753,7 @@ function renderByokProviderEndpointInventory(println, rest) {
 }
 
 /**
- * @param {Record<string, any>} importer
+ * @param {Record<string, unknown>} importer
  * @param {string | null} selector
  * @returns {boolean}
  */
@@ -3057,7 +3051,7 @@ function renderByokGatewayLocalGuidance(println) {
  */
 function renderByokGatewayProbeMatrix(println, rest) {
     const selector = optionalScalarString(rest.find((item) => !/^(probes|probe|matrix|matriz)$/iu.test(item)));
-    const rows = listProviderWireProbeMatrix({ providerId: selector ?? undefined });
+    const rows = listProviderWireProbeMatrix(selector === null ? {} : { providerId: selector });
     const summary = summarizeProviderWireProbeMatrix(rows);
 
     println('');
@@ -3229,7 +3223,7 @@ function renderByokGatewayEnvRequirements(println, rest) {
     const selector = optionalScalarString(
         rest.find((item) => !/^(secrets|secret|env|requirements|requisitos|missing)$/iu.test(item)),
     );
-    const rows = evaluateModelGatewayProviderEnvRequirements({ env: process.env, providerId: selector ?? undefined });
+    const rows = evaluateModelGatewayProviderEnvRequirements({ env: process.env, ...(selector === null ? {} : { providerId: selector }) });
     const summary = summarizeModelGatewayProviderEnvRequirements(rows);
 
     println('');
@@ -3371,8 +3365,12 @@ function renderByokGatewayCanonicalCommands(println, rest) {
         .find((item) => /^(orientation|metadata|pre-runtime|selection|validate|prebuild|live-readiness)$/iu.test(item))
         ?.toLowerCase();
     const full = rest.some((item) => /^(full|all|completo|todos|--full|--all)$/iu.test(item));
-    const commands = listModelGatewayCanonicalCommands({ surface, phase });
-    const renderedLines = renderModelGatewayCanonicalCommandLines({ surface, phase });
+    const commandFilters = {
+        ...(surface === undefined ? {} : { surface }),
+        ...(phase === undefined ? {} : { phase }),
+    };
+    const commands = listModelGatewayCanonicalCommands(commandFilters);
+    const renderedLines = renderModelGatewayCanonicalCommandLines(commandFilters);
     const visibleCommands = full || surface || phase ? commands : commands.slice(0, 48);
     println('');
     println(terminalThemeHeadline('tool', 'Comandos canônicos BYOK'));
@@ -4050,7 +4048,7 @@ async function renderByokGatewayCatalogRefreshLog(println) {
  * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T>
  *         ? T
  *         : never} snapshot
- * @returns {Record<string, any> | null}
+ * @returns {Record<string, unknown> | null}
  */
 function findLatestCatalogRefreshRun(snapshot) {
     return (
@@ -4076,7 +4074,7 @@ function normalizeCatalogDiffForDisplay(value) {
         ? record['changed']
               .filter((item) => item && typeof item === 'object')
               .map((item) => {
-                  const changedRecord = /** @type {Record<string, any>} */ (item);
+                  const changedRecord = asRecord(item);
                   return {
                       key: optionalScalarString(changedRecord['key']) ?? 'unknown',
                       changedFields: Array.isArray(changedRecord['changedFields'])
@@ -4115,7 +4113,7 @@ function normalizeEligibilityDiffForDisplay(value) {
         ? record['changed']
               .filter((item) => item && typeof item === 'object')
               .map((item) => {
-                  const changedRecord = /** @type {Record<string, any>} */ (item);
+                  const changedRecord = asRecord(item);
                   return {
                       key: optionalScalarString(changedRecord['key']) ?? 'unknown',
                       changedFields: Array.isArray(changedRecord['changedFields'])
@@ -4144,7 +4142,7 @@ function normalizeEligibilityDiffForDisplay(value) {
  * @param {ReturnType<InstanceType<typeof JsonModelGatewayCatalogStore>['readSnapshot']> extends Promise<infer T>
  *         ? T
  *         : never} snapshot
- * @returns {Record<string, any> | null}
+ * @returns {Record<string, unknown> | null}
  */
 function findLatestEligibilityRun(snapshot) {
     const runs = Array.isArray(snapshot.modelEligibilityRuns) ? snapshot.modelEligibilityRuns : [];
@@ -5125,7 +5123,7 @@ async function renderByokGatewayProviderExplain(println, selector) {
  * @param {string[]} rest
  * @returns {{
  *     query: string;
- *     providerId: string | undefined;
+ *     providerId?: string;
  *     onlyEligible: boolean;
  *     requireTools: boolean;
  *     requireStreaming: boolean;
@@ -5146,7 +5144,7 @@ function parseByokGatewayCatalogSearchArgs(rest) {
         .trim();
     return {
         query,
-        providerId,
+        ...(providerId === undefined ? {} : { providerId }),
         onlyEligible: rest.some((item) => /^(eligible|only-eligible)$/iu.test(item)),
         requireTools: rest.some((item) => /^(tools|tool)$/iu.test(item)),
         requireStreaming: rest.some((item) => /^(streaming|stream)$/iu.test(item)),
@@ -6919,7 +6917,7 @@ async function renderByokGatewayCatalogFreshness(println, rest) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @param {string | null} selector
  * @returns {boolean}
  */
@@ -7445,7 +7443,12 @@ async function runByokProbe(mode, selection, eventBus = null) {
                 : {}),
         },
     });
-    const probe = /** @type {ByokProbeResult} */ (executed.probe);
+    const probe = executed.probe;
+    if (!probe) {
+        throw new Error(
+            '[terminal/byok] replay de probe legado nao contem payload suficiente para renderizacao; execute a probe novamente',
+        );
+    }
     return {
         probe,
         providerAttempted: executed.providerAttempted,

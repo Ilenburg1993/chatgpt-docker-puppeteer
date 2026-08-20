@@ -14,10 +14,10 @@ const HIGH_VALUE_OUTPUT_TOKENS = 4_096;
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
 }
 
 /**
@@ -54,7 +54,7 @@ function truthy(value) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function projectionKey(projection) {
@@ -66,7 +66,7 @@ function projectionKey(projection) {
 }
 
 /**
- * @param {Record<string, any>} decision
+ * @param {Record<string, unknown>} decision
  * @returns {string}
  */
 function eligibilityKey(decision) {
@@ -78,7 +78,7 @@ function eligibilityKey(decision) {
 }
 
 /**
- * @param {Record<string, any> | null} decision
+ * @param {Record<string, unknown> | null} decision
  * @returns {'eligible' | 'unknown' | 'excluded' | null}
  */
 function eligibilityStatus(decision) {
@@ -90,8 +90,8 @@ function eligibilityStatus(decision) {
 
 /**
  * @param {'eligible' | 'unknown' | 'excluded' | null} status
- * @param {Record<string, any> | null} decision
- * @param {Record<string, any>} options
+ * @param {Record<string, unknown> | null} decision
+ * @param {Record<string, unknown>} options
  * @returns {boolean}
  */
 function canRecommendProbeForEligibility(status, decision, options) {
@@ -105,7 +105,7 @@ function canRecommendProbeForEligibility(status, decision, options) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {{ chat: boolean; streaming: boolean; json: boolean; agent: boolean; vision: boolean; highValue: boolean; reasons: string[] }}
  */
 function inferProbeSurface(projection) {
@@ -149,7 +149,7 @@ function inferProbeSurface(projection) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @param {string} kind
  * @returns {string}
  */
@@ -163,8 +163,8 @@ function buildProbeCommand(projection, kind) {
 /**
  * @param {object} input
  * @param {{ added?: string[]; changed?: Array<{ key?: string; changedKinds?: string[] }> }} input.diff
- * @param {Array<Record<string, any>>} input.projections
- * @param {Array<Record<string, any>>} [input.eligibilityDecisions]
+ * @param {Array<Record<string, unknown>>} input.projections
+ * @param {Array<Record<string, unknown>>} [input.eligibilityDecisions]
  * @param {boolean} [input.requireEligibilityDecision]
  * @param {boolean} [input.allowUnknownEligibility]
  * @param {number} [input.limit]

@@ -216,7 +216,7 @@ describe('Kernel Task Runtime - Ambiente de Execução', () => {
             let recoveryExecutado = false;
 
             const runtime = {
-                onError: (/** @type {any} */ error) => {
+                onError: (/** @type {unknown} */ _error) => {
                     recoveryExecutado = true;
                 },
             };

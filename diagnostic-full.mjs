@@ -5,7 +5,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import ts from './scripts/analysis/typescript-compat.mjs';
 
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, 'jsconfig.json');
@@ -43,6 +43,7 @@ const allDiagnostics = [
 ];
 
 // Categorizar diagnósticos
+/** @type {Record<string, ts.Diagnostic[]> & { error: ts.Diagnostic[], warning: ts.Diagnostic[], suggestion: ts.Diagnostic[], message: ts.Diagnostic[] }} */
 const categories = {
     error: [],
     warning: [],
@@ -69,6 +70,7 @@ if (categories.error.length > 0) {
     console.log('\n❌ ERROS (primeiros 100):\n');
 
     const errors = categories.error.slice(0, 100);
+    /** @type {Record<string, { line: number, column: number, code: number, message: string }[]>} */
     const errorsByFile = {};
 
     for (const diagnostic of errors) {
@@ -78,15 +80,12 @@ if (categories.error.length > 0) {
         }
 
         const fileName = path.relative(ROOT, diagnostic.file.fileName);
-        const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+        const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
         const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
         const code = diagnostic.code;
 
-        if (!errorsByFile[fileName]) {
-            errorsByFile[fileName] = [];
-        }
-
-        errorsByFile[fileName].push({
+        const fileErrors = errorsByFile[fileName] ?? (errorsByFile[fileName] = []);
+        fileErrors.push({
             line: line + 1,
             column: character + 1,
             code,
@@ -98,7 +97,7 @@ if (categories.error.length > 0) {
     const sortedFiles = Object.keys(errorsByFile).sort();
 
     for (const file of sortedFiles) {
-        const diagnostics = errorsByFile[file];
+        const diagnostics = errorsByFile[file] ?? [];
         console.log(`\n📄 ${file} (${diagnostics.length} erro(s))`);
         for (const d of diagnostics) {
             console.log(
@@ -121,7 +120,7 @@ if (categories.warning.length > 0) {
         if (!diagnostic.file) continue;
 
         const fileName = path.relative(ROOT, diagnostic.file.fileName);
-        const { line } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
+        const { line } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
         const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
 
         console.log(`   ${fileName}:${line + 1} - ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`);
@@ -151,7 +150,7 @@ const report = {
             return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
 
         const fileName = path.relative(ROOT, d.file.fileName);
-        const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
+        const { line, character } = d.file.getLineAndCharacterOfPosition(d.start ?? 0);
 
         return {
             file: fileName,
@@ -167,7 +166,7 @@ const report = {
             return { global: true, message: ts.flattenDiagnosticMessageText(d.messageText, '\n'), code: d.code };
 
         const fileName = path.relative(ROOT, d.file.fileName);
-        const { line, character } = d.file.getLineAndCharacterOfPosition(d.start);
+        const { line, character } = d.file.getLineAndCharacterOfPosition(d.start ?? 0);
 
         return {
             file: fileName,
@@ -188,9 +187,11 @@ console.log('\n✅ Análise concluída!');
 
 // Análise de padrões de erros
 if (categories.error.length > 0) {
+    /** @type {Record<string, number>} */
     const errorCodes = {};
     for (const err of categories.error) {
-        errorCodes[err.code] = (errorCodes[err.code] || 0) + 1;
+        const code = String(err.code);
+        errorCodes[code] = (errorCodes[code] ?? 0) + 1;
     }
 
     console.log('\n📈 Top 10 códigos de erro mais frequentes:');

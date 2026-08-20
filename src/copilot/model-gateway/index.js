@@ -281,6 +281,7 @@ export {
     isModelGatewayCatalogRefreshLocked,
     resolveModelGatewayCatalogRefreshLockKey,
     resolveModelDeprecationAlias,
+    defineCatalogImporter,
     runCatalogImporters,
     searchModelGatewayCatalogEntries,
     summarizeModelGatewayCatalogSnapshot,

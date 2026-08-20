@@ -8,7 +8,7 @@
  */
 
 /**
- * @typedef {ReturnType<import('./deps.js').resolveSdkRouteSharedDeps>} SdkRouteDeps
+ * @typedef {ReturnType<typeof import('./deps.js').resolveSdkRouteSharedDeps>} SdkRouteDeps
  *
  * @typedef {{ type?: string; data?: { message?: string; stack?: string }; [key: string]: unknown }} RouteSessionEvent
  *

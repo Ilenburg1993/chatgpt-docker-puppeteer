@@ -19,23 +19,25 @@ function estimateMessageTokens(message) {
     return Math.ceil(utf8ByteLength(message, 'model gateway probe budget estimate') / 4);
 }
 
+
 /**
- * @param {Record<string, any>} byok
+ * @param {ReturnType<typeof import('#copilot/sdk/session/provider').readConfiguredByokState>['summary']} byok
  * @param {'chat' | 'agent'} mode
  * @param {string} prompt
  */
 export function evaluateModelGatewayProbeAdmission(byok, mode, prompt) {
+    const limits = byok.limits;
     const limit =
-        typeof byok['limits']?.['maxRequestTokens'] === 'number'
-            ? byok['limits']['maxRequestTokens']
-            : typeof byok['limits']?.['tokensPerMinute'] === 'number'
-              ? byok['limits']['tokensPerMinute']
+        typeof limits.maxRequestTokens === 'number'
+            ? limits.maxRequestTokens
+            : typeof limits.tokensPerMinute === 'number'
+              ? limits.tokensPerMinute
               : null;
     const estimatedRequestTokens = Math.max(
         MODEL_GATEWAY_PROBE_REQUEST_FLOOR_TOKENS,
         estimateMessageTokens(prompt) + MODEL_GATEWAY_PROBE_RESPONSE_RESERVE_TOKENS,
     );
-    if (byok['enabled'] !== true || byok['ready'] !== true || limit === null) {
+    if (byok.enabled !== true || byok.ready !== true || limit === null) {
         return {
             shouldWarn: false,
             shouldBlock: false,

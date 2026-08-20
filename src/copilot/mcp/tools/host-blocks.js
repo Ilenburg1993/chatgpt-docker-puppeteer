@@ -236,23 +236,21 @@ export const mcpHostBlockDiagnosticsTool = {
     description:
         'Classify a ChatGPT host-side MCP block and return lower-friction replacement tools plus a stable audit template. Does not persist anything.',
     inputSchema: {
-        toolName: z.string().optional().describe('Tool name ChatGPT tried to call when the host blocked it.'),
-        hostMessage: z.string().optional().describe('Host/UI error text shown by ChatGPT.'),
+        toolName: z.string().optional()['describe']('Tool name ChatGPT tried to call when the host blocked it.'),
+        hostMessage: z.string().optional()['describe']('Host/UI error text shown by ChatGPT.'),
         operationKind: z
             .string()
-            .optional()
-            .describe('Optional coarse kind: read, plan-read, bounded-write, destructive, validation, url-input.'),
+            .optional()['describe']('Optional coarse kind: read, plan-read, bounded-write, destructive, validation, url-input.'),
         argsShape: z
             .string()
-            .optional()
-            .describe('Short non-sensitive description of attempted args, not raw secrets or full file content.'),
-        mcpReachedServer: z.boolean().optional().describe('Whether MCP server logs/metrics/audit show that the call reached MCP.'),
-        httpStatus: z.number().int().min(100).max(599).optional().describe('Observed HTTP status, if any.'),
-        wwwAuthenticatePresent: z.boolean().optional().describe('Whether a WWW-Authenticate challenge was observed.'),
-        cloudflareRayIdPresent: z.boolean().optional().describe('Whether Cloudflare response metadata, such as a Ray ID, was observed.'),
-        mcpAuditEventPresent: z.boolean().optional().describe('Whether MCP audit/log/metrics recorded the attempted tool call.'),
-        schemaErrorPresent: z.boolean().optional().describe('Whether the error was an input schema or argument validation failure.'),
-        toolResultIsError: z.boolean().optional().describe('Whether MCP returned a tool result with isError=true.'),
+            .optional()['describe']('Short non-sensitive description of attempted args, not raw secrets or full file content.'),
+        mcpReachedServer: z.boolean().optional()['describe']('Whether MCP server logs/metrics/audit show that the call reached MCP.'),
+        httpStatus: z.number().int().min(100).max(599).optional()['describe']('Observed HTTP status, if any.'),
+        wwwAuthenticatePresent: z.boolean().optional()['describe']('Whether a WWW-Authenticate challenge was observed.'),
+        cloudflareRayIdPresent: z.boolean().optional()['describe']('Whether Cloudflare response metadata, such as a Ray ID, was observed.'),
+        mcpAuditEventPresent: z.boolean().optional()['describe']('Whether MCP audit/log/metrics recorded the attempted tool call.'),
+        schemaErrorPresent: z.boolean().optional()['describe']('Whether the error was an input schema or argument validation failure.'),
+        toolResultIsError: z.boolean().optional()['describe']('Whether MCP returned a tool result with isError=true.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async ({

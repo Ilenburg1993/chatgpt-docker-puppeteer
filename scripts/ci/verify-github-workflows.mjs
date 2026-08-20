@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,7 +59,7 @@ function readLocalWorkflowNames() {
         const parsed = /** @type {Record<string, unknown> | null} */ (yaml.load(raw));
         return {
             file,
-            name: String(parsed?.name || file),
+            name: String(parsed?.['name'] || file),
             path: `.github/workflows/${file}`,
         };
     });
@@ -128,13 +128,13 @@ try {
     const remote = readRemoteWorkflows(owner, repo);
 
     const localByName = new Map(local.map((item) => [item.name, item]));
-    const remoteVersioned = remote.filter((item) => String(item.path || '').startsWith('.github/workflows/'));
-    const remoteDynamic = remote.filter((item) => !String(item.path || '').startsWith('.github/workflows/'));
-    const remoteVersionedNames = new Set(remoteVersioned.map((item) => String(item.name || '')));
+    const remoteVersioned = remote.filter((item) => String(item['path'] || '').startsWith('.github/workflows/'));
+    const remoteDynamic = remote.filter((item) => !String(item['path'] || '').startsWith('.github/workflows/'));
+    const remoteVersionedNames = new Set(remoteVersioned.map((item) => String(item['name'] || '')));
 
     const missingRemote = local.filter((item) => !remoteVersionedNames.has(item.name));
-    const unexpectedRemoteVersioned = remoteVersioned.filter((item) => !localByName.has(String(item.name || '')));
-    const unexpectedDynamic = remoteDynamic.filter((item) => !allowedDynamicWorkflows.has(String(item.name || '')));
+    const unexpectedRemoteVersioned = remoteVersioned.filter((item) => !localByName.has(String(item['name'] || '')));
+    const unexpectedDynamic = remoteDynamic.filter((item) => !allowedDynamicWorkflows.has(String(item['name'] || '')));
     const typingWorkflowIssues = validateTypingWorkflowContract();
 
     console.log(`[ci] Local versioned workflows: ${local.length}`);
@@ -150,7 +150,7 @@ try {
     if (remoteDynamic.length > 0) {
         console.log('[ci] Dynamic/external workflows reported by GitHub:');
         for (const item of remoteDynamic) {
-            console.log(`  - ${String(item.name || 'unknown')} (${String(item.path || '')})`);
+            console.log(`  - ${String(item['name'] || 'unknown')} (${String(item['path'] || '')})`);
         }
     }
 
@@ -164,14 +164,14 @@ try {
     if (unexpectedRemoteVersioned.length > 0) {
         console.log('[ci] Remote versioned workflows missing locally:');
         for (const item of unexpectedRemoteVersioned) {
-            console.log(`  - ${String(item.name || 'unknown')} (${String(item.path || '')})`);
+            console.log(`  - ${String(item['name'] || 'unknown')} (${String(item['path'] || '')})`);
         }
     }
 
     if (unexpectedDynamic.length > 0) {
         console.log('[ci] Unexpected dynamic workflows reported by GitHub:');
         for (const item of unexpectedDynamic) {
-            console.log(`  - ${String(item.name || 'unknown')} (${String(item.path || '')})`);
+            console.log(`  - ${String(item['name'] || 'unknown')} (${String(item['path'] || '')})`);
         }
     }
 

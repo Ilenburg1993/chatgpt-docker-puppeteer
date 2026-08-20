@@ -152,13 +152,14 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
 import Modal from '@/components/ui/Modal.vue';
 import { useRealtime } from '@/composables/useRealtime';
 import { useTaskStore } from '@/stores/tasks';
+import type { BadgeVariant, ButtonVariant } from '@/types/dashboard';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -177,11 +178,19 @@ export default {
         // Real-time integration
         useRealtime();
 
-        const notice = ref(null); // { type: 'success'|'info'|'error', message: string }
-        let noticeTimer = null;
+        interface LegacyTask {
+            id?: string;
+            unified_status?: string;
+            meta?: { id?: string; priority?: number; created_at?: string | number };
+            spec?: { target?: string; payload?: { user_message?: string } };
+            runtime_state?: { progress_percent?: number };
+        }
+
+        const notice = ref<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+        let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
         // Local filter state
-        const statusFilter = ref(null);
+        const statusFilter = ref<string | null>(null);
         const searchFilter = ref('');
 
         // Computed
@@ -197,12 +206,11 @@ export default {
         const confirmOpen = ref(false);
         const confirmTitle = ref('');
         const confirmDescription = ref('');
-        const confirmVariant = ref('primary');
+        const confirmVariant = ref<ButtonVariant>('primary');
         const confirmLoading = ref(false);
-        /** @type {import('vue').Ref<null | (() => Promise<void>)>} */
-        const confirmAction = ref(null);
+        const confirmAction = ref<null | (() => Promise<void>)>(null);
 
-        const showNotice = (type, message) => {
+        const showNotice = (type: 'success' | 'info' | 'error', message: string) => {
             notice.value = { type, message };
             if (noticeTimer) {
                 clearTimeout(noticeTimer);
@@ -228,7 +236,17 @@ export default {
             return 'border-info/40 bg-info-muted/20';
         });
 
-        const openConfirm = ({ title, description, variant = 'primary', action }) => {
+        const openConfirm = ({
+            title,
+            description,
+            variant = 'primary',
+            action,
+        }: {
+            title: string;
+            description: string;
+            variant?: ButtonVariant;
+            action: () => Promise<void>;
+        }) => {
             confirmTitle.value = title;
             confirmDescription.value = description;
             confirmVariant.value = variant;
@@ -264,20 +282,20 @@ export default {
             taskStore.clearError();
         };
 
-        const viewTask = (task) => {
+        const viewTask = (task: LegacyTask) => {
             const taskId = task.meta?.id || task.id;
             router.push(`/tasks/${taskId}`);
         };
 
-        const retryTask = async (task) => {
+        const retryTask = async (_task: LegacyTask) => {
             try {
                 showNotice('info', 'Retry is not implemented yet.');
-            } catch (err) {
-                showNotice('error', `Failed to retry: ${err.message}`);
+            } catch (err: unknown) {
+                showNotice('error', `Failed to retry: ${err instanceof Error ? err.message : String(err)}`);
             }
         };
 
-        const confirmDelete = (task) => {
+        const confirmDelete = (task: LegacyTask) => {
             const taskId = task.meta?.id || task.id;
             openConfirm({
                 title: 'Delete task',
@@ -294,8 +312,8 @@ export default {
             try {
                 await taskStore.retryFailed();
                 showNotice('success', 'Retry initiated for all failed tasks');
-            } catch (err) {
-                showNotice('error', `Failed to retry: ${err.message}`);
+            } catch (err: unknown) {
+                showNotice('error', `Failed to retry: ${err instanceof Error ? err.message : String(err)}`);
             }
         };
 
@@ -311,8 +329,8 @@ export default {
             });
         };
 
-        const getBadgeVariant = (status) => {
-            const variants = {
+        const getBadgeVariant = (status: string | undefined): BadgeVariant => {
+            const variants: Record<string, BadgeVariant> = {
                 RUNNING: 'warning',
                 PENDING: 'info',
                 DONE: 'success',
@@ -320,16 +338,16 @@ export default {
                 PAUSED: 'info',
                 CANCELLED: 'default',
             };
-            return variants[status] || 'default';
+            return status ? variants[status] || 'default' : 'default';
         };
 
-        const truncatePrompt = (prompt, maxLength = 150) => {
+        const truncatePrompt = (prompt: string, maxLength = 150) => {
             if (!prompt) return '';
             if (prompt.length <= maxLength) return prompt;
             return prompt.substring(0, maxLength) + '...';
         };
 
-        const formatDate = (dateStr) => {
+        const formatDate = (dateStr: string | number | Date | null | undefined) => {
             if (!dateStr) return '';
             const date = new Date(dateStr);
             return date.toLocaleString();

@@ -12,7 +12,10 @@ import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
 loadModelGatewayDotenv();
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -24,15 +27,6 @@ runtime probes or call models.
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 function readProfiles() {
     const profiles = [];
@@ -43,6 +37,7 @@ function readProfiles() {
     return profiles.map((profile) => profile.trim()).filter(Boolean);
 }
 
+/** @param {Record<string, unknown> | null | undefined} counts */
 function formatCountMap(counts) {
     return Object.entries(counts ?? {})
         .map(([key, count]) => `${key}:${count}`)
@@ -77,7 +72,7 @@ if (json) {
 } else {
     process.stdout.write(`model-gateway pre-runtime selection audit: ok=${selection.ok ? 'yes' : 'no'} mode=${selection.mode}\n`);
     process.stdout.write(
-        `snapshot: projections=${selection.snapshotContext.projectionCount} routes=${selection.snapshotContext.routeOptionCount} overlays=${selection.snapshotContext.accountOverlayCount} eligibility=${selection.snapshotContext.eligibilityDecisionCount} candidates=${selection.snapshotContext.candidateCount}\n`,
+        `snapshot: projections=${selection.snapshotContext['projectionCount']} routes=${selection.snapshotContext['routeOptionCount']} overlays=${selection.snapshotContext['accountOverlayCount']} eligibility=${selection.snapshotContext['eligibilityDecisionCount']} candidates=${selection.snapshotContext['candidateCount']}\n`,
     );
     process.stdout.write(
         `profiles: selected=${selection.summary.selectedProfileCount}/${selection.summary.profileCount} candidates=${selection.summary.candidateCount} rejected=${selection.summary.rejectedCount}\n`,
@@ -85,7 +80,7 @@ if (json) {
     for (const profile of selection.profiles) {
         const selected = profile.selected;
         const selectedLabel = selected
-            ? `${selected.providerId}:${selected.providerModel} via ${selected.selectorKind} score=${selected.score ?? '-'}`
+            ? `${selected['providerId']}:${selected['providerModel']} via ${selected['selectorKind']} score=${selected['score'] ?? '-'}`
             : '(none)';
         process.stdout.write(
             `  ${profile.profileId}: selected=${selectedLabel} candidates=${profile.candidateCount} rejected=${profile.rejectedCount}\n`,

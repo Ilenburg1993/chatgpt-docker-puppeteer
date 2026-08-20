@@ -7,7 +7,10 @@ import {
     SqliteModelGatewayCatalogStore,
 } from '#copilot/model-gateway';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -19,26 +22,24 @@ Without --apply it is a dry-run preview. Use --all --apply only for deliberate f
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
+/** @param {unknown} value */
 function clean(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/** @param {string} name */
 function readColonArg(name) {
     const prefix = `${name}:`;
     const token = args.find((arg) => arg.startsWith(prefix));
     return token ? token.slice(prefix.length) : '';
 }
 
+/**
+ * @param {ReturnType<typeof listByokProviderModelHealth>[number]} record
+ * @param {{ providerId: string | null, providerModel: string | null, routeProfile: string | null }} scope
+ * @param {boolean} all
+ */
 function matchesScope(record, scope, all) {
     if (all) return true;
     if (scope.providerId && record.providerId !== scope.providerId) return false;

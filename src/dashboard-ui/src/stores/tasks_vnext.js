@@ -1,6 +1,7 @@
 // @ts-check
 import { formatHttpError, http } from '@/lib/http';
 import { defineStore } from 'pinia';
+/** @import {DashboardTask} from '@/types/dashboard' */
 
 function _normalizeUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
@@ -71,8 +72,8 @@ async function _dispatchControlCommand(/** @type {any} */ command, /** @type {an
 /** Constante/valor exportado: useTasksVNextStore. */
 export const useTasksVNextStore = defineStore('tasks_vnext', {
     state: () => ({
-        items: /** @type {any[]} */ ([]),
-        byId: /** @type {Map<string, any>} */ (new Map()),
+        items: /** @type {DashboardTask[]} */ ([]),
+        byId: /** @type {Map<string, DashboardTask>} */ (new Map()),
         taskIdsByMissionId: /** @type {Map<string, string[]>} */ (new Map()),
         cursor: null,
         hasMore: false,
@@ -80,11 +81,11 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
         loadingMore: false,
         error: null,
         filters: {
-            status: null,
-            stage: null,
-            mission_id: null,
-            target: null,
-            blocked: null, // true|false|null
+            status: /** @type {string | null} */ (null),
+            stage: /** @type {string | null} */ (null),
+            mission_id: /** @type {string | null} */ (null),
+            target: /** @type {string | null} */ (null),
+            blocked: /** @type {boolean | null} */ (null),
             search: '',
             priority_gte: null,
         },
@@ -198,7 +199,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             /** @type {any} */ taskId,
             /** @type {any} */ patch,
             reason = 'Edição de task via control plane',
-            ifVersion = null,
+            /** @type {number | null} */ ifVersion = null,
         ) {
             const current = this.getById(taskId);
             const version = ifVersion ?? current?.timestamps?.updated_at_ms ?? current?.updated_at_ms ?? null;
@@ -217,7 +218,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             /** @type {any} */ taskId,
             /** @type {any} */ missionId,
             reason = 'Reatribuição de missão da task',
-            ifVersion = null,
+            /** @type {number | null} */ ifVersion = null,
         ) {
             const current = this.getById(taskId);
             const version = ifVersion ?? current?.timestamps?.updated_at_ms ?? current?.updated_at_ms ?? null;
@@ -236,7 +237,7 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             /** @type {any} */ taskId,
             /** @type {any} */ dependencies,
             reason = 'Atualização de dependências da task',
-            ifVersion = null,
+            /** @type {number | null} */ ifVersion = null,
         ) {
             return this.patchTask(
                 taskId,
@@ -246,7 +247,12 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
             );
         },
 
-        async taskAction(/** @type {any} */ taskId, /** @type {any} */ action, reason = null, ifVersion = null) {
+        async taskAction(
+            /** @type {string | number} */ taskId,
+            /** @type {string} */ action,
+            /** @type {string | null} */ reason = null,
+            /** @type {number | null} */ ifVersion = null,
+        ) {
             const normalizedAction = String(action || '')
                 .trim()
                 .toUpperCase();
@@ -275,11 +281,11 @@ export const useTasksVNextStore = defineStore('tasks_vnext', {
 
             if (normalizedAction === 'APPROVE') {
                 bulkAction = 'PATCH';
-                bulkParams.stage = 'READY';
-                bulkParams.status = 'PENDING';
+                bulkParams['stage'] = 'READY';
+                bulkParams['status'] = 'PENDING';
             } else if (normalizedAction === 'REJECT') {
                 bulkAction = 'PATCH';
-                bulkParams.stage = 'REJECTED';
+                bulkParams['stage'] = 'REJECTED';
             } else if (normalizedAction === 'SET_STAGE') {
                 bulkAction = 'SET_STAGE';
             } else if (normalizedAction === 'SET_TARGET') {

@@ -26,7 +26,7 @@ import {
 } from '#copilot/event-handlers';
 import { EMITTER_SESSION_ERROR } from '#copilot/events';
 import { toError } from '#copilot/core';
-import { log } from '#copilot/agent/ports/logging-port';
+import { log } from '#copilot/agent/ports';
 
 // Re-exportar KNOWN_SDK_EVENTS para consumidores existentes
 export { KNOWN_SDK_EVENTS } from '#copilot/event-handlers';

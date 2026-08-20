@@ -76,7 +76,7 @@ export async function startCopilotServer(opts) {
     const app = createCopilotApp(appOpts);
 
     // Onda 3.1: montar todas as rotas copilot
-    mountCopilotRoutes(app, { token: opts?.token });
+    mountCopilotRoutes(app, opts?.token === undefined ? {} : { token: opts.token });
 
     // Error handler deve ser registrado APÓS rotas
     registerErrorHandler(app);

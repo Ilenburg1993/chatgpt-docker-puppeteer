@@ -11,7 +11,7 @@ import { log } from '#core/logger';
  */
 function denyIfDelegated(req, res, next) {
     try {
-        const authority = req.app?.locals?.authority || process.env.SERVER_AUTHORITY || 'standalone';
+        const authority = req.app?.locals?.authority || process.env['SERVER_AUTHORITY'] || 'standalone';
         if (String(authority).toLowerCase() === 'delegated') {
             log('WARN', '[MW] denyIfDelegated bloqueou operação de escrita', req.id);
             return res.status(403).json({

@@ -64,13 +64,13 @@ const RAG_INDEX_MODE = Object.freeze({
 });
 
 function resolveDefaultProfile(/** @type {any} */ requestedProfile) {
-    const raw = String(requestedProfile || process.env.RAG_PROFILE_DEFAULT || 'core').trim();
+    const raw = String(requestedProfile || process.env['RAG_PROFILE_DEFAULT'] || 'core').trim();
     return Object.prototype.hasOwnProperty.call(RAG_SCAN_PROFILES, raw) ? raw : 'core';
 }
 
 function isDegradedEnabled(/** @type {any} */ explicitValue) {
     if (typeof explicitValue === 'boolean') return explicitValue;
-    return String(process.env.RAG_DEGRADED_MODE_ENABLED || 'true') !== 'false';
+    return String(process.env['RAG_DEGRADED_MODE_ENABLED'] || 'true') !== 'false';
 }
 
 function classifyRagReasonCode(/** @type {any} */ error) {
@@ -514,9 +514,9 @@ function parsePositiveIntWithDefault(/** @type {any} */ value, /** @type {any} *
 function getExpandConfig() {
     const fallbackDefaultLines = 40;
     const fallbackMaxLines = 240;
-    const maxLines = parsePositiveIntWithDefault(process.env.RAG_EXPAND_MAX_LINES, fallbackMaxLines);
+    const maxLines = parsePositiveIntWithDefault(process.env['RAG_EXPAND_MAX_LINES'], fallbackMaxLines);
     const defaultLines = Math.min(
-        parsePositiveIntWithDefault(process.env.RAG_EXPAND_DEFAULT_LINES, fallbackDefaultLines),
+        parsePositiveIntWithDefault(process.env['RAG_EXPAND_DEFAULT_LINES'], fallbackDefaultLines),
         maxLines,
     );
     return { defaultLines, maxLines };
@@ -551,7 +551,7 @@ async function retryWithBackoff(/** @type {any} */ fn, /** @type {any} */ option
         try {
             return await fn();
         } catch (error) {
-            const _ce = /** @type {any} */ (error);
+
             lastError = error;
             if (attempt < maxRetries - 1) {
                 const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
@@ -608,7 +608,7 @@ export async function ragHealth(/** @type {any} */ options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
-                    const _ce = /** @type {any} */ (_);
+
                     // ignore
                 }
             }
@@ -950,7 +950,7 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
-                    const _ce = /** @type {any} */ (_);
+
                     // ignore
                 }
 
@@ -1067,7 +1067,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                     try {
                         await db.close();
                     } catch (_) {
-                        const _ce = /** @type {any} */ (_);
+
                         // ignore
                     }
                     return report;
@@ -1277,7 +1277,7 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
-                    const _ce = /** @type {any} */ (_);
+
                     // ignore
                 }
 
@@ -1482,7 +1482,7 @@ export async function ragQuery(/** @type {any} */ options = {}) {
                         await db.close();
                         dbClosed = true;
                     } catch (_) {
-                        const _ce = /** @type {any} */ (_);
+
                         // ignore close errors
                     }
                 }
@@ -1755,7 +1755,7 @@ export async function ragHybridSearch(options = {}) {
                         await db.close();
                         dbClosed = true;
                     } catch (_) {
-                        const _ce = /** @type {any} */ (_);
+
                         // ignore close errors
                     }
                 }
@@ -1985,7 +1985,7 @@ async function canWrite(/** @type {any} */ dirPath) {
         await fs.unlink(testFile);
         return true;
     } catch (_) {
-        const _ce = /** @type {any} */ (_);
+
         return false;
     }
 }

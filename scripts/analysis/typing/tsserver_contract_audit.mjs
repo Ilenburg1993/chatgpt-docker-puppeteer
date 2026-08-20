@@ -11,9 +11,10 @@ const { values } = parseArgs({
 });
 
 const schemaPath = path.resolve('schemas/typing/tsserver-tool-contract.schema.json');
-const daemonPath = path.resolve('src/integration/lsp/tsserver-daemon.mjs');
+const daemonPath = path.resolve('src/integration/lsp/tsgo-lsp-daemon.mjs');
 const skillPath = path.resolve('.github/skills/lsp-ops/SKILL.md');
-const typescriptDtsPath = path.resolve('node_modules/typescript/lib/typescript.d.ts');
+const nativePackagePath = path.resolve('node_modules/@typescript/native/package.json');
+const nativeLspEntrypoint = path.resolve('node_modules/@typescript/native/lib/tsc.js');
 
 /**
  * @param {string[]} valuesToSort
@@ -36,10 +37,11 @@ function isRecord(value) {
  * @returns {string[]}
  */
 function extractOperationsFromDaemon(text) {
+    const block = /const SUPPORTED_OPERATIONS = new Set\(\[([\s\S]*?)\]\);/u.exec(text)?.[1] || '';
     return sorted(
         Array.from(
             new Set(
-                Array.from(text.matchAll(/case '([A-Za-z_]+)':/g))
+                Array.from(block.matchAll(/'([A-Za-z_]+)'/g))
                     .map((match) => match[1] ?? '')
                     .filter(Boolean),
             ),
@@ -78,7 +80,9 @@ const issues = [];
 if (!fs.existsSync(schemaPath)) issues.push(`Missing schema: ${schemaPath}`);
 if (!fs.existsSync(daemonPath)) issues.push(`Missing daemon: ${daemonPath}`);
 if (!fs.existsSync(skillPath)) issues.push(`Missing skill: ${skillPath}`);
-if (!fs.existsSync(typescriptDtsPath)) issues.push(`Missing TypeScript declarations: ${typescriptDtsPath}`);
+if (!fs.existsSync(nativePackagePath)) issues.push(`Missing native TypeScript package: ${nativePackagePath}`);
+if (!fs.existsSync(nativeLspEntrypoint))
+    issues.push(`Missing native TypeScript LSP entrypoint: ${nativeLspEntrypoint}`);
 
 /** @type {string[]} */
 let schemaOperations = [];
@@ -91,28 +95,32 @@ if (issues.length === 0) {
     const schema = /** @type {unknown} */ (JSON.parse(fs.readFileSync(schemaPath, 'utf8')));
     const daemonText = fs.readFileSync(daemonPath, 'utf8');
     const skillText = fs.readFileSync(skillPath, 'utf8');
-    const typescriptDts = fs.readFileSync(typescriptDtsPath, 'utf8');
+    const nativePackage = /** @type {{ version?: string }} */ (JSON.parse(fs.readFileSync(nativePackagePath, 'utf8')));
+    const nativeEntrypointText = fs.readFileSync(nativeLspEntrypoint, 'utf8');
 
-    if (!typescriptDts.includes('namespace protocol') || !typescriptDts.includes('CommandTypes')) {
-        issues.push('Local TypeScript declaration bundle does not expose ts.server.protocol / CommandTypes.');
+    if (!String(nativePackage.version || '').startsWith('7.')) {
+        issues.push(`Native TypeScript package must be 7.x; found ${String(nativePackage.version || 'unknown')}.`);
+    }
+    if (!nativeEntrypointText.includes('process.argv.slice(2)')) {
+        issues.push('Native TypeScript entrypoint does not expose CLI argument forwarding required by --lsp --stdio.');
     }
 
     if (!isRecord(schema)) {
         issues.push('tsserver schema must be a JSON object.');
     } else {
-        if (schema.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
+        if (schema['$schema'] !== 'https://json-schema.org/draft/2020-12/schema') {
             issues.push('tsserver schema must use JSON Schema Draft 2020-12.');
         }
-        const properties = isRecord(schema.properties) ? schema.properties : null;
+        const properties = isRecord(schema['properties']) ? schema['properties'] : null;
         const xToolContract = isRecord(schema['x-tool-contract']) ? schema['x-tool-contract'] : null;
-        const operations = xToolContract && isRecord(xToolContract.operations) ? xToolContract.operations : null;
+        const operations = xToolContract && isRecord(xToolContract['operations']) ? xToolContract['operations'] : null;
         if (!properties || !operations) {
             issues.push('tsserver schema must expose properties and x-tool-contract.operations.');
         } else {
             schemaOperations = sorted(Object.keys(operations));
-            const operationProperty = isRecord(properties.operation) ? properties.operation : null;
-            const enumValues = Array.isArray(operationProperty?.enum)
-                ? operationProperty.enum.filter((item) => typeof item === 'string')
+            const operationProperty = isRecord(properties['operation']) ? properties['operation'] : null;
+            const enumValues = Array.isArray(operationProperty?.['enum'])
+                ? operationProperty['enum'].filter((item) => typeof item === 'string')
                 : [];
             const sortedEnumValues = sorted(/** @type {string[]} */ (enumValues));
             if (JSON.stringify(schemaOperations) !== JSON.stringify(sortedEnumValues)) {
@@ -147,6 +155,9 @@ const report = {
     schema_path: path.relative(process.cwd(), schemaPath).replace(/\\/g, '/'),
     daemon_path: path.relative(process.cwd(), daemonPath).replace(/\\/g, '/'),
     skill_path: path.relative(process.cwd(), skillPath).replace(/\\/g, '/'),
+    native_typescript_version: fs.existsSync(nativePackagePath)
+        ? String(JSON.parse(fs.readFileSync(nativePackagePath, 'utf8')).version || 'unknown')
+        : null,
     schema_operations: schemaOperations,
     daemon_operations: daemonOperations,
     skill_operations: skillOperations,

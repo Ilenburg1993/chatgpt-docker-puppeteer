@@ -51,9 +51,9 @@ test('wave20b: /ready reporta status degraded com componentes opcionais indispon
     });
 
     app.locals = app.locals || {};
-    app.locals.runtimeReadiness = { nerv: true, serverAdapter: true, httpServer: true };
-    app.locals.requiredReadiness = ['nerv', 'serverAdapter', 'httpServer'];
-    app.locals.getRuntimeResourcesStatus = () =>
+    app.locals['runtimeReadiness'] = { nerv: true, serverAdapter: true, httpServer: true };
+    app.locals['requiredReadiness'] = ['nerv', 'serverAdapter', 'httpServer'];
+    app.locals['getRuntimeResourcesStatus'] = () =>
         getRuntimeReadinessSummary({
             owner: 'dashboard-web',
             requiredComponents: ['http_server', 'nerv_runtime', 'server_adapter'],

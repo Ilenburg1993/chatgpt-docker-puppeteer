@@ -15,6 +15,8 @@ describe('session-tools — execFileSync security (F131)', () => {
         const { sessionTools } = await import('#copilot/tools');
         const getWorkspaceInfo = sessionTools.find((t) => t.name === 'get_workspace_info');
         assert.ok(getWorkspaceInfo, 'Tool get_workspace_info deve existir');
+        if (!getWorkspaceInfo) throw new Error('Tool get_workspace_info ausente.');
+        if (typeof getWorkspaceInfo.handler !== 'function') throw new Error('Handler get_workspace_info ausente.');
         const result = /** @type {any} */ (
             await getWorkspaceInfo.handler(
                 {},

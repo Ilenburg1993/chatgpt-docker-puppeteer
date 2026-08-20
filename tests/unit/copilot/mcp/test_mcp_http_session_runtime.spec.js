@@ -42,7 +42,7 @@ describe('MCP HTTP stateful session runtime', () => {
         assert.equal(Object.hasOwn(entry, 'sessionId'), false);
 
         const snapshot = runtime.snapshot();
-        assert.equal(snapshot.activeSessions, 1);
+        assert.equal(snapshot['activeSessions'], 1);
         assert.equal(JSON.stringify(snapshot).includes('session-abc-123'), false);
 
         now += 500;
@@ -53,7 +53,7 @@ describe('MCP HTTP stateful session runtime', () => {
         assert.equal(runtime.terminate('session-abc-123', 'client_delete'), true);
         assert.equal(transport.closed, 1);
         assert.equal(server.closed, 1);
-        assert.equal(runtime.snapshot().activeSessions, 0);
+        assert.equal(runtime.snapshot()['activeSessions'], 0);
     });
 
     it('expires idle sessions and enforces maxSessions', () => {
@@ -65,9 +65,9 @@ describe('MCP HTTP stateful session runtime', () => {
 
         now = 10_011;
         assert.equal(runtime.get('a'), null);
-        assert.equal(runtime.snapshot().activeSessions, 0);
+        assert.equal(runtime.snapshot()['activeSessions'], 0);
         runtime.register({ sessionId: 'b', transport: {}, server: {} });
-        assert.equal(runtime.snapshot().activeSessions, 1);
+        assert.equal(runtime.snapshot()['activeSessions'], 1);
     });
 
     it('persists only redacted session metadata in SQLite', () => {

@@ -11,16 +11,22 @@ import { getCanonicalMcpTools } from '#copilot/mcp';
 /** @type {string[]} */
 const tempDirs = [];
 
+/** @param {string} value */
 function sha256(value) {
     return hash('sha256', value, 'hex');
 }
 
+/** @param {string} name */
 function findTool(name) {
     const tool = getCanonicalMcpTools().find((candidate) => candidate.name === name);
     assert.ok(tool, `missing tool ${name}`);
     return tool;
 }
 
+/**
+ * @param {string} name
+ * @param {string} content
+ */
 async function createRepoFile(name, content) {
     const root = join(process.cwd(), 'src/copilot/.ai/jobs');
     await mkdir(root, { recursive: true });
@@ -164,6 +170,10 @@ describe('repo_apply_patch_batch V2', () => {
             causalFailureCount: 1,
             abortedOperationCount: 2,
             causalByCode: { ERR_PATCH_NOT_FOUND: 1 },
+            failureClassCounts: { 'stale-context': 1 },
+            retryabilityCounts: { 'caller-refresh': 1 },
+            recoveryRequiredTargetCount: 1,
+            convergenceCandidateCount: 0,
         });
         const causal = failures[0];
         assert.equal(causal?.['index'], 1);

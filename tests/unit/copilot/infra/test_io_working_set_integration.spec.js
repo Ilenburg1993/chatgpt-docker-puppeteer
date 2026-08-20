@@ -91,7 +91,7 @@ describe('Working Set V2 integration', () => {
         assert.ok(context);
         assert.ok(Buffer.byteLength(JSON.stringify(context), 'utf8') <= 16 * 1024);
         assert.ok(matches.some((entry) => entry.filePath.endsWith('/repo-working-set.js')));
-        assert.deepEqual(refresh, { refreshed: 0, failed: 0, skipped: 0 });
+        assert.deepEqual(refresh, { refreshed: 0, removed: 0, failed: 0, skipped: 0 });
 
         console.log(
             `[working-set-benchmark] ${JSON.stringify({

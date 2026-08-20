@@ -26,7 +26,7 @@ export const mcpCloudflarePostChangeGatesTool = {
     description:
         'Run a read-only gate bundle after Cloudflare tunnel/origin/edge changes: tunnel status, remote audit, metrics and pass/fail recommendations.',
     inputSchema: {
-        includeDetails: z.boolean().optional().describe('Include full tunnel, remote audit and metrics objects. Defaults to false for faster compact responses.'),
+        includeDetails: z.boolean().optional()['describe']('Include full tunnel, remote audit and metrics objects. Defaults to false for faster compact responses.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async (input) => okResult(await runCloudflarePostChangeGates({ includeDetails: input['includeDetails'] === true })),

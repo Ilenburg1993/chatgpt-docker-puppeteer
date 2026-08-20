@@ -7,7 +7,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import {
@@ -18,8 +18,6 @@ import {
 import { deleteMemory, recallMemories, storeMemory } from '../../../../src/copilot/conversation-hub/store-memories.js';
 import { countTurns, getTurn, readTurns, searchTurns } from '../../../../src/copilot/conversation-hub/store-queries.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +47,6 @@ let db;
 const HUB_SESSION = 'test-hub-session-001';
 
 beforeAll(() => {
-    const Database = require('better-sqlite3');
     db = new Database(':memory:');
     applyCopilotMigrations(db);
     // Criar sessão de teste

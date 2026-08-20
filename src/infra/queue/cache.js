@@ -53,7 +53,7 @@ async function loadTask(filePath) {
         const raw = await fs.promises.readFile(filePath, 'utf-8');
         return JSON.parse(raw);
     } catch (/** @type {any} */ _) {
-        const _ce = /** @type {any} */ (_);
+
         // Falha silenciosa para arquivos em processo de escrita/deleção
         return null;
     }

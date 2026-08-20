@@ -114,7 +114,7 @@ function modelListIncludesAny(providerModelTokens, models) {
 }
 
 /**
- * @param {Record<string, any>} overlay
+ * @param {Record<string, unknown>} overlay
  * @param {string} providerId
  * @param {string | null} accountScope
  * @returns {boolean}
@@ -126,7 +126,7 @@ function overlayMatches(overlay, providerId, accountScope) {
 }
 
 /**
- * @param {Record<string, any>[]} overlays
+ * @param {Record<string, unknown>[]} overlays
  * @returns {string | null}
  */
 function firstSecretRef(overlays) {
@@ -199,7 +199,7 @@ function classifyFailure(status, hardReasons, softReasons) {
  * @param {string} status
  * @param {boolean | null} secretConfigured
  * @param {boolean} modelVisible
- * @param {Record<string, any>[]} overlays
+ * @param {Record<string, unknown>[]} overlays
  * @returns {string}
  */
 function resolveConfidence(status, secretConfigured, modelVisible, overlays) {
@@ -221,7 +221,7 @@ function resolveConfidence(status, secretConfigured, modelVisible, overlays) {
 }
 
 /**
- * @param {Record<string, any>} overlay
+ * @param {Record<string, unknown>} overlay
  * @param {number} nowMs
  * @returns {boolean}
  */
@@ -235,8 +235,8 @@ function overlayExpired(overlay, nowMs) {
  * @param {string} input.providerModel
  * @param {string[]} [input.providerModelAliases]
  * @param {string | null} [input.accountScope]
- * @param {Record<string, any>[]} [input.accountOverlays]
- * @param {{ has(ref: string): boolean }} [input.secretRegistry]
+ * @param {Record<string, unknown>[]} [input.accountOverlays]
+ * @param {{ has(ref: string): boolean } | undefined} [input.secretRegistry]
  * @param {string | null} [input.secretRef]
  * @param {boolean} [input.requireAccountOverlay]
  * @param {boolean} [input.requireFreshAccountOverlay]
@@ -244,7 +244,7 @@ function overlayExpired(overlay, nowMs) {
  * @param {'allow_probe' | 'block' | string} [input.unknownAccessPolicy]
  * @param {boolean} [input.treatEnabledModelsAsClosed]
  * @param {boolean} [input.localPrivate]
- * @param {string | number | Date} [input.now]
+ * @param {string | number | Date | undefined} [input.now]
  * @returns {{
  *   providerId: string;
  *   providerModel: string;
@@ -257,7 +257,7 @@ function overlayExpired(overlay, nowMs) {
  *   modelIdentifiers: string[];
  *   accessConfidence: string;
  *   failureClass: string;
- *   overlays: Record<string, any>[];
+ *   overlays: Record<string, unknown>[];
  *   overlayRefs: string[];
  *   resetWindows: Array<{
  *     status: string;

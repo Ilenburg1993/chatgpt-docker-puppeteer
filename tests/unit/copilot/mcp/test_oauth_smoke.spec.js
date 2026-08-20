@@ -36,8 +36,8 @@ describe('MCP OAuth smoke hardening', () => {
     });
 
     it('fails the authorization-code flow when redirect state does not match', async () => {
-        process.env.COPILOT_MCP_PUBLIC_URL = 'https://mcp.example.test';
-        process.env.COPILOT_MCP_AUTH_MODE = 'oauth';
+        process.env['COPILOT_MCP_PUBLIC_URL'] = 'https://mcp.example.test';
+        process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
         const authorizationServer = 'https://mcp.example.test';
         const metadata = {
             issuer: authorizationServer,
@@ -88,8 +88,8 @@ describe('MCP OAuth smoke hardening', () => {
             runNegativeResourceChecks: false,
         });
 
-        assert.equal(result.ok, false);
-        const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result.dcrFlow);
+        assert.equal(result['ok'], false);
+        const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result['dcrFlow']);
         assert.equal(flow.token.ok, false);
         assert.equal(flow.token.error, 'authorization state mismatch');
         assert.equal(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/oauth/token')), false);
@@ -109,8 +109,8 @@ describe('MCP OAuth smoke hardening', () => {
     });
 
     it('parses relative redirects and still rejects mismatched state', async () => {
-        process.env.COPILOT_MCP_PUBLIC_URL = 'https://mcp.example.test';
-        process.env.COPILOT_MCP_AUTH_MODE = 'oauth';
+        process.env['COPILOT_MCP_PUBLIC_URL'] = 'https://mcp.example.test';
+        process.env['COPILOT_MCP_AUTH_MODE'] = 'oauth';
         const authorizationServer = 'https://mcp.example.test';
         const metadata = {
             issuer: authorizationServer,
@@ -158,8 +158,8 @@ describe('MCP OAuth smoke hardening', () => {
             runNegativeResourceChecks: false,
         });
 
-        assert.equal(result.ok, false);
-        const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result.dcrFlow);
+        assert.equal(result['ok'], false);
+        const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result['dcrFlow']);
         assert.equal(flow.token.ok, false);
         assert.equal(flow.token.error, 'authorization state mismatch');
     });

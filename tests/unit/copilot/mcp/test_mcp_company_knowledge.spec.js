@@ -30,8 +30,10 @@ describe('MCP Company Knowledge tools', () => {
         assert.equal(fetch.annotations.readOnlyHint, true);
         assert.equal(search.annotations.openWorldHint, false);
         assert.equal(fetch.annotations.openWorldHint, false);
-        assert.equal(search._meta?.['ui']?.['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
-        assert.equal(fetch._meta?.['ui']?.['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
+        const searchUi = /** @type {Record<string, unknown>} */ (search._meta?.['ui'] ?? {});
+        const fetchUi = /** @type {Record<string, unknown>} */ (fetch._meta?.['ui'] ?? {});
+        assert.equal(searchUi['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
+        assert.equal(fetchUi['resourceUri'], COMPANY_KNOWLEDGE_WIDGET_URI);
         assert.equal(search._meta?.['openai/outputTemplate'], COMPANY_KNOWLEDGE_WIDGET_URI);
         assert.equal(fetch._meta?.['openai/outputTemplate'], COMPANY_KNOWLEDGE_WIDGET_URI);
     });

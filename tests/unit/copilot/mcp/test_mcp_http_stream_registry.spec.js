@@ -8,46 +8,14 @@ import { describe, it } from 'vitest';
 
 import { handleStatefulMcpHttpRequest, readMcpHttpSessionRuntimeState } from '#copilot/mcp/adapters';
 import { createMcpHttpSessionRuntime, createMcpHttpStreamRegistry } from '#copilot/mcp/control-plane';
+import {
+    createMcpTransportErrorCollector,
+    fakeMcpRequest as fakeReq,
+    fakeMcpResponse as fakeRes,
+    fakeMcpTransport,
+    readFakeMcpHeader as readHeader,
+} from './helpers/http-fakes.js';
 
-/**
- * @param {string} method
- * @param {Record<string, string>} [headers]
- * @returns {import('node:http').IncomingMessage}
- */
-function fakeReq(method, headers = {}) {
-    return /** @type {import('node:http').IncomingMessage} */ ({
-        method,
-        headers,
-        httpVersionMajor: 1,
-    });
-}
-
-/** @returns {import('node:http').ServerResponse} */
-function fakeRes() {
-    return /** @type {import('node:http').ServerResponse} */ ({
-        headersSent: false,
-        writableEnded: false,
-        statusCode: 200,
-        end() {
-            this.writableEnded = true;
-        },
-    });
-}
-
-/**
- * @param {import('node:http').IncomingMessage} req
- * @param {string} name
- * @returns {string | undefined}
- */
-function readHeader(req, name) {
-    const value = req.headers[name.toLowerCase()];
-    return typeof value === 'string' ? value : undefined;
-}
-
-/** @returns {(res: import('node:http').ServerResponse, statusCode: number, error: { error: string; error_description: string }) => void} */
-function ignoreTransportErrors() {
-    return () => {};
-}
 
 describe('MCP HTTP stream registry', () => {
     it('exposes stream registry metrics in the HTTP runtime snapshot', () => {
@@ -62,25 +30,24 @@ describe('MCP HTTP stream registry', () => {
         assert.equal(stream.kind, 'standalone-get-sse');
         assert.equal(Object.hasOwn(stream, 'sessionId'), false);
         assert.equal(JSON.stringify(registry.snapshot()).includes('session-stream-secret'), false);
-        assert.equal(registry.snapshot().activeStreams, 1);
+        assert.equal(registry.snapshot()['activeStreams'], 1);
         assert.equal(registry.touch(stream.streamKey), true);
         assert.equal(registry.close(stream.streamKey, 'unit-test'), true);
-        assert.equal(registry.snapshot().activeStreams, 0);
+        assert.equal(registry.snapshot()['activeStreams'], 0);
     });
 
     it('rejects GET requests that do not accept text/event-stream', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         let handled = 0;
         runtime.register({
             sessionId: 'session-get-no-accept',
             server: {},
-            transport: {
-                async handleRequest() {
+            transport: fakeMcpTransport({
+                handleRequest() {
                     handled += 1;
                 },
-                async close() {},
-            },
+            }),
         });
 
         await handleStatefulMcpHttpRequest({
@@ -93,11 +60,11 @@ describe('MCP HTTP stream registry', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: (_res, statusCode, error) => errors.push({ statusCode, error }),
+            writeTransportError,
         });
 
         assert.equal(handled, 0);
-        assert.equal(/** @type {{ statusCode?: number }[]} */ (errors).at(-1)?.statusCode, 406);
+        assert.equal(errors.at(-1)?.statusCode, 406);
     });
 
     it('opens and closes stream registry entries around GET handling', async () => {
@@ -107,13 +74,12 @@ describe('MCP HTTP stream registry', () => {
         runtime.register({
             sessionId: 'session-get',
             server: {},
-            transport: {
-                async handleRequest() {
+            transport: fakeMcpTransport({
+                handleRequest() {
                     handled += 1;
-                    assert.equal(registry.snapshot().activeStreams, 1);
+                    assert.equal(registry.snapshot()['activeStreams'], 1);
                 },
-                async close() {},
-            },
+            }),
         });
 
         await handleStatefulMcpHttpRequest({
@@ -127,12 +93,12 @@ describe('MCP HTTP stream registry', () => {
             streamRegistry: registry,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: ignoreTransportErrors(),
+            writeTransportError: createMcpTransportErrorCollector().writeTransportError,
         });
 
         assert.equal(handled, 1);
-        assert.equal(registry.snapshot().activeStreams, 0);
-        assert.equal(/** @type {{ closed?: number }} */ (registry.snapshot().counters).closed, 1);
+        assert.equal(registry.snapshot()['activeStreams'], 0);
+        assert.equal(/** @type {{ closed?: number }} */ (registry.snapshot()['counters']).closed, 1);
     });
 
     it('terminates the session after DELETE is delegated to the transport', async () => {
@@ -145,14 +111,14 @@ describe('MCP HTTP stream registry', () => {
         runtime.register({
             sessionId: 'session-delete',
             server: {},
-            transport: {
-                async handleRequest() {
+            transport: fakeMcpTransport({
+                handleRequest() {
                     handled += 1;
                 },
-                async close() {
+                close() {
                     closed += 1;
                 },
-            },
+            }),
         });
 
         await handleStatefulMcpHttpRequest({
@@ -166,7 +132,7 @@ describe('MCP HTTP stream registry', () => {
             streamRegistry: registry,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: ignoreTransportErrors(),
+            writeTransportError: createMcpTransportErrorCollector().writeTransportError,
         });
 
         assert.equal(handled, 1);
@@ -174,10 +140,10 @@ describe('MCP HTTP stream registry', () => {
         assert.equal(runtime.get('session-delete'), null);
         assert.equal(res.statusCode, 204);
         assert.equal(res.writableEnded, true);
-        assert.equal(registry.snapshot().activeStreams, 0);
-        assert.equal(/** @type {{ closedBySession?: number }} */ (registry.snapshot().counters).closedBySession, 1);
+        assert.equal(registry.snapshot()['activeStreams'], 0);
+        assert.equal(/** @type {{ closedBySession?: number }} */ (registry.snapshot()['counters']).closedBySession, 1);
 
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         await handleStatefulMcpHttpRequest({
             req: fakeReq('DELETE', { 'mcp-session-id': 'session-delete' }),
             res: fakeRes(),
@@ -189,8 +155,8 @@ describe('MCP HTTP stream registry', () => {
             streamRegistry: registry,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: (_res, statusCode, error) => errors.push({ statusCode, error }),
+            writeTransportError,
         });
-        assert.equal(/** @type {{ statusCode?: number }[]} */ (errors).at(-1)?.statusCode, 404);
+        assert.equal(errors.at(-1)?.statusCode, 404);
     });
 });

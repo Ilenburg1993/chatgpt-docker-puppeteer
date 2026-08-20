@@ -42,6 +42,7 @@ export {
     classifyToolFailure,
     createToolFailureFeedback,
     createToolFailureResponse,
+    isToolExecutionFailureResponse,
     createToolFailureResult,
     enrichToolFailureResult,
     isToolFailureResult,

@@ -31,10 +31,10 @@ async function runSinglePassValidation(task, filePath, systemErrorTerms = [], si
         }
 
         // 2. PREPARAÇÃO DA VARREDURA
-        const userForbidden = taskAny.spec?.validation?.forbidden_terms || [];
+        const userForbidden = taskAny['spec']?.validation?.forbidden_terms || [];
         const forbiddenList = compileForbiddenList(systemErrorTerms, userForbidden);
-        const formatRequired = taskAny.spec?.validation?.required_format || 'text';
-        const patternRequired = taskAny.spec?.validation?.required_pattern;
+        const formatRequired = taskAny['spec']?.validation?.required_format || 'text';
+        const patternRequired = taskAny['spec']?.validation?.required_pattern;
 
         // [FIX 1.2] Otimização de Memória: Uso de Array Buffer em vez de String Concatenation
         // Isso evita realocações de memória O(N^2) durante o processamento de arquivos grandes.

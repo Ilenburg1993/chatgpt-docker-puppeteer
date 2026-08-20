@@ -32,7 +32,7 @@ test('wave3: adaptive state schema accepts string record keys', async () => {
     );
 });
 
-test('wave3: concurrent signals reuse the same shutdown promise and exit once', async (t) => {
+test('wave3: concurrent signals reuse the same shutdown promise and exit once', async () => {
     const originalExit = process.exit;
     const exitCodes = /** @type {any[]} */ ([]);
 
@@ -53,8 +53,8 @@ test('wave3: concurrent signals reuse the same shutdown promise and exit once', 
     __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
 
     const handlers = __mainTestHooks.getSignalHandlers();
-    assert.equal(typeof handlers.sigterm, 'function');
-    assert.equal(typeof handlers.sigint, 'function');
+    assert.equal(typeof handlers['sigterm'], 'function');
+    assert.equal(typeof handlers['sigint'], 'function');
 
     const p1 = /** @type {any} */ (handlers).sigterm();
     const p2 = /** @type {any} */ (handlers).sigint();

@@ -17,21 +17,21 @@ after(async () => {
 });
 
 test('wave2: server mode matrix resolves integrated/split/disabled', () => {
-    const original = process.env.SERVER_MODE;
+    const original = process.env['SERVER_MODE'];
     try {
-        process.env.SERVER_MODE = 'integrated';
+        process.env['SERVER_MODE'] = 'integrated';
         assert.equal(resolveServerMode(), 'integrated');
 
-        process.env.SERVER_MODE = 'split';
+        process.env['SERVER_MODE'] = 'split';
         assert.equal(resolveServerMode(), 'split');
 
-        process.env.SERVER_MODE = 'disabled';
+        process.env['SERVER_MODE'] = 'disabled';
         assert.equal(resolveServerMode(), 'disabled');
     } finally {
         if (original === undefined) {
-            delete process.env.SERVER_MODE;
+            delete process.env['SERVER_MODE'];
         } else {
-            process.env.SERVER_MODE = original;
+            process.env['SERVER_MODE'] = original;
         }
     }
 });
@@ -54,7 +54,7 @@ test('wave2: shutdown does not call process.exit by default', async () => {
     }
 });
 
-test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async (t) => {
+test('wave2: env bootstrap honors .env.local precedence and remains idempotent', async () => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'wave2-env-bootstrap-'));
     after(async () => {
         await rm(tmpDir, { recursive: true, force: true });
@@ -68,7 +68,7 @@ test('wave2: env bootstrap honors .env.local precedence and remains idempotent',
         const mod = ${JSON.stringify(moduleUrl)};
         await import(mod);
         await import(mod);
-        console.log(process.env.WAVE2_ENV_BOOTSTRAP_TEST || '');
+        console.log(process.env['WAVE2_ENV_BOOTSTRAP_TEST'] || '');
     `;
 
     const { stdout } = await execFileAsync(process.execPath, ['--input-type=module', '-e', code], {

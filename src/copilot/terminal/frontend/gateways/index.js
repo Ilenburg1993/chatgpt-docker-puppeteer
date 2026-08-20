@@ -15,6 +15,7 @@ export {
     readTerminalAgentRuntimeEventHost,
     readTerminalDialogStreamMeta,
     readTerminalHandoffHistory,
+    readTerminalRuntimeContextWindow,
     readTerminalRuntimeControlState,
     readTerminalRuntimePermissionMode,
     readTerminalRuntimeState,

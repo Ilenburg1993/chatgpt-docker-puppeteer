@@ -1,34 +1,24 @@
-<script setup>
+<script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { cva } from 'class-variance-authority';
 import { computed } from 'vue';
 
-const props = defineProps({
-    variant: {
-        type: String,
-        default: 'primary',
-        validator: (v) => ['primary', 'secondary', 'ghost', 'danger', 'outline'].includes(v),
-    },
-    size: {
-        type: String,
-        default: 'md',
-        validator: (v) => ['sm', 'md', 'lg'].includes(v),
-    },
-    disabled: {
-        type: Boolean,
-        default: false,
-    },
-    loading: {
-        type: Boolean,
-        default: false,
-    },
-    class: {
-        type: String,
-        default: '',
-    },
-});
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+type ButtonSize = 'sm' | 'md' | 'lg';
 
-const emit = defineEmits(['click']);
+const props = withDefaults(
+    defineProps<{
+        variant?: ButtonVariant;
+        size?: ButtonSize;
+        type?: 'button' | 'submit' | 'reset';
+        disabled?: boolean;
+        loading?: boolean;
+        class?: string;
+    }>(),
+    { variant: 'primary', size: 'md', type: 'button', disabled: false, loading: false, class: '' },
+);
+
+const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
 const buttonVariants = cva(
     'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed',
@@ -56,7 +46,7 @@ const buttonVariants = cva(
 
 const buttonClass = computed(() => cn(buttonVariants({ variant: props.variant, size: props.size }), props.class));
 
-const handleClick = (event) => {
+const handleClick = (event: MouseEvent) => {
     if (!props.disabled && !props.loading) {
         emit('click', event);
     }
@@ -64,7 +54,7 @@ const handleClick = (event) => {
 </script>
 
 <template>
-    <button :class="buttonClass" :disabled="disabled || loading" @click="handleClick">
+    <button :class="buttonClass" :type="type" :disabled="disabled || loading" @click="handleClick">
         <svg
             v-if="loading"
             class="animate-spin h-4 w-4"

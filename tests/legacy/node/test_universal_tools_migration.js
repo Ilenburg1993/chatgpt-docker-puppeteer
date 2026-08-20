@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,34 +16,37 @@ const colors = {
     bold: '\x1b[1m',
 };
 
+/** @typedef {keyof typeof colors} ColorName */
+
 // ============================================
 // Test State
 // ============================================
 let passCount = 0;
 let failCount = 0;
+/** @type {Array<{ testName: string; reason: string }>} */
 const failures = [];
 
 // ============================================
 // Helper Functions
 // ============================================
 
-function log(message, color = 'reset') {
+function log(/** @type {string} */ message, /** @type {ColorName} */ color = 'reset') {
     console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function pass(testName) {
+function pass(/** @type {string} */ testName) {
     passCount++;
     log(`✅ PASS: ${testName}`, 'green');
 }
 
-function fail(testName, reason) {
+function fail(/** @type {string} */ testName, /** @type {string} */ reason) {
     failCount++;
     failures.push({ testName, reason });
     log(`❌ FAIL: ${testName}`, 'red');
     log(`   Reason: ${reason}`, 'yellow');
 }
 
-function section(title) {
+function section(/** @type {string} */ title) {
     log(`\n${'='.repeat(50)}`, 'blue');
     log(title, 'bold');
     log('='.repeat(50), 'blue');
@@ -109,7 +111,7 @@ for (const { path: modulePath, name } of modulesToLoad) {
         await import(pathToFileURL(fullPath).href);
         pass(`Module loads: ${name}`);
     } catch (err) {
-        fail(`Module loads: ${name}`, err.message);
+        fail(`Module loads: ${name}`, err instanceof Error ? err.message : String(err));
     }
 }
 
@@ -131,7 +133,7 @@ try {
         }
     });
 } catch (err) {
-    fail('human.js exports', err.message);
+    fail('human.js exports', err instanceof Error ? err.message : String(err));
 }
 
 try {
@@ -148,7 +150,7 @@ try {
         }
     });
 } catch (err) {
-    fail('stabilizer.js exports', err.message);
+    fail('stabilizer.js exports', err instanceof Error ? err.message : String(err));
 }
 
 // ============================================
@@ -229,7 +231,12 @@ try {
                 pass(`ESLint: ${file}`);
             } catch (err) {
                 // ESLint exits with code 1 on errors
-                const stderr = err.stderr ? err.stderr.toString() : err.message;
+                const errorRecord = /** @type {{ stderr?: unknown }} */ (err);
+                const stderr = errorRecord.stderr
+                    ? String(errorRecord.stderr)
+                    : err instanceof Error
+                      ? err.message
+                      : String(err);
                 fail(`ESLint: ${file}`, `Linting errors found:\n${stderr}`);
             }
         });
@@ -237,7 +244,7 @@ try {
         log('⚠️  SKIP: ESLint not found (optional check)', 'yellow');
     }
 } catch (err) {
-    log(`⚠️  SKIP: ESLint check failed: ${err.message}`, 'yellow');
+    log(`⚠️  SKIP: ESLint check failed: ${err instanceof Error ? err.message : String(err)}`, 'yellow');
 }
 
 // ============================================

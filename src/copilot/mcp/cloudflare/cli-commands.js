@@ -3,6 +3,7 @@
 import process from 'node:process';
 import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { getCanonicalMcpTools } from '../registry.js';
 import { auditCloudflareConfigPosture } from './config-audit.js';
 import { auditCloudflarePlanCapabilities } from './plan-capabilities-audit.js';
 import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from './edge-backup.js';
@@ -117,10 +118,15 @@ function runQuick({ env }) { runQuickTunnel(readCloudflareTunnelConfig(env), env
 /** @param {CloudflareCliContext} context */
 async function runSmoke({ env }) {
     const config = readCloudflareTunnelConfig(env);
-    await writeJsonAndSetExit(await runCanonicalConnectorSmoke({ config, env, persistState: true }));
+    await writeJsonAndSetExit(
+        await runCanonicalConnectorSmoke({ config, env, persistState: true, localToolNames: canonicalToolNames() }),
+    );
 }
 /** @param {CloudflareCliContext} context */
-async function runOAuthSmoke({ env }) { await writeJsonAndSetExit(await runCloudflareSmoke({ config: readCloudflareTunnelConfig(env), authenticated: true, env })); }
+async function runOAuthSmoke({ env }) { await writeJsonAndSetExit(await runCloudflareSmoke({ config: readCloudflareTunnelConfig(env), authenticated: true, env, localToolNames: canonicalToolNames() })); }
+
+/** @returns {string[]} */
+function canonicalToolNames() { return getCanonicalMcpTools().map((tool) => tool.name); }
 /** @param {CloudflareCliContext} context */
 async function runUp({ env }) { await writeJsonAndSetExit(await startManagedStack({ config: readCloudflareTunnelConfig(env), env, restart: false })); }
 /** @param {CloudflareCliContext} context */

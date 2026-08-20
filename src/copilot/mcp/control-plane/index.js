@@ -12,6 +12,7 @@ export * from './auth.js';
 export * from './auth-jwks-warmup.js';
 export * from './client-latency-evidence.js';
 export * from './dev-oauth.js';
+export * from './dependency-maintenance.js';
 export * from './event-store.js';
 export * from './http-client.js';
 export * from './index-auto-build.js';
@@ -44,8 +45,8 @@ export {
     ensureMcpHttpSessionStoreSchema,
 } from './session-store.js';
 export * from './smoke-state.js';
-export * from './startup-maintenance.js';
 export * from './stream-registry.js';
 export * from './tool-capabilities.js';
 export * from './tool-metadata.js';
+export * from './terminal-control.js';
 export * from './ttl-cache.js';

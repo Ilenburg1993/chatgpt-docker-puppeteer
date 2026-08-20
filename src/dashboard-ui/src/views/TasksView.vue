@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Input from '@/components/ui/Input.vue';
@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal.vue';
 import { useSsotRealtime } from '@/composables/useSsotRealtime';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import type { BadgeVariant } from '@/types/dashboard';
 import { Plus, RefreshCw } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -15,22 +16,25 @@ const store = useTasksVNextStore();
 const missions = useMissionsVNextStore();
 useSsotRealtime();
 
-const selectedIds = ref(new Set());
+const selectedIds = ref<Set<string>>(new Set());
 const bulkAction = ref('pause');
 const bulkStage = ref('READY');
 const bulkTarget = ref('auto');
 const bulkPriority = ref(5);
-const bulkExecuteAfterMs = ref(null);
+const bulkExecuteAfterMs = ref<number | null>(null);
 const bulkMissionId = ref('');
 const bulkReason = ref('');
 const bulkProcessing = ref(false);
-const actionFeedback = ref(null);
+const actionFeedback = ref<{ message: string; type: 'success' | 'error' } | null>(null);
 
 const showCreate = ref(false);
 const creating = ref(false);
 const showReasonModal = ref(false);
 const showConfirmModal = ref(false);
-const pendingAction = ref(null);
+const pendingAction = ref<{
+    action: string;
+    callback: (reason: string) => Promise<void> | void;
+} | null>(null);
 const reasonInput = ref('');
 const confirmedReason = ref('');
 
@@ -48,7 +52,7 @@ const items = computed(() => store.items || []);
 const missionOptions = computed(() => missions.items || []);
 const totalSelected = computed(() => selectedIds.value.size);
 
-function statusVariant(status) {
+function statusVariant(status: string | undefined): BadgeVariant {
     const s = String(status || '').toUpperCase();
     if (s === 'RUNNING') return 'info';
     if (s === 'DONE') return 'success';
@@ -58,9 +62,9 @@ function statusVariant(status) {
     return 'default';
 }
 
-let feedbackTimer = null;
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
-function showFeedback(message, type = 'success') {
+function showFeedback(message: string, type: 'success' | 'error' = 'success') {
     actionFeedback.value = { message, type };
     if (feedbackTimer) clearTimeout(feedbackTimer);
     feedbackTimer = setTimeout(() => {
@@ -69,7 +73,7 @@ function showFeedback(message, type = 'success') {
     }, 4000);
 }
 
-function requestReason(action, callback) {
+function requestReason(action: string, callback: (reason: string) => Promise<void> | void) {
     pendingAction.value = { action, callback };
     reasonInput.value = bulkReason.value || '';
     showReasonModal.value = true;
@@ -95,8 +99,8 @@ async function executeConfirmedAction() {
     if (action?.callback) {
         try {
             await action.callback(reason);
-        } catch (err) {
-            showFeedback(`Erro ao executar ação: ${err?.message || String(err)}`, 'error');
+        } catch (err: unknown) {
+            showFeedback(`Erro ao executar ação: ${err instanceof Error ? err.message : String(err)}`, 'error');
         }
     }
 }
@@ -108,7 +112,7 @@ function cancelConfirmation() {
     confirmedReason.value = '';
 }
 
-function toggle(id) {
+function toggle(id: string) {
     const set = selectedIds.value;
     if (set.has(id)) set.delete(id);
     else set.add(id);
@@ -119,23 +123,23 @@ function toggleAll() {
         selectedIds.value = new Set();
         return;
     }
-    selectedIds.value = new Set(items.value.map((t) => t.id));
+    selectedIds.value = new Set(items.value.flatMap((task) => (task.id ? [task.id] : [])));
 }
 
 async function refresh() {
     selectedIds.value = new Set();
     try {
         await store.fetchFirstPage({ limit: 200 });
-    } catch (err) {
-        showFeedback(`Falha ao carregar tarefas: ${err?.message || String(err)}`, 'error');
+    } catch (err: unknown) {
+        showFeedback(`Falha ao carregar tarefas: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }
 }
 
 async function loadMore() {
     try {
         await store.fetchNextPage({ limit: 200 });
-    } catch (err) {
-        showFeedback(`Falha ao carregar mais: ${err?.message || String(err)}`, 'error');
+    } catch (err: unknown) {
+        showFeedback(`Falha ao carregar mais: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }
 }
 
@@ -145,14 +149,14 @@ async function runBulk() {
 
     const action = bulkAction.value;
     requestReason(`bulk:${String(action).toUpperCase()} (${ids.length} tasks)`, async (reason) => {
-        const params = {};
-        if (action === 'set_stage') params.stage = bulkStage.value;
-        if (action === 'set_target') params.target = bulkTarget.value;
-        if (action === 'set_priority') params.priority = bulkPriority.value;
-        if (action === 'set_execute_after') params.execute_after_ms = bulkExecuteAfterMs.value;
+        const params: Record<string, string | number | null> = {};
+        if (action === 'set_stage') params['stage'] = bulkStage.value;
+        if (action === 'set_target') params['target'] = bulkTarget.value;
+        if (action === 'set_priority') params['priority'] = bulkPriority.value;
+        if (action === 'set_execute_after') params['execute_after_ms'] = bulkExecuteAfterMs.value;
         if (action === 'reassign_mission') {
-            params.mission_id = bulkMissionId.value || null;
-            if (!params.mission_id) {
+            params['mission_id'] = bulkMissionId.value || null;
+            if (!params['mission_id']) {
                 showFeedback('Selecione a missão destino para reatribuição.', 'error');
                 return;
             }
@@ -165,22 +169,22 @@ async function runBulk() {
             selectedIds.value = new Set();
             bulkReason.value = '';
             await refresh();
-        } catch (err) {
-            showFeedback(`Falha na ação em lote: ${err?.message || String(err)}`, 'error');
+        } catch (err: unknown) {
+            showFeedback(`Falha na ação em lote: ${err instanceof Error ? err.message : String(err)}`, 'error');
         } finally {
             bulkProcessing.value = false;
         }
     });
 }
 
-async function quickAction(taskId, action) {
+async function quickAction(taskId: string, action: string) {
     requestReason(`task:${String(action).toUpperCase()} (${taskId})`, async (reason) => {
         try {
             await store.taskAction(taskId, action, reason);
             showFeedback(`Ação ${String(action).toUpperCase()} executada na task ${taskId}.`);
             await refresh();
-        } catch (err) {
-            showFeedback(`Falha: ${err?.message || String(err)}`, 'error');
+        } catch (err: unknown) {
+            showFeedback(`Falha: ${err instanceof Error ? err.message : String(err)}`, 'error');
         }
     });
 }
@@ -221,8 +225,8 @@ async function createTask() {
             };
             showFeedback('Tarefa criada com sucesso.');
             await refresh();
-        } catch (err) {
-            showFeedback(`Falha ao criar tarefa: ${err?.message || String(err)}`, 'error');
+        } catch (err: unknown) {
+            showFeedback(`Falha ao criar tarefa: ${err instanceof Error ? err.message : String(err)}`, 'error');
         } finally {
             creating.value = false;
         }

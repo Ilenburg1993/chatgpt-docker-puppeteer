@@ -16,7 +16,7 @@
  * @module copilot/llm-a-conversation
  */
 
-import { alwaysAliveAgent } from '../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '../src/copilot/agent/always-alive-singleton.js';
 import { LlmBridgeClient } from '../src/copilot/channel/client.js';
 
 // ─── Helpers de display ────────────────────────────────────────────────────

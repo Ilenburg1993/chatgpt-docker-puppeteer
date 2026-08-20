@@ -35,9 +35,9 @@ const summary = {
     sqlite: {
         runtimeRows: diagnostics.runtimeRows,
         tableCounts: {
-            healthObservations: diagnostics.tableCounts.copilot_model_gateway_health_observations,
-            runtimeProbeRuns: diagnostics.tableCounts.copilot_model_gateway_runtime_probe_runs,
-            runtimeProbeResults: diagnostics.tableCounts.copilot_model_gateway_runtime_probe_results,
+            healthObservations: diagnostics.tableCounts['copilot_model_gateway_health_observations'],
+            runtimeProbeRuns: diagnostics.tableCounts['copilot_model_gateway_runtime_probe_runs'],
+            runtimeProbeResults: diagnostics.tableCounts['copilot_model_gateway_runtime_probe_results'],
         },
     },
 };

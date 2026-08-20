@@ -192,15 +192,15 @@ function listTasks(
 
     if (status) {
         where.push('status = @status');
-        params.status = status;
+        params['status'] = status;
     }
     if (stage) {
         where.push('stage = @stage');
-        params.stage = stage;
+        params['stage'] = stage;
     }
     if (missionId) {
         where.push('mission_id = @mission_id');
-        params.mission_id = missionId;
+        params['mission_id'] = missionId;
     }
 
     const sql = `
@@ -210,8 +210,8 @@ function listTasks(
         LIMIT @limit OFFSET @offset
     `;
 
-    params.limit = Math.max(1, Math.min(Number(limit) || 100, 500));
-    params.offset = Math.max(0, Number(offset) || 0);
+    params['limit'] = Math.max(1, Math.min(Number(limit) || 100, 500));
+    params['offset'] = Math.max(0, Number(offset) || 0);
     const rows = db.prepare(sql).all(params);
     return rows.map((r) => _rowToTask(/** @type {TaskRow} */ (r)));
 }
@@ -236,15 +236,15 @@ function countTasks({ status = null, stage = null, missionId = null } = /** @typ
 
     if (status) {
         where.push('status = @status');
-        params.status = status;
+        params['status'] = status;
     }
     if (stage) {
         where.push('stage = @stage');
-        params.stage = stage;
+        params['stage'] = stage;
     }
     if (missionId) {
         where.push('mission_id = @mission_id');
-        params.mission_id = missionId;
+        params['mission_id'] = missionId;
     }
 
     const sql = `SELECT COUNT(*) as n FROM tasks ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`;

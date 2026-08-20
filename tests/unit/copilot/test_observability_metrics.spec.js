@@ -58,8 +58,8 @@ describe('createMetricsStore', () => {
         assert.equal(summary.dialogRecovery.withoutAdditionalModelCall, 1);
         assert.equal(summary.dialogRecovery.pr, 1); // legacy alias
         assert.equal(summary.dialogRecovery.zeroPr, 1); // legacy alias
-        assert.equal(summary.dialogRecovery.byStrategy.restart_with_model_call, 1);
-        assert.equal(summary.dialogRecovery.byStrategy.reuse_ready, 1);
+        assert.equal(summary.dialogRecovery.byStrategy['restart_with_model_call'], 1);
+        assert.equal(summary.dialogRecovery.byStrategy['reuse_ready'], 1);
     });
 
     it('defaultMetrics é instância singleton exportada', async () => {

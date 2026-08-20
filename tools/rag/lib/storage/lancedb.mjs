@@ -42,7 +42,7 @@ export function buildSchema(/** @type {any} */ embeddingDim) {
 
 export async function ensureTable(/** @type {any} */ db, /** @type {any} */ embeddingDim) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             const tables = await db.tableNames();
             if (tables.includes(TABLE_NAME)) {
                 return db.openTable(TABLE_NAME);
@@ -74,7 +74,7 @@ export async function createFTSIndex(/** @type {any} */ table) {
 
 export async function deleteByPath(/** @type {any} */ table, /** @type {any} */ relPath) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             const safe = relPath.replace(/'/g, "''");
             await table.delete(`path = '${safe}'`);
         },
@@ -89,7 +89,7 @@ export async function addChunks(
     /** @type {any} */ { batchSize = 32 } = {},
 ) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             let total = 0;
             let retriedWithoutContentClass = false;
             for (let i = 0; i < rows.length; i += batchSize) {
@@ -127,7 +127,7 @@ export async function addChunks(
 
 export async function getChunkById(/** @type {any} */ table, /** @type {any} */ chunkId) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             const safe = String(chunkId || '').replace(/'/g, "''");
             const rows = await table.query().where(`chunk_id = '${safe}'`).limit(1).toArray();
             if (!rows.length) return null;
@@ -140,7 +140,7 @@ export async function getChunkById(/** @type {any} */ table, /** @type {any} */ 
 
 export async function getChunkStats(/** @type {any} */ table) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             let chunkCount = null;
             const counters = ['countRows', 'count_rows', 'count'];
             for (const fn of counters) {
@@ -211,7 +211,7 @@ export async function search(
     /** @type {any} */ { topK = 8, filters = {}, distanceRange } = {},
 ) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             const where = buildWhere(filters);
             let q = table.search(vector);
 
@@ -273,7 +273,7 @@ export async function hybridSearch(
     /** @type {any} */ options = {},
 ) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             const {
                 topK = 8,
                 filters = {},
@@ -350,7 +350,7 @@ export async function lexicalSearch(
     /** @type {any} */ options = {},
 ) {
     return await withTimeout(
-        /** @type {any} */ async () => {
+        async () => {
             const { topK = 8, filters = {} } = options;
 
             let q = table

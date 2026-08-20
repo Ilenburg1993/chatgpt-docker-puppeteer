@@ -18,8 +18,7 @@ const OllamaGenerateSchema = z.object({
         .min(1, 'Prompt cannot be empty')
         .max(10000, 'Prompt too long (max 10000 chars) - potential DoS attack'),
     model: z
-        .string()
-        .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .string()['regex'](/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
         .optional(),
     runtime: z.enum(['auto', 'cloud', 'local']).optional(),
     temperature: z.number().min(0, 'Temperature must be >= 0').max(2, 'Temperature must be <= 2').optional(),
@@ -34,8 +33,7 @@ const OllamaGenerateSchema = z.object({
 const OllamaEmbedSchema = z.object({
     text: z.string().min(1, 'Text cannot be empty').max(8000, 'Text too long (max 8000 chars) - potential DoS attack'),
     model: z
-        .string()
-        .regex(/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .string()['regex'](/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
         .optional(),
 });
 
@@ -61,7 +59,7 @@ async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} 
         validated = OllamaGenerateSchema.parse(params);
     } catch (/** @type {any} */ _raw_error) {
         const error = /** @type {any} */ (_raw_error);
-        if (error instanceof z.ZodError) {
+        if (error instanceof z['ZodError']) {
             const issues = /** @type {any} */ (error).issues ?? [];
             const message =
                 Array.isArray(issues) && issues.length > 0
@@ -74,8 +72,8 @@ async function ollamaGenerateHandler(/** @type {any} */ params, /** @type {any} 
 
     const { prompt, model, runtime = 'auto', temperature = 0.7, max_tokens } = validated;
 
-    const selectedModel = model || process.env.OLLAMA_DEFAULT_MODEL || 'qwen3-coder-next';
-    const selectedMaxTokens = max_tokens || Number(process.env.OLLAMA_MAX_TOKENS || 1000);
+    const selectedModel = model || process.env['OLLAMA_DEFAULT_MODEL'] || 'qwen3-coder-next';
+    const selectedMaxTokens = max_tokens || Number(process.env['OLLAMA_MAX_TOKENS'] || 1000);
 
     if (options.signal?.aborted) {
         throw new Error('Generation cancelled before execution');
@@ -115,7 +113,7 @@ async function ollamaEmbedHandler(/** @type {any} */ params, /** @type {any} */ 
         validated = OllamaEmbedSchema.parse(params);
     } catch (/** @type {any} */ _raw_error) {
         const error = /** @type {any} */ (_raw_error);
-        if (error instanceof z.ZodError) {
+        if (error instanceof z['ZodError']) {
             const issues = /** @type {any} */ (error).issues ?? [];
             const message =
                 Array.isArray(issues) && issues.length > 0

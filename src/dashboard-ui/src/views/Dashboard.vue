@@ -120,7 +120,7 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import { useRealtime } from '@/composables/useRealtime';
 import { useSystemStore } from '@/stores/system';
 import { useTaskStore } from '@/stores/tasks';
@@ -165,19 +165,19 @@ export default {
         }));
 
         // Methods
-        const getHealthClass = (value) => {
+        const getHealthClass = (value: number) => {
             if (value > 90) return 'critical';
             if (value > 70) return 'warning';
             return 'healthy';
         };
 
-        const getEventLoopClass = (value) => {
+        const getEventLoopClass = (value: number) => {
             if (value > 100) return 'critical';
             if (value > 50) return 'warning';
             return 'healthy';
         };
 
-        const formatTime = (timestamp) => {
+        const formatTime = (timestamp: string | number | Date | null | undefined) => {
             if (!timestamp) return '';
             const date = new Date(timestamp);
             return date.toLocaleTimeString();

@@ -10,19 +10,17 @@ try {
 
     // Test 2: prerequisite_validator loads
     console.log('\n2. Loading prerequisite_validator...');
-    const _validator = await import('#core/validators/prerequisite_validator').then(
-        (/** @type {any} */ m) => m.default ?? m,
-    );
+    await import('#core/validators/prerequisite_validator');
     console.log('   ✅ prerequisite_validator loaded');
 
     // Test 3: input_resolver loads
     console.log('\n3. Loading input_resolver...');
-    const _input = await import('#driver/modules/input_resolver').then((/** @type {any} */ m) => m.default ?? m);
+    await import('#driver/modules/input_resolver');
     console.log('   ✅ input_resolver loaded');
 
     // Test 4: biomechanics_engine loads
     console.log('\n4. Loading biomechanics_engine...');
-    const _bio = await import('#driver/modules/biomechanics_engine').then((/** @type {any} */ m) => m.default ?? m);
+    await import('#driver/modules/biomechanics_engine');
     console.log('   ✅ biomechanics_engine loaded');
 
     console.log('\n✅ SUCCESS: All modules load correctly after SADI migration!');

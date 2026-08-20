@@ -401,7 +401,7 @@ async function getBabelParse() {
     if (_babelParse !== null) return _babelParse === 'unavailable' ? null : _babelParse;
     try {
         const m = await import('@babel/parser');
-        _babelParse = m.parse ?? m.default?.parse ?? null;
+        _babelParse = m.parse ?? null;
         if (!_babelParse) _babelParse = 'unavailable';
     } catch {
         _babelParse = 'unavailable';

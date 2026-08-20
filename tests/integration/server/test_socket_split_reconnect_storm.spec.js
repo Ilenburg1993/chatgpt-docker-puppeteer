@@ -46,7 +46,7 @@ async function findAgentSocket(/** @type {any} */ io, timeoutMs = 10000) {
     throw new Error('Agent socket not found');
 }
 
-test('split mode survives reconnect storm (3 forced transport drops)', async (t) => {
+test('split mode survives reconnect storm (3 forced transport drops)', async () => {
     const httpServer = http.createServer((_, res) => {
         res.statusCode = 200;
         res.end('ok');

@@ -218,7 +218,7 @@ describe('E1 — mergeStaticFilters', () => {
 describe('E1.2 — createHooks dynamic-only path', () => {
     it('permite todas as tools quando sem listas estáticas', async () => {
         const hooks = createHooks({ auditLog: true });
-        const result = await hooks.onPreToolUse?.({ toolName: 'any_tool', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
+        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'any_tool', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
         expect(result).toEqual({ permissionDecision: 'allow' });
     });
 
@@ -226,16 +226,16 @@ describe('E1.2 — createHooks dynamic-only path', () => {
         const hooks = createHooks({
             onPermissionAsk: async () => false,
         });
-        const result = await hooks.onPreToolUse?.({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
+        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'shell', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
         expect(result?.permissionDecision).toBe('deny');
     });
 
     it('argsModifier retorna modifiedArgs', async () => {
         const hooks = createHooks({
-            argsModifier: (name, args) => ({ ...args, injected: true }),
+            argsModifier: (_name, args) => ({ ...args, injected: true }),
         });
         const result = await hooks.onPreToolUse?.(
-            { toolName: 'test', toolArgs: { foo: 1 }, timestamp: 0, cwd: '/' },
+            { sessionId: 's1', toolName: 'test', toolArgs: { foo: 1 }, timestamp: new Date(0), workingDirectory: '/' },
             INV,
         );
         expect(result?.permissionDecision).toBe('allow');
@@ -244,13 +244,13 @@ describe('E1.2 — createHooks dynamic-only path', () => {
 
     it('static path: denyTools nega tool listada', async () => {
         const hooks = createHooks({ denyTools: ['rm_rf'] });
-        const result = await hooks.onPreToolUse?.({ toolName: 'rm_rf', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
+        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'rm_rf', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
         expect(result?.permissionDecision).toBe('deny');
     });
 
     it('static path: allowTools nega tool não listada', async () => {
         const hooks = createHooks({ allowTools: ['read_file'] });
-        const result = await hooks.onPreToolUse?.({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
+        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'shell', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
         expect(result?.permissionDecision).toBe('deny');
     });
 });
@@ -316,7 +316,7 @@ describe('E2.1 — loggingMiddleware', () => {
 
 describe('E2.1 — forTools', () => {
     it('aplica middleware apenas para tools específicas', async () => {
-        const spy = vi.fn(async (_input, _inv, next) => {
+        const spy = vi.fn(async (_input, _inv, _next) => {
             return { permissionDecision: 'deny' };
         });
 
@@ -464,8 +464,8 @@ describe('E3.1 — AuditTrail', () => {
         expect(trail.size).toBe(1);
         const [first] = trail.tail(1);
         expect(first).toBeDefined();
-        expect(first?.toolName).toBe('read_file');
-        expect(first?.decision).toBe('allow');
+        expect(first?.['toolName']).toBe('read_file');
+        expect(first?.['decision']).toBe('allow');
     });
 
     it('respeita maxSize (ring buffer)', () => {
@@ -481,7 +481,7 @@ describe('E3.1 — AuditTrail', () => {
         }
         expect(trail.size).toBe(3);
         const all = trail.tail();
-        expect(all.map((d) => d.toolName)).toEqual(['tool-4', 'tool-3', 'tool-2']);
+        expect(all.map((d) => d['toolName'])).toEqual(['tool-4', 'tool-3', 'tool-2']);
     });
 
     it('query filtra por hookName', () => {
@@ -491,7 +491,7 @@ describe('E3.1 — AuditTrail', () => {
         const result = trail.query({ hookName: 'pre' });
         expect(result).toHaveLength(1);
         expect(result[0]).toBeDefined();
-        expect(result[0]?.hookName).toBe('pre');
+        expect(result[0]?.['hookName']).toBe('pre');
     });
 
     it('query filtra por decision', () => {
@@ -563,8 +563,8 @@ describe('E3.1 — withPreToolAudit', () => {
         expect(trail.size).toBe(1);
         const [d] = trail.tail();
         expect(d).toBeDefined();
-        expect(d?.decision).toBe('allow');
-        expect(d?.toolName).toBe('read');
+        expect(d?.['decision']).toBe('allow');
+        expect(d?.['toolName']).toBe('read');
     });
 
     it('registra decisão deny no trail', async () => {
@@ -579,8 +579,8 @@ describe('E3.1 — withPreToolAudit', () => {
         await handler({ toolName: 'shell', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         const [d] = trail.tail();
         expect(d).toBeDefined();
-        expect(d?.decision).toBe('deny');
-        expect(d?.reason).toBe('blocked by policy');
+        expect(d?.['decision']).toBe('deny');
+        expect(d?.['reason']).toBe('blocked by policy');
     });
 
     it('registra modify quando modifiedArgs presente', async () => {
@@ -592,7 +592,7 @@ describe('E3.1 — withPreToolAudit', () => {
         await handler({ toolName: 't', toolArgs: {}, timestamp: 0, cwd: '/' }, INV);
         const [d] = trail.tail();
         expect(d).toBeDefined();
-        expect(d?.decision).toBe('modify');
+        expect(d?.['decision']).toBe('modify');
     });
 });
 
@@ -612,7 +612,7 @@ describe('E3.1 — withPostToolAudit', () => {
         );
         const [d] = trail.tail();
         expect(d).toBeDefined();
-        expect(d?.decision).toBe('enrich');
+        expect(d?.['decision']).toBe('enrich');
     });
 
     it('registra allow quando sem additionalContext', async () => {
@@ -630,7 +630,7 @@ describe('E3.1 — withPostToolAudit', () => {
         );
         const [d] = trail.tail();
         expect(d).toBeDefined();
-        expect(d?.decision).toBe('allow');
+        expect(d?.['decision']).toBe('allow');
     });
 });
 
@@ -647,9 +647,9 @@ describe('E3.1 — withErrorAudit', () => {
         );
         const [d] = trail.tail();
         expect(d).toBeDefined();
-        expect(d?.decision).toBe('retry');
-        expect(d?.hookName).toBe('onErrorOccurred');
-        expect(d?.metadata).toEqual({ recoverable: true });
+        expect(d?.['decision']).toBe('retry');
+        expect(d?.['hookName']).toBe('onErrorOccurred');
+        expect(d?.['metadata']).toEqual({ recoverable: true });
     });
 });
 

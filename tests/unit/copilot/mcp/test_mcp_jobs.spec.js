@@ -4,7 +4,6 @@
  */
 
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -74,6 +73,14 @@ describe('copilot MCP jobs', () => {
                 '.devcontainer/scripts/network/contracts/summary-contracts.jsonc',
             ],
         });
+        assert.deepEqual(resolveValidatorCommand('dependency-outdated'), {
+            command: 'node',
+            args: ['src/copilot/mcp/scripts/dependency-maintenance-runner.js', 'outdated'],
+        });
+        assert.throws(
+            () => Reflect.apply(resolveValidatorCommand, undefined, ['dependency-upgrade']),
+            /Unsupported validator/u,
+        );
         assert.deepEqual(resolveValidatorCommand('suite-mcp-fast'), {
             command: 'node',
             args: ['src/copilot/mcp/scripts/run-safe-validation-suite.js', 'mcp-fast'],

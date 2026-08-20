@@ -4,7 +4,7 @@ import { getDb } from '#infra/db/sqlite';
 import { listAttemptsByTask } from '#infra/db/task_attempt_repo';
 import express from 'express';
 import { decodeCursor, encodeCursor, fail, ok, parseIncludeParam } from '../utils/api_envelope.js';
-import { taskRowToDetailTask, taskRowToListItem } from '../utils/task_views.js';
+import { taskDbRowToListItem, taskRowToDetailTask } from '../utils/task_views.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -108,19 +108,19 @@ function _buildTasksWhere({ status, stage, missionId, target, blocked, search, p
 
     if (status) {
         where.push('t.status = @status');
-        params.status = String(status).toUpperCase().trim();
+        params['status'] = String(status).toUpperCase().trim();
     }
     if (stage) {
         where.push('t.stage = @stage');
-        params.stage = String(stage).toUpperCase().trim();
+        params['stage'] = String(stage).toUpperCase().trim();
     }
     if (missionId) {
         where.push('t.mission_id = @mission_id');
-        params.mission_id = String(missionId);
+        params['mission_id'] = String(missionId);
     }
     if (target) {
         where.push('t.target = @target');
-        params.target = String(target).toLowerCase().trim();
+        params['target'] = String(target).toLowerCase().trim();
     }
     if (blocked === true) {
         where.push("(t.status = 'BLOCKED' OR t.blocked_reason IS NOT NULL)");
@@ -129,11 +129,11 @@ function _buildTasksWhere({ status, stage, missionId, target, blocked, search, p
     }
     if (search) {
         where.push('(instr(lower(t.id), lower(@search)) > 0 OR instr(lower(t.spec_user_message), lower(@search)) > 0)');
-        params.search = String(search);
+        params['search'] = String(search);
     }
     if (priorityGte !== null && priorityGte !== undefined && String(priorityGte) !== '') {
         where.push('t.priority >= @priority_gte');
-        params.priority_gte = Number(priorityGte) || 0;
+        params['priority_gte'] = Number(priorityGte) || 0;
     }
 
     return { where, params };
@@ -157,16 +157,16 @@ router.get('/tasks', async (req, res) => {
     try {
         const db = getDb();
 
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
 
-        const status = req.query.status ? String(req.query.status) : null;
-        const stage = req.query.stage ? String(req.query.stage) : null;
-        const missionId = req.query.mission_id ? String(req.query.mission_id) : null;
-        const target = req.query.target ? String(req.query.target) : null;
-        const search = req.query.search ? String(req.query.search) : null;
-        const priorityGte = req.query.priority_gte != null ? String(req.query.priority_gte) : null;
-        const blockedRaw = req.query.blocked;
+        const status = req.query['status'] ? String(req.query['status']) : null;
+        const stage = req.query['stage'] ? String(req.query['stage']) : null;
+        const missionId = req.query['mission_id'] ? String(req.query['mission_id']) : null;
+        const target = req.query['target'] ? String(req.query['target']) : null;
+        const search = req.query['search'] ? String(req.query['search']) : null;
+        const priorityGte = req.query['priority_gte'] != null ? String(req.query['priority_gte']) : null;
+        const blockedRaw = req.query['blocked'];
         const blocked =
             blockedRaw === undefined
                 ? null
@@ -187,7 +187,7 @@ router.get('/tasks', async (req, res) => {
         });
         _applyCursorToWhere(where, params, cursor);
 
-        params.limit = limit + 1;
+        params['limit'] = limit + 1;
 
         const sql = `
             SELECT
@@ -216,7 +216,7 @@ router.get('/tasks', async (req, res) => {
         const hasMore = rows.length > limit;
         const page = hasMore ? rows.slice(0, limit) : rows;
 
-        const items = page.map((/** @type {any} */ r) => taskRowToListItem(r));
+        const items = page.map(taskDbRowToListItem);
         const last = page.length ? page[page.length - 1] : null;
         const nextCursor =
             hasMore && last
@@ -246,7 +246,7 @@ router.get('/tasks/:id', async (req, res) => {
     try {
         const db = getDb();
         const taskId = String(req.params.id);
-        const include = parseIncludeParam(req.query.include);
+        const include = parseIncludeParam(req.query['include']);
 
         const row = /** @type {any} */ (
             db
@@ -277,14 +277,14 @@ router.get('/tasks/:id', async (req, res) => {
 
         /** @type {Record<string, unknown>} */
         const data = { task };
-        data.mission_ref = task.mission_ref || null;
+        data['mission_ref'] = task['mission_ref'] || null;
 
         if (include.has('attempts')) {
-            data.attempts = listAttemptsByTask(taskId, { limit: 200 });
+            data['attempts'] = listAttemptsByTask(taskId, { limit: 200 });
         }
 
         if (include.has('events')) {
-            data.events = db
+            data['events'] = db
                 .prepare(
                     `
                     SELECT *
@@ -325,7 +325,7 @@ router.get('/tasks/:id', async (req, res) => {
                 `,
                 )
                 .all(taskId);
-            data.dependencies = deps.map((/** @type {any} */ r) => taskRowToListItem(r));
+            data['dependencies'] = deps.map(taskDbRowToListItem);
         }
 
         if (include.has('children')) {
@@ -348,11 +348,11 @@ router.get('/tasks/:id', async (req, res) => {
                 `,
                 )
                 .all(taskId);
-            data.children = children.map((/** @type {any} */ r) => taskRowToListItem(r));
+            data['children'] = children.map(taskDbRowToListItem);
         }
 
         if (include.has('workflow')) {
-            const workflowId = row.workflow_id || task?.meta?.workflow_id || null;
+            const workflowId = row.workflow_id || task?.meta?.['workflow_id'] || null;
             if (workflowId) {
                 const wfTasks = db
                     .prepare(
@@ -373,22 +373,22 @@ router.get('/tasks/:id', async (req, res) => {
                     `,
                     )
                     .all(workflowId);
-                data.workflow = {
+                data['workflow'] = {
                     workflow_id: workflowId,
-                    tasks: wfTasks.map((/** @type {any} */ r) => taskRowToListItem(r)),
+                    tasks: wfTasks.map(taskDbRowToListItem),
                 };
             } else {
-                data.workflow = null;
+                data['workflow'] = null;
             }
         }
 
         if (include.has('mission_context')) {
-            data.mission_context = _buildMissionContext(db, row.mission_id);
+            data['mission_context'] = _buildMissionContext(db, row.mission_id);
         }
 
         if (include.has('siblings')) {
             if (!row.mission_id) {
-                data.siblings = [];
+                data['siblings'] = [];
             } else {
                 const siblings = db
                     .prepare(
@@ -408,9 +408,9 @@ router.get('/tasks/:id', async (req, res) => {
                     .all({
                         mission_id: row.mission_id,
                         task_id: taskId,
-                        limit: Math.max(1, Math.min(_asInt(req.query.siblings_limit, 25), 100)),
+                        limit: Math.max(1, Math.min(_asInt(req.query['siblings_limit'], 25), 100)),
                     });
-                data.siblings = siblings.map((/** @type {any} */ r) => taskRowToListItem(r));
+                data['siblings'] = siblings.map(taskDbRowToListItem);
             }
         }
 
@@ -452,10 +452,10 @@ router.get('/tasks/:id', async (req, res) => {
 
             const ids = Array.from(artifactIds);
             if (ids.length === 0) {
-                data.artifacts = [];
+                data['artifacts'] = [];
             } else {
                 const placeholders = ids.map(() => '?').join(',');
-                data.artifacts = db.prepare(`SELECT * FROM artifacts WHERE id IN (${placeholders})`).all(...ids);
+                data['artifacts'] = db.prepare(`SELECT * FROM artifacts WHERE id IN (${placeholders})`).all(...ids);
             }
         }
 
@@ -488,8 +488,8 @@ router.get('/tasks-stats', async (req, res) => {
             .all();
 
         const byStatus = /** @type {Record<string, number>} */ ({});
-        for (const /** @type {any} */ r of rows) {
-            byStatus[String(/** @type {any} */ (r).status)] = Number(/** @type {any} */ (r).c) || 0;
+        for (const row of /** @type {{ status: unknown; c: unknown }[]} */ (rows)) {
+            byStatus[String(row.status)] = Number(row.c) || 0;
         }
 
         const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
@@ -512,18 +512,18 @@ router.get('/tasks/:id/attempts', async (req, res) => {
     try {
         const db = getDb();
         const taskId = String(req.params.id);
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
 
         const where = ['task_id = @task_id'];
         const params = /** @type {Record<string, any>} */ ({ task_id: taskId, limit: limit + 1 });
 
-        const cMs = cursor && Number(cursor.created_at_ms);
-        const cId = cursor && cursor.id ? String(cursor.id) : null;
+        const cMs = cursor && Number(cursor['created_at_ms']);
+        const cId = cursor && cursor['id'] ? String(cursor['id']) : null;
         if (Number.isFinite(cMs) && cId) {
             where.push('(created_at_ms < @cursor_created OR (created_at_ms = @cursor_created AND id < @cursor_id))');
-            params.cursor_created = cMs;
-            params.cursor_id = cId;
+            params['cursor_created'] = cMs;
+            params['cursor_id'] = cId;
         }
 
         const rows = db
@@ -569,9 +569,9 @@ router.get('/tasks/:id/events', async (req, res) => {
     try {
         const db = getDb();
         const taskId = String(req.params.id);
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
-        const eventType = req.query.event_type ? String(req.query.event_type) : null;
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
+        const eventType = req.query['event_type'] ? String(req.query['event_type']) : null;
 
         const where = ["entity_type = 'task'", 'entity_id = @entity_id'];
         /** @type {Record<string, unknown>} */
@@ -579,13 +579,13 @@ router.get('/tasks/:id/events', async (req, res) => {
 
         if (eventType) {
             where.push('event_type = @event_type');
-            params.event_type = eventType;
+            params['event_type'] = eventType;
         }
 
-        const cId = cursor && Number(cursor.id);
+        const cId = cursor && Number(cursor['id']);
         if (Number.isFinite(cId)) {
             where.push('id < @cursor_id');
-            params.cursor_id = cId;
+            params['cursor_id'] = cId;
         }
 
         const rows = db
@@ -716,12 +716,7 @@ router.get('/workflows/:workflow_id', async (req, res) => {
             .all(...tasks.map((/** @type {any} */ t) => t.id))
             .filter((/** @type {any} */ e) => taskIds.has(e.task_id) && taskIds.has(e.depends_on_task_id));
 
-        ok(
-            res,
-            req,
-            { workflow_id: workflowId, tasks: tasks.map((/** @type {any} */ r) => taskRowToListItem(r)), edges: deps },
-            {},
-        );
+        ok(res, req, { workflow_id: workflowId, tasks: tasks.map(taskDbRowToListItem), edges: deps }, {});
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[DASHBOARD_API] workflow view failed: ${_e?.message || String(_e)}`, req.id);

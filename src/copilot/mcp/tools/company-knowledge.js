@@ -434,7 +434,7 @@ export const companyKnowledgeTools = [
         description:
             'Search the bounded local Company Knowledge corpus. Read-only; returns only id, title and url for fetchable workspace documents.',
         inputSchema: {
-            query: z.string().min(1).max(MAX_QUERY_LENGTH).describe('Search query string.'),
+            query: z.string().min(1).max(MAX_QUERY_LENGTH)['describe']('Search query string.'),
         },
         outputSchema: {
             results: z.array(
@@ -464,7 +464,7 @@ export const companyKnowledgeTools = [
         description:
             'Fetch one document previously returned by Company Knowledge search. Read-only; the id must be a repo:* result id.',
         inputSchema: {
-            id: z.string().min(1).max(4096).describe('Document id returned by the search tool.'),
+            id: z.string().min(1).max(4096)['describe']('Document id returned by the search tool.'),
         },
         outputSchema: {
             id: z.string(),

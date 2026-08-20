@@ -6,9 +6,9 @@ const puppeteer = require('puppeteer');
 
         // Endpoint obtido do curl (com Host: localhost) - use variável de ambiente para sobrescrever
         const wsEndpoint =
-            process.env.CHROME_WSE ||
-            process.env.CHROME_WS_ENDPOINT ||
-            `ws://host.docker.internal:${process.env.CHROME_PORT || 9225}/devtools/browser/d5a443e3-2e26-4463-a462-141ef57b9d90`;
+            process.env['CHROME_WSE'] ||
+            process.env['CHROME_WS_ENDPOINT'] ||
+            `ws://host.docker.internal:${process.env['CHROME_PORT'] || 9225}/devtools/browser/d5a443e3-2e26-4463-a462-141ef57b9d90`;
 
         console.log('[TEST] Conectando via WebSocket direto...');
         const browser = await puppeteer.connect({

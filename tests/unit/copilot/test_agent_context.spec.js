@@ -175,14 +175,14 @@ describe('AgentContext', () => {
         const ctx = new AgentContext(emitter);
 
         const metadata = ctx.getContextFactoryCapabilitiesSnapshot();
-        assert.equal(metadata['governance.permissions']?.runtimeAuthority, 'agent');
-        assert.equal(metadata['governance.permissions']?.sdkFirst, true);
-        assert.equal(metadata['tools.registry']?.provider, 'sdk/tools-registry');
-        assert.equal(metadata['tools.registry']?.sdkFirst, true);
-        assert.equal(metadata['dialog.loop']?.provider, 'agent/dialog/loop-manager');
+        assert.equal(metadata['governance.permissions']?.['runtimeAuthority'], 'agent');
+        assert.equal(metadata['governance.permissions']?.['sdkFirst'], true);
+        assert.equal(metadata['tools.registry']?.['provider'], 'sdk/tools-registry');
+        assert.equal(metadata['tools.registry']?.['sdkFirst'], true);
+        assert.equal(metadata['dialog.loop']?.['provider'], 'agent/dialog/loop-manager');
 
         metadata['dialog.loop'] = { provider: 'mutated' };
-        assert.equal(ctx.getContextFactoryCapabilitiesSnapshot()['dialog.loop']?.provider, 'agent/dialog/loop-manager');
+        assert.equal(ctx.getContextFactoryCapabilitiesSnapshot()['dialog.loop']?.['provider'], 'agent/dialog/loop-manager');
     });
 
     it('backgroundTasks emite completed e idle via emitter', async () => {
@@ -203,10 +203,10 @@ describe('AgentContext', () => {
         });
 
         assert.equal(completed.length, 1);
-        assert.equal(completed[0]?.label, 'test.background');
-        assert.equal(completed[0]?.status, 'success');
+        assert.equal(completed[0]?.['label'], 'test.background');
+        assert.equal(completed[0]?.['status'], 'success');
         assert.equal(idle.length, 1);
-        assert.equal(idle[0]?.pendingCount, 0);
+        assert.equal(idle[0]?.['pendingCount'], 0);
     });
 
     it('messageQueue.onEnqueue emite __processQueue no emitter', () => {

@@ -92,8 +92,17 @@ function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+
 /**
- * @param {Record<string, any>} record
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {Record<string, unknown>} record
  * @returns {{ routeProfile: string | null; providerId: string | null; providerModel: string | null }}
  */
 function healthIdentity(record) {
@@ -133,17 +142,16 @@ function positiveNumber(value, fallback) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {Record<string, unknown>} record
  * @returns {number}
  */
 function latestProviderSuccessAt(record) {
-    const probes = record && typeof record['probes'] === 'object' && !Array.isArray(record['probes']) ? record['probes'] : {};
-    const probeSuccessAt = Object.values(probes)
-        .filter((probe) => probe && typeof probe === 'object' && !Array.isArray(probe))
-        .reduce((max, probe) => {
-            const item = /** @type {Record<string, unknown>} */ (probe);
-            return item['ok'] === true ? Math.max(max, optionalNumber(item['lastAt']) ?? 0) : max;
-        }, 0);
+    const probes = isRecord(record['probes']) ? record['probes'] : {};
+    let probeSuccessAt = 0;
+    for (const probe of Object.values(probes)) {
+        if (!isRecord(probe) || probe['ok'] !== true) continue;
+        probeSuccessAt = Math.max(probeSuccessAt, optionalNumber(probe['lastAt']) ?? 0);
+    }
     return Math.max(
         optionalNumber(record['lastSuccessAt']) ?? 0,
         optionalNumber(record['lastAgentProbeSuccessAt']) ?? 0,
@@ -153,11 +161,12 @@ function latestProviderSuccessAt(record) {
 }
 
 /**
- * @param {Record<string, any>} record
- * @returns {{ at: number; kind: string | null; model: string | null; record: Record<string, any> } | null}
+ * @param {Record<string, unknown>} record
+ * @returns {{ at: number; kind: string | null; model: string | null; record: Record<string, unknown> } | null}
  */
 function latestProviderFailure(record) {
-    const probes = record && typeof record['probes'] === 'object' && !Array.isArray(record['probes']) ? record['probes'] : {};
+    const probes = isRecord(record['probes']) ? record['probes'] : {};
+    /** @type {Array<{ at: number; kind: string | null }>} */
     const candidates = [
         {
             at: optionalNumber(record['lastFailureAt']) ?? 0,
@@ -171,19 +180,17 @@ function latestProviderFailure(record) {
             at: record['runtimeHealthStatus'] === 'failed' ? (optionalNumber(record['runtimeObservedAtMs']) ?? 0) : 0,
             kind: optionalString(record['runtimeClassifiedFailure']),
         },
-        ...Object.values(probes)
-            .filter((probe) => probe && typeof probe === 'object' && !Array.isArray(probe))
-            .map((probe) => {
-                const item = /** @type {Record<string, unknown>} */ (probe);
-                return {
-                    at: optionalNumber(item['lastAt']) ?? 0,
-                    kind: optionalString(item['lastFailureKind']) ?? optionalString(item['lastErrorContext']),
-                };
-            }),
-    ]
-        .filter((candidate) => candidate.at > 0)
-        .sort((left, right) => right.at - left.at);
-    const latest = candidates[0];
+    ];
+    for (const probe of Object.values(probes)) {
+        if (!isRecord(probe)) continue;
+        candidates.push({
+            at: optionalNumber(probe['lastAt']) ?? 0,
+            kind: optionalString(probe['lastFailureKind']) ?? optionalString(probe['lastErrorContext']),
+        });
+    }
+    candidates.sort((left, right) => right.at - left.at);
+    const filteredCandidates = candidates.filter((candidate) => candidate.at > 0);
+    const latest = filteredCandidates[0];
     if (!latest) return null;
     return {
         at: latest.at,
@@ -248,7 +255,7 @@ function normalizedFailureKindSet(value, fallback) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {Record<string, unknown>} record
  * @param {{ routeProfile: string | null; providerId: string | null; providerModel: string | null }} identity
  * @returns {boolean}
  */
@@ -260,7 +267,7 @@ function healthRecordMatches(record, identity) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {Record<string, unknown>} record
  * @param {{ providerId: string | null; providerModel: string | null }} identity
  * @returns {boolean}
  */
@@ -270,8 +277,8 @@ function healthRecordMatchesProviderModel(record, identity) {
 }
 
 /**
- * @param {Record<string, any>[]} records
- * @returns {Record<string, any>[]}
+ * @param {Record<string, unknown>[]} records
+ * @returns {Record<string, unknown>[]}
  */
 function latestHealthRecordsFirst(records) {
     return records
@@ -319,14 +326,14 @@ function isGatewayRuntimeHealthIndex(value) {
  * Build a per-routing-call index over volatile runtime health. The index intentionally stores only pointers to the
  * provided records; it does not promote runtime facts into canonical metadata and it does not mutate the health store.
  *
- * @param {Record<string, any>[]} records
+ * @param {Record<string, unknown>[]} records
  * @returns {{
  *   schema: 'model-gateway-runtime-health-index';
- *   records: Record<string, any>[];
- *   exact: Map<string, Record<string, any>>;
- *   global: Map<string, Record<string, any>>;
- *   providerModel: Map<string, Record<string, any>>;
- *   provider: Map<string, Record<string, any>[]>;
+ *   records: Record<string, unknown>[];
+ *   exact: Map<string, Record<string, unknown>>;
+ *   global: Map<string, Record<string, unknown>>;
+ *   providerModel: Map<string, Record<string, unknown>>;
+ *   provider: Map<string, Record<string, unknown>[]>;
  * }}
  */
 export function createGatewayRuntimeHealthIndex(records) {
@@ -431,7 +438,7 @@ export function listGatewayModelVerifiedProbeKinds(health) {
  * Convert historical positive health into a time-bounded proof that is meaningful for the current terminal session.
  * Historical successes remain observable, but only fresh successes may promote a route as runtime-proved.
  *
- * @param {Record<string, any> | null} health
+ * @param {Record<string, unknown> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {{
  *   hasHistoricalProof: boolean;
@@ -492,7 +499,7 @@ export function summarizeGatewayRuntimeProofFreshness(health, options = {}) {
 }
 
 /**
- * @param {Record<string, any> | null} health
+ * @param {Record<string, unknown> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {boolean}
  */
@@ -501,7 +508,7 @@ export function hasFreshGatewayRuntimeProof(health, options = {}) {
 }
 
 /**
- * @param {Record<string, any> | null} health
+ * @param {Record<string, unknown> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {boolean}
  */
@@ -556,8 +563,8 @@ function canUseGlobalAgentProbeFallback(primary, fallback) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {{ runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex> }} options
+ * @param {Record<string, unknown>} model
+ * @param {{ runtimeHealthRecords?: Record<string, unknown>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex> }} options
  * @returns {ReturnType<typeof readGatewayModelHealth>}
  */
 function readGatewayModelGlobalRuntimeHealth(model, options) {
@@ -577,7 +584,7 @@ function readGatewayModelGlobalRuntimeHealth(model, options) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {{ routeProfile?: string | null }} [options]
  * @returns {ReturnType<typeof readByokProviderModelHealth>}
  */
@@ -605,8 +612,8 @@ export function readGatewayModelHealth(model, options = {}) {
  * This keeps post-runtime/effective selection deterministic without promoting runtime facts into canonical metadata and
  * without depending on whichever health store happens to be hydrated in the current process.
  *
- * @param {Record<string, any>} model
- * @param {Record<string, any>[]} records
+ * @param {Record<string, unknown>} model
+ * @param {Record<string, unknown>[]} records
  * @param {{ routeProfile?: string | null; allowRouteProfileFallback?: boolean }} [options]
  * @returns {ReturnType<typeof readGatewayModelHealth>}
  */
@@ -615,7 +622,7 @@ export function readGatewayModelHealthFromRecords(model, records, options = {}) 
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {ReturnType<typeof createGatewayRuntimeHealthIndex>} index
  * @param {{ routeProfile?: string | null; allowRouteProfileFallback?: boolean }} [options]
  * @returns {ReturnType<typeof readGatewayModelHealth>}
@@ -648,8 +655,8 @@ export function readGatewayModelHealthFromIndex(model, index, options = {}) {
  * Repeated temporary failures across different models of the same provider usually indicate account/provider
  * instability, not a bad single model. Keep that volatile and time-bounded so canonical metadata stays clean.
  *
- * @param {Record<string, any>} model
- * @param {Record<string, any>[] | ReturnType<typeof createGatewayRuntimeHealthIndex>} recordsOrIndex
+ * @param {Record<string, unknown>} model
+ * @param {Record<string, unknown>[] | ReturnType<typeof createGatewayRuntimeHealthIndex>} recordsOrIndex
  * @param {{ now?: string | number | Date; windowMs?: number; minFailedModels?: number; failureKinds?: string[] }} [options]
  * @returns {{
  *   include: boolean;
@@ -684,7 +691,7 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
     const failureKinds = normalizedFailureKindSet(options.failureKinds, MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS);
     const index = isGatewayRuntimeHealthIndex(recordsOrIndex)
         ? recordsOrIndex
-        : createGatewayRuntimeHealthIndex(/** @type {Record<string, any>[]} */ (recordsOrIndex));
+        : createGatewayRuntimeHealthIndex(/** @type {Record<string, unknown>[]} */ (recordsOrIndex));
     const providerRecords = index.provider.get(providerId) ?? [];
     const latestSuccessAt = providerRecords.reduce((max, record) => Math.max(max, latestProviderSuccessAt(record)), 0);
     const since = nowMs - Math.max(0, windowMs);
@@ -713,8 +720,8 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; allowRouteProfileFallback?: boolean }} [options]
+ * @param {Record<string, unknown>} model
+ * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, unknown>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; allowRouteProfileFallback?: boolean }} [options]
  * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth>; runtimeProof: ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {

@@ -171,7 +171,7 @@ function envBool(key, fallback) {
  *         canonicalProcess: string;
  *         terminalEnabled: boolean;
  *     };
- *     skills: ReturnType<import('./skills.js').readBootSkillConfig>;
+ *     skills: ReturnType<typeof import('./skills.js').readBootSkillConfig>;
  *     entrypoints: {
  *         canonical: string;
  *     };

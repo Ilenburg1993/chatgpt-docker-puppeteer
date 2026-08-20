@@ -26,8 +26,7 @@ describe('initializer.js', () => {
         });
 
         it('rejeita silenciosamente não-número', () => {
-            // @ts-expect-error — teste de robustez
-            expect(() => setBackgroundCompactionThreshold('abc')).not.toThrow();
+            expect(() => Reflect.apply(setBackgroundCompactionThreshold, undefined, ['abc'])).not.toThrow();
         });
 
         it('rejeita silenciosamente NaN', () => {

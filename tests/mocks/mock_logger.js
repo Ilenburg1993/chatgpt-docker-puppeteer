@@ -18,18 +18,18 @@ function criarLoggerMock() {
         obterLogs: function (/** @type {string | undefined} */ nivel) {
             const self = /** @type {Record<string, any>} */ (this);
             if (!nivel) {
-                return self.log.getCalls().map((/** @type {any} */ call) => call.args);
+                return self['log'].getCalls().map((/** @type {{ args: unknown[] }} */ call) => call.args);
             }
             return self[nivel].getCalls().map((/** @type {any} */ call) => call.args);
         },
 
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            self.log.resetHistory();
-            self.info.resetHistory();
-            self.warn.resetHistory();
-            self.error.resetHistory();
-            self.debug.resetHistory();
+            self['log'].resetHistory();
+            self['info'].resetHistory();
+            self['warn'].resetHistory();
+            self['error'].resetHistory();
+            self['debug'].resetHistory();
         },
 
         verificarChamado: function (/** @type {string} */ nivel, /** @type {string} */ mensagem) {

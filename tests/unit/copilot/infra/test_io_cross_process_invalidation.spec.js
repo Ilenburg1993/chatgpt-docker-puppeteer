@@ -64,6 +64,7 @@ describe('cross-process IO invalidation journal', () => {
         producer.publish(expectedPath, { recursive: true, source: 'unit-test' });
         now += 37;
 
+        /** @type {Array<{ filePath: string; recursive: boolean; source: string }>} */
         const received = [];
         const consumerPoll = consumer.poll((filePath, event) => received.push({ filePath, ...event }));
         const producerPoll = producer.poll(() => assert.fail('producer must not receive its own journal row'));

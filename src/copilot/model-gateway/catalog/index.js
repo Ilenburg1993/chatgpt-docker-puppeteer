@@ -142,7 +142,7 @@ export {
     parseOpenRouterKeyRows,
     parseZaiOpenApiRows,
 } from './importers/index.js';
-export { runCatalogImporters } from './importer-runner.js';
+export { defineCatalogImporter, runCatalogImporters } from './importer-runner.js';
 export {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,

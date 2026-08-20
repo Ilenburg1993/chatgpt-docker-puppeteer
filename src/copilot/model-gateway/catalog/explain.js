@@ -9,6 +9,7 @@
  */
 
 import { explainModelGatewayEligibilityDecision } from '../eligibility/index.js';
+import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogEntry } from './openai-schema.js';
 
 /**
@@ -188,7 +189,7 @@ function findRuntimeProbesForHealth(health, rows) {
 }
 
 /**
- * @param {ReturnType<typeof import('./json-catalog-store.js').normalizeStoredCatalogSnapshot>} snapshot
+ * @param {unknown} snapshot
  * @param {string} selector
  * @param {{ runtimeHealthRecords?: Record<string, unknown>[]; runtimeProbeResults?: Record<string, unknown>[] }} [options]
  * @returns {{
@@ -196,12 +197,12 @@ function findRuntimeProbesForHealth(health, rows) {
  *   operationalFound?: boolean;
  *   selector: string;
  *   key: string | null;
- *   projection: Record<string, any> | null;
+ *   projection: Record<string, unknown> | null;
  *   openai: ReturnType<typeof toOpenAIModelCatalogEntry> | null;
- *   routeOptions: Record<string, any>[];
- *   accountOverlays: Record<string, any>[];
+ *   routeOptions: Record<string, unknown>[];
+ *   accountOverlays: Record<string, unknown>[];
  *   eligibility: ReturnType<typeof explainModelGatewayEligibilityDecision> | null;
- *   providerProjection: Record<string, any> | null;
+ *   providerProjection: Record<string, unknown> | null;
  *   runtimeHealth: { status: 'ok' | 'failed' | 'unknown'; record: Record<string, unknown> } | null;
  *   runtimeProbes: Record<string, unknown>[];
  *   metadataCoverage: {
@@ -214,9 +215,10 @@ function findRuntimeProbesForHealth(health, rows) {
  * }}
  */
 export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}) {
+    const catalog = normalizeStoredCatalogSnapshot(snapshot);
     const normalizedSelector = optionalString(selector) ?? '';
     const projection =
-        snapshot.projections.find((item) => matchesProjectionSelector(item, normalizedSelector)) ?? null;
+        catalog.projections.find((item) => matchesProjectionSelector(item, normalizedSelector)) ?? null;
     if (!projection) {
         const runtimeHealthRecord = findRuntimeHealthBySelector(normalizedSelector, options.runtimeHealthRecords ?? []);
         const runtimeProbes = runtimeHealthRecord ? findRuntimeProbesForHealth(runtimeHealthRecord, options.runtimeProbeResults ?? []) : [];
@@ -254,16 +256,16 @@ export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}
                 : ['refresh_catalog_or_use_more_specific_selector'],
         };
     }
-    const routeOptions = snapshot.routeOptions.filter((route) => sameModelRoute(route, projection));
-    const accountOverlays = snapshot.accountOverlays.filter((overlay) => overlayMentionsProjection(overlay, projection));
+    const routeOptions = catalog.routeOptions.filter((route) => sameModelRoute(route, projection));
+    const accountOverlays = catalog.accountOverlays.filter((overlay) => overlayMentionsProjection(overlay, projection));
     const eligibilityDecision =
-        snapshot.modelEligibilityDecisions.find((decision) => sameModelRoute(decision, projection)) ?? null;
+        catalog.modelEligibilityDecisions.find((decision) => sameModelRoute(decision, projection)) ?? null;
     const eligibility = eligibilityDecision ? explainModelGatewayEligibilityDecision(eligibilityDecision) : null;
     const subjectProviderId =
         optionalString(isRecord(projection['providerMetadata']) ? projection['providerMetadata']['ownedBy'] : null) ??
         optionalString(projection['providerId']);
     const providerProjection =
-        snapshot.providerProjections.find(
+        catalog.providerProjections.find(
             (provider) =>
                 optionalString(provider['providerId']) === optionalString(projection['providerId']) &&
                 optionalString(provider['subjectProviderId']) === subjectProviderId,
@@ -315,28 +317,29 @@ export function explainModelGatewayCatalogEntry(snapshot, selector, options = {}
 }
 
 /**
- * @param {ReturnType<typeof import('./json-catalog-store.js').normalizeStoredCatalogSnapshot>} snapshot
+ * @param {unknown} snapshot
  * @param {string} selector
  * @returns {{
  *   found: boolean;
  *   selector: string;
  *   providerId: string | null;
- *   providerProjection: Record<string, any> | null;
- *   sources: Record<string, any>[];
- *   providerEvidences: Record<string, any>[];
- *   projections: Record<string, any>[];
- *   routeOptions: Record<string, any>[];
- *   accountOverlays: Record<string, any>[];
- *   conflicts: Record<string, any>[];
+ *   providerProjection: Record<string, unknown> | null;
+ *   sources: Record<string, unknown>[];
+ *   providerEvidences: Record<string, unknown>[];
+ *   projections: Record<string, unknown>[];
+ *   routeOptions: Record<string, unknown>[];
+ *   accountOverlays: Record<string, unknown>[];
+ *   conflicts: Record<string, unknown>[];
  *   freshness: { newestSourceAt: string | null; oldestSourceAt: string | null; sourceCount: number };
  *   nextActions: string[];
  * }}
  */
 export function explainModelGatewayProviderEntry(snapshot, selector) {
+    const catalog = normalizeStoredCatalogSnapshot(snapshot);
     const normalizedSelector = optionalString(selector) ?? '';
     const normalized = normalizedSelector.toLowerCase();
     const providerProjection =
-        snapshot.providerProjections.find((provider) =>
+        catalog.providerProjections.find((provider) =>
             [
                 optionalString(provider['providerId']),
                 optionalString(provider['subjectProviderId']),
@@ -348,7 +351,7 @@ export function explainModelGatewayProviderEntry(snapshot, selector) {
     const providerId =
         optionalString(providerProjection?.['providerId']) ??
         optionalString(providerProjection?.['subjectProviderId']) ??
-        (snapshot.projections.find((projection) => optionalString(projection['providerId'])?.toLowerCase().includes(normalized))?.[
+        (catalog.projections.find((projection) => optionalString(projection['providerId'])?.toLowerCase().includes(normalized))?.[
             'providerId'
         ] ?? null);
     const providerIdText = optionalString(providerId);
@@ -368,17 +371,17 @@ export function explainModelGatewayProviderEntry(snapshot, selector) {
             nextActions: ['refresh_catalog_or_use_provider_id'],
         };
     }
-    const sources = snapshot.sources.filter((source) => optionalString(source['providerId']) === providerIdText);
-    const providerEvidences = snapshot.providerEvidences.filter(
+    const sources = catalog.sources.filter((source) => optionalString(source['providerId']) === providerIdText);
+    const providerEvidences = catalog.providerEvidences.filter(
         (evidence) =>
             optionalString(evidence['providerId']) === providerIdText ||
             optionalString(evidence['subjectProviderId']) === providerIdText,
     );
-    const projections = snapshot.projections.filter((projection) => optionalString(projection['providerId']) === providerIdText);
-    const routeOptions = snapshot.routeOptions.filter((route) => optionalString(route['providerId']) === providerIdText);
-    const accountOverlays = snapshot.accountOverlays.filter((overlay) => optionalString(overlay['providerId']) === providerIdText);
+    const projections = catalog.projections.filter((projection) => optionalString(projection['providerId']) === providerIdText);
+    const routeOptions = catalog.routeOptions.filter((route) => optionalString(route['providerId']) === providerIdText);
+    const accountOverlays = catalog.accountOverlays.filter((overlay) => optionalString(overlay['providerId']) === providerIdText);
     const projectionKeys = new Set(projections.map(projectionKey));
-    const conflicts = snapshot.conflicts.filter((conflict) =>
+    const conflicts = catalog.conflicts.filter((conflict) =>
         projectionKeys.has(optionalString(conflict['projectionKey']) ?? ''),
     );
     const sourceDates = sources

@@ -214,7 +214,7 @@ describe('createMetricsStore', () => {
         it('gauge sobrescreve valor anterior', () => {
             store.recordGauge('mem', 100);
             store.recordGauge('mem', 200);
-            expect(store.getGauges().mem?.value).toBe(200);
+            expect(store.getGauges()['mem']?.value).toBe(200);
         });
     });
 

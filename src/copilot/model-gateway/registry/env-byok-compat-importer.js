@@ -9,13 +9,29 @@
  */
 
 import { readConfiguredByokModelsFromEnv, readConfiguredByokState } from '#copilot/sdk/session';
-import { buildProviderModelId, createModelRecord, createProviderRecord, normalizeGatewayIdPart } from '../contracts/records.js';
+import { buildProviderModelId, createModelRecord, createProviderRecord, normalizeGatewayIdPart, optionalPositiveInteger } from '../contracts/records.js';
 import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
 import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
 import {
     createModelGatewayEnvProfileStore,
     materializeModelGatewayActiveByokProfileEnv,
 } from '../profiles/env-profile-store.js';
+
+/**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | undefined}
+ */
+function optionalNonNegativeNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
 
 /**
  * @param {ReturnType<typeof readConfiguredByokState>} state
@@ -97,51 +113,54 @@ function buildEnvCompatModelRouting(providerId, state) {
  * @param {unknown} modelInfo
  * @param {string} providerId
  * @param {ReturnType<typeof readConfiguredByokState>} state
- * @returns {object | null}
  */
 function modelInfoToRecord(modelInfo, providerId, state) {
     if (!modelInfo || typeof modelInfo !== 'object') return null;
-    const record = /** @type {Record<string, any>} */ (modelInfo);
+    const record = /** @type {Record<string, unknown>} */ (modelInfo);
     const providerModel = typeof record['id'] === 'string' && record['id'].trim() ? record['id'].trim() : null;
     if (!providerModel) return null;
-    const byok = record['byok'] ?? {};
-    const supports = record['capabilities']?.supports ?? {};
-    const limits = record['capabilities']?.limits ?? {};
+    const byok = isRecord(record['byok']) ? record['byok'] : {};
+    const capabilities = isRecord(record['capabilities']) ? record['capabilities'] : {};
+    const supports = isRecord(capabilities['supports']) ? capabilities['supports'] : {};
+    const limits = isRecord(capabilities['limits']) ? capabilities['limits'] : {};
+    const rateLimits = isRecord(byok['rateLimits']) ? byok['rateLimits'] : {};
+    const pricing = isRecord(byok['pricing']) ? byok['pricing'] : {};
+    const policy = isRecord(record['policy']) ? record['policy'] : {};
     return createModelRecord({
         id: buildProviderModelId(providerId, providerModel),
         providerId,
         providerModel,
         displayName: typeof record['name'] === 'string' ? record['name'] : providerModel,
-        enabled: record['policy']?.state !== 'disabled',
+        enabled: policy['state'] !== 'disabled',
         capabilities: {
             text: true,
             streaming: true,
-            vision: Boolean(supports.vision ?? byok.supportsVision ?? state.summary.capabilities.vision),
+            vision: Boolean(supports['vision'] ?? byok['supportsVision'] ?? state.summary.capabilities.vision),
             reasoningEffort: Boolean(
-                supports.reasoningEffort ??
-                    byok.supportsReasoning ??
+                supports['reasoningEffort'] ??
+                    byok['supportsReasoning'] ??
                     state.summary.capabilities.sdkReasoningEffort,
             ),
-            tools: Boolean(byok.tools ?? false),
+            tools: Boolean(byok['tools'] ?? false),
         },
         limits: {
             contextWindowTokens:
-                limits.max_context_window_tokens ??
-                byok.contextWindowTokens ??
+                optionalPositiveInteger(limits['max_context_window_tokens']) ??
+                optionalPositiveInteger(byok['contextWindowTokens']) ??
                 state.summary.capabilities.contextWindowTokens,
-            maxRequestTokens: byok.rateLimits?.maxRequestTokens ?? state.summary.limits.maxRequestTokens,
-            tokensPerMinute: byok.rateLimits?.tokensPerMinute ?? state.summary.limits.tokensPerMinute,
-            requestsPerMinute: byok.rateLimits?.requestsPerMinute ?? state.summary.limits.requestsPerMinute,
-            dailyRequests: byok.rateLimits?.dailyRequests ?? state.summary.limits.dailyRequests,
+            maxRequestTokens: optionalPositiveInteger(rateLimits['maxRequestTokens']) ?? state.summary.limits.maxRequestTokens,
+            tokensPerMinute: optionalPositiveInteger(rateLimits['tokensPerMinute']) ?? state.summary.limits.tokensPerMinute,
+            requestsPerMinute: optionalPositiveInteger(rateLimits['requestsPerMinute']) ?? state.summary.limits.requestsPerMinute,
+            dailyRequests: optionalPositiveInteger(rateLimits['dailyRequests']) ?? state.summary.limits.dailyRequests,
         },
         pricing: {
-            inputUsdPerMillion: byok.pricing?.prompt ?? undefined,
-            outputUsdPerMillion: byok.pricing?.completion ?? undefined,
+            inputUsdPerMillion: optionalNonNegativeNumber(pricing['prompt']),
+            outputUsdPerMillion: optionalNonNegativeNumber(pricing['completion']),
         },
         routing: buildEnvCompatModelRouting(providerId, state),
         verification: {
-            confidence: byok.source === 'remote' ? 'catalog' : 'static_seed',
-            sources: [byok.source === 'remote' ? 'provider_catalog' : 'env_compat'],
+            confidence: byok['source'] === 'remote' ? 'catalog' : 'static_seed',
+            sources: [byok['source'] === 'remote' ? 'provider_catalog' : 'env_compat'],
         },
         provenance: {
             source: 'env_compat',
@@ -152,7 +171,6 @@ function modelInfoToRecord(modelInfo, providerId, state) {
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @returns {{ provider: object | null; models: object[]; active: object; warnings: string[]; errors: string[] }}
  */
 export function importConfiguredByokFromEnv(env = process.env) {
     const materialized = materializeModelGatewayActiveByokProfileEnv(env);
@@ -209,9 +227,12 @@ export function importConfiguredByokFromEnv(env = process.env) {
         ...state.summary.limits,
     });
     const activeProviderModel = state.model ?? state.summary.model ?? null;
-    if (activeProviderModel && !modelInfos.some((model) => model.id === activeProviderModel)) {
-        modelInfos.unshift(
-            /** @type {any} */ ({
+    const models = modelInfos
+        .map((model) => modelInfoToRecord(model, providerId, state))
+        .filter((model) => model !== null);
+    if (activeProviderModel && !models.some((model) => model.providerModel === activeProviderModel)) {
+        const activeRecord = modelInfoToRecord(
+            {
                 id: activeProviderModel,
                 name: activeProviderModel,
                 byok: {
@@ -221,12 +242,12 @@ export function importConfiguredByokFromEnv(env = process.env) {
                     contextWindowTokens: state.summary.capabilities.contextWindowTokens,
                     rateLimits: state.summary.limits,
                 },
-            }),
+            },
+            providerId,
+            state,
         );
+        if (activeRecord) models.unshift(activeRecord);
     }
-    const models = modelInfos
-        .map((model) => modelInfoToRecord(model, providerId, state))
-        .filter((model) => model !== null);
     return {
         provider,
         models,

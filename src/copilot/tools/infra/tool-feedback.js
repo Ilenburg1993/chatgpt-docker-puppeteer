@@ -382,11 +382,12 @@ function extractFailureDetails(result) {
 }
 
 /**
- * Acrescenta `toolFeedback` a retornos legados de falha.
+ * Acrescenta `toolFeedback` a retornos legados de falha sem apagar o tipo estrutural do resultado original.
  *
- * @param {unknown} result
+ * @template TResult
+ * @param {TResult} result
  * @param {{ toolName: string; parameters?: unknown; receivedParameters?: unknown }} context
- * @returns {unknown}
+ * @returns {TResult}
  */
 export function enrichToolFailureResult(result, context) {
     if (!isToolFailureResult(result)) return result;
@@ -398,12 +399,25 @@ export function enrichToolFailureResult(result, context) {
         receivedParameters: context.receivedParameters,
         details: extractFailureDetails(result),
     });
-    return { ...result, toolFeedback: feedback };
+    return /** @type {TResult} */ ({ ...result, toolFeedback: feedback });
+}
+
+/**
+ * @typedef {{ success: false; ok: false; error: string; toolFeedback: ToolFailureFeedback }} ToolExecutionFailureResponse
+ */
+
+/**
+ * @param {unknown} value
+ * @returns {value is ToolExecutionFailureResponse}
+ */
+export function isToolExecutionFailureResponse(value) {
+    if (!isRecord(value)) return false;
+    return value['success'] === false && value['ok'] === false && typeof value['error'] === 'string' && isRecord(value['toolFeedback']);
 }
 
 /**
  * @param {{ toolName: string; error: unknown; parameters?: unknown; receivedParameters?: unknown }} options
- * @returns {{ success: false; ok: false; error: string; toolFeedback: ToolFailureFeedback }}
+ * @returns {ToolExecutionFailureResponse}
  */
 export function createToolFailureResponse(options) {
     const feedback = createToolFailureFeedback({
@@ -452,24 +466,21 @@ export function createToolFailureResult(options) {
 }
 
 /**
- * Envolve handlers de tools com feedback estruturado de falha.
+ * Envolve handlers de tools com feedback estruturado de falha preservando o resultado do caminho normal.
+ * Exceções são convertidas, por contrato, em uma resposta de falha estruturada.
  *
  * @template TArgs
+ * @template TResult
  * @param {string} toolName
- * @param {import('#copilot/sdk/types').ToolHandler<TArgs>} handler
+ * @param {(args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult> | TResult} handler
  * @param {{ parameters?: unknown }} [options]
- * @returns {import('#copilot/sdk/types').ToolHandler<TArgs>}
+ * @returns {(args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult | ReturnType<typeof createToolFailureResponse>>}
  */
 export function withToolFailureFeedback(toolName, handler, options = {}) {
-    /**
-     * @this {unknown}
-     * @param {...unknown} args
-     * @returns {Promise<unknown>}
-     */
-    async function toolFailureAwareHandler(...args) {
-        const receivedParameters = args[0];
+    return async function toolFailureAwareHandler(args, invocation) {
+        const receivedParameters = args;
         try {
-            const result = await Reflect.apply(handler, this, args);
+            const result = await handler(args, invocation);
             return enrichToolFailureResult(result, {
                 toolName,
                 parameters: options.parameters,
@@ -483,6 +494,5 @@ export function withToolFailureFeedback(toolName, handler, options = {}) {
                 receivedParameters,
             });
         }
-    }
-    return /** @type {import('#copilot/sdk/types').ToolHandler<TArgs>} */ (toolFailureAwareHandler);
+    };
 }

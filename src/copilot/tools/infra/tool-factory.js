@@ -97,36 +97,40 @@ function isRecoverableToolFactoryError(err) {
 /**
  * Fallback estritamente local para a janela de TDZ do barrel em ciclos ESM/Vitest.
  *
+ * @template TArgs
+ * @template TResult
  * @param {{
  *     name: string;
  *     description: string;
  *     parameters?: Record<string, unknown>;
- *     handler: import('#copilot/sdk/types').ToolHandler<any>;
+ *     handler: (args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult>;
  *     skipPermission?: boolean;
  *     overridesBuiltInTool?: boolean;
  * }} options
- * @returns {import('#copilot/sdk/types').Tool<any>}
+ * @returns {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>}
  */
 function makePlainTool(options) {
-    return /** @type {import('#copilot/sdk/types').Tool<any>} */ ({
+    return {
         name: options.name,
         description: options.description,
         ...(options.parameters !== undefined ? { parameters: options.parameters } : {}),
         handler: options.handler,
         skipPermission: options.skipPermission ?? false,
         ...(options.overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-    });
+    };
 }
 
 /**
  * Constrói opções seguras para fallback plain tool, materializando apenas campos opcionais definidos.
  *
- * @param {Parameters<typeof sdkCreateTool>[0]} options
+ * @template TArgs
+ * @template TResult
+ * @param {import('#copilot/sdk/types').CreateToolOptions<TArgs, TResult>} options
  * @returns {{
  *     name: string;
  *     description: string;
  *     parameters?: Record<string, unknown>;
- *     handler: import('#copilot/sdk/types').ToolHandler<any>;
+ *     handler: (args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult> | TResult;
  *     skipPermission?: boolean;
  *     overridesBuiltInTool?: boolean;
  * }}
@@ -137,7 +141,7 @@ function buildPlainToolOptions(options) {
     return {
         name: options.name,
         description: options.description,
-        handler: /** @type {import('#copilot/sdk/types').ToolHandler<any>} */ (options.handler),
+        handler: options.handler,
         ...(normalizedParameters !== undefined ? { parameters: normalizedParameters } : {}),
         ...(typeof options.skipPermission === 'boolean' ? { skipPermission: options.skipPermission } : {}),
         ...(options.overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
@@ -147,14 +151,19 @@ function buildPlainToolOptions(options) {
 /**
  * Factory SDK-first com fallback apenas para ciclos de inicialização.
  *
- * @param {Parameters<typeof sdkCreateTool>[0]} options
- * @returns {ReturnType<typeof sdkCreateTool>}
+ * @template TArgs
+ * @template TResult
+ * @param {import('#copilot/sdk/types').CreateToolOptions<TArgs, TResult>} options
+ * @returns {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>}
  */
 function createTool(options) {
     const plainToolOptions = buildPlainToolOptions(options);
-    const plainTool = makePlainTool(plainToolOptions);
+    const plainTool = makePlainTool({
+        ...plainToolOptions,
+        handler: async (args, invocation) => plainToolOptions.handler(args, invocation),
+    });
     try {
-        const tool = safeSdkCreateTool(options) || plainTool;
+        const tool = safeSdkCreateTool(options) ?? plainTool;
         return validateBuiltTool(options.name, tool);
     } catch (err) {
         if (isRecoverableToolFactoryError(err)) {
@@ -171,8 +180,10 @@ function createTool(options) {
 /**
  * Invoca o builder do SDK de forma resiliente a mocks parciais/exports ausentes.
  *
- * @param {Parameters<typeof sdkCreateTool>[0]} options
- * @returns {ReturnType<typeof sdkCreateTool> | null}
+ * @template TArgs
+ * @template TResult
+ * @param {import('#copilot/sdk/types').CreateToolOptions<TArgs, TResult>} options
+ * @returns {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult> | null}
  */
 function safeSdkCreateTool(options) {
     try {
@@ -203,9 +214,22 @@ function logToolFactory(level, message) {
 }
 
 /**
+ * Tool executável decorada com metadados locais opcionais.
+ *
+ * @template TArgs
+ * @template TResult
+ * @typedef {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult> & {
+ *     instructions?: string;
+ *     outputSchema?: Record<string, unknown>;
+ *     annotations?: Record<string, unknown>;
+ * }} BuiltTool
+ */
+
+/**
  * Opções para `buildTool`.
  *
  * @template TArgs
+ * @template TResult
  * @typedef {object} BuildToolOptions
  * @property {string} name - Nome único da ferramenta (snake_case recomendado)
  * @property {string} description - Descrição legível para o modelo
@@ -214,7 +238,9 @@ function logToolFactory(level, message) {
  *   - Schema Zod (v3 ou v4, inclusive tipagem SDK) ou JSON Schema manual dos parâmetros
  *
  * @property {string} [instructions] - Orientação operacional explícita para o modelo usar a tool com segurança.
- * @property {import('#copilot/sdk/types').ToolHandler<TArgs>} handler - Callback executor da ferramenta
+ * @property {(args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult> | TResult} handler
+ *   - Callback executor da ferramenta
+ *
  * @property {boolean} [requiresApproval] - Se `true` (default), skipPermission=false
  * @property {boolean} [overridesBuiltInTool] - Se sobrescreve ferramenta nativa do SDK
  * @property {'warn' | 'throw'} [schemaFailurePolicy] - `throw` impede registro sem schema após falha de normalização.
@@ -264,10 +290,11 @@ function normalizeParameters(parameters, toolName = 'unknown', failurePolicy = '
 /**
  * Hardening local: garante que a tool produzida respeita o contrato canônico antes de sair da factory.
  *
- * @template T
+ * @template TArgs
+ * @template TResult
  * @param {string} toolName
- * @param {import('#copilot/sdk/types').Tool<T>} tool
- * @returns {import('#copilot/sdk/types').Tool<T>}
+ * @param {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>} tool
+ * @returns {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>}
  */
 function validateBuiltTool(toolName, tool) {
     const validation = validateToolDefinitionContractLocal(tool);
@@ -323,8 +350,9 @@ function validateToolDefinitionContractLocal(tool) {
  *     });
  *
  * @template TArgs
- * @param {BuildToolOptions<TArgs>} options
- * @returns {import('#copilot/sdk/types').Tool<TArgs>}
+ * @template TResult
+ * @param {BuildToolOptions<TArgs, TResult>} options
+ * @returns {BuiltTool<TArgs, TResult | ReturnType<typeof import('./tool-feedback.js').createToolFailureResponse>>}
  */
 export function buildTool({
     name,
@@ -349,12 +377,12 @@ export function buildTool({
         name,
         description,
         ...(jsonSchemaParams !== undefined ? { parameters: jsonSchemaParams } : {}),
-        handler: /** @type {Parameters<typeof sdkCreateTool>[0]['handler']} */ (failureAwareHandler),
+        handler: failureAwareHandler,
         // Semântica explícita: requiresApproval=true => skipPermission=false; false => skipPermission=true.
         skipPermission: !requiresApproval,
         ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
     });
-    return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ ({
+    return {
         ...tool,
         ...(typeof instructions === 'string' && instructions.trim().length > 0
             ? { instructions: instructions.trim() }
@@ -363,19 +391,19 @@ export function buildTool({
         ...(annotations && typeof annotations === 'object' && !Array.isArray(annotations)
             ? { annotations: { ...annotations } }
             : {}),
-    });
+    };
 }
 
 /**
  * Marca uma tool existente como `skipPermission: true` (execução sem aprovação prévia do usuário). Aplicável a tools de
  * leitura, introspecção e operações sem efeito colateral.
  *
- * @template [TArgs=unknown] Default is `unknown`
- * @param {import('#copilot/sdk/types').Tool<TArgs>} tool - Tool a ser marcada
- * @returns {import('#copilot/sdk/types').Tool<TArgs>} A mesma tool com `skipPermission: true`
+ * @template {{ skipPermission?: boolean }} TTool
+ * @param {TTool} tool - Tool a ser marcada
+ * @returns {TTool} A mesma forma estrutural da tool com `skipPermission: true`
  */
 export function withSkipPermission(tool) {
     // FIX TF-01: Object.assign mutava o objeto original — todos os importadores passavam a ter skipPermission=true.
-    // Solução: spread cria cópia rasa sem afetar a referência original.
-    return /** @type {import('#copilot/sdk/types').Tool<TArgs>} */ ({ ...tool, skipPermission: true });
+    // Solução: spread cria cópia rasa sem afetar a referência original e preserva o subtipo executável.
+    return /** @type {TTool} */ ({ ...tool, skipPermission: true });
 }

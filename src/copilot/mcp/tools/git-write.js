@@ -31,8 +31,7 @@ const PATHSPEC_MAGIC_RE = /^(?::|[-])|[*?[\]{}!]/u;
 const explicitPathsSchema = z
     .array(z.string().min(1).max(1024))
     .min(1)
-    .max(MAX_STAGE_PATHS)
-    .describe('Explicit workspace-relative paths. Git pathspec magic, globs, option-like values and implicit dot are rejected.');
+    .max(MAX_STAGE_PATHS)['describe']('Explicit workspace-relative paths. Git pathspec magic, globs, option-like values and implicit dot are rejected.');
 
 /** @returns {Promise<string | null>} */
 async function readHead() {
@@ -268,8 +267,8 @@ export const gitWriteTools = [
         description: 'Stage only the explicitly supplied, policy-validated workspace paths. Never performs git add -A or implicit dot staging.',
         inputSchema: {
             paths: explicitPathsSchema,
-            expectedHead: z.string().max(64).optional().describe('Optional HEAD prefix precondition from git_stage_plan.'),
-            confirmStage: z.literal(true).describe('Explicit acknowledgement that the enumerated path set should be staged.'),
+            expectedHead: z.string().max(64).optional()['describe']('Optional HEAD prefix precondition from git_stage_plan.'),
+            confirmStage: z.literal(true)['describe']('Explicit acknowledgement that the enumerated path set should be staged.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ paths, expectedHead }) => {
@@ -335,7 +334,7 @@ export const gitWriteTools = [
         description: 'Resolve only the current branch upstream and perform git push --dry-run without accepting a remote, refspec or force option.',
         inputSchema: {
             expectedHead: z.string().max(64).optional(),
-            runDryRun: z.boolean().optional().describe('Contact the configured upstream with git push --dry-run. Default: true.'),
+            runDryRun: z.boolean().optional()['describe']('Contact the configured upstream with git push --dry-run. Default: true.'),
         },
         annotations: { ...readOnlyAnnotations(), openWorldHint: true },
         handler: async ({ expectedHead, runDryRun }) => {
@@ -360,13 +359,12 @@ export const gitWriteTools = [
         inputSchema: {
             paths: explicitPathsSchema,
             message: z.string().min(1).max(MAX_COMMIT_MESSAGE_CHARS),
-            expectedHead: z.string().max(64).optional().describe('Optional initial HEAD prefix precondition.'),
-            push: z.boolean().optional().describe('Push after commit. Default: true.'),
+            expectedHead: z.string().max(64).optional()['describe']('Optional initial HEAD prefix precondition.'),
+            push: z.boolean().optional()['describe']('Push after commit. Default: true.'),
             pushDryRunFirst: z
                 .boolean()
-                .optional()
-                .describe('Run one upstream push --dry-run before the real push. Default: false for lower network latency.'),
-            confirmPublish: z.literal(true).describe('Explicit acknowledgement of stage + commit + optional upstream push.'),
+                .optional()['describe']('Run one upstream push --dry-run before the real push. Default: false for lower network latency.'),
+            confirmPublish: z.literal(true)['describe']('Explicit acknowledgement of stage + commit + optional upstream push.'),
         },
         annotations: { ...destructiveAnnotations(), openWorldHint: true },
         handler: async ({ paths, message, expectedHead, push, pushDryRunFirst }) => {
@@ -549,12 +547,11 @@ export const gitWriteTools = [
         title: 'Push current branch to configured upstream',
         description: 'Push the current branch using only its existing upstream. Force, arbitrary remotes and arbitrary refspecs are impossible through this tool.',
         inputSchema: {
-            expectedHead: z.string().min(7).max(64).describe('HEAD precondition obtained from git_commit/git_push_plan.'),
-            expectedUpstream: z.string().min(1).max(256).describe('Expected existing upstream, for example origin/main.'),
+            expectedHead: z.string().min(7).max(64)['describe']('HEAD precondition obtained from git_commit/git_push_plan.'),
+            expectedUpstream: z.string().min(1).max(256)['describe']('Expected existing upstream, for example origin/main.'),
             pushDryRunFirst: z
                 .boolean()
-                .optional()
-                .describe('Run git push --dry-run before the real push. Default: false; git_push_plan remains available for explicit preflight.'),
+                .optional()['describe']('Run git push --dry-run before the real push. Default: false; git_push_plan remains available for explicit preflight.'),
             confirmPush: z.literal(true),
         },
         annotations: { ...destructiveAnnotations(), openWorldHint: true },

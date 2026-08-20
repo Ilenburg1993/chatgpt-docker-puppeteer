@@ -4,7 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 import { listModelGatewayRuntimeAutomationPolicyPresets } from '../../../src/copilot/model-gateway/index.js';
 
+import { createArgReader, readPositiveIntArg } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -16,33 +19,39 @@ live runs and runtime-health diff without calling providers, running models or m
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 function readPositiveInt(name, fallback) {
-    const value = Number.parseInt(readArg(name), 10);
-    return Number.isFinite(value) && value > 0 ? value : fallback;
+    return readPositiveIntArg(readArg, name, fallback);
 }
 
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
 function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
+/** @param {unknown} value */
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/** @param {unknown} value */
 function optionalNumber(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
+ * @param {string[]} [scriptArgs]
+ */
 function runJson(scriptId, scriptArgs = []) {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs], {
         cwd: REPO_ROOT,
@@ -64,14 +73,22 @@ function runJson(scriptId, scriptArgs = []) {
     }
 }
 
+/**
+ * @param {string} id
+ * @param {unknown} pass
+ * @param {unknown} detail
+ * @param {'error' | 'warn'} [severity]
+ */
 function check(id, pass, detail, severity = 'error') {
     return { id, pass: Boolean(pass), detail, severity };
 }
 
+/** @param {unknown} value */
 function commandList(value) {
     return Array.isArray(value) ? value.map(optionalString).filter((item) => item !== null) : [];
 }
 
+/** @param {(string | null | undefined)[]} values */
 function uniqueCommands(values) {
     return [...new Set(values.map(optionalString).filter((item) => item !== null))];
 }
@@ -101,6 +118,7 @@ const diagnosticsJson = optionalRecord(diagnostics.json);
 const opsDatabase = diagnosticsJson;
 const autoReadyJson = optionalRecord(autoReady.json);
 const runtimeSelectorJson = optionalRecord(runtimeSelector.json);
+const runtimeSelection = optionalRecord(runtimeSelectorJson?.['selection']);
 const runtimePlan = optionalRecord(runtimeSelectorJson?.['runtimeSelectorPlan']);
 const standbyJson = optionalRecord(standby.json);
 const standbySummary = optionalRecord(standbyJson?.['summary']);
@@ -115,6 +133,7 @@ const latestLiveScenarioRunEffective = optionalString(latestLiveScenarioRun?.['s
 const runtimeRoutes = Array.isArray(runtimePlan?.['routes']) ? runtimePlan['routes'].filter(optionalRecord) : [];
 const selectedRuntimeRoute = runtimeRoutes.find((route) => route['profileId'] === profile) ?? null;
 const standbyRoutes = Array.isArray(standbyJson?.['routes']) ? standbyJson['routes'].filter(optionalRecord) : [];
+/** @param {Record<string, unknown>} route */
 function buildCandidateAction(route) {
     const providerId = optionalString(route['providerId']);
     const providerModel = optionalString(route['providerModel']);
@@ -173,6 +192,7 @@ const liveCommands = [
     'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000',
     `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=${profile} --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
 ];
+/** @param {ReturnType<typeof listModelGatewayRuntimeAutomationPolicyPresets>[number]} preset */
 function buildPolicyPresetAction(preset) {
     const presetId = optionalString(preset['preset']) ?? 'operator_manual';
     const profileArg = `profile:${profile}`;
@@ -227,7 +247,11 @@ const checks = [
         diagnostics.ok && optionalRecord(diagnosticsJson?.['activeSnapshot'])?.['exists'] === true,
         diagnostics.error ?? `snapshot=${optionalRecord(diagnosticsJson?.['activeSnapshot'])?.['source'] ?? '-'}`,
     ),
-    check('auto_ready_ok', autoReady.ok && autoReadyJson?.['ok'] === true, autoReady.error ?? `failed=${autoReadyJson?.['blockers']?.length ?? 0}`),
+    check(
+        'auto_ready_ok',
+        autoReady.ok && autoReadyJson?.['ok'] === true,
+        autoReady.error ?? `failed=${Array.isArray(autoReadyJson?.['blockers']) ? autoReadyJson['blockers'].length : 0}`,
+    ),
     check(
         'live_readiness_ok',
         autoReady.ok && autoReadyJson?.['ok'] === true,
@@ -236,7 +260,7 @@ const checks = [
     check(
         'runtime_selector_ok',
         runtimeSelector.ok && runtimeSelectorJson?.['ok'] === true && runtimePlan?.['ready'] === true,
-        runtimeSelector.error ?? `selected=${runtimePlan?.['selectedCount'] ?? runtimeSelectorJson?.['selection']?.['selected'] ?? '-'}`,
+        runtimeSelector.error ?? `selected=${runtimePlan?.['selectedCount'] ?? runtimeSelection?.['selected'] ?? '-'}`,
     ),
     check(
         'standby_available',
@@ -284,8 +308,8 @@ const output = {
         standbyProviders: optionalNumber(standbySummary?.['providerCount']) ?? 0,
         standbyPersistedRows: optionalNumber(opsDatabase?.['standbyPlanRows']) ?? 0,
         liveScenarioRuns: liveScenarioRunRowCount,
-        runtimeSelected: runtimeSelectorJson?.['selection']?.['selected'] ?? null,
-        runtimeProfiles: runtimeSelectorJson?.['selection']?.['profiles'] ?? null,
+        runtimeSelected: runtimeSelection?.['selected'] ?? null,
+        runtimeProfiles: runtimeSelection?.['profiles'] ?? null,
         nextSafeCommands: uniqueNextSafeCommands.length,
         liveCommands: liveCommands.length,
         candidateActions: candidateActions.length,

@@ -169,7 +169,7 @@ function quotaResetWindow(quotaState, nowMs) {
 }
 
 /**
- * @param {Record<string, any>} overlay
+ * @param {Record<string, unknown>} overlay
  * @param {{ now?: string | number | Date }} [options]
  * @returns {{
  *   status: string;
@@ -229,8 +229,8 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
         failureKind: optionalString(providerMetadata['failureKind']),
         retryAfterSeconds: rateLimit.retryAfterSeconds,
         resetAt: rateLimit.resetAt ?? quotaState.resetAt,
-        observedAt: overlay['observedAt'],
-        expiresAt: overlay['expiresAt'],
+        observedAt: isoDate(overlay['observedAt']),
+        expiresAt: isoDate(overlay['expiresAt']),
     }, { now: nowMs });
     return {
         status,

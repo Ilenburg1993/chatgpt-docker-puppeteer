@@ -66,8 +66,7 @@ describe('createAgent', () => {
 
     it('deve lançar erro quando name não é string', () => {
         assert.throws(
-            // @ts-expect-error — teste de runtime: name deve ser string, não number
-            () => createAgent({ name: 42, prompt: 'ok' }),
+            () => Reflect.apply(createAgent, undefined, [{ name: 42, prompt: 'ok' }]),
             /createAgent.*"name"/,
         );
     });

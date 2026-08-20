@@ -1,7 +1,7 @@
 // @ts-check
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import ts from './typescript-compat.mjs';
 
 /** Schema version for the JSON report emitted by the JSDoc coverage tooling. */
 export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.1.0';

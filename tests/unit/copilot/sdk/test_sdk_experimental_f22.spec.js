@@ -81,7 +81,7 @@ describe('F22 — F124: feature-flags.js', () => {
 // ─── F124 runtime: feature-flags API ──────────────────────────────────────────
 
 describe('F22 — F124 runtime: feature-flags API', () => {
-    /** @type {import('../../../../src/copilot/sdk/feature-flags.js')} */
+    /** @type {typeof import('../../../../src/copilot/sdk/feature-flags.js')} */
     let featureFlags;
 
     beforeAll(async () => {
@@ -196,6 +196,20 @@ describe('F22 — F118-F123: rpc/experimental.js exports', () => {
 
 // ─── F125: feature flag on/off por subsistema (runtime) ──────────────────────
 
+/**
+ * Invoca a surface pública com uma fixture deliberadamente parcial. O limite reflexivo mantém o teste focado no
+ * contrato runtime sem fingir que a fixture implementa uma CopilotSession completa.
+ *
+ * @template R
+ * @param {(...args: never[]) => R} operation
+ * @param {unknown} session
+ * @param {...unknown} args
+ * @returns {R}
+ */
+function invokeExperimental(operation, session, ...args) {
+    return Reflect.apply(operation, undefined, [session, ...args]);
+}
+
 describe('F22 — F125: feature flag on/off por subsistema', () => {
     /** @type {typeof import('../../../../src/copilot/sdk/feature-flags.js')} */
     let featureFlags;
@@ -211,38 +225,38 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
         featureFlags.resetExperimentalFlags();
     });
 
-    const mockSession = /** @type {any} */ ({ rpc: {} });
+    const mockSession = { sessionId: 'experimental-test-session', rpc: {} };
 
     it('fleetStart lança Error quando fleet=false', async () => {
         featureFlags.resetExperimentalFlags();
-        await expect(expRpc.fleetStart(mockSession)).rejects.toThrow("'fleet'");
+        await expect(invokeExperimental(expRpc.fleetStart, mockSession)).rejects.toThrow("'fleet'");
     });
 
     it('skillsList lança Error quando skills=false', async () => {
         featureFlags.resetExperimentalFlags();
-        await expect(expRpc.skillsList(mockSession)).rejects.toThrow("'skills'");
+        await expect(invokeExperimental(expRpc.skillsList, mockSession)).rejects.toThrow("'skills'");
     });
 
     it('mcpList lança Error quando mcp=false', async () => {
         featureFlags.resetExperimentalFlags();
-        await expect(expRpc.mcpList(mockSession)).rejects.toThrow("'mcp'");
+        await expect(invokeExperimental(expRpc.mcpList, mockSession)).rejects.toThrow("'mcp'");
     });
 
     it('pluginsList lança Error quando plugins=false', async () => {
         featureFlags.resetExperimentalFlags();
-        await expect(expRpc.pluginsList(mockSession)).rejects.toThrow("'plugins'");
+        await expect(invokeExperimental(expRpc.pluginsList, mockSession)).rejects.toThrow("'plugins'");
     });
 
     it('extensionsList lança Error quando extensions=false', async () => {
         featureFlags.resetExperimentalFlags();
-        await expect(expRpc.extensionsList(mockSession)).rejects.toThrow("'extensions'");
+        await expect(invokeExperimental(expRpc.extensionsList, mockSession)).rejects.toThrow("'extensions'");
     });
 
     it('fleetStart com flag=true chama session.rpc.fleet.start()', async () => {
         featureFlags.setExperimentalFlag('fleet', true);
         const startMock = vi.fn().mockResolvedValue({ started: true });
-        const sess = /** @type {any} */ ({ rpc: { fleet: { start: startMock } } });
-        const result = await expRpc.fleetStart(sess, { prompt: 'investigue' });
+        const sess = { sessionId: 'fleet-test', rpc: { fleet: { start: startMock } } };
+        const result = await invokeExperimental(expRpc.fleetStart, sess, { prompt: 'investigue' });
         expect(startMock).toHaveBeenCalledWith({ prompt: 'investigue' });
         expect(result).toEqual({ started: true });
     });
@@ -250,8 +264,8 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     it('mcpList com flag=true chama session.rpc.mcp.list()', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const listMock = vi.fn().mockResolvedValue([{ name: 'Server A', status: 'connected' }]);
-        const sess = /** @type {any} */ ({ rpc: { mcp: { list: listMock } } });
-        const result = await expRpc.mcpList(sess);
+        const sess = { sessionId: 'mcp-list-test', rpc: { mcp: { list: listMock } } };
+        const result = await invokeExperimental(expRpc.mcpList, sess);
         expect(listMock).toHaveBeenCalledOnce();
         expect(result[0]?.name).toBe('Server A');
     });
@@ -272,50 +286,50 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     it('skillsReload com flag=true chama session.rpc.skills.reload()', async () => {
         featureFlags.setExperimentalFlag('skills', true);
         const reloadMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { skills: { reload: reloadMock } } });
-        await expRpc.skillsReload(sess);
+        const sess = { sessionId: 'skills-reload-test', rpc: { skills: { reload: reloadMock } } };
+        await invokeExperimental(expRpc.skillsReload, sess);
         expect(reloadMock).toHaveBeenCalledOnce();
     });
 
     it('mcpReload com flag=true chama session.rpc.mcp.reload()', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const reloadMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { mcp: { reload: reloadMock } } });
-        await expRpc.mcpReload(sess);
+        const sess = { sessionId: 'mcp-reload-test', rpc: { mcp: { reload: reloadMock } } };
+        await invokeExperimental(expRpc.mcpReload, sess);
         expect(reloadMock).toHaveBeenCalledOnce();
     });
 
     it('extensionsReload com flag=true chama session.rpc.extensions.reload()', async () => {
         featureFlags.setExperimentalFlag('extensions', true);
         const reloadMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { extensions: { reload: reloadMock } } });
-        await expRpc.extensionsReload(sess);
+        const sess = { sessionId: 'extensions-reload-test', rpc: { extensions: { reload: reloadMock } } };
+        await invokeExperimental(expRpc.extensionsReload, sess);
         expect(reloadMock).toHaveBeenCalledOnce();
     });
 
     it('mcpEnable valida serverName não-vazio', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
-        const sess = /** @type {any} */ ({ rpc: { mcp: { enable: vi.fn() } } });
-        await expect(expRpc.mcpEnable(sess, '')).rejects.toThrow(TypeError);
+        const sess = { sessionId: 'mcp-enable-validation', rpc: { mcp: { enable: vi.fn() } } };
+        await expect(invokeExperimental(expRpc.mcpEnable, sess, '')).rejects.toThrow(TypeError);
     });
 
     it('extensionsDisable valida id não-vazio', async () => {
         featureFlags.setExperimentalFlag('extensions', true);
-        const sess = /** @type {any} */ ({ rpc: { extensions: { disable: vi.fn() } } });
-        await expect(expRpc.extensionsDisable(sess, '')).rejects.toThrow(TypeError);
+        const sess = { sessionId: 'extensions-disable-validation', rpc: { extensions: { disable: vi.fn() } } };
+        await expect(invokeExperimental(expRpc.extensionsDisable, sess, '')).rejects.toThrow(TypeError);
     });
 
     it('assertSession lança TypeError para sessão inválida', async () => {
         featureFlags.setExperimentalFlag('skills', true);
-        await expect(expRpc.skillsList(/** @type {any} */ (null))).rejects.toThrow(TypeError);
-        await expect(expRpc.skillsList(/** @type {any} */ ({}))).rejects.toThrow(TypeError);
+        await expect(invokeExperimental(expRpc.skillsList, null)).rejects.toThrow(TypeError);
+        await expect(invokeExperimental(expRpc.skillsList, {})).rejects.toThrow(TypeError);
     });
 
     it('pluginsList com flag=true chama session.rpc.plugins.list()', async () => {
         featureFlags.setExperimentalFlag('plugins', true);
         const listMock = vi.fn().mockResolvedValue([{ id: 'p1', name: 'P', version: '1.0', enabled: true }]);
-        const sess = /** @type {any} */ ({ rpc: { plugins: { list: listMock } } });
-        const result = await expRpc.pluginsList(sess);
+        const sess = { sessionId: 'plugins-list-test', rpc: { plugins: { list: listMock } } };
+        const result = await invokeExperimental(expRpc.pluginsList, sess);
         expect(listMock).toHaveBeenCalledOnce();
         expect(/** @type {{ id?: string }} */ (result[0])?.id).toBe('p1');
     });
@@ -323,47 +337,47 @@ describe('F22 — F125: feature flag on/off por subsistema', () => {
     it('extensionsEnable com flag=true chama session.rpc.extensions.enable({ id })', async () => {
         featureFlags.setExperimentalFlag('extensions', true);
         const enableMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { extensions: { enable: enableMock } } });
-        await expRpc.extensionsEnable(sess, 'ext-1');
+        const sess = { sessionId: 'extensions-enable-test', rpc: { extensions: { enable: enableMock } } };
+        await invokeExperimental(expRpc.extensionsEnable, sess, 'ext-1');
         expect(enableMock).toHaveBeenCalledWith({ id: 'ext-1' });
     });
 
     it('skillsDisable com flag=true chama session.rpc.skills.disable({ name })', async () => {
         featureFlags.setExperimentalFlag('skills', true);
         const disableMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { skills: { disable: disableMock } } });
-        await expRpc.skillsDisable(sess, 'skill-1');
+        const sess = { sessionId: 'skills-disable-test', rpc: { skills: { disable: disableMock } } };
+        await invokeExperimental(expRpc.skillsDisable, sess, 'skill-1');
         expect(disableMock).toHaveBeenCalledWith({ name: 'skill-1' });
     });
 
     it('skillsEnable com flag=true chama session.rpc.skills.enable({ name })', async () => {
         featureFlags.setExperimentalFlag('skills', true);
         const enableMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { skills: { enable: enableMock } } });
-        await expRpc.skillsEnable(sess, 'skill-1');
+        const sess = { sessionId: 'skills-enable-test', rpc: { skills: { enable: enableMock } } };
+        await invokeExperimental(expRpc.skillsEnable, sess, 'skill-1');
         expect(enableMock).toHaveBeenCalledWith({ name: 'skill-1' });
     });
 
     it('mcpDisable com flag=true chama session.rpc.mcp.disable({ serverName })', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const disableMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { mcp: { disable: disableMock } } });
-        await expRpc.mcpDisable(sess, 'srv-1');
+        const sess = { sessionId: 'mcp-disable-test', rpc: { mcp: { disable: disableMock } } };
+        await invokeExperimental(expRpc.mcpDisable, sess, 'srv-1');
         expect(disableMock).toHaveBeenCalledWith({ serverName: 'srv-1' });
     });
 
     it('mcpEnable com flag=true chama session.rpc.mcp.enable({ serverName })', async () => {
         featureFlags.setExperimentalFlag('mcp', true);
         const enableMock = vi.fn().mockResolvedValue(undefined);
-        const sess = /** @type {any} */ ({ rpc: { mcp: { enable: enableMock } } });
-        await expRpc.mcpEnable(sess, 'srv-1');
+        const sess = { sessionId: 'mcp-enable-test', rpc: { mcp: { enable: enableMock } } };
+        await invokeExperimental(expRpc.mcpEnable, sess, 'srv-1');
         expect(enableMock).toHaveBeenCalledWith({ serverName: 'srv-1' });
     });
 
     it('skillsList converte falha de auth em SdkOperationError', async () => {
         featureFlags.setExperimentalFlag('skills', true);
         const listMock = vi.fn().mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }));
-        const sess = /** @type {any} */ ({ sessionId: 'sess-exp-1', rpc: { skills: { list: listMock } } });
-        await expect(expRpc.skillsList(sess)).rejects.toBeInstanceOf(SdkOperationError);
+        const sess = { sessionId: 'sess-exp-1', rpc: { skills: { list: listMock } } };
+        await expect(invokeExperimental(expRpc.skillsList, sess)).rejects.toBeInstanceOf(SdkOperationError);
     });
 });

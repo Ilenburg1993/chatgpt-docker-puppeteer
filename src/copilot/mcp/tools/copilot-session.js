@@ -31,7 +31,7 @@ export const copilotSessionTools = [
         title: 'List Copilot sessions',
         description: 'List active Copilot SDK/LLM-B sessions known in this process without starting a new session.',
         inputSchema: {
-            limit: z.number().int().min(1).max(100).optional().describe('Maximum sessions to return. Default: 50.'),
+            limit: z.number().int().min(1).max(100).optional()['describe']('Maximum sessions to return. Default: 50.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ limit }) => {
@@ -49,7 +49,7 @@ export const copilotSessionTools = [
         title: 'Get Copilot session',
         description: 'Return read-only metadata for one active Copilot SDK/LLM-B session by id.',
         inputSchema: {
-            sessionId: z.string().min(1).describe('Copilot SDK session id.'),
+            sessionId: z.string().min(1)['describe']('Copilot SDK session id.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ sessionId }) => {

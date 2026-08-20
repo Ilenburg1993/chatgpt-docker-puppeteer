@@ -59,7 +59,7 @@ class InfraFailurePolicy {
                  * Caso: O canal de comunicação com o Chrome foi cortado. Ação: Notificar e garantir que não restem
                  * processos órfãos.
                  */
-                await this._executeManeuver('TERMINAL_CONNECTION_FAILURE', pid, traceId, ctx);
+                await this._executeManeuver('TERMINAL_CONNECTION_FAILURE', pid, traceId);
                 break;
 
             case FAILURE_CATEGORIES.BROWSER_FROZEN:
@@ -68,7 +68,7 @@ class InfraFailurePolicy {
                  * Caso: O navegador parou de responder ao protocolo DevTools (HUNG). Ação: Executar Kill cirúrgico para
                  * permitir o restart pelo Engine.
                  */
-                await this._executeManeuver('HARD_BROWSER_STALL', pid, traceId, ctx, true);
+                await this._executeManeuver('HARD_BROWSER_STALL', pid, traceId, true);
                 break;
 
             default:
@@ -88,7 +88,6 @@ class InfraFailurePolicy {
         /** @type {any} */ type,
         /** @type {any} */ pid,
         /** @type {any} */ correlationId,
-        /** @type {any} */ ctx,
         forceKill = false,
     ) {
         if (!type || typeof type !== 'string') {

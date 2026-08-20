@@ -335,18 +335,18 @@ export function evaluateStaticContracts(options) {
         if (contract.kind !== 'static' || contract.status !== 'active') {
             continue;
         }
-        if (contract.matcher?.engine !== 'regex') {
+        if (contract.matcher?.['engine'] !== 'regex') {
             continue;
         }
 
-        const pattern = String(contract.matcher.pattern || '');
+        const pattern = String(contract.matcher['pattern'] || '');
         if (!pattern) {
             continue;
         }
-        const flags = String(contract.matcher.flags || 'g');
+        const flags = String(contract.matcher['flags'] || 'g');
         const regexFlags = flags.includes('g') ? flags : `${flags}g`;
-        const ignoreCommentLike = contract.matcher.ignore_comment_like !== false;
-        const ignoreStringLike = contract.matcher.ignore_string_like !== false;
+        const ignoreCommentLike = contract.matcher['ignore_comment_like'] !== false;
+        const ignoreStringLike = contract.matcher['ignore_string_like'] !== false;
         const allowlistedFiles = resolveAllowlistedFiles(contract, options.allowlists || {});
         const regex = new RegExp(pattern, regexFlags);
 

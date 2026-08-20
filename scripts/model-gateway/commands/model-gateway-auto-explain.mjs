@@ -3,7 +3,10 @@ import { spawnSync } from 'node:child_process';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -14,16 +17,11 @@ Explain the current model-gateway automation decision together with the auto doc
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
+/**
+ * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
+ * @param {string[]} [scriptArgs]
+ */
 function runJson(scriptId, scriptArgs = []) {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs], {
         cwd: REPO_ROOT,

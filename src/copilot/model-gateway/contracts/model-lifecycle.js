@@ -23,13 +23,13 @@ function timestamp(value) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {{ now?: number }} [options]
  */
 export function evaluateModelGatewayModelLifecycle(model, options = {}) {
     const now = options.now ?? Date.now();
     const lifecycle = model['lifecycle'] && typeof model['lifecycle'] === 'object'
-        ? /** @type {Record<string, any>} */ (model['lifecycle'])
+        ? /** @type {Record<string, unknown>} */ (model['lifecycle'])
         : model;
     const deprecatedAtMs = timestamp(lifecycle['deprecatedAt']);
     const retiredAtMs = timestamp(lifecycle['retiredAt']);

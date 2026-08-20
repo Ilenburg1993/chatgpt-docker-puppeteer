@@ -44,7 +44,7 @@ const ISSUE_TYPES = Object.freeze({
 ======================================================================== */
 const DEFAULTS = {
     // Connection mode: 'wsEndpoint' | 'connect' | 'auto'
-    mode: process.env.BROWSER_MODE || 'wsEndpoint',
+    mode: process.env['BROWSER_MODE'] || 'wsEndpoint',
 
     // Optional explicit endpoint override (fast-path).
     // Keep keys present so @ts-check can type-narrow correctly.
@@ -56,15 +56,15 @@ const DEFAULTS = {
     // Connection targets (DevContainer: localhost:9224 = Chrome Proxy)
     // ARCHITECTURE: Puppeteer → localhost:9224 (Proxy) → host.docker.internal:9225 (Chrome)
     // IMPORTANT: Port 9225 (Chrome on Windows) is NOT accessible from container!
-    ports: [Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT)], // 9224
+    ports: [Number(process.env['CHROME_PROXY_PORT'] || CONFIG['CHROME_PROXY_PORT'])], // 9224
     hosts: ['localhost'], // Proxy runs IN container (localhost), not on Windows host
     connectionStrategies: ['BROWSER_URL', 'WS_ENDPOINT'],
 
     // Retry & Timing
     retryDelayMs: 3000,
     maxRetryDelayMs: 15000,
-    maxConnectionAttempts: parseInt(process.env.MAX_CONNECTION_ATTEMPTS || '5', 10),
-    connectionTimeout: parseInt(process.env.CONNECTION_TIMEOUT || '30000', 10),
+    maxConnectionAttempts: parseInt(process.env['MAX_CONNECTION_ATTEMPTS'] || '5', 10),
+    connectionTimeout: parseInt(process.env['CONNECTION_TIMEOUT'] || '30000', 10),
 
     // Page Selection
     pageScanIntervalMs: 4000,
@@ -77,7 +77,7 @@ const DEFAULTS = {
 };
 
 // Porta canonical do proxy (container-facing). Pode ser sobrescrita por env/config
-const PROXY_PORT = Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT);
+const PROXY_PORT = Number(process.env['CHROME_PROXY_PORT'] || CONFIG['CHROME_PROXY_PORT']);
 
 /* ========================================================================
    WINDOWS CHROME CONFIGURATION (Reference Only - NOT Managed by Container)
@@ -271,7 +271,7 @@ class ConnectionOrchestrator {
         const errors = [];
 
         // Mock mode: return a lightweight mock browser for tests/CI
-        if (process.env.MOCK_CHROME === '1') {
+        if (process.env['MOCK_CHROME'] === '1') {
             log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (browserURL)');
             return createMockBrowser();
         }
@@ -301,7 +301,7 @@ class ConnectionOrchestrator {
         // DevContainer padrão: 1 host (localhost) × 1 porta (9224) = 1 iteração
         log('DEBUG', '[ORCH] [FALLBACK] browserEndpoint não definido, tentando hosts/ports configurados');
         for (const port of this.config.ports) {
-            const isProxyPort = port === Number(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT);
+            const isProxyPort = port === Number(process.env['CHROME_PROXY_PORT'] || CONFIG['CHROME_PROXY_PORT']);
             const portType = isProxyPort ? '[PROXY]' : '[DIRECT]';
 
             for (const host of this.config.hosts) {
@@ -336,7 +336,7 @@ class ConnectionOrchestrator {
         const errors = [];
 
         // Mock mode: return a lightweight mock browser for tests/CI
-        if (process.env.MOCK_CHROME === '1') {
+        if (process.env['MOCK_CHROME'] === '1') {
             log('INFO', '[ORCH] MOCK_CHROME enabled — returning mock browser (wsEndpoint)');
             return createMockBrowser();
         }
@@ -622,7 +622,7 @@ class ConnectionOrchestrator {
             try {
                 const parsed = new URL(url);
                 return this.config.allowedDomains.some(
-                    /** @type {any} */ (d) => {
+                    (/** @type {string} */ d) => {
                         // Match exact hostname or subdomain
                         return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
                     },

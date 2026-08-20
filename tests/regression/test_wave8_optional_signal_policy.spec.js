@@ -67,17 +67,17 @@ test('wave8: optional signal policy registers only platform-specific listener an
         __mainTestHooks.setupSignalHandlers(/** @type {any} */ ({}));
         const afterSetup = captureCounts(events);
 
-        assert.equal(afterSetup.SIGTERM, before.SIGTERM + 1, 'SIGTERM listener should be registered');
-        assert.equal(afterSetup.SIGINT, before.SIGINT + 1, 'SIGINT listener should be registered');
-        assert.equal(afterSetup.SIGUSR2, before.SIGUSR2 + 1, 'SIGUSR2 listener should be registered');
-        assert.equal(afterSetup.SIGHUP, before.SIGHUP + 1, 'SIGHUP listener should be registered');
+        assert.equal(afterSetup['SIGTERM'], before['SIGTERM'] + 1, 'SIGTERM listener should be registered');
+        assert.equal(afterSetup['SIGINT'], before['SIGINT'] + 1, 'SIGINT listener should be registered');
+        assert.equal(afterSetup['SIGUSR2'], before['SIGUSR2'] + 1, 'SIGUSR2 listener should be registered');
+        assert.equal(afterSetup['SIGHUP'], before['SIGHUP'] + 1, 'SIGHUP listener should be registered');
 
         if (process.platform === 'win32') {
-            assert.equal(afterSetup.SIGBREAK, before.SIGBREAK + 1, 'SIGBREAK should be registered on win32');
-            assert.equal(afterSetup.SIGQUIT, before.SIGQUIT, 'SIGQUIT should not be registered on win32');
+            assert.equal(afterSetup['SIGBREAK'], before['SIGBREAK'] + 1, 'SIGBREAK should be registered on win32');
+            assert.equal(afterSetup['SIGQUIT'], before['SIGQUIT'], 'SIGQUIT should not be registered on win32');
         } else {
-            assert.equal(afterSetup.SIGQUIT, before.SIGQUIT + 1, 'SIGQUIT should be registered on non-win32');
-            assert.equal(afterSetup.SIGBREAK, before.SIGBREAK, 'SIGBREAK should not be registered on non-win32');
+            assert.equal(afterSetup['SIGQUIT'], before['SIGQUIT'] + 1, 'SIGQUIT should be registered on non-win32');
+            assert.equal(afterSetup['SIGBREAK'], before['SIGBREAK'], 'SIGBREAK should not be registered on non-win32');
         }
     } finally {
         __mainTestHooks.cleanupSignalHandlers();
@@ -110,7 +110,7 @@ test(
     { skip: process.platform === 'win32' },
     async () => {
         const childScript = `
-            process.env.LOG_LEVEL = 'ERROR';
+            process.env['LOG_LEVEL'] = 'ERROR';
             const { __mainTestHooks } = await import('#main');
             const { shutdown: shutdownDriverFactory } = await import('#driver/factory');
 

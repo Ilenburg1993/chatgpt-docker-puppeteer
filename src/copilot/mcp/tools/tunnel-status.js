@@ -12,13 +12,13 @@ import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
     readCloudflareTunnelConfig,
-    runCanonicalConnectorSmoke,
     readConnectorSmokeState,
     readQuickTunnelState,
     summarizeConnectorSmokeState,
     summarizeQuickTunnelState,
     validateConfiguredPublicUrl,
 } from '#copilot/mcp/cloudflare';
+import { runCanonicalConnectorSmoke } from '../cloudflare/connector-smoke.js';
 import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
 import {
     boundedWriteAnnotations,
@@ -587,14 +587,12 @@ export const mcpConnectorSmokeRefreshTool = {
     inputSchema: {
         includeRemoteToolNames: z
             .boolean()
-            .optional()
-            .describe(
+            .optional()['describe'](
                 'Include the full remote tool-name list in the response. This implies detailed output.',
             ),
         includeDetails: z
             .boolean()
-            .optional()
-            .describe('Include the full smoke report. Default: false; compact decision summary plus post-restart readiness is returned.'),
+            .optional()['describe']('Include the full smoke report. Default: false; compact decision summary plus post-restart readiness is returned.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: runConnectorSmokeRefresh,

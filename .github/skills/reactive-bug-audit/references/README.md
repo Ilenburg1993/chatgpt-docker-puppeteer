@@ -3,11 +3,13 @@
 **Propósito**: Documentos de referência técnica que suportam a skill `reactive-bug-audit`.  
 **Status**: Especializado.  
 **Público**: Agentes de IA e desenvolvedores que usam esta skill.  
-**Última atualização**: 2 de março de 2026.
+**Última atualização**: 20 de agosto de 2026.
 
 ## O que esta pasta contém
 
-Materiais de referência consultados durante a execução da skill.
+- [`reactive-triage-prompt.md`](reactive-triage-prompt.md): roteiro de triagem.
+- [`evidence-template.md`](evidence-template.md): campos mínimos da evidência.
+- [`reproduction-playbook.md`](reproduction-playbook.md): reprodução determinística e regressão.
 
 ## Links relacionados
 

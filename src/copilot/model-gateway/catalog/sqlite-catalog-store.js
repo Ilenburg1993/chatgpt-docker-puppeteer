@@ -1889,7 +1889,7 @@ export class SqliteModelGatewayCatalogStore {
     }
 
     /**
-     * @param {Record<string, unknown>[]} records
+     * @param {readonly unknown[]} records
      * @param {{ runId?: string; observedAt?: string | number | Date }} [options]
      * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number }>}
      */
@@ -2236,7 +2236,7 @@ export class SqliteModelGatewayCatalogStore {
      * @returns {Promise<Record<string, unknown> | null>}
      */
     async readRuntimeProbeRunRecord(runId) {
-        const row = /** @type {Record<string, any> | undefined} */ (
+        const row = /** @type {Record<string, unknown> | undefined} */ (
             this.#db
                 .prepare(
                     `

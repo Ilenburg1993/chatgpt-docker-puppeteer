@@ -41,13 +41,13 @@ describe('mcp/cloudflare/edge-backup', () => {
         );
 
         expect(result.ok).toBe(true);
-        expect(result.backupWritten).toBe(true);
-        expect(result.backup).toMatchObject({
+        expect(result['backupWritten']).toBe(true);
+        expect(result['backup']).toMatchObject({
             label: 'before-rate-limit',
             fileName: 'cloudflare-edge-snapshot-2026-05-24T17-45-01-123Z-before-rate-limit.json',
         });
 
-        const backup = /** @type {{ relativePath: string }} */ (result.backup);
+        const backup = /** @type {{ relativePath: string }} */ (result['backup']);
         const persisted = JSON.parse(await readFile(String(backup.relativePath), 'utf8'));
         expect(persisted.kind).toBe('cloudflare-edge-snapshot-backup');
         expect(persisted.snapshot.readiness.mutationReady).toBe(true);
@@ -55,8 +55,8 @@ describe('mcp/cloudflare/edge-backup', () => {
 
         const listed = await listCloudflareEdgeBackups({ dir: tempDir, limit: 10 });
         expect(listed.ok).toBe(true);
-        expect(listed.total).toBe(1);
-        expect(listed.backups).toEqual([
+        expect(listed['total']).toBe(1);
+        expect(listed['backups']).toEqual([
             expect.objectContaining({
                 valid: true,
                 label: 'before-rate-limit',

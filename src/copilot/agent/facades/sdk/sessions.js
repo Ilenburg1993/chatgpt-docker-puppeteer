@@ -79,7 +79,7 @@ export async function deleteAgentSdkSessionByClient(client, sessionId) {
 /**
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {Record<string, unknown>} options
- * @returns {Promise<Awaited<ReturnType<typeof createSession>>>}
+ * @returns {Promise<import('../../../sdk/session/lifecycle.js').SessionResult<import('#copilot/sdk/types').CopilotSession>>}
  */
 export async function createAgentSdkSessionByClient(client, options) {
     return createSession(client, options);
@@ -104,7 +104,7 @@ export function readAgentConfiguredSessionFsState(sessionId) {
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {string | null | undefined} sessionId
  * @param {Record<string, unknown>} options
- * @returns {Promise<Awaited<ReturnType<typeof resumeOrCreate>>>}
+ * @returns {Promise<import('../../../sdk/session/lifecycle.js').SessionResult<import('#copilot/sdk/types').CopilotSession>>}
  */
 export async function resumeOrCreateAgentSdkSession(client, sessionId, options) {
     if (options['requireSameSession'] === true) {

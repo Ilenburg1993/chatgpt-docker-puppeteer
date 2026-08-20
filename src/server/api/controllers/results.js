@@ -48,9 +48,9 @@ router.get('/:id', async (req, res) => {
     const requestId = req.id;
     try {
         const taskId = _safeId(req.params.id);
-        const attemptIdRaw = req.query?.attempt ? String(req.query.attempt) : null;
+        const attemptIdRaw = req.query?.['attempt'] ? String(req.query['attempt']) : null;
         const attemptId = attemptIdRaw ? _safeId(attemptIdRaw) : null;
-        const format = req.query?.format ? String(req.query.format).toLowerCase().trim() : 'text';
+        const format = req.query?.['format'] ? String(req.query['format']).toLowerCase().trim() : 'text';
 
         const extByFormat = {
             text: '.txt',
@@ -70,7 +70,7 @@ router.get('/:id', async (req, res) => {
         // Attempt-scoped resolution (preferred)
         if (attemptId) {
             const attempt = getAttemptById(attemptId);
-            if (!attempt || attempt.task_id !== taskId) {
+            if (!attempt || attempt['task_id'] !== taskId) {
                 return res.status(404).json({ success: false, error: 'Attempt não encontrado', request_id: requestId });
             }
 
@@ -134,7 +134,7 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Resultado indisponível', request_id: requestId });
         }
 
-        const disposition = req.query.disposition ? String(req.query.disposition) : 'inline';
+        const disposition = req.query['disposition'] ? String(req.query['disposition']) : 'inline';
         const safeDisposition = disposition === 'attachment' ? 'attachment' : 'inline';
 
         res.setHeader('Content-Type', _contentTypeForExt(ext));

@@ -131,10 +131,9 @@ function isLocalLocator(locator) {
 }
 
 /**
- * @param {Record<string, any>} inventory
+ * @param {Record<string, unknown>} inventory
  * @param {'catalog' | 'runtime'} target
- * @param {Record<string, any>} source
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} source
  */
 function endpointSourceRecord(inventory, target, source) {
     const providerId = optionalString(inventory['providerId']) ?? 'unknown-provider';
@@ -172,8 +171,7 @@ function endpointSourceRecord(inventory, target, source) {
 }
 
 /**
- * @param {readonly Record<string, any>[]} inventories
- * @returns {Record<string, any>[]}
+ * @param {readonly Record<string, unknown>[]} inventories
  */
 export function listProviderEndpointSourceRecords(inventories) {
     return inventories.flatMap((inventory) => [
@@ -188,8 +186,8 @@ export function listProviderEndpointSourceRecords(inventories) {
 
 /**
  * @param {object} input
- * @param {readonly Record<string, any>[]} input.inventories
- * @param {readonly Record<string, any>[]} input.importers
+ * @param {readonly Record<string, unknown>[]} input.inventories
+ * @param {readonly Record<string, unknown>[]} input.importers
  * @returns {Array<{ providerId: string; catalogSourceCount: number; importerCount: number; coveredCatalogSourceCount: number; uncoveredCatalogSourceIds: string[] }>}
  */
 export function auditProviderEndpointImporterCoverage(input) {

@@ -91,7 +91,7 @@ function operationKey(value) {
 }
 
 /**
- * @param {ReturnType<import('../state/turn-trace-state.js').readTerminalTurnTraceProjection>} projection
+ * @param {ReturnType<typeof import('../state/turn-trace-state.js').readTerminalTurnTraceProjection>} projection
  * @returns {Set<string>}
  */
 function collectCompletedEvidenceOperations(projection) {
@@ -119,7 +119,7 @@ function collectCompletedEvidenceOperations(projection) {
 /**
  * @param {{
  *     reply: string | null | undefined;
- *     projection: ReturnType<import('../state/turn-trace-state.js').readTerminalTurnTraceProjection>;
+ *     projection: ReturnType<typeof import('../state/turn-trace-state.js').readTerminalTurnTraceProjection>;
  * }} input
  * @returns {AssistantToolClaimAuditFinding[]}
  */

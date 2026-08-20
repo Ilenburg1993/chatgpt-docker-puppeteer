@@ -14,7 +14,7 @@ const CANONICAL_READER = path.join('src', 'copilot', 'infra', 'public', 'http-re
 const RESPONSE_METHODS = new Set(['arrayBuffer', 'blob', 'formData', 'json', 'text']);
 const RESPONSE_CONSUMER_HINT =
     /(?:\.(?:arrayBuffer|blob|formData|json|text)\s*\(|\[\s*['"](?:arrayBuffer|blob|formData|json|text)['"]\s*\]\s*\()/u;
-const traverse = typeof traverseModule === 'function' ? traverseModule : traverseModule.default;
+const traverse = traverseModule;
 
 /** @typedef {{ file: string; line: number; method: string; text: string }} Finding */
 
@@ -101,16 +101,17 @@ function promiseAllInputs(node) {
  */
 function collectFetchBindings(id, init, bindings) {
     if (!id || typeof id !== 'object') return;
-    if (id.type === 'Identifier') {
-        if (isFetchCall(init)) bindings.add(id.name);
+    const pattern = /** @type {import('@babel/types').LVal} */ (id);
+    if (pattern.type === 'Identifier') {
+        if (isFetchCall(init)) bindings.add(pattern.name);
         const source = unwrapExpression(init);
-        if (source?.type === 'Identifier' && bindings.has(source.name)) bindings.add(id.name);
+        if (source?.type === 'Identifier' && bindings.has(source.name)) bindings.add(pattern.name);
         return;
     }
-    if (id.type !== 'ArrayPattern') return;
+    if (pattern.type !== 'ArrayPattern') return;
     const inputs = promiseAllInputs(init);
     if (!inputs) return;
-    id.elements.forEach((element, index) => {
+    pattern.elements.forEach((element, index) => {
         if (element?.type === 'Identifier' && isFetchCall(inputs[index])) bindings.add(element.name);
     });
 }
@@ -168,13 +169,13 @@ export function checkHttpResponseConsumption(options = {}) {
         /** @type {any[]} */
         const calls = [];
         traverse(ast, {
-            VariableDeclarator(astPath) {
+            VariableDeclarator(/** @type {{ node: import('@babel/types').VariableDeclarator }} */ astPath) {
                 collectFetchBindings(astPath.node.id, astPath.node.init, fetchBindings);
             },
-            AssignmentExpression(astPath) {
+            AssignmentExpression(/** @type {{ node: import('@babel/types').AssignmentExpression }} */ astPath) {
                 collectFetchBindings(astPath.node.left, astPath.node.right, fetchBindings);
             },
-            CallExpression(astPath) {
+            CallExpression(/** @type {{ node: import('@babel/types').CallExpression }} */ astPath) {
                 calls.push(astPath.node);
             },
         });

@@ -56,9 +56,9 @@ test('wave6: upstream manager installs and removes listeners deterministically w
         await registerUpstreams(registryStub, { env });
         const afterRegister = captureCounts(events);
 
-        assert.equal(afterRegister.exit, before.exit + 1, 'exit listener should be installed once');
-        assert.equal(afterRegister.SIGINT, before.SIGINT + 1, 'SIGINT listener should be installed once');
-        assert.equal(afterRegister.SIGTERM, before.SIGTERM + 1, 'SIGTERM listener should be installed once');
+        assert.equal(afterRegister['exit'], before['exit'] + 1, 'exit listener should be installed once');
+        assert.equal(afterRegister['SIGINT'], before['SIGINT'] + 1, 'SIGINT listener should be installed once');
+        assert.equal(afterRegister['SIGTERM'], before['SIGTERM'] + 1, 'SIGTERM listener should be installed once');
     } finally {
         await shutdownUpstreams();
         const afterShutdown = captureCounts(events);

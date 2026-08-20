@@ -18,9 +18,9 @@ function makeDbPath() {
     );
 }
 
-test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicação', async (t) => {
+test('wave15: KernelNERVBridge NEXT_STEP cria task filha via SSOT sem duplicação', async () => {
     const dbPath = makeDbPath();
-    process.env.MAESTRO_DB_PATH = dbPath;
+    process.env['MAESTRO_DB_PATH'] = dbPath;
     const db = getDb();
     db.exec(`
         DELETE FROM task_dependencies;

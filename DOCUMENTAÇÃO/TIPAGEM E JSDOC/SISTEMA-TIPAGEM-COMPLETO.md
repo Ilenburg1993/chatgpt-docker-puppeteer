@@ -38,7 +38,7 @@ como linguagem de tipagem**. O TypeScript é usado apenas como verificador está
 ```
 JavaScript de produção (runtime)    →  .js/.mjs/.cjs
 Tipagem pública (contratos)         →  JSDoc @param/@returns/@typedef
-Verificação estática (CI)           →  TypeScript 5.9 (tsc --noEmit)
+Verificação estática (CI)           →  TypeScript 7.0 nativo (tsc --noEmit)
 Declarações públicas (API)          →  src/types/**/*.d.ts
 LSP / IntelliSense                  →  tsserver local wrapper
 ```
@@ -60,8 +60,8 @@ LSP / IntelliSense                  →  tsserver local wrapper
 | Componente     | Versão/Valor | Papel                                          |
 | -------------- | ------------ | ---------------------------------------------- |
 | Node.js        | 24.13.0      | Runtime obrigatório (ESM nativo)               |
-| TypeScript     | 5.9.3        | Verificador estático (via tsc, não runtime)    |
-| `tsc`          | 5.9.3        | Compilador/verificador TypeScript              |
+| TypeScript     | 7.0.2        | Verificador estático nativo (via runner TS7)   |
+| `tsc`          | 7.0.2        | Compilador/verificador TypeScript              |
 | `vue-tsc`      | ≥ 2.x        | Verificação de SFCs Vue em `src/dashboard-ui/` |
 | jsServer local | wrapper      | `src/integration/lsp/tsserver-daemon.mjs`      |
 | ESLint         | 9.x          | Lint de JS + regras custom                     |
@@ -316,7 +316,7 @@ npm run typecheck:strict:tests # → todas as lanes de tests.*
    `{ "path": "./config/typing/strict/tsconfig.strict.<nome>.json" }`
 3. Adicionar script npm em `package.json`:
    ```json
-   "typecheck:strict:<nome>": "tsc -p config/typing/strict/tsconfig.strict.<nome>.json"
+   "typecheck:strict:<nome>": "npm run -s tsc7 -- -p config/typing/strict/tsconfig.strict.<nome>.json"
    ```
 4. Incluir no script `typecheck:strict:all`
 5. Documentar na seção 4.2 deste arquivo e no `ROADMAP.md`
@@ -610,12 +610,12 @@ Os dois devem estar sincronizados.
 
 | Script                    | Comando                              | Escopo              |
 | ------------------------- | ------------------------------------ | ------------------- |
-| `typecheck:node`          | `tsc -p tsconfig.node.json`          | src/ + scripts/     |
-| `typecheck:tools`         | `tsc -p tsconfig.tools.json`         | tools/              |
-| `typecheck:browser`       | `tsc -p tsconfig.browser.json`       | src/dashboard-ui/   |
-| `typecheck:tests`         | `tsc -p tsconfig.tests.json`         | tests/              |
-| `typecheck:declarations`  | `tsc -p tsconfig.declarations.json`  | src/types/ (emite)  |
-| `typecheck:isolated`      | `tsc -p tsconfig.isolated-decl.json` | isolated decl check |
+| `typecheck:node`          | runner TS7 + `tsconfig.node.json`          | src/ + scripts/     |
+| `typecheck:tools`         | runner TS7 + `tsconfig.tools.json`         | tools/              |
+| `typecheck:browser`       | runner TS7 + `tsconfig.browser.json`       | src/dashboard-ui/   |
+| `typecheck:tests`         | runner TS7 + `tsconfig.tests.json`         | tests/              |
+| `typecheck:declarations`  | runner TS7 + `tsconfig.declarations.json`  | src/types/ (emite)  |
+| `typecheck:isolated`      | runner TS7 + isolated declarations         | isolated decl check |
 | `typecheck:dashboard`     | `vue-tsc --noEmit`                   | SFCs Vue (vue-tsc)  |
 | `typecheck:full`          | node + tools + browser               | base sem tests      |
 | `typecheck:repo`          | full + tests + dashboard + isolated  | **completo**        |
@@ -702,7 +702,7 @@ Os workflows CI verificam:
 **Decisão**: manter arquivos de produção em `.js` com JSDoc como tipagem.
 
 **Razão**: migrar ~300 arquivos `.js` para `.ts` seria um risco operacional enorme sem benefício
-proporcional. O TypeScript 5.x suporta verificação completa de JS via `allowJs + checkJs + JSDoc`.
+proporcional. O TypeScript 7 suporta verificação completa de JS via `allowJs + checkJs + JSDoc`.
 
 **Consequências**:
 

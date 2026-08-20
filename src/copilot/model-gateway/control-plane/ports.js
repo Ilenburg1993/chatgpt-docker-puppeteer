@@ -10,15 +10,15 @@
 
 /**
  * @typedef {{
- *   readSnapshot?: () => Promise<Record<string, any>>;
- *   readRoutingSnapshot?: (options?: { includeImportRuns?: boolean }) => Promise<Record<string, any>>;
+ *   readSnapshot?: () => Promise<Record<string, unknown>>;
+ *   readRoutingSnapshot?: (options?: { includeImportRuns?: boolean }) => Promise<Record<string, unknown>>;
  * }} ModelGatewayCatalogReadPort
  */
 
 /**
  * @typedef {{
  *   filePath: string;
- *   readSnapshot: () => Promise<Record<string, any>>;
+ *   readSnapshot: () => Promise<Record<string, unknown>>;
  *   writeSnapshot: (snapshot: Record<string, unknown>) => Promise<unknown>;
  * }} ModelGatewayCatalogWritePort
  */
@@ -40,16 +40,11 @@
  */
 
 /**
+ * @template {{ sessionId: string }} TSession
  * @typedef {{
- *   reattach: (route: Record<string, unknown>) => Promise<import('#copilot/sdk/types').CopilotSession>;
- *   verify: (
- *     session: import('#copilot/sdk/types').CopilotSession,
- *     route: Record<string, unknown>,
- *   ) => Promise<boolean>;
- *   commit: (
- *     session: import('#copilot/sdk/types').CopilotSession,
- *     route: Record<string, unknown>,
- *   ) => Promise<void>;
+ *   reattach: (route: Record<string, unknown>) => Promise<TSession>;
+ *   verify: (session: TSession, route: Record<string, unknown>) => Promise<boolean>;
+ *   commit: (session: TSession, route: Record<string, unknown>) => Promise<void>;
  * }} ModelGatewaySessionRoutePort
  */
 
@@ -137,13 +132,14 @@ export function assertModelGatewaySecretRegistryPort(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {ModelGatewaySessionRoutePort}
+ * @template {{ sessionId: string }} TSession
+ * @param {ModelGatewaySessionRoutePort<TSession>} value
+ * @returns {ModelGatewaySessionRoutePort<TSession>}
  */
 export function assertModelGatewaySessionRoutePort(value) {
     const port = portRecord(value, 'session.route');
     requireMethods(port, 'session.route', ['reattach', 'verify', 'commit']);
-    return /** @type {ModelGatewaySessionRoutePort} */ (value);
+    return value;
 }
 
 /**

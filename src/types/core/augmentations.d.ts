@@ -18,6 +18,9 @@ declare module '#core/config' {
         // Debug
         DEBUG_PORT?: string;
 
+        // HTTP/Socket CORS
+        ALLOWED_ORIGINS: string | string[];
+
         // Timeouts (used in queue/task loader)
         RUNNING_RECOVERY_MS?: number;
 
@@ -57,6 +60,7 @@ declare module '#core/config' {
 
     class ConfigurationManager {
         DEBUG_PORT?: string;
+        ALLOWED_ORIGINS: string | string[];
         BROWSER_POOL_SIZE?: number;
         ALLOCATION_STRATEGY?: string;
         HEALTH_CHECK_INTERVAL?: number;

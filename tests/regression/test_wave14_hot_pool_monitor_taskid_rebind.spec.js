@@ -33,15 +33,15 @@ test('wave14: updatePageTaskId rebinds lifecycle monitor taskId on hot-reuse', (
             reboundTo = nextTaskId;
         },
     };
-    manager.lifecycleMonitors.set(tempTaskId, monitor);
+    manager['lifecycleMonitors'].set(tempTaskId, monitor);
 
-    manager.updatePageTaskId(page, realTaskId);
+    manager['updatePageTaskId'](page, realTaskId);
 
     assert.equal(poolEntry.pages.has(tempTaskId), false, 'temp taskId should be removed from pages map');
     assert.equal(poolEntry.pages.get(realTaskId), page, 'real taskId should point to the same page');
     assert.equal(reboundTo, realTaskId, 'monitor should be rebound to real taskId');
-    assert.equal(manager.lifecycleMonitors.has(tempTaskId), false, 'old monitor key should be removed');
-    assert.equal(manager.lifecycleMonitors.get(realTaskId), monitor, 'monitor should be stored under real taskId');
+    assert.equal(manager['lifecycleMonitors'].has(tempTaskId), false, 'old monitor key should be removed');
+    assert.equal(manager['lifecycleMonitors'].get(realTaskId), monitor, 'monitor should be stored under real taskId');
 });
 
 test('wave14: removePageFromPool supports fallback by page reference when taskId is stale', () => {
@@ -57,7 +57,7 @@ test('wave14: removePageFromPool supports fallback by page reference when taskId
     manager.pool = /** @type {any[]} */ ([poolEntry]);
 
     let cleaned = false;
-    manager.lifecycleMonitors.set('task-live', {
+    manager['lifecycleMonitors'].set('task-live', {
         cleanup: () => {
             cleaned = true;
         },

@@ -10,7 +10,7 @@ import {
     readMcpStartupMaintenanceState,
     resetMcpStartupMaintenanceForTests,
     scheduleMcpStartupMaintenance,
-} from '#copilot/mcp/control-plane';
+} from '#copilot/mcp/control-plane/startup-maintenance.js';
 
 /** @type {string[]} */
 const tempDirs = [];
@@ -22,11 +22,11 @@ afterEach(async () => {
 
 describe('MCP startup maintenance', () => {
     it('schedules once and records the smoke result without blocking startup', async () => {
-        /** @type {(() => void) | null} */
-        let callback = null;
+        /** @type {Array<() => void>} */
+        const callbacks = [];
         const setTimeoutFn = /** @type {typeof setTimeout} */ (
-            (fn) => {
-                callback = /** @type {() => void} */ (fn);
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
                 return /** @type {NodeJS.Timeout} */ ({ unref() {} });
             }
         );
@@ -43,6 +43,7 @@ describe('MCP startup maintenance', () => {
         assert.equal(scheduled, true);
         assert.equal(scheduleMcpStartupMaintenance({ setTimeoutFn }), false);
         assert.equal(readMcpStartupMaintenanceState().scheduled, true);
+        const callback = callbacks.shift();
         assert.ok(callback);
         callback();
         await new Promise((resolve) => setImmediate(resolve));
@@ -55,11 +56,11 @@ describe('MCP startup maintenance', () => {
     });
 
     it('keeps workspace smoke successful when detached live reaping fails non-fatally', async () => {
-        /** @type {(() => void) | null} */
-        let callback = null;
+        /** @type {Array<() => void>} */
+        const callbacks = [];
         const setTimeoutFn = /** @type {typeof setTimeout} */ (
-            (fn) => {
-                callback = /** @type {() => void} */ (fn);
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
                 return /** @type {NodeJS.Timeout} */ ({ unref() {} });
             }
         );
@@ -76,6 +77,7 @@ describe('MCP startup maintenance', () => {
         });
 
         assert.equal(scheduled, true);
+        const callback = callbacks.shift();
         assert.ok(callback);
         callback();
         await new Promise((resolve) => setImmediate(resolve));

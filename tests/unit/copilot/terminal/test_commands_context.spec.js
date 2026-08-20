@@ -30,11 +30,11 @@ const frontendMocks = vi.hoisted(() => ({
         liveBridgeTailCount: 0,
         syncStatus: 'not_needed',
         syncReason: 'empty',
-        syncBlockedReason: null,
+        syncBlockedReason: /** @type {string | null} */ (null),
         syncPendingCount: 0,
         syncSyncedCount: 0,
         syncFailedCount: 0,
-        syncLastError: null,
+        syncLastError: /** @type {string | null} */ (null),
     })),
     requestTerminalCompactionProjection: vi.fn(async () => ({
         ok: true,

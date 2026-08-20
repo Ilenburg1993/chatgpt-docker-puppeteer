@@ -17,9 +17,9 @@ function makeDbPath() {
     );
 }
 
-test('wave17: MissionRunner cria task de step com id determinístico e sem duplicar em reprocessamento', async (t) => {
+test('wave17: MissionRunner cria task de step com id determinístico e sem duplicar em reprocessamento', async () => {
     const dbPath = makeDbPath();
-    process.env.MAESTRO_DB_PATH = dbPath;
+    process.env['MAESTRO_DB_PATH'] = dbPath;
 
     const db = getDb();
     db.exec(`

@@ -65,9 +65,8 @@ function hasParameterizedLocator(locator) {
 }
 
 /**
- * @param {Record<string, any>} inventory
- * @param {Record<string, any> | null} spec
- * @returns {Record<string, unknown>}
+ * @param {Record<string, unknown>} inventory
+ * @param {Record<string, unknown> | null} spec
  */
 export function createProviderGatewayTraits(inventory, spec = null) {
     const providerId = optionalString(inventory['providerId']) ?? optionalString(spec?.['id']) ?? 'unknown-provider';
@@ -164,8 +163,7 @@ export function createProviderGatewayTraits(inventory, spec = null) {
 }
 
 /**
- * @param {{ inventories?: readonly Record<string, any>[]; specs?: readonly Record<string, any>[] }} [options]
- * @returns {Record<string, unknown>[]}
+ * @param {{ inventories?: readonly Record<string, unknown>[]; specs?: readonly Record<string, unknown>[] }} [options]
  */
 export function listProviderGatewayTraits(options = {}) {
     const specs = Array.isArray(options.specs) ? options.specs : OPENAI_PROVIDER_FAMILY_SPECS;
@@ -183,7 +181,6 @@ export function listProviderGatewayTraits(options = {}) {
 
 /**
  * @param {string | null | undefined} providerId
- * @returns {Record<string, unknown> | null}
  */
 export function resolveProviderGatewayTraits(providerId) {
     const inventory = resolveProviderEndpointInventory(providerId);

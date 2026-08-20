@@ -14,7 +14,7 @@ export const DEFAULT_CATALOG_RESPONSE_MAX_BYTES = 8 * 1024 * 1024;
 export const MAX_CATALOG_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;
 
 /**
- * @param {Response} response
+ * @param {Parameters<typeof readBoundedResponseText>[0]} response
  * @param {{ maxBytes?: number; label?: string }} [options]
  * @returns {Promise<string>}
  */
@@ -28,7 +28,7 @@ export async function readCatalogResponseText(response, options = {}) {
 }
 
 /**
- * @param {Response} response
+ * @param {Parameters<typeof readBoundedResponseJson>[0]} response
  * @param {{ maxBytes?: number; label?: string }} [options]
  * @returns {Promise<unknown>}
  */

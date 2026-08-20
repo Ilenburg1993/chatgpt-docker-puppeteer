@@ -3,7 +3,7 @@ import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import express from 'express';
 import { decodeCursor, encodeCursor, fail, ok, parseIncludeParam } from '../utils/api_envelope.js';
-import { taskRowToListItem } from '../utils/task_views.js';
+import { taskDbRowToListItem } from '../utils/task_views.js';
 
 /** Constante/valor exportado: default. */
 const router = express.Router();
@@ -107,12 +107,12 @@ function _fetchCountsForMissions(/** @type {any} */ db, /** @type {any} */ missi
 router.get('/missions', async (req, res) => {
     try {
         const db = getDb();
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 100), 200));
-        const cursor = decodeCursor(req.query.cursor);
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 100), 200));
+        const cursor = decodeCursor(req.query['cursor']);
 
-        const status = _normalizeStatus(req.query.status);
-        const autonomyMode = _normalizeAutonomy(req.query.autonomy_mode);
-        const search = req.query.search ? String(req.query.search) : null;
+        const status = _normalizeStatus(req.query['status']);
+        const autonomyMode = _normalizeAutonomy(req.query['autonomy_mode']);
+        const search = req.query['search'] ? String(req.query['search']) : null;
 
         const where = [];
         /** @type {Record<string, any>} */
@@ -120,27 +120,27 @@ router.get('/missions', async (req, res) => {
 
         if (status) {
             where.push('m.status = @status');
-            params.status = status;
+            params['status'] = status;
         }
         if (autonomyMode) {
             where.push('m.autonomy_mode = @autonomy_mode');
-            params.autonomy_mode = autonomyMode;
+            params['autonomy_mode'] = autonomyMode;
         }
         if (search) {
             where.push(
                 '(instr(lower(m.title), lower(@search)) > 0 OR instr(lower(m.description), lower(@search)) > 0 OR instr(lower(m.id), lower(@search)) > 0)',
             );
-            params.search = search;
+            params['search'] = search;
         }
 
-        const cUpdated = cursor && Number(cursor.updated_at_ms);
-        const cId = cursor && cursor.id ? String(cursor.id) : null;
+        const cUpdated = cursor && Number(cursor['updated_at_ms']);
+        const cId = cursor && cursor['id'] ? String(cursor['id']) : null;
         if (Number.isFinite(cUpdated) && cId) {
             where.push(
                 '(m.updated_at_ms < @cursor_updated OR (m.updated_at_ms = @cursor_updated AND m.id < @cursor_id))',
             );
-            params.cursor_updated = cUpdated;
-            params.cursor_id = cId;
+            params['cursor_updated'] = cUpdated;
+            params['cursor_id'] = cId;
         }
 
         const rows = db
@@ -191,7 +191,7 @@ router.get('/missions/:id', async (req, res) => {
     try {
         const db = getDb();
         const missionId = String(req.params.id);
-        const include = parseIncludeParam(req.query.include);
+        const include = parseIncludeParam(req.query['include']);
 
         const row = /** @type {any} */ (db.prepare('SELECT * FROM missions WHERE id = ?').get(missionId));
         if (!row) {
@@ -221,7 +221,7 @@ router.get('/missions/:id', async (req, res) => {
 
         // Summary counts (always useful)
         const counts = _fetchCountsForMissions(db, [missionId])[missionId] || null;
-        data.counts = counts;
+        data['counts'] = counts;
 
         if (include.has('tasks')) {
             const tasks = db
@@ -240,11 +240,11 @@ router.get('/missions/:id', async (req, res) => {
                 `,
                 )
                 .all(missionId);
-            data.tasks = tasks.map((/** @type {any} */ r) => taskRowToListItem(r));
+            data['tasks'] = tasks.map(taskDbRowToListItem);
         }
 
         if (include.has('events')) {
-            data.events = db
+            data['events'] = db
                 .prepare(
                     `
                     SELECT *
@@ -287,11 +287,11 @@ router.get('/missions/:id/tasks', async (req, res) => {
     try {
         const db = getDb();
         const missionId = String(req.params.id);
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
 
-        const stage = req.query.stage ? String(req.query.stage).toUpperCase().trim() : null;
-        const status = req.query.status ? String(req.query.status).toUpperCase().trim() : null;
+        const stage = req.query['stage'] ? String(req.query['stage']).toUpperCase().trim() : null;
+        const status = req.query['status'] ? String(req.query['status']).toUpperCase().trim() : null;
 
         const where = ['t.mission_id = @mission_id'];
         /** @type {Record<string, any>} */
@@ -299,21 +299,21 @@ router.get('/missions/:id/tasks', async (req, res) => {
 
         if (stage) {
             where.push('t.stage = @stage');
-            params.stage = stage;
+            params['stage'] = stage;
         }
         if (status) {
             where.push('t.status = @status');
-            params.status = status;
+            params['status'] = status;
         }
 
-        const cUpdated = cursor && Number(cursor.updated_at_ms);
-        const cId = cursor && cursor.id ? String(cursor.id) : null;
+        const cUpdated = cursor && Number(cursor['updated_at_ms']);
+        const cId = cursor && cursor['id'] ? String(cursor['id']) : null;
         if (Number.isFinite(cUpdated) && cId) {
             where.push(
                 '(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))',
             );
-            params.cursor_updated = cUpdated;
-            params.cursor_id = cId;
+            params['cursor_updated'] = cUpdated;
+            params['cursor_id'] = cId;
         }
 
         const rows = db
@@ -345,12 +345,7 @@ router.get('/missions/:id/tasks', async (req, res) => {
                   })
                 : null;
 
-        ok(
-            res,
-            req,
-            { items: page.map((/** @type {any} */ r) => taskRowToListItem(r)) },
-            { limit, next_cursor: nextCursor, has_more: hasMore },
-        );
+        ok(res, req, { items: page.map(taskDbRowToListItem) }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[DASHBOARD_API] mission tasks failed: ${_e?.message || String(_e)}`, req.id);
@@ -369,21 +364,21 @@ router.get('/missions/:id/proposals', async (req, res) => {
     try {
         const db = getDb();
         const missionId = String(req.params.id);
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
 
         const where = ['t.mission_id = @mission_id', "t.stage = 'PROPOSED'"];
         /** @type {Record<string, any>} */
         const params = { mission_id: missionId, limit: limit + 1 };
 
-        const cUpdated = cursor && Number(cursor.updated_at_ms);
-        const cId = cursor && cursor.id ? String(cursor.id) : null;
+        const cUpdated = cursor && Number(cursor['updated_at_ms']);
+        const cId = cursor && cursor['id'] ? String(cursor['id']) : null;
         if (Number.isFinite(cUpdated) && cId) {
             where.push(
                 '(t.updated_at_ms < @cursor_updated OR (t.updated_at_ms = @cursor_updated AND t.id < @cursor_id))',
             );
-            params.cursor_updated = cUpdated;
-            params.cursor_id = cId;
+            params['cursor_updated'] = cUpdated;
+            params['cursor_id'] = cId;
         }
 
         const rows = db
@@ -415,12 +410,7 @@ router.get('/missions/:id/proposals', async (req, res) => {
                   })
                 : null;
 
-        ok(
-            res,
-            req,
-            { items: page.map((/** @type {any} */ r) => taskRowToListItem(r)) },
-            { limit, next_cursor: nextCursor, has_more: hasMore },
-        );
+        ok(res, req, { items: page.map(taskDbRowToListItem) }, { limit, next_cursor: nextCursor, has_more: hasMore });
     } catch (/** @type {any} */ err) {
         const _e = /** @type {any} */ (err);
         log('ERROR', `[DASHBOARD_API] mission proposals failed: ${_e?.message || String(_e)}`, req.id);
@@ -439,9 +429,9 @@ router.get('/missions/:id/events', async (req, res) => {
     try {
         const db = getDb();
         const missionId = String(req.params.id);
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
-        const eventType = req.query.event_type ? String(req.query.event_type) : null;
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
+        const eventType = req.query['event_type'] ? String(req.query['event_type']) : null;
 
         const where = ["entity_type = 'mission'", 'entity_id = @entity_id'];
         /** @type {Record<string, any>} */
@@ -449,13 +439,13 @@ router.get('/missions/:id/events', async (req, res) => {
 
         if (eventType) {
             where.push('event_type = @event_type');
-            params.event_type = eventType;
+            params['event_type'] = eventType;
         }
 
-        const cId = cursor && Number(cursor.id);
+        const cId = cursor && Number(cursor['id']);
         if (Number.isFinite(cId)) {
             where.push('id < @cursor_id');
-            params.cursor_id = cId;
+            params['cursor_id'] = cId;
         }
 
         const rows = db
@@ -545,7 +535,7 @@ router.get('/missions/:id/graph', async (req, res) => {
             req,
             {
                 mission_id: missionId,
-                tasks: tasks.map((/** @type {any} */ r) => taskRowToListItem(r)),
+                tasks: tasks.map(taskDbRowToListItem),
                 edges,
                 workflows,
             },

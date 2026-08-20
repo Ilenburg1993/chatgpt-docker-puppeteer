@@ -285,23 +285,21 @@ const webFetchTool = buildTool({
         'Bloqueado para IPs privados, localhost e esquemas não-HTTP (proteção SSRF). ' +
         'Resposta limitada por bytes e timeout efetivo para evitar retenção ilimitada.',
     parameters: z.object({
-        url: z.string().url().describe('URL completa da página a buscar (https:// recomendado)'),
-        method: z.enum(['GET', 'POST', 'PUT', 'PATCH']).optional().describe('Método HTTP. Default: GET.'),
-        headers: z.record(z.string(), z.string()).optional().describe('Headers HTTP opcionais (sanitizados).'),
-        body: z.string().optional().describe('Body textual opcional para métodos não-GET.'),
+        url: z.string().url()['describe']('URL completa da página a buscar (https:// recomendado)'),
+        method: z.enum(['GET', 'POST', 'PUT', 'PATCH']).optional()['describe']('Método HTTP. Default: GET.'),
+        headers: z.record(z.string(), z.string()).optional()['describe']('Headers HTTP opcionais (sanitizados).'),
+        body: z.string().optional()['describe']('Body textual opcional para métodos não-GET.'),
         maxBytes: z
             .number()
             .int()
             .min(1)
             .max(MAX_WEB_FETCH_RESPONSE_BYTES)
-            .optional()
-            .describe(`Máximo efetivo da resposta em bytes. Default: ${DEFAULT_WEB_FETCH_RESPONSE_BYTES}.`),
+            .optional()['describe'](`Máximo efetivo da resposta em bytes. Default: ${DEFAULT_WEB_FETCH_RESPONSE_BYTES}.`),
         timeoutMs: z
             .number()
             .int()
             .min(0)
-            .optional()
-            .describe('Timeout efetivo em ms (aborta a operação quando excedido).'),
+            .optional()['describe']('Timeout efetivo em ms (aborta a operação quando excedido).'),
     }),
     handler: async (
         /** @type {{
@@ -489,8 +487,8 @@ const webSearchTool = buildTool({
         'Use quando precisar de informações atuais da web que não estão no workspace. ' +
         'Não requer API key. Volume de uso é registrado como telemetria, sem rate-limit local bloqueante.',
     parameters: z.object({
-        query: z.string().min(1).describe('Consulta de busca'),
-        maxResults: z.number().int().min(1).optional().describe('Número sugerido de resultados a retornar.'),
+        query: z.string().min(1)['describe']('Consulta de busca'),
+        maxResults: z.number().int().min(1).optional()['describe']('Número sugerido de resultados a retornar.'),
     }),
     handler: async (/** @type {{ query: string; maxResults?: number }} */ { query, maxResults }) => {
         const MAX_QUERY_CHARS = 500;

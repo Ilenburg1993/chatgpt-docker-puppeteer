@@ -197,8 +197,8 @@ class TaskSyncBridge extends EventEmitter {
         const taskId = getTaskIdFromPayload(payload);
         const correlationId =
             getCorrelationId(envelope) ||
-            (typeof payload.correlationId === 'string' ? payload.correlationId : null) ||
-            (typeof payload.correlation_id === 'string' ? payload.correlation_id : null) ||
+            (typeof payload['correlationId'] === 'string' ? payload['correlationId'] : null) ||
+            (typeof payload['correlation_id'] === 'string' ? payload['correlation_id'] : null) ||
             null;
         const rawTimestamp = envelope?.protocol?.timestamp;
         const parsedTimestamp = Number(rawTimestamp);
@@ -269,8 +269,8 @@ class TaskSyncBridge extends EventEmitter {
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.RUNNING,
                 started_at: Date.now(),
-                worker_id: /** @type {string} */ (payload.worker_id || payload.workerId) || null,
-                target: /** @type {string} */ (payload.target) || null,
+                worker_id: /** @type {string} */ (payload['worker_id'] || payload['workerId']) || null,
+                target: /** @type {string} */ (payload['target']) || null,
                 progress_percent: 0,
                 last_correlation_id: correlationId,
                 event_timestamp: eventTimestamp,
@@ -281,7 +281,7 @@ class TaskSyncBridge extends EventEmitter {
             const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
-            const result = payload.result;
+            const result = payload['result'];
 
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.DONE,
@@ -292,7 +292,7 @@ class TaskSyncBridge extends EventEmitter {
                         : result
                           ? JSON.stringify(result).substring(0, 500)
                           : null,
-                timings: payload.timings || null,
+                timings: payload['timings'] || null,
                 last_correlation_id: correlationId,
                 event_timestamp: eventTimestamp,
             });
@@ -303,19 +303,19 @@ class TaskSyncBridge extends EventEmitter {
             if (!taskId) return;
 
             const payloadView = asRecord(payload);
-            const err = payloadView.error || payloadView.reason || payloadView.err || null;
+            const err = payloadView['error'] || payloadView['reason'] || payloadView['err'] || null;
             const errView = asRecord(err);
             const errorText =
                 typeof err === 'string'
                     ? err
-                    : err && typeof err === 'object' && err !== null && typeof errView.message === 'string'
-                      ? errView.message
+                    : err && typeof err === 'object' && err !== null && typeof errView['message'] === 'string'
+                      ? errView['message']
                       : err
                         ? JSON.stringify(err)
                         : 'Unknown error';
-            const reason = /** @type {string} */ (payloadView.reason) || 'UNKNOWN';
-            const nextAction = /** @type {string} */ (payloadView.next_action) || null;
-            const retryable = Boolean(payloadView.retryable);
+            const reason = /** @type {string} */ (payloadView['reason']) || 'UNKNOWN';
+            const nextAction = /** @type {string} */ (payloadView['next_action']) || null;
+            const retryable = Boolean(payloadView['retryable']);
 
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
@@ -336,7 +336,7 @@ class TaskSyncBridge extends EventEmitter {
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.CANCELLED,
                 cancelled_at: Date.now(),
-                reason: payload.reason || payload.abortReason || 'USER_ABORT',
+                reason: payload['reason'] || payload['abortReason'] || 'USER_ABORT',
                 last_correlation_id: correlationId,
                 event_timestamp: eventTimestamp,
             });
@@ -348,19 +348,19 @@ class TaskSyncBridge extends EventEmitter {
             if (!taskId) return;
 
             const payloadView = asRecord(payload);
-            const err = payloadView.error || payloadView.reason || payloadView.err || null;
+            const err = payloadView['error'] || payloadView['reason'] || payloadView['err'] || null;
             const errView = asRecord(err);
             const errorText =
                 typeof err === 'string'
                     ? err
-                    : err && typeof err === 'object' && err !== null && typeof errView.message === 'string'
-                      ? errView.message
+                    : err && typeof err === 'object' && err !== null && typeof errView['message'] === 'string'
+                      ? errView['message']
                       : err
                         ? JSON.stringify(err)
                         : 'Task failed';
-            const reason = /** @type {string} */ (payloadView.reason) || 'UNKNOWN';
-            const nextAction = /** @type {string} */ (payloadView.next_action) || null;
-            const retryable = Boolean(payloadView.retryable);
+            const reason = /** @type {string} */ (payloadView['reason']) || 'UNKNOWN';
+            const nextAction = /** @type {string} */ (payloadView['next_action']) || null;
+            const retryable = Boolean(payloadView['retryable']);
 
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.FAILED,
@@ -381,10 +381,10 @@ class TaskSyncBridge extends EventEmitter {
             void this._updateKernelState(taskId, {
                 status: UnifiedStatus.PENDING,
                 queued_at: Date.now(),
-                queue_position: /** @type {number} */ (payload.queuePosition) || null,
-                queue_size: /** @type {number} */ (payload.queueSize) || null,
-                active_drivers: /** @type {number} */ (payload.activeDrivers) || null,
-                next_action: /** @type {string} */ (payload.next_action) || 'RETRY_LATER',
+                queue_position: /** @type {number} */ (payload['queuePosition']) || null,
+                queue_size: /** @type {number} */ (payload['queueSize']) || null,
+                active_drivers: /** @type {number} */ (payload['activeDrivers']) || null,
+                next_action: /** @type {string} */ (payload['next_action']) || 'RETRY_LATER',
                 last_correlation_id: correlationId,
                 event_timestamp: eventTimestamp,
             });
@@ -394,7 +394,7 @@ class TaskSyncBridge extends EventEmitter {
             const { payload, taskId, correlationId, eventTimestamp } = this._extractEnvelopeContext(envelope);
             if (!taskId) return;
 
-            const err = payload.error || payload.reason || payload.err || 'Driver error';
+            const err = payload['error'] || payload['reason'] || payload['err'] || 'Driver error';
             const errorText = typeof err === 'string' ? err : JSON.stringify(err);
 
             void this._updateKernelState(taskId, {
@@ -468,15 +468,15 @@ class TaskSyncBridge extends EventEmitter {
             const queue = await io.getQueue();
             const task = queue.find((t) => {
                 const taskView = asRecord(t);
-                const taskMeta = asRecord(taskView.meta);
-                return taskMeta.id === taskId || taskView.id === taskId;
+                const taskMeta = asRecord(taskView['meta']);
+                return taskMeta['id'] === taskId || taskView['id'] === taskId;
             });
             if (!task) {
                 return;
             }
             const taskView = asRecord(task);
-            const taskRuntimeState = asRecord(taskView.runtime_state);
-            const taskState = asRecord(taskView.state);
+            const taskRuntimeState = asRecord(taskView['runtime_state']);
+            const taskState = asRecord(taskView['state']);
 
             const persistedTask = {
                 ...taskView,

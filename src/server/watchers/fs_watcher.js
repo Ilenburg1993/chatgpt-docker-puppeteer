@@ -38,7 +38,7 @@ function init() {
         try {
             await fsp.access(queuePath);
         } catch (/** @type {any} */ e) {
-            const _e = /** @type {any} */ (e);
+
             log('WARN', `[FS_WATCHER] Alvo ausente: ${queuePath}. Tentando restauração...`);
             try {
                 await fsp.mkdir(queuePath, { recursive: true });
@@ -55,7 +55,7 @@ function init() {
             /**
              * fs.watch: Utiliza notificações nativas do kernel do SO (inotify/fsevents).
              */
-            fsWatcher = fs.watch(queuePath, (event, filename) => {
+            fsWatcher = fs.watch(queuePath, (_event, filename) => {
                 // Filtra cirurgicamente apenas arquivos de intenção (.json)
                 if (filename && filename.endsWith('.json')) {
                     // P1.2: Debounce de 100ms para prevenir múltiplos eventos da mesma mudança

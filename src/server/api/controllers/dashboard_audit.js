@@ -28,11 +28,11 @@ async function _runControl(
             payload: {
                 ...payload,
                 reason:
-                    payload.reason || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/audit`,
+                    payload['reason'] || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/audit`,
                 idempotency_key:
-                    payload.idempotency_key ||
+                    payload['idempotency_key'] ||
                     req.body?.idempotency_key ||
-                    `${req.id}:${command}:${payload.id || payload.audit_job_id || payload.patch_id || payload.watch_rule_id || 'n/a'}`,
+                    `${req.id}:${command}:${payload['id'] || payload['audit_job_id'] || payload['patch_id'] || payload['watch_rule_id'] || 'n/a'}`,
             },
             actor: _actorFromReq(req),
         });
@@ -218,23 +218,10 @@ function _enrichAuditJob(/** @type {any} */ job) {
 }
 
 function getAuditAgentBaseUrl() {
-    const host = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
-    const port = Number(process.env.AUDIT_AGENT_PORT || 3098);
+    const host = process.env['AUDIT_AGENT_HOST'] || '127.0.0.1';
+    const port = Number(process.env['AUDIT_AGENT_PORT'] || 3098);
     return `http://${host}:${port}`;
 }
-
-/**
- * Get Diagnostic Agent base URL - now routes to Audit Agent Diagnostic jobs are processed by Audit Agent at port 3098
- *
- * @returns {string}
- */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-function getDiagnosticAgentBaseUrl() {
-    // Diagnostic Agent was consolidated into Audit Agent
-    // Route all diagnostic requests to Audit Agent
-    return getAuditAgentBaseUrl();
-}
-/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * Check if job kind is diagnostic
@@ -305,7 +292,7 @@ router.get('/audit/runtime', authenticate, async (req, res) => {
     try {
         const appLocals = req.app?.locals || {};
         const runtimeSummary =
-            typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
+            typeof appLocals['getRuntimeResourcesStatus'] === 'function' ? appLocals['getRuntimeResourcesStatus']() : null;
         const baseUrl = getAuditAgentBaseUrl();
         const [health, metrics] = await Promise.all([
             safeFetchJson(`${baseUrl}/health`, 1500),
@@ -342,15 +329,15 @@ router.get('/audit/jobs', authenticate, async (req, res) => {
     try {
         const baseUrl = getAuditAgentBaseUrl();
         const url = new URL(`${baseUrl}/jobs`);
-        if (req.query.status) url.searchParams.set('status', String(req.query.status));
-        if (req.query.limit) url.searchParams.set('limit', String(req.query.limit));
+        if (req.query['status']) url.searchParams.set('status', String(req.query['status']));
+        if (req.query['limit']) url.searchParams.set('limit', String(req.query['limit']));
 
         const upstream = await safeFetchJson(url.toString(), 2500);
         if (!upstream.ok) {
             // Fallback to DB snapshots when local runtime is unavailable.
             const items = listAuditJobs({
-                status: req.query.status ? String(req.query.status) : null,
-                limit: req.query.limit ? Number(req.query.limit) : 100,
+                status: req.query['status'] ? String(req.query['status']) : null,
+                limit: req.query['limit'] ? Number(req.query['limit']) : 100,
             });
             return ok(res, req, items.map(_enrichAuditJob), {
                 source: 'audit-job-repo-fallback',
@@ -371,7 +358,7 @@ router.get('/audit/jobs', authenticate, async (req, res) => {
 });
 
 router.get('/audit/jobs/:id', authenticate, async (req, res) => {
-    const result = await _fetchAuditJobWithFallback(req.params.id);
+    const result = await _fetchAuditJobWithFallback(req.params['id']);
     if (!result.ok) {
         return fail(res, req, result.status, {
             code: result.upstream?.status === 404 ? 'AUDIT_JOB_NOT_FOUND' : 'AUDIT_AGENT_UNAVAILABLE',
@@ -390,7 +377,7 @@ router.get('/audit/jobs/:id', authenticate, async (req, res) => {
 });
 
 router.get('/audit/jobs/:id/llm-triage', authenticate, async (req, res) => {
-    const result = await _fetchAuditJobWithFallback(req.params.id);
+    const result = await _fetchAuditJobWithFallback(req.params['id']);
     if (!result.ok) {
         return fail(res, req, result.status, {
             code: result.upstream?.status === 404 ? 'AUDIT_JOB_NOT_FOUND' : 'AUDIT_AGENT_UNAVAILABLE',
@@ -403,7 +390,7 @@ router.get('/audit/jobs/:id/llm-triage', authenticate, async (req, res) => {
     if (!llmTriage) {
         return ok(res, req, null, {
             source: result.source,
-            audit_job_id: String(req.params.id || ''),
+            audit_job_id: String(req.params['id'] || ''),
             present: false,
         });
     }
@@ -425,14 +412,14 @@ router.get('/audit/jobs/:id/llm-triage', authenticate, async (req, res) => {
         },
         {
             source: result.source,
-            audit_job_id: String(req.params.id || ''),
+            audit_job_id: String(req.params['id'] || ''),
             present: true,
         },
     );
 });
 
 router.get('/audit/jobs/:id/llm-patch-author', authenticate, async (req, res) => {
-    const result = await _fetchAuditJobWithFallback(req.params.id);
+    const result = await _fetchAuditJobWithFallback(req.params['id']);
     if (!result.ok) {
         return fail(res, req, result.status, {
             code: result.upstream?.status === 404 ? 'AUDIT_JOB_NOT_FOUND' : 'AUDIT_AGENT_UNAVAILABLE',
@@ -445,7 +432,7 @@ router.get('/audit/jobs/:id/llm-patch-author', authenticate, async (req, res) =>
     if (!llmPatch) {
         return ok(res, req, null, {
             source: result.source,
-            audit_job_id: String(req.params.id || ''),
+            audit_job_id: String(req.params['id'] || ''),
             present: false,
         });
     }
@@ -469,28 +456,28 @@ router.get('/audit/jobs/:id/llm-patch-author', authenticate, async (req, res) =>
         },
         {
             source: result.source,
-            audit_job_id: String(req.params.id || ''),
+            audit_job_id: String(req.params['id'] || ''),
             present: true,
         },
     );
 });
 
 router.get('/audit/jobs/:id/findings', authenticate, (req, res) => {
-    const items = listAuditFindingsByJobId(String(req.params.id || ''), {
-        limit: req.query.limit ? Number(req.query.limit) : 200,
+    const items = listAuditFindingsByJobId(String(req.params['id'] || ''), {
+        limit: req.query['limit'] ? Number(req.query['limit']) : 200,
     });
     return ok(res, req, items, {
         source: 'audit-finding-repo',
-        audit_job_id: String(req.params.id || ''),
+        audit_job_id: String(req.params['id'] || ''),
     });
 });
 
 router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
-    const items = listAuditPatchProposalsByJobId(String(req.params.id || ''), {
-        limit: req.query.limit ? Number(req.query.limit) : 50,
+    const items = listAuditPatchProposalsByJobId(String(req.params['id'] || ''), {
+        limit: req.query['limit'] ? Number(req.query['limit']) : 50,
     });
     const includeReadiness =
-        String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+        String(req.query['include_readiness'] || req.query['includeReadiness'] || 'false').toLowerCase() === 'true';
     const actor = _actorFromReq(req);
     // Se include_readiness, buscar readiness para cada patch em paralelo
     const enriched = await Promise.all(
@@ -518,14 +505,14 @@ router.get('/audit/jobs/:id/patches', authenticate, async (req, res) => {
     );
     return ok(res, req, enriched, {
         source: 'audit-patch-repo',
-        audit_job_id: String(req.params.id || ''),
+        audit_job_id: String(req.params['id'] || ''),
         summary: counts,
         include_readiness: includeReadiness,
     });
 });
 
 router.get('/audit/patches/:id', authenticate, async (req, res) => {
-    const patch = getAuditPatchProposalById(String(req.params.id || ''));
+    const patch = getAuditPatchProposalById(String(req.params['id'] || ''));
     if (!patch) {
         return fail(res, req, 404, {
             code: 'AUDIT_PATCH_NOT_FOUND',
@@ -534,16 +521,16 @@ router.get('/audit/patches/:id', authenticate, async (req, res) => {
     }
     const enriched = _enrichPatch(patch);
     const includeReadiness =
-        String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+        String(req.query['include_readiness'] || req.query['includeReadiness'] || 'false').toLowerCase() === 'true';
     if (includeReadiness) {
-        const readiness = await _fetchApplyReadiness(String(req.params.id || ''), _actorFromReq(req));
+        const readiness = await _fetchApplyReadiness(String(req.params['id'] || ''), _actorFromReq(req));
         if (readiness) {
             enriched.apply_readiness = readiness;
         }
     }
     return ok(res, req, enriched, {
         source: 'audit-patch-repo',
-        audit_patch_id: String(req.params.id || ''),
+        audit_patch_id: String(req.params['id'] || ''),
         include_readiness: includeReadiness,
     });
 });
@@ -553,9 +540,9 @@ router.get('/audit/patches/:id/apply-readiness', authenticate, async (req, res) 
         const result = await executeCommand({
             command: COMMANDS.AUDIT_PATCH_APPLY_VALIDATE,
             payload: {
-                patch_id: req.params.id,
-                reason: String(req.query.reason || 'read apply readiness via /api/dashboard/audit'),
-                idempotency_key: `${req.id}:${COMMANDS.AUDIT_PATCH_APPLY_VALIDATE}:${String(req.params.id || '')}`,
+                patch_id: req.params['id'],
+                reason: String(req.query['reason'] || 'read apply readiness via /api/dashboard/audit'),
+                idempotency_key: `${req.id}:${COMMANDS.AUDIT_PATCH_APPLY_VALIDATE}:${String(req.params['id'] || '')}`,
             },
             actor: _actorFromReq(req),
         });
@@ -583,8 +570,8 @@ router.get('/audit/patches/:id/apply-readiness', authenticate, async (req, res) 
 });
 
 router.get('/audit/jobs/:id/patches/:patchId', authenticate, async (req, res) => {
-    const patch = getAuditPatchProposalById(String(req.params.patchId || ''));
-    if (!patch || String(patch.job_id) !== String(req.params.id || '')) {
+    const patch = getAuditPatchProposalById(String(req.params['patchId'] || ''));
+    if (!patch || String(patch.job_id) !== String(req.params['id'] || '')) {
         return fail(res, req, 404, {
             code: 'AUDIT_PATCH_NOT_FOUND',
             error: 'Audit patch proposal não encontrado para este job',
@@ -592,17 +579,17 @@ router.get('/audit/jobs/:id/patches/:patchId', authenticate, async (req, res) =>
     }
     const enriched = _enrichPatch(patch);
     const includeReadiness =
-        String(req.query.include_readiness || req.query.includeReadiness || 'false').toLowerCase() === 'true';
+        String(req.query['include_readiness'] || req.query['includeReadiness'] || 'false').toLowerCase() === 'true';
     if (includeReadiness) {
-        const readiness = await _fetchApplyReadiness(String(req.params.patchId || ''), _actorFromReq(req));
+        const readiness = await _fetchApplyReadiness(String(req.params['patchId'] || ''), _actorFromReq(req));
         if (readiness) {
             enriched.apply_readiness = readiness;
         }
     }
     return ok(res, req, enriched, {
         source: 'audit-patch-repo',
-        audit_patch_id: String(req.params.patchId || ''),
-        audit_job_id: String(req.params.id || ''),
+        audit_patch_id: String(req.params['patchId'] || ''),
+        audit_job_id: String(req.params['id'] || ''),
         include_readiness: includeReadiness,
     });
 });
@@ -650,7 +637,7 @@ router.post('/audit/jobs', authenticate, async (req, res) => {
 router.post('/audit/jobs/:id/run', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_JOB_RUN, {
         ...(req.body || {}),
-        audit_job_id: req.params.id,
+        audit_job_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -663,7 +650,7 @@ router.post('/audit/jobs/:id/run', authenticate, async (req, res) => {
 router.post('/audit/jobs/:id/cancel', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_JOB_CANCEL, {
         ...(req.body || {}),
-        audit_job_id: req.params.id,
+        audit_job_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -676,7 +663,7 @@ router.post('/audit/jobs/:id/cancel', authenticate, async (req, res) => {
 router.post('/audit/patches/:id/approve', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_APPROVE, {
         ...(req.body || {}),
-        patch_id: req.params.id,
+        patch_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -689,7 +676,7 @@ router.post('/audit/patches/:id/approve', authenticate, async (req, res) => {
 router.post('/audit/patches/:id/reject', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_REJECT, {
         ...(req.body || {}),
-        patch_id: req.params.id,
+        patch_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -702,7 +689,7 @@ router.post('/audit/patches/:id/reject', authenticate, async (req, res) => {
 router.post('/audit/patches/:id/apply', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_APPLY, {
         ...(req.body || {}),
-        patch_id: req.params.id,
+        patch_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -715,7 +702,7 @@ router.post('/audit/patches/:id/apply', authenticate, async (req, res) => {
 router.post('/audit/patches/:id/apply/validate', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_PATCH_APPLY_VALIDATE, {
         ...(req.body || {}),
-        patch_id: req.params.id,
+        patch_id: req.params['id'],
     });
     if (!result) return;
     return ok(
@@ -746,7 +733,7 @@ router.post('/audit/watch-rules', authenticate, async (req, res) => {
 router.post('/audit/watch-rules/:id/toggle', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.AUDIT_WATCH_RULE_TOGGLE, {
         ...(req.body || {}),
-        watch_rule_id: req.params.id,
+        watch_rule_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -758,8 +745,8 @@ router.post('/audit/watch-rules/:id/toggle', authenticate, async (req, res) => {
 
 router.get('/audit/watch-rules', authenticate, (_req, res) => {
     const items = listAuditWatchRules({
-        enabledOnly: String(_req.query.enabled_only || 'false').toLowerCase() === 'true',
-        limit: _req.query.limit ? Number(_req.query.limit) : 100,
+        enabledOnly: String(_req.query['enabled_only'] || 'false').toLowerCase() === 'true',
+        limit: _req.query['limit'] ? Number(_req.query['limit']) : 100,
     });
     return ok(res, _req, items, { source: 'audit-watch-rule-repo' });
 });
@@ -828,15 +815,15 @@ router.get('/audit/diagnostic/jobs', authenticate, async (req, res) => {
     try {
         const baseUrl = getAuditAgentBaseUrl();
         const url = new URL(`${baseUrl}/jobs`);
-        if (req.query.status) url.searchParams.set('status', String(req.query.status));
-        if (req.query.limit) url.searchParams.set('limit', String(req.query.limit));
+        if (req.query['status']) url.searchParams.set('status', String(req.query['status']));
+        if (req.query['limit']) url.searchParams.set('limit', String(req.query['limit']));
 
         const upstream = await safeFetchJson(url.toString(), 2500);
         if (!upstream.ok) {
             // Fallback to DB
             const allJobs = listAuditJobs({
-                status: req.query.status ? String(req.query.status) : null,
-                limit: req.query.limit ? Number(req.query.limit) : 100,
+                status: req.query['status'] ? String(req.query['status']) : null,
+                limit: req.query['limit'] ? Number(req.query['limit']) : 100,
             });
             const diagJobs = _filterDiagnosticJobs(allJobs);
             return ok(res, req, diagJobs, {
@@ -867,7 +854,7 @@ router.get('/audit/diagnostic/jobs', authenticate, async (req, res) => {
  * GET /audit/diagnostic/jobs/:id Get diagnostic job by ID
  */
 router.get('/audit/diagnostic/jobs/:id', authenticate, async (req, res) => {
-    const result = await _fetchAuditJobWithFallback(req.params.id);
+    const result = await _fetchAuditJobWithFallback(req.params['id']);
     if (!result.ok) {
         return fail(res, req, result.status, {
             code: result.upstream?.status === 404 ? 'DIAGNOSTIC_JOB_NOT_FOUND' : 'DIAGNOSTIC_AGENT_UNAVAILABLE',
@@ -893,7 +880,7 @@ router.get('/audit/diagnostic/jobs/:id', authenticate, async (req, res) => {
  * GET /audit/diagnostic/jobs/:id/result Get diagnostic result from job
  */
 router.get('/audit/diagnostic/jobs/:id/result', authenticate, async (req, res) => {
-    const result = await _fetchAuditJobWithFallback(req.params.id);
+    const result = await _fetchAuditJobWithFallback(req.params['id']);
     if (!result.ok) {
         return fail(res, req, result.status, {
             code: result.upstream?.status === 404 ? 'DIAGNOSTIC_JOB_NOT_FOUND' : 'DIAGNOSTIC_AGENT_UNAVAILABLE',
@@ -912,7 +899,7 @@ router.get('/audit/diagnostic/jobs/:id/result', authenticate, async (req, res) =
     const diagnosticResult = result.job?.result_json?.diagnostic_result || null;
     return ok(res, req, diagnosticResult, {
         source: result.source,
-        audit_job_id: String(req.params.id || ''),
+        audit_job_id: String(req.params['id'] || ''),
         job_status: result.job?.status,
     });
 });
@@ -961,7 +948,7 @@ router.post('/audit/diagnostic/jobs', authenticate, async (req, res) => {
  */
 router.post('/audit/diagnostic/jobs/:id/run', authenticate, async (req, res) => {
     // First verify it's a diagnostic job
-    const jobCheck = await _fetchAuditJobWithFallback(req.params.id);
+    const jobCheck = await _fetchAuditJobWithFallback(req.params['id']);
     if (!jobCheck.ok) {
         return fail(res, req, jobCheck.status, {
             code: 'DIAGNOSTIC_JOB_NOT_FOUND',
@@ -978,7 +965,7 @@ router.post('/audit/diagnostic/jobs/:id/run', authenticate, async (req, res) => 
 
     const result = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_RUN, {
         ...(req.body || {}),
-        diagnostic_job_id: req.params.id,
+        diagnostic_job_id: req.params['id'],
     });
     if (!result) return;
 
@@ -994,7 +981,7 @@ router.post('/audit/diagnostic/jobs/:id/run', authenticate, async (req, res) => 
  */
 router.post('/audit/diagnostic/jobs/:id/cancel', authenticate, async (req, res) => {
     // First verify it's a diagnostic job
-    const jobCheck = await _fetchAuditJobWithFallback(req.params.id);
+    const jobCheck = await _fetchAuditJobWithFallback(req.params['id']);
     if (!jobCheck.ok) {
         return fail(res, req, jobCheck.status, {
             code: 'DIAGNOSTIC_JOB_NOT_FOUND',
@@ -1011,7 +998,7 @@ router.post('/audit/diagnostic/jobs/:id/cancel', authenticate, async (req, res) 
 
     const result = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_CANCEL, {
         ...(req.body || {}),
-        diagnostic_job_id: req.params.id,
+        diagnostic_job_id: req.params['id'],
     });
     if (!result) return;
 
@@ -1027,7 +1014,7 @@ router.post('/audit/diagnostic/jobs/:id/cancel', authenticate, async (req, res) 
  */
 router.post('/audit/diagnostic/jobs/:id/retry', authenticate, async (req, res) => {
     // First verify it's a diagnostic job
-    const jobCheck = await _fetchAuditJobWithFallback(req.params.id);
+    const jobCheck = await _fetchAuditJobWithFallback(req.params['id']);
     if (!jobCheck.ok) {
         return fail(res, req, jobCheck.status, {
             code: 'DIAGNOSTIC_JOB_NOT_FOUND',
@@ -1044,7 +1031,7 @@ router.post('/audit/diagnostic/jobs/:id/retry', authenticate, async (req, res) =
 
     const result = await _runControl(req, res, COMMANDS.DIAGNOSTIC_JOB_RETRY, {
         ...(req.body || {}),
-        diagnostic_job_id: req.params.id,
+        diagnostic_job_id: req.params['id'],
     });
     if (!result) return;
 

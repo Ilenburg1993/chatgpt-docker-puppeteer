@@ -39,8 +39,8 @@ describe('Server API - workflow empty + results controller + breaking /api/tasks
     const artifactsDir = makeArtifactsDir();
 
     before(() => {
-        process.env.MAESTRO_DB_PATH = dbPath;
-        process.env.MAESTRO_ARTIFACTS_DIR = artifactsDir;
+        process.env['MAESTRO_DB_PATH'] = dbPath;
+        process.env['MAESTRO_ARTIFACTS_DIR'] = artifactsDir;
         getDb(); // migrations
     });
 

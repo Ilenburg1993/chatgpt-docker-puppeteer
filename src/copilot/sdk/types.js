@@ -112,6 +112,22 @@
  */
 
 /**
+ * Tool criada pelas factories executáveis locais; `handler` é obrigatório e preserva o tipo de resultado.
+ *
+ * @template [TArgs=unknown]
+ * @template [TResult=unknown]
+ * @typedef {import('./tools/core.js').ExecutableTool<TArgs, TResult>} ExecutableTool
+ */
+
+/**
+ * Opções da factory executável local.
+ *
+ * @template [TArgs=unknown]
+ * @template [TResult=unknown]
+ * @typedef {import('./tools/core.js').CreateToolOptions<TArgs, TResult>} CreateToolOptions
+ */
+
+/**
  * Handler de execução de tool. Recebe `(args: TArgs, invocation: ToolInvocation)`.
  *
  * @template [TArgs=unknown] Default is `unknown`
@@ -718,12 +734,12 @@
  */
 
 /**
- * Input do hook `errorOccurred`. Campos: `error` (string), `errorContext` (`"model_call"` | `"tool_execution"` |
- * `"system"` | `"user_input"`), `recoverable` (bool) + `BaseHookInput`.
+ * Input do hook `errorOccurred`. `errorContext` permanece extensível porque o runtime também classifica contextos
+ * operacionais como rate limit, quota, permissão e identificadores de tools.
  *
  * @typedef {BaseHookInput & {
  *     error: string;
- *     errorContext: 'model_call' | 'tool_execution' | 'system' | 'user_input';
+ *     errorContext: string;
  *     recoverable: boolean;
  * }} ErrorOccurredHookInput
  */

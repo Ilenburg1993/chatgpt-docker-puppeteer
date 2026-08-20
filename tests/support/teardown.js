@@ -31,10 +31,10 @@ async function teardown() {
         }
 
         // 3. Restaurar variáveis de ambiente
-        delete process.env.NODE_ENV;
-        delete process.env.LOG_LEVEL;
-        delete process.env.DISABLE_BROWSER;
-        delete process.env.TEST_MODE;
+        delete process.env['NODE_ENV'];
+        delete process.env['LOG_LEVEL'];
+        delete process.env['DISABLE_BROWSER'];
+        delete process.env['TEST_MODE'];
         console.log('[TEST TEARDOWN] Variáveis de ambiente restauradas');
 
         // 4. Fechar handlers pendentes

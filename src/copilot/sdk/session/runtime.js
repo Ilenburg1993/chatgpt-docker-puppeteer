@@ -230,7 +230,7 @@ function resolveNativeModelSwitcher(session) {
     return null;
 }
 
-/** @param {CopilotSession} session */
+/** @param {unknown} session */
 export async function abortSession(session) {
     assertSession(session, 'abort');
     log('INFO', `[session-runtime] Abortando mensagem: sessionId='${session.sessionId}'`);
@@ -242,7 +242,7 @@ export async function abortSession(session) {
     log('INFO', `[session-runtime] Abort concluído: sessionId='${session.sessionId}'`);
 }
 
-/** @param {CopilotSession} session */
+/** @param {unknown} session */
 export async function disconnectSessionSafe(session) {
     assertSession(session, 'disconnect');
     log('INFO', `[session-runtime] Desconectando sessão: sessionId='${session.sessionId}'`);
@@ -353,7 +353,7 @@ export async function sendSession(session, messageOptions) {
 }
 
 /**
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} model
  * @param {SessionModelOptions} [options]
  */
@@ -504,7 +504,7 @@ export async function logSessionTimeline(session, message, options = {}) {
     });
 }
 
-/** @param {CopilotSession} session @returns {Promise<SessionEvent[]>} */
+/** @param {unknown} session @returns {Promise<SessionEvent[]>} */
 export async function getSessionMessages(session) {
     assertSession(session, 'getMessages');
     log('DEBUG', `[session-runtime] getEvents compat(getMessages): sessionId='${session.sessionId}'`);
@@ -521,13 +521,13 @@ export async function getSessionMessages(session) {
     return messages;
 }
 
-/** @param {CopilotSession} session */
+/** @param {unknown} session */
 export function getSessionWorkspacePath(session) {
     assertSession(session, 'workspacePath');
     return session.workspacePath;
 }
 
-/** @param {CopilotSession} session */
+/** @param {unknown} session */
 export async function disposeSession(session) {
     assertSession(session, 'dispose');
     log('INFO', `[session-runtime] Disposing sessão: sessionId='${session.sessionId}'`);

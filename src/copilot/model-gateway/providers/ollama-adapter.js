@@ -8,31 +8,33 @@
  * @module copilot/model-gateway/providers/ollama-adapter
  */
 
-import { OpenAICompatibleAdapter } from './openai-compatible-adapter.js';
+import { OpenAICompatibleAdapter, providerRecord } from './openai-compatible-adapter.js';
 
 export const OLLAMA_PROVIDER_IDS = Object.freeze(['ollama-local', 'ollama-cloud']);
 export const OLLAMA_LOCAL_BASE_URL = 'http://localhost:11434/v1';
 export const OLLAMA_CLOUD_BASE_URL = 'https://ollama.com/v1';
 
 /**
- * @param {Record<string, any>} provider
+ * @param {Record<string, unknown>} provider
  * @returns {boolean}
  */
 function isOllamaProvider(provider) {
+    const provenance = providerRecord(provider['provenance']);
     return (
         OLLAMA_PROVIDER_IDS.includes(String(provider['id'] ?? '')) ||
-        OLLAMA_PROVIDER_IDS.includes(String(provider['provenance']?.['preset'] ?? '')) ||
+        OLLAMA_PROVIDER_IDS.includes(String(provenance['preset'] ?? '')) ||
         provider['baseUrl'] === OLLAMA_LOCAL_BASE_URL ||
         provider['baseUrl'] === OLLAMA_CLOUD_BASE_URL
     );
 }
 
 /**
- * @param {Record<string, any>} provider
+ * @param {Record<string, unknown>} provider
  * @returns {'local' | 'cloud'}
  */
 function resolveOllamaRuntimeKind(provider) {
-    const id = String(provider['id'] ?? provider['provenance']?.['preset'] ?? '');
+    const provenance = providerRecord(provider['provenance']);
+    const id = String(provider['id'] ?? provenance['preset'] ?? '');
     const baseUrl = String(provider['baseUrl'] ?? '');
     return id === 'ollama-local' || baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1') ? 'local' : 'cloud';
 }
@@ -42,20 +44,16 @@ export class OllamaAdapter extends OpenAICompatibleAdapter {
     id = 'ollama';
 
     /**
-     * @param {Record<string, any>} provider
+     * @param {Record<string, unknown>} provider
      * @returns {boolean}
+     * @override
      */
     canHandle(provider) {
         return isOllamaProvider(provider);
     }
 
     /**
-     * @param {{
-     *     provider: Record<string, any>;
-     *     model: Record<string, any>;
-     *     secrets: import('../secrets/env-secret-registry.js').EnvSecretRegistry;
-     * }} input
-     * @returns {{ model: string; provider: Record<string, any>; modelCapabilities?: Record<string, any>; gateway?: Record<string, any> }}
+     * @param {import('./openai-compatible-adapter.js').ModelGatewayProviderAdapterInput} input
      * @override
      */
     toCopilotSessionOverrides(input) {

@@ -18,7 +18,7 @@ async function main() {
         const health = await axios.get(`${PROXY_URL}/health`, { timeout: 3000 });
         console.log(`✅ Proxy health: ${health.data.status}`);
     } catch (err) {
-        console.error(`❌ Proxy health failed: ${err.message}`);
+        console.error(`❌ Proxy health failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
     }
 
@@ -28,7 +28,7 @@ async function main() {
         const version = await axios.get(`${PROXY_URL}/json/version`, { timeout: 3000 });
         console.log(`✅ Chrome version: ${version.data.Browser}`);
     } catch (err) {
-        console.error(`❌ Version check failed: ${err.message}`);
+        console.error(`❌ Version check failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
     }
 
@@ -40,7 +40,7 @@ async function main() {
         wsEndpoint = version.data.webSocketDebuggerUrl;
         console.log(`✅ WS Endpoint: ${wsEndpoint}`);
     } catch (err) {
-        console.error(`❌ Failed to get WS endpoint: ${err.message}`);
+        console.error(`❌ Failed to get WS endpoint: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
     }
 
@@ -54,7 +54,7 @@ async function main() {
         });
         console.log('✅ Puppeteer connected');
     } catch (err) {
-        console.error(`❌ Puppeteer connection failed: ${err.message}`);
+        console.error(`❌ Puppeteer connection failed: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);
     }
 
@@ -67,7 +67,7 @@ async function main() {
         console.log(`✅ Page loaded: ${title}`);
         await page.close();
     } catch (err) {
-        console.error(`❌ Page navigation failed: ${err.message}`);
+        console.error(`❌ Page navigation failed: ${err instanceof Error ? err.message : String(err)}`);
         if (browser) await browser.disconnect();
         process.exit(1);
     }
@@ -78,7 +78,7 @@ async function main() {
         await browser.disconnect();
         console.log('✅ Disconnected');
     } catch (err) {
-        console.error(`❌ Disconnect failed: ${err.message}`);
+        console.error(`❌ Disconnect failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     console.log('\n🎉 ALL TESTS PASSED!\n');
@@ -93,6 +93,6 @@ async function main() {
 }
 
 main().catch((err) => {
-    console.error('\n💥 TEST SUITE FAILED:', err.message);
+    console.error('\n💥 TEST SUITE FAILED:', err instanceof Error ? err.message : String(err));
     process.exit(1);
 });

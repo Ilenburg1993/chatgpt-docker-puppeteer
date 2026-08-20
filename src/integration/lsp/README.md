@@ -1,14 +1,15 @@
 # src/integration/lsp
 
-**Propósito**: Daemon do servidor LSP (tsserver) para integração de inteligência de código no
-runtime.  
-**Status**: Especializado.  
-**Público**: Mantenedores de integrações de tooling de desenvolvimento e auditoria de código.  
-**Última atualização**: 2 de março de 2026.
+**Propósito**: compatibilidade opt-in das ferramentas MCP com o LSP nativo do TypeScript 7.
+**Status**: preservado, desligado por padrão.
+**Público**: Mantenedores de integrações de tooling de desenvolvimento e auditoria de código.
+**Última atualização**: 19 de agosto de 2026.
 
 ## O que esta pasta contém
 
-- `tsserver-daemon.mjs`: daemon que gerencia o processo tsserver para análise de código.
+- `tsgo-lsp-daemon.mjs`: cliente JSON-RPC do `tsc --lsp --stdio` nativo.
+- `tsserver-daemon.mjs`: alias temporário para consumidores com o nome histórico.
+- `tsserver-process-daemon.mjs` e `tsserver-worker.mjs`: isolamento e reciclagem do heap.
 
 ## O que não deve ficar aqui
 
@@ -17,13 +18,17 @@ runtime.
 
 ## Entradas principais
 
-| Arquivo               | Descrição                                    |
-| --------------------- | -------------------------------------------- |
-| `tsserver-daemon.mjs` | Gerencia o processo tsserver como daemon LSP |
+| Arquivo | Descrição |
+| --- | --- |
+| `tsgo-lsp-daemon.mjs` | Implementação canônica preservada do cliente LSP TS7 |
+| `tsserver-daemon.mjs` | Alias de compatibilidade de nomes |
 
 ## Regras de manutenção
 
-- Verifique a saúde do LSP com `npm run lsp:health` antes de depender dele.
+- `LSP_ENABLED=false` e `LSP_MUTATIONS_ENABLED=false` são os defaults obrigatórios.
+- O editor usa diretamente o LSP/TSServer 7; este daemon não participa do fluxo normal.
+- Para um teste explícito, habilite `LSP_ENABLED=true` apenas no processo isolado e execute
+  `npm run lsp:health`.
 
 ## Links relacionados
 

@@ -73,7 +73,7 @@ O registro canônico do progresso por fase vive em:
    ```
 5. Adicionar script no `package.json` (dentro do bloco `typecheck:strict:*`):
    ```jsonc
-   "typecheck:strict:src.<modulo>": "tsc -p config/typing/strict/tsconfig.strict.src.<modulo>.json"
+   "typecheck:strict:src.<modulo>": "npm run -s tsc7 -- -p config/typing/strict/tsconfig.strict.src.<modulo>.json"
    ```
 6. Atualizar `typecheck:strict:all` para incluir o novo script.
 7. Adicionar target no Makefile:
@@ -81,7 +81,7 @@ O registro canônico do progresso por fase vive em:
    typecheck-strict-src-<modulo>:
    	npm run typecheck:strict:src.<modulo>
    ```
-8. Rodar a lane isolada: `tsc -p config/typing/strict/tsconfig.strict.src.<modulo>.json`.
+8. Rodar a lane isolada pelo runner TS7: `npm run typecheck:strict:src.<modulo>`.
 9. Corrigir erros estáticos até a lane estar verde (sem `@ts-ignore` de silêncio).
 10. Remover a eventual âncora simbólica antiga do mesmo módulo.
 11. Rodar `npm run analyze:typing:gaps` e confirmar que `strict_uncovered_files_total` decrementou.
@@ -98,7 +98,7 @@ O registro canônico do progresso por fase vive em:
 
 ## Validation / Done Criteria
 
-- [ ] `tsc -p config/typing/strict/tsconfig.strict.src.<modulo>.json` executa sem erros de tipo.
+- [ ] `npm run typecheck:strict:src.<modulo>` executa sem erros de tipo.
 - [ ] `tsconfig.strict.json` referencia a nova lane.
 - [ ] `npm run typecheck:strict:all` continua verde.
 - [ ] `npm run analyze:typing:gaps` mostra `strict_uncovered_files_total` reduzido.

@@ -10,7 +10,7 @@
 
 import { spawnSync } from 'node:child_process';
 
-import yamlModule from 'js-yaml';
+import * as yamlModule from 'js-yaml';
 
 import { readTerminalExternalToolCapabilities, sanitizeTerminalExternalToolText } from './external-tools.js';
 

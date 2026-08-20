@@ -200,11 +200,11 @@ export class ToolRegistry {
         }
 
         // Check if retry enabled (opt-in via env var, default: false)
-        const retryEnabled = process.env.MCP_TOOL_RETRY_ENABLED === 'true';
-        const maxRetries = Number(process.env.MCP_TOOL_MAX_RETRIES || 3);
+        const retryEnabled = process.env['MCP_TOOL_RETRY_ENABLED'] === 'true';
+        const maxRetries = Number(process.env['MCP_TOOL_MAX_RETRIES'] || 3);
 
         // Check if adaptive timeout enabled (opt-in via env var, default: false)
-        const adaptiveEnabled = process.env.MCP_TOOL_ADAPTIVE_TIMEOUT === 'true';
+        const adaptiveEnabled = process.env['MCP_TOOL_ADAPTIVE_TIMEOUT'] === 'true';
 
         // Determine timeout strategy
         let toolTimeout;
@@ -222,19 +222,19 @@ export class ToolRegistry {
             toolTimeout = adaptive.timeout;
             console.error(
                 `[Tool Registry] Using adaptive timeout for ${name}: ${toolTimeout}ms ` +
-                    `(learned_avg=${adaptive.breakdown?.learned_avg}ms, phase=${adaptive.phase})`,
+                    `(learned_avg=${adaptive.breakdown?.['learned_avg']}ms, phase=${adaptive.phase})`,
             );
         } else {
             // Fallback to fixed timeout (backward compatible)
-            toolTimeout = Number(process.env.TOOL_EXECUTION_TIMEOUT || 75000);
+            toolTimeout = Number(process.env['TOOL_EXECUTION_TIMEOUT'] || 75000);
         }
 
         // Circuit breaker check (for Ollama tools only)
         const isOllamaTool = name.startsWith('ollama_');
-        if (isOllamaTool && process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED !== 'false') {
+        if (isOllamaTool && process.env['OLLAMA_CIRCUIT_BREAKER_ENABLED'] !== 'false') {
             // Import circuit breaker dynamically (only if needed)
             const { getCircuitBreaker } = await import('./ollama-circuit-breaker.mjs');
-            const endpoint = process.env.OLLAMA_CLOUD_ENABLED === 'true' ? 'cloud' : 'local';
+            const endpoint = process.env['OLLAMA_CLOUD_ENABLED'] === 'true' ? 'cloud' : 'local';
             const breaker = getCircuitBreaker(endpoint);
 
             if (!breaker.allowRequest()) {
@@ -285,9 +285,9 @@ export class ToolRegistry {
                 }
 
                 // Success: record circuit breaker success
-                if (isOllamaTool && process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED !== 'false') {
+                if (isOllamaTool && process.env['OLLAMA_CIRCUIT_BREAKER_ENABLED'] !== 'false') {
                     const { getCircuitBreaker } = await import('./ollama-circuit-breaker.mjs');
-                    const endpoint = process.env.OLLAMA_CLOUD_ENABLED === 'true' ? 'cloud' : 'local';
+                    const endpoint = process.env['OLLAMA_CLOUD_ENABLED'] === 'true' ? 'cloud' : 'local';
                     const breaker = getCircuitBreaker(endpoint);
                     breaker.recordSuccess();
                 }
@@ -322,9 +322,9 @@ export class ToolRegistry {
                 );
 
                 // Record circuit breaker failure
-                if (isOllamaTool && process.env.OLLAMA_CIRCUIT_BREAKER_ENABLED !== 'false') {
+                if (isOllamaTool && process.env['OLLAMA_CIRCUIT_BREAKER_ENABLED'] !== 'false') {
                     const { getCircuitBreaker } = await import('./ollama-circuit-breaker.mjs');
-                    const endpoint = process.env.OLLAMA_CLOUD_ENABLED === 'true' ? 'cloud' : 'local';
+                    const endpoint = process.env['OLLAMA_CLOUD_ENABLED'] === 'true' ? 'cloud' : 'local';
                     const breaker = getCircuitBreaker(endpoint);
                     breaker.recordFailure();
                 }
@@ -341,14 +341,14 @@ export class ToolRegistry {
                 if (
                     classification.strategy === 'MODEL_FALLBACK' &&
                     classification.modelFallback &&
-                    process.env.OLLAMA_MODEL_FALLBACK_ENABLED !== 'false'
+                    process.env['OLLAMA_MODEL_FALLBACK_ENABLED'] !== 'false'
                 ) {
                     console.error(`[Tool Registry] Model fallback: ${params.model} → ${classification.modelFallback}`);
                     params = { ...params, model: classification.modelFallback };
                 }
 
                 // Exponential backoff before retry
-                const maxBackoff = Number(process.env.MCP_TOOL_MAX_BACKOFF_MS || 30000);
+                const maxBackoff = Number(process.env['MCP_TOOL_MAX_BACKOFF_MS'] || 30000);
                 const delayMs = calculateBackoff(attempt, classification.suggestedDelayMs, maxBackoff);
 
                 console.error(
@@ -493,8 +493,9 @@ export async function initialize() {
             const { registerOllamaTools } = await import('./tools/ollama-tools.mjs');
             await registerOllamaTools(registry);
 
-            // Optional: LSP/tsserver tools for semantic code navigation
-            if (String(process.env.LSP_ENABLED || 'true') !== 'false') {
+            // Optional, opt-in semantic LSP tools. The editor/TS7 native language server is the canonical semantic
+            // service; this MCP surface remains available for explicit agent-side experiments and fallback workflows.
+            if (String(process.env['LSP_ENABLED'] || 'false') === 'true') {
                 const { registerLspTools } = await import('./tools/lsp-tools.mjs');
                 await registerLspTools(registry);
             }

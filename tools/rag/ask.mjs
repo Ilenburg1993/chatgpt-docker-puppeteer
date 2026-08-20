@@ -28,7 +28,7 @@ if (!query) {
 const { markdown, result } = await ragAsk({
     query,
     topK: values.topk ? Number(values.topk) : 8,
-    profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
+    profile: values.profile || process.env['RAG_PROFILE_DEFAULT'] || 'core',
     mode: values.mode || 'auto',
     includeDiagnostics: values.diagnostics,
     filters: {

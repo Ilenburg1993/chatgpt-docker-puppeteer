@@ -41,6 +41,7 @@ export const COPILOT_VALIDATOR_NAMES = Object.freeze([
     'unit-focused',
     'devcontainer-shell',
     'network-contracts',
+    'dependency-outdated',
     'suite-mcp-fast',
     'suite-mcp-full',
     'suite-copilot-fast',
@@ -61,6 +62,7 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  *     | 'unit-focused'
  *     | 'devcontainer-shell'
  *     | 'network-contracts'
+ *     | 'dependency-outdated'
  *     | 'suite-mcp-fast'
  *     | 'suite-mcp-full'
  *     | 'suite-copilot-fast'} CopilotValidatorName
@@ -290,6 +292,11 @@ export function resolveValidatorCommand(validator, options = {}) {
                     'validate',
                     '.devcontainer/scripts/network/contracts/summary-contracts.jsonc',
                 ],
+            };
+        case 'dependency-outdated':
+            return {
+                command: 'node',
+                args: ['src/copilot/mcp/scripts/dependency-maintenance-runner.js', 'outdated'],
             };
         case 'suite-mcp-fast':
             return {

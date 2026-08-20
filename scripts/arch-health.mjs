@@ -61,7 +61,9 @@ function walkJs(dir) {
  */
 function listModules(dir) {
     if (!existsSync(dir)) return [];
-    const EXCLUDE = new Set(['.github', 'logs', 'node_modules']);
+    // Artefatos operacionais e documentação não são módulos de runtime e,
+    // portanto, não participam da política de barrels do código-fonte.
+    const EXCLUDE = new Set(['.ai', '.github', 'docs', 'logs', 'node_modules']);
     return readdirSync(dir).filter((e) => {
         if (EXCLUDE.has(e)) return false;
         const full = join(dir, e);

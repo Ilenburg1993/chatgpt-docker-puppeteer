@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
-import { SqliteModelGatewayCatalogStore, buildModelGatewayRuntimeStandbyPlan } from '#copilot/model-gateway';
+import {
+    SqliteModelGatewayCatalogStore,
+    buildModelGatewayRuntimeSelectorPlan,
+    buildModelGatewayRuntimeStandbyPlan,
+} from '#copilot/model-gateway';
 
 import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader, readPositiveIntArg } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--json')) {
@@ -29,22 +36,16 @@ Use --read-sqlite or --persisted to list previously persisted standby plans with
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 function readPositiveInt(name, fallback) {
-    const value = Number.parseInt(readArg(name), 10);
-    return Number.isFinite(value) && value > 0 ? value : fallback;
+    return readPositiveIntArg(readArg, name, fallback);
 }
 
-function runtimeSelectorArgs(profile) {
+function runtimeSelectorArgs(/** @type {string} */ profile) {
     const forwarded = ['--json', `--profile=${profile}`];
     let hasSelectionPolicy = false;
     for (const flag of [
@@ -64,7 +65,8 @@ function runtimeSelectorArgs(profile) {
     return forwarded;
 }
 
-function readRuntimeSelectorPlan(profile) {
+/** @returns {{ ok?: boolean; runtimeSelectorPlan: ReturnType<typeof buildModelGatewayRuntimeSelectorPlan> }} */
+function readRuntimeSelectorPlan(/** @type {string} */ profile) {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS.runtimeSelector, ...runtimeSelectorArgs(profile)], {
         cwd: REPO_ROOT,
         encoding: 'utf8',
@@ -83,6 +85,11 @@ const includeSelected = !argSet.has('--alternates-only');
 if (argSet.has('--read-sqlite') || argSet.has('--persisted')) {
     const plans = await new SqliteModelGatewayCatalogStore().readStandbyPlanRecords({ limit, profileId: profile });
     const latest = plans[0] ?? null;
+    const latestSummary =
+        latest?.['summary'] && typeof latest['summary'] === 'object' && !Array.isArray(latest['summary'])
+            ? Object.fromEntries(Object.entries(latest['summary']))
+            : null;
+    const latestRoutes = Array.isArray(latest?.['routes']) ? latest['routes'] : [];
     const output = {
         schema: 'model-gateway-auto-standby-persisted',
         ok: plans.length > 0,
@@ -90,9 +97,9 @@ if (argSet.has('--read-sqlite') || argSet.has('--persisted')) {
         generatedAt: new Date().toISOString(),
         summary: {
             planCount: plans.length,
-            latestRouteCount: latest?.summary?.routeCount ?? latest?.routes?.length ?? 0,
-            latestProviderCount: latest?.summary?.providerCount ?? 0,
-            latestRuntimeProofCount: latest?.summary?.runtimeProofCount ?? 0,
+            latestRouteCount: latestSummary?.['routeCount'] ?? latestRoutes.length,
+            latestProviderCount: latestSummary?.['providerCount'] ?? 0,
+            latestRuntimeProofCount: latestSummary?.['runtimeProofCount'] ?? 0,
         },
         latest,
         plans,
@@ -104,8 +111,13 @@ if (argSet.has('--read-sqlite') || argSet.has('--persisted')) {
             `model-gateway auto standby persisted: plans=${output.summary.planCount} profile=${profile} latestRoutes=${output.summary.latestRouteCount}\n`,
         );
         for (const [index, plan] of plans.entries()) {
+            const planSummary =
+                plan['summary'] && typeof plan['summary'] === 'object' && !Array.isArray(plan['summary'])
+                    ? Object.fromEntries(Object.entries(plan['summary']))
+                    : null;
+            const planRoutes = Array.isArray(plan['routes']) ? plan['routes'] : [];
             process.stdout.write(
-                `  ${index + 1}. ${plan.standbyPlanId ?? '-'} status=${plan.status ?? '-'} routes=${plan.summary?.routeCount ?? plan.routes?.length ?? 0} providers=${plan.summary?.providerCount ?? 0} generated=${plan.generatedAt ?? plan.generatedAtMs ?? '-'}\n`,
+                `  ${index + 1}. ${plan['standbyPlanId'] ?? '-'} status=${plan['status'] ?? '-'} routes=${planSummary?.['routeCount'] ?? planRoutes.length} providers=${planSummary?.['providerCount'] ?? 0} generated=${plan['generatedAt'] ?? plan['generatedAtMs'] ?? '-'}\n`,
             );
         }
     }
@@ -158,7 +170,7 @@ if (argSet.has('--json')) {
         process.stdout.write(`    recommended: ${row.recommendedAction} -> ${row.recommendedCommand ?? '-'}\n`);
         process.stdout.write(`    prove: ${row.commands.probeAgent ?? '-'}\n`);
         process.stdout.write(`    live:  ${row.commands.liveModel ?? '-'}\n`);
-        process.stdout.write(`    next:  ${row.commands.newSession} && ${row.commands.provider ?? '-'}\n`);
+        process.stdout.write(`    next:  ${row.commands.explicitNewSession} && ${row.commands.provider ?? '-'}\n`);
     }
     if (standbyPlan.routes.length === 0) {
         process.stdout.write('  No standby routes are currently derivable from the runtime selector plan.\n');

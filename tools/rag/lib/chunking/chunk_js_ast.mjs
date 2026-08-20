@@ -5,21 +5,17 @@ import { RAG_CHUNK_MAX_CHARS, RAG_CHUNK_TARGET_CHARS } from '../contract.mjs';
 import { estimateCharsForLines } from '../text.mjs';
 import { chunkPlain } from './chunk_plain.mjs';
 
-const traverse = typeof traverseModule === 'function' ? traverseModule : /** @type {any} */ (traverseModule).default;
+const traverse = traverseModule;
 
 function buildCodeFromLines(/** @type {any} */ lines) {
     return lines.join('\n');
 }
 
 function parserPlugins(/** @type {any} */ language) {
+    /** @type {import('@babel/parser').ParserPlugin[]} */
     const plugins = [
         'jsx',
-        'classProperties',
-        'classPrivateProperties',
-        'classPrivateMethods',
-        'dynamicImport',
         'importMeta',
-        'topLevelAwait',
     ];
     if (language === 'ts') {
         plugins.push('typescript');
@@ -100,7 +96,7 @@ function splitLargeUnit(
     });
 
     return subRanges.map(
-        /** @type {any} */ (r, idx) => ({
+        (r, idx) => ({
             startLine: startIdx + r.startLine,
             endLine: startIdx + r.endLine,
             kind: `${unit.kind}_block`,
@@ -129,7 +125,7 @@ function normalizeAndSplitUnits(/** @type {any} */ units, /** @type {any} */ lin
     }
 
     normalized.sort(
-        /** @type {any} */ (a, b) =>
+        (a, b) =>
             a.startLine - b.startLine ||
             a.endLine - b.endLine ||
             String(a.symbol || '').localeCompare(String(b.symbol || '')),
@@ -275,7 +271,7 @@ export function chunkJsAst(
     const ast = parse(source, {
         sourceType: 'module',
         errorRecovery: true,
-        plugins: /** @type {any} */ (parserPlugins(language)),
+        plugins: (parserPlugins(language)),
         attachComment: true,
     });
 
@@ -289,7 +285,7 @@ export function chunkJsAst(
     const normalized = normalizeAndSplitUnits(units, lines, maxChunkChars);
     return normalized.map(
         (/** @type {any} */ unit) =>
-            /** @type {any} */ ({
+            ({
                 startLine: unit.startLine,
                 endLine: unit.endLine,
                 kind: unit.kind,

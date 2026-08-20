@@ -15,14 +15,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /**
  * Aplica as migrations copilot a um banco in-memory de teste.
@@ -82,7 +80,6 @@ const mockAgent = { sessionId: 'mock-sdk-session-id' };
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 beforeAll(() => {
-    const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
 
@@ -267,8 +264,6 @@ describe('HubOrchestrator.sendToLlmB', () => {
 
 describe('HubOrchestrator.sendToLlmB serialização', () => {
     it('chamadas concorrentes para a mesma sessão executam em sequência', async () => {
-        const sessionId = orchestrator.createSession({ title: 'Mutex test' });
-
         const order = /** @type {number[]} */ ([]);
 
         // Substitui o bridge por um que registra a ordem de execução com delay
@@ -292,7 +287,6 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
         });
 
         // Criar orquestrador isolado para este teste
-        const Database = require('better-sqlite3');
         const db2 = new Database(':memory:');
         applyCopilotMigrations(db2);
         const store2 = new ConversationStore();
@@ -320,7 +314,6 @@ describe('HubOrchestrator.sendToLlmB serialização', () => {
     });
 
     it('emite turn:user_pending quando usuário injeta enquanto turn está em andamento', async () => {
-        const Database = require('better-sqlite3');
         const db3 = new Database(':memory:');
         applyCopilotMigrations(db3);
         const store3 = new ConversationStore();

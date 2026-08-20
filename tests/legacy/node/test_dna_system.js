@@ -1,10 +1,14 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import identityManager from '#core/identity_manager';
 import * as io from '#infra/io';
 
 // Test counters
 let passed = 0;
 let failed = 0;
+
+/** @param {unknown} error @returns {string} */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
 
 console.log('\n========================================');
 console.log('  DNA System V2.0 Tests');
@@ -13,7 +17,7 @@ console.log('========================================\n');
 /**
  * Função exportada: runTests.
  *
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function runTests() {
     // Test 1: Capabilities atualizadas no IdentityManager
@@ -21,7 +25,7 @@ async function runTests() {
         const testName = 'IdentityManager - Capabilities V2.0';
         try {
             await identityManager.initialize();
-            const identity = identityManager.getFullIdentity();
+            const identity = identityManager['getFullIdentity']();
 
             // Verifica capabilities modernas
             const expectedCapabilities = [
@@ -44,7 +48,7 @@ async function runTests() {
                 );
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -55,16 +59,16 @@ async function runTests() {
         try {
             const dna = await io.getDna();
 
-            if (dna._meta && dna._meta.version && dna.targets && dna.global_selectors) {
+            if (dna._meta && dna._meta['version'] && dna.targets && dna['global_selectors']) {
                 console.log(`✅ ${testName}`);
-                console.log(`   DNA version: ${dna._meta.version}`);
-                console.log(`   Evolution count: ${dna._meta.evolution_count || 0}`);
+                console.log(`   DNA version: ${dna._meta['version']}`);
+                console.log(`   Evolution count: ${dna._meta['evolution_count'] || 0}`);
                 passed++;
             } else {
                 throw new Error('DNA structure invalid');
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -84,7 +88,7 @@ async function runTests() {
                 throw new Error('History is not an array');
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -113,7 +117,7 @@ async function runTests() {
                 throw new Error('Target rules resolution failed');
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -132,7 +136,7 @@ async function runTests() {
                 throw new Error('Stats invalid');
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -167,7 +171,7 @@ async function runTests() {
                 throw new Error(`Evolution returned unexpected type: ${typeof evolved}`);
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -196,7 +200,7 @@ async function runTests() {
                 console.log(`⏭️  ${testName} (skipped - no history)`);
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }

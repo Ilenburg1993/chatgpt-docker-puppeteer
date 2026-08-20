@@ -74,7 +74,6 @@ function normalizePositiveInteger(value, fallback) {
 
 /**
  * @param {unknown} route
- * @returns {Record<string, unknown> | null}
  */
 function summarizeSelectedRoute(route) {
     const record = optionalRecord(route);
@@ -153,7 +152,6 @@ function summarizeSelectedRoute(route) {
 
 /**
  * @param {unknown} audit
- * @returns {Record<string, unknown>}
  */
 function summarizeSelectionAudit(audit) {
     const record = optionalRecord(audit) ?? {};
@@ -182,7 +180,6 @@ function selectedRouteKey(selected) {
 
 /**
  * @param {unknown} row
- * @returns {Record<string, unknown>}
  */
 function normalizeTraceRow(row) {
     const record = optionalRecord(row) ?? {};
@@ -201,7 +198,7 @@ function normalizeTraceRow(row) {
 
 /**
  * @param {unknown} trace
- * @returns {Map<string, Record<string, unknown>>}
+ * @returns {Map<string, ReturnType<typeof normalizeTraceRow>>}
  */
 function traceRowsByProfile(trace) {
     const record = optionalRecord(trace) ?? {};
@@ -218,10 +215,10 @@ function traceRowsByProfile(trace) {
  * @param {{
  *     snapshot?: Record<string, unknown>;
  *     integrity?: Record<string, unknown>;
- *     selection: Record<string, unknown>;
- *     postRuntimeSelection: Record<string, unknown>;
- *     selectionComparison: Record<string, unknown>;
- *     policyResolution: Record<string, unknown>;
+ *     selection: ReturnType<typeof import('./selection-audit.js').auditModelGatewayPreRuntimeSelection>;
+ *     postRuntimeSelection: ReturnType<typeof import('./selection-audit.js').auditModelGatewayPostRuntimeSelection>;
+ *     selectionComparison: ReturnType<typeof import('./selection-audit.js').compareModelGatewaySelectionAudits>;
+ *     policyResolution: ReturnType<typeof import('./selection-audit.js').resolveModelGatewaySelectionPolicy>;
  *     runtimeSource?: string;
  *     runtimeHealthRecordCount?: number;
  *     runtimeAccountOverlaySummary?: Record<string, unknown>;
@@ -229,7 +226,6 @@ function traceRowsByProfile(trace) {
  *     generatedAt?: string | Date;
  *     source?: string;
  * }} input
- * @returns {Record<string, unknown>}
  */
 export function buildModelGatewaySelectionDecisionTrace(input) {
     const generatedAt =

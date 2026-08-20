@@ -1648,7 +1648,7 @@ terminal-aux-libs-smoke:
 # 🔟 FORMATAÇÃO & LINT
 # =============================================================================
 
-.PHONY: format format-check jsdoc-coverage jsdoc-delta jsdoc-gaps lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full typecheck-dashboard typecheck-repo analyze-typing-gaps check-ts-expect-error check-base-strict typing-fullstrict-check test-audit-quality
+.PHONY: format format-check jsdoc-coverage jsdoc-delta jsdoc-gaps lint lint-fix lint-quiet lint-report lint-src lint-tests typecheck-node typecheck-browser typecheck-full typecheck-dashboard typecheck-repo analyze-typing-gaps check-ts-suppressions check-ts-expect-error check-base-strict typing-fullstrict-check test-audit-quality
 
 format:
 	@echo "$(CYAN)🎨 Formatando código (Prettier)$(NC)"
@@ -1723,9 +1723,15 @@ jsdoc-gaps:
 	@echo "$(CYAN)📊 JSDoc gaps (símbolos bloqueadores por lote)$(NC)"
 	@$(NPM) run jsdoc:coverage:gaps
 
-check-ts-expect-error:
-	@echo "$(CYAN)🔍 Gate CI: @ts-expect-error allowlist$(NC)"
-	@$(NPM) run check:ts-expect-error
+check-ts7-strict-coverage:
+	@echo "$(CYAN)🔍 Gate CI: cobertura TS7 strict$(NC)"
+	@$(NPM) run check:ts7-strict-coverage
+
+check-ts-suppressions:
+	@echo "$(CYAN)🔍 Gate CI: zero TypeScript suppressions$(NC)"
+	@$(NPM) run check:ts-suppressions
+
+check-ts-expect-error: check-ts-suppressions
 
 check-base-strict:
 	@echo "$(CYAN)🔍 Gate CI: tsconfig.base.json strict$(NC)"
@@ -1735,7 +1741,8 @@ typing-fullstrict-check:
 	@echo "$(CYAN)🎟️ Full-Strict Check: todos os gates de tipagem$(NC)"
 	@$(NPM) run typecheck:repo
 	@$(NPM) run typecheck:strict:all
-	@$(NPM) run check:ts-expect-error
+	@$(NPM) run check:ts-suppressions
+	@$(NPM) run check:ts7-strict-coverage
 	@$(NPM) run check:base-strict
 	@echo "$(GREEN)✅ Todos os gates de tipagem passaram$(NC)"
 

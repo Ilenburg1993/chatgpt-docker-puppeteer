@@ -52,6 +52,251 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  * }} CanonicalEventSummaryItem
  */
 
+/**
+ * @typedef {{ answer: string; trigger: 'ask'; delayMs: number }} LiveScenarioAnswerStep
+ * @typedef {{
+ *     name: string;
+ *     renderedName: string;
+ *     expectedOutcome?: string;
+ *     allowFocusTransitions?: boolean;
+ *     minSuccessfulCalls?: number;
+ * }} LiveScenarioLifecycleTool
+ * @typedef {{ toolName: string; renderedName: string; badge: string; forbiddenBadge: string }} LiveScenarioTerminalRender
+ * @typedef {{
+ *     id: string;
+ *     description: string;
+ *     askQuestion: string;
+ *     finalMarker: string;
+ *     answerSteps: LiveScenarioAnswerStep[];
+ *     askToolInstruction: string;
+ *     finalInstruction: string;
+ *     beforeDeltaInstructions?: string[];
+ *     allowedTools?: string[];
+ *     expectedLifecycleTools?: LiveScenarioLifecycleTool[];
+ *     expectedOutputMarkers?: string[];
+ *     expectedPlainOutputMarkers?: string[];
+ *     expectedTerminalRender?: LiveScenarioTerminalRender[];
+ *     postAnswerCommands?: string[];
+ *     deferAskUntilDeltaContinuation?: boolean;
+ *     postCompletionGraceMs?: number;
+ *     invalidChoiceExpected?: boolean;
+ *     recoverableToolErrorExpected?: boolean;
+ * }} LiveScenarioInput
+ * @typedef {{
+ *     id: string;
+ *     description: string;
+ *     askQuestion: string;
+ *     finalMarker: string;
+ *     answerSteps: readonly Readonly<LiveScenarioAnswerStep>[];
+ *     askToolInstruction: string;
+ *     finalInstruction: string;
+ *     beforeDeltaInstructions: readonly string[];
+ *     allowedTools: readonly string[];
+ *     expectedLifecycleTools: readonly Readonly<LiveScenarioLifecycleTool>[];
+ *     expectedOutputMarkers: readonly string[];
+ *     expectedPlainOutputMarkers: readonly string[];
+ *     expectedTerminalRender: readonly Readonly<LiveScenarioTerminalRender>[];
+ *     postAnswerCommands: readonly string[];
+ *     deferAskUntilDeltaContinuation: boolean;
+ *     postCompletionGraceMs: number;
+ *     invalidChoiceExpected: boolean;
+ *     recoverableToolErrorExpected: boolean;
+ *     askRenderedRe: RegExp;
+ *     askQuestionRe: RegExp;
+ *     questionPendingRe: RegExp;
+ *     postAskFinalRe: RegExp;
+ *     finalAnswerRe: RegExp;
+ * }} LiveScenario
+ * @typedef {{ canonical: LiveScenario; [id: string]: LiveScenario }} LiveScenarioMap
+ * @typedef {Record<string, string | undefined>} StringEnv
+ * @typedef {{
+ *     preset?: string | undefined;
+ *     providerType?: string | undefined;
+ *     provider?: string | undefined;
+ *     name?: string | undefined;
+ *     bearerTokenEnv?: string | undefined;
+ *     apiKeyEnv?: string | undefined;
+ *     bearerToken?: string | undefined;
+ *     apiKey?: string | undefined;
+ *     model?: string | undefined;
+ * }} ByokProfile
+ * @typedef {Record<string, ByokProfile>} ByokProfileMap
+ * @typedef {{
+ *     routeProfile?: string;
+ *     sourceRouteProfile?: string;
+ *     sourceTaskProfile?: string;
+ *     providerId?: string;
+ *     providerModel?: string;
+ *     selectorKind?: string;
+ *     selectorSyntax?: string;
+ *     hasRuntimeProof?: boolean;
+ *     runtimeHealth?: { verifiedProbes?: unknown[]; failedProbes?: unknown[] };
+ *     routeLayer?: string;
+ *     wireApi?: string;
+ *     upstreamProvider?: string;
+ *     openAICompatibleBaseUrl?: string;
+ *     baseUrl?: string;
+ *     candidateSource?: string;
+ *     runtimeObservedOnly?: boolean;
+ *     runtimeEvidence?: Record<string, unknown>;
+ * }} RuntimeSelectedRoute
+ * @typedef {{
+ *     profileId?: string;
+ *     status?: string;
+ *     reasons?: string[];
+ *     selected?: RuntimeSelectedRoute;
+ * }} RuntimeSelectorRoute
+ * @typedef {{
+ *     ok?: boolean;
+ *     runtimeExecuted?: boolean;
+ *     selectionPolicy?: string;
+ *     execution?: {
+ *         ok?: boolean;
+ *         status?: string;
+ *         attemptedCount?: number;
+ *         skippedAttemptCount?: number;
+ *         selectedProfileId?: string;
+ *         error?: string;
+ *         final?: { error?: string; route?: RuntimeSelectorRoute };
+ *     };
+ *     routeDecisionPersistence?: { attempted?: boolean; ok?: boolean; written?: number; error?: string };
+ *     runtimeProbePersistence?: {
+ *         attempted?: boolean; ok?: boolean; runId?: string; probeResults?: number; skippedResults?: number;
+ *         successCount?: number; failureCount?: number; error?: string;
+ *     };
+ *     runtimeHealthPersistence?: {
+ *         attempted?: boolean; ok?: boolean; runId?: string; records?: number; healthObservations?: number;
+ *         probeResults?: number; skippedRecords?: number; error?: string;
+ *     };
+ *     runtimeSelectorPlan?: { routes?: RuntimeSelectorRoute[] };
+ * }} RuntimeSelectorSummary
+ * @typedef {{
+ *     requested: boolean;
+ *     ok: boolean;
+ *     status: number | null;
+ *     executed: boolean;
+ *     allowProbe: boolean;
+ *     commandOk: boolean;
+ *     profileId: string;
+ *     fallbackProfiles: string[];
+ *     summary: RuntimeSelectorSummary | null;
+ *     selectedRoute: RuntimeSelectorRoute | null;
+ *     error: string | null;
+ * }} RuntimeSelectorLiveResult
+ * @typedef {{ id: string; pass: boolean; detail?: string | undefined; required?: boolean; severity?: string }} LiveCriterion
+ * @typedef {{
+ *     id: string;
+ *     detail?: string;
+ *     outcome?: ReturnType<typeof parseModelGatewayAdaptiveSelectionOutcome>;
+ * }} LiveBlocker
+ * @typedef {{
+ *     content?: string;
+ *     chunk?: string;
+ *     traceId?: string;
+ *     turnId?: string | number;
+ *     source?: string;
+ *     eventSource?: string;
+ *     hookType?: string;
+ *     input?: EventPayload;
+ *     toolResult?: EventPayload;
+ *     toolName?: string | undefined;
+ *     rawToolName?: string;
+ *     correlatedToolName?: string;
+ *     name?: string;
+ *     tool?: string;
+ *     type?: string;
+ *     success?: boolean;
+ *     resultType?: string;
+ *     textResultForLlm?: string;
+ *     exitCode?: number;
+ *     toolCallId?: string;
+ *     partialOutput?: string;
+ *     progressMessage?: string;
+ *     reply?: string;
+ *     originalReplyChars?: number;
+ *     replySuppressed?: boolean;
+ *     publicChunk?: string;
+ *     phase?: string;
+ *     operatorSummary?: string;
+ *     question?: string;
+ *     answer?: string;
+ *     data?: EventPayload;
+ *     selectionDecision?: EventPayload;
+ *     selectedRoute?: EventPayload;
+ *     status?: string;
+ *     providerId?: string;
+ *     providerModel?: string;
+ *     currentModel?: string;
+ *     runtimeProofRequired?: boolean;
+ *     [key: string]: unknown;
+ * }} EventPayload
+ * @typedef {{
+ *     id?: number | string | null;
+ *     eventId?: number | string;
+ *     event?: string;
+ *     data?: EventPayload | string;
+ *     payload?: EventPayload;
+ *     turnId?: string | number;
+ *     traceId?: string;
+ * }} TerminalEvent
+ * @typedef {{
+ *     connected: boolean;
+ *     eventCount: number;
+ *     eventsWithId: number;
+ *     eventsWithSource?: number;
+ *     eventsWithTraceId?: number;
+ *     traceIds?: string[];
+ *     errors: string[];
+ *     events: TerminalEvent[];
+ *     raw: string;
+ *     statusCode?: number | null;
+ *     disabled?: boolean;
+ * }} SseSummary
+ * @typedef {{ attempted?: boolean; recorded?: boolean; ok?: boolean; reason?: string }} RecordStatus
+ * @typedef {{
+ *     readonly raw: string;
+ *     events: TerminalEvent[];
+ *     errors: string[];
+ *     close: () => void;
+ *     summary: () => SseSummary;
+ * }} SseCollector
+ * @typedef {{
+ *     ok: boolean;
+ *     detail: string;
+ *     hasTranscript: boolean;
+ *     hasStreamingDiagnostics: boolean;
+ *     hasEnvelope: boolean;
+ *     hasAskUser: boolean;
+ *     hasAskUserAnswer: boolean;
+ *     hasPostAskFinal: boolean;
+ *     envelopes: { source: string; traceId: string | null; turnId: string | null; eventId: string | null }[];
+ *     content: string;
+ * }} ExportSummary
+ * @typedef {{ line: string; waitBeforeMs?: number; advanceAfterMs?: number; waitFor?: string | RegExp | null }} LiveCommandEntry
+ * @typedef {{
+ *     id: string;
+ *     label: string;
+ *     plain: string;
+ *     raw: string;
+ *     exitCode: number | null;
+ *     sessionId: string;
+ *     lastSessionId?: string;
+ *     transport: string;
+ * }} SessionCycleBootResult
+ * @typedef {{ outDir: string; requestedTransport: string; timeoutMs: number; terminalPort: number; startedAt: string }} RunCycleOptions
+ * @typedef {{
+ *     liveScenario?: LiveScenario;
+ *     answerSent?: boolean;
+ *     postAskContinuationObserved?: boolean;
+ *     adaptiveSelectionOutcome?: ReturnType<typeof parseModelGatewayAdaptiveSelectionOutcome> | null;
+ *     sseEvents?: TerminalEvent[];
+ *     timedOut?: boolean;
+ *     timeoutStage?: string;
+ *     timeoutBudgetMs?: number;
+ *     postCommandsSent?: boolean;
+ * }} LiveRuntimeState
+ */
+
 if (hasFlag('--help') || hasFlag('-h')) {
     console.log(`Usage: node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs [options]
 
@@ -92,16 +337,29 @@ Common options:
     process.exit(0);
 }
 
-function stripAnsi(value) {
+function stripAnsi(/** @type {unknown} */ value) {
     return String(value ?? '').replace(ANSI_RE, '');
 }
 
-function readArg(name, fallback) {
+function errorCode(/** @type {unknown} */ error) {
+    return error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+}
+
+function errorMessage(/** @type {unknown} */ error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/** @returns {value is number} */
+function isFiniteNumber(/** @type {unknown} */ value) {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function readArg(/** @type {string} */ name, /** @type {string} */ fallback) {
     const prefix = `${name}=`;
     const args = process.argv.slice(2);
     for (let index = 0; index < args.length; index += 1) {
         const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+        if (arg?.startsWith(prefix)) return arg.slice(prefix.length);
         if (arg === name) {
             const next = args[index + 1];
             if (typeof next === 'string' && next.length > 0 && !next.startsWith('--')) return next;
@@ -111,27 +369,27 @@ function readArg(name, fallback) {
     return fallback;
 }
 
-function hasFlag(name) {
+function hasFlag(/** @type {string} */ name) {
     return process.argv.includes(name);
 }
 
-function hasCommand(name) {
+function hasCommand(/** @type {string} */ name) {
     const result = spawnSync('sh', ['-lc', `command -v ${name}`], { stdio: 'ignore' });
     return result.status === 0;
 }
 
 const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; API local permanece ativa até o processo encerrar/u;
 const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
-const LIVE_TEST_COPILOT_MODEL = process.env.COPILOT_LIVE_TEST_COPILOT_MODEL || 'auto';
+const LIVE_TEST_COPILOT_MODEL = process.env['COPILOT_LIVE_TEST_COPILOT_MODEL'] || 'auto';
 const MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL =
-    process.env.COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL || 'auto';
+    process.env['COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL'] || 'auto';
 
-function hasHumanTerminalShutdownCopy(plain) {
+function hasHumanTerminalShutdownCopy(/** @type {unknown} */ plain) {
     const text = String(plain ?? '');
     return HUMAN_TERMINAL_SHUTDOWN_RE.test(text) && !LEGACY_TERMINAL_SHUTDOWN_RE.test(text);
 }
 
-function buildTerminalLlmbCommand(canUsePty) {
+function buildTerminalLlmbCommand(/** @type {boolean} */ canUsePty) {
     const bootstrapArgs = [
         '--disable-warning=ExperimentalWarning',
         '--strip-types',
@@ -146,7 +404,7 @@ function buildTerminalLlmbCommand(canUsePty) {
     return { cmd: process.execPath, args: bootstrapArgs };
 }
 
-function appendCsvEnvValue(name, value) {
+function appendCsvEnvValue(/** @type {string} */ name, /** @type {string} */ value) {
     const entries = new Set(
         String(process.env[name] ?? '')
             .split(',')
@@ -157,7 +415,7 @@ function appendCsvEnvValue(name, value) {
     return [...entries].join(',');
 }
 
-function canListenOnPort(port, host = '127.0.0.1') {
+function canListenOnPort(/** @type {number} */ port, /** @type {string} */ host = '127.0.0.1') {
     return new Promise((resolve) => {
         const server = net.createServer();
         server.once('error', () => resolve(false));
@@ -167,7 +425,10 @@ function canListenOnPort(port, host = '127.0.0.1') {
     });
 }
 
-async function resolveLiveTerminalPort(preferredPort, { scanLimit = 50 } = {}) {
+async function resolveLiveTerminalPort(
+    /** @type {number} */ preferredPort,
+    /** @type {{ scanLimit?: number }} */ { scanLimit = 50 } = {},
+) {
     const preferred = Number.isFinite(preferredPort) && preferredPort >= 0 ? Math.trunc(preferredPort) : 3009;
     if (preferred === 0) return 0;
     for (let offset = 0; offset <= scanLimit; offset += 1) {
@@ -181,25 +442,25 @@ function nowStamp() {
     return new Date().toISOString().replace(/[:.]/g, '-');
 }
 
-function ensureLine(input) {
+function ensureLine(/** @type {string} */ input) {
     return input.endsWith('\n') ? input : `${input}\n`;
 }
 
-function escapeRegExp(value) {
+function escapeRegExp(/** @type {unknown} */ value) {
     return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 const DEFAULT_LIVE_SCENARIO_ID = 'canonical';
 
-function buildExactLineRegex(value) {
+function buildExactLineRegex(/** @type {string} */ value) {
     return new RegExp(escapeRegExp(value), 'iu');
 }
 
-function buildAskRenderedRegex(question) {
+function buildAskRenderedRegex(/** @type {string} */ question) {
     return new RegExp(`\\[(?:PERGUNTA|ASK)\\]\\s+${escapeRegExp(question)}`, 'u');
 }
 
-function hasHumanQuestionInputPrompt(plain) {
+function hasHumanQuestionInputPrompt(/** @type {unknown} */ plain) {
     const text = String(plain ?? '');
     return (
         /voc[eê]\[[^\]\n]+(?:\/[^\]\n]+)?\](?:\[[^\]\n]+\])*\[PERG(?:UNTA)?\]›/iu.test(text) ||
@@ -207,7 +468,10 @@ function hasHumanQuestionInputPrompt(plain) {
     );
 }
 
-function findDivergentScenarioAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function findDivergentScenarioAsk(
+    /** @type {unknown} */ plain,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     const text = String(plain ?? '');
     if (scenario.askRenderedRe.test(text)) return null;
     const prefix = scenario.askQuestion.split(':')[0];
@@ -222,14 +486,18 @@ function findDivergentScenarioAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_
     };
 }
 
-function buildQuestionPendingRegex(question) {
+function buildQuestionPendingRegex(/** @type {string} */ question) {
     return new RegExp(`\\[(?:QUESTION|ASK:[^\\]]+)\\]\\s+LLM-B perguntou:\\s*"${escapeRegExp(question)}"`, 'u');
 }
 
-function buildAnswerRegex(answer) {
+function buildAnswerRegex(/** @type {string} */ answer) {
     return new RegExp(escapeRegExp(answer), 'iu');
 }
 
+/**
+ * @param {LiveScenarioInput} input
+ * @returns {LiveScenario}
+ */
 function createLiveScenario({
     id,
     description,
@@ -280,6 +548,7 @@ function createLiveScenario({
 const ROUTE_APPLY_MINIMAL_IDEMPOTENCY_KEY = `live-route-minimal-${Date.now()}:route-switch-ollama-cloud`;
 const ADAPTIVE_PROBE_IDEMPOTENCY_PREFIX = `live-adaptive-route-${Date.now()}`;
 
+/** @type {LiveScenarioMap} */
 const LIVE_SCENARIOS = Object.freeze({
     canonical: createLiveScenario({
         id: 'canonical',
@@ -787,7 +1056,7 @@ const LIVE_SCENARIOS = Object.freeze({
     }),
 });
 
-function normalizeLiveScenarioId(value) {
+function normalizeLiveScenarioId(/** @type {unknown} */ value) {
     const normalized = String(value ?? DEFAULT_LIVE_SCENARIO_ID)
         .trim()
         .toLowerCase()
@@ -807,7 +1076,7 @@ function readLiveScenario() {
     return scenario;
 }
 
-function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function buildScenarioPrompt(/** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical) {
     const stagedAskInstructions = scenario.deferAskUntilDeltaContinuation
         ? [
               'Depois da oitava linha DELTA-CANONICAL, encerre este turno e aguarde a continuação controlada do operador.',
@@ -841,7 +1110,7 @@ function buildScenarioPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]
     ].join(' ');
 }
 
-function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function buildMissingRequiredAskRecoveryPrompt(/** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical) {
     return [
         'Continue o teste canônico exatamente de onde parou.',
         'Você já produziu as oito linhas públicas de delta, mas ainda não chamou a ferramenta real ask_user obrigatória.',
@@ -855,7 +1124,10 @@ function buildMissingRequiredAskRecoveryPrompt(scenario = LIVE_SCENARIOS[DEFAULT
     ].join(' ');
 }
 
-function scenarioSpecificRecoveryInstructions(scenario, toolName) {
+function scenarioSpecificRecoveryInstructions(
+    /** @type {LiveScenario} */ scenario,
+    /** @type {string} */ toolName,
+) {
     const normalizedToolName = String(toolName ?? '').trim().toLowerCase();
     if (!normalizedToolName || !Array.isArray(scenario?.beforeDeltaInstructions)) return [];
     return scenario.beforeDeltaInstructions.filter(
@@ -864,7 +1136,11 @@ function scenarioSpecificRecoveryInstructions(scenario, toolName) {
     );
 }
 
-function appendScenarioSpecificRecoveryInstructions(instructions, scenario, toolName) {
+function appendScenarioSpecificRecoveryInstructions(
+    /** @type {string[]} */ instructions,
+    /** @type {LiveScenario} */ scenario,
+    /** @type {string} */ toolName,
+) {
     const specific = scenarioSpecificRecoveryInstructions(scenario, toolName);
     if (specific.length === 0) return false;
     instructions.push(
@@ -875,8 +1151,8 @@ function appendScenarioSpecificRecoveryInstructions(instructions, scenario, tool
 }
 
 function buildIncompleteExpectedToolRecoveryPrompt(
-    scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
-    missingTools = [],
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+    /** @type {string[]} */ missingTools = [],
 ) {
     const missing = missingTools.map((tool) => String(tool ?? '').trim()).filter(Boolean);
     const instructions = [];
@@ -1070,12 +1346,13 @@ async function loadDotenvLocalEnv() {
         const content = await readFile(path.join(ROOT, '.env.local'), 'utf8');
         return parseDotenv(content);
     } catch (error) {
-        if (error?.code === 'ENOENT') return {};
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return {};
         throw error;
     }
 }
 
-function collectSecretValues(env) {
+function collectSecretValues(/** @type {StringEnv} */ env) {
+    /** @type {{ key: string; value: string }[]} */
     const values = [];
     for (const [key, value] of Object.entries(env)) {
         if (!SECRET_ENV_RE.test(key)) continue;
@@ -1085,32 +1362,57 @@ function collectSecretValues(env) {
     return values;
 }
 
-function hasSecretLeak(text, secretValues) {
+function hasSecretLeak(
+    /** @type {string} */ text,
+    /** @type {{ key: string; value: string }[]} */ secretValues,
+) {
     return secretValues.some(({ value }) => value.length > 0 && text.includes(value));
 }
 
-function parseProfilesJson(raw) {
+/** @returns {ByokProfileMap} */
+function parseProfilesJson(/** @type {string | undefined} */ raw) {
     if (!raw || raw.trim() === '') return {};
     try {
         const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+        /** @type {ByokProfileMap} */
+        const profiles = {};
+        for (const [name, candidate] of Object.entries(parsed)) {
+            if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
+            const source = Object.fromEntries(
+                Object.entries(candidate).filter(([, value]) => typeof value === 'string'),
+            );
+            profiles[name] = {
+                preset: typeof source['preset'] === 'string' ? source['preset'] : undefined,
+                providerType: typeof source['providerType'] === 'string' ? source['providerType'] : undefined,
+                provider: typeof source['provider'] === 'string' ? source['provider'] : undefined,
+                name: typeof source['name'] === 'string' ? source['name'] : undefined,
+                bearerTokenEnv:
+                    typeof source['bearerTokenEnv'] === 'string' ? source['bearerTokenEnv'] : undefined,
+                apiKeyEnv: typeof source['apiKeyEnv'] === 'string' ? source['apiKeyEnv'] : undefined,
+                bearerToken: typeof source['bearerToken'] === 'string' ? source['bearerToken'] : undefined,
+                apiKey: typeof source['apiKey'] === 'string' ? source['apiKey'] : undefined,
+                model: typeof source['model'] === 'string' ? source['model'] : undefined,
+            };
+        }
+        return profiles;
     } catch {
         return {};
     }
 }
 
-function runtimeSelectorFallbackProfiles(raw) {
+function runtimeSelectorFallbackProfiles(/** @type {unknown} */ raw) {
     return String(raw ?? '')
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean);
 }
 
-function optionalRuntimeSelectorString(value) {
+function optionalRuntimeSelectorString(/** @type {unknown} */ value) {
     return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
-function sdkWireApiForRuntimeRoute(wireApi) {
+function sdkWireApiForRuntimeRoute(/** @type {unknown} */ wireApi) {
     const normalized = optionalRuntimeSelectorString(wireApi)?.replaceAll('-', '_') ?? '';
     if (normalized === 'openai_chat_completions' || normalized === 'chat_completions' || normalized === 'completions') {
         return 'completions';
@@ -1119,7 +1421,7 @@ function sdkWireApiForRuntimeRoute(wireApi) {
     return '';
 }
 
-function runtimeRouteSdkWireApi(selected) {
+function runtimeRouteSdkWireApi(/** @type {RuntimeSelectedRoute | null | undefined} */ selected) {
     const explicit = sdkWireApiForRuntimeRoute(selected?.wireApi);
     if (explicit) return explicit;
     const routeLayer = optionalRuntimeSelectorString(selected?.routeLayer) ?? '';
@@ -1129,31 +1431,40 @@ function runtimeRouteSdkWireApi(selected) {
     return baseUrl && routeLayer.includes('openai_compatible') ? 'completions' : '';
 }
 
-function parseRuntimeSelectorJsonOutput(text) {
+/** @returns {RuntimeSelectorSummary | null} */
+function parseRuntimeSelectorJsonOutput(/** @type {unknown} */ text) {
     const raw = typeof text === 'string' ? text.trim() : '';
     if (!raw) return null;
     try {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
     } catch {
         const start = raw.indexOf('{');
         const end = raw.lastIndexOf('}');
         if (start < 0 || end <= start) return null;
         try {
-            return JSON.parse(raw.slice(start, end + 1));
+            const parsed = JSON.parse(raw.slice(start, end + 1));
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
         } catch {
             return null;
         }
     }
 }
 
-function selectRuntimeSelectorRoute(summary, requestedProfile) {
+function selectRuntimeSelectorRoute(
+    /** @type {RuntimeSelectorSummary} */ summary,
+    /** @type {string} */ requestedProfile,
+) {
     const routes = Array.isArray(summary?.runtimeSelectorPlan?.routes) ? summary.runtimeSelectorPlan.routes : [];
     const requested = optionalRuntimeSelectorString(requestedProfile);
     const selectedRoutes = routes.filter((route) => route?.status === 'selected' && route?.selected);
     return selectedRoutes.find((route) => route.profileId === requested) ?? selectedRoutes[0] ?? null;
 }
 
-function selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) {
+function selectRuntimeSelectorEffectiveRoute(
+    /** @type {RuntimeSelectorSummary} */ summary,
+    /** @type {string} */ requestedProfile,
+) {
     if (summary?.runtimeExecuted === true) {
         return summary.execution?.ok === true && summary.execution.final?.route?.selected
             ? summary.execution.final.route
@@ -1165,7 +1476,19 @@ function selectRuntimeSelectorEffectiveRoute(summary, requestedProfile) {
     return selectRuntimeSelectorRoute(summary, requestedProfile);
 }
 
-function runRuntimeSelectorLiveRoute({
+/** @returns {RuntimeSelectorLiveResult} */
+function runRuntimeSelectorLiveRoute(
+    /** @type {{
+     *     profileId?: string;
+     *     fallbackProfiles?: string[];
+     *     execute?: boolean;
+     *     allowProbe?: boolean;
+     *     maxAttempts?: number;
+     *     maxAttemptsPerProvider?: number;
+     *     temporaryFailureCooldownMs?: number;
+     *     timeoutMs?: number;
+     *     selectionPolicy?: string;
+     * }} */ {
     profileId,
     fallbackProfiles = [],
     execute = false,
@@ -1175,7 +1498,8 @@ function runRuntimeSelectorLiveRoute({
     temporaryFailureCooldownMs = 0,
     timeoutMs = 45_000,
     selectionPolicy = '',
-} = {}) {
+    } = {},
+) {
     const requestedProfile = optionalRuntimeSelectorString(profileId);
     if (!requestedProfile) {
         return {
@@ -1259,20 +1583,24 @@ function runRuntimeSelectorLiveRoute({
     };
 }
 
-function profileHasUsableSecret(profileName, profile, env) {
+function profileHasUsableSecret(
+    /** @type {string} */ profileName,
+    /** @type {ByokProfile | undefined} */ profile,
+    /** @type {StringEnv} */ env,
+) {
     const tokenEnv = typeof profile?.bearerTokenEnv === 'string' ? profile.bearerTokenEnv : null;
     const apiKeyEnv = typeof profile?.apiKeyEnv === 'string' ? profile.apiKeyEnv : null;
     if (tokenEnv && env[tokenEnv]) return true;
     if (apiKeyEnv && env[apiKeyEnv]) return true;
-    if (/^kilo\b/iu.test(profileName)) return Boolean(env.KILO_CODE_API_KEY || env.KILO_API_KEY);
-    if (/ollama-cloud/iu.test(profileName)) return Boolean(env.OLLAMA_CLOUD_API_KEY || env.OLLAMA_API_KEY);
+    if (/^kilo\b/iu.test(profileName)) return Boolean(env['KILO_CODE_API_KEY'] || env['KILO_API_KEY']);
+    if (/ollama-cloud/iu.test(profileName)) return Boolean(env['OLLAMA_CLOUD_API_KEY'] || env['OLLAMA_API_KEY']);
     return Boolean(profile?.bearerToken || profile?.apiKey);
 }
 
-function chooseRealByokProfile(env, requestedProfile) {
-    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+function chooseRealByokProfile(/** @type {StringEnv} */ env, /** @type {string} */ requestedProfile) {
+    const profiles = parseProfilesJson(env['COPILOT_BYOK_PROFILES_JSON']);
     if (requestedProfile) return requestedProfile;
-    if (profiles.kilo && profileHasUsableSecret('kilo', profiles.kilo, env)) return 'kilo';
+    if (profiles['kilo'] && profileHasUsableSecret('kilo', profiles['kilo'], env)) return 'kilo';
     if (profiles['ollama-cloud'] && profileHasUsableSecret('ollama-cloud', profiles['ollama-cloud'], env)) {
         return 'ollama-cloud';
     }
@@ -1280,38 +1608,42 @@ function chooseRealByokProfile(env, requestedProfile) {
     return usable?.[0] ?? Object.keys(profiles)[0] ?? '';
 }
 
-function chooseAlternateByokProfile(env, activeProfile, requestedAltProfile) {
+function chooseAlternateByokProfile(
+    /** @type {StringEnv} */ env,
+    /** @type {string} */ activeProfile,
+    /** @type {string} */ requestedAltProfile,
+) {
     if (requestedAltProfile) return requestedAltProfile === activeProfile ? '' : requestedAltProfile;
-    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+    const profiles = parseProfilesJson(env['COPILOT_BYOK_PROFILES_JSON']);
     const first = Object.entries(profiles).find(
         ([name, profile]) => name !== activeProfile && profileHasUsableSecret(name, profile, env),
     );
     return first?.[0] ?? '';
 }
 
-function profileModel(env, profileName) {
-    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+function profileModel(/** @type {StringEnv} */ env, /** @type {string} */ profileName) {
+    const profiles = parseProfilesJson(env['COPILOT_BYOK_PROFILES_JSON']);
     const profile = profiles[profileName];
     return typeof profile?.model === 'string' && profile.model.trim() ? profile.model.trim() : '';
 }
 
-function profileProvider(env, profileName) {
-    const profiles = parseProfilesJson(env.COPILOT_BYOK_PROFILES_JSON);
+function profileProvider(/** @type {StringEnv} */ env, /** @type {string} */ profileName) {
+    const profiles = parseProfilesJson(env['COPILOT_BYOK_PROFILES_JSON']);
     const profile = profiles[profileName];
-    for (const key of ['preset', 'providerType', 'provider', 'name']) {
-        const value = profile?.[key];
+    for (const value of [profile?.preset, profile?.providerType, profile?.provider, profile?.name]) {
         if (typeof value === 'string' && value.trim()) return value.trim();
     }
     return profileName || '';
 }
 
-function runtimeSelectorRouteDetails(runtimeSelector) {
-    const selected = runtimeSelector?.selectedRoute?.selected;
+function runtimeSelectorRouteDetails(/** @type {RuntimeSelectorLiveResult} */ runtimeSelector) {
+    const selectedRoute = runtimeSelector.selectedRoute;
+    const selected = selectedRoute?.selected;
     if (!selected) return null;
     const runtimeHealth =
         selected.runtimeHealth && typeof selected.runtimeHealth === 'object' ? selected.runtimeHealth : {};
     return {
-        routeProfile: optionalRuntimeSelectorString(runtimeSelector.selectedRoute.profileId) || null,
+        routeProfile: optionalRuntimeSelectorString(selectedRoute.profileId) || null,
         selectedRouteProfile: optionalRuntimeSelectorString(selected.routeProfile) || null,
         sourceRouteProfile: optionalRuntimeSelectorString(selected.sourceRouteProfile) || null,
         sourceTaskProfile: optionalRuntimeSelectorString(selected.sourceTaskProfile) || null,
@@ -1345,7 +1677,24 @@ function runtimeSelectorRouteDetails(runtimeSelector) {
     };
 }
 
-async function buildRealByokRuntime({
+async function buildRealByokRuntime(
+    /** @type {{
+     *     dotenvEnv: StringEnv;
+     *     requestedProfile: string;
+     *     requestedAltProfile: string;
+     *     requestedModel: string;
+     *     requestedAltModel: string;
+     *     runtimeSelectorProfile: string;
+     *     runtimeSelectorFallbackProfiles?: string[];
+     *     runtimeSelectorExecute?: boolean;
+     *     runtimeSelectorAllowProbe?: boolean;
+     *     runtimeSelectorMaxAttempts?: number;
+     *     runtimeSelectorMaxAttemptsPerProvider?: number;
+     *     runtimeSelectorTemporaryFailureCooldownMs?: number;
+     *     runtimeSelectorTimeoutMs?: number;
+     *     runtimeSelectorSelectionPolicy?: string;
+     *     requireAgentAdmission?: boolean;
+     * }} */ {
     dotenvEnv,
     requestedProfile,
     requestedAltProfile,
@@ -1361,7 +1710,8 @@ async function buildRealByokRuntime({
     runtimeSelectorTimeoutMs = 45_000,
     runtimeSelectorSelectionPolicy = '',
     requireAgentAdmission = false,
-}) {
+    },
+) {
     const mergedEnv = { ...process.env, ...dotenvEnv };
     const routeSelectorMandatory = Boolean(optionalRuntimeSelectorString(runtimeSelectorProfile));
     const selectorInput = {
@@ -1512,7 +1862,7 @@ async function buildRealByokRuntime({
                 : profile
                   ? { COPILOT_BYOK_PROFILE: profile }
                   : {}),
-            COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: mergedEnv.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED ?? 'true',
+            COPILOT_BYOK_MODEL_DISCOVERY_ENABLED: mergedEnv['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'] ?? 'true',
         },
         profile,
         altProfile,
@@ -1619,7 +1969,8 @@ async function buildRealByokRuntime({
     };
 }
 
-function byokLiveRouteIdentity(realByok) {
+function byokLiveRouteIdentity(/** @type {Awaited<ReturnType<typeof buildRealByokRuntime>> | null} */ realByok) {
+    /** @type {Partial<NonNullable<ReturnType<typeof runtimeSelectorRouteDetails>>>} */
     const selected = realByok?.redacted?.runtimeSelector?.selected ?? {};
     const routeProfile =
         optionalRuntimeSelectorString(selected.routeProfile) ||
@@ -1637,7 +1988,7 @@ function byokLiveRouteIdentity(realByok) {
     return { routeProfile, providerId, providerModel };
 }
 
-function renderedReadFileToolOk(plain) {
+function renderedReadFileToolOk(/** @type {string} */ plain) {
     return (
         (/\[LER\].*(?:read_file_content|Ler arquivo)/s.test(plain) ||
             /Ferramenta\s+Ler arquivo\s+·\s+lendo arquivo/s.test(plain)) &&
@@ -1646,33 +1997,37 @@ function renderedReadFileToolOk(plain) {
     );
 }
 
-function defaultToolNarrationLines(plain) {
+function defaultToolNarrationLines(/** @type {unknown} */ plain) {
     return String(plain ?? '')
         .split(/\r?\n/u)
         .filter((line) => /\[(?:TOOL|INTENT|DONE|TOOLS|ASK)\]/u.test(line) || /^\s*(?:Ferramenta|Conclu[ií]do)\s/u.test(line));
 }
 
-function hasRawInternalIdInDefaultToolNarration(plain) {
+function hasRawInternalIdInDefaultToolNarration(/** @type {unknown} */ plain) {
     return defaultToolNarrationLines(plain).some((line) =>
         /(?:chatcmpl-tool-|toolu_|report_intent_local \(alias:)/iu.test(line),
     );
 }
 
-function extractHealthToolStatsSection(plain) {
+function extractHealthToolStatsSection(/** @type {unknown} */ plain) {
     const match = String(plain ?? '').match(
         /(?:TOOL STATS|Ferramentas por lat[eê]ncia)[^\n]*\n(?<body>[\s\S]*?)(?:\n\s*[─╚]|você\[|$)/iu,
     );
-    return match?.groups?.body?.trim() ?? '';
+    return match?.groups?.['body']?.trim() ?? '';
 }
 
-function healthToolStatsUseHumanNames(plain) {
+function healthToolStatsUseHumanNames(/** @type {unknown} */ plain) {
     const section = extractHealthToolStatsSection(plain);
     if (!section) return false;
     if (/\b(?:read_file_content|report_intent_local)\b/u.test(section)) return false;
     return /(?:Ler arquivo|Intenção capturada)/u.test(section);
 }
 
-function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function byokLiveMaterializationState(
+    /** @type {string} */ plain,
+    /** @type {LiveCriterion[]} */ criteria = [],
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     const passed = new Set(criteria.filter((criterion) => criterion?.pass === true).map((criterion) => criterion.id));
     return {
         toolProtocolOk: passed.has('tool-start-done') && renderedReadFileToolOk(plain),
@@ -1685,7 +2040,17 @@ function byokLiveMaterializationState(plain, criteria = [], scenario = LIVE_SCEN
     };
 }
 
-async function recordByokLiveProtocolHealth({
+async function recordByokLiveProtocolHealth(
+    /** @type {{
+     *     realByok: Awaited<ReturnType<typeof buildRealByokRuntime>> | null;
+     *     blocker: LiveBlocker | null;
+     *     criteria: LiveCriterion[];
+     *     plain: string;
+     *     startedAt: string;
+     *     durationMs: number;
+     *     controlOnly: boolean;
+     *     byokControlProbe: boolean;
+     * }} */ {
     realByok,
     blocker,
     criteria,
@@ -1694,7 +2059,8 @@ async function recordByokLiveProtocolHealth({
     durationMs,
     controlOnly,
     byokControlProbe,
-}) {
+    },
+) {
     if (!realByok || controlOnly || byokControlProbe)
         return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
     const identity = byokLiveRouteIdentity(realByok);
@@ -1845,7 +2211,7 @@ async function recordByokLiveProtocolHealth({
     }
 }
 
-function buildByokCatalogCommands(provider) {
+function buildByokCatalogCommands(/** @type {string} */ provider) {
     const providerFilter = provider ? ` provider:${provider}` : '';
     return [
         `/byok models refresh${providerFilter}`,
@@ -1855,12 +2221,14 @@ function buildByokCatalogCommands(provider) {
     ];
 }
 
-function buildByokRouteCommand(provider, routeProfile = 'repo_agent') {
+function buildByokRouteCommand(/** @type {string} */ provider, /** @type {string} */ routeProfile = 'repo_agent') {
     const providerFilter = provider ? ` provider:${provider}` : '';
     return `/byok models route ${routeProfile || 'repo_agent'} active --show-rejected${providerFilter}`;
 }
 
-function buildRuntimeSelectorProviderCommand(runtimeRoute) {
+function buildRuntimeSelectorProviderCommand(
+    /** @type {ReturnType<typeof runtimeSelectorRouteDetails>} */ runtimeRoute,
+) {
     if (!runtimeRoute?.providerId || !runtimeRoute.providerModel) return '';
     return [
         '/byok provider',
@@ -1873,13 +2241,29 @@ function buildRuntimeSelectorProviderCommand(runtimeRoute) {
         .join(' ');
 }
 
-function isModelGatewayToolScenario(liveScenario) {
+function isModelGatewayToolScenario(/** @type {LiveScenario} */ liveScenario) {
     return typeof liveScenario?.id === 'string' && liveScenario.id.startsWith('model-gateway-');
 }
 
 function buildByokRealPreflightCommands(
-    { profile, altProfile, model, altModel, provider, altProvider, runtimeRoute },
-    { lean = false } = {},
+    /** @type {{
+     *     profile?: string;
+     *     altProfile?: string;
+     *     model?: string;
+     *     altModel?: string;
+     *     provider?: string;
+     *     altProvider?: string;
+     *     runtimeRoute?: ReturnType<typeof runtimeSelectorRouteDetails>;
+     * }} */ {
+        profile = '',
+        altProfile = '',
+        model = '',
+        altModel = '',
+        provider = '',
+        altProvider = '',
+        runtimeRoute = null,
+    },
+    /** @type {{ lean?: boolean }} */ { lean = false } = {},
 ) {
     const commands = ['/session sdk 8', runtimeRoute ? '/byok reload --no-status' : '/byok reload'];
     const runtimeProviderCommand = buildRuntimeSelectorProviderCommand(runtimeRoute);
@@ -1944,6 +2328,7 @@ function buildByokRealControlOnlyDiagnosticCommands() {
 }
 
 function startByokFixtureProviderServer() {
+    /** @type {Promise<{ baseUrl: string; close: () => Promise<void> }>} */
     return new Promise((resolve, reject) => {
         const server = http.createServer((req, res) => {
             if (req.url === '/v1/models' || req.url === '/models') {
@@ -1983,13 +2368,17 @@ function startByokFixtureProviderServer() {
     });
 }
 
-function sendCommandSequence(write, commands, { delayMs = 250 } = {}) {
+function sendCommandSequence(
+    /** @type {(line: string) => void} */ write,
+    /** @type {string[]} */ commands,
+    /** @type {{ delayMs?: number }} */ { delayMs = 250 } = {},
+) {
     commands.forEach((commandLine, index) => {
         setTimeout(() => write(commandLine), index * delayMs).unref();
     });
 }
 
-function normalizeLiveCommandEntry(entry) {
+function normalizeLiveCommandEntry(/** @type {string | LiveCommandEntry} */ entry) {
     if (typeof entry === 'string') return { line: entry, waitBeforeMs: 0, advanceAfterMs: 0, waitFor: null };
     if (!entry || typeof entry !== 'object') return { line: '', waitBeforeMs: 0, advanceAfterMs: 0, waitFor: null };
     return {
@@ -2000,7 +2389,7 @@ function normalizeLiveCommandEntry(entry) {
     };
 }
 
-function liveWaitForMatched(waitFor, text) {
+function liveWaitForMatched(/** @type {string | RegExp | null} */ waitFor, /** @type {unknown} */ text) {
     if (!waitFor) return true;
     const value = String(text ?? '');
     if (typeof waitFor === 'string') return value.includes(waitFor);
@@ -2008,13 +2397,19 @@ function liveWaitForMatched(waitFor, text) {
     return waitFor.test(value);
 }
 
-function extractSdkSessionCockpitId(plain, label) {
+function extractSdkSessionCockpitId(/** @type {unknown} */ plain, /** @type {string} */ label) {
     const match = String(plain ?? '').match(new RegExp(`\\b${escapeRegExp(label)}:\\s+([^\\s]+)`, 'iu'));
     const sessionId = match?.[1]?.trim();
     return sessionId && !sessionId.startsWith('(') ? sessionId : '';
 }
 
-function sessionCycleBootCriteria(boot, { expectCreated = false, expectResumed = false } = {}) {
+function sessionCycleBootCriteria(
+    /** @type {SessionCycleBootResult} */ boot,
+    /** @type {{ expectCreated?: boolean; expectResumed?: boolean }} */ {
+        expectCreated = false,
+        expectResumed = false,
+    } = {},
+) {
     const plain = String(boot?.plain ?? '');
     return [
         {
@@ -2053,7 +2448,18 @@ function sessionCycleBootCriteria(boot, { expectCreated = false, expectResumed =
     ];
 }
 
-async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, requestedTransport, timeoutMs }) {
+/** @returns {Promise<SessionCycleBootResult>} */
+async function runSessionCycleBoot(
+    /** @type {{
+     *     id: string;
+     *     label: string;
+     *     outDir: string;
+     *     commands: (string | LiveCommandEntry)[];
+     *     terminalPort: number;
+     *     requestedTransport: string;
+     *     timeoutMs: number;
+     * }} */ { id, label, outDir, commands, terminalPort, requestedTransport, timeoutMs },
+) {
     const canUsePty = requestedTransport === 'pty' && hasCommand('script');
     const transport = canUsePty ? 'pty:script' : 'stdio:headless';
     const command = buildTerminalLlmbCommand(canUsePty);
@@ -2061,6 +2467,7 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
     let ready = false;
     let childClosed = false;
     let waitingForPrompt = false;
+    /** @type {string | RegExp | null} */
     let activeWaitFor = null;
     let commandOutputOffset = 0;
     let commandPromptWaitStartedAt = 0;
@@ -2075,7 +2482,7 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
             COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
             COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
-            TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
+            TERMINAL_DISPLAY_PRESET: process.env['TERMINAL_DISPLAY_PRESET'] ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
             LLM_B_TERMINAL_PORT: String(terminalPort),
@@ -2083,13 +2490,13 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
         },
         stdio: ['pipe', 'pipe', 'pipe'],
     });
-    const write = (line) => {
+    const write = (/** @type {string} */ line) => {
         if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
         try {
             return child.stdin.write(ensureLine(line));
         } catch (error) {
-            if (error?.code !== 'EPIPE') {
-                console.warn(`[terminal-live] ${label} write failed: ${error?.message ?? String(error)}`);
+            if (errorCode(error) !== 'EPIPE') {
+                console.warn(`[terminal-live] ${label} write failed: ${errorMessage(error)}`);
             }
             return false;
         }
@@ -2162,11 +2569,11 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
         }
     };
     child.stdin.on('error', (error) => {
-        if (error?.code !== 'EPIPE') {
-            console.warn(`[terminal-live] ${label} stdin error: ${error?.message ?? String(error)}`);
+        if (errorCode(error) !== 'EPIPE') {
+            console.warn(`[terminal-live] ${label} stdin error: ${errorMessage(error)}`);
         }
     });
-    const onData = (chunk) => {
+    const onData = (/** @type {Buffer} */ chunk) => {
         const text = chunk.toString('utf8');
         raw += text;
         process.stdout.write(text);
@@ -2200,7 +2607,7 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
         },
         Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
     );
-    const exitCode = await new Promise((resolve) => {
+    const exitCode = await new Promise((/** @type {(code: number | null) => void} */ resolve) => {
         child.on('close', (code) => {
             childClosed = true;
             resolve(code);
@@ -2222,7 +2629,9 @@ async function runSessionCycleBoot({ id, label, outDir, commands, terminalPort, 
     };
 }
 
-async function runSessionCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runSessionCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const boot1 = await runSessionCycleBoot({
         id: 'session-cycle-boot-1',
         label: 'boot 1 / schedule new',
@@ -2328,7 +2737,7 @@ async function runSessionCycleLiveTest({ outDir, requestedTransport, timeoutMs, 
     return summary;
 }
 
-function structuredInputCycleCriteria(boot) {
+function structuredInputCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const plain = String(boot?.plain ?? '');
     const answerConfirmationRe = /Resposta\s+enviada para pergunta pendente/u;
     return [
@@ -2399,7 +2808,9 @@ function structuredInputCycleCriteria(boot) {
     ];
 }
 
-async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runStructuredInputCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const boot = await runSessionCycleBoot({
         id: 'structured-input-cycle',
         label: 'structured request_user_input',
@@ -2458,7 +2869,7 @@ async function runStructuredInputCycleLiveTest({ outDir, requestedTransport, tim
     return summary;
 }
 
-function menuCycleCriteria(boot) {
+function menuCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const plain = String(boot?.plain ?? '');
     const menuStartIndex = plain.indexOf('Painel de ações');
     const menuPlain = menuStartIndex >= 0 ? plain.slice(menuStartIndex) : plain;
@@ -2498,7 +2909,9 @@ function menuCycleCriteria(boot) {
     ];
 }
 
-async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runMenuCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const boot = await runSessionCycleBoot({
         id: 'menu-cycle',
         label: 'compact command palette',
@@ -2551,7 +2964,7 @@ async function runMenuCycleLiveTest({ outDir, requestedTransport, timeoutMs, ter
     return summary;
 }
 
-function pickerInteractiveCycleCriteria(boot) {
+function pickerInteractiveCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const plain = String(boot?.plain ?? '');
     return [
         {
@@ -2582,7 +2995,9 @@ function pickerInteractiveCycleCriteria(boot) {
     ];
 }
 
-async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runPickerInteractiveCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const canUsePty = requestedTransport === 'pty' && hasCommand('script');
     const transport = canUsePty ? 'pty:script' : 'stdio:headless';
     const command = buildTerminalLlmbCommand(canUsePty);
@@ -2599,7 +3014,7 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
             COPILOT_MODEL: LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
             COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
-            TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
+            TERMINAL_DISPLAY_PRESET: process.env['TERMINAL_DISPLAY_PRESET'] ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
             COPILOT_TERMINAL_PICKER_FILTER: 'Status',
@@ -2608,21 +3023,21 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
         },
         stdio: ['pipe', 'pipe', 'pipe'],
     });
-    const writeRaw = (text) => {
+    const writeRaw = (/** @type {string} */ text) => {
         if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
         try {
             return child.stdin.write(text);
         } catch (error) {
-            if (error?.code !== 'EPIPE') {
-                console.warn(`[terminal-live] picker interactive write failed: ${error?.message ?? String(error)}`);
+            if (errorCode(error) !== 'EPIPE') {
+                console.warn(`[terminal-live] picker interactive write failed: ${errorMessage(error)}`);
             }
             return false;
         }
     };
-    const writeLine = (line) => writeRaw(ensureLine(line));
+    const writeLine = (/** @type {string} */ line) => writeRaw(ensureLine(line));
     child.stdin.on('error', (error) => {
-        if (error?.code !== 'EPIPE') {
-            console.warn(`[terminal-live] picker interactive stdin error: ${error?.message ?? String(error)}`);
+        if (errorCode(error) !== 'EPIPE') {
+            console.warn(`[terminal-live] picker interactive stdin error: ${errorMessage(error)}`);
         }
     });
     const timeout = setTimeout(
@@ -2632,7 +3047,7 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
         },
         Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS,
     );
-    const onData = (chunk) => {
+    const onData = (/** @type {Buffer} */ chunk) => {
         const text = chunk.toString('utf8');
         raw += text;
         process.stdout.write(text);
@@ -2651,7 +3066,7 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
     };
     child.stdout.on('data', onData);
     child.stderr.on('data', onData);
-    const exitCode = await new Promise((resolve) => {
+    const exitCode = await new Promise((/** @type {(code: number | null) => void} */ resolve) => {
         child.on('close', (code) => {
             childClosed = true;
             resolve(code);
@@ -2713,7 +3128,7 @@ async function runPickerInteractiveCycleLiveTest({ outDir, requestedTransport, t
     return summary;
 }
 
-function hasDefaultUxInformativeLineInsidePrompt(plain) {
+function hasDefaultUxInformativeLineInsidePrompt(/** @type {unknown} */ plain) {
     const text = String(plain ?? '');
     const durableIntrusion =
         /voc[eê]\[[^\n]*?›\s*(?:\r?\n)+\s{2,}(?:Skills|Configuração|Ferramentas)\b[\s\S]{0,260}?(?:^|\n)(?:voc[eê]\[[^\n]*?›\s*)?\/(?:session sdk 6|quit)\b/imu.test(
@@ -2726,10 +3141,10 @@ function hasDefaultUxInformativeLineInsidePrompt(plain) {
     return durableIntrusion || liveIntrusion;
 }
 
-function diagnosticUxCycleCriteria(boot) {
+function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const raw = String(boot?.raw ?? '');
     const plain = String(boot?.plain ?? '');
-    const findPromptCommandStart = (command, from = 0) => {
+    const findPromptCommandStart = (/** @type {string} */ command, /** @type {number} */ from = 0) => {
         const promptStart = plain.indexOf(`› ${command}`, Math.max(0, from));
         if (promptStart >= 0) return promptStart + 2;
         const lineStart = plain.indexOf(`\n${command}`, Math.max(0, from));
@@ -2776,7 +3191,7 @@ function diagnosticUxCycleCriteria(boot) {
     const countStart = plain.indexOf('/count', Math.max(0, whoStart));
     const clearStart = plain.indexOf('/clear', Math.max(0, countStart));
     const quitStart = plain.indexOf('/quit', Math.max(0, clearStart));
-    const surfaceBetween = (start, end) => {
+    const surfaceBetween = (/** @type {number} */ start, /** @type {number} */ end) => {
         if (start < 0) return plain;
         const safeEnd = end > start ? end : plain.length;
         return plain.slice(start, safeEnd);
@@ -2814,9 +3229,9 @@ function diagnosticUxCycleCriteria(boot) {
     const whoSurface = surfaceBetween(whoStart, countStart);
     const countSurface = surfaceBetween(countStart, clearStart);
     const clearSurface = surfaceBetween(clearStart, quitStart);
-    const hasIsoSeconds = (surface) =>
+    const hasIsoSeconds = (/** @type {string} */ surface) =>
         /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?[+-]\d{2}:\d{2}/u.test(surface);
-    const hasRelativeAge = (surface) => /há \d+[smhda]/iu.test(surface);
+    const hasRelativeAge = (/** @type {string} */ surface) => /há \d+[smhda]/iu.test(surface);
     return [
         {
             id: 'diagnostic-ux-ready',
@@ -3138,7 +3553,9 @@ function diagnosticUxCycleCriteria(boot) {
     ];
 }
 
-async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runDiagnosticUxCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const marker = `TERMINAL_DIAGNOSTIC_UX_${Date.now()}`;
     const scratchPath = `data/copilot-terminal/live-scratch/${marker}.txt`;
     const markdownPath = `data/copilot-terminal/live-scratch/${marker}.md`;
@@ -3285,7 +3702,7 @@ async function runDiagnosticUxCycleLiveTest({ outDir, requestedTransport, timeou
     }
 }
 
-function defaultUxCycleCriteria(boot) {
+function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const plain = String(boot?.plain ?? '');
     const helpStart = plain.indexOf('Ajuda rápida');
     const helpLibsStart = plain.indexOf('Ajuda de libs auxiliares', Math.max(0, helpStart));
@@ -3355,7 +3772,7 @@ function defaultUxCycleCriteria(boot) {
     ]
         .filter((index) => index >= 0)
         .sort((a, b) => a - b);
-    const surfaceAt = (start) => {
+    const surfaceAt = (/** @type {number} */ start) => {
         if (start < 0) return '';
         const position = surfaceStarts.indexOf(start);
         return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
@@ -3429,7 +3846,9 @@ function defaultUxCycleCriteria(boot) {
     ];
     const surfacesRenderedInOrder =
         orderedSurfaceStarts.every((index) => index >= 0) &&
-        orderedSurfaceStarts.every((index, position, values) => position === 0 || values[position - 1] < index);
+        orderedSurfaceStarts.every(
+            (index, position, values) => position === 0 || (values[position - 1] ?? Number.NEGATIVE_INFINITY) < index,
+        );
     return [
         {
             id: 'ux-cycle-ready',
@@ -3712,7 +4131,9 @@ function defaultUxCycleCriteria(boot) {
     ];
 }
 
-async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runDefaultUxCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const boot = await runSessionCycleBoot({
         id: 'default-ux-cycle',
         label: 'default human UX surfaces',
@@ -3795,9 +4216,9 @@ async function runDefaultUxCycleLiveTest({ outDir, requestedTransport, timeoutMs
     return summary;
 }
 
-function auditUxCycleCriteria(boot) {
+function auditUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const plain = stripAnsi(boot.plain);
-    const commandStart = (command, from = 0) => {
+    const commandStart = (/** @type {string} */ command, /** @type {number} */ from = 0) => {
         const pattern = new RegExp(
             `(?:^|\\n)(?:\\s*voc[eê]\\[[^\\n]*?›\\s+|\\s*)${escapeRegExp(command)}(?:\\s*\\r?\\n|\\r|$)`,
             'iu',
@@ -3825,7 +4246,7 @@ function auditUxCycleCriteria(boot) {
         eventsSourcesDetailStart,
         quitStart,
     ].filter((index) => index >= 0);
-    const surfaceAt = (start) => {
+    const surfaceAt = (/** @type {number} */ start) => {
         if (start < 0) return '';
         const position = surfaceStarts.indexOf(start);
         return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
@@ -3900,7 +4321,9 @@ function auditUxCycleCriteria(boot) {
     ];
 }
 
-async function runAuditUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runAuditUxCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const boot = await runSessionCycleBoot({
         id: 'audit-ux-cycle',
         label: 'audit and diagnostic UX surfaces',
@@ -3963,9 +4386,9 @@ async function runAuditUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, 
     return summary;
 }
 
-function operatorUxCycleCriteria(boot) {
+function operatorUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const plain = stripAnsi(boot.plain);
-    const commandStart = (command, from = 0) => {
+    const commandStart = (/** @type {string} */ command, /** @type {number} */ from = 0) => {
         const pattern = new RegExp(
             `(?:^|\\n)\\s*voc[eê]\\[[^\\n]*?›\\s+${escapeRegExp(command)}(?:\\s*\\r?\\n|\\r|$)`,
             'iu',
@@ -4007,7 +4430,7 @@ function operatorUxCycleCriteria(boot) {
         liveStart,
         quitStart,
     ].filter((index) => index >= 0);
-    const surfaceAt = (start) => {
+    const surfaceAt = (/** @type {number} */ start) => {
         if (start < 0) return '';
         const position = surfaceStarts.indexOf(start);
         return plain.slice(start, surfaceStarts[position + 1] ?? plain.length);
@@ -4104,7 +4527,9 @@ function operatorUxCycleCriteria(boot) {
     ];
 }
 
-async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutMs, terminalPort, startedAt }) {
+async function runOperatorUxCycleLiveTest(
+    /** @type {RunCycleOptions} */ { outDir, requestedTransport, timeoutMs, terminalPort, startedAt },
+) {
     const boot = await runSessionCycleBoot({
         id: 'operator-ux-cycle',
         label: 'operator command UX surfaces',
@@ -4183,20 +4608,24 @@ async function runOperatorUxCycleLiveTest({ outDir, requestedTransport, timeoutM
     return summary;
 }
 
-function hasReturnedToReplPrompt(plain, outputOffset) {
+function hasReturnedToReplPrompt(/** @type {string} */ plain, /** @type {number} */ outputOffset) {
     return REPL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
 
-function hasReturnedToNormalReplPrompt(plain, outputOffset) {
+function hasReturnedToNormalReplPrompt(/** @type {string} */ plain, /** @type {number} */ outputOffset) {
     return REPL_NORMAL_PROMPT_TAIL_RE.test(String(plain ?? '').slice(outputOffset));
 }
 
-function extractTerminalUxRowValue(surface, label) {
+function extractTerminalUxRowValue(/** @type {string} */ surface, /** @type {string} */ label) {
     const pattern = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s+([^\\n\\r]+)`, 'u');
     return String(surface ?? '').match(pattern)?.[1]?.trim() ?? '';
 }
 
-function findAssistantEndedBeforeRequiredAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID], events = []) {
+function findAssistantEndedBeforeRequiredAsk(
+    /** @type {unknown} */ plain,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+    /** @type {TerminalEvent[]} */ events = [],
+) {
     const text = String(plain ?? '');
     if (scenario.askRenderedRe.test(text)) return null;
     if (!hasRenderedRequiredDeltaTail(text)) return null;
@@ -4212,14 +4641,18 @@ function findAssistantEndedBeforeRequiredAsk(plain, scenario = LIVE_SCENARIOS[DE
         : null;
     if (askEvent) return null;
     if (!promptReturned && !assistantMessage) return null;
+    const assistantPayload = isObjectPayload(assistantMessage?.data) ? assistantMessage.data : null;
     return {
         eventId: Number(assistantMessage?.id),
-        traceId: typeof assistantMessage?.data?.traceId === 'string' ? assistantMessage.data.traceId : null,
-        turnId: typeof assistantMessage?.data?.turnId === 'string' ? assistantMessage.data.turnId : null,
+        traceId: typeof assistantPayload?.traceId === 'string' ? assistantPayload.traceId : null,
+        turnId: typeof assistantPayload?.turnId === 'string' ? assistantPayload.turnId : null,
     };
 }
 
-function findAssistantEndedAfterAskRecoveryWithoutAsk(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function findAssistantEndedAfterAskRecoveryWithoutAsk(
+    /** @type {unknown} */ plain,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     const text = String(plain ?? '');
     if (scenario.askRenderedRe.test(text)) return null;
     if (!/Turno conclu[ií]do; aguardando próxima mensagem|Aguardando próxima mensagem/iu.test(text)) return null;
@@ -4228,9 +4661,9 @@ function findAssistantEndedAfterAskRecoveryWithoutAsk(plain, scenario = LIVE_SCE
 }
 
 function findIncompleteExpectedToolChain(
-    events,
-    scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
-    { allowAllMissing = false } = {},
+    /** @type {TerminalEvent[]} */ events,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+    /** @type {{ allowAllMissing?: boolean }} */ { allowAllMissing = false } = {},
 ) {
     const expectedTools = scenario.expectedLifecycleTools;
     if (expectedTools.length === 0) return null;
@@ -4255,20 +4688,39 @@ function findIncompleteExpectedToolChain(
     return { completed, missing };
 }
 
-function isHardCriterionFailure(criterion) {
+function isHardCriterionFailure(/** @type {LiveCriterion} */ criterion) {
     return criterion?.pass !== true && criterion?.severity !== 'warning' && criterion?.required !== false;
 }
 
-function allRequiredCriteriaPassed(criteria) {
+function allRequiredCriteriaPassed(/** @type {LiveCriterion[]} */ criteria) {
     return criteria.every((criterion) => !isHardCriterionFailure(criterion));
 }
 
-function criterionMarker(criterion) {
+function criterionMarker(/** @type {LiveCriterion} */ criterion) {
     if (criterion.pass) return '[x]';
     return isHardCriterionFailure(criterion) ? '[ ]' : '[!]';
 }
 
-function buildReport({
+function buildReport(
+    /** @type {{
+     *     criteria: LiveCriterion[];
+     *     durationMs: number;
+     *     exitCode: number | null;
+     *     blocker: LiveBlocker | null;
+     *     outputPath: string;
+     *     plainOutputPath: string;
+     *     exportPath: string | null;
+     *     exportSummary: ExportSummary | null;
+     *     sseRawPath: string;
+     *     sseJsonlPath: string;
+     *     sseSummary: SseSummary;
+     *     startedAt: string;
+     *     transport: string;
+     *     liveHealthRecord: RecordStatus | null;
+     *     liveScenarioRunRecord?: RecordStatus | null | undefined;
+     *     sdkSessionBootSelection?: RecordStatus | null | undefined;
+     *     liveScenario: LiveScenario | null;
+     * }} */ {
     criteria,
     durationMs,
     exitCode,
@@ -4286,7 +4738,8 @@ function buildReport({
     liveScenarioRunRecord,
     sdkSessionBootSelection,
     liveScenario,
-}) {
+    },
+) {
     const ok = allRequiredCriteriaPassed(criteria);
     const status = blocker ? 'BLOCKED' : ok ? 'PASS' : 'FAIL';
     const lines = [
@@ -4335,7 +4788,24 @@ function buildReport({
     return `${lines.join('\n')}\n`;
 }
 
-function liveScenarioKind({
+function liveScenarioKind(
+    /** @type {{
+     *     autoControlProbe: boolean;
+     *     byokControlProbe: boolean;
+     *     byokFixture: boolean;
+     *     byokReal: boolean;
+     *     controlOnly: boolean;
+     *     sessionCycle: boolean;
+     *     structuredInputCycle: boolean;
+     *     menuCycle: boolean;
+     *     pickerInteractiveCycle: boolean;
+     *     uxCycle: boolean;
+     *     diagnosticUxCycle: boolean;
+     *     auditUxCycle: boolean;
+     *     operatorUxCycle: boolean;
+     *     modelControlProbe: boolean;
+     *     liveScenario: LiveScenario | null;
+     * }} */ {
     autoControlProbe,
     byokControlProbe,
     byokFixture,
@@ -4351,7 +4821,8 @@ function liveScenarioKind({
     operatorUxCycle,
     modelControlProbe,
     liveScenario,
-}) {
+    },
+) {
     if (sessionCycle) return 'session_cycle';
     if (structuredInputCycle) return 'structured_input_cycle';
     if (menuCycle) return 'menu_cycle';
@@ -4372,7 +4843,9 @@ function liveScenarioKind({
     return 'canonical_full_turn';
 }
 
-async function scheduleFreshSdkSessionForCanonicalScenario({ enabled, model = LIVE_TEST_COPILOT_MODEL }) {
+async function scheduleFreshSdkSessionForCanonicalScenario(
+    /** @type {{ enabled: boolean; model?: string }} */ { enabled, model = LIVE_TEST_COPILOT_MODEL },
+) {
     if (!enabled) return { attempted: false, ok: true, reason: 'disabled' };
     try {
         const [{ scheduleAgentSdkSessionBootSelection }, { persistAgentRuntimeStatePartial }] = await Promise.all([
@@ -4403,7 +4876,7 @@ async function scheduleFreshSdkSessionForCanonicalScenario({ enabled, model = LI
             };
         }
         const result = await scheduleAgentSdkSessionBootSelection({ mode: 'new' });
-        const resultValue = result && typeof result === 'object' ? result.value : null;
+        const resultValue = result.ok ? result.value : null;
         const persistedSelection =
             resultValue && typeof resultValue === 'object' && resultValue.nextSdkSessionBoot
                 ? resultValue.nextSdkSessionBoot
@@ -4431,7 +4904,21 @@ async function scheduleFreshSdkSessionForCanonicalScenario({ enabled, model = LI
     }
 }
 
-async function recordLiveScenarioRunToSqlite({
+async function recordLiveScenarioRunToSqlite(
+    /** @type {{
+     *     criteria: LiveCriterion[];
+     *     startedAt: string;
+     *     durationMs: number;
+     *     exitCode: number | null;
+     *     blocker: LiveBlocker | null;
+     *     scenarioKind: string;
+     *     outDir: string;
+     *     mdPath: string;
+     *     rawPath: string;
+     *     plainPath: string;
+     *     sseJsonlPath: string;
+     *     transport: string;
+     * }} */ {
     criteria,
     startedAt,
     durationMs,
@@ -4444,7 +4931,8 @@ async function recordLiveScenarioRunToSqlite({
     plainPath,
     sseJsonlPath,
     transport,
-}) {
+    },
+) {
     const failedCriteria = criteria.filter(isHardCriterionFailure);
     const completedAt = new Date(
         Date.parse(startedAt) + Math.max(0, Number.isFinite(durationMs) ? durationMs : 0),
@@ -4493,7 +4981,23 @@ async function recordLiveScenarioRunToSqlite({
     }
 }
 
-async function writeEarlyBlockedSummary({
+async function writeEarlyBlockedSummary(
+    /** @type {{
+     *     blocker: LiveBlocker;
+     *     startedAt: string;
+     *     outDir: string;
+     *     rawPath: string;
+     *     plainPath: string;
+     *     exportPath: string;
+     *     sseRawPath: string;
+     *     sseJsonlPath: string;
+     *     jsonPath: string;
+     *     mdPath: string;
+     *     transport: string;
+     *     realByok: Awaited<ReturnType<typeof buildRealByokRuntime>> | null;
+     *     sdkSessionBootSelection?: RecordStatus | null;
+     *     liveScenario: LiveScenario;
+     * }} */ {
     blocker,
     startedAt,
     outDir,
@@ -4508,7 +5012,8 @@ async function writeEarlyBlockedSummary({
     realByok,
     sdkSessionBootSelection,
     liveScenario,
-}) {
+    },
+) {
     const durationMs = Date.now() - Date.parse(startedAt);
     const raw = `[terminal-live] blocked before terminal start: ${blocker.id} · ${blocker.detail}\n`;
     const sseSummary = {
@@ -4593,8 +5098,8 @@ async function writeEarlyBlockedSummary({
     }
 }
 
-function detectLiveBlocker(plain, runtime = {}) {
-    const scenario = runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID];
+function detectLiveBlocker(/** @type {string} */ plain, /** @type {LiveRuntimeState} */ runtime = {}) {
+    const scenario = runtime.liveScenario ?? LIVE_SCENARIOS.canonical;
     const scenarioCompleted =
         runtime.answerSent === true &&
         runtime.postAskContinuationObserved === true &&
@@ -4672,7 +5177,7 @@ function detectLiveBlocker(plain, runtime = {}) {
     }
     const byokLiveToolProtocolMiss = findByokRealLiveToolProtocolMiss(
         plain,
-        runtime.liveScenario ?? LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
+        runtime.liveScenario ?? LIVE_SCENARIOS.canonical,
     );
     if (byokLiveToolProtocolMiss) {
         return {
@@ -4729,7 +5234,8 @@ function detectLiveBlocker(plain, runtime = {}) {
         findUnrecoveredTerminalEmptyOutputEvent(runtime.sseEvents) ??
         findUnrecoveredEmptyDialogTurnEnd(runtime.sseEvents);
     if (/Turno\s+(?:terminou\s+)?sem saída pública/i.test(plain) || emptyOutput) {
-        const emptyOutputIndex = Number.isInteger(emptyOutput?.index) ? emptyOutput.index : null;
+        const emptyOutputIndex =
+            typeof emptyOutput?.index === 'number' && Number.isInteger(emptyOutput.index) ? emptyOutput.index : null;
         const asked =
             Boolean(findUserInputRequestedEvent(runtime.sseEvents, { beforeIndex: emptyOutputIndex })) ||
             (emptyOutputIndex === null && scenario.askRenderedRe.test(plain));
@@ -4759,10 +5265,10 @@ function detectLiveBlocker(plain, runtime = {}) {
                 `terminal reached an explicit turn with empty public output ${phaseDetail}` +
                 `${emptyOutput?.traceId ? ` · trace=${emptyOutput.traceId}` : ''}` +
                 `${emptyOutput?.turnId ? ` · turn=${emptyOutput.turnId}` : ''}` +
-                `${Number.isFinite(emptyOutput?.eventId) ? ` · sse=#${emptyOutput.eventId}` : ''}`,
+                `${isFiniteNumber(emptyOutput?.eventId) ? ` · sse=#${emptyOutput.eventId}` : ''}`,
         };
     }
-    const endedBeforeAsk = findAssistantEndedBeforeRequiredAsk(plain, runtime.liveScenario, runtime.sseEvents);
+    const endedBeforeAsk = findAssistantEndedBeforeRequiredAsk(plain, scenario, runtime.sseEvents);
     if (endedBeforeAsk) {
         return {
             id: 'assistant-ended-before-ask',
@@ -4770,7 +5276,7 @@ function detectLiveBlocker(plain, runtime = {}) {
                 'assistant produced the required public deltas and returned to idle before calling the required ask_user tool' +
                 `${endedBeforeAsk.traceId ? ` · trace=${endedBeforeAsk.traceId}` : ''}` +
                 `${endedBeforeAsk.turnId ? ` · turn=${endedBeforeAsk.turnId}` : ''}` +
-                `${Number.isFinite(endedBeforeAsk.eventId) ? ` · sse=#${endedBeforeAsk.eventId}` : ''}`,
+                `${isFiniteNumber(endedBeforeAsk.eventId) ? ` · sse=#${endedBeforeAsk.eventId}` : ''}`,
         };
     }
     if (runtime.timedOut) {
@@ -4779,7 +5285,7 @@ function detectLiveBlocker(plain, runtime = {}) {
             detail:
                 `runner timeout before scenario completion` +
                 ` · stage=${runtime.timeoutStage ?? 'unknown'}` +
-                `${Number.isFinite(runtime.timeoutBudgetMs) ? ` · budget=${Math.round(runtime.timeoutBudgetMs)}ms` : ''}` +
+                `${isFiniteNumber(runtime.timeoutBudgetMs) ? ` · budget=${Math.round(runtime.timeoutBudgetMs)}ms` : ''}` +
                 ` · ask=${runtime.answerSent ? 'answered' : 'not-answered'}` +
                 ` · postAsk=${runtime.postAskContinuationObserved ? 'observed' : 'missing'}` +
                 ` · diagnostics=${runtime.postCommandsSent ? 'started' : 'not-started'}`,
@@ -4788,7 +5294,10 @@ function detectLiveBlocker(plain, runtime = {}) {
     return null;
 }
 
-function findAskBeforeRequiredPublicDeltas(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function findAskBeforeRequiredPublicDeltas(
+    /** @type {TerminalEvent[] | undefined} */ events,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     if (!Array.isArray(events) || !scenario?.askQuestion) return null;
     const askIndex = events.findIndex((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending');
     if (askIndex < 0) return null;
@@ -4805,6 +5314,7 @@ function findAskBeforeRequiredPublicDeltas(events, scenario = LIVE_SCENARIOS[DEF
     }
     if (deltaMarkersBeforeAsk >= 8) return null;
     const askEvent = events[askIndex];
+    if (!askEvent) return null;
     return {
         askEventId: Number.isFinite(askEvent?.id)
             ? Number(askEvent.id)
@@ -4815,7 +5325,10 @@ function findAskBeforeRequiredPublicDeltas(events, scenario = LIVE_SCENARIOS[DEF
     };
 }
 
-function findUnexpectedScenarioTool(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function findUnexpectedScenarioTool(
+    /** @type {TerminalEvent[] | undefined} */ events,
+    /** @type {LiveScenario | undefined} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     const allowedTools = Array.isArray(scenario?.allowedTools) ? [...scenario.allowedTools] : [];
     if (allowedTools.length === 0 || !Array.isArray(events)) return null;
     const expectedLifecycleTools = Array.isArray(scenario?.expectedLifecycleTools) ? scenario.expectedLifecycleTools : [];
@@ -4843,7 +5356,7 @@ function findUnexpectedScenarioTool(events, scenario = LIVE_SCENARIOS[DEFAULT_LI
     return null;
 }
 
-function findByokRealPreflightProbeFailure(plain) {
+function findByokRealPreflightProbeFailure(/** @type {string} */ plain) {
     const results = [...plain.matchAll(/BYOK (chat|agent) probe[\s\S]{0,1800}?resultado:\s+failed\b([^\n]*)/giu)];
     if (results.length === 0) return null;
     const kinds = [...new Set(results.map((result) => result[1]?.toLowerCase()).filter(Boolean))];
@@ -4855,7 +5368,7 @@ function findByokRealPreflightProbeFailure(plain) {
     };
 }
 
-function findByokProbeResultStatus(plain, mode) {
+function findByokProbeResultStatus(/** @type {unknown} */ plain, /** @type {string} */ mode) {
     const escapedMode = escapeRegExp(mode);
     const match = String(plain ?? '').match(
         new RegExp(`BYOK ${escapedMode} probe[\\s\\S]*?resultado:\\s+([\\w-]+)`, 'iu'),
@@ -4863,7 +5376,10 @@ function findByokProbeResultStatus(plain, mode) {
     return match?.[1]?.toLowerCase() ?? null;
 }
 
-function findByokRealLiveToolProtocolMiss(plain, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function findByokRealLiveToolProtocolMiss(
+    /** @type {string} */ plain,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     // The live transcript intentionally preserves assistant Markdown; the
     // public delta marker may therefore arrive as `DELTA-*` or `**DELTA-* **`.
     if (scenario.askRenderedRe.test(plain)) return null;
@@ -4892,11 +5408,15 @@ function findByokRealLiveToolProtocolMiss(plain, scenario = LIVE_SCENARIOS[DEFAU
     return hasTextifiedAsk || markers.length >= 2 ? { markers } : null;
 }
 
-function isObjectPayload(value) {
+/** @returns {value is EventPayload} */
+function isObjectPayload(/** @type {unknown} */ value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function eventPayloadMatchesTurnIdentity(payload, identity) {
+function eventPayloadMatchesTurnIdentity(
+    /** @type {unknown} */ payload,
+    /** @type {{ traceId: string | null; turnId: string | null }} */ identity,
+) {
     if (!isObjectPayload(payload)) return false;
     const traceId = typeof payload.traceId === 'string' ? payload.traceId : null;
     const turnId = typeof payload.turnId === 'string' ? payload.turnId : null;
@@ -4905,7 +5425,11 @@ function eventPayloadMatchesTurnIdentity(payload, identity) {
     return !identity.traceId && !identity.turnId;
 }
 
-function hasPublicAssistantMessageAfterEvent(events, eventIndex, identity) {
+function hasPublicAssistantMessageAfterEvent(
+    /** @type {TerminalEvent[]} */ events,
+    /** @type {number} */ eventIndex,
+    /** @type {{ traceId: string | null; turnId: string | null }} */ identity,
+) {
     if (!Array.isArray(events)) return false;
     for (let index = eventIndex + 1; index < events.length; index += 1) {
         const evt = events[index];
@@ -4917,7 +5441,7 @@ function hasPublicAssistantMessageAfterEvent(events, eventIndex, identity) {
     return false;
 }
 
-function hasPublicMaterializationAfterEvent(events, eventIndex) {
+function hasPublicMaterializationAfterEvent(/** @type {TerminalEvent[]} */ events, /** @type {number} */ eventIndex) {
     if (!Array.isArray(events)) return false;
     for (let index = eventIndex + 1; index < events.length; index += 1) {
         const evt = events[index];
@@ -4944,7 +5468,11 @@ function hasPublicMaterializationAfterEvent(events, eventIndex) {
     return false;
 }
 
-function hasRecoveredEmptyTurnAfterEvent(events, eventIndex, identity) {
+function hasRecoveredEmptyTurnAfterEvent(
+    /** @type {TerminalEvent[]} */ events,
+    /** @type {number} */ eventIndex,
+    /** @type {{ traceId: string | null; turnId: string | null }} */ identity,
+) {
     if (!Array.isArray(events)) return false;
     for (let index = eventIndex + 1; index < events.length; index += 1) {
         const evt = events[index];
@@ -4955,7 +5483,7 @@ function hasRecoveredEmptyTurnAfterEvent(events, eventIndex, identity) {
     return false;
 }
 
-function findUnrecoveredEmptyDialogTurnEnd(events) {
+function findUnrecoveredEmptyDialogTurnEnd(/** @type {TerminalEvent[] | undefined} */ events) {
     if (!Array.isArray(events)) return null;
     for (let index = events.length - 1; index >= 0; index -= 1) {
         const evt = events[index];
@@ -4970,7 +5498,7 @@ function findUnrecoveredEmptyDialogTurnEnd(events) {
         if (hasPublicAssistantMessageAfterEvent(events, index, identity)) continue;
         if (hasRecoveredEmptyTurnAfterEvent(events, index, identity)) continue;
         return {
-            eventId: evt.id,
+            eventId: eventPublicId(evt),
             traceId: identity.traceId,
             turnId: identity.turnId,
             index,
@@ -4979,7 +5507,7 @@ function findUnrecoveredEmptyDialogTurnEnd(events) {
     return null;
 }
 
-function findUnrecoveredTerminalEmptyOutputEvent(events) {
+function findUnrecoveredTerminalEmptyOutputEvent(/** @type {TerminalEvent[] | undefined} */ events) {
     if (!Array.isArray(events)) return null;
     for (let index = events.length - 1; index >= 0; index -= 1) {
         const evt = events[index];
@@ -4991,7 +5519,7 @@ function findUnrecoveredTerminalEmptyOutputEvent(events) {
         if (hasPublicAssistantMessageAfterEvent(events, index, identity)) continue;
         if (hasRecoveredEmptyTurnAfterEvent(events, index, identity)) continue;
         return {
-            eventId: evt.id,
+            eventId: eventPublicId(evt),
             traceId: identity.traceId,
             turnId: identity.turnId,
             index,
@@ -5000,9 +5528,15 @@ function findUnrecoveredTerminalEmptyOutputEvent(events) {
     return null;
 }
 
-function findUserInputRequestedEvent(events, options = {}) {
+function findUserInputRequestedEvent(
+    /** @type {TerminalEvent[] | undefined} */ events,
+    /** @type {{ beforeIndex?: number | null }} */ options = {},
+) {
     if (!Array.isArray(events)) return null;
-    const beforeIndex = Number.isInteger(options.beforeIndex) ? options.beforeIndex : events.length;
+    const beforeIndex =
+        typeof options.beforeIndex === 'number' && Number.isInteger(options.beforeIndex)
+            ? options.beforeIndex
+            : events.length;
     return (
         events
             .slice(0, beforeIndex)
@@ -5010,9 +5544,15 @@ function findUserInputRequestedEvent(events, options = {}) {
     );
 }
 
-function findUserInputCompletedEvent(events, options = {}) {
+function findUserInputCompletedEvent(
+    /** @type {TerminalEvent[] | undefined} */ events,
+    /** @type {{ beforeIndex?: number | null }} */ options = {},
+) {
     if (!Array.isArray(events)) return null;
-    const beforeIndex = Number.isInteger(options.beforeIndex) ? options.beforeIndex : events.length;
+    const beforeIndex =
+        typeof options.beforeIndex === 'number' && Number.isInteger(options.beforeIndex)
+            ? options.beforeIndex
+            : events.length;
     return (
         events
             .slice(0, beforeIndex)
@@ -5025,13 +5565,15 @@ function findUserInputCompletedEvent(events, options = {}) {
     );
 }
 
-function shouldEvaluateScenarioDespiteBlocker(blocker) {
-    return ['assistant-empty-after-user-input', 'assistant-empty-after-ask', 'assistant-ended-before-ask'].includes(
-        blocker?.id,
-    );
+function shouldEvaluateScenarioDespiteBlocker(/** @type {LiveBlocker | null} */ blocker) {
+    return blocker
+        ? ['assistant-empty-after-user-input', 'assistant-empty-after-ask', 'assistant-ended-before-ask'].includes(
+              blocker.id,
+          )
+        : false;
 }
 
-function evaluateEmptyAfterUserInputRecoveryVisible(plain) {
+function evaluateEmptyAfterUserInputRecoveryVisible(/** @type {unknown} */ plain) {
     const text = String(plain ?? '');
     const hasTitle =
         /Retomada autom[aá]tica[\s\S]{0,260}continua[cç][aã]o p[oó]s-pergunta sem resposta p[uú]blica/iu.test(text) ||
@@ -5052,11 +5594,15 @@ function evaluateEmptyAfterUserInputRecoveryVisible(plain) {
     };
 }
 
-function summarizeSseEvents(events) {
-    const publicEvents = events.filter((evt) => !['connected', 'heartbeat'].includes(evt.event));
-    const ids = publicEvents.map((evt) => evt.id).filter((id) => Number.isFinite(id));
-    const names = new Set(publicEvents.map((evt) => evt.event));
-    const payloadObjects = publicEvents.filter((evt) => isObjectPayload(evt.data));
+function summarizeSseEvents(/** @type {TerminalEvent[]} */ events) {
+    const publicEvents = events.filter(
+        (evt) => typeof evt.event !== 'string' || !['connected', 'heartbeat'].includes(evt.event),
+    );
+    const ids = publicEvents.map((evt) => evt.id).filter(isFiniteNumber);
+    const names = new Set(publicEvents.flatMap((evt) => (typeof evt.event === 'string' ? [evt.event] : [])));
+    const payloadObjects = publicEvents.flatMap((evt) =>
+        isObjectPayload(evt.data) ? [{ ...evt, data: evt.data }] : [],
+    );
     const sourceEvents = payloadObjects.filter(
         (evt) => typeof evt.data.source === 'string' && evt.data.source.length > 0,
     );
@@ -5071,7 +5617,9 @@ function summarizeSseEvents(events) {
     const traceEvents = payloadObjects.filter(
         (evt) => typeof evt.data.traceId === 'string' && evt.data.traceId.length > 0,
     );
-    const traceIds = [...new Set(traceEvents.map((evt) => evt.data.traceId))].sort();
+    const traceIds = [
+        ...new Set(traceEvents.flatMap((evt) => (typeof evt.data.traceId === 'string' ? [evt.data.traceId] : []))),
+    ].sort();
     const criticalEvents = payloadObjects.filter((evt) =>
         [
             'delta',
@@ -5080,7 +5628,7 @@ function summarizeSseEvents(events) {
             'tool.lifecycle',
             'user_input.requested',
             'user_input.completed',
-        ].includes(evt.event),
+        ].includes(typeof evt.event === 'string' ? evt.event : ''),
     );
     return {
         publicEvents,
@@ -5096,7 +5644,7 @@ function summarizeSseEvents(events) {
     };
 }
 
-function normalizeLifecycleToolName(payload) {
+function normalizeLifecycleToolName(/** @type {EventPayload | null | undefined} */ payload) {
     const names = [payload?.rawToolName, payload?.toolName, payload?.correlatedToolName, payload?.name, payload?.tool];
     for (const value of names) {
         if (typeof value === 'string' && value.trim().length > 0) return value.trim().toLowerCase();
@@ -5104,20 +5652,20 @@ function normalizeLifecycleToolName(payload) {
     return '';
 }
 
-function isLifecycleTool(payload, expectedName) {
+function isLifecycleTool(/** @type {EventPayload} */ payload, /** @type {string} */ expectedName) {
     const name = normalizeLifecycleToolName(payload);
     return name === expectedName || name.endsWith(`.${expectedName}`) || name === `${expectedName}_local`;
 }
 
-function isLifecycleStartType(type) {
+function isLifecycleStartType(/** @type {string} */ type) {
     return type === 'start' || type === 'external_requested';
 }
 
-function isLifecycleCompletionType(type) {
+function isLifecycleCompletionType(/** @type {string} */ type) {
     return type === 'complete' || type === 'external_completed' || type === 'io_op';
 }
 
-function parseToolResultPayload(toolResult) {
+function parseToolResultPayload(/** @type {unknown} */ toolResult) {
     if (!isObjectPayload(toolResult)) return null;
     const text = typeof toolResult.textResultForLlm === 'string' ? toolResult.textResultForLlm.trim() : '';
     if (!text.startsWith('{')) return null;
@@ -5129,7 +5677,7 @@ function parseToolResultPayload(toolResult) {
     }
 }
 
-function evaluateAdaptiveSelectionReadyEvidence(events) {
+function evaluateAdaptiveSelectionReadyEvidence(/** @type {TerminalEvent[]} */ events) {
     const readyRe = /(?:^|\n)ADAPTIVE-SELECTION-READY provider=([^\s]+) model=([^\s]+) decision=(use_current|switch_recommended)(?:\n|$)/u;
     let latestAuthority = null;
     let marker = null;
@@ -5211,7 +5759,7 @@ function evaluateAdaptiveSelectionReadyEvidence(events) {
     };
 }
 
-function summarizePostToolUseResult(payload, expectedName) {
+function summarizePostToolUseResult(/** @type {EventPayload} */ payload, /** @type {string} */ expectedName) {
     if (payload?.hookType !== 'postToolUse') return null;
     const input = isObjectPayload(payload.input) ? payload.input : null;
     if (!input || !isLifecycleTool({ toolName: input.toolName }, expectedName)) return null;
@@ -5232,7 +5780,18 @@ function summarizePostToolUseResult(payload, expectedName) {
     };
 }
 
-function summarizeCanonicalToolLifecycle(events) {
+function summarizeCanonicalToolLifecycle(/** @type {TerminalEvent[]} */ events) {
+    /** @type {{
+     *     reportIntentStart: boolean;
+     *     reportIntentDone: boolean;
+     *     readFileStart: boolean;
+     *     readFileDone: boolean;
+     *     readFilePostToolSuccess: boolean;
+     *     readFilePostToolFailure: boolean;
+     *     readFileIo: boolean;
+     *     toolLifecycleEvents: number;
+     *     matchedEventIds: number[];
+     * }} */
     const summary = {
         reportIntentStart: false,
         reportIntentDone: false,
@@ -5254,7 +5813,7 @@ function summarizeCanonicalToolLifecycle(events) {
             if (readFilePostToolUse.success) summary.readFilePostToolSuccess = true;
             if (readFilePostToolUse.failure) summary.readFilePostToolFailure = true;
             const eventId = eventPublicId(evt);
-            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
             continue;
         }
         if (evt?.event !== 'tool.lifecycle') continue;
@@ -5269,7 +5828,7 @@ function summarizeCanonicalToolLifecycle(events) {
                 if (toolCallId) reportIntentCallIds.add(toolCallId);
             }
             if (isLifecycleCompletionType(type) && success) summary.reportIntentDone = true;
-            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
         } else if (
             isLifecycleCompletionType(type) &&
             success &&
@@ -5278,20 +5837,29 @@ function summarizeCanonicalToolLifecycle(events) {
         ) {
             // SDK 1.0.9 humanizes some completion names, but preserves the originating tool call id.
             summary.reportIntentDone = true;
-            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
         }
         if (isLifecycleTool(payload, 'read_file_content')) {
             if (isLifecycleStartType(type)) summary.readFileStart = true;
             if (isLifecycleCompletionType(type) && success) summary.readFileDone = true;
             if (type === 'io_op' && success) summary.readFileIo = true;
-            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
         }
     }
     summary.matchedEventIds = [...new Set(summary.matchedEventIds)].sort((a, b) => a - b);
     return summary;
 }
 
-function summarizeNamedToolLifecycle(events, expectedName) {
+function summarizeNamedToolLifecycle(/** @type {TerminalEvent[]} */ events, /** @type {string} */ expectedName) {
+    /** @type {{
+     *     start: boolean; done: boolean; io: boolean; failed: boolean;
+     *     postToolSuccess: boolean; postToolFailure: boolean;
+     *     postToolSuccessCount: number; postToolFailureCount: number;
+     *     startCount: number; completionSuccessCount: number; completionFailureCount: number;
+     *     successfulCallCount: number; failedCallCount: number;
+     *     resultTypes: string[]; exitCodes: number[]; matchedEventIds: number[];
+     *     startEventIds: number[]; completionEventIds: number[];
+     * }} */
     const summary = {
         start: false,
         done: false,
@@ -5327,9 +5895,9 @@ function summarizeNamedToolLifecycle(events, expectedName) {
                 summary.postToolFailureCount += 1;
             }
             if (postToolUse.resultType) summary.resultTypes.push(postToolUse.resultType);
-            if (Number.isFinite(postToolUse.exitCode)) summary.exitCodes.push(postToolUse.exitCode);
+            if (isFiniteNumber(postToolUse.exitCode)) summary.exitCodes.push(postToolUse.exitCode);
             const eventId = eventPublicId(evt);
-            if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
             continue;
         }
         if (evt?.event !== 'tool.lifecycle' || !isLifecycleTool(payload, expectedName)) continue;
@@ -5339,20 +5907,20 @@ function summarizeNamedToolLifecycle(events, expectedName) {
         if (isLifecycleStartType(type)) {
             summary.start = true;
             summary.startCount += 1;
-            if (Number.isFinite(eventId)) summary.startEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.startEventIds.push(eventId);
         }
         if (isLifecycleCompletionType(type) && success) {
             summary.done = true;
             summary.completionSuccessCount += 1;
-            if (Number.isFinite(eventId)) summary.completionEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.completionEventIds.push(eventId);
         }
         if (isLifecycleCompletionType(type) && !success) {
             summary.failed = true;
             summary.completionFailureCount += 1;
-            if (Number.isFinite(eventId)) summary.completionEventIds.push(eventId);
+            if (isFiniteNumber(eventId)) summary.completionEventIds.push(eventId);
         }
         if (type === 'io_op' && success) summary.io = true;
-        if (Number.isFinite(eventId)) summary.matchedEventIds.push(eventId);
+        if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
     }
     summary.resultTypes = [...new Set(summary.resultTypes)].sort();
     summary.exitCodes = [...new Set(summary.exitCodes)].sort((a, b) => a - b);
@@ -5364,7 +5932,7 @@ function summarizeNamedToolLifecycle(events, expectedName) {
     return summary;
 }
 
-function scenarioMarkerObservedInToolResults(events, marker) {
+function scenarioMarkerObservedInToolResults(/** @type {TerminalEvent[]} */ events, /** @type {string} */ marker) {
     if (typeof marker !== 'string' || marker.length === 0) return false;
     return events.some((evt) => {
         const payload = eventPayload(evt);
@@ -5383,32 +5951,32 @@ function scenarioMarkerObservedInToolResults(events, marker) {
 }
 
 /**
- * @param {unknown} evt
- * @param {Record<string, unknown>} payload
+ * @param {TerminalEvent} evt
+ * @param {EventPayload} payload
  * @returns {CanonicalEventSummaryItem}
  */
 function canonicalEventSummaryItem(evt, payload) {
     return {
         event: typeof evt?.event === 'string' ? evt.event : '',
         source:
-            typeof payload?.source === 'string'
-                ? payload.source
-                : typeof payload?.eventSource === 'string'
-                  ? payload.eventSource
+            typeof payload?.['source'] === 'string'
+                ? payload['source']
+                : typeof payload?.['eventSource'] === 'string'
+                  ? payload['eventSource']
                   : null,
-        traceId: typeof payload?.traceId === 'string' ? payload.traceId : null,
+        traceId: typeof payload?.['traceId'] === 'string' ? payload['traceId'] : null,
         turnId:
-            typeof payload?.turnId === 'string'
-                ? payload.turnId
-                : typeof payload?.turnId === 'number'
-                  ? String(payload.turnId)
+            typeof payload?.['turnId'] === 'string'
+                ? payload['turnId']
+                : typeof payload?.['turnId'] === 'number'
+                  ? String(payload['turnId'])
                   : null,
         eventId: eventPublicId(evt),
     };
 }
 
 /**
- * @param {unknown[]} events
+ * @param {TerminalEvent[]} events
  * @returns {{
  *     deltaAssistant: CanonicalEventSummaryItem | null;
  *     askRequested: CanonicalEventSummaryItem | null;
@@ -5416,7 +5984,7 @@ function canonicalEventSummaryItem(evt, payload) {
  *     postAskAssistant: CanonicalEventSummaryItem | null;
  * }}
  */
-function summarizeCanonicalTranscriptEvents(events, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function summarizeCanonicalTranscriptEvents(events, /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical) {
     /**
      * @type {{
      *     deltaAssistant: CanonicalEventSummaryItem | null;
@@ -5499,9 +6067,10 @@ function exportEnvelopeMatchesEvent(exportSummary, event) {
     });
 }
 
-function extractArchiveRawEvents(plain) {
+function extractArchiveRawEvents(/** @type {unknown} */ plain) {
+    /** @type {TerminalEvent[]} */
     const entries = [];
-    for (const line of plain.split('\n')) {
+    for (const line of String(plain ?? '').split('\n')) {
         const trimmed = line.trim();
         if (!trimmed.startsWith('{') || !trimmed.endsWith('}') || !trimmed.includes('"schemaVersion"')) continue;
         try {
@@ -5516,7 +6085,10 @@ function extractArchiveRawEvents(plain) {
     return entries;
 }
 
-function countJsonStructuralBraceDelta(line, state) {
+function countJsonStructuralBraceDelta(
+    /** @type {string} */ line,
+    /** @type {{ inString: boolean; escape: boolean }} */ state,
+) {
     let delta = 0;
     for (const char of String(line ?? '')) {
         if (state.escape) {
@@ -5538,7 +6110,7 @@ function countJsonStructuralBraceDelta(line, state) {
     return delta;
 }
 
-function extractArchiveJsonDump(plain) {
+function extractArchiveJsonDump(/** @type {unknown} */ plain) {
     const lines = String(plain ?? '').split('\n');
     for (let start = 0; start < lines.length; start += 1) {
         const first = (lines[start] ?? '').trim();
@@ -5573,7 +6145,7 @@ function extractArchiveJsonDump(plain) {
     return null;
 }
 
-function extractTerminalBlocks(plain, headerRe) {
+function extractTerminalBlocks(/** @type {unknown} */ plain, /** @type {RegExp} */ headerRe) {
     const lines = String(plain ?? '').split('\n');
     const blocks = [];
     for (let i = 0; i < lines.length; i += 1) {
@@ -5596,24 +6168,28 @@ function extractTerminalBlocks(plain, headerRe) {
     return blocks;
 }
 
-function extractSdkSessionCockpitProbeResidueCounts(plain) {
+function extractSdkSessionCockpitProbeResidueCounts(/** @type {unknown} */ plain) {
     return extractTerminalBlocks(plain, /^\s*Sessão SDK\b/u).map(
         (block) => block.match(/\bprobe-residue\b/gu)?.length ?? 0,
     );
 }
 
-function terminalBlockContains(plain, headerRe, markerRe) {
+function terminalBlockContains(
+    /** @type {unknown} */ plain,
+    /** @type {RegExp} */ headerRe,
+    /** @type {RegExp} */ markerRe,
+) {
     return extractTerminalBlocks(plain, headerRe).some((block) => markerRe.test(block));
 }
 
 const REQUIRED_DELTA_TAIL_RE = /DELTA-(?:CANONICAL-)?8\b/u;
 const RENDERED_REQUIRED_DELTA_TAIL_RE = /(?:^|\n)\s*│\s+(?:\*{1,2})?DELTA-(?:CANONICAL-)?8\b/u;
 
-function countCanonicalDeltaMarkers(value) {
+function countCanonicalDeltaMarkers(/** @type {unknown} */ value) {
     return (String(value ?? '').match(/DELTA-CANONICAL-\d/g) ?? []).length;
 }
 
-function countExactCanonicalDeltaLines(value) {
+function countExactCanonicalDeltaLines(/** @type {unknown} */ value) {
     const observed = new Set();
     for (const rawLine of stripAnsi(String(value ?? '')).split(/\r?\n/u)) {
         const line = rawLine.replace(/^\s*│\s*/u, '').trim();
@@ -5623,34 +6199,35 @@ function countExactCanonicalDeltaLines(value) {
     return observed.size;
 }
 
-function countRequiredDeltaMarkers(value) {
+function countRequiredDeltaMarkers(/** @type {unknown} */ value) {
     return (String(value ?? '').match(/DELTA-(?:CANONICAL-)?\d/g) ?? []).length;
 }
 
-function hasRequiredDeltaTail(value) {
+function hasRequiredDeltaTail(/** @type {unknown} */ value) {
     return REQUIRED_DELTA_TAIL_RE.test(String(value ?? ''));
 }
 
-function hasRenderedRequiredDeltaTail(value) {
+function hasRenderedRequiredDeltaTail(/** @type {unknown} */ value) {
     return RENDERED_REQUIRED_DELTA_TAIL_RE.test(String(value ?? ''));
 }
 
-function normalizeTranscriptCoverageText(value) {
+function normalizeTranscriptCoverageText(/** @type {unknown} */ value) {
     return stripAnsi(value).replace(/\s+/gu, ' ').trim();
 }
 
-function eventPayload(evt) {
+/** @returns {EventPayload | null} */
+function eventPayload(/** @type {TerminalEvent | undefined} */ evt) {
     if (isObjectPayload(evt?.payload)) return evt.payload;
     if (isObjectPayload(evt?.data)) return evt.data;
     return null;
 }
 
-function eventPublicId(evt) {
+function eventPublicId(/** @type {TerminalEvent | undefined} */ evt) {
     const id = Number(evt?.eventId ?? evt?.id);
-    return Number.isFinite(id) ? id : null;
+    return isFiniteNumber(id) ? id : null;
 }
 
-function eventTurnKey(evt, payload) {
+function eventTurnKey(/** @type {TerminalEvent} */ evt, /** @type {EventPayload} */ payload) {
     const turnId = payload?.turnId ?? evt?.turnId;
     const traceId = payload?.traceId ?? evt?.traceId;
     if (typeof turnId === 'string' || typeof turnId === 'number') return `turn:${turnId}`;
@@ -5658,7 +6235,7 @@ function eventTurnKey(evt, payload) {
     return null;
 }
 
-function findTruncatedTurnEndDuplicate(events) {
+function findTruncatedTurnEndDuplicate(/** @type {TerminalEvent[]} */ events) {
     const assistantMessages = [];
     for (const evt of events) {
         const payload = eventPayload(evt);
@@ -5698,15 +6275,20 @@ function findTruncatedTurnEndDuplicate(events) {
     return null;
 }
 
-function extractPlainTraceIds(plain) {
+function extractPlainTraceIds(/** @type {unknown} */ plain) {
+    /** @type {Set<string>} */
     const ids = new Set();
-    for (const match of plain.matchAll(/\btrace(?:Id)?["']?\s*[=:]\s*["']?(turn:[A-Za-z0-9_.:-]+)/giu)) {
-        ids.add(match[1]);
+    for (const match of String(plain ?? '').matchAll(/\btrace(?:Id)?["']?\s*[=:]\s*["']?(turn:[A-Za-z0-9_.:-]+)/giu)) {
+        const id = match[1];
+        if (id) ids.add(id);
     }
     return [...ids].sort();
 }
 
-function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
+function evaluateSseCriteria(
+    /** @type {SseSummary} */ sseSummary,
+    /** @type {{ expectPublicEvents: boolean; plain?: string }} */ { expectPublicEvents, plain = '' },
+) {
     if (sseSummary.disabled) {
         return [
             {
@@ -5719,7 +6301,9 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
     const summary = summarizeSseEvents(sseSummary.events);
     const { publicEvents, ids, names, payloadObjects, sourceEnvelopeEvents, traceEvents, traceIds, criticalEvents } =
         summary;
-    const monotonic = ids.every((id, index) => index === 0 || id > ids[index - 1]);
+    const monotonic = ids.every(
+        (id, index) => index === 0 || id > (ids[index - 1] ?? Number.NEGATIVE_INFINITY),
+    );
     const plainTraceIds = extractPlainTraceIds(plain);
     const traceOverlap = traceIds.filter((traceId) => plainTraceIds.includes(traceId));
     const criticalWithSource = criticalEvents.filter(
@@ -5778,7 +6362,12 @@ function evaluateSseCriteria(sseSummary, { expectPublicEvents, plain = '' }) {
     ];
 }
 
-function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+function evaluateOutput(
+    /** @type {string} */ plain,
+    /** @type {SseSummary} */ sseSummary,
+    /** @type {ExportSummary | null} */ exportSummary,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     const markerCount = countCanonicalDeltaMarkers(plain);
     const preEventsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b/i)[0] ?? plain;
     const beforeRawDiagnosticsPlain = plain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/events\b[^\n]*--raw/i)[0] ?? plain;
@@ -5839,7 +6428,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                           const eventId = eventPublicId(evt);
                           const payload = eventPayload(evt);
                           return (
-                              Number.isFinite(eventId) &&
+                              isFiniteNumber(eventId) &&
                               eventId > firstStartId &&
                               eventId < lastCompletionId &&
                               evt?.event === 'terminal.activity' &&
@@ -5847,7 +6436,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
                           );
                       })
                       .map((evt) => eventPublicId(evt))
-                      .filter((eventId) => Number.isFinite(eventId));
+                      .filter(isFiniteNumber);
         return {
             ...tool,
             lifecycle,
@@ -5919,7 +6508,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
               }) ?? null)
             : null;
     const sseIds = summarizeSseEvents(sseSummary.events).ids;
-    const archiveIds = archiveRawEvents.map((evt) => evt.eventId).filter((id) => Number.isFinite(id));
+    const archiveIds = archiveRawEvents.map((evt) => eventPublicId(evt)).filter(isFiniteNumber);
     const archiveSseOverlap = archiveIds.filter((id) => sseIds.includes(id));
     const truncatedTurnEndDuplicate = findTruncatedTurnEndDuplicate([...sseSummary.events, ...archiveRawEvents]);
     const askRenderedByQuestionPending = scenario.questionPendingRe.test(preEventsPlain);
@@ -6780,7 +7369,7 @@ function evaluateOutput(plain, sseSummary, exportSummary, scenario = LIVE_SCENAR
     ];
 }
 
-function evaluateControlOnlyOutput(plain, sseSummary) {
+function evaluateControlOnlyOutput(/** @type {string} */ plain, /** @type {SseSummary} */ sseSummary) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const archiveJsonDump = extractArchiveJsonDump(plain);
     return [
@@ -6893,7 +7482,11 @@ function evaluateControlOnlyOutput(plain, sseSummary) {
     ];
 }
 
-function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
+function evaluateByokProbeOutput(
+    /** @type {string} */ plain,
+    /** @type {SseSummary} */ sseSummary,
+    /** @type {{ fixture?: boolean }} */ { fixture = false } = {},
+) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const byokProfilesRe = /BYOK (?:profiles|perfis)/iu;
     const byokModelsRe = /BYOK (?:models|modelos)/iu;
@@ -7037,7 +7630,11 @@ function evaluateByokProbeOutput(plain, sseSummary, { fixture = false } = {}) {
     return criteria;
 }
 
-function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } = {}) {
+function evaluateAutoProbeOutput(
+    /** @type {string} */ plain,
+    /** @type {SseSummary} */ sseSummary,
+    /** @type {{ profile?: string }} */ { profile = 'repo_agent' } = {},
+) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const routeProfile = profile || 'repo_agent';
     return [
@@ -7208,13 +7805,16 @@ function evaluateAutoProbeOutput(plain, sseSummary, { profile = 'repo_agent' } =
     ];
 }
 
-function evaluateModelProbeOutput(plain, sseSummary) {
+function evaluateModelProbeOutput(/** @type {string} */ plain, /** @type {SseSummary} */ sseSummary) {
     const archiveRawEvents = extractArchiveRawEvents(plain);
     const defaultSurface = plain.split(/\/events\s+80\s+--raw/iu)[0] ?? plain;
     const modelChangedEvents = sseSummary.events.filter((event) => event?.event === 'session.model_changed');
-    const hasCanonicalModelChangedSummary = modelChangedEvents.some((event) =>
-        /confirmado(?: sem troca)?: .+ · origem SDK · \d{4}-\d{2}-\d{2}T/u.test(String(event?.data?.operatorSummary ?? '')),
-    );
+    const hasCanonicalModelChangedSummary = modelChangedEvents.some((event) => {
+        const payload = isObjectPayload(event.data) ? event.data : null;
+        return /confirmado(?: sem troca)?: .+ · origem SDK · \d{4}-\d{2}-\d{2}T/u.test(
+            String(payload?.operatorSummary ?? ''),
+        );
+    });
     return [
         {
             id: 'ready',
@@ -7299,9 +7899,13 @@ function evaluateModelProbeOutput(plain, sseSummary) {
 }
 
 function evaluateByokRealOutput(
-    plain,
-    secretValues,
-    {
+    /** @type {string} */ plain,
+    /** @type {{ key: string; value: string }[]} */ secretValues,
+    /** @type {Partial<Awaited<ReturnType<typeof buildRealByokRuntime>>> & {
+     *     controlOnly?: boolean;
+     *     requireVisionProbe?: boolean;
+     *     liveScenario?: LiveScenario;
+     * }} */ {
         profile,
         altProfile,
         model,
@@ -7311,10 +7915,10 @@ function evaluateByokRealOutput(
         runtimeRoute,
         agentAdmission,
         requireVisionProbe = false,
-        liveScenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID],
+        liveScenario = LIVE_SCENARIOS.canonical,
     } = {},
 ) {
-    const renderedProfileRe = (candidate) => {
+    const renderedProfileRe = (/** @type {string} */ candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
         return new RegExp(
             [
@@ -7326,7 +7930,9 @@ function evaluateByokRealOutput(
             'iu',
         );
     };
-    const byokModels = [...new Set([model, altModel].filter((value) => typeof value === 'string' && value.length > 0))];
+    const byokModels = [
+        ...new Set([model, altModel].flatMap((value) => (typeof value === 'string' && value.length > 0 ? [value] : []))),
+    ];
     const byokModelLegacyRequestLines = byokModels.flatMap((candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
         return plain.match(new RegExp(`^\\s*\\[PR\\]\\s+modelo=${escaped}\\b.*$`, 'gmu')) ?? [];
@@ -7359,6 +7965,8 @@ function evaluateByokRealOutput(
     const leanModelGatewayPreflight = isModelGatewayToolScenario(liveScenario);
     const selectorPreparedBootstrap =
         runtimeSelector?.requested === true && runtimeSelector?.ok === true && Boolean(runtimeRoute?.providerId && runtimeRoute?.providerModel);
+    const runtimeProviderId = runtimeRoute?.providerId ?? '';
+    const runtimeProviderModel = runtimeRoute?.providerModel ?? '';
     const admissionExecutionOk =
         agentAdmission?.required === true
             ? selectorPreparedBootstrap
@@ -7401,8 +8009,8 @@ function evaluateByokRealOutput(
                 (runtimeSelector.ok === true &&
                     Boolean(runtimeRoute?.providerId) &&
                     Boolean(runtimeRoute?.providerModel) &&
-                    new RegExp(`preset:\\s+${escapeRegExp(runtimeRoute.providerId)}`, 'u').test(plain) &&
-                    new RegExp(`model:\\s+${escapeRegExp(runtimeRoute.providerModel)}`, 'u').test(plain)),
+                    new RegExp(`preset:\\s+${escapeRegExp(runtimeProviderId)}`, 'u').test(plain) &&
+                    new RegExp(`model:\\s+${escapeRegExp(runtimeProviderModel)}`, 'u').test(plain)),
             detail: runtimeSelector?.requested
                 ? `runtime selector ${runtimeSelector.ok ? 'selected' : 'failed'} route=${runtimeRoute?.providerId ?? '-'}/${runtimeRoute?.providerModel ?? '-'} profile=${runtimeRoute?.routeProfile ?? runtimeSelector.profileId ?? '-'}`
                 : 'runtime selector route handoff was not requested for this BYOK live run',
@@ -7611,7 +8219,11 @@ function evaluateByokRealOutput(
     return criteria;
 }
 
-function evaluateBlockedOutput(plain, sseSummary, blocker) {
+function evaluateBlockedOutput(
+    /** @type {string} */ plain,
+    /** @type {SseSummary} */ sseSummary,
+    /** @type {LiveBlocker} */ blocker,
+) {
     const blockedByByokProvider =
         blocker?.id === 'byok-provider-turn-failed' || blocker?.id === 'byok-route-no-response';
     const adaptiveExhausted = blocker?.id === 'adaptive-selection-exhausted';
@@ -7685,7 +8297,11 @@ function evaluateBlockedOutput(plain, sseSummary, blocker) {
     ];
 }
 
-async function inspectExportedMarkdown(exportPath, scenario = LIVE_SCENARIOS[DEFAULT_LIVE_SCENARIO_ID]) {
+/** @returns {Promise<ExportSummary>} */
+async function inspectExportedMarkdown(
+    /** @type {string} */ exportPath,
+    /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
+) {
     try {
         const content = await readFile(exportPath, 'utf8');
         const envelopes = [
@@ -7731,7 +8347,8 @@ async function inspectExportedMarkdown(exportPath, scenario = LIVE_SCENARIOS[DEF
     }
 }
 
-function parseSseFrame(frame) {
+/** @returns {TerminalEvent} */
+function parseSseFrame(/** @type {string} */ frame) {
     const lines = frame.split(/\r?\n/u);
     let event = 'message';
     let id = null;
@@ -7758,12 +8375,18 @@ function parseSseFrame(frame) {
     return { id, event, data };
 }
 
-function startSseCollector({ port = 3009, pathname = '/events' } = {}) {
+/** @returns {SseCollector} */
+function startSseCollector(
+    /** @type {{ port?: number; pathname?: string }} */ { port = 3009, pathname = '/events' } = {},
+) {
     let raw = '';
     let buffer = '';
     let connected = false;
+    /** @type {number | null} */
     let statusCode = null;
+    /** @type {string[]} */
     const errors = [];
+    /** @type {TerminalEvent[]} */
     const events = [];
 
     const req = http.request(
@@ -8196,33 +8819,40 @@ async function main() {
     let scenarioSent = false;
     let scenarioPlainOffset = 0;
     let byokControlOnlyCanQuit = !(byokReal && controlOnly);
+    /** @type {number | null} */
     let exitCode = null;
+    /** @type {SseCollector | null} */
     let sseCollector = null;
     let postAskContinuationObserved = false;
     let answerPlainOffset = 0;
     let lastAnswerStepPlainOffset = 0;
+    /** @type {NodeJS.Timeout | null} */
     let postAnswerCommandTimer = null;
     let timedOut = false;
     let timeoutStage = 'scenario';
     let timeoutBudgetMs = Number.isFinite(timeoutMs) ? timeoutMs : DEFAULT_TIMEOUT_MS;
-    /** @type {string[]} */
+    /** @type {(string | LiveCommandEntry)[]} */
     let promptSynchronizedCommands = [];
     /** @type {null | (() => void)} */
     let onPromptSynchronizedCommandsDrained = null;
     let promptSynchronizedCommandOutputOffset = 0;
     let waitingForPromptSynchronizedCommand = false;
     let waitingForPromptBeforeSynchronizedCommand = false;
+    /** @type {NodeJS.Timeout | null} */
     let promptSynchronizedStartFallbackTimer = null;
     let pendingByokLiveProtocolDiagnostics = false;
     let askBeforeDeltasDiagnosticsSent = false;
     let askBeforeDeltasDiagnosticsPendingAfterAnswer = false;
     let askBeforeDeltasAnswerPlainOffset = 0;
+    /** @type {NodeJS.Timeout | null} */
     let missingRequiredAskDiagnosticTimer = null;
     let missingRequiredAskRecoverySent = false;
     let missingRequiredAskRecoveryPlainOffset = 0;
     let incompleteExpectedToolRecoverySent = false;
     let incompleteExpectedToolRecoveryPlainOffset = 0;
+    /** @type {ReturnType<typeof parseModelGatewayAdaptiveSelectionOutcome> | null} */
     let adaptiveSelectionOutcome = null;
+    /** @type {NodeJS.Timeout | null} */
     let forcedKillTimer = null;
     const command = buildTerminalLlmbCommand(canUsePty);
     const terminalInheritedEnv = controlPlaneHostEnv ?? { ...process.env, ...dotenvEnv };
@@ -8240,7 +8870,7 @@ async function main() {
                 : LIVE_TEST_COPILOT_MODEL,
             COPILOT_REASONING_EFFORT: 'high',
             COPILOT_SDK_EXCLUDED_TOOLS: appendCsvEnvValue('COPILOT_SDK_EXCLUDED_TOOLS', 'session_compact'),
-            TERMINAL_DISPLAY_PRESET: process.env.TERMINAL_DISPLAY_PRESET ?? 'default',
+            TERMINAL_DISPLAY_PRESET: process.env['TERMINAL_DISPLAY_PRESET'] ?? 'default',
             COPILOT_SDK_ENABLED: 'true',
             COPILOT_OPERATIONAL_PROFILE: 'production',
             LLM_B_TERMINAL_PORT: String(terminalPort),
@@ -8251,17 +8881,17 @@ async function main() {
 
     let childClosed = false;
     child.stdin.on('error', (error) => {
-        if (error?.code === 'EPIPE') return;
-        console.warn(`[terminal-live] stdin error: ${error?.message ?? String(error)}`);
+        if (errorCode(error) === 'EPIPE') return;
+        console.warn(`[terminal-live] stdin error: ${errorMessage(error)}`);
     });
-    const write = (line) => {
+    const write = (/** @type {string} */ line) => {
         if (childClosed || child.stdin.destroyed || child.stdin.writableEnded) return false;
         if (byokReal && controlOnly && String(line ?? '').trim() === '/quit' && !byokControlOnlyCanQuit) return false;
         try {
             return child.stdin.write(ensureLine(line));
         } catch (error) {
-            if (error?.code !== 'EPIPE') {
-                console.warn(`[terminal-live] write failed: ${error?.message ?? String(error)}`);
+            if (errorCode(error) !== 'EPIPE') {
+                console.warn(`[terminal-live] write failed: ${errorMessage(error)}`);
             }
             return false;
         }
@@ -8299,9 +8929,9 @@ async function main() {
         }
     };
     const startPromptSynchronizedCommandSequence = (
-        commands,
-        onDrained = null,
-        { promptAfterOffset = null } = {},
+        /** @type {(string | LiveCommandEntry)[]} */ commands,
+        /** @type {(() => void) | null} */ onDrained = null,
+        /** @type {{ promptAfterOffset?: number | null }} */ { promptAfterOffset = null } = {},
     ) => {
         promptSynchronizedCommands = [...commands];
         onPromptSynchronizedCommandsDrained = onDrained;
@@ -8328,7 +8958,10 @@ async function main() {
         forcedKillTimer = setTimeout(() => child.kill('SIGTERM'), Math.max(0, delayMs));
         forcedKillTimer.unref();
     };
-    const startDiagnosticCommandSequenceThenQuit = (diagnostics, { forceKillDelayMs = 10_000 } = {}) => {
+    const startDiagnosticCommandSequenceThenQuit = (
+        /** @type {string[]} */ diagnostics,
+        /** @type {{ forceKillDelayMs?: number }} */ { forceKillDelayMs = 10_000 } = {},
+    ) => {
         startPromptSynchronizedCommandSequence(diagnostics, () => {
             if (!quitSent) {
                 quitSent = true;
@@ -8357,7 +8990,7 @@ async function main() {
         startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: Math.max(30_000, diagnostics.length * 3_000) });
         return true;
     };
-    const scheduleStartupBlockerDiagnostics = (blocker) => {
+    const scheduleStartupBlockerDiagnostics = (/** @type {LiveBlocker | null} */ blocker) => {
         if (postCommandsSent || !blocker) return false;
         postCommandsSent = true;
         clearMissingRequiredAskDiagnosticTimer();
@@ -8372,7 +9005,9 @@ async function main() {
         scheduleForcedKill(Math.max(20_000, diagnostics.length * 3_000));
         return true;
     };
-    const scheduleAdaptiveExhaustionDiagnostics = (outcome) => {
+    const scheduleAdaptiveExhaustionDiagnostics = (
+        /** @type {ReturnType<typeof parseModelGatewayAdaptiveSelectionOutcome>} */ outcome,
+    ) => {
         if (postCommandsSent || outcome?.status !== 'exhausted') return false;
         postCommandsSent = true;
         clearMissingRequiredAskDiagnosticTimer();
@@ -8521,7 +9156,9 @@ async function main() {
         clearTimeout(missingRequiredAskDiagnosticTimer);
         missingRequiredAskDiagnosticTimer = null;
     };
-    const scheduleMissingRequiredAskDiagnostics = ({ delayMs = DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS } = {}) => {
+    const scheduleMissingRequiredAskDiagnostics = (
+        /** @type {{ delayMs?: number }} */ { delayMs = DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS } = {},
+    ) => {
         if (postCommandsSent || missingRequiredAskDiagnosticTimer) return;
         missingRequiredAskDiagnosticTimer = setTimeout(() => {
             missingRequiredAskDiagnosticTimer = null;
@@ -8554,7 +9191,9 @@ async function main() {
         }, Math.max(0, delayMs));
         missingRequiredAskDiagnosticTimer.unref();
     };
-    const sendIncompleteExpectedToolRecovery = (incomplete) => {
+    const sendIncompleteExpectedToolRecovery = (
+        /** @type {{ completed: string[]; missing: string[] } | null} */ incomplete,
+    ) => {
         if (postCommandsSent || answerSent || incompleteExpectedToolRecoverySent || !incomplete) return;
         incompleteExpectedToolRecoverySent = true;
         incompleteExpectedToolRecoveryPlainOffset = stripAnsi(raw).length;
@@ -8564,7 +9203,9 @@ async function main() {
         );
         write(buildIncompleteExpectedToolRecoveryPrompt(liveScenario, incomplete.missing));
     };
-    const scheduleIncompleteExpectedToolDiagnostics = (incomplete) => {
+    const scheduleIncompleteExpectedToolDiagnostics = (
+        /** @type {{ completed: string[]; missing: string[] } | null} */ incomplete,
+    ) => {
         if (postCommandsSent || !incomplete) return;
         postCommandsSent = true;
         console.warn(
@@ -8583,7 +9224,9 @@ async function main() {
         ];
         startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
     };
-    const scheduleDivergentAskDiagnostics = (divergentAsk) => {
+    const scheduleDivergentAskDiagnostics = (
+        /** @type {{ expected: string; observed: string; prefix: string } | null} */ divergentAsk,
+    ) => {
         if (postCommandsSent || !divergentAsk) return;
         postCommandsSent = true;
         console.warn(
@@ -8638,7 +9281,10 @@ async function main() {
         timeout = setTimeout(handleRunnerTimeout, timeoutBudgetMs);
         timeout.unref();
     }
-    const sendScenarioAnswerStep = (plain, step) => {
+    const sendScenarioAnswerStep = (
+        /** @type {string} */ plain,
+        /** @type {Readonly<LiveScenarioAnswerStep> | undefined} */ step,
+    ) => {
         if (!step) return;
         answerSequenceStarted = true;
         answerStepIndex += 1;
@@ -8656,10 +9302,11 @@ async function main() {
         setTimeout(() => write(step.answer), Math.max(0, Number(step.delayMs ?? 500))).unref();
     };
     /** @type {NodeJS.Timeout | null} */
+    /** @type {NodeJS.Timeout | null} */
     let timeout = null;
     armRunnerTimeout(timeoutBudgetMs, 'scenario');
 
-    const onData = (chunk) => {
+    const onData = (/** @type {Buffer} */ chunk) => {
         const text = chunk.toString('utf8');
         raw += text;
         process.stdout.write(text);
@@ -8958,19 +9605,21 @@ async function main() {
     child.stdout.on('data', onData);
     child.stderr.on('data', onData);
 
-    exitCode = await new Promise((resolve) => {
+    exitCode = await new Promise((/** @type {(code: number | null) => void} */ resolve) => {
         child.on('close', (code) => {
             childClosed = true;
             resolve(code);
         });
     });
-    clearTimeout(timeout);
+    if (timeout) clearTimeout(timeout);
     if (forcedKillTimer) clearTimeout(forcedKillTimer);
-    sseCollector?.close();
+    /** @returns {SseCollector | null} */
+    const currentSseCollector = () => sseCollector;
+    currentSseCollector()?.close();
     await byokFixtureProvider?.close();
 
     const plain = stripAnsi(raw);
-    const sseSummary = sseCollector?.summary() ?? {
+    const sseSummary = currentSseCollector()?.summary() ?? {
         connected: false,
         statusCode: null,
         eventCount: 0,

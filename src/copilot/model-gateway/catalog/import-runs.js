@@ -75,7 +75,7 @@ function sha256(value) {
  * @param {string} input.sourceId
  * @param {unknown} input.payload
  * @param {string} [input.mediaType]
- * @param {{ mode?: string; maxInlineBytes?: number }} [input.storagePolicy]
+ * @param {{ mode?: string; maxInlineBytes?: number } | undefined} [input.storagePolicy]
  * @returns {{ schemaVersion: number; rawPayloadRef: string; providerId: string; sourceId: string; mediaType: string; byteLength: number; payloadSha256: string; storagePolicy: string; sanitizedPayload: unknown; redactionStatus: string }}
  */
 export function createSanitizedRawPayloadRef(input) {
@@ -115,7 +115,6 @@ export function createSanitizedRawPayloadRef(input) {
  * @param {number} [input.rowCount]
  * @param {unknown[]} [input.errors]
  * @param {unknown} [input.diff]
- * @returns {object}
  */
 export function createCatalogImportRun(input) {
     const runId = optionalString(input.runId);
@@ -140,8 +139,8 @@ export function createCatalogImportRun(input) {
 }
 
 /**
- * @param {Array<Record<string, any>>} previous
- * @param {Array<Record<string, any>>} next
+ * @param {Array<Record<string, unknown>>} previous
+ * @param {Array<Record<string, unknown>>} next
  * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[] }> }}
  */
 export function diffCanonicalModelProjections(previous, next) {
@@ -165,10 +164,10 @@ export function diffCanonicalModelProjections(previous, next) {
 /**
  * @param {object} input
  * @param {{ removed?: string[] }} input.diff
- * @param {Array<Record<string, any>>} input.previousProjections
+ * @param {Array<Record<string, unknown>>} input.previousProjections
  * @param {string | number | Date} [input.observedAt]
  * @param {string} [input.reason]
- * @returns {Array<{ schemaVersion: number; tombstoneId: string; projectionKey: string; providerId: string | null; providerModel: string | null; routeProfile: string; displayName: string | null; reason: string; observedAt: string; lastProjection: Record<string, any> | null }>}
+ * @returns {Array<{ schemaVersion: number; tombstoneId: string; projectionKey: string; providerId: string | null; providerModel: string | null; routeProfile: string; displayName: string | null; reason: string; observedAt: string; lastProjection: Record<string, unknown> | null }>}
  */
 export function createCatalogModelTombstones(input) {
     const observedAt = normalizeIsoDate(input.observedAt) ?? new Date().toISOString();
@@ -264,7 +263,7 @@ function classifyChangedFields(changedFields) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function projectionKey(projection) {

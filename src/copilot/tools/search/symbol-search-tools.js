@@ -34,23 +34,20 @@ export const workspaceSymbolSearchTool = buildTool({
     parameters: z.object({
         name: z
             .string()
-            .min(1)
-            .describe('Nome ou prefixo/substring do símbolo a buscar (ex: "validatePath", "MyClass")'),
+            .min(1)['describe']('Nome ou prefixo/substring do símbolo a buscar (ex: "validatePath", "MyClass")'),
         kind: z
             .enum(['function', 'class', 'variable', 'export', 'type', 'all'])
             .optional()
-            .default('all')
-            .describe('Tipo de símbolo: function, class, variable, export, type ou all (qualquer declaração).'),
+            .default('all')['describe']('Tipo de símbolo: function, class, variable, export, type ou all (qualquer declaração).'),
         path: z
             .string()
             .optional()
-            .default('.')
-            .describe('Diretório onde buscar (relativo ao workspace). Default: raiz do workspace'),
-        includePattern: z.string().optional().describe('Glob de arquivos a incluir (ex: "*.ts", "src/**/*.js")'),
-        caseSensitive: z.boolean().optional().default(false).describe('Busca sensível a maiúsculas. Default: false'),
-        maxResults: z.number().int().min(1).optional().describe('Número máximo sugerido de declarações a retornar.'),
-        cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
-        exactMatch: z.boolean().optional().default(false).describe('Se true, busca apenas símbolos com nome exato (sem substring match). Default: false.'),
+            .default('.')['describe']('Diretório onde buscar (relativo ao workspace). Default: raiz do workspace'),
+        includePattern: z.string().optional()['describe']('Glob de arquivos a incluir (ex: "*.ts", "src/**/*.js")'),
+        caseSensitive: z.boolean().optional().default(false)['describe']('Busca sensível a maiúsculas. Default: false'),
+        maxResults: z.number().int().min(1).optional()['describe']('Número máximo sugerido de declarações a retornar.'),
+        cursor: z.string().optional()['describe']('Cursor numérico retornado por chamada anterior.'),
+        exactMatch: z.boolean().optional().default(false)['describe']('Se true, busca apenas símbolos com nome exato (sem substring match). Default: false.'),
     }),
     handler: async ({
         name: symbolName,

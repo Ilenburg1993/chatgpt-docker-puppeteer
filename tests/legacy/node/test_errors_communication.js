@@ -1,4 +1,3 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 // ============================================================
 // TESTE DE COMUNICAÇÃO VISUAL DE ERROS/WARNINGS
 // ============================================================
@@ -6,30 +5,17 @@
 // para validar a configuração do ESLint + VS Code
 // ============================================================
 
-// ✅ ERRO 1: no-undef (variável não declarada)
-console.log(variavel_nao_existe);
+// Os exemplos são dados deliberadamente inválidos. Mantê-los como strings permite validar a
+// comunicação visual sem introduzir erros reais no workspace tipado.
+const diagnosticExamples = [
+    { rule: 'no-undef', source: 'console.log(variavel_nao_existe);' },
+    { rule: 'no-unused-vars', source: 'const variavelNaoUsada = 123;' },
+    { rule: 'no-shadow', source: 'const x = 1; function testShadow() { const x = 2; return x; }' },
+    { rule: 'no-redeclare', source: 'let y = 1; let y = 2;' },
+    { rule: 'prefer-const', source: "let neverReassigned = 'test';" },
+];
 
-// ⚠️ WARNING 2: no-unused-vars (variável não usada)
-const variavelNaoUsada = 123;
-
-// ⚠️ WARNING 3: no-shadow (sombreamento de variável)
-const x = 1;
-function testShadow() {
-    const x = 2; // shadow - deve aparecer como warning
-    return x;
-}
-
-// ✅ ERRO 4: no-redeclare (redeclaração)
-let y = 1;
-// let y = 2; // COMENTADO: causaria erro (descomentar para testar)
-
-// ⚠️ WARNING 5: prefer-const (deveria usar const)
-let neverReassigned = 'test'; // deveria ser const
-
-// ✅ CÓDIGO VÁLIDO (para comparação)
-const validVariable = 'test';
-console.log(validVariable);
-console.log(testShadow());
+console.log(`Exemplos de diagnóstico disponíveis: ${diagnosticExamples.length}`);
 
 // ============================================================
 // INSTRUÇÕES DE USO:

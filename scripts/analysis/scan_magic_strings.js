@@ -220,9 +220,9 @@ function printResults(results, label) {
     );
 
     console.log('📊 SEVERITY BREAKDOWN:');
-    console.log(`   🔴 HIGH: ${bySeverity.HIGH} (must fix)`);
-    console.log(`   🟡 MEDIUM: ${bySeverity.MEDIUM} (should fix)`);
-    console.log(`   🔵 LOW: ${bySeverity.LOW} (consider fixing)\n`);
+    console.log(`   🔴 HIGH: ${bySeverity['HIGH']} (must fix)`);
+    console.log(`   🟡 MEDIUM: ${bySeverity['MEDIUM']} (should fix)`);
+    console.log(`   🔵 LOW: ${bySeverity['LOW']} (consider fixing)\n`);
 
     // Print details
     Object.keys(byFile)

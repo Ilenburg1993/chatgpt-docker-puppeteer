@@ -93,7 +93,6 @@ function parseArgs(argv) {
 }
 
 /**
- * @template T
  * @param {string} command
  * @param {string[]} args
  * @returns {Promise<{ stdout: string; stderr: string; exitCode: number }>}
@@ -463,7 +462,7 @@ if (actionable.length > 0) {
     markdownLines.push('## Blocking (published fix exists)', '');
     for (const item of actionable) {
         markdownLines.push(
-            `- ${item.name} (${item.severity}) -> ${Array.isArray(item.candidates) ? item.candidates.join(', ') : 'n/a'}`,
+            `- ${item['name']} (${item['severity']}) -> ${Array.isArray(item['candidates']) ? item['candidates'].join(', ') : 'n/a'}`,
         );
     }
     markdownLines.push('');
@@ -472,7 +471,7 @@ if (actionable.length > 0) {
 if (residual.length > 0) {
     markdownLines.push('## Residual (no published fix / manual review)', '');
     for (const item of residual) {
-        markdownLines.push(`- ${item.name} (${item.severity}) -> ${item.state}: ${item.note}`);
+        markdownLines.push(`- ${item['name']} (${item['severity']}) -> ${item['state']}: ${item['note']}`);
     }
     markdownLines.push('');
 }

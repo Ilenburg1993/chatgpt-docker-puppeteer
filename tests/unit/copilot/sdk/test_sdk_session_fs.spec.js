@@ -28,11 +28,11 @@ afterEach(async () => {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
     }
-    delete process.env.COPILOT_SDK_SESSION_FS_ENABLED;
-    delete process.env.COPILOT_SDK_SESSION_STATE_PATH;
-    delete process.env.COPILOT_SDK_SESSION_FS_CONVENTIONS;
-    delete process.env.COPILOT_SDK_SESSION_FS_ROOT;
-    delete process.env.COPILOT_SDK_SESSION_IDLE_TIMEOUT_SECONDS;
+    delete process.env['COPILOT_SDK_SESSION_FS_ENABLED'];
+    delete process.env['COPILOT_SDK_SESSION_STATE_PATH'];
+    delete process.env['COPILOT_SDK_SESSION_FS_CONVENTIONS'];
+    delete process.env['COPILOT_SDK_SESSION_FS_ROOT'];
+    delete process.env['COPILOT_SDK_SESSION_IDLE_TIMEOUT_SECONDS'];
     metrics = [];
     setSdkMetricEmitter(null);
 });
@@ -189,10 +189,10 @@ describe('sdk/session-fs', () => {
     });
 
     it('buildConfiguredClientSessionFsConfig lê env/boot quando habilitado', () => {
-        process.env.COPILOT_SDK_SESSION_FS_ENABLED = 'true';
-        process.env.COPILOT_SDK_SESSION_STATE_PATH = '.copilot/custom-session-state';
-        process.env.COPILOT_SDK_SESSION_FS_CONVENTIONS = 'posix';
-        process.env.COPILOT_SDK_SESSION_IDLE_TIMEOUT_SECONDS = '900';
+        process.env['COPILOT_SDK_SESSION_FS_ENABLED'] = 'true';
+        process.env['COPILOT_SDK_SESSION_STATE_PATH'] = '.copilot/custom-session-state';
+        process.env['COPILOT_SDK_SESSION_FS_CONVENTIONS'] = 'posix';
+        process.env['COPILOT_SDK_SESSION_IDLE_TIMEOUT_SECONDS'] = '900';
 
         expect(buildConfiguredClientSessionFsConfig()).toMatchObject({
             initialCwd: expect.any(String),
@@ -205,8 +205,8 @@ describe('sdk/session-fs', () => {
 
     it('describeConfiguredSessionFs e readConfiguredSessionFsState expõem paths seguros e estado por sessão', async () => {
         const storageRootDir = await createTempDir();
-        process.env.COPILOT_SDK_SESSION_FS_ENABLED = 'true';
-        process.env.COPILOT_SDK_SESSION_FS_ROOT = storageRootDir;
+        process.env['COPILOT_SDK_SESSION_FS_ENABLED'] = 'true';
+        process.env['COPILOT_SDK_SESSION_FS_ROOT'] = storageRootDir;
 
         const descriptor = describeConfiguredSessionFs('sess-A');
         expect(descriptor.enabled).toBe(true);
@@ -228,7 +228,7 @@ describe('sdk/session-fs', () => {
     });
 
     it('não expõe config quando SessionFs está desabilitado', () => {
-        delete process.env.COPILOT_SDK_SESSION_FS_ENABLED;
+        delete process.env['COPILOT_SDK_SESSION_FS_ENABLED'];
         expect(buildConfiguredClientSessionFsConfig()).toBeUndefined();
         expect(getConfiguredSessionFsHandler()).toBeUndefined();
         expect(getConfiguredSessionIdleTimeoutSeconds()).toBeUndefined();

@@ -1,13 +1,7 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { convertV1toV2, isResponseV2, loadResponse, saveResponse } from '#infra/storage/response_adapter';
-import path from 'node:path';
-
-// Diretórios temporários para testes (NOTA: response_store_v2 salva em respostas/ produção)
-const TEST_DIR = path.join(import.meta.dirname, 'temp_test_responses');
-const RESPONSES_DIR = path.join(TEST_DIR, 'respostas');
 
 // Mock task para testes
-const createMockTask = (taskId) => ({
+const createMockTask = (/** @type {string} */ taskId) => ({
     meta: {
         id: taskId,
         created_at: new Date().toISOString(),
@@ -17,14 +11,23 @@ const createMockTask = (taskId) => ({
         prompt: 'Test prompt',
         target: 'chatgpt',
     },
-    result: {},
+    result: /** @type {{
+     *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
+     *     generation?: unknown;
+     *     file_path?: string;
+     * }} */ ({}),
 });
+
+/** @param {unknown} error @returns {string} */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
 
 // Testes
 /**
  * Função exportada: runTests.
  *
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function runTests() {
     let passed = 0;
@@ -63,7 +66,7 @@ async function runTests() {
                 throw new Error(`Expected true, got ${result}`);
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -82,7 +85,7 @@ async function runTests() {
                 throw new Error(`Expected false, got ${result}`);
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -115,7 +118,7 @@ async function runTests() {
                 throw new Error('V2 conversion failed validation');
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -165,7 +168,7 @@ async function runTests() {
             console.log(`✅ ${testName}`);
             passed++;
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -194,7 +197,7 @@ async function runTests() {
                 throw new Error('V1 backward compatibility failed');
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }
@@ -236,7 +239,7 @@ async function runTests() {
                 throw new Error(`Expected '# Load test', got '${JSON.stringify(mdContent)}'`);
             }
         } catch (error) {
-            console.error(`❌ ${testName}: ${error.message}`);
+            console.error(`❌ ${testName}: ${errorMessage(error)}`);
             failed++;
         }
     }

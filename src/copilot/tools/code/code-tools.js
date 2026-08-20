@@ -157,7 +157,7 @@ const lintCheckTool = buildTool({
     description:
         'Executa ESLint em modo somente leitura com cache no projeto para detectar erros de estilo/qualidade. Retorna erros encontrados sem aplicar correções.',
     parameters: z.object({
-        path: z.string().optional().describe('Caminho específico para lintar (ex: src/copilot)'),
+        path: z.string().optional()['describe']('Caminho específico para lintar (ex: src/copilot)'),
     }),
     handler: async (/** @type {{ fix?: boolean; path?: string }} */ { fix, path: filePath }) => {
         if (fix !== undefined) {
@@ -187,12 +187,11 @@ const lintFixTool = buildTool({
     description:
         'Executa ESLint para pré-visualizar ou aplicar correções automáticas. Operação mutável quando dryRun=false.',
     parameters: z.object({
-        path: z.string().optional().describe('Caminho específico para lintar/corrigir (ex: src/copilot)'),
+        path: z.string().optional()['describe']('Caminho específico para lintar/corrigir (ex: src/copilot)'),
         dryRun: z
             .boolean()
             .optional()
-            .default(true)
-            .describe('Se true, usa --fix-dry-run e não escreve arquivos. Default: true.'),
+            .default(true)['describe']('Se true, usa --fix-dry-run e não escreve arquivos. Default: true.'),
     }),
     handler: async (/** @type {{ dryRun?: boolean; path?: string }} */ { dryRun = true, path: filePath }) => {
         const target = filePath ?? '.';
@@ -268,13 +267,11 @@ const qualityGateTool = buildTool({
         'Executa um quality gate allowlisted do Copilot sem aceitar comandos arbitrários. Retorna JSON estável com ok, gate, script, duração, exitCode, checks e artifacts.',
     parameters: z.object({
         gate: z
-            .enum(['lint', 'typecheck', 'unit', 'integration', 'arch', 'mcp-fast', 'mcp-full', 'index-status'])
-            .describe('Quality gate allowlisted a executar.'),
+            .enum(['lint', 'typecheck', 'unit', 'integration', 'arch', 'mcp-fast', 'mcp-full', 'index-status'])['describe']('Quality gate allowlisted a executar.'),
         scope: z
             .enum(['src/copilot', 'mcp', 'all'])
             .optional()
-            .default('src/copilot')
-            .describe('Escopo lógico/informativo do gate. Não altera o comando allowlisted.'),
+            .default('src/copilot')['describe']('Escopo lógico/informativo do gate. Não altera o comando allowlisted.'),
     }),
     handler: async (/** @type {{ gate?: QualityGateName; scope?: string }} */ { gate, scope = 'src/copilot' }) => {
         const plan = gate ? QUALITY_GATE_PLANS[gate] : undefined;
@@ -309,8 +306,7 @@ const runTestsTool = buildTool({
         suite: z
             .enum(['fast', 'unit', 'integration', 'all'])
             .optional()
-            .default('fast')
-            .describe('Suíte de testes a executar'),
+            .default('fast')['describe']('Suíte de testes a executar'),
     }),
     handler: async (/** @type {{ suite?: string }} */ { suite }) => {
         /** @type {Record<string, string>} */

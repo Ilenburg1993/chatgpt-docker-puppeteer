@@ -72,10 +72,10 @@ vi.mock('../../../../src/copilot/config/sdk-config-port.js', async () => {
     );
     return {
         BUILTIN_HANDLER_MAP: new Map(),
-        ClientOptionsBuilder: clientOptions.ClientOptionsBuilder,
-        buildCopilotClientOptionsFromEnv: clientOptions.buildCopilotClientOptionsFromEnv,
-        buildServerCopilotClientOptions: clientOptions.buildServerCopilotClientOptions,
-        buildTerminalCopilotClientOptions: clientOptions.buildTerminalCopilotClientOptions,
+        ClientOptionsBuilder: clientOptions['ClientOptionsBuilder'],
+        buildCopilotClientOptionsFromEnv: clientOptions['buildCopilotClientOptionsFromEnv'],
+        buildServerCopilotClientOptions: clientOptions['buildServerCopilotClientOptions'],
+        buildTerminalCopilotClientOptions: clientOptions['buildTerminalCopilotClientOptions'],
         SYSTEM_MESSAGE_SECTIONS: {},
         SYSTEM_PROMPT_SECTIONS: {},
         INFINITE_SESSION_DEFAULTS: {
@@ -434,31 +434,31 @@ describe('ClientOptionsBuilder', () => {
     });
 
     it('logLevelFromEnv() mapeia LOG_LEVEL do env', () => {
-        const original = process.env.LOG_LEVEL;
+        const original = process.env['LOG_LEVEL'];
         try {
-            process.env.LOG_LEVEL = 'DEBUG';
+            process.env['LOG_LEVEL'] = 'DEBUG';
             const opts = new ClientOptionsBuilder().logLevelFromEnv().build();
             expect(opts.logLevel).toBe('debug');
         } finally {
             if (original !== undefined) {
-                process.env.LOG_LEVEL = original;
+                process.env['LOG_LEVEL'] = original;
             } else {
-                delete process.env.LOG_LEVEL;
+                delete process.env['LOG_LEVEL'];
             }
         }
     });
 
     it('logLevelFromEnv() mapeia WARN → warning', () => {
-        const original = process.env.LOG_LEVEL;
+        const original = process.env['LOG_LEVEL'];
         try {
-            process.env.LOG_LEVEL = 'WARN';
+            process.env['LOG_LEVEL'] = 'WARN';
             const opts = new ClientOptionsBuilder().logLevelFromEnv().build();
             expect(opts.logLevel).toBe('warning');
         } finally {
             if (original !== undefined) {
-                process.env.LOG_LEVEL = original;
+                process.env['LOG_LEVEL'] = original;
             } else {
-                delete process.env.LOG_LEVEL;
+                delete process.env['LOG_LEVEL'];
             }
         }
     });
@@ -469,16 +469,16 @@ describe('ClientOptionsBuilder', () => {
     });
 
     it('githubTokenFromEnv() lê GITHUB_TOKEN', () => {
-        const original = process.env.GITHUB_TOKEN;
+        const original = process.env['GITHUB_TOKEN'];
         try {
-            process.env.GITHUB_TOKEN = 'ghp_from_env';
+            process.env['GITHUB_TOKEN'] = 'ghp_from_env';
             const opts = new ClientOptionsBuilder().githubTokenFromEnv().build();
             expect(opts.gitHubToken).toBe('ghp_from_env');
         } finally {
             if (original !== undefined) {
-                process.env.GITHUB_TOKEN = original;
+                process.env['GITHUB_TOKEN'] = original;
             } else {
-                delete process.env.GITHUB_TOKEN;
+                delete process.env['GITHUB_TOKEN'];
             }
         }
     });
@@ -486,41 +486,41 @@ describe('ClientOptionsBuilder', () => {
     it('envPassthrough() filtra variáveis seguras', () => {
         const original = { ...process.env };
         try {
-            process.env.COPILOT_CLI_URL = 'test';
-            process.env.GITHUB_TOKEN = 'ghp';
-            process.env.COPILOT_BYOK_API_KEY = 'byok-secret';
-            process.env.SECRET_KEY = 'should-not-pass';
+            process.env['COPILOT_CLI_URL'] = 'test';
+            process.env['GITHUB_TOKEN'] = 'ghp';
+            process.env['COPILOT_BYOK_API_KEY'] = 'byok-secret';
+            process.env['SECRET_KEY'] = 'should-not-pass';
             const opts = new ClientOptionsBuilder().envPassthrough().build();
             expect(opts.env).toBeDefined();
-            expect(opts.env?.COPILOT_CLI_URL).toBe('test');
-            expect(opts.env?.GITHUB_TOKEN).toBe('ghp');
-            expect(opts.env?.COPILOT_BYOK_API_KEY).toBeUndefined();
-            expect(opts.env?.SECRET_KEY).toBeUndefined();
-            expect(opts.env?.PATH).toBeDefined();
+            expect(opts.env?.['COPILOT_CLI_URL']).toBe('test');
+            expect(opts.env?.['GITHUB_TOKEN']).toBe('ghp');
+            expect(opts.env?.['COPILOT_BYOK_API_KEY']).toBeUndefined();
+            expect(opts.env?.['SECRET_KEY']).toBeUndefined();
+            expect(opts.env?.['PATH']).toBeDefined();
         } finally {
             // Restaurar env original (apenas as chaves adicionadas)
-            delete process.env.COPILOT_CLI_URL;
-            delete process.env.COPILOT_BYOK_API_KEY;
-            delete process.env.SECRET_KEY;
-            if (original.GITHUB_TOKEN !== undefined) {
-                process.env.GITHUB_TOKEN = original.GITHUB_TOKEN;
+            delete process.env['COPILOT_CLI_URL'];
+            delete process.env['COPILOT_BYOK_API_KEY'];
+            delete process.env['SECRET_KEY'];
+            if (original['GITHUB_TOKEN'] !== undefined) {
+                process.env['GITHUB_TOKEN'] = original['GITHUB_TOKEN'];
             } else {
-                delete process.env.GITHUB_TOKEN;
+                delete process.env['GITHUB_TOKEN'];
             }
         }
     });
 
     it('envPassthrough() inclui extraKeys', () => {
-        const original = process.env.MY_CUSTOM;
+        const original = process.env['MY_CUSTOM'];
         try {
-            process.env.MY_CUSTOM = 'value';
+            process.env['MY_CUSTOM'] = 'value';
             const opts = new ClientOptionsBuilder().envPassthrough(['MY_CUSTOM']).build();
-            expect(opts.env?.MY_CUSTOM).toBe('value');
+            expect(opts.env?.['MY_CUSTOM']).toBe('value');
         } finally {
             if (original !== undefined) {
-                process.env.MY_CUSTOM = original;
+                process.env['MY_CUSTOM'] = original;
             } else {
-                delete process.env.MY_CUSTOM;
+                delete process.env['MY_CUSTOM'];
             }
         }
     });
@@ -528,15 +528,15 @@ describe('ClientOptionsBuilder', () => {
     it('envPassthrough() normaliza conflito NO_COLOR/FORCE_COLOR e injeta disable-warning no child CLI', () => {
         const original = { ...process.env };
         try {
-            process.env.FORCE_COLOR = '1';
-            process.env.NO_COLOR = '1';
-            delete process.env.COPILOT_CLI_DISABLE_EXPERIMENTAL_WARNING;
+            process.env['FORCE_COLOR'] = '1';
+            process.env['NO_COLOR'] = '1';
+            delete process.env['COPILOT_CLI_DISABLE_EXPERIMENTAL_WARNING'];
 
             const opts = new ClientOptionsBuilder().envPassthrough().build();
 
-            expect(opts.env?.FORCE_COLOR).toBe('1');
-            expect(opts.env?.NO_COLOR).toBeUndefined();
-            expect(opts.env?.NODE_OPTIONS).toContain('--disable-warning=ExperimentalWarning');
+            expect(opts.env?.['FORCE_COLOR']).toBe('1');
+            expect(opts.env?.['NO_COLOR']).toBeUndefined();
+            expect(opts.env?.['NODE_OPTIONS']).toContain('--disable-warning=ExperimentalWarning');
         } finally {
             process.env = original;
         }
@@ -570,16 +570,16 @@ describe('ClientOptionsBuilder', () => {
     });
 
     it('telemetryFromEnv() lê OTEL_EXPORTER_OTLP_ENDPOINT', () => {
-        const original = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+        const original = process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
         try {
-            process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4317';
+            process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = 'http://localhost:4317';
             const opts = new ClientOptionsBuilder().telemetryFromEnv().build();
             expect(opts.telemetry).toBeDefined();
         } finally {
             if (original !== undefined) {
-                process.env.OTEL_EXPORTER_OTLP_ENDPOINT = original;
+                process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = original;
             } else {
-                delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+                delete process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
             }
         }
     });
@@ -619,17 +619,17 @@ describe('ClientOptionsBuilder', () => {
     it('buildCopilotClientOptionsFromEnv centraliza cliUrl e omite transporte conflitante', () => {
         const original = { ...process.env };
         try {
-            process.env.COPILOT_CLI_URL = 'http://127.0.0.1:9010';
-            process.env.COPILOT_CLI_PATH = '/bin/copilot';
-            process.env.COPILOT_USE_STDIO = 'false';
-            process.env.COPILOT_CLI_PORT = '9011';
-            process.env.COPILOT_LOG_LEVEL = 'DEBUG';
+            process.env['COPILOT_CLI_URL'] = 'http://127.0.0.1:9010';
+            process.env['COPILOT_CLI_PATH'] = '/bin/copilot';
+            process.env['COPILOT_USE_STDIO'] = 'false';
+            process.env['COPILOT_CLI_PORT'] = '9011';
+            process.env['COPILOT_LOG_LEVEL'] = 'DEBUG';
             const opts = buildCopilotClientOptionsFromEnv();
             expect(opts.connection).toMatchObject({ kind: 'uri', url: 'http://127.0.0.1:9010' });
-            expect(opts.cliUrl).toBeUndefined();
-            expect(opts.cliPath).toBeUndefined();
-            expect(opts.useStdio).toBeUndefined();
-            expect(opts.port).toBeUndefined();
+            expect('cliUrl' in opts).toBe(false);
+            expect('cliPath' in opts).toBe(false);
+            expect('useStdio' in opts).toBe(false);
+            expect('port' in opts).toBe(false);
             expect(opts.logLevel).toBe('debug');
         } finally {
             process.env = original;
@@ -639,33 +639,33 @@ describe('ClientOptionsBuilder', () => {
     it('buildCopilotClientOptionsFromEnv cobre spawn, auth e telemetria do SDK', () => {
         const original = { ...process.env };
         try {
-            delete process.env.COPILOT_CLI_URL;
-            process.env.COPILOT_CLI_PATH = '/opt/copilot';
-            process.env.COPILOT_CLI_ARGS = '["--stdio"]';
-            process.env.COPILOT_CLI_CWD = '/workspace/copilot';
-            process.env.COPILOT_USE_STDIO = 'true';
-            process.env.COPILOT_CLI_IS_CHILD_PROCESS = 'false';
-            process.env.COPILOT_AUTO_START = 'false';
-            process.env.COPILOT_AUTO_RESTART = 'false';
-            process.env.COPILOT_GITHUB_TOKEN = 'ghp_env';
-            process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318';
-            process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT = 'true';
-            process.env.FORCE_COLOR = '1';
-            process.env.NO_COLOR = '1';
+            delete process.env['COPILOT_CLI_URL'];
+            process.env['COPILOT_CLI_PATH'] = '/opt/copilot';
+            process.env['COPILOT_CLI_ARGS'] = '["--stdio"]';
+            process.env['COPILOT_CLI_CWD'] = '/workspace/copilot';
+            process.env['COPILOT_USE_STDIO'] = 'true';
+            process.env['COPILOT_CLI_IS_CHILD_PROCESS'] = 'false';
+            process.env['COPILOT_AUTO_START'] = 'false';
+            process.env['COPILOT_AUTO_RESTART'] = 'false';
+            process.env['COPILOT_GITHUB_TOKEN'] = 'ghp_env';
+            process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = 'http://localhost:4318';
+            process.env['OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT'] = 'true';
+            process.env['FORCE_COLOR'] = '1';
+            process.env['NO_COLOR'] = '1';
             const opts = buildCopilotClientOptionsFromEnv();
             expect(opts.connection).toMatchObject({ kind: 'stdio', path: '/opt/copilot', args: ['--stdio'] });
             expect(opts.workingDirectory).toBe('/workspace/copilot');
-            expect(opts.cliPath).toBeUndefined();
-            expect(opts.cliArgs).toBeUndefined();
-            expect(opts.cwd).toBeUndefined();
-            expect(opts.useStdio).toBeUndefined();
-            expect(opts.isChildProcess).toBeUndefined();
-            expect(opts.autoStart).toBeUndefined();
-            expect(opts.autoRestart).toBeUndefined();
+            expect('cliPath' in opts).toBe(false);
+            expect('cliArgs' in opts).toBe(false);
+            expect('cwd' in opts).toBe(false);
+            expect('useStdio' in opts).toBe(false);
+            expect('isChildProcess' in opts).toBe(false);
+            expect('autoStart' in opts).toBe(false);
+            expect('autoRestart' in opts).toBe(false);
             expect(opts.gitHubToken).toBe('ghp_env');
             expect(opts.useLoggedInUser).toBe(false);
-            expect(opts.env?.NO_COLOR).toBeUndefined();
-            expect(opts.env?.NODE_OPTIONS).toContain('--disable-warning=ExperimentalWarning');
+            expect(opts.env?.['NO_COLOR']).toBeUndefined();
+            expect(opts.env?.['NODE_OPTIONS']).toContain('--disable-warning=ExperimentalWarning');
             expect(opts.telemetry).toMatchObject({
                 otlpEndpoint: 'http://localhost:4318',
                 sourceName: 'llm-b-terminal',
@@ -679,7 +679,7 @@ describe('ClientOptionsBuilder', () => {
     it('modela modos explícitos para terminal local e server multiusuário', () => {
         const original = { ...process.env };
         try {
-            process.env.COPILOT_CLIENT_MODE = 'empty';
+            process.env['COPILOT_CLIENT_MODE'] = 'empty';
 
             expect(buildTerminalCopilotClientOptions().mode).toBe('copilot-cli');
             expect(buildServerCopilotClientOptions().mode).toBe('empty');
@@ -693,19 +693,19 @@ describe('ClientOptionsBuilder', () => {
     it('buildCopilotClientOptionsFromEnv registra onListModels BYOK seguro', async () => {
         const original = { ...process.env };
         try {
-            delete process.env.COPILOT_CLI_URL;
-            process.env.COPILOT_BYOK_ENABLED = 'true';
-            process.env.COPILOT_BYOK_BASE_URL = 'https://provider.example/v1';
-            process.env.COPILOT_BYOK_MODEL = 'provider-model';
-            process.env.COPILOT_BYOK_MODELS = 'provider-model,provider-model-2';
-            process.env.COPILOT_BYOK_API_KEY = 'secret';
-            process.env.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED = 'false';
+            delete process.env['COPILOT_CLI_URL'];
+            process.env['COPILOT_BYOK_ENABLED'] = 'true';
+            process.env['COPILOT_BYOK_BASE_URL'] = 'https://provider.example/v1';
+            process.env['COPILOT_BYOK_MODEL'] = 'provider-model';
+            process.env['COPILOT_BYOK_MODELS'] = 'provider-model,provider-model-2';
+            process.env['COPILOT_BYOK_API_KEY'] = 'secret';
+            process.env['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'] = 'false';
 
             const opts = buildCopilotClientOptionsFromEnv();
 
             expect(opts.onListModels).toBeTypeOf('function');
             await expect(opts.onListModels?.()).resolves.toHaveLength(2);
-            expect(opts.env?.COPILOT_BYOK_API_KEY).toBeUndefined();
+            expect(opts.env?.['COPILOT_BYOK_API_KEY']).toBeUndefined();
         } finally {
             process.env = original;
         }
@@ -714,19 +714,27 @@ describe('ClientOptionsBuilder', () => {
     it('permite que o terminal injete onListModels canônico do model-gateway sobre o fallback BYOK', async () => {
         const original = { ...process.env };
         try {
-            delete process.env.COPILOT_CLI_URL;
-            process.env.COPILOT_BYOK_ENABLED = 'true';
-            process.env.COPILOT_BYOK_BASE_URL = 'https://provider.example/v1';
-            process.env.COPILOT_BYOK_MODEL = 'provider-model';
-            process.env.COPILOT_BYOK_MODELS = 'provider-model,provider-model-2';
-            process.env.COPILOT_BYOK_API_KEY = 'secret';
-            process.env.COPILOT_BYOK_MODEL_DISCOVERY_ENABLED = 'false';
-            const gatewayHandler = vi.fn(async () => [{ id: 'gateway-model' }]);
+            delete process.env['COPILOT_CLI_URL'];
+            process.env['COPILOT_BYOK_ENABLED'] = 'true';
+            process.env['COPILOT_BYOK_BASE_URL'] = 'https://provider.example/v1';
+            process.env['COPILOT_BYOK_MODEL'] = 'provider-model';
+            process.env['COPILOT_BYOK_MODELS'] = 'provider-model,provider-model-2';
+            process.env['COPILOT_BYOK_API_KEY'] = 'secret';
+            process.env['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'] = 'false';
+            const gatewayHandler = vi.fn(async () => [{
+                id: 'gateway-model',
+                name: 'Gateway Model',
+                capabilities: { supports: { vision: false, reasoningEffort: false }, limits: { max_context_window_tokens: 128000 } },
+            }]);
 
             const opts = buildTerminalCopilotClientOptions({ onListModels: gatewayHandler });
 
             expect(opts.onListModels).toBe(gatewayHandler);
-            await expect(opts.onListModels?.()).resolves.toEqual([{ id: 'gateway-model' }]);
+            await expect(opts.onListModels?.()).resolves.toEqual([{
+                id: 'gateway-model',
+                name: 'Gateway Model',
+                capabilities: { supports: { vision: false, reasoningEffort: false }, limits: { max_context_window_tokens: 128000 } },
+            }]);
             expect(gatewayHandler).toHaveBeenCalledTimes(1);
         } finally {
             process.env = original;

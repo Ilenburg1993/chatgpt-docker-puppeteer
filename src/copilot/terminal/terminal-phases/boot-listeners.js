@@ -62,6 +62,7 @@ function shouldEnableModelGatewayRuntimeHealthMirror() {
 function ensureModelGatewayRuntimeHealthMirror() {
     if (_modelGatewayRuntimeHealthMirror) return _modelGatewayRuntimeHealthMirror;
     const enabled = shouldEnableModelGatewayRuntimeHealthMirror();
+    const debounceMs = optionalNonNegativeInteger(process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS']);
     _modelGatewayRuntimeHealthMirror = installByokProviderHealthSqliteMirror({
         sqliteStore: enabled
             ? new SqliteModelGatewayCatalogStore()
@@ -73,7 +74,7 @@ function ensureModelGatewayRuntimeHealthMirror() {
                       skippedRecords: 0,
                   }),
               },
-        debounceMs: optionalNonNegativeInteger(process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS']),
+        ...(debounceMs === undefined ? {} : { debounceMs }),
         enabled,
         onError: (error) => {
             const message = error instanceof Error ? error.message : String(error);

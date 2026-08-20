@@ -76,7 +76,7 @@ test('waitForServerReady resolves when NERV emits SERVER_READY', async () => {
 test('listenForServerReady calls handler and unsubscribe works', async () => {
     const mock = makeMockNerv();
     let calls = 0;
-    const unsub = Discovery.listenForServerReady(mock, (payload) => {
+    const unsub = Discovery.listenForServerReady(mock, (_payload) => {
         calls++;
     });
 
@@ -90,8 +90,8 @@ test('listenForServerReady calls handler and unsubscribe works', async () => {
 });
 
 test('publish/unpublish no-op when NERV absent (file fallback removed)', async () => {
-    const prev = process.env.ENABLE_STATE_FILE;
-    process.env.ENABLE_STATE_FILE = 'true';
+    const prev = process.env['ENABLE_STATE_FILE'];
+    process.env['ENABLE_STATE_FILE'] = 'true';
 
     try {
         // publish with null nerv should NO-OP and return null
@@ -106,7 +106,7 @@ test('publish/unpublish no-op when NERV absent (file fallback removed)', async (
         const removed = Discovery.unpublishServerReady();
         assert.strictEqual(removed, false, 'unpublish should be a no-op when fallback removed');
     } finally {
-        if (prev === undefined) delete process.env.ENABLE_STATE_FILE;
-        else process.env.ENABLE_STATE_FILE = prev;
+        if (prev === undefined) delete process.env['ENABLE_STATE_FILE'];
+        else process.env['ENABLE_STATE_FILE'] = prev;
     }
 });

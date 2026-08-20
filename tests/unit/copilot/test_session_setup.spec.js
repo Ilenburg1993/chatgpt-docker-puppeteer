@@ -79,10 +79,10 @@ import { buildMcpTools } from '../../../src/copilot/bridges/mcp-tool-bridge.js';
 
 describe('session-setup (F63)', () => {
     const previousByokEnv = {
-        COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
-        COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
-        COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
-        COPILOT_SDK_EXCLUDED_TOOLS: process.env.COPILOT_SDK_EXCLUDED_TOOLS,
+        COPILOT_BYOK_ENABLED: process.env['COPILOT_BYOK_ENABLED'],
+        COPILOT_BYOK_PROVIDER_PRESET: process.env['COPILOT_BYOK_PROVIDER_PRESET'],
+        COPILOT_BYOK_MODEL: process.env['COPILOT_BYOK_MODEL'],
+        COPILOT_SDK_EXCLUDED_TOOLS: process.env['COPILOT_SDK_EXCLUDED_TOOLS'],
     };
 
     /** @type {any} */
@@ -92,10 +92,10 @@ describe('session-setup (F63)', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.COPILOT_BYOK_ENABLED = 'false';
-        delete process.env.COPILOT_BYOK_PROVIDER_PRESET;
-        delete process.env.COPILOT_BYOK_MODEL;
-        delete process.env.COPILOT_SDK_EXCLUDED_TOOLS;
+        process.env['COPILOT_BYOK_ENABLED'] = 'false';
+        delete process.env['COPILOT_BYOK_PROVIDER_PRESET'];
+        delete process.env['COPILOT_BYOK_MODEL'];
+        delete process.env['COPILOT_SDK_EXCLUDED_TOOLS'];
         ctx = {
             messagesCache: { invalidate: vi.fn() },
             toolsRegistry: null,
@@ -177,7 +177,7 @@ describe('session-setup (F63)', () => {
             const result = buildSessionHooks(ctx, host);
             const decision = await result.busHooks.onPreToolUse?.(
                 /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
-                { toolName: 'custom-danger', toolArgs: {}, timestamp: 0, cwd: '/' },
+                { sessionId: 's1', toolName: 'custom-danger', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
                 { sessionId: 's1' },
             );
 
@@ -191,7 +191,7 @@ describe('session-setup (F63)', () => {
             const result = buildSessionHooks(ctx, host);
             const decision = await result.busHooks.onPreToolUse?.(
                 /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
-                { toolName: 'danger_tool', toolArgs: {}, timestamp: 0, cwd: '/' },
+                { sessionId: 's1', toolName: 'danger_tool', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
                 { sessionId: 's1' },
             );
 
@@ -205,17 +205,17 @@ describe('session-setup (F63)', () => {
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-            expect(options.model).toBe('gpt-4');
-            expect(options.tools).toBe(tools);
-            expect(options.hooks).toBe(busHooks);
-            expect(options.reasoningEffort).toBe('medium');
-            expect(options.enableConfigDiscovery).toBe(false);
-            expect(options.includeSubAgentStreamingEvents).toBe(false);
-            expect(options.injectHookContext).toBe(true);
-            expect(typeof options.onPermissionRequest).toBe('function');
-            expect(typeof options.onUserInputRequest).toBe('function');
-            expect(Array.isArray(options.commands)).toBe(true);
-            expect(options.commands).toEqual(
+            expect(options['model']).toBe('gpt-4');
+            expect(options['tools']).toBe(tools);
+            expect(options['hooks']).toBe(busHooks);
+            expect(options['reasoningEffort']).toBe('medium');
+            expect(options['enableConfigDiscovery']).toBe(false);
+            expect(options['includeSubAgentStreamingEvents']).toBe(false);
+            expect(options['injectHookContext']).toBe(true);
+            expect(typeof options['onPermissionRequest']).toBe('function');
+            expect(typeof options['onUserInputRequest']).toBe('function');
+            expect(Array.isArray(options['commands'])).toBe(true);
+            expect(options['commands']).toEqual(
                 expect.arrayContaining([
                     expect.objectContaining({
                         name: 'terminal_status',
@@ -240,7 +240,7 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const commands = /** @type {{ name: string; handler: Function }[]} */ (options.commands);
+            const commands = /** @type {{ name: string; handler: Function }[]} */ (options['commands']);
             const terminalSession = commands.find((command) => command.name === 'terminal_session');
 
             terminalSession?.handler({
@@ -276,17 +276,17 @@ describe('session-setup (F63)', () => {
 
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-            expect(options.excludedTools).toEqual(['glob', 'view']);
+            expect(options['excludedTools']).toEqual(['glob', 'view']);
         });
 
         it('inclui denylist extra de tools da sessão via COPILOT_SDK_EXCLUDED_TOOLS', () => {
-            process.env.COPILOT_SDK_EXCLUDED_TOOLS = 'session_compact, custom_tool';
+            process.env['COPILOT_SDK_EXCLUDED_TOOLS'] = 'session_compact, custom_tool';
             const tools = /** @type {any} */ ([{ name: 'read_file_content' }]);
             const busHooks = /** @type {any} */ ({ mock: true });
 
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-            expect(options.excludedTools).toEqual(expect.arrayContaining(['custom_tool', 'session_compact']));
+            expect(options['excludedTools']).toEqual(expect.arrayContaining(['custom_tool', 'session_compact']));
         });
 
         it('omite reasoningEffort quando o modelo não suporta a capability e normaliza o ctx', () => {
@@ -297,7 +297,7 @@ describe('session-setup (F63)', () => {
 
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
-            expect(options.reasoningEffort).toBeUndefined();
+            expect(options['reasoningEffort']).toBeUndefined();
             expect(ctx.setReasoningEffort).toHaveBeenCalledWith(undefined);
         });
 
@@ -312,7 +312,7 @@ describe('session-setup (F63)', () => {
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
 
             expect(buildConfig).toHaveBeenCalledTimes(1);
-            expect(options.mcpServers).toEqual({ demo: { command: 'node', args: ['server.js'] } });
+            expect(options['mcpServers']).toEqual({ demo: { command: 'node', args: ['server.js'] } });
         });
 
         it('normaliza UserInputRequest do SDK preservando default allowFreeform=true', async () => {
@@ -321,7 +321,7 @@ describe('session-setup (F63)', () => {
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
             const onUserInputRequest = /**
              * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
-             */ (options.onUserInputRequest);
+             */ (options['onUserInputRequest']);
 
             await onUserInputRequest({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
 
@@ -348,7 +348,7 @@ describe('session-setup (F63)', () => {
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
             const onUserInputRequest = /**
              * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
-             */ (options.onUserInputRequest);
+             */ (options['onUserInputRequest']);
 
             await onUserInputRequest({ question: 'Escolha', allowFreeform: false });
 

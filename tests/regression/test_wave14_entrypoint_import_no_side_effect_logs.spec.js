@@ -5,8 +5,8 @@ import { test } from 'node:test';
 
 function runPureImport(/** @type {any} */ modulePath) {
     const env = { ...process.env };
-    delete env.NO_COLOR;
-    delete env.FORCE_COLOR;
+    delete env['NO_COLOR'];
+    delete env['FORCE_COLOR'];
 
     return spawnSync(process.execPath, ['--input-type=module', '-e', `import '${modulePath}'; console.log('OK');`], {
         cwd: process.cwd(),

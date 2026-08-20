@@ -11,6 +11,15 @@
 import { log } from '#core/logger';
 
 /**
+ * @typedef {object} CleanupHandlers
+ * @property {((code: number) => void) | null} beforeExit
+ * @property {(() => void) | null} sigint
+ * @property {(() => void) | null} sigterm
+ * @property {((error: Error, origin: NodeJS.UncaughtExceptionOrigin) => void) | null} uncaughtException
+ * @property {((reason: unknown, promise: Promise<unknown>) => void) | null} unhandledRejection
+ */
+
+/**
  * Manages locks with automatic cleanup on process exit. Ensures locks are released even in crash scenarios by
  * registering process termination handlers.
  *
@@ -39,7 +48,7 @@ class ResilientLockManager {
          * @private
          */
         this._cleanupHandlersRegistered = false;
-        this._cleanupHandlers = /** @type {Record<string, any>} */ ({
+        this._cleanupHandlers = /** @type {CleanupHandlers} */ ({
             beforeExit: null,
             sigint: null,
             sigterm: null,
@@ -78,21 +87,21 @@ class ResilientLockManager {
             return;
         }
 
-        const cleanup = async (/** @type {any} */ signal) => {
+        const cleanup = async (/** @type {string} */ signal) => {
             const lockCount = this.activeLocks.size;
             if (lockCount > 0) {
                 console.log(`[ResilientLock] ${signal} received. Releasing ${lockCount} active locks...`);
-                await this.releaseAll().catch((/** @type {any} */ err) =>
-                    console.error(`[ResilientLock] Cleanup error: ${err.message}`),
+                await this.releaseAll().catch((err) =>
+                    console.error(`[ResilientLock] Cleanup error: ${err instanceof Error ? err.message : String(err)}`),
                 );
             }
         };
 
         // Standard termination signals (graceful shutdown)
         // We do NOT exit the process here; we let the main event loop finish or be terminated by the orchestrator.
-        this._cleanupHandlers.sigint = () => cleanup('SIGINT');
-        this._cleanupHandlers.sigterm = () => cleanup('SIGTERM');
-        this._cleanupHandlers.beforeExit = () => cleanup('beforeExit');
+        this._cleanupHandlers['sigint'] = () => cleanup('SIGINT');
+        this._cleanupHandlers['sigterm'] = () => cleanup('SIGTERM');
+        this._cleanupHandlers['beforeExit'] = () => cleanup('beforeExit');
 
         // Compatibility + cleanup safety:
         // We keep passive fatal hooks so active locks are released under crash paths,
@@ -101,7 +110,7 @@ class ResilientLockManager {
             process.listenerCount('uncaughtException') > 0;
         this._fatalHookRegistration.unhandledRejectionHadExternalListener =
             process.listenerCount('unhandledRejection') > 0;
-        this._cleanupHandlers.uncaughtException = (/** @type {any} */ err) => {
+        this._cleanupHandlers['uncaughtException'] = (err) => {
             void cleanup('uncaughtException').finally(() => {
                 if (!this._fatalHookRegistration.uncaughtExceptionHadExternalListener) {
                     // Preserve Node crash semantics when no app-level handler existed.
@@ -111,18 +120,18 @@ class ResilientLockManager {
                 }
             });
         };
-        this._cleanupHandlers.unhandledRejection = (/** @type {any} */ reason) => {
+        this._cleanupHandlers['unhandledRejection'] = (reason) => {
             void cleanup('unhandledRejection');
             // Deliberately no rethrow here to avoid changing Node's configured
             // unhandled rejection mode. App-level policy remains the owner.
             void reason;
         };
 
-        process.once('SIGINT', /** @type {any} */ (this._cleanupHandlers.sigint));
-        process.once('SIGTERM', /** @type {any} */ (this._cleanupHandlers.sigterm));
-        process.once('beforeExit', /** @type {any} */ (this._cleanupHandlers.beforeExit));
-        process.once('uncaughtException', /** @type {any} */ (this._cleanupHandlers.uncaughtException));
-        process.once('unhandledRejection', /** @type {any} */ (this._cleanupHandlers.unhandledRejection));
+        process.once('SIGINT', this._cleanupHandlers['sigint']);
+        process.once('SIGTERM', this._cleanupHandlers['sigterm']);
+        process.once('beforeExit', this._cleanupHandlers['beforeExit']);
+        process.once('uncaughtException', this._cleanupHandlers['uncaughtException']);
+        process.once('unhandledRejection', this._cleanupHandlers['unhandledRejection']);
 
         this._cleanupHandlersRegistered = true;
         log('DEBUG', '[ResilientLock] Cleanup handlers registered');
@@ -133,25 +142,25 @@ class ResilientLockManager {
             return;
         }
 
-        if (this._cleanupHandlers.beforeExit) {
-            process.removeListener('beforeExit', this._cleanupHandlers.beforeExit);
-            this._cleanupHandlers.beforeExit = null;
+        if (this._cleanupHandlers['beforeExit']) {
+            process.removeListener('beforeExit', this._cleanupHandlers['beforeExit']);
+            this._cleanupHandlers['beforeExit'] = null;
         }
-        if (this._cleanupHandlers.sigint) {
-            process.removeListener('SIGINT', this._cleanupHandlers.sigint);
-            this._cleanupHandlers.sigint = null;
+        if (this._cleanupHandlers['sigint']) {
+            process.removeListener('SIGINT', this._cleanupHandlers['sigint']);
+            this._cleanupHandlers['sigint'] = null;
         }
-        if (this._cleanupHandlers.sigterm) {
-            process.removeListener('SIGTERM', this._cleanupHandlers.sigterm);
-            this._cleanupHandlers.sigterm = null;
+        if (this._cleanupHandlers['sigterm']) {
+            process.removeListener('SIGTERM', this._cleanupHandlers['sigterm']);
+            this._cleanupHandlers['sigterm'] = null;
         }
-        if (this._cleanupHandlers.uncaughtException) {
-            process.removeListener('uncaughtException', this._cleanupHandlers.uncaughtException);
-            this._cleanupHandlers.uncaughtException = null;
+        if (this._cleanupHandlers['uncaughtException']) {
+            process.removeListener('uncaughtException', this._cleanupHandlers['uncaughtException']);
+            this._cleanupHandlers['uncaughtException'] = null;
         }
-        if (this._cleanupHandlers.unhandledRejection) {
-            process.removeListener('unhandledRejection', this._cleanupHandlers.unhandledRejection);
-            this._cleanupHandlers.unhandledRejection = null;
+        if (this._cleanupHandlers['unhandledRejection']) {
+            process.removeListener('unhandledRejection', this._cleanupHandlers['unhandledRejection']);
+            this._cleanupHandlers['unhandledRejection'] = null;
         }
 
         this._cleanupHandlersRegistered = false;

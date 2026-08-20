@@ -5,7 +5,9 @@ import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { SqliteModelGatewayCatalogStore, summarizeModelGatewayRefreshLogText } from '../../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
+/** @param {string} name */
 const hasFlag = (name) => args.includes(name);
+/** @param {string} name */
 const valueFor = (name) => {
     const prefix = `${name}=`;
     const found = args.find((arg) => arg.startsWith(prefix));

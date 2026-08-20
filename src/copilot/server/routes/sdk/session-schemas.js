@@ -34,14 +34,14 @@ export const CreateSessionBodySchema = z.object({
     skillDirectories: z.array(z.string()).optional(),
     disabledSkills: z.array(z.string()).optional(),
     infiniteSessions: z.unknown().optional(),
-    gitHubToken: z.string().trim().min(1).optional(),
+    gitHubToken: z.string()['trim']().min(1).optional(),
 });
 
 /** Schema para POST /sessions/:id/send body */
 export const SendMessageBodySchema = z.object({
     prompt: z.string().min(1),
     waitForResponse: z.boolean().optional(),
-    timeoutMs: z.number().nonnegative().finite().optional(),
+    timeoutMs: z.number().nonnegative()['finite']().optional(),
     attachments: z.array(z.unknown()).optional(),
     mode: z.enum(['immediate', 'enqueue']).optional(),
 });
@@ -81,7 +81,7 @@ export const ResumeSessionBodySchema = z
         skillDirectories: z.array(z.string()).optional(),
         disabledSkills: z.array(z.string()).optional(),
         infiniteSessions: z.unknown().optional(),
-        gitHubToken: z.string().trim().min(1).optional(),
+        gitHubToken: z.string()['trim']().min(1).optional(),
         disableResume: z.boolean().optional(),
         suppressResumeEvent: z.boolean().optional(),
         continuePendingWork: z.boolean().optional(),
@@ -168,7 +168,7 @@ export const HandlePendingCommandBodySchema = z.object({
 export const ShellExecBodySchema = z.object({
     command: z.string().min(1),
     cwd: z.string().optional(),
-    timeout: z.number().positive().finite().optional(),
+    timeout: z.number().positive()['finite']().optional(),
 });
 
 /** Schema para POST /sessions/:id/shell/:processId/kill body */

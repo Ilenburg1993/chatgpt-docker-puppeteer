@@ -2,9 +2,12 @@ import fs from 'fs';
 import path from 'path';
 
 // Função simples para listar arquivos recursivamente
+/** @param {string} dir */
 function findFiles(dir) {
+    /** @type {string[]} */
     const results = [];
 
+    /** @param {string} currentDir */
     function walk(currentDir) {
         try {
             const entries = fs.readdirSync(currentDir, { withFileTypes: true });
@@ -70,7 +73,7 @@ for (const file of files) {
             console.log(`✅ ${file}`);
         }
     } catch (err) {
-        console.error(`❌ ${file}: ${err.message}`);
+        console.error(`❌ ${file}: ${err instanceof Error ? err.message : String(err)}`);
     }
 }
 

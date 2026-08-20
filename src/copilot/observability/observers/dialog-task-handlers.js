@@ -11,7 +11,7 @@
 import { TimeoutError, toError } from '#copilot/core';
 import { AGENT_DIALOG_TURN_TIMEOUT, AGENT_TASK_ERROR } from '#copilot/events';
 import { log } from '../logger.js';
-import { startSpanImmediate } from '../otel.js';
+import { startSpanImmediate, toOtelException } from '../otel.js';
 
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */
 
@@ -298,7 +298,7 @@ export function attachDialogTaskHandlers(ctx) {
                     entry.span.setAttribute('duration_ms', Math.round(durationMs));
                     entry.span.setAttribute('success', false);
                     entry.span.setStatus({ code: 2, message: String(evt?.error ?? 'task.error') });
-                    if (evt?.error) entry.span.recordException(evt.error);
+                    if (evt?.error) entry.span.recordException(toOtelException(evt.error));
                     entry.span.end();
                 }
             }

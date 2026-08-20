@@ -203,7 +203,7 @@ vi.mock('#copilot/agent', () => ({
         { runtimeId: 'alt', runtime: altRuntime },
     ],
     readAgentRuntimeStatusSnapshot: (/** @type {any} */ runtime) => runtime.getStatusSnapshot(),
-    readAgentRuntimeHealthSnapshot: (/** @type {any} */ runtime) => ({ ok: true, status: 'healthy' }),
+    readAgentRuntimeHealthSnapshot: (/** @type {unknown} */ _runtime) => ({ ok: true, status: 'healthy' }),
     readRuntimeControlState: (/** @type {any} */ runtime) => ({
         status: runtime.status,
         model: runtime.model,
@@ -647,8 +647,8 @@ describe('terminal/frontend/index', () => {
         expect(runtime.isTerminalHubReady()).toBe(true);
         expect(runtime.readTerminalHubOrchestrator()).toEqual({ kind: 'orchestrator' });
         expect(runtime.readTerminalHubStore()).toBeTruthy();
-        expect(runtime.readTerminalHubSession('hub-1')?.id).toBe('hub-1');
-        expect(runtime.readTerminalHubTurn(42)?.turn_number).toBe(7);
+        expect(runtime.readTerminalHubSession('hub-1')?.['id']).toBe('hub-1');
+        expect(runtime.readTerminalHubTurn(42)?.['turn_number']).toBe(7);
         expect(hubId).toBe('hub-1');
         expect(turnId).toBe(42);
         expect(pauseDialogLoop).toHaveBeenCalled();

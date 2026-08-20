@@ -100,12 +100,12 @@ test('executeCommand dryRun supports DIAGNOSTIC_JOB_RETRY without proxy calls', 
 });
 
 test('executeCommand routing: DIAGNOSTIC_JOB_CREATE agora roteia para Audit Agent (Audit Agent não disponível)', async () => {
-    const prevHost = process.env.AUDIT_AGENT_HOST;
-    const prevPort = process.env.AUDIT_AGENT_PORT;
+    const prevHost = process.env['AUDIT_AGENT_HOST'];
+    const prevPort = process.env['AUDIT_AGENT_PORT'];
 
     // Define servidor inexistente (Audit Agent não rodando)
-    process.env.AUDIT_AGENT_HOST = '127.0.0.1';
-    process.env.AUDIT_AGENT_PORT = '19998';
+    process.env['AUDIT_AGENT_HOST'] = '127.0.0.1';
+    process.env['AUDIT_AGENT_PORT'] = '19998';
 
     try {
         // Deve falhar porque o Audit Agent não está disponível
@@ -126,10 +126,10 @@ test('executeCommand routing: DIAGNOSTIC_JOB_CREATE agora roteia para Audit Agen
             { code: 'DIAGNOSTIC_TO_AUDIT_AGENT_ROUTING_FAILED' },
         );
     } finally {
-        if (prevHost === undefined) delete process.env.AUDIT_AGENT_HOST;
-        else process.env.AUDIT_AGENT_HOST = prevHost;
-        if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
-        else process.env.AUDIT_AGENT_PORT = prevPort;
+        if (prevHost === undefined) delete process.env['AUDIT_AGENT_HOST'];
+        else process.env['AUDIT_AGENT_HOST'] = prevHost;
+        if (prevPort === undefined) delete process.env['AUDIT_AGENT_PORT'];
+        else process.env['AUDIT_AGENT_PORT'] = prevPort;
     }
 });
 

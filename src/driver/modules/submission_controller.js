@@ -17,25 +17,25 @@ import EventEmitter from 'node:events';
  */
 const SUBMISSION_CONFIG = {
     /** Lock duration para anti-race condition (ms) - Default: 3s */
-    LOCK_DURATION_MS: parseInt(process.env.SUBMISSION_LOCK_DURATION || '3000', 10),
+    LOCK_DURATION_MS: parseInt(process.env['SUBMISSION_LOCK_DURATION'] || '3000', 10),
 
     /** Delay pré-press biomecânico (ms) - Default: 300ms */
-    PRE_PRESS_DELAY_MS: parseInt(process.env.SUBMISSION_PRE_PRESS || '300', 10),
+    PRE_PRESS_DELAY_MS: parseInt(process.env['SUBMISSION_PRE_PRESS'] || '300', 10),
 
     /** Debounce delay fallback (ms) - Default: 400ms */
-    DEBOUNCE_FALLBACK_MS: parseInt(process.env.SUBMISSION_DEBOUNCE || '400', 10),
+    DEBOUNCE_FALLBACK_MS: parseInt(process.env['SUBMISSION_DEBOUNCE'] || '400', 10),
 
     /** Debounce delay máximo (ms) - Default: 600ms */
-    DEBOUNCE_MAX_MS: parseInt(process.env.SUBMISSION_DEBOUNCE_MAX || '600', 10),
+    DEBOUNCE_MAX_MS: parseInt(process.env['SUBMISSION_DEBOUNCE_MAX'] || '600', 10),
 
     /** Delay pós-envio (ms) - Default: 500ms */
-    POST_SEND_DELAY_MS: parseInt(process.env.SUBMISSION_POST_SEND || '500', 10),
+    POST_SEND_DELAY_MS: parseInt(process.env['SUBMISSION_POST_SEND'] || '500', 10),
 
     /** Timeout para submit completo (ms) - Default: 10s */
-    SUBMIT_TIMEOUT_MS: parseInt(process.env.SUBMISSION_TIMEOUT || '10000', 10),
+    SUBMIT_TIMEOUT_MS: parseInt(process.env['SUBMISSION_TIMEOUT'] || '10000', 10),
 
     /** Máximo de retries em synthetic fallback - Default: 2 */
-    MAX_SYNTHETIC_RETRIES: parseInt(process.env.SUBMISSION_MAX_RETRIES || '2', 10),
+    MAX_SYNTHETIC_RETRIES: parseInt(process.env['SUBMISSION_MAX_RETRIES'] || '2', 10),
 };
 
 /**

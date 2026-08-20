@@ -406,10 +406,10 @@ describe('MissionManager (end-to-end)', () => {
     beforeEach(async () => {
         // Este suite valida integração histórica com mock de kernel (dispatch direto).
         // No runtime real o default é SSOT-first; aqui ativamos contingência explicitamente.
-        prevMissionDispatchMode = process.env.MISSION_STEP_DISPATCH_MODE;
-        prevMissionLegacyDispatchEnabled = process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
-        process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
-        process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED = 'true';
+        prevMissionDispatchMode = process.env['MISSION_STEP_DISPATCH_MODE'];
+        prevMissionLegacyDispatchEnabled = process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'];
+        process.env['MISSION_STEP_DISPATCH_MODE'] = 'legacy_direct';
+        process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] = 'true';
 
         kernel = new MockKernel();
         nerv = new MockNERV();
@@ -433,14 +433,14 @@ describe('MissionManager (end-to-end)', () => {
         } catch (_) {}
 
         if (typeof prevMissionDispatchMode === 'undefined') {
-            delete process.env.MISSION_STEP_DISPATCH_MODE;
+            delete process.env['MISSION_STEP_DISPATCH_MODE'];
         } else {
-            process.env.MISSION_STEP_DISPATCH_MODE = prevMissionDispatchMode;
+            process.env['MISSION_STEP_DISPATCH_MODE'] = prevMissionDispatchMode;
         }
         if (typeof prevMissionLegacyDispatchEnabled === 'undefined') {
-            delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
+            delete process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'];
         } else {
-            process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED = prevMissionLegacyDispatchEnabled;
+            process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] = prevMissionLegacyDispatchEnabled;
         }
 
         try {

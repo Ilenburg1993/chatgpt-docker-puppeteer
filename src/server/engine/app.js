@@ -19,7 +19,7 @@ import requestId from '../middleware/request_id.js';
 
 /** Constante/valor exportado: default. */
 const app = express();
-const RAG_MANIFEST_PATH = process.env.RAG_MANIFEST_PATH || '/home/node/.local/share/rag-index/manifest.v1.json';
+const RAG_MANIFEST_PATH = process.env['RAG_MANIFEST_PATH'] || '/home/node/.local/share/rag-index/manifest.v1.json';
 
 function formatIsoSecond(/** @type {any} */ epochMs) {
     if (!Number.isFinite(epochMs)) return null;
@@ -56,7 +56,7 @@ function readRagReadiness() {
 -------------------------------------------------------------------------- */
 // Apenas para dev local: trust apenas loopback
 // Em produção: configure explicitamente o número de proxies
-if (process.env.NODE_ENV === 'production') {
+if (process.env['NODE_ENV'] === 'production') {
     app.set('trust proxy', 1); // Trust first proxy only
 } else {
     app.set('trust proxy', 'loopback'); // Trust apenas 127.0.0.1, ::1
@@ -70,7 +70,7 @@ if (process.env.NODE_ENV === 'production') {
 /* --------------------------------------------------------------------------
    1.1 RESPONSE TIMING (OBSERVABILIDADE)
 -------------------------------------------------------------------------- */
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
     const start = process.hrtime.bigint();
 
     // Hook ANTES de enviar headers (não após 'finish')
@@ -101,7 +101,7 @@ app.use(
                     "'self'",
                     'ws://localhost:*',
                     'wss://localhost:*',
-                    ...(process.env.DASHBOARD_ORIGIN ? [process.env.DASHBOARD_ORIGIN] : []),
+                    ...(process.env['DASHBOARD_ORIGIN'] ? [process.env['DASHBOARD_ORIGIN']] : []),
                 ],
                 fontSrc: ["'self'", 'data:'],
                 objectSrc: ["'none'"],
@@ -114,7 +114,7 @@ app.use(
         frameguard: { action: 'deny' },
         referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
         hsts:
-            process.env.NODE_ENV === 'production'
+            process.env['NODE_ENV'] === 'production'
                 ? { maxAge: 31536000, includeSubDomains: true, preload: true }
                 : false,
     }),
@@ -123,8 +123,8 @@ app.use(
 /* --------------------------------------------------------------------------
    2.1 HSTS (HTTP Strict Transport Security) - FORÇADO EM PRODUÇÃO
 -------------------------------------------------------------------------- */
-if (process.env.NODE_ENV === 'production' || process.env.FORCE_HTTPS === 'true') {
-    app.use((req, res, next) => {
+if (process.env['NODE_ENV'] === 'production' || process.env['FORCE_HTTPS'] === 'true') {
+    app.use((_req, res, next) => {
         // HSTS já configurado via helmet acima; este middleware é mantido para compatibilidade
         // com ambientes que não usam helmet (ex: proxies reversos customizados)
         if (!res.getHeader('Strict-Transport-Security')) {
@@ -144,7 +144,7 @@ function updateCorsOrigins() {
     corsOrigins.clear();
 
     // Add default/local origins
-    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env.DASHBOARD_ORIGIN];
+    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env['DASHBOARD_ORIGIN']];
 
     defaults.filter(Boolean).forEach((o) => corsOrigins.add(o));
 
@@ -210,9 +210,9 @@ app.use(
 const apiLimiter = rateLimit({
     windowMs: 60 * 1000,
     max:
-        process.env.NODE_ENV === 'production'
-            ? parseInt(process.env.RATE_LIMIT_MAX || '100', 10)
-            : parseInt(process.env.RATE_LIMIT_MAX_DEV || '2000', 10),
+        process.env['NODE_ENV'] === 'production'
+            ? parseInt(process.env['RATE_LIMIT_MAX'] || '100', 10)
+            : parseInt(process.env['RATE_LIMIT_MAX_DEV'] || '2000', 10),
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => ipKeyGenerator(req.ip || ''),
@@ -258,7 +258,7 @@ const dashboardAssetsPath = path.join(dashboardV2Path, 'assets');
 
 // Serve precompressed dashboard assets when available (.br / .gz) + long-term caching.
 // The Vite build generates hashed asset filenames, making them safe for immutable caching.
-app.use('/dashboard/assets', (req, res, next) => {
+app.use('/dashboard/assets', (req, _res, next) => {
     const accept = String(req.headers['accept-encoding'] || '');
     const urlPath = req.path; // mounted path (ex: /index-abc.js)
     const rel = urlPath.replace(/^\/+/, '');
@@ -323,7 +323,7 @@ app.use(
     }),
 );
 
-app.get(/^\/dashboard($|\/.*)/, (req, res) => {
+app.get(/^\/dashboard($|\/.*)/, (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(dashboardV2Path, 'index.html'));
 });
@@ -336,23 +336,23 @@ app.use('/crash_reports', express.static(crashReportsPath));
 -------------------------------------------------------------------------- */
 
 // Liveness
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
     res.json({ status: 'alive', ts: Date.now() });
 });
 
 // Readiness
-app.get('/ready', (req, res) => {
+app.get('/ready', (_req, res) => {
     try {
-        const runtime = app.locals && app.locals.runtimeReadiness ? app.locals.runtimeReadiness : null;
+        const runtime = app.locals && app.locals['runtimeReadiness'] ? app.locals['runtimeReadiness'] : null;
         const runtimeResources =
-            app.locals && typeof app.locals.getRuntimeResourcesStatus === 'function'
-                ? app.locals.getRuntimeResourcesStatus()
+            app.locals && typeof app.locals['getRuntimeResourcesStatus'] === 'function'
+                ? app.locals['getRuntimeResourcesStatus']()
                 : getRuntimeReadinessSummary({
                       owner: 'dashboard-web',
                       requiredComponents: ['http_server'],
-                      allowDegradedReady: CONFIG.BOOT_DEGRADED_READY_ALLOWED !== false,
+                      allowDegradedReady: CONFIG['BOOT_DEGRADED_READY_ALLOWED'] !== false,
                   });
-        const mcpBase = app.locals && app.locals.mcp ? app.locals.mcp : null;
+        const mcpBase = app.locals && app.locals['mcp'] ? app.locals['mcp'] : null;
         const hardwareMetrics = typeof hardware.getAllMetrics === 'function' ? hardware.getAllMetrics() : {};
 
         let status = 'ready';
@@ -361,8 +361,8 @@ app.get('/ready', (req, res) => {
         let mcp = mcpBase;
         try {
             const getter =
-                app.locals && typeof app.locals.getMcpUpstreamsStatus === 'function'
-                    ? app.locals.getMcpUpstreamsStatus
+                app.locals && typeof app.locals['getMcpUpstreamsStatus'] === 'function'
+                    ? app.locals['getMcpUpstreamsStatus']
                     : null;
             const upstreams = getter ? getter() : null;
             if (upstreams && Array.isArray(upstreams)) {
@@ -374,8 +374,8 @@ app.get('/ready', (req, res) => {
 
         if (runtime) {
             const requiredKeys =
-                app.locals && Array.isArray(app.locals.requiredReadiness)
-                    ? app.locals.requiredReadiness
+                app.locals && Array.isArray(app.locals['requiredReadiness'])
+                    ? app.locals['requiredReadiness']
                     : Object.keys(runtime);
 
             // Non-required readiness hints
@@ -426,15 +426,29 @@ app.use((req, res, next) => {
 /* --------------------------------------------------------------------------
    9. ERROR BOUNDARY GLOBAL
 -------------------------------------------------------------------------- */
-app.use((/** @type {any} */ err, /** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
-    const status = err.status || 500;
-    log('ERROR', `[APP] Unhandled error: ${err?.message || String(err)}${err?.stack ? `\n${err.stack}` : ''}`);
+app.use(
+    (
+        /** @type {unknown} */ err,
+        /** @type {import('express').Request} */ req,
+        /** @type {import('express').Response} */ res,
+        /** @type {import('express').NextFunction} */ _,
+    ) => {
+        const normalizedError = err instanceof Error ? err : new Error(String(err));
+        const status =
+            err !== null && typeof err === 'object' && 'status' in err && typeof err.status === 'number'
+                ? err.status
+                : 500;
+        log(
+            'ERROR',
+            `[APP] Unhandled error: ${normalizedError.message}${normalizedError.stack ? `\n${normalizedError.stack}` : ''}`,
+        );
 
-    res.status(status).json({
-        error: status >= 500 ? 'Internal server error' : err.message || 'Request failed',
-        request_id: req.id || null,
-    });
-});
+        res.status(status).json({
+            error: status >= 500 ? 'Internal server error' : normalizedError.message || 'Request failed',
+            request_id: req.id || null,
+        });
+    },
+);
 
 export default app;
 export { apiLimiter };

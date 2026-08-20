@@ -97,15 +97,14 @@ export const delegateToRepoAutonomyRunnerTool = {
     title: 'Delegate to repo autonomy runner',
     description: 'Run or dry-run a fixed local autonomy mission; no arbitrary shell, paths, or destructive actions.',
     inputSchema: {
-        mission: missionSchema.describe('Fixed mission; prefer validate-focused for localized validation.'),
+        mission: missionSchema['describe']('Fixed mission; prefer validate-focused for localized validation.'),
         testFile: z
             .string()
             .min(1)
             .max(1024)
-            .optional()
-            .describe('Explicit Copilot .spec.js path for validate-focused.'),
-        dryRun: z.boolean().optional().describe('Plan only. Default: true.'),
-        timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Validator timeout ms.'),
+            .optional()['describe']('Explicit Copilot .spec.js path for validate-focused.'),
+        dryRun: z.boolean().optional()['describe']('Plan only. Default: true.'),
+        timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Validator timeout ms.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async ({ mission, testFile, dryRun, timeoutMs }) => {

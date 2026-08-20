@@ -59,8 +59,7 @@ function pulseExperimentLabelSchema(description) {
     return z
         .string()
         .min(1)
-        .max(64)
-        .regex(/^[A-Za-z0-9._:-]+$/u)
+        .max(64)['regex'](/^[A-Za-z0-9._:-]+$/u)
         .optional()
         .describe(description);
 }
@@ -89,11 +88,10 @@ export const mcpLatencyPulseTool = {
         seriesId: z
             .string()
             .min(1)
-            .max(64)
-            .regex(/^[A-Za-z0-9._-]+$/u)
+            .max(64)['regex'](/^[A-Za-z0-9._-]+$/u)
             .optional()
             .describe('Optional short series identifier for a controlled pulse run.'),
-        step: z.number().int().min(0).max(1000).optional().describe('Optional pulse step number.'),
+        step: z.number().int().min(0).max(1000).optional()['describe']('Optional pulse step number.'),
         networkLabel: pulseExperimentLabelSchema('Optional sanitized client network label, for example wifi-home or hotspot-cellular.'),
         modelLabel: pulseExperimentLabelSchema('Optional sanitized model label for A/B comparison.'),
         conversationLabel: pulseExperimentLabelSchema('Optional sanitized conversation condition, for example fresh-chat or long-chat.'),
@@ -130,12 +128,10 @@ export const mcpLatencyAttributionTool = {
     inputSchema: {
         reportedSlow: z
             .boolean()
-            .optional()
-            .describe('Set true when the user is currently experiencing slowness even if local MCP metrics look healthy.'),
+            .optional()['describe']('Set true when the user is currently experiencing slowness even if local MCP metrics look healthy.'),
         clientSchemaProjectionStale: z
             .boolean()
-            .optional()
-            .describe(
+            .optional()['describe'](
                 'Set true only when the caller has observed a client-advertised MCP schema that is stale relative to the restarted server implementation.',
             ),
         timeoutMs: z
@@ -143,12 +139,10 @@ export const mcpLatencyAttributionTool = {
             .int()
             .min(500)
             .max(5000)
-            .optional()
-            .describe('Per external probe timeout. Defaults to 2500ms.'),
+            .optional()['describe']('Per external probe timeout. Defaults to 2500ms.'),
         includeDetails: z
             .boolean()
-            .optional()
-            .describe('Include per-endpoint and per-source evidence. Defaults false to minimize context pressure.'),
+            .optional()['describe']('Include per-endpoint and per-source evidence. Defaults false to minimize context pressure.'),
     },
     annotations: openWorldReadOnlyAnnotations(),
     handler: async (input = {}) => {

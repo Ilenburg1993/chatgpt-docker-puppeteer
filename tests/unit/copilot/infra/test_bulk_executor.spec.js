@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { runBoundedOperationBatch } from '#copilot/infra';
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('shared bulk executor', () => {
     it('preserva ordem e isola exceção por item em best-effort', async () => {

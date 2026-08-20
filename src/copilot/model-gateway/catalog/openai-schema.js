@@ -46,7 +46,7 @@ function unixSeconds(value) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {number | null}
  */
 function readCreated(projection) {
@@ -62,7 +62,7 @@ function readCreated(projection) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function readOwnedBy(projection) {
@@ -79,7 +79,7 @@ function readOwnedBy(projection) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {string | null}
  */
 function readSubjectProviderId(projection) {
@@ -97,8 +97,7 @@ function readSubjectProviderId(projection) {
 }
 
 /**
- * @param {Record<string, any> | null} providerProjection
- * @returns {Record<string, unknown> | null}
+ * @param {Record<string, unknown> | null} providerProjection
  */
 function buildProviderProjectionExtension(providerProjection) {
     if (!providerProjection) return null;
@@ -114,9 +113,9 @@ function buildProviderProjectionExtension(providerProjection) {
 }
 
 /**
- * @param {Record<string, any>} projection
- * @param {Record<string, any>[]} providerProjections
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>} projection
+ * @param {Record<string, unknown>[]} providerProjections
+ * @returns {Record<string, unknown> | null}
  */
 function findProviderProjection(projection, providerProjections) {
     const providerId = typeof projection['providerId'] === 'string' ? projection['providerId'] : null;
@@ -130,9 +129,9 @@ function findProviderProjection(projection, providerProjections) {
 }
 
 /**
- * @param {Record<string, any>} projection
- * @param {Record<string, any>[]} eligibilityDecisions
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>} projection
+ * @param {Record<string, unknown>[]} eligibilityDecisions
+ * @returns {Record<string, unknown> | null}
  */
 function findEligibilityDecision(projection, eligibilityDecisions) {
     const providerId = typeof projection['providerId'] === 'string' ? projection['providerId'] : null;
@@ -150,8 +149,7 @@ function findEligibilityDecision(projection, eligibilityDecisions) {
 }
 
 /**
- * @param {Record<string, any> | null} decision
- * @returns {Record<string, unknown> | null}
+ * @param {Record<string, unknown> | null} decision
  */
 function buildEligibilityExtension(decision) {
     if (!decision) return null;
@@ -169,9 +167,9 @@ function buildEligibilityExtension(decision) {
 }
 
 /**
- * @param {Record<string, any>} projection
- * @param {Record<string, any>[]} routeOptions
- * @returns {Record<string, any>[]}
+ * @param {Record<string, unknown>} projection
+ * @param {Record<string, unknown>[]} routeOptions
+ * @returns {Record<string, unknown>[]}
  */
 function findRouteOptions(projection, routeOptions) {
     const providerId = optionalString(projection['providerId']);
@@ -187,8 +185,7 @@ function findRouteOptions(projection, routeOptions) {
 }
 
 /**
- * @param {Record<string, any>} route
- * @returns {Record<string, unknown>}
+ * @param {Record<string, unknown>} route
  */
 function buildRouteOptionExtension(route) {
     const normalizedPolicy = isRecord(route['normalizedPolicy']) ? route['normalizedPolicy'] : {};
@@ -208,9 +205,8 @@ function buildRouteOptionExtension(route) {
 }
 
 /**
- * @param {Record<string, any>} projection
- * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[]; routeOptions?: Record<string, any>[] }} [options]
- * @returns {Record<string, unknown>}
+ * @param {Record<string, unknown>} projection
+ * @param {{ providerProjections?: Record<string, unknown>[]; eligibilityDecisions?: Record<string, unknown>[]; routeOptions?: Record<string, unknown>[] }} [options]
  */
 function buildGatewayExtension(projection, options = {}) {
     const providerProjection = findProviderProjection(projection, options.providerProjections ?? []);
@@ -248,9 +244,8 @@ function buildGatewayExtension(projection, options = {}) {
 }
 
 /**
- * @param {Record<string, any>} projection
- * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[]; routeOptions?: Record<string, any>[] }} [options]
- * @returns {{ id: string; object: 'model'; created: number | null; owned_by: string; x_model_gateway: Record<string, unknown> }}
+ * @param {Record<string, unknown>} projection
+ * @param {{ providerProjections?: Record<string, unknown>[]; eligibilityDecisions?: Record<string, unknown>[]; routeOptions?: Record<string, unknown>[] }} [options]
  */
 export function toOpenAIModelCatalogEntry(projection, options = {}) {
     const openai = isRecord(projection['openai']) ? projection['openai'] : {};
@@ -264,8 +259,8 @@ export function toOpenAIModelCatalogEntry(projection, options = {}) {
 }
 
 /**
- * @param {Record<string, any>[]} projections
- * @param {{ providerProjections?: Record<string, any>[]; eligibilityDecisions?: Record<string, any>[]; routeOptions?: Record<string, any>[] }} [options]
+ * @param {Record<string, unknown>[]} projections
+ * @param {{ providerProjections?: Record<string, unknown>[]; eligibilityDecisions?: Record<string, unknown>[]; routeOptions?: Record<string, unknown>[] }} [options]
  * @returns {{ object: 'list'; data: ReturnType<typeof toOpenAIModelCatalogEntry>[] }}
  */
 export function toOpenAIModelCatalogList(projections, options = {}) {

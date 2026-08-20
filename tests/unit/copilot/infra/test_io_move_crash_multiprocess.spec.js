@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const MOVE_URL = new URL('../../../../src/copilot/infra/io/fs/move.js', import.meta.url).href;
 const CHILD_SCRIPT = `
-const options = JSON.parse(process.env.COPILOT_MOVE_CRASH_CASE);
+const options = JSON.parse(process.env['COPILOT_MOVE_CRASH_CASE']);
 const { moveFileUnlocked } = await import(options.moveUrl);
 const { open } = await import('node:fs/promises');
 const path = await import('node:path');
@@ -134,6 +134,7 @@ async function killAndWait(child) {
     expect(child.signalCode).toBe('SIGKILL');
 }
 
+/** @param {string} filePath */
 async function expectMissing(filePath) {
     await expect(access(filePath)).rejects.toMatchObject({ code: 'ENOENT' });
 }
@@ -203,12 +204,16 @@ describe('move EXDEV real crash states', () => {
                 const temps = await moveTemps(destinationDir);
                 expect(temps).toHaveLength(scenario.tempExpected ? 1 : 0);
                 if (scenario.tempExpected) {
-                    expect(reached.details?.tmpDestination).toBe(path.join(destinationDir, temps[0]));
-                    expect(await readFile(path.join(destinationDir, temps[0]))).toEqual(payload);
+                    const tempName = temps[0];
+                    expect(tempName).toBeDefined();
+                    if (!tempName) throw new Error(`Arquivo temporário ausente para a fase ${scenario.id}.`);
+                    const tempPath = path.join(destinationDir, tempName);
+                    expect(reached.details?.tmpDestination).toBe(tempPath);
+                    expect(await readFile(tempPath)).toEqual(payload);
                     const handle = await open(destinationDir, 'r');
                     await handle.sync();
                     await handle.close();
-                    await rm(path.join(destinationDir, temps[0]), { force: true });
+                    await rm(tempPath, { force: true });
                 }
             }
         },

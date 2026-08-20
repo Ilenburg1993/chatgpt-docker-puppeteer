@@ -192,14 +192,14 @@ async function _runTaskControlCommand(
 router.get('/', async (req, res) => {
     try {
         // Parse pagination parameters
-        const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
-        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query.limit), 10) || 100));
+        const page = Math.max(1, parseInt(String(req.query['page']), 10) || 1);
+        const limit = Math.min(1000, Math.max(1, parseInt(String(req.query['limit']), 10) || 100));
         const offset = (page - 1) * limit;
 
         // Get optional filters
-        const status = req.query.status ? String(req.query.status) : null;
-        const stage = req.query.stage ? String(req.query.stage) : null;
-        const missionId = req.query.missionId ? String(req.query.missionId) : null;
+        const status = req.query['status'] ? String(req.query['status']) : null;
+        const stage = req.query['stage'] ? String(req.query['stage']) : null;
+        const missionId = req.query['missionId'] ? String(req.query['missionId']) : null;
 
         // Fetch paginated tasks and total count in parallel
         const [tasks, total] = await Promise.all([
@@ -623,17 +623,17 @@ router.get('/:id/prompt', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
         }
 
-        const attemptId = req.query?.attempt ? String(req.query.attempt) : task.latest_attempt_id || null;
+        const attemptId = req.query?.['attempt'] ? String(req.query['attempt']) : task.latest_attempt_id || null;
         if (!attemptId) {
             return res.status(404).json({ success: false, error: 'Attempt não especificado', request_id: req.id });
         }
 
         const attempt = getAttemptById(attemptId);
-        if (!attempt || attempt.task_id !== safeId) {
+        if (!attempt || attempt['task_id'] !== safeId) {
             return res.status(404).json({ success: false, error: 'Attempt não encontrado', request_id: req.id });
         }
 
-        const artId = attempt.rendered_prompt_artifact_id || null;
+        const artId = attempt['rendered_prompt_artifact_id'] || null;
         if (!artId) {
             return res
                 .status(404)
@@ -688,7 +688,7 @@ const replaceDependenciesSchema = z.object({
 
 router.put('/:id/dependencies', schemaGuard(replaceDependenciesSchema), async (req, res) => {
     try {
-        const taskId = _safeId(req.params.id);
+        const taskId = _safeId(req.params['id']);
         const existing = /** @type {any} */ (getTaskById(taskId));
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Task não encontrada', request_id: req.id });
@@ -1396,9 +1396,9 @@ router.post('/clear', async (req, res) => {
 router.get('/results/:id', async (req, res) => {
     const safeId = _safeId(req.params.id);
     const search = new URLSearchParams();
-    if (req.query.attempt) search.set('attempt', String(req.query.attempt));
-    if (req.query.format) search.set('format', String(req.query.format));
-    if (req.query.disposition) search.set('disposition', String(req.query.disposition));
+    if (req.query['attempt']) search.set('attempt', String(req.query['attempt']));
+    if (req.query['format']) search.set('format', String(req.query['format']));
+    if (req.query['disposition']) search.set('disposition', String(req.query['disposition']));
     const qs = search.toString();
     res.redirect(302, `/api/results/${safeId}${qs ? `?${qs}` : ''}`);
 });
@@ -1406,9 +1406,9 @@ router.get('/results/:id', async (req, res) => {
 router.get('/:id/result', async (req, res) => {
     const safeId = _safeId(req.params.id);
     const search = new URLSearchParams();
-    if (req.query.attempt) search.set('attempt', String(req.query.attempt));
-    if (req.query.format) search.set('format', String(req.query.format));
-    if (req.query.disposition) search.set('disposition', String(req.query.disposition));
+    if (req.query['attempt']) search.set('attempt', String(req.query['attempt']));
+    if (req.query['format']) search.set('format', String(req.query['format']));
+    if (req.query['disposition']) search.set('disposition', String(req.query['disposition']));
     const qs = search.toString();
     res.redirect(302, `/api/results/${safeId}${qs ? `?${qs}` : ''}`);
 });

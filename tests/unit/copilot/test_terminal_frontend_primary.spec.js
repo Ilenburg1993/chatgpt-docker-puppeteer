@@ -952,7 +952,7 @@ describe('terminal/frontend/index', () => {
     it('salva snapshot via fachada principal do terminal', async () => {
         const result = await frontend.saveTerminalSnapshotProjection('manual');
 
-        expect(result.data.snapshotId).toBe('snap-1');
+        expect(result.data['snapshotId']).toBe('snap-1');
         expect(result.path).toBe('/tmp/snap-1.json');
     });
 
@@ -963,7 +963,7 @@ describe('terminal/frontend/index', () => {
         await frontend.updateTerminalPlanProjection('novo plano', 'alt');
         await frontend.deleteTerminalPlanProjection('alt');
 
-        expect(result.data.sessionId).toBe('runtime-alt');
+        expect(result.data['sessionId']).toBe('runtime-alt');
         expect(plan.currentMode).toBe('plan');
         expect(mode.currentMode).toBe('autopilot');
         expect(altUpdateSdkPlan).toHaveBeenCalledWith('novo plano');

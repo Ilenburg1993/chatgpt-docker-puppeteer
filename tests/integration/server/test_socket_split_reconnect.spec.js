@@ -33,7 +33,7 @@ async function waitFor(/** @type {any} */ predicate, timeoutMs = 10000, interval
     throw new Error(`Timeout waiting for condition (${timeoutMs}ms)`);
 }
 
-test('split mode reconnects and reauthorizes handshake after forced disconnect', async (t) => {
+test('split mode reconnects and reauthorizes handshake after forced disconnect', async () => {
     const httpServer = http.createServer((_, res) => {
         res.statusCode = 200;
         res.end('ok');

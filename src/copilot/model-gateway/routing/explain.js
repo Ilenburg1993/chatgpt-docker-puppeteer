@@ -24,7 +24,7 @@ function isRecord(value) {
 }
 
 /**
- * @param {Record<string, any>} candidate
+ * @param {Record<string, unknown>} candidate
  * @returns {string}
  */
 function candidateId(candidate) {
@@ -47,7 +47,7 @@ function reasonCounts(reasons) {
 }
 
 /**
- * @param {Record<string, any> | null} health
+ * @param {Record<string, unknown> | null} health
  * @param {ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null} [precomputedRuntimeProof]
  * @returns {{
  *   status: string | null;
@@ -103,8 +103,7 @@ function probeSummary(health, precomputedRuntimeProof = null) {
 }
 
 /**
- * @param {Record<string, any>} candidate
- * @returns {Record<string, unknown>}
+ * @param {Record<string, unknown>} candidate
  */
 function candidateSummary(candidate) {
     const model = isRecord(candidate['model']) ? candidate['model'] : {};
@@ -148,12 +147,11 @@ function candidateSummary(candidate) {
 }
 
 /**
- * @param {Record<string, any>[]} candidates
- * @returns {Record<string, unknown>}
+ * @param {Record<string, unknown>[]} candidates
  */
 function decisionLayers(candidates) {
     const summaries = candidates.map(candidateSummary);
-    const probeSummaries = summaries.map((summary) => (isRecord(summary['probes']) ? summary['probes'] : {}));
+    const probeSummaries = summaries.map((summary) => summary.probes);
     const chatOkCount = probeSummaries.filter((probes) => probes['chatOk'] === true).length;
     const agentProbeProofCount = probeSummaries.filter((probes) => probes['agentProbeVerified'] === true).length;
     const runtimeProbeProofCount = probeSummaries.filter(
@@ -225,22 +223,7 @@ function nextActions(reasons) {
 }
 
 /**
- * @param {Record<string, any>} route
- * @returns {{
- *   selected: boolean;
- *   selectedId: string | null;
- *   candidateCount: number;
- *   rejectedCount: number;
- *   fallbackChain: string[];
- *   rejectedReasonCounts: Record<string, number>;
- *   topRejectedReasons: string[];
- *   selectedSummary: Record<string, unknown> | null;
- *   candidateSummaries: Record<string, unknown>[];
- *   rejectedSummaries: Record<string, unknown>[];
- *   decisionLayers: Record<string, unknown>;
- *   nextActions: string[];
- *   summary: string;
- * }}
+ * @param {Record<string, unknown>} route
  */
 export function explainGatewayRouteDecision(route) {
     const candidates = Array.isArray(route['candidates']) ? route['candidates'].filter(isRecord) : [];

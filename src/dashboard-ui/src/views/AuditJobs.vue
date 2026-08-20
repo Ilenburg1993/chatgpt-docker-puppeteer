@@ -80,7 +80,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useAudit } from '@/composables/useAudit';
 import { computed, onMounted, ref } from 'vue';
 
@@ -90,7 +90,7 @@ const statusFilter = ref('');
 
 const filteredJobs = computed(() => {
     if (!statusFilter.value) return jobs.value;
-    return jobs.value.filter((j) => j.status === statusFilter.value);
+    return jobs.value.filter((j: { status?: string }) => j.status === statusFilter.value);
 });
 
 onMounted(async () => {
@@ -106,7 +106,7 @@ async function handleCreateJob() {
     }
 }
 
-async function handleRunJob(jobId) {
+async function handleRunJob(jobId: string) {
     try {
         await runJob(jobId);
         await listJobs();
@@ -115,7 +115,7 @@ async function handleRunJob(jobId) {
     }
 }
 
-async function handleCancelJob(jobId) {
+async function handleCancelJob(jobId: string) {
     try {
         await cancelJob(jobId);
         await listJobs();
@@ -124,8 +124,8 @@ async function handleCancelJob(jobId) {
     }
 }
 
-function statusClass(status) {
-    const classes = {
+function statusClass(status: string) {
+    const classes: Record<string, string> = {
         pending: 'bg-yellow-100 text-yellow-800',
         running: 'bg-blue-100 text-blue-800',
         completed: 'bg-green-100 text-green-800',
@@ -135,7 +135,7 @@ function statusClass(status) {
     return classes[status] || 'bg-gray-100 text-gray-800';
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | number | Date | null | undefined) {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('pt-BR');
 }

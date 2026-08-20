@@ -80,7 +80,7 @@ function modelRouteBoolean(model, field) {
 }
 
 /**
- * @param {Record<string, any>} profile
+ * @param {Record<string, unknown>} profile
  * @returns {boolean}
  */
 function isDefaultAuditProfile(profile) {
@@ -88,8 +88,7 @@ function isDefaultAuditProfile(profile) {
 }
 
 /**
- * @param {Record<string, any> | null} selected
- * @returns {Record<string, unknown> | null}
+ * @param {Record<string, unknown> | null} selected
  */
 function selectedSummary(selected) {
     if (!selected) return null;
@@ -168,24 +167,25 @@ function selectedSummary(selected) {
 }
 
 /**
- * @param {Array<Record<string, any>>} candidates
+ * @param {Array<Record<string, unknown>>} candidates
  * @param {number} limit
- * @returns {Record<string, unknown>[]}
+ * @returns {Array<NonNullable<ReturnType<typeof selectedSummary>>>}
  */
 function candidateSummaries(candidates, limit = 96) {
-    return candidates.map(selectedSummary).filter(isRecord).slice(0, Math.max(0, Math.floor(limit)));
+    return candidates.map(selectedSummary).filter((summary) => summary !== null).slice(0, Math.max(0, Math.floor(limit)));
 }
 
 /**
- * @param {Array<Record<string, unknown>>} rows
- * @param {string} key
+ * @template T
+ * @param {readonly T[]} rows
+ * @param {(row: T) => unknown} readValue
  * @returns {Record<string, number>}
  */
-function countBy(rows, key) {
+function countBy(rows, readValue) {
     /** @type {Record<string, number>} */
     const counts = {};
     for (const row of rows) {
-        const value = optionalString(row[key]) ?? 'unknown';
+        const value = optionalString(readValue(row)) ?? 'unknown';
         counts[value] = (counts[value] ?? 0) + 1;
     }
     return counts;
@@ -216,8 +216,8 @@ function hasCapability(row, capability) {
 }
 
 /**
- * @param {Array<Record<string, any>>} candidates
- * @param {Record<string, any> | null} profile
+ * @param {Array<Record<string, unknown>>} candidates
+ * @param {Record<string, unknown> | null} profile
  * @returns {{
  *   candidateCount: number;
  *   required: Record<string, number>;
@@ -248,7 +248,7 @@ function capabilitySupply(candidates, profile) {
 
 /**
  * @param {ReturnType<typeof capabilitySupply>} supply
- * @param {Record<string, any> | null} profile
+ * @param {Record<string, unknown> | null} profile
  * @returns {string[]}
  */
 function capabilitySupplyWarnings(supply, profile) {
@@ -305,15 +305,15 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
+ * @param {Record<string, unknown>} snapshot
  * @param {{
  *   profiles?: string[];
  *   strict?: boolean;
  *   includeProjectionOnly?: boolean;
  *   secretRegistry?: { has(ref: string): boolean };
- *   eligibilityPolicy?: Record<string, any>;
- *   runtimeHealthRecords?: Record<string, any>[];
- *   runtimeHealthIndex?: Record<string, any>;
+ *   eligibilityPolicy?: Record<string, unknown>;
+ *   runtimeHealthRecords?: Record<string, unknown>[];
+ *   runtimeHealthIndex?: Record<string, unknown>;
  *   runtimeRouteProfile?: string | null;
  *   requireRuntimeProof?: boolean;
  *   now?: string | number | Date;
@@ -358,8 +358,8 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
  *   };
  *   profiles: Array<{
  *     profileId: string;
- *     selected: Record<string, unknown> | null;
- *     candidateAlternates: Record<string, unknown>[];
+ *     selected: ReturnType<typeof selectedSummary>;
+ *     candidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
  *     candidateCount: number;
  *     rejectedCount: number;
  *     fallbackChain: string[];
@@ -449,7 +449,7 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
             rejectedReasonCounts: explanation.rejectedReasonCounts,
         };
     });
-    const selectedRows = profileAudits.map((profile) => profile.selected).filter(isRecord);
+    const selectedRows = profileAudits.map((profile) => profile.selected).filter((selected) => selected !== null);
     const selectedProfileCount = selectedRows.length;
     return {
         ok: selectedProfileCount === profileAudits.length,
@@ -503,8 +503,8 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
                 const value = profile.decisionLayers['runtimeHealthProofCount'];
                 return sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0);
             }, 0),
-            selectedProviders: countBy(selectedRows, 'providerId'),
-            selectedSelectorKinds: countBy(selectedRows, 'selectorKind'),
+            selectedProviders: countBy(selectedRows, (selected) => selected.providerId),
+            selectedSelectorKinds: countBy(selectedRows, (selected) => selected.selectorKind),
             rejectedReasonCounts: mergeCounts(profileAudits.map((profile) => profile.rejectedReasonCounts)),
         },
         profiles: profileAudits.map(({ rejectedReasonCounts, ...profile }) => profile),
@@ -543,45 +543,40 @@ export function auditModelGatewayPostRuntimeSelection(snapshot, options = {}) {
 }
 
 /**
- * @param {Record<string, unknown> | null | undefined} selected
+ * @param {ReturnType<typeof selectedSummary>} selected
  * @returns {string | null}
  */
 function selectedRouteKey(selected) {
-    if (!isRecord(selected)) return null;
+    if (!selected) return null;
     return [
-        optionalString(selected['providerId']) ?? 'unknown-provider',
-        optionalString(selected['providerModel']) ?? optionalString(selected['id']) ?? 'unknown-model',
-        optionalString(selected['selectorKind']) ?? 'exact_model',
-        optionalString(selected['selectorSyntax']) ?? optionalString(selected['providerModel']) ?? optionalString(selected['id']) ?? 'unknown-model',
+        selected.providerId ?? 'unknown-provider',
+        selected.providerModel ?? selected.id ?? 'unknown-model',
+        selected.selectorKind ?? 'exact_model',
+        selected.selectorSyntax ?? selected.providerModel ?? selected.id ?? 'unknown-model',
     ].join(':');
 }
 
 /**
- * @param {Record<string, unknown> | null | undefined} selected
+ * @param {ReturnType<typeof selectedSummary>} selected
  * @returns {boolean}
  */
 function selectedHasRuntimeProof(selected) {
-    if (!isRecord(selected)) return false;
-    const runtimeHealth = isRecord(selected['runtimeHealth']) ? selected['runtimeHealth'] : {};
-    const verifiedProbes = Array.isArray(runtimeHealth['verifiedProbes']) ? runtimeHealth['verifiedProbes'] : [];
+    if (!selected?.runtimeHealth) return false;
     return (
-        optionalString(runtimeHealth['lastStatus']) === 'ok' ||
-        optionalString(runtimeHealth['agentProbeStatus']) === 'ok' ||
-        verifiedProbes.length > 0
+        selected.runtimeHealth.lastStatus === 'ok' ||
+        selected.runtimeHealth.agentProbeStatus === 'ok' ||
+        selected.runtimeHealth.verifiedProbes.length > 0
     );
 }
 
 /**
- * @param {Array<Record<string, unknown>>} profiles
- * @returns {Map<string, Record<string, unknown>>}
+ * @template {{ profileId: string }} T
+ * @param {readonly T[]} profiles
+ * @returns {Map<string, T>}
  */
 function profilesById(profiles) {
-    /** @type {Map<string, Record<string, unknown>>} */
     const byId = new Map();
-    for (const profile of profiles) {
-        const profileId = optionalString(profile['profileId']);
-        if (profileId) byId.set(profileId, profile);
-    }
+    for (const profile of profiles) byId.set(profile.profileId, profile);
     return byId;
 }
 
@@ -610,10 +605,10 @@ function profilesById(profiles) {
  *   rows: Array<{
  *     profileId: string;
  *     changed: boolean;
- *     preSelected: Record<string, unknown> | null;
- *     postSelected: Record<string, unknown> | null;
- *     preCandidateAlternates: Record<string, unknown>[];
- *     postCandidateAlternates: Record<string, unknown>[];
+ *     preSelected: ReturnType<typeof selectedSummary>;
+ *     postSelected: ReturnType<typeof selectedSummary>;
+ *     preCandidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
+ *     postCandidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
  *     preRouteKey: string | null;
  *     postRouteKey: string | null;
  *     postSelectedHasRuntimeProof: boolean;
@@ -624,24 +619,20 @@ function profilesById(profiles) {
 export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection, options = {}) {
     const requestedProfileIds = stringList(options.profiles);
     const requestedProfiles = new Set(requestedProfileIds);
-    const allPreProfiles = Array.isArray(preRuntimeSelection.profiles) ? preRuntimeSelection.profiles.filter(isRecord) : [];
+    const allPreProfiles = preRuntimeSelection.profiles;
     const preProfilesById = profilesById(allPreProfiles);
     const preProfiles =
         requestedProfiles.size > 0
             ? requestedProfileIds.map((profileId) => preProfilesById.get(profileId)).filter((profile) => profile !== undefined)
             : allPreProfiles;
-    const postProfiles = profilesById(Array.isArray(postRuntimeSelection.profiles) ? postRuntimeSelection.profiles.filter(isRecord) : []);
+    const postProfiles = profilesById(postRuntimeSelection.profiles);
     const rows = preProfiles.map((preProfile) => {
-        const profileId = optionalString(preProfile['profileId']) ?? 'unknown-profile';
-        const postProfile = postProfiles.get(profileId) ?? {};
-        const preSelected = isRecord(preProfile['selected']) ? preProfile['selected'] : null;
-        const postSelected = isRecord(postProfile['selected']) ? postProfile['selected'] : null;
-        const preCandidateAlternates = Array.isArray(preProfile['candidateAlternates'])
-            ? preProfile['candidateAlternates'].filter(isRecord)
-            : [];
-        const postCandidateAlternates = Array.isArray(postProfile['candidateAlternates'])
-            ? postProfile['candidateAlternates'].filter(isRecord)
-            : [];
+        const profileId = preProfile.profileId;
+        const postProfile = postProfiles.get(profileId);
+        const preSelected = preProfile.selected;
+        const postSelected = postProfile?.selected ?? null;
+        const preCandidateAlternates = preProfile.candidateAlternates;
+        const postCandidateAlternates = postProfile?.candidateAlternates ?? [];
         const preRouteKey = selectedRouteKey(preSelected);
         const postRouteKey = selectedRouteKey(postSelected);
         return {
@@ -654,7 +645,7 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
             preRouteKey,
             postRouteKey,
             postSelectedHasRuntimeProof: selectedHasRuntimeProof(postSelected),
-            postDecisionLayers: isRecord(postProfile['decisionLayers']) ? postProfile['decisionLayers'] : {},
+            postDecisionLayers: postProfile?.decisionLayers ?? {},
         };
     });
     const changedCount = rows.filter((row) => row.changed).length;
@@ -767,7 +758,7 @@ export function explainModelGatewaySelectionComparison(comparison) {
             changedCount: rows.filter((row) => row.changed).length,
             unchangedCount: rows.filter((row) => !row.changed).length,
             runtimeProofCount: rows.filter((row) => row.postSelectedHasRuntimeProof).length,
-            reasonCounts: countBy(rows, 'reason'),
+            reasonCounts: countBy(rows, (row) => row.reason),
             nextActions: [...new Set(rows.flatMap((row) => row.nextActions))].sort(),
         },
         rows,
@@ -808,13 +799,13 @@ function normalizeSelectionPolicyMode(value) {
  *   };
  *   rows: Array<{
  *     profileId: string;
- *     selected: Record<string, unknown> | null;
+ *     selected: ReturnType<typeof selectedSummary>;
  *     source: 'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing';
  *     changedFromPreRuntime: boolean;
  *     hasRuntimeProof: boolean;
- *     preSelected: Record<string, unknown> | null;
- *     postSelected: Record<string, unknown> | null;
- *     candidateAlternates: Record<string, unknown>[];
+ *     preSelected: ReturnType<typeof selectedSummary>;
+ *     postSelected: ReturnType<typeof selectedSummary>;
+ *     candidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
  *   }>;
  * }}
  */
@@ -822,12 +813,8 @@ export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
     const mode = normalizeSelectionPolicyMode(options.mode);
     const rows = comparison.rows.map((row) => {
         let selected = row.preSelected;
-        const preCandidateAlternates = Array.isArray(row.preCandidateAlternates)
-            ? row.preCandidateAlternates.filter(isRecord)
-            : [];
-        const postCandidateAlternates = Array.isArray(row.postCandidateAlternates)
-            ? row.postCandidateAlternates.filter(isRecord)
-            : [];
+        const preCandidateAlternates = row.preCandidateAlternates;
+        const postCandidateAlternates = row.postCandidateAlternates;
         /** @type {'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing'} */
         let source = 'pre_runtime_metadata';
         if (mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF) {

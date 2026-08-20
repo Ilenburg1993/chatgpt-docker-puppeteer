@@ -24,6 +24,24 @@ import {
 } from './openai-transformer.js';
 
 /**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * @param {unknown} error
+ * @returns {{ payload: unknown; statusCode: number } | null}
+ */
+function readValidationError(error) {
+    if (error === null || typeof error !== 'object' || !('openaiError' in error)) return null;
+    const statusCode = 'statusCode' in error && typeof error.statusCode === 'number' ? error.statusCode : 400;
+    return { payload: error.openaiError, statusCode };
+}
+
+/**
  * Setup OpenAI-compatible endpoints in Express app
  *
  * @example
@@ -43,10 +61,13 @@ export function setupOpenAIHandler(app) {
     console.error('[OpenAI Handler] setupOpenAIHandler() called, registering routes...');
 
     // Debug: Test route
-    app.get('/v1/test', (/** @type {any} */ req, /** @type {any} */ res) => {
-        console.error('[OpenAI Handler] TEST ROUTE CALLED!');
-        res.json({ message: 'Test route works!' });
-    });
+    app['get'](
+        '/v1/test',
+        (/** @type {import('express').Request} */ _req, /** @type {import('express').Response} */ res) => {
+            console.error('[OpenAI Handler] TEST ROUTE CALLED!');
+            res.json({ message: 'Test route works!' });
+        },
+    );
 
     /**
      * POST /v1/chat/completions
@@ -60,92 +81,100 @@ export function setupOpenAIHandler(app) {
      * "qwen3-coder-next", "choices": [{ "index": 0, "message": { "role": "assistant", "content": "Hi!" },
      * "finish_reason": "stop" }], "usage": { "prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7 } }
      */
-    app.post('/v1/chat/completions', async (/** @type {any} */ req, /** @type {any} */ res) => {
-        console.error('[OpenAI Handler] POST /v1/chat/completions called');
-        const startTime = Date.now();
+    app['post'](
+        '/v1/chat/completions',
+        async (/** @type {import('express').Request} */ req, /** @type {import('express').Response} */ res) => {
+            console.error('[OpenAI Handler] POST /v1/chat/completions called');
+            const startTime = Date.now();
 
-        try {
-            // 1. Validate request (fail-fast)
-            validateOpenAIRequest(req.body);
+            try {
+                // 1. Validate request (fail-fast)
+                validateOpenAIRequest(req.body);
 
-            // 2. Log warnings for unsupported features (but proceed)
-            if (req.body.tools || req.body.tool_choice) {
-                console.warn(
-                    '[OpenAI Handler] Tool calling requested but not supported - ignoring. ' +
-                        'Set toolCalling:false in VSCode customOAIModels config to avoid this warning.',
+                // 2. Log warnings for unsupported features (but proceed)
+                if (req.body.tools || req.body.tool_choice) {
+                    console.warn(
+                        '[OpenAI Handler] Tool calling requested but not supported - ignoring. ' +
+                            'Set toolCalling:false in VSCode customOAIModels config to avoid this warning.',
+                    );
+                }
+
+                if (req.body.stream) {
+                    console.warn(
+                        '[OpenAI Handler] Streaming requested but not supported in v1.0 - ' +
+                            'will return complete response instead.',
+                    );
+                }
+
+                // 3. Translate OpenAI request → Ollama format
+                const ollamaReq = translateRequestToOllama(req.body);
+
+                console.error(
+                    `[OpenAI Handler] Generating with model=${ollamaReq.model}, ` +
+                        `prompt_length=${ollamaReq.prompt.length} chars, ` +
+                        `temperature=${ollamaReq.options.temperature}`,
                 );
-            }
 
-            if (req.body.stream) {
-                console.warn(
-                    '[OpenAI Handler] Streaming requested but not supported in v1.0 - ' +
-                        'will return complete response instead.',
+                // 4. Call Ollama (uses OllamaClient with circuit breaker, adaptive timeout)
+                // OllamaClient handles:
+                // - Cloud vs local routing (OLLAMA_CLOUD_ENABLED)
+                // - API key authentication (OLLAMA_CLOUD_API_KEY)
+                // - Timeouts (OLLAMA_GENERATE_TIMEOUT)
+                // - Error handling (auth failures, network errors)
+                const ollamaResponse = await ollama.generate(ollamaReq.prompt, ollamaReq.model, ollamaReq.options);
+
+                // 5. Translate Ollama response → OpenAI format
+                const openaiResponse = translateResponseToOpenAI(
+                    { response: ollamaResponse, model: ollamaReq.model },
+                    req.body,
                 );
+
+                const duration = Date.now() - startTime;
+                console.error(
+                    `[OpenAI Handler] Completed in ${duration}ms, ` +
+                        `tokens=${openaiResponse.usage.total_tokens} ` +
+                        `(prompt=${openaiResponse.usage.prompt_tokens}, ` +
+                        `completion=${openaiResponse.usage.completion_tokens})`,
+                );
+
+                // 6. Return OpenAI-compatible response
+                return res.json(openaiResponse);
+            } catch (error) {
+                const message = errorMessage(error);
+                const validationError = readValidationError(error);
+                const duration = Date.now() - startTime;
+
+                // Handle validation errors (already formatted as OpenAI errors)
+                if (validationError) {
+                    console.error(`[OpenAI Handler] Validation error (${duration}ms): ${message}`);
+                    return res.status(validationError.statusCode).json(validationError.payload);
+                }
+
+                // Handle Ollama errors (translate to OpenAI format)
+                console.error(`[OpenAI Handler] Error (${duration}ms):`, message);
+
+                // Map error types to appropriate HTTP status codes
+                const statusCode = message.includes('timeout')
+                    ? 504 // Gateway Timeout
+                    : message.includes('cancelled')
+                      ? 499 // Client Closed Request
+                      : message.includes('authentication')
+                        ? 401 // Unauthorized
+                        : message.includes('Cloud')
+                          ? 502 // Bad Gateway
+                          : 500; // Internal Server Error
+
+                const errorType =
+                    statusCode === 401
+                        ? 'authentication_error'
+                        : statusCode === 504
+                          ? 'timeout_error'
+                          : 'internal_error';
+
+                return res.status(statusCode).json(buildOpenAIError(message, errorType, statusCode));
             }
-
-            // 3. Translate OpenAI request → Ollama format
-            const ollamaReq = translateRequestToOllama(req.body);
-
-            console.error(
-                `[OpenAI Handler] Generating with model=${ollamaReq.model}, ` +
-                    `prompt_length=${ollamaReq.prompt.length} chars, ` +
-                    `temperature=${ollamaReq.options.temperature}`,
-            );
-
-            // 4. Call Ollama (uses OllamaClient with circuit breaker, adaptive timeout)
-            // OllamaClient handles:
-            // - Cloud vs local routing (OLLAMA_CLOUD_ENABLED)
-            // - API key authentication (OLLAMA_CLOUD_API_KEY)
-            // - Timeouts (OLLAMA_GENERATE_TIMEOUT)
-            // - Error handling (auth failures, network errors)
-            const ollamaResponse = await ollama.generate(ollamaReq.prompt, ollamaReq.model, ollamaReq.options);
-
-            // 5. Translate Ollama response → OpenAI format
-            const openaiResponse = translateResponseToOpenAI(
-                { response: ollamaResponse, model: ollamaReq.model },
-                req.body,
-            );
-
-            const duration = Date.now() - startTime;
-            console.error(
-                `[OpenAI Handler] Completed in ${duration}ms, ` +
-                    `tokens=${openaiResponse.usage.total_tokens} ` +
-                    `(prompt=${openaiResponse.usage.prompt_tokens}, ` +
-                    `completion=${openaiResponse.usage.completion_tokens})`,
-            );
-
-            // 6. Return OpenAI-compatible response
-            res.json(openaiResponse);
-        } catch (/** @type {any} */ error) {
-            const _e = /** @type {any} */ (error);
-            const duration = Date.now() - startTime;
-
-            // Handle validation errors (already formatted as OpenAI errors)
-            if (_e.openaiError) {
-                console.error(`[OpenAI Handler] Validation error (${duration}ms): ${_e.message}`);
-                return res.status(_e.statusCode || 400).json(_e.openaiError);
-            }
-
-            // Handle Ollama errors (translate to OpenAI format)
-            console.error(`[OpenAI Handler] Error (${duration}ms):`, _e.message);
-
-            // Map error types to appropriate HTTP status codes
-            const statusCode = _e.message.includes('timeout')
-                ? 504 // Gateway Timeout
-                : _e.message.includes('cancelled')
-                  ? 499 // Client Closed Request
-                  : _e.message.includes('authentication')
-                    ? 401 // Unauthorized
-                    : _e.message.includes('Cloud')
-                      ? 502 // Bad Gateway
-                      : 500; // Internal Server Error
-
-            const errorType =
-                statusCode === 401 ? 'authentication_error' : statusCode === 504 ? 'timeout_error' : 'internal_error';
-
-            res.status(statusCode).json(buildOpenAIError(_e.message, errorType, statusCode));
-        }
-    });
+        },
+    );
 
     /**
      * GET /v1/models
@@ -157,31 +186,33 @@ export function setupOpenAIHandler(app) {
      *
      * Note: Ollama's /api/tags endpoint has different format, so we return hardcoded list for simplicity.
      */
-    app.get('/v1/models', async (/** @type {any} */ req, /** @type {any} */ res) => {
-        console.error('[OpenAI Handler] GET /v1/models called');
-        try {
-            // Return hardcoded list of models
-            // (Ollama /api/tags has different schema - not worth adapting)
-            const models = [
-                {
-                    id: 'qwen3-coder-next',
-                    object: 'model',
-                    created: 1672531200,
-                    owned_by: 'ollama',
-                    permission: [],
-                    root: 'qwen3-coder-next',
-                    parent: null,
-                },
-            ];
+    app['get'](
+        '/v1/models',
+        async (/** @type {import('express').Request} */ _req, /** @type {import('express').Response} */ res) => {
+            console.error('[OpenAI Handler] GET /v1/models called');
+            try {
+                // Return hardcoded list of models
+                // (Ollama /api/tags has different schema - not worth adapting)
+                const models = [
+                    {
+                        id: 'qwen3-coder-next',
+                        object: 'model',
+                        created: 1672531200,
+                        owned_by: 'ollama',
+                        permission: [],
+                        root: 'qwen3-coder-next',
+                        parent: null,
+                    },
+                ];
 
-            res.json({
-                object: 'list',
-                data: models,
-            });
-        } catch (/** @type {any} */ error) {
-            const _e = /** @type {any} */ (error);
-            console.error('[OpenAI Handler] Error listing models:', _e.message);
-            res.status(500).json(buildOpenAIError('Failed to list models', 'internal_error', 500));
-        }
-    });
+                res.json({
+                    object: 'list',
+                    data: models,
+                });
+            } catch (error) {
+                console.error('[OpenAI Handler] Error listing models:', errorMessage(error));
+                res.status(500).json(buildOpenAIError('Failed to list models', 'internal_error', 500));
+            }
+        },
+    );
 }

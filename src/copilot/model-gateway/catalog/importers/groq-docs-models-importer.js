@@ -334,7 +334,7 @@ function modelEvidenceValues(row) {
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.modelsUrl]
  * @param {string} [options.pricingUrl]
  * @returns {import('../importer-runner.js').CatalogImporter}
@@ -372,9 +372,9 @@ export function createGroqDocsModelsImporter(options = {}) {
             const builtInTools = rows
                 .map((row) => (isRecord(row) && isRecord(row['builtInToolPricing']) ? row['builtInToolPricing'] : null))
                 .find(isRecord);
-            /** @type {Record<string, unknown>[]} */
+            /** @type {ReturnType<typeof createProviderMetadataEvidence>[]} */
             const evidences = [
-                /** @type {Record<string, unknown>} */ (createProviderMetadataEvidence({
+                createProviderMetadataEvidence({
                     evidenceId: `${sourceId}:groq:providerMetadata.groqDocs.modelsUrl`,
                     providerId: 'groq',
                     subjectProviderId: 'groq',
@@ -384,8 +384,8 @@ export function createGroqDocsModelsImporter(options = {}) {
                     sourceKind: 'public_docs',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.DOCS,
                     rawPayloadRef: context.rawPayloadRef,
-                })),
-                /** @type {Record<string, unknown>} */ (createProviderMetadataEvidence({
+                }),
+                createProviderMetadataEvidence({
                     evidenceId: `${sourceId}:groq:providerMetadata.groqDocs.pricingUrl`,
                     providerId: 'groq',
                     subjectProviderId: 'groq',
@@ -395,11 +395,11 @@ export function createGroqDocsModelsImporter(options = {}) {
                     sourceKind: 'public_docs',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.DOCS,
                     rawPayloadRef: context.rawPayloadRef,
-                })),
+                }),
             ];
             if (builtInTools && Object.keys(builtInTools).length > 0) {
                 evidences.push(
-                    /** @type {Record<string, unknown>} */ (createProviderMetadataEvidence({
+                    createProviderMetadataEvidence({
                         evidenceId: `${sourceId}:groq:providerMetadata.groqDocs.builtInToolPricing`,
                         providerId: 'groq',
                         subjectProviderId: 'groq',
@@ -409,7 +409,7 @@ export function createGroqDocsModelsImporter(options = {}) {
                         sourceKind: 'public_docs',
                         confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.DOCS,
                         rawPayloadRef: context.rawPayloadRef,
-                    })),
+                    }),
                 );
             }
             return evidences;

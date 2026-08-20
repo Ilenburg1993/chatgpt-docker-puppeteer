@@ -32,15 +32,15 @@ function isRecord(value) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>[]}
+ * @returns {Record<string, unknown>[]}
  */
 function readRecordArray(value) {
-    return Array.isArray(value) ? value.filter(isRecord).map((item) => /** @type {Record<string, any>} */ (item)) : [];
+    return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
 /**
  * @param {unknown} snapshot
- * @returns {{ schemaVersion: number; generatedAt: string | null; source: string; providers: Record<string, any>[]; models: Record<string, any>[] }}
+ * @returns {{ schemaVersion: number; generatedAt: string | null; source: string; providers: Record<string, unknown>[]; models: Record<string, unknown>[] }}
  */
 export function normalizeStoredRegistrySnapshot(snapshot) {
     if (!isRecord(snapshot) || snapshot['schemaVersion'] !== MODEL_GATEWAY_SCHEMA_VERSION) {
@@ -78,7 +78,7 @@ export class JsonModelGatewayRegistryStore {
     }
 
     /**
-     * @returns {Promise<{ schemaVersion: number; generatedAt: string | null; source: string; providers: Record<string, any>[]; models: Record<string, any>[] }>}
+     * @returns {Promise<{ schemaVersion: number; generatedAt: string | null; source: string; providers: Record<string, unknown>[]; models: Record<string, unknown>[] }>}
      */
     async readSnapshot() {
         const raw = await readJson(this.#filePath, null);
@@ -97,7 +97,7 @@ export class JsonModelGatewayRegistryStore {
     }
 
     /**
-     * @param {{ source?: string; providers: Record<string, any>[]; models: Record<string, any>[] }} snapshot
+     * @param {{ source?: string; providers: Record<string, unknown>[]; models: Record<string, unknown>[] }} snapshot
      * @returns {Promise<void>}
      */
     async writeSnapshot(snapshot) {

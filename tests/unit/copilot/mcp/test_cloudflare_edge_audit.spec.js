@@ -66,9 +66,9 @@ describe('mcp/cloudflare/edge-audit', () => {
         );
 
         expect(result.critical).toEqual([]);
-        expect(result.findings.cacheBypassCandidateCount).toBe(1);
-        expect(result.findings.oauthTokenRateLimitCount).toBe(1);
-        expect(result.findings.mcpRateLimitCount).toBe(1);
+        expect(result.findings['cacheBypassCandidateCount']).toBe(1);
+        expect(result.findings['oauthTokenRateLimitCount']).toBe(1);
+        expect(result.findings['mcpRateLimitCount']).toBe(1);
     });
 
     it('marks interactive challenge rules on /mcp as critical', () => {

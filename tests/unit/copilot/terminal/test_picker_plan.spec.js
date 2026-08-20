@@ -2,21 +2,20 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildTerminalPickerPlan } from '../../../../src/copilot/terminal/capabilities/index.js';
+import {
+    buildTerminalPickerPlan,
+    TERMINAL_EXTERNAL_TOOL_DEFINITIONS,
+} from '../../../../src/copilot/terminal/capabilities/index.js';
 
-const FZF_TOOL = /** @type {const} */ ({
-    id: 'fzf',
-    label: 'fzf',
+const FZF_DEFINITION = TERMINAL_EXTERNAL_TOOL_DEFINITIONS.find((definition) => definition.id === 'fzf');
+if (!FZF_DEFINITION) throw new Error('A definição canônica da ferramenta fzf deve existir');
+
+const FZF_TOOL = Object.freeze({
+    ...FZF_DEFINITION,
     available: true,
     command: 'fzf',
     path: '/bin/fzf',
     version: 'fzf 0.66.0',
-    decision: 'accepted',
-    defaultEnabled: false,
-    recommendedFor: 'picker',
-    fallback: 'textual',
-    risk: 'tty',
-    officialDocs: 'https://junegunn.github.io/fzf/',
 });
 
 describe('terminal/capabilities/picker-plan', () => {

@@ -321,10 +321,10 @@ describe('copilot-api multi-runtime propagation', () => {
             auditRuntime.emit('status', {});
 
             const [defaultEvent, auditEvent] = await Promise.all([defaultEventPromise, auditEventPromise]);
-            assert.equal(defaultEvent.runtimeId, 'default');
-            assert.equal(defaultEvent.sourceRuntime, 'default');
-            assert.equal(auditEvent.runtimeId, 'audit');
-            assert.equal(auditEvent.sourceRuntime, 'audit');
+            assert.equal(defaultEvent['runtimeId'], 'default');
+            assert.equal(defaultEvent['sourceRuntime'], 'default');
+            assert.equal(auditEvent['runtimeId'], 'audit');
+            assert.equal(auditEvent['sourceRuntime'], 'audit');
         } finally {
             await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve(undefined))));
         }

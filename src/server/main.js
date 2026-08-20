@@ -88,8 +88,8 @@ function validateDashboardAuthConfig(/** @type {any} */ config) {
         }
     }
 
-    const username = String(config?.DASHBOARD_AUTH_USERNAME || process.env.DASHBOARD_AUTH_USERNAME || '').trim();
-    const password = String(config?.DASHBOARD_AUTH_PASSWORD || process.env.DASHBOARD_AUTH_PASSWORD || '');
+    const username = String(config?.DASHBOARD_AUTH_USERNAME || process.env['DASHBOARD_AUTH_USERNAME'] || '').trim();
+    const password = String(config?.DASHBOARD_AUTH_PASSWORD || process.env['DASHBOARD_AUTH_PASSWORD'] || '');
 
     if (authRequired && !username) {
         throw new Error('[BOOT] DASHBOARD_AUTH_REQUIRED=true, mas DASHBOARD_AUTH_USERNAME está ausente');
@@ -238,9 +238,9 @@ async function bootstrap(options = {}) {
         }
 
         log('INFO', `🚀 Server Process — Canonical Bootstrap (authority=${authority})`);
-        const requestedSyncMode = CONFIG.DASHBOARD_TASK_SYNC_MODE || 'ssot_feed';
+        const requestedSyncMode = CONFIG['DASHBOARD_TASK_SYNC_MODE'] || 'ssot_feed';
         const legacyBridgeContingency = Boolean(
-            CONFIG.DASHBOARD_LEGACY_BRIDGE_CONTINGENCY || envFlag('DASHBOARD_LEGACY_BRIDGE_CONTINGENCY', false),
+            CONFIG['DASHBOARD_LEGACY_BRIDGE_CONTINGENCY'] || envFlag('DASHBOARD_LEGACY_BRIDGE_CONTINGENCY', false),
         );
         const dashboardTaskSyncMode =
             requestedSyncMode === 'legacy_bridge' && legacyBridgeContingency ? 'legacy_bridge' : 'ssot_feed';
@@ -270,7 +270,7 @@ async function bootstrap(options = {}) {
            FASE 2 — Fundação HTTP
            Único ponto de bind de rede.
         -------------------------------------------------------------- */
-        const basePort = /** @type {number} */ (CONFIG.SERVER_PORT);
+        const basePort = /** @type {number} */ (CONFIG['SERVER_PORT']);
         const { server: httpServer, port, protocol } = await serverEngine.start(basePort);
         setRuntimeResourceState('http_server', 'ready', {
             owner: runtimeOwner,
@@ -311,8 +311,8 @@ async function bootstrap(options = {}) {
         // Dashboard vNext: SSOT DB Event Feed (realtime via SQLite events table)
         if (dashboardTaskSyncMode === 'ssot_feed') {
             try {
-                const intervalMs = Number(process.env.SSOT_EVENT_FEED_INTERVAL_MS || 250) || 250;
-                const batchLimit = Number(process.env.SSOT_EVENT_FEED_BATCH_LIMIT || 500) || 500;
+                const intervalMs = Number(process.env['SSOT_EVENT_FEED_INTERVAL_MS'] || 250) || 250;
+                const batchLimit = Number(process.env['SSOT_EVENT_FEED_BATCH_LIMIT'] || 500) || 500;
                 ssotEventFeed.start({ socketHub, intervalMs, batchLimit });
                 upsertRuntimeResource({
                     id: 'ssot_feed',
@@ -346,7 +346,7 @@ async function bootstrap(options = {}) {
 
         // Dashboard V2: TelemetryAggregator (realtime metrics)
         try {
-            const intervalMs = Number(process.env.DASHBOARD_TELEMETRY_INTERVAL_MS || 1000) || 1000;
+            const intervalMs = Number(process.env['DASHBOARD_TELEMETRY_INTERVAL_MS'] || 1000) || 1000;
             telemetryAggregator.start({ socketHub, intervalMs });
             log('INFO', `[BOOT] Dashboard telemetry aggregator ativo (interval=${intervalMs}ms)`);
             upsertRuntimeResource({
@@ -379,9 +379,8 @@ async function bootstrap(options = {}) {
         // conservadora (ex.: negar operações de lifecycle quando delegated)
         try {
             appInstance.locals = appInstance.locals || {};
-            appInstance.locals.authority = authority;
+            appInstance.locals['authority'] = authority;
         } catch (/** @type {any} */ e) {
-            const _e = /** @type {any} */ (e);
             /* noop */
         }
 
@@ -497,7 +496,7 @@ async function bootstrap(options = {}) {
 
         // Inicia snapshot de telemetria em background para respostas rápidas
         try {
-            const intervalMs = parseInt(process.env.SNAPSHOT_INTERVAL_MS || '60000', 10);
+            const intervalMs = parseInt(process.env['SNAPSHOT_INTERVAL_MS'] || '60000', 10);
             void snapshot.start(intervalMs);
         } catch (/** @type {any} */ e) {
             const _e = /** @type {any} */ (e);
@@ -748,7 +747,6 @@ async function bootstrap(options = {}) {
             sendReadySignalOnce();
             log('DEBUG', '[BOOT] PM2 ready signal sent');
         } catch (/** @type {any} */ e) {
-            const _e = /** @type {any} */ (e);
             // noop
         }
 
@@ -766,18 +764,21 @@ async function bootstrap(options = {}) {
                     }
                 },
             });
-            upsertRuntimeResource({
-                id: 'lsp_daemon',
-                owner: runtimeOwner,
-                criticality: 'optional',
-                state: 'unknown',
-                stop: async () => {
-                    const { stopTsserverDaemon } = await import('../integration/lsp/tsserver-daemon.mjs');
-                    if (typeof stopTsserverDaemon === 'function') {
-                        await stopTsserverDaemon();
-                    }
-                },
-            });
+            const localLspEnabled = String(process.env['LSP_ENABLED'] || 'false').toLowerCase() === 'true';
+            if (localLspEnabled) {
+                upsertRuntimeResource({
+                    id: 'lsp_daemon',
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    state: 'unknown',
+                    stop: async () => {
+                        const { stopTsserverDaemon } = await import('../integration/lsp/tsserver-process-daemon.mjs');
+                        if (typeof stopTsserverDaemon === 'function') {
+                            await stopTsserverDaemon();
+                        }
+                    },
+                });
+            }
             upsertRuntimeResource({
                 id: 'ollama_host',
                 owner: runtimeOwner,
@@ -802,20 +803,20 @@ async function bootstrap(options = {}) {
             });
 
             appInstance.locals = appInstance.locals || {};
-            appInstance.locals.runtimeReadiness = Object.assign({}, appInstance.locals.runtimeReadiness || null, {
+            appInstance.locals['runtimeReadiness'] = Object.assign({}, appInstance.locals['runtimeReadiness'] || null, {
                 nerv: Boolean(nerv),
                 serverAdapter: Boolean(serverAdapter),
                 httpServer: Boolean(httpServer),
             });
-            appInstance.locals.requiredReadiness = appInstance.locals.requiredReadiness || ['nerv'];
-            appInstance.locals.getRuntimeResourcesStatus = () =>
+            appInstance.locals['requiredReadiness'] = appInstance.locals['requiredReadiness'] || ['nerv'];
+            appInstance.locals['getRuntimeResourcesStatus'] = () =>
                 getRuntimeReadinessSummary({
                     owner: runtimeOwner,
                     requiredComponents: ['http_server', 'nerv_runtime', 'server_adapter'],
-                    allowDegradedReady: CONFIG.BOOT_DEGRADED_READY_ALLOWED !== false,
+                    allowDegradedReady: CONFIG['BOOT_DEGRADED_READY_ALLOWED'] !== false,
                 });
 
-            const upstreamStatusGetter = appInstance.locals.getMcpUpstreamsStatus;
+            const upstreamStatusGetter = appInstance.locals['getMcpUpstreamsStatus'];
             const upstreams = typeof upstreamStatusGetter === 'function' ? upstreamStatusGetter() : [];
             const hasRequiredUpstreamDown = Array.isArray(upstreams)
                 ? upstreams.some((item) => item?.required && item?.enabled !== false && item?.ready !== true)
@@ -835,15 +836,17 @@ async function bootstrap(options = {}) {
                 });
             }
 
-            const mcpTools = appInstance.locals?.mcp?.tools;
-            const hasLspTools =
-                Array.isArray(mcpTools) && mcpTools.some((tool) => String(tool || '').startsWith('lsp_'));
-            setRuntimeResourceState('lsp_daemon', hasLspTools ? 'ready' : 'degraded', {
-                owner: runtimeOwner,
-                criticality: 'optional',
-                reasonCode: hasLspTools ? null : 'LSP_TOOLS_NOT_EXPOSED',
-                message: hasLspTools ? null : 'MCP não expôs ferramentas LSP neste ciclo',
-            });
+            if (localLspEnabled) {
+                const mcpTools = appInstance.locals?.['mcp']?.tools;
+                const hasLspTools =
+                    Array.isArray(mcpTools) && mcpTools.some((tool) => String(tool || '').startsWith('lsp_'));
+                setRuntimeResourceState('lsp_daemon', hasLspTools ? 'ready' : 'degraded', {
+                    owner: runtimeOwner,
+                    criticality: 'optional',
+                    reasonCode: hasLspTools ? null : 'LSP_TOOLS_NOT_EXPOSED',
+                    message: hasLspTools ? null : 'MCP não expôs ferramentas LSP neste ciclo',
+                });
+            }
 
             try {
                 const { createOllamaHostSupervisor } = await import('../inference_gateway/ollama_host_supervisor.js');
@@ -888,8 +891,8 @@ async function bootstrap(options = {}) {
             };
 
             try {
-                const inferenceGatewayHost = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-                const inferenceGatewayPort = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+                const inferenceGatewayHost = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+                const inferenceGatewayPort = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
                 const inferenceProbe = await safeProbeJson(
                     `http://${inferenceGatewayHost}:${inferenceGatewayPort}/health`,
                     1200,
@@ -914,8 +917,8 @@ async function bootstrap(options = {}) {
             }
 
             try {
-                const auditAgentHost = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
-                const auditAgentPort = Number(process.env.AUDIT_AGENT_PORT || 3098);
+                const auditAgentHost = process.env['AUDIT_AGENT_HOST'] || '127.0.0.1';
+                const auditAgentPort = Number(process.env['AUDIT_AGENT_PORT'] || 3098);
                 const auditAgentProbe = await safeProbeJson(`http://${auditAgentHost}:${auditAgentPort}/health`, 1200);
                 setRuntimeResourceState('audit_agent', auditAgentProbe.ok ? 'ready' : 'degraded', {
                     owner: runtimeOwner,

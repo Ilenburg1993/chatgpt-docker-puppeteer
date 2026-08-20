@@ -10,22 +10,22 @@ import EventEmitter from 'node:events';
 /** Constante/valor exportado: RECOVERY_CONFIG. */
 const RECOVERY_CONFIG = {
     /** Timeout para process kill (ms) - Default: 5s */
-    KILL_TIMEOUT_MS: parseInt(process.env.RECOVERY_KILL_TIMEOUT || '5000', 10),
+    KILL_TIMEOUT_MS: parseInt(process.env['RECOVERY_KILL_TIMEOUT'] || '5000', 10),
 
     /** Timeout para page reload (ms) - Default: 30s */
-    RELOAD_TIMEOUT_MS: parseInt(process.env.RECOVERY_RELOAD_TIMEOUT || '30000', 10),
+    RELOAD_TIMEOUT_MS: parseInt(process.env['RECOVERY_RELOAD_TIMEOUT'] || '30000', 10),
 
     /** Delay base para tier 0 backoff (ms) - Default: 1200ms */
-    TIER0_BACKOFF_BASE_MS: parseInt(process.env.RECOVERY_TIER0_BACKOFF || '1200', 10),
+    TIER0_BACKOFF_BASE_MS: parseInt(process.env['RECOVERY_TIER0_BACKOFF'] || '1200', 10),
 
     /** Delay incremental para tier 0 backoff (ms) - Default: 800ms */
-    TIER0_BACKOFF_INCREMENT_MS: parseInt(process.env.RECOVERY_TIER0_INCREMENT || '800', 10),
+    TIER0_BACKOFF_INCREMENT_MS: parseInt(process.env['RECOVERY_TIER0_INCREMENT'] || '800', 10),
 
     /** Timeout para focus recovery (ms) - Default: 2s */
-    FOCUS_TIMEOUT_MS: parseInt(process.env.RECOVERY_FOCUS_TIMEOUT || '2000', 10),
+    FOCUS_TIMEOUT_MS: parseInt(process.env['RECOVERY_FOCUS_TIMEOUT'] || '2000', 10),
 
     /** Máximo de retries por tier - Default: 2 */
-    MAX_TIER_RETRIES: parseInt(process.env.RECOVERY_MAX_RETRIES || '2', 10),
+    MAX_TIER_RETRIES: parseInt(process.env['RECOVERY_MAX_RETRIES'] || '2', 10),
 };
 
 /* ==========================================================================

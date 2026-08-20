@@ -9,6 +9,9 @@
       "path": "./config/typing/strict/tsconfig.strict.configs.json"
     },
     {
+      "path": "./config/typing/strict/tsconfig.strict.workspace-root.json"
+    },
+    {
       "path": "./config/typing/strict/tsconfig.strict.agents.json"
     },
     {
@@ -94,6 +97,9 @@
     },
     {
       "path": "./config/typing/strict/tsconfig.strict.scripts.ops.json"
+    },
+    {
+      "path": "./config/typing/strict/tsconfig.strict.scripts.model-gateway.json"
     },
     {
       "path": "./config/typing/strict/tsconfig.strict.scripts.setup.json"

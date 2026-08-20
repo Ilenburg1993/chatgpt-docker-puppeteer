@@ -27,19 +27,30 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** @param {string} toolName @param {Record<string, unknown>} [args] */
-const makeInput = (toolName, args = {}) => ({ toolName, toolArgs: args, timestamp: Date.now(), cwd: '/tmp' });
+/**
+ * @param {string} toolName
+ * @param {Record<string, unknown>} [args]
+ * @returns {import('../../../src/copilot/hooks/types.js').PreToolUseHookInput}
+ */
+const makeInput = (toolName, args = {}) => ({
+    sessionId: 'sess-1',
+    toolName,
+    toolArgs: args,
+    timestamp: new Date(),
+    workingDirectory: '/tmp',
+});
 
 /** @param {string} [sessionId] */
 const makeInvocation = (sessionId = 'sess-1') => ({ sessionId });
 
 /** @param {Partial<import('../../../src/copilot/hooks/types.js').ErrorOccurredHookInput>} [overrides] */
 const errorInput = (overrides = {}) => ({
+    sessionId: 'sess-1',
     error: 'erro',
     errorContext: 'system',
     recoverable: true,
-    timestamp: Date.now(),
-    cwd: '/tmp',
+    timestamp: new Date(),
+    workingDirectory: '/tmp',
     ...overrides,
 });
 

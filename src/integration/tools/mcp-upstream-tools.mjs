@@ -50,20 +50,20 @@ function sanitizeToolMetadata(/** @type {any} */ tool) {
  * @returns {Promise<any>}
  */
 export async function registerUpstreamMcpTools(/** @type {any} */ registry, /** @type {any} */ options = {}) {
-    const enabled = options.enabled ?? process.env.MCP_UPSTREAM_ENABLED === 'true';
+    const enabled = options.enabled ?? process.env['MCP_UPSTREAM_ENABLED'] === 'true';
     if (!enabled) {
         return { enabled: false, registered: 0 };
     }
 
-    const url = options.url ?? process.env.MCP_UPSTREAM_URL;
+    const url = options.url ?? process.env['MCP_UPSTREAM_URL'];
     if (!url) {
         throw new Error('MCP_UPSTREAM_ENABLED=true but MCP_UPSTREAM_URL is missing');
     }
 
-    const alias = options.alias ?? process.env.MCP_UPSTREAM_ALIAS ?? 'upstream';
-    const prefix = options.prefix ?? process.env.MCP_UPSTREAM_TOOL_PREFIX ?? `mcp_${alias}__`;
+    const alias = options.alias ?? process.env['MCP_UPSTREAM_ALIAS'] ?? 'upstream';
+    const prefix = options.prefix ?? process.env['MCP_UPSTREAM_TOOL_PREFIX'] ?? `mcp_${alias}__`;
 
-    const headers = options.headers ?? parseJsonObject(process.env.MCP_UPSTREAM_HEADERS_JSON) ?? undefined;
+    const headers = options.headers ?? parseJsonObject(process.env['MCP_UPSTREAM_HEADERS_JSON']) ?? undefined;
 
     const client = /** @type {any} */ (createMcpHttpClient({ url, headers }));
 

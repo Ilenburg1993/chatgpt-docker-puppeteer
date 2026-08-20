@@ -75,14 +75,12 @@ describe('core/event-bus.js › on + emit', () => {
 
     it('rejeita handler não-função', () => {
         const bus = createEventBus();
-        // @ts-expect-error — teste intencional
-        assert.throws(() => bus.on('x:y', 'nope'), /function/);
+        assert.throws(() => Reflect.apply(bus.on, bus, ['x:y', 'nope']), /function/);
     });
 
     it('rejeita emit sem type', () => {
         const bus = createEventBus();
-        // @ts-expect-error — teste intencional
-        assert.throws(() => bus.emit({}), /type/);
+        assert.throws(() => Reflect.apply(bus.emit, bus, [{}]), /type/);
     });
 });
 
@@ -246,8 +244,7 @@ describe('core/event-bus.js › middleware', () => {
 
     it('rejeita middleware não-função', () => {
         const bus = createEventBus();
-        // @ts-expect-error — teste intencional
-        assert.throws(() => bus.use('nope'), /function/);
+        assert.throws(() => Reflect.apply(bus.use, bus, ['nope']), /function/);
     });
 });
 

@@ -530,37 +530,30 @@ const listToolsTool = buildTool({
             z.object({
                 category: z
                     .string()
-                    .optional()
-                    .describe('Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")'),
-                search: z.string().optional().describe('Filtrar por termo no nome ou descrição da tool'),
+                    .optional()['describe']('Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")'),
+                search: z.string().optional()['describe']('Filtrar por termo no nome ou descrição da tool'),
                 operation: z
                     .string()
-                    .optional()
-                    .describe('Filtrar por operação canônica: read, patch, write, delete, search, shell, web etc.'),
-                risk: z.string().optional().describe('Filtrar por risco canônico: low, medium, high, destructive.'),
+                    .optional()['describe']('Filtrar por operação canônica: read, patch, write, delete, search, shell, web etc.'),
+                risk: z.string().optional()['describe']('Filtrar por risco canônico: low, medium, high, destructive.'),
                 sideEffect: z
                     .string()
-                    .optional()
-                    .describe('Filtrar por efeito colateral: none, filesystem, process, network, session etc.'),
+                    .optional()['describe']('Filtrar por efeito colateral: none, filesystem, process, network, session etc.'),
                 capability: z
                     .string()
-                    .optional()
-                    .describe('Filtrar por capability booleana: dryRun, rollback, hashPrecondition, pagination, streaming, diff, preview.'),
+                    .optional()['describe']('Filtrar por capability booleana: dryRun, rollback, hashPrecondition, pagination, streaming, diff, preview.'),
                 detailed: z
                     .boolean()
                     .optional()
-                    .default(false)
-                    .describe('Se true, inclui metadata canônica, schema resumido e instructions quando solicitado.'),
+                    .default(false)['describe']('Se true, inclui metadata canônica, schema resumido e instructions quando solicitado.'),
                 includeSchema: z
                     .boolean()
                     .optional()
-                    .default(false)
-                    .describe('Se true, inclui resumo sanitizado de parameters. Implica detailed=true.'),
+                    .default(false)['describe']('Se true, inclui resumo sanitizado de parameters. Implica detailed=true.'),
                 includeInstructions: z
                     .boolean()
                     .optional()
-                    .default(false)
-                    .describe('Se true, inclui instructions sanitizadas. Implica detailed=true.'),
+                    .default(false)['describe']('Se true, inclui instructions sanitizadas. Implica detailed=true.'),
             })
         )
     ),
@@ -763,9 +756,8 @@ const getTelemetryTool = buildTool({
                     .int()
                     .min(1)
                     .optional()
-                    .default(10)
-                    .describe('Número sugerido de chamadas recentes a incluir no resultado'),
-                toolName: z.string().optional().describe('Filtrar histórico por nome específico de tool'),
+                    .default(10)['describe']('Número sugerido de chamadas recentes a incluir no resultado'),
+                toolName: z.string().optional()['describe']('Filtrar histórico por nome específico de tool'),
             })
         )
     ),
@@ -840,9 +832,9 @@ const reportIntentTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ intent: string; tool: string; risk?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                intent: z.string().describe('Descrição clara da intenção (o que o agente pretende fazer e por quê)'),
-                tool: z.string().describe('Nome da tool que será chamada em seguida'),
-                risk: z.string().optional().describe('Nível de risco estimado: low | medium | high'),
+                intent: z.string()['describe']('Descrição clara da intenção (o que o agente pretende fazer e por quê)'),
+                tool: z.string()['describe']('Nome da tool que será chamada em seguida'),
+                risk: z.string().optional()['describe']('Nível de risco estimado: low | medium | high'),
             })
         )
     ),
@@ -881,12 +873,11 @@ const toggleToolTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ toolName: string; enabled: boolean; reason?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                toolName: z.string().describe('Nome da tool a habilitar/desabilitar'),
-                enabled: z.boolean().describe('true para habilitar, false para desabilitar'),
+                toolName: z.string()['describe']('Nome da tool a habilitar/desabilitar'),
+                enabled: z.boolean()['describe']('true para habilitar, false para desabilitar'),
                 reason: z
                     .string()
-                    .optional()
-                    .describe('Motivo operacional curto para auditoria quando enabled=false.'),
+                    .optional()['describe']('Motivo operacional curto para auditoria quando enabled=false.'),
             })
         )
     ),
@@ -956,13 +947,12 @@ const getToolHealthTool = buildTool({
      * }>}
      */ (
         z.object({
-            tool_name: z.string().optional().describe('Nome da tool para detalhar (omitir = todas)'),
+            tool_name: z.string().optional()['describe']('Nome da tool para detalhar (omitir = todas)'),
             sort_by: z
                 .enum(['calls', 'errors', 'latency', 'error_rate'])
                 .optional()
-                .default('calls')
-                .describe('Campo para ordenação descendente'),
-            limit: z.number().int().min(1).optional().default(20).describe('Número sugerido de tools no resultado'),
+                .default('calls')['describe']('Campo para ordenação descendente'),
+            limit: z.number().int().min(1).optional().default(20)['describe']('Número sugerido de tools no resultado'),
         })
     ),
     handler: async (
@@ -1026,8 +1016,7 @@ const getToolContractReportTool = buildTool({
                     .min(1)
                     .max(200)
                     .optional()
-                    .default(50)
-                    .describe('Quantidade máxima de issues retornadas'),
+                    .default(50)['describe']('Quantidade máxima de issues retornadas'),
             })
         )
     ),

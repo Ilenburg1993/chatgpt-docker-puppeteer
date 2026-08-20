@@ -7,6 +7,7 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "declarationMap": false,
+    "rootDir": "./src/shared",
     "outDir": "./tmp/types-public"
   },
   "include": ["src/shared/health-check.js", "src/shared/inference-gateway-client.js", "src/types/**/*.d.ts"],

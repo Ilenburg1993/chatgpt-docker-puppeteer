@@ -150,7 +150,7 @@ function modelEvidenceValues(row) {
 }
 
 /**
- * @param {typeof fetch} fetchImpl
+ * @param {import('./http-port.js').CatalogFetch} fetchImpl
  * @param {string} baseUrl
  * @param {Record<string, unknown>[]} rows
  * @param {string} apiVersion
@@ -190,7 +190,7 @@ async function fetchAnthropicModelDetails(fetchImpl, baseUrl, rows, apiVersion, 
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.apiKey]
  * @param {string} [options.secretRef]
  * @param {string} [options.accountScope]

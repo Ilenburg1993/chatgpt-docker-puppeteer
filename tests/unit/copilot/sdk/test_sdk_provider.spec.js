@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 import { describe, expect, it, vi } from 'vitest';
 
 // ─── SDK mock ──────────────────────────────────────────────────────────────
@@ -392,7 +391,10 @@ describe('F72 — BYOK env configuration', () => {
     });
 
     it('descobre modelos remotos OpenAI-compatible com timeout/cache e sem vazar segredo', async () => {
-        const fetchMock = vi.fn(async () => ({
+        const fetchMock = vi.fn(async (
+            /** @type {string | URL | Request} */ _input,
+            /** @type {RequestInit} */ _init,
+        ) => ({
             ok: true,
             status: 200,
             json: async () => ({ data: [{ id: 'remote-a' }, { id: 'remote-b' }, { id: 'remote-a' }] }),
@@ -687,7 +689,7 @@ describe('F72 — BYOK env configuration', () => {
         const state = readConfiguredByokState(env);
         const profiles = readConfiguredByokProfileSummaries(env);
 
-        expect(readConfiguredByokProfilesFromEnv(env).kilo).toBeTruthy();
+        expect(readConfiguredByokProfilesFromEnv(env)['kilo']).toBeTruthy();
         expect(state.ready).toBe(true);
         expect(state.summary.profile).toBe('kilo');
         expect(state.model).toBe('anthropic/claude-sonnet-4.5');

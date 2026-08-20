@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -327,8 +326,8 @@ describe('BYOK provider chat health state', () => {
         expect(diff.regressions[0]?.key).toBe('kilo|kilo-code|stable');
         expect(diff.newFailures[0]?.key).toBe('kilo|kilo-code|new-empty-agent');
         expect(diff.recovered[0]?.key).toBe('kilo|kilo-code|recovering');
-        expect(summary.byStatus.failed).toBe(3);
-        expect(summary.byStatus.ok).toBe(1);
+        expect(summary.byStatus['failed']).toBe(3);
+        expect(summary.byStatus['ok']).toBe(1);
     });
 
     it('inclui probes live na comparação sem tratar vision como falha bloqueante', () => {
@@ -359,10 +358,13 @@ describe('BYOK provider chat health state', () => {
 
         const diff = diffModelGatewayRuntimeHealthSnapshots(before, after);
         const summary = summarizeModelGatewayRuntimeHealthRecords(after);
+        const beforeRecord = before[0];
+        const afterRecord = after[0];
+        if (!beforeRecord || !afterRecord) throw new Error('Snapshots de saúde incompletos.');
 
-        expect(before[0].failedProbeKinds).toEqual(['vision']);
-        expect(before[0].blockingFailedProbeKinds).toEqual([]);
-        expect(after[0].blockingFailedProbeKinds).toEqual(['live_turn']);
+        expect(beforeRecord.failedProbeKinds).toEqual(['vision']);
+        expect(beforeRecord.blockingFailedProbeKinds).toEqual([]);
+        expect(afterRecord.blockingFailedProbeKinds).toEqual(['live_turn']);
         expect(diff.summary).toEqual({
             added: 0,
             removed: 0,

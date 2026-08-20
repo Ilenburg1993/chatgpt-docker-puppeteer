@@ -58,8 +58,8 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
     const artifactsDir = makeArtifactsDir();
 
     before(() => {
-        process.env.MAESTRO_DB_PATH = dbPath;
-        process.env.MAESTRO_ARTIFACTS_DIR = artifactsDir;
+        process.env['MAESTRO_DB_PATH'] = dbPath;
+        process.env['MAESTRO_ARTIFACTS_DIR'] = artifactsDir;
         getDb(); // migrations
     });
 
@@ -117,10 +117,10 @@ describe('Artifacts + Attempts (attempt = correlationId)', { concurrency: 1 }, (
 
         const attempt = getAttemptById(taskRow.latest_attempt_id);
         assert.ok(attempt, 'attempt deve existir');
-        assert.strictEqual(attempt.task_id, taskId);
-        assert.ok(attempt.rendered_prompt_artifact_id, 'attempt deve referenciar rendered_prompt_artifact_id');
+        assert.strictEqual(attempt['task_id'], taskId);
+        assert.ok(attempt['rendered_prompt_artifact_id'], 'attempt deve referenciar rendered_prompt_artifact_id');
 
-        const art = getArtifactById(attempt.rendered_prompt_artifact_id);
+        const art = getArtifactById(attempt['rendered_prompt_artifact_id']);
         assert.ok(art && art.storage_uri, 'artifact deve existir e ter storage_uri');
 
         const content = fs.readFileSync(art.storage_uri, 'utf8');

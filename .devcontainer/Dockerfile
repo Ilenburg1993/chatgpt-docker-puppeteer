@@ -89,15 +89,14 @@ FROM ${BASE_IMAGE}
 # - Curated tools that are too stale in Debian should be pinned explicitly.
 # - Keep these values in sync with upstream stable releases when refreshing the image.
 # ---------------------------------------------------------------------------
-ARG NPM_VERSION=11.14.1
+ARG NPM_VERSION=12.0.2
 ARG DEVCONTAINER_CLI_VERSION=0.86.1
 ARG GH_VERSION=2.92.0
 ARG ACTIONLINT_VERSION=1.7.12
 ARG HADOLINT_VERSION=2.14.0
 ARG YQ_VERSION=4.53.2
 ARG CLOUDFLARED_VERSION=2026.5.0
-ARG TYPESCRIPT_VERSION=6.0.3
-ARG TYPESCRIPT_LANGUAGE_SERVER_VERSION=5.2.0
+ARG TYPESCRIPT_VERSION=7.0.2
 ARG JSONC_PARSER_VERSION=3.3.1
 ARG NETWORK_BENCHMARK_DURATION_SECONDS=600
 ARG NETWORK_BENCHMARK_INTERVAL_SECONDS=10
@@ -300,9 +299,9 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python
 # NPM global prefix + PATH (garante disponibilidade das bins globais)
 #
 # Importante:
-# - `~/.npm-global` é um volume nomeado do DevContainer (runtime/user space).
-# - Tooling canônico de imagem NÃO deve morar ali, senão o volume mascara a camada da imagem.
-# - O prefixo canônico da imagem fica em /usr/local/share/npm-global.
+# - `/usr/local/share/npm-global` é o prefixo canônico e prioritário tanto para execução quanto para `npm -g`.
+# - `~/.npm-global` permanece montado apenas como fallback/migração de tooling histórico; não deve sombrear a imagem.
+# - O grupo `npm` recebe escrita recursiva controlada no prefixo canônico para upgrades em runtime sem sudo.
 ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR}/.local/bin:${PATH}" \
     DEVCONTAINER_TOOLING_PREFIX="/usr/local/share/npm-global" \
     JSONC_PARSER_MODULE_PATH="/usr/local/share/npm-global/lib/node_modules/jsonc-parser" \
@@ -311,7 +310,7 @@ ENV PATH="/usr/local/share/npm-global/bin:${HOME_DIR}/.npm-global/bin:${HOME_DIR
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_LOGLEVEL=warn \
     NPM_CONFIG_UPDATE_NOTIFIER=false \
-    NPM_CONFIG_PREFIX="${HOME_DIR}/.npm-global"
+    NPM_CONFIG_PREFIX="/usr/local/share/npm-global"
 
 # Toolchain global canônico (CLI de container + parsing JSONC + TS/LSP)
 # - Alinha npm com o contrato do repo (volta/package.json)
@@ -329,17 +328,16 @@ RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
     @devcontainers/cli@${DEVCONTAINER_CLI_VERSION} \
     jsonc-parser@${JSONC_PARSER_VERSION} \
     typescript@${TYPESCRIPT_VERSION} \
-    typescript-language-server@${TYPESCRIPT_LANGUAGE_SERVER_VERSION} \
+    && chgrp -R npm /usr/local/share/npm-global \
+    && chmod -R g+rwX /usr/local/share/npm-global \
+    && find /usr/local/share/npm-global -type d -exec chmod g+s {} + \
     && ln -sf /usr/local/share/npm-global/bin/npm /usr/local/bin/npm \
     && ln -sf /usr/local/share/npm-global/bin/npx /usr/local/bin/npx \
     && ln -sf /usr/local/share/npm-global/bin/devcontainer /usr/local/bin/devcontainer \
     && ln -sf /usr/local/share/npm-global/bin/tsc /usr/local/bin/tsc \
-    && ln -sf /usr/local/share/npm-global/bin/tsserver /usr/local/bin/tsserver \
-    && ln -sf /usr/local/share/npm-global/bin/typescript-language-server /usr/local/bin/typescript-language-server \
     && npm --version \
     && devcontainer --version \
-    && tsc --version \
-    && typescript-language-server --version
+    && tsc --version
 
 
 # =============================================================================
@@ -916,8 +914,8 @@ RUN set -e; \
     echo "── Data & DB ───────────────────────────────────────"; \
     _check sqlite3; _check redis-cli; _check psql; \
     _check jq; _check yq; _check jo; _check protoc; \
-    echo "── TypeScript & LSP ────────────────────────────────"; \
-    _check tsc; _check tsserver; _check typescript-language-server; \
+    echo "── TypeScript 7 native compiler/LSP ────────────────"; \
+    _check tsc; \
     echo "── DevOps CLIs (upstream) ──────────────────────────"; \
     _check gh; _check actionlint; _check hadolint; _check devcontainer; _check git-lfs; \
     _check age; _check pass; _check pinentry-curses; \
@@ -1100,7 +1098,7 @@ ENV WS_IDLE_TIMEOUT_MS=300000 \
 
 # RUNTIME PERFORMANCE (VM / I/O tuning)
 # UV_THREADPOOL_SIZE: pool de threads do libuv (default=4). Aumentar para
-# melhorar I/O paralelo — tsserver, fs watchers e async file ops se beneficiam.
+# melhorar I/O paralelo do runtime Node — fs watchers e async file ops se beneficiam.
 # 16 = bom compromisso para ambientes multi-core sem desperdício de memória.
 ENV UV_THREADPOOL_SIZE=16
 

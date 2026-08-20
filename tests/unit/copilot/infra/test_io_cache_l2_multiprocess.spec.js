@@ -13,7 +13,7 @@ const CORE_URL = new URL('../../../../src/copilot/core/index.js', import.meta.ur
 const DB_URL = new URL('../../../../src/copilot/db/sqlite.js', import.meta.url).href;
 
 const CHILD_SCRIPT = `
-const options = JSON.parse(process.env.COPILOT_L2_MULTIPROCESS_CASE);
+const options = JSON.parse(process.env['COPILOT_L2_MULTIPROCESS_CASE']);
 const print = (value) => process.stdout.write(JSON.stringify(value) + '\\n');
 
 try {
@@ -152,13 +152,13 @@ function spawnCase(options) {
  * @param {number} [timeoutMs]
  */
 function waitForJson(child, predicate, timeoutMs = 5_000) {
-    return new Promise((resolve, reject) => {
+    return new Promise((/** @type {(value: Record<string, unknown>) => void} */ resolve, reject) => {
         let stdout = '';
         let stderr = '';
         let settled = false;
         const timer = setTimeout(() => finish(new Error(`child output timeout: ${stderr || stdout}`)), timeoutMs);
 
-        function finish(error, value) {
+        function finish(/** @type {Error | null} */ error, /** @type {Record<string, unknown> | undefined} */ value = undefined) {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
@@ -167,10 +167,10 @@ function waitForJson(child, predicate, timeoutMs = 5_000) {
             child.off('error', onError);
             child.off('close', onClose);
             if (error) reject(error);
-            else resolve(value);
+            else if (value !== undefined) resolve(value);
         }
 
-        function onStdout(chunk) {
+        function onStdout(/** @type {Buffer | string} */ chunk) {
             stdout += String(chunk);
             const lines = stdout.split('\n');
             stdout = lines.pop() ?? '';
@@ -184,15 +184,15 @@ function waitForJson(child, predicate, timeoutMs = 5_000) {
             }
         }
 
-        function onStderr(chunk) {
+        function onStderr(/** @type {Buffer | string} */ chunk) {
             stderr += String(chunk);
         }
 
-        function onError(error) {
+        function onError(/** @type {Error} */ error) {
             finish(error);
         }
 
-        function onClose(code, signal) {
+        function onClose(/** @type {number | null} */ code, /** @type {NodeJS.Signals | null} */ signal) {
             finish(new Error(`child exited before expected output: code=${code} signal=${signal} ${stderr}`));
         }
 
@@ -208,7 +208,7 @@ function waitForJson(child, predicate, timeoutMs = 5_000) {
  * @param {number} [timeoutMs]
  */
 function waitForClose(child, timeoutMs = 5_000) {
-    return new Promise((resolve, reject) => {
+    return new Promise((/** @type {(value: { code: number | null; signal: NodeJS.Signals | null }) => void} */ resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('child close timeout')), timeoutMs);
         child.once('close', (code, signal) => {
             clearTimeout(timer);

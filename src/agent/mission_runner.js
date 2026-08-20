@@ -129,12 +129,12 @@ class MissionRunner {
             const missions = listMissions({ status: MISSION_STATUS.RUNNING, limit: 200 });
             for (const mission of missions) {
                 try {
-                    await this._processMission(mission.id);
+                    await this._processMission(mission['id']);
                 } catch (/** @type {any} */ _rawErr) {
                     const err = /** @type {any} */ (_rawErr);
                     log(
                         'WARN',
-                        `[MissionRunner] mission ${mission.id} processing failed: ${err?.message || String(err)}`,
+                        `[MissionRunner] mission ${mission['id']} processing failed: ${err?.message || String(err)}`,
                     );
                 }
                 await _sleep(0);
@@ -154,9 +154,9 @@ class MissionRunner {
     async _processMission(missionId) {
         const mission = getMissionById(missionId);
         if (!mission) return;
-        if (mission.status !== MISSION_STATUS.RUNNING) return;
+        if (mission['status'] !== MISSION_STATUS.RUNNING) return;
 
-        const context = mission.context || {};
+        const context = mission['context'] || {};
         const workflow = context.workflow;
         // Missions can be "open-ended" (no workflow). In that case, MissionRunner
         // does not force completion/failure — tasks can be created manually (dashboard/LLM).
@@ -173,7 +173,7 @@ class MissionRunner {
             completed: [],
             failed: [],
         };
-        const policy = mission.policy || {};
+        const policy = mission['policy'] || {};
 
         const maxTasks = Number(policy.max_tasks_total || 200) || 200;
         const createdCount = Number(progress.created_count || 0) || 0;

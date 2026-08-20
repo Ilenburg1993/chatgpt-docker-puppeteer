@@ -26,15 +26,7 @@
 /**
  * Conjunto de hooks para uma sessão Copilot SDK.
  *
- * @typedef {object} SessionHooks
- * @property {PreToolUseHandler} [onPreToolUse]
- * @property {PreMcpToolCallHandler} [onPreMcpToolCall]
- * @property {PostToolUseHandler} [onPostToolUse]
- * @property {PostToolUseFailureHandler} [onPostToolUseFailure]
- * @property {UserPromptSubmittedHandler} [onUserPromptSubmitted]
- * @property {SessionStartHandler} [onSessionStart]
- * @property {SessionEndHandler} [onSessionEnd]
- * @property {ErrorOccurredHandler} [onErrorOccurred]
+ * @typedef {import('#copilot/sdk/types.js').SessionHooks} SessionHooks
  */
 
 /**
@@ -45,10 +37,7 @@
  */
 
 /**
- * @callback PreMcpToolCallHandler
- * @param {PreMcpToolCallHookInput} input
- * @param {InvocationContext} invocation
- * @returns {Promise<PreMcpToolCallHookOutput | void> | PreMcpToolCallHookOutput | void}
+ * @typedef {import('#copilot/sdk/types.js').PreMcpToolCallHandler} PreMcpToolCallHandler
  */
 
 /**
@@ -59,10 +48,7 @@
  */
 
 /**
- * @callback PostToolUseFailureHandler
- * @param {PostToolUseFailureHookInput} input
- * @param {InvocationContext} invocation
- * @returns {Promise<PostToolUseFailureHookOutput | void> | PostToolUseFailureHookOutput | void}
+ * @typedef {import('#copilot/sdk/types.js').PostToolUseFailureHandler} PostToolUseFailureHandler
  */
 
 /**
@@ -104,16 +90,7 @@
  */
 
 /**
- * @typedef {object} PreToolUseHookInput
- * @property {string} [sessionId]
- * @property {string} toolName
- * @property {unknown} toolArgs
- * @property {Date | number} timestamp
- * @property {string} [workingDirectory]
- * @property {string} [cwd]
- * @property {string} [agentName]
- * @property {string} [traceparent]
- * @property {string} [tracestate]
+ * @typedef {import('#copilot/sdk/types.js').PreToolUseHookInput} PreToolUseHookInput
  */
 
 /**
@@ -185,13 +162,7 @@
  */
 
 /**
- * @typedef {object} ErrorOccurredHookInput
- * @property {string} error
- * @property {string} errorContext
- * @property {boolean} recoverable
- * @property {Date | number} timestamp
- * @property {string} [workingDirectory]
- * @property {string} [cwd]
+ * @typedef {import('#copilot/sdk/types.js').ErrorOccurredHookInput} ErrorOccurredHookInput
  */
 
 /**

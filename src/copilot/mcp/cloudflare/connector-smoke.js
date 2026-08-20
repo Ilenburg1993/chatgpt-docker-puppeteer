@@ -12,10 +12,56 @@
 import { runCloudflareSmoke } from './cli-smoke.js';
 import { writeConnectorSmokeState } from './state.js';
 
-/** @param {unknown} value @returns {Record<string, any>} */
-function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (value) : {};
+/** @type {() => string[]} */
+let localToolNamesProvider = () => [];
+
+/**
+ * @param {() => string[]} provider
+ * @returns {void}
+ */
+export function bindConnectorSmokeLocalToolNamesProvider(provider) {
+    localToolNamesProvider = provider;
 }
+
+/** @param {unknown} value @returns {Record<string, unknown>} */
+function asRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
+}
+
+/**
+ * @typedef {Record<string, unknown> & {
+ *   ok: boolean;
+ *   status: number | null;
+ *   tools: number;
+ *   expectedLocalTools: number;
+ *   toolsMatchLocalRegistry: boolean;
+ *   missingLocalTools: string[];
+ *   unexpectedRemoteTools: string[];
+ * }} AuthenticatedToolsListProjection
+ *
+ * @typedef {{
+ *   ok: boolean;
+ *   durationMs: number | null;
+ *   phaseTimings: Record<string, unknown>;
+ *   failedChecks: string[];
+ *   runtimeHealth: Record<string, unknown> | null;
+ *   authenticatedToolsList: AuthenticatedToolsListProjection | null;
+ *   authenticatedSse: Record<string, unknown> | null;
+ * }} AuthenticatedOAuthSmokeProjection
+ *
+ * @typedef {Record<string, unknown> & {
+ *   ok: boolean;
+ *   orchestrationTimings: {
+ *     strategy: 'parallel-unauthenticated-and-oauth';
+ *     totalMs: number;
+ *     unauthenticatedMs: number | null;
+ *     authenticatedOauthMs: number | null;
+ *   };
+ *   authenticatedOAuthSmoke: AuthenticatedOAuthSmokeProjection;
+ * }} CanonicalConnectorSmokeReport
+ */
 
 /** @param {unknown} value @returns {string[]} */
 function stringArray(value) {
@@ -32,15 +78,22 @@ function finiteNumber(value) {
  *   config: import('./config.js').CloudflareTunnelConfig;
  *   env?: NodeJS.ProcessEnv;
  *   persistState?: boolean;
+ *   localToolNames?: string[];
  *   deps?: {
  *     runUnauthenticatedSmoke?: typeof runCloudflareSmoke;
  *     runOauthSmoke?: (options: Record<string, unknown>) => Promise<Record<string, unknown>>;
  *     writeState?: typeof writeConnectorSmokeState;
  *   };
  * }} input
- * @returns {Promise<Record<string, unknown>>}
+ * @returns {Promise<CanonicalConnectorSmokeReport>}
  */
-export async function runCanonicalConnectorSmoke({ config, env = process.env, persistState = true, deps = {} }) {
+export async function runCanonicalConnectorSmoke({
+    config,
+    env = process.env,
+    persistState = true,
+    localToolNames = localToolNamesProvider(),
+    deps = {},
+}) {
     const startedAt = Date.now();
     const runUnauthenticatedSmoke = deps.runUnauthenticatedSmoke ?? runCloudflareSmoke;
     const runOauthSmoke =
@@ -57,9 +110,10 @@ export async function runCanonicalConnectorSmoke({ config, env = process.env, pe
         retryMaxDelayMs: 1_000,
         runPrivateKeyJwt: false,
         runNegativeResourceChecks: false,
+        localToolNames,
     };
     const [unauthenticated, oauth] = await Promise.all([
-        runUnauthenticatedSmoke({ config, authenticated: false, env, persistState: false }),
+        runUnauthenticatedSmoke({ config, authenticated: false, env, persistState: false, localToolNames }),
         runOauthSmoke(oauthOptions),
     ]);
     const oauthRecord = asRecord(oauth);
@@ -67,9 +121,24 @@ export async function runCanonicalConnectorSmoke({ config, env = process.env, pe
     const authenticatedToolsList = asRecord(dcrFlow['authenticatedToolsList']);
     const authenticatedSse = asRecord(dcrFlow['authenticatedSse']);
     const runtimeHealth = asRecord(dcrFlow['runtimeHealth']);
+    /** @type {AuthenticatedToolsListProjection | null} */
+    const authenticatedToolsListProjection =
+        Object.keys(authenticatedToolsList).length > 0
+            ? {
+                  ...authenticatedToolsList,
+                  ok: authenticatedToolsList['ok'] === true,
+                  status: finiteNumber(authenticatedToolsList['status']),
+                  tools: finiteNumber(authenticatedToolsList['tools']) ?? 0,
+                  expectedLocalTools: finiteNumber(authenticatedToolsList['expectedLocalTools']) ?? 0,
+                  toolsMatchLocalRegistry: authenticatedToolsList['toolsMatchLocalRegistry'] === true,
+                  missingLocalTools: stringArray(authenticatedToolsList['missingLocalTools']),
+                  unexpectedRemoteTools: stringArray(authenticatedToolsList['unexpectedRemoteTools']),
+              }
+            : null;
     const authenticatedOk = oauthRecord['ok'] === true;
     const combinedOk = unauthenticated['ok'] === true && authenticatedOk;
     const unauthenticatedTimings = asRecord(unauthenticated['timings']);
+    /** @type {CanonicalConnectorSmokeReport} */
     const report = {
         ...unauthenticated,
         ok: combinedOk,
@@ -81,11 +150,11 @@ export async function runCanonicalConnectorSmoke({ config, env = process.env, pe
         },
         authenticatedOAuthSmoke: {
             ok: authenticatedOk,
-            durationMs: oauthRecord['durationMs'] ?? null,
+            durationMs: finiteNumber(oauthRecord['durationMs']),
             phaseTimings: asRecord(oauthRecord['phaseTimings']),
-            failedChecks: Array.isArray(oauthRecord['failedChecks']) ? oauthRecord['failedChecks'] : [],
+            failedChecks: stringArray(oauthRecord['failedChecks']),
             runtimeHealth: Object.keys(runtimeHealth).length > 0 ? runtimeHealth : null,
-            authenticatedToolsList: Object.keys(authenticatedToolsList).length > 0 ? authenticatedToolsList : null,
+            authenticatedToolsList: authenticatedToolsListProjection,
             authenticatedSse: Object.keys(authenticatedSse).length > 0 ? authenticatedSse : null,
         },
     };
@@ -95,27 +164,34 @@ export async function runCanonicalConnectorSmoke({ config, env = process.env, pe
         const criticalTools = asRecord(unauthenticated['criticalTools']);
         const writeState = deps.writeState ?? writeConnectorSmokeState;
         try {
-            await writeState(config.smokeStateFile, /** @type {any} */ ({
+            const healthRecord = asRecord(unauthenticated['health']);
+            /** @type {import('./state.js').ConnectorSmokeState} */
+            const smokeState = {
                 connectorUrl: String(unauthenticated['connectorUrl'] ?? config.publicMcpUrl ?? ''),
                 checkedAt: new Date().toISOString(),
-                health: asRecord(unauthenticated['health']),
+                health: {
+                    ok: healthRecord['ok'] === true,
+                    status: finiteNumber(healthRecord['status']),
+                    error: typeof healthRecord['error'] === 'string' ? healthRecord['error'] : null,
+                },
                 toolsList: {
-                    ok: authenticatedToolsList['ok'] === true,
-                    status: finiteNumber(authenticatedToolsList['status']),
-                    tools: finiteNumber(authenticatedToolsList['tools']) ?? 0,
-                    expectedLocalTools: finiteNumber(authenticatedToolsList['expectedLocalTools']) ?? 0,
-                    toolsMatchLocalRegistry: authenticatedToolsList['toolsMatchLocalRegistry'] === true,
+                    ok: authenticatedToolsListProjection?.ok === true,
+                    status: authenticatedToolsListProjection?.status ?? null,
+                    tools: authenticatedToolsListProjection?.tools ?? 0,
+                    expectedLocalTools: authenticatedToolsListProjection?.expectedLocalTools ?? 0,
+                    toolsMatchLocalRegistry: authenticatedToolsListProjection?.toolsMatchLocalRegistry === true,
                     criticalToolsPresent: criticalTools['ok'] === true,
                     missingCriticalTools: stringArray(criticalTools['missing']),
-                    missingLocalTools: stringArray(authenticatedToolsList['missingLocalTools']),
-                    unexpectedRemoteTools: stringArray(authenticatedToolsList['unexpectedRemoteTools']),
+                    missingLocalTools: authenticatedToolsListProjection?.missingLocalTools ?? [],
+                    unexpectedRemoteTools: authenticatedToolsListProjection?.unexpectedRemoteTools ?? [],
                     authChallenge: authChallenge['ok'] === true,
                 },
                 ok: combinedOk,
                 oauth: asRecord(unauthenticated['oauth']),
                 authenticatedOAuthSmoke: report.authenticatedOAuthSmoke,
                 timings: report.orchestrationTimings,
-            }));
+            };
+            await writeState(config.smokeStateFile, smokeState);
         } catch {
             // Canonical smoke state persistence is best-effort; the returned report remains authoritative for this call.
         }

@@ -42,10 +42,10 @@ function buildContractAwareReplacement(finding, oldLine, fallback) {
         const assignment = trimmed.match(/^const\s+([A-Za-z0-9_$]+)\s*=/);
         if (assignment) {
             const variable = assignment[1];
-            return `${indent}const ${variable} = Number(CONFIG.CHROME_PROXY_PORT ?? process.env.CHROME_PROXY_PORT);`;
+            return `${indent}const ${variable} = Number(CONFIG.CHROME_PROXY_PORT ?? process.env['CHROME_PROXY_PORT']);`;
         }
         if (/\b9222\b|\b9224\b/.test(trimmed)) {
-            return `${indent}${trimmed.replace(/\b9222\b|\b9224\b/g, 'Number(CONFIG.CHROME_PROXY_PORT ?? process.env.CHROME_PROXY_PORT)')}`;
+            return `${indent}${trimmed.replace(/\b9222\b|\b9224\b/g, "Number(CONFIG.CHROME_PROXY_PORT ?? process.env['CHROME_PROXY_PORT'])")}`;
         }
     }
 

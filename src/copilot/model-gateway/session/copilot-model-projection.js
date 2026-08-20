@@ -11,6 +11,40 @@
 import { buildModelGatewayRouteCandidates } from '../routing/index.js';
 
 /**
+ * @typedef {object} ModelGatewayCopilotByokMetadata
+ * @property {string} gatewayId
+ * @property {string} routeCandidateId
+ * @property {string | null} provider
+ * @property {string} providerModel
+ * @property {string} sdkModelId
+ * @property {string | null} routeProfile
+ * @property {string | null} profile
+ * @property {boolean | null} freeTier
+ * @property {boolean | null} profileFreeTier
+ * @property {string | null} profileCostSource
+ * @property {string | null} profileCostDetail
+ * @property {string | null} routeOptionRef
+ * @property {string[]} routeOptionRefs
+ * @property {string | null} selectorKind
+ * @property {string | null} selectorSyntax
+ * @property {string | null} routeLayer
+ * @property {string | null} wireApi
+ * @property {boolean} autoSelection
+ * @property {boolean} supportsFallback
+ * @property {string} source
+ * @property {string} confidence
+ * @property {boolean} supportsReasoning
+ * @property {string[]} inputModalities
+ * @property {string[]} outputModalities
+ * @property {Record<string, unknown>} capabilities
+ * @property {Record<string, unknown>} limits
+ * @property {{ maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null }} rateLimits
+ * @property {{ prompt: number | null; completion: number | null; request: number | null }} pricing
+ */
+
+/** @typedef {import('#copilot/sdk/types').ModelInfo & { byok: ModelGatewayCopilotByokMetadata }} ModelGatewayCopilotModelInfo */
+
+/**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
  */
@@ -26,8 +60,27 @@ function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+
 /**
- * @param {Record<string, any>} model
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+function optionalNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function stringList(value) {
+    return Array.isArray(value)
+        ? value.map(optionalString).filter((item) => item !== null)
+        : [];
+}
+
+/**
+ * @param {Record<string, unknown>} model
  * @returns {string}
  */
 function sdkModelId(model) {
@@ -35,92 +88,120 @@ function sdkModelId(model) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @returns {import('#copilot/sdk/types').ModelInfo}
+ * @param {Record<string, unknown>} model
+ * @returns {ModelGatewayCopilotModelInfo | null}
  */
 export function toCopilotModelInfo(model) {
     const providerModel = optionalString(model['providerModel']) ?? optionalString(model['id']) ?? 'unknown-model';
     const sdkId = sdkModelId(model);
     const gatewayId = optionalString(model['canonicalModelId']) ?? optionalString(model['id']) ?? providerModel;
     const routeCandidateId = optionalString(model['routeCandidateId']) ?? optionalString(model['id']) ?? gatewayId;
-    const capabilities = model['capabilities'] ?? {};
-    const limits = model['limits'] ?? {};
+    const capabilities = isRecord(model['capabilities']) ? model['capabilities'] : {};
+    const limits = isRecord(model['limits']) ? model['limits'] : {};
     const routing = isRecord(model['routing']) ? model['routing'] : {};
-    return /** @type {import('#copilot/sdk/types').ModelInfo} */ ({
+    const verification = isRecord(model['verification']) ? model['verification'] : {};
+    const provenance = isRecord(model['provenance']) ? model['provenance'] : {};
+    const modalities = isRecord(model['modalities']) ? model['modalities'] : {};
+    const pricing = isRecord(model['pricing']) ? model['pricing'] : {};
+    const routeOptionRefs = stringList(model['routeOptionRefs']);
+    const contextWindowTokens = optionalNumber(limits['contextWindowTokens']);
+    if (contextWindowTokens === null || contextWindowTokens <= 0) return null;
+    const promptPrice = optionalNumber(pricing['inputUsdPerMillion']);
+    const completionPrice = optionalNumber(pricing['outputUsdPerMillion']);
+    const requestPrice = optionalNumber(pricing['requestUsd']);
+    const pricingKnown = promptPrice !== null || completionPrice !== null || requestPrice !== null;
+    const freeTier = pricingKnown
+        ? (promptPrice ?? 0) === 0 && (completionPrice ?? 0) === 0 && (requestPrice ?? 0) === 0
+        : null;
+    const routeProfile = optionalString(model['routeProfile']) ?? optionalString(provenance['profile']);
+    const profileFreeTier = typeof provenance['profileFreeTier'] === 'boolean' ? provenance['profileFreeTier'] : null;
+    /** @type {ModelGatewayCopilotModelInfo} */
+    const info = {
         id: sdkId,
-        name: model['displayName'] ?? sdkId,
+        name: optionalString(model['displayName']) ?? sdkId,
         capabilities: {
             supports: {
-                vision: Boolean(capabilities.vision),
-                reasoningEffort: Boolean(capabilities.reasoningEffort),
+                vision: capabilities['vision'] === true,
+                reasoningEffort: capabilities['reasoningEffort'] === true,
             },
             limits: {
-                max_context_window_tokens:
-                    typeof limits['contextWindowTokens'] === 'number' ? limits['contextWindowTokens'] : undefined,
+                max_context_window_tokens: contextWindowTokens,
             },
         },
         policy: {
             state: model['enabled'] === false ? 'disabled' : 'enabled',
             terms: [
-                `provider:${model['providerId'] ?? 'unknown'}`,
+                `provider:${optionalString(model['providerId']) ?? 'unknown'}`,
                 `gateway:${gatewayId}`,
                 `route:${routeCandidateId}`,
-                `selector:${model['selectorKind'] ?? 'exact_model'}`,
-                `confidence:${model['verification']?.confidence ?? 'unknown'}`,
+                `selector:${optionalString(model['selectorKind']) ?? 'exact_model'}`,
+                `confidence:${optionalString(verification['confidence']) ?? 'unknown'}`,
             ].join(' '),
         },
         billing: { multiplier: 0 },
         byok: {
             gatewayId,
             routeCandidateId,
-            provider: model['providerId'] ?? null,
+            provider: optionalString(model['providerId']),
             providerModel,
             sdkModelId: sdkId,
-            routeProfile: model['routeProfile'] ?? null,
-            routeOptionRef: model['routeOptionRef'] ?? null,
-            routeOptionRefs: Array.isArray(model['routeOptionRefs']) ? model['routeOptionRefs'] : [],
-            selectorKind: model['selectorKind'] ?? null,
-            selectorSyntax: model['selectorSyntax'] ?? null,
-            routeLayer: routing['routeLayer'] ?? null,
-            wireApi: routing['wireApi'] ?? null,
+            routeProfile,
+            profile: routeProfile,
+            freeTier,
+            profileFreeTier,
+            profileCostSource: optionalString(provenance['profileCostSource']),
+            profileCostDetail: optionalString(provenance['profileCostDetail']),
+            routeOptionRef: optionalString(model['routeOptionRef']),
+            routeOptionRefs,
+            selectorKind: optionalString(model['selectorKind']),
+            selectorSyntax: optionalString(model['selectorSyntax']),
+            routeLayer: optionalString(routing['routeLayer']),
+            wireApi: optionalString(routing['wireApi']),
             autoSelection: routing['autoSelection'] === true,
             supportsFallback: routing['supportsFallback'] === true,
-            source: model['provenance']?.source ?? model['verification']?.sources?.[0] ?? 'model-gateway',
-            confidence: model['verification']?.confidence ?? 'unknown',
-            supportsReasoning: Boolean(capabilities.reasoningEffort),
-            inputModalities: Array.isArray(model['modalities']?.input) ? model['modalities'].input : ['text'],
-            outputModalities: Array.isArray(model['modalities']?.output) ? model['modalities'].output : ['text'],
-            capabilities: model['capabilities'] ?? {},
-            limits,
+            source:
+                optionalString(provenance['source']) ??
+                stringList(verification['sources'])[0] ??
+                'model-gateway',
+            confidence: optionalString(verification['confidence']) ?? 'unknown',
+            supportsReasoning: capabilities['reasoningEffort'] === true,
+            inputModalities: stringList(modalities['input']).length > 0 ? stringList(modalities['input']) : ['text'],
+            outputModalities: stringList(modalities['output']).length > 0 ? stringList(modalities['output']) : ['text'],
+            capabilities: { ...capabilities },
+            limits: { ...limits },
             rateLimits: {
-                maxRequestTokens: limits['maxRequestTokens'] ?? null,
-                tokensPerMinute: limits['tokensPerMinute'] ?? null,
-                requestsPerMinute: limits['requestsPerMinute'] ?? null,
-                dailyRequests: limits['dailyRequests'] ?? null,
+                maxRequestTokens: optionalNumber(limits['maxRequestTokens']),
+                tokensPerMinute: optionalNumber(limits['tokensPerMinute']),
+                requestsPerMinute: optionalNumber(limits['requestsPerMinute']),
+                dailyRequests: optionalNumber(limits['dailyRequests']),
             },
             pricing: {
-                prompt: model['pricing']?.inputUsdPerMillion ?? null,
-                completion: model['pricing']?.outputUsdPerMillion ?? null,
-                request: model['pricing']?.requestUsd ?? null,
+                prompt: promptPrice,
+                completion: completionPrice,
+                request: requestPrice,
             },
         },
-    });
+    };
+    return info;
 }
 
 /**
- * @param {Record<string, any>[]} models
- * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ * @param {Record<string, unknown>[]} models
+ * @returns {ModelGatewayCopilotModelInfo[]}
  */
 export function toCopilotModelInfoList(models) {
-    return models.filter((model) => model?.['enabled'] !== false).map(toCopilotModelInfo);
+    return models
+        .filter((model) => model['enabled'] !== false)
+        .map(toCopilotModelInfo)
+        .filter((model) => model !== null);
 }
 
 /**
  * @param {object} input
- * @param {Record<string, any>[]} [input.projections]
- * @param {Record<string, any>[]} [input.routeOptions]
+ * @param {Record<string, unknown>[]} [input.projections]
+ * @param {Record<string, unknown>[]} [input.routeOptions]
  * @param {boolean} [input.includeProjectionOnly]
- * @returns {import('#copilot/sdk/types').ModelInfo[]}
+ * @returns {ModelGatewayCopilotModelInfo[]}
  */
 export function toCopilotRouteModelInfoList(input = {}) {
     return toCopilotModelInfoList(

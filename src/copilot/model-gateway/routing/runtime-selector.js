@@ -33,6 +33,69 @@ import {
 
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
 
+
+/**
+ * @typedef {object} RuntimeSelectorProbeResult
+ * @property {boolean} ok
+ * @property {string} status
+ * @property {boolean} [providerAttempted]
+ * @property {string[]} errors
+ * @property {string[]} [warnings]
+ * @property {ReturnType<typeof classifyByokProviderFailure> | null} [providerFailure]
+ * @property {number} [elapsedMs]
+ * @property {string | null} [model]
+ * @property {string | null} [profile]
+ * @property {string | null} [preset]
+ * @property {string | null} [providerType]
+ */
+
+/**
+ * @typedef {object} RuntimeSelectorProbeOptions
+ * @property {Record<string, string | undefined>} [env]
+ * @property {string | null} [model]
+ * @property {number} [timeoutMs]
+ * @property {string} [prompt]
+ * @property {{ classifyProviderFailure?: typeof classifyByokProviderFailure }} [deps]
+ */
+
+/** @typedef {(options?: RuntimeSelectorProbeOptions) => Promise<RuntimeSelectorProbeResult>} RuntimeSelectorProbeRunner */
+
+
+/**
+ * Minimal selected-route contract consumed by the execution layer. Planning may attach richer metadata, but execution
+ * must not depend on the planner's complete internal representation.
+ *
+ * @typedef {Record<string, unknown> & {
+ *   id?: string;
+ *   providerId?: string;
+ *   providerModel?: string;
+ *   routeProfile?: string | null;
+ *   selectorSyntax?: string;
+ *   score?: number | null;
+ *   scoreBreakdown?: Record<string, unknown> | null;
+ *   reasons?: string[];
+ *   hasRuntimeProof?: boolean;
+ * }} RuntimeSelectorExecutionSelected
+ */
+
+/**
+ * @typedef {object} RuntimeSelectorExecutionRoute
+ * @property {string} profileId
+ * @property {'selected' | 'blocked'} status
+ * @property {RuntimeSelectorExecutionSelected | null} selected
+ * @property {string | null} selectedRouteKey
+ * @property {boolean} hasRuntimeProof
+ * @property {RuntimeSelectorExecutionRoute[]} candidateAlternatives
+ * @property {string[]} reasons
+ * @property {ReturnType<typeof buildRouteDecisionEvent>} decisionEvent
+ */
+
+/**
+ * @typedef {object} RuntimeSelectorExecutionPlan
+ * @property {string} mode
+ * @property {RuntimeSelectorExecutionRoute[]} routes
+ */
+
 const RUNTIME_ROUTE_ENV_RESET_KEYS = Object.freeze([
     'COPILOT_MODEL_GATEWAY_BINDING_SOURCE',
     'COPILOT_MODEL_GATEWAY_PROVIDER_ID',
@@ -327,9 +390,9 @@ function routeKey(route) {
 }
 
 /**
- * @param {Record<string, unknown> | null} route
+ * @template {object} TRoute
+ * @param {TRoute | null} route
  * @param {boolean} hasRuntimeProof
- * @returns {Record<string, unknown> | null}
  */
 function routeWithRuntimeProofFlag(route, hasRuntimeProof) {
     if (!route) return null;
@@ -337,20 +400,21 @@ function routeWithRuntimeProofFlag(route, hasRuntimeProof) {
 }
 
 /**
- * @param {Record<string, unknown> | null} route
+ * @template {object} TRoute
+ * @param {TRoute | null} route
  * @param {string} profileId
- * @returns {Record<string, unknown> | null}
  */
 function routeWithRuntimeProfile(route, profileId) {
     if (!route) return null;
-    const routeProfile = optionalString(route['routeProfile']);
-    const taskProfile = optionalString(route['taskProfile']);
+    const record = optionalRecord(route);
+    const routeProfile = optionalString(record?.['routeProfile']);
+    const taskProfile = optionalString(record?.['taskProfile']);
     return {
         ...route,
         routeProfile: profileId,
         taskProfile: profileId,
-        ...(routeProfile && routeProfile !== profileId ? { sourceRouteProfile: routeProfile } : {}),
-        ...(taskProfile && taskProfile !== profileId ? { sourceTaskProfile: taskProfile } : {}),
+        sourceRouteProfile: routeProfile && routeProfile !== profileId ? routeProfile : null,
+        sourceTaskProfile: taskProfile && taskProfile !== profileId ? taskProfile : null,
     };
 }
 
@@ -374,7 +438,7 @@ function runtimeSelectorRouteHasProof(route) {
 
 /**
  * @param {string[]} profileIds
- * @param {Map<string, Record<string, unknown>>} routeByProfileId
+ * @param {Map<string, RuntimeSelectorExecutionRoute>} routeByProfileId
  * @param {boolean} preferRuntimeProof
  * @returns {string[]}
  */
@@ -516,15 +580,86 @@ export function evaluateModelGatewayRuntimeSelectorRouteEnv(selected, baseEnv = 
 }
 
 /**
+ * @param {unknown} value
+ */
+function normalizeRuntimeRouteEvidence(value) {
+    const record = optionalRecord(value);
+    if (!record) return null;
+    return {
+        ...record,
+        source: optionalString(record['source']),
+        routeProfile: optionalString(record['routeProfile']),
+        runtimeHealthStatus: optionalString(record['runtimeHealthStatus']),
+        lastStatus: optionalString(record['lastStatus']),
+        agentProbeStatus: optionalString(record['agentProbeStatus']),
+        verifiedProbes: stringList(record['verifiedProbes']),
+    };
+}
+
+/**
+ * @param {unknown} value
+ */
+function normalizeRuntimeRouteScoreBreakdown(value) {
+    const record = optionalRecord(value);
+    if (!record) return null;
+    return {
+        baseScore: optionalNumber(record['baseScore']),
+        finalScore: optionalNumber(record['finalScore']),
+        delta: optionalNumber(record['delta']),
+        hardGateCount: optionalNumber(record['hardGateCount']),
+        positiveSignals: stringList(record['positiveSignals']),
+        negativeSignals: stringList(record['negativeSignals']),
+        groups: optionalRecord(record['groups']) ?? {},
+        rejectedGroups: optionalRecord(record['rejectedGroups']) ?? {},
+    };
+}
+
+/**
+ * @param {unknown} value
+ */
+function normalizeRuntimeRouteAccountAccess(value) {
+    const record = optionalRecord(value);
+    if (!record) return null;
+    return {
+        status: optionalString(record['status']),
+        canAttempt: record['canAttempt'] === true,
+        secretRef: optionalString(record['secretRef']),
+        secretConfigured: optionalBoolean(record['secretConfigured']),
+        modelVisible: record['modelVisible'] === true,
+        modelIdentifiers: stringList(record['modelIdentifiers']),
+        accessConfidence: optionalString(record['accessConfidence']),
+        failureClass: optionalString(record['failureClass']),
+        overlayRefs: stringList(record['overlayRefs']),
+        resetWindows: Array.isArray(record['resetWindows']) ? record['resetWindows'].map(optionalRecord).filter((item) => item !== null) : [],
+        hardReasons: stringList(record['hardReasons']),
+        softReasons: stringList(record['softReasons']),
+        reasons: stringList(record['reasons']),
+    };
+}
+
+/**
+ * @param {unknown} value
+ */
+function normalizeRuntimeRouteHealth(value) {
+    const record = optionalRecord(value);
+    if (!record) return null;
+    return {
+        ...record,
+        lastStatus: optionalString(record['lastStatus']),
+        agentProbeStatus: optionalString(record['agentProbeStatus']),
+        verifiedProbes: stringList(record['verifiedProbes']),
+    };
+}
+
+/**
  * @param {Record<string, unknown> | null} route
- * @returns {Record<string, unknown> | null}
  */
 function runtimeRoute(route) {
     if (!route) return null;
     const providerId = optionalString(route['providerId']);
     const providerModel = optionalString(route['providerModel']);
     if (!providerId || !providerModel) return null;
-    const runtimeEvidence = optionalRecord(route['runtimeEvidence']);
+    const runtimeEvidence = normalizeRuntimeRouteEvidence(route['runtimeEvidence']);
     return {
         id: `${providerId}:${providerModel}`,
         providerId,
@@ -551,27 +686,26 @@ function runtimeRoute(route) {
         runtimeObservedOnly: route['runtimeObservedOnly'] === true || runtimeEvidence?.['source'] === 'runtime_health',
         runtimeEvidence,
         score: optionalNumber(route['score']),
-        scoreBreakdown: optionalRecord(route['scoreBreakdown']),
+        scoreBreakdown: normalizeRuntimeRouteScoreBreakdown(route['scoreBreakdown']),
         reasons: stringList(route['reasons']).slice(0, 24),
         rejectedReasons: stringList(route['rejectedReasons']).slice(0, 24),
         eligibilityDisposition: optionalString(route['eligibilityDisposition']),
         accountScope: optionalString(route['accountScope']) ?? 'default',
         policyProfile: optionalString(route['policyProfile']),
         taskProfile: optionalString(route['taskProfile']),
-        accountAccess: optionalRecord(route['accountAccess']),
+        accountAccess: normalizeRuntimeRouteAccountAccess(route['accountAccess']),
         hasRuntimeProof: route['hasRuntimeProof'] === true,
-        runtimeHealth: optionalRecord(route['runtimeHealth']),
+        runtimeHealth: normalizeRuntimeRouteHealth(route['runtimeHealth']),
     };
 }
 
 /**
- * @param {Record<string, unknown> | null} route
+ * @param {ReturnType<typeof runtimeRoute>} route
  * @returns {boolean}
  */
 function routeAccountCanAttempt(route) {
     if (!route) return false;
-    const accountAccess = optionalRecord(route['accountAccess']);
-    return accountAccess?.['canAttempt'] !== false;
+    return route.accountAccess?.canAttempt !== false;
 }
 
 /**
@@ -1028,7 +1162,7 @@ export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options
 }
 
 /**
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
+ * @param {RuntimeSelectorExecutionRoute} route
  * @param {{ ok: boolean; failure: string | null }} outcome
  * @returns {ReturnType<typeof buildRouteDecisionEvent>}
  */
@@ -1150,20 +1284,17 @@ function runtimeSelectorAttemptProbeResult(attempt, index, observedAtMs) {
 }
 
 /**
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
- * @returns {Array<ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]>}
+ * @param {RuntimeSelectorExecutionRoute} route
+ * @returns {RuntimeSelectorExecutionRoute[]}
  */
 function runtimeSelectorRouteAttempts(route) {
-    const alternatives = Array.isArray(route['candidateAlternatives'])
-        ? route['candidateAlternatives'].map((candidate) => optionalRecord(candidate)).filter((candidate) => candidate !== null)
-        : [];
-    return [route, .../** @type {Array<ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]>} */ (alternatives)];
+    return [route, ...route.candidateAlternatives];
 }
 
 /**
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number]} route
- * @returns {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>}
+ * @param {RuntimeSelectorExecutionPlan} plan
+ * @param {RuntimeSelectorExecutionRoute} route
+ * @returns {RuntimeSelectorExecutionPlan}
  */
 function runtimeSelectorPlanForRouteAttempt(plan, route) {
     const profileId = optionalString(route['profileId']);
@@ -1176,45 +1307,7 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, any>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
- * @returns {{
- *   schema: 'model-gateway-runtime-selector-plan';
- *   ok: boolean;
- *   ready: boolean;
- *   mode: string;
- *   sourceSchema: string | null;
- *   traceId: string | null;
- *   summary: {
- *     profileCount: number;
- *     selectedProfileCount: number;
- *     blockedProfileCount: number;
- *     accountAccessBlockedCount: number;
- *     runtimeProofSelectedCount: number;
- *     runtimeEnvReadyCount: number;
- *     runtimeEnvBlockedCount: number;
- *     runtimeHealthBlockedCount: number;
- *     runtimeProbeBlockedCount: number;
- *     providerCooldownBlockedCount: number;
- *     alternativeEvaluatedCount: number;
- *     alternativeUsableCount: number;
- *   };
- *   routes: Array<{
- *     profileId: string;
- *     status: 'selected' | 'blocked';
- *     source: string;
- *     selected: Record<string, unknown> | null;
- *     selectedRouteKey: string | null;
- *     hasRuntimeProof: boolean;
- *     runtimeEnv: ReturnType<typeof evaluateModelGatewayRuntimeSelectorRouteEnv> | null;
- *     runtimeHealth: ReturnType<typeof evaluateGatewayModelHealthRoute> | null;
- *     providerCooldown: ReturnType<typeof evaluateGatewayProviderHealthCooldown> | null;
- *     alternativeSummary: ReturnType<typeof summarizeRuntimeSelectorAlternatives>;
- *     candidateAlternatives: Array<Record<string, unknown>>;
- *     reasons: string[];
- *     nextActions: string[];
- *     decisionEvent: ReturnType<typeof buildRouteDecisionEvent>;
- *   }>;
- * }}
+ * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, unknown>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
  */
 export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, options = {}) {
     const input = optionalRecord(selectionPolicyOrTrace) ?? {};
@@ -1378,10 +1471,12 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             source: optionalString(row['source']) ?? 'unknown',
             hasRuntimeProof,
         };
+        /** @type {'selected'} */
+        const selectedAlternativeStatus = 'selected';
         const candidateAlternatives = candidateEvaluations
-            .filter((candidate) => candidate !== chosen && candidate['blocked'] !== true && optionalRecord(candidate['selected']))
+            .filter((candidate) => candidate !== chosen && candidate.blocked !== true && candidate.selected !== null)
             .map((candidate) => {
-                const candidateSelected = routeWithRuntimeProfile(optionalRecord(candidate['selected']), profileId);
+                const candidateSelected = routeWithRuntimeProfile(candidate.selected, profileId);
                 const candidateHasRuntimeProof = candidate['hasRuntimeProof'] === true;
                 const candidateRuntimeProofStale = candidate['runtimeProofStale'] === true;
                 const candidateSelectedWithProofFlag = routeWithRuntimeProofFlag(candidateSelected, candidateHasRuntimeProof);
@@ -1391,16 +1486,16 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                 if (label && label !== 'selected') candidateReasons.push(`runtime_selector_fallback:${label}`);
                 return {
                     profileId,
-                    status: 'selected',
+                    status: selectedAlternativeStatus,
                     source: String(normalizedRow['source']),
                     selected: candidateSelectedWithProofFlag,
                     selectedRouteKey: routeKey(candidateSelectedWithProofFlag),
                     hasRuntimeProof: candidateHasRuntimeProof,
                     runtimeProofStale: candidateRuntimeProofStale,
-                    runtimeProof: optionalRecord(candidate['runtimeHealth'])?.['runtimeProof'] ?? null,
-                    runtimeEnv: optionalRecord(candidate['runtimeEnv']),
-                    runtimeHealth: optionalRecord(candidate['runtimeHealth']),
-                    providerCooldown: optionalRecord(candidate['providerCooldown']),
+                    runtimeProof: candidate.runtimeHealth?.runtimeProof ?? null,
+                    runtimeEnv: candidate.runtimeEnv,
+                    runtimeHealth: candidate.runtimeHealth,
+                    providerCooldown: candidate.providerCooldown,
                     alternativeSummary,
                     candidateAlternatives: [],
                     reasons: candidateReasons,
@@ -1478,16 +1573,16 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
 }
 
 /**
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
+ * @param {RuntimeSelectorExecutionPlan} plan
  * @param {string} profileId
- * @returns {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>['routes'][number] | null}
+ * @returns {RuntimeSelectorExecutionRoute | null}
  */
 export function selectModelGatewayRuntimeRoute(plan, profileId) {
     return plan.routes.find((route) => route.profileId === profileId && route.status === 'selected') ?? null;
 }
 
 /**
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
+ * @param {RuntimeSelectorExecutionPlan} plan
  * @param {{
  *   profileId?: string;
  *   timeoutMs?: number;
@@ -1495,7 +1590,7 @@ export function selectModelGatewayRuntimeRoute(plan, profileId) {
  *   recordHealth?: boolean;
  *   env?: Record<string, string | undefined>;
  *   deps?: {
- *     runChatProbe?: typeof runConfiguredByokChatProbe;
+ *     runChatProbe?: RuntimeSelectorProbeRunner;
  *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
  *     recordFailure?: typeof recordByokProviderModelCallFailure;
  *     flushHealth?: typeof flushByokProviderHealth;
@@ -1509,8 +1604,8 @@ export function selectModelGatewayRuntimeRoute(plan, profileId) {
  *   status: 'ok' | 'blocked' | 'failed';
  *   profileId: string | null;
  *   route: ReturnType<typeof selectModelGatewayRuntimeRoute> | null;
- *   probe: Awaited<ReturnType<typeof runConfiguredByokChatProbe>> | null;
- *   providerFailure: ReturnType<typeof classifyByokProviderFailure> | Awaited<ReturnType<typeof runConfiguredByokChatProbe>>['providerFailure'] | null;
+ *   probe: RuntimeSelectorProbeResult | null;
+ *   providerFailure: ReturnType<typeof classifyByokProviderFailure> | null;
  *   failureScope: 'provider' | 'controller_substrate' | 'preflight' | null;
  *   healthRecorded: boolean;
  *   routeDecisionRecordedCount: number;
@@ -1763,7 +1858,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
 }
 
 /**
- * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} plan
+ * @param {RuntimeSelectorExecutionPlan} plan
  * @param {{
  *   profileId?: string;
  *   fallbackProfileIds?: string[];
@@ -1777,7 +1872,7 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
  *   recordHealth?: boolean;
  *   env?: Record<string, string | undefined>;
  *   deps?: {
- *     runChatProbe?: typeof runConfiguredByokChatProbe;
+ *     runChatProbe?: RuntimeSelectorProbeRunner;
  *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
  *     recordFailure?: typeof recordByokProviderModelCallFailure;
  *     flushHealth?: typeof flushByokProviderHealth;

@@ -174,8 +174,8 @@ describe('F86 - Barrel complete export coverage', () => {
         barrel = barrel ?? (await import('#copilot/sdk'));
         const names = ['buildSessionConfig', 'getProjectDefaults', 'mergeExcludedTools', 'mergeTools'];
         for (const n of names) expect(barrel[n], `unexpected: ${n}`).toBeUndefined();
-        expect(barrel.DEFAULT_MODEL).toBeDefined();
-        expect(barrel.DEFAULT_DIAGNOSTIC_MODEL).toBeDefined();
+        expect(barrel['DEFAULT_MODEL']).toBeDefined();
+        expect(barrel['DEFAULT_DIAGNOSTIC_MODEL']).toBeDefined();
     });
 
     // ─── client-facade.js (F5) ─────────────────────────────────────────

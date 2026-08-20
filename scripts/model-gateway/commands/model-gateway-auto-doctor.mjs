@@ -9,7 +9,10 @@ import {
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -22,32 +25,33 @@ state.
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
+
+/** @returns {Record<string, unknown> | null} */
+function optionalRecord(/** @type {unknown} */ value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
 }
 
-function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-}
-
-function optionalNumber(value) {
+function optionalNumber(/** @type {unknown} */ value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function optionalString(value) {
+function optionalString(/** @type {unknown} */ value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-function createCheck(id, pass, detail, severity = 'error') {
+function createCheck(
+    /** @type {string} */ id,
+    /** @type {unknown} */ pass,
+    /** @type {string} */ detail,
+    /** @type {string} */ severity = 'error',
+) {
     return { id, pass: Boolean(pass), severity, detail };
 }
 
+/**
+ * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
+ * @param {string[]} [scriptArgs]
+ */
 function runJson(scriptId, scriptArgs = []) {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs], {
         cwd: REPO_ROOT,
@@ -93,7 +97,8 @@ const policySources = explainModelGatewayRuntimeAutomationPolicySources({
 const readyJson = optionalRecord(ready.json);
 const statusJson = optionalRecord(status.json);
 const diagnosticsJson = optionalRecord(diagnostics.json);
-const commandRows = Array.isArray(optionalRecord(commands.json)?.['commands']) ? optionalRecord(commands.json)['commands'] : [];
+const commandsJson = optionalRecord(commands.json);
+const commandRows = Array.isArray(commandsJson?.['commands']) ? commandsJson['commands'] : [];
 const policy = optionalRecord(statusJson?.['policy']);
 const decision = optionalRecord(statusJson?.['decision']);
 const cooldown = optionalRecord(decision?.['cooldown']);

@@ -91,9 +91,9 @@ describe('fileTools — exportações do módulo', () => {
         assert.ok(fileReadTools.length >= 3);
     });
 
-    it('fileWriteTools é um Array com 9 elementos', () => {
+    it('fileWriteTools é um Array com 10 elementos', () => {
         assert.ok(Array.isArray(fileWriteTools));
-        assert.equal(fileWriteTools.length, 9);
+        assert.equal(fileWriteTools.length, 10);
     });
 
     it('fileTools = fileReadTools + indexTools + scopeTools + fileWriteTools', () => {

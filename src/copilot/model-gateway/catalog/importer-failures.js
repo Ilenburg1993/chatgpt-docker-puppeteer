@@ -54,10 +54,10 @@ function isLocalDaemonSource(sourceKind) {
 
 /**
  * @param {object} input
- * @param {string} [input.importerId]
- * @param {string} [input.providerId]
- * @param {string} [input.sourceId]
- * @param {string} [input.sourceKind]
+ * @param {string | null} [input.importerId]
+ * @param {string | null} [input.providerId]
+ * @param {string | null} [input.sourceId]
+ * @param {string | null} [input.sourceKind]
  * @param {boolean} [input.requiresAuth]
  * @param {unknown[]} [input.errors]
  * @param {unknown} [input.message]

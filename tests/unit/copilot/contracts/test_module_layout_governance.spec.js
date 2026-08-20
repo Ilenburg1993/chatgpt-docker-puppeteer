@@ -469,6 +469,7 @@ describe('W114 — module layout governance: terminal root', () => {
         assert.equal(scorecard.total, TERMINAL_MODULE_LAYOUT.length);
         assert.equal(scorecard.byRisk['hotspot'], listTerminalModulesByRisk('hotspot').length);
         assert.deepEqual(scorecard.watch, [
+            'bootstrap-runtime.js',
             'dev-watch.js',
             'runtime-root.js',
             'state/transcript-state.js',

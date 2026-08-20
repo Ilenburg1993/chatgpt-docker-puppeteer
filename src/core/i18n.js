@@ -182,7 +182,7 @@ async function learnTerm(langCode, category, term) {
         .replace(/[.!?]$/, '');
 
     // 1. Proteção contra Envenenamento (Blocklist)
-    if (v.blocked.some((/** @type {string} */ bad) => cleanTerm.includes(bad))) {
+    if (v['blocked'].some((/** @type {string} */ bad) => cleanTerm.includes(bad))) {
         return;
     }
 

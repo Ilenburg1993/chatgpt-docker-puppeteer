@@ -28,7 +28,8 @@ describe('Cloudflare transport benchmark plan', () => {
         const decisionPolicy = /** @type {{ keepQuicWhen: string[] }} */ (plan['decisionPolicy']);
         const nextActions = /** @type {string[]} */ (plan['nextActions']);
 
-        assert.equal(plan.current.transportProtocol, 'quic');
+        const current = /** @type {{ transportProtocol: string }} */ (plan['current']);
+        assert.equal(current.transportProtocol, 'quic');
         assert.equal(candidates.find((candidate) => candidate.protocol === 'quic')?.role, 'control-current');
         const http2 = candidates.find((candidate) => candidate.protocol === 'http2');
         assert.equal(http2?.role, 'tcp-rollback-candidate');
@@ -78,6 +79,7 @@ describe('Cloudflare transport benchmark plan', () => {
     });
 });
 
+/** @param {string} name @param {string | undefined} value */
 function restoreEnv(name, value) {
     if (value === undefined) Reflect.deleteProperty(process.env, name);
     else process.env[name] = value;

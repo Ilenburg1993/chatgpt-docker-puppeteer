@@ -258,7 +258,7 @@ describe('F49 — createJsonlWriter', () => {
         releaseFirst();
         await writer.flush();
         expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
-        expect(String(mockFs.appendFile.mock.calls[1]?.[1])).toContain('"sequence":2');
+        expect(String(/** @type {unknown[]} */ (mockFs.appendFile.mock.calls[1] ?? [])[1])).toContain('"sequence":2');
     });
 
     it('recoloca o lote na fila quando append falha', async () => {
@@ -271,7 +271,7 @@ describe('F49 — createJsonlWriter', () => {
 
         await writer.flush();
         expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
-        expect(String(mockFs.appendFile.mock.calls[1]?.[1])).toContain('"sequence":1');
+        expect(String(/** @type {unknown[]} */ (mockFs.appendFile.mock.calls[1] ?? [])[1])).toContain('"sequence":1');
         expect(writer.getState()).toMatchObject({ queueDepth: 0, persistedLines: 1 });
     });
 });

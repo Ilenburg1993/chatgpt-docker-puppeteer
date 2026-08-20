@@ -311,7 +311,7 @@ class MissionPlannerProcessor {
             return;
         }
 
-        const proposals = Array.isArray(parsed.proposals) ? parsed.proposals : [];
+        const proposals = Array.isArray(parsed['proposals']) ? parsed['proposals'] : [];
         if (proposals.length === 0) {
             return;
         }

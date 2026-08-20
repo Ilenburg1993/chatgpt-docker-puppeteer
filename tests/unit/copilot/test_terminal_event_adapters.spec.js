@@ -23,8 +23,8 @@ const mocks = vi.hoisted(() => ({
     readTerminalAgentRuntimeEventHost: vi.fn(() => ({ on: vi.fn(), off: vi.fn() })),
     readTerminalRuntimeState: vi.fn(() => ({
         status: 'idle',
-        pendingQuestion: null,
-        pendingQuestionKind: null,
+        pendingQuestion: /** @type {{ question: string } | null} */ (null),
+        pendingQuestionKind: /** @type {string | null} */ (null),
     })),
 }));
 

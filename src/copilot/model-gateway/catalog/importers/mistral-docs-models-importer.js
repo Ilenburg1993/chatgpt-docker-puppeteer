@@ -255,7 +255,7 @@ export function parseMistralDocsRows(raw) {
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.modelsUrl]
  * @param {string} [options.limitsUrl]
  * @param {string} [options.apiDocsUrl]

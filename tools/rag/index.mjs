@@ -24,7 +24,7 @@ const report = /** @type {any} */ (
         root: values.root,
         ollamaBaseUrl: values['ollama-base-url'],
         model: values.model,
-        profile: values.profile || process.env.RAG_PROFILE_DEFAULT || 'core',
+        profile: values.profile || process.env['RAG_PROFILE_DEFAULT'] || 'core',
         includeGlobs: values['include-glob'],
         excludeGlobs: values['exclude-glob'],
         docsMode: values['docs-mode'],

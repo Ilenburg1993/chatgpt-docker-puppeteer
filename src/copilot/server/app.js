@@ -59,7 +59,7 @@ export function createCopilotApp(opts) {
 
     // 4. Auth: Bearer token timing-safe (aplicado globalmente; rotas skipAuth usam middleware local)
     if (!opts?.skipAuth) {
-        app.use(createAuthMiddleware({ token: opts?.token }));
+        app.use(createAuthMiddleware(opts?.token === undefined ? {} : { token: opts.token }));
     }
 
     // Error handler — DEVE ser registrado após todas as rotas (via registerErrorHandler no owner do servidor)

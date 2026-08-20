@@ -5,10 +5,11 @@ config({ path: resolve(process.cwd(), '.env.local'), quiet: true });
 
 import { OllamaClient } from './tools/ollama/client.mjs';
 
+const cloudApiKey = process.env['OLLAMA_CLOUD_API_KEY'];
 const ollama = new OllamaClient({
     cloudEnabled: true,
     cloudBaseUrl: 'https://ollama.com',
-    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY,
+    ...(cloudApiKey ? { cloudApiKey } : {}),
 });
 
 console.log('Perguntando ao Ollama Cloud: Quem é Fernando Henrique Cardoso?');

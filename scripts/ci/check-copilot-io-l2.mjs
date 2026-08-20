@@ -191,19 +191,31 @@ function runChild(phase, dbPath) {
 }
 
 /**
- * @param {Record<string, unknown>} summary
+ * @typedef {{
+ *     stats?: { latency?: { set?: { maxMs?: number }; flush?: { maxMs?: number }; get?: { maxMs?: number } } };
+ * }} L2PhaseStats
+ *
+ * @typedef {Record<string, unknown> & {
+ *     default?: { profile?: string };
+ *     seed?: L2PhaseStats;
+ *     read?: L2PhaseStats & { persistedAcrossProcesses?: boolean; payloadBytes?: number };
+ * }} L2CanarySummary
+ */
+
+/**
+ * @param {L2CanarySummary} summary
  */
 async function appendGithubSummary(summary) {
     const summaryPath = String(process.env['GITHUB_STEP_SUMMARY'] ?? '').trim();
     if (!summaryPath) return;
-    const seedLatency = /** @type {any} */ (summary.seed)?.stats?.latency;
-    const readLatency = /** @type {any} */ (summary.read)?.stats?.latency;
+    const seedLatency = summary.seed?.stats?.latency;
+    const readLatency = summary.read?.stats?.latency;
     const markdown = [
         '### Copilot IO L2 experimental canary',
         '',
-        `- Default profile: \`${String(/** @type {any} */ (summary.default)?.profile)}\``,
-        `- Experimental persistence across processes: **${String(/** @type {any} */ (summary.read)?.persistedAcrossProcesses)}**`,
-        `- Payload: ${String(/** @type {any} */ (summary.read)?.payloadBytes)} bytes`,
+        `- Default profile: \`${String(summary.default?.profile)}\``,
+        `- Experimental persistence across processes: **${String(summary.read?.persistedAcrossProcesses)}**`,
+        `- Payload: ${String(summary.read?.payloadBytes)} bytes`,
         `- Seed set max latency: ${String(seedLatency?.set?.maxMs ?? 'n/a')} ms`,
         `- Seed flush max latency: ${String(seedLatency?.flush?.maxMs ?? 'n/a')} ms`,
         `- Read get max latency: ${String(readLatency?.get?.maxMs ?? 'n/a')} ms`,

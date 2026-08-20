@@ -14,18 +14,16 @@ import { toCopilotRouteModelInfoList } from './copilot-model-projection.js';
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @param {{ catalogStore?: JsonModelGatewayCatalogStore }} [options]
- * @returns {(() => Promise<import('#copilot/sdk/types').ModelInfo[]>) | undefined}
+ * @param {{ catalogStore?: { readSnapshot(): Promise<ReturnType<typeof import('../catalog/json-catalog-store.js').normalizeStoredCatalogSnapshot>> } }} [options]
+ * @returns {(() => Promise<ReturnType<typeof toCopilotRouteModelInfoList>>) | undefined}
  */
 export function buildModelGatewayOnListModelsHandler(env = process.env, options = {}) {
     const initialSnapshot = buildEnvByokModelGatewaySnapshot(env);
-    const initialActive = /** @type {{ enabled?: boolean }} */ (initialSnapshot.active);
-    if (initialActive.enabled !== true) return undefined;
+    if (initialSnapshot.active.enabled !== true) return undefined;
     const catalogStore = options.catalogStore ?? new JsonModelGatewayCatalogStore();
     return async () => {
         const compatibilitySnapshot = buildEnvByokModelGatewaySnapshot(env);
-        const active = /** @type {{ providerId?: string | null }} */ (compatibilitySnapshot.active);
-        const providerId = typeof active.providerId === 'string' ? active.providerId : null;
+        const providerId = compatibilitySnapshot.active.providerId;
         const catalogSnapshot = await catalogStore.readSnapshot();
         const eligibleKeys = new Set(
             catalogSnapshot.modelEligibilityDecisions
@@ -55,10 +53,6 @@ export function buildModelGatewayOnListModelsHandler(env = process.env, options 
         if (projections.length > 0) {
             return toCopilotRouteModelInfoList({ projections, routeOptions });
         }
-        const snapshotRecord = /** @type {Record<string, any>} */ (compatibilitySnapshot);
-        return toCopilotRouteModelInfoList({
-            projections: compatibilitySnapshot.models,
-            routeOptions: Array.isArray(snapshotRecord['routeOptions']) ? snapshotRecord['routeOptions'] : [],
-        });
+        return toCopilotRouteModelInfoList({ projections: compatibilitySnapshot.models, routeOptions: [] });
     };
 }

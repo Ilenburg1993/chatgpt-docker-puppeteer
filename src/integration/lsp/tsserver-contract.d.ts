@@ -13,6 +13,7 @@ export type TsserverToolOperation =
 export interface TsserverDaemonOptions {
     rootDir?: string;
     timeoutMs?: number;
+    idleTtlMs?: number;
 }
 
 export interface TsserverExecuteOptions {
@@ -24,6 +25,7 @@ export interface TsserverStartResult {
     started: true;
     rootDir: string;
     timeoutMs: number;
+    idleTtlMs: number;
 }
 
 export interface TsserverStopResult {
@@ -32,6 +34,7 @@ export interface TsserverStopResult {
 
 export interface TsserverDaemonFacade {
     timeoutMs: number;
+    idleTtlMs: number;
     start(): Promise<TsserverStartResult>;
     stop(): Promise<TsserverStopResult>;
     execute(

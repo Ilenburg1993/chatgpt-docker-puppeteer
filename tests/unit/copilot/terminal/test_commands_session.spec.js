@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/terminal/test_commands_session.spec.js
  *
@@ -10,28 +9,93 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const answerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
-const clearPendingQuestionShadow = vi.fn(() => true);
-const listTerminalSdkSessionInventory = vi.fn(async () => ({
-    currentSessionId: 'sdk-current',
-    lastSessionId: 'sdk-last',
-    foregroundSessionId: 'sdk-foreground',
-    sessions: [
-        {
-            sessionId: 'sdk-current',
-            startTime: new Date('2026-05-21T00:00:00.000Z'),
-            modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
-            summary: 'sessão atual',
-            isRemote: false,
-        },
-    ],
-}));
-const readTerminalSdkSessionBootSelection = vi.fn(async () => null);
-const scheduleTerminalSdkSessionBootSelection = vi.fn(async () => ({ ok: true, data: {}, error: null }));
-const deleteTerminalSdkSession = vi.fn(async () => undefined);
-const readTerminalSseEventArchiveTail = vi.fn(async (/** @type {Record<string, unknown>} */ input = {}) => ({
-    entries: [],
-    state: {
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/session/index.js').listTerminalSdkSessionInventory>>} TerminalSdkSessionInventory */
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>>} TerminalSessionFsState */
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail>>} TerminalSseArchiveProjection */
+/** @typedef {TerminalSseArchiveProjection['entries'][number]} TerminalSseArchiveEntry */
+/** @typedef {Omit<Partial<TerminalSdkSessionInventory>, 'sessionFs'> & { sessionFs?: Partial<TerminalSessionFsState> }} TerminalSdkSessionInventoryOverrides */
+/** @typedef {Omit<Partial<TerminalSseArchiveProjection>, 'state' | 'filters' | 'tailRead'> & { state?: Partial<TerminalSseArchiveProjection['state']>; filters?: Partial<TerminalSseArchiveProjection['filters']>; tailRead?: Partial<TerminalSseArchiveProjection['tailRead']> }} TerminalSseArchiveProjectionOverrides */
+
+/**
+ * @param {Partial<TerminalSessionFsState>} [overrides]
+ * @returns {TerminalSessionFsState}
+ */
+function sessionFsFixture(overrides = {}) {
+    const storageRoot = {
+        display: 'data/copilot/sessions',
+        withinWorkspace: true,
+        exists: null,
+        ...(overrides.storageRoot ?? {}),
+    };
+    const { storageRoot: _storageRoot, ...rest } = overrides;
+    return {
+        enabled: false,
+        initialCwd: '/workspaces/chatgpt-docker-puppeteer',
+        sessionStatePath: 'data/copilot/session-state.json',
+        conventions: 'posix',
+        session: null,
+        ...rest,
+        storageRoot,
+    };
+}
+
+/**
+ * @param {TerminalSdkSessionInventoryOverrides} [overrides]
+ * @returns {TerminalSdkSessionInventory}
+ */
+function sdkSessionInventoryFixture(overrides = {}) {
+    const { sessionFs: sessionFsOverrides, ...rest } = overrides;
+    return {
+        currentSessionId: 'sdk-current',
+        lastSessionId: 'sdk-last',
+        foregroundSessionId: 'sdk-foreground',
+        persistedByokBinding: null,
+        lastBootDecision: null,
+        sessions: [
+            {
+                sessionId: 'sdk-current',
+                startTime: new Date('2026-05-21T00:00:00.000Z'),
+                modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                summary: 'sessão atual',
+                isRemote: false,
+            },
+        ],
+        ...rest,
+        sessionFs: sessionFsFixture(sessionFsOverrides ?? {}),
+    };
+}
+
+/**
+ * @param {string} event
+ * @param {Record<string, unknown>} payload
+ * @param {Partial<TerminalSseArchiveEntry>} [overrides]
+ * @returns {TerminalSseArchiveEntry}
+ */
+function sseArchiveEntryFixture(event, payload, overrides = {}) {
+    const timestamp = overrides.timestamp ?? Date.parse('2026-05-22T00:00:00.000Z');
+    return {
+        ...overrides,
+        schemaVersion: 1,
+        ts: overrides.ts ?? new Date(timestamp).toISOString(),
+        timestamp,
+        event,
+        eventId: overrides.eventId ?? 1,
+        source: overrides.source ?? 'test',
+        eventSource: overrides.eventSource ?? overrides.source ?? 'test',
+        traceId: overrides.traceId ?? null,
+        turnId: overrides.turnId ?? null,
+        hubSessionId: overrides.hubSessionId ?? null,
+        payload,
+    };
+}
+
+/**
+ * @param {string | null} [event]
+ * @param {TerminalSseArchiveProjectionOverrides} [overrides]
+ * @returns {TerminalSseArchiveProjection}
+ */
+function sseArchiveProjectionFixture(event = null, overrides = {}) {
+    const state = {
         enabled: true,
         path: '/tmp/terminal-sse-events.jsonl',
         error: null,
@@ -43,20 +107,134 @@ const readTerminalSseEventArchiveTail = vi.fn(async (/** @type {Record<string, u
         failedEvents: 0,
         droppedEvents: 0,
         lastEventId: null,
-    },
-    filters: {
-        limit: Number(input['limit'] ?? 20),
-        event: typeof input['event'] === 'string' ? input['event'] : null,
+        ...(overrides.state ?? {}),
+    };
+    const filters = {
+        limit: 20,
+        event,
         traceId: null,
         turnId: null,
         source: null,
         toolCallId: null,
         requestId: null,
         hubSessionId: null,
-    },
+        ...(overrides.filters ?? {}),
+    };
+    const tailRead = {
+        bytesRead: 0,
+        maxBytes: 0,
+        truncatedByByteLimit: false,
+        ...(overrides.tailRead ?? {}),
+    };
+    return {
+        entries: [],
+        ...overrides,
+        state,
+        filters,
+        tailRead,
+    };
+}
+
+const channelMocks = vi.hoisted(() => ({
+    history: [
+        { role: 'user', content: 'hello world', timestamp: Date.now() },
+        { role: 'assistant', content: 'hi', timestamp: Date.now() },
+    ],
+    clearHistory: vi.fn(),
 }));
 
-const defaultRuntime = /** @type {any} */ ({
+const conversationMocks = vi.hoisted(() => ({
+    readTurns: vi.fn((_id, _opts) => [
+        { role: 'user', content: 'a', created_at: Date.now() },
+        { role: 'llm_b', content: 'b', created_at: Date.now() },
+    ]),
+    countTurns: vi.fn(() => 2),
+}));
+
+const answerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
+const clearPendingQuestionShadow = vi.fn(() => true);
+const listTerminalSdkSessionInventory = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/session/index.js').listTerminalSdkSessionInventory>} */ (
+    vi.fn(async () => sdkSessionInventoryFixture())
+);
+const readTerminalSdkSessionBootSelection = vi.fn(async () => null);
+const scheduleTerminalSdkSessionBootSelection = vi.fn(async () => ({ ok: true, data: {}, error: null }));
+const deleteTerminalSdkSession = vi.fn(async () => undefined);
+const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail>} */ (
+    vi.fn(async (input = {}) =>
+        sseArchiveProjectionFixture(typeof input.event === 'string' ? input.event : null, {
+            filters: { limit: Number(input.limit ?? 20) },
+        }),
+    )
+);
+
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimeControlState>} RuntimeControlState */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimeInteractionState>} RuntimeInteractionState */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimePrBudgetSnapshot>} RuntimePrBudgetSnapshot */
+/**
+ * @typedef {{
+ *     status?: string;
+ *     model?: string;
+ *     reasoningEffort?: string;
+ *     sessionId?: string | null;
+ *     sendCount?: number;
+ *     dialogPaused?: boolean;
+ *     queueSize?: number;
+ *     pendingQuestion?: import('../../../../src/copilot/agent/types.js').PendingQuestion | string | null;
+ *     contextWindow?: number | { tokens: number; tokenLimit: number; utilization: number } | null;
+ *     systemPromptBinding?: { digest?: string } | null;
+ *     systemPromptFreshness?: { isStale?: boolean; reason?: string; recommendedAction?: string } | null;
+ * }} TestAgentStatusSnapshot
+ *
+ * @typedef {{
+ *     ok: boolean;
+ *     healthy: boolean;
+ *     status: string;
+ *     issues: string[];
+ *     backgroundPendingCount: number;
+ *     recommendedAction: string;
+ * }} TestAgentHealthSnapshot
+ *
+ * @typedef {{
+ *     status: string;
+ *     model: string;
+ *     reasoningEffort: string;
+ *     dialogLoopActive: boolean;
+ *     dialogPaused?: boolean;
+ *     queueSize?: number;
+ *     sessionId: string | null;
+ *     getHealthSnapshot: () => TestAgentHealthSnapshot;
+ *     getStatusSnapshot: () => TestAgentStatusSnapshot;
+ *     dialogPrMetrics: RuntimePrBudgetSnapshot['prMetrics'] | null;
+ *     answerPendingQuestion: (answer: string) => boolean;
+ *     clearPendingQuestionShadow: () => boolean;
+ *     pendingQuestion?: import('../../../../src/copilot/agent/types.js').PendingQuestion | null;
+ *     pendingQuestionKind?: import('../../../../src/copilot/agent/types.js').PendingQuestionKind | null;
+ *     pendingQuestionShadow?: import('../../../../src/copilot/agent/types.js').PendingQuestionShadow | null;
+ *     pendingQuestionShadowKind?: import('../../../../src/copilot/agent/types.js').PendingQuestionKind | null;
+ *     pendingQuestionShadowState?: import('../../../../src/copilot/agent/types.js').PendingQuestionShadowState | null;
+ *     pendingQuestionShadowExpired?: boolean;
+ *     pendingQuestionShadowAgeMs?: number | null;
+ *     pendingQuestionShadowExpiresAt?: number | null;
+ *     pendingQuestionShadowRemainingMs?: number | null;
+ *     lastPrInfo?: RuntimePrBudgetSnapshot['lastPrInfo'];
+ *     lastLlmUsage?: RuntimePrBudgetSnapshot['lastLlmUsage'];
+ * }} TestAgentRuntime
+ */
+
+/** @returns {RuntimePrBudgetSnapshot['prMetrics']} */
+function emptyDialogCostLedgerFixture() {
+    return {
+        boots: 0,
+        resumesWithAdditionalModelCall: 0,
+        resumesWithoutAdditionalModelCall: 0,
+        totalModelCalls: 0,
+        resumesWithPR: 0,
+        resumesZeroPR: 0,
+        totalPR: 0,
+    };
+}
+
+const defaultRuntime = /** @type {TestAgentRuntime} */ ({
     status: 'idle',
     model: 'gpt-5-mini',
     reasoningEffort: 'high',
@@ -96,7 +274,7 @@ const defaultRuntime = /** @type {any} */ ({
 const altAnswerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
 const altClearPendingQuestionShadow = vi.fn(() => true);
 
-const altRuntime = /** @type {any} */ ({
+const altRuntime = /** @type {TestAgentRuntime} */ ({
     status: 'waiting_for_input',
     model: 'gpt-4.1-mini',
     reasoningEffort: 'medium',
@@ -134,16 +312,8 @@ const altRuntime = /** @type {any} */ ({
 });
 
 /**
- * @param {typeof defaultRuntime} runtime
- * @returns {{
- *     status: string;
- *     model: string;
- *     reasoningEffort: string;
- *     sessionId: string | null;
- *     dialogLoopActive: boolean;
- *     dialogPaused: boolean;
- *     queueSize: number;
- * }}
+ * @param {TestAgentRuntime} runtime
+ * @returns {RuntimeControlState}
  */
 function readMockRuntimeControlState(runtime) {
     const snap = runtime.getStatusSnapshot?.() ?? {};
@@ -154,13 +324,14 @@ function readMockRuntimeControlState(runtime) {
         sessionId: runtime.sessionId ?? snap.sessionId ?? null,
         dialogLoopActive: Boolean(runtime.dialogLoopActive),
         dialogPaused: Boolean(snap.dialogPaused ?? runtime.dialogPaused),
+        isResumed: false,
         queueSize: Number(runtime.queueSize ?? snap.queueSize ?? 0),
     };
 }
 
 /**
- * @param {typeof defaultRuntime} runtime
- * @returns {Record<string, any>}
+ * @param {TestAgentRuntime} runtime
+ * @returns {RuntimeInteractionState}
  */
 function readMockRuntimeInteractionState(runtime) {
     return {
@@ -178,16 +349,19 @@ function readMockRuntimeInteractionState(runtime) {
 }
 
 /**
- * @param {typeof defaultRuntime} runtime
- * @returns {Record<string, any>}
+ * @param {TestAgentRuntime} runtime
+ * @returns {RuntimePrBudgetSnapshot}
  */
 function readMockRuntimePrBudgetSnapshot(runtime) {
+    const usageMetrics = runtime.dialogPrMetrics ?? emptyDialogCostLedgerFixture();
     return {
-        sendCount: Number(runtime.getStatusSnapshot?.().sendCount ?? 0),
+        sendCount: Number(runtime.getStatusSnapshot().sendCount ?? 0),
         dialogLoopActive: Boolean(runtime.dialogLoopActive),
         sessionId: runtime.sessionId ?? null,
-        prMetrics: runtime.dialogPrMetrics ?? null,
+        usageMetrics,
+        prMetrics: usageMetrics,
         lastPrInfo: runtime.lastPrInfo ?? null,
+        lastLlmUsage: runtime.lastLlmUsage ?? null,
     };
 }
 
@@ -202,20 +376,20 @@ vi.mock('#copilot/agent', () => ({
         { runtimeId: 'default', runtime: defaultRuntime },
         { runtimeId: 'alt', runtime: altRuntime },
     ],
-    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
-    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readAgentRuntimeStatusSnapshot: (/** @type {TestAgentRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {TestAgentRuntime} */ agent) => agent.getHealthSnapshot(),
     readRuntimeControlState: readMockRuntimeControlState,
     readRuntimeInteractionState: readMockRuntimeInteractionState,
     readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
-    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+    readRuntimeAutoModelPolicy: (/** @type {TestAgentRuntime} */ runtime) => ({
         configuredModel: runtime.model,
         observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
         selectionAuthority: 'github-copilot',
         canForcePreference: false,
     }),
-    answerRuntimePendingQuestion: (/** @type {typeof defaultRuntime} */ runtime, /** @type {string} */ answer) =>
+    answerRuntimePendingQuestion: (/** @type {TestAgentRuntime} */ runtime, /** @type {string} */ answer) =>
         runtime.answerPendingQuestion?.(answer) ?? false,
-    clearRuntimePendingQuestionShadow: (/** @type {typeof defaultRuntime} */ runtime) =>
+    clearRuntimePendingQuestionShadow: (/** @type {TestAgentRuntime} */ runtime) =>
         runtime.clearPendingQuestionShadow?.() ?? false,
     readSdkModelMetadata: () => null,
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
@@ -274,15 +448,15 @@ vi.mock('#copilot/agent/runtime-registry', () => ({
 }));
 
 vi.mock('#copilot/agent/facades', () => ({
-    readAgentRuntimeStatusSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getStatusSnapshot(),
-    readAgentRuntimeHealthSnapshot: (/** @type {typeof defaultRuntime} */ agent) => agent.getHealthSnapshot(),
+    readAgentRuntimeStatusSnapshot: (/** @type {TestAgentRuntime} */ agent) => agent.getStatusSnapshot(),
+    readAgentRuntimeHealthSnapshot: (/** @type {TestAgentRuntime} */ agent) => agent.getHealthSnapshot(),
     readRuntimeControlState: readMockRuntimeControlState,
     readRuntimeInteractionState: readMockRuntimeInteractionState,
     readRuntimePrBudgetSnapshot: readMockRuntimePrBudgetSnapshot,
     readRuntimePermissionMode: vi.fn(() => 'approve_all'),
     readAgentRuntimeSdkResourceSnapshot: vi.fn(() => ({ client: false, session: false, quotaMonitor: false })),
     readAgentRuntimeCapabilities: vi.fn(() => ({})),
-    readRuntimeAutoModelPolicy: (/** @type {typeof defaultRuntime} */ runtime) => ({
+    readRuntimeAutoModelPolicy: (/** @type {TestAgentRuntime} */ runtime) => ({
         configuredModel: runtime.model,
         observedModel: runtime.lastPrInfo?.effectiveModel ?? runtime.lastPrInfo?.model ?? null,
         selectionAuthority: 'github-copilot',
@@ -290,9 +464,9 @@ vi.mock('#copilot/agent/facades', () => ({
     }),
     readSdkModelMetadata: () => null,
     readAgentRuntimeTodoSummaries: vi.fn(async () => []),
-    answerRuntimePendingQuestion: (/** @type {typeof defaultRuntime} */ runtime, /** @type {string} */ answer) =>
+    answerRuntimePendingQuestion: (/** @type {TestAgentRuntime} */ runtime, /** @type {string} */ answer) =>
         runtime.answerPendingQuestion?.(answer) ?? false,
-    clearRuntimePendingQuestionShadow: (/** @type {typeof defaultRuntime} */ runtime) =>
+    clearRuntimePendingQuestionShadow: (/** @type {TestAgentRuntime} */ runtime) =>
         runtime.clearPendingQuestionShadow?.() ?? false,
     createRuntimeSnapshot: vi.fn((/** @type {Record<string, unknown>} */ data) => ({
         snapshotId: 'snap-001',
@@ -338,21 +512,15 @@ vi.mock('#copilot/core', async () => {
 vi.mock('#copilot/channel', () => ({
     llmBridgeClient: {
         turnCount: 12,
-        history: [
-            { role: 'user', content: 'hello world', timestamp: Date.now() },
-            { role: 'assistant', content: 'hi', timestamp: Date.now() },
-        ],
-        clearHistory: vi.fn(),
+        history: channelMocks.history,
+        clearHistory: channelMocks.clearHistory,
     },
 }));
 
 vi.mock('#copilot/conversation-hub', () => ({
     conversationStore: {
-        readTurns: vi.fn((_id, _opts) => [
-            { role: 'user', content: 'a', created_at: Date.now() },
-            { role: 'llm_b', content: 'b', created_at: Date.now() },
-        ]),
-        countTurns: vi.fn(() => 2),
+        readTurns: conversationMocks.readTurns,
+        countTurns: conversationMocks.countTurns,
         listHubSessions: vi.fn(() => [
             { id: 'abc-123', status: 'active', title: 'Test Session', created_at: Date.now() },
         ]),
@@ -399,8 +567,6 @@ const {
     cmdSessionSdk,
     cmdClearShadow,
 } = await import('../../../../src/copilot/terminal/commands/session.js');
-const { conversationStore } = await import('#copilot/conversation-hub');
-const { llmBridgeClient } = await import('#copilot/channel');
 
 /**
  * @returns {{ println: import('vitest').Mock; output: () => string }}
@@ -429,15 +595,17 @@ describe('commands/session — sync commands', () => {
         altRuntime.status = 'waiting_for_input';
         altRuntime.pendingQuestion = null;
         altRuntime.pendingQuestionKind = null;
-        conversationStore.readTurns.mockReturnValue([
+        conversationMocks.readTurns.mockReturnValue([
             { role: 'user', content: 'a', created_at: Date.now() },
             { role: 'llm_b', content: 'b', created_at: Date.now() },
         ]);
-        conversationStore.countTurns.mockReturnValue(2);
-        llmBridgeClient.history = [
+        conversationMocks.countTurns.mockReturnValue(2);
+        channelMocks.history.splice(
+            0,
+            channelMocks.history.length,
             { role: 'user', content: 'hello world', timestamp: Date.now() },
             { role: 'assistant', content: 'hi', timestamp: Date.now() },
-        ];
+        );
     });
 
     it('cmdStatus imprime painel humano compacto por padrão', () => {
@@ -588,6 +756,7 @@ describe('commands/session — sync commands', () => {
             question: 'Responder default?',
             kind: 'question',
             allowFreeform: true,
+            resolve: () => true,
             askedAt: 1,
             protocolControlled: false,
         };
@@ -605,15 +774,15 @@ describe('commands/session — sync commands', () => {
 
     it('cmdNow full preserva detalhe operacional em painel humano', () => {
         const previousEnv = {
-            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
-            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
-            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
-            COPILOT_BYOK_API_KEY: process.env.COPILOT_BYOK_API_KEY,
+            COPILOT_BYOK_ENABLED: process.env['COPILOT_BYOK_ENABLED'],
+            COPILOT_BYOK_PROVIDER_PRESET: process.env['COPILOT_BYOK_PROVIDER_PRESET'],
+            COPILOT_BYOK_MODEL: process.env['COPILOT_BYOK_MODEL'],
+            COPILOT_BYOK_API_KEY: process.env['COPILOT_BYOK_API_KEY'],
         };
-        process.env.COPILOT_BYOK_ENABLED = 'true';
-        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'openrouter';
-        process.env.COPILOT_BYOK_MODEL = 'deepseek/deepseek-v4-flash:free';
-        process.env.COPILOT_BYOK_API_KEY = 'test-byok-key-that-must-not-render';
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'openrouter';
+        process.env['COPILOT_BYOK_MODEL'] = 'deepseek/deepseek-v4-flash:free';
+        process.env['COPILOT_BYOK_API_KEY'] = 'test-byok-key-that-must-not-render';
         const ctx = mockCtx();
         try {
             cmdNow({ hubSessionId: 'hub-1', injectPort: 3009, println: ctx.println }, 'full');
@@ -715,12 +884,12 @@ describe('commands/session — sync commands', () => {
     });
 
     it('cmdHistory omite turnos sem mensagem visível', () => {
-        conversationStore.readTurns.mockReturnValueOnce([
+        conversationMocks.readTurns.mockReturnValueOnce([
             { role: 'user', content: '   ', created_at: Date.now() - 2000 },
             { role: 'assistant', content: '\n\t', created_at: Date.now() - 1000 },
             { role: 'llm_b', content: 'mensagem real', created_at: Date.now() },
         ]);
-        conversationStore.countTurns.mockReturnValueOnce(3);
+        conversationMocks.countTurns.mockReturnValueOnce(3);
         const ctx = mockCtx();
 
         cmdHistory({ println: ctx.println }, 5);
@@ -748,8 +917,7 @@ describe('commands/session — sync commands', () => {
     it('cmdClear chama clearHistory', async () => {
         const ctx = mockCtx();
         cmdClear({ println: ctx.println });
-        const { llmBridgeClient } = await import('#copilot/channel');
-        expect(llmBridgeClient.clearHistory).toHaveBeenCalled();
+        expect(channelMocks.clearHistory).toHaveBeenCalled();
         expect(ctx.output()).toContain('memória local limpa');
         expect(ctx.output()).not.toContain('\x1b[');
     });
@@ -759,6 +927,7 @@ describe('commands/session — sync commands', () => {
             question: 'Responder default?',
             kind: 'question',
             allowFreeform: true,
+            resolve: () => true,
             askedAt: 1,
             protocolControlled: false,
         };
@@ -777,6 +946,7 @@ describe('commands/session — sync commands', () => {
             question: 'Responder alt?',
             kind: 'question',
             allowFreeform: true,
+            resolve: () => true,
             askedAt: 1,
             protocolControlled: false,
         };
@@ -795,6 +965,7 @@ describe('commands/session — sync commands', () => {
             question: 'Responder default?',
             kind: 'question',
             allowFreeform: true,
+            resolve: () => true,
             askedAt: 1,
             protocolControlled: false,
         };
@@ -825,6 +996,7 @@ describe('commands/session — sync commands', () => {
             question: 'READY: aguardando próxima mensagem',
             kind: 'ready',
             allowFreeform: true,
+            resolve: () => true,
             askedAt: 1,
             protocolControlled: true,
         };
@@ -859,8 +1031,8 @@ describe('commands/session — sync commands', () => {
     });
 
     it('cmdDbHistory vazio usa estado humano sem comando como label', () => {
-        conversationStore.readTurns.mockReturnValueOnce([]);
-        conversationStore.countTurns.mockReturnValueOnce(0);
+        conversationMocks.readTurns.mockReturnValueOnce([]);
+        conversationMocks.countTurns.mockReturnValueOnce(0);
         const ctx = mockCtx();
 
         cmdDbHistory({ hubSessionId: 'hub-1', println: ctx.println });
@@ -879,11 +1051,11 @@ describe('commands/session — sync commands', () => {
     });
 
     it('cmdDbHistory omite turnos persistidos sem mensagem visível', () => {
-        conversationStore.readTurns.mockReturnValueOnce([
+        conversationMocks.readTurns.mockReturnValueOnce([
             { role: 'user', content: '', created_at: Date.now() - 1000 },
             { role: 'llm_b', content: 'resposta persistida', created_at: Date.now() },
         ]);
-        conversationStore.countTurns.mockReturnValueOnce(2);
+        conversationMocks.countTurns.mockReturnValueOnce(2);
         const ctx = mockCtx();
 
         cmdDbHistory({ hubSessionId: 'hub-1', println: ctx.println });
@@ -927,7 +1099,7 @@ describe('commands/session — async commands', () => {
         scheduleTerminalSdkSessionBootSelection.mockResolvedValue({ ok: true, data: {}, error: null });
         deleteTerminalSdkSession.mockClear();
         readTerminalSseEventArchiveTail.mockClear();
-        readTerminalSseEventArchiveTail.mockResolvedValue({
+        readTerminalSseEventArchiveTail.mockResolvedValue(sseArchiveProjectionFixture(null, {
             entries: [],
             state: {
                 enabled: true,
@@ -952,7 +1124,7 @@ describe('commands/session — async commands', () => {
                 requestId: null,
                 hubSessionId: null,
             },
-        });
+        }));
     });
 
     it('cmdSessionSdk distingue inventário SDK de resume do hub e snapshots', async () => {
@@ -973,20 +1145,17 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk resume comandos SDK chamados no archive principal', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(sseArchiveProjectionFixture(null, {
             entries: [
-                {
-                    event: 'sdk.command.executed',
-                    payload: {
-                        commandName: 'terminal_status',
-                        localCommand: '/status',
-                        status: 'completed',
-                    },
-                },
+                sseArchiveEntryFixture('sdk.command.executed', {
+                    commandName: 'terminal_status',
+                    localCommand: '/status',
+                    status: 'completed',
+                }),
             ],
             state: { error: null },
             filters: {},
-        });
+        }));
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
 
@@ -997,7 +1166,7 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk respeita limite numérico e compacta previews longos', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
             currentSessionId: 'sdk-current',
             lastSessionId: 'sdk-last',
             foregroundSessionId: null,
@@ -1017,7 +1186,7 @@ describe('commands/session — async commands', () => {
                     isRemote: false,
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '1');
         expect(ctx.output()).toContain('sessão #1');
@@ -1040,16 +1209,26 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk pagina, filtra e mostra metadata local/session fs segura', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        const currentSessionFs = sessionFsFixture({
+            enabled: true,
+            sessionStatePath: '.copilot/session-state',
+            storageRoot: {
+                display: 'workspace:.copilot/sdk-session-fs',
+                withinWorkspace: true,
+                exists: true,
+            },
+            session: {
+                key: 'sdk-current',
+                display: 'workspace:.copilot/sdk-session-fs/sdk-current',
+                withinWorkspace: true,
+                exists: true,
+            },
+        });
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
             currentSessionId: 'sdk-current',
             lastSessionId: 'sdk-last',
             foregroundSessionId: null,
-            sessionFs: {
-                enabled: true,
-                sessionStatePath: '.copilot/session-state',
-                storageRoot: { display: 'workspace:.copilot/sdk-session-fs', exists: true },
-                session: { display: 'workspace:.copilot/sdk-session-fs/sdk-current', exists: true },
-            },
+            sessionFs: currentSessionFs,
             sessions: [
                 {
                     sessionId: 'sdk-first',
@@ -1069,15 +1248,10 @@ describe('commands/session — async commands', () => {
                         provider: { kind: 'byok', model: 'kilo-auto/free' },
                         boundary: { reason: 'provider-boundary: binding BYOK model mudou' },
                     },
-                    sessionFs: {
-                        enabled: true,
-                        sessionStatePath: '.copilot/session-state',
-                        storageRoot: { display: 'workspace:.copilot/sdk-session-fs', exists: true },
-                        session: { display: 'workspace:.copilot/sdk-session-fs/sdk-current', exists: true },
-                    },
+                    sessionFs: currentSessionFs,
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '1 offset=1 branch=main repo=owner/repo');
         expect(listTerminalSdkSessionInventory).toHaveBeenCalledWith(null, {
@@ -1118,7 +1292,7 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk apaga sessão persistida por índice fora da sessão viva', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
             currentSessionId: 'sdk-current',
             lastSessionId: 'sdk-current',
             foregroundSessionId: null,
@@ -1131,7 +1305,7 @@ describe('commands/session — async commands', () => {
                     isRemote: false,
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'delete #1');
         expect(deleteTerminalSdkSession).toHaveBeenCalledWith('sdk-old', null);
@@ -1150,7 +1324,7 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk marca resíduos de probes antigos sem esconder a sessão', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
             currentSessionId: 'sdk-current',
             lastSessionId: 'sdk-current',
             foregroundSessionId: null,
@@ -1163,7 +1337,7 @@ describe('commands/session — async commands', () => {
                     isRemote: false,
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
         expect(ctx.output()).not.toContain('sdk-probe');
@@ -1173,18 +1347,18 @@ describe('commands/session — async commands', () => {
 
     it('cmdSessionSdk expõe binding BYOK redigido e decisão do último boot SDK', async () => {
         const previousEnv = {
-            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
-            COPILOT_BYOK_PROFILE: process.env.COPILOT_BYOK_PROFILE,
-            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
-            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
-            GROQ_API_KEY: process.env.GROQ_API_KEY,
+            COPILOT_BYOK_ENABLED: process.env['COPILOT_BYOK_ENABLED'],
+            COPILOT_BYOK_PROFILE: process.env['COPILOT_BYOK_PROFILE'],
+            COPILOT_BYOK_PROVIDER_PRESET: process.env['COPILOT_BYOK_PROVIDER_PRESET'],
+            COPILOT_BYOK_MODEL: process.env['COPILOT_BYOK_MODEL'],
+            GROQ_API_KEY: process.env['GROQ_API_KEY'],
         };
-        process.env.COPILOT_BYOK_ENABLED = 'true';
-        delete process.env.COPILOT_BYOK_PROFILE;
-        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'groq';
-        process.env.COPILOT_BYOK_MODEL = 'qwen/qwen3-32b';
-        process.env.GROQ_API_KEY = 'test-session-sdk-groq-key-that-must-not-render';
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        delete process.env['COPILOT_BYOK_PROFILE'];
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'groq';
+        process.env['COPILOT_BYOK_MODEL'] = 'qwen/qwen3-32b';
+        process.env['GROQ_API_KEY'] = 'test-session-sdk-groq-key-that-must-not-render';
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
             currentSessionId: 'sdk-new',
             lastSessionId: 'sdk-new',
             foregroundSessionId: 'sdk-new',
@@ -1203,7 +1377,7 @@ describe('commands/session — async commands', () => {
                 reason: 'provider-boundary: binding BYOK model mudou',
             },
             sessions: [],
-        });
+        }));
         const ctx = mockCtx();
         try {
             await cmdSessionSdk({ println: ctx.println }, '');
@@ -1232,18 +1406,18 @@ describe('commands/session — async commands', () => {
 
     it('cmdSessionSdk exibe rota efetiva do Model Gateway compartilhado', async () => {
         const previousEnv = {
-            COPILOT_BYOK_ENABLED: process.env.COPILOT_BYOK_ENABLED,
-            COPILOT_BYOK_PROFILE: process.env.COPILOT_BYOK_PROFILE,
-            COPILOT_BYOK_PROVIDER_PRESET: process.env.COPILOT_BYOK_PROVIDER_PRESET,
-            COPILOT_BYOK_MODEL: process.env.COPILOT_BYOK_MODEL,
-            OLLAMA_CLOUD_API_KEY: process.env.OLLAMA_CLOUD_API_KEY,
+            COPILOT_BYOK_ENABLED: process.env['COPILOT_BYOK_ENABLED'],
+            COPILOT_BYOK_PROFILE: process.env['COPILOT_BYOK_PROFILE'],
+            COPILOT_BYOK_PROVIDER_PRESET: process.env['COPILOT_BYOK_PROVIDER_PRESET'],
+            COPILOT_BYOK_MODEL: process.env['COPILOT_BYOK_MODEL'],
+            OLLAMA_CLOUD_API_KEY: process.env['OLLAMA_CLOUD_API_KEY'],
         };
-        process.env.COPILOT_BYOK_ENABLED = 'true';
-        delete process.env.COPILOT_BYOK_PROFILE;
-        process.env.COPILOT_BYOK_PROVIDER_PRESET = 'ollama-cloud';
-        process.env.COPILOT_BYOK_MODEL = 'qwen3-coder-next';
-        process.env.OLLAMA_CLOUD_API_KEY = 'session-sdk-secret-that-must-not-render';
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        process.env['COPILOT_BYOK_ENABLED'] = 'true';
+        delete process.env['COPILOT_BYOK_PROFILE'];
+        process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'ollama-cloud';
+        process.env['COPILOT_BYOK_MODEL'] = 'qwen3-coder-next';
+        process.env['OLLAMA_CLOUD_API_KEY'] = 'session-sdk-secret-that-must-not-render';
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
             currentSessionId: 'sdk-current',
             lastSessionId: 'sdk-current',
             foregroundSessionId: 'sdk-current',
@@ -1254,7 +1428,7 @@ describe('commands/session — async commands', () => {
                 model: 'qwen3-coder-next',
             },
             sessions: [],
-        });
+        }));
         const ctx = mockCtx();
 
         try {
@@ -1275,7 +1449,7 @@ describe('commands/session — async commands', () => {
 
     it('cmdSessionSdkEvents resume lifecycle e commands pelo archive SSE canônico', async () => {
         readTerminalSseEventArchiveTail
-            .mockResolvedValueOnce({
+            .mockResolvedValueOnce(sseArchiveProjectionFixture('sdk.lifecycle', {
                 entries: [
                     {
                         schemaVersion: 1,
@@ -1327,8 +1501,8 @@ describe('commands/session — async commands', () => {
                     requestId: null,
                     hubSessionId: null,
                 },
-            })
-            .mockResolvedValueOnce({
+            }))
+            .mockResolvedValueOnce(sseArchiveProjectionFixture('sdk.command.executed', {
                 entries: [
                     {
                         schemaVersion: 1,
@@ -1372,7 +1546,7 @@ describe('commands/session — async commands', () => {
                     requestId: null,
                     hubSessionId: null,
                 },
-            });
+            }));
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'events 5');
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.lifecycle', limit: 5 });
@@ -1431,11 +1605,11 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk descreve erro do arquivo SSE sem termo archive cru', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(sseArchiveProjectionFixture(null, {
             entries: [],
             state: { error: 'falha de leitura' },
             filters: {},
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdSessionSdk({ println: ctx.println }, '2');
@@ -1445,33 +1619,14 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdkWaits explica estado vazio após resume silencioso', async () => {
-        const emptyProjection = (/** @type {string} */ event) => ({
-            entries: [],
-            state: {
-                enabled: true,
-                path: '/tmp/terminal-sse-events.jsonl',
-                error: null,
-                events: 0,
-                bytes: 0,
-                queueDepth: 0,
-                flushScheduled: false,
-                flushInFlight: false,
-                failedEvents: 0,
-                droppedEvents: 0,
-                lastEventId: 0,
-            },
-            filters: {
-                limit: 5,
-                event,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-        });
-        readTerminalSseEventArchiveTail.mockImplementation(({ event }) => Promise.resolve(emptyProjection(event)));
+        const emptyProjection = (/** @type {string | null} */ event) =>
+            sseArchiveProjectionFixture(event, {
+                state: { lastEventId: 0 },
+                filters: { limit: 5 },
+            });
+        readTerminalSseEventArchiveTail.mockImplementation((input = {}) =>
+            Promise.resolve(emptyProjection(input.event ?? null)),
+        );
 
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'waits 5');
@@ -1486,32 +1641,11 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdkWaits agrega ask_user, elicitation e permission pelo archive SSE canônico', async () => {
-        const emptyProjection = (/** @type {string} */ event) => ({
-            entries: [],
-            state: {
-                enabled: true,
-                path: '/tmp/terminal-sse-events.jsonl',
-                error: null,
-                events: 40,
-                bytes: 2048,
-                queueDepth: 0,
-                flushScheduled: false,
-                flushInFlight: false,
-                failedEvents: 0,
-                droppedEvents: 0,
-                lastEventId: 40,
-            },
-            filters: {
-                limit: 6,
-                event,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-        });
+        const emptyProjection = (/** @type {string | null} */ event) =>
+            sseArchiveProjectionFixture(event, {
+                state: { events: 40, bytes: 2048, lastEventId: 40 },
+                filters: { limit: 6 },
+            });
         readTerminalSseEventArchiveTail
             .mockResolvedValueOnce({
                 ...emptyProjection('user_input.requested'),

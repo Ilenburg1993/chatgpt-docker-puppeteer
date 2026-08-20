@@ -5,15 +5,15 @@ import {
 } from '../../../src/copilot/model-gateway/commands/index.js';
 
 const args = new Set(process.argv.slice(2));
-const optionValue = (name) => {
+const optionValue = (/** @type {string} */ name) => {
     const prefix = `${name}=`;
     const item = process.argv.slice(2).find((value) => value.startsWith(prefix));
     return item ? item.slice(prefix.length) : null;
 };
 
 const filters = {
-    surface: optionValue('--surface') ?? undefined,
-    phase: optionValue('--phase') ?? undefined,
+    ...(optionValue('--surface') ? { surface: optionValue('--surface') ?? '' } : {}),
+    ...(optionValue('--phase') ? { phase: optionValue('--phase') ?? '' } : {}),
 };
 
 if (args.has('--json')) {

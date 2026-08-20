@@ -4,21 +4,32 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { runCanonicalConnectorSmoke } from '#copilot/mcp/cloudflare/connector-smoke.js';
+import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
 
+/** @returns {Awaited<ReturnType<typeof import('../../../../src/copilot/mcp/cloudflare/cli-smoke.js').runCloudflareSmoke>>} */
 function healthyUnauthenticatedSmoke() {
     return {
         ok: true,
         connectorUrl: 'https://mcp.example.test/mcp',
-        timings: { totalMs: 20 },
+        protocolVersion: '2025-06-18',
+        authenticated: false,
+        authMode: 'oauth',
+        probePolicy: { attempts: 1, delayMs: 0 },
+        timings: {
+            strategy: 'parallel-health-resource-tools-then-auth-metadata',
+            discoveryParallelMs: 10,
+            authorizationServerMs: 5,
+            totalMs: 20,
+        },
         health: { ok: true, status: 200, error: null },
         oauth: {
             ok: true,
             protectedResource: { ok: true, status: 200, error: null },
             authorizationServer: { ok: true, status: 200, error: null },
         },
-        authChallenge: { ok: true, expected: true, status: 401, wwwAuthenticatePresent: true },
+        authChallenge: { ok: true, expected: true, status: 401, wwwAuthenticatePresent: true, reason: null },
         criticalTools: { ok: true, expected: ['repo_status'], missing: [], unknownExpected: [] },
-        tools: { ok: false, status: 401, toolCount: 0, toolNames: [] },
+        tools: { ok: false, status: 401, toolCount: 0, toolNames: [], error: undefined },
     };
 }
 
@@ -44,14 +55,33 @@ function healthyOauthSmoke() {
 }
 
 function testConfig() {
-    return /** @type {any} */ ({
-        publicMcpUrl: 'https://mcp.example.test/mcp',
-        smokeStateFile: '/virtual/connector-smoke.json',
+    return readCloudflareTunnelConfig({
+        COPILOT_MCP_CLOUDFLARE_MODE: 'named-permanent',
+        COPILOT_MCP_CLOUDFLARE_ZONE: 'example.com',
+        COPILOT_MCP_CLOUDFLARE_PUBLIC_HOSTNAME: 'mcp.example.com',
+        COPILOT_MCP_CLOUDFLARE_PUBLIC_URL: 'https://mcp.example.com/mcp',
+        COPILOT_MCP_ORIGIN_TRANSPORT: 'http',
+        COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'http://127.0.0.1:3008',
+        COPILOT_MCP_CLOUDFLARE_SMOKE_STATE_FILE: '/virtual/connector-smoke.json',
     });
+}
+
+/**
+ * @template T
+ * @param {readonly T[]} values
+ * @param {number} index
+ * @param {string} label
+ * @returns {T}
+ */
+function requireFixtureIndex(values, index, label) {
+    const value = values[index];
+    assert.notEqual(value, undefined, label);
+    return /** @type {T} */ (value);
 }
 
 describe('canonical connector smoke', () => {
     it('fails the canonical gate when authenticated OAuth fails even if the public challenge is healthy', async () => {
+        /** @type {Array<{ path: string; state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }>} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
@@ -66,32 +96,34 @@ describe('canonical connector smoke', () => {
                         authenticatedSse: { ok: false, status: 500 },
                     },
                 }),
-                writeState: async (path, state) => persisted.push({ path, state }),
+                writeState: async (path, state) => { persisted.push({ path, state }); },
             },
         });
 
-        assert.equal(report.ok, false);
-        assert.equal(report.authenticatedOAuthSmoke.ok, false);
+        assert.equal(report['ok'], false);
+        assert.equal(report['authenticatedOAuthSmoke'].ok, false);
         assert.equal(persisted.length, 1);
-        assert.equal(persisted[0].state.ok, false);
-        assert.equal(persisted[0].state.toolsList.ok, false);
+        const persistedSmoke = requireFixtureIndex(persisted, 0, 'persisted smoke');
+        assert.equal(persistedSmoke.state.ok, false);
+        assert.equal(persistedSmoke.state.toolsList.ok, false);
     });
 
     it('persists authenticated tool-registry evidence instead of the expected unauthenticated 401 tools response', async () => {
+        /** @type {Array<{ path: string; state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }>} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
             deps: {
                 runUnauthenticatedSmoke: async () => healthyUnauthenticatedSmoke(),
                 runOauthSmoke: async () => healthyOauthSmoke(),
-                writeState: async (path, state) => persisted.push({ path, state }),
+                writeState: async (path, state) => { persisted.push({ path, state }); },
             },
         });
 
-        assert.equal(report.ok, true);
-        assert.equal(report.authenticatedOAuthSmoke.authenticatedToolsList.tools, 116);
+        assert.equal(report['ok'], true);
+        assert.equal(report.authenticatedOAuthSmoke.authenticatedToolsList?.tools, 116);
         assert.equal(persisted.length, 1);
-        assert.deepEqual(persisted[0].state.toolsList, {
+        assert.deepEqual(requireFixtureIndex(persisted, 0, 'persisted smoke').state.toolsList, {
             ok: true,
             status: 200,
             tools: 116,
@@ -108,7 +140,8 @@ describe('canonical connector smoke', () => {
     it('starts public and authenticated smoke branches concurrently', async () => {
         let unauthStarted = false;
         let oauthStarted = false;
-        let release;
+        /** @type {(value?: void | PromiseLike<void>) => void} */
+        let release = () => {};
         const barrier = new Promise((resolve) => {
             release = resolve;
         });
@@ -137,7 +170,7 @@ describe('canonical connector smoke', () => {
 
         assert.equal(unauthStarted, true);
         assert.equal(oauthStarted, true);
-        assert.equal(report.ok, true);
-        assert.equal(report.orchestrationTimings.strategy, 'parallel-unauthenticated-and-oauth');
+        assert.equal(report['ok'], true);
+        assert.equal(report['orchestrationTimings'].strategy, 'parallel-unauthenticated-and-oauth');
     });
 });

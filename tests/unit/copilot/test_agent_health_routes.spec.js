@@ -867,20 +867,20 @@ describe('agent health routes', () => {
         );
 
         assert.equal(result.ok, true);
-        assert.equal(result.details.keepaliveRunning, false);
-        assert.equal(result.details.quotaMonitorRunning, true);
-        assert.equal(result.details.pendingQuestionShadow, true);
-        assert.equal(result.details.pendingQuestionShadowKind, 'ready');
-        assert.equal(result.details.pendingQuestionShadowExpired, true);
-        assert.equal(result.details.pendingQuestionShadowAgeMs, 90_000);
-        assert.equal(result.details.recommendedAction, 'restart_keepalive');
-        assert.deepEqual(result.details.riskFlags, ['io.keepalive_stopped']);
-        assert.equal(result.details.bootDegradedSteps, 0);
+        assert.equal(result.details['keepaliveRunning'], false);
+        assert.equal(result.details['quotaMonitorRunning'], true);
+        assert.equal(result.details['pendingQuestionShadow'], true);
+        assert.equal(result.details['pendingQuestionShadowKind'], 'ready');
+        assert.equal(result.details['pendingQuestionShadowExpired'], true);
+        assert.equal(result.details['pendingQuestionShadowAgeMs'], 90_000);
+        assert.equal(result.details['recommendedAction'], 'restart_keepalive');
+        assert.deepEqual(result.details['riskFlags'], ['io.keepalive_stopped']);
+        assert.equal(result.details['bootDegradedSteps'], 0);
         assert.equal(
-            /** @type {{ allCoreResourcesAvailable?: boolean }} */ (result.details.sdkResources)
+            /** @type {{ allCoreResourcesAvailable?: boolean }} */ (result.details['sdkResources'])
                 .allCoreResourcesAvailable,
             true,
         );
-        assert.deepEqual(result.details.issues, ['io.keepalive_stopped']);
+        assert.deepEqual(result.details['issues'], ['io.keepalive_stopped']);
     });
 });

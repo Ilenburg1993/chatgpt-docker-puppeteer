@@ -30,7 +30,7 @@ describe('copilot-api stream runtime targeting', () => {
     it('GET /stream retorna 404 quando runtimeId explícito não existe', async () => {
         const agent = /** @type {any} */ (new EventEmitter());
         const app = createApp((req) => {
-            const requested = typeof req.query.runtimeId === 'string' ? req.query.runtimeId : null;
+            const requested = typeof req.query['runtimeId'] === 'string' ? req.query['runtimeId'] : null;
             if (requested === 'missing') {
                 return {
                     agent,
@@ -61,7 +61,7 @@ describe('copilot-api stream runtime targeting', () => {
     it('GET /stream/tasks retorna 404 quando runtimeId explícito não existe', async () => {
         const agent = /** @type {any} */ (new EventEmitter());
         const app = createApp((req) => {
-            const requested = typeof req.query.runtimeId === 'string' ? req.query.runtimeId : null;
+            const requested = typeof req.query['runtimeId'] === 'string' ? req.query['runtimeId'] : null;
             if (requested === 'missing') {
                 return {
                     agent,

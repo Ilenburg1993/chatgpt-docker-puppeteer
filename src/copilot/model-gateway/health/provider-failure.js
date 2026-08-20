@@ -30,6 +30,40 @@ import { toError } from '#copilot/core';
  * @property {Record<string, string | number>} limitHeaders
  */
 
+const BYOK_PROVIDER_FAILURE_KINDS = new Set([
+    'credits',
+    'rate-limit',
+    'auth',
+    'model-or-route',
+    'capability-unsupported',
+    'invalid-request',
+    'timeout',
+    'network',
+    'upstream',
+    'unknown',
+]);
+
+/**
+ * Validates an already-classified provider failure, e.g. one read back from SQLite/JSON.
+ *
+ * @param {unknown} value
+ * @returns {value is ByokProviderFailure}
+ */
+export function isByokProviderFailure(value) {
+    if (!isRecord(value)) return false;
+    if (typeof value['kind'] !== 'string' || !BYOK_PROVIDER_FAILURE_KINDS.has(value['kind'])) return false;
+    if (typeof value['message'] !== 'string') return false;
+    if (value['statusCode'] !== null && typeof value['statusCode'] !== 'number') return false;
+    if (typeof value['errorContext'] !== 'string') return false;
+    if (typeof value['operatorLabel'] !== 'string') return false;
+    if (typeof value['operatorAction'] !== 'string') return false;
+    if (typeof value['external'] !== 'boolean') return false;
+    if (value['retryAfterSeconds'] !== null && typeof value['retryAfterSeconds'] !== 'number') return false;
+    if (value['resetAt'] !== null && typeof value['resetAt'] !== 'string') return false;
+    if (!isRecord(value['limitHeaders'])) return false;
+    return Object.values(value['limitHeaders']).every((item) => typeof item === 'string' || typeof item === 'number');
+}
+
 /**
  * @param {unknown} error
  * @returns {number | null}

@@ -19,25 +19,22 @@ import EventEmitter from 'node:events';
  */
 const RESOLVER_CONFIG = {
     /** Cache TTL para protocolos (ms) - Default: 60s */
-    CACHE_TTL_MS: parseInt(
-        process.env.RESOLVER_CACHE_TTL || String(/** @type {any} */ (CONFIG)?.all?.INPUT_CACHE_TTL || '60000'),
-        10,
-    ),
+    CACHE_TTL_MS: parseInt(process.env['RESOLVER_CACHE_TTL'] || String(CONFIG.get('INPUT_CACHE_TTL', 60000)), 10),
 
     /** Timeout para resolve completo (ms) - Default: 15s */
-    RESOLVE_TIMEOUT_MS: parseInt(process.env.RESOLVER_TIMEOUT || '15000', 10),
+    RESOLVE_TIMEOUT_MS: parseInt(process.env['RESOLVER_TIMEOUT'] || '15000', 10),
 
     /** Timeout para validação de interatividade (ms) - Default: 5s */
-    VALIDATION_TIMEOUT_MS: parseInt(process.env.RESOLVER_VALIDATION_TIMEOUT || '5000', 10),
+    VALIDATION_TIMEOUT_MS: parseInt(process.env['RESOLVER_VALIDATION_TIMEOUT'] || '5000', 10),
 
     /** Máximo de retries em fallback heurístico - Default: 2 */
-    MAX_HEURISTIC_RETRIES: parseInt(process.env.RESOLVER_MAX_RETRIES || '2', 10),
+    MAX_HEURISTIC_RETRIES: parseInt(process.env['RESOLVER_MAX_RETRIES'] || '2', 10),
 
     /** Máximo de protocolos em cache (multi-domain) - Default: 10 */
-    MAX_CACHE_SIZE: parseInt(process.env.RESOLVER_CACHE_SIZE || '10', 10),
+    MAX_CACHE_SIZE: parseInt(process.env['RESOLVER_CACHE_SIZE'] || '10', 10),
 
     /** Confidence threshold para cache (0-1) - Default: 0.7 */
-    MIN_CONFIDENCE_THRESHOLD: parseFloat(process.env.RESOLVER_MIN_CONFIDENCE || '0.7'),
+    MIN_CONFIDENCE_THRESHOLD: parseFloat(process.env['RESOLVER_MIN_CONFIDENCE'] || '0.7'),
 };
 
 /**
@@ -313,7 +310,7 @@ class InputResolver extends EventEmitter {
             const dnaCandidate = await this._tryKnownSelectors(inputBox);
             if (dnaCandidate) {
                 this.stats.dnaMatches++;
-                return this._finalizeDiscovery(dnaCandidate, 'DNA_MATCH', dnaRules, 1.0);
+                return this._finalizeDiscovery(dnaCandidate, 'DNA_MATCH', 1.0);
             }
         }
 
@@ -334,7 +331,6 @@ class InputResolver extends EventEmitter {
                     return this._finalizeDiscovery(
                         heuristicResult.protocol,
                         'HEURISTIC_MATCH',
-                        dnaRules,
                         heuristicResult.confidence || 0.8,
                     );
                 }
@@ -418,11 +414,10 @@ class InputResolver extends EventEmitter {
      * @fires RESOLVER_EVENTS.RESOLUTION_COMPLETED
      * @param {any} protocol - Protocolo resolvido
      * @param {string} source - Fonte da resolução ('DNA_MATCH' ou 'HEURISTIC_MATCH')
-     * @param {object} dnaRules - Regras DNA do domínio
      * @param {number} [confidence=1.0] - Nível de confiança (0-1). Default is `1.0`
      * @returns {Promise<any>} Protocolo final com sendButton
      */
-    async _finalizeDiscovery(protocol, source, dnaRules, confidence = 1.0) {
+    async _finalizeDiscovery(protocol, source, confidence = 1.0) {
         const domain = this.driver.currentDomain;
         const correlationId = this.driver.correlationId;
 

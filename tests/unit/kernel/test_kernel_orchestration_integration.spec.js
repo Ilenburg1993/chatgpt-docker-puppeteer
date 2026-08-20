@@ -38,6 +38,7 @@ class MockNERV extends EventEmitter {
         this.emittedEvents.push(envelope);
     }
 
+    /** @override */
     emit(/** @type {any} */ actionCode, /** @type {any} */ payload) {
         return super.emit(actionCode, payload);
     }
@@ -320,12 +321,18 @@ describe('TaskExecutionOrchestrator (standalone)', () => {
         // Mock simplificado do nervBridge
         nervBridge = {
             beforeTaskExecution: async (/** @type {any} */ task) => task,
-            afterTaskExecution: async (/** @type {any} */ task, /** @type {any} */ result) => ({
+            afterTaskExecution: async (
+                /** @type {Record<string, unknown>} */ task,
+                /** @type {unknown} */ _result,
+            ) => ({
                 action: 'DONE',
                 task,
                 feedback: null,
             }),
-            processOrchestrationDecision: async (/** @type {any} */ decision, /** @type {any} */ correlationId) => {},
+            processOrchestrationDecision: async (
+                /** @type {unknown} */ _decision,
+                /** @type {string} */ _correlationId,
+            ) => {},
             emitCommand: (/** @type {any} */ params) => nerv.emitCommand(params),
             emitEvent: (/** @type {any} */ params) => nerv.emitEvent(params),
         };

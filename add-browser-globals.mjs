@@ -34,15 +34,15 @@ for (const file of files) {
         let insertIndex = 0;
 
         // Skip shebang
-        if (lines[0].startsWith('#!')) insertIndex = 1;
+        if (lines[0]?.startsWith('#!')) insertIndex = 1;
 
         // Skip existing comments at top
         while (
             insertIndex < lines.length &&
-            (lines[insertIndex].trim().startsWith('//') ||
-                lines[insertIndex].trim().startsWith('/*') ||
-                lines[insertIndex].trim().startsWith('*') ||
-                lines[insertIndex].trim() === '')
+            (lines[insertIndex]?.trim().startsWith('//') ||
+                lines[insertIndex]?.trim().startsWith('/*') ||
+                lines[insertIndex]?.trim().startsWith('*') ||
+                lines[insertIndex]?.trim() === '')
         ) {
             insertIndex++;
         }
@@ -53,7 +53,7 @@ for (const file of files) {
         fs.writeFileSync(file, lines.join('\n'));
         console.log(`✅ ${file}: global declaration added`);
     } catch (err) {
-        console.error(`❌ ${file}: ${err.message}`);
+        console.error(`❌ ${file}: ${err instanceof Error ? err.message : String(err)}`);
     }
 }
 

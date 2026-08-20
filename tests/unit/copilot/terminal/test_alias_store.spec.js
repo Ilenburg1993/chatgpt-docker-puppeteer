@@ -111,8 +111,8 @@ describe('alias-store setAlias', () => {
         await flushAliasPersistence();
 
         expect(writeFileAtomicTrusted).toHaveBeenCalledTimes(2);
-        const firstSnapshot = String(writeFileAtomicTrusted.mock.calls[0]?.[1]);
-        const secondSnapshot = String(writeFileAtomicTrusted.mock.calls[1]?.[1]);
+        const firstSnapshot = String(/** @type {unknown[]} */ (writeFileAtomicTrusted.mock.calls[0] ?? [])[1]);
+        const secondSnapshot = String(/** @type {unknown[]} */ (writeFileAtomicTrusted.mock.calls[1] ?? [])[1]);
         expect(firstSnapshot).toContain('/first');
         expect(firstSnapshot).not.toContain('/second');
         expect(secondSnapshot).toContain('/first');

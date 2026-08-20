@@ -3,7 +3,7 @@
 
 import { createOllamaHostSupervisor } from '../src/inference_gateway/ollama_host_supervisor.js';
 
-const enabled = String(process.env.OLLAMA_SUPERVISOR_ENABLED || 'false').toLowerCase() === 'true';
+const enabled = String(process.env['OLLAMA_SUPERVISOR_ENABLED'] || 'false').toLowerCase() === 'true';
 
 if (!enabled) {
     console.log('[ollama-host-supervisor] disabled (OLLAMA_SUPERVISOR_ENABLED=false)');

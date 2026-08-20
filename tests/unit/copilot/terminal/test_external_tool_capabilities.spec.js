@@ -15,6 +15,7 @@ import {
     terminalPreviewSummaryRole,
 } from '../../../../src/copilot/terminal/capabilities/index.js';
 
+/** @param {string} command @param {string} [body] */
 function makeExecutableFixture(command, body = '#!/bin/sh\nprintf "%s\\n" "$0 1.2.3"\n') {
     const dir = join(tmpdir(), `terminal-tool-${command}-${process.pid}-${Math.random().toString(16).slice(2)}`);
     mkdirSync(dir, { recursive: true });

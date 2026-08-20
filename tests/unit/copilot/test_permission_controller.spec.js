@@ -29,13 +29,13 @@ describe.skip('PermissionController › análise estrutural (G2-DX-12/13/15)', a
     });
 
     it('modo padrão deve ser configurável via AGENT_PERMISSION_MODE', () => {
-        assert.ok(src.includes('AGENT_PERMISSION_MODE'), 'deve usar process.env.AGENT_PERMISSION_MODE como default');
+        assert.ok(src.includes('AGENT_PERMISSION_MODE'), "deve usar process.env['AGENT_PERMISSION_MODE'] como default");
     });
 
     it('lista denyShell deve ser configurável via AGENT_DENY_SHELL_TOOLS', () => {
         assert.ok(
             src.includes('AGENT_DENY_SHELL_TOOLS'),
-            'deve usar process.env.AGENT_DENY_SHELL_TOOLS para lista shell deny',
+            "deve usar process.env['AGENT_DENY_SHELL_TOOLS'] para lista shell deny",
         );
     });
 
@@ -54,7 +54,7 @@ describe.skip('PermissionController › análise estrutural (G2-DX-12/13/15)', a
 describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
     /** @type {import('#copilot/hooks/permission-controller').PermissionController} */
     let ctrl;
-    /** @type {import('#copilot/hooks/permission-controller')} */
+    /** @type {typeof import('#copilot/hooks/permission-controller')} */
     let mod;
 
     beforeAll(async () => {
@@ -92,7 +92,7 @@ describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
         let notified = null;
         const { PermissionController } = mod;
         const c2 = new PermissionController({
-            onModeChanged: (m) => {
+            onModeChanged: (/** @type {Parameters<InstanceType<typeof import('../../../src/copilot/hooks/permission-controller.js').PermissionController>['setMode']>[0]} */ m) => {
                 notified = m;
             },
         });

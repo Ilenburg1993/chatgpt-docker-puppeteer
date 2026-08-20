@@ -30,11 +30,11 @@ describe('MCP stateful env manager', () => {
         assert.equal(JSON.stringify(first).includes(String(secretLine).split('=').slice(1).join('=')), false);
 
         const env = buildStatefulProcessEnv(testEnvPath);
-        assert.equal(env.COPILOT_MCP_HTTP_STATEFUL_SESSIONS, 'true');
-        assert.equal(env.COPILOT_MCP_HTTP_STATELESS_COMPAT, 'false');
-        assert.equal(env.COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT, 'true');
-        assert.equal(env.COPILOT_MCP_HTTP_MAX_SESSIONS, '256');
-        assert.equal(typeof env.COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET, 'string');
+        assert.equal(env['COPILOT_MCP_HTTP_STATEFUL_SESSIONS'], 'true');
+        assert.equal(env['COPILOT_MCP_HTTP_STATELESS_COMPAT'], 'false');
+        assert.equal(env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'], 'true');
+        assert.equal(env['COPILOT_MCP_HTTP_MAX_SESSIONS'], '256');
+        assert.equal(typeof env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'], 'string');
     });
 
     it('upgrades an existing low session limit without rotating the secret', async () => {
@@ -59,6 +59,6 @@ describe('MCP stateful env manager', () => {
         assert.equal(text.includes(stableSecret), true);
         assert.equal(text.includes('COPILOT_MCP_HTTP_MAX_SESSIONS=256'), true);
         assert.equal(statSync(absoluteTestEnvPath).mode & 0o777, 0o600);
-        assert.equal(env.COPILOT_MCP_HTTP_MAX_SESSIONS, '256');
+        assert.equal(env['COPILOT_MCP_HTTP_MAX_SESSIONS'], '256');
     });
 });

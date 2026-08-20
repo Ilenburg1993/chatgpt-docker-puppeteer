@@ -1,4 +1,5 @@
-<script setup>
+<script setup lang="ts">
+import type { BadgeVariant } from '@/types/dashboard';
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -17,10 +18,10 @@ const router = useRouter();
 const missions = useMissionsVNextStore();
 const tasks = useTasksVNextStore();
 
-const missionId = computed(() => String(route.params.id || ''));
+const missionId = computed(() => String(route.params['id'] || ''));
 
 const loading = ref(false);
-const error = ref(null);
+const error = ref<string | null>(null);
 const tab = ref('resumo'); // resumo|tasks|propostas|grafo|eventos|policy|feedback
 const commandReason = ref('');
 
@@ -83,7 +84,7 @@ const progressPercent = computed(() => {
     return null;
 });
 
-function resolveReason(defaultReason, errorMessage) {
+function resolveReason(defaultReason: string, errorMessage: string) {
     const typed = String(commandReason.value || '').trim();
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
@@ -98,7 +99,7 @@ function resolveReason(defaultReason, errorMessage) {
     return requireReason('', errorMessage);
 }
 
-function statusVariant(status) {
+function statusVariant(status: string | undefined): BadgeVariant {
     const s = String(status || '').toUpperCase();
     if (s === 'RUNNING') return 'info';
     if (s === 'PAUSED') return 'warning';
@@ -130,8 +131,8 @@ async function loadAll() {
 
         policyAutonomy.value = mission.value?.autonomy_mode || 'USER_ONLY';
         policyText.value = JSON.stringify(mission.value?.policy || {}, null, 2);
-    } catch (err) {
-        error.value = err?.message || String(err);
+    } catch (err: unknown) {
+        error.value = err instanceof Error ? err.message : String(err);
     } finally {
         loading.value = false;
     }
@@ -225,8 +226,8 @@ async function savePolicy() {
     await loadAll();
 }
 
-const selectedProposalIds = ref(new Set());
-function toggleProposal(id) {
+const selectedProposalIds = ref(new Set<string>());
+function toggleProposal(id: string) {
     const set = selectedProposalIds.value;
     if (set.has(id)) set.delete(id);
     else set.add(id);
@@ -258,8 +259,8 @@ async function bulkRejectProposals() {
         await missions.rejectProposals(missionId.value, { task_ids: ids });
         selectedProposalIds.value = new Set();
         await loadAll();
-    } catch (err) {
-        alert(`Erro ao rejeitar proposals: ${err?.response?.data?.error || err?.message || String(err)}`);
+    } catch (err: unknown) {
+        alert(`Erro ao rejeitar proposals: ${err instanceof Error ? err.message : String(err)}`);
     }
 }
 
@@ -273,8 +274,8 @@ async function suggestTasksFromLLM() {
         });
         alert(`Planner task criada: ${res?.task_id || 'ok'}. Aguarde execução e recarregue para ver proposals.`);
         await loadAll();
-    } catch (err) {
-        alert(`Erro ao sugerir tasks: ${err?.response?.data?.error || err?.message || String(err)}`);
+    } catch (err: unknown) {
+        alert(`Erro ao sugerir tasks: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
         suggestingTasks.value = false;
     }
@@ -288,8 +289,8 @@ async function sendFeedback() {
         await missions.addFeedback(missionId.value, fb);
         feedbackText.value = '';
         await loadAll();
-    } catch (err) {
-        alert(`Erro ao enviar feedback: ${err?.response?.data?.error || err?.message || String(err)}`);
+    } catch (err: unknown) {
+        alert(`Erro ao enviar feedback: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
         sendingFeedback.value = false;
     }
@@ -298,7 +299,7 @@ async function sendFeedback() {
 const graphNodes = computed(() => {
     const list = graph.value?.tasks || [];
     return list.map((t) => ({
-        id: t.id,
+        id: String(t.id || ''),
         label: `${t.id}\n${t.unified_status} · ${t.stage}`,
         title: t.spec_user_message_preview || '',
     }));
@@ -347,7 +348,8 @@ async function createTaskInMission() {
     }
 }
 
-async function quickTaskAction(taskId, action) {
+async function quickTaskAction(taskId: string | undefined, action: string) {
+    if (!taskId) return;
     const reason = resolveReason(
         `Ação ${String(action).toUpperCase()} na task ${taskId}`,
         'Motivo obrigatório para comando de task.',
@@ -748,8 +750,8 @@ watch(missionId, () => void loadAll());
                             <input
                                 type="checkbox"
                                 class="mt-1"
-                                :checked="selectedProposalIds.has(t.id)"
-                                @change="toggleProposal(t.id)"
+                                :checked="selectedProposalIds.has(String(t.id || ''))"
+                                @change="toggleProposal(String(t.id || ''))"
                             />
                             <div class="min-w-0 flex-1 cursor-pointer" @click="router.push(`/tasks/${t.id}`)">
                                 <div class="text-sm font-mono text-slate-200 truncate">{{ t.id }}</div>
@@ -778,7 +780,7 @@ watch(missionId, () => void loadAll());
                             <div class="text-xs text-slate-400 font-mono truncate">
                                 #{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}
                             </div>
-                            <div class="text-xs text-slate-500">{{ new Date(e.ts_ms).toLocaleString() }}</div>
+                            <div class="text-xs text-slate-500">{{ new Date(Number(e.ts_ms || 0)).toLocaleString() }}</div>
                         </div>
                         <div class="text-sm text-slate-200 font-semibold">{{ e.event_type }}</div>
                         <pre
@@ -860,7 +862,7 @@ watch(missionId, () => void loadAll());
                             :key="i"
                             class="p-3 rounded-lg bg-slate-900/40 border border-slate-800"
                         >
-                            <div class="text-xs text-slate-500 mb-1">{{ new Date(fb.ts_ms).toLocaleString() }}</div>
+                            <div class="text-xs text-slate-500 mb-1">{{ new Date(Number(fb.ts_ms || 0)).toLocaleString() }}</div>
                             <div class="text-sm text-slate-200 whitespace-pre-wrap">{{ fb.text }}</div>
                         </div>
                     </div>

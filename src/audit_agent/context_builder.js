@@ -99,7 +99,7 @@ function asRecord(value) {
  */
 function getErrorMessage(error) {
     const errorData = asRecord(error);
-    const message = errorData?.message;
+    const message = errorData?.['message'];
     return typeof message === 'string' ? message : String(error);
 }
 
@@ -119,9 +119,9 @@ function getExecErrorOutput(error, field) {
  * @returns {Record<string, unknown> | null}
  */
 function getStructuredContentData(json) {
-    const result = asRecord(json?.result);
-    const structuredContent = asRecord(result?.structuredContent);
-    return asRecord(structuredContent?.data);
+    const result = asRecord(json?.['result']);
+    const structuredContent = asRecord(result?.['structuredContent']);
+    return asRecord(structuredContent?.['data']);
 }
 
 /**
@@ -138,8 +138,8 @@ function parseJsonSafe(text, fallback = null) {
 }
 
 function getServerBaseUrl() {
-    const host = process.env.DASHBOARD_API_HOST || process.env.SERVER_HOST || '127.0.0.1';
-    const port = Number(process.env.PORT || 3008);
+    const host = process.env['DASHBOARD_API_HOST'] || process.env['SERVER_HOST'] || '127.0.0.1';
+    const port = Number(process.env['PORT'] || 3008);
     return `http://${host}:${port}`;
 }
 
@@ -152,7 +152,7 @@ async function runNodeScript(scriptArgs, timeoutMs = 10000) {
     try {
         /** @type {Record<string, string | undefined>} */
         const childEnv = { ...process.env, FORCE_COLOR: '0' };
-        delete childEnv.NO_COLOR;
+        delete childEnv['NO_COLOR'];
         const { stdout, stderr } = await execFile('npm', scriptArgs, {
             timeout: timeoutMs,
             maxBuffer: 2 * 1024 * 1024,
@@ -171,8 +171,8 @@ async function runNodeScript(scriptArgs, timeoutMs = 10000) {
 }
 
 async function probeInferenceGateway() {
-    const host = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-    const port = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+    const host = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+    const port = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
     const baseUrl = `http://${host}:${port}`;
     try {
         const [healthRes, modelsRes] = await Promise.all([
@@ -186,7 +186,7 @@ async function probeInferenceGateway() {
         ]);
         const health = parseJsonSafe(await healthRes.text(), null);
         const models = asRecord(parseJsonSafe(await modelsRes.text(), null));
-        const modelEntries = models && Array.isArray(models.models) ? models.models : null;
+        const modelEntries = models && Array.isArray(models['models']) ? models['models'] : null;
         return {
             ok: healthRes.ok,
             status: healthRes.status,
@@ -272,7 +272,7 @@ async function callMcpTool(name, args, options = {}) {
         const text = await res.text();
         const json = asRecord(parseJsonSafe(text, null));
         return {
-            ok: res.ok && !json?.error,
+            ok: res.ok && !json?.['error'],
             status: res.status,
             json,
             text,
@@ -298,13 +298,14 @@ async function collectMcpSemanticContext(job, callToolOverride) {
     const call = callToolOverride || callMcpTool;
 
     const scope = asRecord(job?.scope_json) || {};
-    const filePath = String(scope.filePath || scope.file_path || 'src/main.js');
-    const line = Math.max(1, Number(scope.line || 1));
-    const character = Math.max(1, Number(scope.character || 1));
-    const query = String(scope.query || scope.rag_query || 'AUDIT_AGENT');
+    const filePath = String(scope['filePath'] || scope['file_path'] || 'src/main.js');
+    const line = Math.max(1, Number(scope['line'] || 1));
+    const character = Math.max(1, Number(scope['character'] || 1));
+    const query = String(scope['query'] || scope['rag_query'] || 'AUDIT_AGENT');
+    const lspEnabled = String(process.env['LSP_ENABLED'] || 'false').toLowerCase() === 'true';
     const mcpBudget = Math.max(
         1,
-        Math.min(Number(scope.mcp_budget || process.env.AUDIT_AGENT_CONTEXT_MCP_BUDGET || 5) || 5, 8),
+        Math.min(Number(scope['mcp_budget'] || process.env['AUDIT_AGENT_CONTEXT_MCP_BUDGET'] || 5) || 5, 8),
     );
     let budgetUsed = 0;
 
@@ -314,9 +315,15 @@ async function collectMcpSemanticContext(job, callToolOverride) {
     };
 
     spend();
-    spend();
     const [lspDiagnostics, ragSearch] = await Promise.all([
-        call('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 }),
+        lspEnabled
+            ? (spend(), call('lsp_diagnostics', { filePath, maxResults: 20 }, { timeoutMs: 5000, id: 201 }))
+            : Promise.resolve({
+                  ok: true,
+                  status: null,
+                  json: null,
+                  text: '',
+              }),
         call('rag_search', { query, topK: 2, mode: 'auto', includeDiagnostics: true }, { timeoutMs: 8000, id: 202 }),
     ]);
 
@@ -326,7 +333,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
     // Optional targeted definition probe when diagnostics path is usable.
     /** @type {McpToolCallResult | null} */
     let lspDefinition = null;
-    if (lspDiagnostics.ok) {
+    if (lspEnabled && lspDiagnostics.ok) {
         const defKey = _cacheKey('lsp_definition', filePath, line, character);
         if (_mcpLspCache.has(defKey)) {
             // cache hit, no budget spent
@@ -348,9 +355,9 @@ async function collectMcpSemanticContext(job, callToolOverride) {
 
     /** @type {McpToolCallResult | null} */
     let ragExpand = null;
-    const ragResults = ragData && Array.isArray(ragData.results) ? ragData.results : null;
+    const ragResults = ragData && Array.isArray(ragData['results']) ? ragData['results'] : null;
     const firstChunk = asRecord(ragResults?.[0]);
-    const firstChunkId = firstChunk?.chunk_id || null;
+    const firstChunkId = firstChunk?.['chunk_id'] || null;
     if (ragSearch.ok && firstChunkId && canSpend()) {
         spend();
         ragExpand = await call(
@@ -363,7 +370,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
 
     /** @type {McpToolCallResult | null} */
     let lspReferences = null;
-    if (lspDefinition?.ok) {
+    if (lspEnabled && lspDefinition?.ok) {
         const refKey = _cacheKey('lsp_references', filePath, line, character);
         if (_mcpLspCache.has(refKey)) {
             lspReferences = _mcpLspCache.get(refKey) || null;
@@ -384,7 +391,7 @@ async function collectMcpSemanticContext(job, callToolOverride) {
 
     /** @type {McpToolCallResult | null} */
     let lspDocumentSymbols = null;
-    if (canSpend()) {
+    if (lspEnabled && canSpend()) {
         spend();
         lspDocumentSymbols = await call(
             'lsp_document_symbols',
@@ -399,42 +406,44 @@ async function collectMcpSemanticContext(job, callToolOverride) {
             lsp_diagnostics: {
                 ok: lspDiagnostics.ok,
                 status: lspDiagnostics.status,
-                diagnostics_count: Array.isArray(lspData?.diagnostics) ? lspData.diagnostics.length : null,
+                skipped: !lspEnabled,
+                disabled_by_policy: !lspEnabled,
+                diagnostics_count: Array.isArray(lspData?.['diagnostics']) ? lspData['diagnostics'].length : null,
             },
             lsp_definition: lspDefinition
                 ? {
                       ok: lspDefinition.ok,
                       status: lspDefinition.status,
-                      locations_count: Array.isArray(defData?.locations) ? defData.locations.length : null,
+                      locations_count: Array.isArray(defData?.['locations']) ? defData['locations'].length : null,
                   }
                 : { ok: false, status: null, skipped: true },
             rag_search: {
                 ok: ragSearch.ok,
                 status: ragSearch.status,
-                backend: ragData?.backend || null,
-                degraded: ragData?.degraded ?? null,
-                results_count: Array.isArray(ragData?.results) ? ragData.results.length : null,
+                backend: ragData?.['backend'] || null,
+                degraded: ragData?.['degraded'] ?? null,
+                results_count: Array.isArray(ragData?.['results']) ? ragData['results'].length : null,
             },
             rag_expand: ragExpand
                 ? {
                       ok: ragExpand.ok,
                       status: ragExpand.status,
                       chunk_id: firstChunkId,
-                      content_present: Boolean(ragExpandData?.content || ragExpandData?.lines),
+                      content_present: Boolean(ragExpandData?.['content'] || ragExpandData?.['lines']),
                   }
                 : { ok: false, status: null, skipped: true },
             lsp_references: lspReferences
                 ? {
                       ok: lspReferences.ok,
                       status: lspReferences.status,
-                      locations_count: Array.isArray(refsData?.locations) ? refsData.locations.length : null,
+                      locations_count: Array.isArray(refsData?.['locations']) ? refsData['locations'].length : null,
                   }
                 : { ok: false, status: null, skipped: true },
             lsp_document_symbols: lspDocumentSymbols
                 ? {
                       ok: lspDocumentSymbols.ok,
                       status: lspDocumentSymbols.status,
-                      symbols_count: Array.isArray(symbolsData?.symbols) ? symbolsData.symbols.length : null,
+                      symbols_count: Array.isArray(symbolsData?.['symbols']) ? symbolsData['symbols'].length : null,
                   }
                 : { ok: false, status: null, skipped: true },
             budget: {
@@ -462,17 +471,17 @@ function deriveContextFindings(context) {
     /** @type {Record<string, unknown>[]} */
     const findings = [];
     const runtime = asRecord(context.runtime) || {};
-    const mcp = asRecord(runtime.mcp) || {};
-    const rag = asRecord(runtime.rag) || {};
-    const lsp = asRecord(runtime.lsp) || {};
+    const mcp = asRecord(runtime['mcp']) || {};
+    const rag = asRecord(runtime['rag']) || {};
+    const lsp = asRecord(runtime['lsp']) || {};
     const inf = asRecord(context.inference_gateway) || {};
     const mcpTools = asRecord(context.mcp_tools) || {};
-    const lspDiagnosticsTool = asRecord(mcpTools.lsp_diagnostics);
-    const ragSearchTool = asRecord(mcpTools.rag_search);
-    const ragExpandTool = asRecord(mcpTools.rag_expand);
-    const lspReferencesTool = asRecord(mcpTools.lsp_references);
+    const lspDiagnosticsTool = asRecord(mcpTools['lsp_diagnostics']);
+    const ragSearchTool = asRecord(mcpTools['rag_search']);
+    const ragExpandTool = asRecord(mcpTools['rag_expand']);
+    const lspReferencesTool = asRecord(mcpTools['lsp_references']);
 
-    if (!mcp.ok) {
+    if (!mcp['ok']) {
         findings.push({
             severity: 'warning',
             category: 'runtime',
@@ -482,7 +491,7 @@ function deriveContextFindings(context) {
             evidence: { probe: 'mcp:diagnose', details: mcp },
         });
     }
-    if (rag.ok === false) {
+    if (rag['ok'] === false) {
         findings.push({
             severity: 'warning',
             category: 'runtime',
@@ -492,7 +501,7 @@ function deriveContextFindings(context) {
             evidence: { probe: 'rag:health', details: rag },
         });
     }
-    if (lsp.ok === false) {
+    if (lsp['ok'] === false) {
         findings.push({
             severity: 'warning',
             category: 'semantic',
@@ -502,7 +511,7 @@ function deriveContextFindings(context) {
             evidence: { probe: 'lsp:health', details: lsp },
         });
     }
-    if (inf.ok === false) {
+    if (inf['ok'] === false) {
         findings.push({
             severity: 'warning',
             category: 'inference',
@@ -513,7 +522,7 @@ function deriveContextFindings(context) {
         });
     }
 
-    if (lspDiagnosticsTool && lspDiagnosticsTool.ok === false) {
+    if (lspDiagnosticsTool && lspDiagnosticsTool['ok'] === false && !lspDiagnosticsTool['skipped']) {
         findings.push({
             severity: 'warning',
             category: 'semantic',
@@ -523,7 +532,7 @@ function deriveContextFindings(context) {
             evidence: { tool: 'lsp_diagnostics', details: lspDiagnosticsTool },
         });
     }
-    if (ragSearchTool && ragSearchTool.ok === false) {
+    if (ragSearchTool && ragSearchTool['ok'] === false) {
         findings.push({
             severity: 'warning',
             category: 'context',
@@ -533,7 +542,7 @@ function deriveContextFindings(context) {
             evidence: { tool: 'rag_search', details: ragSearchTool },
         });
     }
-    if (ragExpandTool && ragExpandTool.ok === false && !ragExpandTool.skipped) {
+    if (ragExpandTool && ragExpandTool['ok'] === false && !ragExpandTool['skipped']) {
         findings.push({
             severity: 'info',
             category: 'context',
@@ -543,7 +552,7 @@ function deriveContextFindings(context) {
             evidence: { tool: 'rag_expand', details: ragExpandTool },
         });
     }
-    if (lspReferencesTool && lspReferencesTool.ok === false && !lspReferencesTool.skipped) {
+    if (lspReferencesTool && lspReferencesTool['ok'] === false && !lspReferencesTool['skipped']) {
         findings.push({
             severity: 'info',
             category: 'semantic',
@@ -565,7 +574,7 @@ function deriveContextFindings(context) {
                 semantic_quality: context.semantic_quality,
                 rag_quality: context.rag_quality,
                 runtime_quality: context.runtime_quality,
-                inference_models_count: inf.models_count ?? null,
+                inference_models_count: inf['models_count'] ?? null,
             },
         });
     }
@@ -612,7 +621,7 @@ export function createAuditAgentContextBuilder(options = {}) {
 
             const shouldInvokeMcpTools =
                 mcpProbe.ok &&
-                String(process.env.AUDIT_AGENT_CONTEXT_USE_MCP_TOOLS || 'true').toLowerCase() !== 'false';
+                String(process.env['AUDIT_AGENT_CONTEXT_USE_MCP_TOOLS'] || 'true').toLowerCase() !== 'false';
             const mcpSemantic = shouldInvokeMcpTools ? await collectMcpSemanticContext(job, callOverride) : null;
 
             const context = {
@@ -624,7 +633,12 @@ export function createAuditAgentContextBuilder(options = {}) {
                 inference_gateway: infProbe,
                 mcp_tools: mcpSemantic?.tools || null,
                 mcp_tool_payloads: mcpSemantic?.raw || null,
-                semantic_quality: lspProbe.ok ? 'high' : 'low',
+                semantic_quality:
+                    String(process.env['LSP_ENABLED'] || 'false').toLowerCase() === 'true'
+                        ? lspProbe.ok
+                            ? 'high'
+                            : 'low'
+                        : 'disabled-by-policy',
                 rag_quality: ragProbe.ok ? 'high' : 'low',
                 runtime_quality: mcpProbe.ok && ragProbe.ok && lspProbe.ok ? 'high' : 'degraded',
                 mcp_tools_invoked: Boolean(mcpSemantic),

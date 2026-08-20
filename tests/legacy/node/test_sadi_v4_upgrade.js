@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 
 console.log('\n🧪 SADI Analyzer v4.0 - Upgrade Validation\n');
 
@@ -18,7 +17,7 @@ try {
 
     console.log('   ✓ All 5 functions exported\n');
 } catch (error) {
-    console.error('   ✗ FAIL:', error.message);
+    console.error('   ✗ FAIL:', error instanceof Error ? error.message : String(error));
     process.exit(1);
 }
 
@@ -35,7 +34,7 @@ console.log('✅ Test 2: Parameter validation (defensive programming)');
             console.error('   ✗ FAIL: Should have thrown on null page');
             process.exit(1);
         } catch (error) {
-            if (error.message.includes('Invalid Puppeteer page object')) {
+            if (error instanceof Error && error.message.includes('Invalid Puppeteer page object')) {
                 console.log('   ✓ Correctly throws on null page');
             } else {
                 throw error;
@@ -49,7 +48,7 @@ console.log('✅ Test 2: Parameter validation (defensive programming)');
             console.error('   ✗ FAIL: Should have thrown on empty langCode');
             process.exit(1);
         } catch (error) {
-            if (error.message.includes('Invalid langCode parameter')) {
+            if (error instanceof Error && error.message.includes('Invalid langCode parameter')) {
                 console.log('   ✓ Correctly throws on empty langCode');
             } else {
                 throw error;
@@ -109,8 +108,8 @@ console.log('✅ Test 2: Parameter validation (defensive programming)');
 
         process.exit(0);
     } catch (error) {
-        console.error('\n❌ TEST FAILED:', error.message);
-        console.error(error.stack);
+        console.error('\n❌ TEST FAILED:', error instanceof Error ? error.message : String(error));
+        console.error(error instanceof Error ? error.stack : '');
         process.exit(1);
     }
 })();

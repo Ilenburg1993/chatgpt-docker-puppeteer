@@ -295,7 +295,7 @@ async function resolveChangedFiles(profile, changedOnly) {
 
 async function main() {
     // Test-only escape hatch to validate fatal-fallback schema/artifacts without running the full audit pipeline.
-    if (process.env.AUDIT_RUNNER_TEST_FORCE_FATAL_FALLBACK === '1') {
+    if (process.env['AUDIT_RUNNER_TEST_FORCE_FATAL_FALLBACK'] === '1') {
         throw new Error('forced fatal fallback for audit runner test');
     }
 

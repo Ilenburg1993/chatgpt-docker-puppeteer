@@ -1,17 +1,18 @@
-<script setup>
+<script setup lang="ts">
+import type { BadgeVariant, DashboardTask } from '@/types/dashboard';
 import { CheckCircle, Clock, Pause, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 import Badge from '../ui/Badge.vue';
 import Card from '../ui/Card.vue';
 
-const props = defineProps({
-    task: {
-        type: Object,
-        required: true,
-    },
-});
+const props = defineProps<{ task: DashboardTask }>();
 
-const emit = defineEmits(['view', 'edit', 'delete', 'cancel']);
+const emit = defineEmits<{
+    view: [task: DashboardTask];
+    edit: [task: DashboardTask];
+    delete: [task: DashboardTask];
+    cancel: [task: DashboardTask];
+}>();
 
 const statusIcon = computed(() => {
     const icons = {
@@ -20,11 +21,12 @@ const statusIcon = computed(() => {
         FAILED: XCircle,
         PAUSED: Pause,
     };
-    return icons[props.task.unified_status] || Clock;
+    const status = String(props.task.unified_status || '');
+    return icons[status as keyof typeof icons] || Clock;
 });
 
-const getStatusVariant = (status) => {
-    const variants = {
+const getStatusVariant = (status?: string): BadgeVariant => {
+    const variants: Record<string, BadgeVariant> = {
         RUNNING: 'info',
         PENDING: 'default',
         DONE: 'success',
@@ -32,22 +34,22 @@ const getStatusVariant = (status) => {
         CANCELLED: 'warning',
         PAUSED: 'warning',
     };
-    return variants[status] || 'default';
+    return variants[String(status || '')] || 'default';
 };
 
-const getPriorityVariant = (priority) => {
+const getPriorityVariant = (priority: number): BadgeVariant => {
     if (priority >= 8) return 'error';
     if (priority >= 5) return 'warning';
     return 'default';
 };
 
-const getPriorityLabel = (priority) => {
+const getPriorityLabel = (priority: number) => {
     if (priority >= 8) return 'HIGH';
     if (priority >= 5) return 'MEDIUM';
     return 'LOW';
 };
 
-const truncate = (text, length = 100) => {
+const truncate = (text: string, length = 100) => {
     if (!text) return '';
     return text.length > length ? text.substring(0, length) + '...' : text;
 };
@@ -62,38 +64,38 @@ const truncate = (text, length = 100) => {
                         :is="statusIcon"
                         :size="18"
                         :class="{
-                            'text-info': task.unified_status === 'RUNNING',
-                            'text-success': task.unified_status === 'DONE',
-                            'text-error': task.unified_status === 'FAILED',
-                            'text-warning': ['PAUSED', 'CANCELLED'].includes(task.unified_status),
-                            'text-foreground-muted': task.unified_status === 'PENDING',
+                            'text-info': task['unified_status'] === 'RUNNING',
+                            'text-success': task['unified_status'] === 'DONE',
+                            'text-error': task['unified_status'] === 'FAILED',
+                            'text-warning': ['PAUSED', 'CANCELLED'].includes(String(task['unified_status'] || '')),
+                            'text-foreground-muted': task['unified_status'] === 'PENDING',
                         }"
                     />
                     <span class="text-xs font-mono text-foreground-muted">
-                        {{ task.meta?.id?.substring(0, 8) || 'N/A' }}
+                        {{ task['meta']?.id?.substring(0, 8) || 'N/A' }}
                     </span>
                 </div>
 
                 <div class="flex gap-2">
-                    <Badge :variant="getStatusVariant(task.unified_status)" size="sm">
-                        {{ task.unified_status || 'UNKNOWN' }}
+                    <Badge :variant="getStatusVariant(task['unified_status'])" size="sm">
+                        {{ task['unified_status'] || 'UNKNOWN' }}
                     </Badge>
-                    <Badge :variant="getPriorityVariant(task.meta?.priority || 0)" size="sm">
-                        {{ getPriorityLabel(task.meta?.priority || 0) }}
+                    <Badge :variant="getPriorityVariant(task['meta']?.priority || 0)" size="sm">
+                        {{ getPriorityLabel(task['meta']?.priority || 0) }}
                     </Badge>
                 </div>
             </div>
 
             <div>
                 <p class="text-sm text-foreground line-clamp-2">
-                    {{ truncate(task.spec?.payload?.user_message || 'No prompt', 120) }}
+                    {{ truncate(task['spec']?.payload?.user_message || 'No prompt', 120) }}
                 </p>
             </div>
 
             <div class="flex items-center justify-between text-xs text-foreground-muted">
-                <span v-if="task.meta?.agent"> Agent: {{ task.meta.agent }} </span>
-                <span v-if="task.meta?.created_at">
-                    {{ new Date(task.meta.created_at).toLocaleDateString() }}
+                <span v-if="task['meta']?.agent"> Agent: {{ task['meta'].agent }} </span>
+                <span v-if="task['meta']?.created_at">
+                    {{ new Date(task['meta'].created_at).toLocaleDateString() }}
                 </span>
             </div>
         </div>

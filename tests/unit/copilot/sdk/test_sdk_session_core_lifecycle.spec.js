@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file uses untyped mocks extensively
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,7 +14,7 @@ const copilotCtor = vi.fn();
 
 vi.mock('@github/copilot-sdk', () => {
     class MockCopilotClient {
-        constructor(options) {
+        constructor(/** @type {unknown} */ options) {
             this.options = options;
             copilotCtor(options);
         }
@@ -52,7 +51,9 @@ function fakeClient(overrides = {}) {
         start: vi.fn().mockResolvedValue(undefined),
         createSession: vi.fn().mockResolvedValue({ sessionId: 's1' }),
         resumeSession: vi.fn().mockResolvedValue({ sessionId: 's2' }),
-        listSessions: vi.fn().mockResolvedValue([{ id: 's1' }]),
+        listSessions: vi.fn().mockResolvedValue([
+            { sessionId: 's1', startTime: new Date(0), modifiedTime: new Date(0), isRemote: false },
+        ]),
         deleteSession: vi.fn().mockResolvedValue(undefined),
         ...overrides,
     };
@@ -159,8 +160,8 @@ describe('sdk/session/lifecycle core hardening', () => {
     });
 
     it('createSession permite configurar reasoning default do gpt-5-mini por env', async () => {
-        const previous = process.env.COPILOT_GPT5_MINI_REASONING_EFFORT;
-        process.env.COPILOT_GPT5_MINI_REASONING_EFFORT = 'medium';
+        const previous = process.env['COPILOT_GPT5_MINI_REASONING_EFFORT'];
+        process.env['COPILOT_GPT5_MINI_REASONING_EFFORT'] = 'medium';
         try {
             const client = fakeClient();
             await createSession(client, { model: 'gpt-5-mini' });
@@ -172,9 +173,9 @@ describe('sdk/session/lifecycle core hardening', () => {
             );
         } finally {
             if (previous === undefined) {
-                delete process.env.COPILOT_GPT5_MINI_REASONING_EFFORT;
+                delete process.env['COPILOT_GPT5_MINI_REASONING_EFFORT'];
             } else {
-                process.env.COPILOT_GPT5_MINI_REASONING_EFFORT = previous;
+                process.env['COPILOT_GPT5_MINI_REASONING_EFFORT'] = previous;
             }
         }
     });
@@ -240,7 +241,7 @@ describe('sdk/session/lifecycle core hardening', () => {
             modelCapabilities: { supports: { vision: true } },
             enableConfigDiscovery: true,
             includeSubAgentStreamingEvents: false,
-            defaultAgent: { availableTools: ['read_file'] },
+            defaultAgent: { excludedTools: ['write_file'] },
         });
 
         expect(client.resumeSession).toHaveBeenCalledWith(
@@ -255,7 +256,7 @@ describe('sdk/session/lifecycle core hardening', () => {
                 modelCapabilities: { supports: { vision: true } },
                 enableConfigDiscovery: true,
                 includeSubAgentStreamingEvents: false,
-                defaultAgent: { availableTools: ['read_file'] },
+                defaultAgent: { excludedTools: ['write_file'] },
             }),
         );
         const payload = client.resumeSession.mock.calls[0]?.[1];

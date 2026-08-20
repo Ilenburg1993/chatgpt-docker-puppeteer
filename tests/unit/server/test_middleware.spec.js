@@ -90,7 +90,6 @@ describe('Server Middleware - Request Processing', () => {
         });
 
         it('deve adicionar Request ID ao header', () => {
-            const req = {};
             const res = /** @type {any} */ ({
                 setHeader: (/** @type {string} */ name, /** @type {string} */ value) => {
                     res.headers = res.headers || {};

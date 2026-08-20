@@ -28,7 +28,7 @@ let _hubModule = null;
  * @returns {Promise<import('#copilot/conversation-hub/hub').ConversationHub | null>}
  */
 async function getHub() {
-    if (process.env.COPILOT_SDK_ENABLED === 'false') return null;
+    if (process.env['COPILOT_SDK_ENABLED'] === 'false') return null;
 
     try {
         if (!_hubModule) {
@@ -70,7 +70,7 @@ router.get('/status', async (_req, res) => {
     const hub = await getHub();
     res.json({
         ready: hub?.isReady ?? false,
-        sdkEnabled: process.env.COPILOT_SDK_ENABLED !== 'false',
+        sdkEnabled: process.env['COPILOT_SDK_ENABLED'] !== 'false',
     });
 });
 
@@ -79,9 +79,9 @@ router.get('/status', async (_req, res) => {
 router.get('/sessions', requireHub, (req, res) => {
     try {
         const hub = /** @type {any} */ (req).hub;
-        const limit = Math.min(Number(req.query.limit) || 20, 100);
-        const offset = Number(req.query.offset) || 0;
-        const status = /** @type {string | undefined} */ (req.query.status);
+        const limit = Math.min(Number(req.query['limit']) || 20, 100);
+        const offset = Number(req.query['offset']) || 0;
+        const status = /** @type {string | undefined} */ (req.query['status']);
 
         const sessions = hub.store.listHubSessions({ limit, offset, status: status || undefined });
         res.json({ sessions, limit, offset });
@@ -114,10 +114,10 @@ router.post('/sessions', requireHub, (req, res) => {
 router.get('/sessions/:id', requireHub, (req, res) => {
     try {
         const hub = /** @type {any} */ (req).hub;
-        const session = hub.store.getHubSession(req.params.id);
+        const session = hub.store.getHubSession(req.params['id']);
 
         if (!session) {
-            res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+            res.status(404).json({ error: `Sessão '${req.params['id']}' não encontrada.` });
             return;
         }
 
@@ -133,12 +133,12 @@ router.get('/sessions/:id', requireHub, (req, res) => {
 router.get('/sessions/:id/turns', requireHub, (req, res) => {
     try {
         const hub = /** @type {any} */ (req).hub;
-        const limit = Math.min(Number(req.query.limit) || 50, 200);
-        const offset = Number(req.query.offset) || 0;
-        const after = req.query.after ? Number(req.query.after) : undefined;
+        const limit = Math.min(Number(req.query['limit']) || 50, 200);
+        const offset = Number(req.query['offset']) || 0;
+        const after = req.query['after'] ? Number(req.query['after']) : undefined;
 
-        const turns = hub.store.readTurns(req.params.id, { limit, offset, after });
-        const total = hub.store.countTurns(req.params.id);
+        const turns = hub.store.readTurns(req.params['id'], { limit, offset, after });
+        const total = hub.store.countTurns(req.params['id']);
 
         res.json({ turns, total, limit, offset });
     } catch (/** @type {any} */ err) {
@@ -159,21 +159,21 @@ router.post('/sessions/:id/inject', requireHub, (req, res) => {
             return;
         }
 
-        const session = hub.store.getHubSession(req.params.id);
+        const session = hub.store.getHubSession(req.params['id']);
         if (!session) {
-            res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+            res.status(404).json({ error: `Sessão '${req.params['id']}' não encontrada.` });
             return;
         }
         if (session.status !== 'active') {
-            res.status(409).json({ error: `Sessão '${req.params.id}' não está ativa (${session.status}).` });
+            res.status(409).json({ error: `Sessão '${req.params['id']}' não está ativa (${session.status}).` });
             return;
         }
 
-        const turnId = hub.injectUserMessage(req.params.id, content, {
+        const turnId = hub.injectUserMessage(req.params['id'], content, {
             metadata: { source: 'rest-api' },
         });
 
-        res.status(201).json({ turnId, hubSessionId: req.params.id });
+        res.status(201).json({ turnId, hubSessionId: req.params['id'] });
     } catch (/** @type {any} */ err) {
         log('ERROR', `[copilot-hub-router] POST /sessions/:id/inject: ${err.message}`);
         res.status(500).json({ error: err.message });
@@ -185,15 +185,15 @@ router.post('/sessions/:id/inject', requireHub, (req, res) => {
 router.post('/sessions/:id/close', requireHub, (req, res) => {
     try {
         const hub = /** @type {any} */ (req).hub;
-        const session = hub.store.getHubSession(req.params.id);
+        const session = hub.store.getHubSession(req.params['id']);
 
         if (!session) {
-            res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+            res.status(404).json({ error: `Sessão '${req.params['id']}' não encontrada.` });
             return;
         }
 
-        hub.orchestrator.closeSession(req.params.id);
-        res.json({ closed: true, hubSessionId: req.params.id });
+        hub.orchestrator.closeSession(req.params['id']);
+        res.json({ closed: true, hubSessionId: req.params['id'] });
     } catch (/** @type {any} */ err) {
         log('ERROR', `[copilot-hub-router] POST /sessions/:id/close: ${err.message}`);
         res.status(500).json({ error: err.message });
@@ -220,17 +220,17 @@ router.post('/sessions/:id/send', requireHub, async (req, res) => {
             return;
         }
 
-        const session = hub.store.getHubSession(req.params.id);
+        const session = hub.store.getHubSession(req.params['id']);
         if (!session) {
-            res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+            res.status(404).json({ error: `Sessão '${req.params['id']}' não encontrada.` });
             return;
         }
         if (session.status !== 'active') {
-            res.status(409).json({ error: `Sessão '${req.params.id}' não está ativa (${session.status}).` });
+            res.status(409).json({ error: `Sessão '${req.params['id']}' não está ativa (${session.status}).` });
             return;
         }
 
-        const result = await hub.sendToLlmB(req.params.id, message, { useStructured, timeoutMs });
+        const result = await hub.sendToLlmB(req.params['id'], message, { useStructured, timeoutMs });
         res.json(result);
     } catch (/** @type {any} */ err) {
         log('ERROR', `[copilot-hub-router] POST /sessions/:id/send: ${err.message}`);
@@ -255,9 +255,9 @@ router.get('/sessions/:id/stream', requireHub, (req, res) => {
     const hub = /** @type {any} */ (req).hub;
 
     // Verifica se a sessão existe
-    const session = hub.store.getHubSession(req.params.id);
+    const session = hub.store.getHubSession(req.params['id']);
     if (!session) {
-        res.status(404).json({ error: `Sessão '${req.params.id}' não encontrada.` });
+        res.status(404).json({ error: `Sessão '${req.params['id']}' não encontrada.` });
         return;
     }
 
@@ -282,7 +282,7 @@ router.get('/sessions/:id/stream', requireHub, (req, res) => {
     }, 15_000);
 
     // Listeners de eventos do orchestrator (filtrados pela sessão)
-    const sessionId = req.params.id;
+    const sessionId = req.params['id'];
 
     /** @param {any} evt */
     const onSent = (evt) => {
@@ -331,7 +331,7 @@ router.get('/sessions/:id/stream', requireHub, (req, res) => {
  * terminal não estiver acessível.
  */
 router.post('/inject', async (req, res) => {
-    const terminalPort = Number(process.env.LLM_B_TERMINAL_PORT ?? 3009);
+    const terminalPort = Number(process.env['LLM_B_TERMINAL_PORT'] ?? 3009);
     const injectUrl = `http://127.0.0.1:${terminalPort}/inject`;
 
     const body = JSON.stringify(req.body ?? {});

@@ -22,6 +22,24 @@ beforeEach(() => {
     resetMcpMetricsForTests();
 });
 
+/**
+ * @param {ReturnType<typeof activateMcpHttpRequestActivity>} value
+ * @returns {Exclude<ReturnType<typeof activateMcpHttpRequestActivity>, null>}
+ */
+function requireRequestFinalizer(value) {
+    assert.ok(value, 'expected HTTP request activity finalizer');
+    return value;
+}
+
+/**
+ * @param {ReturnType<typeof activateMcpHttpToolRequestTiming>} value
+ * @returns {Exclude<ReturnType<typeof activateMcpHttpToolRequestTiming>, null>}
+ */
+function requireToolFinalizer(value) {
+    assert.ok(value, 'expected HTTP tool timing finalizer');
+    return value;
+}
+
 describe('MCP runtime metrics', () => {
     it('records per-tool phase latency without changing aggregate call metrics', () => {
         recordMcpToolMetric('repo_status', {
@@ -45,12 +63,17 @@ describe('MCP runtime metrics', () => {
 
         const snapshot = readMcpMetricsSnapshot();
         const metric = snapshot.tools['repo_status'];
+        assert.ok(metric);
         assert.equal(metric.calls, 2);
         assert.equal(metric.errors, 1);
         assert.equal(metric.averageDurationMs, 30);
-        assert.equal(metric.phaseAverages['authorization'].averageDurationMs, 3);
-        assert.equal(metric.phaseAverages['handler'].averageDurationMs, 23);
-        assert.equal(metric.phaseAverages['auditCompletion'].averageDurationMs, 2);
+        const authorization = metric.phaseAverages['authorization'];
+        const handler = metric.phaseAverages['handler'];
+        const auditCompletion = metric.phaseAverages['auditCompletion'];
+        assert.ok(authorization && handler && auditCompletion);
+        assert.equal(authorization.averageDurationMs, 3);
+        assert.equal(handler.averageDurationMs, 23);
+        assert.equal(auditCompletion.averageDurationMs, 2);
     });
 
     it('records quiescent inter-tool gaps without misclassifying parallel calls', () => {
@@ -95,7 +118,9 @@ describe('MCP runtime metrics', () => {
             },
         );
 
+        /** @type {ReturnType<typeof activateMcpHttpToolRequestTiming>} */
         let finishFirst = null;
+        /** @type {ReturnType<typeof activateMcpHttpRequestActivity>} */
         let finishFirstActivity = null;
         await runWithMcpHttpToolTimingContext(
             { requestId: 'request-a', receivedAt: 1_000, edgeColo: 'gru' },
@@ -108,12 +133,13 @@ describe('MCP runtime metrics', () => {
                 recordMcpHttpToolHandlerEnd(1_100);
             },
         );
-        assert.ok(finishFirst);
-        assert.ok(finishFirstActivity);
-        finishFirstActivity(200, 1_120);
-        finishFirst(1_120);
-        finishFirst(1_130);
+        const firstActivityFinalizer = requireRequestFinalizer(finishFirstActivity);
+        const firstToolFinalizer = requireToolFinalizer(finishFirst);
+        firstActivityFinalizer(200, 1_120);
+        firstToolFinalizer(1_120);
+        firstToolFinalizer(1_130);
 
+        /** @type {ReturnType<typeof activateMcpHttpRequestActivity>} */
         let finishTransientStream = null;
         await runWithMcpHttpToolTimingContext(
             { requestId: 'request-transient-stream', receivedAt: 1_500, edgeColo: 'gru' },
@@ -121,9 +147,9 @@ describe('MCP runtime metrics', () => {
                 finishTransientStream = activateMcpHttpRequestActivity({ httpMethod: 'GET', routeClass: 'mcp-stream' });
             },
         );
-        assert.ok(finishTransientStream);
-        finishTransientStream(200, 1_900);
+        requireRequestFinalizer(finishTransientStream)(200, 1_900);
 
+        /** @type {ReturnType<typeof activateMcpHttpRequestActivity>} */
         let finishAuxiliary = null;
         await runWithMcpHttpToolTimingContext(
             { requestId: 'request-list', receivedAt: 2_000, edgeColo: 'gru' },
@@ -132,10 +158,11 @@ describe('MCP runtime metrics', () => {
                 recordMcpHttpRequestRpcMethod('tools/list');
             },
         );
-        assert.ok(finishAuxiliary);
-        finishAuxiliary(200, 2_200);
+        requireRequestFinalizer(finishAuxiliary)(200, 2_200);
 
+        /** @type {ReturnType<typeof activateMcpHttpToolRequestTiming>} */
         let finishSecond = null;
+        /** @type {ReturnType<typeof activateMcpHttpRequestActivity>} */
         let finishSecondActivity = null;
         await runWithMcpHttpToolTimingContext(
             { requestId: 'request-b', receivedAt: 5_000, edgeColo: 'iad' },
@@ -148,10 +175,8 @@ describe('MCP runtime metrics', () => {
                 recordMcpHttpToolHandlerEnd(5_100);
             },
         );
-        assert.ok(finishSecond);
-        assert.ok(finishSecondActivity);
-        finishSecondActivity(200, 5_140);
-        finishSecond(5_140);
+        requireRequestFinalizer(finishSecondActivity)(200, 5_140);
+        requireToolFinalizer(finishSecond)(5_140);
 
         const boundary = readMcpMetricsSnapshot().interaction.originBoundary;
         assert.equal(boundary.requestCount, 2);
@@ -219,8 +244,12 @@ describe('MCP runtime metrics', () => {
         const snapshot = readMcpMetricsSnapshot();
         assert.equal(snapshot.totals.tools, 1000);
         assert.equal(snapshot.tools['dynamic_0'], undefined);
-        assert.equal(snapshot.tools['__proto__'].calls, 1);
-        assert.equal(Object.keys(snapshot.tools['__proto__'].phaseAverages).length, 64);
-        assert.equal(snapshot.tools['__proto__'].phaseAverages['__proto__'].calls, 1);
+        const protoMetric = snapshot.tools['__proto__'];
+        assert.ok(protoMetric);
+        assert.equal(protoMetric.calls, 1);
+        assert.equal(Object.keys(protoMetric.phaseAverages).length, 64);
+        const protoPhase = protoMetric.phaseAverages['__proto__'];
+        assert.ok(protoPhase);
+        assert.equal(protoPhase.calls, 1);
     });
 });

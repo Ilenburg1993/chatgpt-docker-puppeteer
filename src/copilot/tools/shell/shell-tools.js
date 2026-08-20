@@ -129,23 +129,20 @@ const execCommandTool = buildTool({
         'Exemplos: "ls -la src/", "node --version", "git status", "cat config.json".',
     parameters: sdkParam(
         z.object({
-            command: z.string().min(1).describe('Comando shell a executar (ex: "git status", "ls src/")'),
+            command: z.string().min(1)['describe']('Comando shell a executar (ex: "git status", "ls src/")'),
             cwd: z
                 .string()
-                .optional()
-                .describe(
+                .optional()['describe'](
                     'Diretório de trabalho (relativo ao workspace ou absoluto dentro de /workspaces/). Default: raiz do workspace.',
                 ),
             timeoutSeconds: z
                 .number()
                 .int()
                 .min(1)
-                .optional()
-                .describe('Timeout informativo em segundos. Default histórico: 30.'),
+                .optional()['describe']('Timeout informativo em segundos. Default histórico: 30.'),
             enforceTimeout: z
                 .boolean()
-                .optional()
-                .describe('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
+                .optional()['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (
@@ -303,18 +300,15 @@ const runNpmScriptTool = buildTool({
         z.object({
             script: z
                 .string()
-                .min(1)
-                .describe('Nome do script npm a executar (ex: "lint", "test:unit", "typecheck:node")'),
+                .min(1)['describe']('Nome do script npm a executar (ex: "lint", "test:unit", "typecheck:node")'),
             timeoutSeconds: z
                 .number()
                 .int()
                 .min(1)
-                .optional()
-                .describe('Timeout informativo em segundos. Default histórico: 60.'),
+                .optional()['describe']('Timeout informativo em segundos. Default histórico: 60.'),
             enforceTimeout: z
                 .boolean()
-                .optional()
-                .describe('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
+                .optional()['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (
@@ -389,19 +383,16 @@ const runNodeFileTool = buildTool({
         z.object({
             filePath: z
                 .string()
-                .min(1)
-                .describe('Caminho do arquivo .js ou .mjs (relativo ao workspace ou absoluto dentro de /workspaces/)'),
-            args: z.array(z.string()).optional().describe('Argumentos adicionais passados ao script (process.argv)'),
+                .min(1)['describe']('Caminho do arquivo .js ou .mjs (relativo ao workspace ou absoluto dentro de /workspaces/)'),
+            args: z.array(z.string()).optional()['describe']('Argumentos adicionais passados ao script (process.argv)'),
             timeoutSeconds: z
                 .number()
                 .int()
                 .min(1)
-                .optional()
-                .describe('Timeout informativo em segundos. Default histórico: 30.'),
+                .optional()['describe']('Timeout informativo em segundos. Default histórico: 30.'),
             enforceTimeout: z
                 .boolean()
-                .optional()
-                .describe('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
+                .optional()['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (

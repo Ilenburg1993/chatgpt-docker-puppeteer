@@ -18,9 +18,9 @@ import { atomicWrite } from '#infra/io';
 /**
  * ✅ P1-22: Artifact size limits to prevent disk exhaustion Configurable via environment variables
  */
-const MAX_TEXT_ARTIFACT_BYTES = Number(process.env.MAX_TEXT_ARTIFACT_BYTES) || 50 * 1024 * 1024; // 50 MB
-const MAX_BINARY_ARTIFACT_BYTES = Number(process.env.MAX_BINARY_ARTIFACT_BYTES) || 100 * 1024 * 1024; // 100 MB
-const MAX_JSON_ARTIFACT_BYTES = Number(process.env.MAX_JSON_ARTIFACT_BYTES) || 10 * 1024 * 1024; // 10 MB
+const MAX_TEXT_ARTIFACT_BYTES = Number(process.env['MAX_TEXT_ARTIFACT_BYTES']) || 50 * 1024 * 1024; // 50 MB
+const MAX_BINARY_ARTIFACT_BYTES = Number(process.env['MAX_BINARY_ARTIFACT_BYTES']) || 100 * 1024 * 1024; // 100 MB
+const MAX_JSON_ARTIFACT_BYTES = Number(process.env['MAX_JSON_ARTIFACT_BYTES']) || 10 * 1024 * 1024; // 10 MB
 
 /**
  * @typedef {object} PutArtifactResult
@@ -38,7 +38,7 @@ const MAX_JSON_ARTIFACT_BYTES = Number(process.env.MAX_JSON_ARTIFACT_BYTES) || 1
  * @returns {string}
  */
 function _resolveArtifactsRoot() {
-    const fromEnv = process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || null;
+    const fromEnv = process.env['MAESTRO_ARTIFACTS_DIR'] || process.env['ARTIFACTS_DIR'] || null;
     return path.resolve(fromEnv || ARTIFACTS_DIR);
 }
 

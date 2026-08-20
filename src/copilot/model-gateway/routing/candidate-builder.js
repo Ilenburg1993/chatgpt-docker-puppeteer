@@ -28,7 +28,7 @@ function optionalString(value) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function providerId(row) {
@@ -36,7 +36,7 @@ function providerId(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function providerModel(row) {
@@ -44,7 +44,7 @@ function providerModel(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function routeProfile(row) {
@@ -52,7 +52,7 @@ function routeProfile(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function projectionKey(row) {
@@ -60,7 +60,7 @@ function projectionKey(row) {
 }
 
 /**
- * @param {Record<string, any>} route
+ * @param {Record<string, unknown>} route
  * @returns {string}
  */
 function routeOptionRef(route) {
@@ -74,16 +74,16 @@ function routeOptionRef(route) {
 }
 
 /**
- * @param {Record<string, any>} route
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} route
+ * @returns {Record<string, unknown>}
  */
 function routePolicy(route) {
     return isRecord(route['normalizedPolicy']) ? route['normalizedPolicy'] : {};
 }
 
 /**
- * @param {Record<string, any>} route
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} route
+ * @returns {Record<string, unknown>}
  */
 function routeTraits(route) {
     const policy = routePolicy(route);
@@ -91,17 +91,16 @@ function routeTraits(route) {
 }
 
 /**
- * @param {Record<string, any>} route
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} route
+ * @returns {Record<string, unknown>}
  */
 function routeProviderSpecific(route) {
     return isRecord(route['providerSpecific']) ? route['providerSpecific'] : {};
 }
 
 /**
- * @param {Record<string, any>} projection
- * @param {Record<string, any> | null} route
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} projection
+ * @param {Record<string, unknown> | null} route
  */
 function buildCandidate(projection, route) {
     const provider = route ? providerId(route) : providerId(projection);
@@ -155,10 +154,9 @@ function buildCandidate(projection, route) {
 
 /**
  * @param {object} input
- * @param {Record<string, any>[]} [input.projections]
- * @param {Record<string, any>[]} [input.routeOptions]
+ * @param {Record<string, unknown>[]} [input.projections]
+ * @param {Record<string, unknown>[]} [input.routeOptions]
  * @param {boolean} [input.includeProjectionOnly]
- * @returns {Record<string, any>[]}
  */
 export function buildModelGatewayRouteCandidates(input = {}) {
     const projections = Array.isArray(input.projections) ? input.projections.filter(isRecord) : [];

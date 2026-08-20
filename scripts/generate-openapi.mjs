@@ -130,9 +130,9 @@ async function main() {
                 },
             };
 
-            if (params.length) operation.parameters = params;
+            if (params.length) operation['parameters'] = params;
             if (['post', 'put', 'patch'].includes(method)) {
-                operation.requestBody = {
+                operation['requestBody'] = {
                     content: { 'application/json': { schema: { type: 'object' } } },
                 };
             }

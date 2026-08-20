@@ -29,7 +29,7 @@ import { loadAliasesAsync } from './stores/index.js';
  * @property {(event: string, payload: object) => void} [broadcastSse]
  * @property {() => void | Promise<void>} [loadAliases]
  * @property {() => NodeJS.Timeout} [startTodoCleanupJob]
- * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
+ * @property {ReturnType<typeof import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
  * @property {Record<string, unknown> | null} [bootPreflight]
  *
  *
@@ -39,7 +39,7 @@ import { loadAliasesAsync } from './stores/index.js';
  * @property {(event: string, payload: object) => void} broadcastSse
  * @property {() => void | Promise<void>} loadAliases
  * @property {() => NodeJS.Timeout} startTodoCleanupJob
- * @property {ReturnType<import('#copilot/boot').readCopilotBootConfig>} bootConfig
+ * @property {ReturnType<typeof import('#copilot/boot').readCopilotBootConfig>} bootConfig
  * @property {Record<string, unknown> | null} bootPreflight
  * @property {import('../config/pinned-files.js').PinnedFilesLoader | null} pinnedLoader
  * @property {(() => void) | null} disposePinnedBridge

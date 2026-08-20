@@ -1,7 +1,6 @@
 // @ts-check
 /** Cloudflare MCP smoke orchestration. */
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
-import { getCanonicalMcpTools } from '../registry.js';
 import { writeConnectorSmokeState } from './state.js';
 import { buildToolsListSmokeHeaders, extractAuthorizationServer, probeJsonWithRetry, readSmokeBearerToken, summarizeOAuthReadiness, summarizeProbeEnvelope, summarizeToolsListProbe } from './cli-probe.js';
 
@@ -11,10 +10,21 @@ const DEFAULT_SMOKE_DELAY_MS = 1_000;
 const DEFAULT_CRITICAL_TOOL_NAMES = ['repo_status', 'repo_tree', 'repo_read_file', 'repo_search_text', 'repo_apply_file_batch', 'mcp_runtime_health', 'mcp_tunnel_status'];
 
 /**
- * @param {{ config?: import('./config.js').CloudflareTunnelConfig; authenticated?: boolean; env?: NodeJS.ProcessEnv; persistState?: boolean }} [input]
- * @returns {Promise<Record<string, unknown>>}
+ * @param {{
+ *     config?: import('./config.js').CloudflareTunnelConfig;
+ *     authenticated?: boolean;
+ *     env?: NodeJS.ProcessEnv;
+ *     persistState?: boolean;
+ *     localToolNames?: string[];
+ * }} [input]
  */
-export async function runCloudflareSmoke({ config, authenticated = false, env = process.env, persistState = true } = {}) {
+export async function runCloudflareSmoke({
+    config,
+    authenticated = false,
+    env = process.env,
+    persistState = true,
+    localToolNames = [],
+} = {}) {
     if (!config) throw new Error('Cloudflare smoke requires a resolved tunnel config.');
     const connectorUrl = resolveConnectorUrl(config, env);
     const protocolVersion = String(env['COPILOT_MCP_PROTOCOL_VERSION'] ?? DEFAULT_MCP_PROTOCOL_VERSION).trim();
@@ -50,7 +60,9 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
     const oauth = summarizeOAuthReadiness(protectedResource, authorization);
     const authConfig = readMcpAuthConfig(env);
     const authChallenge = summarizeExpectedAuthChallenge(toolsList, authConfig, authenticated);
-    const criticalTools = authChallenge.ok ? summarizeSkippedCriticalTools(env) : summarizeCriticalTools(tools.toolNames, env);
+    const criticalTools = authChallenge.ok
+        ? summarizeSkippedCriticalTools(env)
+        : summarizeCriticalTools(tools.toolNames, env, localToolNames);
     const toolsGateOk = tools.ok || authChallenge.ok;
     const report = {
         ok: Boolean(health.ok && protectedResource.ok && oauth.ok && toolsGateOk && criticalTools.ok),
@@ -81,7 +93,7 @@ export async function runCloudflareSmoke({ config, authenticated = false, env = 
                     ok: toolsGateOk,
                     status: tools.status,
                     tools: tools.toolCount,
-                    expectedLocalTools: getCanonicalMcpTools().length,
+                    expectedLocalTools: localToolNames.length,
                     toolsMatchLocalRegistry: tools.ok,
                     criticalToolsPresent: criticalTools.ok,
                     missingCriticalTools: criticalTools.missing,
@@ -131,11 +143,12 @@ function resolveConnectorUrl(config, env) {
 /**
  * @param {string[]} toolNames
  * @param {NodeJS.ProcessEnv} env
+ * @param {string[]} localToolNames
  * @returns {{ ok: boolean; expected: string[]; missing: string[]; unknownExpected: string[] }}
  */
-function summarizeCriticalTools(toolNames, env) {
+function summarizeCriticalTools(toolNames, env, localToolNames) {
     const expected = readExpectedCriticalTools(env);
-    const canonical = new Set(getCanonicalMcpTools().map((tool) => tool.name));
+    const canonical = new Set(localToolNames);
     const advertised = new Set(toolNames);
     const missing = expected.filter((name) => !advertised.has(name));
     const unknownExpected = expected.filter((name) => !canonical.has(name));

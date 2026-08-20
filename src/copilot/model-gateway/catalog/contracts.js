@@ -9,6 +9,7 @@
  */
 
 import { normalizeGatewayIdPart, optionalPositiveInteger, optionalString } from '../contracts/index.js';
+import { sanitizeJsonRecord, sanitizeJsonValue } from '../contracts/sanitized-json.js';
 import { redactModelGatewayAuditedValue, redactSecretRecord } from '../secrets/index.js';
 import { normalizeModelRoutePolicyTraits } from './normalizers.js';
 
@@ -53,24 +54,22 @@ function stringList(value) {
 }
 
 /**
- * @param {unknown} value
- * @returns {unknown}
+ * @param {string} value
+ * @returns {string}
  */
-function sanitizeJsonValue(value) {
-    if (typeof value === 'string') return redactModelGatewayAuditedValue(value);
-    if (Array.isArray(value)) return value.map(sanitizeJsonValue);
-    if (isRecord(value)) {
-        return Object.fromEntries(
-            Object.entries(value).map(([key, item]) => [
-                key,
-                /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(key)
-                    ? '[redacted]'
-                    : sanitizeJsonValue(item),
-            ]),
-        );
-    }
-    if (value === undefined) return null;
-    return value;
+function sanitizeCatalogString(value) {
+    return String(redactModelGatewayAuditedValue(value));
+}
+
+/**
+ * @template {Record<string, unknown>} T
+ * @param {T | undefined} value
+ * @returns {Record<string, unknown> & Partial<import('../contracts/sanitized-json.js').SanitizedRecord<T>>}
+ */
+function sanitizeOptionalCatalogRecord(value) {
+    return /** @type {Record<string, unknown> & Partial<import('../contracts/sanitized-json.js').SanitizedRecord<T>>} */ (
+        isRecord(value) ? sanitizeJsonRecord(value, sanitizeCatalogString) : {}
+    );
 }
 
 /**
@@ -99,16 +98,15 @@ function normalizeProviderId(providerId) {
  * @param {object} input
  * @param {string} input.id
  * @param {string} input.providerId
- * @param {string} [input.kind]
- * @param {string} [input.url]
- * @param {string} [input.command]
- * @param {string[]} [input.envRequirements]
- * @param {string} [input.authMode]
- * @param {string} [input.refreshPolicy]
- * @param {number} [input.ttlSeconds]
- * @param {string} [input.parserId]
- * @param {string} [input.trustTier]
- * @returns {object}
+ * @param {string | undefined} [input.kind]
+ * @param {string | undefined} [input.url]
+ * @param {string | undefined} [input.command]
+ * @param {string[] | undefined} [input.envRequirements]
+ * @param {string | undefined} [input.authMode]
+ * @param {string | undefined} [input.refreshPolicy]
+ * @param {number | undefined} [input.ttlSeconds]
+ * @param {string | undefined} [input.parserId]
+ * @param {string | undefined} [input.trustTier]
  */
 export function createProviderCatalogSource(input) {
     const id = optionalString(input.id);
@@ -142,12 +140,11 @@ export function createProviderCatalogSource(input) {
  * @param {unknown} input.value
  * @param {unknown} [input.normalizedValue]
  * @param {string} input.sourceId
- * @param {string} [input.sourceKind]
- * @param {string} [input.confidence]
+ * @param {string | undefined} [input.sourceKind]
+ * @param {string | undefined} [input.confidence]
  * @param {string | number | Date} [input.observedAt]
  * @param {string | number | Date | null} [input.expiresAt]
  * @param {string} [input.rawPayloadRef]
- * @returns {object}
  */
 export function createModelMetadataEvidence(input) {
     const evidenceId = optionalString(input.evidenceId);
@@ -165,8 +162,8 @@ export function createModelMetadataEvidence(input) {
         providerModel,
         routeProfile: optionalString(input.routeProfile),
         fieldPath,
-        value: sanitizeJsonValue(input.value),
-        normalizedValue: sanitizeJsonValue(input.normalizedValue ?? input.value),
+        value: sanitizeJsonValue(input.value, sanitizeCatalogString),
+        normalizedValue: sanitizeJsonValue(input.normalizedValue ?? input.value, sanitizeCatalogString),
         sourceId,
         sourceKind: optionalString(input.sourceKind) ?? 'unknown',
         confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
@@ -186,12 +183,11 @@ export function createModelMetadataEvidence(input) {
  * @param {unknown} input.value
  * @param {unknown} [input.normalizedValue]
  * @param {string} input.sourceId
- * @param {string} [input.sourceKind]
- * @param {string} [input.confidence]
+ * @param {string | undefined} [input.sourceKind]
+ * @param {string | undefined} [input.confidence]
  * @param {string | number | Date} [input.observedAt]
  * @param {string | number | Date | null} [input.expiresAt]
  * @param {string} [input.rawPayloadRef]
- * @returns {object}
  */
 export function createProviderMetadataEvidence(input) {
     const evidenceId = optionalString(input.evidenceId);
@@ -208,8 +204,8 @@ export function createProviderMetadataEvidence(input) {
         providerId: normalizeProviderId(input.providerId),
         subjectProviderId: normalizeProviderId(subjectProviderId),
         fieldPath,
-        value: sanitizeJsonValue(input.value),
-        normalizedValue: sanitizeJsonValue(input.normalizedValue ?? input.value),
+        value: sanitizeJsonValue(input.value, sanitizeCatalogString),
+        normalizedValue: sanitizeJsonValue(input.normalizedValue ?? input.value, sanitizeCatalogString),
         sourceId,
         sourceKind: optionalString(input.sourceKind) ?? 'unknown',
         confidence: optionalString(input.confidence) ?? MODEL_GATEWAY_CATALOG_CONFIDENCE.UNKNOWN,
@@ -229,7 +225,6 @@ export function createProviderMetadataEvidence(input) {
  * @param {Record<string, unknown>} [input.providerMetadata]
  * @param {Record<string, unknown>} [input.provenanceByField]
  * @param {Record<string, unknown>} [input.confidenceByField]
- * @returns {object}
  */
 export function createCanonicalProviderProjection(input) {
     const subjectProviderId = optionalString(input.subjectProviderId);
@@ -239,36 +234,33 @@ export function createCanonicalProviderProjection(input) {
         providerId: normalizeProviderId(input.providerId),
         subjectProviderId: normalizeProviderId(subjectProviderId),
         displayName: optionalString(input.displayName) ?? subjectProviderId,
-        dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonValue(input.dataPolicy) : {},
-        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonValue(input.providerMetadata) : {},
-        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonValue(input.provenanceByField) : {},
-        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonValue(input.confidenceByField) : {},
+        dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonRecord(input.dataPolicy, sanitizeCatalogString) : {},
+        providerMetadata: sanitizeOptionalCatalogRecord(input.providerMetadata),
+        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonRecord(input.provenanceByField, sanitizeCatalogString) : {},
+        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonRecord(input.confidenceByField, sanitizeCatalogString) : {},
     };
 }
 
 /**
+ * @template {Record<string, unknown>} TNormalizedPolicy
+ * @template {Record<string, unknown>} TProviderSpecific
  * @param {object} input
  * @param {string} input.providerId
  * @param {string} input.providerModel
  * @param {string} [input.routeProfile]
  * @param {string} [input.selectorKind]
  * @param {string} [input.selectorSyntax]
- * @param {string} [input.sourceId]
- * @param {string} [input.sourceKind]
- * @param {string} [input.confidence]
- * @param {Record<string, unknown>} [input.providerSpecific]
- * @param {Record<string, unknown>} [input.normalizedPolicy]
- * @returns {object}
+ * @param {string | undefined} [input.sourceId]
+ * @param {string | undefined} [input.sourceKind]
+ * @param {string | undefined} [input.confidence]
+ * @param {TProviderSpecific} [input.providerSpecific]
+ * @param {TNormalizedPolicy} input.normalizedPolicy
  */
 export function createModelRouteOption(input) {
     const providerModel = optionalString(input.providerModel);
     if (!providerModel) throw new Error('[model-gateway/catalog] route providerModel is required');
-    const providerSpecific = /** @type {Record<string, unknown>} */ (
-        isRecord(input.providerSpecific) ? sanitizeJsonValue(input.providerSpecific) : {}
-    );
-    const normalizedPolicy = /** @type {Record<string, unknown>} */ (
-        isRecord(input.normalizedPolicy) ? sanitizeJsonValue(input.normalizedPolicy) : {}
-    );
+    const providerSpecific = sanitizeOptionalCatalogRecord(input.providerSpecific);
+    const normalizedPolicy = sanitizeJsonRecord(input.normalizedPolicy, sanitizeCatalogString);
     const selectorKind = optionalString(input.selectorKind) ?? 'exact_model';
     const routeTraits = normalizeModelRoutePolicyTraits({
         selectorKind,
@@ -294,26 +286,30 @@ export function createModelRouteOption(input) {
 }
 
 /**
+ * @template {Record<string, unknown>} TQuota
+ * @template {Record<string, unknown>} TRateLimits
+ * @template {Record<string, unknown>} TSpendingLimits
+ * @template {Record<string, unknown>} TProviderMetadata
+
  * @param {object} input
  * @param {string} input.providerId
- * @param {string} [input.accountOverlayId]
- * @param {string} [input.accountScope]
- * @param {string} [input.secretRef]
- * @param {string} [input.organizationIdRef]
- * @param {string} [input.sourceId]
- * @param {string} [input.sourceKind]
- * @param {string} [input.confidence]
- * @param {string[]} [input.enabledModels]
- * @param {string[]} [input.blockedModels]
- * @param {string[]} [input.byokProviderKeys]
- * @param {Record<string, unknown>} [input.quota]
- * @param {Record<string, unknown>} [input.rateLimits]
- * @param {Record<string, unknown>} [input.spendingLimits]
+ * @param {string | undefined} [input.accountOverlayId]
+ * @param {string | undefined} [input.accountScope]
+ * @param {string | undefined} [input.secretRef]
+ * @param {string | undefined} [input.organizationIdRef]
+ * @param {string | undefined} [input.sourceId]
+ * @param {string | undefined} [input.sourceKind]
+ * @param {string | undefined} [input.confidence]
+ * @param {string[] | undefined} [input.enabledModels]
+ * @param {string[] | undefined} [input.blockedModels]
+ * @param {string[] | undefined} [input.byokProviderKeys]
+ * @param {TQuota} [input.quota]
+ * @param {TRateLimits} [input.rateLimits]
+ * @param {TSpendingLimits} [input.spendingLimits]
  * @param {Record<string, unknown>} [input.policyHeaders]
- * @param {Record<string, unknown>} [input.providerMetadata]
+ * @param {TProviderMetadata} [input.providerMetadata]
  * @param {string | number | Date} [input.observedAt]
  * @param {string | number | Date | null} [input.expiresAt]
- * @returns {object}
  */
 export function createProviderAccountOverlay(input) {
     const providerId = normalizeProviderId(input.providerId);
@@ -336,11 +332,11 @@ export function createProviderAccountOverlay(input) {
         enabledModels: stringList(input.enabledModels),
         blockedModels: stringList(input.blockedModels),
         byokProviderKeys: stringList(input.byokProviderKeys),
-        quota: isRecord(input.quota) ? sanitizeJsonValue(input.quota) : {},
-        rateLimits: isRecord(input.rateLimits) ? sanitizeJsonValue(input.rateLimits) : {},
-        spendingLimits: isRecord(input.spendingLimits) ? sanitizeJsonValue(input.spendingLimits) : {},
+        quota: sanitizeOptionalCatalogRecord(input.quota),
+        rateLimits: sanitizeOptionalCatalogRecord(input.rateLimits),
+        spendingLimits: sanitizeOptionalCatalogRecord(input.spendingLimits),
         policyHeaders: isRecord(input.policyHeaders) ? redactSecretRecord(input.policyHeaders) : {},
-        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonValue(input.providerMetadata) : {},
+        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonRecord(input.providerMetadata, sanitizeCatalogString) : {},
         observedAt: normalizeIsoDate(input.observedAt) ?? new Date().toISOString(),
         expiresAt: normalizeIsoDate(input.expiresAt),
         redactionStatus: 'sanitized',
@@ -372,7 +368,6 @@ export function createProviderAccountOverlay(input) {
  * @param {Record<string, unknown>} [input.confidenceByField]
  * @param {Record<string, unknown>} [input.routingHints]
  * @param {string[]} [input.accountOverlayRefs]
- * @returns {object}
  */
 export function createCanonicalModelProjection(input) {
     const providerModel = optionalString(input.providerModel);
@@ -385,11 +380,11 @@ export function createCanonicalModelProjection(input) {
         routeProfile: optionalString(input.routeProfile),
         displayName: optionalString(input.displayName) ?? providerModel,
         description: optionalString(input.description),
-        lifecycle: lifecycleText ?? (isRecord(input.lifecycle) ? sanitizeJsonValue(input.lifecycle) : 'unknown'),
+        lifecycle: lifecycleText ?? (isRecord(input.lifecycle) ? sanitizeJsonRecord(input.lifecycle, sanitizeCatalogString) : 'unknown'),
         aliases: Array.isArray(input.aliases)
             ? stringList(input.aliases)
             : isRecord(input.aliases)
-              ? sanitizeJsonValue(input.aliases)
+              ? sanitizeJsonRecord(input.aliases, sanitizeCatalogString)
               : [],
         family: optionalString(input.family),
         modalities: {
@@ -399,16 +394,16 @@ export function createCanonicalModelProjection(input) {
         capabilities: isRecord(input.capabilities) ? { ...input.capabilities } : {},
         supportedParameters: stringList(input.supportedParameters),
         unsupportedParameters: stringList(input.unsupportedParameters),
-        limits: isRecord(input.limits) ? sanitizeJsonValue(input.limits) : {},
-        pricing: isRecord(input.pricing) ? sanitizeJsonValue(input.pricing) : {},
-        rateLimits: isRecord(input.rateLimits) ? sanitizeJsonValue(input.rateLimits) : {},
-        dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonValue(input.dataPolicy) : {},
+        limits: isRecord(input.limits) ? sanitizeJsonRecord(input.limits, sanitizeCatalogString) : {},
+        pricing: isRecord(input.pricing) ? sanitizeJsonRecord(input.pricing, sanitizeCatalogString) : {},
+        rateLimits: isRecord(input.rateLimits) ? sanitizeJsonRecord(input.rateLimits, sanitizeCatalogString) : {},
+        dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonRecord(input.dataPolicy, sanitizeCatalogString) : {},
         license: optionalString(input.license),
-        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonValue(input.providerMetadata) : {},
-        openai: isRecord(input.openai) ? sanitizeJsonValue(input.openai) : {},
-        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonValue(input.provenanceByField) : {},
-        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonValue(input.confidenceByField) : {},
-        routingHints: isRecord(input.routingHints) ? sanitizeJsonValue(input.routingHints) : {},
+        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonRecord(input.providerMetadata, sanitizeCatalogString) : {},
+        openai: isRecord(input.openai) ? sanitizeJsonRecord(input.openai, sanitizeCatalogString) : {},
+        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonRecord(input.provenanceByField, sanitizeCatalogString) : {},
+        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonRecord(input.confidenceByField, sanitizeCatalogString) : {},
+        routingHints: isRecord(input.routingHints) ? sanitizeJsonRecord(input.routingHints, sanitizeCatalogString) : {},
         accountOverlayRefs: stringList(input.accountOverlayRefs),
     };
 }

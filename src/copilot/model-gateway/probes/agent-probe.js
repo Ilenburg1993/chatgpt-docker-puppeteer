@@ -11,14 +11,14 @@
 import {
     createPermissionHandler,
     createStaticInputHandler,
-    onSessionEvents,
     readConfiguredByokState,
     resolveConfiguredByokSessionOverrides,
-    sendSessionAndWait,
-    withEphemeralSession,
 } from '#copilot/sdk/session';
 import { createTool } from '#copilot/sdk/tools';
 import { evaluateModelGatewayProbeAdmission } from './admission.js';
+import { DEFAULT_MODEL_GATEWAY_PROBE_SESSION_RUNTIME } from './session-runtime.js';
+
+/** @typedef {import('../health/provider-failure.js').ByokProviderFailure} ByokProviderFailure */
 
 export const BYOK_AGENT_PROBE_TOOL = 'terminal_byok_probe_marker';
 export const BYOK_AGENT_PROBE_READ_TOOL = 'read_file_content';
@@ -52,7 +52,7 @@ function errorMessage(error) {
 
 /**
  * @param {unknown} value
- * @returns {any}
+ * @returns {ByokProviderFailure | null}
  */
 function defaultFailureClassifier(value) {
     void value;
@@ -60,7 +60,7 @@ function defaultFailureClassifier(value) {
 }
 
 /**
- * @param {any} summary
+ * @param {ReturnType<typeof readConfiguredByokState>['summary']} summary
  * @param {'chat' | 'agent'} mode
  * @param {string} prompt
  * @returns {{ shouldBlock: boolean; label: string }}
@@ -78,9 +78,7 @@ function defaultAdmission(summary, mode, prompt) {
  *     deps?: {
  *         readConfiguredByokState?: typeof readConfiguredByokState;
  *         resolveConfiguredByokSessionOverrides?: typeof resolveConfiguredByokSessionOverrides;
- *         withEphemeralSession?: typeof withEphemeralSession;
- *         onSessionEvents?: typeof onSessionEvents;
- *         sendSessionAndWait?: typeof sendSessionAndWait;
+ *         sessionRuntime?: import('./session-runtime.js').ModelGatewayProbeSessionRuntime;
  *         createPermissionHandler?: typeof createPermissionHandler;
  *         createStaticInputHandler?: typeof createStaticInputHandler;
  *         createTool?: typeof createTool;
@@ -116,9 +114,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
     const deps = options.deps ?? {};
     const readState = deps.readConfiguredByokState ?? readConfiguredByokState;
     const resolveOverrides = deps.resolveConfiguredByokSessionOverrides ?? resolveConfiguredByokSessionOverrides;
-    const runEphemeral = deps.withEphemeralSession ?? withEphemeralSession;
-    const subscribe = deps.onSessionEvents ?? onSessionEvents;
-    const sendAndWait = deps.sendSessionAndWait ?? sendSessionAndWait;
+    const sessionRuntime = deps.sessionRuntime ?? DEFAULT_MODEL_GATEWAY_PROBE_SESSION_RUNTIME;
     const makePermissionHandler = deps.createPermissionHandler ?? createPermissionHandler;
     const makeStaticInputHandler = deps.createStaticInputHandler ?? createStaticInputHandler;
     const makeTool = deps.createTool ?? createTool;
@@ -264,7 +260,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
     });
 
     try {
-        await runEphemeral(
+        await sessionRuntime.withSession(
             {
                 model,
                 provider,
@@ -285,7 +281,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
             },
             async ({ session, sessionId: temporarySessionId }) => {
                 sessionId = temporarySessionId;
-                const unsubscribe = subscribe(session, {
+                const unsubscribe = sessionRuntime.subscribe(session, {
                     'assistant.message_delta': (event) => {
                         const delta = typeof event?.data?.deltaContent === 'string' ? event.data.deltaContent : '';
                         if (!delta) return;
@@ -313,7 +309,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
                 });
                 try {
                     providerAttempted = true;
-                    const reply = await sendAndWait(session, { prompt }, timeoutMs);
+                    const reply = await sessionRuntime.sendAndWait(session, { prompt }, timeoutMs);
                     const content = typeof reply?.data?.content === 'string' ? reply.data.content : '';
                     if (content) finalContent = content;
                 } finally {

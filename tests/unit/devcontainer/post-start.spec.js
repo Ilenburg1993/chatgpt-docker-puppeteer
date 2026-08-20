@@ -20,6 +20,7 @@ function runPostStart(env = {}) {
 describe('post-start.sh repairs and status', () => {
     it('creates health.status=ok when environment is healthy', () => {
         const out = runPostStart({ DEVCONTAINER_NSS_DIR: mkdtempSync(join(tmpdir(), 'nss-')) });
+        assert.equal(typeof out, 'string');
         const status = execSync('cat /tmp/devcontainer-health.status').toString().trim();
         assert.equal(status, 'ok');
     });
@@ -27,6 +28,7 @@ describe('post-start.sh repairs and status', () => {
     it('honors DEVCONTAINER_MAKE_TIMEOUT env', () => {
         const dir = mkdtempSync(join(tmpdir(), 'nss-'));
         const out = runPostStart({ DEVCONTAINER_NSS_DIR: dir, DEVCONTAINER_MAKE_TIMEOUT: '1' });
+        assert.equal(typeof out, 'string');
         // script should still run and create health file regardless of result
         const status = execSync('cat /tmp/devcontainer-health.status').toString().trim();
         assert(['ok', 'degraded'].includes(status), 'health file should exist even if degraded');
@@ -44,7 +46,7 @@ describe('post-start.sh repairs and status', () => {
         const fakeDir = mkdtempSync(join(tmpdir(), 'fakeid-'));
         const fakeId = join(fakeDir, 'id');
         writeFileSync(fakeId, '#!/bin/sh\necho 0\n', { mode: 0o755 });
-        const env = { DEVCONTAINER_NSS_DIR: dir, PATH: fakeDir + ':' + process.env.PATH };
+        const env = { DEVCONTAINER_NSS_DIR: dir, PATH: fakeDir + ':' + process.env['PATH'] };
         // remove files so repair would normally run
         try {
             rmSync(join(dir, 'passwd'));

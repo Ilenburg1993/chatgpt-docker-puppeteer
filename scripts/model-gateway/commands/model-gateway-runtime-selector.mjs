@@ -29,8 +29,17 @@ import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
 loadModelGatewayDotenv();
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
+
+/**
+ * @typedef {{ name: string; durationMs: number }} Timing
+ * @typedef {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} SelectionAudit
+ * @typedef {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} RuntimeSelectorPlan
+ */
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-selector.mjs [--json] [--full-json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--require-agent-probe-profiles a,b] [--runtime-health-limit N] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
@@ -42,17 +51,9 @@ explicit --execute flag.
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 function readProfiles() {
+    /** @type {string[]} */
     const values = [];
     const profile = readArg('--profile');
     const profiles = readArg('--profiles');
@@ -63,14 +64,14 @@ function readProfiles() {
     return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
 }
 
-function readInteger(name, fallback) {
+function readInteger(/** @type {string} */ name, /** @type {number | undefined} */ fallback) {
     const raw = readArg(name);
     if (!raw) return fallback;
     const parsed = Number.parseInt(raw, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function readStringList(name) {
+function readStringList(/** @type {string} */ name) {
     return [
         ...new Set(
             readArg(name)
@@ -84,6 +85,7 @@ function readStringList(name) {
 function readRuntimeProofWeights() {
     const raw = readArg('--runtime-proof-weights');
     if (!raw.trim()) return null;
+    /** @type {Record<string, number>} */
     const weights = {};
     for (const item of raw.split(',')) {
         const [key, value] = item.split(/[=:]/u, 2).map((part) => part.trim());
@@ -94,7 +96,7 @@ function readRuntimeProofWeights() {
     return Object.keys(weights).length > 0 ? weights : null;
 }
 
-function selectedDispositions(selection) {
+function selectedDispositions(/** @type {SelectionAudit} */ selection) {
     return [
         ...new Set(
             selection.profiles
@@ -108,23 +110,36 @@ function selectedDispositions(selection) {
     ].sort();
 }
 
+/** @returns {'file' | 'sqlite' | 'merged'} */
 function runtimeSourceArg() {
     const value = readArg('--runtime-source', 'merged');
-    return ['file', 'sqlite', 'merged'].includes(value) ? value : 'merged';
+    if (value === 'file' || value === 'sqlite' || value === 'merged') return value;
+    return 'merged';
 }
 
-function selectionPolicyArg(requireRuntimeProof) {
+/** @returns {'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof'} */
+function selectionPolicyArg(/** @type {boolean} */ requireRuntimeProof) {
     if (requireRuntimeProof) return 'require_runtime_proof';
     const value = readArg('--selection-policy', 'metadata_first').replaceAll('-', '_');
-    return ['metadata_first', 'prefer_runtime_proved', 'require_runtime_proof'].includes(value) ? value : 'metadata_first';
+    if (value === 'metadata_first' || value === 'prefer_runtime_proved' || value === 'require_runtime_proof') {
+        return value;
+    }
+    return 'metadata_first';
 }
 
-function formatCountMap(counts) {
+function formatCountMap(/** @type {Record<string, number> | null | undefined} */ counts) {
     return Object.entries(counts ?? {})
         .map(([key, count]) => `${key}:${count}`)
         .join(',') || '-';
 }
 
+/**
+ * @template T
+ * @param {Timing[]} timings
+ * @param {string} name
+ * @param {() => Promise<T>} callback
+ * @returns {Promise<T>}
+ */
 async function measured(timings, name, callback) {
     const started = Date.now();
     try {
@@ -134,6 +149,13 @@ async function measured(timings, name, callback) {
     }
 }
 
+/**
+ * @template T
+ * @param {Timing[]} timings
+ * @param {string} name
+ * @param {() => T} callback
+ * @returns {T}
+ */
 function measuredSync(timings, name, callback) {
     const started = Date.now();
     try {
@@ -143,7 +165,21 @@ function measuredSync(timings, name, callback) {
     }
 }
 
-async function buildRuntimeSelectorContext({
+async function buildRuntimeSelectorContext(
+    /** @type {{
+     *     strict: boolean;
+     *     requireRuntimeProof: boolean;
+     *     requireRuntimeEnvReady: boolean;
+     *     selectionPolicy: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof';
+     *     runtimeSource: 'file' | 'sqlite' | 'merged';
+     *     runtimeHealthLimit: number;
+     *     preferredProbeKinds?: string[];
+     *     blockFailedProbeKinds?: string[];
+     *     requireAgentProbeProfiles?: string[];
+     *     temporaryFailureCooldownMs?: number | null;
+     *     preferProviderDiversity?: boolean;
+     *     runtimeProofWeights?: Record<string, number> | null;
+     * }} */ {
     strict,
     requireRuntimeProof,
     requireRuntimeEnvReady,
@@ -156,13 +192,16 @@ async function buildRuntimeSelectorContext({
     temporaryFailureCooldownMs = null,
     preferProviderDiversity = false,
     runtimeProofWeights = null,
-}) {
+    },
+) {
+    /** @type {Timing[]} */
     const timings = [];
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await measured(timings, 'catalog.read_json_snapshot', () => store.readSnapshot());
     const integrity = measuredSync(timings, 'catalog.integrity_audit', () => auditModelGatewayCatalogSnapshotIntegrity(snapshot));
     const secretRegistry = measuredSync(timings, 'env.secret_registry', () => createEnvSecretRegistry());
     const fileHealthRecords = measuredSync(timings, 'health.read_file_store', () => listByokProviderModelHealth());
+    /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
     let sqliteHealthRecords = [];
     let sqliteRuntimeError = null;
     if (runtimeSource === 'sqlite' || runtimeSource === 'merged') {
@@ -301,8 +340,8 @@ const selectionPolicy = selectionPolicyArg(requireRuntimeProof);
 const preferredProbeKinds = readStringList('--preferred-probes');
 const blockFailedProbeKinds = readStringList('--block-failed-probes');
 const requireAgentProbeProfiles = readStringList('--require-agent-probe-profiles');
-const temporaryFailureCooldownMs = readInteger('--temporary-failure-cooldown-ms', 0);
-const runtimeHealthLimit = readInteger('--runtime-health-limit', 1_500);
+const temporaryFailureCooldownMs = readInteger('--temporary-failure-cooldown-ms', 0) ?? 0;
+const runtimeHealthLimit = readInteger('--runtime-health-limit', 1_500) ?? 1_500;
 const runtimeProofWeights = readRuntimeProofWeights();
 const requestedExecutionProfile = readArg('--profile') || null;
 const fallbackExecutionProfiles = readArg('--fallback-profiles')
@@ -333,13 +372,16 @@ const context = await buildRuntimeSelectorContext({
     runtimeProofWeights,
 });
 
+/** @type {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlanWithFallbacks>> | null} */
 let execution = null;
+/** @type {{ attempted: boolean; ok: boolean; written: number; error: string | null }} */
 let routeDecisionPersistence = {
     attempted: false,
     ok: true,
     written: 0,
     error: null,
 };
+/** @type {{ attempted: boolean; ok: boolean; records: number; healthObservations: number; probeResults: number; skippedRecords: number; runId: string | null; error: string | null }} */
 let runtimeHealthPersistence = {
     attempted: false,
     ok: true,
@@ -350,6 +392,7 @@ let runtimeHealthPersistence = {
     runId: null,
     error: null,
 };
+/** @type {{ attempted: boolean; ok: boolean; runId: string | null; probeResults: number; skippedResults: number; successCount: number; failureCount: number; error: string | null }} */
 let runtimeProbePersistence = {
     attempted: false,
     ok: true,
@@ -367,7 +410,7 @@ function routeRequestProfiles() {
     );
 }
 
-function hasSelectedRequestedOrFallbackRoute(plan) {
+function hasSelectedRequestedOrFallbackRoute(/** @type {RuntimeSelectorPlan} */ plan) {
     const profiles = new Set(routeRequestProfiles());
     if (profiles.size === 0) return plan.summary.blockedProfileCount === 0;
     return plan.routes.some((route) => profiles.has(route.profileId) && route.status === 'selected' && route.selected);
@@ -391,17 +434,17 @@ if (execute) {
         };
     } else {
         const runtimeRouteDecisionCapture = createModelGatewayRouteDecisionCapture();
-        const maxAttempts = readInteger('--max-attempts', 0);
-        const maxAttemptsPerProvider = readInteger('--max-attempts-per-provider', 4);
+        const maxAttempts = readInteger('--max-attempts', 0) ?? 0;
+        const maxAttemptsPerProvider = readInteger('--max-attempts-per-provider', 4) ?? 4;
         execution = await executeModelGatewayRuntimeSelectorPlanWithFallbacks(context.runtimeSelectorPlan, {
-            profileId: requestedExecutionProfile || undefined,
+            ...(requestedExecutionProfile ? { profileId: requestedExecutionProfile } : {}),
             fallbackProfileIds: fallbackExecutionProfiles,
             ...(maxAttempts > 0 ? { maxAttempts } : {}),
             maxAttemptsPerProvider,
-            attemptsPerRoute: readInteger('--attempts-per-route', 1),
-            retryDelayMs: readInteger('--retry-delay-ms', 0),
-            maxRetryDelayMs: readInteger('--max-retry-delay-ms', 30_000),
-            timeoutMs: readInteger('--timeout-ms', 45_000),
+            attemptsPerRoute: readInteger('--attempts-per-route', 1) ?? 1,
+            retryDelayMs: readInteger('--retry-delay-ms', 0) ?? 0,
+            maxRetryDelayMs: readInteger('--max-retry-delay-ms', 30_000) ?? 30_000,
+            timeoutMs: readInteger('--timeout-ms', 45_000) ?? 45_000,
             env: process.env,
             deps: {
                 recordRouteDecision: runtimeRouteDecisionCapture.record,
@@ -563,8 +606,8 @@ const summary = {
           ],
 };
 
-function compactHealthDecision(value) {
-    const row = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+function compactHealthDecision(/** @type {unknown} */ value) {
+    const row = value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
     if (!row) return null;
     const health = row['health'] && typeof row['health'] === 'object' && !Array.isArray(row['health']) ? row['health'] : null;
     return {
@@ -579,8 +622,8 @@ function compactHealthDecision(value) {
     };
 }
 
-function compactProviderCooldown(value) {
-    const row = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+function compactProviderCooldown(/** @type {unknown} */ value) {
+    const row = value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
     if (!row) return null;
     return {
         include: row['include'] === true,
@@ -593,8 +636,8 @@ function compactProviderCooldown(value) {
     };
 }
 
-function compactSelectedRoute(selected) {
-    const row = selected && typeof selected === 'object' && !Array.isArray(selected) ? selected : null;
+function compactSelectedRoute(/** @type {unknown} */ selected) {
+    const row = selected && typeof selected === 'object' && !Array.isArray(selected) ? Object.fromEntries(Object.entries(selected)) : null;
     if (!row) return null;
     return {
         id: typeof row['id'] === 'string' ? row['id'] : null,
@@ -614,8 +657,8 @@ function compactSelectedRoute(selected) {
     };
 }
 
-function compactDecisionEvent(event) {
-    const row = event && typeof event === 'object' && !Array.isArray(event) ? event : null;
+function compactDecisionEvent(/** @type {unknown} */ event) {
+    const row = event && typeof event === 'object' && !Array.isArray(event) ? Object.fromEntries(Object.entries(event)) : null;
     if (!row) return null;
     return {
         type: typeof row['type'] === 'string' ? row['type'] : null,
@@ -631,7 +674,7 @@ function compactDecisionEvent(event) {
     };
 }
 
-function compactSelectorRoute(route) {
+function compactSelectorRoute(/** @type {RuntimeSelectorPlan['routes'][number]} */ route) {
     return {
         profileId: route.profileId,
         status: route.status,
@@ -663,14 +706,14 @@ function compactSelectorRoute(route) {
     };
 }
 
-function compactRuntimeSelectorPlan(plan) {
+function compactRuntimeSelectorPlan(/** @type {RuntimeSelectorPlan} */ plan) {
     return {
         ...plan,
         routes: plan.routes.map(compactSelectorRoute),
     };
 }
 
-function compactPolicyResolution(policyResolution) {
+function compactPolicyResolution(/** @type {ReturnType<typeof resolveModelGatewaySelectionPolicy>} */ policyResolution) {
     return {
         schema: policyResolution.schema,
         ok: policyResolution.ok,
@@ -691,7 +734,7 @@ function compactPolicyResolution(policyResolution) {
     };
 }
 
-function compactSummaryForJson(value) {
+function compactSummaryForJson(/** @type {typeof summary} */ value) {
     if (fullJson) return value;
     return {
         ...value,
@@ -720,9 +763,9 @@ if (json) {
     );
     for (const route of context.runtimeSelectorPlan.routes) {
         const runtimeEnv = route.runtimeEnv;
-        const selected = route.selected ?? {};
+        const selected = route.selected;
         process.stdout.write(
-            `  ${route.profileId}: ${route.status} route=${route.selectedRouteKey ?? '-'} selector=${selected['selectorKind'] ?? '-'}:${selected['selectorSyntax'] ?? '-'} layer=${selected['routeLayer'] ?? '-'} wire=${selected['wireApi'] ?? '-'} upstream=${selected['upstreamProvider'] ?? '-'} env=${runtimeEnv?.status ?? '-'} missing=${runtimeEnv?.missingRequiredKeys.join(',') || '-'} alternatives=${route.alternativeSummary?.usableCount ?? 0}/${route.alternativeSummary?.evaluatedCount ?? 0} reasons=${route.reasons.slice(0, 4).join(',') || '-'}\n`,
+            `  ${route.profileId}: ${route.status} route=${route.selectedRouteKey ?? '-'} selector=${selected?.selectorKind ?? '-'}:${selected?.selectorSyntax ?? '-'} layer=${selected?.routeLayer ?? '-'} wire=${selected?.wireApi ?? '-'} upstream=${selected?.upstreamProvider ?? '-'} env=${runtimeEnv?.status ?? '-'} missing=${runtimeEnv?.missingRequiredKeys.join(',') || '-'} alternatives=${route.alternativeSummary?.usableCount ?? 0}/${route.alternativeSummary?.evaluatedCount ?? 0} reasons=${route.reasons.slice(0, 4).join(',') || '-'}\n`,
         );
     }
     if (execution) {

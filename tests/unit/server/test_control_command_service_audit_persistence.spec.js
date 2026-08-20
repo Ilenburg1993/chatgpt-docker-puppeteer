@@ -31,15 +31,15 @@ function withTempDb(/** @type {() => Promise<void>} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'control-audit-persist-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
-        const prevDb = process.env.MAESTRO_DB_PATH;
-        process.env.MAESTRO_DB_PATH = dbPath;
+        const prevDb = process.env['MAESTRO_DB_PATH'];
+        process.env['MAESTRO_DB_PATH'] = dbPath;
         try {
             getDb();
             await fn();
         } finally {
             closeDb();
-            if (prevDb === undefined) delete process.env.MAESTRO_DB_PATH;
-            else process.env.MAESTRO_DB_PATH = prevDb;
+            if (prevDb === undefined) delete process.env['MAESTRO_DB_PATH'];
+            else process.env['MAESTRO_DB_PATH'] = prevDb;
             fs.rmSync(tmpDir, { recursive: true, force: true });
         }
     };
@@ -66,16 +66,16 @@ async function listenJsonStub(/** @type {(req: any) => any} */ handler) {
 test(
     'control commands approve/reject patch, upsert/toggle watch rule and upsert inference config',
     withTempDb(async () => {
-        const prevGwHost = process.env.INFERENCE_GATEWAY_HOST;
-        const prevGwPort = process.env.INFERENCE_GATEWAY_PORT;
+        const prevGwHost = process.env['INFERENCE_GATEWAY_HOST'];
+        const prevGwPort = process.env['INFERENCE_GATEWAY_PORT'];
         const stub = await listenJsonStub((/** @type {any} */ req) => {
             if ((req.url || '').startsWith('/v1/policies/reload')) {
                 return { ok: true, reloaded: { ok: true } };
             }
             return { ok: true };
         });
-        process.env.INFERENCE_GATEWAY_HOST = stub.host;
-        process.env.INFERENCE_GATEWAY_PORT = String(stub.port);
+        process.env['INFERENCE_GATEWAY_HOST'] = stub.host;
+        process.env['INFERENCE_GATEWAY_PORT'] = String(stub.port);
 
         try {
             createAuditJob({
@@ -307,15 +307,15 @@ test(
                 true,
             );
 
-            const prevApplyEnabled = process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL;
-            const prevAllowedPrefixes = process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES;
-            const prevAllowedBranches = process.env.AUDIT_PATCH_APPLY_ALLOWED_BRANCHES;
-            const prevRequireClean = process.env.AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE;
+            const prevApplyEnabled = process.env['AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL'];
+            const prevAllowedPrefixes = process.env['AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES'];
+            const prevAllowedBranches = process.env['AUDIT_PATCH_APPLY_ALLOWED_BRANCHES'];
+            const prevRequireClean = process.env['AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE'];
             try {
-                process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL = 'true';
-                process.env.AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE = 'true';
-                process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES = '';
-                process.env.AUDIT_PATCH_APPLY_ALLOWED_BRANCHES = '';
+                process.env['AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL'] = 'true';
+                process.env['AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE'] = 'true';
+                process.env['AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES'] = '';
+                process.env['AUDIT_PATCH_APPLY_ALLOWED_BRANCHES'] = '';
                 await assert.rejects(
                     () =>
                         executeCommand({
@@ -330,8 +330,8 @@ test(
                     /worktree local precisa estar limpo/i,
                 );
 
-                process.env.AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE = 'false';
-                process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES = 'safe/';
+                process.env['AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE'] = 'false';
+                process.env['AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES'] = 'safe/';
                 await assert.rejects(
                     () =>
                         executeCommand({
@@ -346,8 +346,8 @@ test(
                     /paths fora da allowlist/i,
                 );
 
-                process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES = '';
-                process.env.AUDIT_PATCH_APPLY_ALLOWED_BRANCHES = '__definitely_not_current_branch__';
+                process.env['AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES'] = '';
+                process.env['AUDIT_PATCH_APPLY_ALLOWED_BRANCHES'] = '__definitely_not_current_branch__';
                 await assert.rejects(
                     () =>
                         executeCommand({
@@ -362,20 +362,20 @@ test(
                     /branch atual não permitido/i,
                 );
             } finally {
-                if (prevApplyEnabled === undefined) delete process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL;
-                else process.env.AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL = prevApplyEnabled;
-                if (prevAllowedPrefixes === undefined) delete process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES;
-                else process.env.AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES = prevAllowedPrefixes;
-                if (prevAllowedBranches === undefined) delete process.env.AUDIT_PATCH_APPLY_ALLOWED_BRANCHES;
-                else process.env.AUDIT_PATCH_APPLY_ALLOWED_BRANCHES = prevAllowedBranches;
-                if (prevRequireClean === undefined) delete process.env.AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE;
-                else process.env.AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE = prevRequireClean;
+                if (prevApplyEnabled === undefined) delete process.env['AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL'];
+                else process.env['AUDIT_AGENT_PATCH_APPLY_ENABLE_UNSAFE_LOCAL'] = prevApplyEnabled;
+                if (prevAllowedPrefixes === undefined) delete process.env['AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES'];
+                else process.env['AUDIT_PATCH_APPLY_ALLOWED_PATH_PREFIXES'] = prevAllowedPrefixes;
+                if (prevAllowedBranches === undefined) delete process.env['AUDIT_PATCH_APPLY_ALLOWED_BRANCHES'];
+                else process.env['AUDIT_PATCH_APPLY_ALLOWED_BRANCHES'] = prevAllowedBranches;
+                if (prevRequireClean === undefined) delete process.env['AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE'];
+                else process.env['AUDIT_PATCH_APPLY_REQUIRE_CLEAN_WORKTREE'] = prevRequireClean;
             }
         } finally {
-            if (prevGwHost === undefined) delete process.env.INFERENCE_GATEWAY_HOST;
-            else process.env.INFERENCE_GATEWAY_HOST = prevGwHost;
-            if (prevGwPort === undefined) delete process.env.INFERENCE_GATEWAY_PORT;
-            else process.env.INFERENCE_GATEWAY_PORT = prevGwPort;
+            if (prevGwHost === undefined) delete process.env['INFERENCE_GATEWAY_HOST'];
+            else process.env['INFERENCE_GATEWAY_HOST'] = prevGwHost;
+            if (prevGwPort === undefined) delete process.env['INFERENCE_GATEWAY_PORT'];
+            else process.env['INFERENCE_GATEWAY_PORT'] = prevGwPort;
             await /** @type {Promise<void>} */ (
                 new Promise((resolve) => {
                     stub.server.close(() => resolve());

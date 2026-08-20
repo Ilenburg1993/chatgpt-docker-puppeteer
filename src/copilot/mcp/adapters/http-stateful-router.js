@@ -25,15 +25,40 @@ import { createCopilotMcpServer } from '../server.js';
 import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.js';
 
 /**
+ * Concrete Node request/response types used by the default HTTP adapters.
+ * The stateful router itself is generic so injected adapters and deterministic tests only implement the surface used here.
+ *
  * @typedef {import('node:http').IncomingMessage | import('node:http2').Http2ServerRequest} McpHttpRequest
  * @typedef {import('node:http').ServerResponse | import('node:http2').Http2ServerResponse} McpHttpResponse
+ * @typedef {{ method?: string | undefined; httpVersionMajor?: number | undefined }} StatefulRouterRequestLike
+ * @typedef {object} StatefulRouterResponseLike
  * @typedef {{ error: string; error_description: string }} McpTransportError
  * @typedef {import('../control-plane/session-runtime.js').McpHttpSessionAuthBinding} McpHttpSessionAuthBinding
  * @typedef {import('../control-plane/auth.js').McpSessionAuthBindingResolution} StatefulRouterAuthBindingResolution
- *
+ * @typedef {{
+ *   connect: (transport: unknown) => Promise<void>;
+ *   close: () => Promise<void> | void;
+ *   sendToolListChanged?: () => Promise<void> | void;
+ * }} StatefulRouterServer
+ * @typedef {{ handled: true; mode: 'stateful'; kind: 'initialize' | 'session-bound' }} StatefulRouterResult
+ */
+
+/**
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @typedef {{
+ *   handleRequest: (req: TReq, res: TRes, body?: unknown) => Promise<void>;
+ *   close: () => Promise<void> | void;
+ *   send?: (message: unknown) => Promise<unknown> | unknown;
+ * }} StatefulRouterTransport
+ */
+
+/**
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
  * @typedef {object} StatefulRouterOptions
- * @property {McpHttpRequest} req
- * @property {McpHttpResponse} res
+ * @property {TReq} req
+ * @property {TRes} res
  * @property {URL} url
  * @property {unknown} parsedMcpBody
  * @property {import('../control-plane/auth.js').McpAuthContext} authContext
@@ -41,20 +66,20 @@ import { isMcpInitializeRequestBody, normalizeMcpSessionId } from './http-body.j
  * @property {boolean} [useSqliteStore]
  * @property {ReturnType<typeof getDefaultMcpHttpSessionRuntime>} [runtime]
  * @property {ReturnType<typeof getDefaultMcpHttpStreamRegistry>} [streamRegistry]
- * @property {(req: McpHttpRequest, name: string) => string | undefined} readHeader
- * @property {(res: McpHttpResponse, statusCode: number, error: McpTransportError) => void} writeTransportError
- * @property {(options: { authContext: import('../control-plane/auth.js').McpAuthContext }) => ReturnType<typeof createCopilotMcpServer>} [createServer]
- * @property {(options: import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions) => StreamableHTTPServerTransport} [createTransport]
+ * @property {(req: TReq, name: string) => string | undefined} readHeader
+ * @property {(res: TRes, statusCode: number, error: McpTransportError) => void} writeTransportError
+ * @property {(options: { authContext: import('../control-plane/auth.js').McpAuthContext }) => StatefulRouterServer} [createServer]
+ * @property {(options: import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions) => StatefulRouterTransport<TReq, TRes>} [createTransport]
  * @property {() => import('../control-plane/event-store.js').McpSdkCompatibleEventStore} [createEventStore]
  * @property {(authContext: import('../control-plane/auth.js').McpAuthContext, url: URL) => Promise<StatefulRouterAuthBindingResolution> | StatefulRouterAuthBindingResolution} [resolveAuthBinding]
- *
- * @typedef {{ handled: true; mode: 'stateful'; kind: 'initialize' | 'session-bound' }} StatefulRouterResult
  */
 
 const statefulTransportEventStores = new WeakMap();
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @returns {Promise<StatefulRouterResult>}
  */
 export async function handleStatefulMcpHttpRequest(options) {
@@ -162,7 +187,9 @@ export async function handleStatefulMcpHttpRequest(options) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @returns {boolean}
  */
 function writeStatefulSseProbeIfRequested(options) {
@@ -183,7 +210,9 @@ function writeStatefulSseProbeIfRequested(options) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @param {unknown} transport
  * @returns {NodeJS.Timeout | null}
  */
@@ -213,7 +242,9 @@ function scheduleStatefulSdkSseProbeIfRequested(options, transport) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @param {unknown} transport
  * @returns {Promise<void>}
  */
@@ -234,7 +265,9 @@ async function seedStatefulSdkReplayProbeIfRequested(options, transport) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @returns {Promise<StatefulRouterAuthBindingResolution>}
  */
 async function resolveRequestAuthBinding(options) {
@@ -247,7 +280,9 @@ async function resolveRequestAuthBinding(options) {
  * Direct unit tests and explicit in-memory router harnesses do not pass through the public HTTP envelope. Keep that path
  * deterministic while preserving the operational SQLite/JWKS claims path above.
  *
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @returns {StatefulRouterAuthBindingResolution}
  */
 function buildInMemoryRouterBinding(options) {
@@ -268,7 +303,9 @@ function buildInMemoryRouterBinding(options) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @param {Extract<StatefulRouterAuthBindingResolution, { ok: false }>} failure
  * @returns {void}
  */
@@ -278,7 +315,9 @@ function writeAuthBindingFailure(options, failure) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @returns {McpTransportError | null}
  */
 function validateLastEventIdHeader(options) {
@@ -311,14 +350,20 @@ function hasStatefulSessionCapacity(runtime) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @param {ReturnType<typeof getDefaultMcpHttpSessionRuntime>} runtime
  * @param {McpHttpSessionAuthBinding} authBinding
  * @returns {Promise<void>}
  */
 async function handleStatefulInitialize(options, runtime, authBinding) {
-    const createServer = options.createServer ?? createCopilotMcpServer;
-    const createTransport = options.createTransport ?? ((transportOptions) => new StreamableHTTPServerTransport(transportOptions));
+    const createServer = options.createServer ?? ((serverOptions) =>
+        /** @type {StatefulRouterServer} */ (/** @type {unknown} */ (createCopilotMcpServer(serverOptions))));
+    const createTransport = options.createTransport ?? ((transportOptions) =>
+        /** @type {StatefulRouterTransport<TReq, TRes>} */ (
+            /** @type {unknown} */ (new StreamableHTTPServerTransport(transportOptions))
+        ));
     const createEventStore = options.createEventStore ?? (() => createDefaultStatefulEventStore(options));
     const server = createServer({ authContext: options.authContext });
     const rawEventStore = createEventStore();
@@ -327,7 +372,6 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
     );
     /** @type {string | null} */
     let initializedSessionId = null;
-    /** @type {StreamableHTTPServerTransport} */
     const transport = createTransport({
         eventStore,
         sessionIdGenerator: () => randomUUID(),
@@ -353,14 +397,8 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
     if (transport && typeof transport === 'object') statefulTransportEventStores.set(transport, rawEventStore);
 
     try {
-        await server.connect(
-            /** @type {import('@modelcontextprotocol/sdk/shared/transport.js').Transport} */ (transport),
-        );
-        await transport.handleRequest(
-            /** @type {import('node:http').IncomingMessage} */ (options.req),
-            /** @type {import('node:http').ServerResponse} */ (options.res),
-            options.parsedMcpBody,
-        );
+        await server.connect(transport);
+        await transport.handleRequest(options.req, options.res, options.parsedMcpBody);
         if (initializedSessionId) {
             // Do not hold initialize open for schema convergence; the helper captures failures and reserves one attempt
             // per descriptor revision so ChatGPT session churn cannot create notification fan-out.
@@ -382,7 +420,9 @@ async function handleStatefulInitialize(options, runtime, authBinding) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @returns {import('../control-plane/event-store.js').McpSdkCompatibleEventStore}
  */
 function createDefaultStatefulEventStore(options) {
@@ -390,7 +430,9 @@ function createDefaultStatefulEventStore(options) {
 }
 
 /**
- * @param {StatefulRouterOptions} options
+ * @template {StatefulRouterRequestLike} TReq
+ * @template {StatefulRouterResponseLike} TRes
+ * @param {StatefulRouterOptions<TReq, TRes>} options
  * @param {unknown} transport
  * @param {unknown} parsedMcpBody
  * @returns {Promise<void>}
@@ -403,19 +445,10 @@ async function handleRequestOnExistingTransport(options, transport, parsedMcpBod
         throw new Error('MCP stateful transport is missing handleRequest().');
     }
     if (parsedMcpBody === undefined) {
-        await handleRequest.call(
-            transport,
-            /** @type {import('node:http').IncomingMessage} */ (options.req),
-            /** @type {import('node:http').ServerResponse} */ (options.res),
-        );
+        await handleRequest.call(transport, options.req, options.res);
         return;
     }
-    await handleRequest.call(
-        transport,
-        /** @type {import('node:http').IncomingMessage} */ (options.req),
-        /** @type {import('node:http').ServerResponse} */ (options.res),
-        parsedMcpBody,
-    );
+    await handleRequest.call(transport, options.req, options.res, parsedMcpBody);
 }
 
 /**
@@ -456,7 +489,7 @@ function acceptsTextEventStream(value) {
 }
 
 /**
- * @param {McpHttpRequest} req
+ * @param {StatefulRouterRequestLike} req
  * @returns {'http1' | 'http2' | 'unknown'}
  */
 function detectAdapter(req) {
@@ -467,7 +500,7 @@ function detectAdapter(req) {
 }
 
 /**
- * @param {McpHttpResponse} res
+ * @param {StatefulRouterResponseLike} res
  * @param {string} name
  * @param {string} value
  * @returns {void}
@@ -478,7 +511,7 @@ function setHeaderIfSupported(res, name, value) {
 }
 
 /**
- * @param {McpHttpResponse} res
+ * @param {StatefulRouterResponseLike} res
  * @returns {void}
  */
 function writeNoContentIfResponseOpen(res) {

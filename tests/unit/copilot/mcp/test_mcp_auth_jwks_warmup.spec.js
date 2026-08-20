@@ -30,7 +30,7 @@ describe('MCP auth JWKS warmup', () => {
             response.end(JSON.stringify({ keys: [] }));
         });
         servers.push(server);
-        await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+        await new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(undefined)));
         const address = server.address();
         assert.ok(address && typeof address === 'object');
         const issuer = `http://127.0.0.1:${address.port}`;
@@ -54,16 +54,16 @@ describe('MCP auth JWKS warmup', () => {
     });
 
     it('schedules once and records a successful non-blocking warmup', async () => {
-        /** @type {(() => void) | null} */
-        let callback = null;
+        /** @type {{ value: (() => void) | undefined }} */
+        const callback = { value: undefined };
         const scheduled = scheduleMcpAuthJwksWarmup({
             enabled: true,
             delayMs: 0,
             env: {},
-            setTimeoutFn: /** @type {typeof setTimeout} */ ((fn) => {
-                callback = /** @type {() => void} */ (fn);
-                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
-            }),
+            setTimeoutFn: (fn) => {
+                callback.value = fn;
+                return { unref() {} };
+            },
             warmupRunner: async () => ({
                 ok: true,
                 skipped: false,
@@ -77,8 +77,8 @@ describe('MCP auth JWKS warmup', () => {
 
         assert.equal(scheduled, true);
         assert.equal(scheduleMcpAuthJwksWarmup({ enabled: true }), false);
-        assert.ok(callback);
-        callback();
+        assert.ok(callback.value);
+        callback.value();
         await new Promise((resolve) => setImmediate(resolve));
 
         const state = readMcpAuthJwksWarmupState();
@@ -100,24 +100,24 @@ describe('MCP auth JWKS warmup', () => {
     });
 
     it('records warmup failure without throwing into the HTTP startup path', async () => {
-        /** @type {(() => void) | null} */
-        let callback = null;
+        /** @type {{ value: (() => void) | undefined }} */
+        const callback = { value: undefined };
         scheduleMcpAuthJwksWarmup({
             enabled: true,
             delayMs: 0,
             env: {},
-            setTimeoutFn: /** @type {typeof setTimeout} */ ((fn) => {
-                callback = /** @type {() => void} */ (fn);
-                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
-            }),
+            setTimeoutFn: (fn) => {
+                callback.value = fn;
+                return { unref() {} };
+            },
             warmupRunner: async () => {
                 throw new Error('issuer unavailable');
             },
             logFn: () => {},
         });
 
-        assert.ok(callback);
-        callback();
+        assert.ok(callback.value);
+        callback.value();
         await new Promise((resolve) => setImmediate(resolve));
         const state = readMcpAuthJwksWarmupState();
 

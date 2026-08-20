@@ -94,8 +94,8 @@ function waitForServerReady(nerv, { timeoutMs = 10000 } = {}) {
  * servidor. **Unidades:** N/A
  *
  * @param {any} nerv - Instância NERV com método onEvent
- * @param {function(object): void} handler - Callback invocado para cada SERVER_READY
- * @returns {function(): void} Função de unsubscribe para remover listener
+ * @param {(envelope: object) => void} handler - Callback invocado para cada SERVER_READY
+ * @returns {() => void} Função de unsubscribe para remover listener
  * @throws {Error} Se NERV não tem onEvent ou handler não é função
  */
 function listenForServerReady(nerv, handler) {

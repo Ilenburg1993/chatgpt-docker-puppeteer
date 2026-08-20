@@ -48,14 +48,14 @@ manutenção do DevContainer:
   dentro do container;
 - `jsonc-parser` como biblioteca global e o wrapper `jsonc-validate` para validar `.jsonc` reais
   (`.devcontainer/devcontainer.json`, `settings.json`, templates do OpenCode);
-- `typescript` (que já inclui `tsserver`) e `typescript-language-server`;
+- TypeScript 7 nativo, que fornece compilador e servidor LSP em `tsc --lsp --stdio`;
 - `npm` e `pnpm` alinhados ao baseline do repositório no prefixo canônico da imagem;
 - `gh`, `actionlint` e `hadolint` instalados a partir dos releases oficiais upstream, em vez dos
   pacotes atrasados (ou ausentes) do Debian.
 
 Leitura importante:
 
-- `tsserver` não exige pacote separado: ele já vem com `typescript`;
+- o LSP nativo não exige wrapper global separado; o daemon MCP local permanece desligado por padrão;
 - `jsonc-parser` não expõe um binário de usuário por padrão, por isso o projeto instala o wrapper
   `jsonc-validate`;
 - esse tooling canônico de imagem deve viver em `/usr/local/share/npm-global`, não em

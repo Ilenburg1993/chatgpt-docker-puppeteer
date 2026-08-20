@@ -41,7 +41,7 @@ try {
     console.log('-'.repeat(80));
     console.log();
 } catch (error) {
-    console.error('❌ Erro na geração de código:', error.message);
+    console.error('❌ Erro na geração de código:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -69,7 +69,7 @@ try {
     console.log('-'.repeat(80));
     console.log();
 } catch (error) {
-    console.error('❌ Erro na geração de texto:', error.message);
+    console.error('❌ Erro na geração de texto:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -96,7 +96,7 @@ try {
     console.log('-'.repeat(80));
     console.log();
 } catch (error) {
-    console.error('❌ Erro com modelo cloud:', error.message);
+    console.error('❌ Erro com modelo cloud:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 

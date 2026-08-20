@@ -1,17 +1,9 @@
 #!/usr/bin/env node
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import assert from 'node:assert';
 
 /* ==========================================================================
    MOCK SETUP
 ========================================================================== */
-
-// Mock logger (global)
-global.log = (level, msg) => {
-    if (process.env.TEST_VERBOSE === '1') {
-        console.log(`[${level}] ${msg}`);
-    }
-};
 
 // Mock BrowserPoolManager
 class MockBrowserPoolManager {
@@ -40,8 +32,22 @@ class MockBrowserPoolManager {
     }
 }
 
-import PeriodicHealthMonitor from '#infra/browser_pool/PeriodicHealthMonitor';
-const { HEALTH_STATUS, CHECK_TYPES, MONITOR_EVENTS, MONITOR_CONFIG } = PeriodicHealthMonitor;
+import PeriodicHealthMonitor, {
+    CHECK_TYPES,
+    HEALTH_STATUS,
+    MONITOR_CONFIG,
+    MONITOR_EVENTS,
+} from '#infra/browser_pool/PeriodicHealthMonitor';
+
+/** @param {unknown} error @returns {string} */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
+/** @param {unknown} error @returns {string | undefined} */
+function errorStack(error) {
+    return error instanceof Error ? error.stack : undefined;
+}
 
 async function runTests() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -73,7 +79,7 @@ async function runTests() {
         console.log('  ✅ Stats structure correct');
         passedTests++;
     } catch (err) {
-        console.error(`  ❌ Test 1 failed: ${err.message}`);
+        console.error(`  ❌ Test 1 failed: ${errorMessage(err)}`);
     }
 
     /* ======================================================================
@@ -125,9 +131,9 @@ async function runTests() {
         console.log('  ✅ Stats updated correctly');
         passedTests++;
     } catch (err) {
-        console.error(`  ❌ Test 2 failed: ${err.message}`);
-        if (process.env.TEST_VERBOSE === '1') {
-            console.error(err.stack);
+        console.error(`  ❌ Test 2 failed: ${errorMessage(err)}`);
+        if (process.env['TEST_VERBOSE'] === '1') {
+            console.error(errorStack(err));
         }
     }
 
@@ -179,7 +185,7 @@ async function runTests() {
         assert(results.issues.length > 0, 'Should have issues');
 
         // Check issue details
-        const jsHeapIssue = results.issues.find((i) => i.type === 'JS_HEAP_WARNING');
+        const jsHeapIssue = results.issues.find((/** @type {{ type: string }} */ i) => i.type === 'JS_HEAP_WARNING');
         assert(jsHeapIssue, 'Should have JS_HEAP_WARNING issue');
         assert.strictEqual(jsHeapIssue.severity, 'WARNING', 'Issue severity should be WARNING');
         assert.strictEqual(jsHeapIssue.value, 350, 'Issue value should be 350MB');
@@ -190,9 +196,9 @@ async function runTests() {
         console.log('  ✅ Issue details correct');
         passedTests++;
     } catch (err) {
-        console.error(`  ❌ Test 3 failed: ${err.message}`);
-        if (process.env.TEST_VERBOSE === '1') {
-            console.error(err.stack);
+        console.error(`  ❌ Test 3 failed: ${errorMessage(err)}`);
+        if (process.env['TEST_VERBOSE'] === '1') {
+            console.error(errorStack(err));
         }
     }
 
@@ -231,7 +237,7 @@ async function runTests() {
         assert.strictEqual(recoveryNeeded, true, 'RECOVERY_NEEDED event should fire');
 
         // Check connection issue
-        const connIssue = results.issues.find((i) => i.type === CHECK_TYPES.CONNECTION);
+        const connIssue = results.issues.find((/** @type {{ type: string }} */ i) => i.type === CHECK_TYPES.CONNECTION);
         assert(connIssue, 'Should have CONNECTION issue');
         assert.strictEqual(connIssue.severity, 'CRITICAL', 'Connection issue should be CRITICAL');
         assert.strictEqual(connIssue.action, 'RECONNECT_NEEDED', 'Should need reconnection');
@@ -242,9 +248,9 @@ async function runTests() {
         console.log('  ✅ Reconnection action triggered');
         passedTests++;
     } catch (err) {
-        console.error(`  ❌ Test 4 failed: ${err.message}`);
-        if (process.env.TEST_VERBOSE === '1') {
-            console.error(err.stack);
+        console.error(`  ❌ Test 4 failed: ${errorMessage(err)}`);
+        if (process.env['TEST_VERBOSE'] === '1') {
+            console.error(errorStack(err));
         }
     }
 
@@ -287,9 +293,9 @@ async function runTests() {
         console.log('  ✅ Stop prevents further checks');
         passedTests++;
     } catch (err) {
-        console.error(`  ❌ Test 5 failed: ${err.message}`);
-        if (process.env.TEST_VERBOSE === '1') {
-            console.error(err.stack);
+        console.error(`  ❌ Test 5 failed: ${errorMessage(err)}`);
+        if (process.env['TEST_VERBOSE'] === '1') {
+            console.error(errorStack(err));
         }
     }
 
@@ -340,9 +346,9 @@ async function runTests() {
         console.log('  ✅ Enums complete');
         passedTests++;
     } catch (err) {
-        console.error(`  ❌ Test 6 failed: ${err.message}`);
-        if (process.env.TEST_VERBOSE === '1') {
-            console.error(err.stack);
+        console.error(`  ❌ Test 6 failed: ${errorMessage(err)}`);
+        if (process.env['TEST_VERBOSE'] === '1') {
+            console.error(errorStack(err));
         }
     }
 

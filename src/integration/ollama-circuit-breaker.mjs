@@ -292,10 +292,10 @@ export function getCircuitBreaker(/** @type {any} */ endpoint, /** @type {any} *
     if (!circuitBreakers.has(endpoint)) {
         // Apply env var overrides
         const config = {
-            failureThreshold: Number(process.env.OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD || 5),
-            successThreshold: Number(process.env.OLLAMA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD || 2),
-            timeout: Number(process.env.OLLAMA_CIRCUIT_BREAKER_TIMEOUT || 60000),
-            windowSize: Number(process.env.OLLAMA_CIRCUIT_BREAKER_WINDOW_SIZE || 10),
+            failureThreshold: Number(process.env['OLLAMA_CIRCUIT_BREAKER_FAILURE_THRESHOLD'] || 5),
+            successThreshold: Number(process.env['OLLAMA_CIRCUIT_BREAKER_SUCCESS_THRESHOLD'] || 2),
+            timeout: Number(process.env['OLLAMA_CIRCUIT_BREAKER_TIMEOUT'] || 60000),
+            windowSize: Number(process.env['OLLAMA_CIRCUIT_BREAKER_WINDOW_SIZE'] || 10),
             ...options,
         };
 

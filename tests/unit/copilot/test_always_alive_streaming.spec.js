@@ -13,61 +13,9 @@
  */
 
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
 import { describe, it } from 'vitest';
 
 import { alwaysAliveAgent } from '#copilot/agent/always-alive';
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Cria uma sessão mock que simula o comportamento do SDK CopilotSession. Permite controlar o comportamento de
- * sendAndWait e emitir assistant.message_delta.
- *
- * @param {{ response?: string; deltaChunks?: string[]; rejectWith?: Error }} [opts]
- * @returns {{ session: any; emittedDeltas: string[] }}
- */
-function makeMockSession(opts = {}) {
-    const { response = 'Resposta de teste', deltaChunks = [], rejectWith } = opts;
-    const sessionEmitter = new EventEmitter();
-    /** @type {string[]} */
-    const emittedDeltas = [];
-
-    const session = /** @type {any} */ ({
-        sessionId: 'mock-session-uuid',
-        on: (/** @type {string} */ eventType, /** @type {(...args: any[]) => void} */ handler) => {
-            sessionEmitter.on(eventType, handler);
-            // Retorna função de unsubscribe (compatível com SDK)
-            return () => sessionEmitter.off(eventType, handler);
-        },
-        sendAndWait: async (/** @type {any} */ { prompt: _p }) => {
-            // Emite deltas antes de resolver, simulando streaming
-            for (const chunk of deltaChunks) {
-                emittedDeltas.push(chunk);
-                sessionEmitter.emit('assistant.message_delta', { data: { deltaContent: chunk } });
-                // Pequeno yield para garantir que handlers processam
-                await Promise.resolve();
-            }
-            if (rejectWith) throw rejectWith;
-            return { data: { content: response } };
-        },
-    });
-
-    return { session, emittedDeltas };
-}
-
-/**
- * Força o agente a voltar ao estado stopped (limpa estado interno via hack). Necessário porque alwaysAliveAgent é
- * singleton.
- *
- * @returns {void}
- */
-function forceAgentStopped() {
-    // Acessa o status via getter público
-    if (alwaysAliveAgent.status === 'stopped') return;
-    // Emite evento stopped para resetar estado (se possível)
-    // O agente não expõe método de reset, então testamos via mocking da sessão interna
-}
 
 // ─── Suite: task.completed sem truncamento ────────────────────────────────────
 

@@ -89,7 +89,7 @@ function spendingLimits(row) {
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.apiKey]
  * @param {string} [options.secretRef]
  * @param {string} [options.accountScope]

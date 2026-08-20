@@ -25,7 +25,7 @@ describe('ModelFallbackState', () => {
         expect(state.pending).toBe(true);
     });
 
-    it('applyIfPending() deve aplicar modelo no host e emitir evento', () => {
+    it('applyIfPending() deve aplicar modelo no host e emitir evento', async () => {
         const state = new ModelFallbackState({ defaultModel: 'auto' });
         state.setPending();
 
@@ -35,7 +35,7 @@ describe('ModelFallbackState', () => {
         };
         const emitFn = vi.fn();
 
-        const result = state.applyIfPending(host, emitFn);
+        const result = await state.applyIfPending(host, emitFn);
         expect(result.applied).toBe(true);
         expect(result.previousModel).toBe('gpt-4o-mini');
         expect(result.newModel).toBe('auto');
@@ -51,23 +51,23 @@ describe('ModelFallbackState', () => {
         expect(state.pending).toBe(false);
     });
 
-    it('applyIfPending() sem pendência deve retornar applied=false', () => {
+    it('applyIfPending() sem pendência deve retornar applied=false', async () => {
         const state = new ModelFallbackState({ defaultModel: 'auto' });
         const host = { getModel: () => 'gpt-4o-mini' };
         const emitFn = vi.fn();
 
-        const result = state.applyIfPending(host, emitFn);
+        const result = await state.applyIfPending(host, emitFn);
         expect(result.applied).toBe(false);
         expect(emitFn).not.toHaveBeenCalled();
     });
 
-    it('applyIfPending() com modelo null não deve aplicar', () => {
+    it('applyIfPending() com modelo null não deve aplicar', async () => {
         const state = new ModelFallbackState({ defaultModel: null });
         state.setPending();
         const host = { getModel: () => 'gpt-4o-mini' };
         const emitFn = vi.fn();
 
-        const result = state.applyIfPending(host, emitFn);
+        const result = await state.applyIfPending(host, emitFn);
         expect(result.applied).toBe(false);
     });
 });

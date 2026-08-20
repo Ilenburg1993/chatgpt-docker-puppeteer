@@ -481,10 +481,10 @@ export function declareScope(opts) {
                 const scanResult = await warmFromDirectory(
                     directory,
                     {
-                        extensions,
+                        ...(extensions === undefined ? {} : { extensions }),
                         maxFiles,
-                        include,
-                        exclude,
+                        ...(include === undefined ? {} : { include }),
+                        ...(exclude === undefined ? {} : { exclude }),
                         selectionMode,
                         preferredPaths: effectivePreferredPaths,
                         recursive,

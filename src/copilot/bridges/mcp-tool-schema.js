@@ -88,7 +88,7 @@ export function buildZodSchema(inputSchema, parentRequired, key) {
         if (schema.enum.every((/** @type {unknown} */ v) => typeof v === 'string')) {
             const desc = schema.description ?? '';
             const baseEnum = z.enum(/** @type {[string, ...string[]]} */ (schema.enum));
-            const field = desc ? baseEnum.describe(desc) : baseEnum;
+            const field = desc ? baseEnum['describe'](desc) : baseEnum;
             return parentRequired && key && !parentRequired.has(key) ? field.optional() : field;
         }
     }
@@ -121,18 +121,18 @@ export function buildZodSchema(inputSchema, parentRequired, key) {
     switch (schema.type) {
         case 'number':
         case 'integer':
-            field = z.number().describe(description);
+            field = z.number()['describe'](description);
             break;
         case 'boolean':
-            field = z.boolean().describe(description);
+            field = z.boolean()['describe'](description);
             break;
         case 'array': {
             const items = schema.items ? buildZodSchema(schema.items) : z.unknown();
-            field = z.array(items).describe(description);
+            field = z.array(items)['describe'](description);
             break;
         }
         default:
-            field = z.string().describe(description);
+            field = z.string()['describe'](description);
     }
 
     if (parentRequired && key && !parentRequired.has(key)) return field.optional();

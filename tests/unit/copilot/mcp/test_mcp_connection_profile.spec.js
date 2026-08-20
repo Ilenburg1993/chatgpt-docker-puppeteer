@@ -93,9 +93,9 @@ describe('copilot MCP ChatGPT connection profile', () => {
         });
         const metadata = buildProtectedResourceMetadata(config);
         assert.equal(config.mode, 'mixed-auth');
-        assert.equal(metadata.resource, 'https://example.com');
-        assert.deepEqual(metadata.authorization_servers, ['https://auth.example.com']);
-        assert.deepEqual(metadata.scopes_supported, ['repo:read', 'repo:write', 'repo:validate', 'repo:admin']);
+        assert.equal(metadata['resource'], 'https://example.com');
+        assert.deepEqual(metadata['authorization_servers'], ['https://auth.example.com']);
+        assert.deepEqual(metadata['scopes_supported'], ['repo:read', 'repo:write', 'repo:validate', 'repo:admin']);
         assert.match(buildWwwAuthenticateChallenge(['repo:read'], config), /resource_metadata="https:\/\/example\.com/);
     });
 
@@ -111,26 +111,26 @@ describe('copilot MCP ChatGPT connection profile', () => {
         assert.equal(config.jwksUri, 'https://mcp.aurelin.org/oauth/jwks.json');
         assert.equal(isDevOAuthServerEnabled(config), true);
         const metadata = buildDevOAuthServerMetadata(config);
-        assert.equal(metadata.issuer, 'https://mcp.aurelin.org');
-        assert.equal(metadata.authorization_endpoint, 'https://mcp.aurelin.org/oauth/authorize');
-        assert.equal(metadata.token_endpoint, 'https://mcp.aurelin.org/oauth/token');
-        assert.equal(metadata.jwks_uri, 'https://mcp.aurelin.org/oauth/jwks.json');
-        assert.equal(metadata.userinfo_endpoint, 'https://mcp.aurelin.org/oauth/userinfo');
-        assert.equal(metadata.client_id_metadata_document_supported, true);
-        assert.ok(/** @type {string[]} */ (metadata.grant_types_supported).includes('refresh_token'));
-        assert.deepEqual(metadata.token_endpoint_auth_methods_supported, ['none', 'private_key_jwt']);
-        assert.ok(/** @type {string[]} */ (metadata.scopes_supported).includes('openid'));
-        assert.ok(/** @type {string[]} */ (metadata.claims_supported).includes('email'));
-        assert.deepEqual(buildProtectedResourceMetadata(config).scopes_supported, [
+        assert.equal(metadata['issuer'], 'https://mcp.aurelin.org');
+        assert.equal(metadata['authorization_endpoint'], 'https://mcp.aurelin.org/oauth/authorize');
+        assert.equal(metadata['token_endpoint'], 'https://mcp.aurelin.org/oauth/token');
+        assert.equal(metadata['jwks_uri'], 'https://mcp.aurelin.org/oauth/jwks.json');
+        assert.equal(metadata['userinfo_endpoint'], 'https://mcp.aurelin.org/oauth/userinfo');
+        assert.equal(metadata['client_id_metadata_document_supported'], true);
+        assert.ok(/** @type {string[]} */ (metadata['grant_types_supported']).includes('refresh_token'));
+        assert.deepEqual(metadata['token_endpoint_auth_methods_supported'], ['none', 'private_key_jwt']);
+        assert.ok(/** @type {string[]} */ (metadata['scopes_supported']).includes('openid'));
+        assert.ok(/** @type {string[]} */ (metadata['claims_supported']).includes('email'));
+        assert.deepEqual(buildProtectedResourceMetadata(config)['scopes_supported'], [
             'repo:read',
             'repo:write',
             'repo:validate',
             'repo:admin',
         ]);
         const clientMetadata = buildBuiltInDevOAuthClientMetadata(config);
-        assert.equal(clientMetadata.client_id, 'https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json');
-        assert.deepEqual(clientMetadata.redirect_uris, ['https://chatgpt.com/connector/oauth/codex-smoke']);
-        assert.ok(/** @type {string[]} */ (clientMetadata.grant_types).includes('refresh_token'));
+        assert.equal(clientMetadata['client_id'], 'https://mcp.aurelin.org/.well-known/oauth-client/codex-smoke.json');
+        assert.deepEqual(clientMetadata['redirect_uris'], ['https://chatgpt.com/connector/oauth/codex-smoke']);
+        assert.ok(/** @type {string[]} */ (clientMetadata['grant_types']).includes('refresh_token'));
     });
 
     it('maps tool annotations to planned OAuth scopes and mixed security schemes', () => {

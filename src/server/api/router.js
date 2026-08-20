@@ -18,14 +18,7 @@ import systemController from './controllers/system.js';
 // L53.16: copilot routes removidos — copilot é ferramenta DEV-only com boot standalone via terminal:llm-b (:3009)
 import tasksController from './controllers/tasks.js';
 
-/**
- * @typedef {{
- *     use: (...args: unknown[]) => unknown;
- *     get: (...args: unknown[]) => unknown;
- *     post: (...args: unknown[]) => unknown;
- *     locals: Record<string, unknown>;
- * }} ExpressAppLike
- */
+/** @typedef {import('express').Express} ExpressAppLike */
 
 /**
  * Aplica a malha de rotas à instância do Express. Define a topologia lógica da API e injeta os escudos de integridade.
@@ -40,7 +33,7 @@ async function applyRoutes(app) {
 
     // FIXED (P1-14): Global request timeout middleware (30s default)
     // Previne requests órfãos que bloqueiam workers indefinidamente
-    const REQUEST_TIMEOUT_MS = parseInt(process.env.API_REQUEST_TIMEOUT || '30000', 10);
+    const REQUEST_TIMEOUT_MS = parseInt(process.env['API_REQUEST_TIMEOUT'] || '30000', 10);
     app.use((/** @type {any} */ req, /** @type {any} */ res, /** @type {any} */ next) => {
         // Set timeout on the request
         req.setTimeout(REQUEST_TIMEOUT_MS, () => {
@@ -183,7 +176,7 @@ async function applyRoutes(app) {
      *
      * Protocolo: MCP Streamable HTTP (JSON-RPC 2.0 over HTTP)
      */
-    if (process.env.MCP_ENABLED === 'true') {
+    if (process.env['MCP_ENABLED'] === 'true') {
         log('INFO', '[MCP] MCP_ENABLED=true, setting up MCP handler...');
         try {
             // Dynamic import to avoid loading if MCP is disabled
@@ -201,7 +194,7 @@ async function applyRoutes(app) {
             try {
                 const toolCount = typeof registry?.getToolNames === 'function' ? registry.getToolNames().length : null;
                 app.locals = app.locals || {};
-                app.locals.mcp = {
+                app.locals['mcp'] = {
                     enabled: true,
                     ready: true,
                     toolCount,
@@ -209,7 +202,7 @@ async function applyRoutes(app) {
                     lastInitError: null,
                 };
 
-                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: true });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { mcp: true });
             } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
@@ -221,7 +214,7 @@ async function applyRoutes(app) {
                 );
                 if (typeof getUpstreamStatus === 'function') {
                     app.locals = app.locals || {};
-                    app.locals.getMcpUpstreamsStatus = () => getUpstreamStatus().upstreams;
+                    app.locals['getMcpUpstreamsStatus'] = () => getUpstreamStatus().upstreams;
                 }
             } catch (/** @type {any} */ e) {
                 // noop
@@ -235,14 +228,14 @@ async function applyRoutes(app) {
             // Don't crash server, just disable MCP
             try {
                 app.locals = app.locals || {};
-                app.locals.mcp = {
+                app.locals['mcp'] = {
                     enabled: true,
                     ready: false,
                     toolCount: null,
                     lastInitAt: new Date().toISOString(),
                     lastInitError: error && _e.message ? _e.message : String(error),
                 };
-                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { mcp: false });
             } catch (/** @type {any} */ e) {
                 // noop
             }
@@ -251,14 +244,14 @@ async function applyRoutes(app) {
         log('INFO', '[MCP] MCP_ENABLED=false, skipping MCP handler setup');
         try {
             app.locals = app.locals || {};
-            app.locals.mcp = {
+            app.locals['mcp'] = {
                 enabled: false,
                 ready: false,
                 toolCount: null,
                 lastInitAt: new Date().toISOString(),
                 lastInitError: null,
             };
-            app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { mcp: false });
+            app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { mcp: false });
         } catch (/** @type {any} */ e) {
             // noop
         }
@@ -267,7 +260,7 @@ async function applyRoutes(app) {
     // ========================================================================
     // [4] OPENAI-COMPATIBLE API (v1/chat/completions for GitHub Copilot)
     // ========================================================================
-    if (process.env.OPENAI_COMPATIBLE_ENABLED === 'true') {
+    if (process.env['OPENAI_COMPATIBLE_ENABLED'] === 'true') {
         log('INFO', '[OpenAI] OPENAI_COMPATIBLE_ENABLED=true, setting up handler...');
         try {
             // Dynamic import to avoid loading if disabled
@@ -279,14 +272,14 @@ async function applyRoutes(app) {
             // Observability hooks
             try {
                 app.locals = app.locals || {};
-                app.locals.openai = {
+                app.locals['openai'] = {
                     enabled: true,
                     ready: true,
                     endpoints: ['/v1/chat/completions', '/v1/models'],
                     lastInitAt: new Date().toISOString(),
                 };
 
-                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: true });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { openai: true });
             } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
@@ -300,13 +293,13 @@ async function applyRoutes(app) {
             // Don't crash server, just disable feature
             try {
                 app.locals = app.locals || {};
-                app.locals.openai = {
+                app.locals['openai'] = {
                     enabled: true,
                     ready: false,
                     lastInitAt: new Date().toISOString(),
                     lastInitError: _e.message,
                 };
-                app.locals.runtimeReadiness = Object.assign({}, app.locals.runtimeReadiness || null, { openai: false });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { openai: false });
             } catch (/** @type {any} */ e) {
                 // noop
             }

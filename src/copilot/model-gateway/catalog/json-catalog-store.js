@@ -92,11 +92,11 @@ function sanitizeCatalogValue(value) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>[]}
+ * @returns {Record<string, unknown>[]}
  */
 function readRecordArray(value) {
     return Array.isArray(value)
-        ? value.filter(isRecord).map((item) => /** @type {Record<string, any>} */ (sanitizeCatalogValue(item)))
+        ? value.filter(isRecord).map((item) => /** @type {Record<string, unknown>} */ (sanitizeCatalogValue(item)))
         : [];
 }
 
@@ -133,19 +133,19 @@ export function createModelGatewayCatalogSnapshotId(snapshot) {
  *     snapshotId: string;
  *     generatedAt: string | null;
  *     source: string;
- *     sources: Record<string, any>[];
- *     providerEvidences: Record<string, any>[];
- *     evidences: Record<string, any>[];
- *     routeOptions: Record<string, any>[];
- *     accountOverlays: Record<string, any>[];
- *     providerProjections: Record<string, any>[];
- *     projections: Record<string, any>[];
- *     importRuns: Record<string, any>[];
- *     rawPayloadRefs: Record<string, any>[];
- *     conflicts: Record<string, any>[];
- *     modelTombstones: Record<string, any>[];
- *     modelEligibilityRuns: Record<string, any>[];
- *     modelEligibilityDecisions: Record<string, any>[];
+ *     sources: Record<string, unknown>[];
+ *     providerEvidences: Record<string, unknown>[];
+ *     evidences: Record<string, unknown>[];
+ *     routeOptions: Record<string, unknown>[];
+ *     accountOverlays: Record<string, unknown>[];
+ *     providerProjections: Record<string, unknown>[];
+ *     projections: Record<string, unknown>[];
+ *     importRuns: Record<string, unknown>[];
+ *     rawPayloadRefs: Record<string, unknown>[];
+ *     conflicts: Record<string, unknown>[];
+ *     modelTombstones: Record<string, unknown>[];
+ *     modelEligibilityRuns: Record<string, unknown>[];
+ *     modelEligibilityDecisions: Record<string, unknown>[];
  * }}
  */
 export function normalizeStoredCatalogSnapshot(snapshot) {

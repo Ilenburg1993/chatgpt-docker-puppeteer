@@ -45,6 +45,7 @@ const TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS = Object.freeze([
     ...TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
     'live_turn',
 ]);
+/** @type {readonly string[]} */
 const TERMINAL_LIVE_REQUIRE_AGENT_PROBE_PROFILES = Object.freeze([]);
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 // Readiness needs a recent representative sample, not an exhaustive runtime-health replay. Keep this bounded so the
@@ -52,9 +53,21 @@ const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
 const SQLITE_RUNTIME_HEALTH_READ_LIMIT = 500;
 const DEFAULT_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 25;
 const DEEP_SQLITE_REDACTION_MAX_ROWS_PER_TABLE = 100_000;
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
+/** @type {{ sourceStore: JsonModelGatewayCatalogStore; sqliteStore: SqliteModelGatewayCatalogStore } | null} */
 let readinessStoreContext = null;
+/** @type {{
+ *     identity: string;
+ *     sourceSnapshot: Awaited<ReturnType<JsonModelGatewayCatalogStore['readSnapshot']>>;
+ *     integrity: ReturnType<typeof auditModelGatewayCatalogSnapshotIntegrity>;
+ *     selectionEnvironmentIdentity?: string;
+ *     allowProbeSelection?: ReturnType<typeof auditModelGatewayPreRuntimeSelection>;
+ *     strictAccessSelection?: ReturnType<typeof auditModelGatewayPreRuntimeSelection>;
+ * } | null} */
 let catalogStaticReadinessCache = null;
 
 function getReadinessStores() {
@@ -66,7 +79,7 @@ function getReadinessStores() {
     return readinessStoreContext;
 }
 
-async function catalogFileIdentity(filePath) {
+async function catalogFileIdentity(/** @type {string} */ filePath) {
     try {
         const info = await stat(filePath);
         return `${info.size}:${Math.trunc(info.mtimeMs)}:${Math.trunc(info.ctimeMs)}`;
@@ -85,10 +98,14 @@ function readinessEnvironmentIdentity(env = process.env) {
 }
 
 let persistentRedactionRequestSequence = 0;
-/** @type {Map<string, { worker: Worker; pending: Map<string, { startedAt: number; timer: NodeJS.Timeout; resolve: Function; reject: Function }> }>} */
+/** @type {Map<string, { worker: Worker; pending: Map<string, { startedAt: number; timer: NodeJS.Timeout; resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> }>} */
 const persistentRedactionWorkers = new Map();
 
-function normalizeRedactionWorkerResult(mode, startedAt, result) {
+function normalizeRedactionWorkerResult(
+    /** @type {'catalog' | 'sqlite'} */ mode,
+    /** @type {number} */ startedAt,
+    /** @type {{ success?: boolean; audit?: Record<string, unknown>; error?: string; durationMs?: number; sourceSnapshotId?: string; requestId?: string }} */ result,
+) {
     if (!result || result.success !== true || !result.audit) {
         throw new Error(result?.error ?? `redaction worker ${mode} returned no audit`);
     }
@@ -100,7 +117,11 @@ function normalizeRedactionWorkerResult(mode, startedAt, result) {
     };
 }
 
-function destroyPersistentRedactionWorker(mode, state, error) {
+function destroyPersistentRedactionWorker(
+    /** @type {'catalog' | 'sqlite'} */ mode,
+    /** @type {{ worker: Worker; pending: Map<string, { startedAt: number; timer: NodeJS.Timeout; resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> }} */ state,
+    /** @type {unknown} */ error,
+) {
     if (persistentRedactionWorkers.get(mode) === state) persistentRedactionWorkers.delete(mode);
     for (const pending of state.pending.values()) {
         clearTimeout(pending.timer);
@@ -110,7 +131,7 @@ function destroyPersistentRedactionWorker(mode, state, error) {
     void state.worker.terminate();
 }
 
-function getPersistentRedactionWorker(mode) {
+function getPersistentRedactionWorker(/** @type {'catalog' | 'sqlite'} */ mode) {
     const existing = persistentRedactionWorkers.get(mode);
     if (existing) return existing;
     const worker = new Worker(REDACTION_WORKER_PATH, { workerData: { mode, persistent: true } });
@@ -136,7 +157,10 @@ function getPersistentRedactionWorker(mode) {
     return state;
 }
 
-function runPersistentRedactionWorker(mode, maxRowsPerTable) {
+function runPersistentRedactionWorker(
+    /** @type {'catalog' | 'sqlite'} */ mode,
+    /** @type {number} */ maxRowsPerTable,
+) {
     const state = getPersistentRedactionWorker(mode);
     const requestId = `redaction-${mode}-${Date.now()}-${++persistentRedactionRequestSequence}`;
     return new Promise((resolvePromise, rejectPromise) => {
@@ -175,11 +199,15 @@ function runRedactionWorker(mode, maxRowsPerTable, reuseWorker = false) {
             rejectPromise(new Error(`redaction worker ${mode} timed out`));
         }, 30_000);
         timer.unref?.();
-        const finish = (result, error = null) => {
+        const finish = (
+            /** @type {{ success?: boolean; audit?: Record<string, unknown>; error?: string; durationMs?: number; sourceSnapshotId?: string } | null} */ result,
+            /** @type {unknown} */ error = null,
+        ) => {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
             if (error) return rejectPromise(error);
+            if (!result) return rejectPromise(new Error(`redaction worker ${mode} returned no result`));
             try {
                 resolvePromise(normalizeRedactionWorkerResult(mode, startedAt, result));
             } catch (normalizeError) {
@@ -194,15 +222,6 @@ function runRedactionWorker(mode, maxRowsPerTable, reuseWorker = false) {
     });
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 /**
  * @param {unknown} value
@@ -244,7 +263,7 @@ function readPositiveInteger(names, fallback) {
     return fallback;
 }
 
-async function fileExists(filePath) {
+async function fileExists(/** @type {string} */ filePath) {
     try {
         await access(filePath);
         return true;
@@ -260,9 +279,10 @@ async function fileExists(filePath) {
 function selectedDispositions(audit) {
     return [
         ...new Set(
-            audit.profiles
-                .map((profile) => optionalString(profile.selected?.['eligibilityDisposition']))
-                .filter((item) => item !== null),
+            audit.profiles.flatMap((profile) => {
+                const disposition = optionalString(profile.selected?.['eligibilityDisposition']);
+                return disposition ? [disposition] : [];
+            }),
         ),
     ].sort();
 }
@@ -300,15 +320,14 @@ function runtimeProbeStatus(probe) {
 function runtimeProbeStatuses(probes) {
     const normalizedProbes = optionalRecord(probes);
     if (!normalizedProbes) return {};
-    return Object.fromEntries(
-        Object.entries(normalizedProbes)
-            .map(([kind, probe]) => {
-                const status = runtimeProbeStatus(optionalRecord(probe));
-                return status ? [kind, status] : null;
-            })
-            .filter((entry) => entry !== null)
-            .sort(([left], [right]) => left.localeCompare(right)),
-    );
+    /** @type {[string, string][]} */
+    const entries = [];
+    for (const [kind, probe] of Object.entries(normalizedProbes)) {
+        const status = runtimeProbeStatus(optionalRecord(probe));
+        if (status) entries.push([kind, status]);
+    }
+    entries.sort(([left], [right]) => left.localeCompare(right));
+    return Object.fromEntries(entries);
 }
 
 /**
@@ -355,7 +374,6 @@ function summarizeTerminalLiveRoute(route) {
  * This function is safe to call from the MCP process; CPU-heavy redaction remains isolated in worker threads.
  *
  * @param {{ includeSqliteRuntimeHealth?: boolean; failOnSupplyWarning?: boolean; sqliteRedactionMaxRowsPerTable?: number; reuseRedactionWorkers?: boolean }} [options]
- * @returns {Promise<Record<string, any>>}
  */
 export async function buildModelGatewayLiveReadiness(options = {}) {
     const readinessStartedAt = performance.now();
@@ -424,6 +442,7 @@ const secretAuditValues = timedSync('secretAuditEnvCollection', () => collectMod
 const secretRegistry = createEnvSecretRegistry();
 const selectionEnvironmentIdentity = timedSync('selectionEnvironmentIdentity', () => readinessEnvironmentIdentity(process.env));
 const fileHealthRecords = timedSync('fileRuntimeHealthRead', () => listByokProviderModelHealth());
+/** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
 if (includeSqliteRuntimeHealth) {
@@ -487,17 +506,17 @@ const cachedStaticSelections =
     catalogStaticReadinessCache?.strictAccessSelection
         ? catalogStaticReadinessCache
         : null;
-const allowProbeSelection = cachedStaticSelections
-    ? cachedStaticSelections.allowProbeSelection
-    : timedSync('selectionAllowProbeAudit', () =>
+const allowProbeSelection =
+    cachedStaticSelections?.allowProbeSelection ??
+    timedSync('selectionAllowProbeAudit', () =>
           auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
               strict: false,
               secretRegistry,
           }),
       );
-const strictAccessSelection = cachedStaticSelections
-    ? cachedStaticSelections.strictAccessSelection
-    : timedSync('selectionStrictAccessAudit', () =>
+const strictAccessSelection =
+    cachedStaticSelections?.strictAccessSelection ??
+    timedSync('selectionStrictAccessAudit', () =>
           auditModelGatewayPreRuntimeSelection(sourceSnapshot, {
               strict: true,
               secretRegistry,
@@ -544,11 +563,10 @@ const terminalLivePostRuntimeSelection = timedSync('terminalLivePostRuntimeAudit
     auditModelGatewayPostRuntimeSelection(effectiveSnapshot, {
         strict: true,
         secretRegistry,
-        profiles: TERMINAL_LIVE_ROUTE_PROFILES,
+        profiles: [...TERMINAL_LIVE_ROUTE_PROFILES],
         runtimeHealthRecords: healthRecords,
         runtimeHealthIndex,
-        preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
-        blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+        blockFailedProbeKinds: [...TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS],
         temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
     }),
 );
@@ -570,8 +588,7 @@ const terminalLiveRuntimeSelectorPlan = timedSync('terminalLiveSelectorPlan', ()
         env: process.env,
         runtimeHealthRecords: healthRecords,
         runtimeHealthIndex,
-        preferredProbeKinds: TERMINAL_LIVE_PREFERRED_PROBE_KINDS,
-        blockFailedProbeKinds: TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS,
+        blockFailedProbeKinds: [...TERMINAL_LIVE_BLOCK_FAILED_PROBE_KINDS],
         temporaryFailureCooldownMs: TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS,
     }),
 );
@@ -680,7 +697,7 @@ const checks = [
     {
         id: 'runtime_sqlite_observability',
         ok: true,
-        detail: `runtimeRows=${sqliteDiagnostics.runtimeRows}, healthObservations=${sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations}, probeResults=${sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results}`,
+        detail: `runtimeRows=${sqliteDiagnostics.runtimeRows}, healthObservations=${sqliteDiagnostics.tableCounts['copilot_model_gateway_health_observations']}, probeResults=${sqliteDiagnostics.tableCounts['copilot_model_gateway_runtime_probe_results']}`,
     },
     {
         id: 'runtime_sqlite_probe_source',
@@ -734,9 +751,9 @@ const summary = {
         keyMismatches: parity.keyMismatches,
         runtimeRows: sqliteDiagnostics.runtimeRows,
         runtimeHealthReadLimit: SQLITE_RUNTIME_HEALTH_READ_LIMIT,
-        healthObservations: sqliteDiagnostics.tableCounts.copilot_model_gateway_health_observations,
-        runtimeProbeRuns: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_runs,
-        runtimeProbeResults: sqliteDiagnostics.tableCounts.copilot_model_gateway_runtime_probe_results,
+            healthObservations: sqliteDiagnostics.tableCounts['copilot_model_gateway_health_observations'],
+            runtimeProbeRuns: sqliteDiagnostics.tableCounts['copilot_model_gateway_runtime_probe_runs'],
+            runtimeProbeResults: sqliteDiagnostics.tableCounts['copilot_model_gateway_runtime_probe_results'],
         runtimeProbeOnlyRecords: sqliteProbeOnlyRecords.length,
         runtimeProbeProofRecords: sqliteRuntimeProbeProofRecords.length,
     },
@@ -845,7 +862,9 @@ const summary = {
     return summary;
 }
 
-const isDirectCli = Boolean(process.argv[1]) && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+const directCliEntry = process.argv[1];
+const isDirectCli =
+    typeof directCliEntry === 'string' && path.resolve(directCliEntry) === path.resolve(fileURLToPath(import.meta.url));
 if (isDirectCli) {
     if (argSet.has('--help') || argSet.has('-h')) {
         process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-readiness.mjs [--json] [--fail] [--fail-on-supply-warning] [--sqlite-runtime-health] [--redaction-max-rows-per-table N] [--deep-redaction]\n\nCheck whether the model-gateway metadata database is ready for terminal llm-b live tests.\nThis does not start the terminal, execute providers, run models or run runtime probes.\n`);
@@ -874,17 +893,17 @@ if (isDirectCli) {
         if (json) {
             process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
         } else {
-            process.stdout.write(`model-gateway live readiness: ok=${summary.ok ? 'yes' : 'no'}\n`);
-            for (const check of summary.checks) {
+            process.stdout.write(`model-gateway live readiness: ok=${summary['ok'] ? 'yes' : 'no'}\n`);
+            for (const check of summary['checks']) {
                 process.stdout.write(`  ${check.ok ? 'OK' : 'FAIL'} ${check.id}: ${check.detail}\n`);
             }
-            const localProviderOptIn = summary.selection.effectiveStrict.localProviderOptIn;
+            const localProviderOptIn = summary['selection'].effectiveStrict.localProviderOptIn;
             if (localProviderOptIn.hasBlocks) {
                 process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
             }
             process.stdout.write('\nrecommended live order:\n');
-            summary.livePlan.commands.forEach((command, index) => process.stdout.write(`  ${index + 1}. ${command}\n`));
+            summary['livePlan'].commands.forEach((command, index) => process.stdout.write(`  ${index + 1}. ${command}\n`));
         }
-        if (fail && !summary.ok) process.exitCode = 1;
+        if (fail && !summary['ok']) process.exitCode = 1;
     }
 }

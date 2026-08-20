@@ -33,14 +33,14 @@ function optionalString(value) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>[]}
+ * @returns {Record<string, unknown>[]}
  */
 function records(value) {
     return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function providerId(row) {
@@ -48,7 +48,7 @@ function providerId(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function providerModel(row) {
@@ -56,7 +56,7 @@ function providerModel(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @param {string} key
  * @returns {boolean}
  */
@@ -65,7 +65,7 @@ function hasRecord(row, key) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {boolean}
  */
 function hasRuntimeAgenticTaxonomy(row) {
@@ -78,7 +78,7 @@ function hasRuntimeAgenticTaxonomy(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {boolean}
  */
 function hasPricingTaxonomy(row) {
@@ -86,7 +86,7 @@ function hasPricingTaxonomy(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {boolean}
  */
 function hasRateLimitTaxonomy(row) {
@@ -98,7 +98,7 @@ function hasRateLimitTaxonomy(row) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {boolean}
  */
 function hasDataPolicyTaxonomy(row) {
@@ -106,8 +106,8 @@ function hasDataPolicyTaxonomy(row) {
 }
 
 /**
- * @param {Record<string, any>[]} rows
- * @param {(row: Record<string, any>) => boolean} predicate
+ * @param {Record<string, unknown>[]} rows
+ * @param {(row: Record<string, unknown>) => boolean} predicate
  * @returns {number}
  */
 function countRows(rows, predicate) {
@@ -134,7 +134,7 @@ function positiveNumber(value) {
 }
 
 /**
- * @param {Record<string, any>} source
+ * @param {Record<string, unknown>} source
  * @param {Date} now
  * @returns {number | null}
  */
@@ -145,7 +145,7 @@ function sourceAgeSeconds(source, now) {
 }
 
 /**
- * @param {Record<string, any>[]} rows
+ * @param {Record<string, unknown>[]} rows
  * @returns {Set<string>}
  */
 function providerSet(rows) {
@@ -153,7 +153,7 @@ function providerSet(rows) {
 }
 
 /**
- * @param {Record<string, any>[]} rows
+ * @param {Record<string, unknown>[]} rows
  * @returns {Set<string>}
  */
 function providerModelSet(rows) {
@@ -161,7 +161,7 @@ function providerModelSet(rows) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
+ * @param {Record<string, unknown>} snapshot
  * @param {object} [options]
  * @param {Date} [options.now]
  * @returns {{
@@ -231,7 +231,7 @@ export function projectModelGatewayProviderFreshnessMetrics(summary) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
+ * @param {Record<string, unknown>} snapshot
  * @returns {{
  *   providerCount: number;
  *   modelCount: number;

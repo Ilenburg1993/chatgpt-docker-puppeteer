@@ -24,6 +24,39 @@ import { WorkflowGenerator } from '#missions/workflow_generator';
 const workflowGenerator = new WorkflowGenerator();
 
 /**
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * Contrato mínimo consumido por este adaptador HTTP.
+ *
+ * @typedef {object} MCPToolRegistry
+ * @property {() => string[]} getToolNames
+ * @property {() => unknown[]} getAllMetadata
+ * @property {() => { totalTools: number }} getStats
+ * @property {(name: string, args: Record<string, unknown>, context: { signal: AbortSignal }) => Promise<unknown>} execute
+ *
+ *
+ * @typedef {object} JsonRpcRequest
+ * @property {unknown} [jsonrpc]
+ * @property {unknown} [id]
+ * @property {string} [method]
+ * @property {Record<string, unknown>} [params]
+ *
+ * @typedef {{ controller?: AbortController; timeoutMs?: number }} MCPHandlerContext
+ *
+ * @typedef {(
+ *     params: Record<string, unknown>,
+ *     registry: MCPToolRegistry,
+ *     context?: MCPHandlerContext,
+ * ) => Promise<unknown>} MCPHandler
+ */
+
+/**
  * Lightweight, compatible MCP-ish HTTP endpoint.
  *
  * Notes:
@@ -36,14 +69,14 @@ const workflowGenerator = new WorkflowGenerator();
 /**
  * Handler map for MCP methods
  */
-const handlers = {
+const handlers = /** @type {Record<string, MCPHandler>} */ ({
     /**
      * initialize: MCP protocol handshake
      *
      * Minimal implementation: advertises tools/resources capabilities.
      */
-    initialize: async (/** @type {any} */ params, /** @type {any} */ registry) => {
-        const clientProtocolVersion = params?.protocolVersion;
+    initialize: async (params, registry) => {
+        const clientProtocolVersion = params['protocolVersion'];
         const protocolVersion =
             typeof clientProtocolVersion === 'string' && clientProtocolVersion.trim()
                 ? clientProtocolVersion
@@ -74,7 +107,7 @@ const handlers = {
     /**
      * notifications/cancelled: client notifies that a request was cancelled Notification (no response expected).
      */
-    'notifications/cancelled': async (/** @type {any} */ params) => {
+    'notifications/cancelled': async (params) => {
         console.error('[MCP Handler] notifications/cancelled (legacy handler):', params);
         return {};
     },
@@ -89,7 +122,7 @@ const handlers = {
     /**
      * tools/list: Return all available tools from registry
      */
-    'tools/list': async (/** @type {any} */ params, /** @type {any} */ registry) => {
+    'tools/list': async (_params, registry) => {
         console.error('[MCP Handler] tools/list request');
         const tools = registry.getAllMetadata();
         console.error(`[MCP Handler] Returning ${tools.length} tools`);
@@ -99,18 +132,16 @@ const handlers = {
     /**
      * tools/call: Execute a tool by name
      */
-    'tools/call': async (
-        /** @type {any} */ params,
-        /** @type {any} */ registry,
-        /** @type {Record<string, any>} */ context = {},
-    ) => {
-        const { name, arguments: args = {} } = params;
+    'tools/call': async (params, registry, context = {}) => {
+        const name = typeof params['name'] === 'string' ? params['name'] : '';
+        const rawArgs = params['arguments'];
+        const args = isRecord(rawArgs) ? rawArgs : {};
 
         console.error(`[MCP Handler] tools/call: ${name}`);
 
         // MCP layer timeout (90s by default, wraps TOOL_EXECUTION_TIMEOUT)
-        const timeout = Number(context.timeoutMs || process.env.MCP_TOOL_TIMEOUT || 90000);
-        const controller = context.controller || new AbortController();
+        const timeout = Number(context['timeoutMs'] || process.env['MCP_TOOL_TIMEOUT'] || 90000);
+        const controller = context['controller'] || new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
         try {
@@ -121,7 +152,7 @@ const handlers = {
             clearTimeout(timeoutId);
 
             // If tool already returns MCP tool result shape, preserve it.
-            if (result && typeof result === 'object' && Array.isArray(result.content)) {
+            if (result && typeof result === 'object' && 'content' in result && Array.isArray(result.content)) {
                 return result;
             }
 
@@ -143,8 +174,8 @@ const handlers = {
                     flags: normalized.flags,
                 },
             };
-        } catch (/** @type {any} */ error) {
-            const _e = /** @type {any} */ (error);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             clearTimeout(timeoutId);
 
             // Check if aborted (timeout)
@@ -168,7 +199,7 @@ const handlers = {
                 content: [
                     {
                         type: 'text',
-                        text: `Error executing tool "${name}": ${_e.message}`,
+                        text: `Error executing tool "${name}": ${message}`,
                     },
                 ],
                 isError: true,
@@ -215,8 +246,8 @@ const handlers = {
     /**
      * resources/read: Read resource content
      */
-    'resources/read': async (/** @type {any} */ params) => {
-        const { uri } = params;
+    'resources/read': async (params) => {
+        const uri = typeof params['uri'] === 'string' ? params['uri'] : '';
 
         console.error(`[MCP Handler] resources/read: ${uri}`);
 
@@ -234,8 +265,8 @@ const handlers = {
                     storage,
                     expand_health: {
                         enabled: true,
-                        default_lines: Number(process.env.RAG_EXPAND_DEFAULT_LINES || 40),
-                        max_lines: Number(process.env.RAG_EXPAND_MAX_LINES || 240),
+                        default_lines: Number(process.env['RAG_EXPAND_DEFAULT_LINES'] || 40),
+                        max_lines: Number(process.env['RAG_EXPAND_MAX_LINES'] || 240),
                     },
                 };
 
@@ -272,8 +303,8 @@ const handlers = {
     /**
      * resources/templates/read - fetch a single template by id params: { id: string }
      */
-    'resources/templates/read': async (/** @type {any} */ params) => {
-        const { id } = params || {};
+    'resources/templates/read': async (params) => {
+        const id = typeof params['id'] === 'string' ? params['id'] : '';
         console.error(`[MCP Handler] resources/templates/read: ${id}`);
         if (!id) {
             throw new Error('Template id is required');
@@ -281,7 +312,7 @@ const handlers = {
         const template = await workflowGenerator.loadTemplate(id);
         return { template };
     },
-};
+});
 
 /**
  * Configura endpoint MCP (Model Context Protocol) no servidor Express.
@@ -290,7 +321,7 @@ const handlers = {
  * batch requests, notifications e SSE discovery.
  *
  * @param {Express.Application} app - Instância do Express app
- * @param {ToolRegistry} registry - Registry de ferramentas MCP
+ * @param {MCPToolRegistry} registry - Registry de ferramentas MCP
  * @returns {void}
  */
 export function setupMCPHandler(app, registry) {
@@ -303,154 +334,156 @@ export function setupMCPHandler(app, registry) {
      *
      * Accepts JSON-RPC 2.0 requests and routes to appropriate handler
      */
-    app.post('/api/mcp', async (/** @type {any} */ req, /** @type {any} */ res) => {
-        try {
-            console.error('[MCP Handler] POST /api/mcp received');
+    app['post'](
+        '/api/mcp',
+        async (/** @type {import('express').Request} */ req, /** @type {import('express').Response} */ res) => {
+            try {
+                console.error('[MCP Handler] POST /api/mcp received');
 
-            const payload = req.body;
+                const payload = req.body;
 
-            const handleOne = async (/** @type {any} */ msg) => {
-                const { jsonrpc, id, method, params = {} } = msg || {};
-                const requestKey = id === undefined || id === null ? null : String(id);
+                const handleOne = async (/** @type {JsonRpcRequest | null | undefined} */ msg) => {
+                    const { jsonrpc, id, method, params = {} } = msg || {};
+                    const requestKey = id === undefined || id === null ? null : String(id);
 
-                // Validate JSON-RPC version
-                if (jsonrpc !== '2.0') {
-                    return {
-                        httpStatus: 400,
-                        json: {
-                            jsonrpc: '2.0',
-                            id,
-                            error: {
-                                code: -32600,
-                                message: 'Invalid Request: jsonrpc must be "2.0"',
+                    // Validate JSON-RPC version
+                    if (jsonrpc !== '2.0') {
+                        return {
+                            httpStatus: 400,
+                            json: {
+                                jsonrpc: '2.0',
+                                id,
+                                error: {
+                                    code: -32600,
+                                    message: 'Invalid Request: jsonrpc must be "2.0"',
+                                },
                             },
-                        },
-                    };
-                }
+                        };
+                    }
 
-                // Find handler for method
-                const handler = /** @type {Record<string, any>} */ (handlers)[method];
-                if (!handler) {
-                    return {
-                        httpStatus: 404,
-                        json: {
-                            jsonrpc: '2.0',
-                            id,
-                            error: {
-                                code: -32601,
-                                message: `Method not found: ${method}`,
+                    // Find handler for method
+                    const handler = typeof method === 'string' ? handlers[method] : undefined;
+                    if (!handler) {
+                        return {
+                            httpStatus: 404,
+                            json: {
+                                jsonrpc: '2.0',
+                                id,
+                                error: {
+                                    code: -32601,
+                                    message: `Method not found: ${method}`,
+                                },
                             },
-                        },
-                    };
-                }
+                        };
+                    }
 
-                // Notifications (no id) should not return a JSON-RPC response
-                const isNotification = id === undefined || id === null;
-                if (isNotification) {
-                    if (method === 'notifications/cancelled') {
-                        const targetId = params?.requestId ?? params?.id ?? params?.request_id;
-                        const targetKey = targetId === undefined || targetId === null ? null : String(targetId);
-                        const controller = targetKey ? pendingRequests.get(targetKey) : null;
-                        if (controller) {
-                            controller.abort();
-                            pendingRequests.delete(/** @type {string} */ (targetKey));
-                            console.error(`[MCP Handler] Cancelled request ${targetKey}`);
-                        } else {
-                            console.error(`[MCP Handler] Cancellation received for unknown request ${targetKey}`);
+                    // Notifications (no id) should not return a JSON-RPC response
+                    const isNotification = id === undefined || id === null;
+                    if (isNotification) {
+                        if (method === 'notifications/cancelled') {
+                            const targetId = params?.['requestId'] ?? params?.['id'] ?? params?.['request_id'];
+                            const targetKey = targetId === undefined || targetId === null ? null : String(targetId);
+                            const controller = targetKey ? pendingRequests.get(targetKey) : null;
+                            if (controller) {
+                                controller.abort();
+                                pendingRequests.delete(/** @type {string} */ (targetKey));
+                                console.error(`[MCP Handler] Cancelled request ${targetKey}`);
+                            } else {
+                                console.error(`[MCP Handler] Cancellation received for unknown request ${targetKey}`);
+                            }
+                        }
+                        await handler(params, registry);
+                        return { httpStatus: 202, json: null };
+                    }
+
+                    if (method === 'tools/call' && requestKey) {
+                        const controller = new AbortController();
+                        pendingRequests.set(requestKey, controller);
+                        try {
+                            const result = await handler(params, registry, {
+                                controller,
+                                timeoutMs: Number(process.env['MCP_TOOL_TIMEOUT'] || 90000),
+                            });
+                            return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
+                        } finally {
+                            pendingRequests.delete(requestKey);
                         }
                     }
-                    await handler(params, registry);
-                    return { httpStatus: 202, json: null };
-                }
 
-                if (method === 'tools/call' && requestKey) {
-                    const controller = new AbortController();
-                    pendingRequests.set(requestKey, controller);
-                    try {
-                        const result = await handler(params, registry, {
-                            controller,
-                            timeoutMs: Number(process.env.MCP_TOOL_TIMEOUT || 90000),
-                        });
-                        return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
-                    } finally {
-                        pendingRequests.delete(requestKey);
+                    const result = await handler(params, registry, {});
+                    return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
+                };
+
+                // Batch support
+                if (Array.isArray(payload)) {
+                    const results = (await Promise.all(payload.map(handleOne))).map((r) => r?.json).filter(Boolean);
+                    if (results.length === 0) {
+                        return res.status(202).end();
                     }
+                    return res.json(results);
                 }
 
-                const result = await handler(params, registry, {});
-                return { httpStatus: 200, json: { jsonrpc: '2.0', id, result } };
-            };
-
-            // Batch support
-            if (Array.isArray(payload)) {
-                const results = (await Promise.all(payload.map(handleOne))).map((r) => r?.json).filter(Boolean);
-                if (results.length === 0) {
+                const single = await handleOne(payload);
+                if (!single?.json) {
                     return res.status(202).end();
                 }
-                return res.json(results);
+
+                return res.status(single.httpStatus || 200).json(single.json);
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error('[MCP Handler] Error:', error);
+
+                return res.status(500).json({
+                    jsonrpc: '2.0',
+                    id: Array.isArray(req.body) ? null : req.body?.id,
+                    error: {
+                        code: -32603,
+                        message: 'Internal error',
+                        data: errorMessage,
+                    },
+                });
             }
-
-            const single = await handleOne(payload);
-            if (!single?.json) {
-                return res.status(202).end();
-            }
-
-            res.status(single.httpStatus || 200).json(single.json);
-        } catch (/** @type {any} */ error) {
-            const _e = /** @type {any} */ (error);
-            console.error('[MCP Handler] Error:', error);
-
-            res.status(500).json({
-                jsonrpc: '2.0',
-                id: Array.isArray(req.body) ? null : req.body?.id,
-                error: {
-                    code: -32603,
-                    message: 'Internal error',
-                    data: _e.message,
-                },
-            });
-        }
-    });
+        },
+    );
 
     /**
      * GET /api/mcp: Discovery endpoint
      *
      * Returns server info, available tools, and methods
      */
-    app.get('/api/mcp', (/** @type {any} */ req, /** @type {any} */ res) => {
-        // Streamable HTTP clients (like Kilo) may probe a GET SSE stream by
-        // sending `Accept: text/event-stream`.  Historically we replied 405 to
-        // signal "SSE not supported" so others would fall back to JSON.  that
-        // behaviour, however, causes clients which treat any non-200 status as a
-        // failure to repeatedly reconnect and eventually drop the server entry.
-        //
-        // Instead we now ignore the Accept header and simply return the normal
-        // discovery payload regardless of whether the probe looked for SSE.  the
-        // presence of `sse: false` in the JSON makes the intent explicit.
-        //
-        // This keeps the connector stable (Kilo will see a 200 and stop restarting)
-        // while preserving backward compatibility with clients that reject
-        // unexpected content-types.
+    app['get'](
+        '/api/mcp',
+        (/** @type {import('express').Request} */ _req, /** @type {import('express').Response} */ res) => {
+            // Streamable HTTP clients (like Kilo) may probe a GET SSE stream by
+            // sending `Accept: text/event-stream`.  Historically we replied 405 to
+            // signal "SSE not supported" so others would fall back to JSON.  that
+            // behaviour, however, causes clients which treat any non-200 status as a
+            // failure to repeatedly reconnect and eventually drop the server entry.
+            //
+            // Instead we now ignore the Accept header and simply return the normal
+            // discovery payload regardless of whether the probe looked for SSE.  the
+            // presence of `sse: false` in the JSON makes the intent explicit.
+            //
+            // This keeps the connector stable (Kilo will see a 200 and stop restarting)
+            // while preserving backward compatibility with clients that reject
+            // unexpected content-types.
 
-        /* eslint-disable @typescript-eslint/no-unused-vars */
-        const accept = String(req.headers?.accept || '');
-        /* eslint-enable @typescript-eslint/no-unused-vars */
-
-        res.json({
-            sse: false, // explicit hint to clients that streaming is not available
-            name: 'chatgpt-docker-unified',
-            version: '4.0.0',
-            protocol: 'MCP/JSON-RPC 2.0',
-            endpoint: '/api/mcp',
-            methods: Object.keys(handlers),
-            tools: registry.getToolNames(),
-            toolCount: registry.getStats().totalTools,
-            status: 'ready',
-        });
-    });
+            res.json({
+                sse: false, // explicit hint to clients that streaming is not available
+                name: 'chatgpt-docker-unified',
+                version: '4.0.0',
+                protocol: 'MCP/JSON-RPC 2.0',
+                endpoint: '/api/mcp',
+                methods: Object.keys(handlers),
+                tools: registry['getToolNames'](),
+                toolCount: registry['getStats']().totalTools,
+                status: 'ready',
+            });
+        },
+    );
 
     console.error('[MCP Handler] MCP endpoint ready at POST/GET /api/mcp');
-    console.error(`[MCP Handler] Exposed ${registry.getStats().totalTools} tools`);
+    console.error(`[MCP Handler] Exposed ${registry['getStats']().totalTools} tools`);
 }
 function normalizeToolResultPayload(/** @type {any} */ value) {
     if (value && typeof value === 'object' && Array.isArray(value.content)) {

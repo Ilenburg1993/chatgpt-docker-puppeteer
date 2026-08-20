@@ -34,15 +34,15 @@ function withTempDb(/** @type {(arg: any) => Promise<void>} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-agent-db-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
-        const prev = process.env.MAESTRO_DB_PATH;
-        process.env.MAESTRO_DB_PATH = dbPath;
+        const prev = process.env['MAESTRO_DB_PATH'];
+        process.env['MAESTRO_DB_PATH'] = dbPath;
         try {
             getDb(); // apply migrations
             await fn({ dbPath, tmpDir });
         } finally {
             closeDb();
-            if (prev === undefined) delete process.env.MAESTRO_DB_PATH;
-            else process.env.MAESTRO_DB_PATH = prev;
+            if (prev === undefined) delete process.env['MAESTRO_DB_PATH'];
+            else process.env['MAESTRO_DB_PATH'] = prev;
             fs.rmSync(tmpDir, { recursive: true, force: true });
         }
     };
@@ -54,20 +54,21 @@ test(
         const store = createAuditAgentDbStore();
         const rt = new AuditAgentRuntime({ store: /** @type {any} */ (store) });
         const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual', created_by: 'unit-test' });
-        rt.queueJob(job.id);
+        rt.queueJob(job['id']);
         await rt.tick();
 
-        const persisted = /** @type {any} */ (getAuditJobById(job.id));
+        const persisted = getAuditJobById(job['id']);
         assert.ok(persisted);
         assert.equal(persisted.status, 'COMPLETED');
         assert.equal(persisted.kind, 'quick_audit');
 
-        const runs = /** @type {any[]} */ (listAuditJobRunsByJobId(job.id));
+        const runs = listAuditJobRunsByJobId(job['id']);
         assert.equal(runs.length, 1);
+        assert.ok(runs[0]);
         assert.equal(runs[0].status, 'COMPLETED');
 
         const list = listAuditJobs({ limit: 10 });
-        assert.ok(list.some((item) => item.id === job.id));
+        assert.ok(list.some((item) => item.id === job['id']));
     }),
 );
 
@@ -116,26 +117,30 @@ test(
             },
         });
         const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'manual' });
-        rt.queueJob(job.id);
+        rt.queueJob(job['id']);
         await rt.tick();
 
-        const persisted = /** @type {any} */ (getAuditJobById(job.id));
+        const persisted = getAuditJobById(job['id']);
+        assert.ok(persisted);
         assert.equal(persisted.status, 'WAITING_APPROVAL');
 
-        const runs = /** @type {any[]} */ (listAuditJobRunsByJobId(job.id));
+        const runs = listAuditJobRunsByJobId(job['id']);
         assert.equal(runs.length, 1);
+        assert.ok(runs[0]);
         assert.equal(runs[0].status, 'WAITING_APPROVAL');
 
-        const findings = /** @type {any[]} */ (listAuditFindingsByJobId(job.id));
+        const findings = listAuditFindingsByJobId(job['id']);
         assert.equal(findings.length, 1);
+        assert.ok(findings[0]);
         assert.equal(findings[0].title, 'Synthetic finding');
 
-        const patches = /** @type {any[]} */ (listAuditPatchProposalsByJobId(job.id));
+        const patches = listAuditPatchProposalsByJobId(job['id']);
         assert.equal(patches.length, 1);
+        assert.ok(patches[0]);
         assert.equal(patches[0].status, 'draft');
         assert.equal(patches[0].approval_required, true);
-        assert.equal(patches[0].patch_summary_json?.context_signals?.diagnostics_count, 2);
-        assert.equal(patches[0].patch_summary_json?.context_budget?.remaining, 1);
+        assert.equal(patches[0].patch_summary_json?.['context_signals']?.['diagnostics_count'], 2);
+        assert.equal(patches[0].patch_summary_json?.['context_budget']?.['remaining'], 1);
         assert.equal(patches[0].dry_run_result_json?.pending, true);
     }),
 );
@@ -216,15 +221,15 @@ test(
         const store = createAuditAgentDbStore();
         const rt1 = new AuditAgentRuntime({ store: /** @type {any} */ (store) });
         const j = rt1.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
-        rt1.queueJob(j.id);
+        rt1.queueJob(j['id']);
         await rt1.tick();
 
         const rt2 = new AuditAgentRuntime({ store: /** @type {any} */ (store) });
         const hydration = rt2.hydrateFromStore();
         assert.equal(hydration.hydrated >= 1, true);
-        const loaded = rt2.getJob(j.id);
+        const loaded = rt2.getJob(j['id']);
         assert.ok(loaded);
-        assert.equal(loaded.status, 'COMPLETED');
+        assert.equal(loaded['status'], 'COMPLETED');
 
         upsertAuditWatchRule({
             name: 'Probe MCP health',

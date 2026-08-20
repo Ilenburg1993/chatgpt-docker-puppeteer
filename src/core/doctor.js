@@ -111,9 +111,9 @@ const TREND_FILE = path.join(LOG_DIR, 'health_trends.json');
  * @throws {Error} Nunca lança erro - sempre retorna objeto de status.
  */
 async function probeChromeConnection() {
-    const proxyPort = process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || 9224;
+    const proxyPort = process.env['CHROME_PROXY_PORT'] || CONFIG.CHROME_PROXY_PORT || 9224;
     const defaultEndpoint = `http://localhost:${proxyPort}`;
-    const endpoint = process.env.CHROME_WS_ENDPOINT || process.env.CHROME_URL || CONFIG.DEBUG_PORT || defaultEndpoint;
+    const endpoint = process.env['CHROME_WS_ENDPOINT'] || process.env['CHROME_URL'] || CONFIG.DEBUG_PORT || defaultEndpoint;
     const httpEndpoint = endpoint.replace('ws://', 'http://').replace('wss://', 'https://');
 
     try {
@@ -217,7 +217,7 @@ async function saveTrends(/** @type {any} */ trends) {
         };
         await fsp.writeFile(TREND_FILE, JSON.stringify(simplified, null, 2));
     } catch (/** @type {any} */ _) {
-        const _ce = /** @type {any} */ (_);
+
         /* Fail-safe */
     }
 }
@@ -300,13 +300,13 @@ async function checkStorageSLA() {
         ioLatency = Date.now() - t0;
         writeOk = true;
     } catch (/** @type {any} */ _) {
-        const _ce = /** @type {any} */ (_);
+
         writeOk = false;
     }
 
     return new Promise((resolve) => {
         const cmd = process.platform === 'win32' ? 'dir' : 'df -h .';
-        exec(cmd, (err, stdout) => {
+        exec(cmd, (_err, stdout) => {
             resolve({
                 latency_ms: ioLatency,
                 write_ok: writeOk,

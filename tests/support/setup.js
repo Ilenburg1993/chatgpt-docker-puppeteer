@@ -23,6 +23,7 @@ const TEST_ENV = {
     COPILOT_LOG_DIR: path.join(import.meta.dirname, 'tmp', 'logs', 'copilot'),
     DISABLE_BROWSER: 'true',
     TEST_MODE: 'true',
+    NO_COLOR: '1',
 };
 
 /**

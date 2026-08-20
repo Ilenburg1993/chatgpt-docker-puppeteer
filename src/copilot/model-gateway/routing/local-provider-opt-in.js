@@ -28,7 +28,7 @@ function stringList(value) {
 }
 
 /**
- * @param {Record<string, any>} profile
+ * @param {Record<string, unknown>} profile
  * @returns {boolean}
  */
 function profileHasLocalProviderOptInBlock(profile) {
@@ -36,7 +36,7 @@ function profileHasLocalProviderOptInBlock(profile) {
 }
 
 /**
- * @param {{ profiles?: Array<Record<string, any>>; summary?: { rejectedReasonCounts?: Record<string, number> } }} selection
+ * @param {{ profiles?: Array<Record<string, unknown>>; summary?: { rejectedReasonCounts?: Record<string, number> } }} selection
  * @returns {{ reason: string; blockedProfileIds: string[]; blockedProfileCount: number; rejectedCount: number; hasBlocks: boolean }}
  */
 export function summarizeModelGatewayLocalProviderOptInBlocks(selection) {

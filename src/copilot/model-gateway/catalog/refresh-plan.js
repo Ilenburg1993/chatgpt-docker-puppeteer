@@ -9,8 +9,16 @@
  */
 
 /**
- * @typedef {import('./importer-runner.js').CatalogImporter} CatalogImporter
- *
+ * @typedef {object} CatalogImporterMetadata
+ * @property {string} id
+ * @property {string} providerId
+ * @property {string} sourceKind
+ * @property {boolean} requiresAuth
+ * @property {string} [refreshPolicy]
+ * @property {number} [ttlSeconds]
+ */
+
+/**
  * @typedef {object} CatalogRefreshPlanEntry
  * @property {string} importerId
  * @property {string} providerId
@@ -20,9 +28,13 @@
  * @property {number | null} ttlSeconds
  * @property {number | null} ageSeconds
  * @property {string} reason
- *
+ */
+
+/**
+ * @template [TRaw=unknown]
+ * @template [TRow=unknown]
  * @typedef {object} CatalogRefreshPlan
- * @property {CatalogImporter[]} selectedImporters
+ * @property {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} selectedImporters
  * @property {CatalogRefreshPlanEntry[]} selected
  * @property {CatalogRefreshPlanEntry[]} skipped
  * @property {number} importerCount
@@ -31,10 +43,10 @@
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any> | null}
+ * @returns {Record<string, unknown> | null}
  */
 function recordOrNull(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
 }
 
 /**
@@ -65,7 +77,7 @@ function dateMs(value) {
 }
 
 /**
- * @param {CatalogImporter} importer
+ * @param {CatalogImporterMetadata} importer
  * @returns {string}
  */
 function importerSourceId(importer) {
@@ -73,8 +85,8 @@ function importerSourceId(importer) {
 }
 
 /**
- * @param {CatalogImporter} importer
- * @param {Record<string, any> | null} source
+ * @param {CatalogImporterMetadata} importer
+ * @param {Record<string, unknown> | null} source
  * @returns {number | null}
  */
 function ttlSecondsFor(importer, source) {
@@ -82,8 +94,8 @@ function ttlSecondsFor(importer, source) {
 }
 
 /**
- * @param {CatalogImporter} importer
- * @param {Record<string, any> | null} source
+ * @param {CatalogImporterMetadata} importer
+ * @param {Record<string, unknown> | null} source
  * @returns {string}
  */
 function refreshPolicyFor(importer, source) {
@@ -91,7 +103,7 @@ function refreshPolicyFor(importer, source) {
 }
 
 /**
- * @param {Record<string, any> | null} source
+ * @param {Record<string, unknown> | null} source
  * @param {Date} now
  * @returns {number | null}
  */
@@ -103,7 +115,7 @@ function sourceAgeSeconds(source, now) {
 }
 
 /**
- * @param {Record<string, any> | null} source
+ * @param {Record<string, unknown> | null} source
  * @param {number | null} ttlSeconds
  * @param {Date} now
  * @returns {boolean}
@@ -115,8 +127,8 @@ function sourceIsFresh(source, ttlSeconds, now) {
 }
 
 /**
- * @param {CatalogImporter} importer
- * @param {Record<string, any> | null} source
+ * @param {CatalogImporterMetadata} importer
+ * @param {Record<string, unknown> | null} source
  * @param {Date} now
  * @param {string} reason
  * @returns {CatalogRefreshPlanEntry}
@@ -136,19 +148,21 @@ function createPlanEntry(importer, source, now, reason) {
 }
 
 /**
+ * @template TRaw
+ * @template TRow
  * @param {object} [input]
- * @param {CatalogImporter[]} [input.importers]
- * @param {Record<string, any>[]} [input.sources]
+ * @param {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} [input.importers]
+ * @param {Record<string, unknown>[]} [input.sources]
  * @param {() => Date} [input.now]
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
- * @returns {CatalogRefreshPlan}
+ * @returns {CatalogRefreshPlan<TRaw, TRow>}
  */
 export function planModelGatewayCatalogRefresh(input = {}) {
     const now = input.now ?? (() => new Date());
     const observedAt = now();
     const requestedSourceIds = new Set((input.sourceIds ?? []).map((sourceId) => sourceId.trim()).filter(Boolean));
-    /** @type {Map<string, Record<string, any>>} */
+    /** @type {Map<string, Record<string, unknown>>} */
     const sourceById = new Map();
     for (const candidate of input.sources ?? []) {
         const source = recordOrNull(candidate);
@@ -156,7 +170,7 @@ export function planModelGatewayCatalogRefresh(input = {}) {
         if (source && id) sourceById.set(id, source);
     }
 
-    /** @type {CatalogImporter[]} */
+    /** @type {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} */
     const selectedImporters = [];
     /** @type {CatalogRefreshPlanEntry[]} */
     const selected = [];

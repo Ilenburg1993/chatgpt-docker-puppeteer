@@ -36,12 +36,12 @@ function _safeParsePayloadJson(/** @type {any} */ raw) {
 router.get('/events', async (req, res) => {
     try {
         const db = getDb();
-        const limit = Math.max(1, Math.min(_asInt(req.query.limit, 200), 500));
-        const cursor = decodeCursor(req.query.cursor);
+        const limit = Math.max(1, Math.min(_asInt(req.query['limit'], 200), 500));
+        const cursor = decodeCursor(req.query['cursor']);
 
-        const entityType = req.query.entity_type ? String(req.query.entity_type).trim() : null;
-        const entityId = req.query.entity_id ? String(req.query.entity_id).trim() : null;
-        const eventType = req.query.event_type ? String(req.query.event_type).trim() : null;
+        const entityType = req.query['entity_type'] ? String(req.query['entity_type']).trim() : null;
+        const entityId = req.query['entity_id'] ? String(req.query['entity_id']).trim() : null;
+        const eventType = req.query['event_type'] ? String(req.query['event_type']).trim() : null;
 
         const where = [];
         /** @type {Record<string, unknown>} */
@@ -49,21 +49,21 @@ router.get('/events', async (req, res) => {
 
         if (entityType) {
             where.push('entity_type = @entity_type');
-            params.entity_type = entityType;
+            params['entity_type'] = entityType;
         }
         if (entityId) {
             where.push('entity_id = @entity_id');
-            params.entity_id = entityId;
+            params['entity_id'] = entityId;
         }
         if (eventType) {
             where.push('event_type = @event_type');
-            params.event_type = eventType;
+            params['event_type'] = eventType;
         }
 
-        const cursorId = cursor?.id !== undefined ? Number(cursor.id) : null;
+        const cursorId = cursor?.['id'] !== undefined ? Number(cursor['id']) : null;
         if (Number.isFinite(/** @type {any} */ (cursorId)) && /** @type {number} */ (cursorId) > 0) {
             where.push('id < @cursor_id');
-            params.cursor_id = /** @type {number} */ (cursorId);
+            params['cursor_id'] = /** @type {number} */ (cursorId);
         }
 
         const rows = db

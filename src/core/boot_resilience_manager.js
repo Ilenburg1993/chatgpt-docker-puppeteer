@@ -18,7 +18,7 @@ import { log } from './logger.js';
  *
  * Ordem de precedência (via CONFIG.BROWSER_ENDPOINT):
  *
- * 1. process.env.CHROME_WS_ENDPOINT
+ * 1. process.env['CHROME_WS_ENDPOINT']
  * 2. CONFIG.BROWSER_URL
  * 3. CONFIG.DEBUG_PORT
  * 4. Fallback local (localhost:CHROME_PROXY_PORT)
@@ -105,7 +105,7 @@ async function createBrowserPool(config, nerv = null) {
  *
  * ⚠️ DESABILITADO por padrão. ⚠️ Violação arquitetural se ativado sem consciência.
  */
-const AUTO_START_CHROME = process.env.AUTO_START_CHROME === 'true';
+const AUTO_START_CHROME = process.env['AUTO_START_CHROME'] === 'true';
 
 /**
  * Tenta iniciar Chrome automaticamente usando o script start-chrome.sh
@@ -262,11 +262,11 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                         const browserPool = await createBrowserPool(
                             /** @type {any} */ ({
-                                poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
+                                poolSize: process.env['BROWSER_POOL_SIZE'] || all.BROWSER_POOL_SIZE || 3,
                                 allocationStrategy:
-                                    process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
+                                    process.env['ALLOCATION_STRATEGY'] || all.ALLOCATION_STRATEGY || 'round-robin',
                                 healthCheckInterval:
-                                    process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
+                                    process.env['HEALTH_CHECK_INTERVAL'] || all.HEALTH_CHECK_INTERVAL || 30000,
                                 browserEndpoint: getBrowserEndpoint(),
                             }),
                         );
@@ -352,11 +352,11 @@ async function handleBrowserPoolFailure(error, options = {}) {
 
                     const browserPool = await createBrowserPool(
                         /** @type {any} */ ({
-                            poolSize: process.env.BROWSER_POOL_SIZE || all.BROWSER_POOL_SIZE || 3,
+                            poolSize: process.env['BROWSER_POOL_SIZE'] || all.BROWSER_POOL_SIZE || 3,
                             allocationStrategy:
-                                process.env.ALLOCATION_STRATEGY || all.ALLOCATION_STRATEGY || 'round-robin',
+                                process.env['ALLOCATION_STRATEGY'] || all.ALLOCATION_STRATEGY || 'round-robin',
                             healthCheckInterval:
-                                process.env.HEALTH_CHECK_INTERVAL || all.HEALTH_CHECK_INTERVAL || 30000,
+                                process.env['HEALTH_CHECK_INTERVAL'] || all.HEALTH_CHECK_INTERVAL || 30000,
                             browserEndpoint: getBrowserEndpoint(),
                         }),
                     );

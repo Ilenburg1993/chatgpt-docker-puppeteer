@@ -25,8 +25,6 @@ import {
 } from './session.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
- *
  * @typedef {'interactive' | 'plan' | 'autopilot'} SessionMode
  *
  * @typedef {{ modelId: string }} ModelCurrentResult
@@ -59,7 +57,7 @@ import {
  */
 
 /**
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {{
  *     model: {
  *         getCurrent: () => Promise<ModelCurrentResult>;

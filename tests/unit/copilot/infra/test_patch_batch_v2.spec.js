@@ -11,6 +11,7 @@ import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 /** @type {string[]} */
 const tempDirs = [];
 
+/** @param {string} name @param {string} content */
 async function createTempFile(name, content) {
     const dir = await mkdtemp(join(tmpdir(), 'copilot-patch-batch-v2-'));
     tempDirs.push(dir);

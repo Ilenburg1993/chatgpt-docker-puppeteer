@@ -1,22 +1,20 @@
-<script setup>
+<script setup lang="ts">
 import { DataSet } from 'vis-data';
-import { Network } from 'vis-network';
+import { Network, type Edge, type Node, type Options } from 'vis-network';
 import 'vis-network/styles/vis-network.min.css';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 
-const props = defineProps({
-    nodes: { type: Array, default: () => [] },
-    edges: { type: Array, default: () => [] },
-    height: { type: String, default: '420px' },
-    options: { type: Object, default: () => ({}) },
-});
+const props = withDefaults(
+    defineProps<{ nodes?: Node[]; edges?: Edge[]; height?: string; options?: Options }>(),
+    { nodes: () => [], edges: () => [], height: '420px', options: () => ({}) },
+);
 
-const containerRef = ref(null);
-let network = null;
-let nodesDs = null;
-let edgesDs = null;
+const containerRef = ref<HTMLDivElement | null>(null);
+let network: Network | null = null;
+let nodesDs: DataSet<Node> | null = null;
+let edgesDs: DataSet<Edge> | null = null;
 
-function _defaultOptions() {
+function _defaultOptions(): Options {
     return {
         autoResize: true,
         layout: { improvedLayout: true },
@@ -24,7 +22,7 @@ function _defaultOptions() {
         interaction: { hover: true, navigationButtons: true, keyboard: true },
         nodes: {
             shape: 'box',
-            margin: 10,
+            margin: { top: 10, right: 10, bottom: 10, left: 10 },
             font: { color: '#e5e7eb', face: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas' },
             color: {
                 background: '#0f172a',
@@ -35,7 +33,7 @@ function _defaultOptions() {
         edges: {
             arrows: { to: { enabled: true, scaleFactor: 0.8 } },
             color: { color: '#475569', highlight: '#60a5fa' },
-            smooth: { type: 'cubicBezier', forceDirection: 'horizontal' },
+            smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.5 },
             font: { color: '#94a3b8', align: 'middle' },
         },
     };
@@ -74,7 +72,7 @@ watch(
         edgesDs.clear();
         nodesDs.add(props.nodes || []);
         edgesDs.add(props.edges || []);
-        network.fit({ animation: { duration: 250 } });
+        network.fit({ animation: true });
     },
     { deep: true },
 );

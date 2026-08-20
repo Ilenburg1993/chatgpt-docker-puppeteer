@@ -54,8 +54,8 @@ const writePendingTaskTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                title: z.string().describe('Título da tarefa pendente'),
-                description: z.string().optional().describe('Descrição detalhada'),
+                title: z.string()['describe']('Título da tarefa pendente'),
+                description: z.string().optional()['describe']('Descrição detalhada'),
                 priority: z.enum(['high', 'medium', 'low']).optional().default('medium'),
             })
         )
@@ -150,8 +150,8 @@ const setSessionContextTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                key: z.string().describe('Chave de contexto (ex: "current_task", "user_goal")'),
-                value: z.string().describe('Valor a armazenar (string)'),
+                key: z.string()['describe']('Chave de contexto (ex: "current_task", "user_goal")'),
+                value: z.string()['describe']('Valor a armazenar (string)'),
             })
         )
     ),
@@ -175,7 +175,7 @@ const invokeSkillTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                name: z.string().optional().describe('Nome da skill a carregar (slug do diretório em .github/skills/)'),
+                name: z.string().optional()['describe']('Nome da skill a carregar (slug do diretório em .github/skills/)'),
             })
         )
     ),

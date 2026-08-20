@@ -138,60 +138,51 @@ export const patchFileTool = buildTool({
         'full-file rewrites; use write_file_content only when replacing the whole file is truly intended. Do not claim ' +
         'an edit was applied until dryRun=false returns success.',
     parameters: z.object({
-        path: z.string().describe('Caminho do arquivo (relativo ao workspace ou absoluto)'),
-        old_string: z.string().min(1).describe('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),
-        new_string: z.string().describe('Texto de substituição (pode ser string vazia para deletar)'),
+        path: z.string()['describe']('Caminho do arquivo (relativo ao workspace ou absoluto)'),
+        old_string: z.string().min(1)['describe']('Texto exato a substituir. Deve ocorrer exatamente 1 vez no arquivo.'),
+        new_string: z.string()['describe']('Texto de substituição (pode ser string vazia para deletar)'),
         replace_all: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Se true, substitui todas as ocorrências de old_string.'),
+            .default(false)['describe']('Se true, substitui todas as ocorrências de old_string.'),
         expected_occurrences: z
             .number()
             .int()
             .min(1)
-            .optional()
-            .describe('Se definido, força contagem exata esperada de ocorrências antes de aplicar o patch.'),
+            .optional()['describe']('Se definido, força contagem exata esperada de ocorrências antes de aplicar o patch.'),
         occurrence_index: z
             .number()
             .int()
             .min(1)
-            .optional()
-            .describe('Índice 1-based da ocorrência a substituir quando old_string aparece múltiplas vezes.'),
+            .optional()['describe']('Índice 1-based da ocorrência a substituir quando old_string aparece múltiplas vezes.'),
         expectedHash: z
             .string()
-            .optional()
-            .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, o patch falha sem aplicar.'),
+            .optional()['describe']('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, o patch falha sem aplicar.'),
         dryRun: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Se true, valida e calcula o patch sem escrever no disco.'),
+            .default(false)['describe']('Se true, valida e calcula o patch sem escrever no disco.'),
         allowNoop: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Se true, permite old_string e new_string iguais para validar match sem mudança.'),
+            .default(false)['describe']('Se true, permite old_string e new_string iguais para validar match sem mudança.'),
         diffContextLines: z
             .number()
             .int()
             .min(0)
             .max(20)
             .optional()
-            .default(3)
-            .describe('Linhas de contexto no diffPreview retornado.'),
+            .default(3)['describe']('Linhas de contexto no diffPreview retornado.'),
         maxDiffLines: z
             .number()
             .int()
             .min(1)
             .max(500)
             .optional()
-            .default(160)
-            .describe('Máximo de linhas no diffPreview retornado.'),
+            .default(160)['describe']('Máximo de linhas no diffPreview retornado.'),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()
-            .describe('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade ou preconditions.'),
+            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade ou preconditions.'),
     }),
     handler: async ({
         path: filePath,

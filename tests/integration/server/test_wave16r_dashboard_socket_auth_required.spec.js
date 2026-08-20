@@ -12,9 +12,9 @@ import express from 'express';
 import { io as ioClient } from 'socket.io-client';
 import * as socketHub from '#server/engine/socket';
 
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'wave16r_dashboard_socket_auth_required_secret_123456789';
-process.env.DASHBOARD_SOCKET_AUTH_REQUIRED = 'true';
-process.env.DASHBOARD_COMMANDS_ENABLED = 'false';
+process.env['JWT_SECRET'] = process.env['JWT_SECRET'] || 'wave16r_dashboard_socket_auth_required_secret_123456789';
+process.env['DASHBOARD_SOCKET_AUTH_REQUIRED'] = 'true';
+process.env['DASHBOARD_COMMANDS_ENABLED'] = 'false';
 
 const app = express();
 const server = http.createServer(app);

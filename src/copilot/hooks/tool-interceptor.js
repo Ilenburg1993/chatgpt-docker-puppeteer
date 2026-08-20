@@ -253,7 +253,7 @@ export function createTimingEnricherHook(opts = {}) {
 
     /**
      * @param {{ sessionId?: string; toolName: string }} input
-     * @param {InvocationContext | undefined} invocation
+     * @param {{ sessionId?: string; agentName?: string } | undefined} invocation
      * @returns {string}
      */
     function timingKey(input, invocation) {
@@ -293,7 +293,7 @@ export function createTimingEnricherHook(opts = {}) {
 
     /**
      * @param {{ sessionId?: string; toolName: string }} input
-     * @param {InvocationContext | undefined} invocation
+     * @param {{ sessionId?: string; agentName?: string } | undefined} invocation
      * @param {string} outcome
      * @returns {{ additionalContext?: string }}
      */

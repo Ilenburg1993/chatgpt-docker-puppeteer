@@ -89,7 +89,10 @@ beforeEach(() => {
         ok: true,
         resolved: '/workspaces/chatgpt-docker-puppeteer/src/copilot/foo.js',
     });
-    mocks.readText.mockResolvedValue({ content: 'export function buildTool() {}' });
+    mocks.readText.mockResolvedValue({
+        content: 'export function buildTool() {}',
+        contentHash: 'content-hash',
+    });
     mocks.parseFileForContext.mockResolvedValue(PARSED_PAYLOAD);
 });
 
@@ -206,6 +209,7 @@ describe('workspace_parse_file', () => {
         expect(mocks.parseFileForContext).toHaveBeenCalledWith(
             '/workspaces/chatgpt-docker-puppeteer/src/copilot/foo.js',
             'export function buildTool() {}',
+            { contentHash: 'content-hash' },
         );
     });
 

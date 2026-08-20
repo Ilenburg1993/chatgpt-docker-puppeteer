@@ -62,10 +62,7 @@ const makeInput = (toolName) => /** @type {any} */ ({ toolName, toolArgs: {}, ti
 
 const makeInvocation = (sid = 'sess-1') => /** @type {any} */ ({ sessionId: sid });
 
-const makePromptInput = (prompt = 'hello') => /** @type {any} */ ({ prompt });
 const makeSessionStartInput = (source = 'new') => /** @type {any} */ ({ source, cwd: '/tmp', timestamp: Date.now() });
-const makeSessionEndInput = (reason = 'complete') =>
-    /** @type {any} */ ({ reason, timestamp: Date.now(), cwd: '/tmp' });
 const makeErrorInput = (opts = {}) =>
     /** @type {any} */ ({
         error: 'some error',

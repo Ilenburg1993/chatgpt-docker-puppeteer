@@ -33,15 +33,15 @@ describe('infra/io/fs line-offset cache', () => {
         assert.deepEqual(first.returnedLines, { start: 2, end: 3 });
         assert.equal(first.totalLines, 4);
         assert.equal(first.cache, 'line-offset-miss');
-        assert.equal(afterFirst.misses, 1);
-        assert.equal(afterFirst.sets, 1);
+        assert.equal(afterFirst['misses'], 1);
+        assert.equal(afterFirst['sets'], 1);
         assert.ok(afterFirst.sizeBytes > 0);
         assert.ok(afterFirst.sizeBytes <= afterFirst.maxBytes);
 
         assert.equal(second.content, text);
         assert.deepEqual(second.returnedLines, { start: 1, end: 4 });
         assert.equal(second.cache, 'line-offset-hit');
-        assert.equal(afterSecond.hits, 1);
+        assert.equal(afterSecond['hits'], 1);
         assert.equal(afterSecond.size, 1);
     });
 
@@ -55,8 +55,8 @@ describe('infra/io/fs line-offset cache', () => {
 
         invalidateIoCachePath(FILE);
         const stats = getLineOffsetCacheStats();
-        assert.equal(stats.busInvalidations, 1);
-        assert.equal(stats.clears, 1);
+        assert.equal(stats['busInvalidations'], 1);
+        assert.equal(stats['clears'], 1);
         assert.equal(stats.size, 0);
         assert.equal(stats.sizeBytes, 0);
     });
@@ -84,7 +84,7 @@ describe('infra/io/fs line-offset cache', () => {
 
         assert.equal(result.content, 'b');
         assert.equal(result.cache, 'line-offset-bypass');
-        assert.equal(getLineOffsetCacheStats().bypasses, 1);
+        assert.equal(getLineOffsetCacheStats()['bypasses'], 1);
         assert.equal(getLineOffsetCacheStats().size, 0);
     });
 
@@ -121,7 +121,7 @@ describe('infra/io/fs line-offset cache', () => {
         assert.deepEqual(result.returnedLines, { start: 2, end: 3 });
         assert.equal(result.cache, 'line-offset-bypass');
         assert.equal(stats.enabled, false);
-        assert.equal(stats.bypasses, 1);
+        assert.equal(stats['bypasses'], 1);
         assert.equal(stats.size, 0);
     });
 });

@@ -49,48 +49,48 @@ test('wave10: lifecycle signal matrix is registered once with platform policy', 
     const handlers = __lifecycleTestHooks.getSignalHandlers();
     const afterSetup = captureCounts(events);
 
-    assert.equal(afterSetup.SIGINT, before.SIGINT + 1, 'SIGINT should be registered exactly once');
-    assert.equal(afterSetup.SIGTERM, before.SIGTERM + 1, 'SIGTERM should be registered exactly once');
+    assert.equal(afterSetup['SIGINT'], before['SIGINT'] + 1, 'SIGINT should be registered exactly once');
+    assert.equal(afterSetup['SIGTERM'], before['SIGTERM'] + 1, 'SIGTERM should be registered exactly once');
 
-    if (typeof handlers.sigusr2 === 'function') {
-        assert.equal(afterSetup.SIGUSR2, before.SIGUSR2 + 1, 'SIGUSR2 should be registered once when supported');
+    if (typeof handlers['sigusr2'] === 'function') {
+        assert.equal(afterSetup['SIGUSR2'], before['SIGUSR2'] + 1, 'SIGUSR2 should be registered once when supported');
     } else {
-        assert.equal(afterSetup.SIGUSR2, before.SIGUSR2, 'SIGUSR2 count should remain stable when unsupported');
+        assert.equal(afterSetup['SIGUSR2'], before['SIGUSR2'], 'SIGUSR2 count should remain stable when unsupported');
     }
 
     if (process.platform === 'win32') {
-        assert.equal(afterSetup.SIGBREAK, before.SIGBREAK + 1, 'SIGBREAK should be registered on win32');
-        assert.equal(afterSetup.SIGQUIT, before.SIGQUIT, 'SIGQUIT should not be registered on win32');
+        assert.equal(afterSetup['SIGBREAK'], before['SIGBREAK'] + 1, 'SIGBREAK should be registered on win32');
+        assert.equal(afterSetup['SIGQUIT'], before['SIGQUIT'], 'SIGQUIT should not be registered on win32');
     } else {
-        assert.equal(afterSetup.SIGQUIT, before.SIGQUIT + 1, 'SIGQUIT should be registered on non-win32');
-        assert.equal(afterSetup.SIGBREAK, before.SIGBREAK, 'SIGBREAK should not be registered on non-win32');
+        assert.equal(afterSetup['SIGQUIT'], before['SIGQUIT'] + 1, 'SIGQUIT should be registered on non-win32');
+        assert.equal(afterSetup['SIGBREAK'], before['SIGBREAK'], 'SIGBREAK should not be registered on non-win32');
     }
 
     if (process.platform === 'win32') {
-        assert.equal(afterSetup.SIGPIPE, before.SIGPIPE, 'SIGPIPE should stay unchanged on win32');
-        assert.equal(afterSetup.SIGCHLD, before.SIGCHLD, 'SIGCHLD should stay unchanged on win32');
+        assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'], 'SIGPIPE should stay unchanged on win32');
+        assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'], 'SIGCHLD should stay unchanged on win32');
     } else {
-        if (typeof handlers.sigpipe === 'function') {
-            assert.equal(afterSetup.SIGPIPE, before.SIGPIPE + 1, 'SIGPIPE should be registered on POSIX');
+        if (typeof handlers['sigpipe'] === 'function') {
+            assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'] + 1, 'SIGPIPE should be registered on POSIX');
         } else {
-            assert.equal(afterSetup.SIGPIPE, before.SIGPIPE, 'SIGPIPE should stay unchanged when unsupported');
+            assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'], 'SIGPIPE should stay unchanged when unsupported');
         }
 
-        if (typeof handlers.sigchld === 'function') {
-            assert.equal(afterSetup.SIGCHLD, before.SIGCHLD + 1, 'SIGCHLD should be registered on POSIX');
+        if (typeof handlers['sigchld'] === 'function') {
+            assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'] + 1, 'SIGCHLD should be registered on POSIX');
         } else {
-            assert.equal(afterSetup.SIGCHLD, before.SIGCHLD, 'SIGCHLD should stay unchanged when unsupported');
+            assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'], 'SIGCHLD should stay unchanged when unsupported');
         }
     }
 
     assert.equal(
-        afterSetup.uncaughtException,
-        before.uncaughtException + 1,
+        afterSetup['uncaughtException'],
+        before['uncaughtException'] + 1,
         'uncaughtException should be registered once',
     );
     assert.equal(
-        afterSetup.unhandledRejection,
-        before.unhandledRejection + 1,
+        afterSetup['unhandledRejection'],
+        before['unhandledRejection'] + 1,
         'unhandledRejection should be registered once',
     );
 });
@@ -129,10 +129,10 @@ test('wave10: optional subprocess handlers do not arm shutdown state', () => {
     listenToSignals();
     const handlers = __lifecycleTestHooks.getSignalHandlers();
 
-    if (typeof handlers.sigpipe === 'function') {
+    if (typeof handlers['sigpipe'] === 'function') {
         /** @type {any} */ (handlers).sigpipe();
     }
-    if (typeof handlers.sigchld === 'function') {
+    if (typeof handlers['sigchld'] === 'function') {
         /** @type {any} */ (handlers).sigchld();
     }
 

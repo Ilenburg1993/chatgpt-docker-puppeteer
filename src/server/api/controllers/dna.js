@@ -149,7 +149,7 @@ router.put('/dna', denyIfDelegated, async (req, res) => {
  */
 router.get('/dna/history', async (req, res) => {
     try {
-        const history = await io.getDnaHistory();
+        const history = io.getDnaHistory();
 
         res.json({
             success: true,
@@ -200,7 +200,7 @@ router.post('/dna/rollback', denyIfDelegated, async (req, res) => {
         return res.json({
             success: true,
             message: `DNA restaurado para versão index ${versionIndex}`,
-            current_version: dna.version,
+            current_version: dna['version'],
             request_id: req.id,
         });
     } catch (/** @type {any} */ e) {
@@ -228,8 +228,8 @@ router.get('/dna/stats', async (req, res) => {
             success: true,
             stats: {
                 session: stats, // Evolutions this session
-                total: dna.evolution_count, // Total evolutions
-                version: dna.version,
+                total: dna['evolution_count'], // Total evolutions
+                version: dna['version'],
                 domains: Object.keys(dna.targets || {}).length,
             },
             request_id: req.id,

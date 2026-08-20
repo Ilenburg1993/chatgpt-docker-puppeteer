@@ -40,10 +40,10 @@ function optionalString(value) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
 }
 
 /**
@@ -81,7 +81,7 @@ function isChatLike(runtimeKind) {
 
 /**
  * @param {string} runtimeKind
- * @param {Record<string, any>} routing
+ * @param {Record<string, unknown>} routing
  * @returns {string[]}
  */
 function inferProbeKinds(runtimeKind, routing) {
@@ -110,7 +110,7 @@ function inferProbeKinds(runtimeKind, routing) {
 
 /**
  * @param {object} [options]
- * @param {readonly Record<string, any>[]} [options.traits]
+ * @param {readonly Record<string, unknown>[]} [options.traits]
  * @param {string} [options.providerId]
  * @returns {Array<{
  *   providerId: string;
@@ -162,7 +162,7 @@ export function listProviderWireProbeMatrix(options = {}) {
 }
 
 /**
- * @param {readonly Record<string, any>[]} rows
+ * @param {readonly Record<string, unknown>[]} rows
  * @returns {{ providerCount: number; rowCount: number; implementedProbeKindCounts: Record<string, number>; pendingProbeKindCounts: Record<string, number>; providersWithPendingProbeKinds: string[] }}
  */
 export function summarizeProviderWireProbeMatrix(rows) {

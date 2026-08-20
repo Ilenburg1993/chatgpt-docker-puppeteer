@@ -1,17 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { computed } from 'vue';
 
-const props = defineProps({
-    hoverable: {
-        type: Boolean,
-        default: false,
-    },
-    class: {
-        type: String,
-        default: '',
-    },
+const props = withDefaults(defineProps<{ hoverable?: boolean; class?: string }>(), {
+    hoverable: false,
+    class: '',
 });
+const emit = defineEmits<{ click: [event: MouseEvent] }>();
 
 const cardClass = computed(() =>
     cn(
@@ -24,9 +19,9 @@ const cardClass = computed(() =>
 </script>
 
 <template>
-    <div :class="cardClass">
+    <div :class="cardClass" @click="emit('click', $event)">
         <div
-            v-if="$slots.header"
+            v-if="$slots['header']"
             class="px-6 py-5 border-b border-slate-700/50 bg-gradient-to-r from-slate-800/50 to-transparent"
         >
             <slot name="header" />
@@ -37,7 +32,7 @@ const cardClass = computed(() =>
         </div>
 
         <div
-            v-if="$slots.footer"
+            v-if="$slots['footer']"
             class="px-6 py-4 border-t border-slate-700/50 bg-gradient-to-r from-transparent to-slate-800/50"
         >
             <slot name="footer" />

@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +10,10 @@ const runtimeMocks = vi.hoisted(() => ({
 
 const hookToolMocks = vi.hoisted(() => ({
     hasTerminalPendingStructuredUserInputRequests: vi.fn(() => false),
-    listTerminalPendingStructuredUserInputs: vi.fn(() => []),
+    listTerminalPendingStructuredUserInputs: vi.fn(
+        /** @returns {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalPendingStructuredUserInputs>} */
+        () => [],
+    ),
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => runtimeMocks);

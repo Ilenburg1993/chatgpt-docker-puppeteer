@@ -256,13 +256,11 @@ const hookGetAuditTailTool = buildTool({
             .int()
             .min(1)
             .optional()
-            .default(20)
-            .describe('Número sugerido de linhas a retornar (padrão histórico: 20)'),
+            .default(20)['describe']('Número sugerido de linhas a retornar (padrão histórico: 20)'),
         source: z
             .enum(['sdk', 'compliance', 'auto'])
             .optional()
-            .default('auto')
-            .describe(
+            .default('auto')['describe'](
                 'Fonte: "sdk" = ring buffer interno (tool calls SDK), "compliance" = audit.jsonl operacional (.github/hooks/), "auto" = sdk primeiro, compliance como fallback',
             ),
     }),
@@ -341,17 +339,15 @@ const requestUserInputTool = buildTool({
         'No terminal LLM-B, não chame automaticamente ao fim de toda resposta; a continuidade normal usa ask_user READY/REPLY. ' +
         'É compatível com o padrão vscode_askQuestions do protocolo de hooks quando esse fluxo estiver ativo.',
     parameters: z.object({
-        question: z.string().describe('Pergunta principal ao usuário (clara e objetiva)'),
-        context: z.string().optional().describe('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
+        question: z.string()['describe']('Pergunta principal ao usuário (clara e objetiva)'),
+        context: z.string().optional()['describe']('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
         choices: z
             .array(z.string())
-            .optional()
-            .describe('Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre'),
+            .optional()['describe']('Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre'),
         requires_selection: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Compatibilidade legada: no Terminal LLM-B, choices são sugestões e texto livre continua permitido'),
+            .default(false)['describe']('Compatibilidade legada: no Terminal LLM-B, choices são sugestões e texto livre continua permitido'),
     }),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {

@@ -19,7 +19,7 @@ import { readCopilotBootConfig } from './config.js';
  */
 
 /**
- * @param {ReturnType<import('./config.js').readCopilotBootConfig>} [config]
+ * @param {ReturnType<typeof import('./config.js').readCopilotBootConfig>} [config]
  * @returns {{
  *     mode: string;
  *     workspaceRoot: string;

@@ -32,7 +32,7 @@ try {
     console.log('='.repeat(80));
     console.log();
 } catch (error) {
-    console.error('❌ Erro:', error.message);
+    console.error('❌ Erro:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -60,7 +60,7 @@ try {
     console.log('='.repeat(80));
     console.log();
 } catch (error) {
-    console.error('❌ Erro:', error.message);
+    console.error('❌ Erro:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -85,7 +85,7 @@ try {
     console.log('='.repeat(80));
     console.log();
 } catch (error) {
-    console.error('❌ Erro:', error.message);
+    console.error('❌ Erro:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 

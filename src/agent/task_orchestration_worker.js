@@ -115,7 +115,14 @@ import fs from 'node:fs/promises';
  * Minimal DB interface expected from `getDb()` (better-sqlite3-like).
  *
  * @typedef {object} DBInterface
- * @property {function(string): {get: function(...any): unknown, all: function(...any): unknown[], run: function(...any): {changes?: number}}} prepare
+ * @property {(sql: string) => {
+ *     get: (...args: unknown[]) => unknown;
+ *     all: (...args: unknown[]) => unknown[];
+ *     run: (...args: unknown[]) => { changes?: number };
+ * }} prepare
+ *
+ *
+ * @typedef {{ id?: string; latest_attempt_id?: string }} TaskOrchestrationRow
  * @param {number} ms
  */
 function _sleep(ms) {
@@ -173,7 +180,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
         const attempt = getAttemptById(attemptId);
 
         // 1) response_v2_json artifact
-        const v2Id = attempt?.response_v2_json_artifact_id || null;
+        const v2Id = attempt?.['response_v2_json_artifact_id'] || null;
         if (v2Id) {
             try {
                 const raw = await readText(v2Id);
@@ -202,7 +209,7 @@ async function _readAttemptOutputText({ taskId, attemptId, resultJson, maxRetrie
         }
 
         // 2) response_text artifact
-        const textId = attempt?.response_text_artifact_id || null;
+        const textId = attempt?.['response_text_artifact_id'] || null;
         if (textId) {
             try {
                 const raw = await readText(textId);
@@ -505,7 +512,7 @@ class TaskOrchestrationWorker {
         try {
             const db = getDb();
 
-            const rows = /** @type {any[]} */ (
+            const rows = /** @type {TaskOrchestrationRow[]} */ (
                 db
                     .prepare(
                         `
@@ -1123,7 +1130,7 @@ class TaskOrchestrationWorker {
             step_id: currentStepId,
             task_id: taskId,
             attempt_id: attemptId,
-            response_text_artifact_id: attempt?.response_text_artifact_id || null,
+            response_text_artifact_id: attempt?.['response_text_artifact_id'] || null,
             output_preview: _truncate(outputText, 500),
         };
 

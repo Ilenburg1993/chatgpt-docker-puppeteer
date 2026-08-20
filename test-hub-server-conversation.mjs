@@ -71,11 +71,17 @@ const c = {
     gray: '\x1b[90m',
 };
 
+/** @param {number} n @param {string} msg */
 const step = (n, msg) => console.log(`\n${c.blue}${c.bold}[STEP ${n}]${c.reset} ${msg}`);
+/** @param {string} msg */
 const ok = (msg) => console.log(`${c.green}  ✅ ${msg}${c.reset}`);
+/** @param {string} msg */
 const info = (msg) => console.log(`${c.gray}  ℹ️  ${msg}${c.reset}`);
+/** @param {string} msg */
 const llmA = (msg) => console.log(`\n${c.cyan}  LLM-A →${c.reset} ${msg}`);
+/** @param {string} msg */
 const llmB = (msg) => console.log(`\n${c.yellow}  LLM-B ←${c.reset} ${msg}`);
+/** @param {string} msg */
 const logErr = (msg) => console.error(`${c.red}  ❌ ${msg}${c.reset}`);
 
 // ── Tópicos da conversa ──────────────────────────────────────────────────────
@@ -90,6 +96,7 @@ const CONVERSATION_TURNS = [
 ];
 
 // ── Processo do servidor ─────────────────────────────────────────────────────
+/** @type {import('node:child_process').ChildProcess | null} */
 let serverProcess = null;
 let _serverOutput = '';
 
@@ -227,6 +234,7 @@ async function createHubSession() {
     return sessionId;
 }
 
+/** @param {string} hubSessionId */
 async function conductConversation(hubSessionId) {
     step(5, `Conduzindo ${CONVERSATION_TURNS.length} turnos de conversa...`);
     console.log(`  ${c.gray}Hub Session ID: ${hubSessionId}${c.reset}\n`);
@@ -234,6 +242,7 @@ async function conductConversation(hubSessionId) {
     let completedTurns = 0;
     for (let i = 0; i < CONVERSATION_TURNS.length; i++) {
         const message = CONVERSATION_TURNS[i];
+        if (!message) continue;
         llmA(message);
 
         try {
@@ -259,6 +268,7 @@ async function conductConversation(hubSessionId) {
     return completedTurns;
 }
 
+/** @param {string} hubSessionId */
 async function verifyHistory(hubSessionId) {
     step(6, 'Verificando histórico via GET /api/hub/sessions/:id/turns...');
     const r = await req('GET', `/api/hub/sessions/${hubSessionId}/turns?limit=20`);

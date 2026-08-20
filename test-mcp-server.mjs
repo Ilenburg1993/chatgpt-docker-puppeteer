@@ -20,6 +20,10 @@ let testsFailed = 0;
 /**
  * Utility: Log with colors
  */
+/**
+ * @param {keyof typeof COLORS} color
+ * @param {string} message
+ */
 function log(color, message) {
     console.log(`${COLORS[color]}${message}${COLORS.reset}`);
 }
@@ -27,7 +31,13 @@ function log(color, message) {
 /**
  * Utility: Make HTTP request
  */
-async function request(method, url, body = null) {
+/**
+ * @param {string} method
+ * @param {string} url
+ * @param {unknown} [body]
+ */
+async function request(method, url, body) {
+    /** @type {RequestInit} */
     const options = {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -44,8 +54,23 @@ async function request(method, url, body = null) {
     };
 }
 
+class TestAssertionError extends Error {
+    /**
+     * @param {string} message
+     * @param {unknown} details
+     */
+    constructor(message, details) {
+        super(message);
+        this.contextDetails = details;
+    }
+}
+
 /**
  * Test runner
+ */
+/**
+ * @param {string} name
+ * @param {() => Promise<void>} fn
  */
 async function test(name, fn) {
     try {
@@ -55,9 +80,10 @@ async function test(name, fn) {
         log('green', `  ✓ PASSED`);
     } catch (error) {
         testsFailed++;
-        log('red', `  ✗ FAILED: ${error.message}`);
-        if (error.details) {
-            log('gray', `    Details: ${JSON.stringify(error.details, null, 2)}`);
+        const message = error instanceof Error ? error.message : String(error);
+        log('red', `  ✗ FAILED: ${message}`);
+        if (error instanceof TestAssertionError && error.contextDetails) {
+            log('gray', `    Details: ${JSON.stringify(error.contextDetails, null, 2)}`);
         }
     }
 }
@@ -65,11 +91,14 @@ async function test(name, fn) {
 /**
  * Assertion helper
  */
-function assert(condition, message, details = null) {
+/**
+ * @param {unknown} condition
+ * @param {string} [message]
+ * @param {unknown} [details]
+ */
+function assert(condition, message = 'Assertion failed', details = null) {
     if (!condition) {
-        const error = new Error(message);
-        error.details = details;
-        throw error;
+        throw new TestAssertionError(message, details);
     }
 }
 
@@ -190,7 +219,7 @@ async function runTests() {
         assert(tool.inputSchema !== undefined, 'Tool should have inputSchema');
 
         log('gray', `    Found ${res.body.result.tools.length} tools:`);
-        res.body.result.tools.forEach((t) => {
+        res.body.result.tools.forEach((/** @type {{ name: string; description: string }} */ t) => {
             log('gray', `      - ${t.name}: ${t.description.substring(0, 60)}...`);
         });
     });

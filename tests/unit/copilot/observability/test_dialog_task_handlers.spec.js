@@ -102,13 +102,13 @@ describe('dialog-task-handlers', () => {
         it('registra turn completo com duração e sucesso', () => {
             agent.emit('dialog.turn_start', { turnId: 'T1' });
             agent.emit('dialog.turn_end', { turnId: 'T1', durationMs: 500, reply: 'Ok' });
-            expect(metrics.recordDialogTurn).toHaveBeenCalledWith(500, true);
+            expect(metrics['recordDialogTurn']).toHaveBeenCalledWith(500, true);
         });
 
         it('registra turn sem reply como falha', () => {
             agent.emit('dialog.turn_start', { turnId: 'T2' });
             agent.emit('dialog.turn_end', { turnId: 'T2', durationMs: 200, reply: '' });
-            expect(metrics.recordDialogTurn).toHaveBeenCalledWith(200, false);
+            expect(metrics['recordDialogTurn']).toHaveBeenCalledWith(200, false);
         });
 
         it('expõe lastTurnDurationMs e lastTurnSuccess', () => {
@@ -121,7 +121,7 @@ describe('dialog-task-handlers', () => {
         it('usa fallback turnId "current" quando turnId ausente', () => {
             agent.emit('dialog.turn_start', {});
             agent.emit('dialog.turn_end', { durationMs: 100, reply: 'r' });
-            expect(metrics.recordDialogTurn).toHaveBeenCalledWith(100, true);
+            expect(metrics['recordDialogTurn']).toHaveBeenCalledWith(100, true);
         });
     });
 
@@ -130,13 +130,13 @@ describe('dialog-task-handlers', () => {
     describe('dialog.stalled', () => {
         it('registra stall com stalledMs', () => {
             agent.emit('dialog.stalled', { stalledMs: 3000 });
-            expect(metrics.recordDialogStall).toHaveBeenCalledWith(3000);
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.stalls');
+            expect(metrics['recordDialogStall']).toHaveBeenCalledWith(3000);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.stalls');
         });
 
         it('usa 0 quando stalledMs ausente', () => {
             agent.emit('dialog.stalled', {});
-            expect(metrics.recordDialogStall).toHaveBeenCalledWith(0);
+            expect(metrics['recordDialogStall']).toHaveBeenCalledWith(0);
         });
     });
 
@@ -145,14 +145,14 @@ describe('dialog-task-handlers', () => {
     describe('dialog.turn_timeout', () => {
         it('registra timeout com phase e notifica errorTracker', () => {
             agent.emit('dialog.turn_timeout', { phase: 'boot', timeoutMs: 30000 });
-            expect(metrics.recordDialogTimeout).toHaveBeenCalled();
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.timeout.boot');
-            expect(errorTracker.trackError).toHaveBeenCalled();
+            expect(metrics['recordDialogTimeout']).toHaveBeenCalled();
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.timeout.boot');
+            expect(errorTracker['trackError']).toHaveBeenCalled();
         });
 
         it('usa phase "unknown" quando ausente', () => {
             agent.emit('dialog.turn_timeout', {});
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.timeout.unknown');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.timeout.unknown');
         });
     });
 
@@ -161,14 +161,14 @@ describe('dialog-task-handlers', () => {
     describe('dialog.loop.changed', () => {
         it('registra ativação do loop', () => {
             agent.emit('dialog.loop.changed', { active: true });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.loop.activated');
-            expect(metrics.recordGauge).toHaveBeenCalledWith('dialog.loop.active', 1);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.loop.activated');
+            expect(metrics['recordGauge']).toHaveBeenCalledWith('dialog.loop.active', 1);
         });
 
         it('registra desativação do loop', () => {
             agent.emit('dialog.loop.changed', { active: false });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.loop.deactivated');
-            expect(metrics.recordGauge).toHaveBeenCalledWith('dialog.loop.active', 0);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.loop.deactivated');
+            expect(metrics['recordGauge']).toHaveBeenCalledWith('dialog.loop.active', 0);
         });
     });
 
@@ -177,18 +177,18 @@ describe('dialog-task-handlers', () => {
     describe('dialog simple events', () => {
         it.each(['dialog.ready', 'dialog.paused', 'dialog.resumed'])('%s registra counter', (evt) => {
             agent.emit(evt);
-            expect(metrics.recordCounter).toHaveBeenCalledWith(evt);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith(evt);
         });
 
         it('dialog.reply registra counter', () => {
             agent.emit('dialog.reply', { reply: 'Hello', turnId: '1' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.reply');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.reply');
         });
 
         it('dialog.stopped registra counter com reason', () => {
             agent.emit('dialog.stopped', { reason: 'user_cancel' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.stopped');
-            expect(metrics.recordCounter).toHaveBeenCalledWith('dialog.stopped.user_cancel');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.stopped');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('dialog.stopped.user_cancel');
         });
     });
 
@@ -197,13 +197,13 @@ describe('dialog-task-handlers', () => {
     describe('task.completed', () => {
         it('registra task com sucesso', () => {
             agent.emit('task.completed', { taskId: 'TK1', durationMs: 1500 });
-            expect(metrics.recordTaskCompletion).toHaveBeenCalledWith(1500, true);
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tasks.completed');
+            expect(metrics['recordTaskCompletion']).toHaveBeenCalledWith(1500, true);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tasks.completed');
         });
 
         it('usa durationMs 0 quando ausente', () => {
             agent.emit('task.completed', {});
-            expect(metrics.recordTaskCompletion).toHaveBeenCalledWith(0, true);
+            expect(metrics['recordTaskCompletion']).toHaveBeenCalledWith(0, true);
         });
     });
 
@@ -213,10 +213,10 @@ describe('dialog-task-handlers', () => {
         it('registra task com falha e notifica errorTracker', () => {
             const err = new Error('fail');
             agent.emit('task.error', { taskId: 'TK2', durationMs: 300, error: err });
-            expect(metrics.recordTaskCompletion).toHaveBeenCalledWith(300, false);
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tasks.errors');
-            expect(metrics.recordSessionError).toHaveBeenCalled();
-            expect(errorTracker.trackError).toHaveBeenCalled();
+            expect(metrics['recordTaskCompletion']).toHaveBeenCalledWith(300, false);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tasks.errors');
+            expect(metrics['recordSessionError']).toHaveBeenCalled();
+            expect(errorTracker['trackError']).toHaveBeenCalled();
         });
     });
 
@@ -225,12 +225,12 @@ describe('dialog-task-handlers', () => {
     describe('task.queued / task.started', () => {
         it('task.queued registra counter', () => {
             agent.emit('task.queued', { taskId: 'q-1' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tasks.queued');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tasks.queued');
         });
 
         it('task.started registra counter', () => {
             agent.emit('task.started', { taskId: 's-1' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tasks.started');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tasks.started');
         });
     });
 
@@ -239,8 +239,8 @@ describe('dialog-task-handlers', () => {
     describe('task.delta', () => {
         it('registra streaming delta counter e bytes', () => {
             agent.emit('task.delta', { delta: 'abc', taskId: '1' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('task.streaming.deltas');
-            expect(metrics.recordCounter).toHaveBeenCalledWith('task.streaming.bytes', 3);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('task.streaming.deltas');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('task.streaming.bytes', 3);
         });
     });
 
@@ -249,8 +249,8 @@ describe('dialog-task-handlers', () => {
     describe('task.reasoning', () => {
         it('registra reasoning chunk counter', () => {
             agent.emit('task.reasoning', { text: 'reason text' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('task.reasoning.chunks');
-            expect(metrics.recordCounter).toHaveBeenCalledWith('task.reasoning.bytes', 11);
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('task.reasoning.chunks');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('task.reasoning.bytes', 11);
         });
     });
 
@@ -265,14 +265,14 @@ describe('dialog-task-handlers', () => {
                 durationMs: 120,
                 success: true,
             });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.start');
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.complete');
-            expect(metrics.recordToolCall).not.toHaveBeenCalled();
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tool.execution.start');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tool.execution.complete');
+            expect(metrics['recordToolCall']).not.toHaveBeenCalled();
         });
 
         it('registra tool.execution_progress', () => {
             agent.emit('tool.execution_progress', { toolName: 'web_fetch', progress: 50 });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('tool.execution.progress');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('tool.execution.progress');
         });
     });
 
@@ -281,12 +281,12 @@ describe('dialog-task-handlers', () => {
     describe('pr events', () => {
         it('pr.fallback_model registra counter', () => {
             agent.emit('pr.fallback_model', { from: 'gpt-4o', to: 'gpt-4o-mini' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('model.fallback');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('model.fallback');
         });
 
         it('pr.consumed registra counter', () => {
             agent.emit('pr.consumed', { tokens: 100, model: 'gpt-4o' });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('pr.consumed');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('pr.consumed');
         });
     });
 
@@ -295,7 +295,7 @@ describe('dialog-task-handlers', () => {
     describe('session.usage', () => {
         it('registra session.usage counter e chama modelStatsTracker injetado', async () => {
             agent.emit('session.usage', { model: 'gpt-4o', inputTokens: 100, outputTokens: 50 });
-            expect(metrics.recordCounter).toHaveBeenCalledWith('session.usage');
+            expect(metrics['recordCounter']).toHaveBeenCalledWith('session.usage');
             expect(modelStatsTracker.record).toHaveBeenCalledWith(
                 'gpt-4o',
                 expect.objectContaining({

@@ -5,10 +5,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 // ✅ Padronizado: host.docker.internal (Docker/WSL-friendly)
 // Para uso local direto (fora de Docker): CHROME_HOST=127.0.0.1 node scripts/mock-chrome-http.js
-const host = process.env.MOCK_CHROME_HOST || process.env.CHROME_HOST || 'host.docker.internal';
+const host = process.env['MOCK_CHROME_HOST'] || process.env['CHROME_HOST'] || 'host.docker.internal';
 
 // ✅ Validação de porta (0-65535)
-const rawPort = process.env.MOCK_CHROME_PORT || process.env.CHROME_PORT || '9225';
+const rawPort = process.env['MOCK_CHROME_PORT'] || process.env['CHROME_PORT'] || '9225';
 const parsedPort = parseInt(rawPort, 10);
 const port = Number.isFinite(parsedPort) && parsedPort >= 0 && parsedPort <= 65535 ? parsedPort : 9225;
 

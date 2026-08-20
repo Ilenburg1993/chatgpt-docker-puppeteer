@@ -1,12 +1,11 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildEligibilityEvaluatedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, materializeModelGatewayActiveByokProfileEnv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, readModelGatewayByokProfileCostHint, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, mkdir, rm, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalConfigProjection, readTerminalConfiguredSessionFsState, readTerminalRuntimeState, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, switchTerminalRouteProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeGatewayRuntimeProofFreshness, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
+const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildEligibilityEvaluatedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, materializeModelGatewayActiveByokProfileEnv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, readModelGatewayByokProfileCostHint, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, mkdir, rm, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalByokRuntimeConfigProjection, readTerminalConfiguredSessionFsState, readTerminalRuntimeContextWindow, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, switchTerminalRouteProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeGatewayRuntimeProofFreshness, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
     vi.hoisted(() => ({
-        buildCatalogRefreshEventBatch: vi.fn((input) => {
+        buildCatalogRefreshEventBatch: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/observability/events.js').buildCatalogRefreshEventBatch>[0]} */ input) => {
             const changedKinds = [
                 ...new Set((input.diff?.changed ?? []).flatMap((item) => item.changedKinds ?? [])),
             ];
@@ -36,7 +35,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 commands: ['/byok probe agent model:changed-model'],
             },
         ]),
-        summarizeCanonicalModelProjectionDiff: vi.fn((diff) => ({
+        summarizeCanonicalModelProjectionDiff: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/catalog/import-runs.js').summarizeCanonicalModelProjectionDiff>[0]} */ diff) => ({
             addedCount: diff.added?.length ?? 0,
             removedCount: diff.removed?.length ?? 0,
             changedCount: diff.changed?.length ?? 0,
@@ -57,7 +56,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 .map(([kind]) => kind),
             staleProbeKinds: [],
         })),
-        summarizeModelGatewayEligibilityDiff: vi.fn((diff) => ({
+        summarizeModelGatewayEligibilityDiff: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/eligibility/diff.js').summarizeModelGatewayEligibilityDiff>[0]} */ diff) => ({
             addedCount: diff.added?.length ?? 0,
             removedCount: diff.removed?.length ?? 0,
             changedCount: diff.changed?.length ?? 0,
@@ -231,10 +230,15 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             },
         })),
         MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON: 'local_provider_requires_explicit_request',
-        summarizeModelGatewayLocalProviderOptInBlocks: vi.fn((selection) => {
+        summarizeModelGatewayLocalProviderOptInBlocks: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/local-provider-opt-in.js').summarizeModelGatewayLocalProviderOptInBlocks>[0]} */ selection) => {
             const blockedProfileIds = (selection.profiles ?? [])
-                .filter((profile) => (profile.topRejectedReasons ?? []).includes('local_provider_requires_explicit_request'))
-                .map((profile) => profile.profileId);
+                .filter(
+                    (profile) =>
+                        Array.isArray(profile['topRejectedReasons']) &&
+                        profile['topRejectedReasons'].includes('local_provider_requires_explicit_request'),
+                )
+                .map((profile) => profile['profileId'])
+                .filter((profileId) => typeof profileId === 'string');
             const rejectedCount = selection.summary?.rejectedReasonCounts?.['local_provider_requires_explicit_request'] ?? 0;
             return {
                 reason: 'local_provider_requires_explicit_request',
@@ -398,10 +402,11 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 accountOverlays: { rowCount: 1, uniqueKeyCount: 1, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
             },
         })),
-        auditModelGatewayPreRuntimeSelection: vi.fn(() => ({
+        auditModelGatewayPreRuntimeSelection: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/routing/selection-audit.js').auditModelGatewayPreRuntimeSelection>} */ (vi.fn(() => ({
             schema: 'model-gateway-pre-runtime-selection-audit',
             ok: true,
             mode: 'allow_probe_unknown',
+            runtimeMode: 'metadata_only',
             snapshotContext: {
                 projectionCount: 1,
                 routeOptionCount: 1,
@@ -415,47 +420,77 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 unselectedProfileCount: 0,
                 candidateCount: 2,
                 rejectedCount: 0,
+                healthRecordCount: 0,
+                runtimeChatOkCount: 0,
+                runtimeAgentProbeProofCount: 0,
+                runtimeProbeProofCount: 0,
+                runtimeLiveToolProtocolProofCount: 0,
+                runtimeLiveAskUserProofCount: 0,
+                runtimeLiveProtocolFailureCount: 0,
+                runtimeHealthProofCount: 0,
                 selectedProviders: { openrouter: 2 },
                 selectedSelectorKinds: { provider_explicit: 2 },
                 rejectedReasonCounts: {},
             },
-            profiles: [
-                {
-                    profileId: 'repo_agent',
-                    selected: {
-                        providerId: 'openrouter',
-                        providerModel: 'openai/gpt-oss-120b',
-                        selectorKind: 'provider_explicit',
-                        selectorSyntax: 'openai/gpt-oss-120b:groq',
-                        score: 250,
+            profiles: ['repo_agent', 'tool_agent'].map((profileId, index) => ({
+                profileId,
+                selected: {
+                    id: 'openrouter:openai/gpt-oss-120b',
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    routeCandidateId: null,
+                    canonicalModelId: null,
+                    routeProfile: null,
+                    routeOptionRef: null,
+                    routeOptionRefs: [],
+                    selectorKind: 'provider_explicit',
+                    selectorSyntax: 'openai/gpt-oss-120b:groq',
+                    routeLayer: null,
+                    wireApi: null,
+                    runtimeKind: null,
+                    upstreamProvider: null,
+                    baseUrl: null,
+                    openAICompatibleBaseUrl: null,
+                    endpoint: null,
+                    aiSdkPackage: null,
+                    autoSelection: null,
+                    supportsFallback: null,
+                    localPrivate: null,
+                    candidateSource: null,
+                    runtimeObservedOnly: false,
+                    runtimeEvidence: null,
+                    score: index === 0 ? 250 : 240,
+                    scoreBreakdown: null,
+                    eligibilityDisposition: null,
+                    accountScope: 'default',
+                    policyProfile: null,
+                    taskProfile: null,
+                    accountAccess: {
+                        status: null,
+                        canAttempt: false,
+                        secretConfigured: null,
+                        modelVisible: false,
+                        failureClass: null,
+                        accessConfidence: null,
+                        resetWindows: [],
+                        hardReasons: [],
+                        softReasons: [],
                     },
-                    candidateCount: 1,
-                    rejectedCount: 0,
-                    fallbackChain: ['openrouter:openai/gpt-oss-120b'],
-                    topRejectedReasons: [],
-                    nextActions: ['route_decision_ready'],
-                    decisionLayers: { runtimeProbeProofCount: 0 },
-                    snapshotContext: {},
+                    runtimeHealth: null,
+                    reasons: [],
                 },
-                {
-                    profileId: 'tool_agent',
-                    selected: {
-                        providerId: 'openrouter',
-                        providerModel: 'openai/gpt-oss-120b',
-                        selectorKind: 'provider_explicit',
-                        selectorSyntax: 'openai/gpt-oss-120b:groq',
-                        score: 240,
-                    },
-                    candidateCount: 1,
-                    rejectedCount: 0,
-                    fallbackChain: ['openrouter:openai/gpt-oss-120b'],
-                    topRejectedReasons: [],
-                    nextActions: ['route_decision_ready'],
-                    decisionLayers: { runtimeProbeProofCount: 0 },
-                    snapshotContext: {},
-                },
-            ],
-        })),
+                candidateAlternates: [],
+                candidateCount: 1,
+                rejectedCount: 0,
+                fallbackChain: ['openrouter:openai/gpt-oss-120b'],
+                topRejectedReasons: [],
+                nextActions: ['route_decision_ready'],
+                capabilitySupply: { candidateCount: 1, required: {}, softRequired: {}, preferred: {} },
+                supplyWarnings: [],
+                decisionLayers: { runtimeProbeProofCount: 0 },
+                snapshotContext: {},
+            })),
+        }))),
         auditModelGatewayPostRuntimeSelection: vi.fn(() => ({
             schema: 'model-gateway-post-runtime-selection-audit',
             ok: true,
@@ -602,17 +637,19 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 preset: presetId,
             };
         }),
-        readModelGatewayRuntimeAutomationPolicy: vi.fn(() => ({
-            enabled: false,
-            preset: 'operator_manual',
-            policy: 'prefer_runtime_proved',
-            profiles: [],
-            allowLiveSetModel: false,
-            allowNewSession: false,
-            allowProviderProbes: false,
-            allowLocalPrivate: false,
-            accountWideFailureKinds: [],
-        })),
+        readModelGatewayRuntimeAutomationPolicy: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy>} */ (vi.fn(() =>
+            /** @satisfies {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy>} */ ({
+                enabled: false,
+                preset: 'operator_manual',
+                policy: 'prefer_runtime_proved',
+                profiles: [],
+                allowLiveSetModel: false,
+                allowNewSession: false,
+                allowProviderProbes: false,
+                allowLocalPrivate: false,
+                accountWideFailureKinds: [],
+            })
+        )),
         readModelGatewayRuntimeAutomationPolicyFile: vi.fn(() => Promise.resolve({})),
         explainModelGatewayRuntimeAutomationPolicySources: vi.fn(() => ({
             enabled: { source: 'default' },
@@ -631,81 +668,84 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             allowedModes: ['prefer_runtime_proved'],
             allowedPresets: ['operator_manual', 'llm_operator_guarded', 'auto_same_boundary', 'auto_prepare_new_session'],
         })),
-        readModelGatewayRuntimeAutomationEffectivePolicy: vi.fn(() =>
-            Promise.resolve({
-                enabled: false,
-                preset: 'operator_manual',
-                policy: 'prefer_runtime_proved',
-                profiles: [],
-                allowLiveSetModel: false,
-                allowNewSession: false,
-                allowProviderProbes: false,
-                allowLocalPrivate: false,
-                accountWideFailureKinds: [],
-            }),
-        ),
+        readModelGatewayRuntimeAutomationEffectivePolicy: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationEffectivePolicy>} */ (vi.fn(() =>
+            Promise.resolve(
+                /** @satisfies {Awaited<ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationEffectivePolicy>>} */ ({
+                    enabled: false,
+                    preset: 'operator_manual',
+                    policy: 'prefer_runtime_proved',
+                    profiles: [],
+                    allowLiveSetModel: false,
+                    allowNewSession: false,
+                    allowProviderProbes: false,
+                    allowLocalPrivate: false,
+                    accountWideFailureKinds: [],
+                }),
+            ),
+        )),
         writeModelGatewayRuntimeAutomationPolicyFile: vi.fn((policy) =>
             Promise.resolve({
                 filePath: '/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/runtime-automation-policy.json',
                 policy,
             }),
         ),
-        buildModelGatewayRuntimeAutomationDecision: vi.fn((input) => ({
-            schema: 'model-gateway-runtime-automation-decision',
-            ok: true,
-            status: 'ready',
-            action: 'prepare_new_session',
-            selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
-            routeProfile: input.profileId ?? 'repo_agent',
-            canApplyLiveModel: false,
-            requiresNewSession: true,
-            blockers: [],
-            currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
-            targetBoundary: { profile: input.profileId ?? 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'openai/gpt-oss-120b' },
-            cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
-            blockerClass: 'none',
-            nonActionReason: null,
-            nextCommands: ['/session sdk next new', '/byok model openai/gpt-oss-120b'],
-            operatorSummary: 'mock automation decision',
-        })),
-        buildModelGatewayRuntimeAutomationControllerStep: vi.fn((input) => ({
-            schema: 'model-gateway-runtime-automation-controller-step',
-            ok: input.decision?.ok === true,
-            phase: input.phase ?? 'manual',
-            action: input.decision?.action ?? 'manual_intervention',
-            effectMode: input.policy?.allowEffects === true ? 'allowed' : 'dry_run',
-            effects: [
-                ...(input.phase === 'post_turn'
-                    ? [
-                          {
-                              kind: 'replan_after_turn_failure',
-                              failureKind: input.turnOutcome?.failureKind ?? 'unknown_failure',
-                              execute: input.policy?.allowEffects === true,
-                          },
-                      ]
-                    : []),
-                {
-                    kind: input.decision?.action === 'apply_live_model' ? 'set_live_model' : 'prepare_new_sdk_session',
-                    model: input.decision?.targetBoundary?.model ?? null,
-                    execute: input.policy?.allowEffects === true && input.policy?.allowLiveSetModel === true,
-                },
-            ],
-            blockers: input.decision?.blockers ?? [],
-            selectedRouteKey: input.decision?.selectedRouteKey ?? null,
-            operatorSummary: 'mock controller step',
-        })),
-        buildModelGatewayRuntimeProofCommands: vi.fn((alternativeSummary, options = {}) => {
+        buildModelGatewayRuntimeAutomationDecision: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision>} */ (vi.fn((input) =>
+            /** @satisfies {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision>} */ ({
+                schema: 'model-gateway-runtime-automation-decision',
+                ok: false,
+                status: 'blocked',
+                action: 'manual_intervention',
+                selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
+                selectedRouteReasons: ['mock_selection'],
+                selectedRouteConfidence: 'catalog',
+                routeProfile: input.profileId ?? 'repo_agent',
+                fallbackFromSelectedRouteKey: null,
+                fallbackReason: null,
+                canApplyLiveModel: false,
+                canApplyLiveRoute: false,
+                requiresProviderRebind: true,
+                requiresNewSession: false,
+                blockers: ['live_set_model_policy_disabled'],
+                currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
+                targetBoundary: { profile: input.profileId ?? 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'openai/gpt-oss-120b' },
+                targetRoute: { providerId: 'openrouter', providerModel: 'openai/gpt-oss-120b', selectorSyntax: 'openai/gpt-oss-120b', baseUrl: null, openAICompatibleBaseUrl: null, wireApi: null, routeProfile: input.profileId ?? 'repo_agent', selectedRouteKey: 'openrouter:openai/gpt-oss-120b' },
+                cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
+                blockerClass: 'route_blocked',
+                nonActionReason: 'live_set_model_policy_disabled',
+                nextCommands: ['/byok auto status'],
+                operatorSummary: 'mock automation decision',
+            })
+        )),
+        buildModelGatewayRuntimeAutomationControllerStep: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/controller.js').buildModelGatewayRuntimeAutomationControllerStep>} */ (vi.fn()),
+        buildModelGatewayRuntimeProofCommands: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeProofCommands>[0]} */ alternativeSummary, /** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeProofCommands>[1]} */ options = {}) => {
             const limit = typeof options.limit === 'number' ? options.limit : 3;
             const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20_000;
-            return (alternativeSummary?.topBlockedRoutes ?? [])
-                .filter((route) => route.providerId && route.providerModel)
-                .map((route) => ({
-                    mode: String(route.reasons?.join(',') ?? '').includes('chat_health') ? 'chat' : 'agent',
-                    providerId: route.providerId,
-                    providerModel: route.providerModel,
-                    command: `/byok probe ${String(route.reasons?.join(',') ?? '').includes('chat_health') ? 'chat' : 'agent'} provider:${route.providerId} model:${route.providerModel} timeout:${timeoutMs}`,
-                    reasons: route.reasons ?? [],
-                }))
+            const summary =
+                alternativeSummary && typeof alternativeSummary === 'object' && !Array.isArray(alternativeSummary)
+                    ? /** @type {Record<string, unknown>} */ (alternativeSummary)
+                    : {};
+            const blockedRoutes = Array.isArray(summary['topBlockedRoutes']) ? summary['topBlockedRoutes'] : [];
+            return blockedRoutes
+                .filter((route) => route && typeof route === 'object' && !Array.isArray(route))
+                .map((route) => /** @type {Record<string, unknown>} */ (route))
+                .filter(
+                    (route) =>
+                        typeof route['providerId'] === 'string' &&
+                        typeof route['providerModel'] === 'string',
+                )
+                .map((route) => {
+                    const reasons = Array.isArray(route['reasons'])
+                        ? route['reasons'].filter((reason) => typeof reason === 'string')
+                        : [];
+                    const mode = reasons.join(',').includes('chat_health') ? 'chat' : 'agent';
+                    return {
+                        mode,
+                        providerId: String(route['providerId']),
+                        providerModel: String(route['providerModel']),
+                        command: `/byok probe ${mode} provider:${String(route['providerId'])} model:${String(route['providerModel'])} timeout:${timeoutMs}`,
+                        reasons,
+                    };
+                })
                 .slice(0, limit);
         }),
         buildModelGatewayRuntimeStandbyRoutes: vi.fn((_runtimeSelectorPlan, options = {}) => {
@@ -794,21 +834,31 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 ],
             };
         }),
-        buildModelGatewayRuntimeSelectorPlan: vi.fn((_policy, options = {}) => ({
-            schema: 'model-gateway-runtime-selector-plan',
-            ok: true,
-            ready: true,
-            mode: options.requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first',
-            summary: {
-                profileCount: 1,
-                selectedProfileCount: 1,
-                blockedProfileCount: 0,
-                runtimeProofSelectedCount: options.requireRuntimeProof ? 1 : 0,
-                runtimeEnvReadyCount: 1,
-                runtimeEnvBlockedCount: 0,
-            },
-            routes: [],
-        })),
+        buildModelGatewayRuntimeSelectorPlan: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan>} */ (vi.fn((_policy, options = {}) =>
+            /** @satisfies {ReturnType<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan>} */ ({
+                schema: 'model-gateway-runtime-selector-plan',
+                ok: true,
+                ready: true,
+                mode: options.requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first',
+                sourceSchema: null,
+                traceId: null,
+                summary: {
+                    profileCount: 1,
+                    selectedProfileCount: 1,
+                    blockedProfileCount: 0,
+                    accountAccessBlockedCount: 0,
+                    runtimeProofSelectedCount: options.requireRuntimeProof ? 1 : 0,
+                    runtimeEnvReadyCount: 1,
+                    runtimeEnvBlockedCount: 0,
+                    runtimeHealthBlockedCount: 0,
+                    runtimeProbeBlockedCount: 0,
+                    providerCooldownBlockedCount: 0,
+                    alternativeEvaluatedCount: 0,
+                    alternativeUsableCount: 0,
+                },
+                routes: [],
+            })
+        )),
         persistModelGatewaySelectionDecisionTrace: vi.fn((trace) =>
             Promise.resolve({
                 schema: 'model-gateway-selection-decision-trace-persistence',
@@ -861,7 +911,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             external: true,
         })),
         clearByokProviderModelHealth: vi.fn(),
-        createDefaultModelGatewayCatalogImporters: vi.fn(() => [{ id: 'openrouter-models' }, { id: 'openai-models' }]),
+        createDefaultModelGatewayCatalogImporters: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/default-importers.js').createDefaultModelGatewayCatalogImporters>} */ (vi.fn(() => [])),
         createEnvSecretRegistry: vi.fn(() => ({ has: () => false, get: () => null, list: () => [] })),
         DEFAULT_MODEL_GATEWAY_CATALOG_PATH: 'data/copilot/model-gateway/catalog.json',
         deriveModelGatewayRuntimeAccountOverlaysFromHealth: vi.fn(() => [
@@ -877,11 +927,29 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             modelEligibilityDecisions: decisions,
             modelEligibilityRuns: [run],
         })),
-        evaluateModelGatewayCatalogEligibility: vi.fn(() => ({
-            run: { runId: 'eligibility-run', policyProfile: 'default' },
+        evaluateModelGatewayCatalogEligibility: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/eligibility/catalog-snapshot.js').evaluateModelGatewayCatalogEligibility>} */ (vi.fn(() => ({
+            run: {
+                schemaVersion: 1,
+                runId: 'eligibility-run',
+                status: 'completed',
+                policyProfile: 'default',
+                taskProfile: 'default',
+                accountScope: 'default',
+                startedAt: '2026-06-01T00:00:00.000Z',
+                completedAt: '2026-06-01T00:00:00.000Z',
+                modelCount: 0,
+                eligibleCount: 0,
+                unknownCount: 0,
+                excludedCount: 0,
+                errors: [],
+                policyInputs: {},
+                diff: null,
+                diffSummary: null,
+                redactionStatus: 'sanitized',
+            },
             decisions: [],
             summary: { modelCount: 0, eligibleCount: 0, unknownCount: 0, excludedCount: 0 },
-        })),
+        }))),
         evaluateModelGatewayProviderEnvRequirements: vi.fn(() => [
             {
                 providerId: 'kilo',
@@ -897,33 +965,47 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             },
         ]),
         flushByokProviderHealth: vi.fn(() => Promise.resolve()),
-        explainModelGatewayCatalogEntry: vi.fn(() => ({
-            key: 'openrouter:new-model:default',
+        explainModelGatewayCatalogEntry: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/explain.js').explainModelGatewayCatalogEntry>} */ (vi.fn(() => ({
+            found: false,
+            operationalFound: false,
+            selector: '',
+            key: null,
+            projection: null,
+            openai: null,
+            routeOptions: [],
+            accountOverlays: [],
+            eligibility: null,
+            providerProjection: null,
+            runtimeHealth: null,
+            runtimeProbes: [],
+            metadataCoverage: { confidenceFields: 0, provenanceFields: 0, supportedParameters: 0, unsupportedParameters: 0 },
+            nextActions: ['refresh_catalog_or_use_more_specific_selector'],
+        }))),
+        explainModelGatewayProviderEntry: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/explain.js').explainModelGatewayProviderEntry>} */ (vi.fn(() => ({
+            found: false,
+            selector: '',
+            providerId: null,
+            providerProjection: null,
             sources: [],
             providerEvidences: [],
             projections: [],
             routeOptions: [],
             accountOverlays: [],
             conflicts: [],
-            eligibility: null,
-            openai: null,
-            runtimeHealth: null,
-            runtimeProbes: [],
-        })),
-        explainModelGatewayProviderEntry: vi.fn(() => ({
-            providerId: 'openrouter',
-            sources: [],
-            providerEvidences: [],
-            providerProjection: null,
-            summary: 'openrouter',
-        })),
-        explainModelGatewayEligibilityDecision: vi.fn(() => ({
+            freshness: { newestSourceAt: null, oldestSourceAt: null, sourceCount: 0 },
+            nextActions: ['refresh_catalog_or_use_provider_id'],
+        }))),
+        explainModelGatewayEligibilityDecision: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/eligibility/explain.js').explainModelGatewayEligibilityDecision>} */ (vi.fn(() => ({
             status: 'eligible',
             key: 'openrouter:model:default:exact_model:model',
+            include: true,
             summary: 'eligible:account_model_visible',
             disposition: 'eligible',
+            primaryReason: 'account_model_visible',
             hardExclusions: [],
             softPenalties: [],
+            reasons: ['account_model_visible'],
+            requiredRuntimeProbes: [],
             actionable: {
                 category: 'rankable',
                 dataNeeded: [],
@@ -931,7 +1013,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 operatorHint: 'no_extra_action',
             },
             nextActions: ['candidate_can_be_ranked'],
-        })),
+        }))),
         JsonModelGatewayCatalogStore: vi.fn(function JsonModelGatewayCatalogStore() {
             return {
                 filePath: 'data/copilot/model-gateway/catalog.json',
@@ -1017,7 +1099,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 ),
             };
         }),
-        listByokProviderModelHealth: vi.fn(() => []),
+        listByokProviderModelHealth: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').listByokProviderModelHealth>} */ (vi.fn(() => [])),
         listModelGatewayCanonicalCommands: vi.fn(() => [
             { id: 'prebuild.all', surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
             { id: 'prebuild.first-build', surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
@@ -1072,16 +1154,26 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 notes: ['runtime_probe_gap'],
             },
         ]),
-        listTerminalSdkSessionInventory: vi.fn(() =>
-            Promise.resolve({
-                currentSessionId: null,
-                lastSessionId: null,
-                foregroundSessionId: null,
-                persistedByokBinding: null,
-                lastBootDecision: null,
-                sessions: [],
-            }),
-        ),
+        listTerminalSdkSessionInventory: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory>} */ (vi.fn(() =>
+            Promise.resolve(
+                /** @satisfies {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory>>} */ ({
+                    currentSessionId: null,
+                    lastSessionId: null,
+                    foregroundSessionId: null,
+                    persistedByokBinding: null,
+                    lastBootDecision: null,
+                    sessionFs: {
+                        enabled: false,
+                        initialCwd: '/workspaces/chatgpt-docker-puppeteer',
+                        sessionStatePath: 'data/copilot/session-state.json',
+                        conventions: 'posix',
+                        storageRoot: { display: 'data/copilot/sessions', withinWorkspace: true, exists: null },
+                        session: null,
+                    },
+                    sessions: [],
+                }),
+            ),
+        )),
         scheduleTerminalSdkSessionBootSelection: vi.fn(() => Promise.resolve({ ok: true })),
         loadDotenv: vi.fn(),
         flushAndMirrorByokProviderHealthToSqlite: vi.fn(() =>
@@ -1175,7 +1267,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             'terminal orientation /byok gateway operator-ready profile:repo_agent :: Show operator readiness.',
         ]),
         routeGatewayModels: vi.fn(),
-        searchModelGatewayCatalogEntries: vi.fn(() => []),
+        searchModelGatewayCatalogEntries: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/search.js').searchModelGatewayCatalogEntries>} */ (vi.fn(() => [])),
         SqliteModelGatewayCatalogStore: vi.fn(function SqliteModelGatewayCatalogStore() {
             return {
                 readStorageDiagnostics: vi.fn(() =>
@@ -1296,7 +1388,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
         runConfiguredByokJsonProbe: vi.fn(),
         runConfiguredByokStreamingProbe: vi.fn(),
         runConfiguredByokVisionProbe: vi.fn(),
-        readByokProviderHealthState: vi.fn(() => ({
+        readByokProviderHealthState: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderHealthState>} */ (vi.fn(() => ({
             enabled: false,
             path: null,
             loaded: true,
@@ -1306,21 +1398,62 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             flushInFlight: false,
             dirty: false,
             error: null,
-        })),
-        readByokProviderModelHealth: vi.fn(() => null),
-        readConfiguredByokModelDiscoveryCacheFromEnv: vi.fn(() => null),
+            changeListenerCount: 0,
+        }))),
+        readByokProviderModelHealth: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderModelHealth>} */ (vi.fn(() => null)),
+        readConfiguredByokModelDiscoveryCacheFromEnv: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/sdk/session/provider.js').readConfiguredByokModelDiscoveryCacheFromEnv>} */ (vi.fn(() => null)),
         readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
         readFile: vi.fn(),
         readdir: vi.fn(),
-        readTerminalByokGatewayProjectionFromEnv: vi.fn(() => ({
+        readTerminalByokGatewayProjectionFromEnv: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokGatewayProjectionFromEnv>} */ (vi.fn(() => ({
             gatewayModels: [],
-            modelGateway: { providers: [], models: [] },
-            modelGatewayProjection: { providers: [], models: [] },
-        })),
+            modelGateway: {
+                schemaVersion: 1,
+                generatedAt: '2026-06-01T00:00:00.000Z',
+                source: 'env_compat',
+                active: { enabled: false, ready: false, providerId: null, modelId: null, providerModel: null, bindingSource: 'env_compat' },
+                providers: [],
+                models: [],
+                diagnostics: { providerCount: 0, modelCount: 0, enabledModelCount: 0, warnings: [], errors: [] },
+            },
+            modelGatewayProjection: {
+                source: 'env_compat',
+                generatedAt: '2026-06-01T00:00:00.000Z',
+                active: {},
+                providerCount: 0,
+                modelCount: 0,
+                enabledModelCount: 0,
+                effectiveRoute: { enabled: false, ready: false, providerId: null, providerModel: null, modelId: null, profile: null, gatewayProfile: null, preset: null, bindingSource: null, source: 'env_compat', label: '-' },
+                providers: [],
+                models: [],
+            },
+        }))),
         readTerminalByokProjection: vi.fn(),
-        readTerminalConfigProjection: vi.fn(() => ({ currentModel: 'kilo-auto/free' })),
-        readTerminalConfiguredSessionFsState: vi.fn(() => Promise.resolve({ configured: false, mode: 'default' })),
-        readTerminalRuntimeState: vi.fn(() => ({ contextWindow: null })),
+        readTerminalByokRuntimeConfigProjection: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokRuntimeConfigProjection>} */ (vi.fn(() => ({
+            currentModel: 'kilo-auto/free',
+            modelGatewayProjection: {
+                source: 'env_compat',
+                generatedAt: null,
+                active: {},
+                providerCount: 0,
+                modelCount: 0,
+                enabledModelCount: 0,
+                effectiveRoute: { enabled: false, ready: false, providerId: null, providerModel: null, modelId: null, profile: null, gatewayProfile: null, preset: null, bindingSource: null, source: 'env_compat', label: '-' },
+                providers: [],
+                models: [],
+            },
+        }))),
+        readTerminalConfiguredSessionFsState: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>} */ (vi.fn(() => Promise.resolve(
+            /** @satisfies {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>>} */ ({
+                enabled: false,
+                initialCwd: '/workspaces/chatgpt-docker-puppeteer',
+                sessionStatePath: 'data/copilot/session-state.json',
+                conventions: 'posix',
+                storageRoot: { display: 'data/copilot/sessions', withinWorkspace: true, exists: null },
+                session: null,
+            }),
+        ))),
+        readTerminalRuntimeContextWindow: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeContextWindow>} */ (vi.fn(() => null)),
         recordByokProviderModelCallFailure: vi.fn(),
         recordByokProviderModelCallSuccess: vi.fn(),
         recordByokProviderModelProbeResult: vi.fn(),
@@ -1395,7 +1528,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             },
             failures: [],
         })),
-        toOpenAIModelCatalogList: vi.fn(() => ({ object: 'list', data: [] })),
+        toOpenAIModelCatalogList: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/openai-schema.js').toOpenAIModelCatalogList>} */ (vi.fn(() => ({ object: 'list', data: [] }))),
         activateModelGatewayByokProfileEnv: vi.fn((name, env = process.env) => {
             env.COPILOT_BYOK_ENABLED = 'true';
             env.COPILOT_BYOK_PROFILE = String(name);
@@ -1464,9 +1597,9 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
     listTerminalSdkSessionInventory,
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
-    readTerminalConfigProjection,
+    readTerminalByokRuntimeConfigProjection,
     readTerminalConfiguredSessionFsState,
-    readTerminalRuntimeState,
+    readTerminalRuntimeContextWindow,
     scheduleTerminalSdkSessionBootSelection,
     setTerminalModelProjection,
 }));
@@ -1474,7 +1607,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/index.js', () => ({
 vi.mock('../../../../src/copilot/terminal/frontend/projections/config.js', () => ({
     readTerminalByokGatewayProjectionFromEnv,
     readTerminalByokProjection,
-    readTerminalConfigProjection,
+    readTerminalByokRuntimeConfigProjection,
     setTerminalModelProjection,
 }));
 
@@ -1485,7 +1618,7 @@ vi.mock('../../../../src/copilot/terminal/frontend/gateways/session/index.js', (
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js', () => ({
-    readTerminalRuntimeState,
+    readTerminalRuntimeContextWindow,
 }));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/model-selection/index.js', () => ({
@@ -1493,7 +1626,8 @@ vi.mock('../../../../src/copilot/terminal/frontend/projections/model-selection/i
     switchTerminalRouteProjection,
 }));
 
-vi.mock('#copilot/model-gateway', () => ({
+vi.mock('#copilot/model-gateway', async (importOriginal) => ({
+    ...(await importOriginal()),
     auditCatalogImporterSet,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
@@ -1578,7 +1712,6 @@ vi.mock('#copilot/model-gateway', () => ({
     runConfiguredByokJsonProbe: runConfiguredByokJsonProbe,
     runConfiguredByokStreamingProbe: runConfiguredByokStreamingProbe,
     runConfiguredByokVisionProbe: runConfiguredByokVisionProbe,
-    planModelGatewayProbeBackoff,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewayProviderQuotaCapabilities,
@@ -1592,6 +1725,20 @@ vi.mock('#copilot/model-gateway', () => ({
     toOpenAIModelCatalogList,
 }));
 
+const {
+    createModelEligibilityDecision: createModelEligibilityDecisionActual,
+    createModelEligibilityRun: createModelEligibilityRunActual,
+} = await import('../../../../src/copilot/model-gateway/eligibility/contracts.js');
+const { buildModelGatewayRuntimeAutomationControllerStep: buildModelGatewayRuntimeAutomationControllerStepActual } =
+    await import('../../../../src/copilot/model-gateway/automation/controller.js');
+const { explainModelGatewayEligibilityDecision: explainModelGatewayEligibilityDecisionActual } = await import(
+    '../../../../src/copilot/model-gateway/eligibility/explain.js'
+);
+const {
+    toOpenAIModelCatalogEntry: toOpenAIModelCatalogEntryActual,
+    toOpenAIModelCatalogList: toOpenAIModelCatalogListActual,
+} = await import('../../../../src/copilot/model-gateway/catalog/openai-schema.js');
+
 const { cmdByok } = await import('../../../../src/copilot/terminal/commands/byok.js');
 const {
     applyTerminalByokGatewayAutoEffects,
@@ -1603,6 +1750,10 @@ const {
 } = await import('../../../../src/copilot/terminal/byok/gateway-auto.js');
 const { clearTerminalActivityHistory, readTerminalActivityHistory } = await import(
     '../../../../src/copilot/terminal/state/activity-state.js'
+);
+
+buildModelGatewayRuntimeAutomationControllerStep.mockImplementation(
+    buildModelGatewayRuntimeAutomationControllerStepActual,
 );
 
 const BASE_PROJECTION = Object.freeze({
@@ -1642,8 +1793,661 @@ const BASE_PROJECTION = Object.freeze({
     }),
 });
 
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokProjection>} TerminalByokProjection */
+/** @typedef {TerminalByokProjection['models'][number]} ByokModelInfo */
+/** @typedef {TerminalByokProjection['gatewayModels'][number]} GatewayModelInfo */
+/** @typedef {TerminalByokProjection['modelGateway']} EnvByokModelGatewaySnapshot */
+/** @typedef {Omit<Partial<ByokModelInfo>, 'capabilities' | 'byok'> & { capabilities?: { supports?: Partial<NonNullable<ByokModelInfo['capabilities']>['supports']>; limits?: Partial<NonNullable<ByokModelInfo['capabilities']>['limits']> }; byok?: Omit<Partial<ByokModelInfo['byok']>, 'pricing' | 'rateLimits'> & { pricing?: Partial<ByokModelInfo['byok']['pricing']>; rateLimits?: Partial<ByokModelInfo['byok']['rateLimits']> } }} ByokModelInfoOverrides */
+/** @typedef {Omit<Partial<GatewayModelInfo>, 'capabilities' | 'byok'> & { capabilities?: { supports?: Partial<NonNullable<GatewayModelInfo['capabilities']>['supports']>; limits?: Partial<NonNullable<GatewayModelInfo['capabilities']>['limits']> }; byok?: Omit<Partial<GatewayModelInfo['byok']>, 'pricing' | 'rateLimits' | 'capabilities' | 'limits'> & { pricing?: Partial<GatewayModelInfo['byok']['pricing']>; rateLimits?: Partial<GatewayModelInfo['byok']['rateLimits']>; capabilities?: Record<string, unknown>; limits?: Record<string, unknown> } }} GatewayModelInfoOverrides */
+/** @typedef {Omit<Partial<TerminalByokProjection>, 'summary' | 'modelGateway' | 'modelGatewayProjection'> & { summary?: Partial<TerminalByokProjection['summary']>; modelGateway?: EnvByokModelGatewaySnapshot; modelGatewayProjection?: ModelGatewayOperatorProjection }} TerminalByokProjectionOverrides */
+/** @typedef {TerminalByokProjection['profiles'][number]} TerminalByokProfileSummary */
+/** @typedef {NonNullable<ReturnType<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderModelHealth>>} ByokProviderHealthFixtureRecord */
+/** @typedef {ByokProviderHealthFixtureRecord['probes'][string]} ByokProviderProbeHealthFixtureRecord */
+/** @typedef {Omit<Partial<ByokProviderHealthFixtureRecord>, 'probes'> & { probes?: Record<string, Partial<ByokProviderProbeHealthFixtureRecord>> }} ByokProviderHealthFixtureOverrides */
+
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>>} TerminalSessionFsState */
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory>>} TerminalSdkSessionInventory */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy>} RuntimeAutomationPolicy */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision>} RuntimeAutomationDecision */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan>} RuntimeSelectorPlan */
+/** @typedef {Omit<Partial<RuntimeSelectorPlan>, 'summary'> & { summary?: Partial<RuntimeSelectorPlan['summary']> }} RuntimeSelectorPlanOverrides */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/registry/projection.js').buildModelGatewayOperatorProjection>} ModelGatewayOperatorProjection */
+/** @typedef {Omit<Partial<ModelGatewayOperatorProjection>, 'effectiveRoute'> & { effectiveRoute?: Partial<ModelGatewayOperatorProjection['effectiveRoute']> }} ModelGatewayOperatorProjectionOverrides */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderHealthState>} ByokProviderHealthState */
+
 /**
- * @param {Partial<typeof BASE_PROJECTION>} [overrides]
+ * @template T
+ * @param {readonly T[]} values
+ * @param {number} index
+ * @param {string} label
+ * @returns {T}
+ */
+function requireFixtureIndex(values, index, label) {
+    const value = values[index];
+    if (value === undefined) throw new Error(`[fixture] ${label} missing at index ${index}`);
+    return value;
+}
+
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/catalog/default-importers.js').createDefaultModelGatewayCatalogImporters>[number]} CatalogImporterFixture */
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/routing/selection-audit.js').auditModelGatewayPreRuntimeSelection>} PreRuntimeSelectionAudit */
+
+/**
+ * @param {string} id
+ * @param {string} providerId
+ * @param {string} [sourceKind]
+ * @returns {CatalogImporterFixture}
+ */
+function catalogImporterFixture(id, providerId, sourceKind = 'public_gateway_api') {
+    return {
+        id,
+        providerId,
+        sourceKind,
+        requiresAuth: false,
+        fetchRaw: () => [],
+        parseRows: () => [],
+        toEvidenceFacts: () => [],
+    };
+}
+
+/**
+ * @param {string} profileId
+ * @param {string} reason
+ * @returns {PreRuntimeSelectionAudit}
+ */
+function blockedPreRuntimeSelectionAuditFixture(profileId, reason) {
+    return {
+        schema: 'model-gateway-pre-runtime-selection-audit',
+        ok: true,
+        mode: 'allow_probe_unknown',
+        runtimeMode: 'metadata_only',
+        snapshotContext: {
+            projectionCount: 1,
+            routeOptionCount: 1,
+            accountOverlayCount: 0,
+            eligibilityDecisionCount: 0,
+            candidateCount: 1,
+        },
+        summary: {
+            profileCount: 1,
+            selectedProfileCount: 0,
+            unselectedProfileCount: 1,
+            candidateCount: 1,
+            rejectedCount: 1,
+            healthRecordCount: 0,
+            runtimeChatOkCount: 0,
+            runtimeAgentProbeProofCount: 0,
+            runtimeProbeProofCount: 0,
+            runtimeLiveToolProtocolProofCount: 0,
+            runtimeLiveAskUserProofCount: 0,
+            runtimeLiveProtocolFailureCount: 0,
+            runtimeHealthProofCount: 0,
+            selectedProviders: {},
+            selectedSelectorKinds: {},
+            rejectedReasonCounts: { [reason]: 1 },
+        },
+        profiles: [
+            {
+                profileId,
+                selected: null,
+                candidateAlternates: [],
+                candidateCount: 1,
+                rejectedCount: 1,
+                fallbackChain: [],
+                topRejectedReasons: [reason],
+                nextActions: ['request_local_provider_explicitly'],
+                capabilitySupply: { candidateCount: 1, required: {}, softRequired: {}, preferred: {} },
+                supplyWarnings: [],
+                decisionLayers: { runtimeProbeProofCount: 0 },
+                snapshotContext: {},
+            },
+        ],
+    };
+}
+
+/**
+ * @param {ByokModelInfoOverrides} [overrides]
+ * @returns {ByokModelInfo}
+ */
+function byokModelInfoFixture(overrides = {}) {
+    const id = overrides.id ?? 'fixture-model';
+    const supports = {
+        vision: false,
+        reasoningEffort: false,
+        ...(overrides.capabilities?.supports ?? {}),
+    };
+    const limits = {
+        max_context_window_tokens: 128000,
+        ...(overrides.capabilities?.limits ?? {}),
+    };
+    const pricing = {
+        prompt: null,
+        completion: null,
+        request: null,
+        ...(overrides.byok?.pricing ?? {}),
+    };
+    const rateLimits = {
+        maxRequestTokens: null,
+        tokensPerMinute: null,
+        requestsPerMinute: null,
+        dailyRequests: null,
+        ...(overrides.byok?.rateLimits ?? {}),
+    };
+    const { pricing: _pricing, rateLimits: _rateLimits, ...byokOverrides } = overrides.byok ?? {};
+    return {
+        id,
+        name: overrides.name ?? id,
+        policy: { state: 'enabled', terms: 'byok:fixture' },
+        billing: { multiplier: 0 },
+        ...overrides,
+        capabilities: { supports, limits },
+        byok: {
+            source: 'static',
+            provider: null,
+            freeTier: null,
+            inputModalities: [],
+            outputModalities: [],
+            supportedParameters: [],
+            contextWindowTokens: limits.max_context_window_tokens ?? 128000,
+            supportsReasoning: supports.reasoningEffort === true,
+            supportsVision: supports.vision === true,
+            ...byokOverrides,
+            pricing,
+            rateLimits,
+        },
+    };
+}
+
+/**
+ * @param {GatewayModelInfoOverrides} [overrides]
+ * @returns {GatewayModelInfo}
+ */
+function gatewayModelInfoFixture(overrides = {}) {
+    const id = overrides.id ?? 'fixture-model';
+    const supports = {
+        vision: false,
+        reasoningEffort: false,
+        ...(overrides.capabilities?.supports ?? {}),
+    };
+    const contextWindow = overrides.capabilities?.limits?.max_context_window_tokens ?? 128000;
+    const pricing = {
+        prompt: null,
+        completion: null,
+        request: null,
+        ...(overrides.byok?.pricing ?? {}),
+    };
+    const rateLimits = {
+        maxRequestTokens: null,
+        tokensPerMinute: null,
+        requestsPerMinute: null,
+        dailyRequests: null,
+        ...(overrides.byok?.rateLimits ?? {}),
+    };
+    const { pricing: _pricing, rateLimits: _rateLimits, ...byokOverrides } = overrides.byok ?? {};
+    return {
+        id,
+        name: overrides.name ?? id,
+        policy: { state: 'enabled', terms: 'gateway:fixture' },
+        billing: { multiplier: 0 },
+        ...overrides,
+        capabilities: {
+            supports,
+            limits: { max_context_window_tokens: contextWindow },
+        },
+        byok: {
+            gatewayId: `fixture:${id}`,
+            routeCandidateId: `fixture:${id}`,
+            provider: 'fixture',
+            providerModel: id,
+            sdkModelId: id,
+            routeProfile: null,
+            profile: null,
+            freeTier: null,
+            profileFreeTier: null,
+            profileCostSource: null,
+            profileCostDetail: null,
+            routeOptionRef: null,
+            routeOptionRefs: [],
+            selectorKind: null,
+            selectorSyntax: null,
+            routeLayer: null,
+            wireApi: null,
+            autoSelection: false,
+            supportsFallback: false,
+            source: 'model-gateway',
+            confidence: 'catalog',
+            supportsReasoning: supports.reasoningEffort === true,
+            inputModalities: ['text'],
+            outputModalities: ['text'],
+            capabilities: {},
+            limits: { contextWindowTokens: contextWindow },
+            ...byokOverrides,
+            rateLimits,
+            pricing,
+        },
+    };
+}
+
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokGatewayProjectionFromEnv>} TerminalByokGatewayProjection */
+
+/** @returns {EnvByokModelGatewaySnapshot} */
+function envByokModelGatewaySnapshotFixture() {
+    return {
+        schemaVersion: 1,
+        generatedAt: '2026-06-01T00:00:00.000Z',
+        source: 'env_compat',
+        active: {
+            enabled: false,
+            ready: false,
+            providerId: null,
+            modelId: null,
+            providerModel: null,
+            bindingSource: 'env_compat',
+        },
+        providers: [],
+        models: [],
+        diagnostics: { providerCount: 0, modelCount: 0, enabledModelCount: 0, warnings: [], errors: [] },
+    };
+}
+
+/**
+ * @param {GatewayModelInfo[]} [gatewayModels]
+ * @returns {TerminalByokGatewayProjection}
+ */
+function terminalByokGatewayProjectionFixture(gatewayModels = []) {
+    return {
+        gatewayModels,
+        modelGateway: envByokModelGatewaySnapshotFixture(),
+        modelGatewayProjection: operatorProjectionFixture(),
+    };
+}
+
+/** @returns {TerminalSessionFsState} */
+function sessionFsFixture() {
+    return {
+        enabled: false,
+        initialCwd: '/workspaces/chatgpt-docker-puppeteer',
+        sessionStatePath: 'data/copilot/session-state.json',
+        conventions: 'posix',
+        storageRoot: { display: 'data/copilot/sessions', withinWorkspace: true, exists: null },
+        session: null,
+    };
+}
+
+/**
+ * @param {Partial<TerminalSdkSessionInventory>} [overrides]
+ * @returns {TerminalSdkSessionInventory}
+ */
+function sessionInventoryFixture(overrides = {}) {
+    return {
+        currentSessionId: null,
+        lastSessionId: null,
+        foregroundSessionId: null,
+        persistedByokBinding: null,
+        lastBootDecision: null,
+        sessionFs: sessionFsFixture(),
+        sessions: [],
+        ...overrides,
+    };
+}
+
+/**
+ * @param {Partial<RuntimeAutomationPolicy>} [overrides]
+ * @returns {RuntimeAutomationPolicy}
+ */
+function automationPolicyFixture(overrides = {}) {
+    return {
+        enabled: false,
+        preset: 'operator_manual',
+        policy: 'prefer_runtime_proved',
+        profiles: [],
+        allowLiveSetModel: false,
+        allowNewSession: false,
+        allowProviderProbes: false,
+        allowLocalPrivate: false,
+        accountWideFailureKinds: [],
+        ...overrides,
+    };
+}
+
+/**
+ * @param {Partial<ByokProviderHealthState>} [overrides]
+ * @returns {ByokProviderHealthState}
+ */
+function byokHealthStateFixture(overrides = {}) {
+    return {
+        enabled: false,
+        path: null,
+        loaded: true,
+        records: 0,
+        persistedRecords: 0,
+        flushScheduled: false,
+        flushInFlight: false,
+        dirty: false,
+        error: null,
+        changeListenerCount: 0,
+        ...overrides,
+    };
+}
+
+/**
+ * @param {RuntimeSelectorPlanOverrides} [overrides]
+ * @returns {RuntimeSelectorPlan}
+ */
+function runtimeSelectorPlanFixture(overrides = {}) {
+    const summary = {
+        profileCount: 0,
+        selectedProfileCount: 0,
+        blockedProfileCount: 0,
+        accountAccessBlockedCount: 0,
+        runtimeProofSelectedCount: 0,
+        runtimeEnvReadyCount: 0,
+        runtimeEnvBlockedCount: 0,
+        runtimeHealthBlockedCount: 0,
+        runtimeProbeBlockedCount: 0,
+        providerCooldownBlockedCount: 0,
+        alternativeEvaluatedCount: 0,
+        alternativeUsableCount: 0,
+        ...(overrides.summary ?? {}),
+    };
+    return {
+        schema: 'model-gateway-runtime-selector-plan',
+        ok: true,
+        ready: false,
+        mode: 'metadata_first',
+        sourceSchema: null,
+        traceId: null,
+        routes: [],
+        ...overrides,
+        summary,
+    };
+}
+
+/**
+ * @param {Partial<RuntimeAutomationDecision>} [overrides]
+ * @returns {RuntimeAutomationDecision}
+ */
+function runtimeAutomationDecisionFixture(overrides = {}) {
+    return {
+        schema: 'model-gateway-runtime-automation-decision',
+        ok: false,
+        status: 'blocked',
+        action: 'manual_intervention',
+        selectedRouteKey: null,
+        selectedRouteReasons: [],
+        selectedRouteConfidence: null,
+        routeProfile: null,
+        fallbackFromSelectedRouteKey: null,
+        fallbackReason: null,
+        canApplyLiveModel: false,
+        canApplyLiveRoute: false,
+        requiresProviderRebind: false,
+        requiresNewSession: false,
+        blockers: ['fixture_manual_intervention'],
+        currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
+        targetBoundary: { profile: null, preset: null, providerType: null, baseUrl: null, model: null },
+        targetRoute: null,
+        cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
+        blockerClass: 'route_blocked',
+        nonActionReason: 'fixture_manual_intervention',
+        nextCommands: [],
+        operatorSummary: 'fixture automation decision',
+        ...overrides,
+    };
+}
+
+/**
+ * @param {ModelGatewayOperatorProjectionOverrides} [overrides]
+ * @returns {ModelGatewayOperatorProjection}
+ */
+function operatorProjectionFixture(overrides = {}) {
+    const effectiveRoute = {
+        enabled: false,
+        ready: false,
+        providerId: null,
+        providerModel: null,
+        modelId: null,
+        profile: null,
+        gatewayProfile: null,
+        preset: null,
+        bindingSource: null,
+        source: 'test',
+        label: '-',
+        ...(overrides.effectiveRoute ?? {}),
+    };
+    return {
+        source: 'test',
+        generatedAt: null,
+        active: {},
+        providerCount: 0,
+        modelCount: 0,
+        enabledModelCount: 0,
+        providers: [],
+        models: [],
+        ...overrides,
+        effectiveRoute,
+    };
+}
+
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/observability/events.js').buildRouteDecisionEvent>} RouteDecisionEvent */
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/byok/gateway-auto.js').buildTerminalByokGatewayAutoStatus>>} TerminalGatewayAutoStatus */
+/** @typedef {Omit<Partial<TerminalGatewayAutoStatus>, 'args' | 'decision' | 'automationDecisionRecord'> & { args?: Partial<TerminalGatewayAutoStatus['args']>; decision?: Partial<RuntimeAutomationDecision>; automationDecisionRecord?: Record<string, unknown> }} TerminalGatewayAutoStatusOverrides */
+
+/**
+ * @param {Partial<RouteDecisionEvent>} [overrides]
+ * @returns {RouteDecisionEvent}
+ */
+function routeDecisionEventFixture(overrides = {}) {
+    return {
+        type: 'model_gateway:route_decision',
+        timestamp: 0,
+        decisionId: 'fixture-route-decision',
+        taskProfile: 'repo_agent',
+        routeProfile: null,
+        mode: 'metadata_first',
+        source: 'test',
+        sessionId: null,
+        selected: false,
+        gatewayModelId: null,
+        providerId: null,
+        modelId: null,
+        score: null,
+        scoreBreakdown: null,
+        reasons: [],
+        candidateCount: 0,
+        rejectedCount: 0,
+        fallbackChain: [],
+        estimatedInputTokens: null,
+        estimatedOutputTokens: null,
+        estimatedCostUsd: null,
+        failure: null,
+        traceAttributes: {},
+        ...overrides,
+    };
+}
+
+/**
+ * @param {string} providerId
+ * @param {string} providerModel
+ * @param {string} rejectionReason
+ * @returns {RuntimeSelectorPlan}
+ */
+function blockedRuntimeSelectorPlanFixture(providerId, providerModel, rejectionReason) {
+    return runtimeSelectorPlanFixture({
+        ok: false,
+        ready: false,
+        mode: 'prefer_runtime_proved',
+        summary: {
+            profileCount: 1,
+            selectedProfileCount: 0,
+            blockedProfileCount: 1,
+            runtimeEnvReadyCount: 1,
+        },
+        routes: [
+            {
+                profileId: 'repo_agent',
+                status: 'blocked',
+                source: 'test',
+                selected: null,
+                selectedRouteKey: null,
+                hasRuntimeProof: false,
+                runtimeProofStale: false,
+                runtimeProof: null,
+                runtimeEnv: null,
+                runtimeHealth: null,
+                providerCooldown: null,
+                alternativeSummary: {
+                    evaluatedCount: 1,
+                    usableCount: 0,
+                    blockedCount: 1,
+                    providerCount: 1,
+                    rejectionReasonCounts: { [rejectionReason]: 1 },
+                    topBlockedRoutes: [
+                        { label: 'alternate1', providerId, providerModel, reasons: [rejectionReason] },
+                    ],
+                },
+                candidateAlternatives: [],
+                reasons: ['blocked:no_selected_route'],
+                nextActions: ['run_runtime_probe_for_profile'],
+                decisionEvent: routeDecisionEventFixture({ taskProfile: 'repo_agent', routeProfile: 'repo_agent' }),
+            },
+        ],
+    });
+}
+
+/**
+ * @param {TerminalGatewayAutoStatusOverrides} [overrides]
+ * @returns {TerminalGatewayAutoStatus}
+ */
+function terminalGatewayAutoStatusFixture(overrides = {}) {
+    const args = {
+        profileId: 'repo_agent',
+        presetId: 'operator_manual',
+        allowLiveSetModel: false,
+        allowNewSession: false,
+        allowLocalPrivate: false,
+        ...(overrides.args ?? {}),
+    };
+    const decision = runtimeAutomationDecisionFixture(overrides.decision ?? {});
+    return {
+        ...overrides,
+        schema: 'terminal-byok-gateway-auto-status',
+        args,
+        runtimeSelectorPlan: overrides.runtimeSelectorPlan ?? runtimeSelectorPlanFixture(),
+        inventory: overrides.inventory ?? sessionInventoryFixture(),
+        decision,
+        controllerStep:
+            overrides.controllerStep ?? {
+                schema: 'model-gateway-runtime-automation-controller-step',
+                ok: decision.ok,
+                phase: 'manual',
+                action: decision.action,
+                effectMode: 'dry_run',
+                effects: [],
+                blockers: [...decision.blockers],
+                selectedRouteKey: decision.selectedRouteKey,
+                operatorSummary: decision.operatorSummary,
+            },
+        automationDecisionRecord: {
+            ...decision,
+            decisionId: 'fixture-automation-decision',
+            timestamp: '2026-06-01T00:00:00.000Z',
+            source: 'test',
+            ...(overrides.automationDecisionRecord ?? {}),
+        },
+        persistence: overrides.persistence ?? null,
+    };
+}
+
+/**
+ * @param {Partial<TerminalByokProfileSummary> & Pick<TerminalByokProfileSummary, 'name'>} overrides
+ * @returns {TerminalByokProfileSummary}
+ */
+function byokProfileFixture(overrides) {
+    return {
+        preset: null,
+        providerId: null,
+        providerType: null,
+        baseUrl: null,
+        model: null,
+        ready: false,
+        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+        metadataKeys: [],
+        profileFreeTier: null,
+        profileCostSource: null,
+        profileCostDetail: null,
+        warnings: [],
+        errors: [],
+        ...overrides,
+    };
+}
+
+/**
+ * @param {string} kind
+ * @param {Partial<ByokProviderProbeHealthFixtureRecord>} [overrides]
+ * @returns {ByokProviderProbeHealthFixtureRecord}
+ */
+function byokProbeHealthFixture(kind, overrides = {}) {
+    return {
+        status: 'unknown',
+        ok: false,
+        providerAttempted: false,
+        count: 0,
+        successCount: 0,
+        failureCount: 0,
+        lastAt: null,
+        lastMessage: null,
+        lastErrorContext: null,
+        lastFailureKind: null,
+        lastFailureStatusCode: null,
+        lastRetryAfterSeconds: null,
+        lastResetAt: null,
+        ...overrides,
+        kind: overrides.kind ?? kind,
+    };
+}
+
+/**
+ * @param {ByokProviderHealthFixtureOverrides} [overrides]
+ * @returns {ByokProviderHealthFixtureRecord}
+ */
+function byokHealthFixture(overrides = {}) {
+    const probes = Object.fromEntries(
+        Object.entries(overrides.probes ?? {}).map(([kind, probe]) => [kind, byokProbeHealthFixture(kind, probe)]),
+    );
+    return {
+        key: 'fixture:unknown',
+        routeProfile: null,
+        providerId: null,
+        providerModel: null,
+        profile: null,
+        provider: null,
+        model: null,
+        lastStatus: null,
+        failureCount: 0,
+        successCount: 0,
+        lastFailureAt: null,
+        lastSuccessAt: null,
+        lastMessage: null,
+        lastErrorContext: null,
+        lastFailureKind: null,
+        lastFailureStatusCode: null,
+        lastRetryAfterSeconds: null,
+        lastResetAt: null,
+        lastSuccessContext: null,
+        agentProbeStatus: null,
+        agentProbeFailureCount: 0,
+        agentProbeSuccessCount: 0,
+        lastAgentProbeFailureAt: null,
+        lastAgentProbeSuccessAt: null,
+        lastAgentProbeMessage: null,
+        lastAgentProbeErrorContext: null,
+        ...overrides,
+        probes,
+    };
+}
+
+/**
+ * @param {TerminalByokProjectionOverrides} [overrides]
  */
 function mockProjection(overrides = {}) {
     readTerminalByokProjection.mockReturnValue({
@@ -1673,6 +2477,10 @@ describe('terminal /byok command', () => {
         auditModelGatewayPreRuntimeSelection.mockClear();
         buildModelGatewayRuntimeStandbyPlan.mockClear();
         buildModelGatewayRuntimeSelectorPlan.mockClear();
+        buildModelGatewayRuntimeAutomationControllerStep.mockReset();
+        buildModelGatewayRuntimeAutomationControllerStep.mockImplementation(
+            buildModelGatewayRuntimeAutomationControllerStepActual,
+        );
         buildModelGatewaySelectionDecisionTrace.mockClear();
         compareModelGatewaySelectionAudits.mockClear();
         explainModelGatewaySelectionComparison.mockClear();
@@ -1683,7 +2491,10 @@ describe('terminal /byok command', () => {
         chmod.mockResolvedValue(undefined);
         clearByokProviderModelHealth.mockReset();
         createDefaultModelGatewayCatalogImporters.mockReset();
-        createDefaultModelGatewayCatalogImporters.mockReturnValue([{ id: 'openrouter-models' }, { id: 'openai-models' }]);
+        createDefaultModelGatewayCatalogImporters.mockReturnValue([
+            catalogImporterFixture('openrouter-models', 'openrouter'),
+            catalogImporterFixture('openai-models', 'openai', 'authenticated_api'),
+        ]);
         createEnvSecretRegistry.mockReset();
         createEnvSecretRegistry.mockReturnValue({ has: () => false, get: () => null, list: () => [] });
         evaluateModelGatewayCatalogEligibility.mockClear();
@@ -1786,14 +2597,7 @@ describe('terminal /byok command', () => {
             missingRecommendedKeyCounts: {},
         });
         listTerminalSdkSessionInventory.mockReset();
-        listTerminalSdkSessionInventory.mockResolvedValue({
-            currentSessionId: null,
-            lastSessionId: null,
-            foregroundSessionId: null,
-            persistedByokBinding: null,
-            lastBootDecision: null,
-            sessions: [],
-        });
+        listTerminalSdkSessionInventory.mockResolvedValue(sessionInventoryFixture());
         loadDotenv.mockReset();
         flushAndMirrorByokProviderHealthToSqlite.mockClear();
         mirrorByokProviderHealthToSqlite.mockClear();
@@ -1885,43 +2689,15 @@ describe('terminal /byok command', () => {
         runConfiguredByokStreamingProbe.mockReset();
         runConfiguredByokVisionProbe.mockReset();
         readByokProviderHealthState.mockReset();
-        readByokProviderHealthState.mockReturnValue({
-            enabled: false,
-            path: null,
-            loaded: true,
-            records: 0,
-            persistedRecords: 0,
-            flushScheduled: false,
-            flushInFlight: false,
-            dirty: false,
-            error: null,
-        });
+        readByokProviderHealthState.mockReturnValue(byokHealthStateFixture());
         readByokProviderModelHealth.mockReset();
         readByokProviderModelHealth.mockReturnValue(null);
         readModelGatewayRuntimeAutomationPolicy.mockReset();
-        readModelGatewayRuntimeAutomationPolicy.mockReturnValue({
-            enabled: false,
-            policy: 'prefer_runtime_proved',
-            profiles: [],
-            allowLiveSetModel: false,
-            allowNewSession: false,
-            allowProviderProbes: false,
-            allowLocalPrivate: false,
-            accountWideFailureKinds: [],
-        });
+        readModelGatewayRuntimeAutomationPolicy.mockReturnValue(automationPolicyFixture());
         readModelGatewayRuntimeAutomationPolicyFile.mockReset();
         readModelGatewayRuntimeAutomationPolicyFile.mockResolvedValue({});
         readModelGatewayRuntimeAutomationEffectivePolicy.mockReset();
-        readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValue({
-            enabled: false,
-            policy: 'prefer_runtime_proved',
-            profiles: [],
-            allowLiveSetModel: false,
-            allowNewSession: false,
-            allowProviderProbes: false,
-            allowLocalPrivate: false,
-            accountWideFailureKinds: [],
-        });
+        readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValue(automationPolicyFixture());
         writeModelGatewayRuntimeAutomationPolicyFile.mockClear();
         readConfiguredByokProfilesFromEnv.mockReset();
         readConfiguredByokProfilesFromEnv.mockReturnValue({});
@@ -1942,16 +2718,12 @@ describe('terminal /byok command', () => {
             failures: [],
         });
         readTerminalByokGatewayProjectionFromEnv.mockReset();
-        readTerminalByokGatewayProjectionFromEnv.mockReturnValue({
-            gatewayModels: [],
-            modelGateway: { providers: [], models: [] },
-            modelGatewayProjection: { providers: [], models: [] },
-        });
+        readTerminalByokGatewayProjectionFromEnv.mockReturnValue(terminalByokGatewayProjectionFixture());
         readTerminalByokProjection.mockReset();
-        readTerminalConfigProjection.mockReset();
-        readTerminalConfigProjection.mockReturnValue({ currentModel: 'kilo-auto/free' });
-        readTerminalRuntimeState.mockReset();
-        readTerminalRuntimeState.mockReturnValue({ contextWindow: null });
+        readTerminalByokRuntimeConfigProjection.mockReset();
+        readTerminalByokRuntimeConfigProjection.mockReturnValue({ currentModel: 'kilo-auto/free', modelGatewayProjection: operatorProjectionFixture() });
+        readTerminalRuntimeContextWindow.mockReset();
+        readTerminalRuntimeContextWindow.mockReturnValue(null);
         recordByokProviderModelCallFailure.mockReset();
         recordByokProviderModelCallSuccess.mockReset();
         recordByokProviderModelProbeResult.mockReset();
@@ -2077,16 +2849,23 @@ describe('terminal /byok command', () => {
     });
 
     it('usa effectiveRoute compartilhado no gateway do status BYOK', async () => {
-        readTerminalConfigProjection.mockReturnValue({
+        readTerminalByokRuntimeConfigProjection.mockReturnValue({
             currentModel: 'qwen3-coder-next',
-            modelGatewayProjection: {
+            modelGatewayProjection: operatorProjectionFixture({
                 effectiveRoute: {
+                    enabled: true,
+                    ready: true,
                     providerId: 'ollama-cloud',
                     providerModel: 'qwen3-coder-next',
                     modelId: 'ollama-cloud:qwen3-coder-next',
+                    profile: 'repo_agent',
+                    gatewayProfile: null,
+                    preset: 'ollama-cloud',
+                    bindingSource: 'runtime_state',
+                    source: 'runtime_state',
                     label: 'ollama-cloud · qwen3-coder-next',
                 },
-            },
+            }),
         });
         mockProjection({
             summary: {
@@ -2101,25 +2880,38 @@ describe('terminal /byok command', () => {
                 modelList: { configured: true, count: 1 },
             },
             modelGateway: {
-                source: 'env_compat',
-                active: { modelId: 'legacy-provider:legacy-model' },
-                providers: [],
-                models: [],
-                diagnostics: { providerCount: 1, modelCount: 1, enabledModelCount: 1 },
+                ...envByokModelGatewaySnapshotFixture(),
+                active: {
+                    enabled: true,
+                    ready: true,
+                    providerId: 'legacy-provider',
+                    modelId: 'legacy-provider:legacy-model',
+                    providerModel: 'legacy-model',
+                    profile: 'repo_agent',
+                    gatewayProfile: null,
+                    preset: 'legacy-provider',
+                    bindingSource: 'env_compat',
+                },
+                diagnostics: { providerCount: 1, modelCount: 1, enabledModelCount: 1, warnings: [], errors: [] },
             },
-            modelGatewayProjection: {
+            modelGatewayProjection: operatorProjectionFixture({
                 providerCount: 2,
                 modelCount: 3,
                 enabledModelCount: 2,
-                providers: [],
-                models: [],
                 effectiveRoute: {
+                    enabled: true,
+                    ready: true,
                     providerId: 'kilo-code',
                     providerModel: 'kilo-auto/free',
                     modelId: 'kilo-code:kilo-auto/free',
+                    profile: 'kilo',
+                    gatewayProfile: null,
+                    preset: 'kilo-code',
+                    bindingSource: 'gateway_profile',
+                    source: 'env_compat',
                     label: 'kilo-code · kilo-auto/free',
                 },
-            },
+            }),
         });
         const ctx = mockCtx();
 
@@ -2134,11 +2926,18 @@ describe('terminal /byok command', () => {
     it('usa metadados remotos cacheados do modelo ativo no status sem herdar vision do provider', async () => {
         readConfiguredByokModelDiscoveryCacheFromEnv.mockReturnValue({
             models: [
-                {
+                byokModelInfoFixture({
                     id: 'kilo-auto/free',
                     capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 256000 } },
-                    byok: { source: 'remote', supportsReasoning: true, inputModalities: ['text'], outputModalities: ['text'] },
-                },
+                    byok: {
+                        source: 'remote',
+                        supportsReasoning: true,
+                        supportsVision: false,
+                        inputModalities: ['text'],
+                        outputModalities: ['text'],
+                        contextWindowTokens: 256000,
+                    },
+                }),
             ],
             source: 'remote-cache',
             endpoint: 'https://api.kilo.ai/api/gateway/models',
@@ -2183,7 +2982,7 @@ describe('terminal /byok command', () => {
                 model: 'qwen3-coder-next',
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValueOnce({
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(sessionInventoryFixture({
             currentSessionId: 'sdk-kilo-live',
             lastSessionId: 'sdk-kilo-live',
             foregroundSessionId: 'sdk-kilo-live',
@@ -2197,7 +2996,7 @@ describe('terminal /byok command', () => {
             },
             lastBootDecision: null,
             sessions: [],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'status');
@@ -2213,7 +3012,7 @@ describe('terminal /byok command', () => {
         readByokProviderModelHealth.mockImplementation((input) => {
             const model = input.providerModel ?? input.model;
             return model === 'deepseek/deepseek-v4-flash:free'
-                ? {
+                ? byokHealthFixture({
                       key: 'openrouter-free|openrouter|deepseek/deepseek-v4-flash:free',
                       routeProfile: 'openrouter-free',
                       providerId: 'openrouter',
@@ -2235,19 +3034,21 @@ describe('terminal /byok command', () => {
                       lastAgentProbeSuccessAt: null,
                       lastAgentProbeMessage: 'timeout',
                       lastAgentProbeErrorContext: 'byok_agent_probe',
-                  }
+                  })
                 : null;
         });
         mockProjection({
             models: [
-                {
+                byokModelInfoFixture({
                     id: 'deepseek/deepseek-v4-flash:free',
                     capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
-                },
-                {
+                    byok: { provider: 'openrouter', freeTier: true, supportsReasoning: true, supportsVision: false },
+                }),
+                byokModelInfoFixture({
                     id: 'openrouter/free',
                     capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 128000 } },
-                },
+                    byok: { provider: 'openrouter', freeTier: true, supportsReasoning: true, supportsVision: true },
+                }),
             ],
             summary: {
                 enabled: true,
@@ -2276,7 +3077,7 @@ describe('terminal /byok command', () => {
 
     it('não herda health de outro modelo do profile quando há override BYOK ativo', async () => {
         listByokProviderModelHealth.mockReturnValue([
-            {
+            byokHealthFixture({
                 key: 'openrouter-free|openrouter|openrouter/free',
                 routeProfile: 'openrouter-free',
                 providerId: 'openrouter',
@@ -2298,7 +3099,7 @@ describe('terminal /byok command', () => {
                 lastAgentProbeSuccessAt: Date.now(),
                 lastAgentProbeMessage: null,
                 lastAgentProbeErrorContext: null,
-            },
+            }),
         ]);
         mockProjection({
             summary: {
@@ -2325,7 +3126,7 @@ describe('terminal /byok command', () => {
     it('lista perfis redigidos', async () => {
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'kilo',
                     preset: 'kilo-code',
                     providerType: 'openai',
@@ -2333,7 +3134,7 @@ describe('terminal /byok command', () => {
                     model: 'anthropic/claude-sonnet-4.5',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: ['owner'],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -2351,7 +3152,7 @@ describe('terminal /byok command', () => {
     it('mostra perfil custom sem modelo como bloqueado para SDK 1.0', async () => {
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'local',
                     preset: 'openai-compatible',
                     providerType: 'openai',
@@ -2362,7 +3163,7 @@ describe('terminal /byok command', () => {
                     metadataKeys: [],
                     warnings: [],
                     errors: ['COPILOT_BYOK_MODEL must be an explicit provider model id; BYOK cannot use model=auto.'],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -2379,7 +3180,7 @@ describe('terminal /byok command', () => {
     it('resume provedores com contagem real de prontos e bloqueio por modelo ausente', async () => {
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'kilo',
                     preset: 'kilo-code',
                     providerType: 'openai',
@@ -2390,8 +3191,8 @@ describe('terminal /byok command', () => {
                     metadataKeys: [],
                     warnings: [],
                     errors: [],
-                },
-                {
+                }),
+                byokProfileFixture({
                     name: 'local',
                     preset: 'openai-compatible',
                     providerType: 'openai',
@@ -2402,7 +3203,7 @@ describe('terminal /byok command', () => {
                     metadataKeys: [],
                     warnings: [],
                     errors: ['COPILOT_BYOK_MODEL must be an explicit provider model id; BYOK cannot use model=auto.'],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -2859,7 +3660,7 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'kilo',
                     preset: 'kilo-code',
                     providerType: 'openai',
@@ -2867,8 +3668,8 @@ describe('terminal /byok command', () => {
                     model: 'kilo/ranked',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
-                {
+                }),
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -2876,7 +3677,7 @@ describe('terminal /byok command', () => {
                     model: 'groq/compact',
                     auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -3133,7 +3934,7 @@ describe('terminal /byok command', () => {
         });
         readByokProviderModelHealth.mockReturnValue(null);
         listByokProviderModelHealth.mockReturnValue([
-            {
+            byokHealthFixture({
                 key: 'groq-free|groq|openai/gpt-oss-120b',
                 routeProfile: 'groq-free',
                 providerId: 'groq',
@@ -3148,11 +3949,11 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: now,
                 lastMessage: null,
                 lastErrorContext: null,
-            },
+            }),
         ]);
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'openrouter-free',
                     preset: 'openrouter',
                     providerType: 'openai',
@@ -3160,8 +3961,8 @@ describe('terminal /byok command', () => {
                     model: 'z-ai/glm-4.5-air:free',
                     auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: ['tier', 'owner'],
-                },
-                {
+                }),
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -3169,7 +3970,7 @@ describe('terminal /byok command', () => {
                     model: 'openai/gpt-oss-120b',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: ['limits'],
-                },
+                }),
             ],
             summary: {
                 enabled: true,
@@ -3313,9 +4114,9 @@ describe('terminal /byok command', () => {
     it('audita importers configurados e cobertura de endpoints sem chamar rede', async () => {
         mockProjection();
         createDefaultModelGatewayCatalogImporters.mockReturnValue([
-            { id: 'kilo-gateway-models', providerId: 'kilo', sourceKind: 'public_gateway_api' },
-            { id: 'kilo-gateway-providers', providerId: 'kilo', sourceKind: 'public_gateway_api' },
-            { id: 'openai-models', providerId: 'openai', sourceKind: 'authenticated_api' },
+            catalogImporterFixture('kilo-gateway-models', 'kilo'),
+            catalogImporterFixture('kilo-gateway-providers', 'kilo'),
+            catalogImporterFixture('openai-models', 'openai', 'authenticated_api'),
         ]);
         const ctx = mockCtx();
 
@@ -3325,8 +4126,8 @@ describe('terminal /byok command', () => {
         expect(resolveProviderEndpointInventory).toHaveBeenCalledWith('kilo');
         expect(auditCatalogImporterSet).toHaveBeenCalledWith(
             [
-                { id: 'kilo-gateway-models', providerId: 'kilo', sourceKind: 'public_gateway_api' },
-                { id: 'kilo-gateway-providers', providerId: 'kilo', sourceKind: 'public_gateway_api' },
+                expect.objectContaining({ id: 'kilo-gateway-models', providerId: 'kilo', sourceKind: 'public_gateway_api' }),
+                expect.objectContaining({ id: 'kilo-gateway-providers', providerId: 'kilo', sourceKind: 'public_gateway_api' }),
             ],
             { inventories: [expect.objectContaining({ providerId: 'kilo' })] },
         );
@@ -3610,36 +4411,42 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('BYOK automação do gateway');
         expect(ctx.output()).toMatch(/troca viva n(?:ão|ao)/u);
         expect(ctx.output()).not.toContain('live setModel');
-        expect(ctx.output()).toContain('preparar novo boot SDK');
-        expect(ctx.output()).not.toContain('prepare_new_sdk_session:dry');
+        expect(ctx.output()).toContain('ação intervenção manual');
+        expect(ctx.output()).toContain('Nova sessão   não');
+        expect(ctx.output()).toContain('live set model policy disabled');
+        expect(ctx.output()).not.toContain('preparar novo boot SDK');
         expect(ctx.output()).not.toContain('prepare_new_sdk_session');
-        expect(ctx.output()).toContain('ação preparar nova sessão');
-        expect(ctx.output()).not.toContain('new session policy');
-        expect(ctx.output()).toContain('/session sdk next new');
+        expect(ctx.output()).not.toContain('/session sdk next new');
     });
 
     it('mostra origem e motivo de fallback no auto status quando a decisão promove standby', async () => {
         mockProjection();
-        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce({
-            schema: 'model-gateway-runtime-automation-decision',
-            ok: true,
-            status: 'ready',
-            action: 'prepare_new_session',
-            selectedRouteKey: 'groq:fallback-model',
-            routeProfile: 'repo_agent',
-            fallbackFromSelectedRouteKey: 'openrouter:primary-model',
-            fallbackReason: 'rate-limit',
-            canApplyLiveModel: false,
-            requiresNewSession: true,
-            blockers: [],
-            currentBoundary: { enabled: true, profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'primary-model' },
-            targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'fallback-model' },
-            cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
-            blockerClass: 'none',
-            nonActionReason: null,
-            nextCommands: ['/session sdk next new', '/byok provider groq fallback-model'],
-            operatorSummary: 'fallback standby promoted',
-        });
+        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce(
+            runtimeAutomationDecisionFixture({
+                ok: true,
+                status: 'ready',
+                action: 'apply_live_route',
+                selectedRouteKey: 'groq:fallback-model',
+                selectedRouteReasons: ['fallback:rate-limit'],
+                selectedRouteConfidence: 'runtime_proved',
+                routeProfile: 'repo_agent',
+                fallbackFromSelectedRouteKey: 'openrouter:primary-model',
+                fallbackReason: 'rate-limit',
+                canApplyLiveModel: false,
+                canApplyLiveRoute: true,
+                requiresProviderRebind: true,
+                requiresNewSession: false,
+                blockers: [],
+                currentBoundary: { enabled: true, profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'primary-model' },
+                targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'fallback-model' },
+                targetRoute: { providerId: 'groq', providerModel: 'fallback-model', selectorSyntax: 'fallback-model', baseUrl: null, openAICompatibleBaseUrl: null, wireApi: null, routeProfile: 'repo_agent', selectedRouteKey: 'groq:fallback-model' },
+                cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
+                blockerClass: 'none',
+                nonActionReason: null,
+                nextCommands: ['/byok provider groq fallback-model'],
+                operatorSummary: 'fallback standby promoted by same-session route rebind',
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto status profile:repo_agent');
@@ -3653,52 +4460,9 @@ describe('terminal /byok command', () => {
 
     it('mostra comandos de prova por provider/model quando alternativas auto carecem de agent probe', async () => {
         mockProjection();
-        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce({
-            schema: 'model-gateway-runtime-selector-plan',
-            ok: false,
-            ready: false,
-            mode: 'prefer_runtime_proved',
-            summary: {
-                profileCount: 1,
-                selectedProfileCount: 0,
-                blockedProfileCount: 1,
-                runtimeProofSelectedCount: 0,
-                runtimeEnvReadyCount: 1,
-                runtimeEnvBlockedCount: 0,
-            },
-            routes: [
-                {
-                    profileId: 'repo_agent',
-                    status: 'blocked',
-                    source: 'test',
-                    selected: null,
-                    selectedRouteKey: null,
-                    hasRuntimeProof: false,
-                    runtimeEnv: null,
-                    runtimeHealth: null,
-                    providerCooldown: null,
-                    alternativeSummary: {
-                        evaluatedCount: 1,
-                        usableCount: 0,
-                        blockedCount: 1,
-                        providerCount: 1,
-                        rejectionReasonCounts: { 'runtime_health:agent_probe_missing': 1 },
-                        topBlockedRoutes: [
-                            {
-                                label: 'alternate1',
-                                providerId: 'zai',
-                                providerModel: 'glm-4.5-flash',
-                                reasons: ['runtime_health:agent_probe_missing'],
-                            },
-                        ],
-                    },
-                    candidateAlternatives: [],
-                    reasons: ['blocked:no_selected_route'],
-                    nextActions: ['run_runtime_probe_for_profile'],
-                    decisionEvent: { type: 'model_gateway:route_decision' },
-                },
-            ],
-        });
+        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce(
+            blockedRuntimeSelectorPlanFixture('zai', 'glm-4.5-flash', 'runtime_health:agent_probe_missing'),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto status profile:repo_agent');
@@ -3709,52 +4473,9 @@ describe('terminal /byok command', () => {
 
     it('renderiza plano auto sem executar provider nem aplicar efeito', async () => {
         mockProjection();
-        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce({
-            schema: 'model-gateway-runtime-selector-plan',
-            ok: false,
-            ready: false,
-            mode: 'prefer_runtime_proved',
-            summary: {
-                profileCount: 1,
-                selectedProfileCount: 0,
-                blockedProfileCount: 1,
-                runtimeProofSelectedCount: 0,
-                runtimeEnvReadyCount: 1,
-                runtimeEnvBlockedCount: 0,
-            },
-            routes: [
-                {
-                    profileId: 'repo_agent',
-                    status: 'blocked',
-                    source: 'test',
-                    selected: null,
-                    selectedRouteKey: null,
-                    hasRuntimeProof: false,
-                    runtimeEnv: null,
-                    runtimeHealth: null,
-                    providerCooldown: null,
-                    alternativeSummary: {
-                        evaluatedCount: 1,
-                        usableCount: 0,
-                        blockedCount: 1,
-                        providerCount: 1,
-                        rejectionReasonCounts: { 'runtime_health:agent_probe_not_verified': 1 },
-                        topBlockedRoutes: [
-                            {
-                                label: 'alternate1',
-                                providerId: 'kilo-code',
-                                providerModel: 'kilo-auto/free',
-                                reasons: ['runtime_health:agent_probe_not_verified'],
-                            },
-                        ],
-                    },
-                    candidateAlternatives: [],
-                    reasons: ['blocked:no_selected_route'],
-                    nextActions: ['run_runtime_probe_for_profile'],
-                    decisionEvent: { type: 'model_gateway:route_decision' },
-                },
-            ],
-        });
+        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce(
+            blockedRuntimeSelectorPlanFixture('kilo-code', 'kilo-auto/free', 'runtime_health:agent_probe_not_verified'),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto plan profile:repo_agent 5');
@@ -3791,13 +4512,13 @@ describe('terminal /byok command', () => {
 
     it('renderiza rotas standby auto sem chamar provider', async () => {
         mockProjection();
-        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce({
-            schema: 'model-gateway-runtime-selector-plan',
-            ok: true,
-            ready: true,
-            summary: { selectedProfileCount: 1, profileCount: 1, blockedProfileCount: 0 },
-            routes: [],
-        });
+        buildModelGatewayRuntimeSelectorPlan.mockReturnValueOnce(
+            runtimeSelectorPlanFixture({
+                ok: true,
+                ready: true,
+                summary: { profileCount: 1, selectedProfileCount: 1, blockedProfileCount: 0 },
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto standby profile:repo_agent 5');
@@ -3816,37 +4537,30 @@ describe('terminal /byok command', () => {
 
     it('aplica efeito auto live apenas quando a policy autoriza', async () => {
         mockProjection();
-        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce({
-            schema: 'model-gateway-runtime-automation-decision',
-            ok: true,
-            status: 'ready',
-            action: 'apply_live_model',
-            selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
-            routeProfile: 'repo_agent',
-            canApplyLiveModel: true,
-            requiresNewSession: false,
-            blockers: [],
-            currentBoundary: {
-                enabled: true,
-                profile: 'repo_agent',
-                preset: 'openrouter',
-                providerType: 'openai_compatible',
-                baseUrl: null,
-                model: 'old-model',
-            },
-            targetBoundary: {
-                profile: 'repo_agent',
-                preset: 'openrouter',
-                providerType: 'openai_compatible',
-                baseUrl: null,
-                model: 'openai/gpt-oss-120b',
-            },
-            cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
-            blockerClass: 'none',
-            nonActionReason: null,
-            nextCommands: ['/byok model openai/gpt-oss-120b'],
-            operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
-        });
+        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce(
+            runtimeAutomationDecisionFixture({
+                ok: true,
+                status: 'ready',
+                action: 'apply_live_model',
+                selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
+                selectedRouteReasons: ['selected:runtime_proved'],
+                selectedRouteConfidence: 'runtime_proved',
+                routeProfile: 'repo_agent',
+                canApplyLiveModel: true,
+                canApplyLiveRoute: false,
+                requiresProviderRebind: false,
+                requiresNewSession: false,
+                blockers: [],
+                currentBoundary: { enabled: true, profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'old-model' },
+                targetBoundary: { profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'openai/gpt-oss-120b' },
+                targetRoute: null,
+                cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
+                blockerClass: 'none',
+                nonActionReason: null,
+                nextCommands: ['/byok model openai/gpt-oss-120b'],
+                operatorSummary: 'Mesmo provider BYOK; o modelo pode ser aplicado na sessao viva.',
+            }),
+        );
         setTerminalModelProjection.mockReturnValueOnce({
             previousModel: 'old-model',
             currentModel: 'openai/gpt-oss-120b',
@@ -3868,7 +4582,7 @@ describe('terminal /byok command', () => {
                 expect.objectContaining({
                     label: 'Troca de modelo solicitada',
                     source: 'terminal.byok_auto',
-                    detail: expect.stringContaining('automação model-gateway'),
+                    detail: expect.stringContaining('origem automação BYOK'),
                 }),
             ]),
         );
@@ -4011,24 +4725,30 @@ describe('terminal /byok command', () => {
 
     it('mostra doctor auto no terminal sem aplicar efeitos', async () => {
         mockProjection();
-        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce({
-            schema: 'model-gateway-runtime-automation-decision',
-            ok: false,
-            status: 'blocked',
-            action: 'wait_for_reset',
-            selectedRouteKey: 'groq:reset-model',
-            routeProfile: 'repo_agent',
-            canApplyLiveModel: false,
-            requiresNewSession: false,
-            blockers: ['blocked:provider_health_cooldown:rate-limit'],
-            currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
-            targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'reset-model' },
-            cooldown: { active: true, reason: 'provider_health_cooldown', resetAt: '2026-06-01T10:00:00.000Z', retryAfterSeconds: 120 },
-            blockerClass: 'rate_limit_resettable',
-            nonActionReason: 'route_wait_for_reset',
-            nextCommands: ['npm run model-gateway:runtime-health:diff'],
-            operatorSummary: 'Rota bloqueada por health/cooldown; aguarde reset ou escolha outra rota.',
-        });
+        buildModelGatewayRuntimeAutomationDecision.mockReturnValueOnce(
+            runtimeAutomationDecisionFixture({
+                ok: false,
+                status: 'blocked',
+                action: 'wait_for_reset',
+                selectedRouteKey: 'groq:reset-model',
+                selectedRouteReasons: ['blocked:provider_health_cooldown:rate-limit'],
+                selectedRouteConfidence: 'runtime_health',
+                routeProfile: 'repo_agent',
+                canApplyLiveModel: false,
+                canApplyLiveRoute: false,
+                requiresProviderRebind: false,
+                requiresNewSession: false,
+                blockers: ['blocked:provider_health_cooldown:rate-limit'],
+                currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
+                targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'reset-model' },
+                targetRoute: null,
+                cooldown: { active: true, reason: 'provider_health_cooldown', resetAt: '2026-06-01T10:00:00.000Z', retryAfterSeconds: 120 },
+                blockerClass: 'rate_limit_resettable',
+                nonActionReason: 'route_wait_for_reset',
+                nextCommands: ['npm run model-gateway:runtime-health:diff'],
+                operatorSummary: 'Rota bloqueada por health/cooldown; aguarde reset ou escolha outra rota.',
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'auto doctor profile:repo_agent');
@@ -4062,7 +4782,9 @@ describe('terminal /byok command', () => {
         expect(explainCtx.output()).toContain('BYOK automação do gateway');
         expect(explainCtx.output()).toContain('BYOK diagnóstico da automação');
         expect(switchCtx.output()).toContain('BYOK automação do gateway');
-        expect(switchCtx.output()).toContain('Trilha auto');
+        expect(switchCtx.output()).toContain('nenhum efeito terminal derivado para aplicar');
+        expect(switchCtx.output()).not.toContain('Trilha auto');
+        expect(setTerminalModelProjection).not.toHaveBeenCalled();
     });
 
     it('centraliza executor terminal dos efeitos auto', async () => {
@@ -4107,12 +4829,13 @@ describe('terminal /byok command', () => {
                 skippedReason: 'new_session_not_allowed',
             }),
         ).toBe('preparar novo boot SDK não aplicado (nova sessão não autorizada)');
+        const autoStatus = terminalGatewayAutoStatusFixture({
+            args: { profileId: 'repo_agent' },
+            decision: { routeProfile: 'repo_agent', selectedRouteKey: 'openrouter:model-a' },
+            automationDecisionRecord: { decisionId: 'automation-1' },
+        });
         const records = createTerminalByokGatewayAutoEffectApplicationRecords(
-            {
-                args: { profileId: 'repo_agent' },
-                decision: { routeProfile: 'repo_agent', selectedRouteKey: 'openrouter:model-a' },
-                automationDecisionRecord: { decisionId: 'automation-1' },
-            },
+            autoStatus,
             result,
             { timestamp: '2026-06-01T00:00:00.000Z' },
         );
@@ -4135,11 +4858,7 @@ describe('terminal /byok command', () => {
             ]),
         );
         const handoffs = createTerminalByokGatewaySdkSessionHandoffRecords(
-            {
-                args: { profileId: 'repo_agent' },
-                decision: { routeProfile: 'repo_agent', selectedRouteKey: 'openrouter:model-a' },
-                automationDecisionRecord: { decisionId: 'automation-1' },
-            },
+            autoStatus,
             result,
             { timestamp: '2026-06-01T00:00:00.000Z' },
         );
@@ -4164,16 +4883,15 @@ describe('terminal /byok command', () => {
     });
 
     it('replaneja pós-falha BYOK quando policy auto efetiva está ligada', async () => {
-        readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValueOnce({
-            enabled: true,
-            policy: 'prefer_runtime_proved',
-            profiles: ['repo_agent'],
-            allowLiveSetModel: false,
-            allowNewSession: true,
-            allowProviderProbes: false,
-            allowLocalPrivate: false,
-            accountWideFailureKinds: ['rate-limit'],
-        });
+        readModelGatewayRuntimeAutomationEffectivePolicy.mockResolvedValueOnce(
+            automationPolicyFixture({
+                enabled: true,
+                preset: 'auto_same_session_route',
+                profiles: ['repo_agent'],
+                allowNewSession: true,
+                accountWideFailureKinds: ['rate-limit'],
+            }),
+        );
 
         const result = await runTerminalByokGatewayPostTurnAutomation({
             profile: 'repo_agent',
@@ -4229,41 +4947,9 @@ describe('terminal /byok command', () => {
     });
 
     it('explica bloqueio local padrão na auditoria de seleção pré-runtime', async () => {
-        auditModelGatewayPreRuntimeSelection.mockReturnValueOnce({
-            schema: 'model-gateway-pre-runtime-selection-audit',
-            ok: true,
-            mode: 'allow_probe_unknown',
-            snapshotContext: {
-                projectionCount: 1,
-                routeOptionCount: 1,
-                accountOverlayCount: 0,
-                eligibilityDecisionCount: 0,
-                candidateCount: 1,
-            },
-            summary: {
-                profileCount: 1,
-                selectedProfileCount: 0,
-                unselectedProfileCount: 1,
-                candidateCount: 1,
-                rejectedCount: 1,
-                selectedProviders: {},
-                selectedSelectorKinds: {},
-                rejectedReasonCounts: { local_provider_requires_explicit_request: 1 },
-            },
-            profiles: [
-                {
-                    profileId: 'cheap_chat',
-                    selected: null,
-                    candidateCount: 1,
-                    rejectedCount: 1,
-                    fallbackChain: [],
-                    topRejectedReasons: ['local_provider_requires_explicit_request'],
-                    nextActions: ['request_local_provider_explicitly'],
-                    decisionLayers: { runtimeProbeProofCount: 0 },
-                    snapshotContext: {},
-                },
-            ],
-        });
+        auditModelGatewayPreRuntimeSelection.mockReturnValueOnce(
+            blockedPreRuntimeSelectionAuditFixture('cheap_chat', 'local_provider_requires_explicit_request'),
+        );
         mockProjection();
         const ctx = mockCtx();
 
@@ -4587,32 +5273,33 @@ describe('terminal /byok command', () => {
 
     it('explica elegibilidade pré-runtime com estados humanos sem executar modelo', async () => {
         mockProjection();
+        const eligibilityDecision = createModelEligibilityDecisionActual({
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            include: true,
+            disposition: 'eligible',
+            reasons: ['account_model_visible'],
+            observedAt: '2026-06-01T00:00:00.000Z',
+        });
+        const eligibilityRun = createModelEligibilityRunActual({
+            runId: 'eligibility-run',
+            policyProfile: 'default',
+            taskProfile: 'default',
+            accountScope: 'default',
+            startedAt: '2026-06-01T00:00:00.000Z',
+            completedAt: '2026-06-01T00:00:00.000Z',
+            modelCount: 1,
+            eligibleCount: 1,
+        });
         evaluateModelGatewayCatalogEligibility.mockReturnValue({
-            run: { runId: 'eligibility-run', policyProfile: 'default' },
-            decisions: [
-                {
-                    providerId: 'openrouter',
-                    providerModel: 'new-model',
-                    routeProfile: 'default',
-                },
-            ],
+            run: eligibilityRun,
+            decisions: [eligibilityDecision],
             summary: { modelCount: 1, eligibleCount: 1, unknownCount: 0, excludedCount: 0 },
         });
-        explainModelGatewayEligibilityDecision.mockReturnValue({
-            status: 'eligible',
-            key: 'openrouter:new-model:default:exact_model:new-model',
-            summary: 'eligible:account_model_visible',
-            disposition: 'eligible',
-            hardExclusions: [],
-            softPenalties: [],
-            actionable: {
-                category: 'rankable',
-                dataNeeded: [],
-                probeSafe: false,
-                operatorHint: 'no_extra_action',
-            },
-            nextActions: ['candidate_can_be_ranked'],
-        });
+        explainModelGatewayEligibilityDecision.mockReturnValue(
+            explainModelGatewayEligibilityDecisionActual(eligibilityDecision),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'gateway eligibility new-model');
@@ -4670,21 +5357,35 @@ describe('terminal /byok command', () => {
 
     it('renderiza schema OpenAI normalizado com extensão x_model_gateway sem ANSI manual', async () => {
         mockProjection();
-        toOpenAIModelCatalogList.mockReturnValue({
-            object: 'list',
-            data: [
-                {
-                    id: 'openrouter:new-model',
-                    object: 'model',
-                    x_model_gateway: {
-                        provider_id: 'openrouter',
-                        provider_model: 'new-model',
-                        eligibility: { status: 'eligible' },
-                        route_options: [{ selectorKind: 'exact_model' }],
-                    },
-                },
-            ],
+        const openAiProjection = {
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            displayName: 'New Model',
+            openai: { id: 'openrouter:new-model' },
+        };
+        const openAiEligibility = createModelEligibilityDecisionActual({
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            include: true,
+            disposition: 'eligible',
+            reasons: ['account_model_visible'],
+            observedAt: '2026-06-01T00:00:00.000Z',
         });
+        const openAiRouteOption = {
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            selectorKind: 'exact_model',
+            selectorSyntax: 'new-model',
+        };
+        toOpenAIModelCatalogList.mockReturnValue(
+            toOpenAIModelCatalogListActual([openAiProjection], {
+                eligibilityDecisions: [openAiEligibility],
+                routeOptions: [openAiRouteOption],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'gateway catalog openai');
@@ -4701,24 +5402,38 @@ describe('terminal /byok command', () => {
 
     it('explica entrada do catálogo com camadas e fronteira sem runtime novo', async () => {
         mockProjection();
+        const catalogProjection = {
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            displayName: 'New Model',
+            lifecycle: 'active',
+            family: 'gpt',
+            openai: { id: 'openrouter:new-model' },
+        };
+        const catalogRouteOption = {
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            selectorKind: 'exact_model',
+            selectorSyntax: 'new-model',
+            normalizedPolicy: { routeLayer: 'catalog', wireApi: 'openai_chat_completions' },
+        };
+        const catalogEligibilityDecision = createModelEligibilityDecisionActual({
+            providerId: 'openrouter',
+            providerModel: 'new-model',
+            routeProfile: 'default',
+            include: true,
+            disposition: 'eligible',
+            reasons: ['account_model_visible'],
+            observedAt: '2026-06-01T00:00:00.000Z',
+        });
         explainModelGatewayCatalogEntry.mockReturnValue({
             found: true,
+            selector: 'new-model',
             key: 'openrouter:new-model:default',
-            projection: {
-                providerId: 'openrouter',
-                providerModel: 'new-model',
-                routeProfile: 'default',
-                displayName: 'New Model',
-                lifecycle: 'active',
-                family: 'gpt',
-            },
-            routeOptions: [
-                {
-                    selectorKind: 'exact_model',
-                    selectorSyntax: 'new-model',
-                    normalizedPolicy: { routeLayer: 'catalog', wireApi: 'openai_chat_completions' },
-                },
-            ],
+            projection: catalogProjection,
+            routeOptions: [catalogRouteOption],
             accountOverlays: [
                 {
                     accountScope: 'default',
@@ -4727,13 +5442,13 @@ describe('terminal /byok command', () => {
                     blockedModels: [],
                 },
             ],
-            eligibility: {
-                status: 'eligible',
-                summary: 'eligible:account_model_visible',
-                nextActions: ['candidate_can_be_ranked'],
-            },
-            openai: { id: 'openrouter:new-model' },
-            runtimeHealth: { status: 'ok' },
+            eligibility: explainModelGatewayEligibilityDecisionActual(catalogEligibilityDecision),
+            openai: toOpenAIModelCatalogEntryActual(catalogProjection, {
+                eligibilityDecisions: [catalogEligibilityDecision],
+                routeOptions: [catalogRouteOption],
+            }),
+            providerProjection: null,
+            runtimeHealth: { status: 'ok', record: { providerId: 'openrouter', providerModel: 'new-model' } },
             runtimeProbes: [{ kind: 'agent' }],
             metadataCoverage: {
                 confidenceFields: 2,
@@ -4763,6 +5478,7 @@ describe('terminal /byok command', () => {
         mockProjection();
         explainModelGatewayProviderEntry.mockReturnValue({
             found: true,
+            selector: 'openrouter',
             providerId: 'openrouter',
             sources: [
                 {
@@ -4780,6 +5496,7 @@ describe('terminal /byok command', () => {
             freshness: {
                 newestSourceAt: '2026-05-25T00:00:00.000Z',
                 oldestSourceAt: '2026-05-24T00:00:00.000Z',
+                sourceCount: 1,
             },
             providerProjection: {
                 displayName: 'OpenRouter',
@@ -4841,12 +5558,15 @@ describe('terminal /byok command', () => {
         searchModelGatewayCatalogEntries.mockReturnValue([
             {
                 key: 'openrouter:new-model:default',
+                providerId: 'openrouter',
+                providerModel: 'new-model',
                 score: 87,
                 eligibilityStatus: 'eligible',
                 displayName: 'New Model',
                 routeOptionCount: 2,
                 accountOverlayCount: 1,
                 matchedFields: ['displayName', 'providerModel'],
+                projection: { providerId: 'openrouter', providerModel: 'new-model', displayName: 'New Model' },
             },
         ]);
         const ctx = mockCtx();
@@ -4899,19 +5619,16 @@ describe('terminal /byok command', () => {
     });
 
     it('mostra health operacional persistido de BYOK', async () => {
-        readByokProviderHealthState.mockReturnValue({
-            enabled: true,
-            path: 'data/copilot-terminal/byok-provider-health.json',
-            loaded: true,
-            records: 1,
-            persistedRecords: 1,
-            flushScheduled: false,
-            flushInFlight: false,
-            dirty: false,
-            error: null,
-        });
+        readByokProviderHealthState.mockReturnValue(
+            byokHealthStateFixture({
+                enabled: true,
+                path: 'data/copilot-terminal/byok-provider-health.json',
+                records: 1,
+                persistedRecords: 1,
+            }),
+        );
         listByokProviderModelHealth.mockReturnValue([
-            {
+            byokHealthFixture({
                 key: 'kilo|kilo-code|kilo-auto/free',
                 routeProfile: 'kilo',
                 providerId: 'kilo-code',
@@ -4932,7 +5649,7 @@ describe('terminal /byok command', () => {
                     live_ask_user: { kind: 'live_ask_user', status: 'ok', ok: true, providerAttempted: true, count: 1 },
                     live_tool_protocol: { kind: 'live_tool_protocol', status: 'ok', ok: true, providerAttempted: true, count: 1 },
                 },
-            },
+            }),
         ]);
         mockProjection();
         const ctx = mockCtx();
@@ -4954,19 +5671,16 @@ describe('terminal /byok command', () => {
     });
 
     it('filtra health operacional BYOK por provider/model/profile', async () => {
-        readByokProviderHealthState.mockReturnValue({
-            enabled: true,
-            path: 'data/copilot-terminal/byok-provider-health.json',
-            loaded: true,
-            records: 2,
-            persistedRecords: 2,
-            flushScheduled: false,
-            flushInFlight: false,
-            dirty: false,
-            error: null,
-        });
+        readByokProviderHealthState.mockReturnValue(
+            byokHealthStateFixture({
+                enabled: true,
+                path: 'data/copilot-terminal/byok-provider-health.json',
+                records: 2,
+                persistedRecords: 2,
+            }),
+        );
         listByokProviderModelHealth.mockReturnValue([
-            {
+            byokHealthFixture({
                 key: 'repo|openrouter|openai/gpt-oss-120b',
                 routeProfile: 'repo_agent',
                 providerId: 'openrouter',
@@ -4978,8 +5692,8 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: null,
                 lastMessage: 'rate limit',
                 lastErrorContext: 'provider.rate_limit',
-            },
-            {
+            }),
+            byokHealthFixture({
                 key: 'tool|groq|openai/gpt-oss-120b',
                 routeProfile: 'tool_agent',
                 providerId: 'groq',
@@ -4991,7 +5705,7 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: Date.now(),
                 lastMessage: null,
                 lastErrorContext: null,
-            },
+            }),
         ]);
         mockProjection();
         const ctx = mockCtx();
@@ -5046,7 +5760,7 @@ describe('terminal /byok command', () => {
         process.env['COPILOT_BYOK_BASE_URL'] = 'https://stale.example/v1';
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'kilo',
                     preset: 'kilo-code',
                     providerType: 'openai',
@@ -5054,7 +5768,7 @@ describe('terminal /byok command', () => {
                     model: 'anthropic/claude-sonnet-4.5',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -5111,7 +5825,7 @@ describe('terminal /byok command', () => {
                 model: 'kilo-auto/free',
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValue({
+        listTerminalSdkSessionInventory.mockResolvedValue(sessionInventoryFixture({
             currentSessionId: 'sdk-kilo',
             lastSessionId: 'sdk-kilo',
             foregroundSessionId: 'sdk-kilo',
@@ -5125,7 +5839,7 @@ describe('terminal /byok command', () => {
             },
             lastBootDecision: null,
             sessions: [],
-        });
+        }));
         setTerminalModelProjection.mockReturnValueOnce({
             previousModel: 'kilo-auto/free',
             previousReasoningEffort: 'high',
@@ -5173,7 +5887,7 @@ describe('terminal /byok command', () => {
                 model: 'kilo-auto/free',
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValue({
+        listTerminalSdkSessionInventory.mockResolvedValue(sessionInventoryFixture({
             currentSessionId: 'sdk-openrouter',
             lastSessionId: 'sdk-openrouter',
             foregroundSessionId: 'sdk-openrouter',
@@ -5187,7 +5901,7 @@ describe('terminal /byok command', () => {
             },
             lastBootDecision: null,
             sessions: [],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
@@ -5325,7 +6039,7 @@ describe('terminal /byok command', () => {
         }));
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'kilo-free',
                     preset: 'kilo-code',
                     providerType: 'openai',
@@ -5333,13 +6047,13 @@ describe('terminal /byok command', () => {
                     model: 'kilo-auto/free',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
             summary: { enabled: true, ready: true, profile: 'kilo-free' },
         });
-        readTerminalByokGatewayProjectionFromEnv.mockReturnValue({
-            gatewayModels: [
-                {
+        readTerminalByokGatewayProjectionFromEnv.mockReturnValue(
+            terminalByokGatewayProjectionFixture([
+                gatewayModelInfoFixture({
                     id: 'kilo-auto/free',
                     capabilities: {
                         supports: { reasoningEffort: true, vision: true },
@@ -5349,27 +6063,33 @@ describe('terminal /byok command', () => {
                         freeTier: true,
                         pricing: { prompt: 0, completion: 0, request: null },
                         provider: 'kilo',
+                        providerModel: 'kilo-auto/free',
                         profile: 'kilo-free',
+                        routeProfile: 'kilo-free',
                         source: 'model-gateway',
                         inputModalities: ['text', 'image'],
+                        capabilities: { tools: true, vision: true, reasoningEffort: true },
                         rateLimits: { maxRequestTokens: 64000, tokensPerMinute: 120000 },
                     },
-                },
-                {
+                }),
+                gatewayModelInfoFixture({
                     id: 'tiny-chat-only',
-                    capabilities: { supports: { reasoningEffort: false, vision: false }, limits: { max_context_window_tokens: 4000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 4000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'small',
+                        providerModel: 'tiny-chat-only',
                         profile: 'small-free',
+                        routeProfile: 'small-free',
                         capabilities: { tools: false },
                         source: 'model-gateway',
                     },
-                },
-            ],
-            modelGateway: { providers: [], models: [] },
-            modelGatewayProjection: { providers: [], models: [] },
-        });
+                }),
+            ]),
+        );
         const ctx = mockCtx();
         const eventBus = { emit: vi.fn() };
 
@@ -5456,7 +6176,7 @@ describe('terminal /byok command', () => {
         }));
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'ollama',
                     preset: 'ollama-local',
                     providerType: 'openai',
@@ -5464,7 +6184,7 @@ describe('terminal /byok command', () => {
                     model: 'gemma3:4b',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
             summary: { enabled: true, ready: true, profile: 'remote-default' },
         });
@@ -5582,8 +6302,8 @@ describe('terminal /byok command', () => {
             fromCache: true,
             error: null,
         });
-        routeGatewayModels.mockImplementation((candidates) => {
-            const selectedModel = candidates.find((candidate) => candidate.providerModel === 'glm-4.5-flash') ?? candidates[0];
+        routeGatewayModels.mockImplementation((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/policy-engine.js').routeGatewayModels>[0]} */ candidates) => {
+            const selectedModel = candidates.find((candidate) => candidate['providerModel'] === 'glm-4.5-flash') ?? candidates[0];
             return {
                 profile: { id: 'code' },
                 selected: {
@@ -5665,7 +6385,7 @@ describe('terminal /byok command', () => {
         }));
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'remote-default',
                     preset: 'openrouter',
                     providerType: 'openai',
@@ -5673,10 +6393,10 @@ describe('terminal /byok command', () => {
                     model: 'openai/gpt-4.1-mini',
                     auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
             gatewayModels: [
-                {
+                gatewayModelInfoFixture({
                     id: 'gemma3:4b',
                     capabilities: {
                         supports: { reasoningEffort: false, vision: false },
@@ -5686,10 +6406,11 @@ describe('terminal /byok command', () => {
                         provider: 'ollama-local',
                         providerModel: 'gemma3:4b',
                         profile: 'ollama',
+                        routeProfile: 'ollama',
                         capabilities: { local: true, privacy: true, no_remote_secrets: true, tools: true, streaming: true },
                         source: 'model-gateway',
                     },
-                },
+                }),
             ],
             summary: { enabled: true, ready: true, profile: 'remote-default' },
         });
@@ -5798,18 +6519,19 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             gatewayModels: [
-                {
+                gatewayModelInfoFixture({
                     id: 'gateway-model',
                     capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 131072 } },
                     byok: {
                         gatewayId: 'openrouter:gateway-model',
+                        routeCandidateId: 'openrouter:gateway-model',
                         provider: 'openrouter',
                         providerModel: 'gateway-model',
                         source: 'env_compat',
                         supportsReasoning: true,
                         rateLimits: { maxRequestTokens: 64000 },
                     },
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -5967,7 +6689,7 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'openrouter-free',
                     preset: 'openrouter',
                     providerType: 'openai',
@@ -5975,8 +6697,8 @@ describe('terminal /byok command', () => {
                     model: 'openrouter/default',
                     auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: [],
-                },
-                {
+                }),
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -5984,7 +6706,7 @@ describe('terminal /byok command', () => {
                     model: 'groq/default',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
             summary: { enabled: true, ready: true, profile: 'openrouter-free' },
         });
@@ -6036,7 +6758,7 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'openrouter-free',
                     preset: 'openrouter',
                     providerType: 'openai',
@@ -6044,8 +6766,8 @@ describe('terminal /byok command', () => {
                     model: 'shared/free-model',
                     auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: [],
-                },
-                {
+                }),
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -6053,7 +6775,7 @@ describe('terminal /byok command', () => {
                     model: 'shared/free-model',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -6082,7 +6804,7 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'openrouter-free',
                     preset: 'openrouter',
                     providerType: 'openai',
@@ -6090,8 +6812,8 @@ describe('terminal /byok command', () => {
                     model: 'openrouter/default',
                     auth: { apiKeyConfigured: true, bearerTokenConfigured: false, headersConfigured: false },
                     metadataKeys: [],
-                },
-                {
+                }),
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -6099,7 +6821,7 @@ describe('terminal /byok command', () => {
                     model: 'groq/default',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -6147,7 +6869,7 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -6155,7 +6877,7 @@ describe('terminal /byok command', () => {
                     model: 'qwen/qwen3-32b',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: ['freeLimit'],
-                },
+                }),
             ],
             summary: { enabled: true, ready: true, profile: 'groq-free', preset: 'groq', providerType: 'openai' },
         });
@@ -6235,7 +6957,7 @@ describe('terminal /byok command', () => {
         });
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'groq-free',
                     preset: 'groq',
                     providerType: 'openai',
@@ -6243,7 +6965,7 @@ describe('terminal /byok command', () => {
                     model: 'qwen/qwen3-32b',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: ['freeLimit'],
-                },
+                }),
             ],
             summary: { enabled: true, ready: true, profile: 'groq-free', preset: 'groq', providerType: 'openai' },
         });
@@ -6263,7 +6985,7 @@ describe('terminal /byok command', () => {
         readByokProviderModelHealth.mockImplementation((input) => {
             const model = input.providerModel ?? input.model;
             return model === 'free-comfortable'
-                ? {
+                ? byokHealthFixture({
                       key: 'openrouter|openrouter|free-comfortable',
                       routeProfile: null,
                       providerId: 'openrouter',
@@ -6283,7 +7005,7 @@ describe('terminal /byok command', () => {
                       agentProbeSuccessCount: 1,
                       lastAgentProbeFailureAt: null,
                       lastAgentProbeSuccessAt: now,
-                  }
+                  })
                 : null;
         });
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
@@ -6364,7 +7086,7 @@ describe('terminal /byok command', () => {
         readByokProviderModelHealth.mockImplementation((input) => {
             const model = input.providerModel ?? input.model;
             return model === 'probe-ok'
-                ? {
+                ? byokHealthFixture({
                       key: 'kilo|kilo-code|probe-ok',
                       routeProfile: 'kilo',
                       providerId: 'kilo-code',
@@ -6387,9 +7109,9 @@ describe('terminal /byok command', () => {
                       lastAgentProbeSuccessAt: null,
                       lastAgentProbeMessage: null,
                       lastAgentProbeErrorContext: null,
-                  }
+                  })
                 : model === 'turn-ok'
-	                  ? {
+	                  ? byokHealthFixture({
 	                        key: 'kilo|kilo-code|turn-ok',
                             routeProfile: 'kilo',
                             providerId: 'kilo-code',
@@ -6412,7 +7134,7 @@ describe('terminal /byok command', () => {
                         lastAgentProbeSuccessAt: null,
                         lastAgentProbeMessage: null,
                         lastAgentProbeErrorContext: null,
-                    }
+                    })
 	                  : null;
         });
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
@@ -6451,7 +7173,7 @@ describe('terminal /byok command', () => {
     it('exclui de recommend safe modelo com falha operacional recente', async () => {
         const now = Date.now();
         listByokProviderModelHealth.mockReturnValue([
-            {
+            byokHealthFixture({
                 key: 'cerebras-free|cerebras|gpt-oss-120b',
                 routeProfile: 'cerebras-free',
                 providerId: 'cerebras',
@@ -6466,8 +7188,8 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: null,
                 lastMessage: 'Connection error',
                 lastErrorContext: 'model_call',
-            },
-            {
+            }),
+            byokHealthFixture({
                 key: 'kilo|kilo-code|kilo/healthy',
                 routeProfile: 'kilo',
                 providerId: 'kilo-code',
@@ -6487,7 +7209,7 @@ describe('terminal /byok command', () => {
                 agentProbeSuccessCount: 1,
                 lastAgentProbeFailureAt: null,
                 lastAgentProbeSuccessAt: now,
-            },
+            }),
         ]);
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
@@ -6529,7 +7251,7 @@ describe('terminal /byok command', () => {
     it('mostra falha operacional em models quando safe não foi solicitado', async () => {
         const now = Date.now();
         listByokProviderModelHealth.mockReturnValue([
-            {
+            byokHealthFixture({
                 key: 'cerebras-free|cerebras|gpt-oss-120b',
                 routeProfile: 'cerebras-free',
                 providerId: 'cerebras',
@@ -6544,7 +7266,7 @@ describe('terminal /byok command', () => {
                 lastSuccessAt: null,
                 lastMessage: 'Connection error',
                 lastErrorContext: 'model_call',
-            },
+            }),
         ]);
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
@@ -6642,7 +7364,7 @@ describe('terminal /byok command', () => {
         readByokProviderModelHealth.mockImplementation((input) => {
             const model = input.providerModel ?? input.model;
             return model === 'openrouter-roomy'
-                ? {
+                ? byokHealthFixture({
                       key: 'openrouter|openrouter|openrouter-roomy',
                       routeProfile: null,
                       providerId: 'openrouter',
@@ -6662,12 +7384,10 @@ describe('terminal /byok command', () => {
                       agentProbeSuccessCount: 1,
                       lastAgentProbeFailureAt: null,
                       lastAgentProbeSuccessAt: now,
-                  }
+                  })
                 : null;
         });
-        readTerminalRuntimeState.mockReturnValue({
-            contextWindow: { tokens: 63000, tokenLimit: 200000, utilization: 0.315 },
-        });
+        readTerminalRuntimeContextWindow.mockReturnValue({ tokens: 63000, tokenLimit: 200000, utilization: 0.315 });
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
                 {
@@ -6827,7 +7547,7 @@ describe('terminal /byok command', () => {
         );
         mockProjection({
             profiles: [
-                {
+                byokProfileFixture({
                     name: 'kilo',
                     preset: 'kilo-code',
                     providerType: 'openai',
@@ -6835,7 +7555,7 @@ describe('terminal /byok command', () => {
                     model: 'kilo-auto/free',
                     auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                     metadataKeys: [],
-                },
+                }),
             ],
         });
         const ctx = mockCtx();
@@ -6849,7 +7569,8 @@ describe('terminal /byok command', () => {
             expect.stringContaining('COPILOT_BYOK_PROFILE=kilo'),
             expect.objectContaining({ mode: 0o600 }),
         );
-        const written = String(writeFile.mock.calls[0][1]);
+        const writeCall = requireFixtureIndex(writeFile.mock.calls, 0, 'persist profile writeFile call');
+        const written = String(requireFixtureIndex(writeCall, 1, 'persist profile writeFile payload'));
         expect(written).toContain('COPILOT_BYOK_ENABLED=true');
         expect(written).not.toContain('COPILOT_BYOK_MODEL=old-model');
         expect(written).toContain('KILO_CODE_API_KEY=existing-secret');
@@ -6874,7 +7595,8 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'persist sdk');
 
-        const written = String(writeFile.mock.calls[0][1]);
+        const writeCall = requireFixtureIndex(writeFile.mock.calls, 0, 'persist sdk writeFile call');
+        const written = String(requireFixtureIndex(writeCall, 1, 'persist sdk writeFile payload'));
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('false');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();
         expect(written).toContain('COPILOT_BYOK_ENABLED=false');

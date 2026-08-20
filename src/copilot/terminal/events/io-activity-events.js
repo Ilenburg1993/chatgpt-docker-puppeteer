@@ -260,7 +260,7 @@ function recordRecentIoOperation(entry) {
 
 /**
  * @param {TerminalIoOperationMessage} message
- * @param {ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null} registry
+ * @param {ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry> | null} registry
  * @returns {void}
  */
 function handleIoOperation(message, registry = null) {
@@ -340,7 +340,7 @@ function handleIoOperation(message, registry = null) {
  * Conecta operações reais da engine de I/O ao terminal.
  *
  * @param {{
- *     registry?: ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry> | null;
+ *     registry?: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry> | null;
  * }} [options]
  * @returns {() => void}
  */

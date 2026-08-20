@@ -152,7 +152,7 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import { useSystemStore } from '@/stores/system';
 import { computed, onMounted } from 'vue';
 
@@ -164,7 +164,7 @@ export default {
 
         // Overall status label
         const overallLabel = computed(() => {
-            const map = {
+            const map: Record<string, string> = {
                 healthy: 'Saudável',
                 warning: 'Atenção',
                 critical: 'Crítico',
@@ -185,11 +185,16 @@ export default {
 
         // Health counts summary
         const healthyCounts = computed(() => {
-            const counts = { healthy: 0, warning: 0, critical: 0, unknown: 0 };
+            const counts: Record<'healthy' | 'warning' | 'critical' | 'unknown', number> = {
+                healthy: 0,
+                warning: 0,
+                critical: 0,
+                unknown: 0,
+            };
             system.componentsList.forEach((comp) => {
                 const status = comp.status;
-                if (counts[status] !== undefined) {
-                    counts[status]++;
+                if (status in counts) {
+                    counts[status as keyof typeof counts]++;
                 } else {
                     counts.unknown++;
                 }
@@ -198,8 +203,8 @@ export default {
         });
 
         // Format component name
-        function formatComponentName(name) {
-            const map = {
+        function formatComponentName(name: string) {
+            const map: Record<string, string> = {
                 api: 'API Server',
                 queue: 'Task Queue',
                 memory: 'Memory',
@@ -212,12 +217,12 @@ export default {
         }
 
         // Format metric label
-        function formatMetricLabel(key) {
+        function formatMetricLabel(key: string) {
             return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         }
 
         // Format metric value
-        function formatMetricValue(value) {
+        function formatMetricValue(value: unknown) {
             if (typeof value === 'number') {
                 if (value > 1000) return `${(value / 1000).toFixed(1)}k`;
                 if (Number.isFinite(value)) return value.toFixed(1);
@@ -226,7 +231,7 @@ export default {
         }
 
         // Format uptime seconds
-        function formatUptime(seconds) {
+        function formatUptime(seconds: number | null | undefined) {
             if (!seconds) return '-';
             const s = Math.floor(seconds);
             const days = Math.floor(s / 86400);
@@ -238,7 +243,7 @@ export default {
         }
 
         // Format timestamp
-        function formatTime(timestamp) {
+        function formatTime(timestamp: string | number | Date | null | undefined) {
             if (!timestamp) return '-';
             const date = new Date(timestamp);
             return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });

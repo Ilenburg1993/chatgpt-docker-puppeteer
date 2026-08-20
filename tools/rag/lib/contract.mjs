@@ -12,18 +12,18 @@ export const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text:latest';
 // Base URL for LOCAL Ollama (embeddings only - v5.0)
 // Generation models use cloud URL (https://ollama.com) - see OllamaClient
 // Fallback: Uses OLLAMA_LOCAL_BASE_URL env var if set
-export const DEFAULT_OLLAMA_BASE_URL = process.env.OLLAMA_LOCAL_BASE_URL || 'http://host.docker.internal:11434/v1';
+export const DEFAULT_OLLAMA_BASE_URL = process.env['OLLAMA_LOCAL_BASE_URL'] || 'http://host.docker.internal:11434/v1';
 
 function parsePositiveInt(/** @type {any} */ rawValue, /** @type {any} */ fallback) {
     const parsed = Number.parseInt(String(rawValue ?? ''), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export const DEFAULT_OLLAMA_EMBED_MAX_CHARS = parsePositiveInt(process.env.OLLAMA_EMBED_MAX_CHARS, 8000);
+export const DEFAULT_OLLAMA_EMBED_MAX_CHARS = parsePositiveInt(process.env['OLLAMA_EMBED_MAX_CHARS'], 8000);
 
 // AST-aware chunking tuning knobs (overridable by env).
-export const RAG_CHUNK_TARGET_CHARS = parsePositiveInt(process.env.RAG_CHUNK_TARGET_CHARS, 1800);
-export const RAG_CHUNK_MAX_CHARS = parsePositiveInt(process.env.RAG_CHUNK_MAX_CHARS, 2800);
+export const RAG_CHUNK_TARGET_CHARS = parsePositiveInt(process.env['RAG_CHUNK_TARGET_CHARS'], 1800);
+export const RAG_CHUNK_MAX_CHARS = parsePositiveInt(process.env['RAG_CHUNK_MAX_CHARS'], 2800);
 
 // Backward-compatible constants consumed by legacy chunkers.
 export const MAX_CHUNK_CHARS_CODE = Math.min(RAG_CHUNK_TARGET_CHARS, RAG_CHUNK_MAX_CHARS);

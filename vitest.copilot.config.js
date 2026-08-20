@@ -39,7 +39,7 @@ function buildAliasFromImports() {
     return alias;
 }
 
-const copilotCacheDir = process.env.VITEST_CACHE_DIR ?? `${homedir()}/.cache/vitest/copilot`;
+const copilotCacheDir = process.env['VITEST_CACHE_DIR'] ?? `${homedir()}/.cache/vitest/copilot`;
 
 export default defineConfig({
     cacheDir: copilotCacheDir,
@@ -58,8 +58,8 @@ export default defineConfig({
         ],
         hookTimeout: 60000,
         testTimeout: 15000,
-        pool: process.env.VITEST_POOL ?? 'threads',
-        maxWorkers: process.env.VITEST_MAX_WORKERS ?? '50%',
+        pool: process.env['VITEST_POOL'] ?? 'threads',
+        maxWorkers: process.env['VITEST_MAX_WORKERS'] ?? '50%',
         fileParallelism: true,
         coverage: {
             provider: 'v8',

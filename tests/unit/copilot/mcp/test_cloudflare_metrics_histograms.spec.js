@@ -17,7 +17,7 @@ describe('cloudflared metrics histograms', () => {
         ]);
 
         const rpc = /** @type {{ count: number; averageMs: number; p95Ms: number; finiteBucketCoverage: number; hasInfiniteBucket: boolean }} */ (
-            summary.rpcClientLatency
+            summary['rpcClientLatency']
         );
         assert.equal(rpc.count, 100);
         assert.equal(rpc.averageMs, 200);

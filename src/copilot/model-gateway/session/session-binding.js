@@ -20,23 +20,32 @@ import { assertModelGatewaySecretRegistryPort } from '../control-plane/ports.js'
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function record(value) {
-    return value && typeof value === 'object' ? /** @type {Record<string, any>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+}
+
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+function optionalString(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 /**
- * @param {Record<string, any>} adaptedProvider
- * @param {Record<string, any>} legacyProvider
- * @returns {Record<string, any>}
+ * @param {import('#copilot/sdk/types').ProviderConfig} adaptedProvider
+ * @param {import('#copilot/sdk/types').ProviderConfig} legacyProvider
+ * @returns {import('#copilot/sdk/types').ProviderConfig}
  */
 function mergeCompatibilityProviderDetails(adaptedProvider, legacyProvider) {
-    const adaptedHeaders = record(adaptedProvider['headers']);
-    const legacyHeaders = record(legacyProvider['headers']);
+    const adaptedHeaders = adaptedProvider.headers ?? {};
+    const legacyHeaders = legacyProvider.headers ?? {};
     return {
         ...adaptedProvider,
-        ...(legacyProvider['azure'] ? { azure: legacyProvider['azure'] } : {}),
+        ...(legacyProvider.azure ? { azure: legacyProvider.azure } : {}),
         ...(Object.keys(adaptedHeaders).length > 0 || Object.keys(legacyHeaders).length > 0
             ? { headers: { ...adaptedHeaders, ...legacyHeaders } }
             : {}),
@@ -88,17 +97,18 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
     const secrets = assertModelGatewaySecretRegistryPort(
         createEnvSecretRegistry({ env: effectiveEnv, keys: secretRefs.allowedRefs }),
     );
-    const adapted = adapter['toCopilotSessionOverrides']({
+    const adapted = adapter.toCopilotSessionOverrides({
         provider,
         model,
         secrets,
     });
-    const adaptedProvider = record(adapted['provider']);
-    const legacyProvider = record(legacy.provider);
-    const modelId = typeof record(model)['id'] === 'string' ? record(model)['id'] : `${providerId}:${legacy.model}`;
-    const adapterId = typeof adapter['id'] === 'string' ? adapter['id'] : 'openai-compatible';
-    const adaptedCapabilities = record(adapted['modelCapabilities']);
-    const supports = record(adaptedCapabilities['supports']);
+    const adaptedProvider = adapted.provider;
+    const legacyProvider = legacy.provider;
+    const modelRecord = record(model);
+    const modelId = optionalString(modelRecord['id']) ?? `${providerId}:${legacy.model}`;
+    const adapterId = optionalString(adapter.id) ?? 'openai-compatible';
+    const adaptedCapabilities = adapted.modelCapabilities;
+    const supports = adaptedCapabilities.supports;
     const sdkReasoningEffort =
         legacy.summary.capabilities.sdkReasoningEffort === true && supports['reasoningEffort'] === true;
     const active = record(imported.active);
@@ -106,18 +116,18 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
         active['bindingSource'] === 'gateway_route' || active['bindingSource'] === 'gateway_profile'
             ? active['bindingSource']
             : 'env_compat';
+    const providerProfile =
+        optionalString(active['gatewayProfile']) ?? optionalString(active['profile']) ?? optionalString(active['preset']);
     const identity = createModelGatewayModelIdentity({
         providerId,
-        providerModel: adapted['model'],
-        providerProfile: active['gatewayProfile'] ?? active['profile'] ?? active['preset'] ?? null,
+        providerModel: adapted.model,
+        providerProfile,
     });
 
     return {
         ...legacy,
-        provider: /** @type {import('#copilot/sdk/types').ProviderConfig} */ (
-            mergeCompatibilityProviderDetails(adaptedProvider, legacyProvider)
-        ),
-        model: adapted['model'],
+        provider: mergeCompatibilityProviderDetails(adaptedProvider, legacyProvider),
+        model: adapted.model,
         modelCapabilities:
             Object.keys(adaptedCapabilities).length > 0
                 ? {
@@ -131,7 +141,7 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
         supportsReasoning: sdkReasoningEffort,
         summary: {
             ...legacy.summary,
-            model: adapted['model'],
+            model: adapted.model,
             capabilities: {
                 ...legacy.summary.capabilities,
                 sdkReasoningEffort,
@@ -142,7 +152,7 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
             source: bindingSource,
             providerId,
             modelId,
-            providerModel: adapted['model'],
+            providerModel: adapted.model,
             adapterId,
             identity,
         },

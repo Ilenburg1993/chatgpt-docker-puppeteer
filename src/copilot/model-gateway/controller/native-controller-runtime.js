@@ -2,8 +2,9 @@
 /**
  * Read-only runtime adapter for native Copilot controller selection.
  *
- * It opens a short-lived terminal-mode SDK client only to inspect account-visible models and account quota. No LLM turn
- * is sent. The resulting data is passed to the pure Controller Selection Plane.
+ * The controller depends only on a tiny inspection session: connect, list account-visible models, read quota and close.
+ * The default adapter wraps the concrete Copilot SDK client/manager behind that structural port, while tests and future
+ * substrates can implement the same capabilities without impersonating a CopilotClient.
  *
  * @module copilot/model-gateway/controller/native-controller-runtime
  */
@@ -11,55 +12,89 @@
 import { buildModelGatewayControllerSelectionPlan } from './controller-selection.js';
 
 /**
+ * @typedef {object} ModelGatewayControllerQuotaInspection
+ * @property {unknown} [quotaSnapshots]
+ * @property {string} [error]
+ */
+
+/**
+ * @typedef {object} ModelGatewayControllerInspectionSession
+ * @property {() => Promise<void>} connect
+ * @property {() => Promise<unknown[]>} listModels
+ * @property {() => Promise<ModelGatewayControllerQuotaInspection>} readQuota
+ * @property {() => Promise<number>} close
+ */
+
+/**
+ * @returns {Promise<ModelGatewayControllerInspectionSession>}
+ */
+async function createDefaultInspectionSession() {
+    // Keep metadata-only Model Gateway imports cheap. The SDK client is retained only when native inspection is invoked.
+    const [clientModule, healthModule] = await Promise.all([
+        import('#copilot/sdk/session/client'),
+        import('#copilot/sdk/telemetry/health'),
+    ]);
+    const manager = new clientModule.CopilotClientManager({ createClient: clientModule.createTerminalCopilotClient });
+    /** @type {import('@github/copilot-sdk').CopilotClient | null} */
+    let client = null;
+    return {
+        async connect() {
+            client = await manager.getClient();
+        },
+        async listModels() {
+            if (!client) throw new Error('[model-gateway/controller] native inspection session is not connected');
+            return client.listModels();
+        },
+        async readQuota() {
+            if (!client) throw new Error('[model-gateway/controller] native inspection session is not connected');
+            return healthModule.getQuota(client);
+        },
+        async close() {
+            return (await manager.stopClient()).length;
+        },
+    };
+}
+
+/**
  * @param {{
- *   byokRoutes?: Record<string, any>[];
- *   currentController?: Record<string, any> | null;
+ *   byokRoutes?: unknown[];
+ *   currentController?: Record<string, unknown> | null;
  *   now?: string | number | Date;
  *   minContextWindowTokens?: number;
  *   maxAgentProofAgeMs?: number;
  *   allowOpaqueSdkAutoFallback?: boolean;
  *   deps?: {
- *     createManager?: () => { getClient: () => Promise<any>; stopClient: () => Promise<any[]> };
- *     readQuota?: (client: any) => Promise<any>;
+ *     createInspectionSession?: () => ModelGatewayControllerInspectionSession | Promise<ModelGatewayControllerInspectionSession>;
  *   };
  * }} [options]
  */
 export async function resolveModelGatewayNativeControllerSelection(options = {}) {
-    let createManager = options.deps?.createManager;
-    let readQuota = options.deps?.readQuota;
-    if (!createManager || !readQuota) {
-        // Keep the controller's pure selection plane cheap to import. Pulling the SDK client into the top-level
-        // model-gateway barrel can retain SDK resources even for metadata-only CLI commands that never need a client.
-        // The native substrate is therefore loaded only when this runtime adapter is actually invoked.
-        const [clientModule, healthModule] = await Promise.all([
-            import('#copilot/sdk/session/client'),
-            import('#copilot/sdk/telemetry/health'),
-        ]);
-        createManager ??= () =>
-            new clientModule.CopilotClientManager({ createClient: clientModule.createTerminalCopilotClient });
-        readQuota ??= healthModule.getQuota;
-    }
-    const manager = createManager();
+    const createInspectionSession = options.deps?.createInspectionSession ?? createDefaultInspectionSession;
+    const session = await createInspectionSession();
     let clientConnected = false;
-    /** @type {any[]} */
+    /** @type {unknown[]} */
     let models = [];
+    /** @type {ModelGatewayControllerQuotaInspection | null} */
     let quota = null;
+    /** @type {string | null} */
     let modelListError = null;
+    /** @type {string | null} */
     let quotaError = null;
+    /** @type {string | null} */
     let connectionError = null;
     /** @type {number} */
     let cleanupErrorCount;
     try {
-        const client = await manager.getClient();
+        await session.connect();
         clientConnected = true;
         try {
-            models = await client.listModels();
+            models = await session.listModels();
         } catch (error) {
             modelListError = error instanceof Error ? error.message : String(error);
         }
         try {
-            quota = await readQuota(client);
-            if (quota?.error) quotaError = String(quota.error);
+            quota = await session.readQuota();
+            if (quota.error) quotaError = quota.error;
         } catch (error) {
             quotaError = error instanceof Error ? error.message : String(error);
         }
@@ -67,7 +102,7 @@ export async function resolveModelGatewayNativeControllerSelection(options = {})
         connectionError = error instanceof Error ? error.message : String(error);
     } finally {
         try {
-            cleanupErrorCount = (await manager.stopClient()).length;
+            cleanupErrorCount = await session.close();
         } catch {
             cleanupErrorCount = 1;
         }

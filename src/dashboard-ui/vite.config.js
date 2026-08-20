@@ -15,7 +15,7 @@ export default defineConfig({
             algorithms: ['brotliCompress', 'gzip'],
             exclude: [/\.(br)$/, /\.(gz)$/],
         }),
-        process.env.ANALYZE === 'true'
+        process.env['ANALYZE'] === 'true'
             ? visualizer({
                   open: false,
                   filename: 'dist/stats.html',
@@ -122,8 +122,6 @@ export default defineConfig({
                 },
                 assetFileNames: (assetInfo) => {
                     const name = assetInfo.name ?? 'asset';
-                    const info = name.split('.');
-                    const extType = info[info.length - 1];
                     if (/\.(png|jpe?g|svg|gif|tiff|bmp|ico)$/i.test(name)) {
                         return `assets/images/[name]-[hash][extname]`;
                     }

@@ -164,8 +164,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             if (origStatusDescriptor) {
                 Object.defineProperty(alwaysAliveAgent, 'status', origStatusDescriptor);
             } else {
-                // @ts-expect-error — propriedade de teste definida dinamicamente
-                delete alwaysAliveAgent.status;
+                Reflect.deleteProperty(alwaysAliveAgent, 'status');
             }
             client.clearHistory();
         }
@@ -206,8 +205,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             if (origStatusDescriptor) {
                 Object.defineProperty(alwaysAliveAgent, 'status', origStatusDescriptor);
             } else {
-                // @ts-expect-error — propriedade de teste definida dinamicamente
-                delete alwaysAliveAgent.status;
+                Reflect.deleteProperty(alwaysAliveAgent, 'status');
             }
             client.clearHistory();
         }
@@ -239,8 +237,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             assert.ok(Array.isArray(result.chunks), 'chunks deve ser array');
         } finally {
             alwaysAliveAgent.sendMessage = sendMessageOrig;
-            // @ts-expect-error — propriedade de teste definida dinamicamente
-            delete alwaysAliveAgent.status;
+            Reflect.deleteProperty(alwaysAliveAgent, 'status');
             client.clearHistory();
         }
     });
@@ -281,8 +278,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             assert.strictEqual(result.response, 'Resposta com headers');
         } finally {
             alwaysAliveAgent.sendMessage = sendMessageOrig;
-            // @ts-expect-error — propriedade de teste definida dinamicamente
-            delete alwaysAliveAgent.status;
+            Reflect.deleteProperty(alwaysAliveAgent, 'status');
             client.clearHistory();
         }
     });
@@ -311,8 +307,7 @@ describe('LlmBridgeClient › coleta de streaming via AlwaysAliveAgent', () => {
             assert.strictEqual(client.turnCount, 1);
         } finally {
             alwaysAliveAgent.sendMessage = sendMessageOrig;
-            // @ts-expect-error — propriedade de teste definida dinamicamente
-            delete alwaysAliveAgent.status;
+            Reflect.deleteProperty(alwaysAliveAgent, 'status');
             client.clearHistory();
         }
     });

@@ -2,6 +2,7 @@
 
 export {
     readTerminalByokProjection,
+    readTerminalByokRuntimeConfigProjection,
     listTerminalAvailableModelsProjection,
     observeTerminalModelChangeProjection,
     readTerminalByokGatewayProjectionFromEnv,

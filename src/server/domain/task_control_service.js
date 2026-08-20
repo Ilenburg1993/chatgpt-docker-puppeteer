@@ -287,13 +287,13 @@ function createTaskCommand({ actor = {}, reason, payload = {}, ifNotExists = fal
     const actorView = asRecord(actor);
     const payloadView = asRecord(payload);
     const task = _buildTaskV5FromPayload(payloadView);
-    const stage = String(payloadView.stage || TASK_STAGES.READY).toUpperCase();
-    const status = String(payloadView.status || 'PENDING').toUpperCase();
+    const stage = String(payloadView['stage'] || TASK_STAGES.READY).toUpperCase();
+    const status = String(payloadView['status'] || 'PENDING').toUpperCase();
     const created = /** @type {any} */ (
         insertTask(task, {
             stage,
             status,
-            actor: String(actorView.username || actorView.id || 'user'),
+            actor: String(actorView['username'] || actorView['id'] || 'user'),
             ifNotExists,
         })
     );
@@ -354,41 +354,43 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
         ...existingTask,
         meta: {
             ...(existingTask.meta || {}),
-            ...(patchView.meta && typeof patchView.meta === 'object' ? patchView.meta : {}),
+            ...(patchView['meta'] && typeof patchView['meta'] === 'object' ? patchView['meta'] : {}),
             priority:
-                patchView.priority !== undefined
-                    ? Number(patchView.priority) || Number(existingTask?.meta?.priority || 5)
+                patchView['priority'] !== undefined
+                    ? Number(patchView['priority']) || Number(existingTask?.meta?.priority || 5)
                     : Number(existingTask?.meta?.priority || 5),
         },
         spec: {
             ...(existingTask.spec || {}),
-            ...(patchView.spec && typeof patchView.spec === 'object' ? patchView.spec : {}),
+            ...(patchView['spec'] && typeof patchView['spec'] === 'object' ? patchView['spec'] : {}),
             target:
-                patchView.target !== undefined
-                    ? String(patchView.target).toLowerCase().trim()
+                patchView['target'] !== undefined
+                    ? String(patchView['target']).toLowerCase().trim()
                     : existingTask.spec?.target,
-            model: patchView.model !== undefined ? patchView.model : existingTask.spec?.model,
+            model: patchView['model'] !== undefined ? patchView['model'] : existingTask.spec?.model,
             payload: {
                 ...(existingTask.spec?.payload || {}),
                 ...(() => {
-                    const patchSpec = asRecord(patchView.spec);
-                    return patchSpec.payload && typeof patchSpec.payload === 'object' ? patchSpec.payload : {};
+                    const patchSpec = asRecord(patchView['spec']);
+                    return patchSpec['payload'] && typeof patchSpec['payload'] === 'object' ? patchSpec['payload'] : {};
                 })(),
-                ...(patchView.user_message !== undefined ? { user_message: String(patchView.user_message || '') } : {}),
-                ...(patchView.system_message !== undefined
-                    ? { system_message: String(patchView.system_message || '') }
+                ...(patchView['user_message'] !== undefined
+                    ? { user_message: String(patchView['user_message'] || '') }
+                    : {}),
+                ...(patchView['system_message'] !== undefined
+                    ? { system_message: String(patchView['system_message'] || '') }
                     : {}),
             },
         },
         policy: {
             ...(existingTask.policy || {}),
-            ...(patchView.policy && typeof patchView.policy === 'object' ? patchView.policy : {}),
-            ...(patchView.execute_after_ms !== undefined
+            ...(patchView['policy'] && typeof patchView['policy'] === 'object' ? patchView['policy'] : {}),
+            ...(patchView['execute_after_ms'] !== undefined
                 ? {
                       execute_after:
-                          patchView.execute_after_ms === null
+                          patchView['execute_after_ms'] === null
                               ? null
-                              : new Date(Number(patchView.execute_after_ms) || Date.now()).toISOString(),
+                              : new Date(Number(patchView['execute_after_ms']) || Date.now()).toISOString(),
                   }
                 : {}),
         },
@@ -396,13 +398,15 @@ function patchTaskCommand({ taskId, actor = {}, reason, ifVersion = null, patch 
 
     const updated = updateTask(taskId, {
         task: nextTask,
-        stage: patchView.stage ? String(patchView.stage).toUpperCase() : undefined,
-        status: patchView.status ? String(patchView.status).toUpperCase() : undefined,
-        execute_after_ms: patchView.execute_after_ms,
-        dependencies: patchView.dependencies,
-        blocked_reason: patchView.blocked_reason,
+        stage: patchView['stage'] ? String(patchView['stage']).toUpperCase() : undefined,
+        status: patchView['status'] ? String(patchView['status']).toUpperCase() : undefined,
+        execute_after_ms: patchView['execute_after_ms'],
+        dependencies: patchView['dependencies'],
+        blocked_reason: patchView['blocked_reason'],
         blocked_details_json:
-            patchView.blocked_details !== undefined ? JSON.stringify(patchView.blocked_details ?? null) : undefined,
+            patchView['blocked_details'] !== undefined
+                ? JSON.stringify(patchView['blocked_details'] ?? null)
+                : undefined,
     });
     const updatedView = /** @type {any} */ (updated);
 
@@ -812,13 +816,13 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                     result = patchTaskCommand({ taskId, actor, reason, patch: { stage: 'REJECTED' } });
                     break;
                 case TaskControlCommand.SET_STAGE:
-                    result = patchTaskCommand({ taskId, actor, reason, patch: { stage: paramsView.stage } });
+                    result = patchTaskCommand({ taskId, actor, reason, patch: { stage: paramsView['stage'] } });
                     break;
                 case TaskControlCommand.SET_TARGET:
-                    result = patchTaskCommand({ taskId, actor, reason, patch: { target: paramsView.target } });
+                    result = patchTaskCommand({ taskId, actor, reason, patch: { target: paramsView['target'] } });
                     break;
                 case TaskControlCommand.SET_PRIORITY:
-                    result = patchTaskCommand({ taskId, actor, reason, patch: { priority: paramsView.priority } });
+                    result = patchTaskCommand({ taskId, actor, reason, patch: { priority: paramsView['priority'] } });
                     break;
                 case TaskControlCommand.SET_EXECUTE_AFTER:
                     result = patchTaskCommand({
@@ -826,7 +830,7 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         actor,
                         reason,
                         patch: {
-                            execute_after_ms: paramsView.execute_after_ms ?? null,
+                            execute_after_ms: paramsView['execute_after_ms'] ?? null,
                         },
                     });
                     break;
@@ -836,19 +840,22 @@ function bulkTaskActionCommand({ ids = [], action, params = {}, actor = {}, reas
                         actor,
                         reason,
                         patch: {
-                            dependencies: paramsView.dependencies || [],
+                            dependencies: paramsView['dependencies'] || [],
                         },
                     });
                     break;
-                case TaskControlCommand.REASSIGN_MISSION:
+                case TaskControlCommand.REASSIGN_MISSION: {
+                    const missionId = paramsView['mission_id'];
+                    const ifVersion = paramsView['if_version'];
                     result = reassignTaskMissionCommand({
                         taskId,
-                        missionId: /** @type {any} */ (paramsView.mission_id),
+                        missionId: missionId == null ? null : String(missionId),
                         actor,
                         reason,
-                        ifVersion: /** @type {any} */ (paramsView.if_version),
+                        ifVersion: ifVersion == null ? null : String(ifVersion),
                     });
                     break;
+                }
                 default:
                     throw _error(422, 'TASK_BULK_ACTION_INVALID', `Ação não suportada: ${action}`);
             }

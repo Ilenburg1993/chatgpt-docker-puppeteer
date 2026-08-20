@@ -27,3 +27,8 @@ export {
     riskForDryRun,
     riskForOverwrite,
 } from '../policy/index.js';
+
+export {
+    createValidatedMutableWorkspacePath,
+    createValidatedReadWorkspacePath,
+} from '../io/policy/validated-path.js';

@@ -33,7 +33,7 @@ function estimateMessageTokens(message) {
 }
 
 /**
- * @param {ReturnType<import('#copilot/config').readConfiguredByokSummary>} byok
+ * @param {ReturnType<typeof import('#copilot/config').readConfiguredByokSummary>} byok
  * @returns {number | null}
  */
 function readByokRequestLimit(byok) {
@@ -41,7 +41,7 @@ function readByokRequestLimit(byok) {
 }
 
 /**
- * @param {ReturnType<import('#copilot/config').readConfiguredByokSummary>} byok
+ * @param {ReturnType<typeof import('#copilot/config').readConfiguredByokSummary>} byok
  * @param {number} estimatedRequestTokens
  * @param {number | null} utilization
  * @param {{ subject: string; lowLimitBlocks?: boolean }} options
@@ -113,8 +113,8 @@ function classifyByokEstimate(byok, estimatedRequestTokens, utilization, options
 }
 
 /**
- * @param {ReturnType<import('#copilot/config').readConfiguredByokSummary>} byok
- * @param {ReturnType<import('../frontend/index.js').readTerminalRuntimeState>} runtimeState
+ * @param {ReturnType<typeof import('#copilot/config').readConfiguredByokSummary>} byok
+ * @param {ReturnType<typeof import('../frontend/index.js').readTerminalRuntimeState>} runtimeState
  * @param {string} message
  * @returns {ReturnType<typeof classifyByokEstimate>}
  */
@@ -140,7 +140,7 @@ export function evaluateTerminalByokTurnBudget(byok, runtimeState, message) {
 }
 
 /**
- * @param {ReturnType<import('#copilot/config').readConfiguredByokSummary>} byok
+ * @param {ReturnType<typeof import('#copilot/config').readConfiguredByokSummary>} byok
  * @param {'chat' | 'agent'} mode
  * @param {string} prompt
  * @returns {ReturnType<typeof classifyByokEstimate>}

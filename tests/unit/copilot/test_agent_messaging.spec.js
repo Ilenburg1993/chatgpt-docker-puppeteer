@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/test_agent_messaging.spec.js
  *
@@ -223,11 +222,11 @@ describe('agent-messaging › processQueue', () => {
         const ctx = new AgentContext(emitter);
         ctx.status = 'idle';
         ctx.isDialogLoopActive = () => true;
-        /** @type {((event: any) => void) | null} */
+        /** @type {((event: unknown) => void) | null} */
         let sessionEventHandler = null;
         ctx.session = /** @type {any} */ ({
             sessionId: 'test-dialog-active',
-            on: (eventName, handler) => {
+            on: (/** @type {string} */ eventName, /** @type {(event: unknown) => void} */ handler) => {
                 if (eventName === 'assistant.message_delta') sessionEventHandler = handler;
                 return () => {};
             },
@@ -272,10 +271,10 @@ describe('agent-messaging › processQueue', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
         ctx.status = 'idle';
-        let sessionHandler = /** @type {((event: any) => void) | null} */ (null);
+        let sessionHandler = /** @type {((event: unknown) => void) | null} */ (null);
         ctx.session = /** @type {any} */ ({
             sessionId: 'sess-rate-limit',
-            on: (/** @type {string | ((event: any) => void)} */ eventName, /** @type {unknown} */ handler) => {
+            on: (/** @type {string | ((event: unknown) => void)} */ eventName, /** @type {unknown} */ _handler) => {
                 if (typeof eventName === 'function') {
                     sessionHandler = eventName;
                     return () => {};
@@ -311,10 +310,10 @@ describe('agent-messaging › processQueue', () => {
         const emitter = new EventEmitter();
         const ctx = new AgentContext(emitter);
         ctx.status = 'idle';
-        let sessionHandler = /** @type {((event: any) => void) | null} */ (null);
+        let sessionHandler = /** @type {((event: unknown) => void) | null} */ (null);
         ctx.session = /** @type {any} */ ({
             sessionId: 'sess-network-retry',
-            on: (/** @type {string | ((event: any) => void)} */ eventName, /** @type {unknown} */ handler) => {
+            on: (/** @type {string | ((event: unknown) => void)} */ eventName, /** @type {unknown} */ _handler) => {
                 if (typeof eventName === 'function') {
                     sessionHandler = eventName;
                     return () => {};

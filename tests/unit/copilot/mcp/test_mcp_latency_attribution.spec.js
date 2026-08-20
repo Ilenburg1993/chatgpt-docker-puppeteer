@@ -127,6 +127,7 @@ function aggregateOperational(overrides = {}) {
 describe('MCP latency attribution', () => {
     it('reconstructs historical burst gaps, preserves concurrency and excludes long idle pauses', () => {
         const base = Date.parse('2026-08-18T10:00:00.000Z');
+        /** @param {number} offsetMs @param {string} name @param {string} callId @param {string} tool @param {string | undefined} [edgeColo] */
         const event = (offsetMs, name, callId, tool, edgeColo) => ({
             ts: new Date(base + offsetMs).toISOString(),
             event: name,
@@ -154,11 +155,13 @@ describe('MCP latency attribution', () => {
         );
         assert.equal(history.interactiveGapCount, 3);
         assert.equal(history.idleExcludedCount, 1);
-        assert.equal(history.windows['15m'].count, 3);
-        assert.equal(history.windows['15m'].idleExcluded, 1);
-        assert.equal(history.windows['15m'].averageMs, 1_500);
-        assert.equal(history.windows['15m'].p50Ms, 1_700);
-        assert.equal(history.windows['15m'].p95Ms, 1_900);
+        const window15m = history.windows['15m'];
+        assert.ok(window15m);
+        assert.equal(window15m.count, 3);
+        assert.equal(window15m.idleExcluded, 1);
+        assert.equal(window15m.averageMs, 1_500);
+        assert.equal(window15m.p50Ms, 1_700);
+        assert.equal(window15m.p95Ms, 1_900);
         assert.equal(history.fastBaselineP25Ms, 900);
         assert.equal(history.fastBaselineWindow, 'tail');
         assert.equal(history.hourlyUtc.length, 1);
@@ -176,6 +179,7 @@ describe('MCP latency attribution', () => {
 
     it('groups only same-series latency pulses under sanitized experiment labels', () => {
         const base = Date.parse('2026-08-18T12:00:00.000Z');
+        /** @param {number} offsetMs @param {string} callId @param {string} seriesId @param {Record<string, string>} [labels] */
         const pulseStart = (offsetMs, callId, seriesId, labels = {}) => ({
             ts: new Date(base + offsetMs).toISOString(),
             event: 'tool_call_started',
@@ -184,6 +188,7 @@ describe('MCP latency attribution', () => {
             latencySeriesId: seriesId,
             ...labels,
         });
+        /** @param {number} offsetMs @param {string} callId */
         const pulseEnd = (offsetMs, callId) => ({
             ts: new Date(base + offsetMs).toISOString(),
             event: 'tool_call_completed',

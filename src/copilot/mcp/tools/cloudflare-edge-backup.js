@@ -18,11 +18,10 @@ export const mcpCloudflareEdgeBackupCreateTool = {
     description:
         'Persist a local JSON backup of the current Cloudflare tunnel, DNS, rulesets and policy diff before any edge mutation.',
     inputSchema: {
-        label: z.string().optional().describe('Optional filesystem-safe label for the backup file.'),
+        label: z.string().optional()['describe']('Optional filesystem-safe label for the backup file.'),
         includeSnapshot: z
             .boolean()
-            .optional()
-            .describe('Whether to include the full snapshot in the tool response. Default: false.'),
+            .optional()['describe']('Whether to include the full snapshot in the tool response. Default: false.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async ({ label, includeSnapshot }) =>
@@ -42,7 +41,7 @@ export const mcpCloudflareEdgeBackupsListTool = {
     title: 'Cloudflare edge backups list',
     description: 'List local Cloudflare edge snapshot backups created before Cloudflare edge changes.',
     inputSchema: {
-        limit: z.number().int().min(1).max(200).optional().describe('Maximum backups to return. Default: 20.'),
+        limit: z.number().int().min(1).max(200).optional()['describe']('Maximum backups to return. Default: 20.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async ({ limit }) => okResult(await listCloudflareEdgeBackups({ limit })),

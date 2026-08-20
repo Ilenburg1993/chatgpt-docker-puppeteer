@@ -50,6 +50,9 @@ function sumCpuTimes(/** @type {any} */ cpus) {
  * Adaptive CPU-based throttler for RAG indexing. Focuses on machine-wide stability while preserving throughput.
  */
 export class AdaptiveThrottler {
+    /** @type {number | null} */
+    lastMeasuredCPU = null;
+
     constructor(/** @type {any} */ options = {}) {
         this.enabled = parseBoolean(options.enabled, true);
         this.metric = resolveMetricMode(options.metric, 'auto');
@@ -70,7 +73,6 @@ export class AdaptiveThrottler {
         this.lastSampleAtMs = 0;
         this.lastLoggedAtMs = 0;
         this.lastCpuSource = 'none';
-        /** @type {any} */ (this).lastMeasuredCPU = null;
 
         this.prevProcessUsage = process.cpuUsage();
         this.prevProcessTimeNs = process.hrtime.bigint();
@@ -142,7 +144,7 @@ export class AdaptiveThrottler {
         }
 
         const { cpu, source } = this.measureCpuNow();
-        const resolved = /** @type {any} */ (Number.isFinite(cpu) ? cpu : (this.lastMeasuredCPU ?? 0));
+        const resolved = Number.isFinite(cpu) ? Number(cpu) : (this.lastMeasuredCPU ?? 0);
         this.lastMeasuredCPU = clamp(resolved, 0, 100);
         this.lastCpuSource = source || this.lastCpuSource;
         this.lastSampleAtMs = now;
@@ -174,7 +176,7 @@ export class AdaptiveThrottler {
         this.samples.push(cpu);
         if (this.samples.length > this.sampleSize) this.samples.shift();
 
-        const avgCPU = this.samples.reduce(/** @type {any} */ (a, b) => a + b, 0) / this.samples.length;
+        const avgCPU = this.samples.reduce((a, b) => a + b, 0) / this.samples.length;
         const highThreshold = this.targetCPU + this.highWatermark;
         const lowThreshold = Math.max(0, this.targetCPU - this.lowWatermark);
         const oldDelay = this.currentDelay;
@@ -213,7 +215,7 @@ export class AdaptiveThrottler {
     getStats() {
         const avgCPU =
             this.samples.length > 0
-                ? this.samples.reduce(/** @type {any} */ (a, b) => a + b, 0) / this.samples.length
+                ? this.samples.reduce((a, b) => a + b, 0) / this.samples.length
                 : 0;
 
         return {
@@ -249,23 +251,23 @@ export function createRagAdaptiveThrottler(/** @type {any} */ options = {}) {
                   initialDelay: 260,
               };
 
-    const metric = resolveMetricMode(process.env.RAG_THROTTLE_METRIC, 'auto');
-    const enabled = parseBoolean(process.env.RAG_THROTTLE_ENABLED, true);
+    const metric = resolveMetricMode(process.env['RAG_THROTTLE_METRIC'], 'auto');
+    const enabled = parseBoolean(process.env['RAG_THROTTLE_ENABLED'], true);
 
     return new AdaptiveThrottler({
         enabled,
         metric,
-        targetCPU: parseNumber(process.env.RAG_THROTTLE_TARGET_CPU, defaults.targetCPU),
-        minDelay: parseNumber(process.env.RAG_THROTTLE_MIN_DELAY_MS, defaults.minDelay),
-        maxDelay: parseNumber(process.env.RAG_THROTTLE_MAX_DELAY_MS, defaults.maxDelay),
-        initialDelay: parseNumber(process.env.RAG_THROTTLE_INITIAL_DELAY_MS, defaults.initialDelay),
-        sampleIntervalMs: parseIntSafe(process.env.RAG_THROTTLE_SAMPLE_INTERVAL_MS, 1000),
-        sampleSize: parseIntSafe(process.env.RAG_THROTTLE_SAMPLE_SIZE, 8),
-        slowdownFactor: parseNumber(process.env.RAG_THROTTLE_SLOWDOWN_FACTOR, 1.28),
-        speedupFactor: parseNumber(process.env.RAG_THROTTLE_SPEEDUP_FACTOR, 0.92),
-        highWatermark: parseNumber(process.env.RAG_THROTTLE_HIGH_WATERMARK_PCT, 8),
-        lowWatermark: parseNumber(process.env.RAG_THROTTLE_LOW_WATERMARK_PCT, 15),
-        logCooldownMs: parseIntSafe(process.env.RAG_THROTTLE_LOG_COOLDOWN_MS, 4000),
+        targetCPU: parseNumber(process.env['RAG_THROTTLE_TARGET_CPU'], defaults.targetCPU),
+        minDelay: parseNumber(process.env['RAG_THROTTLE_MIN_DELAY_MS'], defaults.minDelay),
+        maxDelay: parseNumber(process.env['RAG_THROTTLE_MAX_DELAY_MS'], defaults.maxDelay),
+        initialDelay: parseNumber(process.env['RAG_THROTTLE_INITIAL_DELAY_MS'], defaults.initialDelay),
+        sampleIntervalMs: parseIntSafe(process.env['RAG_THROTTLE_SAMPLE_INTERVAL_MS'], 1000),
+        sampleSize: parseIntSafe(process.env['RAG_THROTTLE_SAMPLE_SIZE'], 8),
+        slowdownFactor: parseNumber(process.env['RAG_THROTTLE_SLOWDOWN_FACTOR'], 1.28),
+        speedupFactor: parseNumber(process.env['RAG_THROTTLE_SPEEDUP_FACTOR'], 0.92),
+        highWatermark: parseNumber(process.env['RAG_THROTTLE_HIGH_WATERMARK_PCT'], 8),
+        lowWatermark: parseNumber(process.env['RAG_THROTTLE_LOW_WATERMARK_PCT'], 15),
+        logCooldownMs: parseIntSafe(process.env['RAG_THROTTLE_LOG_COOLDOWN_MS'], 4000),
         ...options,
     });
 }

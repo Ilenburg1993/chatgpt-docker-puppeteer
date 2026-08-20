@@ -29,7 +29,7 @@ const { values } = parseArgs({
     },
 });
 
-const baseUrl = process.env.MCP_DIAG_URL || 'http://localhost:3008';
+const baseUrl = process.env['MCP_DIAG_URL'] || 'http://localhost:3008';
 const report = /** @type {any} */ ({
     ok: false,
     profile: values.profile || 'full',
@@ -42,7 +42,7 @@ const report = /** @type {any} */ ({
         expand_top_n: 0,
     },
     effective_scope: {
-        docs_mode: values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include',
+        docs_mode: values['docs-mode'] || process.env['RAG_DOCS_MODE'] || 'include',
         include_globs: values['include-glob'] || [],
         exclude_globs: values['exclude-glob'] || [],
         max_file_bytes: values['max-file-bytes'] ? Number(values['max-file-bytes']) : null,

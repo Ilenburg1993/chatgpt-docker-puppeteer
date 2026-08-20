@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * @param {ReturnType<import('./context_pack.mjs').buildContextPack>} contextPack
+ * @param {ReturnType<typeof import('./context_pack.mjs').buildContextPack>} contextPack
  * @returns {any[]}
  */
 export function rankRootCauses(contextPack) {

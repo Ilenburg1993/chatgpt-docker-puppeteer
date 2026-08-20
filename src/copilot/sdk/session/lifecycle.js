@@ -29,15 +29,26 @@ import { createConfiguredPermissionHandler } from './permission-controller.js';
 export { setSessionAutoModelResolver };
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
- *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
- *
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
- *
  * @typedef {import('@github/copilot-sdk').Tool[]} ToolList
- *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */
+
+/** @typedef {{ sessionId: string }} SessionIdentityPort */
+
+/**
+ * @template {SessionIdentityPort} TSession
+ * @typedef {{
+ *     start?: (() => Promise<void>) | undefined;
+ *     createSession: (config: SessionConfig) => Promise<TSession>;
+ *     resumeSession: (sessionId: string, config: import('@github/copilot-sdk').ResumeSessionConfig) => Promise<TSession>;
+ *     listSessions: (filter?: import('@github/copilot-sdk').SessionListFilter) => Promise<import('@github/copilot-sdk').SessionMetadata[]>;
+ *     deleteSession: (sessionId: string) => Promise<void>;
+ * }} SessionLifecycleClientPort
+ */
+
+/** @typedef {{ sessionId: string; disconnect: () => Promise<void> }} DisconnectSessionPort */
 
 /**
  * Resolve `model: "auto"` sem depender estaticamente do pacote de models.
@@ -145,8 +156,9 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  */
 
 /**
+ * @template {SessionIdentityPort} TSession
  * @typedef {Object} SessionResult
- * @property {CopilotSession} session - Sessao criada ou retomada
+ * @property {TSession} session - Sessao criada ou retomada
  * @property {boolean} isResumed - true se foi retomada, false se criada
  * @property {string} sessionId - ID da sessao
  * @property {string | undefined} [model] - Modelo efetivamente aplicado à sessão
@@ -156,22 +168,33 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
 /**
  * @param {unknown} client
  * @param {string} caller
- * @returns {asserts client is import('@github/copilot-sdk').CopilotClient}
+ * @param {'createSession' | 'resumeSession' | 'listSessions' | 'deleteSession'} capability
+ * @returns {void}
  */
-function assertClient(client, caller) {
-    if (!client || typeof client !== 'object') {
-        throw new TypeError(`[lib/session/${caller}] client inválido ou não fornecido.`);
+function assertClient(client, caller, capability) {
+    const candidate =
+        client && typeof client === 'object' ? /** @type {Record<string, unknown>} */ (client) : null;
+    if (!candidate || typeof candidate[capability] !== 'function') {
+        throw new TypeError(`[lib/session/${caller}] client inválido ou sem capacidade '${capability}'.`);
     }
 }
 
 /**
  * @param {unknown} session
  * @param {string} caller
- * @returns {asserts session is CopilotSession}
+ * @returns {asserts session is DisconnectSessionPort}
  */
 function assertSession(session, caller) {
-    if (!session || typeof session !== 'object' || !('sessionId' in session)) {
-        throw new TypeError(`[lib/session/${caller}] sessão inválida ou não fornecida.`);
+    if (
+        !session ||
+        typeof session !== 'object' ||
+        !('sessionId' in session) ||
+        typeof session.sessionId !== 'string' ||
+        session.sessionId.length === 0 ||
+        !('disconnect' in session) ||
+        typeof session.disconnect !== 'function'
+    ) {
+        throw new TypeError(`[lib/session/${caller}] sessão inválida ou sem capacidade de disconnect.`);
     }
 }
 
@@ -187,7 +210,7 @@ async function wait(ms) {
 }
 
 /**
- * @param {import('@github/copilot-sdk').CopilotClient} client
+ * @param {{ start?: (() => Promise<void>) | undefined }} client
  * @param {string} operation
  * @returns {Promise<void>}
  */
@@ -287,7 +310,7 @@ function copySdk10SessionBasePassthroughOptions(source, target) {
 /**
  * @template T
  * @param {{
- *     client: import('@github/copilot-sdk').CopilotClient;
+ *     client: { start?: (() => Promise<void>) | undefined };
  *     operation: 'session.create' | 'session.resume';
  *     successAttributes?: Record<string, unknown>;
  *     run: () => Promise<T>;
@@ -436,8 +459,8 @@ function buildSessionConfig(opts, mode) {
     if (!opts.onPermissionRequest) {
         const configuredMode = process.env['AGENT_PERMISSION_MODE']?.trim() || 'approve_all';
         log(
-            'INFO',
-            `[lib/session] onPermissionRequest não fornecido — usando política padrão configurável '${configuredMode}' (default efetivo: approve_all).`,
+            'WARN',
+            `[lib/session] onPermissionRequest não fornecido — usando fallback approveAll pela política configurável '${configuredMode}' (default efetivo: approve_all).`,
         );
     }
 
@@ -622,13 +645,14 @@ function normalizeResumeModelSelection(options) {
  * @example
  *     const { session } = await createSession(client, { model: 'auto' });
  *
- * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
+ * @template {SessionIdentityPort} TSession
+ * @param {SessionLifecycleClientPort<TSession>} client - Cliente com as capacidades de lifecycle consumidas aqui
  * @param {SessionCreateOptions} [opts] - Opcoes de configuracao
- * @returns {Promise<SessionResult>}
+ * @returns {Promise<SessionResult<TSession>>}
  * @throws {Error} Se o SDK falhar ao criar sessão
  */
 export async function createSession(client, opts) {
-    assertClient(client, 'createSession');
+    assertClient(client, 'createSession', 'createSession');
     const options = opts ?? {};
     const model = options.model ?? DEFAULT_MODEL;
     let reasoningEffort = options.reasoningEffort;
@@ -681,14 +705,15 @@ export async function createSession(client, opts) {
  * @example
  *     const { session } = await resumeSession(client, 'abc-123');
  *
- * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
+ * @template {SessionIdentityPort} TSession
+ * @param {SessionLifecycleClientPort<TSession>} client - Cliente com as capacidades de lifecycle consumidas aqui
  * @param {string} sessionId - ID da sessao a retomar
  * @param {SessionResumeOptions} [opts] - Opcoes de configuracao compatíveis com resume
- * @returns {Promise<SessionResult>}
+ * @returns {Promise<SessionResult<TSession>>}
  * @throws {Error} Se a sessao nao existir ou estiver expirada
  */
 export async function resumeSession(client, sessionId, opts) {
-    assertClient(client, 'resumeSession');
+    assertClient(client, 'resumeSession', 'resumeSession');
     if (typeof sessionId !== 'string' || sessionId.length === 0) {
         throw new TypeError('[lib/session/resumeSession] sessionId deve ser string não-vazia.');
     }
@@ -752,10 +777,11 @@ export async function resumeSession(client, sessionId, opts) {
  * Tenta retomar uma sessao; se falhar, cria uma nova. Padrao usado pelo session-manager para persistencia entre
  * reinicializacoes.
  *
- * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
+ * @template {SessionIdentityPort} TSession
+ * @param {SessionLifecycleClientPort<TSession>} client - Cliente com as capacidades de lifecycle consumidas aqui
  * @param {string | null | undefined} existingSessionId - ID da sessao persistida (ou null)
  * @param {SessionCreateOptions} [opts] - Opcoes usadas tanto para resume quanto para create
- * @returns {Promise<SessionResult>}
+ * @returns {Promise<SessionResult<TSession>>}
  */
 export async function resumeOrCreate(client, existingSessionId, opts) {
     if (existingSessionId) {
@@ -776,13 +802,13 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
 /**
  * Lista todas as sessoes ativas no cliente.
  *
- * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
- * @param {object} [filter] - Filtro opcional
+ * @param {SessionLifecycleClientPort<SessionIdentityPort>} client - Cliente com as capacidades de lifecycle consumidas aqui
+ * @param {import('@github/copilot-sdk').SessionListFilter} [filter] - Filtro opcional
  * @returns {Promise<import('@github/copilot-sdk').SessionMetadata[]>}
  * @throws {Error} Se a comunicação com o SDK falhar
  */
 export async function listSessions(client, filter) {
-    assertClient(client, 'listSessions');
+    assertClient(client, 'listSessions', 'listSessions');
     try {
         return await client.listSessions(filter);
     } catch (error) {
@@ -793,13 +819,13 @@ export async function listSessions(client, filter) {
 /**
  * Remove uma sessao pelo ID.
  *
- * @param {import('@github/copilot-sdk').CopilotClient} client - CopilotClient instanciado
+ * @param {SessionLifecycleClientPort<SessionIdentityPort>} client - Cliente com as capacidades de lifecycle consumidas aqui
  * @param {string} sessionId - ID da sessao a remover
  * @returns {Promise<void>}
  * @throws {Error} Se a comunicação com o SDK falhar
  */
 export async function deleteSession(client, sessionId) {
-    assertClient(client, 'deleteSession');
+    assertClient(client, 'deleteSession', 'deleteSession');
     if (typeof sessionId !== 'string' || sessionId.length === 0) {
         throw new TypeError('[lib/session/deleteSession] sessionId deve ser string não-vazia.');
     }
@@ -814,7 +840,7 @@ export async function deleteSession(client, sessionId) {
 /**
  * Desconecta uma sessao ativa (sem remover do servidor).
  *
- * @param {CopilotSession} session - Sessao a desconectar
+ * @param {unknown} session - Sessao a desconectar
  * @returns {Promise<void>}
  * @throws {Error} Se a sessão já estiver desconectada ou comunicação falhar
  */

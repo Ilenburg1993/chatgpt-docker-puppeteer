@@ -11,8 +11,6 @@ const logger = await import('#core/logger').then((m) => /** @type {any} */ (m).d
 
 describe('Logger - Sistema de Logging Unificado', () => {
     const TEST_LOG_DIR = path.join(import.meta.dirname, '../../tmp/logs');
-    const TEST_LOG_FILE = path.join(TEST_LOG_DIR, 'test_agente.log');
-
     before(() => {
         // Criar diretório de teste
         if (!fs.existsSync(TEST_LOG_DIR)) {

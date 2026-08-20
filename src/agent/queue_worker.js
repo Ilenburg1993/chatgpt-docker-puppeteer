@@ -86,8 +86,8 @@ async function _readTextFromTaskLatestResult(taskId) {
 async function _resolveContextInputs(inputs = [], currentTaskId = null) {
     if (!Array.isArray(inputs) || inputs.length === 0) return '';
 
-    const MAX_PER_INPUT_CHARS = Math.max(1000, Number(process.env.QUEUE_INPUT_MAX_CHARS || 50000) || 50000);
-    const MAX_TOTAL_CHARS = Math.max(5000, Number(process.env.QUEUE_INPUT_MAX_TOTAL_CHARS || 200000) || 200000);
+    const MAX_PER_INPUT_CHARS = Math.max(1000, Number(process.env['QUEUE_INPUT_MAX_CHARS'] || 50000) || 50000);
+    const MAX_TOTAL_CHARS = Math.max(5000, Number(process.env['QUEUE_INPUT_MAX_TOTAL_CHARS'] || 200000) || 200000);
 
     const parts = [];
     let total = 0;

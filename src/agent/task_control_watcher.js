@@ -40,8 +40,8 @@ class TaskControlWatcher {
         this._timer = null;
         this._running = false;
         this._stopped = false;
-        this.abortTimeoutMs = Math.max(100, Number(process.env.TASK_CONTROL_ABORT_TIMEOUT_MS || 1500) || 1500);
-        this.abortMaxRetries = Math.max(0, Number.parseInt(process.env.TASK_CONTROL_ABORT_MAX_RETRIES || '2', 10) || 2);
+        this.abortTimeoutMs = Math.max(100, Number(process.env['TASK_CONTROL_ABORT_TIMEOUT_MS'] || 1500) || 1500);
+        this.abortMaxRetries = Math.max(0, Number.parseInt(process.env['TASK_CONTROL_ABORT_MAX_RETRIES'] || '2', 10) || 2);
     }
 
     /** @param {any} ms */

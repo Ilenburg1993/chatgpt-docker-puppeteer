@@ -353,11 +353,11 @@ export class MCPUpstreamStdio extends EventEmitter {
 // TODO: Implement in tool-registry.mjs:
 //
 // async function importUpstreamTools(/** @type {any} */ registry) {
-//     if (process.env.MCP_UPSTREAM_ENABLED !== 'true') return;
+//     if (process.env['MCP_UPSTREAM_ENABLED'] !== 'true') return;
 //
-//     const alias = process.env.MCP_UPSTREAM_ALIAS || 'upstream';
-//     const prefix = process.env.MCP_UPSTREAM_TOOL_PREFIX || `mcp_${alias}__`;
-//     const githubToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
+//     const alias = process.env['MCP_UPSTREAM_ALIAS'] || 'upstream';
+//     const prefix = process.env['MCP_UPSTREAM_TOOL_PREFIX'] || `mcp_${alias}__`;
+//     const githubToken = process.env['GITHUB_PERSONAL_ACCESS_TOKEN'];
 //
 //     if (!githubToken) {
 //         console.error('[Tool Registry] GITHUB_PERSONAL_ACCESS_TOKEN not set');

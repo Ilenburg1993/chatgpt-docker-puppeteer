@@ -3,7 +3,10 @@ import { spawnSync } from 'node:child_process';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -15,21 +18,13 @@ state.
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
+
+/** @returns {Record<string, unknown> | null} */
+function optionalRecord(/** @type {unknown} */ value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
 }
 
-function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-}
-
-function runOps(profile) {
+function runOps(/** @type {string} */ profile) {
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS.ops, '--json', `--profile=${profile}`], {
         cwd: REPO_ROOT,
         encoding: 'utf8',
@@ -49,11 +44,16 @@ function runOps(profile) {
     }
 }
 
-function optionalNumber(value) {
+function optionalNumber(/** @type {unknown} */ value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function createCheck(id, pass, detail, severity = 'error') {
+function createCheck(
+    /** @type {string} */ id,
+    /** @type {unknown} */ pass,
+    /** @type {string} */ detail,
+    /** @type {string} */ severity = 'error',
+) {
     return { id, pass: Boolean(pass), severity, detail };
 }
 

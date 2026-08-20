@@ -44,7 +44,6 @@ function hasExpectedProbePayload(value) {
 
 /**
  * @param {Parameters<typeof runConfiguredByokChatProbe>[0]} [options]
- * @returns {Promise<any>}
  */
 export async function runConfiguredByokJsonProbe(options = {}) {
     const chatResult = await runConfiguredByokChatProbe({

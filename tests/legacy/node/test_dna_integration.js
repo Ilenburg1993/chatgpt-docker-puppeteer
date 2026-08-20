@@ -1,4 +1,3 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import * as io from '#infra/io';
 
 /* ==========================================================================
@@ -16,6 +15,11 @@ const TEST_CONFIG = {
     },
 };
 
+/** @param {unknown} error @returns {string} */
+function errorMessage(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+
 /* ==========================================================================
    HELPER FUNCTIONS
 ========================================================================== */
@@ -31,7 +35,7 @@ async function cleanupTestDna() {
             await io.saveDna(dna, 'test-cleanup');
         }
     } catch (error) {
-        console.warn('⚠️  Cleanup warning:', error.message);
+        console.warn('⚠️  Cleanup warning:', errorMessage(error));
     }
 }
 
@@ -57,7 +61,7 @@ async function isSelectorInDna(domain, intent, selector) {
     }
 
     // Suporta objeto protocol
-    if (typeof selectors === 'object' && selectors.selector) {
+    if (selectors && typeof selectors === 'object' && !Array.isArray(selectors) && selectors.selector) {
         return selectors.selector === selector;
     }
 
@@ -113,7 +117,7 @@ async function test1_SadiAutoEvolutionAcceptance() {
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -152,7 +156,7 @@ async function test2_SadiAutoEvolutionRejection() {
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -185,11 +189,13 @@ async function test3_DnaBackupSystem() {
         }
 
         console.log(`   ✅ Backup created (${countBefore} → ${countAfter})`);
-        console.log(`   ✅ Latest backup: ${historyAfter[0].timestamp}\n`);
+        const latestBackup = historyAfter[0];
+        if (!latestBackup) throw new Error('Latest backup metadata is missing');
+        console.log(`   ✅ Latest backup: ${latestBackup.timestamp}\n`);
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -203,7 +209,7 @@ async function test4_DnaRollback() {
 
     try {
         const dnaBefore = await io.getDna();
-        const versionBefore = dnaBefore.version;
+        const versionBefore = dnaBefore._meta.version;
 
         // Trigger evolution (creates new version)
         const newProtocol = {
@@ -215,7 +221,7 @@ async function test4_DnaRollback() {
         await io.evolveWithSadiProtocol(newProtocol, TEST_CONFIG.TEST_DOMAIN, 'test_rollback');
 
         const dnaAfter = await io.getDna();
-        const versionAfter = dnaAfter.version;
+        const versionAfter = dnaAfter._meta.version;
 
         if (versionAfter <= versionBefore) {
             throw new Error('Version not incremented after evolution');
@@ -228,12 +234,12 @@ async function test4_DnaRollback() {
 
         console.log(`   ✅ Version before: ${versionBefore}`);
         console.log(`   ✅ Version after evolution: ${versionAfter}`);
-        console.log(`   ✅ Version after rollback: ${dnaRolledBack.version}`);
+        console.log(`   ✅ Version after rollback: ${dnaRolledBack._meta.version}`);
         console.log(`   ✅ Rollback successful\n`);
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -270,7 +276,7 @@ async function test5_EvolutionStatsTracking() {
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -327,7 +333,7 @@ async function test6_RateLimiting() {
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -380,7 +386,7 @@ async function test7_DuplicateDetection() {
 
         testsPassed++;
     } catch (error) {
-        console.error(`   ❌ FAILED: ${error.message}\n`);
+        console.error(`   ❌ FAILED: ${errorMessage(error)}\n`);
         testsFailed++;
     }
 }
@@ -417,7 +423,7 @@ async function runAllTests() {
             process.exit(0);
         }
     } catch (error) {
-        console.error('\n❌ FATAL ERROR:', error.message);
+        console.error('\n❌ FATAL ERROR:', errorMessage(error));
         process.exit(1);
     }
 }

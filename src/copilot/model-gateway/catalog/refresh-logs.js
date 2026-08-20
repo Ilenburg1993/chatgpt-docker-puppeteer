@@ -10,7 +10,7 @@
 
 /**
  * @param {unknown} value
- * @returns {value is Record<string, any>}
+ * @returns {value is Record<string, unknown>}
  */
 function isRecord(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -34,7 +34,7 @@ function optionalNumber(value) {
 
 /**
  * @param {string} text
- * @returns {{ events: Record<string, any>[]; invalidLineCount: number }}
+ * @returns {{ events: Record<string, unknown>[]; invalidLineCount: number }}
  */
 export function parseModelGatewayRefreshLogText(text) {
     const events = [];
@@ -53,7 +53,7 @@ export function parseModelGatewayRefreshLogText(text) {
 }
 
 /**
- * @param {Record<string, any>} event
+ * @param {Record<string, unknown>} event
  * @returns {string | null}
  */
 function importerIdForEvent(event) {
@@ -65,7 +65,7 @@ function importerIdForEvent(event) {
 }
 
 /**
- * @param {Record<string, any>} event
+ * @param {Record<string, unknown>} event
  * @returns {string[]}
  */
 function errorsForEvent(event) {
@@ -73,10 +73,10 @@ function errorsForEvent(event) {
 }
 
 /**
- * @param {Record<string, any>[]} events
+ * @param {Record<string, unknown>[]} events
  * @param {object} [input]
  * @param {number} [input.invalidLineCount]
- * @param {string} [input.logPath]
+ * @param {string | undefined} [input.logPath]
  * @returns {{
  *     schema: string;
  *     logPath: string | null;
@@ -164,7 +164,7 @@ export function summarizeModelGatewayRefreshLogEvents(events, input = {}) {
 /**
  * @param {string} text
  * @param {object} [input]
- * @param {string} [input.logPath]
+ * @param {string | undefined} [input.logPath]
  * @returns {ReturnType<typeof summarizeModelGatewayRefreshLogEvents>}
  */
 export function summarizeModelGatewayRefreshLogText(text, input = {}) {

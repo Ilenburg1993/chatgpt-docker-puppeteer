@@ -9,6 +9,7 @@ import { afterEach, describe, it } from 'vitest';
 
 import { buildAiArtifactsReport, clearAiArtifactsReportCache } from '#copilot/mcp/control-plane';
 
+/** @type {string[]} */
 const roots = [];
 
 function makeRoot() {
@@ -20,8 +21,20 @@ function makeRoot() {
     return root;
 }
 
-function writeJob(root, name) {
+function writeJob(/** @type {string} */ root, /** @type {string} */ name) {
     writeFileSync(join(root, 'src/copilot/.ai/jobs', name), 'x');
+}
+
+/**
+ * @param {Record<string, unknown>} report
+ * @returns {{ artifactCount: number }}
+ */
+function jobsProjection(report) {
+    const jobs = report['jobs'];
+    assert.ok(jobs && typeof jobs === 'object' && !Array.isArray(jobs));
+    const artifactCount = /** @type {Record<string, unknown>} */ (jobs)['artifactCount'];
+    assert.equal(typeof artifactCount, 'number');
+    return { artifactCount: /** @type {number} */ (artifactCount) };
 }
 
 describe('AI artifact diagnostics cache', () => {
@@ -40,8 +53,8 @@ describe('AI artifact diagnostics cache', () => {
         clearAiArtifactsReportCache();
         const fresh = await buildAiArtifactsReport({ workspaceRoot: root, retainNewest: 20 });
 
-        assert.equal(first.jobs.artifactCount, 1);
-        assert.equal(cached.jobs.artifactCount, 1);
-        assert.equal(fresh.jobs.artifactCount, 2);
+        assert.equal(jobsProjection(first).artifactCount, 1);
+        assert.equal(jobsProjection(cached).artifactCount, 1);
+        assert.equal(jobsProjection(fresh).artifactCount, 2);
     });
 });

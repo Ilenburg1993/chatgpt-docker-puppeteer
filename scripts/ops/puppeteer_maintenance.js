@@ -44,7 +44,7 @@ console.log('🔧 Puppeteer Maintenance Tool\n');
         for (const profile of profiles) {
             const profilePath = path.join(tmpDir, profile);
             try {
-                const _stats = fs.statSync(profilePath);
+                fs.statSync(profilePath);
                 const size = execSync(`du -sh ${profilePath} 2>/dev/null | cut -f1`).toString().trim();
                 console.log(`    - ${profile} (${size})`);
             } catch (_e) {

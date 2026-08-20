@@ -128,14 +128,14 @@ async function resolveContext(
             }
 
             const tt = asRecord(targetTask);
-            const ttMeta = asRecord(tt.meta);
-            const ttSpec = asRecord(tt.spec);
-            const ttSpecPayload = asRecord(ttSpec.payload);
+            const ttMeta = asRecord(tt['meta']);
+            const ttSpec = asRecord(tt['spec']);
+            const ttSpecPayload = asRecord(ttSpec['payload']);
             const currentTaskView = asRecord(currentTask);
-            const currentTaskMeta = asRecord(currentTaskView.meta);
+            const currentTaskMeta = asRecord(currentTaskView['meta']);
 
             // Proteção contra auto-referência (Prevenção de paradoxo recursivo)
-            if (currentTask && ttMeta.id === currentTaskMeta.id) {
+            if (currentTask && ttMeta['id'] === currentTaskMeta['id']) {
                 resolvedText = resolvedText.split(ref.fullMatch).join(`[ERRO: AUTO_REFERENCIA]`);
                 continue;
             }
@@ -145,12 +145,12 @@ async function resolveContext(
 
             // Caso A: Referência ao PROMPT original (Metadado da Spec)
             if (ref.transform === 'PROMPT') {
-                injectedContent = String(ttSpecPayload.user_message || '');
+                injectedContent = String(ttSpecPayload['user_message'] || '');
             }
             // Caso B: Referência ao RESULTADO (I/O de arquivo físico)
             else {
                 // O io.loadResponse já respeita o sinal de aborto e o teto de 1MB
-                const rawResponse = await io.loadResponse(String(ttMeta.id || ''), signal);
+                const rawResponse = await io.loadResponse(String(ttMeta['id'] || ''), signal);
                 injectedContent = await applyTransform(rawResponse, ref.transform, tt);
             }
 

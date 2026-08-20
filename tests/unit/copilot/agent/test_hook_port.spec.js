@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,8 +8,15 @@ const mocks = vi.hoisted(() => ({
     classifySdkRateLimitScope: vi.fn(() => 'session'),
     defaultHookBus: { on: vi.fn(), off: vi.fn() },
     modelSelector: { suggestFallback: vi.fn(() => null) },
-    getCopilotFallbackModel: vi.fn(() => null),
-    readConfiguredByokSummary: vi.fn(() => ({ enabled: false })),
+    getCopilotFallbackModel: /** @type {import('vitest').Mock<typeof import('#copilot/config').getCopilotFallbackModel>} */ (vi.fn(() => null)),
+    readConfiguredByokSummary: /** @type {import('vitest').Mock<typeof import('#copilot/config').readConfiguredByokSummary>} */ (vi.fn(() => ({
+        enabled: false, ready: false, preset: null, profile: null, providerType: null, baseUrl: null, model: null, wireApi: null, azureApiVersion: null,
+        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+        modelList: { configured: false, count: 0 },
+        capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 },
+        limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
+        warnings: [], errors: [],
+    }))),
     recordBlockedToolCall: vi.fn(),
     defaultAuditLog: { record: vi.fn() },
     log: vi.fn(),
@@ -44,11 +50,24 @@ const { buildAgentBusHooks, withAgentRuntimeToolPolicy } = await import(
     '../../../../src/copilot/agent/ports/hook-port.js'
 );
 
+/** @returns {ReturnType<typeof import('#copilot/config').readConfiguredByokSummary>} */
+function disabledByokSummaryFixture() {
+    return {
+        enabled: false, ready: false, preset: null, profile: null, providerType: null, baseUrl: null, model: null, wireApi: null, azureApiVersion: null,
+        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false }, modelList: { configured: false, count: 0 },
+        capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 }, limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null }, warnings: [], errors: [],
+    };
+}
+
 describe('agent/ports/hook-port', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.getCopilotFallbackModel.mockReturnValue(null);
-        mocks.readConfiguredByokSummary.mockReturnValue({ enabled: false });
+        mocks.readConfiguredByokSummary.mockReturnValue({
+            enabled: false, ready: false, preset: null, profile: null, providerType: null, baseUrl: null, model: null, wireApi: null, azureApiVersion: null,
+            auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false }, modelList: { configured: false, count: 0 },
+            capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 }, limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null }, warnings: [], errors: [],
+        });
     });
 
     it('registra blocked metric quando runtime policy nega a tool', async () => {
@@ -105,7 +124,7 @@ describe('agent/ports/hook-port', () => {
             metrics: { recordSessionStart: vi.fn(), recordSessionEnd: vi.fn() },
         });
 
-        const result = await hooks.onErrorOccurred?.(
+        await hooks.onErrorOccurred?.(
             /** @type {any} */ ({ error: {}, errorContext: 'model_call', recoverable: true }),
             /** @type {any} */ ({ sessionId: 's1' }),
         );
@@ -158,8 +177,10 @@ describe('agent/ports/hook-port', () => {
     it('bloqueia fallback Copilot auto para model_call recuperável quando BYOK está ativo', async () => {
         mocks.getCopilotFallbackModel.mockReturnValue('auto');
         mocks.readConfiguredByokSummary.mockReturnValue({
+            ...disabledByokSummaryFixture(),
             enabled: true,
-            providerType: 'openrouter',
+            ready: true,
+            providerType: 'openai',
             profile: 'openrouter-free',
             model: 'deepseek/deepseek-v4-flash:free',
         });
@@ -192,7 +213,7 @@ describe('agent/ports/hook-port', () => {
                 byokEnabled: true,
                 byokModel: 'google/gemma-4-26b-a4b-it:free',
                 byokProfile: 'openrouter-free',
-                byokProviderType: 'openrouter',
+                byokProviderType: 'openai',
                 errorContext: 'model_call',
                 recoverable: true,
             }),
@@ -202,8 +223,10 @@ describe('agent/ports/hook-port', () => {
     it('usa modelo configurado do perfil BYOK apenas quando a sessão ainda não expõe modelo ativo', async () => {
         mocks.getCopilotFallbackModel.mockReturnValue('auto');
         mocks.readConfiguredByokSummary.mockReturnValue({
+            ...disabledByokSummaryFixture(),
             enabled: true,
-            providerType: 'openrouter',
+            ready: true,
+            providerType: 'openai',
             profile: 'openrouter-free',
             model: 'deepseek/deepseek-v4-flash:free',
         });

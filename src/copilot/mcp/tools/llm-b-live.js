@@ -708,9 +708,9 @@ function buildLiveRunPlan(input) {
 }
 
 const commonPlanInput = {
-    mode: liveModeSchema.optional().describe('Default control-only.'),
-    scenario: liveScenarioSchema.optional().describe('Default canonical.'),
-    transport: transportSchema.optional().describe('Default pty for the canonical interactive LLM-B harness.'),
+    mode: liveModeSchema.optional()['describe']('Default control-only.'),
+    scenario: liveScenarioSchema.optional()['describe']('Default canonical.'),
+    transport: transportSchema.optional()['describe']('Default pty for the canonical interactive LLM-B harness.'),
     timeoutMs: z.number().int().min(30_000).max(900_000).optional(),
     byokProfile: z.string().max(120).optional(),
     routeProfile: z.string().max(120).optional(),
@@ -777,7 +777,7 @@ export const llmBLiveTools = [
         title: 'Cancel detached LLM-B live test',
         description: 'Cancel one allowlisted detached LLM-B live harness by its strict run id after verifying the manifest pid still belongs to that exact harness.',
         inputSchema: {
-            runId: z.string().regex(DETACHED_LIVE_RUN_ID_RE),
+            runId: z.string()['regex'](DETACHED_LIVE_RUN_ID_RE),
         },
         annotations: destructiveAnnotations(),
         handler: async ({ runId }) => {
@@ -886,7 +886,7 @@ export const llmBLiveTools = [
         description: 'Run the fixed canonical LLM-B live harness. Defaults to control-only; real model/provider usage requires confirmModelUsage=true.',
         inputSchema: {
             ...commonPlanInput,
-            confirmModelUsage: z.boolean().optional().describe('Required when the plan can invoke a model or real BYOK/provider.'),
+            confirmModelUsage: z.boolean().optional()['describe']('Required when the plan can invoke a model or real BYOK/provider.'),
         },
         annotations: { ...boundedWriteAnnotations(), openWorldHint: true },
         handler: async ({ mode, scenario, transport, timeoutMs, byokProfile, routeProfile, selectionPolicy, confirmModelUsage }) => {

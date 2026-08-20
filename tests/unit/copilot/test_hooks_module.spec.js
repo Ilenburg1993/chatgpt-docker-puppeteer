@@ -74,21 +74,16 @@ const anyComposeHandlers = /** @type {any} */ (composeHandlers);
 const anyComposePreToolUseHandlers = /** @type {any} */ (composePreToolUseHandlers);
 const anyConditional = /** @type {any} */ (conditional);
 const anyCreateAuditPreset = /** @type {any} */ (createAuditPreset);
-const anyCreateCircuitBreakerHandler = /** @type {any} */ (createCircuitBreakerHandler);
 const anyCreateDenyAllPreset = /** @type {any} */ (createDenyAllPreset);
-const anyCreateErrorHandler = /** @type {any} */ (createErrorHandler);
 const anyCreateHooks = /** @type {any} */ (createHooks);
 const anyCreateInteractivePreset = /** @type {any} */ (createInteractivePreset);
 const anyCreateMinimalHooks = /** @type {any} */ (createMinimalHooks);
 const anyCreateMinimalPreset = /** @type {any} */ (createMinimalPreset);
 const anyCreatePromptTransformer = /** @type {any} */ (createPromptTransformer);
-const anyCreateProductionHooks = /** @type {any} */ (createProductionHooks);
 const anyCreatePostToolEnricher = /** @type {any} */ (createPostToolEnricher);
 const anyCreateQueuedInputHandler = /** @type {any} */ (createQueuedInputHandler);
 const anyCreateReadlineInputHandler = /** @type {any} */ (createReadlineInputHandler);
-const anyCreateSafeHooks = /** @type {any} */ (createSafeHooks);
 const anyCreateSafePreset = /** @type {any} */ (createSafePreset);
-const anyCreateSessionHooks = /** @type {any} */ (createSessionHooks);
 const anyCreateSensitiveDataRedactor = /** @type {any} */ (createSensitiveDataRedactor);
 const anyCreateContextInjector = /** @type {any} */ (createContextInjector);
 const anyCreateLoggingPromptHook = /** @type {any} */ (createLoggingPromptHook);
@@ -155,6 +150,55 @@ const sessionEndInput = (overrides = {}) =>
 
 /** @param {string} sessionId */
 const inv = (sessionId = 'test-session') => ({ sessionId });
+
+/** @typedef {Extract<import('@github/copilot-sdk').PermissionRequest, { kind: 'shell' }>} ShellPermissionRequest */
+/** @typedef {Extract<import('@github/copilot-sdk').PermissionRequest, { kind: 'write' }>} WritePermissionRequest */
+
+/** @typedef {Extract<import('@github/copilot-sdk').PermissionRequest, { kind: 'custom-tool' }>} CustomToolPermissionRequest */
+
+/**
+ * @param {string} [toolName='custom-tool']
+ * @param {string} [toolCallId='custom-tool-call']
+ * @returns {CustomToolPermissionRequest}
+ */
+function customToolPermissionRequest(toolName = 'custom-tool', toolCallId = 'custom-tool-call') {
+    return { kind: 'custom-tool', toolCallId, toolName, toolDescription: `test permission for ${toolName}` };
+}
+
+/**
+ * @param {Partial<ShellPermissionRequest>} [overrides]
+ * @returns {ShellPermissionRequest}
+ */
+function shellPermissionRequest(overrides = {}) {
+    return {
+        kind: 'shell',
+        canOfferSessionApproval: true,
+        commands: [{ identifier: 'echo', readOnly: true }],
+        fullCommandText: 'echo ok',
+        hasWriteFileRedirection: false,
+        intention: 'test shell permission',
+        possiblePaths: [],
+        possibleUrls: [],
+        toolCallId: 'shell-tool-call',
+        ...overrides,
+    };
+}
+
+/**
+ * @param {Partial<WritePermissionRequest>} [overrides]
+ * @returns {WritePermissionRequest}
+ */
+function writePermissionRequest(overrides = {}) {
+    return {
+        kind: 'write',
+        canOfferSessionApproval: true,
+        diff: '',
+        fileName: '/tmp/test.txt',
+        intention: 'test write permission',
+        toolCallId: 'write-tool-call',
+        ...overrides,
+    };
+}
 
 /** @param {Function | undefined} hook @param {unknown} input @param {unknown} [invocation] */
 const callHook = async (hook, input, invocation = inv()) => /** @type {any} */ (await hook?.(input, invocation));
@@ -238,7 +282,7 @@ describe('hooks/factory › createHooks', () => {
 
     it('createErrorNotifierHook invoca callback com error info', async () => {
         let called = false;
-        const h = createErrorNotifierHook((err, ctx) => {
+        const h = createErrorNotifierHook((_err, ctx) => {
             called = true;
             assert.ok(ctx === 'rate_limit');
         });
@@ -267,7 +311,7 @@ describe('hooks/factory › createHooks', () => {
 describe('hooks/permission-handler › createPermissionHandler', () => {
     it('mode approve-all: aprova tudo', async () => {
         const handler = createPermissionHandler({ allowAll: true });
-        const result = await handler(/** @type {any} */ ({ kind: 'shell', toolCallId: '1', toolName: 'shell' }), inv());
+        const result = await handler(shellPermissionRequest({ toolCallId: '1' }), inv());
         assert.ok(
             ['approve-once'].includes(result?.kind ?? result),
             `esperado approve-once, recebido: ${JSON.stringify(result)}`,
@@ -276,13 +320,13 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
 
     it('mode deny-all: nega ferramentas listadas', async () => {
         const handler = createPermissionHandler({ denyTools: ['shell'] });
-        const result = await handler(/** @type {any} */ ({ kind: 'shell', toolCallId: '1', toolName: 'shell' }), inv());
+        const result = await handler(customToolPermissionRequest('shell', '1'), inv());
         assert.ok(result?.kind === 'reject', `esperado reject, recebido: ${JSON.stringify(result)}`);
     });
 
     it('SDK first: denyKinds nega pelo kind canônico do SDK mesmo sem toolName', async () => {
         const handler = createPermissionHandler({ denyKinds: ['shell'] });
-        const result = await handler({ kind: 'shell', toolCallId: '1' }, inv());
+        const result = await handler(shellPermissionRequest({ toolCallId: '1' }), inv());
         assert.equal(result?.kind, 'reject');
     });
 
@@ -293,7 +337,7 @@ describe('hooks/permission-handler › createPermissionHandler', () => {
                 feedback: `session=${invocation.sessionId}`,
             }),
         });
-        const result = await handler({ kind: 'write', toolCallId: '2' }, inv('sdk-session'));
+        const result = await handler(writePermissionRequest({ toolCallId: '2' }), inv('sdk-session'));
         assert.deepEqual(result, {
             kind: 'reject',
             feedback: 'session=sdk-session',
@@ -681,7 +725,7 @@ describe('hooks/registry › SDK_HOOKS', () => {
             canAbort: false,
         });
         const schema = reg.get('custom_hook');
-        const description = schema && typeof schema.description === 'string' ? schema.description : '';
+        const description = schema && typeof schema['description'] === 'string' ? schema['description'] : '';
         assert.ok(description.includes('customizado'));
     });
 });

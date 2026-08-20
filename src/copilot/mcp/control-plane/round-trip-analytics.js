@@ -13,7 +13,8 @@ import { readMcpAuditEventSlice } from './audit.js';
 
 const CURSOR_TABLE = 'copilot_mcp_round_trip_cursor';
 const EVENT_TABLE = 'copilot_mcp_round_trip_events';
-const CURSOR_ID = 'mcp-audit';
+export const MCP_ROUND_TRIP_NORMALIZER_VERSION = 2;
+const CURSOR_ID = `mcp-audit:v${MCP_ROUND_TRIP_NORMALIZER_VERSION}`;
 const DEFAULT_CHUNK_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MAX_CHUNKS = 8;
 const DEFAULT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
@@ -69,7 +70,7 @@ export function createMcpRoundTripAnalytics(options = {}) {
     ensureSchema(db);
 
     const insertEvent = db.prepare(`
-        INSERT OR IGNORE INTO ${EVENT_TABLE} (
+        INSERT INTO ${EVENT_TABLE} (
             source_identity, source_offset, ts_ms, event, tool, duration_ms, is_error, code,
             failure_class, retryability, recovery_required, workflow_success, partial, apply_mode,
             operation_count, target_count, applied_count, failed_count, causal_failure_count,
@@ -80,6 +81,28 @@ export function createMcpRoundTripAnalytics(options = {}) {
             @operationCount, @targetCount, @appliedCount, @failedCount, @causalFailureCount,
             @abortedOperationCount, @recoveryRequiredTargetCount, @convergenceCandidateCount, @synthetic
         )
+        ON CONFLICT(source_identity, source_offset) DO UPDATE SET
+            ts_ms = excluded.ts_ms,
+            event = excluded.event,
+            tool = excluded.tool,
+            duration_ms = excluded.duration_ms,
+            is_error = excluded.is_error,
+            code = excluded.code,
+            failure_class = excluded.failure_class,
+            retryability = excluded.retryability,
+            recovery_required = excluded.recovery_required,
+            workflow_success = excluded.workflow_success,
+            partial = excluded.partial,
+            apply_mode = excluded.apply_mode,
+            operation_count = excluded.operation_count,
+            target_count = excluded.target_count,
+            applied_count = excluded.applied_count,
+            failed_count = excluded.failed_count,
+            causal_failure_count = excluded.causal_failure_count,
+            aborted_operation_count = excluded.aborted_operation_count,
+            recovery_required_target_count = excluded.recovery_required_target_count,
+            convergence_candidate_count = excluded.convergence_candidate_count,
+            synthetic = excluded.synthetic
     `);
     const upsertCursor = db.prepare(`
         INSERT INTO ${CURSOR_TABLE} (cursor_id, file_identity, byte_offset, file_bytes, updated_at_ms)
@@ -247,7 +270,8 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
     if (!exists) {
         return {
             available: false,
-            schemaVersion: 1,
+            schemaVersion: MCP_ROUND_TRIP_NORMALIZER_VERSION,
+            normalizerVersion: MCP_ROUND_TRIP_NORMALIZER_VERSION,
             authority: 'derived-round-trip-index-not-materialized-yet',
             windowMs,
             includeSynthetic,
@@ -463,7 +487,8 @@ function summarizeRows(rows, options) {
         .slice(0, options.top);
 
     return {
-        schemaVersion: 1,
+        schemaVersion: MCP_ROUND_TRIP_NORMALIZER_VERSION,
+        normalizerVersion: MCP_ROUND_TRIP_NORMALIZER_VERSION,
         authority: 'derived-from-incrementally-indexed-mcp-audit',
         windowMs: options.windowMs,
         includeSynthetic: options.includeSynthetic,

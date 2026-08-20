@@ -4,7 +4,7 @@ import 'dotenv/config';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-const DEFAULT_BASE = process.env.MCP_DIAG_URL || 'http://localhost:3008';
+const DEFAULT_BASE = process.env['MCP_DIAG_URL'] || 'http://localhost:3008';
 const REQUIRED_LSP_TOOLS = [
     'lsp_definition',
     'lsp_references',
@@ -92,6 +92,28 @@ async function main() {
         },
     });
 
+    const enabled = String(process.env['LSP_ENABLED'] || 'false').toLowerCase() === 'true';
+    if (!enabled) {
+        const report = {
+            ok: true,
+            enabled: false,
+            disabled_by_policy: true,
+            status: 'disabled-by-policy',
+            lsp_tools_present: false,
+            lsp_functional_ok: true,
+            checks: {},
+            issues: [],
+        };
+        if (values.json) {
+            console.log(JSON.stringify(report, null, 2));
+        } else {
+            console.log('[LSP DIAG]');
+            console.log('enabled=false');
+            console.log('status=disabled-by-policy');
+        }
+        return;
+    }
+
     const base = String(values.base || DEFAULT_BASE).replace(/\/+$/, '');
     const targetFile = path.normalize(String(values.file || 'src/main.js'));
     const line = Math.max(1, Number(values.line || 1));
@@ -152,6 +174,9 @@ async function main() {
 
     const report = {
         ok: issues.length === 0,
+        enabled: true,
+        disabled_by_policy: false,
+        status: issues.length === 0 ? 'ready' : 'unhealthy',
         base,
         target_file: targetFile,
         health_ok: health.ok,

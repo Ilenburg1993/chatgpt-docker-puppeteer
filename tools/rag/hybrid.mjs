@@ -51,14 +51,14 @@ if (!query) {
 const result = await ragHybridSearch({
     query,
     topK: values.topk ? Number(values.topk) : 8,
-    pathPrefix: values['path-prefix'],
-    ext: values.ext,
+    ...(values['path-prefix'] !== undefined ? { pathPrefix: values['path-prefix'] } : {}),
+    ...(values.ext !== undefined ? { ext: values.ext } : {}),
     tags: values.tag || [],
-    ollamaBaseUrl: values['ollama-base-url'],
-    model: values.model,
+    ...(values['ollama-base-url'] !== undefined ? { ollamaBaseUrl: values['ollama-base-url'] } : {}),
+    ...(values.model !== undefined ? { model: values.model } : {}),
     rerank: values.rerank,
     mmr: values.mmr,
-    mmrLambda: values['mmr-lambda'] ? Number(values['mmr-lambda']) : undefined,
+    ...(values['mmr-lambda'] !== undefined ? { mmrLambda: Number(values['mmr-lambda']) } : {}),
 });
 
 if (values.json) {

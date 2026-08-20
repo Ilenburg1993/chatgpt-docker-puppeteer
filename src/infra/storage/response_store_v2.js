@@ -6,7 +6,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 function _resolveArtifactsRoot() {
-    const fromEnv = process.env.MAESTRO_ARTIFACTS_DIR || process.env.ARTIFACTS_DIR || null;
+    const fromEnv = process.env['MAESTRO_ARTIFACTS_DIR'] || process.env['ARTIFACTS_DIR'] || null;
     return path.resolve(fromEnv || ARTIFACTS_DIR);
 }
 

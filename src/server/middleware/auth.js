@@ -44,9 +44,9 @@ export function authenticate(req, res, next) {
         );
 
         // SEC-02 FIX: Verificar se o token foi revogado (logout explícito)
-        const jti = decoded.jti;
+        const jti = decoded['jti'];
         if (jti && isTokenRevoked(String(jti))) {
-            log('WARN', `[AUTH] Token revogado apresentado pelo usuário: ${decoded.username}`, req.id);
+            log('WARN', `[AUTH] Token revogado apresentado pelo usuário: ${decoded['username']}`, req.id);
             return res.status(401).json({
                 success: false,
                 error: 'Token revogado. Por favor, faça login novamente.',
@@ -54,32 +54,32 @@ export function authenticate(req, res, next) {
             });
         }
 
-        const tokenUsername = decoded.username ? String(decoded.username) : '';
+        const tokenUsername = decoded['username'] ? String(decoded['username']) : '';
         const rbacUser = tokenUsername ? getRbacUserByUsername(tokenUsername) : null;
-        const permissions = Array.isArray(decoded.permissions)
-            ? decoded.permissions.map((p) => String(p))
+        const permissions = Array.isArray(decoded['permissions'])
+            ? decoded['permissions'].map((p) => String(p))
             : Array.isArray(rbacUser?.permissions)
               ? rbacUser.permissions
               : [];
-        const role = decoded.role || rbacUser?.role || 'viewer';
+        const role = decoded['role'] || rbacUser?.role || 'viewer';
 
         // Adicionar informações do usuário à requisição
         req.user = {
-            id: decoded.id,
-            username: tokenUsername || decoded.id,
+            id: decoded['id'],
+            username: tokenUsername || decoded['id'],
             role,
-            roles: Array.isArray(decoded.roles)
-                ? decoded.roles
+            roles: Array.isArray(decoded['roles'])
+                ? decoded['roles']
                 : Array.isArray(rbacUser?.roles)
                   ? rbacUser.roles
                   : [role],
             permissions,
-            jti: decoded.jti || null,
-            iat: decoded.iat,
-            exp: decoded.exp,
+            jti: decoded['jti'] || null,
+            iat: decoded['iat'],
+            exp: decoded['exp'],
         };
 
-        log('DEBUG', `[AUTH] User authenticated: ${req.user?.username}`, req.id);
+        log('DEBUG', `[AUTH] User authenticated: ${req.user?.['username']}`, req.id);
         next();
     } catch (/** @type {any} */ error) {
         const _e = /** @type {any} */ (error);
@@ -106,12 +106,12 @@ export function authenticate(req, res, next) {
  * funcionalidades públicas que podem ser aprimoradas com autenticação
  *
  * @param {Request} req - Requisição Express
- * @param {Response} res - Resposta Express
+ * @param {Response} _res - Resposta Express
  * @param {NextFunction} next - Próxima função middleware
  * @returns {void}
  * @sideEffects - Adiciona req.user se token for válido, mas nunca bloqueia
  */
-export function optionalAuthenticate(req, res, next) {
+export function optionalAuthenticate(req, _res, next) {
     const authHeader = req.headers.authorization;
 
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -121,37 +121,37 @@ export function optionalAuthenticate(req, res, next) {
             const decoded = /** @type {{ [k: string]: unknown }} */ (
                 jwt.verify(token, getJwtSecret(), /** @type {VerifyOptions} */ (JWT_VERIFY_OPTIONS))
             );
-            const jti = decoded.jti;
+            const jti = decoded['jti'];
             if (jti && isTokenRevoked(String(jti))) {
                 log('DEBUG', '[AUTH] Optional auth ignored due to revoked token', req.id);
                 return next();
             }
-            const tokenUsername = decoded.username ? String(decoded.username) : '';
+            const tokenUsername = decoded['username'] ? String(decoded['username']) : '';
             const rbacUser = tokenUsername ? getRbacUserByUsername(tokenUsername) : null;
-            const permissions = Array.isArray(decoded.permissions)
-                ? decoded.permissions.map((p) => String(p))
+            const permissions = Array.isArray(decoded['permissions'])
+                ? decoded['permissions'].map((p) => String(p))
                 : Array.isArray(rbacUser?.permissions)
                   ? rbacUser.permissions
                   : [];
-            const role = decoded.role || rbacUser?.role || 'viewer';
+            const role = decoded['role'] || rbacUser?.role || 'viewer';
 
             req.user = {
-                id: decoded.id,
-                username: tokenUsername || decoded.id,
+                id: decoded['id'],
+                username: tokenUsername || decoded['id'],
                 role,
-                roles: Array.isArray(decoded.roles)
-                    ? decoded.roles
+                roles: Array.isArray(decoded['roles'])
+                    ? decoded['roles']
                     : Array.isArray(rbacUser?.roles)
                       ? rbacUser.roles
                       : [role],
                 permissions,
-                jti: decoded.jti || null,
-                iat: decoded.iat,
-                exp: decoded.exp,
+                jti: decoded['jti'] || null,
+                iat: decoded['iat'],
+                exp: decoded['exp'],
             };
-            log('DEBUG', `[AUTH] Optional auth successful: ${req.user?.username}`, req.id);
+            log('DEBUG', `[AUTH] Optional auth successful: ${req.user?.['username']}`, req.id);
         } catch (/** @type {any} */ error) {
-            const _e = /** @type {any} */ (error);
+
             // Ignorar erro - autenticação opcional
             log('DEBUG', `[AUTH] Optional auth failed, continuing without user`, req.id);
         }

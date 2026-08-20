@@ -6,9 +6,20 @@
  * @module copilot/mcp/control-plane/tool-capabilities
  */
 
-export const MCP_TOOL_EXECUTION_LIMITS_VERSION = 1;
+export const MCP_TOOL_EXECUTION_LIMITS_VERSION = 2;
 
 export const MCP_TOOL_EXECUTION_LIMITS = Object.freeze({
+    toolsList: Object.freeze({
+        maxEnvelopeBytes: 400 * 1024,
+    }),
+    terminal: Object.freeze({
+        maxBatchCommands: 32,
+        maxBatchConcurrency: 16,
+        maxSessions: 128,
+        maxExecOutputBytes: 16 * 1024 * 1024,
+        maxSessionBufferBytes: 64 * 1024 * 1024,
+        maxSessionReadBytes: 8 * 1024 * 1024,
+    }),
     repoRead: Object.freeze({
         maxBatchRequests: 64,
         defaultBatchConcurrency: 6,

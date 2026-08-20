@@ -9,11 +9,11 @@ import { countTasksByStatus } from '#infra/db/task_repo';
 /**
  * GET /api/metrics - Métricas gerais do sistema
  *
- * @param {unknown} req
+ * @param {unknown} _req
  * @param {MetricsResponseLike} res
  * @returns {Promise<void>}
  */
-async function getMetrics(req, res) {
+async function getMetrics(_req, res) {
     try {
         const metrics = {
             timestamp: Date.now(),
@@ -39,11 +39,11 @@ async function getMetrics(req, res) {
  * Usa uma única query SQL com GROUP BY status para contar todas as tarefas por status de forma eficiente (evita N+1
  * queries).
  *
- * @param {unknown} req
+ * @param {unknown} _req
  * @param {MetricsResponseLike} res
  * @returns {Promise<void>}
  */
-async function getTaskMetrics(req, res) {
+async function getTaskMetrics(_req, res) {
     try {
         const byStatus = countTasksByStatus();
         const total = Object.values(byStatus).reduce((a, b) => a + b, 0);

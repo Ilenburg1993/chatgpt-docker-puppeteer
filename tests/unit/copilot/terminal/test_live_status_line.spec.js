@@ -1,33 +1,48 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    activity: {
+    activity: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/state/activity-state.js').readTerminalActivitySnapshot>} */ ({
         phase: 'tool',
         label: 'Executando tool',
         detail: 'lendo arquivo · src/copilot/terminal/repl/repl-lifecycle.js',
         source: 'sdk',
         severity: 'info',
-        progress: /** @type {number | null} */ (null),
+        progress: null,
         toolName: 'read_file_content',
+        toolTarget: null,
         startedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
         updatedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
         ageMs: 0,
-    },
-    runtime: {
+    }),
+    runtime: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeState>} */ ({
+        runtimeId: 'default',
         model: 'auto',
         reasoningEffort: 'xhigh',
         status: 'processing',
+        sessionId: null,
         dialogLoopActive: true,
+        dialogPaused: false,
         queueSize: 0,
-    },
-    stream: {
+        pendingQuestion: null,
+        pendingQuestionKind: null,
+        pendingQuestionShadow: null,
+        pendingQuestionShadowKind: null,
+        pendingQuestionShadowState: null,
+        pendingQuestionShadowExpired: false,
+        pendingQuestionShadowAgeMs: null,
+        pendingQuestionShadowExpiresAt: null,
+        pendingQuestionShadowRemainingMs: null,
+        contextWindow: null,
+        lastPrInfo: null,
+        lastLlmUsage: null,
+    }),
+    stream: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalDialogStreamMeta>} */ ({
         model: 'claude-sonnet-4.6',
         reasoningEffort: 'xhigh',
-    },
+    }),
     structuredInputs: /** @type {Record<string, unknown>[]} */ ([]),
     activityHistory: /** @type {Record<string, unknown>[]} */ ([]),
     busy: false,
@@ -88,11 +103,26 @@ describe('terminal/live-status-line', () => {
             ageMs: 12_000,
         };
         mocks.runtime = {
+            runtimeId: 'default',
             model: 'auto',
             reasoningEffort: 'xhigh',
             status: 'processing',
+            sessionId: null,
             dialogLoopActive: true,
+            dialogPaused: false,
             queueSize: 0,
+            pendingQuestion: null,
+            pendingQuestionKind: null,
+            pendingQuestionShadow: null,
+            pendingQuestionShadowKind: null,
+            pendingQuestionShadowState: null,
+            pendingQuestionShadowExpired: false,
+            pendingQuestionShadowAgeMs: null,
+            pendingQuestionShadowExpiresAt: null,
+            pendingQuestionShadowRemainingMs: null,
+            contextWindow: null,
+            lastPrInfo: null,
+            lastLlmUsage: null,
         };
         mocks.stream = {
             model: 'claude-sonnet-4.6',

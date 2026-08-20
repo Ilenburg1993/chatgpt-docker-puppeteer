@@ -4,6 +4,13 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 import { summarizeClientLatencyEvidence, summarizeClientLatencyNumbers } from '#copilot/mcp/control-plane';
 
+/**
+ * @param {string} sampleId
+ * @param {import('../../../../src/copilot/mcp/control-plane/client-latency-evidence.js').ClientThinkingMode} thinkingMode
+ * @param {number} ttftMs
+ * @param {Partial<import('../../../../src/copilot/mcp/control-plane/client-latency-evidence.js').ClientLatencyEvidenceEntry>} [extra]
+ * @returns {import('../../../../src/copilot/mcp/control-plane/client-latency-evidence.js').ClientLatencyEvidenceEntry}
+ */
 function row(sampleId, thinkingMode, ttftMs, extra = {}) {
     return {
         schemaVersion: 1,
@@ -53,7 +60,7 @@ describe('client latency evidence', () => {
             row('m4', 'medium', 5300),
             row('m5', 'medium', 5400),
         ];
-        const summary = summarizeClientLatencyEvidence(/** @type {any} */ (entries));
+        const summary = summarizeClientLatencyEvidence(entries);
         assert.equal(summary.overall.count, 10);
         assert.equal(summary.thinkingHighVsMedium.highCount, 5);
         assert.equal(summary.thinkingHighVsMedium.mediumCount, 5);
@@ -65,7 +72,7 @@ describe('client latency evidence', () => {
     });
 
     it('does not claim a sufficient comparison with sparse evidence', () => {
-        const summary = summarizeClientLatencyEvidence(/** @type {any} */ ([row('h1', 'high', 7000), row('m1', 'medium', 5000)]));
+        const summary = summarizeClientLatencyEvidence([row('h1', 'high', 7000), row('m1', 'medium', 5000)]);
         assert.equal(summary.thinkingHighVsMedium.sufficientForDirectionalComparison, false);
     });
 });

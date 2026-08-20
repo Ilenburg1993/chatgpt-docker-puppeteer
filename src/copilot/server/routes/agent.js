@@ -30,8 +30,8 @@ import { createPresentationRoute } from './presentation-route.js';
 // ── Zod schemas (S-C-03 fix) ──────────────────────────────────────────────
 const injectBodyBaseSchema = z
     .object({
-        message: z.string().trim().min(1).optional(),
-        content: z.string().trim().min(1).optional(),
+        message: z.string()['trim']().min(1).optional(),
+        content: z.string()['trim']().min(1).optional(),
         from: z.string().optional(),
         mode: z
             .enum([
@@ -55,10 +55,9 @@ const injectBodyBaseSchema = z
         strategy: z.string().optional(),
         timeout: z.number().int().min(0).nullable().optional(),
         context_files: z.array(z.string().min(1)).optional(),
-        attachments: z.array(z.object({}).passthrough()).optional(),
+        attachments: z.array(z.object({})['passthrough']()).optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),
-    })
-    .passthrough();
+    })['passthrough']();
 
 const injectBodySchema = injectBodyBaseSchema.refine(
     (/** @type {{ message?: unknown; content?: unknown; mode?: unknown }} */ body) =>
@@ -79,15 +78,13 @@ const pipelineBodySchema = z
             .array(
                 z
                     .object({
-                        prompt: z.string().trim().min(1),
+                        prompt: z.string()['trim']().min(1),
                         from: z.string().optional(),
                         waitMs: z.number().int().min(0).optional(),
-                    })
-                    .passthrough(),
+                    })['passthrough'](),
             )
             .min(1),
-    })
-    .passthrough();
+    })['passthrough']();
 
 const handoffParamsSchema = z.object({
     handoffId: z.string().min(1),

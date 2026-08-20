@@ -40,7 +40,7 @@ function runDevcontainerScript(script, args, env) {
         encoding: 'utf8',
         timeout: 20_000,
     });
-    assert.equal(result.error, undefined, result.error?.message);
+    if (result.error) throw result.error;
     assert.equal(result.signal, null, `${script} terminated by ${String(result.signal)}\n${result.stderr}`);
     return result;
 }
@@ -69,7 +69,7 @@ function auditRegistry(registryPath) {
         encoding: 'utf8',
         timeout: 10_000,
     });
-    assert.equal(result.error, undefined, result.error?.message);
+    if (result.error) throw result.error;
     assert.equal(result.signal, null, `registry audit terminated by ${String(result.signal)}`);
     return { process: result, fields: parseKeyValueLines(result.stdout) };
 }
@@ -78,13 +78,13 @@ describe('DevContainer endpoint registry shared contract', () => {
     it('accepts the canonical v1.2.0 registry and only then materializes all active URLs', () => {
         const result = auditRegistry(CANONICAL_REGISTRY);
         assert.equal(result.process.status, 0);
-        assert.equal(result.fields.status, 'ok');
-        assert.equal(result.fields.version_status, 'ok');
-        assert.equal(result.fields.audit_rc, '0');
-        assert.equal(result.fields.total_bad, '0');
-        assert.equal(result.fields.materialize_rc, '0');
-        assert.ok(Number(result.fields.rows) > 0);
-        assert.equal(result.fields.materialized_count, result.fields.rows);
+        assert.equal(result.fields['status'], 'ok');
+        assert.equal(result.fields['version_status'], 'ok');
+        assert.equal(result.fields['audit_rc'], '0');
+        assert.equal(result.fields['total_bad'], '0');
+        assert.equal(result.fields['materialize_rc'], '0');
+        assert.ok(Number(result.fields['rows']) > 0);
+        assert.equal(result.fields['materialized_count'], result.fields['rows']);
     });
 
     it('rejects a globally invalid registry even when most rows are individually valid', async () => {
@@ -99,12 +99,12 @@ describe('DevContainer endpoint registry shared contract', () => {
         await writeFile(fixture, `${canonical.trimEnd()}\n${firstActive}\n`, 'utf8');
         try {
             const result = auditRegistry(fixture);
-            assert.equal(result.fields.status, 'invalid');
-            assert.notEqual(result.fields.audit_rc, '0');
-            assert.ok(Number(result.fields.duplicate_urls) >= 1);
-            assert.ok(Number(result.fields.duplicate_ids) >= 1);
-            assert.notEqual(result.fields.materialize_rc, '0');
-            assert.equal(result.fields.materialized_count, '0');
+            assert.equal(result.fields['status'], 'invalid');
+            assert.notEqual(result.fields['audit_rc'], '0');
+            assert.ok(Number(result.fields['duplicate_urls']) >= 1);
+            assert.ok(Number(result.fields['duplicate_ids']) >= 1);
+            assert.notEqual(result.fields['materialize_rc'], '0');
+            assert.equal(result.fields['materialized_count'], '0');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -121,11 +121,11 @@ describe('DevContainer endpoint registry shared contract', () => {
         await writeFile(fixture, content, 'utf8');
         try {
             const result = auditRegistry(fixture);
-            assert.equal(result.fields.status, 'invalid');
-            assert.equal(result.fields.version_status, 'mismatch');
-            assert.ok(Number(result.fields.total_bad) >= 2);
-            assert.notEqual(result.fields.materialize_rc, '0');
-            assert.equal(result.fields.materialized_count, '0');
+            assert.equal(result.fields['status'], 'invalid');
+            assert.equal(result.fields['version_status'], 'mismatch');
+            assert.ok(Number(result.fields['total_bad']) >= 2);
+            assert.notEqual(result.fields['materialize_rc'], '0');
+            assert.equal(result.fields['materialized_count'], '0');
         } finally {
             await rm(dir, { recursive: true, force: true });
         }
@@ -161,7 +161,9 @@ describe('DevContainer endpoint registry shared contract', () => {
             const [reportText, summaryText] = await Promise.all([readFile(report, 'utf8'), readFile(summary, 'utf8')]);
             assert.match(reportText, /endpoint_source=default-registry-invalid/u);
             assert.match(summaryText, /endpoint_source=default-registry-invalid/u);
-            assert.doesNotMatch(reportText, new RegExp(firstActive.split('\t')[0].replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+            const firstActiveId = firstActive.split('\t')[0];
+            if (!firstActiveId) throw new Error('Registro ativo sem identificador.');
+            assert.doesNotMatch(reportText, new RegExp(firstActiveId.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
         } finally {
             await rm(dir, { recursive: true, force: true });
         }

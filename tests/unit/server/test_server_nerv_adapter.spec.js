@@ -95,6 +95,7 @@ describe('Server NERV Adapter - Integração Server-NERV', () => {
     describe('3. Comandos Socket.io → NERV', () => {
         it('deve converter comando de pausar para NERV', () => {
             const command = { action: 'pause' };
+            assert.strictEqual(command.action, 'pause');
 
             // Simular conversão
             mockNERV.emit('CONTROL_COMMAND', {

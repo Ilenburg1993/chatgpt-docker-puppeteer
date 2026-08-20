@@ -122,6 +122,7 @@ describe('F128 — audit: nenhum arquivo do projeto importa @github/copilot-sdk 
         const allFiles = globSync(`${SRC}/**/*.js`);
         const sdkFiles = allFiles.filter((f) => f.includes('/sdk/'));
         const nonSdkFiles = allFiles.filter((f) => !f.includes('/sdk/'));
+        expect(sdkFiles.length).toBeGreaterThan(0);
 
         const violations = nonSdkFiles.filter((f) => {
             const content = readFileSync(f, 'utf8');

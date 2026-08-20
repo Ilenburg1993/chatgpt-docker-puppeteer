@@ -10,17 +10,26 @@ const workerStartedAt = performance.now();
 /** @type {Map<string, Promise<Record<string, any>>>} */
 const modeContexts = new Map();
 
+/**
+ * @param {string} name
+ * @param {string} [fallback]
+ */
 function readArg(name, fallback = '') {
     const prefix = `${name}=`;
     const direct = process.argv.slice(2).find((arg) => arg.startsWith(prefix));
     return direct ? direct.slice(prefix.length) : fallback;
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} fallback
+ */
 function readPositiveInteger(value, fallback) {
     const parsed = Number.parseInt(String(value ?? ''), 10);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/** @param {{ ok?: unknown, leakCount?: unknown, scannedStringCount?: unknown, sampleCount?: unknown, tableCount?: unknown }} audit */
 function compactAudit(audit) {
     return {
         ok: audit.ok === true,
@@ -46,6 +55,7 @@ function resolveInput() {
     };
 }
 
+/** @param {string} mode */
 async function loadModeContext(mode) {
     let contextPromise = modeContexts.get(mode);
     if (contextPromise) return contextPromise;
@@ -78,6 +88,7 @@ async function loadModeContext(mode) {
     }
 }
 
+/** @param {{ mode?: unknown, maxRowsPerTable?: unknown }} input */
 async function runAudit(input) {
     const mode = typeof input?.mode === 'string' ? input.mode : '';
     const maxRowsPerTable = readPositiveInteger(input?.maxRowsPerTable, 25);
@@ -85,19 +96,19 @@ async function runAudit(input) {
     const boundedMaxRowsPerTable = Math.max(1, Math.min(maxRowsPerTable, 1_000_000));
     const requestStartedAt = performance.now();
     const context = await loadModeContext(mode);
-    const additionalSecrets = context.redactionModule.collectModelGatewaySecretAuditEnvValues(process.env);
+    const additionalSecrets = context['redactionModule'].collectModelGatewaySecretAuditEnvValues(process.env);
     let audit;
     let sourceSnapshotId = null;
     if (mode === 'catalog') {
-        const snapshot = await context.store.readSnapshot();
+        const snapshot = await context['store'].readSnapshot();
         sourceSnapshotId = snapshot.snapshotId ?? null;
-        audit = context.redactionModule.auditModelGatewayValueRedaction(snapshot, {
+        audit = context['redactionModule'].auditModelGatewayValueRedaction(snapshot, {
             surface: 'json:catalog',
             rootPath: 'catalog',
             additionalSecrets,
         });
     } else {
-        audit = await context.store.auditStoredPayloadRedaction({
+        audit = await context['store'].auditStoredPayloadRedaction({
             additionalSecrets,
             maxRowsPerTable: boundedMaxRowsPerTable,
         });
@@ -116,6 +127,7 @@ async function runOneShot() {
     return runAudit(resolveInput());
 }
 
+/** @param {unknown} result */
 function postWorkerResult(result) {
     if (parentPort) parentPort.postMessage(result);
 }

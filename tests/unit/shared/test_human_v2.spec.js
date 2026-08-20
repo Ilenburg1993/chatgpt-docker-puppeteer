@@ -66,7 +66,7 @@ describe('human.js v2.0 - Unit Tests', () => {
                 assert.ok(result2 >= 4 && result2 <= 16, `result2=${result2} fora da faixa esperada`);
             });
 
-            it('deve invalidar cache após TTL (100ms)', async (t) => {
+            it('deve invalidar cache após TTL (100ms)', async (_t) => {
                 const { gaussian } = humanModule;
 
                 const result1 = gaussian(10, 2);

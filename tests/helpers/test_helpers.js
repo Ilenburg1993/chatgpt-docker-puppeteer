@@ -169,7 +169,7 @@ function startAgent(timeoutMs = 15000) {
     const outPath = path.join(TMP_DIR, `stdout-${Date.now()}.log`);
     const outStream = fs.createWriteStream(outPath);
     const childEnv = /** @type {Record<string, string | undefined>} */ ({ ...process.env, FORCE_COLOR: '1' });
-    delete childEnv.NO_COLOR;
+    delete childEnv['NO_COLOR'];
 
     const proc = child_process.spawn('node', ['index.js'], {
         cwd: ROOT,
@@ -237,7 +237,7 @@ function stopAgent(proc) {
 /**
  * Função exportada: waitForCondition.
  *
- * @param {function(): Promise<boolean>|boolean} fn
+ * @param {() => Promise<boolean> | boolean} fn
  * @param {number} [timeout]
  * @param {number} [interval]
  * @returns {Promise<unknown>}

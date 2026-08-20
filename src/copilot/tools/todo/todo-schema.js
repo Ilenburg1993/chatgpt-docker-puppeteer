@@ -88,7 +88,7 @@ export const VALID_TRANSITIONS = {
 
 export const zStatus = z.enum(['todo', 'in_progress', 'done', 'cancelled', 'blocked']);
 export const zPriority = z.enum(['critical', 'high', 'medium', 'low', 'none']);
-export const zId = z.string().min(1).describe('ID da tarefa (8 chars gerado automaticamente)');
+export const zId = z.string().min(1)['describe']('ID da tarefa (8 chars gerado automaticamente)');
 
 /**
  * Mapa de ordenação de prioridades (menor = mais importante). Usado como chave de sort em listagens e stats.

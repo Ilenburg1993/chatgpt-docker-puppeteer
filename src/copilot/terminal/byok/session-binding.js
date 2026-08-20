@@ -9,7 +9,7 @@
  */
 
 /**
- * @typedef {ReturnType<import('../frontend/projections/config.js').readTerminalByokProjection>['summary']} TerminalByokSummary
+ * @typedef {ReturnType<typeof import('../frontend/projections/config.js').readTerminalByokProjection>['summary']} TerminalByokSummary
  */
 
 /**

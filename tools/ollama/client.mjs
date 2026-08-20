@@ -41,35 +41,35 @@ export class OllamaClient {
      * @param {typeof fetch} [options.fetch]
      */
     constructor(options = {}) {
-        this.cloudBaseUrl = options.cloudBaseUrl || process.env.OLLAMA_CLOUD_BASE_URL || 'https://ollama.com';
-        this.cloudApiKey = options.cloudApiKey || process.env.OLLAMA_CLOUD_API_KEY || '';
+        this.cloudBaseUrl = options.cloudBaseUrl || process.env['OLLAMA_CLOUD_BASE_URL'] || 'https://ollama.com';
+        this.cloudApiKey = options.cloudApiKey || process.env['OLLAMA_CLOUD_API_KEY'] || '';
         this.cloudEnabled =
-            options.cloudEnabled !== undefined ? options.cloudEnabled : process.env.OLLAMA_CLOUD_ENABLED === 'true';
+            options.cloudEnabled !== undefined ? options.cloudEnabled : process.env['OLLAMA_CLOUD_ENABLED'] === 'true';
 
         this.localBaseUrl =
             options.localBaseUrl ||
-            process.env.OLLAMA_LOCAL_BASE_URL ||
-            process.env.OLLAMA_BASE_URL ||
+            process.env['OLLAMA_LOCAL_BASE_URL'] ||
+            process.env['OLLAMA_BASE_URL'] ||
             'http://host.docker.internal:11434';
 
-        this.generateTimeout = Number(process.env.OLLAMA_GENERATE_TIMEOUT || 60000);
-        this.embedTimeout = Number(process.env.OLLAMA_EMBED_TIMEOUT || 30000);
-        this.listTimeout = Number(process.env.OLLAMA_LIST_TIMEOUT || 10000);
-        this.healthTimeout = Number(process.env.OLLAMA_HEALTH_TIMEOUT || 5000);
+        this.generateTimeout = Number(process.env['OLLAMA_GENERATE_TIMEOUT'] || 60000);
+        this.embedTimeout = Number(process.env['OLLAMA_EMBED_TIMEOUT'] || 30000);
+        this.listTimeout = Number(process.env['OLLAMA_LIST_TIMEOUT'] || 10000);
+        this.healthTimeout = Number(process.env['OLLAMA_HEALTH_TIMEOUT'] || 5000);
 
         this.nonEmbeddingRuntime = this._normalizeRuntimePreference(
-            options.nonEmbeddingRuntime || process.env.OLLAMA_NON_EMBEDDING_RUNTIME || 'auto',
+            options.nonEmbeddingRuntime || process.env['OLLAMA_NON_EMBEDDING_RUNTIME'] || 'auto',
         );
 
         this.nonEmbeddingLocalFallback =
             options.nonEmbeddingLocalFallback !== undefined
                 ? Boolean(options.nonEmbeddingLocalFallback)
-                : this._parseBoolean(process.env.OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK, true);
+                : this._parseBoolean(process.env['OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK'], true);
 
-        this.localModelProfile = options.localModelProfile || process.env.OLLAMA_LOCAL_MODEL_PROFILE || 'light';
+        this.localModelProfile = options.localModelProfile || process.env['OLLAMA_LOCAL_MODEL_PROFILE'] || 'light';
 
         this.localAllowedModels = this._buildLocalAllowedModels(
-            options.localAllowedModels || process.env.OLLAMA_LOCAL_ALLOWED_MODELS || '',
+            options.localAllowedModels || process.env['OLLAMA_LOCAL_ALLOWED_MODELS'] || '',
         );
 
         this.lightLocalModels = new Set(DEFAULT_LIGHT_LOCAL_MODELS);
@@ -310,8 +310,8 @@ export class OllamaClient {
      * }>}
      */
     async generateWithMetadata(prompt, model, options = {}) {
-        const defaultModel = process.env.OLLAMA_DEFAULT_MODEL || 'qwen3-coder-next';
-        const defaultMaxTokens = Number(process.env.OLLAMA_MAX_TOKENS || 1000);
+        const defaultModel = process.env['OLLAMA_DEFAULT_MODEL'] || 'qwen3-coder-next';
+        const defaultMaxTokens = Number(process.env['OLLAMA_MAX_TOKENS'] || 1000);
 
         const _opts = /** @type {Record<string, any>} */ (options);
         const {
@@ -530,14 +530,14 @@ export class OllamaClient {
             try {
                 details.cloud_models = await this._listModelsAtRuntime('cloud');
             } catch (error) {
-                details.errors.cloud = /** @type {any} */ (error).message;
+                details.errors['cloud'] = error instanceof Error ? error.message : String(error);
             }
         }
 
         try {
             details.local_models = await this._listModelsAtRuntime('local');
         } catch (error) {
-            details.errors.local = /** @type {any} */ (error).message;
+            details.errors['local'] = error instanceof Error ? error.message : String(error);
         }
 
         return details;

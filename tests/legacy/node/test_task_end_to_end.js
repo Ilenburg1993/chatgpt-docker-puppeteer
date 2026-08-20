@@ -1,4 +1,3 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { parseTask } from '#core/schemas';
 import { saveResponse } from '#infra/storage/response_adapter';
 import fs from 'node:fs';
@@ -18,7 +17,25 @@ const RESPONSES_DIR = path.join(TEST_DIR, 'respostas');
 // Test state
 let testsPassed = 0;
 let testsFailed = 0;
+/** @type {Array<{ name: string; error: string }>} */
 const failedTests = [];
+
+/** @typedef {{
+ *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
+ *     generation?: unknown;
+ *     preview?: unknown;
+ *     validation?: unknown;
+ *     file_path?: string;
+ *     raw_output_preview?: string;
+ *     finish_reason?: string;
+ * }} MockTaskResult */
+
+/** @typedef {{
+ *     meta?: Record<string, unknown>;
+ *     spec?: ({ payload?: Record<string, unknown> } & Record<string, unknown>);
+ *     state?: Record<string, unknown>;
+ *     result?: MockTaskResult;
+ * }} MockTaskOverrides */
 
 // Helpers
 function setupTestDirs() {
@@ -35,7 +52,7 @@ function cleanupTestDirs() {
     }
 }
 
-function createMockTask(taskId, overrides = {}) {
+function createMockTask(/** @type {string} */ taskId, /** @type {MockTaskOverrides} */ overrides = {}) {
     return {
         meta: {
             id: taskId,
@@ -67,41 +84,42 @@ function createMockTask(taskId, overrides = {}) {
         },
         execution: {},
         mission: {},
-        result: overrides.result || {},
+        result: overrides.result || /** @type {MockTaskResult} */ ({}),
     };
 }
 
-function createMockResponseV2(text, includeFormats = { json: true, html: true }) {
+function createMockResponseV2(
+    /** @type {string} */ text,
+    /** @type {{ json: boolean; html: boolean }} */ includeFormats = { json: true, html: true },
+) {
     return {
-        text,
-        markdown: `# Response\n\n${text}`,
-        json: includeFormats.json ? { answer: text } : null,
-        html: includeFormats.html ? `<div><p>${text}</p></div>` : null,
-        metadata: {
-            format_version: 2,
-            generated_at: new Date().toISOString(),
-            source: 'test',
-            extraction_method: 'mock',
-            has_code: false,
-            has_tables: false,
+        content: {
+            text,
+            markdown: `# Response\n\n${text}`,
+            json: includeFormats.json ? { answer: text } : {},
+            html: includeFormats.html ? `<div><p>${text}</p></div>` : '',
         },
+        generation: { model: 'test', completed_at: new Date().toISOString() },
+        preview: { text },
+        validation: null,
     };
 }
 
-async function runTest(name, testFn) {
+async function runTest(/** @type {string} */ name, /** @type {() => Promise<void>} */ testFn) {
     try {
         await testFn();
         console.log(`✅ ${name}`);
         testsPassed++;
         return true;
     } catch (error) {
+        const normalizedError = error instanceof Error ? error : new Error(String(error));
         console.error(`❌ ${name}`);
-        console.error(`   Error: ${error.message}`);
-        if (error.stack) {
-            console.error(`   Stack: ${error.stack.split('\n').slice(1, 3).join('\n')}`);
+        console.error(`   Error: ${normalizedError.message}`);
+        if (normalizedError.stack) {
+            console.error(`   Stack: ${normalizedError.stack.split('\n').slice(1, 3).join('\n')}`);
         }
         testsFailed++;
-        failedTests.push({ name, error: error.message });
+        failedTests.push({ name, error: normalizedError.message });
         return false;
     }
 }
@@ -134,9 +152,10 @@ async function testSchemaV5Validation() {
             parseTask(invalidTask);
             throw new Error('Should have thrown validation error for empty user_message');
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             if (
-                !error.message.includes('String must contain at least 1 character') &&
-                !error.message.includes('Falha crítica')
+                !message.includes('String must contain at least 1 character') &&
+                !message.includes('Falha crítica')
             ) {
                 throw error;
             }
@@ -151,7 +170,8 @@ async function testSchemaV5Validation() {
             parseTask(invalidTask);
             throw new Error('Should have thrown validation error for invalid target');
         } catch (error) {
-            if (!error.message.includes('Invalid enum value') && !error.message.includes('Falha crítica')) {
+            const message = error instanceof Error ? error.message : String(error);
+            if (!message.includes('Invalid enum value') && !message.includes('Falha crítica')) {
                 throw error;
             }
         }
@@ -180,10 +200,11 @@ async function testIDSanitization() {
             parseTask(task);
             throw new Error('Should have thrown validation error for invalid ID chars');
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             if (
-                !error.message.includes('Invalid') &&
-                !error.message.includes('inválido') &&
-                !error.message.includes('Falha crítica')
+                !message.includes('Invalid') &&
+                !message.includes('inválido') &&
+                !message.includes('Falha crítica')
             ) {
                 throw error;
             }
@@ -198,7 +219,7 @@ async function testQueueOperations() {
         // [ESM-SKIP] require('#infra/fs/paths').PATHS.QUEUE = QUEUE_DIR;
 
         const task = createMockTask('test-queue-save');
-        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store');
         await taskStore.saveTask(task);
 
         const savedPath = path.join(QUEUE_DIR, 'test-queue-save.json');
@@ -224,7 +245,7 @@ async function testQueueOperations() {
             spec: { prompt: 'Different prompt' },
         });
 
-        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store');
         await taskStore.saveTask(task1);
 
         // Second save should log warning (we can't easily test logs, so just verify no error)
@@ -250,7 +271,7 @@ async function testQueueDepthLimit() {
         // [ESM-SKIP] require('#infra/fs/paths').PATHS.QUEUE = QUEUE_DIR;
 
         // Criar 5 tasks (dentro do limite)
-        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store');
         for (let i = 1; i <= 5; i++) {
             const task = createMockTask(`test-depth-${i}`);
             await taskStore.saveTask(task);
@@ -314,6 +335,7 @@ async function testOrchestratorCaching() {
 
         // Simular task completion
         const cached = activeExecutions.get('test-duration');
+        if (!cached) throw new Error('Task de duração não encontrada no cache');
         const executionDuration = Date.now() - cached.startedAt;
 
         if (executionDuration < 4900 || executionDuration > 5100) {
@@ -327,14 +349,14 @@ async function testDriverResponseGeneration() {
         const responseText = 'The answer is 4';
         const responseV2 = createMockResponseV2(responseText);
 
-        if (!responseV2.text || responseV2.text !== responseText) {
+        if (!responseV2.content.text || responseV2.content.text !== responseText) {
             throw new Error('ResponseV2.text is incorrect');
         }
-        if (!responseV2.markdown || !responseV2.markdown.includes(responseText)) {
+        if (!responseV2.content.markdown || !responseV2.content.markdown.includes(responseText)) {
             throw new Error('ResponseV2.markdown is missing or incorrect');
         }
-        if (responseV2.metadata.format_version !== 2) {
-            throw new Error('ResponseV2.metadata.format_version should be 2');
+        if (responseV2.generation.model !== 'test') {
+            throw new Error('ResponseV2.generation.model should be test');
         }
     });
 }
@@ -352,13 +374,13 @@ async function testResponseSave() {
         const task = createMockTask(taskId);
         const responseV2 = createMockResponseV2('Test response with all formats');
 
-        await saveResponse(taskId, responseV2, task);
+        const saved = await saveResponse(taskId, responseV2, task);
 
         const expectedFiles = [
-            path.join(RESPONSES_DIR, `${taskId}.txt`),
-            path.join(RESPONSES_DIR, `${taskId}.md`),
-            path.join(RESPONSES_DIR, `${taskId}.json`),
-            path.join(RESPONSES_DIR, `${taskId}.html`),
+            saved.storage.textFile,
+            saved.storage.markdownFile,
+            saved.storage.jsonFile,
+            saved.storage.htmlFile,
         ];
 
         for (const file of expectedFiles) {
@@ -380,23 +402,8 @@ async function testResponseSave() {
 
         await saveResponse(taskId, responseV2, task);
 
-        if (!task.result.response_text) {
-            throw new Error('task.result.response_text not populated');
-        }
-        if (task.result.response_format !== 'v2') {
-            throw new Error(`Expected response_format 'v2', got '${task.result.response_format}'`);
-        }
-        if (typeof task.result.response_length !== 'number') {
-            throw new Error('task.result.response_length should be a number');
-        }
-        if (task.result.response_has_json !== true) {
-            throw new Error('task.result.response_has_json should be true');
-        }
-        if (task.result.response_has_html !== true) {
-            throw new Error('task.result.response_has_html should be true');
-        }
-        if (!task.result.response_metadata) {
-            throw new Error('task.result.response_metadata not populated');
+        if (!task.result.storage?.text_file || task.result.finish_reason !== 'success') {
+            throw new Error('task.result V5 não foi populado');
         }
 
         // [ESM-SKIP] require('#infra/fs/paths').PATHS.RESPOSTAS_DIR = originalRespostasDir;
@@ -412,14 +419,8 @@ async function testResponseSave() {
 
         await saveResponse(taskId, v1Response, task);
 
-        if (!task.result.response_text) {
-            throw new Error('task.result.response_text not populated for V1');
-        }
-        if (task.result.response_format !== 'v1') {
-            throw new Error(`Expected response_format 'v1', got '${task.result.response_format}'`);
-        }
-        if (task.result.response_converted_from_v1 !== true) {
-            throw new Error('task.result.response_converted_from_v1 should be true');
+        if (!task.result.storage?.text_file || task.result.raw_output_preview !== v1Response) {
+            throw new Error('Compatibilidade V1 não populou o result V5');
         }
 
         // [ESM-SKIP] require('#infra/fs/paths').PATHS.RESPOSTAS_DIR = originalRespostasDir;
@@ -440,7 +441,7 @@ async function testResponseRetrieval() {
         const { loadResponse } = await import('#infra/storage/response_adapter');
         const mdContent = await loadResponse(taskId, 'markdown');
 
-        if (!mdContent.includes('Test markdown loading')) {
+        if (typeof mdContent !== 'string' || !mdContent.includes('Test markdown loading')) {
             throw new Error('Markdown content is incorrect');
         }
         if (!mdContent.startsWith('# Response')) {
@@ -463,8 +464,11 @@ async function testResponseRetrieval() {
         const { loadResponse } = await import('#infra/storage/response_adapter');
         const jsonContent = await loadResponse(taskId, 'json');
 
-        const parsed = JSON.parse(jsonContent);
-        if (parsed.answer !== 'Test JSON loading') {
+        if (!jsonContent || typeof jsonContent !== 'object') {
+            throw new Error('JSON loading returned an invalid payload');
+        }
+        const parsed = /** @type {{ content?: { json?: { answer?: string } } }} */ (jsonContent);
+        if (parsed.content?.json?.answer !== 'Test JSON loading') {
             throw new Error('JSON content is incorrect');
         }
 
@@ -494,7 +498,7 @@ async function testFullE2EFlow() {
         }
 
         // 3. Save to queue
-        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store');
         await taskStore.saveTask(validated);
 
         // 4. Simulate execution
@@ -509,19 +513,19 @@ async function testFullE2EFlow() {
         const responseV2 = createMockResponseV2('E2E test response');
 
         // 6. Save response
-        await saveResponse(taskId, responseV2, validated);
+        const savedResponse = await saveResponse(taskId, responseV2, validated);
 
         // 7. Verify task.result populated
-        if (!validated.result.response_text) {
+        if (!validated.result.storage?.text_file) {
             throw new Error('task.result not populated');
         }
 
         // 8. Verify 4 files created
         const expectedFiles = [
-            path.join(RESPONSES_DIR, `${taskId}.txt`),
-            path.join(RESPONSES_DIR, `${taskId}.md`),
-            path.join(RESPONSES_DIR, `${taskId}.json`),
-            path.join(RESPONSES_DIR, `${taskId}.html`),
+            savedResponse.storage.textFile,
+            savedResponse.storage.markdownFile,
+            savedResponse.storage.jsonFile,
+            savedResponse.storage.htmlFile,
         ];
 
         for (const file of expectedFiles) {
@@ -533,7 +537,7 @@ async function testFullE2EFlow() {
         // 9. Load response
         const { loadResponse } = await import('#infra/storage/response_adapter');
         const txtContent = await loadResponse(taskId, 'text');
-        if (!txtContent.includes('E2E test response')) {
+        if (typeof txtContent !== 'string' || !txtContent.includes('E2E test response')) {
             throw new Error('Response retrieval failed');
         }
 
@@ -569,7 +573,7 @@ async function testFullE2EFlow() {
         };
 
         // Save V4 task (should auto-migrate to V5)
-        const taskStore = await import('#infra/storage/task_store').then((m) => m.default ?? m);
+        const taskStore = await import('#infra/storage/task_store');
         const saved = await taskStore.saveTask(taskV4);
 
         if (saved.meta.version !== '5.0') {
@@ -590,7 +594,7 @@ async function testFullE2EFlow() {
 /**
  * Função exportada: runAllTests.
  *
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 async function runAllTests() {
     console.log('\n' + '='.repeat(80));

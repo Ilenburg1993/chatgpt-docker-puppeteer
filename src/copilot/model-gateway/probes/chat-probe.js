@@ -10,14 +10,13 @@
 
 import {
     createPermissionHandler,
-    abortSession,
-    onSessionEvents,
     readConfiguredByokState,
     resolveConfiguredByokSessionOverrides,
-    sendSessionAndWait,
-    withEphemeralSession,
 } from '#copilot/sdk/session';
 import { evaluateModelGatewayProbeAdmission } from './admission.js';
+import { DEFAULT_MODEL_GATEWAY_PROBE_SESSION_RUNTIME } from './session-runtime.js';
+
+/** @typedef {import('../health/provider-failure.js').ByokProviderFailure} ByokProviderFailure */
 
 const DEFAULT_CHAT_PROBE_PROMPT =
     'Responda somente com o texto BYOK_PROBE_OK. Nao use ferramentas, nao peca mais contexto e nao explique.';
@@ -42,7 +41,7 @@ function errorMessage(error) {
 
 /**
  * @param {unknown} value
- * @returns {any}
+ * @returns {ByokProviderFailure | null}
  */
 function defaultFailureClassifier(value) {
     void value;
@@ -50,7 +49,7 @@ function defaultFailureClassifier(value) {
 }
 
 /**
- * @param {any} summary
+ * @param {ReturnType<typeof readConfiguredByokState>['summary']} summary
  * @param {'chat' | 'agent'} mode
  * @param {string} prompt
  * @returns {{ shouldBlock: boolean; label: string }}
@@ -69,9 +68,7 @@ function defaultAdmission(summary, mode, prompt) {
  *     deps?: {
  *         readConfiguredByokState?: typeof readConfiguredByokState;
  *         resolveConfiguredByokSessionOverrides?: typeof resolveConfiguredByokSessionOverrides;
- *         withEphemeralSession?: typeof withEphemeralSession;
- *         onSessionEvents?: typeof onSessionEvents;
- *         sendSessionAndWait?: typeof sendSessionAndWait;
+ *         sessionRuntime?: import('./session-runtime.js').ModelGatewayProbeSessionRuntime;
  *         createPermissionHandler?: typeof createPermissionHandler;
  *         evaluateAdmission?: typeof defaultAdmission;
  *         classifyProviderFailure?: typeof defaultFailureClassifier;
@@ -101,9 +98,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
     const deps = options.deps ?? {};
     const readState = deps.readConfiguredByokState ?? readConfiguredByokState;
     const resolveOverrides = deps.resolveConfiguredByokSessionOverrides ?? resolveConfiguredByokSessionOverrides;
-    const runEphemeral = deps.withEphemeralSession ?? withEphemeralSession;
-    const subscribe = deps.onSessionEvents ?? onSessionEvents;
-    const sendAndWait = deps.sendSessionAndWait ?? sendSessionAndWait;
+    const sessionRuntime = deps.sessionRuntime ?? DEFAULT_MODEL_GATEWAY_PROBE_SESSION_RUNTIME;
     const makePermissionHandler = deps.createPermissionHandler ?? createPermissionHandler;
     const evaluateAdmission = deps.evaluateAdmission ?? defaultAdmission;
     const classifyFailure = deps.classifyProviderFailure ?? defaultFailureClassifier;
@@ -181,7 +176,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
     let providerFailure = null;
 
     try {
-        await runEphemeral(
+        await sessionRuntime.withSession(
             {
                 model,
                 provider,
@@ -195,7 +190,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
             },
             async ({ session, sessionId: temporarySessionId }) => {
                 sessionId = temporarySessionId;
-                const unsubscribe = subscribe(session, {
+                const unsubscribe = sessionRuntime.subscribe(session, {
                     'assistant.message_delta': (event) => {
                         const delta = typeof event?.data?.deltaContent === 'string' ? event.data.deltaContent : '';
                         if (!delta) return;
@@ -229,10 +224,10 @@ export async function runConfiguredByokChatProbe(options = {}) {
                     let reply;
                     try {
                         providerAttempted = true;
-                        reply = await sendAndWait(session, payload, timeoutMs);
+                        reply = await sessionRuntime.sendAndWait(session, payload, timeoutMs);
                     } catch (error) {
                         try {
-                            await abortSession(session);
+                            await sessionRuntime.abort(session);
                         } catch {
                             // Best-effort abort: the original provider/SDK failure remains the probe result.
                         }

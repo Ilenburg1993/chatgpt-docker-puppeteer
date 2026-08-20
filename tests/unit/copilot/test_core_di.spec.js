@@ -30,10 +30,8 @@ describe('core/di.js › createToken', () => {
     });
 
     it('rejeita nome não-string', () => {
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => createToken(42), TypeError);
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => createToken(null), TypeError);
+        assert.throws(() => Reflect.apply(createToken, undefined, [42]), TypeError);
+        assert.throws(() => Reflect.apply(createToken, undefined, [null]), TypeError);
     });
 });
 
@@ -65,21 +63,18 @@ describe('core/di.js › createContainer › register & resolve', () => {
 
     it('rejeita token inválido em register', () => {
         const c = createContainer();
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => c.register(null, () => 1), TypeError);
+        assert.throws(() => Reflect.apply(c.register, c, [null, () => 1]), TypeError);
     });
 
     it('rejeita factory não-função', () => {
         const TOKEN = createToken('X');
         const c = createContainer();
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => c.register(TOKEN, 'not-a-fn'), TypeError);
+        assert.throws(() => Reflect.apply(c.register, c, [TOKEN, 'not-a-fn']), TypeError);
     });
 
     it('rejeita token inválido em resolve', () => {
         const c = createContainer();
-        // @ts-expect-error — teste de runtime
-        assert.throws(() => c.resolve(null), TypeError);
+        assert.throws(() => Reflect.apply(c.resolve, c, [null]), TypeError);
     });
 });
 
@@ -101,8 +96,7 @@ describe('core/di.js › createContainer › has', () => {
 
     it('retorna false para token inválido', () => {
         const c = createContainer();
-        // @ts-expect-error — teste de runtime
-        assert.equal(c.has(null), false);
+        assert.equal(Reflect.apply(c.has, c, [null]), false);
     });
 });
 

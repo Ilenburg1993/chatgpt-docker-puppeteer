@@ -25,7 +25,6 @@ const log = {
 import GLOBAL_CONFIG_RAW from '/workspaces/chatgpt-docker-puppeteer/config.json' with { type: 'json' };
 const GLOBAL_CONFIG = /** @type {any} */ (GLOBAL_CONFIG_RAW);
 const PROXY_PORT = GLOBAL_CONFIG.CHROME_PROXY_PORT || 9224;
-const CHROME_PORT = GLOBAL_CONFIG.CHROME_PORT || 9225;
 
 let passedTests = 0;
 let failedTests = 0;

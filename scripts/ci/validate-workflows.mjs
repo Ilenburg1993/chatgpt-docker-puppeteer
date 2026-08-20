@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // @ts-check
-import yaml from 'js-yaml';
+import * as yaml from 'js-yaml';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -76,24 +76,24 @@ for (const file of files) {
     }
     const workflow = /** @type {Record<string, any>} */ (parsed);
 
-    if (!workflow.name) {
+    if (!workflow['name']) {
         throw new Error(`[ci] Missing required field 'name' in ${file}`);
     }
 
-    if (seenWorkflowNames.has(workflow.name)) {
-        throw new Error(`[ci] Duplicate workflow name '${workflow.name}' detected in ${file}`);
+    if (seenWorkflowNames.has(workflow['name'])) {
+        throw new Error(`[ci] Duplicate workflow name '${workflow['name']}' detected in ${file}`);
     }
-    seenWorkflowNames.add(workflow.name);
+    seenWorkflowNames.add(workflow['name']);
 
-    if (!workflow.on) {
+    if (!workflow['on']) {
         throw new Error(`[ci] Missing required field 'on' in ${file}`);
     }
 
-    if (!workflow.jobs || Object.keys(workflow.jobs).length === 0) {
+    if (!workflow['jobs'] || Object.keys(workflow['jobs']).length === 0) {
         throw new Error(`[ci] Missing required field 'jobs' in ${file}`);
     }
 
-    const schedules = Array.isArray(workflow.on?.schedule) ? workflow.on.schedule : [];
+    const schedules = Array.isArray(workflow['on']?.schedule) ? workflow['on'].schedule : [];
     for (const entry of schedules) {
         const cron = String(entry?.cron || '').trim();
         if (!cron) {
@@ -105,7 +105,7 @@ for (const file of files) {
         }
     }
 
-    if (!workflow.permissions || typeof workflow.permissions !== 'object') {
+    if (!workflow['permissions'] || typeof workflow['permissions'] !== 'object') {
         throw new Error(`[ci] Missing required top-level 'permissions' map in ${file}`);
     }
 
@@ -117,7 +117,7 @@ for (const file of files) {
         }
     }
 
-    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+    for (const [jobName, job] of Object.entries(workflow['jobs'])) {
         if (!job || typeof job !== 'object') {
             throw new Error(`[ci] Invalid job definition '${jobName}' in ${file}`);
         }
@@ -128,29 +128,29 @@ for (const file of files) {
             throw new Error(`[ci] Missing numeric 'timeout-minutes' in ${file} job '${jobName}'`);
         }
 
-        if (!Array.isArray(jobObj.steps) || jobObj.steps.length === 0) {
+        if (!Array.isArray(jobObj['steps']) || jobObj['steps'].length === 0) {
             continue;
         }
 
-        for (const step of jobObj.steps) {
+        for (const step of jobObj['steps']) {
             if (!step || typeof step !== 'object') {
                 continue;
             }
             const stepObj = /** @type {Record<string, any>} */ (step);
 
-            if (typeof stepObj.uses === 'string' && uploadArtifactPattern.test(stepObj.uses)) {
-                if (!stepObj.with || typeof stepObj.with !== 'object') {
+            if (typeof stepObj['uses'] === 'string' && uploadArtifactPattern.test(stepObj['uses'])) {
+                if (!stepObj['with'] || typeof stepObj['with'] !== 'object') {
                     throw new Error(`[ci] Upload artifact step missing 'with' block in ${file} job '${jobName}'`);
                 }
-                if (typeof stepObj.with['retention-days'] !== 'number') {
+                if (typeof stepObj['with']['retention-days'] !== 'number') {
                     throw new Error(
                         `[ci] Upload artifact step missing numeric 'retention-days' in ${file} job '${jobName}'`,
                     );
                 }
             }
 
-            if (typeof stepObj.uses === 'string') {
-                const [actionRef = '', ref = ''] = stepObj.uses.split('@');
+            if (typeof stepObj['uses'] === 'string') {
+                const [actionRef = '', ref = ''] = stepObj['uses'].split('@');
                 const expectedRef = requiredPinnedActionRefs.get(actionRef);
                 if (expectedRef && ref !== expectedRef) {
                     throw new Error(
@@ -172,14 +172,14 @@ if (!dependabotParsed || typeof dependabotParsed !== 'object') {
     throw new Error('[ci] Invalid YAML object in .github/dependabot.yml');
 }
 const depConfig = /** @type {Record<string, any>} */ (dependabotParsed);
-if (depConfig.version !== 2) {
+if (depConfig['version'] !== 2) {
     throw new Error('[ci] .github/dependabot.yml must declare version: 2');
 }
-if (!Array.isArray(depConfig.updates) || depConfig.updates.length === 0) {
+if (!Array.isArray(depConfig['updates']) || depConfig['updates'].length === 0) {
     throw new Error('[ci] .github/dependabot.yml must declare at least one updates entry');
 }
 
-for (const [index, update] of depConfig.updates.entries()) {
+for (const [index, update] of depConfig['updates'].entries()) {
     if (!update || typeof update !== 'object') {
         throw new Error(`[ci] Invalid updates entry at index ${index} in .github/dependabot.yml`);
     }

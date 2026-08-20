@@ -20,8 +20,8 @@ test('wave7: real SIGTERM with inline proxy active triggers single coordinated s
     const childScript = `
         import net from 'node:net';
 
-        process.env.LOG_LEVEL = 'ERROR';
-        process.env.NERV_INTEGRATION = 'false';
+        process.env['LOG_LEVEL'] = 'ERROR';
+        process.env['NERV_INTEGRATION'] = 'false';
 
         const { __mainTestHooks } = await import('#main');
         const ChromeProxyService = (await import('#infra/proxy/chromeProxyService')).default;
@@ -152,7 +152,7 @@ test('wave7: real SIGTERM with inline proxy active triggers single coordinated s
 
 test('wave7: SIGUSR2 is wired to canonical shutdown path', async () => {
     const childScript = `
-        process.env.LOG_LEVEL = 'ERROR';
+        process.env['LOG_LEVEL'] = 'ERROR';
         const { __mainTestHooks } = await import('#main');
         const { shutdown: shutdownDriverFactory } = await import('#driver/factory');
 

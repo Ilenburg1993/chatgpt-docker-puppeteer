@@ -171,7 +171,7 @@ class DriverFactory extends EventEmitter {
          * @private
          * @type {string}
          */
-        this.defaultTargetKey = String(CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET).toLowerCase();
+        this.defaultTargetKey = String(CONFIG['DEFAULT_MODEL_ID'] || CONSTANTS.DEFAULT_TARGET).toLowerCase();
 
         /**
          * Controle de lifecycle explícito (import-safe).
@@ -259,7 +259,7 @@ class DriverFactory extends EventEmitter {
 
             this._discover();
 
-            const shouldWarmup = options.warmup ?? CONFIG.DRIVER_POOL_ENABLED;
+            const shouldWarmup = options.warmup ?? CONFIG['DRIVER_POOL_ENABLED'];
             if (shouldWarmup) {
                 await this.initializePool({ skipEnsureReady: true });
             }
@@ -441,11 +441,11 @@ class DriverFactory extends EventEmitter {
             }
 
             // Validar DEFAULT_TARGET ou usar primeiro descoberto
-            const configuredDefault = String(CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET).toLowerCase();
+            const configuredDefault = String(CONFIG['DEFAULT_MODEL_ID'] || CONSTANTS.DEFAULT_TARGET).toLowerCase();
             this.defaultTargetKey = configuredDefault;
             if (!this.registry[this.defaultTargetKey]) {
                 const availableTargets = Object.keys(this.registry);
-                const originalDefault = CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET;
+                const originalDefault = CONFIG['DEFAULT_MODEL_ID'] || CONSTANTS.DEFAULT_TARGET;
                 this.defaultTargetKey = availableTargets[0] ?? '';
                 log(
                     'WARN',
@@ -509,8 +509,8 @@ class DriverFactory extends EventEmitter {
         log('INFO', '[FACTORY] Initializing driver pool (warmup)...');
 
         const warmupPromises = [];
-        const warmupTargets = Array.isArray(CONFIG.DRIVER_WARMUP_TARGETS) ? CONFIG.DRIVER_WARMUP_TARGETS : [];
-        const minPoolSize = Number(CONFIG.DRIVER_POOL_MIN_SIZE || 0);
+        const warmupTargets = Array.isArray(CONFIG['DRIVER_WARMUP_TARGETS']) ? CONFIG['DRIVER_WARMUP_TARGETS'] : [];
+        const minPoolSize = Number(CONFIG['DRIVER_POOL_MIN_SIZE'] || 0);
 
         for (const target of warmupTargets) {
             const targetKey = target.trim().toLowerCase();
@@ -767,8 +767,8 @@ class DriverFactory extends EventEmitter {
         const key = (targetName || this.getDefaultTarget() || CONSTANTS.DEFAULT_TARGET).toLowerCase();
         const hotPoolEnabled = this._isHotPoolEnabled() && Boolean(this.browserPool);
         const desiredState = hotPoolEnabled ? 'IDLE' : 'UNATTACHED';
-        const maxPoolSize = Number(CONFIG.DRIVER_POOL_MAX_SIZE || 0);
-        const backpressureTimeoutMs = Number(CONFIG.DRIVER_BACKPRESSURE_TIMEOUT_MS || 0);
+        const maxPoolSize = Number(CONFIG['DRIVER_POOL_MAX_SIZE'] || 0);
+        const backpressureTimeoutMs = Number(CONFIG['DRIVER_BACKPRESSURE_TIMEOUT_MS'] || 0);
 
         while (true) {
             const acquisition = await this._serializeByTarget(key, async () => {
@@ -886,7 +886,7 @@ class DriverFactory extends EventEmitter {
                 log('INFO', `[FACTORY] Backpressure recovered: driver released for ${key}`);
                 continue;
             } catch (/** @type {any} */ _timeoutError) {
-                if (CONFIG.DRIVER_BACKPRESSURE_TEMP) {
+                if (CONFIG['DRIVER_BACKPRESSURE_TEMP']) {
                     log(
                         'WARN',
                         '[FACTORY] Backpressure timeout. Creating temporary driver (will be discarded after use)',
@@ -1101,8 +1101,8 @@ class DriverFactory extends EventEmitter {
         this.healthTimer = setInterval(() => {
             try {
                 const now = Date.now();
-                const idleTimeoutMs = Number(CONFIG.DRIVER_IDLE_TIMEOUT_MS || 0);
-                const minPoolSize = Number(CONFIG.DRIVER_POOL_MIN_SIZE || 0);
+                const idleTimeoutMs = Number(CONFIG['DRIVER_IDLE_TIMEOUT_MS'] || 0);
+                const minPoolSize = Number(CONFIG['DRIVER_POOL_MIN_SIZE'] || 0);
 
                 for (const [target, pool] of this.pool.entries()) {
                     // Remove drivers idle por muito tempo (se pool > MIN)
@@ -1326,7 +1326,7 @@ class DriverFactory extends EventEmitter {
      * @returns {string} Nome do target padrão
      */
     getDefaultTarget() {
-        return this.defaultTargetKey || String(CONFIG.DEFAULT_MODEL_ID || CONSTANTS.DEFAULT_TARGET).toLowerCase();
+        return this.defaultTargetKey || String(CONFIG['DEFAULT_MODEL_ID'] || CONSTANTS.DEFAULT_TARGET).toLowerCase();
     }
 
     /**
@@ -1359,13 +1359,13 @@ class DriverFactory extends EventEmitter {
 
             // ✅ v3.0: Pool stats
             pool: {
-                enabled: CONFIG.DRIVER_POOL_ENABLED,
+                enabled: CONFIG['DRIVER_POOL_ENABLED'],
                 hotPoolEnabled: this._isHotPoolEnabled() && Boolean(this.browserPool),
                 totalSize: this._getTotalPoolSize(),
-                maxPoolSize: CONFIG.DRIVER_POOL_MAX_SIZE,
-                minPoolSize: CONFIG.DRIVER_POOL_MIN_SIZE,
-                idleTimeout: CONFIG.DRIVER_IDLE_TIMEOUT_MS,
-                warmupTargets: CONFIG.DRIVER_WARMUP_TARGETS,
+                maxPoolSize: CONFIG['DRIVER_POOL_MAX_SIZE'],
+                minPoolSize: CONFIG['DRIVER_POOL_MIN_SIZE'],
+                idleTimeout: CONFIG['DRIVER_IDLE_TIMEOUT_MS'],
+                warmupTargets: CONFIG['DRIVER_WARMUP_TARGETS'],
                 byTarget: poolStats,
             },
 
@@ -1396,9 +1396,9 @@ class DriverFactory extends EventEmitter {
                 targetsDir: CONSTANTS.TARGETS_DIR,
                 defaultTarget: this.getDefaultTarget(),
                 validateOnBoot: true,
-                maxPoolSize: CONFIG.DRIVER_POOL_MAX_SIZE,
-                minPoolSize: CONFIG.DRIVER_POOL_MIN_SIZE,
-                idleTimeout: CONFIG.DRIVER_IDLE_TIMEOUT_MS,
+                maxPoolSize: CONFIG['DRIVER_POOL_MAX_SIZE'],
+                minPoolSize: CONFIG['DRIVER_POOL_MIN_SIZE'],
+                idleTimeout: CONFIG['DRIVER_IDLE_TIMEOUT_MS'],
             },
         };
     }
@@ -1410,34 +1410,6 @@ class DriverFactory extends EventEmitter {
      */
     getMetrics() {
         return { ...this.metrics };
-    }
-
-    /**
-     * Reseta métricas (útil para testes).
-     *
-     * @private
-     */
-    _resetMetrics() {
-        this.metrics = {
-            driversCreated: 0,
-            poolHits: 0,
-            poolMisses: 0,
-            poolExhausted: 0,
-            driversReleased: 0,
-            driversDestroyed: 0,
-            driversEvicted: 0,
-            discoveryTime: 0,
-            errors: 0,
-            poolBackpressureRecovered: 0,
-            temporaryDriversCreated: 0,
-            hotPoolSize: 0,
-            coldPoolSize: 0,
-            pressureEvents: 0,
-            waitersQueued: 0,
-            waitersWoken: 0,
-            waitersTimedOut: 0,
-            createSerializationPasses: 0,
-        };
     }
 
     /**
@@ -1542,7 +1514,7 @@ class DriverFactory extends EventEmitter {
      * @returns {boolean}
      */
     _isHotPoolEnabled() {
-        return String(process.env.DRIVER_HOT_POOL_ENABLED ?? 'true').toLowerCase() !== 'false';
+        return String(process.env['DRIVER_HOT_POOL_ENABLED'] ?? 'true').toLowerCase() !== 'false';
     }
 
     /**
@@ -1616,28 +1588,28 @@ const factory = new DriverFactory();
 /**
  * Cria novo driver para target.
  *
- * @type {function(string, object): Promise<object>}
+ * @type {typeof factory.createDriver}
  */
 export const createDriver = factory.createDriver.bind(factory);
 
 /**
  * Inicializa lifecycle explícito da factory.
  *
- * @type {function(object=): Promise<void>}
+ * @type {typeof factory.start}
  */
 export const start = factory.start.bind(factory);
 
 /**
  * Garante factory pronta de forma lazy.
  *
- * @type {function(object=): Promise<void>}
+ * @type {typeof factory.ensureReady}
  */
 export const ensureReady = factory.ensureReady.bind(factory);
 
 /**
  * Adquire driver do pool.
  *
- * @type {function(string): Promise<object>}
+ * @type {typeof factory.acquireFromPool}
  */
 export const acquireFromPool = factory.acquireFromPool.bind(factory);
 
@@ -1651,14 +1623,14 @@ export const releaseToPool = factory.releaseToPool.bind(factory);
 /**
  * Inicializa pool de drivers.
  *
- * @type {function(): Promise<void>}
+ * @type {typeof factory.initializePool}
  */
 export const initializePool = factory.initializePool.bind(factory);
 
 /**
  * Desliga factory e pool.
  *
- * @type {function(): Promise<void>}
+ * @type {typeof factory.shutdown}
  */
 export const shutdown = factory.shutdown.bind(factory);
 
@@ -1686,56 +1658,56 @@ export const off = factory.off.bind(factory);
 /**
  * Emite evento.
  *
- * @type {function(string, ... any ): void}
+ * @type {typeof factory.emit}
  */
 export const emit = factory.emit.bind(factory);
 
 /**
  * Obtém metadados de driver específico.
  *
- * @type {function(string): any}
+ * @type {typeof factory.getDriverMetadata}
  */
 export const getDriverMetadata = factory.getDriverMetadata.bind(factory);
 
 /**
  * Obtém metadados de todos os drivers.
  *
- * @type {function(): object}
+ * @type {typeof factory.getAllDriversMetadata}
  */
 export const getAllDriversMetadata = factory.getAllDriversMetadata.bind(factory);
 
 /**
  * Lista targets atualmente disponíveis.
  *
- * @type {function(): string[]}
+ * @type {typeof factory.getAvailableTargets}
  */
 export const getAvailableTargets = factory.getAvailableTargets.bind(factory);
 
 /**
  * Verifica se target está disponível.
  *
- * @type {function(string): boolean}
+ * @type {typeof factory.hasTarget}
  */
 export const hasTarget = factory.hasTarget.bind(factory);
 
 /**
  * Obtém target padrão.
  *
- * @type {function(): string}
+ * @type {typeof factory.getDefaultTarget}
  */
 export const getDefaultTarget = factory.getDefaultTarget.bind(factory);
 
 /**
  * Obtém status de saúde da factory.
  *
- * @type {function(): object}
+ * @type {typeof factory.getHealth}
  */
 export const getHealth = factory.getHealth.bind(factory);
 
 /**
  * Obtém métricas da factory.
  *
- * @type {function(): object}
+ * @type {typeof factory.getMetrics}
  */
 export const getMetrics = factory.getMetrics.bind(factory);
 

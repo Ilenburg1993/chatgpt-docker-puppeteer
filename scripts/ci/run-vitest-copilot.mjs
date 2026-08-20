@@ -153,32 +153,32 @@ function asRecord(value) {
  */
 function collectFailures(report) {
     const root = asRecord(report);
-    const testResults = Array.isArray(root.testResults) ? root.testResults : [];
+    const testResults = Array.isArray(root['testResults']) ? root['testResults'] : [];
     const failures = [];
 
     for (const suite of testResults) {
         const suiteData = asRecord(suite);
-        const file = typeof suiteData.name === 'string' ? suiteData.name : '(suite desconhecida)';
-        const assertionResults = Array.isArray(suiteData.assertionResults) ? suiteData.assertionResults : [];
+        const file = typeof suiteData['name'] === 'string' ? suiteData['name'] : '(suite desconhecida)';
+        const assertionResults = Array.isArray(suiteData['assertionResults']) ? suiteData['assertionResults'] : [];
         for (const assertion of assertionResults) {
             const testData = asRecord(assertion);
-            if (testData.status !== 'failed') continue;
-            const failureMessages = Array.isArray(testData.failureMessages) ? testData.failureMessages : [];
+            if (testData['status'] !== 'failed') continue;
+            const failureMessages = Array.isArray(testData['failureMessages']) ? testData['failureMessages'] : [];
             const firstMessage = typeof failureMessages[0] === 'string' ? failureMessages[0] : '';
-            const location = asRecord(testData.location);
+            const location = asRecord(testData['location']);
             failures.push({
                 file,
                 fullName:
-                    typeof testData.fullName === 'string'
-                        ? testData.fullName
-                        : typeof testData.title === 'string'
-                          ? testData.title
+                    typeof testData['fullName'] === 'string'
+                        ? testData['fullName']
+                        : typeof testData['title'] === 'string'
+                          ? testData['title']
                           : '(falha sem nome)',
-                title: typeof testData.title === 'string' ? testData.title : '(falha sem título)',
-                durationMs: typeof testData.duration === 'number' ? testData.duration : null,
+                title: typeof testData['title'] === 'string' ? testData['title'] : '(falha sem título)',
+                durationMs: typeof testData['duration'] === 'number' ? testData['duration'] : null,
                 location:
-                    typeof location.line === 'number' && typeof location.column === 'number'
-                        ? { line: location.line, column: location.column }
+                    typeof location['line'] === 'number' && typeof location['column'] === 'number'
+                        ? { line: location['line'], column: location['column'] }
                         : null,
                 excerpt: extractFailureExcerpt(firstMessage),
             });
@@ -194,14 +194,14 @@ function collectFailures(report) {
  */
 function collectSuiteFailures(report) {
     const root = asRecord(report);
-    const testResults = Array.isArray(root.testResults) ? root.testResults : [];
+    const testResults = Array.isArray(root['testResults']) ? root['testResults'] : [];
     const suiteFailures = [];
 
     for (const suite of testResults) {
         const suiteData = asRecord(suite);
-        if (suiteData.status !== 'failed') continue;
-        const file = typeof suiteData.name === 'string' ? suiteData.name : '(suite desconhecida)';
-        const message = extractFailureExcerpt(typeof suiteData.message === 'string' ? suiteData.message : '');
+        if (suiteData['status'] !== 'failed') continue;
+        const file = typeof suiteData['name'] === 'string' ? suiteData['name'] : '(suite desconhecida)';
+        const message = extractFailureExcerpt(typeof suiteData['message'] === 'string' ? suiteData['message'] : '');
         suiteFailures.push({ file, message });
     }
 
@@ -227,17 +227,17 @@ function collectSuiteFailures(report) {
 function summarizeCounts(report) {
     const root = asRecord(report);
     return {
-        numFailedTests: Number(root.numFailedTests || 0),
-        numFailedTestSuites: Number(root.numFailedTestSuites || 0),
-        numPassedTests: Number(root.numPassedTests || 0),
-        numPassedTestSuites: Number(root.numPassedTestSuites || 0),
-        numPendingTests: Number(root.numPendingTests || 0),
-        numPendingTestSuites: Number(root.numPendingTestSuites || 0),
-        numTodoTests: Number(root.numTodoTests || 0),
-        numTotalTests: Number(root.numTotalTests || 0),
-        numTotalTestSuites: Number(root.numTotalTestSuites || 0),
-        startTime: Number(root.startTime || Date.now()),
-        success: Boolean(root.success),
+        numFailedTests: Number(root['numFailedTests'] || 0),
+        numFailedTestSuites: Number(root['numFailedTestSuites'] || 0),
+        numPassedTests: Number(root['numPassedTests'] || 0),
+        numPassedTestSuites: Number(root['numPassedTestSuites'] || 0),
+        numPendingTests: Number(root['numPendingTests'] || 0),
+        numPendingTestSuites: Number(root['numPendingTestSuites'] || 0),
+        numTodoTests: Number(root['numTodoTests'] || 0),
+        numTotalTests: Number(root['numTotalTests'] || 0),
+        numTotalTestSuites: Number(root['numTotalTestSuites'] || 0),
+        startTime: Number(root['startTime'] || Date.now()),
+        success: Boolean(root['success']),
     };
 }
 
@@ -259,8 +259,8 @@ function rel(filePath) {
 }
 
 const passthroughArgs = [];
-let fullOutput = process.env.COPILOT_TEST_LOG_FULL === '1';
-let rawLog = process.env.COPILOT_TEST_LOG_RAW === '1';
+let fullOutput = process.env['COPILOT_TEST_LOG_FULL'] === '1';
+let rawLog = process.env['COPILOT_TEST_LOG_RAW'] === '1';
 
 for (const arg of process.argv.slice(2)) {
     if (arg === '--full-output') {
@@ -302,7 +302,7 @@ async function expandGlobArguments(args) {
 
 const expandedPassthroughArgs = await expandGlobArguments(passthroughArgs);
 
-const artifactRoot = path.join(cwd, process.env.COPILOT_TEST_ARTIFACT_DIR || 'artifacts', 'test-runs', 'copilot');
+const artifactRoot = path.join(cwd, process.env['COPILOT_TEST_ARTIFACT_DIR'] || 'artifacts', 'test-runs', 'copilot');
 const runId = new Date().toISOString().replace(/[.:]/gu, '-');
 const runDir = path.join(artifactRoot, runId);
 mkdirSync(runDir, { recursive: true });
@@ -315,7 +315,7 @@ const rawLogPath = path.join(runDir, 'raw.log');
 
 const warningsStream = createWriteStream(warningsLogPath, { encoding: 'utf8' });
 const rawStream = rawLog ? createWriteStream(rawLogPath, { encoding: 'utf8' }) : null;
-const maxLiveInterestingGroups = Math.max(0, Number(process.env.COPILOT_TEST_LIVE_GROUPS || 25));
+const maxLiveInterestingGroups = Math.max(0, Number(process.env['COPILOT_TEST_LIVE_GROUPS'] || 25));
 
 /** @type {Map<string, InterestingLineStat>} */
 const interestingLines = new Map();

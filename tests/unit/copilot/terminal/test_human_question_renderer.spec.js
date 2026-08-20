@@ -6,6 +6,7 @@ import { buildTerminalHumanQuestionCard } from '../../../../src/copilot/terminal
 
 const ANSI_RE = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
+/** @param {string[]} lines */
 function plain(lines) {
     return lines.join('\n').replace(ANSI_RE, '');
 }
@@ -36,7 +37,7 @@ describe('terminal/human-question-renderer', () => {
         expect(output).not.toContain('request_user_input');
         expect(output).not.toContain('ask_user SDK');
         expect(output).not.toMatch(/chatcmpl-tool-[a-z0-9-]+/iu);
-        expect(output.split('\n').every((line) => line.length <= 120)).toBe(true);
+        expect(output.split('\n').every((/** @type {string} */ line) => line.length <= 120)).toBe(true);
     });
 
     it('compacta perguntas longas sem remover o marcador humano canônico', () => {

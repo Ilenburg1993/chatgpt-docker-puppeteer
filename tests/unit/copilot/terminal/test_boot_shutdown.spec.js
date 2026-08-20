@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import assert from 'node:assert/strict';
 import { describe, it, vi } from 'vitest';
@@ -23,6 +22,7 @@ describe('terminal/terminal-phases/boot-shutdown', () => {
                     throw new Error('not used');
                 },
                 wireRuntime: () => undefined,
+                broadcastSse: vi.fn(),
                 loadAliases: async () => undefined,
                 startTodoCleanupJob: () => /** @type {NodeJS.Timeout} */ ({ unref() {} }),
                 bootConfig: /** @type {never} */ ({}),

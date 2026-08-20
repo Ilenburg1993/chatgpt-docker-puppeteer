@@ -13,11 +13,11 @@ const BATCH_DELAY_MS = 5000; // 5 second pause between batches
 async function indexIncremental() {
     const excludeDirs = ['analysis', 'node_modules', '.git', 'coverage', 'dist'];
     const scope = resolveRagScopeConfig({
-        profile: process.env.RAG_PROFILE_DEFAULT || 'core',
-        includeGlobs: process.env.RAG_INCLUDE_GLOBS,
-        excludeGlobs: process.env.RAG_EXCLUDE_GLOBS,
-        docsMode: process.env.RAG_DOCS_MODE,
-        maxFileBytes: process.env.RAG_INDEX_MAX_FILE_BYTES,
+        profile: process.env['RAG_PROFILE_DEFAULT'] || 'core',
+        includeGlobs: process.env['RAG_INCLUDE_GLOBS'],
+        excludeGlobs: process.env['RAG_EXCLUDE_GLOBS'],
+        docsMode: process.env['RAG_DOCS_MODE'],
+        maxFileBytes: process.env['RAG_INDEX_MAX_FILE_BYTES'],
     });
 
     console.log('[RAG Incremental] Starting...');

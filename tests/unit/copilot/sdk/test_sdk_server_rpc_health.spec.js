@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file uses untyped mocks extensively
 /**
  * Testes — Faixa 9: sdk/server-rpc.js + sdk/health.js
  *
@@ -97,6 +96,17 @@ function fakeClient(overrides = {}) {
     };
 }
 
+/**
+ * @template T
+ * @param {T | undefined} value
+ * @param {string} label
+ * @returns {T}
+ */
+function requireFixtureValue(value, label) {
+    if (value === undefined) throw new Error(`[fixture] ${label} missing`);
+    return value;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('sdk/server-rpc', () => {
@@ -138,7 +148,7 @@ describe('sdk/server-rpc', () => {
             const c = fakeClient();
             const result = await modelsList(c);
             expect(result.models).toHaveLength(1);
-            expect(result.models[0].id).toBe('gpt-4.1');
+            expect(requireFixtureValue(result.models[0], 'first model').id).toBe('gpt-4.1');
         });
 
         it('rejeita client inválido', async () => {
@@ -162,7 +172,7 @@ describe('sdk/server-rpc', () => {
             const c = fakeClient();
             const result = await toolsList(c);
             expect(result.tools).toHaveLength(1);
-            expect(result.tools[0].name).toBe('bash');
+            expect(requireFixtureValue(result.tools[0], 'first tool').name).toBe('bash');
         });
 
         it('passa filtro por modelo', async () => {
@@ -192,7 +202,7 @@ describe('sdk/server-rpc', () => {
             const c = fakeClient();
             const result = await accountGetQuota(c);
             expect(result.quotaSnapshots).toHaveProperty('chat');
-            expect(result.quotaSnapshots.chat.remainingPercentage).toBe(70);
+            expect(requireFixtureValue(result.quotaSnapshots['chat'], 'chat quota').remainingPercentage).toBe(70);
         });
 
         it('rejeita client inválido', async () => {

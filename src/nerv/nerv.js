@@ -34,7 +34,7 @@ async function bootstrapSocketAdapter(config) {
     const { default: createSocketAdapter } = await import('#infra/transport/socket_io_adapter');
 
     const socketAdapter = createSocketAdapter({
-        url: config.socketUrl || process.env.NERV_SOCKET_URL || 'http://localhost:3008',
+        url: config.socketUrl || process.env['NERV_SOCKET_URL'] || 'http://localhost:3008',
         options: config.socketOptions || {},
     });
 

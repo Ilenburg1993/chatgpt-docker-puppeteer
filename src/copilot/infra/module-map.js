@@ -190,6 +190,15 @@ export const INFRA_MODULE_LAYOUT = Object.freeze([
         summary: 'Operações rastreáveis, audit log opt-in, transações e rollback futuro.',
     },
     {
+        path: 'bulk-executor.js',
+        kind: 'file',
+        role: 'concurrency-foundation',
+        tier: 'secondary',
+        risk: 'watch',
+        public: false,
+        summary: 'Executor bounded de lotes com cancelamento, progresso e resultados ordenados.',
+    },
+    {
         path: 'io-engine.js',
         kind: 'file',
         role: 'io-engine',

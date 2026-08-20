@@ -43,7 +43,7 @@ export {
 } from '#copilot/events';
 
 /**
- * @param {ReturnType<import('../registry/snapshot.js').buildEnvByokModelGatewaySnapshot>} snapshot
+ * @param {ReturnType<typeof import('../registry/snapshot.js').buildEnvByokModelGatewaySnapshot>} snapshot
  * @returns {{ type: string; timestamp: number; providerCount: number; modelCount: number; enabledModelCount: number; source: string }}
  */
 export function buildRegistrySnapshotEvent(snapshot) {
@@ -58,7 +58,7 @@ export function buildRegistrySnapshotEvent(snapshot) {
 }
 
 /**
- * @param {ReturnType<import('../registry/snapshot.js').buildEnvByokModelGatewaySnapshot>} snapshot
+ * @param {ReturnType<typeof import('../registry/snapshot.js').buildEnvByokModelGatewaySnapshot>} snapshot
  * @returns {{ counters: Record<string, number>; gauges: Record<string, number> }}
  */
 export function projectModelGatewayMetrics(snapshot) {
@@ -202,14 +202,14 @@ function safeStringList(values, limit) {
 }
 
 /**
- * @param {Record<string, any> | null | undefined} selected
+ * @param {Record<string, unknown> | null | undefined} selected
  * @returns {{ gatewayModelId: string | null; providerId: string | null; modelId: string | null; score: number | null; scoreBreakdown: Record<string, unknown> | null; reasons: string[] }}
  */
 function summarizeSelectedRouteCandidate(selected) {
     if (!selected) {
         return { gatewayModelId: null, providerId: null, modelId: null, score: null, scoreBreakdown: null, reasons: [] };
     }
-    const model = selected['model'] ?? {};
+    const model = optionalRecord(selected['model']) ?? {};
     return {
         gatewayModelId: optionalString(model['id']),
         providerId: optionalString(model['providerId']),
@@ -253,7 +253,7 @@ function buildRouteDecisionId(timestamp, taskProfile, modelId, input) {
  *     snapshotId?: string | null;
  *     providerProfile?: string | null;
  *     route: {
- *         selected?: Record<string, any> | null;
+ *         selected?: Record<string, unknown> | null;
  *         candidates?: unknown[];
  *         rejected?: unknown[];
  *         fallbackChain?: unknown[];
@@ -413,9 +413,9 @@ export function projectRouteDecisionMetrics(event) {
  * @param {{
  *     source?: string;
  *     storePath?: string | null;
- *     run?: Record<string, any> | null;
+ *     run?: Record<string, unknown> | null;
  *     summary?: { modelCount?: number; eligibleCount?: number; unknownCount?: number; excludedCount?: number };
- *     decisions?: Record<string, any>[];
+ *     decisions?: Record<string, unknown>[];
  *     persisted?: boolean;
  * }} input
  * @returns {{
@@ -542,10 +542,10 @@ function uniqueStringList(value) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, any>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
 }
 
 /**
@@ -572,8 +572,8 @@ export function buildCatalogRefreshStartedEvent(input) {
  *     storePath?: string | null;
  *     importerIds?: string[];
  *     snapshot: { projections?: unknown[]; providerProjections?: unknown[]; importRuns?: unknown[]; conflicts?: unknown[] };
- *     diff: { added?: string[]; removed?: string[]; changed?: Array<{ changedKinds?: string[] }> };
- *     openai?: { data?: unknown[] };
+ *     diff: ReturnType<typeof import('../catalog/import-runs.js').diffCanonicalModelProjections>;
+ *     openai?: ReturnType<typeof import('../catalog/openai-schema.js').toOpenAIModelCatalogList>;
  * }} input
  * @returns {{
  *     type: string;

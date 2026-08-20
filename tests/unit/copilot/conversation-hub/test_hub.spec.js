@@ -7,14 +7,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /** @param {import('better-sqlite3').Database} db */
 function applyCopilotMigrations(db) {
@@ -40,7 +38,6 @@ function applyCopilotMigrations(db) {
 
 /** Helper para criar instância não-singleton com init() standalone */
 async function createHub() {
-    const Database = require('better-sqlite3');
     const db = new Database(':memory:');
     applyCopilotMigrations(db);
     const store = new ConversationStore();

@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/providers/openai-provider-family-adapter
  */
 
-import { OpenAICompatibleAdapter } from './openai-compatible-adapter.js';
+import { OpenAICompatibleAdapter, providerRecord } from './openai-compatible-adapter.js';
 import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
 
 /**
@@ -27,14 +27,15 @@ import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
  */
 
 /**
- * @param {Record<string, any>} provider
+ * @param {Record<string, unknown>} provider
  * @returns {string[]}
  */
 function providerIdentityParts(provider) {
+    const provenance = providerRecord(provider['provenance']);
     return [
         provider['id'],
-        provider['provenance']?.['preset'],
-        provider['provenance']?.['profile'],
+        provenance['preset'],
+        provenance['profile'],
     ]
         .filter((item) => typeof item === 'string' && item.trim().length > 0)
         .map((item) => String(item));
@@ -54,8 +55,9 @@ export class OpenAIProviderFamilyAdapter extends OpenAICompatibleAdapter {
     }
 
     /**
-     * @param {Record<string, any>} provider
+     * @param {Record<string, unknown>} provider
      * @returns {boolean}
+     * @override
      */
     canHandle(provider) {
         const identities = providerIdentityParts(provider);
@@ -65,12 +67,7 @@ export class OpenAIProviderFamilyAdapter extends OpenAICompatibleAdapter {
     }
 
     /**
-     * @param {{
-     *     provider: Record<string, any>;
-     *     model: Record<string, any>;
-     *     secrets: import('../secrets/env-secret-registry.js').EnvSecretRegistry;
-     * }} input
-     * @returns {{ model: string; provider: Record<string, any>; modelCapabilities?: Record<string, any>; gateway?: Record<string, any> }}
+     * @param {import('./openai-compatible-adapter.js').ModelGatewayProviderAdapterInput} input
      * @override
      */
     toCopilotSessionOverrides(input) {

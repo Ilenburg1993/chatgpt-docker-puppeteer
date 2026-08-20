@@ -467,10 +467,11 @@ describe('parseAndCacheSymbols', () => {
 
         // Segunda chamada usa cache
         const stats1 = getParserCacheStats();
-        const _result2 = await parseAndCacheSymbols(filePath);
+        const result2 = await parseAndCacheSymbols(filePath);
         const stats2 = getParserCacheStats();
         // cache size deve ser >= 1
         assert.ok(stats2.size >= 1, `cache size=${stats2.size}`);
+        assert.ok(result2.symbols.length > 0);
         assert.equal(stats2.symbolSnapshotReads, stats1.symbolSnapshotReads);
         assert.equal(stats2.symbolCacheHits, stats1.symbolCacheHits + 1);
     });
@@ -568,6 +569,7 @@ describe('parseAndCacheSymbols', () => {
             timeout: 10_000,
             maxBuffer: 1024 * 1024,
         });
+        /** @type {{ queuedResult: { status: string; name: string; message: string }; workerQueueLength: number }} */
         const result = JSON.parse(stdout);
 
         assert.deepEqual(result.queuedResult, {
@@ -605,6 +607,7 @@ describe('parseAndCacheSymbols', () => {
             timeout: 10_000,
             maxBuffer: 1024 * 1024,
         });
+        /** @type {{ parseErrors: Array<string | null>; workerQueueRejected: number; workerQueueMax: number }} */
         const result = JSON.parse(stdout);
 
         assert.ok(
@@ -644,6 +647,7 @@ describe('parseAndCacheSymbols', () => {
             timeout: 10_000,
             maxBuffer: 1024 * 1024,
         });
+        /** @type {{ parseErrors: Array<string | null>; symbolCounts: number[]; workerFallbacks: number; workerQueueRejected: number; mainThreadFallbackMaxBytes: number }} */
         const result = JSON.parse(stdout);
 
         assert.ok(result.workerQueueRejected > 0, `result=${stdout}`);

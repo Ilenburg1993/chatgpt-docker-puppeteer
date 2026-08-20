@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file uses untyped mocks extensively
 /**
  * Testes — Faixa 8: sdk/rpc.js (Advanced RPC Subsystems)
  *
@@ -7,7 +5,7 @@
  * toolsHandlePendingCall
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 const { mockLog } = vi.hoisted(() => ({
@@ -233,7 +231,7 @@ describe('sdk/rpc — Advanced Subsystems', () => {
 
         it('rejeita schema não-objeto', async () => {
             const s = fakeSession();
-            await expect(uiElicitation(s, 'msg', null)).rejects.toThrow('objeto');
+            await expect(Reflect.apply(uiElicitation, undefined, [s, 'msg', null])).rejects.toThrow('objeto');
         });
 
         it('rejeita sessão inválida', async () => {
@@ -294,7 +292,9 @@ describe('sdk/rpc — Advanced Subsystems', () => {
 
         it('rejeita result sem kind', async () => {
             const s = fakeSession();
-            await expect(permissionsHandlePending(s, 'req-005', {})).rejects.toThrow('kind');
+            await expect(Reflect.apply(permissionsHandlePending, undefined, [s, 'req-005', {}])).rejects.toThrow(
+                'kind',
+            );
         });
 
         it('rejeita requestId vazio', async () => {

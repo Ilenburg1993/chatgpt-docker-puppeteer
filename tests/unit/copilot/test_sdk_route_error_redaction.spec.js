@@ -33,11 +33,11 @@ function createRes() {
         headersSent: false,
         statusCode: null,
         body: null,
-        status(code) {
+        status(/** @type {number} */ code) {
             this.statusCode = code;
             return this;
         },
-        json(body) {
+        json(/** @type {unknown} */ body) {
             this.body = body;
             return this;
         },

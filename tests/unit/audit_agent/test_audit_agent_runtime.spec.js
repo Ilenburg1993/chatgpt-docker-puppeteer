@@ -12,22 +12,24 @@ test('AuditAgentRuntime creates, queues and processes quick audit jobs to comple
         })(),
     });
     const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
-    assert.equal(job.status, 'PENDING');
-    rt.queueJob(job.id);
+    assert.equal(job['status'], 'PENDING');
+    rt.queueJob(job['id']);
     await rt.tick();
-    const after = /** @type {any} */ (rt.getJob(job.id));
-    assert.equal(after.status, 'COMPLETED');
-    assert.equal(after.current_step, 'completed');
+    const after = rt.getJob(job['id']);
+    assert.ok(after);
+    assert.equal(after['status'], 'COMPLETED');
+    assert.equal(after['current_step'], 'completed');
 });
 
 test('AuditAgentRuntime patch-like job ends in waiting approval', async () => {
     const rt = new AuditAgentRuntime();
     const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'api' });
-    rt.queueJob(job.id);
+    rt.queueJob(job['id']);
     await rt.tick();
-    const after = /** @type {any} */ (rt.getJob(job.id));
-    assert.equal(after.status, 'WAITING_APPROVAL');
-    assert.equal(after.result_json.patch_proposal_pending, true);
+    const after = rt.getJob(job['id']);
+    assert.ok(after);
+    assert.equal(after['status'], 'WAITING_APPROVAL');
+    assert.equal(after['result_json']?.['patch_proposal_pending'], true);
 });
 
 test('AuditAgentRuntime passes job to contextBuilder.collectQuickContext', async () => {
@@ -49,9 +51,9 @@ test('AuditAgentRuntime passes job to contextBuilder.collectQuickContext', async
         trigger_type: 'manual',
         scope: { filePath: 'src/main.js', query: 'AUDIT_AGENT' },
     });
-    rt.queueJob(job.id);
+    rt.queueJob(job['id']);
     await rt.tick();
-    assert.equal(seenJobId, job.id);
+    assert.equal(seenJobId, job['id']);
     assert.deepEqual(seenScope, { filePath: 'src/main.js', query: 'AUDIT_AGENT' });
 });
 
@@ -81,13 +83,14 @@ test('AuditAgentRuntime executes triageClient and records llm triage result', as
     });
 
     const job = rt.createJob({ kind: 'quick_audit', trigger_type: 'manual' });
-    rt.queueJob(job.id);
+    rt.queueJob(job['id']);
     await rt.tick();
-    const after = /** @type {any} */ (rt.getJob(job.id));
+    const after = rt.getJob(job['id']);
+    assert.ok(after);
     assert.equal(triageCalled, 1);
-    assert.equal(after.status, 'COMPLETED');
-    assert.equal(after.result_json?.llm_triage?.ok, true);
-    assert.equal(after.result_json?.llm_triage?.model, 'qwen-test');
+    assert.equal(after['status'], 'COMPLETED');
+    assert.equal(after['result_json']?.['llm_triage']?.['ok'], true);
+    assert.equal(after['result_json']?.['llm_triage']?.['model'], 'qwen-test');
 });
 
 test('AuditAgentRuntime executes patchAuthorClient for patch-like job and records result', async () => {
@@ -137,12 +140,13 @@ test('AuditAgentRuntime executes patchAuthorClient for patch-like job and record
     });
 
     const job = rt.createJob({ kind: 'patch_suggest', trigger_type: 'manual' });
-    rt.queueJob(job.id);
+    rt.queueJob(job['id']);
     await rt.tick();
-    const after = /** @type {any} */ (rt.getJob(job.id));
-    assert.equal(after.status, 'WAITING_APPROVAL');
+    const after = rt.getJob(job['id']);
+    assert.ok(after);
+    assert.equal(after['status'], 'WAITING_APPROVAL');
     assert.equal(patchAuthorCalled, 1);
-    assert.equal(after.result_json?.llm_patch_author?.ok, true);
+    assert.equal(after['result_json']?.['llm_patch_author']?.['ok'], true);
     assert.equal(savedPatches.length >= 1, true);
     assert.equal(savedPatches[0]?.patch_summary?.source, 'audit-agent-patch-llm');
 });

@@ -1,5 +1,4 @@
 // @ts-check
-/** @import {Page} from "puppeteer-core" */
 import { DRIVER_NAMES } from '#core/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';
 import { log } from '#core/logger';
@@ -424,13 +423,13 @@ class ChatGPTDriver extends BaseDriver {
      *
      * ✅ v2.0: AbortSignal integration, timeout máximo, telemetria expandida, empty response detection
      *
-     * @param {any} startSnapshot - Estado inicial (message count)
+     * @param {unknown} _startSnapshot - Estado inicial (message count)
      * @param {AbortSignal} [signal] - Sinal de cancelamento externo
      * @returns {Promise<any>} Resposta completa com metadados de captura
      * @throws {Error} OPERATION_ABORTED, STALL_DETECTED, LIMIT_REACHED, EMPTY_RESPONSE, etc
      * @override
      */
-    async waitForCompletion(startSnapshot, signal) {
+    async waitForCompletion(_startSnapshot, signal) {
         // ✅ BUG #5: Timeout máximo (previne hang)
         const MAX_WAIT_TIME_MS = CHATGPT_CONFIG.MAX_WAIT_TIME_MS;
         const startTime = Date.now();
@@ -569,7 +568,7 @@ class ChatGPTDriver extends BaseDriver {
                     delta: textDelta,
                     stableCycles,
                     elapsedMs: Date.now() - startTime,
-                    isBusy: responseArea?.isBusy || false,
+                    isBusy: responseArea?.['isBusy'] || false,
                 });
 
                 if (textDelta > 0) {
@@ -704,7 +703,7 @@ class ChatGPTDriver extends BaseDriver {
                 const watchdogIdleTime = browserNow - /** @type {any} */ (lastChange);
 
                 if (watchdogIdleTime > adaptiveData.timeout) {
-                    if (responseArea && responseArea.isBusy) {
+                    if (responseArea && responseArea['isBusy']) {
                         // IA ainda ativa fisicamente, renovamos a paciência
                         await /** @type {any} */ (this.page).evaluate(() => (window.__wd_last_change = Date.now()));
                         continue;
@@ -717,7 +716,7 @@ class ChatGPTDriver extends BaseDriver {
                         lastTextLength: lastText.length,
                         stableCycles,
                         continuations: continuationCount,
-                        responseAreaBusy: responseArea?.isBusy || false,
+                        responseAreaBusy: responseArea?.['isBusy'] || false,
                         currentUrl: /** @type {any} */ (this.page).url(),
                         watchdogIdleSince: watchdogIdleTime,
                     });

@@ -15,7 +15,10 @@ import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 
 const ROOT = REPO_ROOT;
 const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-runtime-health');
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -27,20 +30,12 @@ diff it against a previous snapshot. This never calls providers and never runs p
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 function nowStamp() {
     return new Date().toISOString().replace(/[:.]/gu, '-');
 }
 
+/** @param {string | null | undefined} filePath */
 async function readBaseline(filePath) {
     if (!filePath) return null;
     const parsed = JSON.parse(await readFile(filePath, 'utf8'));
@@ -49,6 +44,7 @@ async function readBaseline(filePath) {
 
 async function readCurrentHealth() {
     const fileRecords = listByokProviderModelHealth();
+    /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
     let sqliteRecords = [];
     let sqliteRuntimeError = null;
     try {
@@ -62,12 +58,22 @@ async function readCurrentHealth() {
     return { records, fileRecords: fileRecords.length, sqliteRecords: sqliteRecords.length, sqliteRuntimeError };
 }
 
+/**
+ * @param {unknown} payload
+ * @param {string} filePath
+ * @param {string} latestPath
+ */
 async function writeJsonPayload(payload, filePath, latestPath) {
     const serialized = `${JSON.stringify(payload, null, 2)}\n`;
     await writeFile(filePath, serialized, 'utf8');
     await writeFile(latestPath, serialized, 'utf8');
 }
 
+/**
+ * @param {unknown} snapshot
+ * @param {string} outDir
+ * @param {string} stamp
+ */
 async function writeSnapshot(snapshot, outDir, stamp) {
     await mkdir(outDir, { recursive: true });
     const filePath = path.join(outDir, `${stamp}.json`);
@@ -76,6 +82,11 @@ async function writeSnapshot(snapshot, outDir, stamp) {
     return { filePath, latestPath };
 }
 
+/**
+ * @param {unknown} report
+ * @param {string} outDir
+ * @param {string} stamp
+ */
 async function writeDiffReport(report, outDir, stamp) {
     await mkdir(outDir, { recursive: true });
     const filePath = path.join(outDir, `${stamp}-diff.json`);

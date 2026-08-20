@@ -52,14 +52,13 @@ DevContainers) com:
 
 | Ferramenta                 | Versão Pinada | ARG                                  |
 | -------------------------- | ------------- | ------------------------------------ |
-| npm                        | 11.14.1       | `NPM_VERSION`                        |
+| npm                        | 12.0.2        | `NPM_VERSION`                        |
 | pnpm                       | 11.1.0        | `PNPM_VERSION`                       |
 | @devcontainers/cli         | 0.86.1        | `DEVCONTAINER_CLI_VERSION`           |
 | gh (GitHub CLI)            | 2.92.0        | `GH_VERSION`                         |
 | actionlint                 | 1.7.12        | `ACTIONLINT_VERSION`                 |
 | hadolint                   | 2.14.0        | `HADOLINT_VERSION`                   |
-| typescript                 | 6.0.3         | `TYPESCRIPT_VERSION`                 |
-| typescript-language-server | 5.2.0         | `TYPESCRIPT_LANGUAGE_SERVER_VERSION` |
+| TypeScript nativo (compiler + LSP) | 7.0.2 | `TYPESCRIPT_VERSION` |
 | jsonc-parser               | 3.3.1         | (build-time, inline)                 |
 
 **Como atualizar**: editar os ARGs no topo do Dockerfile e fazer rebuild completo.
@@ -451,12 +450,14 @@ polling explicitamente e os demais watchers usam `fs.watch()` nativo.
 - **Racional**: Mais seguro, zero configuração, funciona em Windows/WSL2/Linux
 - **Referência**: `MIGRATION_SSH_V5.3.md` (histórico)
 
-### [DEC-005] npm global split: `/usr/local/share/npm-global` vs `~/.npm-global`
+### [DEC-005] npm global canônico + fallback legado
 
-- **Decisão**: Tooling canônico da imagem fica em `/usr/local/share/npm-global` (imagem). Tooling do
-  usuário em runtime fica em `~/.npm-global` (volume).
-- **Racional**: Volumes mascaram layers da imagem. Tooling de imagem não deve ficar em path
-  volumado.
+- **Decisão**: `/usr/local/share/npm-global` é o prefixo canônico e prioritário para execução **e**
+  instalação global (`NPM_CONFIG_PREFIX`). O grupo `npm` possui escrita recursiva controlada para permitir
+  upgrades em runtime sem `sudo`. `~/.npm-global` permanece como volume/fallback de migração, depois no `PATH`.
+- **Racional**: o desenho anterior priorizava `/usr/local/share/npm-global/bin` no `PATH`, mas escrevia
+  `npm -g` em `~/.npm-global`; um upgrade podia concluir com sucesso e continuar invisível. A convergência
+  de prefixo elimina esse split-brain sem permitir que um volume masque a camada canônica da imagem.
 
 ### [GAP-001] health.status pode estar vazio
 

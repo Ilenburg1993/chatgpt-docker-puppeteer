@@ -44,7 +44,6 @@ function isExpectedRed(color) {
 
 /**
  * @param {Parameters<typeof runConfiguredByokChatProbe>[0]} [options]
- * @returns {Promise<any>}
  */
 export async function runConfiguredByokVisionProbe(options = {}) {
     const attachment = blobAttachment(BYOK_VISION_PROBE_RED_PIXEL_BASE64, BYOK_VISION_PROBE_MIME_TYPE, {

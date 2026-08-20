@@ -208,33 +208,33 @@ function listenToSignals() {
     }
 
     // Sinais de interrupção padrão (Ctrl+C, PM2 Stop/Reload)
-    signalHandlers.sigint = () => gracefulShutdown('SIGINT');
-    signalHandlers.sigterm = () => gracefulShutdown('SIGTERM');
-    signalHandlers.sigusr2 = () => gracefulShutdown('SIGUSR2');
+    signalHandlers['sigint'] = () => gracefulShutdown('SIGINT');
+    signalHandlers['sigterm'] = () => gracefulShutdown('SIGTERM');
+    signalHandlers['sigusr2'] = () => gracefulShutdown('SIGUSR2');
 
-    registerSignalSafely('SIGINT', 'sigint', signalHandlers.sigint);
-    registerSignalSafely('SIGTERM', 'sigterm', signalHandlers.sigterm);
-    registerSignalSafely('SIGUSR2', 'sigusr2', signalHandlers.sigusr2);
+    registerSignalSafely('SIGINT', 'sigint', signalHandlers['sigint']);
+    registerSignalSafely('SIGTERM', 'sigterm', signalHandlers['sigterm']);
+    registerSignalSafely('SIGUSR2', 'sigusr2', signalHandlers['sigusr2']);
 
-    signalHandlers.sigquit = () => gracefulShutdown('SIGQUIT');
-    signalHandlers.sigbreak = () => gracefulShutdown('SIGBREAK');
+    signalHandlers['sigquit'] = () => gracefulShutdown('SIGQUIT');
+    signalHandlers['sigbreak'] = () => gracefulShutdown('SIGBREAK');
 
     if (process.platform === 'win32') {
-        registerSignalSafely('SIGBREAK', 'sigbreak', signalHandlers.sigbreak);
-        signalHandlers.sigquit = null;
+        registerSignalSafely('SIGBREAK', 'sigbreak', signalHandlers['sigbreak']);
+        signalHandlers['sigquit'] = null;
     } else {
-        registerSignalSafely('SIGQUIT', 'sigquit', signalHandlers.sigquit);
-        signalHandlers.sigbreak = null;
+        registerSignalSafely('SIGQUIT', 'sigquit', signalHandlers['sigquit']);
+        signalHandlers['sigbreak'] = null;
     }
 
     // Sinais auxiliares de subprocesso (não encerram o processo principal)
-    signalHandlers.sigpipe = () => {
+    signalHandlers['sigpipe'] = () => {
         if (isShuttingDown) {
             return;
         }
         log('DEBUG', '[LIFECYCLE] SIGPIPE recebido; mantendo runtime ativo.');
     };
-    signalHandlers.sigchld = () => {
+    signalHandlers['sigchld'] = () => {
         if (isShuttingDown) {
             return;
         }
@@ -242,25 +242,25 @@ function listenToSignals() {
     };
 
     if (process.platform === 'win32') {
-        signalHandlers.sigpipe = null;
-        signalHandlers.sigchld = null;
+        signalHandlers['sigpipe'] = null;
+        signalHandlers['sigchld'] = null;
     } else {
-        registerSignalSafely('SIGPIPE', 'sigpipe', signalHandlers.sigpipe);
-        registerSignalSafely('SIGCHLD', 'sigchld', signalHandlers.sigchld);
+        registerSignalSafely('SIGPIPE', 'sigpipe', signalHandlers['sigpipe']);
+        registerSignalSafely('SIGCHLD', 'sigchld', signalHandlers['sigchld']);
     }
 
     // Captura de falhas catastróficas para evitar encerramento "sujo" da infraestrutura
-    signalHandlers.uncaughtException = (/** @type {any} */ err) => {
+    signalHandlers['uncaughtException'] = (/** @type {Error} */ err) => {
         log('FATAL', `[LIFECYCLE] Exceção não tratada: ${err.message}\n${err.stack}`);
         void gracefulShutdown('UNCAUGHT_EXCEPTION');
     };
-    process.on('uncaughtException', signalHandlers.uncaughtException);
+    process.on('uncaughtException', signalHandlers['uncaughtException']);
 
-    signalHandlers.unhandledRejection = (/** @type {any} */ reason) => {
+    signalHandlers['unhandledRejection'] = (/** @type {unknown} */ reason) => {
         log('FATAL', `[LIFECYCLE] Rejeição de Promise não tratada: ${reason}`);
         void gracefulShutdown('UNHANDLED_REJECTION');
     };
-    process.on('unhandledRejection', signalHandlers.unhandledRejection);
+    process.on('unhandledRejection', signalHandlers['unhandledRejection']);
 
     signalsListening = true;
 }

@@ -23,11 +23,11 @@ async function runTests() {
     try {
         // Test 1: Environment Variables
         console.log('[1/6] Testing environment variables...');
-        assert.ok(process.env.OLLAMA_DEFAULT_MODEL, 'OLLAMA_DEFAULT_MODEL should be set');
-        assert.ok(process.env.OLLAMA_GENERATE_TIMEOUT, 'OLLAMA_GENERATE_TIMEOUT should be set');
-        console.log(`✅ Default model: ${process.env.OLLAMA_DEFAULT_MODEL}`);
-        console.log(`✅ Generate timeout: ${process.env.OLLAMA_GENERATE_TIMEOUT}ms`);
-        console.log(`✅ Max tokens: ${process.env.OLLAMA_MAX_TOKENS}\n`);
+        assert.ok(process.env['OLLAMA_DEFAULT_MODEL'], 'OLLAMA_DEFAULT_MODEL should be set');
+        assert.ok(process.env['OLLAMA_GENERATE_TIMEOUT'], 'OLLAMA_GENERATE_TIMEOUT should be set');
+        console.log(`✅ Default model: ${process.env['OLLAMA_DEFAULT_MODEL']}`);
+        console.log(`✅ Generate timeout: ${process.env['OLLAMA_GENERATE_TIMEOUT']}ms`);
+        console.log(`✅ Max tokens: ${process.env['OLLAMA_MAX_TOKENS']}\n`);
 
         // Test 2: Health Check
         console.log('[2/6] Testing health check speed...');
@@ -51,7 +51,7 @@ async function runTests() {
         // Test 4: Small Generation (should succeed)
         console.log('[4/6] Testing small generation (200 tokens)...');
         const smallStart = Date.now();
-        const smallResult = await ollama.generate('Say hello in one sentence.', process.env.OLLAMA_DEFAULT_MODEL, {
+        const smallResult = await ollama.generate('Say hello in one sentence.', process.env['OLLAMA_DEFAULT_MODEL'], {
             num_predict: 200,
             temperature: 0.3,
         });
@@ -68,7 +68,7 @@ async function runTests() {
         try {
             const largeResult = await ollama.generate(
                 'Write a detailed explanation of how neural networks work, including architecture, training, and applications.',
-                process.env.OLLAMA_DEFAULT_MODEL,
+                process.env['OLLAMA_DEFAULT_MODEL'],
                 { num_predict: 2000, temperature: 0.7 },
             );
             const timeoutTime = Date.now() - timeoutStart;
@@ -90,10 +90,10 @@ async function runTests() {
 
         // Test 6: Performance Summary
         console.log('[6/6] Performance Summary');
-        console.log(`Model: ${process.env.OLLAMA_DEFAULT_MODEL}`);
-        console.log(`Client timeout: ${process.env.OLLAMA_GENERATE_TIMEOUT}ms`);
-        console.log(`Max tokens: ${process.env.OLLAMA_MAX_TOKENS}`);
-        console.log(`Base URL: ${process.env.OLLAMA_BASE_URL || 'http://host.docker.internal:11434'}`);
+        console.log(`Model: ${process.env['OLLAMA_DEFAULT_MODEL']}`);
+        console.log(`Client timeout: ${process.env['OLLAMA_GENERATE_TIMEOUT']}ms`);
+        console.log(`Max tokens: ${process.env['OLLAMA_MAX_TOKENS']}`);
+        console.log(`Base URL: ${process.env['OLLAMA_BASE_URL'] || 'http://host.docker.internal:11434'}`);
         console.log();
 
         console.log('✅ All tests passed!');

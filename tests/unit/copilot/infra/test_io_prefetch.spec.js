@@ -234,9 +234,9 @@ describe('warmFromDirectory', () => {
         resetIoL1CacheForTest();
         const result = await warmFromDirectory(tmpDir, { maxFiles: 1 });
         assert.ok(result.preloaded + result.skipped <= 1, `preloaded=${result.preloaded}`);
-        assert.strictEqual(result.advisoryLimits.requestedMaxFiles, 1);
-        assert.strictEqual(result.advisoryLimits.limitMode, 'enforced-max-files');
-        assert.strictEqual(result.advisoryLimits.hardLimitReached, true);
+        assert.strictEqual(result.advisoryLimits['requestedMaxFiles'], 1);
+        assert.strictEqual(result.advisoryLimits['limitMode'], 'enforced-max-files');
+        assert.strictEqual(result.advisoryLimits['hardLimitReached'], true);
     });
 
     it('coverage distribui o hard cap entre buckets top-level', async () => {
@@ -257,7 +257,7 @@ describe('warmFromDirectory', () => {
 
         assert.strictEqual(result.paths.length, 3);
         assert.strictEqual(buckets.size, 3);
-        assert.deepStrictEqual(result.advisoryLimits.selection, {
+        assert.deepStrictEqual(result.advisoryLimits['selection'], {
             mode: 'coverage',
             candidateBuckets: 3,
             selectedBuckets: 3,
@@ -305,7 +305,8 @@ describe('warmFromDirectory', () => {
         });
 
         assert.deepStrictEqual(limited.paths, full.paths.slice(0, 2));
-        assert.strictEqual(limited.advisoryLimits.selection.mode, 'lexical');
+        const limitedSelection = /** @type {{ mode: string }} */ (limited.advisoryLimits['selection']);
+        assert.strictEqual(limitedSelection.mode, 'lexical');
     });
 
     it('preferredPaths entram primeiro, são deduplicados e continuam dentro de maxFiles', async () => {
@@ -326,9 +327,12 @@ describe('warmFromDirectory', () => {
 
         assert.strictEqual(result.paths.length, 2);
         assert.strictEqual(result.paths[0], preferred);
-        assert.strictEqual(result.advisoryLimits.selection.preferredRequested, 2);
-        assert.strictEqual(result.advisoryLimits.selection.preferredSelected, 1);
-        assert.strictEqual(result.advisoryLimits.hardLimitReached, true);
+        const selection = /** @type {{ preferredRequested: number; preferredSelected: number }} */ (
+            result.advisoryLimits['selection']
+        );
+        assert.strictEqual(selection.preferredRequested, 2);
+        assert.strictEqual(selection.preferredSelected, 1);
+        assert.strictEqual(result.advisoryLimits['hardLimitReached'], true);
     });
 
     it('aplica braces e exclusão por diretório com a política glob canônica', async () => {
@@ -351,6 +355,6 @@ describe('warmFromDirectory', () => {
         assert.ok(result.paths.some((filePath) => filePath.endsWith('glob-nested/match.ts')));
         assert.ok(!result.paths.some((filePath) => filePath.endsWith('glob-nested/skip.md')));
         assert.ok(!result.paths.some((filePath) => filePath.includes('glob-excluded')));
-        assert.strictEqual(result.advisoryLimits.globEngine, 'minimatch-v10');
+        assert.strictEqual(result.advisoryLimits['globEngine'], 'minimatch-v10');
     });
 });

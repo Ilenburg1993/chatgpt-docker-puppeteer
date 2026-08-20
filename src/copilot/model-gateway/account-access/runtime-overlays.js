@@ -194,7 +194,7 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
     const accountWide = accountWideFailureKinds.has(failureKind);
     const sourceModelPart = accountWide || !providerModel ? 'provider' : providerModel.replace(/[^a-z0-9_.-]+/giu, '_');
     const sourceId = `runtime-health-${failureKind}`;
-    return /** @type {Record<string, unknown>} */ (createProviderAccountOverlay({
+    return createProviderAccountOverlay({
         accountOverlayId: `runtime-health:${providerId}:${options.accountScope ?? 'default'}:${sourceModelPart}:${failureKind}`,
         providerId,
         accountScope: options.accountScope ?? 'default',
@@ -227,7 +227,7 @@ export function deriveModelGatewayRuntimeAccountOverlayFromHealth(health, option
         },
         observedAt: observedMs,
         expiresAt: resolveExpiresAt(observedMs, resetAt, ttlSeconds),
-    }));
+    });
 }
 
 /**

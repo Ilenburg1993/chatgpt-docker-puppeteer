@@ -44,8 +44,8 @@ describe('HookRegistry', () => {
 
         const schema = reg.get('onSessionStart');
         assert.ok(schema, 'Deve retornar schema');
-        assert.equal(schema.name, 'onSessionStart', 'name deve estar correto');
-        assert.equal(schema.description, 'Início de sessão');
+        assert.equal(schema['name'], 'onSessionStart', 'name deve estar correto');
+        assert.equal(schema['description'], 'Início de sessão');
     });
 
     it('get retorna undefined para hook não registrado', async () => {
@@ -82,7 +82,7 @@ describe('HookRegistry', () => {
 
         const all = reg.list();
         assert.equal(all.length, 3, 'Deve listar 3 hooks');
-        const names = all.map((s) => s.name);
+        const names = all.map((s) => s['name']);
         assert.ok(names.includes('hook1'));
         assert.ok(names.includes('hook2'));
         assert.ok(names.includes('hook3'));

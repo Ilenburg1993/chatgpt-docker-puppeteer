@@ -1,61 +1,46 @@
+// Gerado por scripts/setup/sync-vscode-extensions.mjs.
+// Fonte canônica: config/vscode/extensions.mjs. Não edite as listas manualmente.
 {
-    // ============================================================
-    // VS Code Extensions Configuration v2.0
-    // chatgpt-docker-puppeteer project
-    // ============================================================
     "recommendations": [
-        // === CORE ESSENTIALS ===
-        "GitHub.copilot-chat",
+        "TypeScriptTeam.native-preview",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "ms-azuretools.vscode-docker",
-        // === BUILD & TOOLS ===
-        "ms-vscode.makefile-tools",
-        "christian-kohler.npm-intellisense",
-        "cmstead.jsrefactor",
-        "pflannery.vscode-versionlens",
-        // === GIT & VERSION CONTROL ===
-        "eamodio.gitlens",
-        "GitHub.vscode-pull-request-github", // enable PR management directly from the editor
-        // === CODE QUALITY & PRODUCTIVITY ===
         "usernamehw.errorlens",
-        "aaron-bond.better-comments",
-        "christian-kohler.path-intellisense",
-        "gruntfuggly.todo-tree",
-        // === TESTING & API ===
+        "ms-azuretools.vscode-containers",
+        "ms-vscode.makefile-tools",
+        "eamodio.gitlens",
+        "timonwong.shellcheck",
+        "redhat.vscode-yaml",
+        "EditorConfig.EditorConfig",
+        "ms-vscode.powershell",
+        "MS-CEINTL.vscode-language-pack-pt-BR",
+        "Vue.volar",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
+        "Anthropic.claude-code",
+        "coderabbit.coderabbit-vscode",
+        "openai.chatgpt",
+        "google.geminicodeassist",
+        "HuggingFace.huggingface-vscode-chat",
+        "kilocode.kilo-code",
+        "sst-dev.opencode",
         "humao.rest-client",
-        // === DOCUMENTATION ===
+        "aaron-bond.better-comments",
         "yzhang.markdown-all-in-one",
-        "bierner.markdown-preview-github-styles",
-        // === OPTIONAL (Visual & Utilities) ===
-        "PKief.material-icon-theme",
-        "streetsidesoftware.code-spell-checker",
-        "oderwat.indent-rainbow",
-        "ms-vscode-remote.vscode-remote-extensionpack",
-        "ms-ceintl.vscode-language-pack-pt-br" // Cores arco-íris por nível de indentação (funcionalidade única)
+        "DavidAnson.vscode-markdownlint"
     ],
     "unwantedRecommendations": [
-        // Language servers não relevantes para Node.js project
-        "ms-vscode.powershell",
-        "ms-python.python",
-        "ms-dotnettools.csharp",
-        "vscjava.vscode-java-pack",
-        "golang.go",
-        "rust-lang.rust-analyzer",
-        // IDE alternative keybindings (conflitam)
-        "ms-vscode.sublime-keybindings",
-        "ms-vscode.atom-keybindings",
-        "vscodevim.vim",
-        // Linters conflitantes com ESLint
-        "standard.vscode-standard",
-        "dbaeumer.jshint",
-        // Formatters conflitantes com Prettier
-        "HookyQR.beautify",
-        "esbenp.beautify",
-        // Live servers (projeto usa Express)
-        "ms-vscode.live-server",
-        "ritwickdey.LiveServer",
-        // DEPRECATED/OBSOLETE EXTENSIONS (NEVER INSTALL)
+        "christian-kohler.path-intellisense",
+        "christian-kohler.npm-intellisense",
+        "hbenl.vscode-test-explorer",
+        "mhutchie.git-graph",
+        "oderwat.indent-rainbow",
+        "ZainChen.json",
+        "MermaidChart.vscode-mermaid-chart",
+        "bierner.markdown-mermaid",
+        "vscjava.migrate-java-to-azure",
         "ms-vscode.node-debug",
         "ms-vscode.node-debug2",
         "eg2.vscode-npm-script",
@@ -70,9 +55,16 @@
         "CoenraadS.bracket-pair-colorizer-2",
         "2gua.rainbow-brackets",
         "ms-vscode.vscode-typescript-tslint-plugin",
-        // PROBLEMATIC EXTENSIONS (Don't install)
         "formulahendry.code-runner",
-        "mhutchie.git-graph",
-        "rangav.vscode-thunder-client"
+        "rangav.vscode-thunder-client",
+        "standard.vscode-standard",
+        "dbaeumer.jshint",
+        "HookyQR.beautify",
+        "esbenp.beautify",
+        "ms-vscode.live-server",
+        "ritwickdey.LiveServer",
+        "ms-vscode.sublime-keybindings",
+        "ms-vscode.atom-keybindings",
+        "vscodevim.vim"
     ]
 }

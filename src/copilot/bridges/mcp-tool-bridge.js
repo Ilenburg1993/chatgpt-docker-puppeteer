@@ -343,7 +343,7 @@ async function rpcCall(method, deps, params) {
         span?.setAttribute('duration_ms', deps.now() - t0);
         span?.setAttribute('status_code', 2);
         span?.setStatus({ code: 2, message: toError(err).message });
-        span?.recordException(err);
+        span?.recordException(observability.toOtelException(err));
         deps.metricsStore.recordToolCall(`bridge.mcp.${method}`, deps.now() - t0, false);
         deps.metricsStore.recordCounter('copilot.bridge.errors_total');
         throw err;

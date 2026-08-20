@@ -6,12 +6,10 @@
  * integração real com ConversationStore.
  */
 
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /**
  * @param {import('better-sqlite3').Database} db
@@ -85,7 +83,6 @@ const bodyOf = (result) => /** @type {T} */ (result.body);
 
 describe('handlers/dialog — sessions', () => {
     beforeEach(() => {
-        const Database = require('better-sqlite3');
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
@@ -122,7 +119,6 @@ describe('handlers/dialog — sessions', () => {
 
 describe('handlers/dialog — turns', () => {
     beforeEach(() => {
-        const Database = require('better-sqlite3');
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
@@ -157,7 +153,6 @@ describe('handlers/dialog — turns', () => {
 
 describe('handlers/dialog — memory', () => {
     beforeEach(() => {
-        const Database = require('better-sqlite3');
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();
@@ -207,7 +202,6 @@ describe('handlers/dialog — memory', () => {
 
 describe('handlers/dialog — hub-health', () => {
     beforeEach(() => {
-        const Database = require('better-sqlite3');
         testDb = new Database(':memory:');
         applyCopilotMigrations(testDb);
         store = new ConversationStore();

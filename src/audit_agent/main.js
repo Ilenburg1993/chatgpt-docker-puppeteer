@@ -5,21 +5,21 @@ import { AUDIT_JOB_STATUS } from './contracts.js';
 import { AuditAgentRuntime } from './runtime.js';
 import { createAuditAgentServer } from './server.js';
 
-const enabled = String(process.env.AUDIT_AGENT_ENABLED || 'false').toLowerCase() === 'true';
+const enabled = String(process.env['AUDIT_AGENT_ENABLED'] || 'false').toLowerCase() === 'true';
 if (!enabled) {
     console.log('[audit-agent] disabled (AUDIT_AGENT_ENABLED=false)');
     process.exit(0);
 }
 
 const cfg = {
-    mode: String(process.env.AUDIT_AGENT_MODE || 'semi_auto'),
-    maxConcurrentJobs: Number(process.env.AUDIT_AGENT_MAX_CONCURRENT_JOBS || 1),
-    maxParallelLlmCalls: Number(process.env.AUDIT_AGENT_MAX_PARALLEL_LLM_CALLS || 1),
-    triggerDebounceMs: Number(process.env.AUDIT_AGENT_TRIGGER_DEBOUNCE_MS || 5000),
-    jobCooldownMs: Number(process.env.AUDIT_AGENT_JOB_COOLDOWN_MS || 30000),
-    host: String(process.env.AUDIT_AGENT_HOST || '127.0.0.1'),
-    port: Number(process.env.AUDIT_AGENT_PORT || 3098),
-    persistDb: String(process.env.AUDIT_AGENT_PERSIST_DB || 'true').toLowerCase() !== 'false',
+    mode: String(process.env['AUDIT_AGENT_MODE'] || 'semi_auto'),
+    maxConcurrentJobs: Number(process.env['AUDIT_AGENT_MAX_CONCURRENT_JOBS'] || 1),
+    maxParallelLlmCalls: Number(process.env['AUDIT_AGENT_MAX_PARALLEL_LLM_CALLS'] || 1),
+    triggerDebounceMs: Number(process.env['AUDIT_AGENT_TRIGGER_DEBOUNCE_MS'] || 5000),
+    jobCooldownMs: Number(process.env['AUDIT_AGENT_JOB_COOLDOWN_MS'] || 30000),
+    host: String(process.env['AUDIT_AGENT_HOST'] || '127.0.0.1'),
+    port: Number(process.env['AUDIT_AGENT_PORT'] || 3098),
+    persistDb: String(process.env['AUDIT_AGENT_PERSIST_DB'] || 'true').toLowerCase() !== 'false',
 };
 
 let store = null;
@@ -76,8 +76,8 @@ const server = createAuditAgentServer({ runtime });
 
 console.log('[audit-agent] starting (skeleton)', { cfg, initialStatus: AUDIT_JOB_STATUS.PENDING });
 
-if (String(process.env.AUDIT_AGENT_HYDRATE_ON_START || 'true').toLowerCase() === 'true') {
-    const hydration = runtime.hydrateFromStore({ limit: Number(process.env.AUDIT_AGENT_HYDRATE_LIMIT || 200) });
+if (String(process.env['AUDIT_AGENT_HYDRATE_ON_START'] || 'true').toLowerCase() === 'true') {
+    const hydration = runtime.hydrateFromStore({ limit: Number(process.env['AUDIT_AGENT_HYDRATE_LIMIT'] || 200) });
     console.log('[audit-agent] hydration', hydration);
 }
 

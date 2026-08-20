@@ -78,10 +78,10 @@ function validateReportShape(report, expectedSchemaVersion) {
         'public_symbols_using_template_tags',
     ];
 
-    if (report.schema_version !== expectedSchemaVersion) {
+    if (report['schema_version'] !== expectedSchemaVersion) {
         issues.push(`schema_version must be ${expectedSchemaVersion}.`);
     }
-    if (report.scope !== 'full' && report.scope !== 'changed') {
+    if (report['scope'] !== 'full' && report['scope'] !== 'changed') {
         issues.push('scope must be "full" or "changed".');
     }
     for (const field of requiredNumericFields) {
@@ -90,23 +90,23 @@ function validateReportShape(report, expectedSchemaVersion) {
         }
     }
 
-    if (!Array.isArray(report.files)) {
+    if (!Array.isArray(report['files'])) {
         issues.push('files must be an array.');
     }
-    if (!isRecord(report.by_path_prefix)) {
+    if (!isRecord(report['by_path_prefix'])) {
         issues.push('by_path_prefix must be an object.');
     }
 
-    for (const fileReport of Array.isArray(report.files) ? report.files : []) {
+    for (const fileReport of Array.isArray(report['files']) ? report['files'] : []) {
         if (!isRecord(fileReport)) {
             issues.push('Each file report must be an object.');
             continue;
         }
-        if (!isString(fileReport.file)) {
+        if (!isString(fileReport['file'])) {
             issues.push('Each file report requires a string file path.');
         }
-        if (!Array.isArray(fileReport.exported_symbols)) {
-            issues.push(`File report ${String(fileReport.file || '<unknown>')} must expose exported_symbols.`);
+        if (!Array.isArray(fileReport['exported_symbols'])) {
+            issues.push(`File report ${String(fileReport['file'] || '<unknown>')} must expose exported_symbols.`);
         }
     }
 
@@ -130,16 +130,16 @@ function validateSchemaFile(expectedSchemaVersion) {
         issues.push('Schema file must parse as an object.');
         return issues;
     }
-    if (!isString(schema.$schema) || !schema.$schema.includes('json-schema.org')) {
+    if (!isString(schema['$schema']) || !schema['$schema'].includes('json-schema.org')) {
         issues.push('Schema file must declare a Draft 2020-12 $schema URL.');
     }
-    if (!isRecord(schema.properties)) {
+    if (!isRecord(schema['properties'])) {
         issues.push('Schema file must expose properties.');
         return issues;
     }
-    const properties = schema.properties;
-    const schemaVersionProperty = isRecord(properties.schema_version) ? properties.schema_version : null;
-    if (!schemaVersionProperty || schemaVersionProperty.const !== expectedSchemaVersion) {
+    const properties = schema['properties'];
+    const schemaVersionProperty = isRecord(properties['schema_version']) ? properties['schema_version'] : null;
+    if (!schemaVersionProperty || schemaVersionProperty['const'] !== expectedSchemaVersion) {
         issues.push(`Schema file must pin schema_version const to ${expectedSchemaVersion}.`);
     }
     return issues;

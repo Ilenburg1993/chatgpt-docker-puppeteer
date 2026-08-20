@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 import { mcpHttpSharedTestHarness } from '../../../../src/copilot/mcp/adapters/http-shared.js';
 
+/** @param {string} remoteAddress @param {Record<string, string>} [headers] */
 function request(remoteAddress, headers = {}) {
     return /** @type {any} */ ({ headers, socket: { remoteAddress } });
 }

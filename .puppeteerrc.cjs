@@ -47,8 +47,8 @@ function getCacheDirectory() {
  */
 function findChromeExecutable() {
     // Environment variable override
-    if (process.env.CHROME_EXECUTABLE_PATH) {
-        return process.env.CHROME_EXECUTABLE_PATH;
+    if (process.env['CHROME_EXECUTABLE_PATH']) {
+        return process.env['CHROME_EXECUTABLE_PATH'];
     }
 
     const fs = require('fs');
@@ -74,7 +74,7 @@ function findChromeExecutable() {
         candidates = [
             'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-            process.env.LOCALAPPDATA + '\\Google\\Chrome\\Application\\chrome.exe',
+            process.env['LOCALAPPDATA'] + '\\Google\\Chrome\\Application\\chrome.exe',
         ];
     }
 
@@ -89,6 +89,10 @@ function findChromeExecutable() {
 }
 
 module.exports = {
+    // Shared helpers are part of the same CommonJS export object (TS7 forbids mixing full + property assignments).
+    getCacheDirectory,
+    findChromeExecutable,
+    isDocker,
     // ==========================================================================
     // CACHE DIRECTORY: Onde Chromium é baixado/armazenado
     // ==========================================================================
@@ -354,11 +358,3 @@ module.exports = {
     // - Chrome DevTools Protocol: https://chromedevtools.github.io/devtools-protocol/
     // - Recorder Extension: https://chrome.google.com/webstore (search: Puppeteer Recorder)
 };
-
-// ==========================================================================
-// EXPORTS DE HELPERS: Para uso por ConnectionOrchestrator e outros módulos
-// ==========================================================================
-// Estes helpers são compartilhados (DRY) mas cada módulo mantém sua própria config
-module.exports.getCacheDirectory = getCacheDirectory;
-module.exports.findChromeExecutable = findChromeExecutable;
-module.exports.isDocker = isDocker;

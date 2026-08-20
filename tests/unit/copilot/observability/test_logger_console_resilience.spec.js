@@ -49,15 +49,15 @@ describe('observability/logger.js — console resilience', () => {
     });
 
     it('redige tokens GitHub/BYOK em log, audit e metric persistidos', async () => {
-        const originalLogDir = process.env.COPILOT_LOG_DIR;
-        const originalLogLevel = process.env.COPILOT_LOG_LEVEL;
+        const originalLogDir = process.env['COPILOT_LOG_DIR'];
+        const originalLogLevel = process.env['COPILOT_LOG_LEVEL'];
         const logDir = mkdtempSync(join(tmpdir(), 'copilot-logger-redaction-'));
         const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
         const byokToken = 'sk-testsecret1234567890';
 
         try {
-            process.env.COPILOT_LOG_DIR = logDir;
-            process.env.COPILOT_LOG_LEVEL = 'DEBUG';
+            process.env['COPILOT_LOG_DIR'] = logDir;
+            process.env['COPILOT_LOG_LEVEL'] = 'DEBUG';
 
             const { audit, getRecentLogs, log, metric } = await import('../../../../src/copilot/observability/logger.js');
 
@@ -84,10 +84,10 @@ describe('observability/logger.js — console resilience', () => {
             assert.equal(recent.includes(githubToken), false);
             assert.equal(recent.includes(byokToken), false);
         } finally {
-            if (originalLogDir === undefined) delete process.env.COPILOT_LOG_DIR;
-            else process.env.COPILOT_LOG_DIR = originalLogDir;
-            if (originalLogLevel === undefined) delete process.env.COPILOT_LOG_LEVEL;
-            else process.env.COPILOT_LOG_LEVEL = originalLogLevel;
+            if (originalLogDir === undefined) delete process.env['COPILOT_LOG_DIR'];
+            else process.env['COPILOT_LOG_DIR'] = originalLogDir;
+            if (originalLogLevel === undefined) delete process.env['COPILOT_LOG_LEVEL'];
+            else process.env['COPILOT_LOG_LEVEL'] = originalLogLevel;
             rmSync(logDir, { recursive: true, force: true });
         }
     });

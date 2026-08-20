@@ -17,9 +17,9 @@ function makeDbPath() {
     );
 }
 
-test('wave17: atualização stale (current_task_id divergente) é rejeitada sem mutar missão', async (t) => {
+test('wave17: atualização stale (current_task_id divergente) é rejeitada sem mutar missão', async () => {
     const dbPath = makeDbPath();
-    process.env.MAESTRO_DB_PATH = dbPath;
+    process.env['MAESTRO_DB_PATH'] = dbPath;
     const db = getDb();
     db.exec(`
         DELETE FROM task_dependencies;

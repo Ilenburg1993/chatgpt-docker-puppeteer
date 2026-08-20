@@ -45,9 +45,9 @@ function ok(res, req, data, meta = {}) {
  */
 function fail(res, req, httpStatus, options = {}) {
     const optionRecord = options && typeof options === 'object' ? /** @type {Record<string, unknown>} */ (options) : {};
-    const code = typeof optionRecord.code === 'string' ? optionRecord.code : undefined;
-    const error = typeof optionRecord.error === 'string' ? optionRecord.error : undefined;
-    const details = optionRecord.details;
+    const code = typeof optionRecord['code'] === 'string' ? optionRecord['code'] : undefined;
+    const error = typeof optionRecord['error'] === 'string' ? optionRecord['error'] : undefined;
+    const details = optionRecord['details'];
     res.status(httpStatus).json({
         success: false,
         request_id: req.id,

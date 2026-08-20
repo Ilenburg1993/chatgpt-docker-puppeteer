@@ -28,11 +28,11 @@ import fs from 'node:fs/promises';
  * **Side-effects:** Coleta métricas de sistema (uptime, memória, PID). **Semântica:** Verificação básica de saúde do
  * processo Node.js. **Unidades:** uptime em segundos, memory em bytes, timestamp em milissegundos.
  *
- * @param {HealthRequestLike} req - Requisição HTTP
+ * @param {HealthRequestLike} _req - Requisição HTTP
  * @param {HealthResponseLike} res - Resposta HTTP
  * @returns {Promise<void>}
  */
-async function getHealth(req, res) {
+async function getHealth(_req, res) {
     try {
         res.json({
             status: 'ok',
@@ -54,11 +54,11 @@ async function getHealth(req, res) {
  * **Side-effects:** Testa conectividade com Chrome via WebSocket endpoint. **Semântica:** Verifica se Chrome está
  * acessível e respondendo. **Unidades:** Timeout de 3000ms para verificação.
  *
- * @param {HealthRequestLike} req - Requisição HTTP
+ * @param {HealthRequestLike} _req - Requisição HTTP
  * @param {HealthResponseLike} res - Resposta HTTP
  * @returns {Promise<void>}
  */
-async function getChromeHealth(req, res) {
+async function getChromeHealth(_req, res) {
     try {
         const { checkChromeHealth, getBrowserEndpoint } = await import('#core/boot_resilience_manager');
         const browserEndpoint = getBrowserEndpoint();
@@ -94,11 +94,11 @@ async function getChromeHealth(req, res) {
 /**
  * GET /api/health/pm2 - Health check dos processos PM2
  *
- * @param {HealthRequestLike} req
+ * @param {HealthRequestLike} _req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
  */
-async function getPm2Health(req, res) {
+async function getPm2Health(_req, res) {
     try {
         const pm2Bridge = await import('#server/realtime/bus/pm2_bridge');
         const snapshot = await pm2Bridge.refreshSnapshot();
@@ -160,11 +160,11 @@ async function getKernelHealth(req, res) {
 /**
  * GET /api/health/disk - Health check do disco
  *
- * @param {HealthRequestLike} req
+ * @param {HealthRequestLike} _req
  * @param {HealthResponseLike} res
  * @returns {Promise<void>}
  */
-async function getDiskHealth(req, res) {
+async function getDiskHealth(_req, res) {
     try {
         const dbPath = resolveDbPath();
         const artifactsDir = _resolveArtifactsRoot();

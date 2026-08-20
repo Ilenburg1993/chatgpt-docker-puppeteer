@@ -15,15 +15,15 @@ function withTempDb(/** @type {any} */ fn) {
     return async () => {
         const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'inference-loader-'));
         const dbPath = path.join(tmpDir, 'maestro.sqlite');
-        const prev = process.env.MAESTRO_DB_PATH;
-        process.env.MAESTRO_DB_PATH = dbPath;
+        const prev = process.env['MAESTRO_DB_PATH'];
+        process.env['MAESTRO_DB_PATH'] = dbPath;
         try {
             getDb();
             await fn();
         } finally {
             closeDb();
-            if (prev === undefined) delete process.env.MAESTRO_DB_PATH;
-            else process.env.MAESTRO_DB_PATH = prev;
+            if (prev === undefined) delete process.env['MAESTRO_DB_PATH'];
+            else process.env['MAESTRO_DB_PATH'] = prev;
             fs.rmSync(tmpDir, { recursive: true, force: true });
         }
     };
@@ -50,9 +50,9 @@ test(
         const loaded = loadInferencePoliciesFromDb();
         assert.equal(loaded.meta.profileCount, 1);
         assert.equal(loaded.meta.clientPolicyCount, 1);
-        assert.ok(loaded.profilePolicies.patch_safe);
-        assert.ok(loaded.clientPolicies.audit_agent_patch);
-        assert.equal(loaded.clientPolicies.audit_agent_patch.profile_name, 'patch_safe');
+        assert.ok(loaded.profilePolicies['patch_safe']);
+        assert.ok(loaded.clientPolicies['audit_agent_patch']);
+        assert.equal(loaded.clientPolicies['audit_agent_patch'].profile_name, 'patch_safe');
 
         const gateway = new InferenceGateway({
             ollamaClient: {

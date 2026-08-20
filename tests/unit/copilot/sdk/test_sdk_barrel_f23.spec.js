@@ -80,18 +80,13 @@ describe('F23 — F108: index.js formato consistente', () => {
         expect(src).toContain('@module copilot/sdk');
     });
 
-    it('index.js NÃO tem múltiplas linhas export {} consecutivas sem separador', () => {
+    it('index.js não repete blocos de export idênticos por concatenação acidental', () => {
         const src = readSdk('index.js');
-        // Verifica que não há dois blocos de export sem comentário separando
-        // (prevenção contra cat >> concatenações acidentais)
-        const doubleExport = /\}\s*from\s*['"][^'"]+['"]\s*;\s*\n\s*export\s*\{/;
-        // Isso é permitido APENAS se há um comentário de seção entre eles
-        // Estratégia: contar ocorrências vs. comentários separadores
-        const exportBlockEnds = (src.match(/\}\s*from\s*['"][^'"]+['"]\s*;/g) || []).length;
+        const exportBlocks = src.match(/export\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"]\s*;/g) || [];
         const sectionComments = (src.match(/\/\/ ─{3,}/g) || []).length;
-        // Deve haver pelo menos metade de comentários de seção vs. export blocks
         expect(sectionComments).toBeGreaterThan(5);
-        expect(exportBlockEnds).toBeGreaterThan(10);
+        expect(exportBlocks.length).toBeGreaterThan(10);
+        expect(new Set(exportBlocks).size).toBe(exportBlocks.length);
     });
 
     it('index.js tem comentários de seção para as principais faixas', () => {

@@ -6,18 +6,12 @@ import {
     readModelGatewaySelectionDecisionTrace,
 } from '../../../src/copilot/model-gateway/index.js';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-selection-trace-diff.mjs [--json] [--trace-dir <path>] [--left <path>] [--right <path>]

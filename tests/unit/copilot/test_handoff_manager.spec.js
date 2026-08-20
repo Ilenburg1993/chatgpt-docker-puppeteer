@@ -141,6 +141,7 @@ describe('HandoffManager', async () => {
             nowMs = request.expiresAt;
             assert.equal(mgr.getPending().length, 0);
             const [expired] = mgr.getHistory();
+            assert.ok(expired);
             assert.equal(expired.status, 'expired');
             assert.equal(expired.expirationReason, 'pending-ttl-exceeded');
             assert.equal(rejectedReason, 'pending-ttl-exceeded');

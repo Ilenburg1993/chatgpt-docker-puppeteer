@@ -19,22 +19,22 @@ vi.mock('#copilot/config/env', async (importOriginal) => {
     return {
         ...actual,
         get COPILOT_LOG_DIR() {
-            return envOverrides.COPILOT_LOG_DIR ?? '/tmp/test-logs';
+            return envOverrides['COPILOT_LOG_DIR'] ?? '/tmp/test-logs';
         },
         get COPILOT_OTEL_DISABLED() {
-            return envOverrides.COPILOT_OTEL_DISABLED ?? false;
+            return envOverrides['COPILOT_OTEL_DISABLED'] ?? false;
         },
         get COPILOT_OTEL_ENDPOINT() {
-            return envOverrides.COPILOT_OTEL_ENDPOINT ?? '';
+            return envOverrides['COPILOT_OTEL_ENDPOINT'] ?? '';
         },
         get COPILOT_OTEL_EXPORTER_TYPE() {
-            return envOverrides.COPILOT_OTEL_EXPORTER_TYPE ?? undefined;
+            return envOverrides['COPILOT_OTEL_EXPORTER_TYPE'] ?? undefined;
         },
         get COPILOT_OTEL_SOURCE_NAME() {
-            return envOverrides.COPILOT_OTEL_SOURCE_NAME ?? 'llm-b-terminal';
+            return envOverrides['COPILOT_OTEL_SOURCE_NAME'] ?? 'llm-b-terminal';
         },
         get COPILOT_OTEL_CAPTURE_CONTENT() {
-            return envOverrides.COPILOT_OTEL_CAPTURE_CONTENT ?? false;
+            return envOverrides['COPILOT_OTEL_CAPTURE_CONTENT'] ?? false;
         },
         COPILOT_MCP_SERVERS: '',
         COPILOT_CUSTOM_AGENTS: '',
@@ -59,7 +59,7 @@ describe('otel.js', () => {
 
     describe('buildTelemetryConfig', () => {
         it('retorna undefined quando OTEL está desabilitado', () => {
-            envOverrides.COPILOT_OTEL_DISABLED = true;
+            envOverrides['COPILOT_OTEL_DISABLED'] = true;
             expect(mod.buildTelemetryConfig()).toBeUndefined();
         });
 
@@ -71,15 +71,15 @@ describe('otel.js', () => {
         });
 
         it('retorna otlp-http quando endpoint definido', () => {
-            envOverrides.COPILOT_OTEL_ENDPOINT = 'http://localhost:4318';
+            envOverrides['COPILOT_OTEL_ENDPOINT'] = 'http://localhost:4318';
             const cfg = mod.buildTelemetryConfig();
             expect(cfg?.exporterType).toBe('otlp-http');
             expect(cfg?.otlpEndpoint).toBe('http://localhost:4318');
         });
 
         it('respeita explicitExporterType quando endpoint definido', () => {
-            envOverrides.COPILOT_OTEL_ENDPOINT = 'http://localhost:4318';
-            envOverrides.COPILOT_OTEL_EXPORTER_TYPE = 'custom';
+            envOverrides['COPILOT_OTEL_ENDPOINT'] = 'http://localhost:4318';
+            envOverrides['COPILOT_OTEL_EXPORTER_TYPE'] = 'custom';
             const cfg = mod.buildTelemetryConfig();
             expect(cfg?.exporterType).toBe('custom');
         });
@@ -99,7 +99,7 @@ describe('otel.js', () => {
         });
 
         it('retorna false quando OTEL está desabilitado', () => {
-            envOverrides.COPILOT_OTEL_DISABLED = true;
+            envOverrides['COPILOT_OTEL_DISABLED'] = true;
             expect(mod.isOtelEnabled()).toBe(false);
         });
     });

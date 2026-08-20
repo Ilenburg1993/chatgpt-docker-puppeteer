@@ -194,7 +194,7 @@ jobs:
         run: npm ci --prefer-online --no-audit --no-fund
 
       - name: Typecheck (node)
-        run: npx tsc -p tsconfig.node.json --noEmit
+        run: npm run typecheck:node
 
   audit-lite:
     name: Audit lite (non-blocking)

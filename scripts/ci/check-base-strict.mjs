@@ -1,9 +1,6 @@
 // @ts-check
 /**
- * CI gate: verifica que `tsconfig.base.json` tem `compilerOptions.strict: true`.
- *
- * Este gate deve falhar na Fase 5 do roadmap até que a base seja endurecida. Antes da Fase 5, adicione este script ao
- * job de CI mas com `continue-on-error: true`.
+ * CI gate: verifies the canonical TypeScript base carries the workspace full-strict contract.
  *
  * @module check-base-strict
  */
@@ -12,27 +9,59 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const TSCONFIG_BASE = resolve('tsconfig.base.json');
+const REQUIRED_OPTIONS = Object.freeze({
+    allowJs: true,
+    checkJs: true,
+    strict: true,
+    alwaysStrict: true,
+    noImplicitAny: true,
+    noImplicitThis: true,
+    strictNullChecks: true,
+    strictFunctionTypes: true,
+    strictBindCallApply: true,
+    strictPropertyInitialization: true,
+    strictBuiltinIteratorReturn: true,
+    useUnknownInCatchVariables: true,
+    exactOptionalPropertyTypes: true,
+    noUncheckedIndexedAccess: true,
+    noUncheckedSideEffectImports: true,
+    noImplicitReturns: true,
+    noFallthroughCasesInSwitch: true,
+    noUnusedLocals: true,
+    noUnusedParameters: true,
+    noPropertyAccessFromIndexSignature: true,
+    noImplicitOverride: true,
+    forceConsistentCasingInFileNames: true,
+    isolatedModules: true,
+    erasableSyntaxOnly: true,
+    moduleDetection: 'force',
+    allowUnreachableCode: false,
+    allowUnusedLabels: false,
+});
 
 /** @type {Record<string, unknown>} */
 let config;
-
 try {
     config = JSON.parse(readFileSync(TSCONFIG_BASE, 'utf8'));
-} catch (/** @type {unknown} */ e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`❌ check-base-strict: não foi possível ler ${TSCONFIG_BASE}: ${msg}`);
+} catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`❌ check-base-strict: cannot read ${TSCONFIG_BASE}: ${message}`);
     process.exit(1);
 }
 
-const compilerOptions = /** @type {Record<string, unknown>} */ (config?.compilerOptions ?? {});
-const strict = compilerOptions?.strict;
-
-if (strict !== true) {
-    console.error('\n❌ check-base-strict: tsconfig.base.json NÃO tem strict: true');
-    console.error(`   compilerOptions.strict = ${JSON.stringify(strict ?? null)}`);
-    console.error('\n   A Fase 5 do roadmap exige que a base seja completamente estrita.');
-    console.error('   Ref: DOCUMENTAÇÃO/PLANOS/TYPING_FULLSTRICT_ROADMAP.md — Fase 5\n');
+const compilerOptions = config['compilerOptions'];
+if (!compilerOptions || typeof compilerOptions !== 'object' || Array.isArray(compilerOptions)) {
+    console.error('❌ check-base-strict: compilerOptions is missing or invalid.');
+    process.exit(1);
+}
+const options = /** @type {Record<string, unknown>} */ (compilerOptions);
+const mismatches = Object.entries(REQUIRED_OPTIONS).filter(([key, expected]) => options[key] !== expected);
+if (mismatches.length > 0) {
+    console.error('\n❌ check-base-strict: canonical full-strict contract is not satisfied:\n');
+    for (const [key, expected] of mismatches) {
+        console.error(`  ${key}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(options[key])}`);
+    }
     process.exit(1);
 }
 
-console.log('✅ check-base-strict: tsconfig.base.json tem strict: true.');
+console.log(`✅ check-base-strict: ${Object.keys(REQUIRED_OPTIONS).length} canonical strict options verified.`);

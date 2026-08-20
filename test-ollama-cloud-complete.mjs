@@ -9,10 +9,11 @@ config({ path: resolve(process.cwd(), '.env.local'), quiet: true });
 
 import { OllamaClient } from './tools/ollama/client.mjs';
 
+const cloudApiKey = process.env['OLLAMA_CLOUD_API_KEY'];
 const ollama = new OllamaClient({
     cloudEnabled: true,
     cloudBaseUrl: 'https://ollama.com',
-    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY,
+    ...(cloudApiKey ? { cloudApiKey } : {}),
 });
 
 console.log('═'.repeat(80));
@@ -57,7 +58,7 @@ try {
     console.log(`  ⚡ Velocidade: ${(code.length / parseFloat(duration)).toFixed(0)} chars/s`);
     console.log();
 } catch (error) {
-    console.error('❌ ERRO:', error.message);
+    console.error('❌ ERRO:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -91,7 +92,7 @@ try {
     console.log(`  ⚡ Velocidade: ${(explanation.length / parseFloat(duration)).toFixed(0)} chars/s`);
     console.log();
 } catch (error) {
-    console.error('❌ ERRO:', error.message);
+    console.error('❌ ERRO:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -125,7 +126,7 @@ try {
     console.log(`  ⚡ Velocidade: ${(reactCode.length / parseFloat(duration)).toFixed(0)} chars/s`);
     console.log();
 } catch (error) {
-    console.error('❌ ERRO:', error.message);
+    console.error('❌ ERRO:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -154,7 +155,7 @@ try {
     console.log('  →', criativo.trim());
     console.log();
 } catch (error) {
-    console.error('❌ ERRO:', error.message);
+    console.error('❌ ERRO:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 

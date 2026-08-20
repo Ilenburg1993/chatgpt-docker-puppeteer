@@ -73,9 +73,9 @@ describe('F20 — hooks/types.js alinhamento', () => {
         expect(src).toContain("import('#copilot/sdk/types.js').PermissionRequestResult");
     });
 
-    it('hooks/types.js preserva typedef SessionHooks (não afetado pela migração)', () => {
+    it('hooks/types.js referencia o SessionHooks canônico do SDK', () => {
         const src = readSource('hooks/types.js');
-        expect(src).toContain('@typedef {object} SessionHooks');
+        expect(src).toContain("@typedef {import('#copilot/sdk/types.js').SessionHooks} SessionHooks");
     });
 });
 

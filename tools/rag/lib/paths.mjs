@@ -36,7 +36,7 @@ function isProcessAlive(/** @type {any} */ pid) {
         process.kill(parsed, 0);
         return true;
     } catch (error) {
-        const _ce = /** @type {any} */ (error);
+        const _ce = /** @type {NodeJS.ErrnoException} */ (error);
         if (_ce?.code === 'ESRCH') return false;
         return true;
     }
@@ -53,7 +53,7 @@ export async function acquireIndexLock(
         await handle.close();
         return { acquired: true, staleRecovered: false };
     } catch (err) {
-        const _ce = /** @type {any} */ (err);
+        const _ce = /** @type {NodeJS.ErrnoException} */ (err);
         if (_ce?.code !== 'EEXIST') {
             throw err;
         }
@@ -82,11 +82,11 @@ export async function acquireIndexLock(
         await fs.unlink(paths.lockPath);
         return acquireIndexLock(paths, { staleAfterMs });
     } catch (err) {
-        const _ce = /** @type {any} */ (err);
+        const _ce = /** @type {NodeJS.ErrnoException} */ (err);
         return { acquired: false, staleRecovered: false, reason: 'LOCK_UNKNOWN', error: String(_ce?.message || _ce) };
     }
 }
 
 export async function releaseIndexLock(/** @type {any} */ paths) {
-    await fs.unlink(paths.lockPath).catch(/** @type {any} */ () => {});
+    await fs.unlink(paths.lockPath).catch(() => {});
 }

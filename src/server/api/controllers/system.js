@@ -23,12 +23,12 @@ router.get('/agents', (req, res) => {
         const registry = socketHub.getRegistry();
 
         const agents = registry.map((entry) => ({
-            robot_id: entry.identity.robot_id,
-            instance_id: entry.identity.instance_id,
+            robot_id: entry.identity['robot_id'],
+            instance_id: entry.identity['instance_id'],
             status: 'ONLINE',
             last_seen: entry.last_seen,
-            capabilities: entry.identity.capabilities,
-            metadata: entry.identity.metadata,
+            capabilities: entry.identity['capabilities'],
+            metadata: entry.identity['metadata'],
         }));
 
         res.json({
@@ -160,7 +160,7 @@ router.post('/control/:action', async (req, res) => {
     const { action } = req.params;
     try {
         // Proteção: em modo delegated, o server não deve executar comandos de lifecycle
-        const authority = req.app?.locals?.authority || process.env.SERVER_AUTHORITY || 'standalone';
+        const authority = req.app?.locals?.['authority'] || process.env['SERVER_AUTHORITY'] || 'standalone';
         if (String(authority).toLowerCase() === 'delegated') {
             return res.status(403).json({
                 success: false,

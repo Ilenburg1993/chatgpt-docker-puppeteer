@@ -1,8 +1,12 @@
 import fs from 'fs';
 
+/** @typedef {{ code: number, message: string, file?: string, line: number, column: number }} DiagnosticEntry */
+/** @typedef {DiagnosticEntry & { reason: string }} CategorizedDiagnostic */
+/** @type {{ errors: DiagnosticEntry[] }} */
 const report = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
 // Categorias de erros
+/** @type {{ runtimeBugs: CategorizedDiagnostic[], typeWarnings: CategorizedDiagnostic[], falsPositives: CategorizedDiagnostic[], configIssues: CategorizedDiagnostic[] }} */
 const categories = {
     runtimeBugs: [], // Erros que podem causar bugs em runtime
     typeWarnings: [], // Avisos de tipo (não afetam runtime)
@@ -79,10 +83,12 @@ console.log(`✅ FALSOS POSITIVOS (TS limitation): ${categories.falsPositives.le
 if (categories.runtimeBugs.length > 0) {
     console.log('━━━ 🔴 BUGS REAIS (PRIORIDADE MÁXIMA) ━━━\n');
 
+    /** @type {Record<string, CategorizedDiagnostic[]>} */
     const byFile = {};
     for (const err of categories.runtimeBugs) {
-        if (!byFile[err.file]) byFile[err.file] = [];
-        byFile[err.file].push(err);
+        const file = err.file ?? 'GLOBAL';
+        const fileErrors = byFile[file] ?? (byFile[file] = []);
+        fileErrors.push(err);
     }
 
     const topFiles = Object.entries(byFile)

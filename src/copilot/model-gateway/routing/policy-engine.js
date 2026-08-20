@@ -170,38 +170,42 @@ function resolveRuntimeProofWeights(value) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {string} capability
  * @returns {boolean}
  */
 function hasCapability(model, capability) {
     const capabilities = isRecord(model['capabilities']) ? model['capabilities'] : {};
+    const routing = isRecord(model['routing']) ? model['routing'] : {};
+    const pricing = isRecord(model['pricing']) ? model['pricing'] : {};
     if (capability === 'text') return capabilities['text'] !== false;
-    if (capability === 'free') return model['routing']?.['tier'] === 'free' || model['pricing']?.['inputUsdPerMillion'] === 0;
+    if (capability === 'free') return routing['tier'] === 'free' || pricing['inputUsdPerMillion'] === 0;
     return capabilities[capability] === true;
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {number | null}
  */
 function contextWindow(model) {
-    return finiteNumber(model['limits']?.['contextWindowTokens']) ?? finiteNumber(model['limits']?.['maxContextWindowTokens']);
+    const limits = isRecord(model['limits']) ? model['limits'] : {};
+    return finiteNumber(limits['contextWindowTokens']) ?? finiteNumber(limits['maxContextWindowTokens']);
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {number | null}
  */
 function pricePerMillion(model) {
-    const input = finiteNumber(model['pricing']?.['inputUsdPerMillion']);
-    const output = finiteNumber(model['pricing']?.['outputUsdPerMillion']);
+    const pricing = isRecord(model['pricing']) ? model['pricing'] : {};
+    const input = finiteNumber(pricing['inputUsdPerMillion']);
+    const output = finiteNumber(pricing['outputUsdPerMillion']);
     if (input === null && output === null) return null;
     return (input ?? 0) + (output ?? 0);
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {string} field
  * @returns {string}
  */
@@ -212,7 +216,7 @@ function routePolicyText(model, field) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {string} field
  * @returns {string}
  */
@@ -225,7 +229,7 @@ function routeMetadataText(model, field) {
 }
 
 /**
- * @param {Record<string, any>} profile
+ * @param {Record<string, unknown>} profile
  * @returns {boolean}
  */
 function profileRequiresConversationalRoute(profile) {
@@ -246,7 +250,7 @@ function profileRequiresConversationalRoute(profile) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {string[]}
  */
 function collectModelGatewayFamilyHints(model) {
@@ -278,7 +282,7 @@ function collectModelGatewayFamilyHints(model) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {string | null}
  */
 function inferNonConversationalModelFamily(model) {
@@ -311,7 +315,7 @@ function inferNonConversationalModelFamily(model) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {boolean}
  */
 function isLocalPrivateCandidate(model) {
@@ -365,7 +369,7 @@ function isGatewayFallbackSelector(selectorKind, routeLayer) {
 }
 
 /**
- * @param {Record<string, any>} profile
+ * @param {Record<string, unknown>} profile
  * @param {boolean | undefined} option
  * @returns {boolean}
  */
@@ -375,8 +379,8 @@ function localProviderSelectionAllowed(profile, option) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} model
+ * @returns {Record<string, unknown>}
  */
 function dataPolicy(model) {
     const normalizedPolicy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
@@ -388,7 +392,7 @@ function dataPolicy(model) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {boolean}
  */
 function privacyStrictSatisfied(model) {
@@ -412,8 +416,8 @@ function policyValueMatches(actual, expected) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @param {Record<string, unknown>} model
+ * @param {ModelGatewayRouteScoringOptions} options
  * @param {number} baseScore
  * @param {string[]} reasons
  * @param {string[]} rejectedReasons
@@ -508,76 +512,92 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {Record<string, any>} profile
- * @param {{
- *     routeProfile?: string | null;
- *     excludeFailed?: boolean;
- *     requireAgentProbeOk?: boolean;
- *     allowProviders?: string[];
- *     blockProviders?: string[];
- *     preferredRouteLayers?: string[];
- *     blockRouteLayers?: string[];
- *     preferredWireApis?: string[];
- *     blockWireApis?: string[];
- *     allowUpstreamProviders?: string[];
- *     blockUpstreamProviders?: string[];
- *     preferredUpstreamProviders?: string[];
- *     preferredSelectorKinds?: string[];
- *     allowSelectorKinds?: string[];
- *     blockSelectorKinds?: string[];
- *     allowAutoSelectors?: boolean;
- *     allowGatewayFallbacks?: boolean;
- *     requireProviderDirect?: boolean;
- *     requiredDataPolicy?: Record<string, unknown>;
- *     preferredDataPolicy?: Record<string, unknown>;
- *     privacyStrict?: boolean;
- *     noPaidModels?: boolean;
- *     maxPricePerMillion?: number;
- *     maxEstimatedCostPerMillion?: number;
- *     preferredMaxPricePerMillion?: number;
- *     pricePenaltyWeight?: number;
- *     latencyPenaltyWeight?: number;
- *     minimumConfidence?: string;
- *     preferredProbeKinds?: string[];
- *     requiredProbeKinds?: string[];
- *     blockFailedProbeKinds?: string[];
- *     includeRuntimeOnlyCandidates?: boolean;
- *     allowLocalProviders?: boolean;
- *     excludeLocalProvidersByDefault?: boolean;
- *     requireRuntimeProof?: boolean;
- *     runtimeProofWeights?: Partial<typeof DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS>;
- *     requireKnownEligibility?: boolean;
- *     ignoreRuntimeHealth?: boolean;
- *     runtimeHealthRecords?: Record<string, any>[];
- *     runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>;
- *     now?: string | number | Date;
- *     maxRuntimeProofAgeMs?: number;
- *     temporaryFailureCooldownMs?: number;
- *     providerCooldownWindowMs?: number;
- *     providerCooldownMinFailedModels?: number;
- *     providerCooldownFailureKinds?: string[];
- *     latencyMsByModelId?: Record<string, number>;
- *     eligibilityDecisions?: Record<string, any>[];
- *     eligibilityDecisionIndex?: ReturnType<typeof createEligibilityDecisionIndex>;
- *     evaluateEligibility?: boolean;
- *     routeOptions?: Record<string, any>[];
- *     accountOverlays?: Record<string, any>[];
- *     secretRegistry?: { has(ref: string): boolean };
- *     eligibilityPolicy?: Record<string, any>;
- * }} [options]
+ * Stable eligibility index used by routing. This is named explicitly to avoid circular `ReturnType`/`Parameters`
+ * reflection between the scorer and the index builder.
+ *
+ * @typedef {object} ModelGatewayEligibilityDecisionIndex
+ * @property {'model-gateway-eligibility-decision-index'} schema
+ * @property {Map<string, Record<string, unknown>>} byRouteRuntimeOverlay
+ * @property {Map<string, Record<string, unknown>>} byProviderModelRuntimeOverlay
+ * @property {Map<string, Record<string, unknown>>} byRoute
+ */
+
+/**
+ * @typedef {object} ModelGatewayRouteScoringOptions
+ * @property {string | null} [routeProfile]
+ * @property {boolean} [excludeFailed]
+ * @property {boolean} [requireAgentProbeOk]
+ * @property {string[]} [allowProviders]
+ * @property {string[]} [blockProviders]
+ * @property {string[]} [preferredRouteLayers]
+ * @property {string[]} [blockRouteLayers]
+ * @property {string[]} [preferredWireApis]
+ * @property {string[]} [blockWireApis]
+ * @property {string[]} [allowUpstreamProviders]
+ * @property {string[]} [blockUpstreamProviders]
+ * @property {string[]} [preferredUpstreamProviders]
+ * @property {string[]} [preferredSelectorKinds]
+ * @property {string[]} [allowSelectorKinds]
+ * @property {string[]} [blockSelectorKinds]
+ * @property {boolean} [allowAutoSelectors]
+ * @property {boolean} [allowGatewayFallbacks]
+ * @property {boolean} [requireProviderDirect]
+ * @property {Record<string, unknown>} [requiredDataPolicy]
+ * @property {Record<string, unknown>} [preferredDataPolicy]
+ * @property {boolean} [privacyStrict]
+ * @property {boolean} [noPaidModels]
+ * @property {number} [maxPricePerMillion]
+ * @property {number} [maxEstimatedCostPerMillion]
+ * @property {number} [preferredMaxPricePerMillion]
+ * @property {number} [pricePenaltyWeight]
+ * @property {number} [latencyPenaltyWeight]
+ * @property {string} [minimumConfidence]
+ * @property {string[]} [preferredProbeKinds]
+ * @property {string[]} [requiredProbeKinds]
+ * @property {string[]} [blockFailedProbeKinds]
+ * @property {boolean} [includeRuntimeOnlyCandidates]
+ * @property {boolean} [allowLocalProviders]
+ * @property {boolean} [excludeLocalProvidersByDefault]
+ * @property {boolean} [requireRuntimeProof]
+ * @property {Partial<ModelGatewayRuntimeProofWeights>} [runtimeProofWeights]
+ * @property {boolean} [requireKnownEligibility]
+ * @property {boolean} [ignoreRuntimeHealth]
+ * @property {Record<string, unknown>[]} [runtimeHealthRecords]
+ * @property {ReturnType<typeof createGatewayRuntimeHealthIndex>} [runtimeHealthIndex]
+ * @property {string | number | Date} [now]
+ * @property {number} [maxRuntimeProofAgeMs]
+ * @property {number} [temporaryFailureCooldownMs]
+ * @property {number} [providerCooldownWindowMs]
+ * @property {number} [providerCooldownMinFailedModels]
+ * @property {string[]} [providerCooldownFailureKinds]
+ * @property {Record<string, number>} [latencyMsByModelId]
+ * @property {Record<string, unknown>[]} [eligibilityDecisions]
+ * @property {ModelGatewayEligibilityDecisionIndex} [eligibilityDecisionIndex]
+ * @property {boolean} [evaluateEligibility]
+ * @property {Record<string, unknown>[]} [routeOptions]
+ * @property {Record<string, unknown>[]} [accountOverlays]
+ * @property {{ has(ref: string): boolean }} [secretRegistry]
+ * @property {Record<string, unknown>} [eligibilityPolicy]
+ */
+
+/**
+ * @template {Record<string, unknown>} TModel
+ * @param {TModel} model
+ * @param {Record<string, unknown>} profile
+ * @param {ModelGatewayRouteScoringOptions} [options]
  * @returns {{
- *     model: Record<string, any>;
+ *     model: TModel;
  *     include: boolean;
  *     score: number;
  *     reasons: string[];
  *     rejectedReasons: string[];
  *     scoreBreakdown: ReturnType<typeof buildScoreBreakdown>;
- *     eligibility: Record<string, any> | null;
+ *     eligibility: Record<string, unknown> | null;
  *     health: ReturnType<typeof evaluateGatewayModelHealthRoute>['health'];
  *     runtimeProof: ReturnType<typeof evaluateGatewayModelHealthRoute>['runtimeProof'];
  * }}
  */
+
 export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const reasons = [];
     const rejectedReasons = [];
@@ -686,12 +706,12 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const nonConversationalFamily = profileRequiresConversationalRoute(profile) ? inferNonConversationalModelFamily(model) : null;
     if (nonConversationalFamily) rejectedReasons.push(`non_chat_model_family:${nonConversationalFamily}`);
 
-    for (const capability of profile['requires'] ?? []) {
+    for (const capability of stringArray(profile['requires'])) {
         if (!hasCapability(model, capability)) rejectedReasons.push(`missing_capability:${capability}`);
         else score += 50;
     }
 
-    for (const capability of profile['softRequires'] ?? []) {
+    for (const capability of stringArray(profile['softRequires'])) {
         if (hasCapability(model, capability)) {
             score += 25;
             reasons.push(`soft_capability:${capability}`);
@@ -827,7 +847,7 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         rejectedReasons.push(runtimeProof?.hasHistoricalProof ? 'runtime_proof_stale' : 'runtime_proof_missing');
     }
 
-    for (const preference of profile['prefers'] ?? []) {
+    for (const preference of stringArray(profile['prefers'])) {
         if (hasCapability(model, preference)) {
             score += 10;
             reasons.push(`preferred:${preference}`);
@@ -847,7 +867,8 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
     }
 
-    const confidence = typeof model['verification']?.['confidence'] === 'string' ? model['verification']['confidence'] : 'unknown';
+    const verification = isRecord(model['verification']) ? model['verification'] : {};
+    const confidence = typeof verification['confidence'] === 'string' ? verification['confidence'] : 'unknown';
     score += CONFIDENCE_SCORE[/** @type {keyof typeof CONFIDENCE_SCORE} */ (confidence)] ?? 0;
     reasons.push(`confidence:${confidence}`);
     const minimumConfidence = String(options.minimumConfidence ?? '').trim();
@@ -910,7 +931,7 @@ function stringArray(value) {
 }
 
 /**
- * @param {Record<string, any>} profile
+ * @param {Record<string, unknown>} profile
  * @returns {string[]}
  */
 function profileProbeKinds(profile) {
@@ -929,10 +950,10 @@ function profileProbeKinds(profile) {
 
 /**
  * @param {unknown} value
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function recordMap(value) {
-    return isRecord(value) ? /** @type {Record<string, any>} */ (value) : {};
+    return isRecord(value) ? value : {};
 }
 
 /**
@@ -944,15 +965,15 @@ function optionalString(value) {
 }
 
 /**
- * @param {Record<string, any>} health
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} health
+ * @returns {Record<string, unknown>}
  */
 function runtimeHealthProbes(health) {
     return recordMap(health['probes']);
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @param {string} kind
  * @returns {boolean}
  */
@@ -962,7 +983,7 @@ function runtimeProbeOk(health, kind) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @param {string} kind
  * @returns {boolean}
  */
@@ -972,7 +993,7 @@ function runtimeProbeAttempted(health, kind) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @returns {boolean}
  */
 function runtimeHealthHasPositiveProof(health) {
@@ -984,18 +1005,19 @@ function runtimeHealthHasPositiveProof(health) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @returns {number}
  */
 function runtimeHealthObservedAt(health) {
     const probes = runtimeHealthProbes(health);
-    const probeAt = Object.values(probes).reduce((max, probe) => {
-        if (!isRecord(probe)) return max;
-        return Math.max(
-            max,
+    let probeAt = 0;
+    for (const probe of Object.values(probes)) {
+        if (!isRecord(probe)) continue;
+        probeAt = Math.max(
+            probeAt,
             finiteNumber(probe['lastAt']) ?? finiteNumber(probe['observedAt']) ?? finiteNumber(probe['runtimeObservedAtMs']) ?? 0,
         );
-    }, 0);
+    }
     return Math.max(
         finiteNumber(health['runtimeObservedAtMs']) ?? 0,
         finiteNumber(health['lastSuccessAt']) ?? 0,
@@ -1005,7 +1027,7 @@ function runtimeHealthObservedAt(health) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @returns {string | null}
  */
 function runtimeHealthRouteProfile(health) {
@@ -1014,7 +1036,7 @@ function runtimeHealthRouteProfile(health) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @returns {Record<string, boolean>}
  */
 function runtimeOnlyCapabilities(health) {
@@ -1120,9 +1142,9 @@ function runtimeOnlySecretRef(providerId, secretRegistry) {
  * Runtime health can prove a route before a provider catalog exposes the model. These ephemeral candidates let the
  * selector use that proof without writing operational observations into canonical metadata.
  *
- * @param {Record<string, any>[]} baseCandidates
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
- * @returns {Record<string, any>[]}
+ * @param {Record<string, unknown>[]} baseCandidates
+ * @param {ModelGatewayRouteScoringOptions} options
+ * @returns {Record<string, unknown>[]}
  */
 function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
     if (options.ignoreRuntimeHealth === true || options.includeRuntimeOnlyCandidates === false) return [];
@@ -1137,7 +1159,7 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
             .map((candidate) => `${optionalString(candidate['providerId']) ?? ''}\u001f${optionalString(candidate['providerModel']) ?? ''}`)
             .filter((key) => key !== '\u001f'),
     );
-    /** @type {Map<string, Record<string, any>>} */
+    /** @type {Map<string, Record<string, unknown>>} */
     const newest = new Map();
     for (const health of records.filter(isRecord)) {
         const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']);
@@ -1149,7 +1171,7 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
         const current = newest.get(key);
         if (!current || runtimeHealthObservedAt(health) > runtimeHealthObservedAt(current)) newest.set(key, health);
     }
-    /** @type {Record<string, any>[]} */
+    /** @type {Record<string, unknown>[]} */
     const runtimeCandidates = [];
     for (const health of newest.values()) {
         const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']) ?? 'unknown-provider';
@@ -1244,7 +1266,7 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @returns {string}
  */
 function modelEligibilityKey(model) {
@@ -1258,7 +1280,7 @@ function modelEligibilityKey(model) {
 }
 
 /**
- * @param {Record<string, any>} route
+ * @param {Record<string, unknown>} route
  * @returns {string}
  */
 function routeEligibilityKey(route) {
@@ -1272,7 +1294,7 @@ function routeEligibilityKey(route) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {Record<string, unknown>} record
  * @returns {string | null}
  */
 function providerModelEligibilityKey(record) {
@@ -1282,7 +1304,7 @@ function providerModelEligibilityKey(record) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {Record<string, unknown>} record
  * @returns {string}
  */
 function modelRouteBaseKey(record) {
@@ -1294,9 +1316,9 @@ function modelRouteBaseKey(record) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {Record<string, any>[]} routes
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>} model
+ * @param {Record<string, unknown>[]} routes
+ * @returns {Record<string, unknown> | null}
  */
 function findRouteOptionForModel(model, routes) {
     const key = modelEligibilityKey(model);
@@ -1306,11 +1328,11 @@ function findRouteOptionForModel(model, routes) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {Record<string, any>} profile
- * @param {Record<string, any>[]} decisions
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>} model
+ * @param {Record<string, unknown>} profile
+ * @param {Record<string, unknown>[]} decisions
+ * @param {ModelGatewayRouteScoringOptions} options
+ * @returns {Record<string, unknown> | null}
  */
 function findEligibilityDecisionForModel(model, profile, decisions, options = {}) {
     const key = modelEligibilityKey(model);
@@ -1328,7 +1350,7 @@ function findEligibilityDecisionForModel(model, profile, decisions, options = {}
 }
 
 /**
- * @param {Record<string, any>} decision
+ * @param {Record<string, unknown>} decision
  * @param {string} key
  * @returns {boolean}
  */
@@ -1349,8 +1371,8 @@ function eligibilityDecisionMatchesRoute(decision, key) {
  * is rebuilt. A concrete runtime blocker for the same provider/model/account must override older eligible decisions so
  * the selector does not keep retrying a route that has already reported exhausted credits, disabled keys or rate caps.
  *
- * @param {Record<string, any>} model
- * @param {Record<string, any>} decision
+ * @param {Record<string, unknown>} model
+ * @param {Record<string, unknown>} decision
  * @returns {boolean}
  */
 function eligibilityDecisionMatchesProviderModel(model, decision) {
@@ -1358,9 +1380,9 @@ function eligibilityDecisionMatchesProviderModel(model, decision) {
 }
 
 /**
- * @param {Record<string, any>} decision
- * @param {Record<string, any>} profile
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
+ * @param {Record<string, unknown>} decision
+ * @param {Record<string, unknown>} profile
+ * @param {ModelGatewayRouteScoringOptions} options
  * @returns {boolean}
  */
 function eligibilityDecisionMatchesSelectionScope(decision, profile, options = {}) {
@@ -1389,15 +1411,10 @@ function eligibilityDecisionMatchesSelectionScope(decision, profile, options = {
 }
 
 /**
- * @param {Record<string, any>[]} decisions
- * @param {Record<string, any>} profile
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
- * @returns {{
- *   schema: 'model-gateway-eligibility-decision-index';
- *   byRouteRuntimeOverlay: Map<string, Record<string, any>>;
- *   byProviderModelRuntimeOverlay: Map<string, Record<string, any>>;
- *   byRoute: Map<string, Record<string, any>>;
- * }}
+ * @param {Record<string, unknown>[]} decisions
+ * @param {Record<string, unknown>} profile
+ * @param {ModelGatewayRouteScoringOptions} options
+ * @returns {ModelGatewayEligibilityDecisionIndex}
  */
 function createEligibilityDecisionIndex(decisions, profile, options = {}) {
     const byRouteRuntimeOverlay = new Map();
@@ -1426,7 +1443,7 @@ function createEligibilityDecisionIndex(decisions, profile, options = {}) {
 
 /**
  * @param {unknown} value
- * @returns {value is ReturnType<typeof createEligibilityDecisionIndex>}
+ * @returns {value is ModelGatewayEligibilityDecisionIndex}
  */
 function isEligibilityDecisionIndex(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -1440,9 +1457,9 @@ function isEligibilityDecisionIndex(value) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {ReturnType<typeof createEligibilityDecisionIndex>} index
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>} model
+ * @param {ModelGatewayEligibilityDecisionIndex} index
+ * @returns {Record<string, unknown> | null}
  */
 function findEligibilityDecisionForModelInIndex(model, index) {
     const routeKey = modelEligibilityKey(model);
@@ -1456,10 +1473,10 @@ function findEligibilityDecisionForModelInIndex(model, index) {
 }
 
 /**
- * @param {Record<string, any>} model
- * @param {Record<string, any>} profile
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} options
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>} model
+ * @param {Record<string, unknown>} profile
+ * @param {ModelGatewayRouteScoringOptions} options
+ * @returns {Record<string, unknown> | null}
  */
 function resolveCandidateEligibility(model, profile, options = {}) {
     if (isEligibilityDecisionIndex(options.eligibilityDecisionIndex)) {
@@ -1487,11 +1504,11 @@ function resolveCandidateEligibility(model, profile, options = {}) {
 }
 
 /**
- * @param {Record<string, any>[]} models
- * @param {string | Record<string, any>} profileInput
- * @param {Parameters<typeof scoreGatewayModelCandidate>[2]} [options]
+ * @param {Record<string, unknown>[]} models
+ * @param {string | Record<string, unknown>} profileInput
+ * @param {ModelGatewayRouteScoringOptions} [options]
  * @returns {{
- *     profile: Record<string, any>;
+ *     profile: Record<string, unknown>;
  *     selected: ReturnType<typeof scoreGatewayModelCandidate> | null;
  *     candidates: ReturnType<typeof scoreGatewayModelCandidate>[];
  *     rejected: ReturnType<typeof scoreGatewayModelCandidate>[];
@@ -1540,13 +1557,13 @@ export function routeGatewayModels(models, profileInput, options = {}) {
 /**
  * Prepare immutable catalog routing inputs once so repeated profile audits do not rebuild the same candidate universe.
  *
- * @param {Record<string, any>} snapshot
+ * @param {Record<string, unknown>} snapshot
  * @param {{ includeProjectionOnly?: boolean }} [options]
  * @returns {{
- *   candidates: Record<string, any>[];
- *   routeOptions: Record<string, any>[];
- *   accountOverlays: Record<string, any>[];
- *   eligibilityDecisions: Record<string, any>[];
+ *   candidates: Record<string, unknown>[];
+ *   routeOptions: Record<string, unknown>[];
+ *   accountOverlays: Record<string, unknown>[];
+ *   eligibilityDecisions: Record<string, unknown>[];
  *   baseSnapshotContext: {
  *     projectionCount: number;
  *     routeOptionCount: number;
@@ -1585,7 +1602,7 @@ export function prepareModelGatewayCatalogRoutingSnapshot(snapshot, options = {}
 
 /**
  * @param {ReturnType<typeof prepareModelGatewayCatalogRoutingSnapshot>} prepared
- * @param {string | Record<string, any>} profileInput
+ * @param {string | Record<string, unknown>} profileInput
  * @param {Parameters<typeof routeGatewayModels>[2]} [options]
  * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
  */
@@ -1607,8 +1624,8 @@ export function routePreparedModelGatewayCatalogSnapshot(prepared, profileInput,
 }
 
 /**
- * @param {Record<string, any>} snapshot
- * @param {string | Record<string, any>} profileInput
+ * @param {Record<string, unknown>} snapshot
+ * @param {string | Record<string, unknown>} profileInput
  * @param {Parameters<typeof routeGatewayModels>[2] & { includeProjectionOnly?: boolean }} [options]
  * @returns {ReturnType<typeof routeGatewayModels> & { snapshotContext: Record<string, number> }}
  */

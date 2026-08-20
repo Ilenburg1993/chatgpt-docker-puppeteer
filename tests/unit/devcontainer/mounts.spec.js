@@ -54,12 +54,12 @@ function withFakeBinary(/** @type {any} */ name, /** @type {any} */ content, /**
     const binDir = mkdtempSync(join(tmpdir(), 'fakebin-'));
     const pathFile = join(binDir, name);
     writeFileSync(pathFile, content, { mode: 0o755 });
-    const oldPath = process.env.PATH;
-    process.env.PATH = `${binDir}:${oldPath}`;
+    const oldPath = process.env['PATH'];
+    process.env['PATH'] = `${binDir}:${oldPath}`;
     try {
         return fn();
     } finally {
-        process.env.PATH = oldPath;
+        process.env['PATH'] = oldPath;
         try {
             rmSync(binDir, { recursive: true, force: true });
         } catch {}
@@ -107,7 +107,7 @@ describe('devcontainer mount helpers', () => {
     it('audit_mounts handles missing mount command', () => {
         // filter PATH for the helper only; leave the test process untouched so
         // bootstrap helpers like "date" continue to be available.
-        const parts = (process.env.PATH ?? '').split(':');
+        const parts = (process.env['PATH'] ?? '').split(':');
         const filtered = parts.filter((d) => {
             try {
                 return !existsSync(join(d, 'mount'));

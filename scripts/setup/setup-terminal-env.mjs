@@ -30,7 +30,7 @@ const projectRoot = resolve(__dirname, '..');
  */
 function detectEnvironment() {
     const hasDistBuild = existsSync(join(projectRoot, 'dist/main.js'));
-    const isProduction = process.env.NODE_ENV === 'production' && hasDistBuild;
+    const isProduction = process.env['NODE_ENV'] === 'production' && hasDistBuild;
     const cwd = process.cwd();
 
     return {
@@ -143,9 +143,9 @@ function applyEnvironmentConfig() {
     console.log(generateAliases(env));
 
     // Para uso em scripts, exporta variáveis
-    process.env.CHATGPT_ENV_IS_PRODUCTION = env.isProduction ? '1' : '0';
-    process.env.CHATGPT_ENV_HAS_DIST = env.hasDistBuild ? '1' : '0';
-    process.env.CHATGPT_ENV_IN_DIST = env.isInDist ? '1' : '0';
+    process.env['CHATGPT_ENV_IS_PRODUCTION'] = env.isProduction ? '1' : '0';
+    process.env['CHATGPT_ENV_HAS_DIST'] = env.hasDistBuild ? '1' : '0';
+    process.env['CHATGPT_ENV_IN_DIST'] = env.isInDist ? '1' : '0';
 
     console.log('✅ Configuração do ambiente aplicada com sucesso!');
 }

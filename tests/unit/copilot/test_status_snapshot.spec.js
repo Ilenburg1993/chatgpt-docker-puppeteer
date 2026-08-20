@@ -99,6 +99,7 @@ describe('buildStatusSnapshot() › campos obrigatórios', () => {
     });
 
     it('inclui a rota Model Gateway confirmada no snapshot observável', () => {
+        /** @type {NonNullable<Parameters<typeof buildStatusSnapshot>[0]['modelGatewayActiveRoute']>} */
         const modelGatewayActiveRoute = {
             providerId: 'ollama-cloud',
             providerModel: 'qwen3-coder-next',

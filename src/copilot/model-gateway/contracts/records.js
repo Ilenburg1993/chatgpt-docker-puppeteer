@@ -138,17 +138,16 @@ export function normalizeVerification(input = {}) {
 /**
  * @param {object} input
  * @param {string} input.id
- * @param {string} [input.displayName]
- * @param {string} [input.providerType]
- * @param {string} [input.baseUrl]
- * @param {string} [input.wireApi]
+ * @param {string | undefined} [input.displayName]
+ * @param {string | undefined} [input.providerType]
+ * @param {string | undefined} [input.baseUrl]
+ * @param {string | undefined} [input.wireApi]
  * @param {boolean} [input.enabled]
  * @param {boolean} [input.configured]
  * @param {string[]} [input.secretRefs]
  * @param {Record<string, string>} [input.headers]
  * @param {Record<string, unknown>} [input.auth]
  * @param {object} [input.provenance]
- * @returns {object}
  */
 export function createProviderRecord(input) {
     const id = normalizeGatewayIdPart(input.id);
@@ -177,17 +176,16 @@ export function createProviderRecord(input) {
  * @param {string} input.providerId
  * @param {string} input.providerModel
  * @param {string} [input.id]
- * @param {string} [input.displayName]
+ * @param {string | undefined} [input.displayName]
  * @param {boolean} [input.enabled]
  * @param {{ input?: string[]; output?: string[] }} [input.modalities]
- * @param {Partial<typeof DEFAULT_CAPABILITIES> & Record<string, unknown>} [input.capabilities]
+ * @param {Record<string, unknown>} [input.capabilities]
  * @param {string[]} [input.supportedParameters]
  * @param {Record<string, number | null | undefined>} [input.limits]
  * @param {Record<string, number | null | undefined>} [input.pricing]
  * @param {object} [input.routing]
  * @param {object} [input.verification]
  * @param {object} [input.provenance]
- * @returns {object}
  */
 export function createModelRecord(input) {
     const providerId = normalizeGatewayIdPart(input.providerId);

@@ -34,7 +34,6 @@ describe('Metrics Controller — /api/metrics', () => {
         });
 
         it('deve incluir campo platform', () => {
-            const validPlatforms = ['linux', 'darwin', 'win32'];
             const platform = process.platform;
             // Não restringir a lista — apenas verificar que é string não-vazia
             assert.ok(typeof platform === 'string' && platform.length > 0);
@@ -95,8 +94,8 @@ describe('Metrics Controller — /api/metrics/tasks', () => {
             const counts = { RUNNING: 2, DONE: 10 };
             const response = buildTaskMetricsResponse(counts);
             assert.strictEqual(Object.keys(response.metrics.by_status).length, 2);
-            assert.strictEqual(response.metrics.by_status.RUNNING, 2);
-            assert.strictEqual(response.metrics.by_status.DONE, 10);
+            assert.strictEqual(response.metrics.by_status['RUNNING'], 2);
+            assert.strictEqual(response.metrics.by_status['DONE'], 10);
         });
 
         it('deve calcular corretamente total com valores altos', () => {

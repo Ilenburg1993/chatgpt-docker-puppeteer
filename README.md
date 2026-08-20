@@ -267,8 +267,10 @@ qualquer desenvolvedor.
 
 ## 🧩 Usando o daemon LSP integrado
 
-Para scripts ou editores que queiram interagir com o servidor TypeScript interno, a biblioteca
-exporta `TsserverDaemon` em `src/integration/lsp/tsserver-daemon.mjs`. Exemplo mínimo:
+O editor usa diretamente o servidor nativo do TypeScript 7. A antiga integração MCP local foi
+preservada apenas para compatibilidade, permanece desligada por padrão e exige `LSP_ENABLED=true`
+no processo isolado. Seu alias histórico continua em `src/integration/lsp/tsserver-daemon.mjs`.
+Exemplo explícito de manutenção:
 
 ```js
 import { TsserverDaemon } from './src/integration/lsp/tsserver-daemon.mjs';
@@ -288,8 +290,8 @@ async function demo() {
 demo();
 ```
 
-Esse serviço pode ser ampliado com `completion`, `updateFile`, etc., e a integração com
-`typescript-language-server` é documentada em `DOCUMENTAÇÃO/LSP_UPGRADE_AUDIT.md`.
+O motor desse alias é `src/integration/lsp/tsgo-lsp-daemon.mjs`, que conversa com
+`tsc --lsp --stdio`. `typescript-language-server` não faz parte do toolchain.
 
 ## 🏗️ Build e Distribuição
 
@@ -382,7 +384,7 @@ npm run build:exe
 | `RAG_WATCH_ENABLED`                   | Liga/desliga watch incremental (`true           | false`)         | true    |
 | `RAG_WATCH_DEBOUNCE_MS`               | Debounce do watch incremental (ms)              | 3000            |
 | `RAG_WATCH_BATCH_MAX`                 | Máximo de arquivos por lote incremental         | 64              |
-| `LSP_ENABLED`                         | Habilita ferramentas MCP de LSP/tsserver        | true            |
+| `LSP_ENABLED`                         | Habilita tools MCP semânticas LSP (opt-in)       | false           |
 | `LSP_TOOL_TIMEOUT_MS`                 | Timeout por operação LSP (ms)                   | 15000           |
 | `LSP_MUTATIONS_ENABLED`               | Permite apply de code action (`true             | false`)         | false   |
 | `LSP_MAX_RESULTS`                     | Limite de resultados por ferramenta LSP         | 200             |

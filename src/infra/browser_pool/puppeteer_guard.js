@@ -56,7 +56,7 @@ const ARCH_VIOLATION_MESSAGE =
 /**
  * Flag de ativação explícita. Sem essa flag, o módulo é completamente inerte.
  */
-const isLaunchDisabled = process.env.PUPPETEER_LOCAL_LAUNCH_DISABLED === 'true';
+const isLaunchDisabled = process.env['PUPPETEER_LOCAL_LAUNCH_DISABLED'] === 'true';
 
 /** Constante/valor exportado: active. */
 let active = false;

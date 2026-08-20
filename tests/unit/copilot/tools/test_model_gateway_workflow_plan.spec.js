@@ -20,20 +20,30 @@ const switchRoute = vi.fn();
 function result(input) {
     return {
         schemaVersion: 'model-gateway.tool-result.v1',
-        operation: String(input.operation ?? 'test.operation'),
-        ok: input.ok !== false,
-        status: String(input.status ?? 'ok'),
-        dryRun: input.dryRun === true,
-        data: input.data && typeof input.data === 'object' && !Array.isArray(input.data) ? input.data : {},
-        warnings: Array.isArray(input.warnings) ? input.warnings.map(String) : [],
-        errors: Array.isArray(input.errors) ? input.errors : [],
-        nextActions: Array.isArray(input.nextActions) ? input.nextActions.map(String) : [],
+        operation: String(input['operation'] ?? 'test.operation'),
+        ok: input['ok'] !== false,
+        status: String(input['status'] ?? 'ok'),
+        dryRun: input['dryRun'] === true,
+        data: input['data'] && typeof input['data'] === 'object' && !Array.isArray(input['data']) ? input['data'] : {},
+        warnings: Array.isArray(input['warnings']) ? input['warnings'].map(String) : [],
+        errors: Array.isArray(input['errors']) ? input['errors'] : [],
+        nextActions: Array.isArray(input['nextActions']) ? input['nextActions'].map(String) : [],
         observedAt: '2026-06-16T00:00:00.000Z',
     };
 }
 
+/**
+ * @param {{
+ *   promotionAuthorization?: { authorized?: boolean; policy?: string; source?: string | null; expiresAt?: string | null };
+ *   state?: string;
+ *   operationId?: string | null;
+ *   sessionId?: string | null;
+ *   idempotencyKey?: string | null;
+ *   targetRoute?: Record<string, unknown> | null;
+ * }} operation
+ */
 function classifyDeferredOperation(operation) {
-    const auth = operation?.promotionAuthorization;
+    const auth = operation.promotionAuthorization;
     const promotable =
         auth?.authorized === true &&
         auth?.policy === 'authorized_after_turn_boundary' &&
@@ -78,8 +88,8 @@ vi.mock('#copilot/model-gateway', () => ({
         remove: vi.fn(),
         upsert: vi.fn(),
     }),
-    createModelGatewayModelSwitchOperationId: (key) => `model-switch:${key}`,
-    createModelGatewayProbeOperationId: (key) => `probe:${key}`,
+    createModelGatewayModelSwitchOperationId: (/** @type {string} */ key) => `model-switch:${key}`,
+    createModelGatewayProbeOperationId: (/** @type {string} */ key) => `probe:${key}`,
     createModelGatewayReadControlPlane: () => ({
         evaluateModels,
         inspectOperation: vi.fn(),
@@ -89,11 +99,11 @@ vi.mock('#copilot/model-gateway', () => ({
         proposePolicy: vi.fn(),
         searchCatalog: vi.fn(),
     }),
-    createModelGatewaySameSessionRouteSwitchOperationId: (key) => `route-switch:${key}`,
+    createModelGatewaySameSessionRouteSwitchOperationId: (/** @type {string} */ key) => `route-switch:${key}`,
     executeModelGatewayProbe: vi.fn(),
-    materializeModelGatewayActiveByokProfileEnv: (env) => ({ env }),
+    materializeModelGatewayActiveByokProfileEnv: (/** @type {NodeJS.ProcessEnv} */ env) => ({ env }),
     readModelGatewayProbeOperation: vi.fn(() => null),
-    redactModelGatewayAuditedValue: (value) => value,
+    redactModelGatewayAuditedValue: (/** @type {unknown} */ value) => value,
     removeModelGatewayByokProfileEnv: vi.fn(),
     resolveModelGatewaySessionBinding: () => ({
         enabled: true,
@@ -371,8 +381,8 @@ describe('model_gateway_workflow_plan', () => {
         });
         const parsed = JSON.parse(String(raw));
         const steps = /** @type {Array<Record<string, any>>} */ (parsed.data.steps);
-        const routeSwitchPlan = steps.find((step) => step.id === 'route_switch_plan');
-        const routeSwitchApply = steps.find((step) => step.id === 'route_switch_apply');
+        const routeSwitchPlan = steps.find((step) => step['id'] === 'route_switch_plan');
+        const routeSwitchApply = steps.find((step) => step['id'] === 'route_switch_apply');
 
         expect(modelGatewayReadTools.map((tool) => tool.name)).toContain('model_gateway_workflow_plan');
         expect(modelGatewayTools).toHaveLength(16);
@@ -428,7 +438,7 @@ describe('model_gateway_workflow_plan', () => {
                 idempotencyKey: 'workflow-test-20260616:route-switch-kilo-code-kilo-auto-free',
             },
         });
-        expect(steps.some((step) => String(step.id).startsWith('probe_execute_'))).toBe(false);
+        expect(steps.some((step) => String(step['id']).startsWith('probe_execute_'))).toBe(false);
         expect(parsed.data.selectionDecision.status).toBe('switch_recommended');
         expect(JSON.stringify(parsed)).not.toContain('"requiresNewSession":true');
         expect(JSON.stringify(parsed)).not.toContain('"apiKey":');
@@ -514,8 +524,8 @@ describe('model_gateway_workflow_plan', () => {
                 },
             },
         });
-        const probePlanStep = steps.find((step) => step.id === 'probe_execute_plan_r1_agent');
-        const probeApplyStep = steps.find((step) => step.id === 'probe_execute_apply_r1_agent');
+        const probePlanStep = steps.find((step) => step['id'] === 'probe_execute_plan_r1_agent');
+        const probeApplyStep = steps.find((step) => step['id'] === 'probe_execute_apply_r1_agent');
         expect(probePlanStep).toMatchObject({
             args: {
                 routeProfile: 'repo_agent',
@@ -543,8 +553,8 @@ describe('model_gateway_workflow_plan', () => {
                 allowedProbeKinds: ['agent'],
             }),
         );
-        expect(steps.some((step) => step.id === 'route_switch_plan')).toBe(false);
-        expect(steps.some((step) => step.id === 'route_switch_apply')).toBe(false);
+        expect(steps.some((step) => step['id'] === 'route_switch_plan')).toBe(false);
+        expect(steps.some((step) => step['id'] === 'route_switch_apply')).toBe(false);
         expect(parsed.warnings).toContain('fresh_runtime_proof_required_before_promotion');
     });
 

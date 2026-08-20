@@ -17,7 +17,6 @@
 
 import { writeFileSync } from 'node:fs';
 import process from 'node:process';
-// @ts-expect-error `madge` não publica typings neste workspace.
 import madge from 'madge';
 
 /**

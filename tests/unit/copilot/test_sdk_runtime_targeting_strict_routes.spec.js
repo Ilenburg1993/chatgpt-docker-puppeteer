@@ -23,7 +23,7 @@ function createMissingRuntimeError(runtimeId = 'missing') {
  * @returns {any}
  */
 function rejectMissingRuntimeRoute(req) {
-    const runtimeId = typeof req.query?.runtimeId === 'string' ? req.query.runtimeId : null;
+    const runtimeId = typeof req.query?.['runtimeId'] === 'string' ? req.query['runtimeId'] : null;
     if (runtimeId === 'missing') {
         throw createMissingRuntimeError(runtimeId);
     }
@@ -35,12 +35,12 @@ function rejectMissingRuntimeRoute(req) {
  * @returns {void}
  */
 function assertMissingRuntimeBody(body) {
-    assert.equal(body.ok, false);
-    assert.equal(body.code, 'AGENT_RUNTIME_NOT_FOUND');
-    assert.equal(body.requestedRuntimeId, 'missing');
-    assert.equal(body.runtimeFound, false);
-    assert.equal(body.usedDefaultRuntimeFallback, false);
-    assert.match(String(body.error), /Runtime 'missing' não encontrado/);
+    assert.equal(body['ok'], false);
+    assert.equal(body['code'], 'AGENT_RUNTIME_NOT_FOUND');
+    assert.equal(body['requestedRuntimeId'], 'missing');
+    assert.equal(body['runtimeFound'], false);
+    assert.equal(body['usedDefaultRuntimeFallback'], false);
+    assert.match(String(body['error']), /Runtime 'missing' não encontrado/);
 }
 
 const sessionRouterMocks = vi.hoisted(() => ({

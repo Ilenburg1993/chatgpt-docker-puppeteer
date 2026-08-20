@@ -30,7 +30,7 @@ const DEFAULT_AGENT_PROOF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /** @param {unknown} value */
 function record(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
-        ? /** @type {Record<string, any>} */ (value)
+        ? /** @type {Record<string, unknown>} */ (value)
         : {};
 }
 
@@ -58,7 +58,7 @@ function normalizeSdkQuota(value) {
 }
 
 /**
- * @param {Record<string, any>} model
+ * @param {Record<string, unknown>} model
  * @param {{ minContextWindowTokens: number; quotaStatus: string; currentModelId: string | null }} context
  */
 function evaluateNativeModel(model, context) {
@@ -106,7 +106,7 @@ function evaluateNativeModel(model, context) {
 }
 
 /**
- * @param {Record<string, any>} route
+ * @param {Record<string, unknown>} route
  * @param {{ now?: string | number | Date; maxAgentProofAgeMs: number }} context
  */
 function evaluateByokControllerRoute(route, context) {
@@ -147,9 +147,9 @@ function evaluateByokControllerRoute(route, context) {
  * Build a deterministic controller selection plan.
  *
  * @param {{
- *   sdkModels?: Record<string, any>[];
+ *   sdkModels?: unknown[];
  *   sdkQuota?: unknown;
- *   byokRoutes?: Record<string, any>[];
+ *   byokRoutes?: unknown[];
  *   currentController?: { substrate?: string | null; modelId?: string | null; providerId?: string | null; providerModel?: string | null } | null;
  *   now?: string | number | Date;
  *   minContextWindowTokens?: number;

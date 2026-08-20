@@ -12,11 +12,11 @@ describe('OpenAI Secure MCP Tunnel readiness audit', () => {
 
         assert.equal(result.success, true);
         assert.equal(result.ok, false);
-        const readiness = /** @type {{ blockers: string[]; warnings: string[] }} */ (result.readiness);
+        const readiness = /** @type {{ blockers: string[]; warnings: string[] }} */ (result['readiness']);
         assert.ok(readiness.blockers.some((item) => item.includes('tunnel_id')));
         assert.ok(readiness.blockers.some((item) => item.includes('runtime credential')));
         assert.ok(readiness.warnings.some((item) => item.includes('tunnel-client')));
-        assert.match(JSON.stringify(result.costPosture), /do-not-proceed-if-paid-or-plan-upgrade-required/u);
+        assert.match(JSON.stringify(result['costPosture']), /do-not-proceed-if-paid-or-plan-upgrade-required/u);
     });
 
     it('does not expose raw secret-like environment values', () => {

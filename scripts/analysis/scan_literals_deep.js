@@ -141,8 +141,6 @@ files.forEach((file) => {
         console.error(`Erro ao processar ${file}:`, /** @type {any} */ (_error).message);
         return;
     }
-    const _lines = content.split('\n');
-
     // Task states
     let match;
     while ((match = patterns.taskState.exec(content)) !== null) {

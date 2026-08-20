@@ -23,8 +23,8 @@ async function createTempDir() {
     return dir;
 }
 
-function throwAt(expectedPhase) {
-    return (phase) => {
+function throwAt(/** @type {string} */ expectedPhase) {
+    return (/** @type {string} */ phase) => {
         if (phase === expectedPhase) throw new Error(`fault:${phase}`);
     };
 }
@@ -84,7 +84,7 @@ describe('infra/io deterministic fault injection', () => {
 
         await expect(
             writeAtomicFileUnlocked(target, 'new', {
-                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO' }),
+                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 }),
             }),
         ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
 
@@ -113,7 +113,7 @@ describe('infra/io deterministic fault injection', () => {
 
         await expect(
             copyFileUnlocked(source, destination, {
-                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO' }),
+                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 }),
             }),
         ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
 
@@ -145,7 +145,7 @@ describe('infra/io deterministic fault injection', () => {
 
         const result = await moveFileUnlocked(source, destination, {
             overwrite: false,
-            syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO' }),
+            syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 }),
         });
 
         expect(result).toMatchObject({
@@ -170,8 +170,8 @@ describe('infra/io deterministic fault injection', () => {
                 syncDirectory: async () => {
                     syncCalls += 1;
                     return syncCalls === 1
-                        ? { attempted: true, ok: true }
-                        : { attempted: true, ok: false, errorCode: 'EIO' };
+                        ? { attempted: true, ok: true, durationMs: 0 }
+                        : { attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 };
                 },
             }),
         ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });

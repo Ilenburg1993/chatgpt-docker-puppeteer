@@ -69,23 +69,23 @@ test('wave9: SIGPIPE/SIGCHLD optional policy is explicit, non-shutdown, and clea
         const afterSetup = captureCounts(events);
 
         if (process.platform === 'win32') {
-            assert.equal(handlers.sigpipe, null, 'sigpipe handler should not be installed on win32');
-            assert.equal(handlers.sigchld, null, 'sigchld handler should not be installed on win32');
-            assert.equal(afterSetup.SIGPIPE, before.SIGPIPE, 'SIGPIPE should not change on win32');
-            assert.equal(afterSetup.SIGCHLD, before.SIGCHLD, 'SIGCHLD should not change on win32');
+            assert.equal(handlers['sigpipe'], null, 'sigpipe handler should not be installed on win32');
+            assert.equal(handlers['sigchld'], null, 'sigchld handler should not be installed on win32');
+            assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'], 'SIGPIPE should not change on win32');
+            assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'], 'SIGCHLD should not change on win32');
         } else {
-            if (typeof handlers.sigpipe === 'function') {
-                assert.equal(afterSetup.SIGPIPE, before.SIGPIPE + 1, 'SIGPIPE should be installed on POSIX');
+            if (typeof handlers['sigpipe'] === 'function') {
+                assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'] + 1, 'SIGPIPE should be installed on POSIX');
                 /** @type {any} */ (handlers).sigpipe();
             } else {
-                assert.equal(afterSetup.SIGPIPE, before.SIGPIPE, 'SIGPIPE count should stay stable when unsupported');
+                assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'], 'SIGPIPE count should stay stable when unsupported');
             }
 
-            if (typeof handlers.sigchld === 'function') {
-                assert.equal(afterSetup.SIGCHLD, before.SIGCHLD + 1, 'SIGCHLD should be installed on POSIX');
+            if (typeof handlers['sigchld'] === 'function') {
+                assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'] + 1, 'SIGCHLD should be installed on POSIX');
                 /** @type {any} */ (handlers).sigchld();
             } else {
-                assert.equal(afterSetup.SIGCHLD, before.SIGCHLD, 'SIGCHLD count should stay stable when unsupported');
+                assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'], 'SIGCHLD count should stay stable when unsupported');
             }
 
             assert.equal(
@@ -108,7 +108,7 @@ test(
     { skip: process.platform === 'win32' },
     async () => {
         const childScript = `
-            process.env.LOG_LEVEL = 'ERROR';
+            process.env['LOG_LEVEL'] = 'ERROR';
             const { __mainTestHooks } = await import('#main');
             const { shutdown: shutdownDriverFactory } = await import('#driver/factory');
 

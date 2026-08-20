@@ -31,14 +31,23 @@ describe('agent-dialog-runtime facade', () => {
 
     it('isAgentDialogLoopPaused/readAgentDialogPrMetrics/readAgentDialogLastPrInfo leem snapshots do runtime', () => {
         const prInfo = { model: 'gpt-5-mini', cost: 1, ts: 123 };
+        const metrics = {
+            boots: 1,
+            resumesWithAdditionalModelCall: 2,
+            resumesWithoutAdditionalModelCall: 3,
+            totalModelCalls: 3,
+            resumesWithPR: 2,
+            resumesZeroPR: 3,
+            totalPR: 3,
+        };
         const runtime = {
             isDialogLoopPaused: vi.fn(() => true),
-            getDialogPrMetricsSnapshot: vi.fn(() => ({ boots: 1, resumesWithPR: 2, resumesZeroPR: 3, totalPR: 4 })),
+            getDialogPrMetricsSnapshot: vi.fn(() => metrics),
             getLastPrInfoSnapshot: vi.fn(() => prInfo),
         };
 
         expect(isAgentDialogLoopPaused(runtime)).toBe(true);
-        expect(readAgentDialogPrMetrics(runtime)).toEqual({ boots: 1, resumesWithPR: 2, resumesZeroPR: 3, totalPR: 4 });
+        expect(readAgentDialogPrMetrics(runtime)).toEqual(metrics);
         expect(readAgentDialogLastPrInfo(runtime)).toEqual(prInfo);
     });
 });

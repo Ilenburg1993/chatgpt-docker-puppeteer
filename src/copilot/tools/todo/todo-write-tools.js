@@ -27,18 +27,17 @@ export const todoCreateTool = buildTool({
         'tags, data de vencimento, notas livres, e subtarefas via parentId. ' +
         'Retorna o objeto completo da tarefa criada com seu ID gerado.',
     parameters: z.object({
-        title: z.string().min(1).describe('Título da tarefa (obrigatório)'),
-        description: z.string().optional().describe('Descrição detalhada da tarefa'),
-        priority: zPriority.optional().default('medium').describe('Prioridade: critical | high | medium | low | none'),
-        tags: z.array(z.string()).optional().default([]).describe('Lista de tags/labels para categorização'),
+        title: z.string().min(1)['describe']('Título da tarefa (obrigatório)'),
+        description: z.string().optional()['describe']('Descrição detalhada da tarefa'),
+        priority: zPriority.optional().default('medium')['describe']('Prioridade: critical | high | medium | low | none'),
+        tags: z.array(z.string()).optional().default([])['describe']('Lista de tags/labels para categorização'),
         due_date: z
-            .string()
-            .datetime({ offset: true })
+            .string()['datetime']({ offset: true })
             .optional()
             .describe('Data de vencimento ISO 8601 (ex: 2026-04-01T18:00:00Z)'),
-        parent_id: z.string().optional().describe('ID da tarefa pai para criar como subtarefa'),
-        notes: z.string().optional().describe('Notas livres associadas à tarefa'),
-        metadata: z.record(z.string(), z.unknown()).optional().describe('Campos extras extensíveis (JSON livre)'),
+        parent_id: z.string().optional()['describe']('ID da tarefa pai para criar como subtarefa'),
+        notes: z.string().optional()['describe']('Notas livres associadas à tarefa'),
+        metadata: z.record(z.string(), z.unknown()).optional()['describe']('Campos extras extensíveis (JSON livre)'),
     }),
     handler: async (
         /**
@@ -94,12 +93,11 @@ export const todoSetStatusTool = buildTool({
         'Use force: true para forçar transição fora do grafo (casos excepcionais).',
     parameters: z.object({
         id: zId,
-        status: zStatus.describe('Novo status da tarefa'),
-        force: z.boolean().optional().describe('Forçar transição mesmo fora do grafo de estados'),
+        status: zStatus['describe']('Novo status da tarefa'),
+        force: z.boolean().optional()['describe']('Forçar transição mesmo fora do grafo de estados'),
         completed_by: z
             .string()
-            .optional()
-            .describe('Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.'),
+            .optional()['describe']('Identificador de quem concluiu (agente, usuário). Gravado em completedBy quando status=done.'),
     }),
     handler: async (
         /** @type {{ id: string; status: import('./store.js').TodoStatus; force?: boolean; completed_by?: string }} */ args,
@@ -157,8 +155,7 @@ export const todoDeleteTool = buildTool({
         cascade: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Se true, remove subtarefas recursivamente; se false, desvincula-as'),
+            .default(false)['describe']('Se true, remove subtarefas recursivamente; se false, desvincula-as'),
     }),
     handler: async (/** @type {{ id: string; cascade?: boolean }} */ args) =>
         withStore(async (store) => {

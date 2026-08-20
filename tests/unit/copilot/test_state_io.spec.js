@@ -21,10 +21,10 @@ import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 // Configurar AGENT_STATE_FILE antes de importar state-io para usar um diretório temporário
 const TEST_STATE_DIR = join(import.meta.dirname, '.tmp-state-io-test');
 const TEST_STATE_FILE = join(TEST_STATE_DIR, 'test-state.json');
-process.env.AGENT_STATE_FILE = TEST_STATE_FILE;
+process.env['AGENT_STATE_FILE'] = TEST_STATE_FILE;
 
 // Importar após definir env
-const { readState, readStateAsync, writeState, writeStateAsync, clearState, clearStateAsync, persistStateWithPolicy } =
+const { readState, readStateAsync, writeStateAsync, clearState, clearStateAsync, persistStateWithPolicy } =
     await import('../../../src/copilot/agent/lifecycle/state/state-io.js');
 const { stateFileIoTestHarness } = await import('../../../src/copilot/agent/lifecycle/state/state-file-io.js');
 
@@ -34,7 +34,7 @@ describe('state-io', () => {
     });
 
     afterAll(() => {
-        delete process.env.AGENT_STATE_FILE;
+        delete process.env['AGENT_STATE_FILE'];
         if (existsSync(TEST_STATE_DIR)) {
             rmSync(TEST_STATE_DIR, { recursive: true, force: true });
         }

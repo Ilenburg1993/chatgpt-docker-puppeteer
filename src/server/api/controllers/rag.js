@@ -168,11 +168,11 @@ export async function handleRagQuery(req, res) {
  * **Side-effects:** Verifica conectividade com Ollama e LanceDB. **Semântica:** Status operacional completo do sistema
  * RAG.
  *
- * @param {HandleRagHealthReq} req - Request Express
+ * @param {HandleRagHealthReq} _req - Request Express
  * @param {HandleRagHealthRes} res - Response Express
  * @returns {Promise<void>}
  */
-export async function handleRagHealth(req, res) {
+export async function handleRagHealth(_req, res) {
     try {
         const health = await ragHealth();
         return res.json({
@@ -310,11 +310,11 @@ export async function handleRagHybridSearch(req, res) {
         const result = await ragHybridSearch({
             query,
             topK: Number(topK),
-            pathPrefix,
-            ext,
-            tags: tags ? (Array.isArray(tags) ? tags : [tags]) : undefined,
+            ...(pathPrefix !== undefined ? { pathPrefix } : {}),
+            ...(ext !== undefined ? { ext } : {}),
+            ...(tags !== undefined ? { tags: Array.isArray(tags) ? tags : [tags] } : {}),
             rerank,
-            rerankWeights,
+            ...(rerankWeights !== undefined ? { rerankWeights } : {}),
             mmr,
             mmrLambda: mmrLambda ? Number(mmrLambda) : 0.7,
         });
@@ -377,11 +377,11 @@ export async function handleRagHybridSearch(req, res) {
  * **Side-effects:** Lê estatísticas do cache RAG. **Semântica:** Métricas de performance e eficiência do sistema de
  * cache.
  *
- * @param {HandleRagStatsReq} req - Request Express
+ * @param {HandleRagStatsReq} _req - Request Express
  * @param {HandleRagStatsRes} res - Response Express
  * @returns {Promise<void>}
  */
-export async function handleRagStats(req, res) {
+export async function handleRagStats(_req, res) {
     try {
         const stats = getRagCacheStats();
 

@@ -1,14 +1,14 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 let passed = 0;
 let failed = 0;
 
-function test(name, fn) {
+function test(/** @type {string} */ name, /** @type {() => void} */ fn) {
     try {
         fn();
         console.log(`✅ ${name}`);
         passed++;
     } catch (error) {
-        console.error(`❌ ${name}: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`❌ ${name}: ${message}`);
         failed++;
     }
 }
@@ -56,14 +56,17 @@ test('ResponseV2: Structure validation', () => {
 
 test('ResponseV2: Detect V2 format', () => {
     // Inline implementation to avoid module-alias issues
-    const isResponseV2 = (response) => {
+    const isResponseV2 = (/** @type {unknown} */ response) => {
         return (
-            response &&
+            response !== null &&
             typeof response === 'object' &&
             'text' in response &&
             'markdown' in response &&
             'metadata' in response &&
-            response.metadata?.format_version === 2
+            response.metadata !== null &&
+            typeof response.metadata === 'object' &&
+            'format_version' in response.metadata &&
+            response.metadata.format_version === 2
         );
     };
 
@@ -81,14 +84,17 @@ test('ResponseV2: Detect V2 format', () => {
 });
 
 test('ResponseV2: Detect V1 format (string)', () => {
-    const isResponseV2 = (response) => {
+    const isResponseV2 = (/** @type {unknown} */ response) => {
         return (
-            response &&
+            response !== null &&
             typeof response === 'object' &&
             'text' in response &&
             'markdown' in response &&
             'metadata' in response &&
-            response.metadata?.format_version === 2
+            response.metadata !== null &&
+            typeof response.metadata === 'object' &&
+            'format_version' in response.metadata &&
+            response.metadata.format_version === 2
         );
     };
 
@@ -101,7 +107,7 @@ test('ResponseV2: Detect V1 format (string)', () => {
 
 test('ResponseV2: Convert V1 to V2', () => {
     // Inline conversion logic
-    const convertV1toV2 = (responseText, task) => {
+    const convertV1toV2 = (/** @type {string} */ responseText, /** @type {unknown} */ _task) => {
         return {
             text: responseText,
             markdown: responseText,
@@ -202,7 +208,17 @@ test('Event Payload: ResponseV2 structure', () => {
 test('Task Result: Population structure', () => {
     const task = {
         meta: { id: 'test' },
-        result: {},
+        result:
+            /**
+             * @type {{
+             *     response_text?: string;
+             *     response_format?: string;
+             *     response_length?: number;
+             *     response_has_json?: boolean;
+             *     response_has_html?: boolean;
+             *     response_metadata?: { generated_at: string };
+             * }}
+             */ ({}),
     };
 
     // Simulate what saveResponse does
@@ -234,7 +250,7 @@ test('Multi-format storage: File paths generation', () => {
     if (paths.length !== 4) {
         throw new Error('Should generate 4 file paths');
     }
-    if (!paths[0].endsWith('.txt')) {
+    if (!paths[0]?.endsWith('.txt')) {
         throw new Error('First path should be .txt');
     }
 });
@@ -243,7 +259,7 @@ test('Integration: Full flow simulation', () => {
     // 1. Create task
     const task = {
         meta: { id: 'integration-test' },
-        result: {},
+        result: /** @type {{ response_text?: string; response_format?: string; response_length?: number }} */ ({}),
     };
 
     // 2. Cache in Orchestrator

@@ -20,8 +20,10 @@ const summary = {
 if (json) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } else {
+    const projectionCheck = summary.duplicateChecks['projections'];
+    const evidenceCheck = summary.duplicateChecks['evidences'];
     process.stdout.write(
-        `model-gateway catalog integrity: ok=${summary.ok ? 'yes' : 'no'} projections=${summary.duplicateChecks.projections.rowCount} evidences=${summary.duplicateChecks.evidences.rowCount} redactedIdentities=${summary.redactedIdentityCount}\n`,
+        `model-gateway catalog integrity: ok=${summary.ok ? 'yes' : 'no'} projections=${projectionCheck?.rowCount ?? 0} evidences=${evidenceCheck?.rowCount ?? 0} redactedIdentities=${summary.redactedIdentityCount}\n`,
     );
     for (const [field, check] of Object.entries(summary.duplicateChecks)) {
         process.stdout.write(
@@ -37,4 +39,3 @@ if (json) {
 }
 
 if (!summary.ok) process.exit(1);
-

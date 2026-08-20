@@ -9,11 +9,13 @@ import {
     MCP_AUTH_SCOPES,
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
+    isBaselineMcpOutputSchema,
     okResult,
     readMcpAuthConfig,
     readMcpSchemaConvergenceState,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { buildToolPayloadAudit } from '../scripts/tool-payload-audit.js';
 
 const MAX_POWER_REPO_SCOPES = [
     MCP_AUTH_SCOPES.read,
@@ -31,6 +33,7 @@ let toolsProvider = () => [];
  */
 export function bindMcpToolsStatusProvider(provider) {
     toolsProvider = provider;
+    wirePayloadSummaryPromise = null;
 }
 
 const NEVER_REMEMBER_APPROVAL_TOOLS = new Set(['job_cancel']);
@@ -48,8 +51,7 @@ let wirePayloadSummaryPromise = null;
 async function readCompactWirePayloadSummary() {
     if (!wirePayloadSummaryPromise) {
         wirePayloadSummaryPromise = (async () => {
-            const { buildToolPayloadAudit } = await import('../scripts/tool-payload-audit.js');
-            const audit = /** @type {Record<string, any>} */ (await buildToolPayloadAudit({ top: 3 }));
+            const audit = await buildToolPayloadAudit({ tools: toolsProvider(), top: 3 });
             const fieldTotals = /** @type {Record<string, number>} */ (audit['fieldTotals'] ?? {});
             const largestField = Object.entries(fieldTotals)
                 .filter(([name]) => name !== 'totalBytes')
@@ -64,10 +66,12 @@ async function readCompactWirePayloadSummary() {
                 p50ToolBytes: audit['p50ToolBytes'],
                 p95ToolBytes: audit['p95ToolBytes'],
                 largestField: { name: largestField[0], bytes: largestField[1] },
-                largestDescriptors: (Array.isArray(audit['topTools']) ? audit['topTools'] : []).slice(0, 3).map((row) => ({
-                    name: row['name'],
-                    totalBytes: row['totalBytes'],
-                })),
+                largestDescriptors: (Array.isArray(audit['topTools']) ? audit['topTools'] : [])
+                    .slice(0, 3)
+                    .map((row) => {
+                        const descriptor = /** @type {Record<string, unknown>} */ (row);
+                        return { name: descriptor['name'], totalBytes: descriptor['totalBytes'] };
+                    }),
                 detailsTool: 'mcp_tool_payload_audit',
             };
         })().catch((error) => {
@@ -121,7 +125,7 @@ function buildApprovalFrictionProfile(summaries) {
             ['run_copilot_validator', 'mcp_validation_plan'],
         ],
         planFirstWorkflows: [],
-        escalationOnlyPlans: ['mcp_validation_plan'], 
+        escalationOnlyPlans: ['mcp_validation_plan'],
     };
 }
 
@@ -175,7 +179,9 @@ export const mcpToolsStatusTool = {
         const openWorld = summaries.filter((tool) => tool.annotations.openWorldHint);
         const auth = readMcpAuthConfig();
         const maxPowerRepoScopesByDefault = MAX_POWER_REPO_SCOPES.every((scope) => auth.initialScopes.includes(scope));
-        const outputSchemaCount = summaries.filter((tool) => tool.hasOutputSchema).length;
+        const outputSchemaCount = tools.filter((tool) => tool.outputSchema !== undefined).length;
+        const baselineOutputSchemaCount = tools.filter((tool) => isBaselineMcpOutputSchema(tool.outputSchema)).length;
+        const specificOutputSchemaCount = outputSchemaCount - baselineOutputSchemaCount;
         const securityMetadataCount = summaries.filter(
             (tool) => Array.isArray(tool.securitySchemes) && tool.securitySchemes.length > 0,
         ).length;
@@ -197,8 +203,11 @@ export const mcpToolsStatusTool = {
             openWorldCount: openWorld.length,
             idempotentReadCount: readOnly.filter((tool) => tool.annotations.idempotentHint).length,
             metadataCoverage: {
-                outputSchemaPolicy: 'specific-only',
-                specificOutputSchemaCount: outputSchemaCount,
+                outputSchemaPolicy: 'baseline-plus-specific',
+                outputSchemaCount,
+                baselineOutputSchemaCount,
+                specificOutputSchemaCount,
+                outputSchemaComplete: outputSchemaCount === summaries.length,
                 securityMetadataCount,
                 securityComplete: securityMetadataCount === summaries.length,
             },

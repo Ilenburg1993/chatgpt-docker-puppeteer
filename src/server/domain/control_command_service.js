@@ -394,20 +394,14 @@ function _asEntity(/** @type {any} */ command, /** @type {any} */ payload = {}) 
 }
 
 function _getAuditAgentBaseUrl() {
-    const host = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
-    const port = Number(process.env.AUDIT_AGENT_PORT || 3098);
+    const host = process.env['AUDIT_AGENT_HOST'] || '127.0.0.1';
+    const port = Number(process.env['AUDIT_AGENT_PORT'] || 3098);
     return `http://${host}:${port}`;
 }
 
 function _getInferenceGatewayBaseUrl() {
-    const host = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-    const port = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
-    return `http://${host}:${port}`;
-}
-
-function _getDiagnosticAgentBaseUrl() {
-    const host = process.env.DIAGNOSTIC_AGENT_HOST || '127.0.0.1';
-    const port = Number(process.env.DIAGNOSTIC_AGENT_PORT || 3097);
+    const host = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+    const port = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
     return `http://${host}:${port}`;
 }
 
@@ -885,7 +879,7 @@ function _executeAuditPatchApply(patchId, before, actorId) {
         // 4. Aplicar o patch
         let stderrOutput = '';
         try {
-            const _applyResult = execFileSync('git', ['apply', '--3way', patchFile], {
+            execFileSync('git', ['apply', '--3way', patchFile], {
                 encoding: 'utf8',
                 stdio: ['pipe', 'pipe', 'pipe'],
             });

@@ -351,6 +351,7 @@ describe('MemoryStore Unit Tests', () => {
             // Pattern 1 deveria ter sido preservado por ser muito acessado
             const remaining = memoryStore.patterns.map((/** @type {any} */ p) => p.content);
             // (Nota: LRU simples, não garante que Pattern 1 seja mantido se outros foram acessados recentemente)
+            assert.ok(remaining.length <= 10);
         });
     });
 

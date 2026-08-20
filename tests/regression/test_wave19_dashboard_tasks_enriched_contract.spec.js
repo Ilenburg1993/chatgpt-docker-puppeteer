@@ -20,9 +20,10 @@ test('wave19: dashboard tasks/missions mantém contrato enriquecido de contexto'
     assert.match(dashboardTasks, /include\.has\('siblings'\)/);
 
     assert.match(dashboardMissions, /mission_title/);
-    assert.match(dashboardMissions, /taskRowToListItem/);
+    assert.match(dashboardMissions, /taskDbRowToListItem/);
 
     assert.match(taskViews, /mission_ref/);
     assert.match(taskViews, /command_caps/);
     assert.match(taskViews, /buildTaskCommandCaps/);
+    assert.match(taskViews, /function isTaskViewRow/);
 });

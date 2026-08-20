@@ -1,11 +1,11 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { log } from '#core/logger';
+import { CONNECTION_MODES } from '#core/constants/browser';
 
 // Configuração de teste
-process.env.NODE_ENV = 'test';
-process.env.CHROME_PROXY_ENABLED = 'true';
-process.env.CHROME_PROXY_PORT = '9224';
-process.env.CHROME_PORT = '9225';
+process.env['NODE_ENV'] = 'test';
+process.env['CHROME_PROXY_ENABLED'] = 'true';
+process.env['CHROME_PROXY_PORT'] = '9224';
+process.env['CHROME_PORT'] = '9225';
 
 /**
  * Função exportada: testChromeProxyIntegration.
@@ -21,6 +21,14 @@ async function testChromeProxyIntegration() {
     let nerv = null;
     let browserPool = null;
 
+    /** @type {{
+     *     proxyStart: boolean;
+     *     proxyHealth: boolean;
+     *     poolValidation: boolean;
+     *     poolConnection: boolean;
+     *     nervEvents: Array<{ actor: unknown; action: unknown; payload: Record<string, unknown>; timestamp: number }>;
+     *     shutdown: boolean;
+     * }} */
     const results = {
         proxyStart: false,
         proxyHealth: false,
@@ -33,10 +41,7 @@ async function testChromeProxyIntegration() {
     try {
         // ===== 1. Iniciar NERV =====
         log('INFO', '[TEST] 1/6: Criando NERV...');
-        const nervFactory = await import('#nerv/nerv').then((m) => m.default ?? m);
-        const nervConstants = await import('#shared/nerv/constants').then((m) => m.default ?? m);
-        const { createNERV } = nervFactory;
-        const { CONNECTION_MODES } = nervConstants;
+        const { createNERV } = await import('#nerv/nerv');
 
         nerv = await createNERV({
             mode: CONNECTION_MODES.LOCAL,
@@ -47,10 +52,24 @@ async function testChromeProxyIntegration() {
 
         // Captura eventos NERV
         nerv.onEvent((envelope) => {
+            const envelopeRecord =
+                envelope && typeof envelope === 'object' ? /** @type {Record<string, unknown>} */ (envelope) : {};
+            const identity =
+                envelopeRecord['identity'] && typeof envelopeRecord['identity'] === 'object'
+                    ? /** @type {Record<string, unknown>} */ (envelopeRecord['identity'])
+                    : {};
+            const type =
+                envelopeRecord['type'] && typeof envelopeRecord['type'] === 'object'
+                    ? /** @type {Record<string, unknown>} */ (envelopeRecord['type'])
+                    : {};
+            const payload =
+                envelopeRecord['payload'] && typeof envelopeRecord['payload'] === 'object'
+                    ? /** @type {Record<string, unknown>} */ (envelopeRecord['payload'])
+                    : {};
             results.nervEvents.push({
-                actor: envelope.identity?.actor,
-                action: envelope.type?.action_code,
-                payload: envelope.payload,
+                actor: identity['actor'],
+                action: type['action_code'],
+                payload,
                 timestamp: Date.now(),
             });
         });
@@ -64,9 +83,9 @@ async function testChromeProxyIntegration() {
         const CONFIG = await import('#core/config').then((m) => m.default ?? m);
 
         chromeProxy = new ChromeProxyService({
-            PUBLIC_IP: CONFIG.CHROME_PROXY_HOST || '192.168.0.2',
-            CHROME_PORT: CONFIG.CHROME_PORT || 9225,
-            PROXY_PORT: CONFIG.CHROME_PROXY_PORT || 9224,
+            PUBLIC_IP: CONFIG['CHROME_PROXY_HOST'] || '192.168.0.2',
+            CHROME_PORT: CONFIG['CHROME_PORT'] || 9225,
+            PROXY_PORT: CONFIG['CHROME_PROXY_PORT'] || 9224,
             LOG_LEVEL: 'INFO',
         });
 
@@ -81,13 +100,17 @@ async function testChromeProxyIntegration() {
 
         const healthUrl = `http://192.168.0.2:9224/health`;
         const healthRes = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) });
-        const healthData = await healthRes.json();
+        const rawHealthData = await healthRes.json();
+        const healthData =
+            rawHealthData && typeof rawHealthData === 'object'
+                ? /** @type {Record<string, unknown>} */ (rawHealthData)
+                : {};
 
-        if (healthData.status === 'ok') {
+        if (healthData['status'] === 'ok') {
             results.proxyHealth = true;
             log('INFO', `[TEST] ✅ Proxy health OK: ${JSON.stringify(healthData)}`);
         } else {
-            throw new Error(`Proxy health inválido: ${healthData.status}`);
+            throw new Error(`Proxy health inválido: ${String(healthData['status'])}`);
         }
 
         // ===== 4. Criar Browser Pool (com validação de proxy) =====
@@ -100,7 +123,7 @@ async function testChromeProxyIntegration() {
             allocationStrategy: 'round-robin',
             healthCheckInterval: 60000,
             browserEndpoint: {
-                url: `http://${CONFIG.CHROME_PROXY_HOST || '192.168.0.2'}:${CONFIG.CHROME_PROXY_PORT || 9224}`,
+                url: `http://${CONFIG['CHROME_PROXY_HOST'] || '192.168.0.2'}:${CONFIG['CHROME_PROXY_PORT'] || 9224}`,
             },
         });
 
@@ -117,7 +140,7 @@ async function testChromeProxyIntegration() {
         log('INFO', '[TEST] 5/6: Verificando eventos NERV emitidos...');
 
         const infraReadyEvents = results.nervEvents.filter(
-            (e) => e.action === 'INFRA_READY' && e.payload?.component === 'ChromeProxyService',
+            (e) => e.action === 'INFRA_READY' && e.payload['component'] === 'ChromeProxyService',
         );
 
         if (infraReadyEvents.length > 0) {
@@ -130,7 +153,7 @@ async function testChromeProxyIntegration() {
         log('INFO', '[TEST] 6/6: Executando shutdown gracioso...');
 
         if (browserPool) {
-            await browserPool.shutdown();
+            if (typeof browserPool.shutdown === 'function') await browserPool.shutdown();
             log('INFO', '[TEST] ✅ Browser Pool encerrado');
         }
 
@@ -169,15 +192,16 @@ async function testChromeProxyIntegration() {
             process.exit(1);
         }
     } catch (error) {
-        log('ERROR', `❌ TESTE FALHOU: ${error.message}`);
-        log('ERROR', error.stack);
+        const normalizedError = error instanceof Error ? error : new Error(String(error));
+        log('ERROR', `❌ TESTE FALHOU: ${normalizedError.message}`);
+        log('ERROR', normalizedError.stack || '');
 
         // Cleanup em caso de erro
         try {
-            if (browserPool) await browserPool.shutdown();
+            if (browserPool && typeof browserPool.shutdown === 'function') await browserPool.shutdown();
             if (chromeProxy) await chromeProxy.stop();
         } catch (cleanupError) {
-            log('WARN', `Erro no cleanup: ${cleanupError.message}`);
+            log('WARN', `Erro no cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
         }
 
         process.exit(1);

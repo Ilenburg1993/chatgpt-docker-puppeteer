@@ -300,7 +300,7 @@ function updateMissionProgressState(params) {
     }
 
     const context = asRecord(mission.context);
-    const contextProgress = asRecord(context.progress);
+    const contextProgress = asRecord(context['progress']);
     const nextContext = {
         ...context,
         ...(params.contextPatch && typeof params.contextPatch === 'object' ? params.contextPatch : {}),
@@ -366,7 +366,7 @@ function executeMissionTransition({ missionId, actorType = 'user', actorId = nul
         missionId,
         toStatus: MISSION_STATUS.RUNNING,
         allowedFrom: [MISSION_STATUS.READY, MISSION_STATUS.PAUSED],
-        startedAtMs: mission?.started_at ? Date.parse(mission.started_at) : now,
+        startedAtMs: mission?.['started_at'] ? Date.parse(mission['started_at']) : now,
         actorType,
         actorId,
         eventType: 'MISSION_EXECUTED',
@@ -436,7 +436,7 @@ function resumeMissionTransition({ missionId, actorType = 'user', actorId = null
         missionId,
         toStatus: MISSION_STATUS.RUNNING,
         allowedFrom: [MISSION_STATUS.PAUSED],
-        startedAtMs: mission?.started_at ? Date.parse(mission.started_at) : now,
+        startedAtMs: mission?.['started_at'] ? Date.parse(mission['started_at']) : now,
         actorType,
         actorId,
         eventType: 'MISSION_RESUMED',

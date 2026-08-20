@@ -57,21 +57,21 @@ function _parseJson(raw, fallback = {}) {
 function _rowToPatch(row) {
     if (!row) return null;
     return {
-        id: String(row.id),
-        job_id: String(row.job_id),
-        status: String(row.status || 'draft'),
-        patch_unified_diff: String(row.patch_unified_diff || ''),
-        patch_summary_json: _parseJson(row.patch_summary_json, {}),
-        risk_score: row.risk_score == null ? null : Number(row.risk_score),
-        dry_run_result_json: _parseJson(row.dry_run_result_json, null),
-        approval_required: Number(row.approval_required) === 1,
-        approved_by: row.approved_by ? String(row.approved_by) : null,
-        approved_at_ms: row.approved_at_ms == null ? null : Number(row.approved_at_ms),
-        applied_by: row.applied_by ? String(row.applied_by) : null,
-        applied_at_ms: row.applied_at_ms == null ? null : Number(row.applied_at_ms),
-        rollback_patch: row.rollback_patch ? String(row.rollback_patch) : null,
-        created_at_ms: Number(row.created_at_ms) || 0,
-        updated_at_ms: Number(row.updated_at_ms) || 0,
+        id: String(row['id']),
+        job_id: String(row['job_id']),
+        status: String(row['status'] || 'draft'),
+        patch_unified_diff: String(row['patch_unified_diff'] || ''),
+        patch_summary_json: _parseJson(row['patch_summary_json'], {}),
+        risk_score: row['risk_score'] == null ? null : Number(row['risk_score']),
+        dry_run_result_json: _parseJson(row['dry_run_result_json'], null),
+        approval_required: Number(row['approval_required']) === 1,
+        approved_by: row['approved_by'] ? String(row['approved_by']) : null,
+        approved_at_ms: row['approved_at_ms'] == null ? null : Number(row['approved_at_ms']),
+        applied_by: row['applied_by'] ? String(row['applied_by']) : null,
+        applied_at_ms: row['applied_at_ms'] == null ? null : Number(row['applied_at_ms']),
+        rollback_patch: row['rollback_patch'] ? String(row['rollback_patch']) : null,
+        created_at_ms: Number(row['created_at_ms']) || 0,
+        updated_at_ms: Number(row['updated_at_ms']) || 0,
     };
 }
 
@@ -106,28 +106,28 @@ function _updatePatch(id, fields = {}) {
         WHERE id = @id
     `,
     ).run({
-        id: existing.id,
-        status: String(fields.status ?? existing.status ?? 'draft'),
-        patch_unified_diff: String(fields.patch_unified_diff ?? existing.patch_unified_diff ?? ''),
+        id: existing['id'],
+        status: String(fields['status'] ?? existing['status'] ?? 'draft'),
+        patch_unified_diff: String(fields['patch_unified_diff'] ?? existing['patch_unified_diff'] ?? ''),
         patch_summary_json: _safeJsonString(
-            fields.patch_summary_json ?? fields.patch_summary ?? _parseJson(existing.patch_summary_json, {}),
+            fields['patch_summary_json'] ?? fields['patch_summary'] ?? _parseJson(existing['patch_summary_json'], {}),
             '{}',
         ),
-        risk_score: fields.risk_score == null ? existing.risk_score : Number(fields.risk_score),
+        risk_score: fields['risk_score'] == null ? existing['risk_score'] : Number(fields['risk_score']),
         dry_run_result_json:
-            fields.dry_run_result_json === undefined
-                ? existing.dry_run_result_json
-                : _safeJsonString(fields.dry_run_result_json, 'null'),
+            fields['dry_run_result_json'] === undefined
+                ? existing['dry_run_result_json']
+                : _safeJsonString(fields['dry_run_result_json'], 'null'),
         approval_required:
-            fields.approval_required === undefined ? existing.approval_required : fields.approval_required ? 1 : 0,
-        approved_by: fields.approved_by === undefined ? existing.approved_by : fields.approved_by,
-        approved_at_ms: fields.approved_at_ms === undefined ? existing.approved_at_ms : fields.approved_at_ms,
-        applied_by: fields.applied_by === undefined ? existing.applied_by : fields.applied_by,
-        applied_at_ms: fields.applied_at_ms === undefined ? existing.applied_at_ms : fields.applied_at_ms,
-        rollback_patch: fields.rollback_patch === undefined ? existing.rollback_patch : fields.rollback_patch,
+            fields['approval_required'] === undefined ? existing['approval_required'] : fields['approval_required'] ? 1 : 0,
+        approved_by: fields['approved_by'] === undefined ? existing['approved_by'] : fields['approved_by'],
+        approved_at_ms: fields['approved_at_ms'] === undefined ? existing['approved_at_ms'] : fields['approved_at_ms'],
+        applied_by: fields['applied_by'] === undefined ? existing['applied_by'] : fields['applied_by'],
+        applied_at_ms: fields['applied_at_ms'] === undefined ? existing['applied_at_ms'] : fields['applied_at_ms'],
+        rollback_patch: fields['rollback_patch'] === undefined ? existing['rollback_patch'] : fields['rollback_patch'],
         updated_at_ms: now,
     });
-    return getAuditPatchProposalById(existing.id);
+    return getAuditPatchProposalById(existing['id']);
 }
 
 /**

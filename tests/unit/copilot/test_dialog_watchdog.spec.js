@@ -223,10 +223,10 @@ describe('DialogWatchdog › F31.5: pause/resume behavior', () => {
     });
 
     it('WATCHDOG_THRESHOLDS contém entradas esperadas', () => {
-        assert.ok(typeof WATCHDOG_THRESHOLDS.default === 'number');
-        assert.ok(typeof WATCHDOG_THRESHOLDS.analysis === 'number');
-        assert.ok(typeof WATCHDOG_THRESHOLDS.simple === 'number');
-        assert.ok(WATCHDOG_THRESHOLDS.analysis > WATCHDOG_THRESHOLDS.simple, 'analysis > simple');
+        assert.ok(typeof WATCHDOG_THRESHOLDS['default'] === 'number');
+        assert.ok(typeof WATCHDOG_THRESHOLDS['analysis'] === 'number');
+        assert.ok(typeof WATCHDOG_THRESHOLDS['simple'] === 'number');
+        assert.ok(WATCHDOG_THRESHOLDS['analysis'] > WATCHDOG_THRESHOLDS['simple'], 'analysis > simple');
     });
 });
 

@@ -178,6 +178,27 @@ function taskRowToListItem(row) {
 }
 
 /**
+ * Valida a fronteira não tipada do driver SQLite antes de projetar a linha.
+ *
+ * @param {unknown} value
+ * @returns {value is TaskViewRow}
+ */
+function isTaskViewRow(value) {
+    return value !== null && typeof value === 'object';
+}
+
+/**
+ * @param {unknown} row
+ * @returns {TaskJsonShape}
+ */
+function taskDbRowToListItem(row) {
+    if (!isTaskViewRow(row)) {
+        throw new TypeError('Linha SQLite de task deve ser um objeto');
+    }
+    return taskRowToListItem(row);
+}
+
+/**
  * Projeta uma task persistida para o formato detalhado consumido pela UI.
  *
  * @param {TaskViewRow} row
@@ -185,47 +206,47 @@ function taskRowToListItem(row) {
  */
 function taskRowToDetailTask(row) {
     const task = parseTaskJson(row.task_json) || {};
-    task.stage = row.stage;
-    task.unified_status = row.status;
-    task.latest_attempt_id = row.latest_attempt_id ?? null;
-    task.prompt_template_artifact_id = row.prompt_template_artifact_id ?? null;
+    task['stage'] = row.stage;
+    task['unified_status'] = row.status;
+    task['latest_attempt_id'] = row.latest_attempt_id ?? null;
+    task['prompt_template_artifact_id'] = row.prompt_template_artifact_id ?? null;
 
     task.meta = task.meta && typeof task.meta === 'object' ? /** @type {Record<string, unknown>} */ (task.meta) : {};
     const taskMeta = /** @type {Record<string, unknown>} */ (task.meta);
-    if (row.parent_id) taskMeta.parent_id = row.parent_id;
-    if (row.workflow_id) taskMeta.workflow_id = row.workflow_id;
+    if (row.parent_id) taskMeta['parent_id'] = row.parent_id;
+    if (row.workflow_id) taskMeta['workflow_id'] = row.workflow_id;
 
     task.state =
         task.state && typeof task.state === 'object' ? /** @type {Record<string, unknown>} */ (task.state) : {};
     const taskState = /** @type {Record<string, unknown>} */ (task.state);
-    taskState.status = row.status;
+    taskState['status'] = row.status;
 
     // Expose DB columns that are not stored inside task_json so the UI
     // can show actionable information for BLOCKED/FAILED tasks.
     /** @type {string | null} Reason code set when task was blocked (e.g. 'ENV_UNAVAILABLE_LONG'). */
-    task.blocked_reason = row.blocked_reason ?? null;
+    task['blocked_reason'] = row.blocked_reason ?? null;
     /** @type {number | null} Timestamp (ms) when task was blocked. */
-    task.blocked_at_ms = row.blocked_at_ms ?? null;
+    task['blocked_at_ms'] = row.blocked_at_ms ?? null;
     /** @type {string | null} Last error text from most recent failed attempt. */
-    task.last_error = row.last_error ?? null;
+    task['last_error'] = row.last_error ?? null;
     /** @type {Record<string, unknown> | string | null} Parsed blocked_details_json, or raw string if invalid JSON. */
-    task.blocked_details = null;
+    task['blocked_details'] = null;
     if (row.blocked_details_json) {
         try {
-            task.blocked_details = JSON.parse(String(row.blocked_details_json));
+            task['blocked_details'] = JSON.parse(String(row.blocked_details_json));
         } catch (/** @type {any} */ _) {
             log(
                 'WARN',
                 `[task_views] malformed JSON in blocked_details_json for task ${row.id} — using raw string fallback`,
             );
-            task.blocked_details = row.blocked_details_json;
+            task['blocked_details'] = row.blocked_details_json;
         }
     }
 
-    task.command_caps = buildTaskCommandCaps(row);
-    task.mission_ref = buildMissionRef(row);
+    task['command_caps'] = buildTaskCommandCaps(row);
+    task['mission_ref'] = buildMissionRef(row);
 
     return task;
 }
 
-export { buildTaskCommandCaps, parseTaskJson, taskRowToDetailTask, taskRowToListItem };
+export { buildTaskCommandCaps, parseTaskJson, taskDbRowToListItem, taskRowToDetailTask, taskRowToListItem };

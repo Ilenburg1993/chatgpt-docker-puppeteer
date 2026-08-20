@@ -14,7 +14,7 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { assertRpcSession } from './guards.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('./guards.js').RpcSessionPort} RpcSessionPort
  *
  * @typedef {{ modelId: string }} ModelCurrentResult
  *
@@ -46,7 +46,7 @@ import { assertRpcSession } from './guards.js';
 /**
  * Resolve namespace de workspace compatível entre SDKs (`workspaces` no v0.3.0, `workspace` em versões anteriores).
  *
- * @param {CopilotSession} session
+ * @param {RpcSessionPort} session
  * @returns {{
  *     listFiles: () => Promise<WorkspaceListResult>;
  *     readFile: (params: { path: string }) => Promise<WorkspaceReadResult>;
@@ -89,7 +89,7 @@ function getWorkspaceRpc(session) {
 /**
  * Retorna o modelo atualmente ativo da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<ModelCurrentResult>}
  */
 export async function modelGetCurrent(session) {
@@ -113,7 +113,7 @@ export async function modelGetCurrent(session) {
  * função é uma alternativa de baixo nível que acessa `session.rpc.model.switchTo()` diretamente e pode não disparar
  * hooks/lifecycle internos do SDK.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} modelId
  * @param {{
  *     reasoningEffort?: string;
@@ -194,7 +194,7 @@ export async function modelSwitchTo(session, modelId, options) {
 /**
  * Retorna o nome/título atual da sessão quando suportado pelo host.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<NameGetResult>}
  */
 export async function nameGet(session) {
@@ -214,7 +214,7 @@ export async function nameGet(session) {
 /**
  * Define o nome/título da sessão quando suportado pelo host.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} name
  * @returns {Promise<NameSetResult>}
  */
@@ -245,7 +245,7 @@ export async function nameSet(session, name) {
 /**
  * Retorna o modo atual da sessão (interactive, plan, autopilot).
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<ModeGetResult>}
  */
 export async function modeGet(session) {
@@ -266,7 +266,7 @@ export async function modeGet(session) {
 /**
  * Altera o modo da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {'interactive' | 'plan' | 'autopilot'} mode
  * @returns {Promise<ModeSetResult>}
  */
@@ -314,7 +314,7 @@ export async function modeSet(session, mode) {
 /**
  * Lê o plano da sessão (plan.md do workspace infinito).
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<PlanReadResult>}
  */
 export async function planRead(session) {
@@ -330,7 +330,7 @@ export async function planRead(session) {
 /**
  * Atualiza o conteúdo do plano.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} content - Novo conteúdo do plan.md
  * @returns {Promise<PlanMutationResult>}
  */
@@ -373,7 +373,7 @@ export async function planUpdate(session, content) {
 /**
  * Remove o plano da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<PlanMutationResult>}
  */
 export async function planDelete(session) {
@@ -410,7 +410,7 @@ export async function planDelete(session) {
 /**
  * Lê as fontes de instrução/system prompt reportadas pela sessão SDK.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<InstructionSourcesResult>}
  */
 export async function instructionSourcesGet(session) {
@@ -436,7 +436,7 @@ export async function instructionSourcesGet(session) {
 /**
  * Lista arquivos no diretório workspace da sessão infinita.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<WorkspaceListResult>}
  */
 export async function workspaceListFiles(session) {
@@ -453,7 +453,7 @@ export async function workspaceListFiles(session) {
 /**
  * Lê um arquivo do workspace da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} path - Caminho relativo dentro do diretório workspace
  * @returns {Promise<WorkspaceReadResult>}
  */
@@ -474,7 +474,7 @@ export async function workspaceReadFile(session, path) {
 /**
  * Cria/sobrescreve um arquivo no workspace da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} path - Caminho relativo dentro do diretório workspace
  * @param {string} content - Conteúdo UTF-8 do arquivo
  * @returns {Promise<WorkspaceCreateResult>}
@@ -529,7 +529,7 @@ export async function workspaceCreateFile(session, path, content) {
 /**
  * Emite uma mensagem de log na timeline da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} message - Texto legível
  * @param {{ level?: 'info' | 'warning' | 'error'; ephemeral?: boolean; url?: string }} [options]
  * @returns {Promise<LogResult>}

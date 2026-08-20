@@ -25,7 +25,7 @@ describe('BackgroundTasks', () => {
         await tracked;
         assert.equal(tracker.pendingCount, 0);
         assert.equal(completed.length, 1);
-        assert.equal(completed[0]?.status, 'success');
+        assert.equal(completed[0]?.['status'], 'success');
         assert.equal(idle.length, 1);
     });
 
@@ -44,8 +44,8 @@ describe('BackgroundTasks', () => {
         );
 
         assert.equal(completed.length, 1);
-        assert.equal(completed[0]?.status, 'error');
-        assert.equal(completed[0]?.error, 'boom');
+        assert.equal(completed[0]?.['status'], 'error');
+        assert.equal(completed[0]?.['error'], 'boom');
     });
 
     it('drain() aguarda tarefas pendentes até esvaziar', async () => {
@@ -87,8 +87,8 @@ describe('BackgroundTasks', () => {
 
         assert.equal(tracker.pendingCount, 1);
         await overflow;
-        assert.equal(completed[0]?.status, 'error');
-        assert.match(String(completed[0]?.error), /limite/);
+        assert.equal(completed[0]?.['status'], 'error');
+        assert.match(String(completed[0]?.['error']), /limite/);
 
         release(undefined);
         await tracker.drain(1000);

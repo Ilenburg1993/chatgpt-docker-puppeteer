@@ -1,14 +1,10 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
-    delete process.env.NO_COLOR;
+if (process.env['FORCE_COLOR'] && process.env['NO_COLOR']) {
+    delete process.env['NO_COLOR'];
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 // Verificar se estamos executando de dentro da pasta dist
 const cwd = process.cwd();
 const isInDist = cwd.includes('/dist') || cwd.endsWith('/dist');
@@ -33,13 +29,13 @@ if (isInDist) {
 console.log('');
 console.log('🧭 Runtime atual:');
 console.log(`   node: ${process.execPath}`);
-if (process.env.npm_execpath) {
-    console.log(`   npm:  ${process.env.npm_execpath}`);
+if (process.env['npm_execpath']) {
+    console.log(`   npm:  ${process.env['npm_execpath']}`);
 }
 
 const windowsMountPattern = /^\/mnt\/[a-z]\//i;
 const isWindowsMountedNode = windowsMountPattern.test(process.execPath);
-const isWindowsMountedNpm = Boolean(process.env.npm_execpath && windowsMountPattern.test(process.env.npm_execpath));
+const isWindowsMountedNpm = Boolean(process.env['npm_execpath'] && windowsMountPattern.test(process.env['npm_execpath']));
 
 if (isWindowsMountedNode || isWindowsMountedNpm) {
     console.log('   ⚠️  Runtime misto detectado: node/npm estão vindo de um path do Windows.');

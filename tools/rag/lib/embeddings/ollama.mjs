@@ -12,7 +12,7 @@ function resolveEmbeddingBaseUrl(/** @type {any} */ optionsBaseUrl) {
     const fromOptions = normalizeEmbeddingBaseUrl(optionsBaseUrl);
     if (fromOptions) return fromOptions;
 
-    const fromEnv = normalizeEmbeddingBaseUrl(process.env.OLLAMA_LOCAL_BASE_URL);
+    const fromEnv = normalizeEmbeddingBaseUrl(process.env['OLLAMA_LOCAL_BASE_URL']);
     if (fromEnv) return fromEnv;
 
     return normalizeEmbeddingBaseUrl(DEFAULT_OLLAMA_BASE_URL);
@@ -90,6 +90,9 @@ function sleep(/** @type {any} */ ms) {
  *     });
  */
 export class OllamaEmbeddingsProvider {
+    /** @type {number | null} */
+    runtimeSafeChars = null;
+
     /**
      * @param {Object} options - Configuration options
      * @param {string} [options.baseURL] - LOCAL Ollama base URL (default: host.docker.internal:11434/v1)
@@ -105,14 +108,13 @@ export class OllamaEmbeddingsProvider {
         this.model = options.model || DEFAULT_EMBEDDING_MODEL;
         this.timeoutMs = options.timeoutMs || 30_000;
         this.maxChars = parsePositiveInt(
-            options.maxChars ?? process.env.OLLAMA_EMBED_MAX_CHARS,
+            options.maxChars ?? process.env['OLLAMA_EMBED_MAX_CHARS'],
             DEFAULT_OLLAMA_EMBED_MAX_CHARS,
         );
         this.contextFastShrink = parseBoolean(
-            options.contextFastShrink ?? process.env.OLLAMA_EMBED_CONTEXT_FAST_SHRINK,
+            options.contextFastShrink ?? process.env['OLLAMA_EMBED_CONTEXT_FAST_SHRINK'],
             true,
         );
-        this.runtimeSafeChars = null;
         this.contextOverflowCount = 0;
         this.maxAcceptedChars = 0;
         this.embedCalls = 0;
@@ -171,7 +173,7 @@ export class OllamaEmbeddingsProvider {
                 }
                 return vector;
             } catch (error) {
-                const _ce = /** @type {any} */ (error);
+
                 if (!isContextLengthError(error)) throw error;
                 hadContextOverflow = true;
                 contextOverflowsThisCall++;
@@ -243,7 +245,7 @@ export class OllamaEmbeddingsProvider {
 
 async function fetchJson(/** @type {any} */ url, /** @type {any} */ options = {}) {
     const controller = new AbortController();
-    const timeout = setTimeout(/** @type {any} */ () => controller.abort(), options.timeoutMs ?? 5000);
+    const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 5000);
     try {
         const res = await fetch(url, {
             method: options.method || 'GET',
@@ -252,7 +254,7 @@ async function fetchJson(/** @type {any} */ url, /** @type {any} */ options = {}
             signal: controller.signal,
         });
         if (!res.ok) {
-            const text = await res.text().catch(/** @type {any} */ () => '');
+            const text = await res.text().catch(() => '');
             throw new Error(`HTTP_${res.status}:${text.slice(0, 200)}`);
         }
         return await res.json();

@@ -8,7 +8,7 @@ function buildSignalMap(contracts) {
     /** @type {Map<string, ContractDefinitionV1>} */
     const map = new Map();
     for (const contract of contracts) {
-        const signals = Array.isArray(contract.matcher?.signals) ? contract.matcher.signals : [];
+        const signals = Array.isArray(contract.matcher?.['signals']) ? contract.matcher['signals'] : [];
         for (const signal of signals) {
             if (!map.has(signal)) {
                 map.set(signal, contract);

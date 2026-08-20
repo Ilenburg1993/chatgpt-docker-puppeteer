@@ -9,7 +9,7 @@
  * @module copilot/model-gateway/providers/openrouter-adapter
  */
 
-import { OpenAICompatibleAdapter } from './openai-compatible-adapter.js';
+import { OpenAICompatibleAdapter, providerRecord } from './openai-compatible-adapter.js';
 
 export const OPENROUTER_PROVIDER_ID = 'openrouter';
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
@@ -19,13 +19,14 @@ export const OPENROUTER_DEFAULT_HEADERS = Object.freeze({
 });
 
 /**
- * @param {Record<string, any>} provider
+ * @param {Record<string, unknown>} provider
  * @returns {boolean}
  */
 function isOpenRouterProvider(provider) {
+    const provenance = providerRecord(provider['provenance']);
     return (
         provider['id'] === OPENROUTER_PROVIDER_ID ||
-        provider['provenance']?.['preset'] === OPENROUTER_PROVIDER_ID ||
+        provenance['preset'] === OPENROUTER_PROVIDER_ID ||
         provider['baseUrl'] === OPENROUTER_BASE_URL
     );
 }
@@ -35,20 +36,16 @@ export class OpenRouterAdapter extends OpenAICompatibleAdapter {
     id = OPENROUTER_PROVIDER_ID;
 
     /**
-     * @param {Record<string, any>} provider
+     * @param {Record<string, unknown>} provider
      * @returns {boolean}
+     * @override
      */
     canHandle(provider) {
         return isOpenRouterProvider(provider);
     }
 
     /**
-     * @param {{
-     *     provider: Record<string, any>;
-     *     model: Record<string, any>;
-     *     secrets: import('../secrets/env-secret-registry.js').EnvSecretRegistry;
-     * }} input
-     * @returns {{ model: string; provider: Record<string, any>; modelCapabilities?: Record<string, any> }}
+     * @param {import('./openai-compatible-adapter.js').ModelGatewayProviderAdapterInput} input
      * @override
      */
     toCopilotSessionOverrides(input) {

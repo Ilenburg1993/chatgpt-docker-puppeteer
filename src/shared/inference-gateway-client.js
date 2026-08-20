@@ -109,8 +109,8 @@ export function getGatewayBaseUrl(overrides = {}) {
     if (overrides.baseUrl) {
         return overrides.baseUrl;
     }
-    const host = overrides.host || process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-    const port = overrides.port || Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+    const host = overrides.host || process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+    const port = overrides.port || Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
     return `http://${host}:${port}`;
 }
 
@@ -120,7 +120,7 @@ export function getGatewayBaseUrl(overrides = {}) {
  * @returns {boolean}
  */
 export function isGatewayEnabled() {
-    const envValue = process.env.INFERENCE_GATEWAY_ENABLED;
+    const envValue = process.env['INFERENCE_GATEWAY_ENABLED'];
     if (envValue === undefined || envValue === null) {
         return true; // Padrão: habilitado
     }
@@ -134,7 +134,7 @@ export function isGatewayEnabled() {
  * @returns {number}
  */
 export function getTimeout(defaultTimeout = 120000) {
-    const envTimeout = process.env.INFERENCE_GATEWAY_TIMEOUT_MS;
+    const envTimeout = process.env['INFERENCE_GATEWAY_TIMEOUT_MS'];
     if (envTimeout === undefined || envTimeout === null) {
         return defaultTimeout;
     }
@@ -149,7 +149,7 @@ export function getTimeout(defaultTimeout = 120000) {
  * @returns {string}
  */
 export function getDefaultModel(defaultModel = 'llama3.2') {
-    const envModel = process.env.INFERENCE_GATEWAY_DEFAULT_MODEL;
+    const envModel = process.env['INFERENCE_GATEWAY_DEFAULT_MODEL'];
     return (envModel && envModel.trim()) || defaultModel;
 }
 
@@ -546,7 +546,7 @@ export function createGatewayClient(options = {}) {
 export function createAuditTriageClient() {
     return createGatewayClient({
         clientTag: 'audit_agent_triage',
-        enabled: String(process.env.AUDIT_AGENT_TRIAGE_LLM_ENABLED || 'false').toLowerCase() === 'true',
+        enabled: String(process.env['AUDIT_AGENT_TRIAGE_LLM_ENABLED'] || 'false').toLowerCase() === 'true',
     });
 }
 
@@ -558,7 +558,7 @@ export function createAuditTriageClient() {
 export function createAuditPatchClient() {
     return createGatewayClient({
         clientTag: 'audit_agent_patch',
-        enabled: String(process.env.AUDIT_AGENT_PATCH_AUTHOR_LLM_ENABLED || 'false').toLowerCase() === 'true',
+        enabled: String(process.env['AUDIT_AGENT_PATCH_AUTHOR_LLM_ENABLED'] || 'false').toLowerCase() === 'true',
     });
 }
 

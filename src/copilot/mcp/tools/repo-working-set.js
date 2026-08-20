@@ -76,37 +76,33 @@ export const repoWorkingSetTool = {
         'Open and reuse one bounded repository working set across context, symbol lookup and delta refresh without repeated scans/reads.',
     inputSchema: {
         action: z.enum(['open', 'context', 'find', 'refresh', 'status', 'close']),
-        workingSetId: z.string().min(1).max(128).optional().describe('Opaque id returned by action=open.'),
-        path: z.string().optional().describe('Repository directory for action=open. Default: src/copilot.'),
-        maxFiles: z.number().int().min(1).max(500).optional().describe('Hard selected-file cap for open, or manifest cap for context. Open default: 80.'),
-        maxBytes: z.number().int().min(1024).max(65536).optional().describe('Context manifest UTF-8 budget. Default: 16 KiB.'),
+        workingSetId: z.string().min(1).max(128).optional()['describe']('Opaque id returned by action=open.'),
+        path: z.string().optional()['describe']('Repository directory for action=open. Default: src/copilot.'),
+        maxFiles: z.number().int().min(1).max(500).optional()['describe']('Hard selected-file cap for open, or manifest cap for context. Open default: 80.'),
+        maxBytes: z.number().int().min(1024).max(65536).optional()['describe']('Context manifest UTF-8 budget. Default: 16 KiB.'),
         contextMode: z
             .enum(['auto', 'include', 'omit'])
-            .optional()
-            .describe('Inline context policy for open/refresh. Open auto includes; refresh auto includes only after refresh/failure.'),
-        concurrency: z.number().int().min(1).max(8).optional().describe('Bounded open/refresh concurrency. Default: 4.'),
-        parseSymbols: z.boolean().optional().describe('Parse symbols/imports during open. Default: true.'),
-        indexMode: z.enum(['auto', 'off']).optional().describe('auto refreshes only selected paths in the shared index. Default: auto.'),
+            .optional()['describe']('Inline context policy for open/refresh. Open auto includes; refresh auto includes only after refresh/failure.'),
+        concurrency: z.number().int().min(1).max(8).optional()['describe']('Bounded open/refresh concurrency. Default: 4.'),
+        parseSymbols: z.boolean().optional()['describe']('Parse symbols/imports during open. Default: true.'),
+        indexMode: z.enum(['auto', 'off']).optional()['describe']('auto refreshes only selected paths in the shared index. Default: auto.'),
         selectionMode: z
             .enum(['coverage', 'lexical'])
-            .optional()
-            .describe('Directory selection inside maxFiles. Default coverage; lexical preserves historical prefix ordering.'),
+            .optional()['describe']('Directory selection inside maxFiles. Default coverage; lexical preserves historical prefix ordering.'),
         seedPaths: z
             .array(z.string().min(1))
             .max(32)
-            .optional()
-            .describe('Preferred workspace-relative files for open. Eligible seeds count inside the same maxFiles cap.'),
+            .optional()['describe']('Preferred workspace-relative files for open. Eligible seeds count inside the same maxFiles cap.'),
         seedSymbols: z
             .array(z.string().min(1).max(256))
             .max(32)
-            .optional()
-            .describe('Exact symbols resolved from the local index into preferred files inside the same maxFiles cap.'),
+            .optional()['describe']('Exact symbols resolved from the local index into preferred files inside the same maxFiles cap.'),
         include: z.array(z.string().min(1)).max(32).optional(),
         exclude: z.array(z.string().min(1)).max(32).optional(),
-        modifiedPaths: z.array(z.string().min(1)).max(128).optional().describe('Explicit changed paths for action=refresh; omitted means known invalidations only.'),
-        symbol: z.string().min(1).max(256).optional().describe('Symbol query for action=find.'),
+        modifiedPaths: z.array(z.string().min(1)).max(128).optional()['describe']('Explicit changed paths for action=refresh; omitted means known invalidations only.'),
+        symbol: z.string().min(1).max(256).optional()['describe']('Symbol query for action=find.'),
         exactMatch: z.boolean().optional(),
-        maxResults: z.number().int().min(1).max(200).optional().describe('Maximum symbol matches for action=find. Default: 50.'),
+        maxResults: z.number().int().min(1).max(200).optional()['describe']('Maximum symbol matches for action=find. Default: 50.'),
     },
     annotations: { ...readOnlyAnnotations(), idempotentHint: false },
     handler: async ({

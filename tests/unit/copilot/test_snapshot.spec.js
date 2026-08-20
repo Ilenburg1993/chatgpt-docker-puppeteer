@@ -184,13 +184,6 @@ describe('snapshot', () => {
 
     describe('pruneSnapshotsAsync', () => {
         it('remove snapshots antigos além do limite', async () => {
-            /** @type {{ snapshotId: string; createdAt: number; model: string }[]} */
-            const snaps = [
-                { snapshotId: 's1', createdAt: 300, model: 'm' },
-                { snapshotId: 's2', createdAt: 200, model: 'm' },
-                { snapshotId: 's3', createdAt: 100, model: 'm' },
-                { snapshotId: 's4', createdAt: 50, model: 'm' },
-            ];
             storeMocks.pruneSnapshotFilesAsync.mockResolvedValue(2);
 
             const removed = await pruneSnapshotsAsync(2);

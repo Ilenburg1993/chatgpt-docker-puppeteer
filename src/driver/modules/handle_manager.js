@@ -14,13 +14,13 @@ import EventEmitter from 'node:events';
  */
 const HANDLE_CONFIG = {
     /** Timeout máximo para clearAll (ms) - Default: 3 segundos */
-    CLEANUP_TIMEOUT_MS: parseInt(process.env.HANDLE_CLEANUP_TIMEOUT || '3000', 10),
+    CLEANUP_TIMEOUT_MS: parseInt(process.env['HANDLE_CLEANUP_TIMEOUT'] || '3000', 10),
 
     /** Timeout para dispose individual (ms) - Default: 1 segundo */
-    DISPOSE_TIMEOUT_MS: parseInt(process.env.HANDLE_DISPOSE_TIMEOUT || '1000', 10),
+    DISPOSE_TIMEOUT_MS: parseInt(process.env['HANDLE_DISPOSE_TIMEOUT'] || '1000', 10),
 
     /** Máximo de handles simultâneos - Default: 1000 */
-    MAX_HANDLES: parseInt(process.env.HANDLE_MAX_HANDLES || '1000', 10),
+    MAX_HANDLES: parseInt(process.env['HANDLE_MAX_HANDLES'] || '1000', 10),
 };
 
 /* ==========================================================================
@@ -505,27 +505,6 @@ class HandleManager extends EventEmitter {
         };
     }
 
-    /**
-     * Helper para criar timeout Promise (usado internamente). Similar ao pattern usado em driver_nerv_adapter v2.0.
-     *
-     * @private
-     * @example
-     *     await Promise.race([handle.dispose(), this._timeout(1000, 'dispose')]);
-     *
-     * @param {number} ms - Timeout em milissegundos
-     * @param {string} operation - Nome da operação (para erro)
-     * @returns {Promise<never>} Promise que rejeita após timeout
-     */
-    _timeout(ms, operation) {
-        return new Promise((_, reject) => {
-            setTimeout(() => {
-                const error = /** @type {any} */ (new Error(`Timeout after ${ms}ms`));
-                error.name = 'TimeoutError';
-                error.operation = operation;
-                reject(error);
-            }, ms);
-        });
-    }
 }
 
 /**

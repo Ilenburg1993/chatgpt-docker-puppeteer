@@ -154,7 +154,7 @@ async function controlAgent(action) {
                         await execa('pm2', ['kill']);
                         return { success: true };
                     } catch (/** @type {any} */ err) {
-                        const _ce = /** @type {any} */ (err);
+
                         try {
                             await execa('npx', ['pm2', 'kill']);
                             return { success: true };
@@ -215,13 +215,13 @@ async function killProcess(pid) {
                 try {
                     await execa('pkill', ['-P', String(pid)]);
                 } catch (/** @type {any} */ err) {
-                    const _ce = /** @type {any} */ (err);
+
                     void err;
                 }
                 try {
                     process.kill(pid, 'SIGKILL');
                 } catch (/** @type {any} */ err) {
-                    const _ce = /** @type {any} */ (err);
+
                     void err;
                 }
             }

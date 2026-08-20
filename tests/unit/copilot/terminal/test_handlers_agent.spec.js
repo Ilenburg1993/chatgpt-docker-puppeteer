@@ -9,7 +9,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockStartAgentDialogLoop = vi.fn(async () => {});
-const mockSendAgentDialogTurn = vi.fn(async () => 'reply');
+const mockSendAgentDialogTurn = vi.fn(async (
+    /** @type {unknown} */ _runtime,
+    /** @type {string} */ _message,
+    /** @type {unknown} */ _options,
+) => 'reply');
 const mockSendAgentDialogTurnDetailed = vi.fn(
     async (/** @type {any} */ runtime, /** @type {string} */ message, /** @type {any} */ options) => {
         const reply = await mockSendAgentDialogTurn(runtime, message, options);

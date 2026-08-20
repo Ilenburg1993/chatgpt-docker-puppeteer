@@ -373,7 +373,7 @@ function extractHookToolCalls(input) {
 }
 
 /**
- * @param {ReturnType<import('../state/tool-call-registry.js').createToolCallRegistry>} registry
+ * @param {ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>} registry
  * @param {{ id: string | null; name: string; args: Record<string, unknown> }} call
  * @returns {void}
  */
@@ -651,7 +651,7 @@ function renderSdkSessionInfoForOperator(infoType, message) {
  * @param {{
  *     agent: AgentEventHost;
  *     refreshPromptIfIdle: () => void;
- *     registry?: ReturnType<import('../state/events/index.js').createToolCallRegistry> | null;
+ *     registry?: ReturnType<typeof import('../state/events/index.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
  */

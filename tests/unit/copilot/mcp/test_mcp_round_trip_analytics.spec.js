@@ -1,7 +1,7 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterEach, describe, it } from 'vitest';
 
 import {
@@ -11,8 +11,6 @@ import {
     summarizeMcpRoundTripRows,
 } from '#copilot/mcp/control-plane';
 
-const require = createRequire(import.meta.url);
-const Database = require('better-sqlite3');
 
 /** @type {Array<import('better-sqlite3').Database>} */
 const databases = [];
@@ -153,6 +151,91 @@ describe('MCP incremental round-trip analytics', () => {
         assert.deepEqual(after, before);
     });
 
+    it('replays from zero when only an older normalizer cursor exists and upserts derived rows', async () => {
+        const db = createDb();
+        const nowMs = 100_000;
+        const bootstrap = createMcpRoundTripAnalytics({
+            db,
+            readSlice: async () => ({
+                ok: true,
+                fileIdentity: 'dev:ino-a',
+                fileBytes: 0,
+                requestedOffset: 0,
+                startOffset: 0,
+                nextOffset: 0,
+                bytesRead: 0,
+                complete: true,
+                resetRequired: false,
+                parsedEvents: 0,
+                invalidLines: 0,
+                entries: [],
+                events: [],
+                error: null,
+            }),
+            now: () => nowMs,
+        });
+        await bootstrap.sync();
+        db.prepare(
+            `INSERT OR REPLACE INTO copilot_mcp_round_trip_cursor
+             (cursor_id, file_identity, byte_offset, file_bytes, updated_at_ms)
+             VALUES ('mcp-audit:v1', 'dev:ino-a', 900, 900, ?)`,
+        ).run(nowMs - 1_000);
+        db.prepare(
+            `INSERT OR REPLACE INTO copilot_mcp_round_trip_events
+             (source_identity, source_offset, ts_ms, event, tool, failure_class, synthetic)
+             VALUES ('dev:ino-a', 0, ?, 'repo_apply_patch_failed', 'repo_apply_patch', 'legacy-wrong-class', 0)`,
+        ).run(90_000);
+
+        /** @type {number[]} */
+        const requestedOffsets = [];
+        const analytics = createMcpRoundTripAnalytics({
+            db,
+            now: () => nowMs,
+            readSlice: async ({ offset = 0 } = {}) => {
+                requestedOffsets.push(offset);
+                return {
+                    ok: true,
+                    fileIdentity: 'dev:ino-a',
+                    fileBytes: 100,
+                    requestedOffset: offset,
+                    startOffset: offset,
+                    nextOffset: 100,
+                    bytesRead: offset === 0 ? 100 : 0,
+                    complete: true,
+                    resetRequired: false,
+                    parsedEvents: offset === 0 ? 1 : 0,
+                    invalidLines: 0,
+                    entries:
+                        offset === 0
+                            ? [
+                                  entry(0, {
+                                      ts: iso(90_000),
+                                      event: 'repo_apply_patch_failed',
+                                      tool: 'repo_apply_patch',
+                                      code: 'ERR_PATCH_NOT_FOUND',
+                                      failureClass: 'stale-context',
+                                      retryability: 'caller-refresh',
+                                  }),
+                              ]
+                            : [],
+                    events: [],
+                    error: null,
+                };
+            },
+        });
+        const report = await analytics.summarize({ windowMs: 20_000 });
+        assert.deepEqual(requestedOffsets, [0]);
+        assert.equal(report.schemaVersion, 2);
+        assert.equal(report.normalizerVersion, 2);
+        assert.deepEqual(report.failures.byClass, { 'stale-context': 1 });
+        assert.deepEqual(report.failures.byCode, { ERR_PATCH_NOT_FOUND: 1 });
+        const cursor = db
+            .prepare("SELECT byte_offset FROM copilot_mcp_round_trip_cursor WHERE cursor_id='mcp-audit:v2'")
+            .get();
+        assert.ok(cursor && typeof cursor === 'object');
+        assert.equal(Number(/** @type {Record<string, unknown>} */ (cursor)['byte_offset']), 100);
+    });
+
     it('indexes slices idempotently, advances a byte cursor and excludes synthetic rows by default', async () => {
         const db = createDb();
         const nowMs = 100_000;
@@ -170,6 +253,7 @@ describe('MCP incremental round-trip analytics', () => {
                     ok: true,
                     fileIdentity: 'dev:ino-a',
                     fileBytes: 300,
+                    requestedOffset: 0,
                     startOffset: 0,
                     nextOffset: 300,
                     bytesRead: 300,
@@ -186,6 +270,7 @@ describe('MCP incremental round-trip analytics', () => {
                 ok: true,
                 fileIdentity: 'dev:ino-a',
                 fileBytes: 300,
+                requestedOffset: offset,
                 startOffset: offset,
                 nextOffset: offset,
                 bytesRead: 0,
@@ -228,6 +313,7 @@ describe('MCP incremental round-trip analytics', () => {
                     ok: true,
                     fileIdentity: 'dev:ino-a',
                     fileBytes: 100,
+                    requestedOffset: offset,
                     startOffset: offset,
                     nextOffset: 100,
                     bytesRead: offset === 0 ? 100 : 0,
@@ -245,6 +331,7 @@ describe('MCP incremental round-trip analytics', () => {
                     ok: true,
                     fileIdentity: 'dev:ino-b',
                     fileBytes: 120,
+                    requestedOffset: offset,
                     startOffset: offset,
                     nextOffset: offset,
                     bytesRead: 0,
@@ -261,6 +348,7 @@ describe('MCP incremental round-trip analytics', () => {
                 ok: true,
                 fileIdentity: 'dev:ino-b',
                 fileBytes: 120,
+                requestedOffset: 0,
                 startOffset: 0,
                 nextOffset: 120,
                 bytesRead: 120,

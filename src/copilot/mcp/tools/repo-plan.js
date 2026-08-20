@@ -141,10 +141,10 @@ export const repoPlanTools = [
         title: 'Plan repository file creation',
         description: 'Read-only plan for creating a UTF-8 workspace file. Does not create or modify files.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path to plan.'),
-            content: z.string().optional().describe('Planned initial content. Default: empty string.'),
-            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
-            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path to plan.'),
+            content: z.string().optional()['describe']('Planned initial content. Default: empty string.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, content, maxDiffLines, includeDiffPreview }) => {
@@ -178,13 +178,13 @@ export const repoPlanTools = [
         title: 'Plan repository patch',
         description: 'Read-only exact-string patch plan for one workspace file. Does not modify files.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path.'),
-            old_string: z.string().min(1).describe('Exact text to replace.'),
-            new_string: z.string().describe('Replacement text.'),
-            replace_all: z.boolean().optional().describe('Plan replacing every occurrence. Default: false.'),
-            diffContextLines: z.number().int().min(0).max(20).optional().describe('Context lines in diff preview.'),
-            maxDiffLines: z.number().int().min(1).max(2000).optional().describe('Maximum diff preview lines.'),
-            includeDiffPreview: z.boolean().optional().describe('Include textual diffPreview in the tool result. Default: false.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path.'),
+            old_string: z.string().min(1)['describe']('Exact text to replace.'),
+            new_string: z.string()['describe']('Replacement text.'),
+            replace_all: z.boolean().optional()['describe']('Plan replacing every occurrence. Default: false.'),
+            diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
+            maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
+            includeDiffPreview: z.boolean().optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, old_string, new_string, replace_all, diffContextLines, maxDiffLines, includeDiffPreview }) => {
@@ -238,7 +238,7 @@ export const repoPlanTools = [
         description:
             'Read-only plan for moving one workspace file into reversible MCP quarantine. Does not move files.',
         inputSchema: {
-            path: z.string().min(1).describe('Workspace-relative file path to plan for quarantine.'),
+            path: z.string().min(1)['describe']('Workspace-relative file path to plan for quarantine.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path }) => {
@@ -264,9 +264,9 @@ export const repoPlanTools = [
         title: 'Plan repository file move',
         description: 'Read-only plan for moving or renaming one workspace file. Does not move files.',
         inputSchema: {
-            source: z.string().min(1).describe('Workspace-relative existing source file.'),
-            destination: z.string().min(1).describe('Workspace-relative destination path.'),
-            overwrite: z.boolean().optional().describe('Plan overwrite. Default: false.'),
+            source: z.string().min(1)['describe']('Workspace-relative existing source file.'),
+            destination: z.string().min(1)['describe']('Workspace-relative destination path.'),
+            overwrite: z.boolean().optional()['describe']('Plan overwrite. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ source, destination, overwrite }) => {
@@ -303,8 +303,8 @@ export const repoPlanTools = [
         title: 'Plan repository index refresh',
         description: 'Read-only plan for refreshing the shared Copilot IO index. Does not build or mutate the index.',
         inputSchema: {
-            path: z.string().optional().describe('Workspace-relative directory path. Default: src/copilot.'),
-            maxFiles: z.number().int().positive().max(25_000).optional().describe('Planned max files.'),
+            path: z.string().optional()['describe']('Workspace-relative directory path. Default: src/copilot.'),
+            maxFiles: z.number().int().positive().max(25_000).optional()['describe']('Planned max files.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, maxFiles }) => {
@@ -337,13 +337,12 @@ export const repoPlanTools = [
         title: 'Plan MCP validation',
         description: 'Plan validation escalation; defaults to inspect-first and no validator.',
         inputSchema: {
-            suite: z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']).optional().describe('Explicit broad escalation.'),
+            suite: z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']).optional()['describe']('Explicit broad escalation.'),
             testFile: z
                 .string()
                 .min(1)
                 .max(1024)
-                .optional()
-                .describe('Explicit tests/unit/copilot/**/*.spec.js path.'),
+                .optional()['describe']('Explicit tests/unit/copilot/**/*.spec.js path.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ suite, testFile }) => {

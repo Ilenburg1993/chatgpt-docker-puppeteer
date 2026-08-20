@@ -25,9 +25,12 @@ const runtimeMocks = vi.hoisted(() => {
         }),
         createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
         getTerminalPendingStructuredUserInputCount: vi.fn(() => pendingStructuredInputs.length),
-        getTerminalSdkQuota: vi.fn(async () => ({
-            quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
-        })),
+        getTerminalSdkQuota: vi.fn(
+            /** @returns {Promise<{ quotaSnapshots: Record<string, { remainingPercentage: number; resetDate: string }> }>} */
+            async () => ({
+                quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
+            }),
+        ),
         inputTerminalSdkSessionUi: vi.fn(async (message) => `${message}:typed`),
         isTerminalSdkSessionUiElicitationAvailable: vi.fn(() => true),
         listTerminalPendingStructuredUserInputs: vi.fn(() => pendingStructuredInputs),

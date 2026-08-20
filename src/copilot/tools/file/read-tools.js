@@ -60,19 +60,18 @@ export const listDirectoryTool = buildTool({
         'Lista o conteúdo de um diretório no workspace. Retorna nome, tipo (file/dir) e tamanho. ' +
         'Opcionalmente recursivo com limite de profundidade.',
     parameters: z.object({
-        path: z.string().describe('Caminho do diretório (relativo ao workspace ou absoluto)'),
-        recursive: z.boolean().optional().default(false).describe('Se true, lista recursivamente'),
+        path: z.string()['describe']('Caminho do diretório (relativo ao workspace ou absoluto)'),
+        recursive: z.boolean().optional().default(false)['describe']('Se true, lista recursivamente'),
         depth: z
             .number()
             .int()
             .min(1)
             .optional()
-            .default(3)
-            .describe('Profundidade máxima para listagem recursiva. Informativa e controlada pelo caller.'),
-        showHidden: z.boolean().optional().default(false).describe('Incluir arquivos/diretórios ocultos (dotfiles)'),
-        filter: z.string().optional().describe('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
-        maxEntries: z.number().int().positive().optional().describe('Máximo de entradas de topo a retornar.'),
-        cursor: z.string().optional().describe('Cursor numérico retornado por chamada anterior.'),
+            .default(3)['describe']('Profundidade máxima para listagem recursiva. Informativa e controlada pelo caller.'),
+        showHidden: z.boolean().optional().default(false)['describe']('Incluir arquivos/diretórios ocultos (dotfiles)'),
+        filter: z.string().optional()['describe']('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
+        maxEntries: z.number().int().positive().optional()['describe']('Máximo de entradas de topo a retornar.'),
+        cursor: z.string().optional()['describe']('Cursor numérico retornado por chamada anterior.'),
     }),
     handler: async ({ path: dirPath, recursive, depth, showHidden, filter, maxEntries, cursor }) => {
         const validated = await validatePath(dirPath, { mode: 'read', issueReadCapability: true });
@@ -162,15 +161,14 @@ export const diffFilesTool = buildTool({
         'Exibe a diferença unificada (unified diff) entre dois arquivos do workspace. ' +
         'Útil para comparar versões ou verificar mudanças antes de aplicar patches.',
     parameters: z.object({
-        path_a: z.string().describe('Caminho do primeiro arquivo (linha base / original)'),
-        path_b: z.string().describe('Caminho do segundo arquivo (linha modificada / nova versão)'),
+        path_a: z.string()['describe']('Caminho do primeiro arquivo (linha base / original)'),
+        path_b: z.string()['describe']('Caminho do segundo arquivo (linha modificada / nova versão)'),
         context_lines: z
             .number()
             .int()
             .min(0)
             .optional()
-            .default(3)
-            .describe('Número de linhas de contexto exibidas ao redor de cada mudança (padrão histórico: 3)'),
+            .default(3)['describe']('Número de linhas de contexto exibidas ao redor de cada mudança (padrão histórico: 3)'),
     }),
     handler: async ({ path_a, path_b, context_lines }) => {
         const va = await validatePath(path_a, { mode: 'read', issueReadCapability: true });

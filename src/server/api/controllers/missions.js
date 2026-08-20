@@ -49,8 +49,9 @@ const patchMissionSchema = z
         description: z.string().max(5000).optional(),
         autonomy_mode: AUTONOMY_SCHEMA.optional(),
         autonomyMode: AUTONOMY_SCHEMA.optional(),
-    })
-    .refine((/** @type {any} */ v) => Object.keys(v).length > 0, { message: 'Body vazio' });
+    })['refine']((/** @type {Record<string, unknown>} */ value) => Object.keys(value).length > 0, {
+        message: 'Body vazio',
+    });
 
 const updatePolicySchema = z.object({
     autonomy_mode: AUTONOMY_SCHEMA.optional(),
@@ -88,10 +89,13 @@ const proposalsRejectSchema = z
     .object({
         all: z.boolean().optional(),
         task_ids: z.array(z.string()).max(2000).optional(),
-    })
-    .refine((/** @type {any} */ v) => v.all === true || (Array.isArray(v.task_ids) && v.task_ids.length > 0), {
-        message: 'Body inválido: forneça {all:true} ou {task_ids:[...]}',
-    });
+    })['refine'](
+        (/** @type {{all?: boolean; task_ids?: unknown[]}} */ value) =>
+            value.all === true || (Array.isArray(value.task_ids) && value.task_ids.length > 0),
+        {
+            message: 'Body inválido: forneça {all:true} ou {task_ids:[...]}',
+        },
+    );
 
 function _asUpper(/** @type {any} */ value) {
     return value ? String(value).toUpperCase().trim() : null;
@@ -175,9 +179,9 @@ async function _runMissionControlCommand(
             command,
             payload: {
                 ...payload,
-                reason: payload.reason || req.body?.reason || `${command.toLowerCase()} via /api/missions`,
+                reason: payload['reason'] || req.body?.reason || `${command.toLowerCase()} via /api/missions`,
                 idempotency_key:
-                    payload.idempotency_key || `${req.id}:${command}:${payload.mission_id || req.params.id}`,
+                    payload['idempotency_key'] || `${req.id}:${command}:${payload['mission_id'] || req.params.id}`,
             },
             actor: req.user || { id: req.ip || null, username: req.ip || null, role: 'anonymous', permissions: [] },
         });
@@ -312,7 +316,7 @@ router.post('/', schemaGuard(createMissionSchema), async (req, res) => {
  */
 router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
     try {
-        const missionId = String(req.params.id);
+        const missionId = String(req.params['id']);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -351,7 +355,7 @@ router.patch('/:id', schemaGuard(patchMissionSchema), async (req, res) => {
  */
 router.get('/', async (req, res) => {
     try {
-        const status = req.query.status ? String(req.query.status).toUpperCase().trim() : null;
+        const status = req.query['status'] ? String(req.query['status']).toUpperCase().trim() : null;
         const missions = listMissions({ status, limit: 2000 });
         res.json({
             success: true,
@@ -573,14 +577,14 @@ router.post('/:id/resume', async (req, res) => {
  */
 router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => {
     try {
-        const missionId = String(req.params.id);
+        const missionId = String(req.params['id']);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
         }
 
         const autonomy_mode = _coerceAutonomyMode(
-            req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission.autonomy_mode,
+            req.body?.autonomy_mode ?? req.body?.autonomyMode ?? mission['autonomy_mode'],
         );
         const policy = req.body?.policy && typeof req.body.policy === 'object' ? req.body.policy : null;
         const control = await _runMissionControlCommand(req, res, 'MISSION_SET_POLICY', {
@@ -618,7 +622,7 @@ router.post('/:id/policy', schemaGuard(updatePolicySchema), async (req, res) => 
 router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
     try {
         /** @type {string} */
-        const missionId = String(req.params.id);
+        const missionId = String(req.params['id']);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -634,7 +638,7 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
             });
         }
 
-        const current = mission.context || {};
+        const current = mission['context'] || {};
         const feedbackList = Array.isArray(current.feedback) ? current.feedback : [];
         const updated = persistMissionUpdate(missionId, {
             context: {
@@ -694,7 +698,7 @@ router.post('/:id/feedback', schemaGuard(feedbackSchema), async (req, res) => {
 router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, res) => {
     try {
         /** @type {string} */
-        const missionId = String(req.params.id);
+        const missionId = String(req.params['id']);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -712,7 +716,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
             }
         }
 
-        if (mission.status !== MISSION_STATUS.RUNNING) {
+        if (mission['status'] !== MISSION_STATUS.RUNNING) {
             return res.status(409).json({
                 success: false,
                 error: 'Missão não está em execução',
@@ -722,7 +726,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
             });
         }
 
-        if (mission.autonomy_mode === AUTONOMY_MODES.USER_ONLY) {
+        if (mission['autonomy_mode'] === AUTONOMY_MODES.USER_ONLY) {
             return res.status(409).json({
                 success: false,
                 error: 'Autonomia insuficiente',
@@ -735,12 +739,12 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
         const maxProposals = Math.max(1, Math.min(Number(req.body?.max_proposals || 5) || 5, 25));
         const target = _pickAllowedTarget({
             requested: req.body?.target,
-            allowedTargets: mission.policy?.allowed_targets,
+            allowedTargets: mission['policy']?.allowed_targets,
         });
 
-        const workflow = mission.context?.workflow || null;
-        const progress = mission.context?.progress || {};
-        const feedback = Array.isArray(mission.context?.feedback) ? mission.context.feedback : [];
+        const workflow = mission['context']?.workflow || null;
+        const progress = mission['context']?.progress || {};
+        const feedback = Array.isArray(mission['context']?.feedback) ? mission['context'].feedback : [];
 
         const plannerContract = {
             proposals: [
@@ -765,10 +769,10 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
             'Retorne APENAS um JSON válido (sem Markdown, sem texto extra) seguindo exatamente este schema:',
             JSON.stringify(plannerContract, null, 2),
             '',
-            `Mission title: ${mission.title}`,
-            `Mission description: ${mission.description || ''}`,
+            `Mission title: ${mission['title']}`,
+            `Mission description: ${mission['description'] || ''}`,
             '',
-            `Autonomy mode: ${mission.autonomy_mode}`,
+            `Autonomy mode: ${mission['autonomy_mode']}`,
             `Max proposals: ${maxProposals}`,
             '',
             `Workflow template_id: ${workflow?.template_id || 'none'}`,
@@ -819,7 +823,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
                 step_id: 'planner',
                 step_index: 0,
                 step_dependencies: [],
-                mission_context: mission.context?.mission_context || {},
+                mission_context: mission['context']?.mission_context || {},
                 is_checkpoint: false,
             },
             state: { status: 'PENDING' },
@@ -864,7 +868,7 @@ router.post('/:id/suggest-tasks', schemaGuard(suggestTasksSchema), async (req, r
 router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (req, res) => {
     try {
         /** @type {string} */
-        const missionId = String(req.params.id);
+        const missionId = String(req.params['id']);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });
@@ -872,13 +876,13 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
 
         // Guard: reject proposals for missions in terminal state.
         // Tasks created for DONE/FAILED/CANCELLED missions would be queued and executed unexpectedly.
-        if (TERMINAL_MISSION_STATUSES.has(mission.status)) {
+        if (TERMINAL_MISSION_STATUSES.has(mission['status'])) {
             return res.status(409).json({
                 success: false,
                 error: 'Missão em estado terminal',
-                message: `Não é possível aceitar proposals para missões em estado ${mission.status}. Apenas missões ativas (READY, RUNNING, PAUSED) aceitam proposals.`,
+                message: `Não é possível aceitar proposals para missões em estado ${mission['status']}. Apenas missões ativas (READY, RUNNING, PAUSED) aceitam proposals.`,
                 mission_id: missionId,
-                mission_status: mission.status,
+                mission_status: mission['status'],
                 request_id: req.id,
             });
         }
@@ -890,7 +894,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                 .json({ success: false, error: 'Body inválido: "proposals" é obrigatório', request_id: req.id });
         }
 
-        const workflow = mission.context?.workflow || null;
+        const workflow = mission['context']?.workflow || null;
         const nowIso = new Date().toISOString();
 
         /** @type {string[]} */
@@ -903,7 +907,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
             const taskId = `task-${uuidv4()}`;
             const target = _pickAllowedTarget({
                 requested: proposal?.target,
-                allowedTargets: mission.policy?.allowed_targets,
+                allowedTargets: mission['policy']?.allowed_targets,
             });
 
             const taskV5 = schemas.core.TaskSchemaV5.parse({
@@ -915,8 +919,8 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                     source: 'gui',
                     mission_id: missionId,
                     workflow_id: workflow?.id || undefined,
-                    parent_id: mission.context?.progress?.current_task_id
-                        ? String(mission.context.progress.current_task_id)
+                    parent_id: mission['context']?.progress?.current_task_id
+                        ? String(mission['context'].progress.current_task_id)
                         : undefined,
                     correlation_id: `req-${req.id}-mission-${missionId}-proposal-${taskId}`.replace(
                         /[^a-zA-Z0-9._-]/g,
@@ -942,7 +946,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
                     step_id: null,
                     step_index: 0,
                     step_dependencies: [],
-                    mission_context: mission.context?.mission_context || {},
+                    mission_context: mission['context']?.mission_context || {},
                     is_checkpoint: false,
                 },
                 state: { status: 'PENDING' },
@@ -991,7 +995,7 @@ router.post('/:id/proposals/accept', schemaGuard(proposalsAcceptSchema), async (
  */
 router.post('/:id/proposals/reject', schemaGuard(proposalsRejectSchema), async (req, res) => {
     try {
-        const missionId = String(req.params.id);
+        const missionId = String(req.params['id']);
         const mission = getMissionById(missionId);
         if (!mission) {
             return res.status(404).json({ success: false, error: 'Missão não encontrada', request_id: req.id });

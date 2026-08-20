@@ -22,7 +22,7 @@ describe('event-bridge-map › contratos declarativos', () => {
     });
 
     it('mantém mapeamentos críticos do agente', () => {
-        assert.equal(AGENT_EVENT_BRIDGE_MAP.ready, 'agent:ready');
+        assert.equal(AGENT_EVENT_BRIDGE_MAP['ready'], 'agent:ready');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['task.started'], 'agent:task:started');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['question.answered'], 'agent:question:answered');
         assert.equal(AGENT_EVENT_BRIDGE_MAP['llm.usage'], 'agent:llm:usage');
@@ -31,7 +31,7 @@ describe('event-bridge-map › contratos declarativos', () => {
     });
 
     it('mantém mapeamentos críticos de dialog loop e handoff', () => {
-        assert.equal(DIALOG_LOOP_EVENT_BRIDGE_MAP.reply, 'agent:dialog:reply');
+        assert.equal(DIALOG_LOOP_EVENT_BRIDGE_MAP['reply'], 'agent:dialog:reply');
         assert.equal(DIALOG_LOOP_EVENT_BRIDGE_MAP['compaction.requested'], 'agent:dialog:compaction:requested');
         assert.equal(HANDOFF_EVENT_BRIDGE_MAP['handoff.accepted'], 'agent:handoff:accepted');
     });

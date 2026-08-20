@@ -13,16 +13,24 @@ const READY_KILO_SUMMARY = Object.freeze({
     ready: true,
     profile: 'kilo',
     preset: 'kilo-code',
-    providerType: 'openai_compatible',
+    providerType: 'openai',
     baseUrl: 'https://api.kilo.ai/api/gateway',
     model: 'kilo-auto/free',
+    wireApi: 'completions',
+    azureApiVersion: null,
+    auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
+    modelList: { configured: true, count: 3 },
+    capabilities: { reasoningEffort: true, sdkReasoningEffort: true, vision: true, contextWindowTokens: 200_000 },
+    limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
+    warnings: [],
+    errors: [],
 });
 
 const KILO_BINDING = Object.freeze({
     enabled: true,
     profile: 'kilo',
     preset: 'kilo-code',
-    providerType: 'openai_compatible',
+    providerType: 'openai',
     baseUrl: 'https://api.kilo.ai/api/gateway',
     model: 'anthropic/claude-sonnet-4.5',
 });
@@ -30,10 +38,10 @@ const KILO_BINDING = Object.freeze({
 describe('terminal/byok/session-binding', () => {
     it('renderiza seleção preparada e vínculo SDK sem expor termos internos', () => {
         expect(renderTerminalPreparedByokSelection(READY_KILO_SUMMARY)).toBe(
-            'BYOK · perfil kilo · preset kilo-code · provedor openai_compatible · modelo kilo-auto/free',
+            'BYOK · perfil kilo · preset kilo-code · provedor openai · modelo kilo-auto/free',
         );
         expect(renderTerminalSdkProviderBinding(KILO_BINDING)).toBe(
-            'BYOK · perfil kilo · preset kilo-code · provedor openai_compatible · modelo anthropic/claude-sonnet-4.5',
+            'BYOK · perfil kilo · preset kilo-code · provedor openai · modelo anthropic/claude-sonnet-4.5',
         );
     });
 
@@ -76,7 +84,7 @@ describe('terminal/byok/session-binding', () => {
                 enabled: true,
                 profile: 'openrouter-free',
                 preset: 'openrouter',
-                providerType: 'openai_compatible',
+                providerType: 'openai',
                 baseUrl: 'https://openrouter.ai/api/v1',
                 model: 'openrouter/free',
             },

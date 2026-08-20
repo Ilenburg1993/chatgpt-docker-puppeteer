@@ -39,19 +39,6 @@ import { getCopilotDb } from '../../../src/copilot/db/sqlite.js';
 
 const WORKSPACE_ROOT = path.resolve(url.fileURLToPath(new URL('../../../', import.meta.url)));
 const TMP_BASE = path.join(WORKSPACE_ROOT, 'tests', 'tmp', 'todo-tools-test');
-const TMP_STATE = path.join(TMP_BASE, '.github', 'hooks', 'state');
-const TMP_TODOS = path.join(TMP_STATE, 'todos.json');
-
-/**
- * Escreve o store diretamente no arquivo temporário (backup/restore para migração one-shot).
- *
- * @param {Record<string, any>} data
- */
-function writeRaw(data) {
-    fs.mkdirSync(TMP_STATE, { recursive: true });
-    fs.writeFileSync(TMP_TODOS, JSON.stringify({ version: 1, tasks: data }, null, 2), 'utf8');
-}
-
 /**
  * Lê tarefas diretamente do SQLite (verifica persistência).
  *
@@ -133,8 +120,6 @@ function getTool(name) {
 // Path real do arquivo de dados (onde o módulo persiste)
 const REAL_STATE_DIR = path.join(WORKSPACE_ROOT, '.github', 'hooks', 'state');
 const REAL_TODOS = path.join(REAL_STATE_DIR, 'todos.json');
-const REAL_TODOS_BAK = REAL_TODOS + '.test-backup';
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Lifecycle: backup e restore do arquivo real
 // ─────────────────────────────────────────────────────────────────────────────

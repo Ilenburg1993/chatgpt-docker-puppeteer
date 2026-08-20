@@ -108,9 +108,9 @@ const router = createRouter({
 });
 
 // Navigation guards
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
     // Update document title
-    document.title = to.meta.title ? `${to.meta.title} - Mission Control` : 'Mission Control';
+    document.title = to.meta['title'] ? `${to.meta['title']} - Mission Control` : 'Mission Control';
     next();
 });
 

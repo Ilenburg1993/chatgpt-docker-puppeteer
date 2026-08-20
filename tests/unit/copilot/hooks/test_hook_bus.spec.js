@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 // Stub do log para evitar saída durante testes
-process.env.LOG_LEVEL = 'silent';
+process.env['LOG_LEVEL'] = 'silent';
 
 describe('HookBus', () => {
     it('instancia sem erros', async () => {
@@ -34,9 +34,9 @@ describe('HookBus', () => {
         const event = /** @type {{ hookName: string; sessionId: string; input: Record<string, unknown> }} */ (received);
         assert.equal(event.hookName, 'pre_tool_use', 'hookName deve ser correto');
         assert.equal(event.sessionId, 'session-123', 'sessionId deve ser correto');
-        assert.equal(event.input.tool, 'bash', 'input deve preservar campos do operador');
-        assert.equal(event.input.sessionId, 'session-123', 'input deve carregar sessão normalizada');
-        assert.ok(event.input.timestamp instanceof Date, 'input deve carregar timestamp normalizado');
+        assert.equal(event.input['tool'], 'bash', 'input deve preservar campos do operador');
+        assert.equal(event.input['sessionId'], 'session-123', 'input deve carregar sessão normalizada');
+        assert.ok(event.input['timestamp'] instanceof Date, 'input deve carregar timestamp normalizado');
     });
 
     it('emitHook dispara wildcard listener', async () => {
@@ -66,7 +66,7 @@ describe('HookBus', () => {
 
         /** @type {import('../../../../src/copilot/hooks/types.js').SessionHooks} */
         const hooks = {
-            onPreToolUse: async (input, _inv) => {
+            onPreToolUse: async (_input, _inv) => {
                 calls.push('orig');
                 return { permissionDecision: 'allow' };
             },
@@ -83,8 +83,9 @@ describe('HookBus', () => {
             {
                 toolName: 'bash',
                 toolArgs: {},
-                timestamp: Date.now(),
-                cwd: process.cwd(),
+                sessionId: 's1',
+                timestamp: new Date(),
+                workingDirectory: process.cwd(),
             },
             { sessionId: 's1' },
         );

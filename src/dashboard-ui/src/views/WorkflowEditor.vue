@@ -146,24 +146,57 @@
     </div>
 </template>
 
-<script>
-import cytoscape from 'cytoscape';
+<script lang="ts">
+import cytoscape, { type Core, type NodeSingular } from 'cytoscape';
 import { computed, onUnmounted, ref, watch } from 'vue';
+
+type WorkflowNodeType = 'prompt' | 'validate' | 'branch' | 'aggregate';
+
+interface WorkflowNodeData {
+    id: string;
+    label: string;
+    type: WorkflowNodeType;
+    description: string;
+    prompt?: string;
+    criteria?: string;
+    onFailure: 'abort' | 'retry' | 'skip';
+    position?: { x: number; y: number };
+}
+
+interface WorkflowNode {
+    data: WorkflowNodeData;
+}
+
+interface WorkflowEdge {
+    data: { source: string; target: string };
+}
+
+interface Workflow {
+    id: string;
+    name: string;
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
+}
+
+interface ValidationResult {
+    status: 'valid' | 'invalid' | 'warning';
+    message: string;
+}
 
 export default {
     name: 'WorkflowEditor',
 
     setup() {
-        const cytoscapeMount = ref(null);
-        const currentWorkflow = ref(null);
-        const selectedNode = ref(null);
+        const cytoscapeMount = ref<HTMLElement | null>(null);
+        const currentWorkflow = ref<Workflow | null>(null);
+        const selectedNode = ref<WorkflowNode | null>(null);
         const edgeMode = ref(false);
-        const edgeModeSource = ref(null);
-        const validationResult = ref(null);
-        let cy = null;
+        const edgeModeSource = ref<string | null>(null);
+        const validationResult = ref<ValidationResult | null>(null);
+        let cy: Core | null = null;
 
         // Simulated workflows storage (in-memory for now)
-        const workflows = ref([
+        const workflows = ref<Workflow[]>([
             {
                 id: 'wf-default',
                 name: 'Exemplo: Escrita de Documento',
@@ -229,12 +262,17 @@ export default {
         ]);
 
         // Node type colors
-        const typeColors = {
+        const typeColors: Record<WorkflowNodeType, string> = {
             prompt: '#3498db',
             validate: '#27ae60',
             branch: '#f39c12',
             aggregate: '#9b59b6',
         };
+
+        function nodeColor(node: NodeSingular): string {
+            const type = node.data('type') as WorkflowNodeType;
+            return typeColors[type] || '#64748b';
+        }
 
         // Initialize Cytoscape
         function initCytoscape() {
@@ -246,31 +284,27 @@ export default {
                 cy = null;
             }
 
-            const elements = [...(currentWorkflow.value.nodes || []), ...(currentWorkflow.value.edges || [])];
+            const elements = [...currentWorkflow.value.nodes, ...currentWorkflow.value.edges];
 
-            cy = cytoscape({
+            const graph = cytoscape({
                 container: cytoscapeMount.value,
                 elements: elements,
                 style: [
                     {
                         selector: 'node',
                         css: {
-                            'background-color': (ele) => typeColors[ele.data('type')] || '#64748b',
+                            'background-color': nodeColor,
                             label: 'data(label)',
                             color: '#fff',
-                            'text-align': 'center',
-                            'text-valign': 'middle',
+                            'text-halign': 'center',
+                            'text-valign': 'center',
                             'font-size': '11px',
-                            'font-weight': '600',
+                            'font-weight': 600,
                             width: '120px',
                             height: '50px',
-                            'border-radius': '8px',
+                            shape: 'round-rectangle',
                             'border-width': '2px',
                             'border-color': '#fff',
-                            'box-shadow-color': 'rgba(0,0,0,0.15)',
-                            'box-shadow-blur-radius': '6px',
-                            'box-shadow-offset-x': '0px',
-                            'box-shadow-offset-y': '2px',
                         },
                     },
                     {
@@ -286,7 +320,7 @@ export default {
                             width: '2px',
                             'line-color': '#94a3b8',
                             'target-arrow-color': '#94a3b8',
-                            'target-arrow-shape': 'classic',
+                            'target-arrow-shape': 'triangle',
                             'curve-style': 'bezier',
                             'source-endpoint': 'south',
                             'target-endpoint': 'north',
@@ -302,35 +336,36 @@ export default {
                     },
                 ],
                 layout: {
-                    name: 'dagre',
-                    rankDir: 'TB',
+                    name: 'breadthfirst',
+                    directed: true,
                     padding: 20,
                     spacingFactor: 1.5,
                 },
-                userDragPan: true,
-                userZoomable: true,
-                autoEdgesAsLines: true,
-                autoArrowsAsEdges: true,
+                userPanningEnabled: true,
+                userZoomingEnabled: true,
             });
+            cy = graph;
 
             // Node click handler
-            cy.on('tap', 'node', (evt) => {
+            graph.on('tap', 'node', (evt) => {
                 const node = evt.target;
 
-                if (edgeMode) {
+                if (edgeMode.value) {
                     if (!edgeModeSource.value) {
                         // First click: select source
                         edgeModeSource.value = node.id();
                         node.addClass('edge-source');
                     } else if (edgeModeSource.value !== node.id()) {
                         // Second click: create edge
-                        const existingEdge = cy.getElementById(`${edgeModeSource.value}-${node.id()}`);
+                        const existingEdge = graph.getElementById(`${edgeModeSource.value}-${node.id()}`);
                         if (!existingEdge.length) {
-                            const newEdge = { data: { source: edgeModeSource.value, target: node.id() } };
-                            cy.add(newEdge);
-                            currentWorkflow.value.edges.push(newEdge);
+                            const newEdge: WorkflowEdge = {
+                                data: { source: edgeModeSource.value, target: node.id() },
+                            };
+                            graph.add(newEdge);
+                            currentWorkflow.value?.edges.push(newEdge);
                         }
-                        cy.$('.edge-source').removeClass('edge-source');
+                        graph.$('.edge-source').removeClass('edge-source');
                         edgeModeSource.value = null;
                     }
                 } else {
@@ -343,18 +378,18 @@ export default {
             });
 
             // Background click: deselect
-            cy.on('tap', (evt) => {
-                if (evt.target === cy) {
+            graph.on('tap', (evt) => {
+                if (evt.target === graph) {
                     deselectNode();
-                    if (edgeMode) {
-                        cy.$('.edge-source').removeClass('edge-source');
+                    if (edgeMode.value) {
+                        graph.$('.edge-source').removeClass('edge-source');
                         edgeModeSource.value = null;
                     }
                 }
             });
 
             // Drag end: update positions
-            cy.on('dragfreeon', 'node', () => {
+            graph.on('dragfreeon', 'node', () => {
                 syncPositions();
             });
         }
@@ -362,10 +397,11 @@ export default {
         // Sync positions from cytoscape to workflow data
         function syncPositions() {
             if (!cy || !currentWorkflow.value) return;
+            const workflow = currentWorkflow.value;
 
             cy.nodes().forEach((node) => {
                 const pos = node.position();
-                const nodeData = currentWorkflow.value.nodes.find((n) => n.data.id === node.id());
+                const nodeData = workflow.nodes.find((n) => n.data.id === node.id());
                 if (nodeData) {
                     nodeData.data.position = { x: pos.x, y: pos.y };
                 }
@@ -375,10 +411,11 @@ export default {
         // Sync edges from cytoscape to workflow
         function syncEdges() {
             if (!cy || !currentWorkflow.value) return;
+            const workflow = currentWorkflow.value;
 
-            currentWorkflow.value.edges = [];
+            workflow.edges = [];
             cy.edges().forEach((edge) => {
-                currentWorkflow.value.edges.push({
+                workflow.edges.push({
                     data: { source: edge.source().id(), target: edge.target().id() },
                 });
             });
@@ -389,7 +426,7 @@ export default {
             if (!currentWorkflow.value) return;
 
             const newId = `node-${Date.now()}`;
-            const newNode = {
+            const newNode: WorkflowNode = {
                 data: {
                     id: newId,
                     label: 'Novo Nó',
@@ -404,7 +441,7 @@ export default {
 
             if (cy) {
                 cy.add({ data: { ...newNode.data } });
-                cy.layout({ name: 'dagre', rankDir: 'TB', padding: 20, spacingFactor: 1.5 }).run();
+                cy.layout({ name: 'breadthfirst', directed: true, padding: 20, spacingFactor: 1.5 }).run();
             }
 
             validationResult.value = null;
@@ -421,7 +458,7 @@ export default {
 
         // Delete selected node
         function deleteSelected() {
-            if (!selectedNode.value || !cy) return;
+            if (!selectedNode.value || !cy || !currentWorkflow.value) return;
 
             const nodeId = selectedNode.value.data.id;
 
@@ -438,7 +475,7 @@ export default {
 
         // Update node data
         function updateNode() {
-            if (!selectedNode.value || !cy) return;
+            if (!selectedNode.value || !cy || !currentWorkflow.value) return;
 
             const nodeId = selectedNode.value.data.id;
             const cyNode = cy.getElementById(nodeId);
@@ -467,20 +504,21 @@ export default {
         }
 
         // Get dependencies for a node
-        function getNodeDependencies(nodeId) {
+        function getNodeDependencies(nodeId: string) {
             if (!currentWorkflow.value) return [];
+            const workflow = currentWorkflow.value;
 
-            return currentWorkflow.value.edges
+            return workflow.edges
                 .filter((e) => e.data.target === nodeId)
                 .map((e) => {
-                    const sourceNode = currentWorkflow.value.nodes.find((n) => n.data.id === e.data.source);
+                    const sourceNode = workflow.nodes.find((n) => n.data.id === e.data.source);
                     return sourceNode ? sourceNode.data.label : e.data.source;
                 });
         }
 
         // Select a workflow
-        function selectWorkflow(wf) {
-            currentWorkflow.value = JSON.parse(JSON.stringify(wf));
+        function selectWorkflow(wf: Workflow) {
+            currentWorkflow.value = structuredClone(wf);
             selectedNode.value = null;
             edgeMode.value = false;
             validationResult.value = null;
@@ -518,20 +556,21 @@ export default {
             }
 
             // Check: cycle detection (simple DFS)
-            const adj = {};
+            const adj: Record<string, string[]> = {};
             nodes.forEach((n) => {
                 adj[n.data.id] = [];
             });
             edges.forEach((e) => {
-                if (adj[e.data.source]) {
-                    adj[e.data.source].push(e.data.target);
+                const neighbors = adj[e.data.source];
+                if (neighbors) {
+                    neighbors.push(e.data.target);
                 }
             });
 
-            const visited = new Set();
-            const inStack = new Set();
+            const visited = new Set<string>();
+            const inStack = new Set<string>();
 
-            function hasCycle(node) {
+            function hasCycle(node: string): boolean {
                 visited.add(node);
                 inStack.add(node);
 
@@ -557,7 +596,7 @@ export default {
             }
 
             // Check: orphan detection (nodes with no in or out edges, except start/end nodes)
-            const nodesWithEdges = new Set();
+            const nodesWithEdges = new Set<string>();
             edges.forEach((e) => {
                 nodesWithEdges.add(e.data.source);
                 nodesWithEdges.add(e.data.target);
@@ -584,9 +623,10 @@ export default {
             syncEdges();
 
             // Update in workflows list
-            const idx = workflows.value.findIndex((w) => w.id === currentWorkflow.value.id);
+            const workflow = currentWorkflow.value;
+            const idx = workflows.value.findIndex((w) => w.id === workflow.id);
             if (idx !== -1) {
-                workflows.value[idx] = JSON.parse(JSON.stringify(currentWorkflow.value));
+                workflows.value[idx] = structuredClone(workflow);
             }
 
             validationResult.value = null;

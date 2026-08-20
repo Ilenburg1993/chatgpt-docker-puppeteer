@@ -4,7 +4,7 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import {
     CategoryScale,
     Chart,
@@ -17,7 +17,7 @@ import {
     Title,
     Tooltip,
 } from 'chart.js';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch, type PropType } from 'vue';
 
 // Register Chart.js components
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Title, Tooltip, Legend, Filler);
@@ -26,12 +26,12 @@ export default {
     name: 'LineChart',
     props: {
         data: {
-            type: Array,
+            type: Array as PropType<number[]>,
             required: true,
             default: () => [],
         },
         labels: {
-            type: Array,
+            type: Array as PropType<string[]>,
             default: () => [],
         },
         label: {
@@ -68,13 +68,14 @@ export default {
         },
     },
     setup(props) {
-        const chartCanvas = ref(null);
-        let chartInstance = null;
+        const chartCanvas = ref<HTMLCanvasElement | null>(null);
+        let chartInstance: Chart<'line', number[], string> | null = null;
 
         const createChart = () => {
             if (!chartCanvas.value) return;
 
             const ctx = chartCanvas.value.getContext('2d');
+            if (!ctx) return;
 
             // Generate labels if not provided
             const chartLabels = props.labels.length > 0 ? props.labels : props.data.map((_, i) => i.toString());
@@ -115,7 +116,7 @@ export default {
                             enabled: true,
                             callbacks: {
                                 label: (context) => {
-                                    return `${props.label}: ${context.parsed.y.toFixed(2)}`;
+                                    return `${props.label}: ${Number(context.parsed.y ?? 0).toFixed(2)}`;
                                 },
                             },
                         },
@@ -155,7 +156,9 @@ export default {
             const chartLabels = props.labels.length > 0 ? props.labels : props.data.map((_, i) => i.toString());
 
             chartInstance.data.labels = chartLabels;
-            chartInstance.data.datasets[0].data = props.data;
+            const dataset = chartInstance.data.datasets[0];
+            if (!dataset) return;
+            dataset.data = props.data;
             chartInstance.update('none'); // No animation for real-time updates
         };
 

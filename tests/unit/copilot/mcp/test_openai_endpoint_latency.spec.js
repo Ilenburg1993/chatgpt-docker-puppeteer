@@ -9,6 +9,13 @@ import {
     summarizeOpenAiEndpointLatencyHistory,
 } from '#copilot/mcp/control-plane';
 
+/**
+ * @param {string} id
+ * @param {string} hostname
+ * @param {number} ttfbMs
+ * @param {number} totalMs
+ * @param {number} [tlsMs]
+ */
 function sample(id, hostname, ttfbMs, totalMs, tlsMs = 20) {
     return {
         id,

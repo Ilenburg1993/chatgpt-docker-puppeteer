@@ -146,16 +146,16 @@ function criarNERVMock() {
 
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            self.emit.resetHistory();
-            self.emitCommand.resetHistory();
-            self.emitEvent.resetHistory();
-            self.emitAck.resetHistory();
-            self.on.resetHistory();
-            self.once.resetHistory();
-            self.off.resetHistory();
-            self._emitter.removeAllListeners();
-            self._eventos = {};
-            self._inscricoes = {};
+            self['emit'].resetHistory();
+            self['emitCommand'].resetHistory();
+            self['emitEvent'].resetHistory();
+            self['emitAck'].resetHistory();
+            self['on'].resetHistory();
+            self['once'].resetHistory();
+            self['off'].resetHistory();
+            self['_emitter'].removeAllListeners();
+            self['_eventos'] = {};
+            self['_inscricoes'] = {};
         },
 
         /**
@@ -212,13 +212,13 @@ function criarNERVSimples() {
 
         limpar: function () {
             const self = /** @type {Record<string, any>} */ (this);
-            self.emit.resetHistory();
-            self.emitCommand.resetHistory();
-            self.emitEvent.resetHistory();
-            self.emitAck.resetHistory();
-            self.on.resetHistory();
-            self.once.resetHistory();
-            self.off.resetHistory();
+            self['emit'].resetHistory();
+            self['emitCommand'].resetHistory();
+            self['emitEvent'].resetHistory();
+            self['emitAck'].resetHistory();
+            self['on'].resetHistory();
+            self['once'].resetHistory();
+            self['off'].resetHistory();
         },
     };
 }

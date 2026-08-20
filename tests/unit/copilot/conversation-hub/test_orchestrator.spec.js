@@ -6,14 +6,12 @@
  * event emission, error paths.
  */
 
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /** @param {import('better-sqlite3').Database} db */
 function applyCopilotMigrations(db) {
@@ -73,7 +71,6 @@ let testDb;
 let store;
 
 beforeAll(() => {
-    const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
     store = new ConversationStore();

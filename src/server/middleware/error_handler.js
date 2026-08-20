@@ -24,10 +24,10 @@ function notFound(req, res, next) {
  * @param {Error} err - Objeto de erro capturado.
  * @param {ErrorHandlerReq} req - Request Express.
  * @param {ErrorHandlerRes} res - Response Express.
- * @param {function} next - Próximo middleware.
+ * @param {function} _ - Próximo middleware.
  * @returns {void}
  */
-function errorHandler(err, req, res, next) {
+function errorHandler(err, req, res, _) {
     // 1. Determinação do Status Code
     // Se o status já foi definido (ex: 404), mantém. Caso contrário, assume falha interna (500).
     const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
@@ -41,7 +41,7 @@ function errorHandler(err, req, res, next) {
         path: req.originalUrl,
         method: req.method,
         // Em produção, ocultamos o stack trace para evitar vazamento de infraestrutura
-        stack: process.env.NODE_ENV === 'production' ? '🥞 (Details hidden in production)' : err.stack,
+        stack: process.env['NODE_ENV'] === 'production' ? '🥞 (Details hidden in production)' : err.stack,
     };
 
     // 3. Registro no Log Operacional (Para Diagnóstico Técnico)
@@ -60,7 +60,7 @@ function errorHandler(err, req, res, next) {
     }
 
     // 5. Resposta Padronizada ao Dashboard
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env['NODE_ENV'] === 'production';
     res.status(statusCode).json({
         success: false,
         error: statusCode === 404 ? 'Recurso não encontrado' : 'Erro interno do servidor',

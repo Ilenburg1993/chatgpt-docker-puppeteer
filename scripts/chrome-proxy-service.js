@@ -38,9 +38,10 @@ class ChromeProxyService extends _Impl {
      *
      * @param {string} url - Original WebSocket URL
      * @returns {string} Rewritten URL
+     * @override
      */
     rewriteWebSocketURL(url) {
-        return super.rewriteWebSocketURL(url);
+        return super['rewriteWebSocketURL'](url);
     }
 
     /**
@@ -49,9 +50,10 @@ class ChromeProxyService extends _Impl {
      * @param {import('http').IncomingMessage} req - HTTP request
      * @param {import('http').ServerResponse} res - HTTP response
      * @returns {void}
+     * @override
      */
     handleHTTPRequest(req, res) {
-        return super.handleHTTPRequest(req, res);
+        return super['handleHTTPRequest'](req, res);
     }
 
     /**
@@ -61,15 +63,17 @@ class ChromeProxyService extends _Impl {
      * @param {import('net').Socket} socket - TCP socket
      * @param {Buffer} head - First packet of upgraded stream
      * @returns {void}
+     * @override
      */
     handleWebSocketUpgrade(req, socket, head) {
-        return super.handleWebSocketUpgrade(req, socket, head);
+        return super['handleWebSocketUpgrade'](req, socket, head);
     }
 
     /**
      * Start proxy service
      *
      * @returns {Promise<void>}
+     * @override
      */
     async start() {
         return super.start();
@@ -79,6 +83,7 @@ class ChromeProxyService extends _Impl {
      * Stop proxy service gracefully
      *
      * @returns {Promise<void>}
+     * @override
      */
     async stop() {
         return super.stop();
@@ -89,7 +94,7 @@ class ChromeProxyService extends _Impl {
  * Parse and validate integer from environment variable with range checking
  *
  * @example
- *     const port = parseIntSafe(process.env.PORT, 3000, 'PORT', { min: 1024, max: 65535 });
+ *     const port = parseIntSafe(process.env['PORT'], 3000, 'PORT', { min: 1024, max: 65535 });
  *
  * @param {string | undefined} value - Raw environment variable value
  * @param {number} defaultValue - Fallback value if parsing fails or out of range
@@ -127,7 +132,7 @@ function parseIntSafe(value, defaultValue, varName, range = {}) {
  * - Hostnames (localhost) and random strings
  *
  * @example
- *     const bind = parseBindSafe(process.env.BIND_ADDR, '0.0.0.0');
+ *     const bind = parseBindSafe(process.env['BIND_ADDR'], '0.0.0.0');
  *     // Valid: '0.0.0.0', '127.0.0.1', '::', '::1', 'fe80::1'
  *     // Invalid: '256.1.1.1', ':::1', 'localhost' → returns '0.0.0.0'
  *
@@ -223,8 +228,8 @@ function isLikelyContainer() {
         if (/docker|containerd|kubepods/i.test(cgroup)) return true;
     } catch (_) {}
 
-    if (process.env.KUBERNETES_SERVICE_HOST) return true;
-    if (process.env.container) return true;
+    if (process.env['KUBERNETES_SERVICE_HOST']) return true;
+    if (process.env['container']) return true;
 
     return false;
 }
@@ -321,7 +326,7 @@ function getDefaultGatewayIPv4() {
  * @returns {Promise<string>} Resolved Chrome host address
  */
 async function resolveChromeHost() {
-    const explicit = (process.env.CHROME_HOST || '').trim();
+    const explicit = (process.env['CHROME_HOST'] || '').trim();
     if (explicit) return explicit;
 
     if (await canResolve('host.docker.internal', 250)) {
@@ -352,7 +357,7 @@ async function resolveChromeHost() {
  * @returns {string} Instance identifier (defaults to '0')
  */
 function getInstanceTag() {
-    const inst = process.env.NODE_APP_INSTANCE ?? process.env.pm_id ?? process.env.PM2_INSTANCE_ID ?? '0';
+    const inst = process.env['NODE_APP_INSTANCE'] ?? process.env['pm_id'] ?? process.env['PM2_INSTANCE_ID'] ?? '0';
     return String(inst);
 }
 
@@ -419,18 +424,18 @@ async function main() {
     const tag = getInstanceTag();
 
     // Ports/bind
-    const CHROME_PORT = parseIntSafe(process.env.CHROME_PORT, 9225, 'CHROME_PORT', { min: 1, max: 65535 });
-    const PROXY_PORT = parseIntSafe(process.env.CHROME_PROXY_PORT, 9224, 'CHROME_PROXY_PORT', { min: 1, max: 65535 });
-    const PROXY_BIND = parseBindSafe(process.env.CHROME_PROXY_BIND, '0.0.0.0');
+    const CHROME_PORT = parseIntSafe(process.env['CHROME_PORT'], 9225, 'CHROME_PORT', { min: 1, max: 65535 });
+    const PROXY_PORT = parseIntSafe(process.env['CHROME_PROXY_PORT'], 9224, 'CHROME_PROXY_PORT', { min: 1, max: 65535 });
+    const PROXY_BIND = parseBindSafe(process.env['CHROME_PROXY_BIND'], '0.0.0.0');
 
     // Docker-friendly host auto-detect (explicit env still wins)
     const CHROME_HOST = await resolveChromeHost();
 
     // PUBLIC_IP stays explicit-or-null; implementation can auto-detect if null
-    const PUBLIC_IP = process.env.PUBLIC_IP || null;
+    const PUBLIC_IP = process.env['PUBLIC_IP'] || null;
 
     // PM2 graceful stop window (align with your pm2 kill_timeout if you set it)
-    const PM2_KILL_TIMEOUT_MS = parseIntSafe(process.env.PM2_KILL_TIMEOUT_MS, 12000, 'PM2_KILL_TIMEOUT_MS', {
+    const PM2_KILL_TIMEOUT_MS = parseIntSafe(process.env['PM2_KILL_TIMEOUT_MS'], 12000, 'PM2_KILL_TIMEOUT_MS', {
         min: 1000,
         max: 300000,
     });
@@ -453,7 +458,7 @@ async function main() {
     console.log(`  CHROME_HOST: ${CHROME_HOST}${chromeAccessible ? ' ✓' : ' ⚠ (not resolvable)'}`);
     console.log(`  CHROME_PORT: ${CHROME_PORT}`);
     console.log(`  PUBLIC_IP  : ${PUBLIC_IP || '(auto-detect)'}`);
-    console.log(`  LOG_LEVEL  : ${process.env.LOG_LEVEL || 'info'} (env)`);
+    console.log(`  LOG_LEVEL  : ${process.env['LOG_LEVEL'] || 'info'} (env)`);
     console.log(`  CONTAINER  : ${inContainer ? 'YES' : 'NO'}`);
 
     if (!chromeAccessible) {

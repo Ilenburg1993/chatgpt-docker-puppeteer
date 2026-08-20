@@ -17,11 +17,13 @@
  */
 
 /**
- * @param {unknown} value
- * @returns {Record<string, any>[]}
+ * @template {object} T
+ * @param {readonly T[] | undefined} value
+ * @returns {T[]}
  */
 function records(value) {
-    return Array.isArray(value) ? value.filter((item) => item && typeof item === 'object' && !Array.isArray(item)) : [];
+    if (!Array.isArray(value)) return [];
+    return value.filter((item) => Boolean(item) && typeof item === 'object' && !Array.isArray(item));
 }
 
 /**
@@ -33,16 +35,16 @@ function optionalPositiveInteger(value) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {object} record
  * @returns {number}
  */
 function observedTimeMs(record) {
     const candidates = [
-        record['completedAt'],
-        record['startedAt'],
-        record['observedAt'],
-        record['createdAt'],
-        record['timestamp'],
+        Reflect.get(record, 'completedAt'),
+        Reflect.get(record, 'startedAt'),
+        Reflect.get(record, 'observedAt'),
+        Reflect.get(record, 'createdAt'),
+        Reflect.get(record, 'timestamp'),
     ];
     for (const candidate of candidates) {
         if (candidate instanceof Date && !Number.isNaN(candidate.getTime())) return candidate.getTime();
@@ -55,9 +57,10 @@ function observedTimeMs(record) {
 }
 
 /**
- * @param {Record<string, any>[]} list
+ * @template {object} T
+ * @param {T[]} list
  * @param {number | null} limit
- * @returns {Record<string, any>[]}
+ * @returns {T[]}
  */
 function keepNewest(list, limit) {
     if (limit === null || list.length <= limit) return list;
@@ -65,8 +68,8 @@ function keepNewest(list, limit) {
 }
 
 /**
- * @param {Record<string, any>[]} before
- * @param {Record<string, any>[]} after
+ * @param {readonly unknown[]} before
+ * @param {readonly unknown[]} after
  * @returns {{ before: number; after: number; pruned: number }}
  */
 function stats(before, after) {
@@ -78,17 +81,32 @@ function stats(before, after) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
+ * @template {object} TImportRun
+ * @template {object} TRawPayloadRef
+ * @template {object} TConflict
+ * @template {object} TEligibilityRun
+ * @template {object} TRest
+ * @param {TRest & {
+ *   importRuns?: TImportRun[];
+ *   rawPayloadRefs?: TRawPayloadRef[];
+ *   conflicts?: TConflict[];
+ *   modelEligibilityRuns?: TEligibilityRun[];
+ * }} snapshot
  * @param {ModelGatewayCatalogRetentionPolicy} [policy]
  * @returns {{
- *     snapshot: Record<string, any>;
- *     summary: {
- *         enabled: boolean;
- *         importRuns: { before: number; after: number; pruned: number };
- *         rawPayloadRefs: { before: number; after: number; pruned: number };
- *         conflicts: { before: number; after: number; pruned: number };
- *         modelEligibilityRuns: { before: number; after: number; pruned: number };
- *     };
+ *   snapshot: TRest & {
+ *     importRuns: TImportRun[];
+ *     rawPayloadRefs: TRawPayloadRef[];
+ *     conflicts: TConflict[];
+ *     modelEligibilityRuns: TEligibilityRun[];
+ *   };
+ *   summary: {
+ *     enabled: boolean;
+ *     importRuns: { before: number; after: number; pruned: number };
+ *     rawPayloadRefs: { before: number; after: number; pruned: number };
+ *     conflicts: { before: number; after: number; pruned: number };
+ *     modelEligibilityRuns: { before: number; after: number; pruned: number };
+ *   };
  * }}
  */
 export function applyModelGatewayCatalogRetention(snapshot, policy = {}) {

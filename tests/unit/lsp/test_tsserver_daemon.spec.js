@@ -51,6 +51,36 @@ describe('TsserverDaemon', () => {
             assert.ok(hover);
             assert.ok(typeof hover.display === 'string');
 
+            // Stale editor/LSP positions must clamp to a valid source offset instead of triggering a TypeScript
+            // `Debug Failure` assertion when the line or character raced ahead of the current file contents.
+            const staleHover = await daemon.execute('hover', {
+                filePath,
+                line: 999,
+                character: 999,
+            });
+            assert.ok(staleHover === null || typeof staleHover === 'object');
+
+            await daemon.stop();
+        } finally {
+            await fs.rm(rootDir, { recursive: true, force: true });
+        }
+    });
+
+    it('evicts the heavy language-service cache after the configured idle window', async () => {
+        const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-daemon-'));
+        try {
+            await fs.writeFile(path.join(rootDir, 'jsconfig.json'), JSON.stringify({ include: ['**/*.js'] }), 'utf8');
+            const filePath = path.join(rootDir, 'sample.js');
+            await fs.writeFile(filePath, 'const answer = 42;\nanswer;\n', 'utf8');
+
+            const daemon = new TsserverDaemon({ rootDir, timeoutMs: 10_000, idleTtlMs: 10 });
+            const first = await daemon.execute('hover', { filePath, line: 2, character: 2 });
+            assert.ok(first);
+            await new Promise((resolve) => setTimeout(resolve, 30));
+
+            // A second operation must transparently recreate the evicted service and remain fully functional.
+            const second = await daemon.execute('hover', { filePath, line: 2, character: 2 });
+            assert.ok(second);
             await daemon.stop();
         } finally {
             await fs.rm(rootDir, { recursive: true, force: true });
@@ -80,7 +110,7 @@ describe('TsserverDaemon', () => {
                 character: 1,
             });
             assert.ok(Array.isArray(comps));
-            assert.ok(comps.some((c) => c.name === 'foo'));
+            assert.ok(/** @type {{ name?: string }[]} */ (comps).some((c) => c.name === 'foo'));
 
             const update = await daemon.execute('updateFile', {
                 filePath,
@@ -98,7 +128,7 @@ describe('TsserverDaemon', () => {
 
     it('supports preview/apply code action edits with mutation guards', async () => {
         const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lsp-daemon-'));
-        const previousMutationsEnabled = process.env.LSP_MUTATIONS_ENABLED;
+        const previousMutationsEnabled = process.env['LSP_MUTATIONS_ENABLED'];
 
         try {
             await fs.writeFile(path.join(rootDir, 'jsconfig.json'), JSON.stringify({ include: ['**/*.js'] }), 'utf8');
@@ -129,13 +159,13 @@ describe('TsserverDaemon', () => {
             assert.strictEqual(preview.mode, 'preview');
             assert.strictEqual(preview.totalEdits, 1);
 
-            process.env.LSP_MUTATIONS_ENABLED = 'false';
+            process.env['LSP_MUTATIONS_ENABLED'] = 'false';
             await assert.rejects(
                 async () => daemon.execute('apply_code_action', { mode: 'apply', action, confirmationToken: 'token' }),
                 /LSP_MUTATIONS_DISABLED/,
             );
 
-            process.env.LSP_MUTATIONS_ENABLED = 'true';
+            process.env['LSP_MUTATIONS_ENABLED'] = 'true';
             const applied = /** @type {any} */ (
                 await daemon.execute('apply_code_action', {
                     mode: 'apply',
@@ -150,9 +180,9 @@ describe('TsserverDaemon', () => {
             await daemon.stop();
         } finally {
             if (previousMutationsEnabled === undefined) {
-                delete process.env.LSP_MUTATIONS_ENABLED;
+                delete process.env['LSP_MUTATIONS_ENABLED'];
             } else {
-                process.env.LSP_MUTATIONS_ENABLED = previousMutationsEnabled;
+                process.env['LSP_MUTATIONS_ENABLED'] = previousMutationsEnabled;
             }
             await fs.rm(rootDir, { recursive: true, force: true });
         }

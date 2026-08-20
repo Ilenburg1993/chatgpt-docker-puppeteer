@@ -1,6 +1,7 @@
 // @ts-check
 import { formatHttpError, http } from '@/lib/http';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
+/** @import { DashboardEvent, DashboardGraph, DashboardMission, DashboardProposal, DashboardTask, MissionProgressSelection } from '@/types/dashboard' */
 import { defineStore } from 'pinia';
 
 function _normalizeUpper(/** @type {any} */ value) {
@@ -98,8 +99,8 @@ function _resolveIfVersion(/** @type {any} */ mission) {
 /** Constante/valor exportado: useMissionsVNextStore. */
 export const useMissionsVNextStore = defineStore('missions_vnext', {
     state: () => ({
-        items: /** @type {unknown[]} */ ([]),
-        byId: /** @type {Map<string, any>} */ (new Map()),
+        items: /** @type {DashboardMission[]} */ ([]),
+        byId: /** @type {Map<string, DashboardMission>} */ (new Map()),
         cursor: null,
         hasMore: false,
         loading: false,
@@ -110,12 +111,12 @@ export const useMissionsVNextStore = defineStore('missions_vnext', {
             autonomy_mode: null,
             search: '',
         },
-        selected: null,
-        selectedProgress: /** @type {unknown} */ (null),
-        selectedTasks: [],
-        selectedProposals: [],
-        selectedGraph: null,
-        selectedEvents: [],
+        selected: /** @type {DashboardMission | null} */ (null),
+        selectedProgress: /** @type {MissionProgressSelection | null} */ (null),
+        selectedTasks: /** @type {DashboardTask[]} */ ([]),
+        selectedProposals: /** @type {DashboardProposal[]} */ ([]),
+        selectedGraph: /** @type {DashboardGraph | null} */ (null),
+        selectedEvents: /** @type {DashboardEvent[]} */ ([]),
     }),
     getters: {
         getById: (state) => (/** @type {any} */ id) => state.byId.get(String(/** @type {any} */ id)) || null,

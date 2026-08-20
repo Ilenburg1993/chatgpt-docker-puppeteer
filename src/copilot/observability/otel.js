@@ -120,21 +120,59 @@ export const DEFAULT_OTEL_FILE = DEFAULT_TRACES_FILE;
  * @property {Record<string, unknown>} [extra] - Atributos adicionais
  */
 
+/** @typedef {import('@opentelemetry/api').Tracer} OtelTracer */
+/** @typedef {import('@opentelemetry/api').Span} OtelSpan */
+
 /**
- * @typedef {object} OtelSpan
- * @property {(key: string, value: string | number | boolean) => void} setAttribute
- * @property {(status: { code: number; message?: string }) => void} setStatus
- * @property {(exception: unknown) => void} recordException
- * @property {() => void} end
+ * @typedef {object} OtelNodeTracerProvider
+ * @property {() => void} register
  */
 
 /**
- * @typedef {object} OtelTracer
- * @property {(name: string) => OtelSpan} startSpan
+ * @typedef {object} OtelTraceNodeModule
+ * @property {new () => OtelNodeTracerProvider} NodeTracerProvider
  */
 
 /** @type {OtelTracer | null} Instância do tracer OTEL (null se não disponível) */
 let _tracer = null;
+
+/**
+ * Importa um módulo opcional sem transformar sua ausência em erro estático. A fronteira dinâmica é `unknown` até que
+ * o shape mínimo necessário seja validado em runtime.
+ *
+ * @param {string} specifier
+ * @returns {Promise<unknown>}
+ */
+async function importOptionalModule(specifier) {
+    return import(specifier);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {value is OtelTraceNodeModule}
+ */
+function isOtelTraceNodeModule(value) {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = /** @type {Record<string, unknown>} */ (value);
+    return typeof candidate['NodeTracerProvider'] === 'function';
+}
+
+
+/**
+ * Projects an arbitrary runtime failure into the exact OpenTelemetry Exception contract. Optional fields are omitted
+ * instead of materialized as `undefined`, preserving `exactOptionalPropertyTypes` semantics across package boundaries.
+ *
+ * @param {unknown} value
+ * @returns {import('@opentelemetry/api').Exception}
+ */
+export function toOtelException(value) {
+    const error = toError(value);
+    return {
+        name: error.name || 'Error',
+        message: error.message,
+        ...(typeof error.stack === 'string' && error.stack.length > 0 ? { stack: error.stack } : {}),
+    };
+}
 
 /**
  * Inicializa o tracer OTEL de forma segura (graceful degradation). Tentativa única no primeiro uso. Se
@@ -145,13 +183,14 @@ let _tracer = null;
 async function _getTracer() {
     if (_tracer !== null) return _tracer;
     try {
-        // Importação dinâmica para degradação graciosa quando o pacote não está instalado
-        // @ts-expect-error — @opentelemetry/sdk-trace-node é opcional; graceful degradation se não instalado
-        const { NodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
+        const sdkTraceNode = await importOptionalModule('@opentelemetry/sdk-trace-node');
+        if (!isOtelTraceNodeModule(sdkTraceNode)) {
+            throw new TypeError('[otel] módulo sdk-trace-node não expõe NodeTracerProvider compatível');
+        }
         const { trace } = await import('@opentelemetry/api');
-        const provider = new NodeTracerProvider();
+        const provider = new sdkTraceNode.NodeTracerProvider();
         provider.register();
-        _tracer = /** @type {OtelTracer} */ (/** @type {unknown} */ (trace.getTracer('copilot-agent', '1.0.0')));
+        _tracer = trace.getTracer('copilot-agent', '1.0.0');
         return _tracer;
     } catch {
         _tracer = null;
@@ -215,7 +254,7 @@ export async function startSpan(name, attrs, fn) {
             span.setAttribute('duration_ms', Date.now() - start);
             const redactedErrorMessage = redactSecretText(toError(err).message);
             span.setStatus({ code: /** SpanStatusCode.ERROR */ 2, message: redactedErrorMessage });
-            span.recordException(new Error(redactedErrorMessage));
+            span.recordException({ name: 'Error', message: redactedErrorMessage });
             throw err;
         } finally {
             span.end();

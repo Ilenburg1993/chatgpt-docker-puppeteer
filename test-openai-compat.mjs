@@ -24,6 +24,10 @@ let totalTests = 0;
 /**
  * Test helper
  */
+/**
+ * @param {string} name
+ * @param {() => Promise<void>} testFn
+ */
 async function runTest(name, testFn) {
     totalTests++;
     process.stdout.write(`▶ ${totalTests}. ${name}... `);
@@ -35,7 +39,7 @@ async function runTest(name, testFn) {
         return true;
     } catch (error) {
         console.log('❌ FAILED');
-        console.error(`   Error: ${error.message}`);
+        console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`);
         return false;
     }
 }
@@ -136,11 +140,11 @@ await runTest('GET /v1/models', async () => {
     if (!Array.isArray(data.data) || data.data.length === 0) {
         throw new Error('No models returned');
     }
-    if (!data.data.some((m) => m.id === 'qwen3-coder-next')) {
+    if (!data.data.some((/** @type {{ id: string }} */ m) => m.id === 'qwen3-coder-next')) {
         throw new Error('qwen3-coder-next not in model list');
     }
 
-    console.log(`\n   Models: ${data.data.map((m) => m.id).join(', ')}`);
+    console.log(`\n   Models: ${data.data.map((/** @type {{ id: string }} */ m) => m.id).join(', ')}`);
 });
 
 // Test 4: Error handling (empty messages)

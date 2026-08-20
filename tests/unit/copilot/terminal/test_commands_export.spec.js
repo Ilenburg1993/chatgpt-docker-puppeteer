@@ -1,10 +1,76 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const readTerminalTimelineProjection = vi.fn(() => ({
+/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/timeline.js').readTerminalTimelineProjection>} TimelineProjection */
+/** @typedef {TimelineProjection['turns'][number]} TimelineTurn */
+/** @typedef {Omit<Partial<TimelineProjection>, 'sync' | 'turns'> & { sync?: Partial<TimelineProjection['sync']>; turns?: Array<Partial<TimelineTurn>> }} TimelineProjectionOverrides */
+
+/**
+ * @param {Partial<TimelineTurn>} [overrides]
+ * @returns {TimelineTurn}
+ */
+function timelineTurnFixture(overrides = {}) {
+    return {
+        role: 'assistant',
+        rawRole: 'llm_b',
+        content: '',
+        timestamp: 1710000000000,
+        persisted: true,
+        origin: 'hub',
+        turnId: null,
+        sdkTurnId: null,
+        metadata: null,
+        ...overrides,
+    };
+}
+
+/**
+ * @param {TimelineProjectionOverrides} [overrides]
+ * @returns {TimelineProjection}
+ */
+function timelineProjectionFixture(overrides = {}) {
+    /** @type {TimelineProjection['sync']} */
+    const sync = {
+        policy: 'none',
+        status: 'not_needed',
+        reason: null,
+        pendingCount: 0,
+        syncedCount: 0,
+        failedCount: 0,
+        key: null,
+        lastError: null,
+        attempts: 0,
+        nextRetryAt: null,
+        cacheExpiresAt: null,
+        ...(overrides.sync ?? {}),
+    };
+    return {
+        requestedRuntimeId: null,
+        runtimeId: 'default',
+        runtimeFound: true,
+        usedDefaultRuntimeFallback: false,
+        runtimeFallbackWarning: null,
+        hubSessionId: 'hub-export',
+        sdkSessionId: 'sdk-export',
+        timelineSource: 'hub',
+        timelineAuthority: 'persistent',
+        reconciliationStatus: 'aligned',
+        totalPersistedTurns: overrides.turns?.length ?? 0,
+        effectiveOffset: 0,
+        bridgeTurnCount: 0,
+        liveBridgeTailCount: 0,
+        overlapCount: 0,
+        syncBlockedReason: null,
+        ...overrides,
+        sync,
+        turns: (overrides.turns ?? []).map((turn) => timelineTurnFixture(turn)),
+    };
+}
+
+const readTerminalTimelineProjection = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/projections/timeline.js').readTerminalTimelineProjection>} */ (
+    vi.fn(() => timelineProjectionFixture({
     timelineSource: 'hub',
     reconciliationStatus: 'aligned',
     sync: {
@@ -50,9 +116,10 @@ const readTerminalTimelineProjection = vi.fn(() => ({
             },
         },
     ],
-}));
+}))
+)
 
-const writeFileAtomicTrusted = vi.fn(async () => undefined);
+const writeFileAtomicTrusted = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/infra/public/trusted-io.js').writeFileAtomicTrusted>} */ (vi.fn(async () => undefined));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,
@@ -71,6 +138,13 @@ function mockCtx() {
     return { println, output: () => lines.join('\n') };
 }
 
+/** @returns {Parameters<typeof import('../../../../src/copilot/infra/public/trusted-io.js').writeFileAtomicTrusted>} */
+function requireWriteCall() {
+    const call = writeFileAtomicTrusted.mock.calls[0];
+    if (!call) throw new Error('[fixture] writeFileAtomicTrusted was not called');
+    return call;
+}
+
 describe('terminal/commands/export', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -83,7 +157,7 @@ describe('terminal/commands/export', () => {
 
         expect(readTerminalTimelineProjection).toHaveBeenCalled();
         expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         expect(String(content)).toContain('envelope=sdk/assistant.message');
         expect(String(content)).toContain('trace=trace-export-1');
         expect(String(content)).toContain('streaming=suffix/stream_suffix');
@@ -91,7 +165,7 @@ describe('terminal/commands/export', () => {
     });
 
     it('escapa HTML bruto da LLM-B ao exportar Markdown', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce({
+        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
             timelineSource: 'hub',
             reconciliationStatus: 'aligned',
             sync: { status: 'not_needed' },
@@ -113,12 +187,12 @@ describe('terminal/commands/export', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         const markdown = String(content);
         expect(markdown).toContain('&lt;a href="https://x.example"&gt;&lt;img src=x&gt;oie&lt;/a&gt;');
         expect(markdown).not.toContain('<img src=x>');
@@ -127,7 +201,7 @@ describe('terminal/commands/export', () => {
     it('remove ANSI/OSC e controles antes de exportar Markdown', async () => {
         const esc = String.fromCharCode(27);
         const bel = String.fromCharCode(7);
-        readTerminalTimelineProjection.mockReturnValueOnce({
+        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
             timelineSource: 'hub',
             reconciliationStatus: 'aligned',
             sync: { status: 'not_needed' },
@@ -149,12 +223,12 @@ describe('terminal/commands/export', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         const markdown = String(content);
         expect(markdown).toContain('vermelho');
         expect(markdown).toContain('link');
@@ -171,7 +245,7 @@ describe('terminal/commands/export', () => {
         await cmdExport({ println: ctx.println }, 'artifacts/terminal-live/conversa.md');
 
         expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
-        const [filePath] = writeFileAtomicTrusted.mock.calls[0];
+        const [filePath] = requireWriteCall();
         expect(String(filePath)).toContain(`${process.cwd()}/artifacts/terminal-live/conversa.md`);
         expect(ctx.output()).toContain('Exportado');
         expect(ctx.output()).toContain('artifacts/terminal-live/conversa.md');
@@ -179,7 +253,7 @@ describe('terminal/commands/export', () => {
     });
 
     it('usa terminalStreamingDiagnostics como envelope quando não há assistantMessageEnvelope', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce({
+        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
             timelineSource: 'hub',
             reconciliationStatus: 'aligned',
             sync: {
@@ -214,12 +288,12 @@ describe('terminal/commands/export', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         expect(String(content)).toContain('envelope=terminal.dialog.engine');
         expect(String(content)).toContain('trace=terminal-turn-key-1');
         expect(String(content)).toContain('turn=42');
@@ -227,7 +301,7 @@ describe('terminal/commands/export', () => {
     });
 
     it('preserva ask_user, resposta humana e continuação pós-ask com autoria correta', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce({
+        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
             timelineSource: 'mixed',
             reconciliationStatus: 'diverged',
             sync: {
@@ -284,12 +358,12 @@ describe('terminal/commands/export', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         const markdown = String(content);
         expect(markdown).toContain('timeline=mixed/diverged · sync=blocked:diverged-no-overlap');
         expect(markdown).toContain('## Sistema');
@@ -303,7 +377,7 @@ describe('terminal/commands/export', () => {
     });
 
     it('redige segredos em conteúdo e envelope antes de escrever Markdown', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce({
+        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
             timelineSource: 'hub',
             reconciliationStatus: 'aligned',
             sync: {
@@ -342,12 +416,12 @@ describe('terminal/commands/export', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         const markdown = String(content);
         expect(markdown).toContain('redaction=enabled');
         expect(markdown).toContain('Bearer [redacted]');
@@ -361,20 +435,20 @@ describe('terminal/commands/export', () => {
     });
 
     it('cria Markdown diagnóstico mínimo quando o frontend runtime não tem feed', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce({
+        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
             timelineSource: 'empty',
             reconciliationStatus: 'empty',
             sync: {
                 status: 'not_needed',
             },
             turns: [],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
 
         expect(writeFileAtomicTrusted).toHaveBeenCalledOnce();
-        const [, content] = writeFileAtomicTrusted.mock.calls[0];
+        const [, content] = requireWriteCall();
         expect(String(content)).toContain('0 mensagens');
         expect(String(content)).toContain('diagnóstico mínimo');
         expect(ctx.output()).toContain('Exportado');

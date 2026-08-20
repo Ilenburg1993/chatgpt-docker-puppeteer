@@ -60,7 +60,7 @@ function stringSet(value) {
 }
 
 /**
- * @param {Record<string, any>} row
+ * @param {Record<string, unknown>} row
  * @returns {string}
  */
 function recommendationKey(row) {
@@ -72,7 +72,7 @@ function recommendationKey(row) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @param {string} kind
  * @returns {number | null}
  */
@@ -88,8 +88,8 @@ export function estimateProbeCostUsd(projection, kind) {
 
 /**
  * @param {object} input
- * @param {Array<Record<string, any>>} input.recommendations
- * @param {Array<Record<string, any>>} input.projections
+ * @param {Array<Record<string, unknown>>} input.recommendations
+ * @param {Array<Record<string, unknown>>} input.projections
  * @param {number} [input.maxProbeCount]
  * @param {number} [input.maxEstimatedCostUsd]
  * @param {string[]} [input.allowedProbeKinds]

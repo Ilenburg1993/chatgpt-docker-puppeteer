@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 config({ path: resolve(process.cwd(), '.env.local'), quiet: true });
 
-const apiKey = process.env.OLLAMA_CLOUD_API_KEY;
+const apiKey = process.env['OLLAMA_CLOUD_API_KEY'];
 
 console.log('Testing Ollama Cloud API directly...');
 console.log('API Key configured:', apiKey ? 'Yes' : 'No');
@@ -45,7 +45,7 @@ try {
         console.log('═'.repeat(80));
     }
 } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error:', error instanceof Error ? error.message : String(error));
 }
 
 console.log();
@@ -88,5 +88,5 @@ try {
         console.log('═'.repeat(80));
     }
 } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error:', error instanceof Error ? error.message : String(error));
 }

@@ -1,15 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import { Activity, ChevronLeft, LayoutDashboard, ListTodo, ScrollText, ShieldCheck, Target } from 'lucide-vue-next';
 import { useRoute } from 'vue-router';
 
-const props = defineProps({
-    collapsed: {
-        type: Boolean,
-        default: false,
-    },
-});
+withDefaults(defineProps<{ collapsed?: boolean }>(), { collapsed: false });
 
-const emit = defineEmits(['toggle']);
+const emit = defineEmits<{ toggle: [] }>();
 
 const route = useRoute();
 
@@ -22,7 +17,7 @@ const menuItems = [
     { icon: Activity, label: 'Saúde', path: '/health' },
 ];
 
-const isActive = (path) => {
+const isActive = (path: string) => {
     return route.path === path || route.path.startsWith(path + '/');
 };
 

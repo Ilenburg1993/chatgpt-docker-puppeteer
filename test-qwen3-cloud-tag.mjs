@@ -53,7 +53,7 @@ try {
     }
     console.log();
 } catch (error) {
-    console.error('❌ Erro no fetch:', error.message);
+    console.error('❌ Erro no fetch:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -102,7 +102,7 @@ try {
     }
     console.log();
 } catch (error) {
-    console.error('❌ Erro no fetch:', error.message);
+    console.error('❌ Erro no fetch:', error instanceof Error ? error.message : String(error));
     console.log();
 }
 

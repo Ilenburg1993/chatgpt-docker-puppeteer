@@ -3,8 +3,30 @@ import { execFile } from 'node:child_process';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
+
+/**
+ * @typedef {{ ok: boolean; status?: number; error?: string | null; json?: unknown }} JsonRun
+ * @typedef {{
+ *     id: string;
+ *     order: number;
+ *     phase: string;
+ *     command: string;
+ *     terminalCommand?: string | null;
+ *     purpose: string;
+ *     mutatesPolicy?: boolean;
+ *     mutatesTerminalState?: boolean;
+ *     executesModelTurn?: boolean;
+ *     executesRuntimeProbes?: boolean;
+ *     consumesProviderQuota?: boolean;
+ *     requiresHumanConfirmation?: boolean;
+ *     gateIds?: string[];
+ * }} ScenarioInput
+ */
 
 if (argSet.has('--help') || argSet.has('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-scenarios.mjs [--json] [--fail] [--profile ID] [--include-gates]
@@ -15,25 +37,23 @@ not call providers, run models, mutate policy or start the terminal.
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
+
+/** @returns {Record<string, unknown> | null} */
+function optionalRecord(/** @type {unknown} */ value) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
 }
 
-function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
-}
-
-function optionalArray(value) {
+/** @returns {unknown[]} */
+function optionalArray(/** @type {unknown} */ value) {
     return Array.isArray(value) ? value : [];
 }
 
+/**
+ * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
+ * @param {string[]} [scriptArgs]
+ */
 function runJson(scriptId, scriptArgs = []) {
+    /** @type {Promise<JsonRun>} */
     return new Promise((resolve) => {
         execFile(
             process.execPath,
@@ -70,7 +90,11 @@ function runJson(scriptId, scriptArgs = []) {
     });
 }
 
-function checkFromRun(id, run, detail) {
+function checkFromRun(
+    /** @type {string} */ id,
+    /** @type {JsonRun} */ run,
+    /** @type {(json: unknown) => string} */ detail,
+) {
     return {
         id,
         pass: run.ok,
@@ -79,7 +103,8 @@ function checkFromRun(id, run, detail) {
     };
 }
 
-function createScenario({
+function createScenario(
+    /** @type {ScenarioInput} */ {
     id,
     order,
     phase,
@@ -93,7 +118,8 @@ function createScenario({
     consumesProviderQuota = false,
     requiresHumanConfirmation = false,
     gateIds = [],
-}) {
+    },
+) {
     return {
         id,
         order,
@@ -112,16 +138,22 @@ function createScenario({
     };
 }
 
-function countArray(value) {
+function countArray(/** @type {unknown} */ value) {
     return optionalArray(value).length;
 }
 
-function countRowsOrItems(value) {
+function countRowsOrItems(/** @type {unknown} */ value) {
     const record = optionalRecord(value);
     return countArray(record?.['rows']) || countArray(record?.['items']);
 }
 
-function summarizeGateSummaries({ operatorReady, ready, doctor, explain, handoffs, confirmations, recoveries, proofPlan, standby, standbyPersisted, livePlan }) {
+function summarizeGateSummaries(
+    /** @type {{
+     *     operatorReady: unknown; ready: unknown; doctor: unknown; explain: unknown; handoffs: unknown;
+     *     confirmations: unknown; recoveries: unknown; proofPlan: unknown; standby: unknown;
+     *     standbyPersisted: unknown; livePlan: unknown;
+     * }} */ { operatorReady, ready, doctor, explain, handoffs, confirmations, recoveries, proofPlan, standby, standbyPersisted, livePlan },
+) {
     const operatorReadyJson = optionalRecord(operatorReady);
     const readyJson = optionalRecord(ready);
     const doctorJson = optionalRecord(doctor);
@@ -201,7 +233,7 @@ function summarizeGateSummaries({ operatorReady, ready, doctor, explain, handoff
     };
 }
 
-function buildScenarios(profile) {
+function buildScenarios(/** @type {string} */ profile) {
     return [
         createScenario({
             id: 'operator_ready_cockpit',
@@ -360,31 +392,20 @@ const json = argSet.has('--json');
 const fail = argSet.has('--fail');
 const includeGates = argSet.has('--include-gates');
 const profile = readArg('--profile', 'repo_agent');
-const gateEntries = await Promise.all([
-    ['operatorReady', runJson('operatorReady', ['--json', `--profile=${profile}`])],
-    ['ready', runJson('autoReady', ['--json', `--profile=${profile}`])],
-    ['doctor', runJson('autoDoctor', ['--json', `--profile=${profile}`])],
-    ['explain', runJson('autoExplain', ['--json', `--profile=${profile}`])],
-    ['handoffs', runJson('autoHandoffs', ['--json', '--limit=5'])],
-    ['confirmations', runJson('autoConfirmations', ['--json', '--limit=5'])],
-    ['recoveries', runJson('autoRecoveries', ['--json', '--limit=5'])],
-    ['proofPlan', runJson('autoProofPlan', ['--json', `--profile=${profile}`, '--limit=12'])],
-    ['standby', runJson('autoStandby', ['--json', `--profile=${profile}`, '--limit=12'])],
-    ['standbyPersisted', runJson('autoStandby', ['--json', `--profile=${profile}`, '--read-sqlite'])],
-    ['livePlan', runJson('livePlan', ['--json', '--no-write'])],
-].map(async ([key, run]) => [key, await run]));
-const gateRuns = Object.fromEntries(gateEntries);
-const operatorReady = gateRuns.operatorReady;
-const ready = gateRuns.ready;
-const doctor = gateRuns.doctor;
-const explain = gateRuns.explain;
-const handoffs = gateRuns.handoffs;
-const confirmations = gateRuns.confirmations;
-const recoveries = gateRuns.recoveries;
-const proofPlan = gateRuns.proofPlan;
-const standby = gateRuns.standby;
-const standbyPersisted = gateRuns.standbyPersisted;
-const livePlan = gateRuns.livePlan;
+const [operatorReady, ready, doctor, explain, handoffs, confirmations, recoveries, proofPlan, standby, standbyPersisted, livePlan] =
+    await Promise.all([
+        runJson('operatorReady', ['--json', `--profile=${profile}`]),
+        runJson('autoReady', ['--json', `--profile=${profile}`]),
+        runJson('autoDoctor', ['--json', `--profile=${profile}`]),
+        runJson('autoExplain', ['--json', `--profile=${profile}`]),
+        runJson('autoHandoffs', ['--json', '--limit=5']),
+        runJson('autoConfirmations', ['--json', '--limit=5']),
+        runJson('autoRecoveries', ['--json', '--limit=5']),
+        runJson('autoProofPlan', ['--json', `--profile=${profile}`, '--limit=12']),
+        runJson('autoStandby', ['--json', `--profile=${profile}`, '--limit=12']),
+        runJson('autoStandby', ['--json', `--profile=${profile}`, '--read-sqlite']),
+        runJson('livePlan', ['--json', '--no-write']),
+    ]);
 
 const operatorReadyJson = optionalRecord(operatorReady.json);
 const readyJson = optionalRecord(ready.json);

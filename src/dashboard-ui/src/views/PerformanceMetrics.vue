@@ -214,7 +214,7 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import { BarChart, GaugeChart, LineChart } from '@/components/charts/index';
 import { useRealtime } from '@/composables/useRealtime';
 import { useTaskStore } from '@/stores/tasks';
@@ -322,7 +322,7 @@ export default {
         });
 
         // Format bytes to MB string
-        function formatMB(mb) {
+        function formatMB(mb: number | null | undefined) {
             if (!mb) return '-';
             if (mb > 1024) return `${(mb / 1024).toFixed(1)} GB`;
             return `${mb.toFixed(0)} MB`;

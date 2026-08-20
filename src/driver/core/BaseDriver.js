@@ -58,7 +58,10 @@ import { SubmissionController } from '../modules/submission_controller.js';
 
 /** Classe exportada: default. */
 class BaseDriver extends TargetDriver {
-    /** @type {string} */
+    /**
+     * @override
+     * @type {string}
+     */
     name = '';
 
     /**
@@ -385,6 +388,7 @@ class BaseDriver extends TargetDriver {
      * @throws {Error} PREREQUISITE_FAILED - Página inválida para execução
      * @throws {Error} OPERATION_ABORTED - Sinal de cancelamento recebido
      * @throws {Error} EXECUTION_FAIL - Máximo de tentativas excedido
+     * @override
      */
     async sendPrompt(text, taskId, signal) {
         const resolvedTaskId =
@@ -741,6 +745,7 @@ class BaseDriver extends TargetDriver {
      * collection e logging
      *
      * @returns {Promise<void>}
+     * @override
      */
     async destroy() {
         const cleanupErrors = [];

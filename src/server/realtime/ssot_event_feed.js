@@ -1,7 +1,7 @@
 // @ts-check
 import { log } from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
-import { taskRowToListItem } from '../api/utils/task_views.js';
+import { taskDbRowToListItem } from '../api/utils/task_views.js';
 
 /** @type {any} */
 let _timer = null;
@@ -32,7 +32,7 @@ function _asInt(/** @type {any} */ raw, /** @type {any} */ fallback) {
 }
 
 function _isCompatEmitEnabled() {
-    const raw = String(process.env.DASHBOARD_EMIT_TASK_UPDATED_COMPAT || '')
+    const raw = String(process.env['DASHBOARD_EMIT_TASK_UPDATED_COMPAT'] || '')
         .trim()
         .toLowerCase();
     return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
@@ -69,10 +69,23 @@ function _fetchMissionCounts(/** @type {any} */ db, /** @type {any} */ missionId
         )
         .all(...missionIds, ...missionIds);
 
-    /** @type {Record<string, any>} */
+    /** @type {Record<
+    string,
+    {
+        tasks_total: number;
+        by_stage: Record<string, number>;
+        by_status: Record<string, number>;
+        proposed: number;
+        blocked: number;
+        running: number;
+        pending: number;
+        done: number;
+        failed: number;
+    }
+>} */
     const out = {};
-    for (const /** @type {any} */ r of rows) {
-        const mid = String(r.mission_id);
+    for (const row of /** @type {{ mission_id: unknown; stage: unknown; status: unknown; c: unknown }[]} */ (rows)) {
+        const mid = String(row.mission_id);
         if (!out[mid]) {
             out[mid] = {
                 tasks_total: 0,
@@ -87,19 +100,19 @@ function _fetchMissionCounts(/** @type {any} */ db, /** @type {any} */ missionId
             };
         }
 
-        if (r.stage !== null && r.status !== null) {
-            const c = Number(r.c) || 0;
+        if (row.stage !== null && row.status !== null) {
+            const c = Number(row.c) || 0;
             out[mid].tasks_total += c;
-            out[mid].by_stage[String(r.stage)] = (out[mid].by_stage[String(r.stage)] || 0) + c;
-            out[mid].by_status[String(r.status)] = (out[mid].by_status[String(r.status)] || 0) + c;
+            out[mid].by_stage[String(row.stage)] = (out[mid].by_stage[String(row.stage)] || 0) + c;
+            out[mid].by_status[String(row.status)] = (out[mid].by_status[String(row.status)] || 0) + c;
 
             // Contadores específicos
-            if (String(r.stage) === 'PROPOSED') out[mid].proposed += c;
-            if (String(r.status) === 'BLOCKED') out[mid].blocked += c;
-            if (String(r.status) === 'RUNNING') out[mid].running += c;
-            if (String(r.status) === 'PENDING') out[mid].pending += c;
-            if (String(r.status) === 'DONE') out[mid].done += c;
-            if (String(r.status) === 'FAILED') out[mid].failed += c;
+            if (String(row.stage) === 'PROPOSED') out[mid].proposed += c;
+            if (String(row.status) === 'BLOCKED') out[mid].blocked += c;
+            if (String(row.status) === 'RUNNING') out[mid].running += c;
+            if (String(row.status) === 'PENDING') out[mid].pending += c;
+            if (String(row.status) === 'DONE') out[mid].done += c;
+            if (String(row.status) === 'FAILED') out[mid].failed += c;
         }
     }
     return out;
@@ -144,7 +157,9 @@ async function _tick(options) {
 
         const db = getDb();
         if (_lastEventId === null) {
-            _lastEventId = _getInitialLastEventId(db, { fromStart: process.env.SSOT_EVENT_FEED_FROM_START === 'true' });
+            _lastEventId = _getInitialLastEventId(db, {
+                fromStart: process.env['SSOT_EVENT_FEED_FROM_START'] === 'true',
+            });
         }
 
         const events = db
@@ -221,13 +236,13 @@ async function _tick(options) {
                 .all(...ids);
 
             const updates = rows.map((r) => {
-                const task = taskRowToListItem(/** @type {any} */ (r));
+                const task = taskDbRowToListItem(r);
                 return {
                     taskId: /** @type {any} */ (r).id,
                     task,
                     // Legacy compatibility: keep a minimal `state` for consumers that only
                     // care about status transitions.
-                    state: { status: task.unified_status },
+                    state: { status: task['unified_status'] },
                 };
             });
 
@@ -317,7 +332,7 @@ function start(options) {
     if (_timer) return;
     if (!socketHub) throw new Error('SSOTEventFeed.start requires socketHub');
 
-    const enabled = process.env.SSOT_EVENT_FEED_ENABLED !== 'false';
+    const enabled = process.env['SSOT_EVENT_FEED_ENABLED'] !== 'false';
     if (!enabled) {
         log('INFO', '[SSOTEventFeed] disabled (SSOT_EVENT_FEED_ENABLED=false)');
         return;

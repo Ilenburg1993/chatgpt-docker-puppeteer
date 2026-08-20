@@ -35,7 +35,7 @@ for (const file of browserContextFiles) {
     }
 
     const content = fs.readFileSync(fullPath, 'utf8');
-    const firstLine = content.split('\n')[0];
+    const firstLine = content.split('\n')[0] ?? '';
 
     if (!firstLine.includes('@ts-check')) {
         console.log(`⏭️  Já sem @ts-check: ${file}`);

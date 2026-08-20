@@ -93,7 +93,7 @@ function providerEvidenceValues(row) {
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.url]
  * @returns {import('../importer-runner.js').CatalogImporter}
  */

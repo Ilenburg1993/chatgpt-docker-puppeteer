@@ -120,7 +120,8 @@ describe('agent route binding strategy authority', () => {
 
         expect(result).toMatchObject({ state: 'committed', requiresNewSession: false });
         expect(mocks.executeRouteSwitch).toHaveBeenCalledOnce();
-        const input = mocks.executeRouteSwitch.mock.calls[0][0];
+        const input = mocks.executeRouteSwitch.mock.calls[0]?.[0];
+        if (!input) throw new Error('executeRouteSwitch não recebeu a rota esperada.');
         expect(input.targetRoute).toMatchObject({
             providerId: 'openrouter',
             providerModel: 'openai/gpt-oss-120b',
@@ -234,7 +235,8 @@ describe('agent route binding strategy authority', () => {
             },
         );
 
-        const input = mocks.executeRouteSwitch.mock.calls[0][0];
+        const input = mocks.executeRouteSwitch.mock.calls[0]?.[0];
+        if (!input) throw new Error('executeRouteSwitch não recebeu a rota esperada.');
         expect(mocks.readDirectEvidence).toHaveBeenCalledWith(
             expect.objectContaining({
                 previousProviderId: 'openrouter',
@@ -288,7 +290,8 @@ describe('agent route binding strategy authority', () => {
             },
         );
 
-        const input = mocks.executeRouteSwitch.mock.calls[0][0];
+        const input = mocks.executeRouteSwitch.mock.calls[0]?.[0];
+        if (!input) throw new Error('executeRouteSwitch não recebeu a rota esperada.');
         expect(input.targetRoute).toMatchObject({
             bindingStrategy: 'direct',
             requiresIngress: false,

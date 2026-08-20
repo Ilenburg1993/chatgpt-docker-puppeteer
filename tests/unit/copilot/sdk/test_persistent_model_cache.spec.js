@@ -152,7 +152,7 @@ describe('persistent-model-cache', () => {
         });
 
         it('serializa writes concorrentes na ordem de chamada', async () => {
-            /** @type {(() => void) | undefined} */
+            /** @type {((value?: void | PromiseLike<void>) => void) | undefined} */
             let releaseFirst;
             ioMocks.writeFileAtomicTrusted
                 .mockImplementationOnce(
@@ -177,7 +177,7 @@ describe('persistent-model-cache', () => {
         });
 
         it('ordena clear depois de todos os writes já enfileirados', async () => {
-            /** @type {(() => void) | undefined} */
+            /** @type {((value?: void | PromiseLike<void>) => void) | undefined} */
             let releaseWrite;
             ioMocks.writeFileAtomicTrusted.mockImplementationOnce(
                 () =>

@@ -176,7 +176,7 @@ async function getPageLoadStatus(
                                     )
                                         return true;
                                 } catch (/** @type {any} */ _err) {
-                                    const _ce = /** @type {any} */ (_err);
+
                                     // Ignore cross-origin iframe access errors
                                 }
                             }
@@ -497,7 +497,7 @@ async function waitForStability(
                                                             queue.push(nodeWithContent.contentDocument);
                                                         }
                                                     } catch (/** @type {any} */ _err) {
-                                                        const _ce = /** @type {any} */ (_err);
+
                                                         // Ignore cross-origin iframe access errors
                                                     }
                                                 }
@@ -522,7 +522,7 @@ async function waitForStability(
                                             observers.push(obs);
                                             /** @type {any} */ (window).__STABILIZER_OBSERVERS.push(obs);
                                         } catch (/** @type {any} */ _err) {
-                                            const _ce = /** @type {any} */ (_err);
+
                                             // Ignore observer errors
                                         }
                                     });
@@ -582,7 +582,7 @@ async function waitForStability(
                                 try {
                                     obs.disconnect();
                                 } catch (/** @type {any} */ _err) {
-                                    const _ce = /** @type {any} */ (_err);
+
                                     // Ignore observer cleanup errors
                                 }
                             });
@@ -621,13 +621,13 @@ async function waitForStability(
                             try {
                                 document.removeEventListener('mousemove', onMouseMove);
                             } catch (/** @type {any} */ _err) {
-                                const _ce = /** @type {any} */ (_err);
+
                                 // Ignore remove listener errors
                             }
                             try {
                                 controller.abort();
                             } catch (/** @type {any} */ _err) {
-                                const _ce = /** @type {any} */ (_err);
+
                                 // Ignore abort errors
                             }
                             resolve();
@@ -650,7 +650,7 @@ async function waitForStability(
                                 signal: controller.signal,
                             });
                         } catch (/** @type {any} */ _err) {
-                            const _ce = /** @type {any} */ (_err);
+
                             // Fallback for contexts that do not support AbortSignal in addEventListener options
                             addMouseMoveListener({ once: true });
                         }

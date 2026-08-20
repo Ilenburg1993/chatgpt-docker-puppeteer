@@ -77,7 +77,7 @@ function latencyObservation(startedAtMs, completedAtMs, budgetMs) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function projectionKey(projection) {
@@ -107,8 +107,8 @@ function normalizeCatalogDiff(value) {
 }
 
 /**
- * @param {Record<string, any>[]} importRuns
- * @returns {Record<string, any> | null}
+ * @param {Record<string, unknown>[]} importRuns
+ * @returns {Record<string, unknown> | null}
  */
 function latestCatalogRefreshRun(importRuns) {
     return (
@@ -121,7 +121,7 @@ function latestCatalogRefreshRun(importRuns) {
 }
 
 /**
- * @param {Record<string, any>[]} projections
+ * @param {Record<string, unknown>[]} projections
  * @param {string[]} modelIds
  * @param {string | null} providerId
  * @returns {string[]}
@@ -208,14 +208,14 @@ function buildPolicyProposalPatch(objective, taskProfile) {
 
 /**
  * @param {ReturnType<typeof importConfiguredByokFromEnv>} byok
- * @param {Record<string, any> | null} selectedModel
+ * @param {Record<string, unknown> | null} selectedModel
  * @param {Record<string, unknown> | null} [bindingDecision]
  */
 function buildSessionTransitionPlan(byok, selectedModel, bindingDecision = null) {
-    const active = isRecord(byok.active) ? byok.active : {};
-    const provider = byok.provider && isRecord(byok.provider) ? byok.provider : {};
-    const activeProviderId = optionalString(active['providerId']) ?? optionalString(provider['id']);
-    const activeModelId = optionalString(active['model']) ?? optionalString(active['modelId']);
+    const active = byok.active;
+    const provider = byok.provider;
+    const activeProviderId = optionalString(active.providerId) ?? optionalString(provider?.id);
+    const activeModelId = optionalString(active.providerModel) ?? optionalString(active.modelId);
     const selectedProviderId = optionalString(selectedModel?.['providerId']);
     const selectedModelId =
         optionalString(selectedModel?.['providerModel']) ??
@@ -289,7 +289,7 @@ function buildSessionTransitionPlan(byok, selectedModel, bindingDecision = null)
 }
 
 /**
- * @param {Record<string, any> | null} selectedModel
+ * @param {Record<string, unknown> | null} selectedModel
  * @param {string | null} selectedRouteKey
  * @param {string} taskProfile
  */
@@ -497,8 +497,8 @@ export class ModelGatewayReadControlPlane {
             providers: byok.provider ? [byok.provider] : [],
             models: byok.models,
         });
-        const activeByok = isRecord(byok.active) ? byok.active : {};
-        const activeProvider = byok.provider && isRecord(byok.provider) ? byok.provider : null;
+        const activeByok = byok.active;
+        const activeProvider = byok.provider;
         /** @type {Record<string, unknown>[]} */
         let providerProfiles = [];
         /** @type {string | null} */
@@ -512,10 +512,10 @@ export class ModelGatewayReadControlPlane {
         const activeProviderProfile =
             providerProfiles.find((profile) => profile['name'] === activeProviderProfileName) ?? null;
         const secretDiagnostics = activeProvider
-            ? diagnoseModelGatewayProviderSecretRefs(String(activeByok['providerId'] ?? activeProvider['id'] ?? ''), {
+            ? diagnoseModelGatewayProviderSecretRefs(String(activeByok.providerId ?? activeProvider.id ?? ''), {
                   env: this.#env,
-                  configuredRefs: Array.isArray(activeProvider['secretRefs'])
-                      ? activeProvider['secretRefs'].map(String)
+                  configuredRefs: Array.isArray(activeProvider.secretRefs)
+                      ? activeProvider.secretRefs.map(String)
                       : [],
               })
             : null;
@@ -653,10 +653,9 @@ export class ModelGatewayReadControlPlane {
         });
         const explanation = explainGatewayRouteDecision(route);
         const byok = importConfiguredByokFromEnv(this.#env);
-        const active = isRecord(byok.active) ? byok.active : {};
-        const activeProvider = byok.provider && isRecord(byok.provider) ? byok.provider : {};
-        const activeProviderId =
-            optionalString(active['providerId']) ?? optionalString(activeProvider['id']);
+        const active = byok.active;
+        const activeProvider = byok.provider;
+        const activeProviderId = optionalString(active.providerId) ?? optionalString(activeProvider?.id);
         const selectedRouteBase = buildLiveRouteSwitchTarget(
             route.selected?.model ?? null,
             explanation.selectedId,

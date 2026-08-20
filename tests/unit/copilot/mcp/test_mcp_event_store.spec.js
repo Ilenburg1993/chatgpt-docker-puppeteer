@@ -34,18 +34,18 @@ describe('MCP HTTP event stores', () => {
 
         /** @type {unknown[]} */
         const replayed = [];
-        const streamId = await store.replayEventsAfter(first, { send: (message) => replayed.push(message) });
+        const streamId = await store.replayEventsAfter(first, { send: (message) => { replayed.push(message); } });
         assert.equal(streamId, 'stream-a');
         assert.deepEqual(
             replayed.map((message) => /** @type {{ method?: string }} */ (message).method),
             ['two', 'three'],
         );
-        assert.equal(store.snapshot().eventCount, 3);
+        assert.equal(store.snapshot()['eventCount'], 3);
 
         now = 20_001;
         /** @type {unknown[]} */
         const expiredReplay = [];
-        await store.replayEventsAfter(first, { send: (message) => expiredReplay.push(message) });
+        await store.replayEventsAfter(first, { send: (message) => { expiredReplay.push(message); } });
         assert.deepEqual(expiredReplay, []);
     });
 
@@ -59,10 +59,10 @@ describe('MCP HTTP event stores', () => {
 
             /** @type {unknown[]} */
             const replayed = [];
-            const streamId = await store.replayEventsAfter(first, { send: (message) => replayed.push(message) });
+            const streamId = await store.replayEventsAfter(first, { send: (message) => { replayed.push(message); } });
             assert.equal(streamId, 'stream-sql');
             assert.deepEqual(replayed, [{ jsonrpc: '2.0', method: 'second' }]);
-            assert.equal(store.snapshot().durable, true);
+            assert.equal(store.snapshot()['durable'], true);
         } finally {
             db.close();
         }

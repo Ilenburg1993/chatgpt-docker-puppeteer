@@ -23,6 +23,7 @@ async function createTempDir() {
     return dir;
 }
 
+/** @param {bigint} availableBlocks @param {bigint} [blockSize] */
 function statfsWith(availableBlocks, blockSize = 1n) {
     return /** @type {any} */ (async () => ({ bavail: availableBlocks, bsize: blockSize }));
 }

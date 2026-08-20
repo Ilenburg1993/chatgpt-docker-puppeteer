@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
     findSymbol: vi.fn(() => []),
     findImports: vi.fn(() => []),
     matchesFileFingerprint: vi.fn(() => false),
-    listIndexedFiles: vi.fn(() => []),
+    listIndexedFiles: vi.fn(/** @returns {{ filePath: string; extension: string; metadataJson: string | null }[]} */ () => []),
     indexTextFile: vi.fn(),
     statPathSnapshot: vi.fn(),
     readTextFileSnapshot: vi.fn(),
@@ -91,7 +91,7 @@ beforeEach(() => {
         ino: 2,
     });
     mocks.loadGitignoreMatcher.mockReset().mockResolvedValue({
-        ignores: (value) => String(value).includes('ignored'),
+        ignores: (/** @type {string} */ value) => String(value).includes('ignored'),
     });
     mocks.unregisterInvalidationHook.mockReset();
     vi.stubEnv('IO_INDEX_AUTO_REFRESH_ENABLED', '1');

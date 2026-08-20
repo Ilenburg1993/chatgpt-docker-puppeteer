@@ -18,7 +18,7 @@ export const projectDoctorTool = {
     title: 'Project doctor',
     description: 'Return basic runtime, workspace and script information for the copilot MCP project.',
     inputSchema: {
-        includeScripts: z.boolean().optional().describe('Include relevant npm scripts. Default: true.'),
+        includeScripts: z.boolean().optional()['describe']('Include relevant npm scripts. Default: true.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async ({ includeScripts }) => {

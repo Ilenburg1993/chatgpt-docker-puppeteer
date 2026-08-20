@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- test file uses untyped mocks extensively
 /**
  * Testes — Faixa 7: sdk/rpc.js (Core RPC Subsystems)
  *
@@ -7,7 +5,7 @@
  * createFile), sessionLog, createSessionRpcFacade
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setSdkMetricEmitter } from '../../../../src/copilot/sdk/telemetry/operation-metrics.js';
 
 const { mockLog } = vi.hoisted(() => ({
@@ -168,7 +166,7 @@ describe('sdk/rpc — Core Subsystems', () => {
 
         it('rejeita modelId não-string', async () => {
             const s = fakeSession();
-            await expect(modelSwitchTo(s, 42)).rejects.toThrow(TypeError);
+            await expect(Reflect.apply(modelSwitchTo, undefined, [s, 42])).rejects.toThrow(TypeError);
         });
 
         it('propaga erro do SDK', async () => {
@@ -218,7 +216,7 @@ describe('sdk/rpc — Core Subsystems', () => {
 
         it('rejeita modo inválido', async () => {
             const s = fakeSession();
-            await expect(modeSet(s, 'invalid')).rejects.toThrow('deve ser um de');
+            await expect(Reflect.apply(modeSet, undefined, [s, 'invalid'])).rejects.toThrow('deve ser um de');
         });
 
         it('rejeita para sessão inválida', async () => {
@@ -266,7 +264,7 @@ describe('sdk/rpc — Core Subsystems', () => {
 
         it('rejeita content não-string', async () => {
             const s = fakeSession();
-            await expect(planUpdate(s, 42)).rejects.toThrow('deve ser string');
+            await expect(Reflect.apply(planUpdate, undefined, [s, 42])).rejects.toThrow('deve ser string');
         });
 
         it('rejeita para sessão inválida', async () => {
@@ -346,7 +344,7 @@ describe('sdk/rpc — Core Subsystems', () => {
 
         it('rejeita path não-string', async () => {
             const s = fakeSession();
-            await expect(workspaceReadFile(s, 42)).rejects.toThrow(TypeError);
+            await expect(Reflect.apply(workspaceReadFile, undefined, [s, 42])).rejects.toThrow(TypeError);
         });
     });
 
@@ -367,7 +365,9 @@ describe('sdk/rpc — Core Subsystems', () => {
 
         it('rejeita content não-string', async () => {
             const s = fakeSession();
-            await expect(workspaceCreateFile(s, 'f.txt', 42)).rejects.toThrow('deve ser string');
+            await expect(Reflect.apply(workspaceCreateFile, undefined, [s, 'f.txt', 42])).rejects.toThrow(
+                'deve ser string',
+            );
         });
 
         it('emite métrica failed quando workspace.createFile falha', async () => {

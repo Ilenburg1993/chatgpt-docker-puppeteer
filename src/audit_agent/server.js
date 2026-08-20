@@ -83,12 +83,12 @@ export function createAuditAgentServer(deps) {
                 const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const job = runtime.queueJob(id);
                 await runtime.tick();
-                return writeJson(res, 200, { ok: true, job: runtime.getJob(job.id) });
+                return writeJson(res, 200, { ok: true, job: runtime.getJob(job['id']) });
             }
             if (req.method === 'POST' && url.pathname.match(/^\/jobs\/[^/]+\/cancel$/)) {
                 const id = decodeURIComponent(url.pathname.split('/')[2] ?? '');
                 const body = /** @type {Record<string, unknown>} */ (await readJsonBody(req));
-                const reason = typeof body.reason === 'string' ? body.reason : 'manual_cancel';
+                const reason = typeof body['reason'] === 'string' ? body['reason'] : 'manual_cancel';
                 const job = runtime.cancelJob(id, reason);
                 return writeJson(res, 200, { ok: true, job });
             }

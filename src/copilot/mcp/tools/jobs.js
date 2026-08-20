@@ -28,16 +28,14 @@ import { projectDoctorTool } from './project-doctor.js';
 const validatorSchema = z
     .string()
     .min(1)
-    .max(64)
-    .regex(/^[a-z0-9-]+$/u)
+    .max(64)['regex'](/^[a-z0-9-]+$/u)
     .describe(
         'Allowlisted validator name. The descriptor intentionally uses a bounded string instead of an enum so newly added fixed validators do not require a host-schema refresh; the server still enforces the current runtime allowlist.',
     );
 const focusedTestFileSchema = z
     .string()
     .min(1)
-    .max(1024)
-    .describe('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
+    .max(1024)['describe']('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
 const validatorTimeoutMsSchema = z.number().int().min(1000).max(3600000);
 const validatorWaitMsSchema = z.number().int().min(0).max(120000);
 const validatorFailureTailBytesSchema = z.number().int().min(1000).max(12000);
@@ -56,7 +54,15 @@ const {
 } = MCP_TOOL_EXECUTION_LIMITS.validator;
 const safeValidationSuiteSchema = z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']);
 const jobStatusSchema = z.enum(['running', 'completed', 'failed', 'cancelled']);
-const DEFAULT_INLINE_WAIT_VALIDATORS = new Set(['typecheck', 'lint', 'unit-focused', 'devcontainer-shell', 'network-contracts']);
+const DEFAULT_INLINE_WAIT_VALIDATORS = new Set([
+    'typecheck',
+    'lint',
+    'unit-focused',
+    'devcontainer-shell',
+    'network-contracts',
+    'dependency-outdated',
+]);
+const COMPATIBILITY_MAINTENANCE_VALIDATORS = new Set(['dependency-outdated']);
 
 /** @param {unknown} value */
 function compactValidatorResourceSnapshot(value) {
@@ -162,6 +168,7 @@ const EFFECTIVE_CHECKS_BY_VALIDATOR = {
     'unit-focused': ['unit-focused'],
     'devcontainer-shell': ['devcontainer-shell'],
     'network-contracts': ['network-contracts'],
+    'dependency-outdated': ['dependency-outdated'],
     'suite-mcp-fast': ['typecheck', 'unit-mcp'],
     'suite-mcp-full': ['typecheck', 'lint', 'unit-mcp'],
     'suite-copilot-fast': ['typecheck', 'lint', 'unit-copilot'],
@@ -282,7 +289,12 @@ async function executeValidatorRequest(request) {
         const summary = summarizeJob(waitedJob);
         const completedWithinWait = waitedJob.status !== 'running';
         const failed = waitedJob.status === 'failed';
+        const compatibilityMaintenance = COMPATIBILITY_MAINTENANCE_VALIDATORS.has(validator);
         const failureOutput = failed ? await readJobOutput(job.id, failureTailBytes ?? 4000) : { output: '' };
+        const maintenanceOutput =
+            compatibilityMaintenance && completedWithinWait
+                ? await readJobOutput(job.id, 50_000)
+                : { output: '' };
         return okResult(
             {
                 success: waitedJob.status === 'completed',
@@ -291,6 +303,12 @@ async function executeValidatorRequest(request) {
                 waitMs: effectiveWaitMs,
                 job: summary,
                 ...(failed && failureOutput.output ? { failureOutputTail: failureOutput.output } : {}),
+                ...(compatibilityMaintenance && maintenanceOutput.output
+                    ? {
+                          compatibilityBridge: 'frozen-host-tool-snapshot',
+                          maintenanceOutputTail: maintenanceOutput.output,
+                      }
+                    : {}),
                 nextAction: completedWithinWait
                     ? failed
                         ? 'Fix the reported validation failure; the bounded failure tail is already included.'
@@ -378,7 +396,7 @@ function buildValidatorAliasTool(validator, name, title, description) {
         title,
         description,
         inputSchema: {
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Timeout ms.'),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Timeout ms.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ timeoutMs }) => {
@@ -415,8 +433,8 @@ export const jobTools = [
         title: 'Run safe MCP validation suite',
         description: 'Run a fixed broad validation suite. Escalation-only for cross-cutting risk or release gates.',
         inputSchema: {
-            suite: safeValidationSuiteSchema.describe('Broad suite: mcp-fast, mcp-full, or copilot-fast.'),
-            timeoutMs: z.number().int().min(1000).max(3600000).optional().describe('Timeout ms.'),
+            suite: safeValidationSuiteSchema['describe']('Broad suite: mcp-fast, mcp-full, or copilot-fast.'),
+            timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Timeout ms.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ suite, timeoutMs }) => {
@@ -437,7 +455,7 @@ export const jobTools = [
         title: 'Run project doctor',
         description: 'Return the Copilot MCP project doctor report.',
         inputSchema: {
-            includeScripts: z.boolean().optional().describe('Include scripts. Default: true.'),
+            includeScripts: z.boolean().optional()['describe']('Include scripts. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: projectDoctorTool.handler,
@@ -450,34 +468,28 @@ export const jobTools = [
         inputSchema: {
             validator: validatorSchema.optional().describe('Single allowlisted validator name; required outside batch mode. Prefer unit-focused for JS/TS causal gates.'),
             testFile: focusedTestFileSchema.optional(),
-            timeoutMs: validatorTimeoutMsSchema.optional().describe('Optional validator timeout in ms.'),
+            timeoutMs: validatorTimeoutMsSchema.optional()['describe']('Optional validator timeout in ms.'),
             waitForCompletion: z
                 .boolean()
-                .optional()
-                .describe('Wait in this same call. Defaults true for typecheck/lint/unit-focused/devcontainer-shell and false for broad suites.'),
+                .optional()['describe']('Wait in this same call. Defaults true for typecheck/lint/unit-focused/devcontainer-shell and false for broad suites.'),
             waitMs: validatorWaitMsSchema
-                .optional()
-                .describe('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
+                .optional()['describe']('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
             failureTailBytes: validatorFailureTailBytesSchema
-                .optional()
-                .describe('Short log tail returned in the same call only when a waited validator fails. Default 4000.'),
+                .optional()['describe']('Short log tail returned in the same call only when a waited validator fails. Default 4000.'),
             batch: z
                 .array(validatorRequestSchema)
                 .min(1)
                 .max(MAX_VALIDATOR_BATCH_REQUESTS)
-                .optional()
-                .describe('Batch up to 8 validator requests; do not mix with single-validator fields.'),
+                .optional()['describe']('Batch up to 8 validator requests; do not mix with single-validator fields.'),
             batchFailureMode: z
                 .enum(['best-effort', 'fail-fast'])
-                .optional()
-                .describe('Batch failure policy. Default: best-effort.'),
+                .optional()['describe']('Batch failure policy. Default: best-effort.'),
             batchConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_VALIDATOR_ACCEPTED_INPUT_CONCURRENCY)
-                .optional()
-                .describe(
+                .optional()['describe'](
                     'Compatibility input accepts 1-2 for stale clients, but execution is always serialized at 1 to protect WSL/DevContainer headroom.',
                 ),
         },
@@ -608,10 +620,10 @@ export const jobTools = [
         title: 'List validator jobs',
         description: 'List active and recent validator jobs, including persisted manifests.',
         inputSchema: {
-            status: jobStatusSchema.optional().describe('Status filter.'),
+            status: jobStatusSchema.optional()['describe']('Status filter.'),
             validator: validatorSchema.optional().describe('Validator filter.'),
-            limit: z.number().int().min(1).max(200).optional().describe('Max jobs. Default: 50.'),
-            includeCompleted: z.boolean().optional().describe('Include finished jobs. Default: true.'),
+            limit: z.number().int().min(1).max(200).optional()['describe']('Max jobs. Default: 50.'),
+            includeCompleted: z.boolean().optional()['describe']('Include finished jobs. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ status, validator, limit, includeCompleted }) => {
@@ -636,8 +648,8 @@ export const jobTools = [
         description: 'Return the latest persisted job per validator without starting validation.',
         inputSchema: {
             validator: validatorSchema.optional().describe('Validator filter.'),
-            includeOutputTail: z.boolean().optional().describe('Include short log tails. Default: false.'),
-            tailBytes: z.number().int().min(1000).max(20000).optional().describe('Tail bytes.'),
+            includeOutputTail: z.boolean().optional()['describe']('Include short log tails. Default: false.'),
+            tailBytes: z.number().int().min(1000).max(20000).optional()['describe']('Tail bytes.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ validator, includeOutputTail, tailBytes }) => {
@@ -691,10 +703,10 @@ export const jobTools = [
         title: 'MCP validation dashboard',
         description: 'Return compact validation status without starting jobs or long logs.',
         inputSchema: {
-            includeRunning: z.boolean().optional().describe('Include running jobs. Default: true.'),
-            includeLatest: z.boolean().optional().describe('Include latest jobs. Default: true.'),
-            includeDetails: z.boolean().optional().describe('Include job arrays. Default: false.'),
-            limit: z.number().int().min(10).max(200).optional().describe('Max manifests. Default: 80.'),
+            includeRunning: z.boolean().optional()['describe']('Include running jobs. Default: true.'),
+            includeLatest: z.boolean().optional()['describe']('Include latest jobs. Default: true.'),
+            includeDetails: z.boolean().optional()['describe']('Include job arrays. Default: false.'),
+            limit: z.number().int().min(10).max(200).optional()['describe']('Max manifests. Default: 80.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async (input = {}) => {
@@ -756,7 +768,7 @@ export const jobTools = [
         title: 'Get job summary',
         description: 'Return compact status for one validator job; no log output.',
         inputSchema: {
-            jobId: z.string().min(1).describe('Validator job id.'),
+            jobId: z.string().min(1)['describe']('Validator job id.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ jobId }) => {
@@ -787,8 +799,8 @@ export const jobTools = [
         title: 'Get job output',
         description: 'Read a bounded validator-job log tail and status.',
         inputSchema: {
-            jobId: z.string().min(1).describe('Validator job id.'),
-            tailBytes: z.number().int().min(1000).max(50000).optional().describe('Tail bytes. Default: 8000.'),
+            jobId: z.string().min(1)['describe']('Validator job id.'),
+            tailBytes: z.number().int().min(1000).max(50000).optional()['describe']('Tail bytes. Default: 8000.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ jobId, tailBytes }) => {
@@ -809,7 +821,7 @@ export const jobTools = [
         title: 'Cancel job',
         description: 'Cancel an attached running validator job.',
         inputSchema: {
-            jobId: z.string().min(1).describe('Validator job id.'),
+            jobId: z.string().min(1)['describe']('Validator job id.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({ jobId }) => {

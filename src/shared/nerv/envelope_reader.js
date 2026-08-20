@@ -9,7 +9,7 @@
  */
 function getMessageType(envelope) {
     return (
-        envelope?.kind || envelope?.messageType || envelope?.type?.message_type || envelope?.type?.messageType || null
+        envelope?.['kind'] || envelope?.['messageType'] || envelope?.['type']?.message_type || envelope?.['type']?.messageType || null
     );
 }
 
@@ -22,10 +22,10 @@ function getMessageType(envelope) {
  */
 function getActionCode(envelope) {
     return (
-        envelope?.actionCode ||
-        envelope?.type?.action_code ||
-        envelope?.type?.actionCode ||
-        envelope?.payload?.actionCode ||
+        envelope?.['actionCode'] ||
+        envelope?.['type']?.action_code ||
+        envelope?.['type']?.actionCode ||
+        envelope?.['payload']?.actionCode ||
         null
     );
 }
@@ -39,10 +39,10 @@ function getActionCode(envelope) {
  */
 function getCorrelationId(envelope) {
     return (
-        envelope?.correlationId ||
-        envelope?.ids?.correlation_id ||
-        envelope?.ids?.correlationId ||
-        envelope?.causality?.correlation_id ||
+        envelope?.['correlationId'] ||
+        envelope?.['ids']?.correlation_id ||
+        envelope?.['ids']?.correlationId ||
+        envelope?.['causality']?.correlation_id ||
         null
     );
 }
@@ -55,7 +55,7 @@ function getCorrelationId(envelope) {
  * @sideEffects Nenhum - função pura
  */
 function getMsgId(envelope) {
-    return envelope?.msgId || envelope?.ids?.msg_id || envelope?.ids?.msgId || envelope?.causality?.msg_id || null;
+    return envelope?.['msgId'] || envelope?.['ids']?.msg_id || envelope?.['ids']?.msgId || envelope?.['causality']?.msg_id || null;
 }
 
 /**
@@ -66,7 +66,7 @@ function getMsgId(envelope) {
  * @sideEffects Nenhum - função pura
  */
 function getPayload(envelope) {
-    return envelope?.payload || {};
+    return envelope?.['payload'] || {};
 }
 
 /**
@@ -78,7 +78,7 @@ function getPayload(envelope) {
  */
 function getTaskIdFromPayload(payload) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-    return payload.taskId || payload.task_id || payload.task?.meta?.id || payload.task?.id || null;
+    return payload['taskId'] || payload['task_id'] || payload['task']?.meta?.id || payload['task']?.id || null;
 }
 
 export { getActionCode, getCorrelationId, getMessageType, getMsgId, getPayload, getTaskIdFromPayload };

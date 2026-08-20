@@ -7,14 +7,12 @@
  */
 
 import EventEmitter from 'node:events';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from '../../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /** @param {import('better-sqlite3').Database} db */
 function applyCopilotMigrations(db) {
@@ -34,36 +32,6 @@ function applyCopilotMigrations(db) {
             Date.now(),
         );
     }
-}
-
-// ─── Mock Socket.IO ───────────────────────────────────────────────────────────
-
-function createMockSocket() {
-    const emitted = /** @type {Map<string, any[]>} */ (new Map());
-    const listeners = /** @type {Map<string, Function>} */ (new Map());
-    const rooms = new Set();
-    return {
-        id: 'mock-socket-001',
-        rooms,
-        handshake: { address: '127.0.0.1', auth: {}, headers: {} },
-        emit: vi.fn((/** @type {string} */ event, /** @type {unknown} */ data) => {
-            const arr = emitted.get(event) ?? [];
-            arr.push(data);
-            emitted.set(event, arr);
-        }),
-        on: vi.fn((/** @type {string} */ event, /** @type {Function} */ handler) => {
-            listeners.set(event, handler);
-        }),
-        join: vi.fn((/** @type {string} */ room) => rooms.add(room)),
-        leave: vi.fn((/** @type {string} */ room) => rooms.delete(room)),
-        _emitted: emitted,
-        _listeners: listeners,
-        /** @param {string} event @param {any} data */
-        _trigger(event, data) {
-            const handler = listeners.get(event);
-            if (handler) return handler(data);
-        },
-    };
 }
 
 function createMockNamespace() {
@@ -102,7 +70,6 @@ let testDb;
 let store;
 
 beforeAll(() => {
-    const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     applyCopilotMigrations(testDb);
     store = new ConversationStore();

@@ -66,7 +66,7 @@ describe('sdk/tools/state', () => {
     it('serializa patches concorrentes e persiste o estado final por último', async () => {
         const mod = await import('../../../../src/copilot/sdk/tools/state.js');
         mod.resetToolsConfigForTests();
-        /** @type {(() => void) | undefined} */
+        /** @type {((value?: void | PromiseLike<void>) => void) | undefined} */
         let releaseFirst;
         mocks.writeFileAtomicTrusted
             .mockImplementationOnce(

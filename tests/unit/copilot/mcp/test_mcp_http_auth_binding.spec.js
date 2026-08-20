@@ -8,40 +8,15 @@ import { describe, it } from 'vitest';
 
 import { handleStatefulMcpHttpRequest } from '#copilot/mcp/adapters';
 import { createMcpHttpSessionRuntime } from '#copilot/mcp/control-plane';
+import {
+    createMcpTransportErrorCollector,
+    fakeMcpRequest as fakeReq,
+    fakeMcpResponse as fakeRes,
+    fakeMcpTransport,
+    readFakeMcpHeader as readHeader,
+} from './helpers/http-fakes.js';
 
-/**
- * @param {string} method
- * @param {Record<string, string>} [headers]
- * @returns {import('node:http').IncomingMessage}
- */
-function fakeReq(method, headers = {}) {
-    return /** @type {import('node:http').IncomingMessage} */ ({ method, headers, httpVersionMajor: 1 });
-}
 
-/** @returns {import('node:http').ServerResponse} */
-function fakeRes() {
-    return /** @type {import('node:http').ServerResponse} */ ({ headersSent: false, writableEnded: false, statusCode: 200, end() {} });
-}
-
-/**
- * @param {import('node:http').IncomingMessage} req
- * @param {string} name
- * @returns {string | undefined}
- */
-function readHeader(req, name) {
-    const value = req.headers[name.toLowerCase()];
-    return typeof value === 'string' ? value : undefined;
-}
-
-/**
- * @param {unknown[]} errors
- * @returns {(res: import('node:http').ServerResponse, statusCode: number, error: { error: string; error_description: string }) => void}
- */
-function captureTransportErrors(errors) {
-    return (_res, statusCode, error) => {
-        errors.push({ statusCode, error });
-    };
-}
 
 const initializeBody = {
     jsonrpc: '2.0',
@@ -57,7 +32,7 @@ const initializeBody = {
 describe('MCP HTTP stateful auth binding', () => {
     it('rejects session reuse when the bearer binding changes', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         let handled = 0;
 
         await handleStatefulMcpHttpRequest({
@@ -70,14 +45,13 @@ describe('MCP HTTP stateful auth binding', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
             createServer: () => ({ async connect() {}, async close() {} }),
             createTransport: (transportOptions) =>
-                /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ ({
-                    async handleRequest() {
+                fakeMcpTransport({
+                    handleRequest() {
                         transportOptions.onsessioninitialized?.('session-auth');
                     },
-                    async close() {},
                 }),
         });
 
@@ -91,18 +65,17 @@ describe('MCP HTTP stateful auth binding', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
             createTransport: () =>
-                /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ ({
-                    async handleRequest() {
+                fakeMcpTransport({
+                    handleRequest() {
                         handled += 1;
                     },
-                    async close() {},
                 }),
         });
 
         assert.equal(handled, 0);
-        assert.equal(/** @type {{ statusCode?: number }[]} */ (errors).at(-1)?.statusCode, 403);
+        assert.equal(errors.at(-1)?.statusCode, 403);
         assert.equal(JSON.stringify(runtime.snapshot()).includes('token-a'), false);
         assert.equal(JSON.stringify(runtime.snapshot()).includes('token-b'), false);
     });

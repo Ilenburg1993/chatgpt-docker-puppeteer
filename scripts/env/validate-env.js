@@ -3,8 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
-    delete process.env.NO_COLOR;
+if (process.env['FORCE_COLOR'] && process.env['NO_COLOR']) {
+    delete process.env['NO_COLOR'];
 }
 
 // ============================================================================
@@ -137,10 +137,10 @@ class EnvValidator {
                 if (category.criticality === 'FATAL') {
                     this.errors.push(`${categoryName}: ${varName} ausente (OBRIGATÓRIO)`);
                 } else if (category.criticality === 'FATAL_IF_PRODUCTION') {
-                    if (envData.NODE_ENV === 'production') {
+                    if (envData['NODE_ENV'] === 'production') {
                         this.errors.push(`${categoryName}: ${varName} ausente (OBRIGATÓRIO em production)`);
                     } else {
-                        this.warnings.push(`${categoryName}: ${varName} ausente (WARNING em ${envData.NODE_ENV})`);
+                        this.warnings.push(`${categoryName}: ${varName} ausente (WARNING em ${envData['NODE_ENV']})`);
                     }
                 } else {
                     this.warnings.push(`${categoryName}: ${varName} ausente`);
@@ -168,62 +168,62 @@ class EnvValidator {
      * @returns {void}
      */
     validateType(varName, value, spec, categoryName) {
-        if (spec.type === 'integer') {
+        if (spec['type'] === 'integer') {
             const num = parseInt(value, 10);
             if (isNaN(num)) {
                 this.errors.push(`${categoryName}: ${varName} deve ser inteiro (recebido: ${value})`);
                 return;
             }
 
-            if (spec.minimum !== undefined && num < /** @type {number} */ (spec.minimum)) {
-                this.errors.push(`${categoryName}: ${varName} < ${spec.minimum} (recebido: ${num})`);
+            if (spec['minimum'] !== undefined && num < /** @type {number} */ (spec['minimum'])) {
+                this.errors.push(`${categoryName}: ${varName} < ${spec['minimum']} (recebido: ${num})`);
             }
 
-            if (spec.maximum !== undefined && num > /** @type {number} */ (spec.maximum)) {
-                this.errors.push(`${categoryName}: ${varName} > ${spec.maximum} (recebido: ${num})`);
+            if (spec['maximum'] !== undefined && num > /** @type {number} */ (spec['maximum'])) {
+                this.errors.push(`${categoryName}: ${varName} > ${spec['maximum']} (recebido: ${num})`);
             }
 
-            if (spec.enum && !(/** @type {number[]} */ (spec.enum).includes(num))) {
+            if (spec['enum'] && !(/** @type {number[]} */ (spec['enum']).includes(num))) {
                 this.errors.push(
-                    `${categoryName}: ${varName} deve ser um de [${/** @type {number[]} */ (spec.enum).join(', ')}] (recebido: ${num})`,
+                    `${categoryName}: ${varName} deve ser um de [${/** @type {number[]} */ (spec['enum']).join(', ')}] (recebido: ${num})`,
                 );
             }
         }
 
-        if (spec.type === 'number') {
+        if (spec['type'] === 'number') {
             const num = Number(value);
             if (isNaN(num)) {
                 this.errors.push(`${categoryName}: ${varName} deve ser número (recebido: ${value})`);
                 return;
             }
 
-            if (spec.minimum !== undefined && num < /** @type {number} */ (spec.minimum)) {
-                this.errors.push(`${categoryName}: ${varName} < ${spec.minimum} (recebido: ${num})`);
+            if (spec['minimum'] !== undefined && num < /** @type {number} */ (spec['minimum'])) {
+                this.errors.push(`${categoryName}: ${varName} < ${spec['minimum']} (recebido: ${num})`);
             }
 
-            if (spec.maximum !== undefined && num > /** @type {number} */ (spec.maximum)) {
-                this.errors.push(`${categoryName}: ${varName} > ${spec.maximum} (recebido: ${num})`);
+            if (spec['maximum'] !== undefined && num > /** @type {number} */ (spec['maximum'])) {
+                this.errors.push(`${categoryName}: ${varName} > ${spec['maximum']} (recebido: ${num})`);
             }
         }
 
-        if (spec.type === 'string') {
-            if (spec.enum && !(/** @type {string[]} */ (spec.enum).includes(value))) {
+        if (spec['type'] === 'string') {
+            if (spec['enum'] && !(/** @type {string[]} */ (spec['enum']).includes(value))) {
                 this.errors.push(
-                    `${categoryName}: ${varName} deve ser um de [${/** @type {string[]} */ (spec.enum).join(', ')}] (recebido: ${value})`,
+                    `${categoryName}: ${varName} deve ser um de [${/** @type {string[]} */ (spec['enum']).join(', ')}] (recebido: ${value})`,
                 );
             }
 
-            if (spec.pattern) {
-                const regex = new RegExp(/** @type {string} */ (spec.pattern));
+            if (spec['pattern']) {
+                const regex = new RegExp(/** @type {string} */ (spec['pattern']));
                 if (!regex.test(value)) {
                     this.errors.push(
-                        `${categoryName}: ${varName} não corresponde ao padrão ${spec.pattern} (recebido: ${value})`,
+                        `${categoryName}: ${varName} não corresponde ao padrão ${spec['pattern']} (recebido: ${value})`,
                     );
                 }
             }
         }
 
-        if (spec.type === 'boolean') {
+        if (spec['type'] === 'boolean') {
             const validBooleans = ['true', 'false', '1', '0', 'yes', 'no'];
             if (!validBooleans.includes(value.toLowerCase())) {
                 this.errors.push(`${categoryName}: ${varName} deve ser boolean (recebido: ${value})`);
@@ -250,7 +250,7 @@ class EnvValidator {
         }
 
         // BROWSER_MODE=wsEndpoint → requires CHROME_*
-        if (envData.BROWSER_MODE === 'wsEndpoint') {
+        if (envData['BROWSER_MODE'] === 'wsEndpoint') {
             const required = ['CHROME_PROXY_PORT', 'CHROME_PORT', 'CHROME_HOST'];
             const missing = required.filter((v) => !envData[v]);
 
@@ -265,18 +265,18 @@ class EnvValidator {
         }
 
         // NODE_ENV=production constraints
-        if (envData.NODE_ENV === 'production') {
-            if (envData.ALLOW_DEGRADED_MODE === 'true') {
+        if (envData['NODE_ENV'] === 'production') {
+            if (envData['ALLOW_DEGRADED_MODE'] === 'true') {
                 this.errors.push('CONSTRAINT: ALLOW_DEGRADED_MODE=true não permitido em production');
                 console.log(`  ${colors.red}✗${colors.reset} Production constraints: ALLOW_DEGRADED_MODE inválido`);
             }
 
-            if (envData.MOCK_CHROME === '1') {
+            if (envData['MOCK_CHROME'] === '1') {
                 this.errors.push('CONSTRAINT: MOCK_CHROME=1 não permitido em production');
                 console.log(`  ${colors.red}✗${colors.reset} Production constraints: MOCK_CHROME inválido`);
             }
 
-            if (envData.LOG_LEVEL === 'debug') {
+            if (envData['LOG_LEVEL'] === 'debug') {
                 this.warnings.push('CONSTRAINT: LOG_LEVEL=debug não recomendado em production');
                 console.log(`  ${colors.yellow}!${colors.reset} Production constraints: LOG_LEVEL=debug (warning)`);
             }
@@ -284,11 +284,11 @@ class EnvValidator {
 
         // MCP_UPSTREAM_ENABLED=true → requires MCP_UPSTREAM_URL (legacy single-upstream mode only)
         // If MCP_UPSTREAMS_JSON is set, the legacy URL is not required.
-        if (String(envData.MCP_UPSTREAM_ENABLED || '').toLowerCase() === 'true') {
-            const upstreamsJson = String(envData.MCP_UPSTREAMS_JSON || '').trim();
+        if (String(envData['MCP_UPSTREAM_ENABLED'] || '').toLowerCase() === 'true') {
+            const upstreamsJson = String(envData['MCP_UPSTREAMS_JSON'] || '').trim();
             const legacyRequired = !upstreamsJson;
 
-            if (legacyRequired && !String(envData.MCP_UPSTREAM_URL || '').trim()) {
+            if (legacyRequired && !String(envData['MCP_UPSTREAM_URL'] || '').trim()) {
                 this.errors.push(
                     'CONSTRAINT: MCP_UPSTREAM_ENABLED=true requer MCP_UPSTREAM_URL (quando MCP_UPSTREAMS_JSON está vazio)',
                 );
@@ -300,8 +300,8 @@ class EnvValidator {
 
         // MCP_GITHUB_PROXY_ENABLED=true → recommends/needs GITHUB_PERSONAL_ACCESS_TOKEN
         // This is a best-effort readiness requirement: missing token should not block process boot.
-        if (String(envData.MCP_GITHUB_PROXY_ENABLED || '').toLowerCase() === 'true') {
-            const token = String(envData.GITHUB_PERSONAL_ACCESS_TOKEN || '').trim();
+        if (String(envData['MCP_GITHUB_PROXY_ENABLED'] || '').toLowerCase() === 'true') {
+            const token = String(envData['GITHUB_PERSONAL_ACCESS_TOKEN'] || '').trim();
             if (!token) {
                 this.warnings.push(
                     'CONSTRAINT: MCP_GITHUB_PROXY_ENABLED=true mas GITHUB_PERSONAL_ACCESS_TOKEN está vazio (upstream GitHub ficará not-ready)',

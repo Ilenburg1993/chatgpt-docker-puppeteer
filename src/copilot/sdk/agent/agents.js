@@ -115,7 +115,7 @@ export function createReadOnlyAgent(name, prompt, opts = {}) {
     return createAgent({
         name,
         prompt,
-        displayName: opts.displayName,
+        ...(opts.displayName === undefined ? {} : { displayName: opts.displayName }),
         description: opts.description ?? 'Agente somente-leitura — não modifica arquivos.',
         tools,
     });
@@ -135,7 +135,7 @@ export function createFullAccessAgent(name, prompt, opts = {}) {
     return createAgent({
         name,
         prompt,
-        displayName: opts.displayName,
+        ...(opts.displayName === undefined ? {} : { displayName: opts.displayName }),
         description: opts.description ?? 'Agente com acesso irrestrito a todas as ferramentas.',
         tools: null, // null = todas as ferramentas
     });

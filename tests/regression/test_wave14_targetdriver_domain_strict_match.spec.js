@@ -12,6 +12,7 @@ class FakeTargetDriver extends TargetDriver {
         this.name = 'FakeTargetDriver';
     }
 
+    /** @override */
     async execute() {
         return 'ok';
     }

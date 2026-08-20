@@ -32,6 +32,7 @@ import {
 } from '#copilot/mcp/control-plane';
 import {
     bindMcpOAuthFrictionAuditProvider,
+    bindMcpToolPayloadAuditProvider,
     bindMcpToolsStatusProvider,
     companyKnowledgeTools,
     connectionTools,
@@ -42,6 +43,7 @@ import {
     jobTools,
     llmBLiveTools,
     maintenanceTools,
+    terminalTools,
     mcpAppsSdkReadinessTool,
     mcpAutonomyPowerScoreTool,
     mcpClientLatencyEvidenceTool,
@@ -90,6 +92,8 @@ import {
     repoWriteTools,
 } from '#copilot/mcp/tools';
 import { createHash, randomUUID } from 'node:crypto';
+import { z } from 'zod';
+import { bindConnectorSmokeLocalToolNamesProvider } from './cloudflare/connector-smoke.js';
 import {
     applyMcpToolSurfacePolicy,
     describeMcpToolSurfacePolicy,
@@ -188,6 +192,7 @@ const toolInvocationBudgets = new Map();
  * @property {import('zod').ZodType | Record<string, import('zod').ZodType>} [outputSchema]
  * @property {Record<string, unknown>[]} [securitySchemes]
  * @property {Record<string, unknown>} [_meta]
+ * @property {number} [maxResultBytes] - Internal per-tool result ceiling; never exposed in the wire descriptor.
  * @property {import('@modelcontextprotocol/sdk/types.js').ToolAnnotations} annotations
  * @property {(
  *     args: any,
@@ -238,7 +243,7 @@ export function readMcpRegistryPolicy(env = process.env) {
             ['throw', 'tool-result'],
             DEFAULT_HANDLER_EXCEPTION_MODE,
         ),
-        validateStructuredOutput: readBooleanEnv(env, 'COPILOT_MCP_REGISTRY_VALIDATE_STRUCTURED_OUTPUT', false),
+        validateStructuredOutput: readBooleanEnv(env, 'COPILOT_MCP_REGISTRY_VALIDATE_STRUCTURED_OUTPUT', true),
         maxRegisteredTools: readIntegerEnv(
             env,
             'COPILOT_MCP_REGISTRY_MAX_TOOLS',
@@ -319,7 +324,9 @@ export function getCanonicalMcpTools(options = {}) {
         surfacedValidation,
     });
     bindMcpToolsStatusProvider(() => canonicalMcpToolsCache ?? tools);
+    bindMcpToolPayloadAuditProvider(() => canonicalMcpToolsCache ?? tools);
     bindMcpOAuthFrictionAuditProvider(() => canonicalMcpToolsCache ?? tools);
+    bindConnectorSmokeLocalToolNamesProvider(() => (canonicalMcpToolsCache ?? tools).map((tool) => tool.name));
     return tools;
 }
 
@@ -345,6 +352,7 @@ function buildCanonicalMcpToolList() {
         mcpRoundTripAnalyticsTool,
         mcpToolPayloadAuditTool,
         ...maintenanceTools,
+        ...terminalTools,
         delegateToRepoAutonomyRunnerTool,
         mcpGoldenPromptsTool,
         mcpAppsSdkReadinessTool,
@@ -601,7 +609,7 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
         finishPhase('handler', handlerStartedAt);
         const executionMetric = getResultExecutionHint(result) ?? undefined;
         const resultSizeStartedAt = startPhase('resultSize');
-        const resultSizeValidation = validateToolResultSize(result, registryPolicy);
+        const resultSizeValidation = validateToolResultSize(result, registryPolicy, tool);
         const resultSizeError =
             typeof resultSizeValidation === 'string' ? resultSizeValidation : resultSizeValidation.error;
         const resultSizeMetric = typeof resultSizeValidation === 'string' ? undefined : resultSizeValidation;
@@ -779,32 +787,39 @@ async function runToolHandlerWithTimeout(tool, args, policy) {
 /**
  * @param {unknown} result
  * @param {McpRegistryPolicy} policy
- * @returns {{ error: string | null; strategy: string; bytes: number | null }}
+ * @param {McpToolDefinition} tool
+ * @returns {{ error: string | null; strategy: string; bytes: number | null; limitBytes: number }}
  */
-function validateToolResultSize(result, policy) {
+function validateToolResultSize(result, policy, tool) {
+    const requestedLimit = Number(tool.maxResultBytes);
+    const limitBytes = Number.isInteger(requestedLimit) && requestedLimit > 0
+        ? Math.max(16 * 1024, Math.min(64 * 1024 * 1024, requestedLimit))
+        : policy.maxToolResultBytes;
     const hint = getResultSizeHint(result);
     if (hint) {
         return {
             error:
-                hint.bytes > policy.maxToolResultBytes
-                    ? `Tool result is ${hint.bytes} bytes by ${hint.source}; limit is ${policy.maxToolResultBytes} bytes.`
+                hint.bytes > limitBytes
+                    ? `Tool result is ${hint.bytes} bytes by ${hint.source}; limit is ${limitBytes} bytes.`
                     : null,
             strategy: 'hint',
             bytes: hint.bytes,
+            limitBytes,
         };
     }
     try {
         const bytes = Buffer.byteLength(stableJsonStringify(result));
         return {
             error:
-                bytes > policy.maxToolResultBytes
-                    ? `Tool result is ${bytes} bytes; limit is ${policy.maxToolResultBytes} bytes.`
+                bytes > limitBytes
+                    ? `Tool result is ${bytes} bytes; limit is ${limitBytes} bytes.`
                     : null,
             strategy: 'stringify',
             bytes,
+            limitBytes,
         };
     } catch {
-        return { error: null, strategy: 'unknown', bytes: null };
+        return { error: null, strategy: 'unknown', bytes: null, limitBytes };
     }
 }
 
@@ -876,6 +891,12 @@ export function validateMcpToolDefinitions(tools, policy = readMcpRegistryPolicy
         }
         if (tool.outputSchema !== undefined && (!tool.outputSchema || typeof tool.outputSchema !== 'object')) {
             warnings.push(`${label}: outputSchema should be an object or Zod schema.`);
+        }
+        if (
+            tool.maxResultBytes !== undefined &&
+            (!Number.isInteger(tool.maxResultBytes) || tool.maxResultBytes < 16 * 1024 || tool.maxResultBytes > 64 * 1024 * 1024)
+        ) {
+            errors.push(`${label}: maxResultBytes must be an integer between 16 KiB and 64 MiB.`);
         }
         if (typeof tool.handler !== 'function') errors.push(`${label}: handler must be a function.`);
 
@@ -1247,13 +1268,31 @@ function normalizeSecuritySchemeArray(value) {
  */
 function validateToolStructuredOutput(tool, result) {
     if (tool.outputSchema === undefined || !result || typeof result !== 'object') return [];
-    if (!('structuredContent' in result)) return [];
-    const schema = tool.outputSchema;
-    if (schema && typeof schema === 'object' && 'safeParse' in schema && typeof schema.safeParse === 'function') {
-        const parsed = schema.safeParse(result.structuredContent);
-        return parsed.success ? [] : ['structuredContent does not satisfy outputSchema.'];
+    if (result.isError === true) return [];
+    if (!('structuredContent' in result)) return ['successful tool result is missing structuredContent for outputSchema.'];
+    const schema = normalizeToolOutputSchema(tool.outputSchema);
+    if (!schema) return ['outputSchema cannot be normalized for local structuredContent validation.'];
+    const parsed = schema.safeParse(result.structuredContent);
+    return parsed.success ? [] : ['structuredContent does not satisfy outputSchema.'];
+}
+
+/**
+ * The MCP SDK accepts either a Zod schema or the legacy raw Zod shape accepted by registerTool(). Normalize both forms
+ * here so registry shadow-validation matches the descriptor actually exposed on the wire.
+ *
+ * @param {McpToolDefinition['outputSchema']} schema
+ * @returns {import('zod').ZodType | null}
+ */
+function normalizeToolOutputSchema(schema) {
+    if (!schema || typeof schema !== 'object') return null;
+    if ('safeParse' in schema && typeof schema.safeParse === 'function') {
+        return /** @type {import('zod').ZodType} */ (schema);
     }
-    return [];
+    const entries = Object.entries(schema);
+    if (entries.every(([, value]) => value && typeof value === 'object' && 'safeParse' in value)) {
+        return z.object(/** @type {Record<string, import('zod').ZodType>} */ (schema))['passthrough']();
+    }
+    return null;
 }
 
 /**

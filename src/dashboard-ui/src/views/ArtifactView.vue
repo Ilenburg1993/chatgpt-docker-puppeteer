@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
 import { formatHttpError, http } from '@/lib/http';
@@ -8,12 +8,21 @@ import { useRoute, useRouter } from 'vue-router';
 const route = useRoute();
 const router = useRouter();
 
-const artifactId = computed(() => String(route.params.id || ''));
+const artifactId = computed(() => String(route.params['id'] || ''));
 
 const loading = ref(false);
-const error = ref(null);
-const meta = ref(null);
-const text = ref(null);
+interface ArtifactMetadata {
+    kind?: string;
+    mime?: string;
+    size_bytes?: number;
+    sha256?: string;
+    storage_uri?: string;
+    created_at_ms?: number;
+}
+
+const error = ref<string | null>(null);
+const meta = ref<ArtifactMetadata | null>(null);
+const text = ref<string | null>(null);
 
 async function fetchMeta() {
     if (!artifactId.value) return;

@@ -71,10 +71,10 @@ describe('copilot/boot/surface-validation', () => {
             phases: [{ id: 'observability' }, { id: 'runtime-wiring' }, { id: 'terminal-init' }],
         };
         const input = reportInput(plan, { observability: () => undefined });
-        delete input.core.listActiveTimers;
-        delete input.sdk.createCopilotClient;
-        delete input.agent.startRuntime;
-        delete input.terminal.runTerminalHttpServerPhase;
+        delete input.core['listActiveTimers'];
+        delete input.sdk['createCopilotClient'];
+        delete input.agent['startRuntime'];
+        delete input.terminal['runTerminalHttpServerPhase'];
 
         const report = validateCopilotBootSurfaces(input);
 

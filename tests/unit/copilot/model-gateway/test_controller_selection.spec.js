@@ -9,6 +9,10 @@ import {
     resolveModelGatewayNativeControllerSelection,
 } from '../../../../src/copilot/model-gateway/controller/index.js';
 
+/**
+ * @param {string} id
+ * @param {{ contextWindow?: number; reasoning?: boolean; vision?: boolean; multiplier?: number }} [options]
+ */
 function sdkModel(id, { contextWindow = 128_000, reasoning = true, vision = false, multiplier = 1 } = {}) {
     return {
         id,
@@ -23,6 +27,10 @@ function sdkModel(id, { contextWindow = 128_000, reasoning = true, vision = fals
     };
 }
 
+/**
+ * @param {number} remainingPercentage
+ * @param {Partial<{ remainingPercentage: number; isUnlimitedEntitlement: boolean; usageAllowedWithExhaustedQuota: boolean; overageAllowedWithExhaustedQuota: boolean }>} [overrides]
+ */
 function sdkQuota(remainingPercentage, overrides = {}) {
     return {
         quotaSnapshots: {
@@ -82,7 +90,9 @@ describe('Model Gateway controller selection plane', () => {
 
         expect(plan.status).toBe(MODEL_GATEWAY_CONTROLLER_SELECTION_STATUS.NATIVE_READY);
         expect(plan.nativeBlockedByQuota).toBe(false);
-        expect(plan.selected.modelId).toBe('efficient-native');
+        expect(plan.selected).not.toBeNull();
+        expect(plan.selected?.substrate).toBe(MODEL_GATEWAY_CONTROLLER_SUBSTRATES.COPILOT);
+        expect(plan.selected && 'modelId' in plan.selected ? plan.selected.modelId : null).toBe('efficient-native');
         expect(plan.reasons).toContain('quota_pressure_cost_weight_increased');
     });
 
@@ -168,14 +178,15 @@ describe('Model Gateway native controller runtime adapter', () => {
         };
         const result = await resolveModelGatewayNativeControllerSelection({
             deps: {
-                createManager: () => ({
-                    getClient: async () => client,
-                    stopClient: async () => {
+                createInspectionSession: () => ({
+                    connect: async () => {},
+                    listModels: client.listModels,
+                    readQuota: async () => sdkQuota(0.8),
+                    close: async () => {
                         stopCalls += 1;
-                        return [];
+                        return 0;
                     },
                 }),
-                readQuota: async () => sdkQuota(0.8),
             },
         });
 
@@ -201,16 +212,17 @@ describe('Model Gateway native controller runtime adapter', () => {
         const result = await resolveModelGatewayNativeControllerSelection({
             allowOpaqueSdkAutoFallback: true,
             deps: {
-                createManager: () => ({
-                    getClient: async () => {
+                createInspectionSession: () => ({
+                    connect: async () => {
                         throw new Error('sdk upstream unavailable');
                     },
-                    stopClient: async () => {
+                    listModels: async () => [],
+                    readQuota: async () => sdkQuota(0.9),
+                    close: async () => {
                         stopCalls += 1;
-                        return [];
+                        return 0;
                     },
                 }),
-                readQuota: async () => sdkQuota(0.9),
             },
         });
 
@@ -230,15 +242,14 @@ describe('Model Gateway native controller runtime adapter', () => {
         const result = await resolveModelGatewayNativeControllerSelection({
             allowOpaqueSdkAutoFallback: true,
             deps: {
-                createManager: () => ({
-                    getClient: async () => ({
-                        listModels: async () => {
-                            throw new Error('catalog unavailable');
-                        },
-                    }),
-                    stopClient: async () => [new Error('cleanup warning')],
+                createInspectionSession: () => ({
+                    connect: async () => {},
+                    listModels: async () => {
+                        throw new Error('catalog unavailable');
+                    },
+                    readQuota: async () => sdkQuota(0.75),
+                    close: async () => 1,
                 }),
-                readQuota: async () => sdkQuota(0.75),
             },
         });
 

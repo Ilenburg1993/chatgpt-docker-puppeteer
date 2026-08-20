@@ -256,7 +256,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         it('deve aguardar seletor aparecer', async () => {
             let apareceu = false;
 
-            const waitFor = async (/** @type {any} */ selector, /** @type {any} */ timeout) => {
+            const waitFor = async (/** @type {string} */ _selector, /** @type {number} */ _timeout) => {
                 await new Promise((resolve) => {
                     setTimeout(resolve, 100);
                 });
@@ -269,7 +269,7 @@ describe('Driver Adapters - Adaptadores de Plataforma', () => {
         });
 
         it('deve falhar após timeout', async () => {
-            const waitFor = async (/** @type {any} */ selector, /** @type {any} */ timeout) => {
+            const waitFor = async (/** @type {string} */ _selector, /** @type {number} */ timeout) => {
                 const start = Date.now();
                 await new Promise((resolve) => {
                     setTimeout(resolve, timeout + 100);

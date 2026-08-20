@@ -131,6 +131,23 @@ export function readTerminalConfigProjection(runtimeId) {
 }
 
 /**
+ * Minimal runtime config surface consumed by BYOK status/model-switch rendering.
+ *
+ * @param {string | null | undefined} [runtimeId]
+ * @returns {{
+ *     currentModel: ReturnType<typeof readTerminalConfigProjection>['currentModel'];
+ *     modelGatewayProjection: ReturnType<typeof readTerminalConfigProjection>['modelGatewayProjection'];
+ * }}
+ */
+export function readTerminalByokRuntimeConfigProjection(runtimeId) {
+    const projection = readTerminalConfigProjection(runtimeId);
+    return {
+        currentModel: projection.currentModel,
+        modelGatewayProjection: projection.modelGatewayProjection,
+    };
+}
+
+/**
  * @param {string | null | undefined} [runtimeId]
  * @returns {Promise<{ currentModel: string; models: import('../../../presentation/contracts/index.js').RuntimeModelInfo[] }>}
  */

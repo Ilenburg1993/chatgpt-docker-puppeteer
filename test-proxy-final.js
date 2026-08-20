@@ -72,8 +72,8 @@ async function runTest() {
 
         await page.close();
     } catch (error) {
-        console.error(`\n❌ ERRO: ${error.message}`);
-        console.error(error.stack);
+        console.error(`\n❌ ERRO: ${error instanceof Error ? error.message : String(error)}`);
+        if (error instanceof Error) console.error(error.stack);
     } finally {
         if (browser) {
             console.log('\n[CLEANUP] Desconectando do Chrome...');

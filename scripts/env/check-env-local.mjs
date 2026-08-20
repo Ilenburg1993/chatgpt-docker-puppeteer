@@ -3,8 +3,8 @@ import { execa } from 'execa';
 import fs from 'node:fs';
 import path from 'node:path';
 
-if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
-    delete process.env.NO_COLOR;
+if (process.env['FORCE_COLOR'] && process.env['NO_COLOR']) {
+    delete process.env['NO_COLOR'];
 }
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

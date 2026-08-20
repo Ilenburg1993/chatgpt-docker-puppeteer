@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/test_terminal_task_stream_events.spec.js
  *
@@ -57,7 +56,7 @@ vi.mock('../../../src/copilot/terminal/dialog/output.js', () => ({
     endTerminalRenderLock: vi.fn(),
     println: mocks.println,
     SEPARATOR: '---',
-    writeTerminalRaw: (chunk) => process.stdout.write(String(chunk)),
+    writeTerminalRaw: (/** @type {unknown} */ chunk) => process.stdout.write(String(chunk)),
 }));
 
 vi.mock('../../../src/copilot/presentation/state/index.js', () => ({
@@ -86,23 +85,23 @@ vi.mock('../../../src/copilot/terminal/events/assistant-transcript-renderer.js',
 vi.mock('../../../src/copilot/terminal/frontend/gateways/index.js', () => ({
     readTerminalDialogStreamMeta: () => ({ model: 'gpt-test', reasoningEffort: 'high' }),
     classifyTerminalUserInputQuestionKind: () => 'question',
-    normalizeTerminalUserInputRequestedEvent: (evt) => ({
-        requestId: evt?.requestId ?? null,
-        runtimeId: evt?.runtimeId ?? null,
-        question: evt?.question ?? '',
-        choices: Array.isArray(evt?.choices) ? evt.choices : [],
+    normalizeTerminalUserInputRequestedEvent: (/** @type {Record<string, unknown>} */ evt) => ({
+        requestId: evt?.['requestId'] ?? null,
+        runtimeId: evt?.['runtimeId'] ?? null,
+        question: evt?.['question'] ?? '',
+        choices: Array.isArray(evt?.['choices']) ? evt['choices'] : [],
         allowFreeform: true,
-        toolCallId: evt?.toolCallId ?? null,
-        data: evt?.data ?? {},
-        ts: evt?.timestamp ?? evt?.ts ?? Date.now(),
+        toolCallId: evt?.['toolCallId'] ?? null,
+        data: evt?.['data'] ?? {},
+        ts: evt?.['timestamp'] ?? evt?.['ts'] ?? Date.now(),
     }),
-    normalizeTerminalUserInputCompletedEvent: (evt) => ({
-        requestId: evt?.requestId ?? null,
-        runtimeId: evt?.runtimeId ?? null,
-        answer: evt?.answer ?? '',
-        wasFreeform: typeof evt?.wasFreeform === 'boolean' ? evt.wasFreeform : null,
-        data: evt?.data ?? {},
-        ts: evt?.timestamp ?? evt?.ts ?? Date.now(),
+    normalizeTerminalUserInputCompletedEvent: (/** @type {Record<string, unknown>} */ evt) => ({
+        requestId: evt?.['requestId'] ?? null,
+        runtimeId: evt?.['runtimeId'] ?? null,
+        answer: evt?.['answer'] ?? '',
+        wasFreeform: typeof evt?.['wasFreeform'] === 'boolean' ? evt['wasFreeform'] : null,
+        data: evt?.['data'] ?? {},
+        ts: evt?.['timestamp'] ?? evt?.['ts'] ?? Date.now(),
     }),
 }));
 

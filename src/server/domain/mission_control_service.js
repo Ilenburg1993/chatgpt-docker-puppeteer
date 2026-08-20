@@ -320,21 +320,21 @@ function _recordMissionEvents(
 function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload = {} }) {
     const actorView = asRecord(actor);
     const payloadView = asRecord(payload);
-    const title = String(payloadView.title || '').trim();
+    const title = String(payloadView['title'] || '').trim();
     if (!title) {
         throw _error(422, 'MISSION_TITLE_REQUIRED', 'title é obrigatório para criar missão');
     }
 
-    const description = String(payloadView.description || '');
-    const autonomyModeRaw = payloadView.autonomy_mode ?? payloadView.autonomyMode ?? AUTONOMY_MODES.USER_ONLY;
+    const description = String(payloadView['description'] || '');
+    const autonomyModeRaw = payloadView['autonomy_mode'] ?? payloadView['autonomyMode'] ?? AUTONOMY_MODES.USER_ONLY;
     const autonomyModeValues = /** @type {string[]} */ (Object.values(AUTONOMY_MODES));
     const autonomyMode = autonomyModeValues.includes(String(autonomyModeRaw))
         ? String(autonomyModeRaw)
         : AUTONOMY_MODES.USER_ONLY;
     /** @type {Record<string, unknown>} */
-    const policy = payloadView.policy && typeof payloadView.policy === 'object' ? asRecord(payloadView.policy) : {};
+    const policy = payloadView['policy'] && typeof payloadView['policy'] === 'object' ? asRecord(payloadView['policy']) : {};
     /** @type {Record<string, unknown>} */
-    const context = payloadView.context && typeof payloadView.context === 'object' ? asRecord(payloadView.context) : {};
+    const context = payloadView['context'] && typeof payloadView['context'] === 'object' ? asRecord(payloadView['context']) : {};
 
     const created = createMission({
         title,
@@ -351,7 +351,7 @@ function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload =
 
     _recordMissionEvents({
         missionId: after.id,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: 'MISSION_CREATE',
         before: null,
@@ -403,7 +403,7 @@ function executeMissionCommand(
     _syncMissionStepsForMission(result.after);
     _recordMissionEvents({
         missionId,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: command,
         before: result.before,
@@ -445,7 +445,7 @@ function pauseMissionCommand(/** @type {any} */ { missionId, actor = {}, reason,
 
     _recordMissionEvents({
         missionId,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: 'MISSION_PAUSE',
         before: result.before,
@@ -490,7 +490,7 @@ function resumeMissionCommand(/** @type {any} */ { missionId, actor = {}, reason
 
     _recordMissionEvents({
         missionId,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: 'MISSION_RESUME',
         before: result.before,
@@ -541,7 +541,7 @@ function cancelMissionCommand(/** @type {any} */ { missionId, actor = {}, reason
 
     _recordMissionEvents({
         missionId,
-        actorId: asRecord(actor).id || asRecord(actor).username || null,
+        actorId: asRecord(actor)['id'] || asRecord(actor)['username'] || null,
         actorType: 'user',
         operation: 'MISSION_CANCEL',
         before: result.before,
@@ -561,7 +561,7 @@ function cancelMissionCommand(/** @type {any} */ { missionId, actor = {}, reason
                     entityType: 'task',
                     entityId: taskId,
                     actorType: 'user',
-                    actorId: asRecord(actor).id || asRecord(actor).username || null,
+                    actorId: asRecord(actor)['id'] || asRecord(actor)['username'] || null,
                     eventType: 'TASK_CANCELLED_BY_MISSION',
                     payload: { mission_id: missionId, reason },
                     dedupKey: `task:${taskId}:cancelled_by_mission:${result.after.updated_at_ms}`,
@@ -598,9 +598,9 @@ function patchMissionCommand(/** @type {any} */ { missionId, actor = {}, reason,
         }
 
         const updatedRow = _updateMissionTx(db, row, {
-            title: patchView.title,
-            description: patchView.description,
-            autonomy_mode: patchView.autonomy_mode,
+            title: patchView['title'],
+            description: patchView['description'],
+            autonomy_mode: patchView['autonomy_mode'],
         });
 
         return { before: _rowToMission(row), after: _rowToMission(updatedRow), metadata: {} };
@@ -608,7 +608,7 @@ function patchMissionCommand(/** @type {any} */ { missionId, actor = {}, reason,
 
     _recordMissionEvents({
         missionId,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: 'MISSION_PATCH',
         before: result.before,
@@ -660,7 +660,7 @@ function setMissionPolicyCommand(
 
     _recordMissionEvents({
         missionId,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: 'MISSION_SET_POLICY',
         before: result.before,
@@ -740,7 +740,7 @@ function reorderMissionStepsCommand(
 
     _recordMissionEvents({
         missionId,
-        actorId: actorView.id || actorView.username || null,
+        actorId: actorView['id'] || actorView['username'] || null,
         actorType: 'user',
         operation: 'MISSION_REORDER_STEPS',
         before: result.before,

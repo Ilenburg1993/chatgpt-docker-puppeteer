@@ -134,7 +134,7 @@ npm run typecheck:node 2>&1 | grep "TS8032"
 
 ```bash
 # Verificar apenas um arquivo específico
-npx tsc --noEmit --checkJs --allowJs src/infra/db/task_repo.js 2>&1 | head -20
+npm run -s tsc7 -- --noEmit --checkJs --allowJs src/infra/db/task_repo.js 2>&1 | head -20
 
 # Verificar uma lane específica
 npm run typecheck:strict:src.logic 2>&1 | grep "error TS"

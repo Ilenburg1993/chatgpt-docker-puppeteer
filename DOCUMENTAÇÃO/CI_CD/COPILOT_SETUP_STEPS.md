@@ -54,15 +54,13 @@ atualizar o Dockerfile, **atualize também as variáveis `env:` do workflow**.
 
 | Variável                   | Versão atual | Equivalente no Dockerfile  |
 | -------------------------- | ------------ | -------------------------- |
-| `NPM_VERSION`              | `11.11.0`    | `ARG NPM_VERSION`          |
-| `PNPM_VERSION`             | `10.30.3`    | `ARG PNPM_VERSION`         |
-| `GH_VERSION`               | `2.87.3`     | `ARG GH_VERSION`           |
-| `ACTIONLINT_VERSION`       | `1.7.11`     | `ARG ACTIONLINT_VERSION`   |
+| `NPM_VERSION`              | `12.0.2`     | `ARG NPM_VERSION`          |
+| `GH_VERSION`               | `2.92.0`     | `ARG GH_VERSION`           |
+| `ACTIONLINT_VERSION`       | `1.7.12`     | `ARG ACTIONLINT_VERSION`   |
 | `HADOLINT_VERSION`         | `2.14.0`     | `ARG HADOLINT_VERSION`     |
-| `YQ_VERSION`               | `v4.44.3`    | (instalado via apt/wget)   |
-| `TS_VERSION`               | `5.9.3`      | typescript@5.9.3           |
-| `TS_LSP_VERSION`           | `5.1.3`      | typescript-language-server |
-| `DEVCONTAINER_CLI_VERSION` | `0.83.3`     | @devcontainers/cli         |
+| `YQ_VERSION`               | `4.53.2`     | `ARG YQ_VERSION`           |
+| `TS_VERSION`               | `7.0.2`      | `ARG TYPESCRIPT_VERSION`   |
+| `DEVCONTAINER_CLI_VERSION` | `0.86.1`     | @devcontainers/cli         |
 
 ---
 
@@ -106,15 +104,14 @@ Após o setup, o agente tem acesso a:
 ### Runtime
 
 - **Node.js 24 LTS** — runtime canônico do projeto
-- **npm 11.11.0** — versão canônica do package manager
-- **pnpm 10.30.3** — package manager alternativo
+- **npm 12.0.2** — versão canônica e única do package manager
 - **Python 3** — para scripts Python e agentes
 - **PM2** — daemon de produção (global)
 
 ### TypeScript / Tipagem
 
-- **tsc 5.9.3** — compilador TypeScript
-- **typescript-language-server 5.1.3** — LSP para navegação de tipos
+- **tsc 7.0.2 nativo** — compilador TypeScript e servidor `--lsp --stdio`
+- Nenhum `typescript-language-server` ou daemon LSP local é instalado/iniciado
 - Permite: `npm run typecheck:*`, `npm run typecheck:watch:node`
 
 ### Linting / Qualidade

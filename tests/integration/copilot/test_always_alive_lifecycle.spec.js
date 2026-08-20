@@ -24,17 +24,17 @@ import { afterAll, beforeAll, describe, it } from 'vitest';
 
 // AlwaysAliveAgent é um singleton exportado do módulo — importamos diretamente
 // para garantir o mesmo objeto monitorado pelos listeners do sistema.
-import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive.js';
+import { alwaysAliveAgent } from '../../../src/copilot/agent/always-alive-singleton.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configurações
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Tempo máximo para boot do dialog loop */
-const BOOT_TIMEOUT_MS = Number(process.env.COPILOT_BOOT_TIMEOUT_MS ?? 120_000);
+const BOOT_TIMEOUT_MS = Number(process.env['COPILOT_BOOT_TIMEOUT_MS'] ?? 120_000);
 
 /** Modelo a usar (pode ser sobrescrito) */
-const TEST_MODEL = process.env.COPILOT_TEST_MODEL ?? 'gpt-4.1-mini';
+const TEST_MODEL = process.env['COPILOT_TEST_MODEL'] ?? 'gpt-4.1-mini';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

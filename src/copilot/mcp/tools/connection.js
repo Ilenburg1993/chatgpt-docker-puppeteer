@@ -838,8 +838,7 @@ export const connectionTools = [
         inputSchema: {
             publicMcpUrl: z
                 .string()
-                .optional()
-                .describe('Optional public HTTPS /mcp URL from Cloudflare Tunnel or Secure MCP Tunnel.'),
+                .optional()['describe']('Optional public HTTPS /mcp URL from Cloudflare Tunnel or Secure MCP Tunnel.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ publicMcpUrl }) => {
@@ -870,8 +869,7 @@ export const connectionTools = [
         inputSchema: {
             publicMcpUrl: z
                 .string()
-                .optional()
-                .describe('Optional public HTTPS /mcp URL. Defaults to the permanent Cloudflare hostname.'),
+                .optional()['describe']('Optional public HTTPS /mcp URL. Defaults to the permanent Cloudflare hostname.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ publicMcpUrl }) => {
@@ -898,7 +896,7 @@ export const connectionTools = [
         title: 'Check ChatGPT connector URL',
         description: 'Validate that a candidate ChatGPT connector URL is HTTPS, canonical and ends with /mcp.',
         inputSchema: {
-            publicMcpUrl: z.string().min(1).max(MAX_URL_LENGTH).describe('Candidate public connector URL.'),
+            publicMcpUrl: z.string().min(1).max(MAX_URL_LENGTH)['describe']('Candidate public connector URL.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ publicMcpUrl }) => {
@@ -979,8 +977,7 @@ export const connectionTools = [
             scopes: z
                 .array(z.string().min(1).max(128))
                 .max(16)
-                .optional()
-                .describe('Optional scopes to include in the challenge preview.'),
+                .optional()['describe']('Optional scopes to include in the challenge preview.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ scopes }) => {
@@ -1029,8 +1026,7 @@ export const connectionTools = [
             issuer: z
                 .string()
                 .max(MAX_URL_LENGTH)
-                .optional()
-                .describe(
+                .optional()['describe'](
                     'Optional HTTPS OAuth issuer base URL. Defaults to COPILOT_MCP_OAUTH_EXPECTED_ISSUER or COPILOT_MCP_OAUTH_ISSUER.',
                 ),
             timeoutMs: z
@@ -1038,8 +1034,7 @@ export const connectionTools = [
                 .int()
                 .min(MIN_DIAGNOSTIC_TIMEOUT_MS)
                 .max(MAX_DIAGNOSTIC_TIMEOUT_MS)
-                .optional()
-                .describe('Per-request timeout in milliseconds.'),
+                .optional()['describe']('Per-request timeout in milliseconds.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ issuer, timeoutMs }) => {
@@ -1156,8 +1151,7 @@ export const connectionTools = [
             publicMcpUrl: z
                 .string()
                 .max(MAX_URL_LENGTH)
-                .optional()
-                .describe('Optional public HTTPS /mcp URL to validate instead of the configured/current URL.'),
+                .optional()['describe']('Optional public HTTPS /mcp URL to validate instead of the configured/current URL.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ publicMcpUrl }) => {

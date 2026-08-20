@@ -32,7 +32,16 @@ const isProduction = __dirname.endsWith('/dist') || __dirname.endsWith('\\dist')
 const projectRoot = isProduction ? require('path').resolve(__dirname, '..') : __dirname;
 const scriptPath = isProduction ? './start.js' : './index.js';
 const enableAuditAgentPm2Processes =
-    String(process.env.ENABLE_AUDIT_AGENT_PM2_PROCESSES || '').toLowerCase() === 'true';
+    String(process.env['ENABLE_AUDIT_AGENT_PM2_PROCESSES'] || '').toLowerCase() === 'true';
+const localLspEnabled = String(process.env['LSP_ENABLED'] || 'false').toLowerCase() === 'true';
+const LOCAL_LSP_ENV = {
+    // O daemon LSP local e suas mutações são opt-in. PM2 nunca os habilita implicitamente.
+    LSP_ENABLED: localLspEnabled ? 'true' : 'false',
+    LSP_MUTATIONS_ENABLED:
+        localLspEnabled && String(process.env['LSP_MUTATIONS_ENABLED'] || 'false').toLowerCase() === 'true'
+            ? 'true'
+            : 'false',
+};
 
 console.log(`🔍 PM2 Environment: ${isProduction ? 'PRODUCTION (dist)' : 'DEVELOPMENT (root)'}`);
 console.log(`📁 Project root: ${projectRoot}`);
@@ -59,7 +68,7 @@ const NODE_ARGS_BASE = [
 // without editing the ecosystem file manually. Values are additive so multiple
 // ports can be supplied as a comma-separated list.
 // ----------------------------------------------------------------------------
-const debugPortEnv = process.env.DEBUG_PORT;
+const debugPortEnv = process.env['DEBUG_PORT'];
 if (debugPortEnv) {
     const ports = debugPortEnv
         .split(',')
@@ -122,6 +131,7 @@ module.exports = {
             // Ambiente
             filter_env: ['NO_COLOR'],
             env: {
+                ...LOCAL_LSP_ENV,
                 NODE_ENV: 'development',
                 FORCE_COLOR: '1',
                 SERVER_MODE: 'split', // PM2 SOBERANO: Força modo split
@@ -131,6 +141,7 @@ module.exports = {
             },
 
             env_production: {
+                ...LOCAL_LSP_ENV,
                 NODE_ENV: 'production',
                 FORCE_COLOR: '1',
                 SERVER_MODE: 'split', // PM2 SOBERANO: Força modo split
@@ -191,6 +202,7 @@ module.exports = {
             // Ambiente
             filter_env: ['NO_COLOR'],
             env: {
+                ...LOCAL_LSP_ENV,
                 PORT: 3008,
                 NODE_ENV: 'development',
                 DAEMON_MODE: 'true',
@@ -205,6 +217,7 @@ module.exports = {
             },
 
             env_production: {
+                ...LOCAL_LSP_ENV,
                 PORT: 3008,
                 NODE_ENV: 'production',
                 DAEMON_MODE: 'true',
@@ -311,6 +324,7 @@ module.exports = {
                       out_file: './logs/inference-gateway-out.log',
                       filter_env: ['NO_COLOR'],
                       env: {
+                          ...LOCAL_LSP_ENV,
                           NODE_ENV: 'development',
                           FORCE_COLOR: '1',
                           INFERENCE_GATEWAY_ENABLED: 'true',
@@ -318,6 +332,7 @@ module.exports = {
                           INFERENCE_GATEWAY_PORT: '3099',
                       },
                       env_production: {
+                          ...LOCAL_LSP_ENV,
                           NODE_ENV: 'production',
                           FORCE_COLOR: '1',
                           INFERENCE_GATEWAY_ENABLED: 'true',
@@ -342,12 +357,14 @@ module.exports = {
                       out_file: './logs/ollama-supervisor-out.log',
                       filter_env: ['NO_COLOR'],
                       env: {
+                          ...LOCAL_LSP_ENV,
                           NODE_ENV: 'development',
                           FORCE_COLOR: '1',
                           OLLAMA_SUPERVISOR_ENABLED: 'true',
                           OLLAMA_HEALTH_POLL_MS: '5000',
                       },
                       env_production: {
+                          ...LOCAL_LSP_ENV,
                           NODE_ENV: 'production',
                           FORCE_COLOR: '1',
                           OLLAMA_SUPERVISOR_ENABLED: 'true',
@@ -373,6 +390,7 @@ module.exports = {
                       out_file: './logs/audit-agent-out.log',
                       filter_env: ['NO_COLOR'],
                       env: {
+                          ...LOCAL_LSP_ENV,
                           NODE_ENV: 'development',
                           FORCE_COLOR: '1',
                           AUDIT_AGENT_ENABLED: 'true',
@@ -385,6 +403,7 @@ module.exports = {
                           AUDIT_AGENT_JOB_COOLDOWN_MS: '30000',
                       },
                       env_production: {
+                          ...LOCAL_LSP_ENV,
                           NODE_ENV: 'production',
                           FORCE_COLOR: '1',
                           AUDIT_AGENT_ENABLED: 'true',
@@ -404,7 +423,7 @@ module.exports = {
         // Habilitado quando COPILOT_TERMINAL_ENABLED=true no environment.
         // Mantém sessão dialog loop aberta com LLM-B + servidor HTTP de injeção.
         // Porta padrão: LLM_B_TERMINAL_PORT=3009. Requer COPILOT_SDK_ENABLED=true.
-        ...(process.env.COPILOT_TERMINAL_ENABLED === 'true'
+        ...(process.env['COPILOT_TERMINAL_ENABLED'] === 'true'
             ? [
                   {
                       name: 'llm-b-terminal',

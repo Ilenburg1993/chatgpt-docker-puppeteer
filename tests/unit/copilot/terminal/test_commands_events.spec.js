@@ -1,10 +1,72 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import { describe, expect, it, vi } from 'vitest';
 
-const readTerminalSseEventArchiveTail = vi.fn(async () => ({
+/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail>>} TerminalArchiveResult */
+/** @typedef {TerminalArchiveResult['entries'][number]} TerminalArchiveEntry */
+/** @typedef {Partial<TerminalArchiveEntry> & Pick<TerminalArchiveEntry, 'timestamp' | 'eventId' | 'event' | 'payload'>} TerminalArchiveEntryFixture */
+
+/**
+ * Builds the real archive result shape while keeping scenarios focused on event-specific fields.
+ * Archive-generated metadata is supplied here instead of being duplicated across fixtures.
+ *
+ * @param {{
+ *   state?: Partial<TerminalArchiveResult['state']>;
+ *   filters?: Partial<TerminalArchiveResult['filters']>;
+ *   entries?: TerminalArchiveEntryFixture[];
+ *   tailRead?: Partial<TerminalArchiveResult['tailRead']>;
+ * }} [input]
+ * @returns {TerminalArchiveResult}
+ */
+function archiveFixture(input = {}) {
+    return {
+        state: {
+            enabled: true,
+            path: null,
+            error: null,
+            events: 0,
+            bytes: 0,
+            queueDepth: 0,
+            flushScheduled: false,
+            flushInFlight: false,
+            failedEvents: 0,
+            droppedEvents: 0,
+            lastEventId: null,
+            ...input.state,
+        },
+        filters: {
+            limit: 20,
+            event: null,
+            traceId: null,
+            turnId: null,
+            source: null,
+            toolCallId: null,
+            requestId: null,
+            hubSessionId: null,
+            ...input.filters,
+        },
+        entries: (input.entries ?? []).map((entry) => ({
+            source: null,
+            eventSource: null,
+            traceId: null,
+            turnId: null,
+            hubSessionId: null,
+            ...entry,
+            schemaVersion: 1,
+            ts: entry.ts ?? new Date(entry.timestamp).toISOString(),
+        })),
+        tailRead: {
+            bytesRead: 0,
+            maxBytes: 0,
+            truncatedByByteLimit: false,
+            ...input.tailRead,
+        },
+    };
+}
+
+
+const readTerminalSseEventArchiveTail = vi.fn(/** @type {typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail} */ (async () => archiveFixture({
     state: {
         path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
         events: 2,
@@ -38,7 +100,7 @@ const readTerminalSseEventArchiveTail = vi.fn(async () => ({
             },
         },
     ],
-}));
+})));
 
 vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
     formatTerminalIsoTimestamp: vi.fn((/** @type {unknown} */ value) =>
@@ -63,6 +125,17 @@ vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
 }));
 
 const { cmdEvents } = await import('../../../../src/copilot/terminal/commands/events.js');
+
+/**
+ * @template T
+ * @param {T} value
+ * @param {string} label
+ * @returns {NonNullable<T>}
+ */
+function requireEventFixtureValue(value, label) {
+    if (value === null || value === undefined) throw new Error(`missing event fixture: ${label}`);
+    return /** @type {NonNullable<T>} */ (value);
+}
 
 function mockCtx() {
     /** @type {string[]} */
@@ -172,7 +245,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza eventos de conversa e boot no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 3,
@@ -252,7 +325,7 @@ describe('terminal/commands/events', () => {
                     payload: { previousModel: 'auto', newModel: 'gpt-4.1-mini', reasoningEffort: 'high' },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '10');
@@ -273,7 +346,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza eventos SDK 1.0 novos no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 4,
@@ -396,7 +469,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '10');
@@ -427,7 +500,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('resume anexos e conteúdos multimodais SDK 1.0 sem objetos crus', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 2,
@@ -499,7 +572,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '10');
@@ -522,7 +595,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza sinais long-tail SDK 1.0 de extensões e sessão no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 9,
@@ -640,7 +713,7 @@ describe('terminal/commands/events', () => {
                     payload: { from: 'GitHub', subject: 'Nova solicitação' },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -668,7 +741,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('usa operatorSummary para reconfirmação de modelo sem chamar de alteração', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -702,7 +775,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '5');
@@ -714,7 +787,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza perguntas, raciocínio e tarefas em segundo plano no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 4,
@@ -777,7 +850,7 @@ describe('terminal/commands/events', () => {
                     payload: {},
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -798,7 +871,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza eventos de I/O local sem tratar type como estado', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -831,7 +904,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '12');
@@ -844,7 +917,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('preserva tipos e classificações internas em consultas explícitas', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 2,
@@ -885,7 +958,7 @@ describe('terminal/commands/events', () => {
                     payload: { classification: 'ask_user_continuation' },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 source=agent/sdk.lifecycle');
@@ -1002,7 +1075,7 @@ describe('terminal/commands/events', () => {
                 payload: { answer: 'SIM' },
             },
         ];
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: routineEntries.length,
@@ -1020,7 +1093,7 @@ describe('terminal/commands/events', () => {
                 hubSessionId: null,
             },
             entries: routineEntries,
-        });
+        }));
         const defaultCtx = mockCtx();
 
         await cmdEvents({ println: defaultCtx.println }, '20');
@@ -1036,7 +1109,7 @@ describe('terminal/commands/events', () => {
         expect(defaultCtx.output()).not.toContain('Streaming');
         expect(defaultCtx.output()).not.toContain('Turno concluído');
 
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -1053,8 +1126,8 @@ describe('terminal/commands/events', () => {
                 requestId: null,
                 hubSessionId: null,
             },
-            entries: [routineEntries[2]],
-        });
+            entries: [requireEventFixtureValue(routineEntries[2], 'sdk.lifecycle routine entry')],
+        }));
         const filteredCtx = mockCtx();
 
         await cmdEvents({ println: filteredCtx.println }, '20 event=sdk.lifecycle');
@@ -1062,7 +1135,7 @@ describe('terminal/commands/events', () => {
         expect(filteredCtx.output()).toContain('Sessão atualizada');
         expect(filteredCtx.output()).toContain('controle da sessão');
 
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -1079,8 +1152,8 @@ describe('terminal/commands/events', () => {
                 requestId: null,
                 hubSessionId: null,
             },
-            entries: [routineEntries[7]],
-        });
+            entries: [requireEventFixtureValue(routineEntries[7], 'assistant.turn_end routine entry')],
+        }));
         const turnCtx = mockCtx();
 
         await cmdEvents({ println: turnCtx.println }, '20 event=assistant.turn_end');
@@ -1089,7 +1162,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza erros BYOK, cancelamentos e turnos vazios no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 4,
@@ -1266,7 +1339,7 @@ describe('terminal/commands/events', () => {
                     payload: { count: 105 },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1338,7 +1411,7 @@ describe('terminal/commands/events', () => {
                 toolName: 'io.read',
             },
         }));
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: repeated.length,
@@ -1356,7 +1429,7 @@ describe('terminal/commands/events', () => {
                 hubSessionId: null,
             },
             entries: repeated,
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '12');
@@ -1383,7 +1456,7 @@ describe('terminal/commands/events', () => {
                 visible: false,
             },
         };
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 2,
@@ -1414,7 +1487,7 @@ describe('terminal/commands/events', () => {
                     payload: { answer: 'SIM' },
                 },
             ],
-        });
+        }));
         const defaultCtx = mockCtx();
 
         await cmdEvents({ println: defaultCtx.println }, '20');
@@ -1424,7 +1497,7 @@ describe('terminal/commands/events', () => {
         expect(defaultCtx.output()).not.toContain('Tarefa em segundo plano concluída');
         expect(defaultCtx.output()).not.toContain('Clear persisted pendingQuestion');
 
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -1442,7 +1515,7 @@ describe('terminal/commands/events', () => {
                 hubSessionId: null,
             },
             entries: [internalAck],
-        });
+        }));
         const filteredCtx = mockCtx();
 
         await cmdEvents({ println: filteredCtx.println }, '20 event=agent.background.completed');
@@ -1452,7 +1525,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('consulta por tool call, request e hub session', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 2,
@@ -1486,7 +1559,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '12 tool=call_123 request=req-123 hub=hub-1 source=sdk');
@@ -1513,7 +1586,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('mostra vínculo compacto entre eventos canônicos e transcript/export', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 3,
@@ -1573,7 +1646,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1602,7 +1675,7 @@ describe('terminal/commands/events', () => {
             hubSessionId: null,
             payload: { type: 'session.updated', label: 'Sessão SDK atualizada' },
         }));
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 23,
@@ -1655,7 +1728,7 @@ describe('terminal/commands/events', () => {
                     payload: { requestId: 'ask-1', content: 'SIM' },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '2');
@@ -1669,7 +1742,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza labels e detalhes de sessão/intenção no default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 3,
@@ -1721,7 +1794,7 @@ describe('terminal/commands/events', () => {
                     payload: { intent: 'testar fluxo' },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1738,7 +1811,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('normaliza quebras internas no resumo humano sem afetar raw/json', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -1770,7 +1843,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1811,7 +1884,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('usa publicChunk seguro no preview de JSON compacto de delta', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -1844,7 +1917,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '3 --json compact event=delta');
@@ -1872,7 +1945,7 @@ describe('terminal/commands/events', () => {
             .trim()
             .split('\n')
             .find((line) => line.trim().startsWith('{'));
-        expect(JSON.parse(rawLine)).toMatchObject({
+        expect(JSON.parse(requireEventFixtureValue(rawLine, 'raw preview JSON line'))).toMatchObject({
             eventId: 42,
             event: 'delta',
             traceId: 'turn:abc',
@@ -1893,7 +1966,7 @@ describe('terminal/commands/events', () => {
 
         const lines = ctx.output().trim().split('\n');
         expect(lines).toHaveLength(1);
-        expect(JSON.parse(lines[0])).toMatchObject({
+        expect(JSON.parse(requireEventFixtureValue(lines[0], 'raw full JSON line'))).toMatchObject({
             eventId: 42,
             event: 'delta',
             payload: { content: 'DELTA-CANONICAL-1' },
@@ -1901,7 +1974,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('redige segredos em /events --json, --raw full e preview raw sem perder o formato técnico', async () => {
-        const secretProjection = () => ({
+        const secretProjection = () => (archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 1,
@@ -1934,7 +2007,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
 
         readTerminalSseEventArchiveTail.mockResolvedValueOnce(secretProjection());
         const jsonCtx = mockCtx();
@@ -1963,7 +2036,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza payloadPreview de activity e hooks no preview raw', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 2,
@@ -2020,7 +2093,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 --raw');
@@ -2040,7 +2113,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza conclusão interna de turno no payloadPreview raw sem sugerir fim final', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 2,
@@ -2098,7 +2171,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 --raw');
@@ -2116,7 +2189,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza payloadPreview de boot, quota e background no preview raw', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: {
                 path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
                 events: 4,
@@ -2197,7 +2270,7 @@ describe('terminal/commands/events', () => {
                     },
                 },
             ],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 --raw');
@@ -2225,7 +2298,7 @@ describe('terminal/commands/events', () => {
     });
 
     it('mostra vazio quando archive nao tem entradas', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce({
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
             state: { path: null, events: 0, queueDepth: 0, error: null },
             filters: {
                 limit: 20,
@@ -2238,7 +2311,7 @@ describe('terminal/commands/events', () => {
                 hubSessionId: null,
             },
             entries: [],
-        });
+        }));
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '');

@@ -76,15 +76,15 @@ import CONFIG from '#core/config';
 
 // Configurações locais do proxy (sobrescrevem CONFIG se fornecidas via env)
 const LOCAL_CONFIG = {
-    PROXY_PORT: parseInt(String(process.env.CHROME_PROXY_PORT || CONFIG.CHROME_PROXY_PORT || '9224'), 10),
-    CHROME_HOST: String(process.env.CHROME_HOST || CONFIG.CHROME_HOST || 'host.docker.internal'),
-    CHROME_PORT: parseInt(String(process.env.CHROME_PORT || CONFIG.CHROME_PORT || '9225'), 10),
-    PROXY_BIND: String(process.env.CHROME_PROXY_BIND || CONFIG.CHROME_PROXY_BIND || '0.0.0.0'),
-    PUBLIC_IP: process.env.PUBLIC_IP || null,
-    LOG_LEVEL: process.env.LOG_LEVEL || 'info',
-    AUTO_HANDLE_SIGNALS: String(process.env.CHROME_PROXY_AUTO_HANDLE_SIGNALS || 'true').toLowerCase() !== 'false',
-    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS
-        ? process.env.ALLOWED_ORIGINS.split(',')
+    PROXY_PORT: parseInt(String(process.env['CHROME_PROXY_PORT'] || CONFIG['CHROME_PROXY_PORT'] || '9224'), 10),
+    CHROME_HOST: String(process.env['CHROME_HOST'] || CONFIG['CHROME_HOST'] || 'host.docker.internal'),
+    CHROME_PORT: parseInt(String(process.env['CHROME_PORT'] || CONFIG['CHROME_PORT'] || '9225'), 10),
+    PROXY_BIND: String(process.env['CHROME_PROXY_BIND'] || CONFIG['CHROME_PROXY_BIND'] || '0.0.0.0'),
+    PUBLIC_IP: process.env['PUBLIC_IP'] || null,
+    LOG_LEVEL: process.env['LOG_LEVEL'] || 'info',
+    AUTO_HANDLE_SIGNALS: String(process.env['CHROME_PROXY_AUTO_HANDLE_SIGNALS'] || 'true').toLowerCase() !== 'false',
+    ALLOWED_ORIGINS: process.env['ALLOWED_ORIGINS']
+        ? process.env['ALLOWED_ORIGINS'].split(',')
         : ['http://localhost:3008', 'http://127.0.0.1:3008', 'http://localhost:8080', 'http://127.0.0.1:8080'],
 };
 
@@ -350,7 +350,7 @@ class ChromeProxyService {
         this._proxyReady = this._initProxy();
 
         // Idle connection cleanup (5 minutes for LLM sessions)
-        this._idleTimeoutMs = parseInt(process.env.WS_IDLE_TIMEOUT_MS || '300000', 10);
+        this._idleTimeoutMs = parseInt(process.env['WS_IDLE_TIMEOUT_MS'] || '300000', 10);
         this._idleCheckInterval = setInterval(
             () => this._cleanupIdleConnections(),
             Math.max(10000, this._idleTimeoutMs / 2),
@@ -358,8 +358,8 @@ class ChromeProxyService {
 
         // ✅ WebSocket Rate Limiting (DoS Protection)
         this.wsConnectionsPerIP = new Map(); // IP → count
-        this.MAX_WS_GLOBAL = parseInt(process.env.CHROME_PROXY_MAX_WS_GLOBAL || '200', 10);
-        this.MAX_WS_PER_IP = parseInt(process.env.CHROME_PROXY_MAX_WS_PER_IP || '20', 10);
+        this.MAX_WS_GLOBAL = parseInt(process.env['CHROME_PROXY_MAX_WS_GLOBAL'] || '200', 10);
+        this.MAX_WS_PER_IP = parseInt(process.env['CHROME_PROXY_MAX_WS_PER_IP'] || '20', 10);
         this.WS_IP_CLEANUP_INTERVAL = 60000; // Clean stale entries every 60s
 
         // ✅ P1.5: Store cleanup interval handle for graceful shutdown
@@ -384,7 +384,7 @@ class ChromeProxyService {
             this.wsProxy.on(
                 'error',
                 /** @type {function(any, any, any): void} */ (
-                    (err, req, res) => {
+                    (err, _req, res) => {
                         this.stats.errors++;
                         this._incrementMetric(this.metrics.proxyErrors, { type: 'http_proxy' });
                         this.log('error', 'Proxy error', { error: /** @type {any} */ (err).message });
@@ -442,9 +442,9 @@ class ChromeProxyService {
     ====================================================================== */
     _detectPublicIP() {
         // 1. Env var (most reliable)
-        if (process.env.PUBLIC_IP) {
-            this.log('debug', 'Using PUBLIC_IP from env', { ip: process.env.PUBLIC_IP });
-            return process.env.PUBLIC_IP;
+        if (process.env['PUBLIC_IP']) {
+            this.log('debug', 'Using PUBLIC_IP from env', { ip: process.env['PUBLIC_IP'] });
+            return process.env['PUBLIC_IP'];
         }
 
         // 2. Docker internal IP (container)
@@ -463,8 +463,8 @@ class ChromeProxyService {
     _getDockerInternalIP() {
         const interfaces = os.networkInterfaces();
         // Docker creates eth0 with IP 172.17.0.x or similar
-        if (interfaces.eth0) {
-            const ipv4 = interfaces.eth0.find(
+        if (interfaces['eth0']) {
+            const ipv4 = interfaces['eth0'].find(
                 (iface) => iface.family === 'IPv4' && !iface.internal && iface.address.startsWith('172.'),
             );
             if (ipv4) return ipv4.address;
@@ -1575,7 +1575,7 @@ class ChromeProxyService {
         }
 
         // NERV integration (optional)
-        const nervEnabled = (process.env.NERV_INTEGRATION || 'true').toString().toLowerCase() !== 'false';
+        const nervEnabled = (process.env['NERV_INTEGRATION'] || 'true').toString().toLowerCase() !== 'false';
         if (nervEnabled) {
             try {
                 const nervModule = /** @type {any} */ (await import('#nerv/nerv'));
@@ -1656,7 +1656,7 @@ class ChromeProxyService {
             });
 
             // Metrics endpoint
-            this.app.get('/metrics', async (req, res) => {
+            this.app.get('/metrics', async (_req, res) => {
                 try {
                     // Update circuit breaker state metric
                     const cbState = this.circuitBreaker.state;

@@ -135,11 +135,11 @@ export function hasRequiredProperties(obj, requiredProps) {
  */
 export function isActorLike(value) {
     if (!isRecord(value)) return false;
-    if (value.id !== undefined && typeof value.id !== 'string' && typeof value.id !== 'number') return false;
-    if (value.username !== undefined && typeof value.username !== 'string') return false;
-    if (value.role !== undefined && typeof value.role !== 'string') return false;
-    if (value.roles !== undefined && !Array.isArray(value.roles)) return false;
-    if (value.permissions !== undefined && !Array.isArray(value.permissions)) return false;
+    if (value['id'] !== undefined && typeof value['id'] !== 'string' && typeof value['id'] !== 'number') return false;
+    if (value['username'] !== undefined && typeof value['username'] !== 'string') return false;
+    if (value['role'] !== undefined && typeof value['role'] !== 'string') return false;
+    if (value['roles'] !== undefined && !Array.isArray(value['roles'])) return false;
+    if (value['permissions'] !== undefined && !Array.isArray(value['permissions'])) return false;
     return true;
 }
 

@@ -9,7 +9,7 @@
     </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ArcElement, Chart, DoughnutController, Tooltip } from 'chart.js';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
@@ -62,8 +62,8 @@ export default {
         },
     },
     setup(props) {
-        const chartCanvas = ref(null);
-        let chartInstance = null;
+        const chartCanvas = ref<HTMLCanvasElement | null>(null);
+        let chartInstance: Chart<'doughnut', number[], string> | null = null;
 
         const formattedValue = computed(() => {
             return props.value.toFixed(1);
@@ -80,6 +80,7 @@ export default {
             if (!chartCanvas.value) return;
 
             const ctx = chartCanvas.value.getContext('2d');
+            if (!ctx) return;
             const percentage = Math.min((props.value / props.max) * 100, 100);
             const remaining = 100 - percentage;
 
@@ -117,8 +118,10 @@ export default {
             const percentage = Math.min((props.value / props.max) * 100, 100);
             const remaining = 100 - percentage;
 
-            chartInstance.data.datasets[0].data = [percentage, remaining];
-            chartInstance.data.datasets[0].backgroundColor = [currentColor.value, props.colorBackground];
+            const dataset = chartInstance.data.datasets[0];
+            if (!dataset) return;
+            dataset.data = [percentage, remaining];
+            dataset.backgroundColor = [currentColor.value, props.colorBackground];
             chartInstance.update('none');
         };
 

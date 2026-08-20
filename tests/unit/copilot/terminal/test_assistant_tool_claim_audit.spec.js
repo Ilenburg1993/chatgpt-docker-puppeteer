@@ -6,7 +6,7 @@ import { auditAssistantToolClaims } from '../../../../src/copilot/terminal/dialo
 
 /**
  * @param {{ operation: string; toolName?: string; status?: string; success?: boolean | null }[]} tools
- * @returns {ReturnType<import('../../../../src/copilot/terminal/state/turn-trace-state.js').readTerminalTurnTraceProjection>}
+ * @returns {ReturnType<typeof import('../../../../src/copilot/terminal/state/turn-trace-state.js').readTerminalTurnTraceProjection>}
  */
 function projectionWithTools(tools) {
     return {

@@ -32,7 +32,7 @@ function optionalString(value) {
 }
 
 /**
- * @param {Record<string, any>} projection
+ * @param {Record<string, unknown>} projection
  * @returns {string}
  */
 function projectionRouteKey(projection) {
@@ -44,7 +44,7 @@ function projectionRouteKey(projection) {
 }
 
 /**
- * @param {Record<string, any>} record
+ * @param {Record<string, unknown>} record
  * @returns {string}
  */
 function catalogModelRouteKey(record) {
@@ -56,7 +56,7 @@ function catalogModelRouteKey(record) {
 }
 
 /**
- * @param {Record<string, any>} route
+ * @param {Record<string, unknown>} route
  * @returns {string}
  */
 function routeOptionKey(route) {
@@ -64,7 +64,7 @@ function routeOptionKey(route) {
 }
 
 /**
- * @param {Record<string, any>} health
+ * @param {Record<string, unknown>} health
  * @returns {string}
  */
 function healthRouteKey(health) {
@@ -76,38 +76,41 @@ function healthRouteKey(health) {
 }
 
 /**
- * @param {Record<string, any>} decision
+ * @param {object} decision
  * @returns {string}
  */
 export function modelEligibilityDecisionKey(decision) {
+    const providerModel = optionalString(Reflect.get(decision, 'providerModel')) ?? 'unknown-model';
     return [
-        optionalString(decision['providerId']) ?? 'unknown-provider',
-        optionalString(decision['providerModel']) ?? 'unknown-model',
-        optionalString(decision['routeProfile']) ?? 'default',
-        optionalString(decision['selectorKind']) ?? 'exact_model',
-        optionalString(decision['selectorSyntax']) ?? optionalString(decision['providerModel']) ?? 'unknown-model',
-        optionalString(decision['accountScope']) ?? 'default',
-        optionalString(decision['policyProfile']) ?? 'default',
-        optionalString(decision['taskProfile']) ?? 'default',
+        optionalString(Reflect.get(decision, 'providerId')) ?? 'unknown-provider',
+        providerModel,
+        optionalString(Reflect.get(decision, 'routeProfile')) ?? 'default',
+        optionalString(Reflect.get(decision, 'selectorKind')) ?? 'exact_model',
+        optionalString(Reflect.get(decision, 'selectorSyntax')) ?? providerModel,
+        optionalString(Reflect.get(decision, 'accountScope')) ?? 'default',
+        optionalString(Reflect.get(decision, 'policyProfile')) ?? 'default',
+        optionalString(Reflect.get(decision, 'taskProfile')) ?? 'default',
     ].join(':');
 }
 
 /**
- * @template {Record<string, any>} T
- * @param {T[]} records
- * @param {T[]} additions
- * @param {(record: T) => string} key
- * @returns {T[]}
+ * @template {object} TExisting
+ * @template {object} TAddition
+ * @param {TExisting[]} records
+ * @param {TAddition[]} additions
+ * @param {(record: TExisting | TAddition) => string} key
+ * @returns {Array<TExisting | TAddition>}
  */
 function upsertMany(records, additions, key) {
+    /** @type {Map<string, TExisting | TAddition>} */
     const map = new Map(records.map((record) => [key(record), record]));
     for (const item of additions) map.set(key(item), item);
     return [...map.values()];
 }
 
 /**
- * @param {Record<string, any>[]} routeOptions
- * @returns {Map<string, Record<string, any>[]>}
+ * @param {Record<string, unknown>[]} routeOptions
+ * @returns {Map<string, Record<string, unknown>[]>}
  */
 function routeOptionsByProjectionKey(routeOptions) {
     const map = new Map();
@@ -122,7 +125,7 @@ function routeOptionsByProjectionKey(routeOptions) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
+ * @param {Record<string, unknown>} snapshot
  * @returns {Set<string>}
  */
 function currentCatalogRouteKeys(snapshot) {
@@ -132,7 +135,7 @@ function currentCatalogRouteKeys(snapshot) {
 }
 
 /**
- * @param {Record<string, any>[]} decisions
+ * @param {Record<string, unknown>[]} decisions
  * @returns {{ modelCount: number; eligibleCount: number; unknownCount: number; excludedCount: number }}
  */
 function summarizeDecisions(decisions) {
@@ -155,12 +158,11 @@ function summarizeDecisions(decisions) {
 
 /**
  * @param {object} input
- * @param {Record<string, any>} input.snapshot
- * @param {{ has(ref: string): boolean }} [input.secretRegistry]
- * @param {Record<string, any>} [input.policy]
- * @param {Record<string, any>[]} [input.healthRecords]
+ * @param {Record<string, unknown>} input.snapshot
+ * @param {{ has(ref: string): boolean } | undefined} [input.secretRegistry]
+ * @param {Record<string, unknown> | undefined} [input.policy]
+ * @param {Record<string, unknown>[] | undefined} [input.healthRecords]
  * @param {() => Date} [input.now]
- * @returns {{ run: ReturnType<typeof createModelEligibilityRun>; decisions: Record<string, any>[]; summary: ReturnType<typeof summarizeDecisions> }}
  */
 export function evaluateModelGatewayCatalogEligibility(input) {
     const now = input.now ?? (() => new Date());
@@ -225,10 +227,10 @@ export function evaluateModelGatewayCatalogEligibility(input) {
 }
 
 /**
- * @param {Record<string, any>} snapshot
- * @param {Record<string, any>[]} decisions
- * @param {Record<string, any>} run
- * @returns {Record<string, any>}
+ * @template {Record<string, unknown>} TSnapshot
+ * @param {TSnapshot} snapshot
+ * @param {ReturnType<typeof import('./contracts.js').createModelEligibilityDecision>[]} decisions
+ * @param {ReturnType<typeof createModelEligibilityRun>} run
  */
 export function applyModelGatewayEligibilityToSnapshot(snapshot, decisions, run) {
     const currentKeys = currentCatalogRouteKeys(snapshot);

@@ -423,7 +423,7 @@ export class CopilotClientManager {
         await client.setForegroundSessionId(sessionId);
     }
 
-    /** @returns {Promise<ReturnType<CopilotClient['rpc']>>} */
+    /** @returns {Promise<CopilotClient['rpc']>} */
     async getServerRpc() {
         const client = await this.getClient();
         return client.rpc;
@@ -678,6 +678,7 @@ export async function setForegroundClientSessionId(sessionId) {
     return defaultClientManager.setForegroundClientSessionId(sessionId);
 }
 
+/** @returns {Promise<CopilotClient['rpc']>} */
 export async function getServerRpc() {
     return defaultClientManager.getServerRpc();
 }

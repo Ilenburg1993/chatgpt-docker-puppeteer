@@ -17,7 +17,9 @@ loadDotenv({ path: '.env.local', override: false, quiet: true });
 loadDotenv({ path: '.env', override: false, quiet: true });
 
 const args = process.argv.slice(2);
+/** @param {string} name */
 const hasFlag = (name) => args.includes(name);
+/** @param {string} name */
 const valuesFor = (name) => args
     .filter((arg) => arg.startsWith(`${name}=`))
     .flatMap((arg) => arg.slice(name.length + 1).split(','))
@@ -137,7 +139,7 @@ if (planOnly) {
         importers,
         sources: previous.sources,
         force,
-        sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
+        ...(sourceIds.length > 0 ? { sourceIds } : {}),
     });
     const summary = {
         schema: 'model-gateway-refresh-plan',
@@ -165,7 +167,7 @@ const result = await refreshModelGatewayCatalog({
     importers,
     incremental,
     force,
-    sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
+    ...(sourceIds.length > 0 ? { sourceIds } : {}),
     refreshAccountOverlays: true,
     eligibility: {
         enabled: true,

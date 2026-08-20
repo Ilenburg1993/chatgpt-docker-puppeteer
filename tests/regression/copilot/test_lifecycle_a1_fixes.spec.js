@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- regression test with mocks
 /**
  * Testes de regressão — Fase A1 (BUG-03, BUG-06, BUG-10)
  *
@@ -16,7 +15,9 @@ const { mockLog, mockCreateSession, mockResumeSession, mockApproveAll } = vi.hoi
     mockLog: vi.fn(),
     mockCreateSession: vi.fn(),
     mockResumeSession: vi.fn(),
-    mockApproveAll: vi.fn(() => 'approved'),
+    mockApproveAll: vi.fn(async () =>
+        /** @type {import('@github/copilot-sdk').PermissionRequestResult} */ ({ kind: 'approve-once' }),
+    ),
 }));
 
 // lifecycle.js importa o logger por caminho relativo; o alias folha do SDK não existe mais.
@@ -53,6 +54,9 @@ vi.mock('@github/copilot-sdk', () => ({
 
 import { createSession, resumeSession } from '../../../src/copilot/sdk/session/lifecycle.js';
 
+/** @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig */
+/** @typedef {import('@github/copilot-sdk').ResumeSessionConfig} ResumeSessionConfig */
+
 // ─── Helper: fake client ───────────────────────────────────────────────────
 
 function fakeClient() {
@@ -65,7 +69,23 @@ function fakeClient() {
             sessionId: 'sess-test-a1',
             rpc: {},
         }),
+        listSessions: vi.fn().mockResolvedValue([]),
+        deleteSession: vi.fn().mockResolvedValue(undefined),
     };
+}
+
+/** @returns {SessionConfig} */
+function lastCreateConfig() {
+    const call = mockCreateSession.mock.lastCall;
+    if (!call) throw new Error('createSession não foi chamado');
+    return /** @type {SessionConfig} */ (call[0]);
+}
+
+/** @returns {ResumeSessionConfig} */
+function lastResumeConfig() {
+    const call = mockResumeSession.mock.lastCall;
+    if (!call) throw new Error('resumeSession não foi chamado');
+    return /** @type {ResumeSessionConfig} */ (call[1]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -87,7 +107,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
             });
 
             expect(mockCreateSession).toHaveBeenCalledOnce();
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
 
             // Propriedades diretas (não via cfg['key'])
             expect(config.model).toBe('gpt-4.1');
@@ -103,7 +123,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
             });
 
             expect(mockResumeSession).toHaveBeenCalledOnce();
-            const config = mockResumeSession.mock.calls[0][1];
+            const config = lastResumeConfig();
 
             expect(config.streaming).toBe(true);
             expect(config.onPermissionRequest).toBeDefined();
@@ -118,9 +138,9 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
                 disableResume: true,
             });
 
-            const config = mockResumeSession.mock.calls[0][1];
+            const config = lastResumeConfig();
             expect(config.suppressResumeEvent).toBe(true);
-            expect(config.disableResume).toBeUndefined();
+            expect(/** @type {Record<string, unknown>} */ (config)['disableResume']).toBeUndefined();
         });
 
         it('mcpServers e customAgents são passados corretamente em create', async () => {
@@ -133,7 +153,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
                 customAgents,
             });
 
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.mcpServers).toEqual(mcpServers);
             expect(config.customAgents).toEqual(customAgents);
         });
@@ -151,7 +171,7 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
             );
             expect(warnCalls).toHaveLength(0);
 
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.reasoningEffort).toBe('high');
         });
 
@@ -176,11 +196,13 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
             // Deve ter emitido WARN
             const warnCalls = mockLog.mock.calls.filter(([level]) => level === 'WARN');
             expect(warnCalls.length).toBeGreaterThanOrEqual(1);
-            expect(warnCalls[0][1]).toContain('maximum');
-            expect(warnCalls[0][1]).toContain('inválido');
+            const firstWarn = warnCalls[0];
+            if (!firstWarn) throw new Error('WARN de reasoningEffort não foi emitido');
+            expect(firstWarn[1]).toContain('maximum');
+            expect(firstWarn[1]).toContain('inválido');
 
             // Valor ainda é passado (SDK pode ter razões para aceitar)
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.reasoningEffort).toBe('maximum');
         });
     });
@@ -194,11 +216,13 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
                 infiniteSessions: { enabled: true },
             });
 
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.infiniteSessions).toBeDefined();
-            expect(config.infiniteSessions.enabled).toBe(true);
+            const infiniteSessions = config.infiniteSessions;
+            if (!infiniteSessions) throw new Error('infiniteSessions não foi propagado');
+            expect(infiniteSessions.enabled).toBe(true);
             // BUG-10: era 0.75. Agora deve ser 0.8 (INFINITE_SESSION_DEFAULTS)
-            expect(config.infiniteSessions.backgroundCompactionThreshold).toBe(0.8);
+            expect(infiniteSessions.backgroundCompactionThreshold).toBe(0.8);
         });
 
         it('override explícito de threshold é respeitado', async () => {
@@ -210,8 +234,8 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
                 },
             });
 
-            const config = mockCreateSession.mock.calls[0][0];
-            expect(config.infiniteSessions.backgroundCompactionThreshold).toBe(0.9);
+            const config = lastCreateConfig();
+            expect(config.infiniteSessions?.backgroundCompactionThreshold).toBe(0.9);
         });
 
         it('bufferExhaustionThreshold é incluído quando explícito', async () => {
@@ -223,15 +247,15 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
                 },
             });
 
-            const config = mockCreateSession.mock.calls[0][0];
-            expect(config.infiniteSessions.bufferExhaustionThreshold).toBe(0.95);
+            const config = lastCreateConfig();
+            expect(config.infiniteSessions?.bufferExhaustionThreshold).toBe(0.95);
         });
 
         it('infiniteSessions NÃO é incluído quando não fornecido', async () => {
             const client = fakeClient();
             await createSession(client, { model: 'gpt-4.1' });
 
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.infiniteSessions).toBeUndefined();
         });
     });
@@ -258,7 +282,7 @@ describe('Fase A2 — Regressão lifecycle.js', () => {
                 onPermissionRequest: mockApproveAll,
             });
 
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.clientName).toBe('chatgpt-docker-puppeteer');
         });
 
@@ -269,7 +293,7 @@ describe('Fase A2 — Regressão lifecycle.js', () => {
                 onPermissionRequest: mockApproveAll,
             });
 
-            const config = mockCreateSession.mock.calls[0][0];
+            const config = lastCreateConfig();
             expect(config.clientName).toBeUndefined();
         });
     });
@@ -344,6 +368,7 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
     // ─── A3 — Novos campos SessionConfig passados ao SDK ────────────────
 
     describe('A3: novos campos SessionConfig passados ao SDK', () => {
+        /** @type {Array<[string, string]>} */
         const newFields = [
             ['availableTools', 'availableTools'],
             ['excludedTools', 'excludedTools'],
@@ -364,8 +389,8 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
                     [inputField]: testValue,
                 });
 
-                const config = mockCreateSession.mock.calls[0][0];
-                expect(config[sdkField]).toBe(testValue);
+                const config = lastCreateConfig();
+                expect(/** @type {Record<string, unknown>} */ (config)[sdkField]).toBe(testValue);
             });
 
             it(`campo SDK '${sdkField}' ausente NÃO aparece na config`, async () => {
@@ -375,8 +400,8 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
                     onPermissionRequest: mockApproveAll,
                 });
 
-                const config = mockCreateSession.mock.calls[0][0];
-                expect(config[sdkField]).toBeUndefined();
+                const config = lastCreateConfig();
+                expect(/** @type {Record<string, unknown>} */ (config)[sdkField]).toBeUndefined();
             });
         }
     });

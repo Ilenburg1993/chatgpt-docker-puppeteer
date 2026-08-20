@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.tools.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.strict.workspace-root.tsbuildinfo",
+    "noEmit": true
+  },
+  "include": [
+    "../../../src/types/**/*.d.ts",
+    "../../../*.js",
+    "../../../*.mjs",
+    "../../../*.cjs",
+    "../../../*.ts",
+    "../../../*.tsx",
+    "../../../*.mts",
+    "../../../*.cts"
+  ],
+  "files": [
+    "../../../.dependency-cruiser.mjs"
+  ]
+}

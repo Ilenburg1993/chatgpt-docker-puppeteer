@@ -126,7 +126,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useAudit } from '@/composables/useAudit';
 import { onMounted } from 'vue';
 import { useRoute } from 'vue-router';
@@ -144,7 +144,7 @@ const {
     getPatchApplyReadiness,
 } = useAudit();
 
-const patchId = route.params.id;
+const patchId = route.params['id'];
 
 onMounted(async () => {
     await getPatch(patchId);
@@ -170,8 +170,8 @@ async function handleApply() {
     await getPatch(patchId);
 }
 
-function patchStatusClass(status) {
-    const classes = {
+function patchStatusClass(status: string) {
+    const classes: Record<string, string> = {
         draft: 'bg-gray-100 text-gray-800',
         pending: 'bg-yellow-100 text-yellow-800',
         approved: 'bg-green-100 text-green-800',
@@ -181,7 +181,7 @@ function patchStatusClass(status) {
     return classes[status] || 'bg-gray-100 text-gray-800';
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | number | Date | null | undefined) {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString('pt-BR');
 }

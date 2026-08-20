@@ -28,13 +28,13 @@ async function _runControl(
             payload: {
                 ...payload,
                 reason:
-                    payload.reason ||
+                    payload['reason'] ||
                     req.body?.reason ||
                     `${String(command).toLowerCase()} via /api/dashboard/inference`,
                 idempotency_key:
-                    payload.idempotency_key ||
+                    payload['idempotency_key'] ||
                     req.body?.idempotency_key ||
-                    `${req.id}:${command}:${payload.id || payload.backend_id || payload.model_id || payload.name || 'n/a'}`,
+                    `${req.id}:${command}:${payload['id'] || payload['backend_id'] || payload['model_id'] || payload['name'] || 'n/a'}`,
             },
             actor: _actorFromReq(req),
         });
@@ -135,10 +135,10 @@ function _buildInferenceSummary({ backends = [], models = [], profiles = [], cli
 }
 
 function getBaseUrls() {
-    const gatewayHost = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-    const gatewayPort = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
-    const auditAgentHost = process.env.AUDIT_AGENT_HOST || '127.0.0.1';
-    const auditAgentPort = Number(process.env.AUDIT_AGENT_PORT || 3098);
+    const gatewayHost = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+    const gatewayPort = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
+    const auditAgentHost = process.env['AUDIT_AGENT_HOST'] || '127.0.0.1';
+    const auditAgentPort = Number(process.env['AUDIT_AGENT_PORT'] || 3098);
     return {
         inferenceGateway: `http://${gatewayHost}:${gatewayPort}`,
         auditAgent: `http://${auditAgentHost}:${auditAgentPort}`,
@@ -188,7 +188,7 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
     try {
         const appLocals = req.app?.locals || {};
         const runtimeSummary =
-            typeof appLocals.getRuntimeResourcesStatus === 'function' ? appLocals.getRuntimeResourcesStatus() : null;
+            typeof appLocals['getRuntimeResourcesStatus'] === 'function' ? appLocals['getRuntimeResourcesStatus']() : null;
         const urls = getBaseUrls();
 
         const [gatewayHealth, auditAgentHealth] = await Promise.all([
@@ -282,7 +282,7 @@ router.get('/inference/models', authenticate, async (req, res) => {
 
 router.get('/inference/models-db', authenticate, async (req, res) => {
     try {
-        const backendId = req.query?.backend_id ? String(req.query.backend_id) : null;
+        const backendId = req.query?.['backend_id'] ? String(req.query['backend_id']) : null;
         const models = listInferenceModels({ backendId, enabledOnly: false, limit: 1000 });
         const enriched = models.map(_enrichModelDb);
         return ok(res, req, enriched, { count: enriched.length, source: 'sqlite', enriched: true });
@@ -384,8 +384,8 @@ router.post('/inference/triage/preflight', authenticate, async (req, res) => {
         const urls = getBaseUrls();
         const body = req.body || {};
         const profileName =
-            body.profile_name || body.profileName || process.env.AUDIT_AGENT_TRIAGE_PROFILE_NAME || undefined;
-        const model = body.model || process.env.AUDIT_AGENT_LLM_MODEL_TRIAGE || undefined;
+            body.profile_name || body.profileName || process.env['AUDIT_AGENT_TRIAGE_PROFILE_NAME'] || undefined;
+        const model = body.model || process.env['AUDIT_AGENT_LLM_MODEL_TRIAGE'] || undefined;
         const backend = body.backend || undefined;
         const timeoutMs = Math.max(500, Number(body.timeout_ms || body.timeoutMs || 2000));
         const out = await safePostJson(
@@ -444,8 +444,8 @@ router.post('/inference/patch/preflight', authenticate, async (req, res) => {
         const urls = getBaseUrls();
         const body = req.body || {};
         const profileName =
-            body.profile_name || body.profileName || process.env.AUDIT_AGENT_PATCH_AUTHOR_PROFILE_NAME || undefined;
-        const model = body.model || process.env.AUDIT_AGENT_LLM_MODEL_PATCH || undefined;
+            body.profile_name || body.profileName || process.env['AUDIT_AGENT_PATCH_AUTHOR_PROFILE_NAME'] || undefined;
+        const model = body.model || process.env['AUDIT_AGENT_LLM_MODEL_PATCH'] || undefined;
         const backend = body.backend || undefined;
         const timeoutMs = Math.max(500, Number(body.timeout_ms || body.timeoutMs || 2000));
         const out = await safePostJson(
@@ -513,7 +513,7 @@ router.post('/inference/backends', authenticate, async (req, res) => {
 router.post('/inference/backends/:id/toggle', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.INFERENCE_BACKEND_TOGGLE, {
         ...(req.body || {}),
-        backend_id: req.params.id,
+        backend_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {
@@ -536,7 +536,7 @@ router.post('/inference/models', authenticate, async (req, res) => {
 router.post('/inference/models/:id/toggle', authenticate, async (req, res) => {
     const result = await _runControl(req, res, COMMANDS.INFERENCE_MODEL_TOGGLE, {
         ...(req.body || {}),
-        model_id: req.params.id,
+        model_id: req.params['id'],
     });
     if (!result) return;
     return ok(res, req, result.result?.after || null, {

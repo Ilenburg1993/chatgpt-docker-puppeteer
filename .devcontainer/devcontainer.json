@@ -578,8 +578,12 @@
     "VSCODE_SERVER_EXPECTED": "true",
     "VSCODE_SERVER_ROLE": "instrumentation",
     // ============================================================
-    // LSP / TSSERVER DAEMON (comportamento ajustável sem rebuild)
+    // LSP LOCAL (legado preservado, sempre desligado por padrão)
     // ============================================================
+    // O editor usa o TSServer/LSP nativo do TypeScript 7. O daemon MCP local
+    // só pode ser habilitado explicitamente em um processo isolado.
+    "LSP_ENABLED": "false",
+    "LSP_MUTATIONS_ENABLED": "false",
     // Timeout por operação LSP (ms). O daemon usa este valor como fallback;
     // cada chamada pode sobrescrever via options.timeoutMs.
     "LSP_TOOL_TIMEOUT_MS": "15000",
@@ -600,87 +604,42 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "GitHub.copilot",
-        "GitHub.copilot-chat",
+        "TypeScriptTeam.native-preview",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "usernamehw.errorlens",
-        "ms-azuretools.vscode-docker",
+        "ms-azuretools.vscode-containers",
         "ms-vscode.makefile-tools",
         "eamodio.gitlens",
-        "christian-kohler.path-intellisense",
-        "christian-kohler.npm-intellisense",
         "timonwong.shellcheck",
         "redhat.vscode-yaml",
-        "hbenl.vscode-test-explorer",
-        "ryanluker.vscode-coverage-gutters",
-        "humao.rest-client",
-        "ZainChen.json",
-        "oderwat.indent-rainbow",
-        "aaron-bond.better-comments",
-        "PKief.material-icon-theme",
-        "yzhang.markdown-all-in-one",
-        "streetsidesoftware.code-spell-checker",
-        "streetsidesoftware.code-spell-checker-portuguese-brazilian",
-        "gruntfuggly.todo-tree",
-        "pflannery.vscode-versionlens",
         "EditorConfig.EditorConfig",
         "ms-vscode.powershell",
         "MS-CEINTL.vscode-language-pack-pt-BR",
-        "ms-vscode.azure-repos",
+        "Vue.volar",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github",
         "Anthropic.claude-code",
         "coderabbit.coderabbit-vscode",
         "openai.chatgpt",
-        "ms-azuretools.vscode-containers",
-        "ms-vscode-remote.remote-containers",
-        "ms-vscode-remote.vscode-remote-extensionpack",
-        "docker.docker",
-        "ms-vscode.remote-explorer",
         "google.geminicodeassist",
-        "mhutchie.git-graph",
-        "github.vscode-github-actions",
-        "GitHub.codespaces",
-        "vscjava.migrate-java-to-azure",
-        "ms-vscode.vscode-github-issue-notebooks",
-        "GitHub.github-vscode-theme",
-        "tintinweb.graphviz-interactive-preview",
         "HuggingFace.huggingface-vscode-chat",
-        "cmstead.js-codeformer",
-        "cmstead.jsrefactor",
         "kilocode.kilo-code",
-        "bierner.markdown-preview-github-styles",
-        "bierner.markdown-mermaid",
-        "DavidAnson.vscode-markdownlint",
-        "MermaidChart.vscode-mermaid-chart",
-        "chris-noring.node-snippets",
-        "howardzuo.vscode-npm-dependency",
         "sst-dev.opencode",
-        "GitHub.vscode-pull-request-github",
-        "ms-python.python",
-        "ms-python.vscode-pylance",
-        "ms-python.debugpy",
-        "ms-vscode-remote.remote-ssh",
-        "ms-vscode-remote.remote-ssh-edit",
-        "ms-vscode.remote-server",
-        "GitHub.remotehub",
-        "ms-vscode.remote-repositories",
-        "jasonnutter.search-node-modules",
-        "Vue.volar",
-        "ms-vscode-remote.remote-wsl"
+        "humao.rest-client",
+        "aaron-bond.better-comments",
+        "yzhang.markdown-all-in-one",
+        "DavidAnson.vscode-markdownlint"
       ],
       "settings": {
+        // TypeScript 7 native is the canonical JS/TS language service. `TypeScriptTeam.native-preview` is the
+        // historical Marketplace ID of the official TypeScript 7 VS Code client; its bundled engine is stable TS7.
+        // Toggle this flag to false only for a deliberate fallback to the built-in Node/tsserver.js service.
+        "js/ts.experimental.useTsgo": true,
         // In DevContainer, Codex must run in-container instead of being redirected to host-side WSL.
         "chatgpt.runCodexInWindowsSubsystemForLinux": false,
-        "cSpell.enabledFileTypes": {
-          "javascript": true,
-          "json": true,
-          "markdown": true,
-          "yaml": true
-        },
-        // ========================================================
-        // SPELL CHECKER (EN + PT-BR)
-        // ========================================================
-        "cSpell.language": "pt-BR,en",
         "debug.javascript.autoAttachFilter": "onlyWithFlag",
         "editor.bracketPairColorization.enabled": true,
         //"editor.defaultFormatter": "esbenp.prettier-vscode",

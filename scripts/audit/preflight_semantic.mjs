@@ -68,6 +68,8 @@ async function main() {
         lsp: {
             ...summarizeResult(lspHealth),
             ok: lspHealth.ok && Boolean(lspJson?.ok),
+            enabled: lspJson?.enabled !== false,
+            disabled_by_policy: lspJson?.disabled_by_policy === true,
             lsp_tools_present: Boolean(lspJson?.lsp_tools_present),
             lsp_functional_ok: Boolean(lspJson?.lsp_functional_ok),
             details: lspHealth.ok ? 'lsp-health-command-ok' : 'lsp-health-command-failed',
@@ -84,7 +86,7 @@ async function main() {
     if (components.rag.ok && components.rag.available === false) {
         issues.push('rag index unavailable');
     }
-    if (components.lsp.ok && !components.lsp.lsp_functional_ok) {
+    if (components.lsp.enabled && components.lsp.ok && !components.lsp.lsp_functional_ok) {
         issues.push('lsp functional checks failed');
     }
 

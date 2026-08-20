@@ -274,7 +274,7 @@ export function parseGeminiDocsRows(raw) {
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.modelsUrl]
  * @param {string} [options.pricingUrl]
  * @param {string} [options.openaiUrl]

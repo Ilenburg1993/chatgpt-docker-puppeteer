@@ -9,6 +9,39 @@
 // ============================================================
 
 declare module '#infra/io' {
+    export interface DnaSelectorProtocol {
+        selector: string;
+        confidence?: number;
+        [key: string]: unknown;
+    }
+
+    export type DnaSelectorValue = string | string[] | DnaSelectorProtocol;
+
+    export interface DnaTargetRules {
+        selectors: Record<string, DnaSelectorValue>;
+        behavior_overrides?: Record<string, unknown>;
+        source?: string;
+    }
+
+    export interface DnaDocument {
+        _meta: {
+            version: number;
+            evolution_count: number;
+            last_updated?: string;
+            updated_by?: string;
+        };
+        targets: Record<string, DnaTargetRules>;
+        global_selectors: Record<string, DnaSelectorValue>;
+        [key: string]: unknown;
+    }
+
+    export interface DnaHistoryEntry {
+        version: number;
+        timestamp: string;
+        evolution_count: number;
+        updated_by: string;
+    }
+
     /** Raiz do projeto (PATHS.ROOT) */
     export const ROOT: string;
     /** Diretório de respostas */
@@ -21,24 +54,17 @@ declare module '#infra/io' {
     export function loadResponse(id: string, signal?: AbortSignal): Promise<string>;
     export function synchronize(): Promise<void>;
     export function loadAllTasks(projectId?: string): Promise<unknown[]>;
-    export function getTargetRules(target: string): Promise<unknown>;
+    export function getTargetRules(target: string): Promise<DnaTargetRules>;
 
     // Identity operations
     export function getIdentity(): Promise<{ robot_id?: string; [key: string]: unknown } | null>;
     export function saveIdentity(identity: unknown): Promise<void>;
 
     // DNA operations
-    export function getDna(): Promise<{
-        version?: number;
-        evolution_count?: number;
-        targets?: Record<string, unknown>;
-        selectors?: Record<string, unknown>;
-        _meta?: Record<string, unknown>;
-        [key: string]: unknown;
-    }>;
-    export function saveDna(dna: unknown): Promise<void>;
-    export function getDnaHistory(): Promise<unknown[]>;
-    export function rollbackDna(version: number): Promise<void>;
+    export function getDna(): Promise<DnaDocument>;
+    export function saveDna(dna: DnaDocument, author?: string): Promise<boolean>;
+    export function getDnaHistory(): DnaHistoryEntry[];
+    export function rollbackDna(version: number): Promise<DnaDocument>;
     export function getEvolutionStats(): Record<string, number>;
     export function evolveWithSadiProtocol(
         protocol: { selector?: string; confidence?: number; [key: string]: unknown },
@@ -199,8 +225,8 @@ declare module '#infra/browser_pool/pool_manager' {
         release(resource: unknown): Promise<void>;
         getStats(): PoolStats;
         cleanup(): Promise<void>;
-        initialize?(): Promise<void>;
-        shutdown?(): Promise<void>;
+        initialize(): Promise<void>;
+        shutdown(): Promise<void>;
         removePageFromPool(taskId: string, page?: any): void;
         getHealth?(): Promise<{ healthy: number; poolSize: number; [key: string]: unknown }>;
         initialized?: boolean;
@@ -254,7 +280,15 @@ declare module '#infra/proxy/chromeProxyService' {
         constructor(config?: ProxyConfig);
         start(): Promise<void>;
         stop(): Promise<void>;
+        handleHTTPRequest(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse): void;
+        handleWebSocketUpgrade(
+            req: import('node:http').IncomingMessage,
+            socket: import('node:net').Socket,
+            head: Buffer,
+        ): void;
+        rewriteWebSocketURL(data: string, hostFallback?: string | null): string;
         restart(): Promise<void>;
+        setNERV(nerv: unknown): void;
         getStatus(): ProxyStatus;
         isRunning(): boolean;
         getEndpoint(): string;

@@ -23,10 +23,10 @@ function makeMissionManager(
     const stateManager = {
         baseDir: path.join(process.cwd(), 'tmp', 'missions-wave17-owner'),
         async initialize() {},
-        async getMission(/** @type {any} */ missionId) {
+        async getMission(/** @type {string} */ _missionId) {
             return JSON.parse(JSON.stringify(stateRef.value));
         },
-        async updateMission(/** @type {any} */ missionId, /** @type {any} */ updates) {
+        async updateMission(/** @type {string} */ _missionId, /** @type {Record<string, unknown>} */ updates) {
             stateRef.value = { ...stateRef.value, ...updates };
             return JSON.parse(JSON.stringify(stateRef.value));
         },
@@ -89,11 +89,11 @@ function makeMissionManager(
     });
 }
 
-test('wave17: MissionManager força SSOT quando legacy_direct não está em contingência', async (t) => {
+test('wave17: MissionManager força SSOT quando legacy_direct não está em contingência', async () => {
     const dbPath = makeDbPath();
-    process.env.MAESTRO_DB_PATH = dbPath;
-    process.env.MISSION_STEP_DISPATCH_MODE = 'legacy_direct';
-    delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
+    process.env['MAESTRO_DB_PATH'] = dbPath;
+    process.env['MISSION_STEP_DISPATCH_MODE'] = 'legacy_direct';
+    delete process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'];
 
     const db = getDb();
     db.exec(`
@@ -106,8 +106,8 @@ test('wave17: MissionManager força SSOT quando legacy_direct não está em cont
     `);
 
     after(() => {
-        delete process.env.MISSION_STEP_DISPATCH_MODE;
-        delete process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED;
+        delete process.env['MISSION_STEP_DISPATCH_MODE'];
+        delete process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'];
         try {
             closeDb();
         } catch (_) {}

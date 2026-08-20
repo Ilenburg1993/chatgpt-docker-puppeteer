@@ -9,8 +9,51 @@
 // ============================================================
 
 declare module '#shared/utils/execution_context_filler' {
-    export function fillExecutionContext(context: unknown, data: unknown): Promise<string>;
-    export function prepareContext(context: unknown): Promise<unknown>;
+    export interface ExecutionContext {
+        driver: {
+            type: string;
+            version: string;
+            connection_mode: string;
+            browser_pool_health: string;
+        };
+        environment: {
+            platform: NodeJS.Platform;
+            node_version: string;
+            container: boolean;
+            chrome_version: string;
+        };
+        retry: {
+            tactical_attempts: number;
+            strategic_attempts: number;
+            errors_recovered: string[];
+            total_backoff_ms: number;
+        };
+    }
+
+    export interface ExecutionContextTask {
+        meta: { id: string; [key: string]: unknown };
+        execution?: Partial<ExecutionContext>;
+        [key: string]: unknown;
+    }
+
+    export interface FillExecutionContextOptions {
+        driver?: { name?: string; version?: string; connectionMode?: string };
+        browserPool?: {
+            getHealth?: () => string;
+            browser?: { version?: () => Promise<string> };
+        };
+        tacticalAttempts?: number;
+        strategicAttempts?: number;
+        errorsRecovered?: string[];
+        totalBackoffMs?: number;
+    }
+
+    export function fillExecutionContext<TTask extends ExecutionContextTask>(
+        task: TTask,
+        options?: FillExecutionContextOptions,
+    ): Promise<TTask & { execution: ExecutionContext }>;
+    export function incrementTacticalAttempts(task: ExecutionContextTask, errorRecovered?: string, backoffMs?: number): void;
+    export function incrementStrategicAttempts(task: ExecutionContextTask, errorRecovered?: string, backoffMs?: number): void;
 }
 
 // ============================================================

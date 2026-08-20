@@ -67,7 +67,7 @@ export { createLogObserver } from './bus-actions/log-observer.js';
 export { createAuditLog, defaultAuditLog } from '#copilot/audit';
 
 // ─── OTEL ─────────────────────────────────────────────────────────────────────
-export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan, startSpanImmediate } from './otel.js';
+export { DEFAULT_OTEL_FILE, buildTelemetryConfig, isOtelEnabled, startSpan, startSpanImmediate, toOtelException } from './otel.js';
 
 // ─── Tool Stats ──────────────────────────────────────────────────────────────
 export {

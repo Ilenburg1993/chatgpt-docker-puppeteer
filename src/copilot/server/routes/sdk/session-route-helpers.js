@@ -11,7 +11,7 @@ import { redactSecretText } from '#copilot/core';
 /**
  * @typedef {import('express').Response} Res
  *
- * @typedef {ReturnType<import('./deps.js').resolveSdkRouteSharedDeps>} SdkRouteDeps
+ * @typedef {ReturnType<typeof import('./deps.js').resolveSdkRouteSharedDeps>} SdkRouteDeps
  */
 
 /**

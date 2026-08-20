@@ -12,21 +12,21 @@ describe('mcp/cloudflare/edge-policy-plan', () => {
         });
 
         expect(result.ok).toBe(true);
-        expect(result.mode).toBe('plan-only');
-        expect(result.appliesChanges).toBe(false);
-        expect(result.endpoint).toMatchObject({
+        expect(result['mode']).toBe('plan-only');
+        expect(result['appliesChanges']).toBe(false);
+        expect(result['endpoint']).toMatchObject({
             publicHostname: 'mcp.aurelin.org',
             publicMcpUrl: 'https://mcp.aurelin.org/mcp',
             zone: 'aurelin.org',
         });
-        expect(result.desiredRulesets).toEqual(
+        expect(result['desiredRulesets']).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({ phase: 'http_request_cache_settings' }),
                 expect.objectContaining({ phase: 'http_ratelimit' }),
             ]),
         );
         const desiredRulesets = /** @type {{ name?: string; rules?: { expression?: string; rateLimitDraft?: Record<string, unknown> }[] }[]} */ (
-            result.desiredRulesets
+            result['desiredRulesets']
         );
         const constrainedRule = desiredRulesets
             .find((ruleset) => ruleset.name === 'MCP constrained rate limit policy')

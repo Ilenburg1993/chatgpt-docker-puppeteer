@@ -2,7 +2,6 @@
 import * as lifecycle from '#server/engine/lifecycle';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { test } from 'node:test';
 
 async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ matcher, timeoutMs = 10000) {
@@ -15,6 +14,22 @@ async function waitForOutput(/** @type {any} */ getOutput, /** @type {any} */ ma
         await new Promise((resolve) => setTimeout(resolve, 50));
     }
     throw new Error(`Timeout waiting for output: ${matcher}`);
+}
+
+/**
+ * @param {import('node:child_process').ChildProcess} child
+ * @param {number} [timeoutMs]
+ * @returns {Promise<[number | null, NodeJS.Signals | null]>}
+ */
+function waitForExit(child, timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout waiting child exit')), timeoutMs);
+        timeout.unref();
+        child.once('exit', (code, signal) => {
+            clearTimeout(timeout);
+            resolve([code, signal]);
+        });
+    });
 }
 
 test('wave4: lifecycle.listenToSignals is idempotent and cleanup removes listeners', () => {
@@ -40,7 +55,7 @@ test('wave4: lifecycle.listenToSignals is idempotent and cleanup removes listene
 
 test('wave4: real SIGTERM+SIGINT in subprocess trigger single coordinated shutdown', async () => {
     const childScript = `
-        process.env.LOG_LEVEL = 'ERROR';
+        process.env['LOG_LEVEL'] = 'ERROR';
         const { __mainTestHooks } = await import('#main');
         const { shutdown: shutdownDriverFactory } = await import('#driver/factory');
 
@@ -65,8 +80,8 @@ test('wave4: real SIGTERM+SIGINT in subprocess trigger single coordinated shutdo
                 });
         };
 
-        console.log('W4_READY');
         __mainTestHooks.setupSignalHandlers({});
+        console.log('W4_READY');
     `;
 
     const child = spawn(process.execPath, ['--input-type=module', '-e', childScript], {
@@ -96,10 +111,7 @@ test('wave4: real SIGTERM+SIGINT in subprocess trigger single coordinated shutdo
         // Process may have already exited.
     }
 
-    const exitResult = await Promise.race([
-        once(child, 'exit'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout waiting child exit')), 20000)),
-    ]);
+    const exitResult = await waitForExit(child);
 
     const [code, signal] = exitResult;
     assert.equal(signal, null, `subprocess should exit by code, stderr=${stderr}`);

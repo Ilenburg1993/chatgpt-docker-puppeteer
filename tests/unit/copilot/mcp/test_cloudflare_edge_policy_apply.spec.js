@@ -16,7 +16,7 @@ describe('mcp/cloudflare/edge-policy-apply', () => {
             action: 'set_cache_settings',
             action_parameters: { cache: false },
         });
-        expect(rules[1]?.rule.ratelimit).toMatchObject({
+        expect(rules[1]?.rule['ratelimit']).toMatchObject({
             characteristics: ['cf.colo.id', 'ip.src'],
             period: 10,
             requests_per_period: 20,

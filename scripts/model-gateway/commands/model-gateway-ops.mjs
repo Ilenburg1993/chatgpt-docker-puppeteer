@@ -3,7 +3,10 @@ import { spawnSync } from 'node:child_process';
 
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -15,28 +18,31 @@ canonical commands and the pure automation status without fetching providers, ru
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
+/** @param {unknown} value */
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
+/**
+ * @param {unknown} value
+ * @returns {Record<string, unknown> | null}
+ */
 function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
+/** @param {unknown} value */
 function optionalNumber(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 function readPositiveInteger(name, fallback) {
     const raw = readArg(name);
     if (!raw) return fallback;
@@ -44,6 +50,10 @@ function readPositiveInteger(name, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+/**
+ * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
+ * @param {string[]} [scriptArgs]
+ */
 function runJson(scriptId, scriptArgs = []) {
     const startedAtMs = Date.now();
     const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS[scriptId], ...scriptArgs], {
@@ -97,6 +107,7 @@ function runJson(scriptId, scriptArgs = []) {
     }
 }
 
+/** @param {ReturnType<typeof runJson>} diagnostics */
 function readDatabaseSummary(diagnostics) {
     const json = optionalRecord(diagnostics.json);
     const activeSnapshot = optionalRecord(json?.['activeSnapshot']);
@@ -167,6 +178,7 @@ function readDatabaseSummary(diagnostics) {
     };
 }
 
+/** @param {ReturnType<typeof runJson>} readiness */
 function readReadinessSummary(readiness) {
     const json = optionalRecord(readiness.json);
     const selection = optionalRecord(json?.['selection']);
@@ -180,7 +192,6 @@ function readReadinessSummary(readiness) {
         optionalNumber(runtimeSelector?.['profiles']) ??
         optionalNumber(strictAccess?.['profiles']) ??
         optionalNumber(allowProbe?.['profiles']) ??
-        optionalNumber(runtimeSelector?.['profiles']?.['length']) ??
         (Array.isArray(runtimeSelector?.['profiles']) ? runtimeSelector['profiles'].length : null) ??
         (Array.isArray(strictAccess?.['profiles']) ? strictAccess['profiles'].length : null) ??
         (Array.isArray(allowProbe?.['profiles']) ? allowProbe['profiles'].length : null);
@@ -201,6 +212,7 @@ function readReadinessSummary(readiness) {
     };
 }
 
+/** @param {ReturnType<typeof runJson>} auto */
 function readAutomationSummary(auto) {
     const json = optionalRecord(auto.json);
     const decision = optionalRecord(json?.['decision']);
@@ -213,6 +225,7 @@ function readAutomationSummary(auto) {
     };
 }
 
+/** @param {ReturnType<typeof runJson>} commands */
 function readCommandsSummary(commands) {
     const json = optionalRecord(commands.json);
     const commandRows = Array.isArray(json?.['commands']) ? json['commands'] : [];
@@ -242,15 +255,12 @@ const summary = {
     readiness: readReadinessSummary(readiness),
     automation: readAutomationSummary(auto),
     commands: readCommandsSummary(commands),
-    timings: Object.fromEntries(
-        Object.entries({ diagnostics, readiness, auto, commands }).map(([key, result]) => [
-            key,
-            {
-                durationMs: result.durationMs,
-                timedOut: result.timedOut === true,
-            },
-        ]),
-    ),
+    timings: {
+        diagnostics: { durationMs: diagnostics.durationMs, timedOut: diagnostics.timedOut === true },
+        readiness: { durationMs: readiness.durationMs, timedOut: readiness.timedOut === true },
+        auto: { durationMs: auto.durationMs, timedOut: auto.timedOut === true },
+        commands: { durationMs: commands.durationMs, timedOut: commands.timedOut === true },
+    },
     failures: Object.fromEntries(
         Object.entries({ diagnostics, readiness, auto, commands })
             .filter(([, result]) => !result.ok)

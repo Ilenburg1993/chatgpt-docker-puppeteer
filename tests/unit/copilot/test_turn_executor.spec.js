@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* ── mocks ── */
@@ -193,6 +192,7 @@ describe('turn-executor', () => {
                 reject,
                 waitForRestartAndReplyFn: vi.fn(),
             });
+            expect(timeoutHandle).toBeDefined();
 
             onReplyOuter({ reply: 'world' });
             expect(resolve).toHaveBeenCalledWith('world');
@@ -788,7 +788,7 @@ describe('turn-executor', () => {
                 'question?',
                 { timeout: null },
                 { host, sendCountRef: { sendCount: 0 } },
-            ).then((reply) => {
+            ).then((/** @type {unknown} */ reply) => {
                 settled = true;
                 return reply;
             });

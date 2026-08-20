@@ -54,18 +54,18 @@ function _parseJson(raw, fallback = {}) {
 function _rowToFinding(row) {
     if (!row) return null;
     return {
-        id: String(row.id),
-        job_id: String(row.job_id),
-        severity: String(row.severity || 'info'),
-        category: String(row.category || 'generic'),
-        title: String(row.title || ''),
-        source: String(row.source || 'audit-agent'),
-        contract_id: row.contract_id ? String(row.contract_id) : null,
-        dedup_key: row.dedup_key ? String(row.dedup_key) : null,
-        status: String(row.status || 'open'),
-        evidence_json: _parseJson(row.evidence_json, {}),
-        created_at_ms: Number(row.created_at_ms) || 0,
-        updated_at_ms: Number(row.updated_at_ms) || 0,
+        id: String(row['id']),
+        job_id: String(row['job_id']),
+        severity: String(row['severity'] || 'info'),
+        category: String(row['category'] || 'generic'),
+        title: String(row['title'] || ''),
+        source: String(row['source'] || 'audit-agent'),
+        contract_id: row['contract_id'] ? String(row['contract_id']) : null,
+        dedup_key: row['dedup_key'] ? String(row['dedup_key']) : null,
+        status: String(row['status'] || 'open'),
+        evidence_json: _parseJson(row['evidence_json'], {}),
+        created_at_ms: Number(row['created_at_ms']) || 0,
+        updated_at_ms: Number(row['updated_at_ms']) || 0,
     };
 }
 
@@ -110,17 +110,17 @@ function upsertAuditFinding(input = /** @type {UpsertAuditFindingInput} */ ({}))
                 WHERE id=@id
             `,
             ).run({
-                id: existing.id,
-                severity: String(input.severity || existing.severity || 'info'),
-                category: String(input.category || existing.category || 'generic'),
-                title: String(input.title || existing.title || ''),
-                source: String(input.source || existing.source || 'audit-agent'),
-                contract_id: input.contract_id ? String(input.contract_id) : existing.contract_id,
-                status: String(input.status || existing.status || 'open'),
+                id: existing['id'],
+                severity: String(input.severity || existing['severity'] || 'info'),
+                category: String(input.category || existing['category'] || 'generic'),
+                title: String(input.title || existing['title'] || ''),
+                source: String(input.source || existing['source'] || 'audit-agent'),
+                contract_id: input.contract_id ? String(input.contract_id) : existing['contract_id'],
+                status: String(input.status || existing['status'] || 'open'),
                 evidence_json: _safeJsonString(input.evidence_json ?? input.evidence ?? {}, '{}'),
                 updated_at_ms: now,
             });
-            return getAuditFindingById(String(existing.id));
+            return getAuditFindingById(String(existing['id']));
         }
     }
 

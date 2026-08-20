@@ -1,8 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import VisGraph from '@/components/graphs/VisGraph.vue';
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import { formatHttpError, http } from '@/lib/http';
+import type { DashboardGraph } from '@/types/dashboard';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -10,10 +11,10 @@ const route = useRoute();
 const router = useRouter();
 
 const loading = ref(false);
-const error = ref(null);
-const data = ref(null);
+const error = ref<string | null>(null);
+const data = ref<DashboardGraph | null>(null);
 
-const workflowId = computed(() => String(route.params.workflowId || ''));
+const workflowId = computed(() => String(route.params['workflowId'] || ''));
 
 const nodes = computed(() => {
     const tasks = data.value?.tasks || [];

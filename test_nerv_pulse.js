@@ -6,68 +6,39 @@
 ========================================================================== */
 
 const { v4: uuidv4 } = require('uuid');
-const createNerv = require('./src/nerv/core');
-const createSocketAdapter = require('./src/infra/transport/socket_io_adapter');
+const { default: createNerv } = require('./src/nerv/core');
 const { ActorRole, MessageType, ActionCode } = require('./src/shared/ipc/constants');
 const { createEnvelope } = require('./src/shared/ipc/envelope');
 
 // CONFIGURAÇÃO DO TESTE
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3008';
+const SERVER_URL = process.env['SERVER_URL'] || 'http://localhost:3008';
 const ROBOT_ID = uuidv4(); // Identidade efêmera para o teste
 
 console.log(`\n[DIAGNOSTIC] Iniciando Teste de Pulso do NERV...`);
 console.log(`[DIAGNOSTIC] Alvo: ${SERVER_URL}`);
 console.log(`[DIAGNOSTIC] Identidade Simulada: ${ROBOT_ID}\n`);
 
-// 1. Criar o Adaptador Físico
-const adapter = createSocketAdapter({
-    url: SERVER_URL,
-    options: {
+// 1. Criar o NERV em modo híbrido (o bootstrap atual cria o adaptador físico)
+const nerv = await createNerv({
+    mode: 'HYBRID',
+    socketUrl: SERVER_URL,
+    socketOptions: {
         query: { robot_id: ROBOT_ID }, // Alguns servidores exigem ID na query string
     },
 });
 
-// 2. Criar o NERV (O Cérebro)
-const nerv = createNerv({
-    connection: adapter,
-    identity: {
-        robot_id: ROBOT_ID,
-        capabilities: ['TEST_PULSE', 'DIAGNOSTIC_MODE'],
-    },
+// 2. Monitorar a API atual de telemetria e recepção
+nerv.telemetry.on((/** @type {{ type: string, meta?: unknown }} */ event) => {
+    console.log(`[NERV TELEMETRY] ${event.type}`, event.meta ?? '');
+});
+nerv.onReceive((/** @type {{ type: { message_type: string, action_code: string } }} */ envelope) => {
+    console.log(
+        `[NERV INBOUND] Recebido envelope tipo: ${envelope.type.message_type}/${envelope.type.action_code}`,
+    );
 });
 
-// 3. Monitorar Telemetria (Os Sinais Vitais)
-nerv.telemetry.on('nerv:state:change', (data) => {
-    console.log(`[NERV STATE] ${data.from} -> ${data.to}`);
-
-    if (data.to === 'READY') {
-        console.log('\n✅ SUCESSO! O NERV completou o Handshake e está pronto para combate.');
-        console.log('Enviando ping de teste em 3 segundos...');
-
-        setTimeout(sendTestPing, 3000);
-    }
-});
-
-nerv.telemetry.on('nerv:log', (data) => {
-    console.log(`[NERV LOG] [${data.level}] ${data.msg}`);
-});
-
-nerv.telemetry.on('nerv:error', (err) => {
-    console.error(`[NERV ERROR]`, err);
-});
-
-nerv.telemetry.on('nerv:dropped', (data) => {
-    console.warn(`[NERV DROP] Motivo: ${data.reason}`);
-});
-
-nerv.telemetry.on('nerv:inbound', (envelope) => {
-    console.log(`[NERV INBOUND] Recebido envelope tipo: ${envelope.type.kind}/${envelope.type.action}`);
-    // Se recebermos um Pong ou ACK, o teste passou completo
-});
-
-// 4. Iniciar Conexão
-console.log('[DIAGNOSTIC] Conectando cabo de rede virtual...');
-nerv.connect();
+console.log('[DIAGNOSTIC] Transporte híbrido inicializado. Enviando ping em 3 segundos...');
+setTimeout(sendTestPing, 3000);
 
 // Função auxiliar para enviar dados após conectar
 function sendTestPing() {
@@ -77,7 +48,7 @@ function sendTestPing() {
         actor: ActorRole.MAESTRO,
         target: ActorRole.SERVER,
         messageType: MessageType.EVENT, // Apenas um evento informativo
-        actionCode: 'HEARTBEAT', // Simulando um batimento
+        actionCode: ActionCode.DRIVER_TASK_HEARTBEAT, // Simulando um batimento
         payload: {
             uptime: process.uptime(),
             cpu: 0.1,
@@ -89,9 +60,9 @@ function sendTestPing() {
     console.log('[DIAGNOSTIC] Envelope enviado para a Outbox.');
 
     // Encerrar teste após 5 segundos
-    setTimeout(() => {
+    setTimeout(async () => {
         console.log('\n[DIAGNOSTIC] Encerrando teste e desconectando...');
-        nerv.disconnect();
+        await nerv.shutdown();
         process.exit(0);
     }, 5000);
 }

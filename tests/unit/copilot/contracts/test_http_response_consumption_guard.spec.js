@@ -15,6 +15,7 @@ afterEach(async () => {
     await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
+/** @param {Record<string, string>} files */
 async function createFixture(files) {
     const root = await mkdtemp(path.join(tmpdir(), 'copilot-http-response-guard-'));
     tempRoots.push(root);

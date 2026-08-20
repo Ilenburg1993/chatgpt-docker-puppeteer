@@ -8,6 +8,7 @@
  * @module copilot/model-gateway/catalog/refresh-lock
  */
 
+/** @type {Map<string, symbol>} */
 const ACTIVE_REFRESH_LOCKS = new Map();
 
 export class ModelGatewayCatalogRefreshLockError extends Error {
@@ -49,9 +50,10 @@ export function isModelGatewayCatalogRefreshLocked(lockKey) {
 }
 
 /**
+ * @template T
  * @param {string} lockKey
- * @param {() => Promise<any>} operation
- * @returns {Promise<any>}
+ * @param {() => Promise<T>} operation
+ * @returns {Promise<T>}
  */
 export async function withModelGatewayCatalogRefreshLock(lockKey, operation) {
     const normalizedLockKey = optionalString(lockKey) ?? 'default';

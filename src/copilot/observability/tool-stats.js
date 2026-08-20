@@ -377,6 +377,22 @@ export function getToolStats() {
     return defaultToolTelemetryStore.getToolStats();
 }
 
+/**
+ * Preserve the executable-tool contract when instrumentation wraps a tool with a required handler. Declaration-only
+ * SDK tools still retain the broader optional-handler contract via the second overload.
+ *
+ * @template [TArgs=unknown]
+ * @template [TResult=unknown]
+ * @overload
+ * @param {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>} tool
+ * @returns {import('#copilot/sdk/types').ExecutableTool<TArgs, TResult>}
+ */
+/**
+ * @template [TArgs=unknown]
+ * @overload
+ * @param {import('#copilot/sdk/types').Tool<TArgs>} tool
+ * @returns {import('#copilot/sdk/types').Tool<TArgs>}
+ */
 /** @param {import('#copilot/sdk/types').Tool<any>} tool */
 export function wrapWithStats(tool) {
     return defaultToolTelemetryStore.wrapWithStats(tool);

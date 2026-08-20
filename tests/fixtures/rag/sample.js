@@ -70,3 +70,7 @@ function internalHelper() {
 }
 
 const INTERNAL_CONSTANT = 'secret';
+
+// Mantém as declarações internas como padrões deliberados deste fixture de chunking.
+void internalHelper;
+void INTERNAL_CONSTANT;

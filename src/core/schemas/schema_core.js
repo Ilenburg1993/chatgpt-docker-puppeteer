@@ -29,16 +29,16 @@ export const types = {
  */
 export const parseTask = (raw) => {
     const r = asRecord(raw);
-    const rMeta = asRecord(r.meta);
-    const rSpec = asRecord(r.spec);
+    const rMeta = asRecord(r['meta']);
+    const rSpec = asRecord(r['spec']);
     // V5-safe: never "heal" a declared V5 task back into V4.
-    if (rMeta.version === '5.0') {
+    if (rMeta['version'] === '5.0') {
         return TaskSchemaV5.parse(r);
     }
 
     // Best-effort: if the structure looks like V5 but version is missing, try
     // to validate as V5 before falling back to legacy healer+migrator.
-    const looksLikeV5 = Boolean(r.execution || r.mission || rSpec.execution);
+    const looksLikeV5 = Boolean(r['execution'] || r['mission'] || rSpec['execution']);
     if (looksLikeV5 && r && typeof r === 'object') {
         try {
             const patched = {

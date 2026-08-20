@@ -2,7 +2,10 @@
 import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { SqliteModelGatewayCatalogStore } from '../../../src/copilot/model-gateway/index.js';
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--json')) {
@@ -21,15 +24,6 @@ Read persisted model-gateway SDK session handoffs. This command is read-only and
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 const limit = Math.max(1, Math.min(Number(readArg('--limit', '20')) || 20, 100));
 const rows = await new SqliteModelGatewayCatalogStore().readSdkSessionHandoffRecords({ limit });

@@ -77,7 +77,7 @@ export const cleanupOrphans = async function () {
                 totalCleaned++;
             }
         } catch (/** @type {any} */ _) {
-            const _ce = /** @type {any} */ (_);
+
             /* Falha em diretório específico não interrompe a higiene */
         }
     }
@@ -96,7 +96,7 @@ export const cleanupOrphans = async function () {
  */
 export const saveTask = async function (task) {
     // ✅ DoS Prevention: Queue depth limit - configurable via environment variable
-    const MAX_QUEUE_DEPTH = parseInt(process.env.MAX_QUEUE_DEPTH || '', 10) || 10000;
+    const MAX_QUEUE_DEPTH = parseInt(process.env['MAX_QUEUE_DEPTH'] || '', 10) || 10000;
     const currentQueue = await getQueue();
 
     if (currentQueue.length >= MAX_QUEUE_DEPTH) {

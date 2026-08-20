@@ -651,7 +651,7 @@ function renderLlmUsageModelRowDetail(detail) {
  * @param {{
  *     agent: AgentEventHost;
  *     rl?: import('node:readline').Interface | null;
- *     registry?: ReturnType<import('../state/index.js').createToolCallRegistry> | null;
+ *     registry?: ReturnType<typeof import('../state/index.js').createToolCallRegistry> | null;
  * }} input
  * @returns {() => void}
  */

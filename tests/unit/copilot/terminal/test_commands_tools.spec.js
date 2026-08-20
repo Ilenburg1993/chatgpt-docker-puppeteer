@@ -28,11 +28,14 @@ const { readTerminalToolStatsProjection, readTerminalStatusProjection, readTermi
                 },
             },
         })),
-        readTerminalToolRegistrySnapshot: vi.fn(() => ({
-            toolContract: {
-                issues: [],
-            },
-        })),
+        readTerminalToolRegistrySnapshot: vi.fn(
+            /** @returns {Record<string, unknown>} */
+            () => ({
+                toolContract: {
+                    issues: [],
+                },
+            }),
+        ),
     }),
 );
 

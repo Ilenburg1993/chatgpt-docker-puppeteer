@@ -40,7 +40,7 @@ function createInitialState() {
         runs: 0,
         failures: 0,
         lastError: /** @type {string | null} */ (null),
-        lastSnapshot: /** @type {Record<string, unknown> | null} */ (null),
+        lastSnapshot: /** @type {ReturnType<typeof compactSnapshot> | null} */ (null),
     };
 }
 
@@ -183,7 +183,7 @@ async function runMonitorCycle(intervalMs, timeoutMs, setTimeoutFn, measureFn, p
             success,
             durationMs: monitorState.lastDurationMs,
             failedTargets,
-            targets: monitorState.lastSnapshot?.['targets'] ?? [],
+            targets: monitorState.lastSnapshot?.targets ?? [],
         });
     } catch (error) {
         monitorState = {

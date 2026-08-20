@@ -44,7 +44,7 @@ export const HARD_BULK_MAX_ITEMS = 256;
  */
 
 /**
- * @template T,U
+ * @template U
  * @typedef {{
  *     executionId: string;
  *     failureMode: BulkFailureMode;
@@ -73,7 +73,7 @@ export const HARD_BULK_MAX_ITEMS = 256;
  *     estimateItemBytes?: (item: T, index: number) => number;
  *     isFailure?: (value: U, index: number) => boolean;
  * }} [options]
- * @returns {Promise<BulkExecutionResult<T,U>>}
+ * @returns {Promise<BulkExecutionResult<U>>}
  */
 export async function runBoundedOperationBatch(items, worker, options = {}) {
     if (!Array.isArray(items)) throw bulkLimitError('Bulk items must be an array.', 'ERR_BULK_ITEMS_REQUIRED');

@@ -27,7 +27,10 @@ import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
 loadModelGatewayDotenv();
 
+import { createArgReader } from '../cli-args.mjs';
+
 const args = process.argv.slice(2);
+const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
@@ -39,17 +42,9 @@ health. This does not fetch providers, execute models, run probes or persist eli
     process.exit(0);
 }
 
-function readArg(name, fallback = '') {
-    const prefix = `${name}=`;
-    for (let index = 0; index < args.length; index += 1) {
-        const arg = args[index];
-        if (arg.startsWith(prefix)) return arg.slice(prefix.length);
-        if (arg === name) return args[index + 1] ?? fallback;
-    }
-    return fallback;
-}
 
 function readProfiles() {
+    /** @type {string[]} */
     const profiles = [];
     const profile = readArg('--profile');
     const profileList = readArg('--profiles');
@@ -61,6 +56,7 @@ function readProfiles() {
 function readRuntimeProofWeights() {
     const raw = readArg('--runtime-proof-weights');
     if (!raw.trim()) return null;
+    /** @type {Record<string, number>} */
     const weights = {};
     for (const item of raw.split(',')) {
         const [key, value] = item.split(/[=:]/u, 2).map((part) => part.trim());
@@ -71,6 +67,7 @@ function readRuntimeProofWeights() {
     return Object.keys(weights).length > 0 ? weights : null;
 }
 
+/** @param {ReturnType<typeof auditModelGatewayPostRuntimeSelection>} selection */
 function selectedDispositions(selection) {
     return [
         ...new Set(
@@ -85,6 +82,7 @@ function selectedDispositions(selection) {
     ].sort();
 }
 
+/** @param {Record<string, unknown> | null | undefined} counts */
 function formatCountMap(counts) {
     return Object.entries(counts ?? {})
         .map(([key, count]) => `${key}:${count}`)
@@ -119,6 +117,7 @@ const snapshot = await store.readSnapshot();
 const integrity = auditModelGatewayCatalogSnapshotIntegrity(snapshot);
 const secretRegistry = createEnvSecretRegistry();
 const fileHealthRecords = listByokProviderModelHealth();
+/** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
 let sqliteHealthRecords = [];
 let sqliteRuntimeError = null;
 if (runtimeSource === 'sqlite' || runtimeSource === 'merged') {
@@ -197,7 +196,7 @@ const tracePersistence = writeTrace
           schema: 'model-gateway-selection-decision-trace-persistence',
           ok: true,
           written: false,
-          traceId: typeof decisionTrace.traceId === 'string' ? decisionTrace.traceId : 'selection-trace',
+          traceId: typeof decisionTrace['traceId'] === 'string' ? decisionTrace['traceId'] : 'selection-trace',
           filePath: null,
           latestPath: null,
           error: null,

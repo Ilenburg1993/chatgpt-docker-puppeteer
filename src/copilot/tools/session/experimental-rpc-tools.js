@@ -111,7 +111,7 @@ const expFleetStartTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ prompt?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                prompt: z.string().optional().describe('Prompt opcional combinado às instruções do fleet'),
+                prompt: z.string().optional()['describe']('Prompt opcional combinado às instruções do fleet'),
             })
         )
     ),
@@ -139,7 +139,7 @@ const expSkillsEnableTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                name: z.string().min(1).describe('Nome da skill a habilitar'),
+                name: z.string().min(1)['describe']('Nome da skill a habilitar'),
             })
         )
     ),
@@ -153,7 +153,7 @@ const expSkillsDisableTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                name: z.string().min(1).describe('Nome da skill a desabilitar'),
+                name: z.string().min(1)['describe']('Nome da skill a desabilitar'),
             })
         )
     ),
@@ -189,7 +189,7 @@ const expMcpEnableTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverName: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                serverName: z.string().min(1).describe('Nome do servidor MCP a habilitar'),
+                serverName: z.string().min(1)['describe']('Nome do servidor MCP a habilitar'),
             })
         )
     ),
@@ -203,7 +203,7 @@ const expMcpDisableTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ serverName: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                serverName: z.string().min(1).describe('Nome do servidor MCP a desabilitar'),
+                serverName: z.string().min(1)['describe']('Nome do servidor MCP a desabilitar'),
             })
         )
     ),
@@ -252,7 +252,7 @@ const expExtensionsEnableTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ id: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                id: z.string().min(1).describe('ID source-qualified da extensão a habilitar'),
+                id: z.string().min(1)['describe']('ID source-qualified da extensão a habilitar'),
             })
         )
     ),
@@ -266,7 +266,7 @@ const expExtensionsDisableTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ id: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                id: z.string().min(1).describe('ID source-qualified da extensão a desabilitar'),
+                id: z.string().min(1)['describe']('ID source-qualified da extensão a desabilitar'),
             })
         )
     ),

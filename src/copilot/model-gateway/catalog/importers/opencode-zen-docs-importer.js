@@ -241,7 +241,7 @@ function modelEvidenceValues(row, nowMs) {
 
 /**
  * @param {object} [options]
- * @param {typeof fetch} [options.fetchImpl]
+ * @param {import('./http-port.js').CatalogFetch} [options.fetchImpl]
  * @param {string} [options.url]
  * @param {() => Date} [options.now]
  * @returns {import('../importer-runner.js').CatalogImporter}

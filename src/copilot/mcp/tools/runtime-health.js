@@ -30,11 +30,11 @@ import {
     readMcpMetricsSnapshot,
     readMcpRoundTripAnalyticsMonitorState,
     readMcpSchemaConvergenceState,
-    readMcpStartupMaintenanceState,
     readMcpWorkspaceSmokeSummary,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
 import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
+import { readMcpStartupMaintenanceState } from '../control-plane/startup-maintenance.js';
 import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
@@ -478,7 +478,7 @@ export const mcpRuntimeHealthTool = {
     title: 'MCP runtime health',
     description: 'Return MCP runtime health, workspace root, uptime and per-tool metrics.',
     inputSchema: {
-        includeDetails: z.boolean().optional().describe('Include verbose index, temporary fallback tunnel and full per-tool metrics. Defaults to false.'),
+        includeDetails: z.boolean().optional()['describe']('Include verbose index, temporary fallback tunnel and full per-tool metrics. Defaults to false.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async (input = {}) => {

@@ -16,7 +16,8 @@
 // @ts-check
 
 import Database from 'better-sqlite3';
-import { alwaysAliveAgent } from './src/copilot/always-alive.js';
+import { alwaysAliveAgent } from './src/copilot/agent/always-alive-singleton.js';
+import { LlmBridgeClient } from './src/copilot/channel/client.js';
 import { HubOrchestrator } from './src/copilot/conversation-hub/orchestrator.js';
 import { ConversationStore } from './src/copilot/conversation-hub/store.js';
 
@@ -52,11 +53,6 @@ const testDb = new Database(':memory:');
 const store = new ConversationStore();
 store.init(testDb);
 
-// Agent mock para o orchestrator (alwaysAliveAgent ainda não iniciado)
-const agentMock = {
-    getStatusSnapshot: () => ({ sessionId: alwaysAliveAgent.sessionId ?? 'startup' }),
-};
-
 // ─── Conversa principal ───────────────────────────────────────────────────────
 
 section('ConversationHub — Conversa Real LLM-A ↔ LLM-B');
@@ -66,12 +62,11 @@ await alwaysAliveAgent.start();
 console.log(`✅ Agente iniciado. SessionId: ${alwaysAliveAgent.sessionId}`);
 
 // Hub orchestrator usa o agente real agora
-const orchestrator = new HubOrchestrator(store, agentMock);
+const orchestrator = new HubOrchestrator(store, alwaysAliveAgent);
 
 // Bridge real — usa o alwaysAliveAgent já iniciado
-const { LlmBridgeClient } = await import('./src/copilot/llm-bridge-client.js');
 const bridge = new LlmBridgeClient();
-orchestrator.init(/** @type {any} */ (bridge));
+orchestrator.init(bridge);
 
 // Criar sessão no hub
 const hubSessionId = orchestrator.createSession({ title: 'Conversa Livre Sprint Hub' });
@@ -88,14 +83,11 @@ section('Iniciando Dialog Loop com LLM-B');
 
 // Boot prompt nulo = usa protocolo padrão (READY: / REPLY: / ask_user)
 // Contexto real é injetado no primeiro sendDialogTurn após READY
-const bootPrompt = null;
+const bootPrompt = undefined;
 
-// Pipeline de diálogo
-let _ready = false;
 orchestrator.on('session:created', () => {});
 
 alwaysAliveAgent.on('dialog.ready', () => {
-    _ready = true;
     console.log('\n✅ Dialog loop pronto. Iniciando conversa...');
 });
 
@@ -105,7 +97,7 @@ alwaysAliveAgent.on('dialog.ready', () => {
  */
 async function chat(text) {
     // Salva turno LLM-A no store
-    const _turnId = store.writeTurn(hubSessionId, {
+    store.writeTurn(hubSessionId, {
         role: 'llm_a',
         content: text,
         model: 'copilot-claude-sonnet-4.6',
@@ -129,7 +121,7 @@ async function chat(text) {
 // Inicia o dialog loop (1 PR que sustenta N turnos)
 console.log('\n🚀 Iniciando dialog loop...');
 alwaysAliveAgent.startDialogLoop(bootPrompt).catch((e) => {
-    console.error('\n❌ Dialog loop terminou:', e.message);
+    console.error('\n❌ Dialog loop terminou:', e instanceof Error ? e.message : String(e));
 });
 
 // Aguarda o loop ficar pronto

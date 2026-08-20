@@ -6,11 +6,16 @@ import path from 'node:path';
 
 const TS_CHECK_HEADER = '// @ts-check - Type checking rigoroso habilitado (arquivo core)\n';
 
+/** @param {string} dir */
 function shouldSkipDirectory(dir) {
     const basename = path.basename(dir);
     return basename === 'dashboard-ui' || basename === 'node_modules' || basename === '.git';
 }
 
+/**
+ * @param {string} dir
+ * @param {string[]} [files]
+ */
 function getAllJsFiles(dir, files = []) {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -29,8 +34,9 @@ function getAllJsFiles(dir, files = []) {
     return files;
 }
 
+/** @param {string} content */
 function hasTypeCheckDirective(content) {
-    const firstLine = content.split('\n')[0];
+    const firstLine = content.split('\n')[0] ?? '';
     return firstLine.includes('@ts-check') || firstLine.includes('@ts-nocheck');
 }
 

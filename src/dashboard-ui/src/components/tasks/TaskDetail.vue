@@ -1,28 +1,25 @@
-<script setup>
+<script setup lang="ts">
+import type { BadgeVariant, DashboardTask } from '@/types/dashboard';
 import { Calendar, Clock, FileText, Tag, User } from 'lucide-vue-next';
 import Badge from '../ui/Badge.vue';
 import Button from '../ui/Button.vue';
 import Modal from '../ui/Modal.vue';
 
-const props = defineProps({
-    open: {
-        type: Boolean,
-        default: false,
-    },
-    task: {
-        type: Object,
-        default: null,
-    },
-});
+withDefaults(defineProps<{ open?: boolean; task?: DashboardTask | null }>(), { open: false, task: null });
 
-const emit = defineEmits(['update:open', 'edit', 'delete', 'cancel']);
+const emit = defineEmits<{
+    'update:open': [open: boolean];
+    edit: [task: DashboardTask | null | undefined];
+    delete: [task: DashboardTask | null | undefined];
+    cancel: [task: DashboardTask | null | undefined];
+}>();
 
 const handleClose = () => {
     emit('update:open', false);
 };
 
-const getStatusVariant = (status) => {
-    const variants = {
+const getStatusVariant = (status?: string): BadgeVariant => {
+    const variants: Record<string, BadgeVariant> = {
         RUNNING: 'info',
         PENDING: 'default',
         DONE: 'success',
@@ -30,16 +27,16 @@ const getStatusVariant = (status) => {
         CANCELLED: 'warning',
         PAUSED: 'warning',
     };
-    return variants[status] || 'default';
+    return variants[String(status || '')] || 'default';
 };
 
-const getPriorityVariant = (priority) => {
+const getPriorityVariant = (priority: number): BadgeVariant => {
     if (priority >= 8) return 'error';
     if (priority >= 5) return 'warning';
     return 'default';
 };
 
-const formatDate = (date) => {
+const formatDate = (date?: string | number) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleString();
 };
@@ -51,12 +48,12 @@ const formatDate = (date) => {
 
         <template #description>
             <div class="flex items-center gap-2">
-                <span class="text-xs font-mono text-foreground-muted"> ID: {{ task?.meta?.id || 'N/A' }} </span>
-                <Badge :variant="getStatusVariant(task?.unified_status)" size="sm">
-                    {{ task?.unified_status || 'UNKNOWN' }}
+                <span class="text-xs font-mono text-foreground-muted"> ID: {{ task?.['meta']?.id || 'N/A' }} </span>
+                <Badge :variant="getStatusVariant(task?.['unified_status'])" size="sm">
+                    {{ task?.['unified_status'] || 'UNKNOWN' }}
                 </Badge>
-                <Badge :variant="getPriorityVariant(task?.meta?.priority || 0)" size="sm">
-                    Priority: {{ task?.meta?.priority || 0 }}
+                <Badge :variant="getPriorityVariant(task?.['meta']?.priority || 0)" size="sm">
+                    Priority: {{ task?.['meta']?.priority || 0 }}
                 </Badge>
             </div>
         </template>
@@ -68,7 +65,7 @@ const formatDate = (date) => {
                     Prompt
                 </h3>
                 <p class="text-sm text-foreground-muted bg-background-tertiary rounded-lg p-3">
-                    {{ task.spec?.payload?.user_message || 'No prompt provided' }}
+                    {{ task['spec']?.payload?.user_message || 'No prompt provided' }}
                 </p>
             </div>
 
@@ -79,7 +76,7 @@ const formatDate = (date) => {
                         Agent
                     </h3>
                     <p class="text-sm text-foreground-muted">
-                        {{ task.meta?.agent || 'N/A' }}
+                        {{ task['meta']?.agent || 'N/A' }}
                     </p>
                 </div>
 
@@ -89,7 +86,7 @@ const formatDate = (date) => {
                         Model
                     </h3>
                     <p class="text-sm text-foreground-muted">
-                        {{ task.spec?.payload?.model || 'N/A' }}
+                        {{ task['spec']?.payload?.model || 'N/A' }}
                     </p>
                 </div>
 
@@ -99,7 +96,7 @@ const formatDate = (date) => {
                         Created At
                     </h3>
                     <p class="text-sm text-foreground-muted">
-                        {{ formatDate(task.meta?.created_at) }}
+                        {{ formatDate(task['meta']?.created_at) }}
                     </p>
                 </div>
 
@@ -109,23 +106,23 @@ const formatDate = (date) => {
                         Updated At
                     </h3>
                     <p class="text-sm text-foreground-muted">
-                        {{ formatDate(task.meta?.updated_at) }}
+                        {{ formatDate(task['meta']?.updated_at) }}
                     </p>
                 </div>
             </div>
 
-            <div v-if="task.spec?.payload?.context">
+            <div v-if="task['spec']?.payload?.context">
                 <h3 class="text-sm font-semibold text-foreground mb-2">Context</h3>
                 <pre class="text-xs text-foreground-muted bg-background-tertiary rounded-lg p-3 overflow-x-auto">{{
-                    JSON.stringify(task.spec.payload.context, null, 2)
+                    JSON.stringify(task['spec'].payload.context, null, 2)
                 }}</pre>
             </div>
 
-            <div v-if="task.result">
+            <div v-if="task['result']">
                 <h3 class="text-sm font-semibold text-foreground mb-2">Result</h3>
                 <pre
                     class="text-xs text-foreground-muted bg-background-tertiary rounded-lg p-3 overflow-x-auto max-h-40"
-                    >{{ JSON.stringify(task.result, null, 2) }}</pre
+                    >{{ JSON.stringify(task['result'], null, 2) }}</pre
                 >
             </div>
         </div>
@@ -134,7 +131,7 @@ const formatDate = (date) => {
             <div class="flex justify-between w-full">
                 <div class="flex gap-2">
                     <Button
-                        v-if="task?.unified_status === 'PENDING'"
+                        v-if="task?.['unified_status'] === 'PENDING'"
                         variant="secondary"
                         size="sm"
                         @click="emit('edit', task)"
@@ -142,7 +139,7 @@ const formatDate = (date) => {
                         Edit
                     </Button>
                     <Button
-                        v-if="task?.unified_status === 'RUNNING'"
+                        v-if="task?.['unified_status'] === 'RUNNING'"
                         variant="danger"
                         size="sm"
                         @click="emit('cancel', task)"
@@ -150,7 +147,7 @@ const formatDate = (date) => {
                         Cancel
                     </Button>
                     <Button
-                        v-if="['DONE', 'FAILED', 'CANCELLED'].includes(task?.unified_status)"
+                        v-if="['DONE', 'FAILED', 'CANCELLED'].includes(String(task?.['unified_status'] || ''))"
                         variant="danger"
                         size="sm"
                         @click="emit('delete', task)"

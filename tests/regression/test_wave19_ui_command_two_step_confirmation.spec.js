@@ -23,6 +23,8 @@ test('wave19: UI usa confirmação em 2 etapas e motivo obrigatório para comand
     // TaskDetail e MissionDetail usam confirmação two-step para ações individuais
     assert.match(taskDetail, /confirmTwoStepAction/);
     assert.match(missionDetail, /confirmTwoStepAction/);
-    // TasksView e Missions usam bulk operations com fluxo diferente (selectAll, executeCommand direto)
-    // Não requerem confirmTwoStepAction individual
+    // TasksView e Missions delegam mutações aos stores do control plane e aplicam confirmação em modal.
+    assert.match(tasksView, /requestReason/);
+    assert.match(tasksView, /store\.(?:bulkAction|taskAction|createTask)/);
+    assert.match(missionsView, /store\.createMission/);
 });

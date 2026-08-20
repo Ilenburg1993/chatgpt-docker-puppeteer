@@ -21,8 +21,8 @@ function createAdapterLike(/** @type {any} */ browserPool, /** @type {any} */ ho
 }
 
 test('wave13: hot pool cleanup does not detach context and does not release page back to BrowserPool', async () => {
-    const previous = process.env.DRIVER_HOT_POOL_ENABLED;
-    process.env.DRIVER_HOT_POOL_ENABLED = 'true';
+    const previous = process.env['DRIVER_HOT_POOL_ENABLED'];
+    process.env['DRIVER_HOT_POOL_ENABLED'] = 'true';
 
     let detachCalls = 0;
     let releaseCalls = 0;
@@ -53,9 +53,9 @@ test('wave13: hot pool cleanup does not detach context and does not release page
         await DriverNERVAdapter.prototype._finallyCleanup.call(adapterLike, 'task-hot', { fake: true }, driver, []);
     } finally {
         if (previous === undefined) {
-            delete process.env.DRIVER_HOT_POOL_ENABLED;
+            delete process.env['DRIVER_HOT_POOL_ENABLED'];
         } else {
-            process.env.DRIVER_HOT_POOL_ENABLED = previous;
+            process.env['DRIVER_HOT_POOL_ENABLED'] = previous;
         }
     }
 
@@ -65,8 +65,8 @@ test('wave13: hot pool cleanup does not detach context and does not release page
 });
 
 test('wave13: cold pool cleanup keeps detach + BrowserPool page release', async () => {
-    const previous = process.env.DRIVER_HOT_POOL_ENABLED;
-    process.env.DRIVER_HOT_POOL_ENABLED = 'false';
+    const previous = process.env['DRIVER_HOT_POOL_ENABLED'];
+    process.env['DRIVER_HOT_POOL_ENABLED'] = 'false';
 
     let detachCalls = 0;
     let releaseCalls = 0;
@@ -97,9 +97,9 @@ test('wave13: cold pool cleanup keeps detach + BrowserPool page release', async 
         await DriverNERVAdapter.prototype._finallyCleanup.call(adapterLike, 'task-cold', { fake: true }, driver, []);
     } finally {
         if (previous === undefined) {
-            delete process.env.DRIVER_HOT_POOL_ENABLED;
+            delete process.env['DRIVER_HOT_POOL_ENABLED'];
         } else {
-            process.env.DRIVER_HOT_POOL_ENABLED = previous;
+            process.env['DRIVER_HOT_POOL_ENABLED'] = previous;
         }
     }
 

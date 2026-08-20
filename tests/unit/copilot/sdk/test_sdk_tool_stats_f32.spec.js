@@ -23,8 +23,17 @@ import {
 } from '#copilot/observability/tool-stats';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/** @param {Record<string, unknown>} stats @param {string} name */
-const entryOf = (stats, name) => /** @type {any} */ (stats[name]);
+/**
+ * @template T
+ * @param {Record<string, T>} stats
+ * @param {string} name
+ * @returns {T}
+ */
+function entryOf(stats, name) {
+    const entry = stats[name];
+    if (entry === undefined) throw new Error(`[fixture] missing stats entry '${name}'`);
+    return entry;
+}
 
 // ─── F164: _resetToolStats isolamento ──────────────────────────────────────
 // Executado antes de cada describe para garantir estado limpo

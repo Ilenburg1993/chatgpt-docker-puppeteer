@@ -23,7 +23,7 @@ import { logSwallowed } from '#copilot/core/error-handlers';
  *
  * @typedef {import('./lifecycle.js').SessionCreateOptions} SessionCreateOptions
  *
- * @typedef {import('./lifecycle.js').SessionResult} SessionResult
+ * @typedef {import('./lifecycle.js').SessionResult<CopilotSession>} SessionResult
  */
 
 // ─── quickSession ─────────────────────────────────────────────────────────────

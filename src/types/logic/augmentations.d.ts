@@ -16,11 +16,24 @@ declare module '#logic/adaptive' {
         [key: string]: unknown;
     }
 
-    export interface AdaptiveState {
-        metrics: Record<string, number>;
-        history: unknown[];
-        lastUpdate: number;
-        [key: string]: unknown;
+    export interface AdaptiveStats {
+        avg: number;
+        var: number;
+        count: number;
+    }
+
+    export interface AdaptiveTargetProfile {
+        ttft: AdaptiveStats;
+        stream: AdaptiveStats;
+        echo: AdaptiveStats;
+        tool_execution?: AdaptiveStats;
+        last_update: number;
+    }
+
+    export interface AdaptiveSnapshot {
+        targets: Record<string, AdaptiveTargetProfile>;
+        infra: AdaptiveStats;
+        last_adjustment_at: number;
     }
 
     export interface AdaptiveTimeoutResult {
@@ -33,13 +46,19 @@ declare module '#logic/adaptive' {
         [key: string]: unknown;
     }
 
-    export class AdaptiveEngine {
-        constructor(config?: AdaptiveConfig);
-        learn(input: unknown): Promise<void>;
-        predict(input: unknown): Promise<unknown>;
-        getState(): AdaptiveState;
-        reset(): void;
-        [key: string]: unknown;
+    export interface AdaptiveHealthStatus {
+        status: 'HEALTHY' | 'NOT_READY';
+        state_file: string;
+        targets_count: number;
+        stale_targets_count: number;
+        stale_targets: string[];
+        circuit_broken_count: number;
+        circuit_broken_targets: Array<{ target: string; avg: number }>;
+        infra_health: 'SUFFICIENT_DATA' | 'INSUFFICIENT_DATA';
+        infra_samples: number;
+        last_adjustment: string;
+        persist_locked: boolean;
+        pending_persist: boolean;
     }
 
     export function getAdjustedTimeout(
@@ -53,14 +72,11 @@ declare module '#logic/adaptive' {
     ): Promise<AdaptiveTimeoutResult>;
     export function recordMetric(type: string, ms: number, target?: string): Promise<void>;
     export function getStabilityMetrics(target?: string): Promise<{ score: number; status: string; samples: number }>;
-    export function getHealthStatus(): Promise<Record<string, unknown>>;
-    export function getPercentileTimeout(stats: { avg: number; var: number }, percentile?: number): number;
-    export const getSnapshot: () => Record<string, unknown>;
+    export function getHealthStatus(): Promise<AdaptiveHealthStatus>;
+    export function getPercentileTimeout(stats: AdaptiveStats, percentile?: number): number;
+    export const getSnapshot: () => AdaptiveSnapshot;
     export const forcePersist: () => Promise<void>;
     export const values: Record<string, number>;
-
-    const adaptiveEngine: AdaptiveEngine & Record<string, unknown>;
-    export default adaptiveEngine;
 }
 
 // ============================================================

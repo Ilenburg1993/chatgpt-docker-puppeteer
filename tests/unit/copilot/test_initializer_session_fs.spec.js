@@ -162,9 +162,9 @@ vi.mock('../../../src/copilot/agent/session/context/index.js', () => ({
 describe('agent/session/initializer — sessionFs wiring', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        process.env.COPILOT_BYOK_ENABLED = 'false';
-        delete process.env.COPILOT_BYOK_PROFILE;
-        delete process.env.OPENROUTER_API_KEY;
+        process.env['COPILOT_BYOK_ENABLED'] = 'false';
+        delete process.env['COPILOT_BYOK_PROFILE'];
+        delete process.env['OPENROUTER_API_KEY'];
     });
 
     it('injeta createSessionFsHandler configurado no fluxo initOrResumeSession', async () => {
@@ -554,7 +554,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             '../../../src/copilot/model-gateway/ingress/index.js'
         );
         defaultModelGatewayIngressRouteRegistry.clear();
-        process.env.OPENROUTER_API_KEY = 'upstream-secret';
+        process.env['OPENROUTER_API_KEY'] = 'upstream-secret';
         mocks.readState.mockResolvedValueOnce({
             sessionId: 'saved-sess',
             model: 'previous-model',
@@ -593,7 +593,9 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             requireSameSession: true,
         });
         expect(routes).toHaveLength(1);
-        expect(defaultModelGatewayIngressRouteRegistry.get(String(routes[0].routeId))).toMatchObject({
+        const [registeredRoute] = routes;
+        if (!registeredRoute) throw new Error('Rota ingress não registrada.');
+        expect(defaultModelGatewayIngressRouteRegistry.get(String(registeredRoute['routeId']))).toMatchObject({
             upstreamAuthHeaders: { authorization: 'Bearer upstream-secret' },
             ingressRoute: {
                 providerId: 'openrouter',
@@ -626,7 +628,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             '../../../src/copilot/model-gateway/ingress/index.js'
         );
         defaultModelGatewayIngressRouteRegistry.clear();
-        process.env.OPENROUTER_API_KEY = 'upstream-secret';
+        process.env['OPENROUTER_API_KEY'] = 'upstream-secret';
         mocks.readState.mockResolvedValueOnce({
             sessionId: 'saved-sess',
             model: 'previous-model',
@@ -681,7 +683,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             upstreamAuthHeaders: { authorization: 'Bearer previous-upstream' },
             expectedRevision: null,
         });
-        process.env.OPENROUTER_API_KEY = 'replacement-upstream';
+        process.env['OPENROUTER_API_KEY'] = 'replacement-upstream';
         mocks.readState.mockResolvedValueOnce({
             sessionId: 'saved-sess',
             model: 'previous-model',
@@ -753,7 +755,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             '../../../src/copilot/model-gateway/ingress/index.js'
         );
         defaultModelGatewayIngressRouteRegistry.clear();
-        process.env.OPENROUTER_API_KEY = 'upstream-secret';
+        process.env['OPENROUTER_API_KEY'] = 'upstream-secret';
         mocks.readState.mockResolvedValueOnce({
             sessionId: 'saved-sess',
             model: 'previous-model',
@@ -790,8 +792,10 @@ describe('agent/session/initializer — sessionFs wiring', () => {
             },
         });
         expect(routes).toHaveLength(1);
-        expect(options.provider.baseUrl).toBe(routes[0].sdkBaseUrl);
-        expect(defaultModelGatewayIngressRouteRegistry.get(String(routes[0].routeId))).toMatchObject({
+        const [registeredRoute] = routes;
+        if (!registeredRoute) throw new Error('Rota ingress não registrada.');
+        expect(options.provider.baseUrl).toBe(registeredRoute['sdkBaseUrl']);
+        expect(defaultModelGatewayIngressRouteRegistry.get(String(registeredRoute['routeId']))).toMatchObject({
             upstreamAuthHeaders: { authorization: 'Bearer upstream-secret' },
             ingressRoute: {
                 providerId: 'openrouter',

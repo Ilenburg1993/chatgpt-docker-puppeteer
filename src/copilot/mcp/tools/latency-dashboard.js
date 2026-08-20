@@ -18,6 +18,79 @@ import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime
 import { z } from 'zod';
 
 const DEFAULT_MIN_SAMPLE_CALLS = 5;
+
+/** @param {ReturnType<typeof readMcpRoundTripAnalyticsSnapshot>} snapshot */
+function compactRoundTripTrend(snapshot) {
+    const recovery = snapshot.recovery;
+    const pressure = snapshot.workflowPressure;
+    const top = snapshot.topTransitions[0];
+    return {
+        available: snapshot.available,
+        windowMs: snapshot.windowMs,
+        indexedRows: snapshot.indexedRows,
+        recovery: {
+            traceCount: recovery.traceCount,
+            withInspectionCount: recovery.withInspectionCount,
+            roundTrips: recovery.roundTrips,
+            totalGapMs: recovery.totalGapMs,
+        },
+        workflowPressure: {
+            planThenApplyCount: pressure.planThenApplyCount,
+            validatorPollCount: pressure.validatorPollCount,
+            patchThenValidatorTransitions: pressure.patchThenValidatorTransitions,
+            compositePostValidationCount: pressure.compositePostValidationCount,
+            gitGranularCalls: pressure.gitGranularCalls,
+            gitOneShotCalls: pressure.gitOneShotCalls,
+        },
+        discontinuityCount: snapshot.discontinuities.count,
+        topTransition: top
+            ? {
+                  from: top.from,
+                  to: top.to,
+                  count: top.count,
+                  totalGapMs: top.totalGapMs,
+                  p50GapMs: top.p50GapMs,
+              }
+            : null,
+    };
+}
+
+/** @param {ReturnType<typeof readMcpRoundTripAnalyticsSnapshot>} snapshot */
+function compactRoundTripAnalytics(snapshot) {
+    return {
+        available: snapshot.available,
+        schemaVersion: snapshot.schemaVersion,
+        normalizerVersion: snapshot.normalizerVersion,
+        authority: snapshot.authority,
+        windowMs: snapshot.windowMs,
+        indexedRows: snapshot.indexedRows,
+        topTransitions: snapshot.topTransitions.slice(0, 2).map((row) => ({
+            from: row.from,
+            to: row.to,
+            count: row.count,
+            totalGapMs: row.totalGapMs,
+            p50GapMs: row.p50GapMs,
+        })),
+        recovery: {
+            traceCount: snapshot.recovery.traceCount,
+            withInspectionCount: snapshot.recovery.withInspectionCount,
+            roundTrips: snapshot.recovery.roundTrips,
+            totalGapMs: snapshot.recovery.totalGapMs,
+        },
+        workflowPressure: {
+            planThenApplyCount: snapshot.workflowPressure.planThenApplyCount,
+            validatorPollCount: snapshot.workflowPressure.validatorPollCount,
+            patchThenValidatorTransitions: snapshot.workflowPressure.patchThenValidatorTransitions,
+            compositePostValidationCount: snapshot.workflowPressure.compositePostValidationCount,
+            gitGranularCalls: snapshot.workflowPressure.gitGranularCalls,
+            gitOneShotCalls: snapshot.workflowPressure.gitOneShotCalls,
+        },
+        discontinuities: {
+            thresholdMs: snapshot.discontinuities.thresholdMs,
+            count: snapshot.discontinuities.count,
+        },
+    };
+}
 const DEFAULT_TOOL_AVERAGE_WARN_MS = 1_000;
 const DEFAULT_AUTHORIZATION_AVERAGE_WARN_MS = 250;
 const DEFAULT_HANDLER_AVERAGE_WARN_MS = 750;
@@ -55,41 +128,34 @@ export const mcpLatencyDashboardTool = {
             .int()
             .min(1)
             .max(10_000)
-            .optional()
-            .describe('Minimum total calls before strict SLO status is meaningful.'),
+            .optional()['describe']('Minimum total calls before strict SLO status is meaningful.'),
         silentExternalGapP50WarnMs: z
             .number()
             .int()
             .min(100)
             .max(120000)
-            .optional()
-            .describe('Interaction SLO warning threshold for p50 origin-silent gap. Defaults to 3000ms.'),
+            .optional()['describe']('Interaction SLO warning threshold for p50 origin-silent gap. Defaults to 3000ms.'),
         silentExternalGapP95WarnMs: z
             .number()
             .int()
             .min(100)
             .max(120000)
-            .optional()
-            .describe('Interaction SLO warning threshold for p95 origin-silent gap. Defaults to 8000ms.'),
+            .optional()['describe']('Interaction SLO warning threshold for p95 origin-silent gap. Defaults to 8000ms.'),
         includeTools: z
             .boolean()
-            .optional()
-            .describe('Include detailed per-tool/per-phase ranking rows. Default: false; summary still names each top pressure source.'),
+            .optional()['describe']('Include detailed per-tool/per-phase ranking rows. Default: false; summary still names each top pressure source.'),
         maxRows: z
             .number()
             .int()
             .min(1)
             .max(50)
-            .optional()
-            .describe('Maximum slow tool/phase rows to return. Defaults to 12.'),
+            .optional()['describe']('Maximum slow tool/phase rows to return. Defaults to 12.'),
         persistSnapshot: z
             .boolean()
-            .optional()
-            .describe('Append a compact snapshot to the local latency history JSONL file. Defaults to false.'),
+            .optional()['describe']('Append a compact snapshot to the local latency history JSONL file. Defaults to false.'),
         compareHistory: z
             .boolean()
-            .optional()
-            .describe(
+            .optional()['describe'](
                 'Compare this snapshot with the latest persisted latency snapshot. Defaults to true when persistSnapshot=true.',
             ),
         historyLimit: z
@@ -97,15 +163,13 @@ export const mcpLatencyDashboardTool = {
             .int()
             .min(1)
             .max(500)
-            .optional()
-            .describe('Number of recent persisted snapshots to return when history is requested.'),
+            .optional()['describe']('Number of recent persisted snapshots to return when history is requested.'),
         maxHistorySnapshots: z
             .number()
             .int()
             .min(1)
             .max(10000)
-            .optional()
-            .describe('Maximum snapshots retained when persistSnapshot=true.'),
+            .optional()['describe']('Maximum snapshots retained when persistSnapshot=true.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async (input = {}) => {
@@ -121,6 +185,25 @@ export const mcpLatencyDashboardTool = {
             top: includeTools ? maxRows : 5,
             includeSynthetic: false,
         });
+        const roundTripTrends = includeTools
+            ? {
+                  h1: compactRoundTripTrend(
+                      readMcpRoundTripAnalyticsSnapshot({
+                          windowMs: 60 * 60 * 1000,
+                          top: 3,
+                          includeSynthetic: false,
+                      }),
+                  ),
+                  h6: compactRoundTripTrend(
+                      readMcpRoundTripAnalyticsSnapshot({
+                          windowMs: 6 * 60 * 60 * 1000,
+                          top: 3,
+                          includeSynthetic: false,
+                      }),
+                  ),
+                  h24: compactRoundTripTrend(indexedRoundTrip),
+              }
+            : null;
         const toolRows = includeTools ? buildToolRows(metrics.tools, maxRows) : [];
         const cumulativeCostRows = buildCumulativeCostRows(metrics.tools, metrics.totals.calls, rankingRows);
         const callPressureRows = buildCallPressureRows(metrics.tools, metrics.totals.calls, rankingRows);
@@ -212,7 +295,8 @@ export const mcpLatencyDashboardTool = {
                     'Quiescent gap between completed and next-started tool bursts. Excludes active MCP handler time; includes response return, client/model/orchestrator work, dispatch/transit, and potentially normal reasoning.',
             },
             byteAccounting,
-            roundTripAnalytics: indexedRoundTrip,
+            roundTripAnalytics: includeTools ? indexedRoundTrip : compactRoundTripAnalytics(indexedRoundTrip),
+            ...(roundTripTrends ? { roundTripTrends } : {}),
             roundTripAccounting: {
                 ...roundTripAccounting,
                 silentExternalGapP50Ms: metrics.interaction.originBoundary.silentExternalGaps.p50Ms,

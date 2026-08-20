@@ -26,8 +26,8 @@ test('wave12: setupSignalHandlers tolerates unsupported SIGUSR2 and SIGHUP', () 
         }, 'setupSignalHandlers should not throw when optional signals are unsupported');
 
         const handlers = __mainTestHooks.getSignalHandlers();
-        assert.equal(handlers.sigusr2, null, 'SIGUSR2 handler should be null when registration fails');
-        assert.equal(handlers.sighup, null, 'SIGHUP handler should be null when registration fails');
+        assert.equal(handlers['sigusr2'], null, 'SIGUSR2 handler should be null when registration fails');
+        assert.equal(handlers['sighup'], null, 'SIGHUP handler should be null when registration fails');
     } finally {
         __mainTestHooks.cleanupSignalHandlers();
         __mainTestHooks.resetShutdownState();

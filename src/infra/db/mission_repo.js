@@ -205,21 +205,21 @@ function updateMission(missionId, updates = {}) {
     const now = _now();
     const next = _rowToMission(existing);
 
-    const status = updates.status ? String(updates.status).toUpperCase().trim() : next.status;
-    const autonomy_mode = updates.autonomy_mode ? String(updates.autonomy_mode).trim() : next.autonomy_mode;
-    const policy = updates.policy ? _normalizePolicy({ ...next.policy, ...updates.policy }) : next.policy;
-    const context = updates.context ? { ...(next.context || {}), ...(updates.context || {}) } : next.context;
+    const status = updates['status'] ? String(updates['status']).toUpperCase().trim() : next.status;
+    const autonomy_mode = updates['autonomy_mode'] ? String(updates['autonomy_mode']).trim() : next.autonomy_mode;
+    const policy = updates['policy'] ? _normalizePolicy({ ...next.policy, ...updates['policy'] }) : next.policy;
+    const context = updates['context'] ? { ...(next.context || {}), ...(updates['context'] || {}) } : next.context;
 
     const startedAtMs =
-        updates.started_at_ms !== undefined
-            ? updates.started_at_ms
-                ? Number(updates.started_at_ms)
+        updates['started_at_ms'] !== undefined
+            ? updates['started_at_ms']
+                ? Number(updates['started_at_ms'])
                 : null
             : (existing.started_at_ms ?? null);
     const completedAtMs =
-        updates.completed_at_ms !== undefined
-            ? updates.completed_at_ms
-                ? Number(updates.completed_at_ms)
+        updates['completed_at_ms'] !== undefined
+            ? updates['completed_at_ms']
+                ? Number(updates['completed_at_ms'])
                 : null
             : (existing.completed_at_ms ?? null);
 
@@ -242,8 +242,8 @@ function updateMission(missionId, updates = {}) {
         )
         .run({
             id: missionId,
-            title: updates.title !== undefined ? String(updates.title) : existing.title,
-            description: updates.description !== undefined ? String(updates.description || '') : existing.description,
+            title: updates['title'] !== undefined ? String(updates['title']) : existing.title,
+            description: updates['description'] !== undefined ? String(updates['description'] || '') : existing.description,
             status,
             autonomy_mode,
             policy_json: JSON.stringify(policy),

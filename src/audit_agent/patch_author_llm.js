@@ -47,13 +47,13 @@ function _boolEnv(name, fallback = false) {
 }
 
 function _getInferenceGatewayBaseUrl() {
-    const host = process.env.INFERENCE_GATEWAY_HOST || '127.0.0.1';
-    const port = Number(process.env.INFERENCE_GATEWAY_PORT || 3099);
+    const host = process.env['INFERENCE_GATEWAY_HOST'] || '127.0.0.1';
+    const port = Number(process.env['INFERENCE_GATEWAY_PORT'] || 3099);
     return `http://${host}:${port}`;
 }
 
 function _isEnabled() {
-    return String(process.env.AUDIT_AGENT_PATCH_AUTHOR_LLM_ENABLED || 'false').toLowerCase() === 'true';
+    return String(process.env['AUDIT_AGENT_PATCH_AUTHOR_LLM_ENABLED'] || 'false').toLowerCase() === 'true';
 }
 
 /**
@@ -84,11 +84,11 @@ function _buildPatchPrompt(job, contextPack, llmTriage) {
     const j = _asRecord(job);
     const cp = _asRecord(contextPack);
     const lt = _asRecord(llmTriage);
-    const scope = _asRecord(j.scope_json);
-    const context = _asRecord(cp.context);
-    const mcpTools = _asRecord(context.mcp_tools);
-    const triageParsed = _asRecord(lt.parsed);
-    const findings = Array.isArray(cp.findings) ? cp.findings : [];
+    const scope = _asRecord(j['scope_json']);
+    const context = _asRecord(cp['context']);
+    const mcpTools = _asRecord(context['mcp_tools']);
+    const triageParsed = _asRecord(lt['parsed']);
+    const findings = Array.isArray(cp['findings']) ? cp['findings'] : [];
     return [
         'Você é um planejador de patch em modo proposal-only.',
         'Nao aplique patch. Nao invente diff se nao houver confiança.',
@@ -96,23 +96,23 @@ function _buildPatchPrompt(job, contextPack, llmTriage) {
         'risk_level deve ser low|medium|high.',
         'candidate_files deve ser array de strings.',
         'proposed_changes deve ser array de strings curtas.',
-        `job_kind=${_safeString(j.kind, 'unknown')}`,
-        `target_file=${_safeString(scope.filePath || scope.file_path, 'n/a')}`,
-        `query=${_safeString(scope.query || scope.rag_query, 'n/a')}`,
-        `triage_summary=${_safeString(triageParsed.summary, 'n/a')}`,
-        `triage_risk=${_safeString(triageParsed.risk_level, 'n/a')}`,
-        `mcp_budget=${JSON.stringify(mcpTools.budget || null)}`,
-        `lsp_diagnostics=${JSON.stringify(mcpTools.lsp_diagnostics || null)}`,
-        `lsp_definition=${JSON.stringify(mcpTools.lsp_definition || null)}`,
-        `lsp_references=${JSON.stringify(mcpTools.lsp_references || null)}`,
-        `rag_search=${JSON.stringify(mcpTools.rag_search || null)}`,
-        `rag_expand=${JSON.stringify(mcpTools.rag_expand || null)}`,
+        `job_kind=${_safeString(j['kind'], 'unknown')}`,
+        `target_file=${_safeString(scope['filePath'] || scope['file_path'], 'n/a')}`,
+        `query=${_safeString(scope['query'] || scope['rag_query'], 'n/a')}`,
+        `triage_summary=${_safeString(triageParsed['summary'], 'n/a')}`,
+        `triage_risk=${_safeString(triageParsed['risk_level'], 'n/a')}`,
+        `mcp_budget=${JSON.stringify(mcpTools['budget'] || null)}`,
+        `lsp_diagnostics=${JSON.stringify(mcpTools['lsp_diagnostics'] || null)}`,
+        `lsp_definition=${JSON.stringify(mcpTools['lsp_definition'] || null)}`,
+        `lsp_references=${JSON.stringify(mcpTools['lsp_references'] || null)}`,
+        `rag_search=${JSON.stringify(mcpTools['rag_search'] || null)}`,
+        `rag_expand=${JSON.stringify(mcpTools['rag_expand'] || null)}`,
         `findings=${JSON.stringify(
             findings.slice(0, 10).map(
                 /** @param {Record<string, any>} f */ (f) => ({
-                    title: f?.title,
-                    severity: f?.severity,
-                    category: f?.category,
+                    title: f?.['title'],
+                    severity: f?.['severity'],
+                    category: f?.['category'],
                 }),
             ),
         ).slice(0, 5000)}`,
@@ -125,18 +125,18 @@ function _buildPatchPrompt(job, contextPack, llmTriage) {
  */
 function _coercePatchAuthorParsed(rawParsed) {
     const parsed = _asRecord(rawParsed);
-    const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
-    const riskLevel = ['low', 'medium', 'high'].includes(String(parsed.risk_level || '').toLowerCase())
-        ? String(parsed.risk_level).toLowerCase()
+    const summary = typeof parsed['summary'] === 'string' ? parsed['summary'].trim() : '';
+    const riskLevel = ['low', 'medium', 'high'].includes(String(parsed['risk_level'] || '').toLowerCase())
+        ? String(parsed['risk_level']).toLowerCase()
         : null;
-    const candidateFiles = Array.isArray(parsed.candidate_files)
-        ? parsed.candidate_files
+    const candidateFiles = Array.isArray(parsed['candidate_files'])
+        ? parsed['candidate_files']
               .map(/** @param {unknown} v */ (v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 10)
         : null;
-    const proposedChanges = Array.isArray(parsed.proposed_changes)
-        ? parsed.proposed_changes.map(/** @param {unknown} v */ (v) => String(v || '').trim())
+    const proposedChanges = Array.isArray(parsed['proposed_changes'])
+        ? parsed['proposed_changes'].map(/** @param {unknown} v */ (v) => String(v || '').trim())
         : null;
 
     return {
@@ -167,33 +167,33 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
     const j = _asRecord(job);
     const cp = _asRecord(contextPack);
     const lo = _asRecord(llmOut);
-    const parsed = _asRecord(lo.parsed);
-    const scope = _asRecord(j.scope_json);
-    const targetFile = _safeString(scope.filePath || scope.file_path, 'src/main.js');
-    const candidateFiles = Array.isArray(parsed.candidate_files)
-        ? parsed.candidate_files
+    const parsed = _asRecord(lo['parsed']);
+    const scope = _asRecord(j['scope_json']);
+    const targetFile = _safeString(scope['filePath'] || scope['file_path'], 'src/main.js');
+    const candidateFiles = Array.isArray(parsed['candidate_files'])
+        ? parsed['candidate_files']
               .map(/** @param {unknown} v */ (v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 10)
         : [targetFile];
     const riskMap = /** @type {Record<string, number>} */ ({ low: 0.2, medium: 0.45, high: 0.75 });
-    const riskLevel = _safeString(parsed.risk_level, 'medium').toLowerCase();
+    const riskLevel = _safeString(parsed['risk_level'], 'medium').toLowerCase();
     const riskScore = riskMap[riskLevel] ?? 0.45;
-    const patchUnifiedDiff = typeof parsed.patch_unified_diff === 'string' ? parsed.patch_unified_diff : '';
-    const proposedChanges = Array.isArray(parsed.proposed_changes)
-        ? parsed.proposed_changes
+    const patchUnifiedDiff = typeof parsed['patch_unified_diff'] === 'string' ? parsed['patch_unified_diff'] : '';
+    const proposedChanges = Array.isArray(parsed['proposed_changes'])
+        ? parsed['proposed_changes']
               .map(/** @param {unknown} v */ (v) => String(v || '').trim())
               .filter(Boolean)
               .slice(0, 20)
         : [];
 
     const validation = {
-        shape_valid: typeof lo.parsed === 'object' && lo.parsed !== null && !Array.isArray(lo.parsed),
-        has_summary: typeof parsed.summary === 'string' && parsed.summary.trim().length > 0,
+        shape_valid: typeof lo['parsed'] === 'object' && lo['parsed'] !== null && !Array.isArray(lo['parsed']),
+        has_summary: typeof parsed['summary'] === 'string' && parsed['summary'].trim().length > 0,
         risk_level_supported: ['low', 'medium', 'high'].includes(riskLevel),
         has_candidate_files: candidateFiles.length > 0,
         has_proposed_changes: proposedChanges.length > 0,
-        used_fallback_candidate_file: !Array.isArray(parsed.candidate_files),
+        used_fallback_candidate_file: !Array.isArray(parsed['candidate_files']),
     };
 
     return {
@@ -203,15 +203,15 @@ function _normalizePatchProposal(job, contextPack, llmOut) {
             skeleton: false,
             mode: 'propose_only',
             source: 'audit-agent-patch-llm',
-            llm_provider: lo.provider || 'inference-gateway',
-            llm_model: lo.model || null,
-            profile_name: lo.profile_name || null,
-            summary: parsed.summary ? String(parsed.summary) : null,
+            llm_provider: lo['provider'] || 'inference-gateway',
+            llm_model: lo['model'] || null,
+            profile_name: lo['profile_name'] || null,
+            summary: parsed['summary'] ? String(parsed['summary']) : null,
             risk_level: riskLevel,
             candidate_files: candidateFiles.length > 0 ? candidateFiles : [targetFile],
             proposed_changes: proposedChanges,
-            triage_anchor: _asRecord(lo.triage_anchor) || null,
-            context_budget: _asRecord(cp.context)?.mcp_tools?.budget || null,
+            triage_anchor: _asRecord(lo['triage_anchor']) || null,
+            context_budget: _asRecord(cp['context'])?.['mcp_tools']?.budget || null,
             validation,
         },
         risk_score: riskScore,
@@ -244,9 +244,9 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 return { ok: false, skipped: true, reason: 'patch_author_llm_disabled' };
             }
             const baseUrl = _getInferenceGatewayBaseUrl();
-            const profileName = String(process.env.AUDIT_AGENT_PATCH_AUTHOR_PROFILE_NAME || '').trim() || undefined;
-            const model = String(process.env.AUDIT_AGENT_LLM_MODEL_PATCH || '').trim() || undefined;
-            const timeoutMs = Math.max(1000, Number(process.env.AUDIT_AGENT_LLM_TIMEOUT_MS || 120000));
+            const profileName = String(process.env['AUDIT_AGENT_PATCH_AUTHOR_PROFILE_NAME'] || '').trim() || undefined;
+            const model = String(process.env['AUDIT_AGENT_LLM_MODEL_PATCH'] || '').trim() || undefined;
+            const timeoutMs = Math.max(1000, Number(process.env['AUDIT_AGENT_LLM_TIMEOUT_MS'] || 120000));
             const basePayload = {
                 clientTag: 'audit_agent_patch',
                 profileName,
@@ -258,7 +258,7 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 basePayload,
                 Math.min(timeoutMs, 10_000),
             );
-            if (!preflight.ok || !_asRecord(preflight.json).ok) {
+            if (!preflight.ok || !_asRecord(preflight.json)['ok']) {
                 return {
                     ok: false,
                     skipped: true,
@@ -274,11 +274,11 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 {
                     ...basePayload,
                     prompt,
-                    maxTokens: Number(process.env.AUDIT_AGENT_PATCH_AUTHOR_MAX_TOKENS || 700) || 700,
+                    maxTokens: Number(process.env['AUDIT_AGENT_PATCH_AUTHOR_MAX_TOKENS'] || 700) || 700,
                 },
                 timeoutMs,
             );
-            if (!out.ok || !_asRecord(out.json).ok) {
+            if (!out.ok || !_asRecord(out.json)['ok']) {
                 return {
                     ok: false,
                     skipped: false,
@@ -289,17 +289,17 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 };
             }
 
-            const responseText = _safeString(_asRecord(_asRecord(out.json).result).response, '').trim();
+            const responseText = _safeString(_asRecord(_asRecord(out.json)['result'])['response'], '').trim();
             const parsedRaw = _parseJsonMaybe(responseText);
             const parsedInfo = _coercePatchAuthorParsed(parsedRaw);
-            if (_boolEnv('AUDIT_AGENT_PATCH_AUTHOR_REQUIRE_JSON', false) && !parsedInfo.strict.ok) {
+            if (_boolEnv('AUDIT_AGENT_PATCH_AUTHOR_REQUIRE_JSON', false) && !parsedInfo['strict'].ok) {
                 return {
                     ok: false,
                     skipped: false,
                     error: 'patch_author_invalid_json_shape',
                     status: 200,
                     details: {
-                        strict: parsedInfo.strict,
+                        strict: parsedInfo['strict'],
                         raw_response: responseText.slice(0, 4000),
                     },
                     preflight: preflight.json || null,
@@ -311,13 +311,13 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 provider: 'inference-gateway',
                 profile_name: profileName || null,
                 model: model || null,
-                parsed: parsedInfo.parsed,
-                triage_anchor: _asRecord(lt.parsed),
+                parsed: parsedInfo['parsed'],
+                triage_anchor: _asRecord(lt['parsed']),
             });
-            normalizedProposal.patch_summary.validation = {
-                ..._asRecord(normalizedProposal.patch_summary.validation),
-                strict_shape_ok: parsedInfo.strict.ok,
-                strict_shape_errors: parsedInfo.strict.errors,
+            normalizedProposal['patch_summary'].validation = {
+                ..._asRecord(normalizedProposal['patch_summary'].validation),
+                strict_shape_ok: parsedInfo['strict'].ok,
+                strict_shape_errors: parsedInfo['strict'].errors,
                 require_json_enabled: _boolEnv('AUDIT_AGENT_PATCH_AUTHOR_REQUIRE_JSON', false),
             };
 
@@ -330,12 +330,12 @@ export function createAuditAgentPatchAuthorLlmClient() {
                 model: model || null,
                 prompt_chars: prompt.length,
                 raw_response: responseText,
-                parsed: parsedInfo.parsed || null,
-                validation: normalizedProposal.patch_summary?.validation || null,
+                parsed: parsedInfo['parsed'] || null,
+                validation: normalizedProposal['patch_summary']?.validation || null,
                 patch_proposal: normalizedProposal,
                 preflight: preflight.json || null,
-                policy: _asRecord(out.json).policy || null,
-                ts: _asRecord(out.json).ts || Date.now(),
+                policy: _asRecord(out.json)['policy'] || null,
+                ts: _asRecord(out.json)['ts'] || Date.now(),
             };
         },
     };

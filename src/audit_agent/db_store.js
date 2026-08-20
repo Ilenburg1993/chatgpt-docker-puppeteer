@@ -27,7 +27,7 @@ export function createAuditAgentDbStore() {
          * @param {Record<string, unknown>} job
          */
         saveJob(job) {
-            const existing = getAuditJobById(String(job?.id || ''));
+            const existing = getAuditJobById(String(job?.['id'] || ''));
             if (!existing) {
                 return createAuditJob(/** @type {any} */ (job));
             }
@@ -37,15 +37,15 @@ export function createAuditAgentDbStore() {
          * @param {Record<string, unknown>} job
          */
         onRunStart(job) {
-            if (!job?.current_run_id) return null;
+            if (!job?.['current_run_id']) return null;
             try {
                 return createAuditJobRun({
-                    id: String(job.current_run_id),
-                    job_id: String(job.id || ''),
-                    attempt_seq: Number(job.attempt_seq) || undefined,
-                    status: String(job.status || ''),
+                    id: String(job['current_run_id']),
+                    job_id: String(job['id'] || ''),
+                    attempt_seq: Number(job['attempt_seq']) || undefined,
+                    status: String(job['status'] || ''),
                     executor: 'audit-agent',
-                    started_at_ms: Number(job.updated_at_ms || job.started_at_ms) || Date.now(),
+                    started_at_ms: Number(job['updated_at_ms'] || job['started_at_ms']) || Date.now(),
                     metrics_json: { skeleton: true },
                 });
             } catch {
@@ -56,16 +56,16 @@ export function createAuditAgentDbStore() {
          * @param {Record<string, unknown>} job
          */
         onRunFinish(job) {
-            if (!job?.current_run_id) return null;
+            if (!job?.['current_run_id']) return null;
             try {
-                return updateAuditJobRun(String(job.current_run_id), {
-                    status: String(job.status || ''),
-                    completed_at_ms: Number(job.completed_at_ms ?? job.updated_at_ms) || Date.now(),
+                return updateAuditJobRun(String(job['current_run_id']), {
+                    status: String(job['status'] || ''),
+                    completed_at_ms: Number(job['completed_at_ms'] ?? job['updated_at_ms']) || Date.now(),
                     metrics_json: {
                         skeleton: true,
-                        current_step: job.current_step || null,
+                        current_step: job['current_step'] || null,
                     },
-                    error_json: job.error_json ?? null,
+                    error_json: job['error_json'] ?? null,
                 });
             } catch {
                 return null;
@@ -82,14 +82,14 @@ export function createAuditAgentDbStore() {
                     rows.push(
                         upsertAuditFinding({
                             job_id: jobId,
-                            severity: String(item.severity || 'info'),
-                            category: String(item.category || 'generic'),
-                            title: String(item.title || 'finding'),
-                            source: String(item.source || 'audit-agent'),
-                            contract_id: item.contract_id ? String(item.contract_id) : undefined,
-                            dedup_key: item.dedup_key ? String(item.dedup_key) : undefined,
-                            status: String(item.status || 'open'),
-                            evidence: item.evidence || item.evidence_json || {},
+                            severity: String(item['severity'] || 'info'),
+                            category: String(item['category'] || 'generic'),
+                            title: String(item['title'] || 'finding'),
+                            source: String(item['source'] || 'audit-agent'),
+                            contract_id: item['contract_id'] ? String(item['contract_id']) : undefined,
+                            dedup_key: item['dedup_key'] ? String(item['dedup_key']) : undefined,
+                            status: String(item['status'] || 'open'),
+                            evidence: item['evidence'] || item['evidence_json'] || {},
                         }),
                     );
                 } catch {
@@ -109,13 +109,13 @@ export function createAuditAgentDbStore() {
                     rows.push(
                         createAuditPatchProposal({
                             job_id: jobId,
-                            status: String(p.status || 'draft'),
-                            patch_unified_diff: String(p.patch_unified_diff || ''),
-                            patch_summary: p.patch_summary || {},
-                            risk_score: p.risk_score != null ? Number(p.risk_score) : null,
-                            dry_run_result_json: p.dry_run_result_json ?? null,
-                            approval_required: p.approval_required !== false,
-                            rollback_patch: p.rollback_patch ? String(p.rollback_patch) : undefined,
+                            status: String(p['status'] || 'draft'),
+                            patch_unified_diff: String(p['patch_unified_diff'] || ''),
+                            patch_summary: p['patch_summary'] || {},
+                            risk_score: p['risk_score'] != null ? Number(p['risk_score']) : null,
+                            dry_run_result_json: p['dry_run_result_json'] ?? null,
+                            approval_required: p['approval_required'] !== false,
+                            rollback_patch: p['rollback_patch'] ? String(p['rollback_patch']) : undefined,
                         }),
                     );
                 } catch {

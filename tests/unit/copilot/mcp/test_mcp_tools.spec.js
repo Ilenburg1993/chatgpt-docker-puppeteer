@@ -222,19 +222,19 @@ describe('copilot MCP tools', () => {
 
         assert.deepEqual(second.structuredContent, first.structuredContent);
         assert.deepEqual(second.content, first.content);
-        assert.equal(afterFirst.misses, 1);
-        assert.equal(afterFirst.sets, 1);
+        assert.equal(afterFirst['misses'], 1);
+        assert.equal(afterFirst['sets'], 1);
         assert.equal(typeof afterFirst.bytes, 'number');
         assert.ok(afterFirst.bytes > 0);
         assert.equal(typeof afterFirst.maxBytes, 'number');
-        assert.equal(afterSecond.hits, 1);
+        assert.equal(afterSecond['hits'], 1);
         assert.equal(afterSecond.size, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
         if (resolved.ok) invalidateIoCachePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
-        assert.equal(afterInvalidation.busInvalidations, 1);
-        assert.equal(afterInvalidation.clears, 1);
+        assert.equal(afterInvalidation['busInvalidations'], 1);
+        assert.equal(afterInvalidation['clears'], 1);
         assert.equal(afterInvalidation.size, 0);
     });
 
@@ -260,8 +260,8 @@ describe('copilot MCP tools', () => {
             const second = await tool.handler({ path: relativePath });
             const cacheStats = readRepoReadFileResultCacheStats();
             assert.equal(second.structuredContent?.['content'], 'omega\n');
-            assert.equal(cacheStats.stale, 1);
-            assert.equal(cacheStats.misses, 2);
+            assert.equal(cacheStats['stale'], 1);
+            assert.equal(cacheStats['misses'], 2);
         } finally {
             await rm(tempDir, { recursive: true, force: true });
             resetRepoReadResponseCacheForTest();
@@ -282,9 +282,9 @@ describe('copilot MCP tools', () => {
         assert.equal(first.isError, undefined);
         assert.equal(second.isError, undefined);
         assert.deepEqual(second.structuredContent, first.structuredContent);
-        assert.equal(stats.misses, 1);
-        assert.equal(stats.singleflightLeaders, 1);
-        assert.equal(stats.singleflightJoins, 1);
+        assert.equal(stats['misses'], 1);
+        assert.equal(stats['singleflightLeaders'], 1);
+        assert.equal(stats['singleflightJoins'], 1);
         assert.equal(stats.size, 1);
     });
 
@@ -495,18 +495,18 @@ describe('copilot MCP tools', () => {
         assert.equal(first.isError, undefined);
         assert.deepEqual(second.structuredContent, first.structuredContent);
         assert.deepEqual(second.content, first.content);
-        assert.equal(afterFirst.chunkMisses, 1);
-        assert.equal(afterFirst.chunkSets, 1);
+        assert.equal(afterFirst['chunkMisses'], 1);
+        assert.equal(afterFirst['chunkSets'], 1);
         assert.equal(typeof afterFirst.chunkBytes, 'number');
         assert.ok(afterFirst.chunkBytes > 0);
-        assert.equal(afterSecond.chunkHits, 1);
+        assert.equal(afterSecond['chunkHits'], 1);
         assert.equal(afterSecond.chunkSize, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
         if (resolved.ok) invalidateIoCachePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
-        assert.equal(afterInvalidation.busInvalidations, 1);
-        assert.equal(afterInvalidation.chunkClears, 1);
+        assert.equal(afterInvalidation['busInvalidations'], 1);
+        assert.equal(afterInvalidation['chunkClears'], 1);
         assert.equal(afterInvalidation.chunkSize, 0);
     });
 
@@ -525,9 +525,9 @@ describe('copilot MCP tools', () => {
         assert.equal(first.isError, undefined);
         assert.equal(second.isError, undefined);
         assert.deepEqual(second.structuredContent, first.structuredContent);
-        assert.equal(stats.chunkMisses, 1);
-        assert.equal(stats.chunkSingleflightLeaders, 1);
-        assert.equal(stats.chunkSingleflightJoins, 1);
+        assert.equal(stats['chunkMisses'], 1);
+        assert.equal(stats['chunkSingleflightLeaders'], 1);
+        assert.equal(stats['chunkSingleflightJoins'], 1);
         assert.equal(stats.chunkSize, 1);
     });
 
@@ -818,7 +818,7 @@ describe('copilot MCP tools', () => {
         const authProfile = /** @type {Record<string, unknown>} */ (structured['authProfile']);
         assert.equal(authProfile['maxPowerDefault'], true);
         assert.ok(/** @type {string[]} */ (authProfile['initialScopes']).includes('repo:admin'));
-        assert.equal(structured['executionLimitsVersion'], 1);
+        assert.equal(structured['executionLimitsVersion'], 2);
         const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
         assert.equal(executionLimits['repoRead']?.['maxBatchRequests'], 64);
         assert.equal(executionLimits['repoRead']?.['maxSearchContextLines'], 48);
@@ -898,15 +898,23 @@ describe('copilot MCP tools', () => {
         );
         assert.equal('tools' in structured, false);
         const metadataCoverage = /** @type {Record<string, unknown>} */ (structured['metadataCoverage']);
-        assert.equal(metadataCoverage['outputSchemaPolicy'], 'specific-only');
+        assert.equal(metadataCoverage['outputSchemaPolicy'], 'baseline-plus-specific');
+        assert.equal(metadataCoverage['outputSchemaCount'], getCanonicalMcpTools().length);
+        assert.equal(metadataCoverage['baselineOutputSchemaCount'], getCanonicalMcpTools().length - 2);
         assert.equal(metadataCoverage['specificOutputSchemaCount'], 2);
+        assert.equal(metadataCoverage['outputSchemaComplete'], true);
         assert.equal(metadataCoverage['securityMetadataCount'], getCanonicalMcpTools().length);
         assert.equal(metadataCoverage['securityComplete'], true);
+        assert.equal(metadataCoverage['outputSchemaComplete'], true);
         assert.equal(structured['detailsTool'], 'mcp_capabilities_summary');
-        assert.equal(structured['executionLimitsVersion'], 1);
+        assert.equal(structured['executionLimitsVersion'], 2);
         const executionLimits = /** @type {Record<string, Record<string, unknown>>} */ (structured['executionLimits']);
         assert.equal(executionLimits['repoPatch']?.['maxBatchOperations'], 128);
         assert.equal(executionLimits['repoPatch']?.['defaultApplyMode'], 'per-target-fast');
+        assert.equal(executionLimits['toolsList']?.['maxEnvelopeBytes'], 400 * 1024);
+        assert.equal(executionLimits['terminal']?.['maxBatchCommands'], 32);
+        assert.equal(executionLimits['terminal']?.['maxBatchConcurrency'], 16);
+        assert.equal(executionLimits['terminal']?.['maxSessions'], 128);
         assert.equal(executionLimits['validator']?.['maxBatchConcurrency'], 1);
         assert.equal(executionLimits['validator']?.['acceptedInputMaxConcurrency'], 2);
         const schemaConvergence = /** @type {Record<string, unknown>} */ (structured['schemaConvergence']);
@@ -979,7 +987,8 @@ describe('copilot MCP tools', () => {
         assert.equal(largest[0]?.['averageBytes'], 100_000);
         assert.equal(volume[0]?.['name'], 'chatty-result');
         assert.equal(volume[0]?.['totalBytes'], 150_000);
-        assert.equal(structured['summary']?.['largestAverageResultBytes'], 100_000);
+        const summary = /** @type {Record<string, unknown>} */ (structured['summary']);
+        assert.equal(summary['largestAverageResultBytes'], 100_000);
         resetMcpMetricsForTests();
     });
 
@@ -999,14 +1008,17 @@ describe('copilot MCP tools', () => {
         assert.equal('slowestTools' in structured, false);
         assert.equal('highestCumulativeCost' in structured, false);
         assert.equal('largestResultPayloads' in structured, false);
-        assert.equal(summary['highestCumulativeCost']?.['name'], 'hot-reader');
-        assert.equal(summary['largestResultPayload']?.['name'], 'hot-reader');
+        const highestCumulativeCost = /** @type {Record<string, unknown>} */ (summary['highestCumulativeCost']);
+        const largestResultPayload = /** @type {Record<string, unknown>} */ (summary['largestResultPayload']);
+        assert.equal(highestCumulativeCost['name'], 'hot-reader');
+        assert.equal(largestResultPayload['name'], 'hot-reader');
         const roundTrips = /** @type {Record<string, unknown>} */ (structured['roundTripAccounting']);
         assert.equal('topCompressedTools' in roundTrips, false);
         const indexedRoundTrips = /** @type {Record<string, unknown>} */ (structured['roundTripAnalytics']);
         assert.equal(typeof indexedRoundTrips['available'], 'boolean');
         assert.equal(typeof indexedRoundTrips['authority'], 'string');
         assert.ok(Array.isArray(indexedRoundTrips['topTransitions']));
+        assert.equal('roundTripTrends' in structured, false);
         assert.equal(roundTrips['logicalOperations'], 6);
         assert.ok(Buffer.byteLength(JSON.stringify(structured)) < 6 * 1024);
         resetMcpMetricsForTests();
@@ -1020,6 +1032,14 @@ describe('copilot MCP tools', () => {
         assert.ok('ready' in (result.structuredContent ?? {}));
         assert.equal(result.structuredContent?.['connectorUrl'], 'https://mcp.aurelin.org/mcp');
         assert.ok(Array.isArray(result.structuredContent?.['nextActions']));
+    });
+
+    it('dependency upgrade requires explicit confirmation without executing npm', async () => {
+        const tool = findTool('mcp_dependency_upgrade');
+        const result = await tool.handler({ confirmUpgrade: false });
+        assert.equal(result.isError, undefined);
+        assert.equal(result.structuredContent?.['success'], false);
+        assert.equal(result.structuredContent?.['code'], 'ERR_DEPENDENCY_UPGRADE_CONFIRM_REQUIRED');
     });
 
     it('mcp maintenance tools plan and dry-run fixed safe batches', async () => {
@@ -1158,7 +1178,7 @@ describe('copilot MCP tools', () => {
         const projection = /** @type {Record<string, unknown>} */ (result.structuredContent?.['projectionDiagnosis']);
         assert.equal(projection['status'], 'likely-stale-client-projection');
         assert.equal(projection['hostRefreshRequired'], true);
-        assert.equal(projection['executionLimitsVersion'], 1);
+        assert.equal(projection['executionLimitsVersion'], 2);
         const limits = /** @type {Record<string, Record<string, unknown>>} */ (projection['executionLimits']);
         assert.equal(limits['repoPatch']?.['maxBatchOperations'], 128);
         assert.equal(limits['validator']?.['maxBatchConcurrency'], 1);

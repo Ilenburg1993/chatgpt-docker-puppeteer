@@ -9,8 +9,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const IO_ENGINE_URL = new URL('../../../../src/copilot/infra/io-engine.js', import.meta.url).href;
 const CHILD_SCRIPT = `
-const { operation, args } = JSON.parse(process.env.COPILOT_IO_MULTIPROCESS_CASE);
-const io = await import(process.env.COPILOT_IO_ENGINE_URL);
+const { operation, args } = JSON.parse(process.env['COPILOT_IO_MULTIPROCESS_CASE']);
+const io = await import(process.env['COPILOT_IO_ENGINE_URL']);
 try {
     if (operation === 'create') {
         await io.createOrReplaceFileAtomic(args.target, args.content, { failIfExists: true, createParentDirs: true });

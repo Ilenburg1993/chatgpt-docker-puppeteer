@@ -25,7 +25,7 @@ const SESSION_JSON_FILE = join(ACTUAL_STATE_DIR, 'session.json');
 
 // Definir limite baixo para facilitar teste (default: 8KB, vamos usar 512 bytes para testar truncamento)
 const SMALL_LIMIT = 512;
-process.env.AGENT_HOOK_CONTEXT_MAX_BYTES = String(SMALL_LIMIT);
+process.env['AGENT_HOOK_CONTEXT_MAX_BYTES'] = String(SMALL_LIMIT);
 
 const { buildHookSystemContext, buildHookSystemContextSafe } =
     await import('../../../src/copilot/agent/session/initializers/initializer.js');

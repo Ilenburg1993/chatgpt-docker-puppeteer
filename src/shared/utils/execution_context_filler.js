@@ -5,8 +5,8 @@ import os from 'node:os';
 
 /**
  * @typedef {object} FillExecutionContextOptions
- * @property {object} [driver] - Driver instance (BaseDriver, ChatGPTDriver, etc)
- * @property {object} [browserPool] - BrowserPool manager instance
+ * @property {ExecutionContextDriverSource} [driver] - Driver instance (BaseDriver, ChatGPTDriver, etc)
+ * @property {ExecutionContextBrowserPool} [browserPool] - BrowserPool manager instance
  * @property {number} [tacticalAttempts=0] - Tentativas de retry tático (Driver). Default is `0`
  * @property {number} [strategicAttempts=0] - Tentativas de retry estratégico (Kernel). Default is `0`
  * @property {string[]} [errorsRecovered=[]] - Erros recuperados via retry. Default is `[]`
@@ -14,17 +14,53 @@ import os from 'node:os';
  */
 
 /**
+ * @typedef {object} ExecutionContextDriverSource
+ * @property {string} [name]
+ * @property {string} [version]
+ * @property {string} [connectionMode]
+ *
+ * @typedef {object} ExecutionContextBrowserPool
+ * @property {() => unknown} [getHealth]
+ * @property {{ version?: () => string | Promise<string> }} [browser]
+ *
+ * @typedef {object} ExecutionDriverData
+ * @property {string} [type]
+ * @property {string} [version]
+ * @property {string} [connection_mode]
+ * @property {unknown} [browser_pool_health]
+ *
+ * @typedef {object} ExecutionEnvironmentData
+ * @property {NodeJS.Platform} [platform]
+ * @property {string} [node_version]
+ * @property {boolean} [container]
+ * @property {string} [chrome_version]
+ *
+ * @typedef {object} ExecutionRetryData
+ * @property {number} [tactical_attempts]
+ * @property {number} [strategic_attempts]
+ * @property {string[]} [errors_recovered]
+ * @property {number} [total_backoff_ms]
+ *
+ * @typedef {object} FillExecutionData
+ * @property {ExecutionDriverData} driver
+ * @property {ExecutionEnvironmentData} environment
+ * @property {ExecutionRetryData} retry
+ *
  * @typedef {object} FillExecutionContextTask
- * @property {any} _ Propriedades definidas em runtime.
+ * @property {{ id: string }} meta
+ * @property {FillExecutionData} [execution]
  */
 /**
  * Preenche execution context de uma task V5.
  *
  * @param {FillExecutionContextTask} task - Task V5 object (mutável)
  * @param {FillExecutionContextOptions} options - Opções de preenchimento
- * @returns {any} Task com execution context preenchido
+ * @returns {Promise<FillExecutionContextTask>} Task com execution context preenchido
  */
-function fillExecutionContext(/** @type {any} */ task, /** @type {any} */ options) {
+async function fillExecutionContext(
+    /** @type {FillExecutionContextTask} */ task,
+    /** @type {FillExecutionContextOptions} */ options,
+) {
     options = options || {};
 
     try {
@@ -65,7 +101,7 @@ function fillExecutionContext(/** @type {any} */ task, /** @type {any} */ option
             platform: os.platform(), // 'linux', 'win32', 'darwin'
             node_version: process.version, // 'v24.0.0'
             container: _detectContainer(), // true se Docker
-            chrome_version: _getChromeVersion(options.browserPool), // '120.0.6099.109'
+            chrome_version: await _getChromeVersion(options.browserPool), // '120.0.6099.109'
         };
 
         // ==========================================

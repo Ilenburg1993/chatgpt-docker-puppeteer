@@ -43,6 +43,7 @@ async function sizeIfPresent(filePath) {
     }
 }
 
+/** @param {number} value */
 function rounded(value) {
     return Number(value.toFixed(3));
 }
@@ -109,6 +110,7 @@ async function main() {
             }
 
             await sleep(30);
+            /** @type {{ batchFailures: number; pendingSets: number; size: number; batchFlushes: number; averageBatchSize: number }} */
             const stats = cache.getStats();
             assert.equal(stats.batchFailures, 0);
             assert.equal(stats.pendingSets, 0);

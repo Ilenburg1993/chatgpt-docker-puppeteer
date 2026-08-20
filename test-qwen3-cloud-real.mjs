@@ -11,11 +11,12 @@ config({ path: resolve(process.cwd(), '.env.local') });
 import { OllamaClient } from './tools/ollama/client.mjs';
 
 // Criar cliente com cloud habilitado
+const cloudApiKey = process.env['OLLAMA_CLOUD_API_KEY'];
 const ollama = new OllamaClient({
     cloudEnabled: true,
-    cloudBaseUrl: process.env.OLLAMA_CLOUD_BASE_URL || 'https://ollama.com',
-    cloudApiKey: process.env.OLLAMA_CLOUD_API_KEY,
-    localBaseUrl: process.env.OLLAMA_LOCAL_BASE_URL || 'http://host.docker.internal:11434',
+    cloudBaseUrl: process.env['OLLAMA_CLOUD_BASE_URL'] || 'https://ollama.com',
+    ...(cloudApiKey ? { cloudApiKey } : {}),
+    localBaseUrl: process.env['OLLAMA_LOCAL_BASE_URL'] || 'http://host.docker.internal:11434',
 });
 
 console.log('='.repeat(80));
@@ -65,7 +66,7 @@ try {
     console.log('  - Caracteres:', codeResult.length);
     console.log();
 } catch (error) {
-    console.error('❌ ERRO (qwen3-coder-next):', error.message);
+    console.error('❌ ERRO (qwen3-coder-next):', error instanceof Error ? error.message : String(error));
     console.log();
 }
 
@@ -96,7 +97,7 @@ try {
     console.log('  - Caracteres:', textResult.length);
     console.log();
 } catch (error) {
-    console.error('❌ ERRO (qwen3-next):', error.message);
+    console.error('❌ ERRO (qwen3-next):', error instanceof Error ? error.message : String(error));
     console.log();
 }
 

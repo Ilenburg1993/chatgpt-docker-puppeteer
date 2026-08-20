@@ -23,19 +23,19 @@ class LLMJudge {
     constructor(options) {
         options = options || {};
 
-        this.enabled = options.enabled !== false; // Habilitado por padrão
+        this.enabled = options['enabled'] !== false; // Habilitado por padrão
         this.driver =
             /** @type {{ sendPrompt: (prompt: string, opts: Record<string, unknown>) => Promise<string> } | null} */ (
-                options.driver || null
+                options['driver'] || null
             ); // Driver para chamar LLM
-        this.model = /** @type {string} */ (options.model) || 'gpt-5-mini'; // Model para validação (GPT-5-mini é rápido e eficiente)
-        this.timeout = /** @type {number} */ (options.timeout) || 15000; // 15s timeout
+        this.model = /** @type {string} */ (options['model']) || 'gpt-5-mini'; // Model para validação (GPT-5-mini é rápido e eficiente)
+        this.timeout = /** @type {number} */ (options['timeout']) || 15000; // 15s timeout
 
         // Thresholds de score
         this.thresholds = {
-            accept: /** @type {number} */ (options.acceptThreshold) || 70, // >= 70 = ACCEPT
-            retry: /** @type {number} */ (options.retryThreshold) || 50, // < 50 = RETRY
-            manualReview: /** @type {number} */ (options.manualReviewThreshold) || 70, // 50-70 = MANUAL_REVIEW
+            accept: /** @type {number} */ (options['acceptThreshold']) || 70, // >= 70 = ACCEPT
+            retry: /** @type {number} */ (options['retryThreshold']) || 50, // < 50 = RETRY
+            manualReview: /** @type {number} */ (options['manualReviewThreshold']) || 70, // 50-70 = MANUAL_REVIEW
         };
     }
 

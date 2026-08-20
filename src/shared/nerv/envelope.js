@@ -175,44 +175,47 @@ function normalize(envelope) {
         throw new Error('Envelope must be an object');
     }
     // If already canonical (has protocol/identity/type/causality), return as-is
-    if (envelope.protocol && envelope.identity && envelope.type && envelope.causality) {
+    if (envelope['protocol'] && envelope['identity'] && envelope['type'] && envelope['causality']) {
         return envelope;
     }
 
     // Legacy shape support: header/ids/kind/payload
     // Example legacy fields: envelope.header.source, envelope.ids.correlation_id, envelope.kind, envelope.payload
-    if (envelope.header && envelope.ids && (envelope.kind || envelope.type)) {
-        const headerSource = envelope.header.source || envelope.header?.source;
+    if (envelope['header'] && envelope['ids'] && (envelope['kind'] || envelope['type'])) {
+        const headerSource = envelope['header'].source || envelope['header']?.source;
         const actorKey = headerSource ? String(headerSource).toUpperCase() : null;
-        const actorRoleMap = /** @type {Record<string, string>} */ (ActorRole);
-        const actor = actorKey && actorRoleMap[actorKey] ? actorRoleMap[actorKey] : null;
+        const actorRoleMap = /** @type {Record<string, import('./constants.js').ActorRole>} */ (ActorRole);
+        const actor = actorKey ? (actorRoleMap[actorKey] ?? null) : null;
+        if (actor === null) {
+            throw new Error(`Invalid legacy actor source: ${String(headerSource ?? '')}`);
+        }
 
-        const headerTarget = envelope.header.target || null;
+        const headerTarget = envelope['header'].target || null;
         const targetKey = headerTarget ? String(headerTarget).toUpperCase() : null;
         const target = targetKey && actorRoleMap[targetKey] ? actorRoleMap[targetKey] : null;
 
-        const messageType = envelope.kind || (envelope.type && envelope.type.message_type);
+        const messageType = envelope['kind'] || (envelope['type'] && envelope['type'].message_type);
         const actionCode =
-            (envelope.payload && envelope.payload.actionCode) ||
-            envelope.actionCode ||
-            (envelope.type && envelope.type.action_code) ||
+            (envelope['payload'] && envelope['payload'].actionCode) ||
+            envelope['actionCode'] ||
+            (envelope['type'] && envelope['type'].action_code) ||
             null;
-        const payload = envelope.payload || envelope.data || {};
+        const payload = envelope['payload'] || envelope['data'] || {};
         const correlationId =
-            envelope.ids && (envelope.ids.correlation_id || envelope.ids.correlationId)
-                ? envelope.ids.correlation_id || envelope.ids.correlationId
+            envelope['ids'] && (envelope['ids'].correlation_id || envelope['ids'].correlationId)
+                ? envelope['ids'].correlation_id || envelope['ids'].correlationId
                 : null;
 
         return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });
     }
 
     // Otherwise attempt to construct via createEnvelope (will validate)
-    const actor = envelope.actor || (envelope.identity && envelope.identity.actor);
-    const messageType = envelope.messageType || (envelope.type && envelope.type.message_type);
-    const actionCode = envelope.actionCode || (envelope.type && envelope.type.action_code);
-    const payload = envelope.payload || envelope.data || {};
-    const correlationId = envelope.correlationId || (envelope.causality && envelope.causality.correlation_id) || null;
-    const target = envelope.target || (envelope.identity && envelope.identity.target) || null;
+    const actor = envelope['actor'] || (envelope['identity'] && envelope['identity'].actor);
+    const messageType = envelope['messageType'] || (envelope['type'] && envelope['type'].message_type);
+    const actionCode = envelope['actionCode'] || (envelope['type'] && envelope['type'].action_code);
+    const payload = envelope['payload'] || envelope['data'] || {};
+    const correlationId = envelope['correlationId'] || (envelope['causality'] && envelope['causality'].correlation_id) || null;
+    const target = envelope['target'] || (envelope['identity'] && envelope['identity'].target) || null;
 
     return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });
 }
@@ -231,21 +234,21 @@ function assertValid(envelope) {
     }
 
     // If canonical shape, perform lightweight checks
-    if (envelope.protocol && envelope.identity && envelope.type && envelope.causality) {
-        if (!envelope.protocol.version) throw new Error('protocol.version missing');
-        if (!envelope.identity.actor) throw new Error('identity.actor missing');
-        if (!envelope.type.message_type || !envelope.type.action_code) throw new Error('type fields missing');
+    if (envelope['protocol'] && envelope['identity'] && envelope['type'] && envelope['causality']) {
+        if (!envelope['protocol'].version) throw new Error('protocol.version missing');
+        if (!envelope['identity'].actor) throw new Error('identity.actor missing');
+        if (!envelope['type'].message_type || !envelope['type'].action_code) throw new Error('type fields missing');
         return true;
     }
 
     // Fallback: try to create envelope (will throw on invalid)
     createEnvelope({
-        actor: envelope.actor,
-        messageType: envelope.messageType,
-        actionCode: envelope.actionCode,
-        payload: envelope.payload || envelope.data || {},
-        correlationId: envelope.correlationId || null,
-        target: envelope.target || null,
+        actor: envelope['actor'],
+        messageType: envelope['messageType'],
+        actionCode: envelope['actionCode'],
+        payload: envelope['payload'] || envelope['data'] || {},
+        correlationId: envelope['correlationId'] || null,
+        target: envelope['target'] || null,
     });
 
     return true;

@@ -1,19 +1,13 @@
-<script setup>
+<script setup lang="ts">
+import type { TaskFiltersValue } from '@/types/dashboard';
 import { Search } from 'lucide-vue-next';
 import { ref } from 'vue';
 
-const props = defineProps({
-    modelValue: {
-        type: Object,
-        default: () => ({
-            status: null,
-            priority: null,
-            search: '',
-        }),
-    },
+const props = withDefaults(defineProps<{ modelValue?: TaskFiltersValue }>(), {
+    modelValue: () => ({ status: null, priority: null, search: '' }),
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits<{ 'update:modelValue': [filters: TaskFiltersValue] }>();
 
 const localFilters = ref({ ...props.modelValue });
 
@@ -38,18 +32,18 @@ const updateFilters = () => {
     emit('update:modelValue', localFilters.value);
 };
 
-const handleStatusChange = (status) => {
-    localFilters.value.status = status;
+const handleStatusChange = (status: string | null) => {
+    localFilters.value['status'] = status;
     updateFilters();
 };
 
-const handlePriorityChange = (priority) => {
-    localFilters.value.priority = priority;
+const handlePriorityChange = (priority: number | null) => {
+    localFilters.value['priority'] = priority;
     updateFilters();
 };
 
-const handleSearchInput = (event) => {
-    localFilters.value.search = event.target.value;
+const handleSearchInput = (event: Event) => {
+    localFilters.value['search'] = (event.target as HTMLInputElement).value;
     updateFilters();
 };
 
@@ -63,7 +57,7 @@ const clearFilters = () => {
 };
 
 const hasActiveFilters = () => {
-    return localFilters.value.status || localFilters.value.priority !== null || localFilters.value.search;
+    return localFilters.value['status'] || localFilters.value['priority'] !== null || localFilters.value['search'];
 };
 </script>
 
@@ -73,7 +67,7 @@ const hasActiveFilters = () => {
             <div class="relative">
                 <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground-muted" :size="18" />
                 <input
-                    :value="localFilters.search"
+                    :value="localFilters['search']"
                     @input="handleSearchInput"
                     type="text"
                     placeholder="Search by task ID or prompt..."
@@ -84,21 +78,21 @@ const hasActiveFilters = () => {
 
         <div class="flex flex-wrap gap-2">
             <select
-                v-model="localFilters.status"
-                @change="handleStatusChange(localFilters.status)"
+                v-model="localFilters['status']"
+                @change="handleStatusChange(localFilters['status'])"
                 class="px-3 py-2 bg-background-tertiary border border-border rounded-lg text-sm text-foreground focus:border-primary focus:outline-none"
             >
-                <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                <option v-for="option in statusOptions" :key="option.value ?? 'all'" :value="option.value">
                     {{ option.label }}
                 </option>
             </select>
 
             <select
-                v-model="localFilters.priority"
-                @change="handlePriorityChange(localFilters.priority)"
+                v-model="localFilters['priority']"
+                @change="handlePriorityChange(localFilters['priority'])"
                 class="px-3 py-2 bg-background-tertiary border border-border rounded-lg text-sm text-foreground focus:border-primary focus:outline-none"
             >
-                <option v-for="option in priorityOptions" :key="option.value" :value="option.value">
+                <option v-for="option in priorityOptions" :key="option.value ?? 'all'" :value="option.value">
                     {{ option.label }}
                 </option>
             </select>

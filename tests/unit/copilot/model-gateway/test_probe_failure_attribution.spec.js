@@ -9,55 +9,45 @@ import {
     runConfiguredByokChatProbe,
 } from '../../../../src/copilot/model-gateway/probes/index.js';
 import { executeModelGatewayProbe } from '../../../../src/copilot/model-gateway/control-plane/probe-execution.js';
+import { classifyByokProviderFailure } from '../../../../src/copilot/model-gateway/health/provider-failure.js';
 import {
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     resolveModelGatewayRuntimeRetryDecision,
 } from '../../../../src/copilot/model-gateway/routing/runtime-selector.js';
+import {
+    createProbeSessionRuntime,
+    createReadyByokProbeFixture,
+} from './helpers/probe-fixtures.js';
 
 const TEST_MODEL = 'unit/model';
 
+/** @typedef {NonNullable<NonNullable<Parameters<typeof runConfiguredByokAgentProbe>[0]>['deps']>} ConfiguredProbeDeps */
+/** @typedef {NonNullable<NonNullable<Parameters<typeof executeModelGatewayProbe>[0]>['deps']>} ProbeExecutionDeps */
+/** @typedef {Parameters<typeof executeModelGatewayRuntimeSelectorPlan>[0]} RuntimeSelectorPlan */
+/** @typedef {RuntimeSelectorPlan['routes'][number]} RuntimeSelectorRoute */
+
 function readyProbeFixture() {
-    const provider = { type: 'openai-compatible' };
-    const summary = {
-        profile: 'repo_agent',
-        preset: 'openrouter',
-        providerType: 'openai-compatible',
-        model: TEST_MODEL,
-        warnings: [],
-    };
-    return {
-        state: {
-            enabled: true,
-            ready: true,
-            provider,
-            model: TEST_MODEL,
-            summary,
-            errors: [],
-            warnings: [],
-        },
-        overrides: {
-            provider,
-            model: TEST_MODEL,
-            modelCapabilities: null,
-            summary,
-        },
-    };
+    return createReadyByokProbeFixture({ model: TEST_MODEL, profile: 'repo_agent' });
 }
 
+/**
+ * @param {Partial<ConfiguredProbeDeps>} [overrides]
+ * @returns {ConfiguredProbeDeps}
+ */
 function commonProbeDeps(overrides = {}) {
     const fixture = readyProbeFixture();
-    return /** @type {any} */ ({
+    /** @type {ConfiguredProbeDeps} */
+    const base = {
         readConfiguredByokState: () => fixture.state,
         resolveConfiguredByokSessionOverrides: () => fixture.overrides,
         evaluateAdmission: () => ({ shouldBlock: false, label: 'allowed' }),
-        createPermissionHandler: () => async () => ({ kind: 'denied-by-rules' }),
-        onSessionEvents: () => () => {},
-        ...overrides,
-    });
+        sessionRuntime: createProbeSessionRuntime(),
+    };
+    return { ...base, ...overrides };
 }
 
-function selectorRoute(profileId, providerId, providerModel) {
+function selectorRoute(/** @type {string} */ profileId, /** @type {string} */ providerId, /** @type {string} */ providerModel) {
     const selected = {
         id: `${providerId}:${providerModel}`,
         providerId,
@@ -83,7 +73,7 @@ function selectorRoute(profileId, providerId, providerModel) {
     });
 }
 
-function selectorPlan(routes) {
+function selectorPlan(/** @type {RuntimeSelectorRoute[]} */ routes) {
     return /** @type {any} */ ({
         schema: 'model-gateway-runtime-selector-plan',
         ok: true,
@@ -116,11 +106,13 @@ describe('configured BYOK probe failure attribution', () => {
         const classifyProviderFailure = vi.fn();
         const result = await runConfiguredByokChatProbe({
             deps: commonProbeDeps({
-                withEphemeralSession: async () => {
-                    throw new Error(
-                        'Authentication failed: Failed to validate SDK token (503): No server is currently available',
-                    );
-                },
+                sessionRuntime: createProbeSessionRuntime({
+                    async withSession() {
+                        throw new Error(
+                            'Authentication failed: Failed to validate SDK token (503): No server is currently available',
+                        );
+                    },
+                }),
                 classifyProviderFailure,
             }),
         });
@@ -136,21 +128,20 @@ describe('configured BYOK probe failure attribution', () => {
     });
 
     it('attributes a failure after sendSessionAndWait to the BYOK provider boundary', async () => {
-        const classifyProviderFailure = vi.fn((error) => ({
-            kind: 'rate-limit',
-            statusCode: 429,
-            retryAfterSeconds: 2,
-            resetAt: null,
-            errorContext: 'unit_provider_send',
-            message: error instanceof Error ? error.message : String(error),
-        }));
-        const session = { sessionId: 'unit-chat-session', abort: vi.fn(async () => {}) };
+        const classifyProviderFailure = vi.fn(classifyByokProviderFailure);
+        const session = { sessionId: 'unit-chat-session' };
+        const abort = vi.fn(async () => {});
         const result = await runConfiguredByokChatProbe({
             deps: commonProbeDeps({
-                withEphemeralSession: async (_options, callback) => callback({ session, sessionId: session.sessionId }),
-                sendSessionAndWait: async () => {
-                    throw Object.assign(new Error('provider rate limit'), { status: 429 });
-                },
+                sessionRuntime: createProbeSessionRuntime({
+                    async withSession(_options, callback) {
+                        await callback({ session, sessionId: session.sessionId });
+                    },
+                    async sendAndWait() {
+                        throw Object.assign(new Error('provider rate limit'), { status: 429 });
+                    },
+                    abort,
+                }),
                 classifyProviderFailure,
             }),
         });
@@ -169,11 +160,11 @@ describe('configured BYOK probe failure attribution', () => {
         const classifyProviderFailure = vi.fn();
         const result = await runConfiguredByokAgentProbe({
             deps: commonProbeDeps({
-                createStaticInputHandler: () => async () => ({ answer: 'ack' }),
-                createTool: (definition) => definition,
-                withEphemeralSession: async () => {
-                    throw new Error('SDK session bootstrap unavailable');
-                },
+                sessionRuntime: createProbeSessionRuntime({
+                    async withSession() {
+                        throw new Error('SDK session bootstrap unavailable');
+                    },
+                }),
                 classifyProviderFailure,
             }),
         });
@@ -189,25 +180,33 @@ describe('configured BYOK probe failure attribution', () => {
     });
 
     it('persists controller-substrate scope without fabricating a provider attempt and replays it faithfully', async () => {
+        /** @type {Parameters<NonNullable<ProbeExecutionDeps['sqliteStore']>['writeRuntimeProbeRun']>[0][]} */
         const writes = [];
+        /** @type {Map<string, Record<string, unknown>>} */
         const records = new Map();
+        /** @type {NonNullable<ProbeExecutionDeps['sqliteStore']>} */
         const sqliteStore = {
             readRuntimeProbeRunRecord: async (runId) => records.get(runId) ?? null,
             writeRuntimeProbeRun: async (input) => {
                 writes.push(input);
-                const record = {
+                const runId = input.runId ?? `unit-probe-run-${writes.length}`;
+                const results = input.results ?? [];
+                const successCount = results.filter((entry) => entry['ok'] === true).length;
+                const failureCount = results.filter((entry) => entry['ok'] !== true).length;
+                records.set(runId, {
                     ...input,
-                    successCount: input.results.filter((entry) => entry.ok === true).length,
-                    failureCount: input.results.filter((entry) => entry.ok !== true).length,
-                    skippedCount: 0,
-                };
-                records.set(input.runId, record);
+                    runId,
+                    successCount,
+                    failureCount,
+                    skippedCount: input.skippedCount ?? 0,
+                    results,
+                });
                 return {
-                    runId: input.runId,
-                    probeResults: input.results.length,
-                    skippedResults: 0,
-                    successCount: record.successCount,
-                    failureCount: record.failureCount,
+                    runId,
+                    probeResults: results.length,
+                    skippedResults: input.skippedCount ?? 0,
+                    successCount,
+                    failureCount,
                 };
             },
         };
@@ -220,7 +219,7 @@ describe('configured BYOK probe failure attribution', () => {
                 providerId: 'openrouter',
                 providerModel: TEST_MODEL,
             },
-            deps: /** @type {any} */ ({
+            deps: {
                 sqliteStore,
                 runProbe: async () => ({
                     ok: false,
@@ -246,7 +245,7 @@ describe('configured BYOK probe failure attribution', () => {
                     providerFailure: null,
                 }),
                 recordHealth: async () => false,
-            }),
+            },
         });
 
         expect(executed).toMatchObject({
@@ -259,7 +258,10 @@ describe('configured BYOK probe failure attribution', () => {
             },
         });
         expect(writes).toHaveLength(1);
-        expect(writes[0].payload).toMatchObject({
+        const firstWrite = writes[0];
+        expect(firstWrite).toBeDefined();
+        if (!firstWrite) throw new Error('expected one persisted probe write');
+        expect(firstWrite.payload).toMatchObject({
             providerAttempted: false,
             failureScope: 'controller_substrate',
             result: {
@@ -271,7 +273,7 @@ describe('configured BYOK probe failure attribution', () => {
         const replay = await executeModelGatewayProbe({
             kind: 'agent',
             idempotencyKey,
-            deps: /** @type {any} */ ({ sqliteStore }),
+            deps: { sqliteStore },
         });
         expect(replay).toMatchObject({
             replayed: true,
@@ -282,6 +284,25 @@ describe('configured BYOK probe failure attribution', () => {
                 providerAttempted: false,
                 failureScope: 'controller_substrate',
             },
+        });
+        expect(executed.probe).not.toBeNull();
+        expect(replay.probe).toMatchObject({
+            ok: false,
+            status: 'failed',
+            providerAttempted: false,
+            elapsedMs: 7,
+            model: TEST_MODEL,
+            profile: 'repo_agent',
+            preset: 'openrouter',
+            providerType: 'openai-compatible',
+            deltaCount: 0,
+            deltaChars: 0,
+            finalChars: 0,
+            observedFinalEvent: false,
+            sessionId: null,
+            errors: ['shared SDK bootstrap unavailable'],
+            warnings: [],
+            providerFailure: null,
         });
         expect(writes).toHaveLength(1);
     });
@@ -295,14 +316,14 @@ describe('runtime selector substrate isolation', () => {
         const plan = selectorPlan([selectorRoute('repo_agent', 'openrouter', 'unit/a')]);
         const execution = await executeModelGatewayRuntimeSelectorPlan(plan, {
             profileId: 'repo_agent',
-            deps: /** @type {any} */ ({
+            deps: {
                 runChatProbe: async () => {
                     throw new Error('shared SDK bootstrap failed');
                 },
                 recordFailure,
                 flushHealth,
                 recordRouteDecision,
-            }),
+            },
         });
 
         expect(execution).toMatchObject({
@@ -335,10 +356,10 @@ describe('runtime selector substrate isolation', () => {
             profileId: 'repo_agent',
             fallbackProfileIds: ['tool_agent'],
             maxAttempts: 8,
-            deps: /** @type {any} */ ({
+            deps: {
                 runChatProbe,
-                recordRouteDecision: () => {},
-            }),
+                recordRouteDecision: (event) => event,
+            },
         });
 
         expect(execution.ok).toBe(false);

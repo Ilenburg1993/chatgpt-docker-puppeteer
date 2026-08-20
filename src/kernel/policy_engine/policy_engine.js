@@ -146,11 +146,11 @@ class PolicyEngine {
     /**
      * Avalia pressão por volume de observações.
      *
-     * @param {any} task
+     * @param {unknown} _task
      * @param {any[]} observations
      * @param {any[]} alerts
      */
-    _assessObservationVolume(task, observations, alerts) {
+    _assessObservationVolume(_task, observations, alerts) {
         if (observations.length > this.limits.maxObservationsPerTask) {
             alerts.push(
                 Object.freeze({

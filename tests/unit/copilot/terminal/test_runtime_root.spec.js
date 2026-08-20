@@ -1,11 +1,28 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 
 import assert from 'node:assert/strict';
 import { describe, it, vi } from 'vitest';
 
-import { runTerminalRuntimeConfigPhase } from '../../../../src/copilot/terminal/runtime-root.js';
+import {
+    createTerminalBootContext,
+    runTerminalRuntimeConfigPhase,
+} from '../../../../src/copilot/terminal/runtime-root.js';
+
+/**
+ * @param {() => void | Promise<void>} wireRuntime
+ * @param {(event: string, payload: object) => void} broadcastSse
+ * @param {Record<string, unknown> | null} bootPreflight
+ */
+function makeBootContext(wireRuntime, broadcastSse, bootPreflight) {
+    return createTerminalBootContext({
+        startCopilotServer: async () => { throw new Error('servidor não usado neste teste'); },
+        wireRuntime,
+        broadcastSse,
+        startTodoCleanupJob: () => /** @type {NodeJS.Timeout} */ ({ unref() {} }),
+        bootPreflight,
+    });
+}
 
 describe('terminal/runtime-root', () => {
     it('aguarda wireRuntime assíncrono antes de concluir a fase de runtime', async () => {
@@ -17,13 +34,7 @@ describe('terminal/runtime-root', () => {
             order.push('wire:done');
         });
 
-        await runTerminalRuntimeConfigPhase(
-            /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
-                wireRuntime,
-                bootPreflight: null,
-                broadcastSse: vi.fn(),
-            }),
-        );
+        await runTerminalRuntimeConfigPhase(makeBootContext(wireRuntime, vi.fn(), null));
 
         assert.deepEqual(order, ['wire:start', 'wire:done']);
     });
@@ -31,13 +42,7 @@ describe('terminal/runtime-root', () => {
     it('emite terminal.runtime.wired após wireRuntime concluir', async () => {
         const broadcastSse = vi.fn();
 
-        await runTerminalRuntimeConfigPhase(
-            /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
-                wireRuntime: vi.fn(async () => {}),
-                bootPreflight: { ok: true },
-                broadcastSse,
-            }),
-        );
+        await runTerminalRuntimeConfigPhase(makeBootContext(vi.fn(async () => {}), broadcastSse, { ok: true }));
 
         assert.equal(broadcastSse.mock.calls[0]?.[0], 'terminal.runtime.wired');
         assert.equal(broadcastSse.mock.calls[0]?.[1]?.phase, 'runtime-config');
@@ -50,15 +55,7 @@ describe('terminal/runtime-root', () => {
 
         await assert.rejects(
             () =>
-                runTerminalRuntimeConfigPhase(
-                    /** @type {import('../../../../src/copilot/terminal/runtime-root.js').TerminalBootContext} */ ({
-                        wireRuntime: vi.fn(async () => {
-                            throw error;
-                        }),
-                        bootPreflight: null,
-                        broadcastSse,
-                    }),
-                ),
+                runTerminalRuntimeConfigPhase(makeBootContext(vi.fn(async () => { throw error; }), broadcastSse, null)),
             /runtime down/,
         );
 

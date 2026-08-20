@@ -164,8 +164,9 @@ log.getLevel = () => configuredLevel;
  */
 log.setLevel = (newLevel) => {
     const upperLevel = newLevel.toUpperCase();
-    if (/** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel] !== undefined) {
-        minLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel];
+    const nextLevel = /** @type {Record<string, number>} */ (LOG_LEVELS)[upperLevel];
+    if (nextLevel !== undefined) {
+        minLevel = nextLevel;
         log('INFO', `Log level changed to: ${upperLevel}`);
     } else {
         log('WARN', `Invalid log level: ${newLevel}. Valid levels: DEBUG, INFO, WARN, ERROR, FATAL`);

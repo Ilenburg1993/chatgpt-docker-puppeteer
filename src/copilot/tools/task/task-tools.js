@@ -31,8 +31,8 @@ const getTasksTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                status: z.string().optional().describe('Filtrar por status (pending, running, done, failed)'),
-                limit: z.number().int().min(1).optional().describe('Número sugerido de tarefas a retornar'),
+                status: z.string().optional()['describe']('Filtrar por status (pending, running, done, failed)'),
+                limit: z.number().int().min(1).optional()['describe']('Número sugerido de tarefas a retornar'),
             })
         )
     ),
@@ -67,10 +67,10 @@ const addTaskTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                target: z.string().describe('URL ou identificador do alvo da tarefa'),
-                user_message: z.string().describe('Instrução da tarefa (o que o agente deve fazer)'),
-                priority: z.number().int().min(0).optional().default(50).describe('Prioridade sugerida'),
-                model: z.string().optional().describe('Modelo a usar nesta tarefa (ex: gpt-4.1)'),
+                target: z.string()['describe']('URL ou identificador do alvo da tarefa'),
+                user_message: z.string()['describe']('Instrução da tarefa (o que o agente deve fazer)'),
+                priority: z.number().int().min(0).optional().default(50)['describe']('Prioridade sugerida'),
+                model: z.string().optional()['describe']('Modelo a usar nesta tarefa (ex: gpt-4.1)'),
             })
         )
     ),

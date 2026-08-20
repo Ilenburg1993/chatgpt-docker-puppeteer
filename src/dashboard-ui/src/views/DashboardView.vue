@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import { useSocket } from '@/composables/useSocket';
@@ -6,6 +6,7 @@ import { useSsotRealtime } from '@/composables/useSsotRealtime';
 import { formatHttpError, http } from '@/lib/http';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import type { BadgeVariant } from '@/types/dashboard';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -16,19 +17,22 @@ const { isConnected } = useSocket();
 useSsotRealtime();
 
 const loading = ref(false);
-const error = ref(null);
-const stats = ref({ total: 0, by_status: {}, by_stage: {} });
+const error = ref<string | null>(null);
+const stats = ref<{ total: number; by_status: Record<string, number>; by_stage: Record<string, number> }>({
+    total: 0,
+    by_status: {},
+    by_stage: {},
+});
 const uptimeMs = ref(0);
 const refreshCount = ref(0);
-let uptimeTimer = null;
+let uptimeTimer: ReturnType<typeof setInterval> | null = null;
 
-const pending = computed(() => Number(stats.value.by_status?.PENDING || 0));
-const running = computed(() => Number(stats.value.by_status?.RUNNING || 0));
-const blocked = computed(() => Number(stats.value.by_status?.BLOCKED || 0));
-const failed = computed(() => Number(stats.value.by_status?.FAILED || 0));
-const done = computed(() => Number(stats.value.by_status?.DONE || 0));
-const paused = computed(() => Number(stats.value.by_status?.PAUSED || 0));
-const cancelled = computed(() => Number(stats.value.by_status?.CANCELLED || 0));
+const pending = computed(() => Number(stats.value.by_status['PENDING'] || 0));
+const running = computed(() => Number(stats.value.by_status['RUNNING'] || 0));
+const blocked = computed(() => Number(stats.value.by_status['BLOCKED'] || 0));
+const failed = computed(() => Number(stats.value.by_status['FAILED'] || 0));
+const done = computed(() => Number(stats.value.by_status['DONE'] || 0));
+const paused = computed(() => Number(stats.value.by_status['PAUSED'] || 0));
 const totalTasks = computed(() => Number(stats.value.total || 0));
 const totalMissions = computed(() => missions.items?.length || 0);
 const activeMissions = computed(
@@ -73,7 +77,7 @@ async function refresh() {
     }
 }
 
-function statusVariant(status) {
+function statusVariant(status: string | undefined): BadgeVariant {
     const s = String(status || '').toUpperCase();
     if (s === 'RUNNING') return 'info';
     if (s === 'PAUSED') return 'warning';
@@ -270,14 +274,14 @@ onUnmounted(() => {
                                 </div>
                                 <div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                                     <Badge size="sm" :variant="statusVariant(m.status)">{{ m.status }}</Badge>
-                                    <Badge v-if="m.counts?.running > 0" size="sm" variant="info"
-                                        >{{ m.counts.running }} run</Badge
+                                    <Badge v-if="(m.counts?.running ?? 0) > 0" size="sm" variant="info"
+                                        >{{ m.counts?.running }} run</Badge
                                     >
-                                    <Badge v-if="m.counts?.done > 0" size="sm" variant="success"
-                                        >{{ m.counts.done }} done</Badge
+                                    <Badge v-if="(m.counts?.done ?? 0) > 0" size="sm" variant="success"
+                                        >{{ m.counts?.done }} done</Badge
                                     >
-                                    <Badge v-if="m.counts?.failed > 0" size="sm" variant="error"
-                                        >{{ m.counts.failed }} fail</Badge
+                                    <Badge v-if="(m.counts?.failed ?? 0) > 0" size="sm" variant="error"
+                                        >{{ m.counts?.failed }} fail</Badge
                                     >
                                 </div>
                             </div>

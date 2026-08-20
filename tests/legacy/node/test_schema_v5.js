@@ -1,4 +1,3 @@
-// @ts-nocheck -- LEGACY QUARANTINE: migração pendente (Fase E.0)
 import { autoMigrateTask, migrateTaskV4toV5 } from '#core/schemas/migrator_v4_to_v5';
 import { TaskSchema } from '#core/schemas/task_schema';
 import { TaskSchemaV5 } from '#core/schemas/task_schema_v5';
@@ -10,7 +9,7 @@ let testsRun = 0;
 let testsPassed = 0;
 let testsFailed = 0;
 
-function assert(condition, testName) {
+function assert(/** @type {unknown} */ condition, /** @type {string} */ testName) {
     testsRun++;
     if (condition) {
         console.log(`✅ PASS: ${testName}`);
@@ -75,7 +74,7 @@ try {
     assert(validated.result.storage !== undefined, 'V5 result has storage field');
     assert(validated.result.generation !== undefined, 'V5 result has generation field');
 } catch (error) {
-    assert(false, `Minimal V5 task validation - ERROR: ${error.message}`);
+    assert(false, `Minimal V5 task validation - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================
@@ -177,7 +176,7 @@ try {
     const validatedV5 = TaskSchemaV5.parse(taskV5);
     assert(validatedV5 !== null, 'V4 → V5: migrated task validates against V5 schema');
 } catch (error) {
-    assert(false, `V4 → V5 migration - ERROR: ${error.message}`);
+    assert(false, `V4 → V5 migration - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================
@@ -202,7 +201,7 @@ try {
     const validatedV4 = TaskSchema.parse(downgradedV4);
     assert(validatedV4 !== null, 'V5 → V4: downgraded task validates against V4 schema');
 } catch (error) {
-    assert(false, `V5 → V4 downgrade - ERROR: ${error.message}`);
+    assert(false, `V5 → V4 downgrade - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================
@@ -212,8 +211,8 @@ console.log('\n📋 TEST 4: Auto Migration (Version Detection)\n');
 
 try {
     // Task sem versão (assume V4)
-    const taskNoVersion = { ...taskV4 };
-    delete taskNoVersion.meta.version;
+    const { version: _version, ...metaWithoutVersion } = taskV4.meta;
+    const taskNoVersion = { ...taskV4, meta: metaWithoutVersion };
 
     const migrated = autoMigrateTask(taskNoVersion);
     assert(migrated.meta.version === '5.0', 'Auto-migration: task sem versão → V5');
@@ -228,7 +227,7 @@ try {
     assert(migrated3.meta.version === '5.0', 'Auto-migration: task V5 → V5 (sem mudança)');
     assert(migrated3.meta.id === taskV5Existing.meta.id, 'Auto-migration: task V5 preservada');
 } catch (error) {
-    assert(false, `Auto migration - ERROR: ${error.message}`);
+    assert(false, `Auto migration - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================
@@ -251,7 +250,7 @@ try {
         getHealth: () => 'stable',
     };
 
-    const filled = fillExecutionContext(taskV5, {
+    const filled = await fillExecutionContext(taskV5, {
         driver: mockDriver,
         browserPool: mockBrowserPool,
         tacticalAttempts: 2,
@@ -271,7 +270,7 @@ try {
     assert(filled.execution.retry.errors_recovered.length === 1, 'Execution filler: errors recorded');
     assert(filled.execution.retry.total_backoff_ms === 3000, 'Execution filler: backoff ms set');
 } catch (error) {
-    assert(false, `Execution context filler - ERROR: ${error.message}`);
+    assert(false, `Execution context filler - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================
@@ -316,7 +315,7 @@ try {
     assert(validated.result.preview.text !== '', 'Result V2: preview.text set');
     assert(validated.result.validation === null, 'Result V2: validation null (fase posterior)');
 } catch (error) {
-    assert(false, `Result V2 structure - ERROR: ${error.message}`);
+    assert(false, `Result V2 structure - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================
@@ -348,7 +347,7 @@ try {
     assert(validated.mission.is_checkpoint === true, 'Mission: is_checkpoint set');
     assert(validated.mission.mission_context.accumulated_data.count === 42, 'Mission: context preserved');
 } catch (error) {
-    assert(false, `Mission context structure - ERROR: ${error.message}`);
+    assert(false, `Mission context structure - ERROR: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 // ==========================================

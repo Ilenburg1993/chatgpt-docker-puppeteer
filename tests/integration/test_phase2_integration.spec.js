@@ -15,7 +15,7 @@ describe('Phase 2 Integration Smoke Tests', () => {
 
     // Mocks
     const mockKernel = {
-        executeTask: async (/** @type {any} */ task, /** @type {any} */ correlationId) => {
+        executeTask: async (/** @type {{ meta: { id: string } }} */ task, /** @type {string} */ _correlationId) => {
             return { status: 'queued', task_id: task.meta.id };
         },
     };

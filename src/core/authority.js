@@ -30,7 +30,7 @@ const SERVER_AUTHORITIES = Object.freeze({
  * @throws {Error} Se o modo de autoridade for inválido.
  */
 function resolveAuthority(explicitAuthority = null) {
-    const raw = explicitAuthority ?? process.env.SERVER_AUTHORITY ?? SERVER_AUTHORITIES.STANDALONE;
+    const raw = explicitAuthority ?? process.env['SERVER_AUTHORITY'] ?? SERVER_AUTHORITIES.STANDALONE;
     const authority = String(raw).toLowerCase().trim();
 
     const known = /** @type {string[]} */ (Object.values(SERVER_AUTHORITIES));

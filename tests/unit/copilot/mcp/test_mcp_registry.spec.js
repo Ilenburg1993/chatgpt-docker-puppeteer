@@ -73,6 +73,8 @@ describe('copilot MCP registry', () => {
             'mcp_cloudflare_transport_benchmark_plan',
             'mcp_connection_readiness',
             'mcp_connector_smoke_refresh',
+            'mcp_dependency_outdated',
+            'mcp_dependency_upgrade',
             'mcp_devcontainer_network_control_plane_refresh',
             'mcp_devcontainer_network_posture_audit',
             'mcp_golden_prompts',
@@ -146,6 +148,9 @@ describe('copilot MCP registry', () => {
             'run_typecheck_copilot',
             'run_unit_copilot',
             'search',
+            'terminal_exec',
+            'terminal_session_control',
+            'terminal_session_read',
         ]);
     });
 
@@ -196,7 +201,7 @@ describe('copilot MCP registry', () => {
         const oldMax = process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'];
         const oldPercent = process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'];
         try {
-            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '130';
+            process.env['COPILOT_MCP_REGISTRY_MAX_TOOLS'] = '150';
             process.env['COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT'] = '80';
             resetCanonicalMcpToolsCacheForTests();
             getCanonicalMcpTools();
@@ -226,8 +231,12 @@ describe('copilot MCP registry', () => {
             'git_push',
             'git_publish_changes',
             'llmb_live_test_run',
+            'mcp_dependency_outdated',
+            'mcp_dependency_upgrade',
             'mcp_latency_attribution',
             'mcp_openai_endpoint_latency',
+            'terminal_exec',
+            'terminal_session_control',
         ]);
         const statefulReadOnly = new Set(['repo_working_set']);
         for (const tool of tools) {
@@ -242,12 +251,16 @@ describe('copilot MCP registry', () => {
             );
         }
         assert.equal(tools.find((tool) => tool.name === 'repo_remove_file')?.annotations.destructiveHint, true);
+        assert.equal(tools.find((tool) => tool.name === 'terminal_exec')?.maxResultBytes, 40 * 1024 * 1024);
+        assert.equal(tools.find((tool) => tool.name === 'terminal_session_read')?.maxResultBytes, 12 * 1024 * 1024);
     });
 
-    it('keeps security metadata registry-wide and output schemas only where they provide specific validation', () => {
+    it('keeps security metadata and a baseline output schema registry-wide while preserving specific schemas', () => {
         const tools = getCanonicalMcpTools();
         const outputSchemaTools = tools.filter((tool) => tool.outputSchema !== undefined).map((tool) => tool.name).sort();
-        assert.deepEqual(outputSchemaTools, ['fetch', 'search']);
+        assert.equal(outputSchemaTools.length, tools.length);
+        assert.equal(outputSchemaTools.includes('fetch'), true);
+        assert.equal(outputSchemaTools.includes('search'), true);
 
         for (const tool of tools) {
             assert.ok(tool._meta, `missing _meta: ${tool.name}`);

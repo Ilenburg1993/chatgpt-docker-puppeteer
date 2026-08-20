@@ -10,10 +10,9 @@ const BootstrapStateSchema = z
         server_port: z.number().int().min(1).max(65535),
         server_pid: z.number().int().min(1),
         server_started_at: TIMESTAMP_SCHEMA,
-        server_version: z.string().regex(/^V[0-9]+$/),
+        server_version: z.string()['regex'](/^V[0-9]+$/),
         protocol: z.number().int().min(1),
         mode: z.enum(['normal', 'degraded', 'maintenance']),
-    })
-    .strict(); // <-- PROIBIÇÃO DE CAMPOS EXTRAS
+    })['strict'](); // <-- PROIBIÇÃO DE CAMPOS EXTRAS
 
 export { BootstrapStateSchema };

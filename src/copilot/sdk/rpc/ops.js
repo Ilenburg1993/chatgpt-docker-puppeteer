@@ -14,7 +14,7 @@ import { emitSdkOperationMetric } from '../telemetry/operation-metrics.js';
 import { assertRpcSession } from './guards.js';
 
 /**
- * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ * @typedef {import('./guards.js').RpcSessionPort} RpcSessionPort
  */
 
 /**
@@ -51,7 +51,7 @@ import { assertRpcSession } from './guards.js';
 /**
  * Resolve método de compaction compatível entre SDKs (`history.compact` no v0.3.0, `compaction.compact` legado).
  *
- * @param {CopilotSession} session
+ * @param {RpcSessionPort} session
  * @returns {() => Promise<CompactionCompactResult>}
  */
 function getCompactionMethod(session) {
@@ -77,7 +77,7 @@ function getCompactionMethod(session) {
 }
 
 /**
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<CompactionCompactResult>}
  */
 export async function compactionCompact(session) {
@@ -115,7 +115,7 @@ export async function compactionCompact(session) {
 /**
  * Executa um comando shell na sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} command - Comando shell a executar
  * @param {{ cwd?: string; timeout?: number }} [options]
  * @returns {Promise<ShellExecResult>}
@@ -163,7 +163,7 @@ export async function shellExec(session, command, options) {
 /**
  * Envia sinal para um processo shell em execução.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} processId - ID do processo retornado por shellExec
  * @param {'SIGTERM' | 'SIGKILL' | 'SIGINT'} [signal='SIGTERM'] Default is `'SIGTERM'`
  * @returns {Promise<ShellKillResult>}
@@ -199,7 +199,7 @@ export async function shellKill(session, processId, signal) {
 /**
  * Apresenta um formulário de elicitação ao usuário e aguarda resposta.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} message - Mensagem descrevendo a informação necessária
  * @param {object} requestedSchema - JSON Schema do formulário
  * @returns {Promise<ElicitationResult>}
@@ -254,7 +254,7 @@ export async function uiElicitation(session, message, requestedSchema) {
 /**
  * Resolve um comando pendente na sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} requestId - ID da requisição do comando
  * @param {{ error?: string }} [options]
  * @returns {Promise<HandleResult>}
@@ -285,7 +285,7 @@ export async function commandsHandlePending(session, requestId, options) {
 /**
  * Resolve uma requisição de permissão pendente.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} requestId
  * @param {PermissionRequestResolution} result - Resultado da permissão (`approve-once`, `reject`, etc.)
  * @returns {Promise<HandleResult>}
@@ -323,7 +323,7 @@ export async function permissionsHandlePending(session, requestId, result) {
  * Mantém compatibilidade com múltiplas assinaturas do SDK e retorna um envelope estável para camadas superiores
  * (agent/presentation/terminal).
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<{ available: boolean; source: string | null; requests: unknown[] }>}
  */
 export async function permissionsListPending(session) {
@@ -368,7 +368,7 @@ export async function permissionsListPending(session) {
 /**
  * Ativa/desativa approve-all nativo da sessão quando o host expõe esse RPC.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {boolean} enabled
  * @returns {Promise<HandleResult>}
  */
@@ -394,7 +394,7 @@ export async function permissionsSetApproveAll(session, enabled) {
 /**
  * Remove aprovações session-scoped quando o host expõe esse RPC.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<HandleResult>}
  */
 export async function permissionsResetSessionApprovals(session) {
@@ -420,7 +420,7 @@ export async function permissionsResetSessionApprovals(session) {
 /**
  * Resolve uma chamada de tool pendente.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} requestId
  * @param {{ result?: ToolResult | ToolResultObjectLike; error?: string }} [options]
  * @returns {Promise<HandleResult>}
@@ -463,7 +463,7 @@ export async function toolsHandlePendingCall(session, requestId, options) {
 /**
  * Lista os agentes customizados disponíveis na sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<AgentListResult>}
  */
 export async function agentList(session) {
@@ -479,7 +479,7 @@ export async function agentList(session) {
 /**
  * Retorna o agente atualmente selecionado para a sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<AgentCurrentResult>}
  */
 export async function agentGetCurrent(session) {
@@ -495,7 +495,7 @@ export async function agentGetCurrent(session) {
 /**
  * Seleciona um agente customizado para o turno atual.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @param {string} name - Nome do agente a selecionar
  * @returns {Promise<AgentSelectResult>}
  */
@@ -515,7 +515,7 @@ export async function agentSelect(session, name) {
 /**
  * Deseleciona o agente customizado atual, voltando ao agente padrão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<AgentDeselectResult>}
  */
 export async function agentDeselect(session) {
@@ -533,7 +533,7 @@ export async function agentDeselect(session) {
 /**
  * Recarrega a lista de agentes disponíveis na sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<AgentReloadResult>}
  */
 export async function agentReload(session) {
@@ -553,7 +553,7 @@ export async function agentReload(session) {
 /**
  * Aciona compaction manual da sessão.
  *
- * @param {CopilotSession} session
+ * @param {unknown} session
  * @returns {Promise<CompactionCompactResult>}
  */
 export async function compactionCompactTyped(session) {

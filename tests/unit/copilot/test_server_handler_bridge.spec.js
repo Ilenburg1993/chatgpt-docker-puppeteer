@@ -47,7 +47,7 @@ describe('server/routes/presentation-route runtimeId propagation', () => {
         req.headers = { 'x-agent-runtime-id': 'alt' };
 
         callPresentationHandler(
-            (params) => ({ status: 200, body: { ok: true, runtimeId: params.runtimeId } }),
+            (params) => ({ status: 200, body: { ok: true, runtimeId: params['runtimeId'] } }),
             req,
             res,
             next,

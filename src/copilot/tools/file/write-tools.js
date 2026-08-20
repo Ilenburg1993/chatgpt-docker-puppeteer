@@ -88,8 +88,8 @@ const patchBundlePlanTool = buildTool({
         'Use patch_bundle_plan para validar mudanças em múltiplos arquivos antes de executar patch_file. Sempre forneça um ' +
         'plano válido no formato de patch-plan. Nunca use este tool para mutação real.',
     parameters: z.object({
-        plan: z.any().describe('Patch plan normalizado (use normalizePatchPlan antes se necessário)'),
-        fileContents: z.record(z.string(), z.string()).describe('Mapa de conteúdo atual dos arquivos'),
+        plan: z.any()['describe']('Patch plan normalizado (use normalizePatchPlan antes se necessário)'),
+        fileContents: z.record(z.string(), z.string())['describe']('Mapa de conteúdo atual dos arquivos'),
     }),
     handler: async ({ plan, fileContents }) => {
         const normalized = normalizePatchPlan(plan);
@@ -122,21 +122,18 @@ const writeFileContentTool = buildTool({
         'concurrent changes fail safely instead of being overwritten. Do not claim the file was written until this ' +
         'tool returns success.',
     parameters: z.object({
-        path: z.string().describe('Caminho do arquivo (deve existir)'),
-        content: z.string().describe('Novo conteúdo completo do arquivo'),
+        path: z.string()['describe']('Caminho do arquivo (deve existir)'),
+        content: z.string()['describe']('Novo conteúdo completo do arquivo'),
         encoding: z
             .enum(['utf8', 'base64'])
             .optional()
-            .default('utf8')
-            .describe('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
+            .default('utf8')['describe']('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
         expectedHash: z
             .string()
-            .optional()
-            .describe('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
+            .optional()['describe']('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()
-            .describe('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade, locks ou path policy.'),
+            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade, locks ou path policy.'),
     }),
     handler: async ({ path: filePath, content, encoding, expectedHash, durability }) => {
         const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
@@ -259,27 +256,23 @@ const createFileTool = buildTool({
         'a concrete path and the terminal permission mode is automatic; report the created path and byte count only ' +
         'after this tool returns success.',
     parameters: z.object({
-        path: z.string().describe('Caminho do arquivo a criar'),
-        content: z.string().optional().default('').describe('Conteúdo inicial do arquivo'),
+        path: z.string()['describe']('Caminho do arquivo a criar'),
+        content: z.string().optional().default('')['describe']('Conteúdo inicial do arquivo'),
         encoding: z
             .enum(['utf8', 'base64'])
             .optional()
-            .default('utf8')
-            .describe('Codificação do conteúdo inicial (utf8 para texto, base64 para binário)'),
+            .default('utf8')['describe']('Codificação do conteúdo inicial (utf8 para texto, base64 para binário)'),
         createParentDirs: z
             .boolean()
             .optional()
-            .default(true)
-            .describe('Se true, cria diretórios intermediários se não existirem'),
+            .default(true)['describe']('Se true, cria diretórios intermediários se não existirem'),
         overwrite: z
             .boolean()
             .optional()
-            .default(false)
-            .describe('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
+            .default(false)['describe']('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()
-            .describe('Perfil de persistência após crash; default file-and-directory. Atomicidade e policy permanecem ativas.'),
+            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Atomicidade e policy permanecem ativas.'),
     }),
     handler: async ({ path: filePath, content, encoding, createParentDirs, overwrite, durability }) => {
         const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
@@ -406,7 +399,7 @@ const deleteFileTool = buildTool({
         'or cleanup until this tool returns success. If a requested workflow names delete_file as the final cleanup ' +
         'step, invoke this tool; do not replace it with a textual claim that cleanup happened.',
     parameters: z.object({
-        path: z.string().describe('Caminho do arquivo a deletar'),
+        path: z.string()['describe']('Caminho do arquivo a deletar'),
     }),
     handler: async ({ path: filePath }) => {
         const { ok, reason, resolved } = await validatePath(filePath, { mode: 'write' });
@@ -501,13 +494,12 @@ const copyFileTool = buildTool({
         'when the operator gave relative paths. Set overwrite=true only when replacing the destination is intended. ' +
         'Do not claim the copy happened until this tool returns success.',
     parameters: z.object({
-        source: z.string().describe('Caminho do arquivo de origem'),
-        destination: z.string().describe('Caminho de destino'),
-        overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
+        source: z.string()['describe']('Caminho do arquivo de origem'),
+        destination: z.string()['describe']('Caminho de destino'),
+        overwrite: z.boolean().optional().default(false)['describe']('Sobrescrever destino se existir'),
         expectedSourceHash: z
             .string()
-            .optional()
-            .describe('SHA-256 esperado da origem. Se ela mudou, a cópia falha sem publicar o destino.'),
+            .optional()['describe']('SHA-256 esperado da origem. Se ela mudou, a cópia falha sem publicar o destino.'),
     }),
     handler: async ({ source, destination, overwrite, expectedSourceHash }) => {
         const src = await validatePath(source, { mode: 'read', issueReadCapability: true });
@@ -651,9 +643,9 @@ const moveFileTool = buildTool({
         'avoid additional permission questions when the operator already supplied the exact move in an automatic ' +
         'permission flow. Do not claim the move happened until this tool returns success.',
     parameters: z.object({
-        source: z.string().describe('Caminho do arquivo de origem'),
-        destination: z.string().describe('Caminho de destino'),
-        overwrite: z.boolean().optional().default(false).describe('Sobrescrever destino se existir'),
+        source: z.string()['describe']('Caminho do arquivo de origem'),
+        destination: z.string()['describe']('Caminho de destino'),
+        overwrite: z.boolean().optional().default(false)['describe']('Sobrescrever destino se existir'),
     }),
     handler: async ({ source, destination, overwrite }) => {
         const src = await validatePath(source, { mode: 'write', issueMutableCapability: true });

@@ -43,8 +43,11 @@ function sameRouteIdentity(left, right) {
  * @param {{ sessionId: string; targetRoute: Record<string, unknown>; forceApplyDeferred?: boolean | undefined }} input
  */
 function canReplayRouteSwitchOperation(operation, input) {
-    if (operation['sessionId'] !== input.sessionId) return false;
-    const targetRoute = isRecord(operation['targetRoute']) ? operation['targetRoute'] : {};
+    if (typeof operation['operationId'] !== 'string' || typeof operation['idempotencyKey'] !== 'string') return false;
+    if (typeof operation['sessionId'] !== 'string' || operation['sessionId'] !== input.sessionId) return false;
+    if (typeof operation['state'] !== 'string' || !Array.isArray(operation['transitions'])) return false;
+    if (!isRecord(operation['previousRoute']) || !isRecord(operation['targetRoute'])) return false;
+    const targetRoute = operation['targetRoute'];
     if (!sameRouteIdentity(targetRoute, input.targetRoute)) return false;
     if (operation['state'] === 'deferred_until_turn_boundary' && input.forceApplyDeferred === true) return false;
     return (
@@ -56,20 +59,22 @@ function canReplayRouteSwitchOperation(operation, input) {
 }
 
 /**
+ * @template {{ sessionId: string }} TSession
  * @param {object} input
  * @param {string} input.sessionId
  * @param {Record<string, unknown>} input.previousRoute
  * @param {Record<string, unknown>} input.targetRoute
  * @param {string} [input.idempotencyKey]
  * @param {number} [input.timeoutMs]
- * @param {(route: Record<string, unknown>) => Promise<import('#copilot/sdk/types').CopilotSession>} input.reattach
- * @param {(session: import('#copilot/sdk/types').CopilotSession, route: Record<string, unknown>) => Promise<boolean>} input.verify
- * @param {(session: import('#copilot/sdk/types').CopilotSession, route: Record<string, unknown>) => Promise<void>} input.commit
+ * @param {(route: Record<string, unknown>) => Promise<TSession>} input.reattach
+ * @param {(session: TSession, route: Record<string, unknown>) => Promise<boolean>} input.verify
+ * @param {(session: TSession, route: Record<string, unknown>) => Promise<void>} input.commit
  * @param {SqliteModelGatewayCatalogStore} [input.store]
  * @param {string} [input.source]
  * @param {string} [input.deferReason]
  * @param {Record<string, unknown>} [input.deferDetails]
  * @param {boolean} [input.forceApplyDeferred]
+ * @returns {Promise<import('./same-session-route-switch.js').ModelGatewaySameSessionRouteSwitchResult>}
  */
 export async function executeModelGatewayRuntimeRouteSwitch(input) {
     const store = /** @type {SqliteModelGatewayCatalogStore} */ (
@@ -83,7 +88,10 @@ export async function executeModelGatewayRuntimeRouteSwitch(input) {
         const existing = await store.readSdkSessionHandoffRecord(operationId);
         const existingOperation = isRecord(existing?.['operation']) ? existing['operation'] : null;
         if (existingOperation && canReplayRouteSwitchOperation(existingOperation, input)) {
-            return { ...existingOperation, replayed: true };
+            return /** @type {import('./same-session-route-switch.js').ModelGatewaySameSessionRouteSwitchResult} */ ({
+                ...existingOperation,
+                replayed: true,
+            });
         }
     }
     return executeModelGatewaySameSessionRouteSwitch({
@@ -98,10 +106,8 @@ export async function executeModelGatewayRuntimeRouteSwitch(input) {
             const session = await sessionPort.reattach(route);
             return { sessionId: session.sessionId, session };
         },
-        verify: async (session, route) =>
-            sessionPort.verify(/** @type {import('#copilot/sdk/types').CopilotSession} */ (session), route),
-        commit: async (session, route) =>
-            sessionPort.commit(/** @type {import('#copilot/sdk/types').CopilotSession} */ (session), route),
+        verify: async (session, route) => sessionPort.verify(session, route),
+        commit: async (session, route) => sessionPort.commit(session, route),
         record: createSqliteSameSessionRouteSwitchRecorder({
             store,
             sessionId: input.sessionId,

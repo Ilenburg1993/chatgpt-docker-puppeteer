@@ -52,7 +52,7 @@ function buildAlertDedupeKey(evt) {
 }
 
 /**
- * @param {{ bus: EventBus; onAlert?: (evt: { type: string; timestamp: number }) => void; errorTracker?: ErrorTracker | null }} deps
+ * @param {{ bus: EventBus; onAlert?: (evt: { type: string; timestamp: number }) => void; errorTracker?: { trackError: (error: unknown, options?: import('../error-tracker.js').TrackErrorOptions) => unknown } | null }} deps
  * @returns {{ unsub: () => void; hasAction: true; name: string }}
  */
 export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) {

@@ -10,6 +10,12 @@ import {
 } from '../../../../src/copilot/mcp/tools/llm-b-live.js';
 import { mcpReloadTools } from '../../../../src/copilot/mcp/tools/restart-control.js';
 
+/**
+ * @template {{ name: string }} T
+ * @param {readonly T[]} definitions
+ * @param {string} name
+ * @returns {T}
+ */
 function tool(definitions, name) {
     const definition = definitions.find((entry) => entry.name === name);
     assert.ok(definition, `missing tool ${name}`);
@@ -105,6 +111,7 @@ describe('MCP governed autonomy mutations', () => {
     });
 
     it('reaps only completed verified detached live runs after the cleanup grace period', async () => {
+        /** @type {string[]} */
         const cancelled = [];
         const oldVerified = 'mcp-11111111-1111-4111-8111-111111111111';
         const failingVerified = 'mcp-22222222-2222-4222-8222-222222222222';

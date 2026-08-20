@@ -68,11 +68,11 @@ test('executeCommand dryRun supports new AUDIT/INFERENCE commands without proxy 
 test('executeCommand proxies AUDIT_JOB_CREATE and AUDIT_JOB_RUN to local audit-agent', async () => {
     const rt = new AuditAgentRuntime();
     const server = createAuditAgentServer({ runtime: rt });
-    const prevHost = process.env.AUDIT_AGENT_HOST;
-    const prevPort = process.env.AUDIT_AGENT_PORT;
+    const prevHost = process.env['AUDIT_AGENT_HOST'];
+    const prevPort = process.env['AUDIT_AGENT_PORT'];
     const { host, port } = await listen(server);
-    process.env.AUDIT_AGENT_HOST = host;
-    process.env.AUDIT_AGENT_PORT = String(port);
+    process.env['AUDIT_AGENT_HOST'] = host;
+    process.env['AUDIT_AGENT_PORT'] = String(port);
 
     try {
         const createOut = await executeCommand({
@@ -108,10 +108,10 @@ test('executeCommand proxies AUDIT_JOB_CREATE and AUDIT_JOB_RUN to local audit-a
         assert.equal(runOut.success, true);
         assert.equal(runOut?.result?.after?.id, String(jobId));
     } finally {
-        if (prevHost === undefined) delete process.env.AUDIT_AGENT_HOST;
-        else process.env.AUDIT_AGENT_HOST = prevHost;
-        if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
-        else process.env.AUDIT_AGENT_PORT = prevPort;
+        if (prevHost === undefined) delete process.env['AUDIT_AGENT_HOST'];
+        else process.env['AUDIT_AGENT_HOST'] = prevHost;
+        if (prevPort === undefined) delete process.env['AUDIT_AGENT_PORT'];
+        else process.env['AUDIT_AGENT_PORT'] = prevPort;
         await /** @type {Promise<void>} */ (
             new Promise((resolve) => {
                 server.close(() => resolve());
@@ -123,11 +123,11 @@ test('executeCommand proxies AUDIT_JOB_CREATE and AUDIT_JOB_RUN to local audit-a
 test('executeCommand proxies patch_suggest job and returns WAITING_APPROVAL after run', async () => {
     const rt = new AuditAgentRuntime();
     const server = createAuditAgentServer({ runtime: rt });
-    const prevHost = process.env.AUDIT_AGENT_HOST;
-    const prevPort = process.env.AUDIT_AGENT_PORT;
+    const prevHost = process.env['AUDIT_AGENT_HOST'];
+    const prevPort = process.env['AUDIT_AGENT_PORT'];
     const { host, port } = await listen(server);
-    process.env.AUDIT_AGENT_HOST = host;
-    process.env.AUDIT_AGENT_PORT = String(port);
+    process.env['AUDIT_AGENT_HOST'] = host;
+    process.env['AUDIT_AGENT_PORT'] = String(port);
 
     try {
         const createOut = await executeCommand({
@@ -161,10 +161,10 @@ test('executeCommand proxies patch_suggest job and returns WAITING_APPROVAL afte
         assert.equal(runOut?.result?.after?.status, 'WAITING_APPROVAL');
         assert.equal(runOut?.result?.metadata?.action, 'run');
     } finally {
-        if (prevHost === undefined) delete process.env.AUDIT_AGENT_HOST;
-        else process.env.AUDIT_AGENT_HOST = prevHost;
-        if (prevPort === undefined) delete process.env.AUDIT_AGENT_PORT;
-        else process.env.AUDIT_AGENT_PORT = prevPort;
+        if (prevHost === undefined) delete process.env['AUDIT_AGENT_HOST'];
+        else process.env['AUDIT_AGENT_HOST'] = prevHost;
+        if (prevPort === undefined) delete process.env['AUDIT_AGENT_PORT'];
+        else process.env['AUDIT_AGENT_PORT'] = prevPort;
         await /** @type {Promise<void>} */ (
             new Promise((resolve) => {
                 server.close(() => resolve());

@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/test_terminal_agent_runtime_events.spec.js
  *
@@ -47,14 +46,17 @@ const readTerminalRuntimeState = vi.fn(
 const recordTerminalTurnToolActivity = vi.fn();
 const completeTerminalTurnToolCall = vi.fn();
 const completeTerminalTurnTrace = vi.fn();
-const reviseRecentTerminalTurnTraceStatus = vi.fn(() => null);
+const reviseRecentTerminalTurnTraceStatus = vi.fn(
+    /** @returns {Record<string, unknown> | null} */
+    () => null,
+);
 const readTerminalTurnTraceProjection = vi.fn(() => ({ current: null, recent: [] }));
 const getTerminalDetailLevel = vi.fn(() => 'detailed');
 const recordToolCall = vi.fn();
 const defaultErrorTracker = {
     trackError: vi.fn(),
 };
-const readConfiguredByokSummary = vi.fn(() => ({ enabled: false }));
+const readConfiguredByokSummary = vi.fn(/** @returns {Record<string, unknown>} */ () => ({ enabled: false }));
 
 vi.mock('../../../src/copilot/terminal/dialog/index.js', () => ({
     SEPARATOR: '---',

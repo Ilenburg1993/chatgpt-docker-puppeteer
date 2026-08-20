@@ -1,35 +1,25 @@
-<script setup>
+<script setup lang="ts">
 import { cn } from '@/lib/utils';
 import { computed } from 'vue';
 
-const props = defineProps({
-    modelValue: {
-        type: [String, Number],
-        default: '',
-    },
-    type: {
-        type: String,
-        default: 'text',
-    },
-    placeholder: {
-        type: String,
-        default: '',
-    },
-    disabled: {
-        type: Boolean,
-        default: false,
-    },
-    error: {
-        type: String,
-        default: '',
-    },
-    class: {
-        type: String,
-        default: '',
-    },
-});
+const props = withDefaults(
+    defineProps<{
+        modelValue?: string | number | null;
+        id?: string;
+        type?: string;
+        placeholder?: string;
+        disabled?: boolean;
+        required?: boolean;
+        error?: string;
+        class?: string;
+    }>(),
+    { modelValue: '', type: 'text', placeholder: '', disabled: false, required: false, error: '', class: '' },
+);
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits<{
+    'update:modelValue': [value: string];
+    keyup: [event: KeyboardEvent];
+}>();
 
 const inputClass = computed(() =>
     cn(
@@ -41,8 +31,8 @@ const inputClass = computed(() =>
     ),
 );
 
-const handleInput = (event) => {
-    emit('update:modelValue', event.target.value);
+const handleInput = (event: Event) => {
+    emit('update:modelValue', (event.target as HTMLInputElement).value);
 };
 </script>
 
@@ -50,11 +40,14 @@ const handleInput = (event) => {
     <div class="w-full">
         <input
             :type="type"
+            :id="id"
             :value="modelValue"
             :placeholder="placeholder"
             :disabled="disabled"
+            :required="required"
             :class="inputClass"
             @input="handleInput"
+            @keyup="emit('keyup', $event)"
         />
         <p v-if="error" class="mt-1 text-sm text-error">
             {{ error }}

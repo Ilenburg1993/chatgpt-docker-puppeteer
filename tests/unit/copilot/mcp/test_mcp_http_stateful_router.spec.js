@@ -8,51 +8,13 @@ import { describe, it } from 'vitest';
 
 import { handleStatefulMcpHttpRequest } from '#copilot/mcp/adapters';
 import { createMcpHttpSessionRuntime, createMcpInMemoryEventStore } from '#copilot/mcp/control-plane';
-
-/**
- * @param {string} method
- * @param {Record<string, string>} [headers]
- * @returns {import('node:http').IncomingMessage}
- */
-function fakeReq(method, headers = {}) {
-    return /** @type {import('node:http').IncomingMessage} */ ({
-        method,
-        headers,
-        httpVersionMajor: 1,
-    });
-}
-
-/**
- * @returns {import('node:http').ServerResponse}
- */
-function fakeRes() {
-    return /** @type {import('node:http').ServerResponse} */ ({
-        headersSent: false,
-        writableEnded: false,
-        setHeader() {},
-        end() {},
-    });
-}
-
-/**
- * @param {import('node:http').IncomingMessage} req
- * @param {string} name
- * @returns {string | undefined}
- */
-function readHeader(req, name) {
-    const value = req.headers[name.toLowerCase()];
-    return typeof value === 'string' ? value : undefined;
-}
-
-/**
- * @param {unknown[]} errors
- * @returns {(res: import('node:http').ServerResponse, statusCode: number, error: { error: string; error_description: string }) => void}
- */
-function captureTransportErrors(errors) {
-    return (_res, statusCode, error) => {
-        errors.push({ statusCode, error });
-    };
-}
+import {
+    createMcpTransportErrorCollector,
+    fakeMcpRequest as fakeReq,
+    fakeMcpResponse as fakeRes,
+    fakeMcpTransport,
+    readFakeMcpHeader as readHeader,
+} from './helpers/http-fakes.js';
 
 const initializeBody = {
     jsonrpc: '2.0',
@@ -65,29 +27,10 @@ const initializeBody = {
     },
 };
 
-const noneDevBinding = {
-    ok: true,
-    verified: false,
-    binding: {
-        mode: 'none-dev',
-        issuerHash: '',
-        subjectHash: '',
-        clientIdHash: '',
-        resource: 'https://mcp.aurelin.org/mcp',
-        audience: 'https://mcp.aurelin.org',
-        scopes: [],
-    },
-};
-
-/** @returns {typeof noneDevBinding} */
-function resolveNoneDevBinding() {
-    return noneDevBinding;
-}
-
 describe('MCP HTTP stateful router', () => {
     it('initializes a stateful transport and registers it in the runtime', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         let connected = false;
         let bodySeen = null;
         const server = {
@@ -107,29 +50,28 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
             createServer: () => server,
             createTransport: (transportOptions) =>
-                /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ ({
-                    async handleRequest(_req, _res, body) {
-                        bodySeen = body;
+                fakeMcpTransport({
+                    handleRequest(_req, _res, body) {
+                        bodySeen = body ?? null;
                         transportOptions.onsessioninitialized?.('session-1');
                     },
-                    async close() {},
                 }),
         });
 
         assert.equal(errors.length, 0);
         assert.equal(connected, true);
         assert.equal(bodySeen, initializeBody);
-        assert.equal(runtime.snapshot().activeSessions, 1);
+        assert.equal(runtime.snapshot()['activeSessions'], 1);
         assert.equal(JSON.stringify(runtime.snapshot()).includes('session-1'), false);
     });
 
     it('rejects initialize with 503 before the SDK when session capacity is exhausted', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 1, store: null });
         runtime.register({ sessionId: 'session-full', transport: {}, server: {} });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         let transportCreated = false;
 
         await handleStatefulMcpHttpRequest({
@@ -142,14 +84,11 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
             createServer: () => ({ async connect() {}, async close() {} }),
             createTransport: () => {
                 transportCreated = true;
-                return /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ ({
-                    async handleRequest() {},
-                    async close() {},
-                });
+                return fakeMcpTransport();
             },
         });
 
@@ -168,13 +107,12 @@ describe('MCP HTTP stateful router', () => {
     it('reuses an existing transport for session-bound POST requests', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
         let handled = 0;
-        const transport = {
-            async handleRequest(_req, _res, body) {
+        const transport = fakeMcpTransport({
+            handleRequest(_req, _res, body) {
                 handled += 1;
                 assert.deepEqual(body, { jsonrpc: '2.0', id: 2, method: 'tools/list' });
             },
-            async close() {},
-        };
+        });
         runtime.register({ sessionId: 'session-2', transport, server: {} });
 
         await handleStatefulMcpHttpRequest({
@@ -187,37 +125,38 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors([]),
+            writeTransportError: createMcpTransportErrorCollector().writeTransportError,
         });
 
         assert.equal(handled, 1);
-        assert.equal(runtime.snapshot().activeSessions, 1);
+        assert.equal(runtime.snapshot()['activeSessions'], 1);
     });
 
     it('replays later local events on GET with a valid Last-Event-ID', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         const eventStore = createMcpInMemoryEventStore({ maxEventsPerStream: 10, eventTtlMs: 10_000 });
         /** @type {unknown[]} */
         const replayed = [];
         /** @type {string | null} */
         let firstEventId = null;
 
-        const transport = {
+        /** @type {(sessionId: string) => void} */
+        let initializeSession = () => { throw new Error('transport was not initialized'); };
+        const transport = fakeMcpTransport({
             async handleRequest(req, _res, body) {
                 if (String(req.method ?? '').toUpperCase() === 'POST') {
-                    transportOptions.onsessioninitialized?.('session-replay');
+                    initializeSession('session-replay');
                     assert.equal(body, initializeBody);
                     return;
                 }
-                const lastEventId = readHeader(/** @type {import('node:http').IncomingMessage} */ (req), 'last-event-id');
+                const lastEventId = readHeader(req, 'last-event-id');
                 assert.equal(lastEventId, firstEventId);
-                await eventStore.replayEventsAfter(String(lastEventId), { send: (message) => replayed.push(message) });
+                await eventStore.replayEventsAfter(String(lastEventId), {
+                    send(message) { replayed.push(message); },
+                });
             },
-            async close() {},
-        };
-        /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */
-        let transportOptions;
+        });
 
         await handleStatefulMcpHttpRequest({
             req: fakeReq('POST'),
@@ -229,12 +168,12 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
             createServer: () => ({ async connect() {}, async close() {} }),
             createEventStore: () => eventStore,
             createTransport: (options) => {
-                transportOptions = options;
-                return /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ (transport);
+                initializeSession = (sessionId) => { options.onsessioninitialized?.(sessionId); };
+                return transport;
             },
         });
 
@@ -256,7 +195,7 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
         assert.equal(errors.length, 0);
@@ -265,25 +204,26 @@ describe('MCP HTTP stateful router', () => {
 
     it('seeds the explicit SDK replay diagnostic on the same event store before GET handling', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         const eventStore = createMcpInMemoryEventStore({ maxEventsPerStream: 10, eventTtlMs: 10_000 });
         /** @type {unknown[]} */
         const replayed = [];
-        /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransportOptions} */
-        let transportOptions;
-        const transport = {
+        /** @type {(sessionId: string) => void} */
+        let initializeSession = () => { throw new Error('transport was not initialized'); };
+        const transport = fakeMcpTransport({
             async handleRequest(req, _res, body) {
                 if (String(req.method ?? '').toUpperCase() === 'POST') {
-                    transportOptions.onsessioninitialized?.('session-replay-probe');
+                    initializeSession('session-replay-probe');
                     assert.equal(body, initializeBody);
                     return;
                 }
-                const lastEventId = readHeader(/** @type {import('node:http').IncomingMessage} */ (req), 'last-event-id');
+                const lastEventId = readHeader(req, 'last-event-id');
                 assert.ok(lastEventId);
-                await eventStore.replayEventsAfter(String(lastEventId), { send: (message) => replayed.push(message) });
+                await eventStore.replayEventsAfter(String(lastEventId), {
+                    send(message) { replayed.push(message); },
+                });
             },
-            async close() {},
-        };
+        });
 
         await handleStatefulMcpHttpRequest({
             req: fakeReq('POST'),
@@ -295,22 +235,16 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
             createServer: () => ({ async connect() {}, async close() {} }),
             createEventStore: () => eventStore,
             createTransport: (options) => {
-                transportOptions = options;
-                return /** @type {import('@modelcontextprotocol/sdk/server/streamableHttp.js').StreamableHTTPServerTransport} */ (transport);
+                initializeSession = (sessionId) => { options.onsessioninitialized?.(sessionId); };
+                return transport;
             },
         });
 
-        const headers = {};
-        const res = /** @type {import('node:http').ServerResponse} */ ({
-            headersSent: false,
-            writableEnded: false,
-            setHeader(name, value) { headers[String(name).toLowerCase()] = String(value); },
-            end() {},
-        });
+        const res = fakeRes();
         const firstEventId = await eventStore.storeEvent('stream-replay-probe', { jsonrpc: '2.0', method: 'first' });
         await handleStatefulMcpHttpRequest({
             req: fakeReq('GET', {
@@ -327,11 +261,11 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
         assert.equal(errors.length, 0);
-        assert.equal(headers['x-copilot-mcp-sse-replay-probe'], 'seeded-same-stream');
+        assert.equal(res.headers['x-copilot-mcp-sse-replay-probe'], 'seeded-same-stream');
         assert.deepEqual(replayed, [{
             jsonrpc: '2.0',
             method: 'notifications/message',
@@ -347,17 +281,8 @@ describe('MCP HTTP stateful router', () => {
             transport: { async handleRequest() { handled += 1; } },
             server: {},
         });
-        const errors = [];
-        const headers = {};
-        const res = /** @type {import('node:http').ServerResponse} */ ({
-            headersSent: false,
-            writableEnded: false,
-            statusCode: 0,
-            body: '',
-            setHeader(name, value) { headers[String(name).toLowerCase()] = String(value); },
-            write(chunk) { this.headersSent = true; this.body += String(chunk); },
-            end() { this.writableEnded = true; },
-        });
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
+        const res = fakeRes();
 
         await handleStatefulMcpHttpRequest({
             req: fakeReq('GET', {
@@ -373,34 +298,39 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
         assert.equal(errors.length, 0);
         assert.equal(handled, 0);
-        assert.equal(/** @type {{ statusCode: number; body: string; writableEnded: boolean }} */ (res).statusCode, 200);
-        assert.equal(headers['x-copilot-mcp-sse-probe'], 'ok');
-        assert.match(headers['content-type'], /text\/event-stream/u);
-        assert.match(/** @type {{ body: string }} */ (res).body, /copilot-mcp-sse-probe/u);
-        assert.equal(/** @type {{ writableEnded: boolean }} */ (res).writableEnded, true);
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.headers['x-copilot-mcp-sse-probe'], 'ok');
+                const contentType = res.headers['content-type'];
+        assert.ok(contentType);
+        assert.match(contentType, /text\/event-stream/u);
+        assert.match(res.body, /copilot-mcp-sse-probe/u);
+        assert.equal(res.writableEnded, true);
     });
 
     it('enters the SDK GET stream path and sends the explicit SDK SSE diagnostic notification', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
         let handled = 0;
+        /** @type {unknown[]} */
         const sent = [];
         runtime.register({
             sessionId: 'session-sdk-probe',
-            transport: {
+            transport: fakeMcpTransport({
                 async handleRequest() {
                     handled += 1;
                     await new Promise((resolve) => setTimeout(resolve, 60));
                 },
-                async send(message) { sent.push(message); },
-            },
+                send(message) {
+                    sent.push(message);
+                },
+            }),
             server: {},
         });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
 
         await handleStatefulMcpHttpRequest({
             req: fakeReq('GET', {
@@ -416,20 +346,24 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
         assert.equal(errors.length, 0);
         assert.equal(handled, 1);
         assert.equal(sent.length, 1);
-        assert.equal(sent[0]?.method, 'notifications/message');
-        assert.equal(sent[0]?.params?.logger, 'copilot-mcp-sdk-sse-probe');
+        const sentMessage = sent[0];
+        assert.ok(sentMessage && typeof sentMessage === 'object');
+        assert.equal(Reflect.get(sentMessage, 'method'), 'notifications/message');
+        const params = Reflect.get(sentMessage, 'params');
+        assert.ok(params && typeof params === 'object');
+        assert.equal(Reflect.get(params, 'logger'), 'copilot-mcp-sdk-sse-probe');
     });
 
     it('rejects malformed Last-Event-ID on GET before opening a stream', async () => {
         const runtime = createMcpHttpSessionRuntime({ ttlMs: 10_000, maxSessions: 4, store: null });
         runtime.register({ sessionId: 'session-3', transport: {}, server: {} });
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
 
         await handleStatefulMcpHttpRequest({
             req: fakeReq('GET', { accept: 'text/event-stream', 'mcp-session-id': 'session-3', 'last-event-id': 'bad id' }),
@@ -441,15 +375,15 @@ describe('MCP HTTP stateful router', () => {
             runtime,
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
-        assert.equal(/** @type {{ statusCode: number }[]} */ (errors)[0]?.statusCode, 400);
+        assert.equal(errors[0]?.statusCode, 400);
         assert.match(JSON.stringify(errors[0]), /Last-Event-ID/u);
     });
 
     it('rejects session-bound requests without Mcp-Session-Id', async () => {
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         await handleStatefulMcpHttpRequest({
             req: fakeReq('POST'),
             res: fakeRes(),
@@ -460,7 +394,7 @@ describe('MCP HTTP stateful router', () => {
             runtime: createMcpHttpSessionRuntime({ store: null }),
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
         assert.deepEqual(errors, [
@@ -475,7 +409,7 @@ describe('MCP HTTP stateful router', () => {
     });
 
     it('rejects unknown or expired sessions with 404', async () => {
-        const errors = [];
+        const { errors, writeTransportError } = createMcpTransportErrorCollector();
         await handleStatefulMcpHttpRequest({
             req: fakeReq('POST', { 'mcp-session-id': 'missing' }),
             res: fakeRes(),
@@ -486,9 +420,9 @@ describe('MCP HTTP stateful router', () => {
             runtime: createMcpHttpSessionRuntime({ store: null }),
             useSqliteStore: false,
             readHeader,
-            writeTransportError: captureTransportErrors(errors),
+            writeTransportError,
         });
 
-        assert.equal(/** @type {{ statusCode: number }[]} */ (errors)[0]?.statusCode, 404);
+        assert.equal(errors[0]?.statusCode, 404);
     });
 });

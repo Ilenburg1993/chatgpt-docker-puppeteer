@@ -10,6 +10,10 @@ import {
 
 afterEach(() => resetOpenAiEndpointLatencyMonitorForTests());
 
+/**
+ * @param {number} [ttfbMs]
+ * @returns {import('../../../../src/copilot/mcp/control-plane/openai-endpoint-latency.js').OpenAiEndpointLatencySnapshot}
+ */
 function snapshot(ttfbMs = 100) {
     return {
         schemaVersion: 1,
@@ -38,8 +42,8 @@ describe('OpenAI endpoint latency monitor', () => {
     it('schedules once, runs non-blocking and reschedules after a successful cycle', async () => {
         /** @type {Array<() => void>} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((fn) => {
-            callbacks.push(/** @type {() => void} */ (fn));
+        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
+            callbacks.push(fn);
             return /** @type {NodeJS.Timeout} */ ({ unref() {} });
         });
         let measured = 0;
@@ -51,11 +55,11 @@ describe('OpenAI endpoint latency monitor', () => {
             setTimeoutFn,
             measureFn: async () => {
                 measured += 1;
-                return { snapshot: /** @type {any} */ (snapshot()), samples: [] };
+                return { snapshot: snapshot(), samples: [] };
             },
             persistFn: async () => {
                 persisted += 1;
-                return { persisted: true, path: 'test.jsonl', retainedSnapshots: 1 };
+                return { persisted: true, path: 'test.jsonl', maxSnapshots: 10_000, retainedSnapshots: 1 };
             },
         }), true);
         assert.equal(scheduleOpenAiEndpointLatencyMonitor({ enabled: true, setTimeoutFn }), false);
@@ -70,14 +74,14 @@ describe('OpenAI endpoint latency monitor', () => {
         assert.equal(state.running, false);
         assert.equal(state.scheduled, true);
         assert.equal(callbacks.length, 1);
-        assert.equal(state.lastSnapshot?.targets?.[0]?.ttfbP50Ms, 100);
+        assert.equal(state.lastSnapshot?.targets[0]?.ttfbP50Ms, 100);
     });
 
     it('records failure without throwing and still schedules the next cycle', async () => {
         /** @type {Array<() => void>} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((fn) => {
-            callbacks.push(/** @type {() => void} */ (fn));
+        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
+            callbacks.push(fn);
             return /** @type {NodeJS.Timeout} */ ({ unref() {} });
         });
         scheduleOpenAiEndpointLatencyMonitor({

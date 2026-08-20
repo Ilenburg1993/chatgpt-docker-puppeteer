@@ -45,7 +45,6 @@ function processFile(file) {
     } catch (_) {
         return;
     }
-    const _original = content;
     let changed = false;
     const changesHere = /** @type {any[]} */ ([]);
 
@@ -67,7 +66,7 @@ function processFile(file) {
 
     // 3) Replace hosts arrays: hosts: ['127.0.0.1', 'localhost']
     const hostsArrayRegex = /(\bhosts\s*:\s*\[)([\s\S]*?)(\])/g;
-    content = content.replace(hostsArrayRegex, (m, start, inner, end) => {
+    content = content.replace(hostsArrayRegex, (_match, start, inner, end) => {
         const replaced = inner.replace(
             /(['"])(127\.0\.0\.1|localhost)\1/g,
             (/** @type {any} */ mm, /** @type {any} */ q, /** @type {any} */ h) => {

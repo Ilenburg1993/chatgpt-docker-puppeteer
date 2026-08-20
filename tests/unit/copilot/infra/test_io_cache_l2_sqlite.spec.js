@@ -193,10 +193,12 @@ describe('createIoL2SqliteCache', () => {
         let shouldFail = true;
         db.transaction = (handler) => {
             const persist = transaction(handler);
-            return (...args) => {
-                if (shouldFail) throw new Error('controlled batch failure');
-                return persist(...args);
-            };
+            return new Proxy(persist, {
+                apply(target, thisArg, args) {
+                    if (shouldFail) throw new Error('controlled batch failure');
+                    return Reflect.apply(target, thisArg, args);
+                },
+            });
         };
         const cache = createIoL2SqliteCache({
             db,

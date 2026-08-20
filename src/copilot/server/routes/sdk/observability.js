@@ -36,10 +36,10 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  * Dependências injetáveis do router de observabilidade.
  *
  * @typedef {object} ObservabilityRouterDeps
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools
- * @property {ReturnType<import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRuntimeProjection']} sdkRuntimeProjection
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['allTools']} allTools
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionRpc']} sdkSessionRpc
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
  * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.

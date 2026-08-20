@@ -22,13 +22,11 @@
  */
 
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
+import Database from 'better-sqlite3';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import { ConversationStore } from '../../../src/copilot/conversation-hub/store.js';
 import { COPILOT_MIGRATIONS } from '../../../src/copilot/db/migrations.js';
-
-const require = createRequire(import.meta.url);
 
 /**
  * Aplica as migrations copilot a um banco in-memory de teste.
@@ -64,7 +62,6 @@ let store;
 
 beforeAll(() => {
     // DB in-memory — injeta no store via dbOverride para não tocar em copilot.sqlite
-    const Database = require('better-sqlite3');
     testDb = new Database(':memory:');
     // F7: aplicar migrations copilot para criar tabelas no banco de teste
     applyCopilotMigrations(testDb);

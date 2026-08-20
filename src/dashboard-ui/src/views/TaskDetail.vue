@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -7,6 +7,7 @@ import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
 import { formatHttpError, http } from '@/lib/http';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import type { BadgeVariant, DashboardTask } from '@/types/dashboard';
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -17,15 +18,48 @@ const router = useRouter();
 const tasksStore = useTasksVNextStore();
 const missionsStore = useMissionsVNextStore();
 
-const taskId = computed(() => String(route.params.id || ''));
+const taskId = computed(() => String(route.params['id'] || ''));
 
 const loading = ref(false);
-const error = ref(null);
+const error = ref<string | null>(null);
 const tab = ref('resumo'); // resumo|attempts|artifacts|eventos|deps|json
 
-const detail = ref(null);
+interface TaskDetailPayload {
+    task?: DashboardTask;
+    attempts?: Array<{
+        id: string;
+        status?: string;
+        created_at_ms?: number;
+        ended_at_ms?: number;
+        rendered_prompt_artifact_id?: string;
+        response_text_artifact_id?: string;
+        response_v2_json_artifact_id?: string;
+        response_md_artifact_id?: string;
+        response_html_artifact_id?: string;
+        error?: string;
+    }>;
+    events?: Array<{
+        id: string;
+        actor_type?: string;
+        actor_id?: string;
+        ts_ms: number;
+        event_type?: string;
+        payload?: Record<string, unknown>;
+    }>;
+    dependencies?: Array<{ id: string; [key: string]: unknown }>;
+    workflow?: { tasks?: DashboardTask[] };
+    artifacts?: Array<{ id: string; kind?: string; mime?: string; size_bytes?: number }>;
+    mission_context?: {
+        mission?: { id: string; title?: string; status?: string; autonomy_mode?: string };
+        counts?: { tasks_total?: number };
+    };
+    siblings?: DashboardTask[];
+}
+
+const detail = ref<TaskDetailPayload | null>(null);
 const task = computed(() => detail.value?.task || null);
 const attempts = computed(() => detail.value?.attempts || []);
+const latestAttempt = computed(() => attempts.value[0] ?? null);
 const events = computed(() => detail.value?.events || []);
 const dependencies = computed(() => detail.value?.dependencies || []);
 const workflow = computed(() => detail.value?.workflow?.tasks || []);
@@ -61,7 +95,7 @@ const edit = ref({
     mission_id: '',
     system_message: '',
     user_message: '',
-    execute_after_ms: null,
+    execute_after_ms: null as number | null,
 });
 
 const depsText = ref('');
@@ -71,7 +105,7 @@ function currentTaskVersion() {
     return task.value?.timestamps?.updated_at_ms || task.value?.updated_at_ms || null;
 }
 
-function statusVariant(status) {
+function statusVariant(status: string | undefined): BadgeVariant {
     const s = String(status || '').toUpperCase();
     if (s === 'RUNNING') return 'info';
     if (s === 'DONE') return 'success';
@@ -81,7 +115,7 @@ function statusVariant(status) {
     return 'default';
 }
 
-function resolveReason(defaultReason, errorMessage) {
+function resolveReason(defaultReason: string, errorMessage: string) {
     const typed = String(commandReason.value || '').trim();
     if (typed) return typed;
     if (typeof window !== 'undefined' && typeof window.prompt === 'function') {
@@ -106,7 +140,7 @@ async function fetchDetail() {
         });
         detail.value = res.data?.data || null;
 
-        const t = detail.value?.task || {};
+        const t: Partial<DashboardTask> = detail.value?.task || {};
         edit.value = {
             stage: t.stage || 'READY',
             status: t.unified_status || t.state?.status || 'PENDING',
@@ -188,7 +222,7 @@ async function saveJsonAdvanced() {
     await fetchDetail();
 }
 
-async function action(actionName) {
+async function action(actionName: string) {
     const reason = resolveReason(
         `Ação ${String(actionName).toUpperCase()} na task`,
         'Motivo obrigatório para comando de task.',
@@ -228,9 +262,9 @@ async function reassignMission() {
 
 const depsGraphNodes = computed(() => {
     const t = task.value;
-    if (!t?.meta?.id) return [];
-    const nodes = [];
-    nodes.push({ id: t.meta.id, label: `${t.meta.id}\nSELF`, color: { background: '#1e3a8a', border: '#60a5fa' } });
+    if (!t?.id) return [];
+    const nodes: Array<{ id: string; label: string; color: { background: string; border: string } }> = [];
+    nodes.push({ id: t.id, label: `${t.id}\nSELF`, color: { background: '#1e3a8a', border: '#60a5fa' } });
     for (const d of dependencies.value) {
         nodes.push({ id: d.id, label: `${d.id}\nDEP`, color: { background: '#0f172a', border: '#334155' } });
     }
@@ -239,8 +273,8 @@ const depsGraphNodes = computed(() => {
 
 const depsGraphEdges = computed(() => {
     const t = task.value;
-    if (!t?.meta?.id) return [];
-    return dependencies.value.map((d) => ({ from: d.id, to: t.meta.id }));
+    if (!t?.id) return [];
+    return dependencies.value.map((d) => ({ from: d.id, to: t.id }));
 });
 
 onMounted(async () => {
@@ -361,7 +395,7 @@ watch(taskId, () => void fetchDetail());
 
                 <!-- last_error: only show when task is failed/blocked and has an error message -->
                 <div
-                    v-if="task.last_error && ['FAILED', 'BLOCKED', 'CANCELLED'].includes(task.unified_status)"
+                    v-if="task.last_error && ['FAILED', 'BLOCKED', 'CANCELLED'].includes(task.unified_status ?? '')"
                     class="mt-3 p-3 rounded-lg border border-red-500/30 bg-red-950/20"
                 >
                     <div class="text-xs text-red-400 font-semibold mb-1">Último erro</div>
@@ -374,8 +408,8 @@ watch(taskId, () => void fetchDetail());
                 <div
                     v-if="
                         task.unified_status === 'DONE' &&
-                        attempts.length > 0 &&
-                        (attempts[0].response_text_artifact_id || attempts[0].response_v2_json_artifact_id)
+                        latestAttempt &&
+                        (latestAttempt.response_text_artifact_id || latestAttempt.response_v2_json_artifact_id)
                     "
                     class="mt-3 p-3 rounded-lg border border-emerald-500/30 bg-emerald-950/20"
                 >
@@ -383,19 +417,19 @@ watch(taskId, () => void fetchDetail());
                         <div class="text-xs text-emerald-400 font-semibold">✓ Resposta da LLM disponível</div>
                         <div class="flex items-center gap-2">
                             <Button
-                                v-if="attempts[0].response_text_artifact_id"
+                                v-if="latestAttempt?.response_text_artifact_id"
                                 variant="ghost"
                                 size="sm"
                                 class="h-6 px-2 text-xs"
-                                @click="router.push(`/artifacts/${attempts[0].response_text_artifact_id}`)"
+                                @click="router.push(`/artifacts/${latestAttempt.response_text_artifact_id}`)"
                                 >Ver texto</Button
                             >
                             <Button
-                                v-if="attempts[0].response_v2_json_artifact_id"
+                                v-if="latestAttempt?.response_v2_json_artifact_id"
                                 variant="ghost"
                                 size="sm"
                                 class="h-6 px-2 text-xs"
-                                @click="router.push(`/artifacts/${attempts[0].response_v2_json_artifact_id}`)"
+                                @click="router.push(`/artifacts/${latestAttempt.response_v2_json_artifact_id}`)"
                                 >Ver JSON</Button
                             >
                             <Button variant="ghost" size="sm" class="h-6 px-2 text-xs" @click="tab = 'attempts'"

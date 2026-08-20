@@ -1,6 +1,5 @@
 // @ts-check
 /* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- legacy fixture inference is intentionally outside the MCP strict hardening pass
 /**
  * tests/unit/copilot/test_terminal_dialog_engine.spec.js
  *
@@ -11,19 +10,27 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const configMocks = vi.hoisted(() => ({
-    readConfiguredByokSummary: vi.fn(() => ({
+    readConfiguredByokSummary: /** @type {import('vitest').Mock<typeof import('../../../src/copilot/config/index.js').readConfiguredByokSummary>} */ (vi.fn(() => ({
         enabled: false,
         ready: false,
+        preset: null,
         profile: null,
-        provider: null,
+        providerType: null,
+        baseUrl: null,
         model: null,
-        limits: null,
-        capabilities: null,
-    })),
+        wireApi: null,
+        azureApiVersion: null,
+        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+        modelList: { configured: false, count: 0 },
+        capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 },
+        limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
+        warnings: [],
+        errors: [],
+    }))),
 }));
 const gatewayMocks = vi.hoisted(() => ({
-    readTerminalDialogStreamMeta: vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' })),
-    readTerminalRuntimeControlState: vi.fn(() => ({
+    readTerminalDialogStreamMeta: /** @type {import('vitest').Mock<typeof import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalDialogStreamMeta>} */ (vi.fn(() => ({ model: 'gpt-5-mini', reasoningEffort: 'medium' }))),
+    readTerminalRuntimeControlState: /** @type {import('vitest').Mock<typeof import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeControlState>} */ (vi.fn(() => ({
         status: 'idle',
         model: 'gpt-5-mini',
         reasoningEffort: 'medium',
@@ -31,8 +38,8 @@ const gatewayMocks = vi.hoisted(() => ({
         dialogLoopActive: true,
         dialogPaused: false,
         queueSize: 0,
-    })),
-    readTerminalRuntimeState: vi.fn(() => ({
+    }))),
+    readTerminalRuntimeState: /** @type {import('vitest').Mock<typeof import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeState>} */ (vi.fn(() => ({
         runtimeId: 'default',
         model: 'gpt-5-mini',
         reasoningEffort: 'medium',
@@ -52,7 +59,8 @@ const gatewayMocks = vi.hoisted(() => ({
         pendingQuestionShadowRemainingMs: null,
         contextWindow: null,
         lastPrInfo: null,
-    })),
+        lastLlmUsage: null,
+    }))),
     runTerminalDialogTurn: vi.fn(async () => 'ok'),
     runTerminalDialogTurnDetailed: vi.fn(async () => ({
         reply: 'ok',
@@ -65,7 +73,7 @@ const gatewayMocks = vi.hoisted(() => ({
 
 vi.mock('#copilot/bridges', () => ({ emitNerv: vi.fn() }));
 vi.mock('#copilot/config', async (importOriginal) => {
-    const actual = /** @type {any} */ (await importOriginal());
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         LLM_B_BOOT_TIMEOUT_MS: 60_000,
@@ -76,18 +84,18 @@ vi.mock('#copilot/config', async (importOriginal) => {
     };
 });
 vi.mock('#copilot/core', async (importOriginal) => {
-    const actual = /** @type {any} */ (await importOriginal());
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         container: { resolve: vi.fn(() => ({})) },
-        toError: (/** @type {any} */ e) => e,
+        toError: (/** @type {unknown} */ e) => (e instanceof Error ? e : new Error(String(e))),
         registerShutdownHandler: vi.fn(),
         runShutdown: vi.fn(async () => []),
         isShuttingDown: vi.fn(() => false),
     };
 });
 vi.mock('#copilot/observability', async (importOriginal) => {
-    const actual = /** @type {any} */ (await importOriginal());
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
     return {
         ...actual,
         log: vi.fn(),
@@ -170,13 +178,59 @@ vi.mock('../../../src/copilot/terminal/dialog/turn-display.js', () => ({
     sanitizeTerminalRenderText: vi.fn((text) => String(text ?? '')),
 }));
 
-/** @type {any} */
+/** @type {typeof import('../../../src/copilot/terminal/dialog/engine.js')} */
 let mod;
 /** @type {string} */
 let src;
 /** @type {import('vitest').MockInstance | null} */
 let stdoutWriteSpy = null;
 
+/** @typedef {ReturnType<typeof import('../../../src/copilot/config/index.js').readConfiguredByokSummary>} ConfiguredByokSummary */
+/** @typedef {ReturnType<typeof import('../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeState>} TerminalRuntimeState */
+/** @typedef {Omit<Partial<ConfiguredByokSummary>, 'limits' | 'capabilities'> & { limits?: Partial<ConfiguredByokSummary['limits']>; capabilities?: Partial<ConfiguredByokSummary['capabilities']> }} ConfiguredByokSummaryOverrides */
+
+/**
+ * @param {ConfiguredByokSummaryOverrides} [overrides]
+ * @returns {ConfiguredByokSummary}
+ */
+function configuredByokSummaryFixture(overrides = {}) {
+    const limits = {
+        maxRequestTokens: null,
+        tokensPerMinute: null,
+        requestsPerMinute: null,
+        dailyRequests: null,
+        ...(overrides.limits ?? {}),
+    };
+    const capabilities = {
+        reasoningEffort: false,
+        vision: false,
+        contextWindowTokens: 128000,
+        ...(overrides.capabilities ?? {}),
+    };
+    return {
+        enabled: false,
+        ready: false,
+        preset: null,
+        profile: null,
+        providerType: null,
+        baseUrl: null,
+        model: null,
+        wireApi: null,
+        azureApiVersion: null,
+        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+        modelList: { configured: false, count: 0 },
+        warnings: [],
+        errors: [],
+        ...overrides,
+        capabilities,
+        limits,
+    };
+}
+
+/**
+ * @param {Partial<TerminalRuntimeState>} [overrides]
+ * @returns {TerminalRuntimeState}
+ */
 function terminalIdleRuntimeState(overrides = {}) {
     return {
         runtimeId: 'default',
@@ -198,6 +252,7 @@ function terminalIdleRuntimeState(overrides = {}) {
         pendingQuestionShadowRemainingMs: null,
         contextWindow: null,
         lastPrInfo: null,
+        lastLlmUsage: null,
         ...overrides,
     };
 }
@@ -240,13 +295,13 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('bloqueia quando o limite BYOK declarado não comporta o envelope terminal', async () => {
         const result = mod.evaluateTerminalByokTurnBudget(
-            {
+            configuredByokSummaryFixture({
                 enabled: true,
                 ready: true,
                 limits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
                 capabilities: { contextWindowTokens: 131072 },
-            },
-            { contextWindow: { tokens: 1000, tokenLimit: 131072, utilization: 0.01 } },
+            }),
+            terminalIdleRuntimeState({ contextWindow: { tokens: 1000, tokenLimit: 131072, utilization: 0.01 } }),
             'mensagem curta',
         );
 
@@ -260,13 +315,13 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
     it('avisa quando a estimativa do turno ultrapassa o limite BYOK', async () => {
         const result = mod.evaluateTerminalByokTurnBudget(
-            {
+            configuredByokSummaryFixture({
                 enabled: true,
                 ready: true,
                 limits: { maxRequestTokens: 12000, tokensPerMinute: null },
                 capabilities: { contextWindowTokens: 131072 },
-            },
-            { contextWindow: { tokens: 11500, tokenLimit: 131072, utilization: 0.09 } },
+            }),
+            terminalIdleRuntimeState({ contextWindow: { tokens: 11500, tokenLimit: 131072, utilization: 0.09 } }),
             'mensagem que empurra o turno acima do limite',
         );
 
@@ -289,8 +344,8 @@ describe('terminal/dialog/engine.js — contrato', () => {
         resolveMock.mockClear();
 
         mod.resolveTerminalDialogTurnTimeout({
-            byok: { enabled: false, ready: false },
-            runtimeState: { queueSize: 0, contextWindow: null },
+            byok: configuredByokSummaryFixture({ enabled: false, ready: false }),
+            runtimeState: terminalIdleRuntimeState({ queueSize: 0, contextWindow: null }),
             metricsSummary: null,
             message: 'oi',
         });
@@ -303,8 +358,8 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
 
         mod.resolveTerminalDialogTurnTimeout({
-            byok: { enabled: true, ready: true },
-            runtimeState: { queueSize: 0, contextWindow: null },
+            byok: configuredByokSummaryFixture({ enabled: true, ready: true }),
+            runtimeState: terminalIdleRuntimeState({ queueSize: 0, contextWindow: null }),
             metricsSummary: null,
             message: 'oi',
         });
@@ -324,16 +379,17 @@ describe('terminal/dialog/engine.js — contrato', () => {
 
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockClear();
         vi.mocked(sse.broadcastSse).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValueOnce({
+        configMocks.readConfiguredByokSummary.mockReturnValueOnce(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'tiny-byok',
-            provider: 'test',
+            preset: 'test',
+            providerType: 'openai',
             model: 'tiny-model',
             limits: { maxRequestTokens: 12000, tokensPerMinute: null },
             capabilities: { contextWindowTokens: 131072 },
-        });
-        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValueOnce({
+        }));
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValueOnce(terminalIdleRuntimeState({
             runtimeId: 'default',
             model: 'tiny-model',
             reasoningEffort: 'medium',
@@ -353,7 +409,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             pendingQuestionShadowRemainingMs: null,
             contextWindow: { tokens: 11800, tokenLimit: 131072, utilization: 0.09 },
             lastPrInfo: null,
-        });
+        }));
 
         await expect(mod.sendTurn('mensagem acima do orçamento', 'user')).resolves.toBeNull();
 
@@ -372,16 +428,17 @@ describe('terminal/dialog/engine.js — contrato', () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
 
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValueOnce({
+        configMocks.readConfiguredByokSummary.mockReturnValueOnce(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'tiny-byok',
-            provider: 'test',
+            preset: 'test',
+            providerType: 'openai',
             model: 'tiny-model',
             limits: { maxRequestTokens: 12000, tokensPerMinute: null },
             capabilities: { contextWindowTokens: 131072 },
-        });
-        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValueOnce({
+        }));
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValueOnce(terminalIdleRuntimeState({
             runtimeId: 'default',
             model: 'tiny-model',
             reasoningEffort: 'medium',
@@ -401,17 +458,17 @@ describe('terminal/dialog/engine.js — contrato', () => {
             pendingQuestionShadowRemainingMs: null,
             contextWindow: { tokens: 11800, tokenLimit: 131072, utilization: 0.09 },
             lastPrInfo: null,
-        });
+        }));
 
-        const previousMode = process.env.COPILOT_BYOK_ADMISSION_MODE;
-        process.env.COPILOT_BYOK_ADMISSION_MODE = 'warn';
+        const previousMode = process.env['COPILOT_BYOK_ADMISSION_MODE'];
+        process.env['COPILOT_BYOK_ADMISSION_MODE'] = 'warn';
         try {
             await expect(mod.sendTurn('mensagem acima do orçamento com override', 'user')).resolves.toBe('ok');
         } finally {
             if (previousMode === undefined) {
-                delete process.env.COPILOT_BYOK_ADMISSION_MODE;
+                delete process.env['COPILOT_BYOK_ADMISSION_MODE'];
             } else {
-                process.env.COPILOT_BYOK_ADMISSION_MODE = previousMode;
+                process.env['COPILOT_BYOK_ADMISSION_MODE'] = previousMode;
             }
         }
 
@@ -489,16 +546,14 @@ describe('terminal/dialog/engine.js — contrato', () => {
         const dialogGateway = await import('../../../src/copilot/terminal/frontend/gateways/dialog.js');
         const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
 
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'mistral-free',
-            providerType: 'mistral',
+            providerType: 'openai',
             preset: 'mistral',
             model: 'codestral-latest',
-            limits: null,
-            capabilities: null,
-        });
+        }));
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockRejectedValueOnce(
             Object.assign(new Error('[DialogLoopManager] sendTurn sem progresso por 120000ms'), {
                 code: 'DIALOG_TIMEOUT',
@@ -516,15 +571,12 @@ describe('terminal/dialog/engine.js — contrato', () => {
             }),
         );
 
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: false,
             ready: false,
             profile: null,
-            provider: null,
             model: null,
-            limits: null,
-            capabilities: null,
-        });
+        }));
     });
 
     it('classifica 402 BYOK como bloqueio de credito no turno vivo sem duplicar erro generico no terminal', async () => {
@@ -532,20 +584,18 @@ describe('terminal/dialog/engine.js — contrato', () => {
         const health = await import('../../../src/copilot/model-gateway/health/provider-health.js');
         const activity = await import('../../../src/copilot/terminal/state/activity-state.js');
 
-        const previousAuto = process.env.COPILOT_BYOK_GATEWAY_AUTO;
-        process.env.COPILOT_BYOK_GATEWAY_AUTO = 'true';
+        const previousAuto = process.env['COPILOT_BYOK_GATEWAY_AUTO'];
+        process.env['COPILOT_BYOK_GATEWAY_AUTO'] = 'true';
         stdoutWriteSpy?.mockClear();
         vi.mocked(activity.recordTerminalActivity).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'chutes-ai',
             providerType: 'openai',
             preset: 'chutes',
             model: 'Qwen/Qwen3.5-397B-A17B-TEE',
-            limits: null,
-            capabilities: null,
-        });
+        }));
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockRejectedValueOnce(
             new Error('402 402 status code (no body)'),
         );
@@ -578,18 +628,15 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(renderedOutput).toContain('Destino');
         expect(renderedOutput).not.toContain('dialog.byok_provider_credits:');
         expect(renderedOutput).not.toContain('402 402 status code');
-        if (previousAuto === undefined) delete process.env.COPILOT_BYOK_GATEWAY_AUTO;
-        else process.env.COPILOT_BYOK_GATEWAY_AUTO = previousAuto;
+        if (previousAuto === undefined) delete process.env['COPILOT_BYOK_GATEWAY_AUTO'];
+        else process.env['COPILOT_BYOK_GATEWAY_AUTO'] = previousAuto;
 
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: false,
             ready: false,
             profile: null,
-            provider: null,
             model: null,
-            limits: null,
-            capabilities: null,
-        });
+        }));
     });
 
     it('expõe turno BYOK vazio como falha operacional quando não há input humano pendente', async () => {
@@ -604,16 +651,14 @@ describe('terminal/dialog/engine.js — contrato', () => {
         vi.mocked(state.getNextTurnRequestHeaders).mockReturnValue(null);
         vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
         vi.mocked(sse.broadcastSse).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'kilo',
             providerType: 'openai',
             preset: 'kilo-code',
             model: 'kilo-auto/free',
-            limits: null,
-            capabilities: null,
-        });
+        }));
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
             reply: '',
             channel: 'dialog',
@@ -679,15 +724,12 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(renderedOutput).toContain('Causa');
         expect(renderedOutput).toContain('Evidências');
 
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: false,
             ready: false,
             profile: null,
-            provider: null,
             model: null,
-            limits: null,
-            capabilities: null,
-        });
+        }));
     });
 
     it('recupera uma vez turno vazio pré-ação sem degradar saúde BYOK', async () => {
@@ -702,16 +744,14 @@ describe('terminal/dialog/engine.js — contrato', () => {
         vi.mocked(state.getNextTurnRequestHeaders).mockReturnValue(null);
         vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
         vi.mocked(sse.broadcastSse).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'kilo',
             providerType: 'openai',
             preset: 'kilo-code',
             model: 'kilo-auto/free',
-            limits: null,
-            capabilities: null,
-        });
+        }));
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
             reply: '',
             channel: 'dialog',
@@ -766,15 +806,12 @@ describe('terminal/dialog/engine.js — contrato', () => {
         );
         expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith('terminal.turn.empty_output', expect.any(Object));
 
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: false,
             ready: false,
             profile: null,
-            provider: null,
             model: null,
-            limits: null,
-            capabilities: null,
-        });
+        }));
     });
 
     it('aceita reply vazio quando ask_user deixou input humano pendente', async () => {
@@ -788,17 +825,15 @@ describe('terminal/dialog/engine.js — contrato', () => {
         vi.mocked(state.getNextTurnRequestHeaders).mockReturnValue(null);
         vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
         vi.mocked(sse.broadcastSse).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'kilo',
             providerType: 'openai',
             preset: 'kilo-code',
             model: 'kilo-auto/free',
-            limits: null,
-            capabilities: null,
-        });
-        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+        }));
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue(terminalIdleRuntimeState({
             runtimeId: 'default',
             model: 'kilo-auto/free',
             reasoningEffort: 'high',
@@ -813,6 +848,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
                 kind: 'question',
                 allowFreeform: true,
                 askedAt: 1,
+                protocolControlled: false,
             },
             pendingQuestionKind: 'question',
             pendingQuestionShadow: null,
@@ -824,7 +860,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             pendingQuestionShadowRemainingMs: null,
             contextWindow: null,
             lastPrInfo: null,
-        });
+        }));
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
             reply: '',
             channel: 'dialog',
@@ -836,7 +872,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
         expect(vi.mocked(health.recordByokProviderModelCallFailure)).not.toHaveBeenCalled();
         expect(vi.mocked(sse.broadcastSse)).not.toHaveBeenCalledWith('terminal.turn.empty_output', expect.any(Object));
 
-        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue(terminalIdleRuntimeState({
             runtimeId: 'default',
             model: 'gpt-5-mini',
             reasoningEffort: 'medium',
@@ -856,16 +892,13 @@ describe('terminal/dialog/engine.js — contrato', () => {
             pendingQuestionShadowRemainingMs: null,
             contextWindow: null,
             lastPrInfo: null,
-        });
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        }));
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: false,
             ready: false,
             profile: null,
-            provider: null,
             model: null,
-            limits: null,
-            capabilities: null,
-        });
+        }));
     });
 
     it('não degrada saúde BYOK quando o Agent classifica o turno vazio como tool-only', async () => {
@@ -880,16 +913,14 @@ describe('terminal/dialog/engine.js — contrato', () => {
         vi.mocked(state.getNextTurnRequestHeaders).mockReturnValue(null);
         vi.mocked(health.recordByokProviderModelCallFailure).mockClear();
         vi.mocked(sse.broadcastSse).mockClear();
-        configMocks.readConfiguredByokSummary.mockReturnValue({
+        configMocks.readConfiguredByokSummary.mockReturnValue(configuredByokSummaryFixture({
             enabled: true,
             ready: true,
             profile: 'kilo',
             providerType: 'openai',
             preset: 'kilo-code',
             model: 'kilo-auto/free',
-            limits: null,
-            capabilities: null,
-        });
+        }));
         vi.mocked(dialogGateway.runTerminalDialogTurnDetailed).mockResolvedValueOnce({
             reply: '',
             channel: 'dialog',
@@ -976,7 +1007,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             status: 'stopped',
             queueSize: 0,
         });
-        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue(terminalIdleRuntimeState({
             runtimeId: 'default',
             model: 'gpt-5-mini',
             reasoningEffort: 'medium',
@@ -996,7 +1027,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             pendingQuestionShadowRemainingMs: null,
             contextWindow: null,
             lastPrInfo: null,
-        });
+        }));
         vi.mocked(runtime.startTerminalAgentRuntime).mockRejectedValueOnce(
             Object.assign(new Error('unauthorized'), { status: 401 }),
         );
@@ -1022,7 +1053,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             status: 'stopped',
             queueSize: 0,
         });
-        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue({
+        vi.mocked(runtime.readTerminalRuntimeState).mockReturnValue(terminalIdleRuntimeState({
             runtimeId: 'default',
             model: 'gpt-5-mini',
             reasoningEffort: 'medium',
@@ -1042,7 +1073,7 @@ describe('terminal/dialog/engine.js — contrato', () => {
             pendingQuestionShadowRemainingMs: null,
             contextWindow: null,
             lastPrInfo: null,
-        });
+        }));
         vi.mocked(runtime.startTerminalAgentRuntime).mockRejectedValueOnce(
             Object.assign(new Error('Too many requests'), { status: 429 }),
         );

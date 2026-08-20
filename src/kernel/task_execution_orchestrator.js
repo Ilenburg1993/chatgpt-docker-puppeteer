@@ -540,11 +540,11 @@ class TaskExecutionOrchestrator {
                     retryable,
                     next_action: nextAction,
                     suggestedDelayMs,
-                    errorType: safePayload.errorType || safePayload.error_type || null,
-                    operation: safePayload.operation || null,
-                    isTimeout: safePayload.isTimeout ?? null,
-                    errorClassification: safePayload.errorClassification || null,
-                    retriesAttempted: safePayload.retriesAttempted ?? null,
+                    errorType: safePayload['errorType'] || safePayload['error_type'] || null,
+                    operation: safePayload['operation'] || null,
+                    isTimeout: safePayload['isTimeout'] ?? null,
+                    errorClassification: safePayload['errorClassification'] || null,
+                    retriesAttempted: safePayload['retriesAttempted'] ?? null,
                 },
             });
         } catch (/** @type {any} */ _rawEmitErr) {

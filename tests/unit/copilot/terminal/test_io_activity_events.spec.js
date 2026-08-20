@@ -15,7 +15,10 @@ const getShowStreaming = vi.fn(() => true);
 const getShowToolActivity = vi.fn(() => true);
 const getShowThinking = vi.fn(() => true);
 const getShowUsage = vi.fn(() => true);
-const readTerminalRuntimeState = vi.fn(() => ({ status: 'idle', pendingQuestionKind: null }));
+const readTerminalRuntimeState = vi.fn(() => ({
+    status: 'idle',
+    pendingQuestionKind: /** @type {string | null} */ (null),
+}));
 const setShowIntentActivity = vi.fn();
 const setShowSessionActivity = vi.fn();
 const setShowStreaming = vi.fn();
@@ -296,16 +299,25 @@ describe('terminal/io-activity-events', () => {
                 canonicalToolName: 'read_file_content',
                 displayToolName: 'Ler arquivo',
                 operation: 'read',
+                label: 'Ler arquivo',
                 detail: 'lendo arquivo · package.json',
                 startLine: 'lendo arquivo · package.json',
                 progressLinePrefix: 'lendo arquivo',
                 path: 'package.json',
                 target: 'package.json',
                 fileTargets: ['package.json'],
+                directoryTargets: [],
                 urlTargets: [],
                 searchTerms: [],
                 patchFiles: [],
                 lineRange: null,
+                commands: [],
+                filters: [],
+                questionChoices: [],
+                allowFreeformQuestion: null,
+                resultCount: null,
+                resultSummary: null,
+                primaryTargetKind: 'file',
                 completeLine: () => 'lendo arquivo concluído · package.json',
             },
         });

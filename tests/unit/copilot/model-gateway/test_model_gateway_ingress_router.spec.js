@@ -10,6 +10,7 @@ import {
 } from '../../../../src/copilot/model-gateway/index.js';
 import { createModelGatewayIngressRouter } from '../../../../src/copilot/server/routes/model-gateway-ingress.js';
 
+/** @param {Parameters<typeof createModelGatewayIngressRouter>[0]} options */
 function createIngressTestApp(options) {
     const app = express();
     app.use(express.json({ limit: '2mb' }));
@@ -36,7 +37,7 @@ describe('model gateway ingress HTTP router', () => {
             metadata: { source: 'unit-test' },
         });
         const fetchImpl = vi.fn(
-            async () =>
+            async (/** @type {string | URL | Request} */ _input, /** @type {RequestInit} */ _init) =>
                 new Response(JSON.stringify({ id: 'chatcmpl-test' }), {
                     status: 200,
                     headers: { 'content-type': 'application/json' },
@@ -53,9 +54,12 @@ describe('model gateway ingress HTTP router', () => {
 
         expect(res.body).toEqual({ id: 'chatcmpl-test' });
         expect(fetchImpl).toHaveBeenCalledOnce();
-        const [, init] = fetchImpl.mock.calls[0];
+        const fetchCall = fetchImpl.mock.calls[0];
+        if (!fetchCall) throw new Error('fetch upstream não foi chamado.');
+        const [, init] = fetchCall;
         expect(init.headers).toMatchObject({ authorization: 'Bearer upstream-token' });
         expect(init.headers).not.toHaveProperty('x-api-key');
+        if (typeof init.body !== 'string') throw new Error('Corpo upstream não foi serializado como JSON.');
         expect(JSON.parse(init.body)).toMatchObject({
             model: 'openrouter/free',
             messages: [{ role: 'user', content: 'oi' }],

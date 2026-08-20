@@ -271,8 +271,8 @@ function verifyRbacCredentials(username, password) {
 function bootstrapRbacFromEnv() {
     ensureBaseRbacData();
 
-    const ownerUsername = _normalizeUsername(process.env.RBAC_BOOTSTRAP_OWNER_USERNAME || '');
-    const ownerPassword = String(process.env.RBAC_BOOTSTRAP_OWNER_PASSWORD || '');
+    const ownerUsername = _normalizeUsername(process.env['RBAC_BOOTSTRAP_OWNER_USERNAME'] || '');
+    const ownerPassword = String(process.env['RBAC_BOOTSTRAP_OWNER_PASSWORD'] || '');
 
     if (ownerUsername && ownerPassword.length >= 12) {
         upsertRbacUser({
@@ -283,8 +283,8 @@ function bootstrapRbacFromEnv() {
         });
     }
 
-    const dashboardUsername = _normalizeUsername(process.env.DASHBOARD_AUTH_USERNAME || 'admin');
-    const dashboardPassword = String(process.env.DASHBOARD_AUTH_PASSWORD || 'admin123456789');
+    const dashboardUsername = _normalizeUsername(process.env['DASHBOARD_AUTH_USERNAME'] || 'admin');
+    const dashboardPassword = String(process.env['DASHBOARD_AUTH_PASSWORD'] || 'admin123456789');
     if (dashboardUsername && dashboardPassword.length >= 12) {
         upsertRbacUser({
             username: dashboardUsername,

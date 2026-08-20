@@ -7,8 +7,8 @@ import { parseArgs } from 'node:util';
 import './lib/env-bootstrap.mjs';
 import { ragIndexChanged } from './lib/facade.mjs';
 
-const DEFAULT_DEBOUNCE_MS = Number(process.env.RAG_WATCH_DEBOUNCE_MS || 3000);
-const DEFAULT_BATCH_MAX = Number(process.env.RAG_WATCH_BATCH_MAX || 64);
+const DEFAULT_DEBOUNCE_MS = Number(process.env['RAG_WATCH_DEBOUNCE_MS'] || 3000);
+const DEFAULT_BATCH_MAX = Number(process.env['RAG_WATCH_BATCH_MAX'] || 64);
 const ROOT_DEFAULT = '/workspaces/chatgpt-docker-puppeteer';
 
 const SKIP_DIRS = new Set([
@@ -163,16 +163,16 @@ async function main() {
         },
     });
 
-    if (String(process.env.RAG_WATCH_ENABLED || 'true') === 'false') {
+    if (String(process.env['RAG_WATCH_ENABLED'] || 'true') === 'false') {
         console.log('[RAG Watch] disabled by RAG_WATCH_ENABLED=false');
         process.exit(0);
     }
 
     const root = path.resolve(values.root || ROOT_DEFAULT);
-    const profile = values.profile || process.env.RAG_PROFILE_DEFAULT || 'core';
+    const profile = values.profile || process.env['RAG_PROFILE_DEFAULT'] || 'core';
     const includeGlobs = values['include-glob'];
     const excludeGlobs = values['exclude-glob'];
-    const docsMode = values['docs-mode'] || process.env.RAG_DOCS_MODE || 'include';
+    const docsMode = values['docs-mode'] || process.env['RAG_DOCS_MODE'] || 'include';
     const maxFileBytes = values['max-file-bytes'] ? Number(values['max-file-bytes']) : undefined;
     const debounceMs = Number(values['debounce-ms'] || DEFAULT_DEBOUNCE_MS);
     const batchMax = Number(values['batch-max'] || DEFAULT_BATCH_MAX);

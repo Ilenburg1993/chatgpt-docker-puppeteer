@@ -46,7 +46,14 @@ import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
  */
 
 /**
- * @typedef {QuickTunnelSmokeState & { oauth?: Record<string, unknown> }} ConnectorSmokeState
+ * Persisted canonical connector evidence. The base quick-smoke fields stay backward compatible while authenticated
+ * OAuth orchestration evidence is retained for operator diagnosis and compact tunnel status projections.
+ *
+ * @typedef {QuickTunnelSmokeState & {
+ *   oauth?: Record<string, unknown>;
+ *   authenticatedOAuthSmoke?: object;
+ *   timings?: object;
+ * }} ConnectorSmokeState
  */
 
 /**

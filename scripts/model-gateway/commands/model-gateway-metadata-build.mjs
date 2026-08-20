@@ -24,12 +24,19 @@ loadDotenv({ path: '.env.local', override: false, quiet: true });
 loadDotenv({ path: '.env', override: false, quiet: true });
 
 const args = process.argv.slice(2);
+/** @param {string} name */
 const hasFlag = (name) => args.includes(name);
-const valuesFor = (name) => args
-    .filter((arg) => arg.startsWith(`${name}=`))
-    .flatMap((arg) => arg.slice(name.length + 1).split(','))
-    .map((value) => value.trim())
-    .filter(Boolean);
+/** @param {string} name */
+const valuesFor = (name) =>
+    args
+        .filter((arg) => arg.startsWith(`${name}=`))
+        .flatMap((arg) => arg.slice(name.length + 1).split(','))
+        .map((value) => value.trim())
+        .filter(Boolean);
+/**
+ * @param {string} name
+ * @param {number} fallback
+ */
 const numberFor = (name, fallback) => {
     const value = valuesFor(name)[0];
     if (!value) return fallback;
@@ -93,7 +100,9 @@ Examples:
     process.exit(0);
 }
 
-const providers = new Set([...valuesFor('--provider'), ...valuesFor('--providers')].map((value) => value.toLowerCase()));
+const providers = new Set(
+    [...valuesFor('--provider'), ...valuesFor('--providers')].map((value) => value.toLowerCase()),
+);
 const importerIds = new Set([...valuesFor('--importer'), ...valuesFor('--source')].map((value) => value.toLowerCase()));
 const sourceIds = valuesFor('--source-id');
 const preview = hasFlag('--preview');
@@ -101,7 +110,10 @@ const commit = hasFlag('--commit') || !preview;
 const planOnly = hasFlag('--plan') || hasFlag('--dry-run');
 const incremental = hasFlag('--incremental') && !hasFlag('--all');
 const force = hasFlag('--force') || !incremental;
-const logPath = resolve(valuesFor('--log')[0] ?? `logs/model-gateway-metadata-build/${new Date().toISOString().replace(/[:.]/gu, '-')}.jsonl`);
+const logPath = resolve(
+    valuesFor('--log')[0] ??
+        `logs/model-gateway-metadata-build/${new Date().toISOString().replace(/[:.]/gu, '-')}.jsonl`,
+);
 mkdirSync(dirname(logPath), { recursive: true });
 
 const allImporters = createDefaultModelGatewayCatalogImporters({ env: process.env });
@@ -111,22 +123,30 @@ const importers = allImporters.filter((importer) => {
     return providerMatches && importerMatches;
 });
 const importerById = new Map(importers.map((importer) => [importer.id, importer]));
-/** @type {Record<string, any>[]} */
+/** @type {Record<string, unknown>[]} */
 const progressEvents = [];
 
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 /**
- * @param {Record<string, any>} event
+ * @param {Record<string, unknown>} event
  * @returns {void}
  */
 function recordProgress(event) {
+    /** @type {Record<string, unknown>} */
     const entry = { ts: new Date().toISOString(), schema: 'model-gateway-metadata-build-progress', ...event };
     progressEvents.push(entry);
     appendFileSync(logPath, `${JSON.stringify(entry)}\n`, 'utf8');
     if (!json) {
         const pct = typeof entry['progressPct'] === 'number' ? `${String(entry['progressPct']).padStart(3)}%` : ' --%';
-        const importer = entry['importer'] && typeof entry['importer'] === 'object' ? entry['importer']['importerId'] : entry['importerId'];
+        const importer = isRecord(entry['importer']) ? entry['importer']['importerId'] : entry['importerId'];
         const elapsed = typeof entry['elapsedMs'] === 'number' ? `${entry['elapsedMs']}ms` : '-';
-        process.stdout.write(`[model-gateway:metadata-build] ${pct} ${entry['phase']} importer=${importer ?? '-'} elapsed=${elapsed}\n`);
+        process.stdout.write(
+            `[model-gateway:metadata-build] ${pct} ${entry['phase']} importer=${importer ?? '-'} elapsed=${elapsed}\n`,
+        );
     }
 }
 
@@ -154,7 +174,7 @@ if (planOnly) {
         importers,
         sources: previous.sources,
         force,
-        sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
+        ...(sourceIds.length > 0 ? { sourceIds } : {}),
     });
     const summary = {
         schema: 'model-gateway-metadata-build-plan',
@@ -171,9 +191,12 @@ if (planOnly) {
     if (json) {
         process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     } else {
-        process.stdout.write(`model-gateway metadata build plan: selected=${summary.selected.length} skipped=${summary.skipped.length}\n`);
+        process.stdout.write(
+            `model-gateway metadata build plan: selected=${summary.selected.length} skipped=${summary.skipped.length}\n`,
+        );
         for (const item of summary.selected) process.stdout.write(`  run ${item.sourceId}: ${item.reason}\n`);
-        for (const item of summary.skipped.slice(0, 20)) process.stdout.write(`  skip ${item.sourceId}: ${item.reason}\n`);
+        for (const item of summary.skipped.slice(0, 20))
+            process.stdout.write(`  skip ${item.sourceId}: ${item.reason}\n`);
         process.stdout.write(`full log: ${summary.logPath}\n`);
     }
     process.exit(0);
@@ -184,7 +207,7 @@ const result = await refreshModelGatewayCatalog({
     importers,
     incremental,
     force,
-    sourceIds: sourceIds.length > 0 ? sourceIds : undefined,
+    ...(sourceIds.length > 0 ? { sourceIds } : {}),
     refreshAccountOverlays: true,
     eligibility: {
         enabled: true,
@@ -279,7 +302,11 @@ if (result.writePolicy.committed) {
 const importerFailures = progressEvents
     .filter((event) => event['phase'] === 'importer:importer_failed')
     .map((event) => ({
-        importerId: String(event['importer'] && typeof event['importer'] === 'object' ? event['importer']['importerId'] : event['importerId']),
+        importerId: String(
+            isRecord(event['importer'])
+                ? event['importer']['importerId']
+                : event['importerId'],
+        ),
         providerId: String(event['providerId'] ?? ''),
         sourceId: String(event['sourceId'] ?? ''),
         sourceKind: String(event['sourceKind'] ?? ''),
@@ -290,9 +317,9 @@ const importerFailures = progressEvents
         return classifyModelGatewayCatalogImporterFailure(
             {
                 ...failure,
-                providerId: failure.providerId || importer?.providerId,
-                sourceKind: failure.sourceKind || importer?.sourceKind,
-                requiresAuth: importer?.requiresAuth,
+                providerId: failure.providerId || importer?.providerId || null,
+                sourceKind: failure.sourceKind || importer?.sourceKind || null,
+                ...(typeof importer?.requiresAuth === 'boolean' ? { requiresAuth: importer.requiresAuth } : {}),
             },
             {
                 allowAllImporterFailures: hasFlag('--allow-importer-failures'),
@@ -304,8 +331,12 @@ const importerFailures = progressEvents
 const importerFailuresAllowed = hasFlag('--allow-importer-failures');
 const blockingImporterFailures = importerFailures.filter((failure) => failure.buildBlocking);
 const nonBlockingImporterFailures = importerFailures.filter((failure) => !failure.buildBlocking);
-const accountImporterFailures = importerFailures.filter((failure) => failure.disposition === 'account_state_unavailable');
-const optionalImporterFailures = importerFailures.filter((failure) => failure.disposition === 'optional_local_source_unavailable');
+const accountImporterFailures = importerFailures.filter(
+    (failure) => failure.disposition === 'account_state_unavailable',
+);
+const optionalImporterFailures = importerFailures.filter(
+    (failure) => failure.disposition === 'optional_local_source_unavailable',
+);
 const sqliteParityOk = result.writePolicy.committed ? Boolean(mirrored?.parity.ok) : true;
 const redactionOk = catalogRedaction.ok && (sqliteRedaction?.ok ?? true);
 const summary = {

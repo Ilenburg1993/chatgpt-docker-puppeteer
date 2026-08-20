@@ -23,7 +23,7 @@ import OpenAI from 'openai';
  */
 const client = new OpenAI({
     baseURL: 'https://models.github.ai/inference',
-    apiKey: process.env.GITHUB_TOKEN,
+    apiKey: process.env['GITHUB_TOKEN'],
     defaultQuery: {
         'api-version': '2024-08-01-preview',
     },

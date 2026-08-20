@@ -4,7 +4,7 @@ import path from 'node:path';
 import { evaluateRuntimeSignals } from '../contracts/evaluate_runtime.mjs';
 import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 
-/** @import {RawFinding} from "../normalize/findings.mjs" */
+/** @import {RawFinding} from '../normalize/findings.mjs' */
 
 /**
  * @typedef {object} CollectRuntimeFindingsOptions
@@ -107,6 +107,7 @@ export async function collectRuntimeFindings(options) {
     const lspJson =
         parseJsonFromMixedOutput(lspHealth.stdout) ||
         parseJsonFromMixedOutput(`${lspHealth.stdout}\n${lspHealth.stderr}`);
+    const lspEnabled = lspJson?.enabled !== false && lspJson?.disabled_by_policy !== true;
     const hasLspTools = Boolean(
         lspJson && Object.prototype.hasOwnProperty.call(lspJson, 'lsp_tools_present')
             ? lspJson.lsp_tools_present
@@ -118,14 +119,17 @@ export async function collectRuntimeFindings(options) {
             : mcpJson?.lsp_functional_ok,
     );
 
-    telemetry.lsp.ok = Boolean(hasLspTools && lspFunctionalOk);
-    telemetry.lsp.details = telemetry.lsp.ok
-        ? 'lsp-functional-ok'
-        : !hasLspTools
-          ? 'lsp-tools-missing'
-          : 'lsp-functional-failed';
+    telemetry.lsp.ok = Boolean(!lspEnabled || (hasLspTools && lspFunctionalOk));
+    telemetry.lsp.enabled = lspEnabled;
+    telemetry.lsp.details = !lspEnabled
+        ? 'lsp-disabled-by-policy'
+        : telemetry.lsp.ok
+          ? 'lsp-functional-ok'
+          : !hasLspTools
+            ? 'lsp-tools-missing'
+            : 'lsp-functional-failed';
 
-    if (!hasLspTools) {
+    if (lspEnabled && !hasLspTools) {
         signals.push({
             signal: 'runtime.lsp_tools.missing',
             evidence: (mcpDiag.stdout || mcpDiag.stderr || 'LSP tools not confirmed by MCP diagnose output')
@@ -136,7 +140,7 @@ export async function collectRuntimeFindings(options) {
             source_tool: 'mcp:diagnose',
         });
     }
-    if (hasLspTools && !lspFunctionalOk) {
+    if (lspEnabled && hasLspTools && !lspFunctionalOk) {
         signals.push({
             signal: 'runtime.lsp_functional.failed',
             evidence: (lspHealth.stderr || lspHealth.stdout || 'LSP functional checks failed')
@@ -240,7 +244,7 @@ export async function collectRuntimeFindings(options) {
         }
     }
 
-    if (!hasLspTools || !lspFunctionalOk) {
+    if (lspEnabled && (!hasLspTools || !lspFunctionalOk)) {
         warnings.push({
             source: 'lsp',
             message: !hasLspTools
@@ -255,7 +259,7 @@ export async function collectRuntimeFindings(options) {
     if (!telemetry.rag.ok) {
         errors.push({ source: 'rag:health', message: ragHealth.stderr || ragHealth.stdout || 'failed' });
     }
-    if (!lspHealth.ok || !lspFunctionalOk) {
+    if (!lspHealth.ok || (lspEnabled && !lspFunctionalOk)) {
         errors.push({ source: 'lsp:health', message: lspHealth.stderr || lspHealth.stdout || 'failed' });
     }
 

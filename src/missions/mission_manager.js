@@ -425,9 +425,9 @@ class MissionManager {
 
     _resolveDispatchMode() {
         const raw =
-            process.env.MISSION_STEP_DISPATCH_MODE ||
-            CONFIG.get('MISSION_STEP_DISPATCH_MODE', CONFIG?.all?.MISSION_STEP_DISPATCH_MODE || 'ssot_queue');
-        const contingencyEnabled = String(process.env.MISSION_MANAGER_LEGACY_DISPATCH_ENABLED || '').trim() === 'true';
+            process.env['MISSION_STEP_DISPATCH_MODE'] ||
+            CONFIG.get('MISSION_STEP_DISPATCH_MODE', CONFIG?.all?.['MISSION_STEP_DISPATCH_MODE'] || 'ssot_queue');
+        const contingencyEnabled = String(process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] || '').trim() === 'true';
 
         const normalized = String(raw || 'ssot_queue').trim().toLowerCase();
         if (normalized === 'legacy_direct' && contingencyEnabled) {

@@ -32,19 +32,16 @@ export const todoGetTool = withSkipPermission(
             include_subtasks: z
                 .boolean()
                 .optional()
-                .default(true)
-                .describe('Se true, inclui objetos completos das subtarefas diretas'),
+                .default(true)['describe']('Se true, inclui objetos completos das subtarefas diretas'),
         }),
         handler: async (/** @type {{ id: string; include_subtasks?: boolean }} */ args) => {
             const store = await readStore();
             const task = store.tasks[args.id];
             if (!task) return { success: false, error: `Tarefa não encontrada: ${args.id}` };
 
-            /** @type {object} */
             const result = { ...sanitize(task), overdue: isOverdue(task) };
 
             if (args.include_subtasks !== false && task.subtaskIds.length > 0) {
-                /** @type {import('./store.js').TodoItem[]} */
                 const subtasks = task.subtaskIds
                     .map((sid) => store.tasks[sid])
                     .filter(
@@ -54,8 +51,7 @@ export const todoGetTool = withSkipPermission(
                          */ (x) => x !== undefined,
                     )
                     .map((st) => ({ ...sanitize(st), overdue: isOverdue(st) }));
-                // @ts-expect-error — `result` é construído dinamicamente, o campo subtasks é adicionado condicionalmente
-                result.subtasks = subtasks;
+                return { success: true, task: { ...result, subtasks } };
             }
 
             return { success: true, task: result };
@@ -80,24 +76,22 @@ export const todoUpdateTool = buildTool({
         /** @type {unknown} */ (
             z.object({
                 id: zId,
-                title: z.string().min(1).optional().describe('Novo título'),
-                description: z.string().optional().describe('Nova descrição'),
-                priority: zPriority.optional().describe('Nova prioridade'),
-                tags: z.array(z.string()).optional().describe('Substituir lista de tags'),
-                add_tags: z.array(z.string()).optional().describe('Adicionar tags (merge com existentes)'),
-                remove_tags: z.array(z.string()).optional().describe('Remover tags específicas'),
+                title: z.string().min(1).optional()['describe']('Novo título'),
+                description: z.string().optional()['describe']('Nova descrição'),
+                priority: zPriority.optional()['describe']('Nova prioridade'),
+                tags: z.array(z.string()).optional()['describe']('Substituir lista de tags'),
+                add_tags: z.array(z.string()).optional()['describe']('Adicionar tags (merge com existentes)'),
+                remove_tags: z.array(z.string()).optional()['describe']('Remover tags específicas'),
                 due_date: z
-                    .string()
-                    .datetime({ offset: true })
+                    .string()['datetime']({ offset: true })
                     .nullable()
                     .optional()
                     .describe('Nova data vencimento ISO 8601 (null para remover)'),
-                notes: z.string().optional().describe('Novas notas (substitui completamente)'),
-                append_notes: z.string().optional().describe('Adicionar ao final das notas existentes'),
+                notes: z.string().optional()['describe']('Novas notas (substitui completamente)'),
+                append_notes: z.string().optional()['describe']('Adicionar ao final das notas existentes'),
                 metadata: z
                     .record(z.string(), z.unknown())
-                    .optional()
-                    .describe('Merge de metadata (deep merge de keys)'),
+                    .optional()['describe']('Merge de metadata (deep merge de keys)'),
             })
         )
     ),
@@ -173,13 +167,13 @@ export const todoAddSubtaskTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<any>} */ (
         /** @type {unknown} */ (
             z.object({
-                parent_id: z.string().min(1).describe('ID da tarefa pai'),
-                title: z.string().min(1).describe('Título da subtarefa'),
-                description: z.string().optional().describe('Descrição da subtarefa'),
-                priority: zPriority.optional().default('medium').describe('Prioridade da subtarefa'),
-                tags: z.array(z.string()).optional().describe('Tags da subtarefa'),
-                due_date: z.string().datetime({ offset: true }).optional().describe('Data de vencimento ISO 8601'),
-                notes: z.string().optional().describe('Notas livres da subtarefa'),
+                parent_id: z.string().min(1)['describe']('ID da tarefa pai'),
+                title: z.string().min(1)['describe']('Título da subtarefa'),
+                description: z.string().optional()['describe']('Descrição da subtarefa'),
+                priority: zPriority.optional().default('medium')['describe']('Prioridade da subtarefa'),
+                tags: z.array(z.string()).optional()['describe']('Tags da subtarefa'),
+                due_date: z.string()['datetime']({ offset: true }).optional().describe('Data de vencimento ISO 8601'),
+                notes: z.string().optional()['describe']('Notas livres da subtarefa'),
             })
         )
     ),

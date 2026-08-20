@@ -12,17 +12,7 @@ import { JsonModelGatewayRegistryStore } from './json-registry-store.js';
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @returns {{
- *     schemaVersion: number;
- *     generatedAt: string;
- *     source: string;
- *     active: object;
- *     providers: object[];
- *     models: object[];
- *     diagnostics: { providerCount: number; modelCount: number; enabledModelCount: number; warnings: string[]; errors: string[] };
- * }}
- */
-export function buildEnvByokModelGatewaySnapshot(env = process.env) {
+ */export function buildEnvByokModelGatewaySnapshot(env = process.env) {
     const registry = new ModelGatewayRegistry();
     const imported = importConfiguredByokFromEnv(env);
     if (imported.provider) registry.upsertProvider(imported.provider);

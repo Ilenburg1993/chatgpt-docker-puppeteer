@@ -80,7 +80,7 @@ describe('SSOT Consolidation (DB retry + msg_id idempotency + re-control)', { co
     const dbPath = makeDbPath();
 
     before(() => {
-        process.env.MAESTRO_DB_PATH = dbPath;
+        process.env['MAESTRO_DB_PATH'] = dbPath;
         getDb(); // migrations
     });
 

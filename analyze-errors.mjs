@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 
+/** @typedef {{ file: string, code: number }} DiagnosticEntry */
+/** @type {{ errors: DiagnosticEntry[] }} */
 const data = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
+/** @type {Record<string, number[]>} */
 const byFile = {};
 
 data.errors.forEach((d) => {
     const file = d.file;
-    if (!byFile[file]) byFile[file] = [];
-    byFile[file].push(d.code);
+    const codes = byFile[file] ?? (byFile[file] = []);
+    codes.push(d.code);
 });
 
 const sorted = Object.entries(byFile)

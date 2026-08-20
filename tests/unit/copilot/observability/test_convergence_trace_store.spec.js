@@ -59,11 +59,11 @@ describe('observability/convergence-trace-store', () => {
         assert.equal(snapshot.totalTraces, 1);
         assert.equal(trace?.status, 'mixed');
         assert.equal(trace?.bytes, 12);
-        assert.equal(trace?.phases.read_local?.succeeded, 1);
-        assert.equal(trace?.phases.read_local?.latency.p50, 7);
-        assert.equal(trace?.phases.conflict_check?.failed, 1);
+        assert.equal(trace?.phases['read_local']?.succeeded, 1);
+        assert.equal(trace?.phases['read_local']?.latency.p50, 7);
+        assert.equal(trace?.phases['conflict_check']?.failed, 1);
         assert.equal(snapshot.operations['workspace.promote']?.mixed, 1);
-        assert.equal(snapshot.operations['workspace.promote']?.phases.read_local?.bytes, 12);
+        assert.equal(snapshot.operations['workspace.promote']?.phases['read_local']?.bytes, 12);
     });
 
     it('ignora métricas SDK sem traceId/fase ou fora de workspace.*', () => {
