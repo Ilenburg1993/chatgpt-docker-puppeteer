@@ -467,5 +467,9 @@ npm run -s tsc7 -- --version
 npm run vscode:extensions:reconcile
 npm run vscode:check:runtime
 npm run lsp:health
-command -v tsserver && tsserver --version || true
+node -p "require('$(npm root -g)/typescript/package.json').version"
+if stale_tsserver="$(command -v tsserver)"; then
+  echo "ERRO: tsserver global stale em $(readlink -f "$stale_tsserver")" >&2
+  exit 1
+fi
 ```

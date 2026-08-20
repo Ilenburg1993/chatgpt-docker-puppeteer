@@ -6,6 +6,8 @@ compilador e serviço de linguagem canônico.
 ## Fluxo normal
 
 - O DevContainer instala `typescript@7.0.2` globalmente.
+- O pacote nativo expõe somente `tsc`; a presença de um executável global `tsserver` após rebuild é
+  evidência de resíduo TS6 e deve falhar na aceitação.
 - O workspace instala `@typescript/native` e chama sua entrada por
   `scripts/ci/run-typescript-7.mjs`; os gates não dependem do symlink concorrente `.bin/tsc`.
 - O VS Code usa `TypeScriptTeam.native-preview` com `js/ts.experimental.useTsgo=true`.
