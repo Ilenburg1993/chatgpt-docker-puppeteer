@@ -22,9 +22,8 @@ const {
 const { broadcastSse } = await import('../../../../src/copilot/terminal/dialog/sse.js');
 const { endTerminalRenderLock, isTerminalRenderLocked } =
     await import('../../../../src/copilot/terminal/dialog/output.js');
-const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } = await import(
-    '../../../../src/copilot/terminal/state/turn-materialization-state.js'
-);
+const { beginTerminalTurnMaterialization, clearTerminalTurnMaterialization } =
+    await import('../../../../src/copilot/terminal/state/turn-materialization-state.js');
 
 describe('terminal/dialog/turn-display', () => {
     beforeEach(() => {
@@ -138,9 +137,7 @@ describe('terminal/dialog/turn-display', () => {
         expect(state.streamingChars).toBe(3);
         expect(state.streamingContent).toBe('abc');
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
-        expect(output).toMatch(
-            /\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?[+-]\d{2}:\d{2} \(há \d+s\)\]/u,
-        );
+        expect(output).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?[+-]\d{2}:\d{2} \(há \d+s\)\]/u);
         expect(output).not.toMatch(/\[\d{2}:\d{2}:\d{2}\]/u);
         expect(isTerminalRenderLocked()).toBe(false);
     });

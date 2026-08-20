@@ -5,8 +5,8 @@
  * @module copilot/model-gateway/account-access/summary
  */
 
-import { normalizeModelGatewayAccountLimitState } from './limits.js';
 import { evaluateModelGatewayAccountOverlayFreshness } from './freshness.js';
+import { normalizeModelGatewayAccountLimitState } from './limits.js';
 
 /**
  * @param {unknown} value
@@ -82,37 +82,43 @@ function limitSourceLayer(sourceKind) {
  * @param {Record<string, unknown>[]} overlays
  * @param {{ selector?: string | null; now?: string | number | Date }} [options]
  * @returns {{
- *   rows: Array<{
- *     accountOverlayId: string;
- *     providerId: string;
- *     accountScope: string;
- *     secretRef: string | null;
- *     sourceId: string | null;
- *     sourceKind: string;
- *     confidence: string;
- *     enabledModelCount: number;
- *     blockedModelCount: number;
- *     observedAt: string | null;
- *     expiresAt: string | null;
- *     limitStatus: string;
- *     retryAfterSeconds: number | null;
- *     resetAt: string | null;
- *     quotaResetActive: boolean;
- *     quotaResetExpired: boolean;
- *     freshnessStatus: string;
- *     freshnessAgeSeconds: number | null;
- *     freshnessTtlSeconds: number;
- *     effectiveExpiresAt: string | null;
- *     resetWindowClass: string;
- *     resetWindowSource: string;
- *     nextRefreshAfter: string | null;
- *     retentionExpiresAt: string | null;
- *     autoUnblocksAt: string | null;
- *     blocksUntilRefresh: boolean;
- *     remainingUsd: number | null;
- *     remainingCreditsUsd: number | null;
- *   }>;
- *   summary: { total: number; visible: number; matched: number; providers: number; statusCounts: Record<string, number> };
+ *     rows: {
+ *         accountOverlayId: string;
+ *         providerId: string;
+ *         accountScope: string;
+ *         secretRef: string | null;
+ *         sourceId: string | null;
+ *         sourceKind: string;
+ *         confidence: string;
+ *         enabledModelCount: number;
+ *         blockedModelCount: number;
+ *         observedAt: string | null;
+ *         expiresAt: string | null;
+ *         limitStatus: string;
+ *         retryAfterSeconds: number | null;
+ *         resetAt: string | null;
+ *         quotaResetActive: boolean;
+ *         quotaResetExpired: boolean;
+ *         freshnessStatus: string;
+ *         freshnessAgeSeconds: number | null;
+ *         freshnessTtlSeconds: number;
+ *         effectiveExpiresAt: string | null;
+ *         resetWindowClass: string;
+ *         resetWindowSource: string;
+ *         nextRefreshAfter: string | null;
+ *         retentionExpiresAt: string | null;
+ *         autoUnblocksAt: string | null;
+ *         blocksUntilRefresh: boolean;
+ *         remainingUsd: number | null;
+ *         remainingCreditsUsd: number | null;
+ *     }[];
+ *     summary: {
+ *         total: number;
+ *         visible: number;
+ *         matched: number;
+ *         providers: number;
+ *         statusCounts: Record<string, number>;
+ *     };
  * }}
  */
 export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
@@ -125,11 +131,13 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
             const limits = normalizeModelGatewayAccountLimitState(overlay, limitOptions);
             const freshness = evaluateModelGatewayAccountOverlayFreshness(overlay, limitOptions);
             return {
-                accountOverlayId: optionalString(overlay['accountOverlayId']) ?? [
-                    optionalString(overlay['providerId']) ?? 'unknown-provider',
-                    optionalString(overlay['accountScope']) ?? 'default',
-                    optionalString(overlay['secretRef']) ?? 'no-secret',
-                ].join(':'),
+                accountOverlayId:
+                    optionalString(overlay['accountOverlayId']) ??
+                    [
+                        optionalString(overlay['providerId']) ?? 'unknown-provider',
+                        optionalString(overlay['accountScope']) ?? 'default',
+                        optionalString(overlay['secretRef']) ?? 'no-secret',
+                    ].join(':'),
                 providerId: optionalString(overlay['providerId']) ?? 'unknown-provider',
                 accountScope: optionalString(overlay['accountScope']) ?? 'default',
                 secretRef: optionalString(overlay['secretRef']),
@@ -179,48 +187,48 @@ export function summarizeModelGatewayAccountOverlays(overlays, options = {}) {
  * @param {Record<string, unknown>[]} overlays
  * @param {{ selector?: string | null; now?: string | number | Date }} [options]
  * @returns {{
- *   rows: Array<{
- *     accountOverlayId: string;
- *     providerId: string;
- *     accountScope: string;
- *     secretRef: string | null;
- *     sourceId: string | null;
- *     sourceKind: string;
- *     sourceLayer: 'runtime' | 'account' | 'catalog' | 'unknown';
- *     confidence: string;
- *     limitStatus: string;
- *     activeBlocker: boolean;
- *     expiredSignal: boolean;
- *     temporaryBlocker: boolean;
- *     retryAfterSeconds: number | null;
- *     resetAt: string | null;
- *     expiresAt: string | null;
- *     freshnessStatus: string;
- *     freshnessAgeSeconds: number | null;
- *     freshnessTtlSeconds: number;
- *     effectiveExpiresAt: string | null;
- *     resetWindowClass: string;
- *     resetWindowSource: string;
- *     nextRefreshAfter: string | null;
- *     retentionExpiresAt: string | null;
- *     autoUnblocksAt: string | null;
- *     blocksUntilRefresh: boolean;
- *     remainingUsd: number | null;
- *     remainingCreditsUsd: number | null;
- *     failureKind: string | null;
- *     nextAction: string;
- *   }>;
- *   summary: {
- *     total: number;
- *     matched: number;
- *     providers: number;
- *     activeBlockers: number;
- *     expiredSignals: number;
- *     temporaryBlockers: number;
- *     byStatus: Record<string, number>;
- *     bySourceKind: Record<string, number>;
- *     bySourceLayer: Record<string, number>;
- *   };
+ *     rows: {
+ *         accountOverlayId: string;
+ *         providerId: string;
+ *         accountScope: string;
+ *         secretRef: string | null;
+ *         sourceId: string | null;
+ *         sourceKind: string;
+ *         sourceLayer: 'runtime' | 'account' | 'catalog' | 'unknown';
+ *         confidence: string;
+ *         limitStatus: string;
+ *         activeBlocker: boolean;
+ *         expiredSignal: boolean;
+ *         temporaryBlocker: boolean;
+ *         retryAfterSeconds: number | null;
+ *         resetAt: string | null;
+ *         expiresAt: string | null;
+ *         freshnessStatus: string;
+ *         freshnessAgeSeconds: number | null;
+ *         freshnessTtlSeconds: number;
+ *         effectiveExpiresAt: string | null;
+ *         resetWindowClass: string;
+ *         resetWindowSource: string;
+ *         nextRefreshAfter: string | null;
+ *         retentionExpiresAt: string | null;
+ *         autoUnblocksAt: string | null;
+ *         blocksUntilRefresh: boolean;
+ *         remainingUsd: number | null;
+ *         remainingCreditsUsd: number | null;
+ *         failureKind: string | null;
+ *         nextAction: string;
+ *     }[];
+ *     summary: {
+ *         total: number;
+ *         matched: number;
+ *         providers: number;
+ *         activeBlockers: number;
+ *         expiredSignals: number;
+ *         temporaryBlockers: number;
+ *         byStatus: Record<string, number>;
+ *         bySourceKind: Record<string, number>;
+ *         bySourceLayer: Record<string, number>;
+ *     };
  * }}
  */
 export function explainModelGatewayAccountLimitOverlays(overlays, options = {}) {
@@ -229,21 +237,29 @@ export function explainModelGatewayAccountLimitOverlays(overlays, options = {}) 
         .filter(isRecord)
         .filter((overlay) => matchesSelector(selector, overlay))
         .map((overlay) => {
-            const limits = normalizeModelGatewayAccountLimitState(overlay, options.now === undefined ? {} : { now: options.now });
+            const limits = normalizeModelGatewayAccountLimitState(
+                overlay,
+                options.now === undefined ? {} : { now: options.now },
+            );
             const sourceKind = optionalString(overlay['sourceKind']) ?? 'unknown';
             const providerMetadata = isRecord(overlay['providerMetadata']) ? overlay['providerMetadata'] : {};
             const expiresAt = optionalString(overlay['expiresAt']);
-            const freshness = evaluateModelGatewayAccountOverlayFreshness(overlay, options.now === undefined ? {} : { now: options.now });
+            const freshness = evaluateModelGatewayAccountOverlayFreshness(
+                overlay,
+                options.now === undefined ? {} : { now: options.now },
+            );
             const overlayExpired = freshness.expired;
             const expiredSignal = overlayExpired || limits.quota.resetExpired;
             const activeBlocker = !overlayExpired && !['ok', 'unknown'].includes(limits.status);
             const temporaryBlocker = activeBlocker && ['quota_exhausted', 'rate_limited'].includes(limits.status);
             return {
-                accountOverlayId: optionalString(overlay['accountOverlayId']) ?? [
-                    optionalString(overlay['providerId']) ?? 'unknown-provider',
-                    optionalString(overlay['accountScope']) ?? 'default',
-                    optionalString(overlay['secretRef']) ?? 'no-secret',
-                ].join(':'),
+                accountOverlayId:
+                    optionalString(overlay['accountOverlayId']) ??
+                    [
+                        optionalString(overlay['providerId']) ?? 'unknown-provider',
+                        optionalString(overlay['accountScope']) ?? 'default',
+                        optionalString(overlay['secretRef']) ?? 'no-secret',
+                    ].join(':'),
                 providerId: optionalString(overlay['providerId']) ?? 'unknown-provider',
                 accountScope: optionalString(overlay['accountScope']) ?? 'default',
                 secretRef: optionalString(overlay['secretRef']),

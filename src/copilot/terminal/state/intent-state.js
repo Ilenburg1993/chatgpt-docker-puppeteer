@@ -148,7 +148,8 @@ export function appendTerminalIntent(input) {
  * @returns {TerminalIntentEntry[]}
  */
 export function readTerminalIntentHistory(limit) {
-    const safeLimit = Number.isFinite(limit) && Number(limit) > 0 ? Math.floor(Number(limit)) : _terminalIntentHistory.length;
+    const safeLimit =
+        Number.isFinite(limit) && Number(limit) > 0 ? Math.floor(Number(limit)) : _terminalIntentHistory.length;
     return _terminalIntentHistory.slice(-safeLimit).map((entry) => ({ ...entry }));
 }
 

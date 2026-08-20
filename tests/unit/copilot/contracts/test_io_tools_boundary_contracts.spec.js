@@ -139,6 +139,7 @@ describe('IO/tools boundary contracts', () => {
             'policy.js',
             'runtime.js',
             'session.js',
+            'skill-io.js',
             'testing.js',
             'trusted-io.js',
             'workspace-io.js',

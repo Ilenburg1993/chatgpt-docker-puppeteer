@@ -3,8 +3,8 @@
  * Loader precoce de `.env.local` para o entrypoint do terminal.
  *
  * O arquivo `.env.local` é o contrato operacional do operador para BYOK e ajustes locais. No boot do terminal ele deve
- * ser carregado antes de qualquer projeção de config, mas sem sobrescrever variáveis explicitamente fornecidas pela task,
- * shell ou harness.
+ * ser carregado antes de qualquer projeção de config, mas sem sobrescrever variáveis explicitamente fornecidas pela
+ * task, shell ou harness.
  *
  * @module copilot/terminal/bootstrap-dotenv-loader
  */
@@ -25,7 +25,10 @@ export const TERMINAL_DOTENV_LOCAL_PATH = '.env.local';
 /**
  * @param {object} [options]
  * @param {NodeJS.ProcessEnv} [options.env]
- * @param {(opts: { path: string; override: boolean; quiet: boolean }) => { parsed?: Record<string, string>; error?: Error }} [options.load]
+ * @param {(opts: { path: string; override: boolean; quiet: boolean }) => {
+ *     parsed?: Record<string, string>;
+ *     error?: Error;
+ * }} [options.load]
  * @param {string} [options.path]
  * @returns {TerminalDotenvLoadResult}
  */

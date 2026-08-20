@@ -16,11 +16,7 @@ import {
     readRuntimeToolSessionContext,
     setRuntimePermissionMode,
 } from './agent-runtime-controls.js';
-import {
-    listWebhooks,
-    registerWebhook,
-    unregisterWebhook,
-} from './agent-webhook-ops.js';
+import { listWebhooks, registerWebhook, unregisterWebhook } from './agent-webhook-ops.js';
 
 /**
  * Façade para Permissões e Tools Registry.

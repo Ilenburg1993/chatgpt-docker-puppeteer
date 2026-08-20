@@ -67,7 +67,8 @@ export async function diffCloudflareMcpPassthroughPlan(options = {}) {
         auditCloudflareConfigPosture(options),
     ]);
     const desiredRule = /** @type {Record<string, unknown>} */ (
-        /** @type {{ desiredRuleset?: { rules?: Record<string, unknown>[] } }} */ (plan).desiredRuleset?.rules?.[0] ?? {}
+        /** @type {{ desiredRuleset?: { rules?: Record<string, unknown>[] } }} */ (plan).desiredRuleset?.rules?.[0] ??
+            {}
     );
     const configRulesets = Array.isArray(audit['configRulesets']) ? audit['configRulesets'] : [];
     const existingRules = flattenRules(configRulesets);
@@ -296,7 +297,10 @@ async function applyDesiredMcpPassthroughRule(client, zoneId, desiredRule) {
         phase: PHASE,
         rules,
     });
-    return { operation: existingIndex >= 0 ? 'replace-rule' : 'append-rule', ruleset: summarizeMcpPassthroughRuleset(updated) };
+    return {
+        operation: existingIndex >= 0 ? 'replace-rule' : 'append-rule',
+        ruleset: summarizeMcpPassthroughRuleset(updated),
+    };
 }
 
 /**
@@ -411,5 +415,7 @@ function normalize(value) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }

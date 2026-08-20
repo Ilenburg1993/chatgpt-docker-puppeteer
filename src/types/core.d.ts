@@ -168,9 +168,7 @@ export type { Result as AsyncResult } from './types';
  * @param {unknown} value - Value to check
  * @returns {value is Result<unknown>}
  */
-export function isResult(value: unknown): value is { success: boolean; data?: unknown; error?: string } {
-    return typeof value === 'object' && value !== null && 'success' in value;
-}
+export function isResult(value: unknown): value is { success: boolean; data?: unknown; error?: string };
 
 /**
  * Type guard for checking if a value is a valid ConnectionMode
@@ -178,10 +176,7 @@ export function isResult(value: unknown): value is { success: boolean; data?: un
  * @param {unknown} value - Value to check
  * @returns {boolean}
  */
-export function isConnectionMode(value: unknown): boolean {
-    const validModes = ['HYBRID', 'LOCAL', 'AUTO', 'LAUNCHER', 'REMOTE', 'SINGULARITY'];
-    return typeof value === 'string' && validModes.includes(value);
-}
+export function isConnectionMode(value: unknown): boolean;
 
 // ============================================================================
 // ADDITIONAL ROBUST TYPES (replacing 'any' with specific types)

@@ -1,32 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": [
-    "../../tsconfig.base.json",
-    "@vue/tsconfig/tsconfig.dom.json"
-  ],
+  "extends": ["../../tsconfig.base.json", "@vue/tsconfig/tsconfig.dom.json"],
   "compilerOptions": {
     "strict": true,
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true,
     "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.dashboard-ui.vue.tsbuildinfo",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     },
     "noEmit": true,
-    "lib": [
-      "ES2024",
-      "DOM",
-      "DOM.Iterable"
-    ]
+    "lib": ["ES2024", "DOM", "DOM.Iterable"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "src/**/*.tsx",
-    "src/**/*.vue"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
   "vueCompilerOptions": {
     "strictTemplates": true
   }

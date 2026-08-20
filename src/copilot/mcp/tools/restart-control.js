@@ -8,10 +8,6 @@
  * @module copilot/mcp/tools/restart-control
  */
 
-import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import process from 'node:process';
-import { z } from 'zod';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
@@ -22,6 +18,10 @@ import {
     readMcpReloadState,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import process from 'node:process';
+import { z } from 'zod';
 
 const MIN_DELAY_MS = 1000;
 const MAX_DELAY_MS = 60000;
@@ -79,7 +79,9 @@ export const mcpReloadPlanTool = {
     description:
         'Plan a detached restart of the managed MCP HTTP origin plus Cloudflare tunnel using only allowlisted transport profiles.',
     inputSchema: {
-        profile: restartProfileSchema.optional()['describe']('Default current. quic/h2/auto are the only executable profiles.'),
+        profile: restartProfileSchema
+            .optional()
+            ['describe']('Default current. quic/h2/auto are the only executable profiles.'),
         delayMs: z.number().int().min(MIN_DELAY_MS).max(MAX_DELAY_MS).optional(),
         reason: z.string().max(240).optional(),
     },

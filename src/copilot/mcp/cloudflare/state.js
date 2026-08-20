@@ -5,8 +5,7 @@
  * @module copilot/mcp/cloudflare/state
  */
 
-import { readFile, rm } from 'node:fs/promises';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { deleteFileTrusted, readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 /**
  * @typedef {object} QuickTunnelSmokeState
@@ -15,17 +14,17 @@ import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
  * @property {string} connectorUrl
  * @property {{ ok: boolean; status?: number | null; error?: string | null }} health
  * @property {{
- *   ok: boolean;
- *   status?: number | null;
- *   error?: string | null;
- *   tools: number;
- *   expectedLocalTools: number;
- *   toolsMatchLocalRegistry: boolean;
- *   criticalToolsPresent: boolean;
- *   missingCriticalTools: string[];
- *   missingLocalTools: string[];
- *   unexpectedRemoteTools: string[];
- *   authChallenge?: boolean;
+ *     ok: boolean;
+ *     status?: number | null;
+ *     error?: string | null;
+ *     tools: number;
+ *     expectedLocalTools: number;
+ *     toolsMatchLocalRegistry: boolean;
+ *     criticalToolsPresent: boolean;
+ *     missingCriticalTools: string[];
+ *     missingLocalTools: string[];
+ *     unexpectedRemoteTools: string[];
+ *     authChallenge?: boolean;
  * }} toolsList
  */
 
@@ -50,9 +49,9 @@ import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
  * OAuth orchestration evidence is retained for operator diagnosis and compact tunnel status projections.
  *
  * @typedef {QuickTunnelSmokeState & {
- *   oauth?: Record<string, unknown>;
- *   authenticatedOAuthSmoke?: object;
- *   timings?: object;
+ *     oauth?: Record<string, unknown>;
+ *     authenticatedOAuthSmoke?: object;
+ *     timings?: object;
  * }} ConnectorSmokeState
  */
 
@@ -62,7 +61,7 @@ import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
  */
 export async function readQuickTunnelState(stateFile) {
     try {
-        const parsed = JSON.parse(await readFile(stateFile, 'utf8'));
+        const parsed = JSON.parse((await readTextFreshTrusted(stateFile, { caller: 'mcp.cloudflare.state' })).content);
         return isQuickTunnelState(parsed) ? parsed : { error: 'Invalid Cloudflare quick tunnel state file.' };
     } catch (error) {
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
@@ -95,8 +94,8 @@ export async function updateQuickTunnelLastSmoke(stateFile, state, lastSmoke) {
 }
 
 /**
- * Remove only a valid quick-tunnel state whose process is dead and whose age exceeds the configured stale window.
- * Live, recent and malformed state is preserved for operator inspection.
+ * Remove only a valid quick-tunnel state whose process is dead and whose age exceeds the configured stale window. Live,
+ * recent and malformed state is preserved for operator inspection.
  *
  * @param {string} stateFile
  * @param {{ nowMs?: number; staleAfterMs?: number }} [options]
@@ -113,8 +112,11 @@ export async function cleanupStaleQuickTunnelState(stateFile, options = {}) {
     if (!summary.stateValid) return { removed: false, reason: 'invalid', summary };
     if (summary.processAlive) return { removed: false, reason: 'process-alive', summary };
     if (!summary.stale) return { removed: false, reason: 'not-stale', summary };
-    await rm(stateFile, { force: true });
-    return { removed: true, reason: 'stale-dead-state', summary };
+    const removed = await deleteFileTrusted(stateFile, {
+        caller: 'mcp.cloudflare.state',
+        ignoreMissing: true,
+    });
+    return { removed: removed !== null, reason: removed ? 'stale-dead-state' : 'already-missing', summary };
 }
 
 /**
@@ -123,8 +125,10 @@ export async function cleanupStaleQuickTunnelState(stateFile, options = {}) {
  */
 export async function readConnectorSmokeState(smokeFile) {
     try {
-        const parsed = JSON.parse(await readFile(smokeFile, 'utf8'));
-        return normalizeLastSmoke(parsed) ? /** @type {ConnectorSmokeState} */ (parsed) : { error: 'Invalid connector smoke state file.' };
+        const parsed = JSON.parse((await readTextFreshTrusted(smokeFile, { caller: 'mcp.cloudflare.state' })).content);
+        return normalizeLastSmoke(parsed)
+            ? /** @type {ConnectorSmokeState} */ (parsed)
+            : { error: 'Invalid connector smoke state file.' };
     } catch (error) {
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return undefined;
         return { error: error instanceof Error ? error.message : String(error) };
@@ -148,13 +152,13 @@ export async function writeConnectorSmokeState(smokeFile, lastSmoke) {
  * @param {string | null | undefined} connectorUrl
  * @param {number} [nowMs]
  * @returns {{
- *   configured: boolean;
- *   ok: boolean | null;
- *   checkedAt: string | null;
- *   ageSeconds: number | null;
- *   ageMinutes: number | null;
- *   connectorUrl: string | null;
- *   stateError: string | null;
+ *     configured: boolean;
+ *     ok: boolean | null;
+ *     checkedAt: string | null;
+ *     ageSeconds: number | null;
+ *     ageMinutes: number | null;
+ *     connectorUrl: string | null;
+ *     stateError: string | null;
  * }}
  */
 export function summarizeConnectorSmokeState(smoke, connectorUrl, nowMs = Date.now()) {
@@ -233,26 +237,26 @@ export function isProcessAlive(pid) {
  * @param {QuickTunnelState | { error: string } | undefined} state
  * @param {number} [nowMs]
  * @returns {{
- *   mode: 'temporary-trycloudflare';
- *   configured: boolean;
- *   stateValid: boolean;
- *   processAlive: boolean;
- *   ageMs: number | null;
- *   ageSeconds: number | null;
- *   ageMinutes: number | null;
- *   staleAfterMs: number;
- *   stale: boolean;
- *   recommendedAction: 'start' | 'restart' | 'smoke' | 'use';
- *   lastSmokeAt: string | null;
- *   lastSmokeOk: boolean | null;
- *   lastSmokeAgeSeconds: number | null;
- *   lastSmokeAgeMinutes: number | null;
- *   lastSmokeConnectorUrl: string | null;
- *   connectorUrl: string | null;
- *   publicBaseUrl: string | null;
- *   originUrl: string | null;
- *   stateError: string | null;
- *   recovery: string[];
+ *     mode: 'temporary-trycloudflare';
+ *     configured: boolean;
+ *     stateValid: boolean;
+ *     processAlive: boolean;
+ *     ageMs: number | null;
+ *     ageSeconds: number | null;
+ *     ageMinutes: number | null;
+ *     staleAfterMs: number;
+ *     stale: boolean;
+ *     recommendedAction: 'start' | 'restart' | 'smoke' | 'use';
+ *     lastSmokeAt: string | null;
+ *     lastSmokeOk: boolean | null;
+ *     lastSmokeAgeSeconds: number | null;
+ *     lastSmokeAgeMinutes: number | null;
+ *     lastSmokeConnectorUrl: string | null;
+ *     connectorUrl: string | null;
+ *     publicBaseUrl: string | null;
+ *     originUrl: string | null;
+ *     stateError: string | null;
+ *     recovery: string[];
  * }}
  */
 export function summarizeQuickTunnelState(state, nowMs = Date.now(), staleAfterMs = 6 * 60 * 60 * 1000) {

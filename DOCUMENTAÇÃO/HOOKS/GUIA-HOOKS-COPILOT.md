@@ -3300,18 +3300,17 @@ performance.
 
 A inspeção seguiu as 10 categorias da skill `exploratory-bug-hunt` v2.0:
 
-| Categoria              | O que foi verificado                  | Resultado               |
-| ---------------------- | ------------------------------------- | ----------------------- | ------------------------------- | -------------- |
-| C1 – Temp files        | `mktemp` sem cleanup, nomes estáticos | EBH-M02 encontrado      |
-| C2 – Background procs  | Subshells zumbis                      | Nenhum achado           |
-| C3 – Race conditions   | Escrita não-atômica em CTX            | EBH-M01 encontrado      |
-| C4 – Error handling    | `                                     |                         | true` silenciosos problemáticos | Nenhum crítico |
-| C5 – Input validation  | Interpolação sem sanitização          | EBH-L02 identificado    |
-| C6 – Output corruption | Truncamento de arquivos               | Coberto por EBH-M01/M02 |
-| C7 – Resource leaks    | Descritores/FDs não fechados          | Nenhum achado           |
-| C8 – Logic correctness | Valores semânticos inválidos          | EBH-M03 encontrado      |
-| C9 – Performance       | Chamadas redundantes                  | EBH-L03 identificado    |
-| C10 – Portability      | Dependências não verificadas          | EBH-L01 encontrado      |
+| Categoria | O que foi verificado | Resultado | | ---------------------- |
+------------------------------------- | ----------------------- | ------------------------------- |
+-------------- | | C1 – Temp files | `mktemp` sem cleanup, nomes estáticos | EBH-M02 encontrado | |
+C2 – Background procs | Subshells zumbis | Nenhum achado | | C3 – Race conditions | Escrita
+não-atômica em CTX | EBH-M01 encontrado | | C4 – Error handling |
+`                                     |                         | true` silenciosos problemáticos |
+Nenhum crítico | | C5 – Input validation | Interpolação sem sanitização | EBH-L02 identificado | |
+C6 – Output corruption | Truncamento de arquivos | Coberto por EBH-M01/M02 | | C7 – Resource leaks |
+Descritores/FDs não fechados | Nenhum achado | | C8 – Logic correctness | Valores semânticos
+inválidos | EBH-M03 encontrado | | C9 – Performance | Chamadas redundantes | EBH-L03 identificado |
+| C10 – Portability | Dependências não verificadas | EBH-L01 encontrado |
 
 Referência canônica detalhada: `DOCUMENTAÇÃO/HOOKS/PLANO-CORRECOES-HOOKS.md` — Seção 7-B.
 

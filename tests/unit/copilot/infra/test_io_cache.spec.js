@@ -1,8 +1,8 @@
 // @ts-check
 import * as assert from 'node:assert/strict';
+import { rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as nodePath from 'node:path';
-import { rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { afterEach, describe, it } from 'vitest';
 
 import {

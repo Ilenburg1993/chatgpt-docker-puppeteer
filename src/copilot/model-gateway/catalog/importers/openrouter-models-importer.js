@@ -8,11 +8,7 @@
  * @module copilot/model-gateway/catalog/importers/openrouter-models-importer
  */
 
-import {
-    MODEL_GATEWAY_CATALOG_CONFIDENCE,
-    createModelMetadataEvidence,
-    createModelRouteOption,
-} from '../contracts.js';
+import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createModelRouteOption } from '../contracts.js';
 import {
     normalizeModelAliases,
     normalizeModelIdentityTraits,
@@ -94,7 +90,7 @@ function readLinks(row) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const architecture = readArchitecture(row);
@@ -160,7 +156,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.openrouter.supportedVoices', value: row['supported_voices'] },
         { fieldPath: 'providerMetadata.openrouter.perRequestLimits', value: row['per_request_limits'] },
         { fieldPath: 'providerMetadata.openrouter.detailsPath', value: links['details'] },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'routingHints.openrouterTopProvider', value: topProvider },
     ];
     return values.filter((item) => {

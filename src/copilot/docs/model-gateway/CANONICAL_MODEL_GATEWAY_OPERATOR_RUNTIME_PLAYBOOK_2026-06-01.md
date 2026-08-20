@@ -1,8 +1,8 @@
 # Canonical Model Gateway Operator Runtime Playbook - 2026-06-01
 
-Este arquivo e o playbook operacional para humano ou LLM operar o `src/copilot/model-gateway` no terminal. Ele nao
-substitui o roadmap de implementacao; ele transforma a arquitetura atual em fluxo claro de uso, diagnostico, selecao,
-automacao e teste live.
+Este arquivo e o playbook operacional para humano ou LLM operar o `src/copilot/model-gateway` no
+terminal. Ele nao substitui o roadmap de implementacao; ele transforma a arquitetura atual em fluxo
+claro de uso, diagnostico, selecao, automacao e teste live.
 
 Roadmap ativo de implementacao:
 
@@ -39,7 +39,8 @@ O objetivo pratico e permitir que o operador humano ou outra LLM tenha um sistem
 
 - O catalogo canonico e sobre fatos relativamente estaveis de providers/modelos.
 - Runtime health e quota sao fatos operacionais temporarios, nao metadados canonicos.
-- Read-only deve ser read-only de verdade: sem provider call, sem terminal mutation, sem catalog commit.
+- Read-only deve ser read-only de verdade: sem provider call, sem terminal mutation, sem catalog
+  commit.
 - Runtime real so acontece com flag explicita ou comando terminal que o operador escolheu.
 - Ollama/local/private e suportado, mas nao e selecionado por default.
 - Quota do GitHub Copilot SDK nao e quota BYOK.
@@ -106,7 +107,8 @@ npm run model-gateway:sqlite:retention:apply -- --json
 npm run model-gateway:live:runs
 ```
 
-Regra: tabelas operacionais podem expirar, sofrer retention e refletir janelas de reset. O catalogo nao.
+Regra: tabelas operacionais podem expirar, sofrer retention e refletir janelas de reset. O catalogo
+nao.
 
 ### 3.3 Pre-runtime Selection
 
@@ -159,9 +161,10 @@ Comando real somente quando intencional:
 npm run model-gateway:runtime-selector -- --execute --allow-probe
 ```
 
-Regra: `--execute` e `--allow-probe` devem ser escolhas explicitas.
-Regra de acoplamento: `npm run model-gateway:*` usa `scripts/model-gateway/run.mjs`, e o runner usa o barril
-`scripts/model-gateway/index.mjs`. Operador humano e LLM devem usar comandos npm ou ids do runner como API estavel.
+Regra: `--execute` e `--allow-probe` devem ser escolhas explicitas. Regra de acoplamento:
+`npm run model-gateway:*` usa `scripts/model-gateway/run.mjs`, e o runner usa o barril
+`scripts/model-gateway/index.mjs`. Operador humano e LLM devem usar comandos npm ou ids do runner
+como API estavel.
 
 ### 3.5 Automation
 
@@ -192,25 +195,29 @@ npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-fla
 npm run model-gateway:live:runs
 ```
 
-Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`, `auto:confirmations`,
-`auto:recoveries`, `auto:proof-plan`, `auto:standby` e `auto:scenarios` nao devem chamar provider nem mutar terminal.
-`operator-ready` tambem e read-only e deve ser a primeira saida para humano/LLM antes de aplicar qualquer efeito.
+Regra: `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:handoffs`,
+`auto:confirmations`, `auto:recoveries`, `auto:proof-plan`, `auto:standby` e `auto:scenarios` nao
+devem chamar provider nem mutar terminal. `operator-ready` tambem e read-only e deve ser a primeira
+saida para humano/LLM antes de aplicar qualquer efeito.
 
-Regra de bloqueio: quando a decisao auto encontra `runtime_proof_required`, rota bloqueada, health runtime falha
-ou candidato sem selecao, os `nextCommands` devem apontar primeiro para `model-gateway:auto:proof-plan` e para
-`/byok auto proof-plan`, antes de qualquer prova live explicita.
+Regra de bloqueio: quando a decisao auto encontra `runtime_proof_required`, rota bloqueada, health
+runtime falha ou candidato sem selecao, os `nextCommands` devem apontar primeiro para
+`model-gateway:auto:proof-plan` e para `/byok auto proof-plan`, antes de qualquer prova live
+explicita.
 
-Regra de prontidao: `model-gateway:auto:standby` e `/byok auto standby` mostram substitutos ja derivados do selector,
-separando comandos de prova, troca live no mesmo provider, provider/persist e novo boot SDK.
+Regra de prontidao: `model-gateway:auto:standby` e `/byok auto standby` mostram substitutos ja
+derivados do selector, separando comandos de prova, troca live no mesmo provider, provider/persist e
+novo boot SDK.
 
-Regra de limpeza: `model-gateway:runtime-health:clear` e `/byok health clear` removem apenas health operacional, nao
-metadados canônicos. O script package e dry-run por padrao; `--apply` e obrigatorio para mutar.
-Quando aplicado, o clear deve remover a identidade escopada tanto do ledger JSON quanto das tabelas SQLite de
-health/probe atuais. `runtime_probe_runs` segue como trilha historica; `health_observations` e `runtime_probe_results`
-nao podem ressuscitar residuos que ja foram limpos do ledger operacional.
-Regra de decisao: quando `auto:status`, `auto:doctor` ou o cockpit terminal produzirem `wait_for_reset`, os
-`nextCommands` devem listar `runtime-health:diff`, o preview escopado de `runtime-health:clear`, o equivalente
-`/byok health clear ...` e entao o selector. Isso torna reset de quota/cooldown uma acao visivel, nao uma suposicao.
+Regra de limpeza: `model-gateway:runtime-health:clear` e `/byok health clear` removem apenas health
+operacional, nao metadados canônicos. O script package e dry-run por padrao; `--apply` e obrigatorio
+para mutar. Quando aplicado, o clear deve remover a identidade escopada tanto do ledger JSON quanto
+das tabelas SQLite de health/probe atuais. `runtime_probe_runs` segue como trilha historica;
+`health_observations` e `runtime_probe_results` nao podem ressuscitar residuos que ja foram limpos
+do ledger operacional. Regra de decisao: quando `auto:status`, `auto:doctor` ou o cockpit terminal
+produzirem `wait_for_reset`, os `nextCommands` devem listar `runtime-health:diff`, o preview
+escopado de `runtime-health:clear`, o equivalente `/byok health clear ...` e entao o selector. Isso
+torna reset de quota/cooldown uma acao visivel, nao uma suposicao.
 
 ### 3.6 Terminal
 
@@ -236,8 +243,8 @@ Responsavel pela experiencia viva do operador:
 /byok auto off
 ```
 
-Regra: `apply` e `switch` so aplicam o que a policy permite. Troca live de modelo fica dentro da mesma boundary BYOK.
-Troca de provider/perfil exige novo boot SDK.
+Regra: `apply` e `switch` so aplicam o que a policy permite. Troca live de modelo fica dentro da
+mesma boundary BYOK. Troca de provider/perfil exige novo boot SDK.
 
 ## 4. Default Auto
 
@@ -310,8 +317,8 @@ Resultado esperado:
 npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 ```
 
-Esse probe abre o terminal real, coleta `/usage`, `/activity`, `/session`, `/metrics`, `/events`, `/errors` e fecha com
-`/quit`. Ele nao abre turno explicito de modelo.
+Esse probe abre o terminal real, coleta `/usage`, `/activity`, `/session`, `/metrics`, `/events`,
+`/errors` e fecha com `/quit`. Ele nao abre turno explicito de modelo.
 
 Evidencia em 2026-06-01:
 
@@ -387,28 +394,40 @@ Evidencia em 2026-06-01:
 - status: PASS;
 - artefato inicial: `artifacts/terminal-live/2026-06-01T22-10-32-162Z/summary.md`;
 - artefato com ledger SQLite final: `artifacts/terminal-live/2026-06-01T22-57-46-528Z/summary.md`;
-- artefato com recovery fixture final: `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`;
-- artefato com standby/fixture sintetica final: `artifacts/terminal-live/2026-06-02T00-21-42-083Z/summary.md`;
+- artefato com recovery fixture final:
+  `artifacts/terminal-live/2026-06-01T23-49-06-502Z/summary.md`;
+- artefato com standby/fixture sintetica final:
+  `artifacts/terminal-live/2026-06-02T00-21-42-083Z/summary.md`;
 - duracao mais recente: 21043ms;
 - erros rastreados: 0;
 - criterios PASS mais recentes: 30;
-- inventario canonico exibiu 144 comandos apos recovery fixture, proof-plan, standby, health clear e prova explicita por provider/model;
+- inventario canonico exibiu 144 comandos apos recovery fixture, proof-plan, standby, health clear e
+  prova explicita por provider/model;
 - `/byok auto policy` funcionou;
-- `/byok auto status profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
-- `/byok auto doctor profile:repo_agent` funcionou e mostrou resumo de alternativas usaveis/bloqueadas;
-- `/byok auto proof-plan profile:repo_agent 12` agora existe como fila read-only de probes por provider/model;
-- `/byok auto standby profile:repo_agent 12` agora existe como fila read-only de substitutos e comandos de troca/prova;
-- o cockpit passou a sugerir `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` quando alternativas carecem de agent probe;
+- `/byok auto status profile:repo_agent` funcionou e mostrou resumo de alternativas
+  usaveis/bloqueadas;
+- `/byok auto doctor profile:repo_agent` funcionou e mostrou resumo de alternativas
+  usaveis/bloqueadas;
+- `/byok auto proof-plan profile:repo_agent 12` agora existe como fila read-only de probes por
+  provider/model;
+- `/byok auto standby profile:repo_agent 12` agora existe como fila read-only de substitutos e
+  comandos de troca/prova;
+- o cockpit passou a sugerir
+  `/byok probe agent provider:<provider> model:<provider-model> timeout:20000` quando alternativas
+  carecem de agent probe;
 - `/byok auto explain profile:repo_agent` funcionou;
-- `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` gravou recovery account-wide, runtime health sintetica e espelho SQLite sem chamada ao provider;
+- `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit`
+  gravou recovery account-wide, runtime health sintetica e espelho SQLite sem chamada ao provider;
 - ledgers history/handoffs/confirmations/recoveries renderizaram corretamente;
 - ledger de live scenarios gravou `terminal-live:2026-06-02T00-21-42-091Z:auto_probe`;
 - `npm run model-gateway:live:runs` confirmou `criteriaTotal=30` no ultimo auto-probe;
-- achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
-- BYOK real no-PR de 2026-06-02 gravou `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`, status PASS,
-  sem erro de `COPILOT_BYOK_PROFILE`; shortlist/probe passou a preservar `profile=-` e `preset=kilo-code`.
-- A limpeza `provider=kilo-code/profile=kilo-code` removeu residuos SQLite do bug provider-as-profile; o diff seguinte
-  confirmou `invalidKiloProfile=[]` e nenhuma regressao.
+- achado estrutural: depois dos overlays de health, `repo_agent` pode mostrar `usable=0/78` porque
+  exige agent-probe verificado; isso e bloqueio correto, nao falha do cockpit.
+- BYOK real no-PR de 2026-06-02 gravou
+  `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`, status PASS, sem erro de
+  `COPILOT_BYOK_PROFILE`; shortlist/probe passou a preservar `profile=-` e `preset=kilo-code`.
+- A limpeza `provider=kilo-code/profile=kilo-code` removeu residuos SQLite do bug
+  provider-as-profile; o diff seguinte confirmou `invalidKiloProfile=[]` e nenhuma regressao.
 
 ### 5.6 BYOK real no-PR
 
@@ -432,16 +451,20 @@ Esse e o teste de turno real. Ele pode consumir quota BYOK e deve ser tratado co
 
 ## 6. Quota SDK Versus Quota BYOK
 
-Durante probes no terminal, o SDK pode emitir `quota.warning` para `premium_interactions`. Isso e telemetria do SDK
-Copilot. Nao significa que a rota BYOK esta sem credito, e nao deve ser usada como exclusao automatica de modelo BYOK.
+Durante probes no terminal, o SDK pode emitir `quota.warning` para `premium_interactions`. Isso e
+telemetria do SDK Copilot. Nao significa que a rota BYOK esta sem credito, e nao deve ser usada como
+exclusao automatica de modelo BYOK.
 
 Regras:
 
 - `AssistantUsageQuotaSnapshot` e eventos equivalentes pertencem ao plano/conta SDK Copilot.
-- BYOK quota deve vir de provider errors, headers, endpoint proprio do provider ou health/probe result.
-- Falha BYOK classificada como quota/rate-limit deve virar overlay operacional com freshness e reset/cooldown.
+- BYOK quota deve vir de provider errors, headers, endpoint proprio do provider ou health/probe
+  result.
+- Falha BYOK classificada como quota/rate-limit deve virar overlay operacional com freshness e
+  reset/cooldown.
 - Quota SDK esgotada pode bloquear caminhos SDK-native, mas nao deve bloquear caminho BYOK valido.
-- Quando BYOK esta ativo, falha BYOK deve ser classificada no gateway, nao como consumo de Premium Request.
+- Quando BYOK esta ativo, falha BYOK deve ser classificada no gateway, nao como consumo de Premium
+  Request.
 
 ## 7. Operacao Diaria
 
@@ -472,7 +495,8 @@ npm run model-gateway:live:runs
 /byok auto on profile:repo_agent allow-live-set-model
 ```
 
-Depois reiniciar a task/sessao conforme a mensagem do terminal quando houver rebind de provider/perfil.
+Depois reiniciar a task/sessao conforme a mensagem do terminal quando houver rebind de
+provider/perfil.
 
 ### 7.4 Fazer switch manual explicavel
 
@@ -503,7 +527,8 @@ Ollama/local/private deve continuar suportado:
 - probes locais nao devem rodar por default;
 - selecao automatica nao deve escolher local por default.
 
-Para usar local/private, o operador precisa pedir explicitamente por um perfil local ou strict local.
+Para usar local/private, o operador precisa pedir explicitamente por um perfil local ou strict
+local.
 
 Exemplos:
 
@@ -536,8 +561,8 @@ npm run model-gateway:runtime-selector -- --fail
 
 ### 9.2 Falha account-wide/key-wide
 
-Nao repetir outros modelos do mesmo provider/key sem motivo. O selector deve receber exclusao account-wide e preferir outro
-provider/profile quando a policy permitir.
+Nao repetir outros modelos do mesmo provider/key sem motivo. O selector deve receber exclusao
+account-wide e preferir outro provider/profile quando a policy permitir.
 
 ### 9.3 Falha dura de acesso
 
@@ -567,14 +592,19 @@ Isso cria overlay temporario com reset/cooldown.
 - [x] `npm run model-gateway:auto:doctor` passa.
 - [x] `npm run model-gateway:auto:proof-plan` passa e gera fila read-only de comandos de prova.
 - [x] `npm run model-gateway:auto:standby` passa e lista rotas de prontidao sem chamar provider.
-- [x] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness e com `live_plan_ready=true`.
+- [x] `npm run model-gateway:auto:scenarios` passa sem blockers de readiness e com
+      `live_plan_ready=true`.
 - [x] `npm run model-gateway:live:readiness` passa.
-- [x] `npm run model-gateway:live:plan -- --json --no-write` passa; health sintetica de fixture nao bloqueia live real.
+- [x] `npm run model-gateway:live:plan -- --json --no-write` passa; health sintetica de fixture nao
+      bloqueia live real.
 - [x] `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000` passa.
-- [x] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000` passa.
+- [x] `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+      passa.
 - [x] `npm run model-gateway:live:auto-probe` passa.
 - [x] `npm run model-gateway:live:runs` mostra o ultimo auto-probe persistido.
-- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit` persiste recovery, runtime health sintetica e SQLite sem provider call; health real exige `real-health`.
+- [x] `/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit`
+      persiste recovery, runtime health sintetica e SQLite sem provider call; health real exige
+      `real-health`.
 - [x] `/byok auto doctor profile:repo_agent` passa no terminal.
 - [ ] `byok-real-no-pr` passa quando o operador permitir gasto de quota BYOK.
 - [ ] `byok-real-full` passa quando o operador permitir turno real.
@@ -585,8 +615,10 @@ Isso cria overlay temporario com reset/cooldown.
 
 ## 11. Lacunas Operacionais Ainda Abertas
 
-- Persistencia dedicada de recovery attempts existe; falta ampliar scenarios fixture de falha/cooldown/fallback.
-- Persistencia dedicada de live scenario runs existe; falta apenas ampliar scenarios especificos e rodar redaction audit dedicado.
+- Persistencia dedicada de recovery attempts existe; falta ampliar scenarios fixture de
+  falha/cooldown/fallback.
+- Persistencia dedicada de live scenario runs existe; falta apenas ampliar scenarios especificos e
+  rodar redaction audit dedicado.
 - Pre-turn fixture precisa cobrir anti-loop de decision repetida.
 - Post-turn fixture precisa simular falha, cooldown e fallback.
 - Fixture `model_changed` precisa exercitar confirmation correlacionada.
@@ -627,7 +659,8 @@ Resultado:
 - `auto:ready`: ok;
 - `auto:proof-plan`: ok, gerou 12 comandos para alternativas bloqueadas.
 - `auto:standby`: ok, listou rotas de prontidao sem provider call.
-- `auto:scenarios`: comandos ok, 12 cenarios, standby ok; apos recovery fixture, o doctor pode voltar a bloquear por health/cooldown registrado;
+- `auto:scenarios`: comandos ok, 12 cenarios, standby ok; apos recovery fixture, o doctor pode
+  voltar a bloquear por health/cooldown registrado;
 - `live control no-PR`: PASS;
 - `BYOK fixture no-PR`: PASS;
 - `auto cockpit no-PR`: PASS;

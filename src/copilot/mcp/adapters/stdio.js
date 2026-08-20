@@ -5,8 +5,8 @@
  * @module copilot/mcp/adapters/stdio
  */
 
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { logMcp } from '#copilot/mcp/control-plane';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createCopilotMcpServer } from '../server.js';
 
 /**
@@ -18,4 +18,3 @@ export async function startStdioMcpServer() {
     await server.connect(transport);
     logMcp('INFO', 'MCP stdio server connected.');
 }
-

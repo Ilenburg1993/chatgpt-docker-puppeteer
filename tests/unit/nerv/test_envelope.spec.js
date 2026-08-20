@@ -70,11 +70,13 @@ describe('NERV Envelope - Protocolo Universal', () => {
 
         it('deve rejeitar ator inválido', () => {
             assert.throws(() => {
-                Reflect.apply(createEnvelope, undefined, [{
-                    actor: 'INVALID_ACTOR',
-                    messageType: MessageType.EVENT,
-                    actionCode: ActionCode.ACK_RECEIVED,
-                }]);
+                Reflect.apply(createEnvelope, undefined, [
+                    {
+                        actor: 'INVALID_ACTOR',
+                        messageType: MessageType.EVENT,
+                        actionCode: ActionCode.ACK_RECEIVED,
+                    },
+                ]);
             }, /Invalid actor/);
         });
     });
@@ -201,12 +203,14 @@ describe('NERV Envelope - Protocolo Universal', () => {
 
         it('deve validar target se fornecido', () => {
             assert.throws(() => {
-                Reflect.apply(createEnvelope, undefined, [{
-                    actor: ActorRole.KERNEL,
-                    messageType: MessageType.COMMAND,
-                    actionCode: ActionCode.TASK_START,
-                    target: 'INVALID_TARGET',
-                }]);
+                Reflect.apply(createEnvelope, undefined, [
+                    {
+                        actor: ActorRole.KERNEL,
+                        messageType: MessageType.COMMAND,
+                        actionCode: ActionCode.TASK_START,
+                        target: 'INVALID_TARGET',
+                    },
+                ]);
             }, /Invalid target/);
         });
     });

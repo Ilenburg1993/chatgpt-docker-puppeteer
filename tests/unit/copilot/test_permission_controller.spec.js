@@ -92,7 +92,13 @@ describe('PermissionController › comportamento (G2-TEST-04/05)', async () => {
         let notified = null;
         const { PermissionController } = mod;
         const c2 = new PermissionController({
-            onModeChanged: (/** @type {Parameters<InstanceType<typeof import('../../../src/copilot/hooks/permission-controller.js').PermissionController>['setMode']>[0]} */ m) => {
+            onModeChanged: (
+                /** @type {Parameters<
+    InstanceType<
+        typeof import('../../../src/copilot/hooks/permission-controller.js').PermissionController
+    >['setMode']
+>[0]} */ m,
+            ) => {
                 notified = m;
             },
         });

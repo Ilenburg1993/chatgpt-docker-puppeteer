@@ -21,9 +21,9 @@ import {
     deleteAgentSdkPlan as deleteAgentSdkPlanOnAgent,
     persistAgentRuntimeStatePartial,
     readAgentConfiguredSessionFsState,
+    readAgentRuntimePersistedStateAsync,
     readAgentSdkPlan as readAgentSdkPlanFromAgent,
     readAgentSdkSessionMode,
-    readAgentRuntimePersistedStateAsync,
     readSdkSkillsGovernance as readSdkSkillsGovernanceOnAgent,
     setAgentSdkSessionMode as setAgentSdkSessionModeOnAgent,
     setSdkDisabledSkills as setSdkDisabledSkillsOnAgent,
@@ -297,10 +297,12 @@ export async function setAgentSdkSessionMode(mode, runtimeId) {
  *     persistedByokBinding: Record<string, unknown> | null;
  *     lastBootDecision: Record<string, unknown> | null;
  *     sessionFs: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
- *     sessions: Array<import('../contracts/index.js').RuntimeSessionMetadata & {
- *         localMetadata?: Record<string, unknown> | null;
- *         sessionFs?: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
- *     }>;
+ *     sessions: Array<
+ *         import('../contracts/index.js').RuntimeSessionMetadata & {
+ *             localMetadata?: Record<string, unknown> | null;
+ *             sessionFs?: Awaited<ReturnType<typeof readAgentConfiguredSessionFsState>>;
+ *         }
+ *     >;
  * }>}
  */
 export async function listAgentSdkSessionInventory(runtimeId, filter, options = {}) {
@@ -342,7 +344,10 @@ export async function listAgentSdkSessionInventory(runtimeId, filter, options = 
                 ...session,
                 localMetadata: localMetadata[session.sessionId] ?? null,
             };
-            if (session.sessionId !== currentSessionId && (index < enrichOffset || index >= enrichOffset + enrichLimit)) {
+            if (
+                session.sessionId !== currentSessionId &&
+                (index < enrichOffset || index >= enrichOffset + enrichLimit)
+            ) {
                 return base;
             }
             return {
@@ -411,7 +416,11 @@ export async function readAgentSdkSessionBootSelection() {
  * com uma única autoridade.
  *
  * @param {{ mode: 'new' } | { mode: 'resume'; sessionId: string } | null} selection
- * @returns {Promise<import('../../agent/error/index.js').AgentPolicyResult<import('../../agent/lifecycle/state/index.js').AliveAgentState>>}
+ * @returns {Promise<
+ *     import('../../agent/error/index.js').AgentPolicyResult<
+ *         import('../../agent/lifecycle/state/index.js').AliveAgentState
+ *     >
+ * >}
  */
 export async function scheduleAgentSdkSessionBootSelection(selection) {
     if (

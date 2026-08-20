@@ -2,7 +2,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { estimateStructuredTextResultBytes, getResultSizeHint, okResult, withResultSizeHint } from '#copilot/mcp/control-plane';
+import {
+    estimateStructuredTextResultBytes,
+    getResultSizeHint,
+    okResult,
+    withResultSizeHint,
+} from '#copilot/mcp/control-plane';
 
 describe('MCP result helpers', () => {
     it('keeps result-size hints outside enumerable payload fields', () => {

@@ -23,7 +23,7 @@ const colors = {
 // ============================================
 let passCount = 0;
 let failCount = 0;
-/** @type {Array<{ testName: string; reason: string }>} */
+/** @type {{ testName: string; reason: string }[]} */
 const failures = [];
 
 // ============================================

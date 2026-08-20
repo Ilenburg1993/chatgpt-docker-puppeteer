@@ -7,6 +7,8 @@
 
 import { open } from 'node:fs/promises';
 import { withIoResourceLock } from '../io-locks.js';
+import { assertSuccessfulSync, shouldFlushFile, syncFileHandleBestEffort } from './fs/durability.js';
+import { runFileHandleOperation } from './fs/file-handle-lifecycle.js';
 
 const DEFAULT_BLOCK_SIZE = 65_536;
 const DEFAULT_MAX_TRAILING_RECORD_BYTES = 4 * 1024 * 1024;
@@ -46,7 +48,13 @@ function normalizeJsonlLimit(value, fallback, minimum, maximum) {
 /**
  * @typedef {{
  *     repaired: boolean;
- *     reason: 'missing' | 'empty' | 'newline-terminated' | 'valid-trailing-record' | 'trailing-record-too-large' | 'invalid-trailing-partial';
+ *     reason:
+ *         | 'missing'
+ *         | 'empty'
+ *         | 'newline-terminated'
+ *         | 'valid-trailing-record'
+ *         | 'trailing-record-too-large'
+ *         | 'invalid-trailing-partial';
  *     previousBytes: number;
  *     finalBytes: number;
  *     truncatedBytes: number;
@@ -61,6 +69,7 @@ function normalizeJsonlLimit(value, fallback, minimum, maximum) {
  *     maxTrailingRecordBytes?: number;
  *     maxRepairScanBytes?: number;
  *     flushToDisk?: boolean;
+ *     durability?: import('./fs/durability.js').IoDurabilityMode;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
  * @returns {Promise<JsonlTrailingRepairResult>}
@@ -74,50 +83,76 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
         maxTrailingRecordBytes,
         Math.trunc(options.maxRepairScanBytes ?? DEFAULT_MAX_REPAIR_SCAN_BYTES),
     );
+    const durability = options.durability ?? (options.flushToDisk === false ? 'none' : 'file');
+    const fileFlushRequested = shouldFlushFile(durability);
     try {
         const { value } = await withIoResourceLock(
             filePath,
             async () => {
-                /** @type {import('node:fs/promises').FileHandle | null} */
-                let handle = null;
-                try {
-                    handle = await open(filePath, 'r+');
-                    const { size } = await handle.stat();
-                    if (size === 0) return repairResult('empty', size, size);
+                const handle = await open(filePath, 'r+');
+                let truncateApplied = false;
+                return runFileHandleOperation(
+                    handle,
+                    async () => {
+                        const { size } = await handle.stat();
+                        if (size === 0) return repairResult('empty', size, size);
 
-                    const trailingByte = Buffer.alloc(1);
-                    await handle.read(trailingByte, 0, 1, size - 1);
-                    if (trailingByte[0] === 0x0a) return repairResult('newline-terminated', size, size);
+                        const trailingByte = Buffer.alloc(1);
+                        await handle.read(trailingByte, 0, 1, size - 1);
+                        if (trailingByte[0] === 0x0a) return repairResult('newline-terminated', size, size);
 
-                    const recordStart = await findTrailingRecordStart(handle, size, maxRepairScanBytes);
-                    if (recordStart === null || (recordStart === 0 && size > maxTrailingRecordBytes)) {
-                        return repairResult('trailing-record-too-large', size, size);
-                    }
-                    const recordBytes = size - recordStart;
-                    const recordBuffer = Buffer.alloc(recordBytes);
-                    await handle.read(recordBuffer, 0, recordBytes, recordStart);
-                    const record = decodeJsonlUtf8(recordBuffer);
-                    try {
-                        JSON.parse(record);
-                        return repairResult('valid-trailing-record', size, size);
-                    } catch {
-                        await options.onPhase?.('before-truncate', {
-                            filePath,
-                            previousBytes: size,
-                            finalBytes: recordStart,
-                        });
-                        await handle.truncate(recordStart);
-                        if (options.flushToDisk !== false) await handle.sync();
-                        await options.onPhase?.('after-truncate', {
-                            filePath,
-                            previousBytes: size,
-                            finalBytes: recordStart,
-                        });
-                        return repairResult('invalid-trailing-partial', size, recordStart);
-                    }
-                } finally {
-                    await handle?.close();
-                }
+                        const recordStart = await findTrailingRecordStart(handle, size, maxRepairScanBytes);
+                        if (recordStart === null || (recordStart === 0 && size > maxTrailingRecordBytes)) {
+                            return repairResult('trailing-record-too-large', size, size);
+                        }
+                        const recordBytes = size - recordStart;
+                        const recordBuffer = Buffer.alloc(recordBytes);
+                        await handle.read(recordBuffer, 0, recordBytes, recordStart);
+                        const record = decodeJsonlUtf8(recordBuffer);
+                        try {
+                            JSON.parse(record);
+                            return repairResult('valid-trailing-record', size, size);
+                        } catch {
+                            await options.onPhase?.('before-truncate', {
+                                filePath,
+                                previousBytes: size,
+                                finalBytes: recordStart,
+                            });
+                            await handle.truncate(recordStart);
+                            truncateApplied = true;
+                            if (fileFlushRequested) {
+                                await options.onPhase?.('before-file-sync', {
+                                    filePath,
+                                    previousBytes: size,
+                                    finalBytes: recordStart,
+                                });
+                                const fileSync = await syncFileHandleBestEffort(handle);
+                                await options.onPhase?.('after-file-sync', {
+                                    filePath,
+                                    previousBytes: size,
+                                    finalBytes: recordStart,
+                                    ...fileSync,
+                                });
+                                assertSuccessfulSync(fileSync, {
+                                    code: 'EFILESYNC',
+                                    message: `Falha ao sincronizar repair JSONL: ${filePath}`,
+                                });
+                            }
+                            await options.onPhase?.('after-truncate', {
+                                filePath,
+                                previousBytes: size,
+                                finalBytes: recordStart,
+                            });
+                            return repairResult('invalid-trailing-partial', size, recordStart);
+                        }
+                    },
+                    {
+                        mutationApplied: () => truncateApplied,
+                        operationPhase: 'jsonl-truncate-confirmation',
+                        closePhase: 'jsonl-truncate-close',
+                        paths: [filePath],
+                    },
+                );
             },
             { operation: 'jsonl-repair', target: filePath, riskClass: 'high' },
         );
@@ -130,8 +165,8 @@ export async function repairJsonlTrailingPartial(filePath, options = {}) {
 }
 
 /**
- * Procura o início da última linha JSONL a partir do fim, com limite estrito de bytes para evitar varredura/memória
- * sem bound em arquivos corrompidos ou registros anormalmente grandes.
+ * Procura o início da última linha JSONL a partir do fim, com limite estrito de bytes para evitar varredura/memória sem
+ * bound em arquivos corrompidos ou registros anormalmente grandes.
  *
  * @param {import('node:fs/promises').FileHandle} handle
  * @param {number} size
@@ -241,7 +276,8 @@ export async function readJsonlTail(filePath, options = {}) {
         const newestChunk = chunks[0];
         const hasTrailingNewline = newestChunk?.[newestChunk.length - 1] === 0x0a;
         const chronologicalChunks = chunks.reverse();
-        const completeChunks = remaining > 0 ? discardLeadingPartialJsonlLine(chronologicalChunks) : chronologicalChunks;
+        const completeChunks =
+            remaining > 0 ? discardLeadingPartialJsonlLine(chronologicalChunks) : chronologicalChunks;
         const text = decodeJsonlChunks(completeChunks);
         const lines = collectJsonlTailLines(text, maxLines);
 

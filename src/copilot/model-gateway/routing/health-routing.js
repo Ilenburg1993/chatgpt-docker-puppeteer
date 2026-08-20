@@ -36,7 +36,11 @@ export function isGatewayModelChatHealthFailed(health) {
 }
 
 /**
- * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
+ * @param {{
+ *     agentProbeStatus?: 'failed' | 'ok' | null;
+ *     lastAgentProbeFailureAt?: number | null;
+ *     lastAgentProbeSuccessAt?: number | null;
+ * }} health
  * @returns {boolean}
  */
 export function isGatewayModelAgentProbeHealthFailed(health) {
@@ -50,23 +54,28 @@ export function isGatewayModelAgentProbeHealthFailed(health) {
  * A failed agent probe is operationally blocking only during the temporary-failure cooldown. Older failures remain
  * historical evidence and should trigger re-probing instead of permanently blacklisting the route.
  *
- * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
+ * @param {{
+ *     agentProbeStatus?: 'failed' | 'ok' | null;
+ *     lastAgentProbeFailureAt?: number | null;
+ *     lastAgentProbeSuccessAt?: number | null;
+ * }} health
  * @param {{ now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
  * @returns {boolean}
  */
 export function isGatewayModelAgentProbeHealthActivelyFailed(health, options = {}) {
     if (!isGatewayModelAgentProbeHealthFailed(health)) return false;
     const nowMs = dateMs(options.now) ?? Date.now();
-    const cooldownMs = positiveNumber(
-        options.temporaryFailureCooldownMs,
-        DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS,
-    );
+    const cooldownMs = positiveNumber(options.temporaryFailureCooldownMs, DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS);
     const failedAt = optionalNumber(health.lastAgentProbeFailureAt);
     return failedAt !== null && failedAt <= nowMs && nowMs - failedAt <= cooldownMs;
 }
 
 /**
- * @param {{ agentProbeStatus?: 'failed' | 'ok' | null; lastAgentProbeFailureAt?: number | null; lastAgentProbeSuccessAt?: number | null }} health
+ * @param {{
+ *     agentProbeStatus?: 'failed' | 'ok' | null;
+ *     lastAgentProbeFailureAt?: number | null;
+ *     lastAgentProbeSuccessAt?: number | null;
+ * }} health
  * @returns {boolean}
  */
 export function isGatewayModelAgentProbeVerified(health) {
@@ -91,7 +100,6 @@ function normalizeProbeKind(value) {
 function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
-
 
 /**
  * @param {unknown} value
@@ -166,7 +174,7 @@ function latestProviderSuccessAt(record) {
  */
 function latestProviderFailure(record) {
     const probes = isRecord(record['probes']) ? record['probes'] : {};
-    /** @type {Array<{ at: number; kind: string | null }>} */
+    /** @type {{ at: number; kind: string | null }[]} */
     const candidates = [
         {
             at: optionalNumber(record['lastFailureAt']) ?? 0,
@@ -174,7 +182,9 @@ function latestProviderFailure(record) {
         },
         {
             at: optionalNumber(record['lastAgentProbeFailureAt']) ?? 0,
-            kind: optionalString(record['lastAgentProbeFailureKind']) ?? optionalString(record['lastAgentProbeErrorContext']),
+            kind:
+                optionalString(record['lastAgentProbeFailureKind']) ??
+                optionalString(record['lastAgentProbeErrorContext']),
         },
         {
             at: record['runtimeHealthStatus'] === 'failed' ? (optionalNumber(record['runtimeObservedAtMs']) ?? 0) : 0,
@@ -216,7 +226,8 @@ function normalizeFailureKind(value) {
     }
     if (normalized === 'invalid-request' || normalized.includes('provider.invalid_request')) return 'invalid-request';
     if (normalized === 'credits' || normalized.includes('provider.credits')) return 'credits';
-    if (normalized === 'rate-limit' || normalized.includes('rate_limit') || normalized.includes('rate-limit')) return 'rate-limit';
+    if (normalized === 'rate-limit' || normalized.includes('rate_limit') || normalized.includes('rate-limit'))
+        return 'rate-limit';
     if (normalized === 'auth' || normalized.includes('provider.auth')) return 'auth';
     return normalized;
 }
@@ -230,7 +241,13 @@ function modelLastFailureKind(health) {
 }
 
 /**
- * @param {{ lastStatus: 'failed' | 'ok' | null; lastFailureAt: number | null; lastSuccessAt: number | null; lastFailureKind?: string | null; lastErrorContext?: string | null }} health
+ * @param {{
+ *     lastStatus: 'failed' | 'ok' | null;
+ *     lastFailureAt: number | null;
+ *     lastSuccessAt: number | null;
+ *     lastFailureKind?: string | null;
+ *     lastErrorContext?: string | null;
+ * }} health
  * @param {{ now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
  * @returns {boolean}
  */
@@ -263,7 +280,9 @@ function healthRecordMatches(record, identity) {
     const recordIdentity = healthIdentity(record);
     if (recordIdentity.providerId !== identity.providerId) return false;
     if (recordIdentity.providerModel !== identity.providerModel) return false;
-    return !identity.routeProfile || !recordIdentity.routeProfile || recordIdentity.routeProfile === identity.routeProfile;
+    return (
+        !identity.routeProfile || !recordIdentity.routeProfile || recordIdentity.routeProfile === identity.routeProfile
+    );
 }
 
 /**
@@ -283,7 +302,10 @@ function healthRecordMatchesProviderModel(record, identity) {
 function latestHealthRecordsFirst(records) {
     return records
         .filter((record) => record && typeof record === 'object' && !Array.isArray(record))
-        .sort((left, right) => byokProviderHealthRecordLastObservedAt(right) - byokProviderHealthRecordLastObservedAt(left));
+        .sort(
+            (left, right) =>
+                byokProviderHealthRecordLastObservedAt(right) - byokProviderHealthRecordLastObservedAt(left),
+        );
 }
 
 /**
@@ -328,12 +350,12 @@ function isGatewayRuntimeHealthIndex(value) {
  *
  * @param {Record<string, unknown>[]} records
  * @returns {{
- *   schema: 'model-gateway-runtime-health-index';
- *   records: Record<string, unknown>[];
- *   exact: Map<string, Record<string, unknown>>;
- *   global: Map<string, Record<string, unknown>>;
- *   providerModel: Map<string, Record<string, unknown>>;
- *   provider: Map<string, Record<string, unknown>[]>;
+ *     schema: 'model-gateway-runtime-health-index';
+ *     records: Record<string, unknown>[];
+ *     exact: Map<string, Record<string, unknown>>;
+ *     global: Map<string, Record<string, unknown>>;
+ *     providerModel: Map<string, Record<string, unknown>>;
+ *     provider: Map<string, Record<string, unknown>[]>;
  * }}
  */
 export function createGatewayRuntimeHealthIndex(records) {
@@ -373,7 +395,9 @@ export function createGatewayRuntimeHealthIndex(records) {
 }
 
 /**
- * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean; lastAt?: number | null }> } | null} health
+ * @param {{
+ *     probes?: Record<string, { ok?: boolean; providerAttempted?: boolean; lastAt?: number | null }>;
+ * } | null} health
  * @param {string} kind
  * @returns {{ ok?: boolean; providerAttempted?: boolean; lastAt?: number | null } | null}
  */
@@ -404,7 +428,9 @@ export function isGatewayModelProbeFailed(health, kind) {
 }
 
 /**
- * @param {{ probes?: Record<string, { ok?: boolean; providerAttempted?: boolean; lastAt?: number | null }> } | null} health
+ * @param {{
+ *     probes?: Record<string, { ok?: boolean; providerAttempted?: boolean; lastAt?: number | null }>;
+ * } | null} health
  * @param {string} kind
  * @param {{ now?: string | number | Date; temporaryFailureCooldownMs?: number }} [options]
  * @returns {boolean}
@@ -415,10 +441,7 @@ export function isGatewayModelProbeActivelyFailed(health, kind, options = {}) {
     const failedAt = optionalNumber(probe?.lastAt);
     if (failedAt === null) return false;
     const nowMs = dateMs(options.now) ?? Date.now();
-    const cooldownMs = positiveNumber(
-        options.temporaryFailureCooldownMs,
-        DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS,
-    );
+    const cooldownMs = positiveNumber(options.temporaryFailureCooldownMs, DEFAULT_MODEL_TEMPORARY_FAILURE_COOLDOWN_MS);
     return failedAt <= nowMs && nowMs - failedAt <= cooldownMs;
 }
 
@@ -441,16 +464,16 @@ export function listGatewayModelVerifiedProbeKinds(health) {
  * @param {Record<string, unknown> | null} health
  * @param {{ now?: string | number | Date; maxAgeMs?: number }} [options]
  * @returns {{
- *   hasHistoricalProof: boolean;
- *   hasFreshProof: boolean;
- *   stale: boolean;
- *   maxAgeMs: number;
- *   latestProofAt: number | null;
- *   ageMs: number | null;
- *   chatFresh: boolean;
- *   agentFresh: boolean;
- *   freshProbeKinds: string[];
- *   staleProbeKinds: string[];
+ *     hasHistoricalProof: boolean;
+ *     hasFreshProof: boolean;
+ *     stale: boolean;
+ *     maxAgeMs: number;
+ *     latestProofAt: number | null;
+ *     ageMs: number | null;
+ *     chatFresh: boolean;
+ *     agentFresh: boolean;
+ *     freshProbeKinds: string[];
+ *     staleProbeKinds: string[];
  * }}
  */
 export function summarizeGatewayRuntimeProofFreshness(health, options = {}) {
@@ -472,8 +495,14 @@ export function summarizeGatewayRuntimeProofFreshness(health, options = {}) {
               .filter(([, probe]) => probe?.ok === true && probe.providerAttempted !== false)
               .map(([kind, probe]) => ({ kind, at: optionalNumber(probe.lastAt) }))
         : [];
-    const freshProbeKinds = probeRows.filter((row) => successIsFresh(row.at)).map((row) => row.kind).sort();
-    const staleProbeKinds = probeRows.filter((row) => !successIsFresh(row.at)).map((row) => row.kind).sort();
+    const freshProbeKinds = probeRows
+        .filter((row) => successIsFresh(row.at))
+        .map((row) => row.kind)
+        .sort();
+    const staleProbeKinds = probeRows
+        .filter((row) => !successIsFresh(row.at))
+        .map((row) => row.kind)
+        .sort();
     /** @type {number[]} */
     const historicalTimes = [];
     for (const value of [chatAt, agentAt, ...probeRows.map((row) => row.at)]) {
@@ -524,7 +553,10 @@ export function isGatewayModelAgentProbeFreshlyVerified(health, options = {}) {
  */
 export function isGatewayModelProbeFreshlyVerified(health, kind, options = {}) {
     const normalized = normalizeProbeKind(kind);
-    return normalized !== null && summarizeGatewayRuntimeProofFreshness(health, options).freshProbeKinds.includes(normalized);
+    return (
+        normalized !== null &&
+        summarizeGatewayRuntimeProofFreshness(health, options).freshProbeKinds.includes(normalized)
+    );
 }
 
 /**
@@ -564,7 +596,10 @@ function canUseGlobalAgentProbeFallback(primary, fallback) {
 
 /**
  * @param {Record<string, unknown>} model
- * @param {{ runtimeHealthRecords?: Record<string, unknown>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex> }} options
+ * @param {{
+ *     runtimeHealthRecords?: Record<string, unknown>[];
+ *     runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>;
+ * }} options
  * @returns {ReturnType<typeof readGatewayModelHealth>}
  */
 function readGatewayModelGlobalRuntimeHealth(model, options) {
@@ -591,7 +626,8 @@ function readGatewayModelGlobalRuntimeHealth(model, options) {
 export function readGatewayModelHealth(model, options = {}) {
     const providerId = typeof model['providerId'] === 'string' ? model['providerId'] : null;
     const providerModel = typeof model['providerModel'] === 'string' ? model['providerModel'] : null;
-    const routeProfile = typeof options.routeProfile === 'string' && options.routeProfile.trim() ? options.routeProfile : null;
+    const routeProfile =
+        typeof options.routeProfile === 'string' && options.routeProfile.trim() ? options.routeProfile : null;
     const exact = readByokProviderModelHealth({ routeProfile, providerId, providerModel });
     if (exact) return exact;
     if (routeProfile) {
@@ -643,7 +679,9 @@ export function readGatewayModelHealthFromIndex(model, index, options = {}) {
         if (allowRouteProfileFallback) return healthRecordMatches(record, identity);
         const recordIdentity = healthIdentity(record);
         if (recordIdentity.providerId !== providerId || recordIdentity.providerModel !== providerModel) return false;
-        return routeProfile ? recordIdentity.routeProfile === routeProfile || recordIdentity.routeProfile === null : recordIdentity.routeProfile === null;
+        return routeProfile
+            ? recordIdentity.routeProfile === routeProfile || recordIdentity.routeProfile === null
+            : recordIdentity.routeProfile === null;
     });
     if (match) return /** @type {ReturnType<typeof readGatewayModelHealth>} */ (match);
     if (!allowRouteProfileFallback) return null;
@@ -659,15 +697,15 @@ export function readGatewayModelHealthFromIndex(model, index, options = {}) {
  * @param {Record<string, unknown>[] | ReturnType<typeof createGatewayRuntimeHealthIndex>} recordsOrIndex
  * @param {{ now?: string | number | Date; windowMs?: number; minFailedModels?: number; failureKinds?: string[] }} [options]
  * @returns {{
- *   include: boolean;
- *   reason: 'provider_health_allowed' | 'provider_health_cooldown' | 'provider_health_unknown';
- *   providerId: string | null;
- *   failureKinds: string[];
- *   failedModelCount: number;
- *   failureCount: number;
- *   latestFailureAt: number | null;
- *   latestSuccessAt: number | null;
- *   failedModels: string[];
+ *     include: boolean;
+ *     reason: 'provider_health_allowed' | 'provider_health_cooldown' | 'provider_health_unknown';
+ *     providerId: string | null;
+ *     failureKinds: string[];
+ *     failedModelCount: number;
+ *     failureCount: number;
+ *     latestFailureAt: number | null;
+ *     latestSuccessAt: number | null;
+ *     failedModels: string[];
  * }}
  */
 export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, options = {}) {
@@ -687,7 +725,10 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
     }
     const nowMs = dateMs(options.now) ?? Date.now();
     const windowMs = optionalNumber(options.windowMs) ?? DEFAULT_PROVIDER_COOLDOWN_WINDOW_MS;
-    const minFailedModels = Math.max(1, Math.floor(optionalNumber(options.minFailedModels) ?? DEFAULT_PROVIDER_COOLDOWN_MIN_FAILED_MODELS));
+    const minFailedModels = Math.max(
+        1,
+        Math.floor(optionalNumber(options.minFailedModels) ?? DEFAULT_PROVIDER_COOLDOWN_MIN_FAILED_MODELS),
+    );
     const failureKinds = normalizedFailureKindSet(options.failureKinds, MODEL_GATEWAY_PROVIDER_COOLDOWN_FAILURE_KINDS);
     const index = isGatewayRuntimeHealthIndex(recordsOrIndex)
         ? recordsOrIndex
@@ -721,8 +762,23 @@ export function evaluateGatewayProviderHealthCooldown(model, recordsOrIndex, opt
 
 /**
  * @param {Record<string, unknown>} model
- * @param {{ routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean; runtimeHealthRecords?: Record<string, unknown>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; allowRouteProfileFallback?: boolean }} [options]
- * @returns {{ include: boolean; reason: string; health: ReturnType<typeof readGatewayModelHealth>; runtimeProof: ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null }}
+ * @param {{
+ *     routeProfile?: string | null;
+ *     excludeFailed?: boolean;
+ *     requireAgentProbeOk?: boolean;
+ *     runtimeHealthRecords?: Record<string, unknown>[];
+ *     runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>;
+ *     now?: string | number | Date;
+ *     maxRuntimeProofAgeMs?: number;
+ *     temporaryFailureCooldownMs?: number;
+ *     allowRouteProfileFallback?: boolean;
+ * }} [options]
+ * @returns {{
+ *     include: boolean;
+ *     reason: string;
+ *     health: ReturnType<typeof readGatewayModelHealth>;
+ *     runtimeProof: ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null;
+ * }}
  */
 export function evaluateGatewayModelHealthRoute(model, options = {}) {
     const routeScopedOptions = {

@@ -18,6 +18,11 @@
  * @see EventBus
  */
 
+import {
+    compactTerminalToolText,
+    getTerminalHumanToolName,
+    humanizeTerminalToolSurfaceText,
+} from '../events/presenters/tools/index.js';
 import { readTerminalConfigProjection, readTerminalDiagnoseProjection } from '../frontend/index.js';
 import {
     formatTerminalTimeLabel,
@@ -28,11 +33,6 @@ import {
     terminalThemeRow,
     terminalThemeText,
 } from '../state/index.js';
-import {
-    compactTerminalToolText,
-    getTerminalHumanToolName,
-    humanizeTerminalToolSurfaceText,
-} from '../events/presenters/tools/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, withRuntimeTarget } from './runtime-target.js';
 
 /** @typedef {import('../state/ui-theme.js').TerminalThemeRole} TerminalThemeRole */
@@ -221,19 +221,20 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     const statRows =
         topToolStats.length === 0
             ? [{ label: 'Estado', value: 'nenhum dado registrado', role: /** @type {TerminalThemeRole} */ ('muted') }]
-            : topToolStats
-                  .map(([name, stat], index) => {
-                      const calls = Number(stat['calls'] ?? 0);
-                      const errors = Number(stat['errors'] ?? 0);
-                      const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
-                      const role = /** @type {TerminalThemeRole} */ (rate >= 90 ? 'success' : rate >= 70 ? 'warn' : 'error');
-                      const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 42);
-                      return {
-                          label: `${index + 1}. ${visualName}`,
-                          value: `${rate}% · média ${stat['avgLatencyMs'] ?? 0}ms · ${pluralPt(calls, 'uso', 'usos')}`,
-                          role,
-                      };
-                  });
+            : topToolStats.map(([name, stat], index) => {
+                  const calls = Number(stat['calls'] ?? 0);
+                  const errors = Number(stat['errors'] ?? 0);
+                  const rate = calls > 0 ? Math.round(((calls - errors) / calls) * 100) : 0;
+                  const role = /** @type {TerminalThemeRole} */ (
+                      rate >= 90 ? 'success' : rate >= 70 ? 'warn' : 'error'
+                  );
+                  const visualName = compactTerminalToolText(getTerminalHumanToolName(name), 42);
+                  return {
+                      label: `${index + 1}. ${visualName}`,
+                      value: `${rate}% · média ${stat['avgLatencyMs'] ?? 0}ms · ${pluralPt(calls, 'uso', 'usos')}`,
+                      role,
+                  };
+              });
     const activityDetail = activity.detail
         ? diagnoseText('muted', humanizeDiagnoseToolIdentifiers(activity.detail))
         : diagnoseText('muted', '(sem detalhe)');
@@ -348,12 +349,24 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
         );
         println(terminalThemeRow('Acesso', renderCompactByokLine(byok), { role: byok.ready ? 'success' : 'warn' }));
         println(terminalThemeRow('Gateway', renderCompactGatewayLine(gatewayProjection, gatewayActive)));
-        println(terminalThemeRow('Entrada', `${askUserLine}${backgroundLine}`, { role: askUserLine === 'nenhum' ? 'muted' : 'question' }));
-        println(terminalThemeRow('Ferramentas', renderCompactMcpLine(mcp, toolLoad), { role: renderCompactMcpRole(mcp, toolLoad) }));
         println(
-            terminalThemeRow('Atividade', `${humanizeDiagnoseToolIdentifiers(activity.label)}${activityProgress}${activityDetailLine}`, {
-                role: renderActivityRole(activity.severity),
+            terminalThemeRow('Entrada', `${askUserLine}${backgroundLine}`, {
+                role: askUserLine === 'nenhum' ? 'muted' : 'question',
             }),
+        );
+        println(
+            terminalThemeRow('Ferramentas', renderCompactMcpLine(mcp, toolLoad), {
+                role: renderCompactMcpRole(mcp, toolLoad),
+            }),
+        );
+        println(
+            terminalThemeRow(
+                'Atividade',
+                `${humanizeDiagnoseToolIdentifiers(activity.label)}${activityProgress}${activityDetailLine}`,
+                {
+                    role: renderActivityRole(activity.severity),
+                },
+            ),
         );
         println(
             terminalThemeRow(
@@ -362,8 +375,15 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
                 { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) },
             ),
         );
-        println(terminalThemeRow('Próximo', renderCompactActionLine(health?.['recommendedAction']), { role: 'command' }));
-        println(terminalThemeRow('Mais detalhes', renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail'])));
+        println(
+            terminalThemeRow('Próximo', renderCompactActionLine(health?.['recommendedAction']), { role: 'command' }),
+        );
+        println(
+            terminalThemeRow(
+                'Mais detalhes',
+                renderCommandList(['/health full', '/diagnose', '/tools diag', '/activity detail']),
+            ),
+        );
         println(terminalThemeDivider(36));
         if (configProjection.runtimeFallbackWarning) {
             println(
@@ -382,10 +402,28 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeDivider(62));
 
     println(terminalThemeHeadline('assistant', 'Agente', ['ambiente', 'modelo', 'entrada']));
-    println(terminalThemeRow('Status', renderDiagnoseAgentStatus(snap['status']), { role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive) }));
-    println(terminalThemeRow('Saúde', health ? renderHumanHealthStatus(String(health['status'] ?? 'unknown')) : 'sem leitura', { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) }));
-    println(terminalThemeRow('Conversa', dialogLoopActive ? 'ativa' : 'inativa', { role: dialogLoopActive ? 'success' : 'warn' }));
-    println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${configProjection.currentReasoningEffort}`, { role: 'assistant' }));
+    println(
+        terminalThemeRow('Status', renderDiagnoseAgentStatus(snap['status']), {
+            role: renderRuntimeStatusRole(String(snap['status'] ?? 'unknown'), dialogLoopActive),
+        }),
+    );
+    println(
+        terminalThemeRow(
+            'Saúde',
+            health ? renderHumanHealthStatus(String(health['status'] ?? 'unknown')) : 'sem leitura',
+            { role: renderHealthRole(String(health?.['status'] ?? 'unknown')) },
+        ),
+    );
+    println(
+        terminalThemeRow('Conversa', dialogLoopActive ? 'ativa' : 'inativa', {
+            role: dialogLoopActive ? 'success' : 'warn',
+        }),
+    );
+    println(
+        terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${configProjection.currentReasoningEffort}`, {
+            role: 'assistant',
+        }),
+    );
     println(terminalThemeRow('BYOK', byokLine, { role: byok.ready ? 'success' : byok.enabled ? 'warn' : 'muted' }));
     println(terminalThemeRow('Gateway', gatewayLine));
     println(terminalThemeRow('SDK', sdkModeLine));
@@ -403,11 +441,21 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
 
     println('');
     println(terminalThemeHeadline('thinking', 'Atividade', ['pulso', 'tela']));
-    println(terminalThemeRow('Atual', `${humanizeDiagnoseToolIdentifiers(activity.label)}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`, { role: renderActivityRole(activity.severity) }));
+    println(
+        terminalThemeRow(
+            'Atual',
+            `${humanizeDiagnoseToolIdentifiers(activity.label)}${typeof activity.progress === 'number' ? ` (${activity.progress}%)` : ''}`,
+            { role: renderActivityRole(activity.severity) },
+        ),
+    );
     println(terminalThemeRow('Detalhe', activityDetail));
     println(terminalThemeRow('Segundo plano', String(health?.['backgroundPendingCount'] ?? 0)));
     println(terminalThemeRow('Pulso', keepaliveLine));
-    println(terminalThemeRow('Quota SDK', health?.['checks']?.['quota']?.['running'] ? 'rodando' : 'parada', { role: health?.['checks']?.['quota']?.['running'] ? 'success' : 'warn' }));
+    println(
+        terminalThemeRow('Quota SDK', health?.['checks']?.['quota']?.['running'] ? 'rodando' : 'parada', {
+            role: health?.['checks']?.['quota']?.['running'] ? 'success' : 'warn',
+        }),
+    );
     println(
         terminalThemeRow(
             'Alertas',
@@ -443,7 +491,16 @@ export async function cmdDiagnose({ hubSessionId, println }, arg = '') {
     println(terminalThemeRow('Ciclo de vida', lifecycleMetricsLine));
     println(terminalThemeRow('Uptime', `${Math.floor(uptimeSec / 60)}m ${uptimeSec % 60}s`));
     println(terminalThemeRow('Memória RSS', `${memMB}MB`, { role: memMB > 400 ? 'warn' : 'muted' }));
-    println(terminalThemeRow('Rota SDK/FS', `${renderDiagnoseSdkFsRouteMode(sdkFsRouting.mode)} · ${sdkFsRouting.reason}`, { role: sdkFsRouting.mode === 'local-fs-primary' ? 'success' : sdkFsRouting.mode === 'sdk-workspace-only' ? 'warn' : 'error' }));
+    println(
+        terminalThemeRow('Rota SDK/FS', `${renderDiagnoseSdkFsRouteMode(sdkFsRouting.mode)} · ${sdkFsRouting.reason}`, {
+            role:
+                sdkFsRouting.mode === 'local-fs-primary'
+                    ? 'success'
+                    : sdkFsRouting.mode === 'sdk-workspace-only'
+                      ? 'warn'
+                      : 'error',
+        }),
+    );
 
     println('');
     println(terminalThemeHeadline('warn', 'Pendências', ['top-5']));
@@ -523,7 +580,7 @@ function renderDiagnoseRuntimeTarget(value, detail) {
 }
 
 /**
- * @param {Array<{ runtimeId?: string; model?: string; status?: string; isDefault?: boolean }>} runtimes
+ * @param {{ runtimeId?: string; model?: string; status?: string; isDefault?: boolean }[]} runtimes
  * @param {boolean} detail
  * @returns {string}
  */
@@ -533,7 +590,9 @@ function renderDiagnoseRuntimeMap(runtimes, detail) {
             const runtimeLabel = renderDiagnoseRuntimeTarget(runtime.runtimeId, detail);
             const scope = runtime.isDefault ? 'principal' : runtimeLabel;
             const model = runtime.model || 'sem modelo';
-            const status = detail ? String(runtime.status ?? 'desconhecido') : renderHumanRuntimeStatus(String(runtime.status ?? 'unknown'));
+            const status = detail
+                ? String(runtime.status ?? 'desconhecido')
+                : renderHumanRuntimeStatus(String(runtime.status ?? 'unknown'));
             return detail
                 ? `${runtime.isDefault ? '*' : '-'}${runtime.runtimeId}:${model}/${runtime.status}`
                 : `${scope} · ${model} · ${status}`;
@@ -694,7 +753,13 @@ function resolveDiagnoseGatewayActive(projection) {
 }
 
 /**
- * @param {{ providerCount: number; modelCount: number; enabledModelCount: number; active?: unknown; effectiveRoute?: unknown }} projection
+ * @param {{
+ *     providerCount: number;
+ *     modelCount: number;
+ *     enabledModelCount: number;
+ *     active?: unknown;
+ *     effectiveRoute?: unknown;
+ * }} projection
  * @param {Record<string, unknown> | null} active
  * @returns {string}
  */
@@ -718,7 +783,14 @@ function renderGatewayActiveLabel(active) {
 
 /**
  * @param {{ available: boolean; circuitOpen: boolean; toolCount: number; latencyMs: number | null }} mcp
- * @param {{ total?: number; hasCanonicalLocalFsTools?: boolean; hasCanonicalLocalExecTools?: boolean; hasSdkWorkspaceTooling?: boolean } | null | undefined} toolLoad
+ * @param {{
+ *           total?: number;
+ *           hasCanonicalLocalFsTools?: boolean;
+ *           hasCanonicalLocalExecTools?: boolean;
+ *           hasSdkWorkspaceTooling?: boolean;
+ *       }
+ *     | null
+ *     | undefined} toolLoad
  * @returns {string}
  */
 function renderCompactMcpLine(mcp, toolLoad) {
@@ -742,12 +814,18 @@ function renderCompactMcpLine(mcp, toolLoad) {
 
 /**
  * @param {{ available: boolean; circuitOpen: boolean; toolCount: number }} mcp
- * @param {{ hasCanonicalLocalFsTools?: boolean; hasCanonicalLocalExecTools?: boolean; hasSdkWorkspaceTooling?: boolean } | null | undefined} toolLoad
+ * @param {{ hasCanonicalLocalFsTools?: boolean; hasCanonicalLocalExecTools?: boolean; hasSdkWorkspaceTooling?: boolean }
+ *     | null
+ *     | undefined} toolLoad
  * @returns {'success' | 'warn' | 'error'}
  */
 function renderCompactMcpRole(mcp, toolLoad) {
     if (mcp.available && !mcp.circuitOpen && mcp.toolCount > 0) return 'success';
-    if (toolLoad?.hasCanonicalLocalFsTools || toolLoad?.hasCanonicalLocalExecTools || toolLoad?.hasSdkWorkspaceTooling) {
+    if (
+        toolLoad?.hasCanonicalLocalFsTools ||
+        toolLoad?.hasCanonicalLocalExecTools ||
+        toolLoad?.hasSdkWorkspaceTooling
+    ) {
         return 'success';
     }
     return mcp.circuitOpen ? 'error' : 'warn';

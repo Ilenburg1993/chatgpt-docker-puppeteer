@@ -1087,20 +1087,20 @@ PROJEÇÃO v3.0:
 
 ## 9. Critérios de Gate por Versão
 
-| Versão | Gate                                                                                  |
-| ------ | ------------------------------------------------------------------------------------- | ------------ |
-| v1.1   | Smoke test ≥ 176 PASS + shellcheck limpo + todos os tools do GUIA cobertos            |
-| v1.2   | Injection/traversal detectados em 5+ casos de teste; score=0 para payloads limpos     |
-| v1.3   | `hook_tool_risk_level()` correto para 15 ferramentas; integration test lifecycle      |
-| v1.4   | Todos os Templates A-G detectados em fixtures realistas (1 fixture por template)      |
-| v1.5   | `hook_session_is_healthy()` funciona end-to-end (lifecycle test T-I-22)               |
-| v2.0   | Transcript de 50 msgs parseado em < 2s; 3 predicados transcript corretos              |
-| v2.1   | Round-trip generate→check→rotate funciona + formato ENCERRAR-XXXXXXXX validado        | ✅ CONCLUÍDO |
-| v2.2   | Subagente aninhado 3 níveis: depth=3 detectado; budget limit respeitado               | ✅ CONCLUÍDO |
-| v2.3   | `hook_compact_ctx_full()` com 20 turnos cabe em 2000 chars                            | ✅ CONCLUÍDO |
-| v2.4   | Migração state v0→v1 sem perda de dados (smoke test)                                  | ✅ CONCLUÍDO |
-| v2.5   | Payload com campo errado rejeitado; payload correto passa — para todos os 7 eventos   |
-| v3.0   | Motor de política processa 10 regras + audit log correto + integration test lifecycle |
+| Versão | Gate | | ------ |
+------------------------------------------------------------------------------------- | ------------
+| | v1.1 | Smoke test ≥ 176 PASS + shellcheck limpo + todos os tools do GUIA cobertos | | v1.2 |
+Injection/traversal detectados em 5+ casos de teste; score=0 para payloads limpos | | v1.3 |
+`hook_tool_risk_level()` correto para 15 ferramentas; integration test lifecycle | | v1.4 | Todos os
+Templates A-G detectados em fixtures realistas (1 fixture por template) | | v1.5 |
+`hook_session_is_healthy()` funciona end-to-end (lifecycle test T-I-22) | | v2.0 | Transcript de 50
+msgs parseado em < 2s; 3 predicados transcript corretos | | v2.1 | Round-trip generate→check→rotate
+funciona + formato ENCERRAR-XXXXXXXX validado | ✅ CONCLUÍDO | | v2.2 | Subagente aninhado 3 níveis:
+depth=3 detectado; budget limit respeitado | ✅ CONCLUÍDO | | v2.3 | `hook_compact_ctx_full()` com
+20 turnos cabe em 2000 chars | ✅ CONCLUÍDO | | v2.4 | Migração state v0→v1 sem perda de dados
+(smoke test) | ✅ CONCLUÍDO | | v2.5 | Payload com campo errado rejeitado; payload correto passa —
+para todos os 7 eventos | | v3.0 | Motor de política processa 10 regras + audit log correto +
+integration test lifecycle |
 
 ---
 

@@ -13,10 +13,7 @@ function buildCodeFromLines(/** @type {any} */ lines) {
 
 function parserPlugins(/** @type {any} */ language) {
     /** @type {import('@babel/parser').ParserPlugin[]} */
-    const plugins = [
-        'jsx',
-        'importMeta',
-    ];
+    const plugins = ['jsx', 'importMeta'];
     if (language === 'ts') {
         plugins.push('typescript');
     }
@@ -95,20 +92,18 @@ function splitLargeUnit(
         linesPerBlock: 50,
     });
 
-    return subRanges.map(
-        (r, idx) => ({
-            startLine: startIdx + r.startLine,
-            endLine: startIdx + r.endLine,
-            kind: `${unit.kind}_block`,
-            symbol: unit.symbol,
-            exported: unit.exported,
-            jsdoc: unit.jsdoc,
-            anchor: unit.anchor,
-            imports: unit.imports,
-            subchunkIndex: idx + 1,
-            subchunkTotal: subRanges.length,
-        }),
-    );
+    return subRanges.map((r, idx) => ({
+        startLine: startIdx + r.startLine,
+        endLine: startIdx + r.endLine,
+        kind: `${unit.kind}_block`,
+        symbol: unit.symbol,
+        exported: unit.exported,
+        jsdoc: unit.jsdoc,
+        anchor: unit.anchor,
+        imports: unit.imports,
+        subchunkIndex: idx + 1,
+        subchunkTotal: subRanges.length,
+    }));
 }
 
 function normalizeAndSplitUnits(/** @type {any} */ units, /** @type {any} */ lines, /** @type {any} */ maxChunkChars) {
@@ -271,7 +266,7 @@ export function chunkJsAst(
     const ast = parse(source, {
         sourceType: 'module',
         errorRecovery: true,
-        plugins: (parserPlugins(language)),
+        plugins: parserPlugins(language),
         attachComment: true,
     });
 
@@ -283,19 +278,16 @@ export function chunkJsAst(
     if (!units.length) return [];
 
     const normalized = normalizeAndSplitUnits(units, lines, maxChunkChars);
-    return normalized.map(
-        (/** @type {any} */ unit) =>
-            ({
-                startLine: unit.startLine,
-                endLine: unit.endLine,
-                kind: unit.kind,
-                symbol: unit.symbol || null,
-                exported: Boolean(unit.exported),
-                jsdoc: unit.jsdoc || null,
-                anchor: unit.anchor || null,
-                imports: unit.imports || [],
-                subchunk_index: unit.subchunkIndex || null,
-                subchunk_total: unit.subchunkTotal || null,
-            }),
-    );
+    return normalized.map((/** @type {any} */ unit) => ({
+        startLine: unit.startLine,
+        endLine: unit.endLine,
+        kind: unit.kind,
+        symbol: unit.symbol || null,
+        exported: Boolean(unit.exported),
+        jsdoc: unit.jsdoc || null,
+        anchor: unit.anchor || null,
+        imports: unit.imports || [],
+        subchunk_index: unit.subchunkIndex || null,
+        subchunk_total: unit.subchunkTotal || null,
+    }));
 }

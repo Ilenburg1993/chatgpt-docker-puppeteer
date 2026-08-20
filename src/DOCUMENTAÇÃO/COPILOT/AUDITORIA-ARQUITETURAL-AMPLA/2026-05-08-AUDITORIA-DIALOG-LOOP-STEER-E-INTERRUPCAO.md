@@ -1,18 +1,18 @@
 # Auditoria — Dialog Loop, Steer e Intervenção Imediata
 
-Data: 2026-05-08
-Escopo: `src/copilot/presentation`, `src/copilot/channel`, `src/copilot/terminal/repl`,
-`src/copilot/agent/facades` e fluxo SDK `steerMessage`.
+Data: 2026-05-08 Escopo: `src/copilot/presentation`, `src/copilot/channel`,
+`src/copilot/terminal/repl`, `src/copilot/agent/facades` e fluxo SDK `steerMessage`.
 
-> Nota de leitura: as seções iniciais preservam o histórico da auditoria. O estado canônico vigente está consolidado em
-> **Rodada 3.2 — retificação crítica: queue via mailbox zero-PR, sem PR por padrão**. Qualquer menção anterior a
-> `mode=queue` como turno canônico/consumo de PR foi suplantada por `mode=turn`/`mode=dialog`.
+> Nota de leitura: as seções iniciais preservam o histórico da auditoria. O estado canônico vigente
+> está consolidado em **Rodada 3.2 — retificação crítica: queue via mailbox zero-PR, sem PR por
+> padrão**. Qualquer menção anterior a `mode=queue` como turno canônico/consumo de PR foi suplantada
+> por `mode=turn`/`mode=dialog`.
 
 ## Objetivo
 
-Aprofundar o caso em que uma segunda inteligência operacional entra durante um turno ativo da
-LLM-B. Essa segunda origem pode ser a LLM-A via `/inject`, o usuário humano via terminal, ou uma
-próxima rodada automatizada que precisa corrigir o rumo sem esperar a resposta atual terminar.
+Aprofundar o caso em que uma segunda inteligência operacional entra durante um turno ativo da LLM-B.
+Essa segunda origem pode ser a LLM-A via `/inject`, o usuário humano via terminal, ou uma próxima
+rodada automatizada que precisa corrigir o rumo sem esperar a resposta atual terminar.
 
 O princípio canônico adotado é: existe um único dialog loop como dono da serialização de turnos.
 Intervenções não criam loop paralelo; elas usam capacidades do SDK ou controles formais do runtime.
@@ -34,15 +34,15 @@ atual, não havia contrato explícito no canal mais usado pela LLM-A.
 
 `POST /inject` agora aceita `mode`:
 
-- `queue`: modo padrão histórico. Entrava no dialog loop e aguardava resposta da LLM-B. **Retificado em 3.2: `queue`
-  agora significa mailbox zero-PR; turno explícito usa `turn`/`dialog`.**
+- `queue`: modo padrão histórico. Entrava no dialog loop e aguardava resposta da LLM-B. **Retificado
+  em 3.2: `queue` agora significa mailbox zero-PR; turno explícito usa `turn`/`dialog`.**
 - `steer`: usa o modo SDK `immediate` via `steerMessage()`. Afeta o turno SDK ativo sem aguardar
   `REPLY` do dialog loop. Retorna `202` com `messageId`.
 - `interrupt`: chama `abortCurrentMessage()` no runtime ativo e então envia a nova mensagem pelo
   dialog loop como substituição canônica.
 
-Aliases aceitos: `turn` e `dialog` para `queue`; `immediate` para `steer`;
-`abort-and-queue` e `abort_and_queue` para `interrupt`.
+Aliases aceitos: `turn` e `dialog` para `queue`; `immediate` para `steer`; `abort-and-queue` e
+`abort_and_queue` para `interrupt`.
 
 ## Cenários avaliados
 
@@ -51,8 +51,8 @@ Aliases aceitos: `turn` e `dialog` para `queue`; `immediate` para `steer`;
 Comportamento ideal: por padrão, não deve haver mutação surpresa do turno em andamento. O contrato
 default precisa preservar ordem, auditoria e determinismo.
 
-Implementação histórica: `mode=queue` entrava como próximo turno. **Estado vigente: mensagem comum e `mode=queue`
-entram no mailbox zero-PR; próximo turno só com `mode=turn`/`mode=dialog`.**
+Implementação histórica: `mode=queue` entrava como próximo turno. **Estado vigente: mensagem comum e
+`mode=queue` entram no mailbox zero-PR; próximo turno só com `mode=turn`/`mode=dialog`.**
 
 ### 2. LLM-A precisa corrigir o rumo do turno ativo
 
@@ -91,8 +91,8 @@ Somente `/interrupt` e `mode=interrupt` acionam abort.
 
 ### 5. Relação com a próxima LLM-B
 
-Se a intervenção for `queue`, a próxima LLM-B recebe o turno normalmente após a conclusão atual.
-Se for `steer`, a LLM-B atual continua no comando, mas recebe uma mensagem SDK immediate no mesmo
+Se a intervenção for `queue`, a próxima LLM-B recebe o turno normalmente após a conclusão atual. Se
+for `steer`, a LLM-B atual continua no comando, mas recebe uma mensagem SDK immediate no mesmo
 contexto vivo. Se for `interrupt`, a LLM-B atual é abortada; a próxima execução do dialog loop
 processa a mensagem substituta já sob a serialização canônica.
 
@@ -143,49 +143,57 @@ processa a mensagem substituta já sob a serialização canônica.
 
 ### Achado A1 — lacuna semântica entre "steer/interrupt" e "abort" na API `/inject`
 
-**Problema:** a semântica de intervenção humana/operacional já tratava `abort` no REPL, mas a API HTTP de
-injeção não tinha `mode=abort` canônico (zero-PR explícito), apenas `queue|steer|interrupt`.
+**Problema:** a semântica de intervenção humana/operacional já tratava `abort` no REPL, mas a API
+HTTP de injeção não tinha `mode=abort` canônico (zero-PR explícito), apenas `queue|steer|interrupt`.
 
 **Risco operacional:** clientes automáticos (LLM-A/orquestradores) ficavam sem uma rota formal para
-"apenas abortar" sem enfileirar novo turno, podendo recorrer a `interrupt` indevidamente (consumindo PR
-desnecessário).
+"apenas abortar" sem enfileirar novo turno, podendo recorrer a `interrupt` indevidamente (consumindo
+PR desnecessário).
 
 **Correção aplicada:**
 
 1. `server/routes/agent.js`
-  - schema zod do `/inject` agora aceita `mode='abort'`.
-  - regra de validação permite ausência de `message/content` quando `mode=abort`.
+
+- schema zod do `/inject` agora aceita `mode='abort'`.
+- regra de validação permite ausência de `message/content` quando `mode=abort`.
+
 2. `presentation/agent-control.js`
-  - `resolveInjectMode()` passa a resolver `'abort'`.
-  - `handleInject()` ganhou branch `injectMode === 'abort'`:
-    - executa `abortAgentRuntimeCurrentMessage(runtimeId)`;
-    - retorna `202` com `reply: null`;
-    - registra histórico/diagnóstico com `outcome: 'aborted'`.
+
+- `resolveInjectMode()` passa a resolver `'abort'`.
+- `handleInject()` ganhou branch `injectMode === 'abort'`:
+  - executa `abortAgentRuntimeCurrentMessage(runtimeId)`;
+  - retorna `202` com `reply: null`;
+  - registra histórico/diagnóstico com `outcome: 'aborted'`.
+
 3. `channel/inject.js`
-  - contratos JSDoc atualizados para incluir `mode='abort'` no request/response.
+
+- contratos JSDoc atualizados para incluir `mode='abort'` no request/response.
 
 **Resultado:** agora existe trilha oficial para intervenção zero-PR ponta a ponta no canal HTTP.
 
 ### Achado A1.1 — race entre intervenções de modos distintos no mesmo runtime
 
-**Problema:** `interrupt` já era serializado por runtime, mas `steer` e `abort` não passavam pela mesma fila
-de intervenção. Em concorrência (ex.: `steer` + `abort` quase simultâneos), podia haver ordem não determinística.
+**Problema:** `interrupt` já era serializado por runtime, mas `steer` e `abort` não passavam pela
+mesma fila de intervenção. Em concorrência (ex.: `steer` + `abort` quase simultâneos), podia haver
+ordem não determinística.
 
 **Correção aplicada:**
 
-- `presentation/agent-control.js` agora serializa **todos** os modos de intervenção (`steer`, `abort`, `interrupt`)
-  via `runInjectInterventionSequence(runtimeId, ...)`.
+- `presentation/agent-control.js` agora serializa **todos** os modos de intervenção (`steer`,
+  `abort`, `interrupt`) via `runInjectInterventionSequence(runtimeId, ...)`.
 
-**Resultado:** intervenção por runtime passa a ter ordem determinística e sem interleaving acidental.
+**Resultado:** intervenção por runtime passa a ter ordem determinística e sem interleaving
+acidental.
 
 ### Achado A2 — risco de supressão permanente de observability em sessões longas
 
-**Problema:** em `sdk-session-events.js`, o rastreamento de external tools "em voo" era por `Set<string>`
-de `toolName` sem contagem concorrente e sem expiração temporal.
+**Problema:** em `sdk-session-events.js`, o rastreamento de external tools "em voo" era por
+`Set<string>` de `toolName` sem contagem concorrente e sem expiração temporal.
 
 **Riscos detectados:**
 
-- se um `tool.completed` não chegasse (abort/degradação), a supressão podia ficar presa indefinidamente;
+- se um `tool.completed` não chegasse (abort/degradação), a supressão podia ficar presa
+  indefinidamente;
 - chamadas concorrentes da mesma tool podiam "desmarcar" cedo demais (um completed removia tudo);
 - impacto na legibilidade operacional (eventos úteis suprimidos além do necessário).
 
@@ -200,8 +208,8 @@ de `toolName` sem contagem concorrente e sem expiração temporal.
 
 **Problema:** `suppressedProtocolRequestIds` era `Set` sem política de bounded/TTL.
 
-**Risco:** em sessões muito longas com muitos eventos de protocolo (`ready/reply/stopped`), poderia haver
-crescimento contínuo de memória (ainda que gradual).
+**Risco:** em sessões muito longas com muitos eventos de protocolo (`ready/reply/stopped`), poderia
+haver crescimento contínuo de memória (ainda que gradual).
 
 **Correção aplicada:**
 
@@ -213,15 +221,18 @@ crescimento contínuo de memória (ainda que gradual).
 ### Revalidação da política zero-PR (estado atual)
 
 - `mode=queue`: **zero-PR** no estado vigente; entra no mailbox e aguarda `ask_user(kind=question)`.
-- `mode=steer`: **pode consumir PR** (SDK `session.send(..., mode='immediate')` ainda participa do pipeline de usage).
-- `mode=interrupt`: **abort + mailbox** por padrão; só consome PR se fallback de turno for habilitado explicitamente.
+- `mode=steer`: **pode consumir PR** (SDK `session.send(..., mode='immediate')` ainda participa do
+  pipeline de usage).
+- `mode=interrupt`: **abort + mailbox** por padrão; só consome PR se fallback de turno for
+  habilitado explicitamente.
 - `mode=abort` (novo): **zero-PR** (somente interrupção do turno ativo).
 
 ### Conclusão da rodada
 
-O fluxo de intervenção está agora mais coerente semanticamente entre HTTP e REPL, com cobertura explícita de
-`abort` para cenários zero-PR, e com hardening relevante de observability/memória para sessões long-running.
-Isso reduz risco de degradação silenciosa e melhora fluidez operacional sem matar o dialog loop.
+O fluxo de intervenção está agora mais coerente semanticamente entre HTTP e REPL, com cobertura
+explícita de `abort` para cenários zero-PR, e com hardening relevante de observability/memória para
+sessões long-running. Isso reduz risco de degradação silenciosa e melhora fluidez operacional sem
+matar o dialog loop.
 
 ---
 
@@ -254,23 +265,26 @@ Arquivo: `src/copilot/config/env.js`
   - `getTerminalInterventionPolicy()`
   - `getInjectInterventionPolicy()`
 
-**Efeito:** governança de intervenção muda em runtime via env (sem restart), preservando liberdade operacional da LLM-B com defaults coerentes ao princípio zero-PR.
+**Efeito:** governança de intervenção muda em runtime via env (sem restart), preservando liberdade
+operacional da LLM-B com defaults coerentes ao princípio zero-PR.
 
 #### 2) `/inject` com semântica humana zero-PR por default
 
 Arquivos: `src/copilot/presentation/agent-control.js`, `src/copilot/server/routes/agent.js`
 
 - Novo alias de modo: `auto`.
-- Para `from=user`/`from=llm-a` sem modo explícito: resolução não abre PR por default; entra no mailbox zero-PR.
+- Para `from=user`/`from=llm-a` sem modo explícito: resolução não abre PR por default; entra no
+  mailbox zero-PR.
 - Em `mode=steer` e havendo `ask_user` pendente (`kind=question`): resposta é aplicada via
   `answerAgentPendingQuestion()` em vez de abrir turno.
-- Em `mode=steer` para origem operacional com `allowSteer=false`: retorno `202` com preservação no mailbox
-  (`ZERO_PR_DEFERRED_MAILBOX`), evitando consumo implícito de PR sem perder intenção.
+- Em `mode=steer` para origem operacional com `allowSteer=false`: retorno `202` com preservação no
+  mailbox (`ZERO_PR_DEFERRED_MAILBOX`), evitando consumo implícito de PR sem perder intenção.
 - Em `mode=queue`: retorno `202` com preservação no mailbox (`ZERO_PR_MAILBOX_QUEUED`).
-- `mode=interrupt` para origem operacional aborta e preserva substituição no mailbox quando fallback de turno está
-  desabilitado.
+- `mode=interrupt` para origem operacional aborta e preserva substituição no mailbox quando fallback
+  de turno está desabilitado.
 
-**Efeito:** API fica alinhada ao contrato “intervenção humana não consome PR”, com fallback de fila apenas quando política permitir explicitamente.
+**Efeito:** API fica alinhada ao contrato “intervenção humana não consome PR”, com fallback de fila
+apenas quando política permitir explicitamente.
 
 #### 3) REPL com texto livre em modo intervenção (não turno)
 
@@ -286,7 +300,8 @@ Arquivo: `src/copilot/terminal/repl/repl-lifecycle.js`
 
 #### 4) Comando explícito para consumo deliberado de PR
 
-Arquivos: `src/copilot/terminal/repl/repl-command-router.js`, `src/copilot/terminal/commands/help.js`
+Arquivos: `src/copilot/terminal/repl/repl-command-router.js`,
+`src/copilot/terminal/commands/help.js`
 
 - Novo comando: `/turn <mensagem>`, caminho canônico para abrir turno e potencialmente consumir PR.
 - `/queue <mensagem>` é mailbox zero-PR.
@@ -296,20 +311,23 @@ Arquivos: `src/copilot/terminal/repl/repl-command-router.js`, `src/copilot/termi
 **Efeito:** separação semântica forte entre:
 
 - **intervenção operacional** (`answer`, `abort`) → zero-PR;
-- **steer** → intervenção immediate que pode consumir PR (desligada por padrão em política zero-PR estrita);
+- **steer** → intervenção immediate que pode consumir PR (desligada por padrão em política zero-PR
+  estrita);
 - **novo turno deliberado** (`/turn`) → pode consumir PR.
 
 ### Edge cases críticos cobertos
 
-- Intervenção humana enquanto `ask_user` está ativo: resposta roteada para pending question, sem fila.
+- Intervenção humana enquanto `ask_user` está ativo: resposta roteada para pending question, sem
+  fila.
 - Intervenção humana sem turno ativo: bloqueio seguro sem consumo implícito de PR.
 - Concorrência de intervenções (`steer/abort/interrupt`): serialização por runtime mantida.
-- API client com `from=user`/`from=llm-a` sem `mode`: herda semântica zero-PR automaticamente via mailbox.
+- API client com `from=user`/`from=llm-a` sem `mode`: herda semântica zero-PR automaticamente via
+  mailbox.
 
 ### Resultado prático
 
-O sistema converge para o objetivo original do dialog loop: **manter o loop sempre ativo e usar `ask_user`/intervenção
-como mediadores, evitando consumo de PR por input humano não-intencional**.
+O sistema converge para o objetivo original do dialog loop: **manter o loop sempre ativo e usar
+`ask_user`/intervenção como mediadores, evitando consumo de PR por input humano não-intencional**.
 
 ---
 
@@ -330,16 +348,17 @@ Arquivos-chave:
 
 ### Conclusão técnica
 
-`steer` **não** pode mais ser tratado como “zero-PR garantido”.
-Ele não abre turno no dialog loop, mas ainda pode acionar consumo de PR no pipeline SDK/billing.
+`steer` **não** pode mais ser tratado como “zero-PR garantido”. Ele não abre turno no dialog loop,
+mas ainda pode acionar consumo de PR no pipeline SDK/billing.
 
 ### Implicação para bursts (múltiplas mensagens seguidas)
 
-Sem política estrita, várias mensagens em sequência no modo `steer` podem gerar múltiplos envios immediate e aumentar
-consumo de PR. Com Zero-PR 2.0:
+Sem política estrita, várias mensagens em sequência no modo `steer` podem gerar múltiplos envios
+immediate e aumentar consumo de PR. Com Zero-PR 2.0:
 
 - steer humano fica bloqueado por padrão (`allowSteer=false`);
-- queue humano/LLM-A entra no mailbox zero-PR por padrão (`allowQueueFallback=false` impede turno PR automático);
+- queue humano/LLM-A entra no mailbox zero-PR por padrão (`allowQueueFallback=false` impede turno PR
+  automático);
 - `ask_user`/`abort` seguem como canais zero-PR canônicos.
 
 ---
@@ -348,12 +367,13 @@ consumo de PR. Com Zero-PR 2.0:
 
 ### Hipótese investigada
 
-Como manter intervenção contínua (humano + LLM-A) sem PR mesmo com múltiplas mensagens em sequência e sem
-quebrar o dialog loop?
+Como manter intervenção contínua (humano + LLM-A) sem PR mesmo com múltiplas mensagens em sequência
+e sem quebrar o dialog loop?
 
 ### Resposta arquitetural implementada
 
-Foi introduzido um **Runtime Intervention Mailbox** (bounded + coalescente + observável), com os princípios:
+Foi introduzido um **Runtime Intervention Mailbox** (bounded + coalescente + observável), com os
+princípios:
 
 1. intervenção não vira turno automaticamente;
 2. intervenção entra em mailbox por runtime;
@@ -378,13 +398,15 @@ Foi introduzido um **Runtime Intervention Mailbox** (bounded + coalescente + obs
 
 #### `/inject` (API)
 
-- em caminhos anteriormente 409 (`steer` bloqueado, `queue` bloqueado, sem turno ativo para steer, `interrupt`
-  com fallback desativado), agora retorna `202 deferred_mailbox` e registra intervenção sem PR;
+- em caminhos anteriormente 409 (`steer` bloqueado, `queue` bloqueado, sem turno ativo para steer,
+  `interrupt` com fallback desativado), agora retorna `202 deferred_mailbox` e registra intervenção
+  sem PR;
 - cobertura estendida para origem `llm-a`/`llm_a` (além de `user`) no fluxo zero-PR.
 
 #### Evento SDK `user_input.requested`
 
-- ao detectar `kind=question`, o runtime tenta consumir mailbox automaticamente via `answerPendingQuestion`;
+- ao detectar `kind=question`, o runtime tenta consumir mailbox automaticamente via
+  `answerPendingQuestion`;
 - sucesso: evento `intervention.mailbox.applied` emitido;
 - falha: requeue defensivo para não perder intervenção.
 
@@ -421,9 +443,10 @@ E ajustes complementares em:
 
 ## Conclusão consolidada (estado atual)
 
-O sistema evoluiu de um zero-PR “defensivo” (bloquear) para um zero-PR “operável” (deferir, coalescer e aplicar na
-mediação formal). Isso resolve o gap central para intervenção contínua durante turno ativo sem consumir PR por
-acidente, mantendo o dialog loop como autoridade de serialização.
+O sistema evoluiu de um zero-PR “defensivo” (bloquear) para um zero-PR “operável” (deferir,
+coalescer e aplicar na mediação formal). Isso resolve o gap central para intervenção contínua
+durante turno ativo sem consumir PR por acidente, mantendo o dialog loop como autoridade de
+serialização.
 
 ---
 
@@ -431,30 +454,33 @@ acidente, mantendo o dialog loop como autoridade de serialização.
 
 ### Achado Z31-1 — defer desnecessário quando já existe `ask_user` pendente
 
-**Sintoma:** em alguns caminhos bloqueados por política zero-PR (ex.: `steer` desabilitado), a intervenção era
-registrada no mailbox mesmo quando já havia `ask_user(kind=question)` ativo no runtime, causando atraso evitável até o
-próximo ciclo de consumo.
+**Sintoma:** em alguns caminhos bloqueados por política zero-PR (ex.: `steer` desabilitado), a
+intervenção era registrada no mailbox mesmo quando já havia `ask_user(kind=question)` ativo no
+runtime, causando atraso evitável até o próximo ciclo de consumo.
 
 **Correção aplicada:**
 
 - `src/copilot/presentation/agent-control.js`
   - novo helper `tryApplyImmediateZeroPrIntervention(runtimeId, message)`;
-  - antes de cair em `deferred_mailbox`, tenta responder imediatamente via `answerAgentPendingQuestion(...)` quando
-    `pendingQuestionKind === 'question'` e `protocolControlled=false`.
-  - aplicado em 4 trilhas críticas: `steer` bloqueado, `steer` sem turno ativo (fallback bloqueado), `queue`
-    bloqueado e `interrupt` com fallback de fila desabilitado.
+  - antes de cair em `deferred_mailbox`, tenta responder imediatamente via
+    `answerAgentPendingQuestion(...)` quando `pendingQuestionKind === 'question'` e
+    `protocolControlled=false`.
+  - aplicado em 4 trilhas críticas: `steer` bloqueado, `steer` sem turno ativo (fallback bloqueado),
+    `queue` bloqueado e `interrupt` com fallback de fila desabilitado.
 
 - `src/copilot/terminal/repl/repl-command-router.js`
   - novo helper `tryApplyImmediateTerminalZeroPr(message)` com leitura direta do estado runtime;
-  - `/steer` bloqueado por política e `/interrupt` (sem queue fallback) agora tentam aplicar resposta imediata no
-    `ask_user` antes de registrar mailbox.
+  - `/steer` bloqueado por política e `/interrupt` (sem queue fallback) agora tentam aplicar
+    resposta imediata no `ask_user` antes de registrar mailbox.
 
-**Efeito:** intervenção humana/LLM-A fica mais fluida e continua zero-PR quando o runtime já está em ponto respondível.
+**Efeito:** intervenção humana/LLM-A fica mais fluida e continua zero-PR quando o runtime já está em
+ponto respondível.
 
 ### Achado Z31-2 — watchdog podia ignorar `ask_user` shadow restaurado
 
-**Sintoma:** a supressão de escalonamento do watchdog considerava somente `pendingQuestion` vivo. Em cenários de
-restauração (`pendingQuestionShadow`) havia risco de interpretação indevida de stall e recovery agressivo.
+**Sintoma:** a supressão de escalonamento do watchdog considerava somente `pendingQuestion` vivo. Em
+cenários de restauração (`pendingQuestionShadow`) havia risco de interpretação indevida de stall e
+recovery agressivo.
 
 **Correção aplicada:**
 
@@ -470,8 +496,8 @@ restauração (`pendingQuestionShadow`) havia risco de interpretação indevida 
   - `#shouldSuppressWatchdogEscalation()` agora também suprime escalonamento quando há
     `pendingQuestionShadow.kind === 'question'` e shadow não expirada.
 
-**Efeito:** maior estabilidade do dialog loop em cenários de restauração de estado e menor risco de restart
-desnecessário durante janelas legítimas de espera por input humano.
+**Efeito:** maior estabilidade do dialog loop em cenários de restauração de estado e menor risco de
+restart desnecessário durante janelas legítimas de espera por input humano.
 
 ### Revalidação sintática da rodada 3.1
 
@@ -491,18 +517,18 @@ Resultado: **OK (`OK_ZERO_PR_DEEP_PATCH`)**.
 
 ### Motivo da retificação
 
-A tentativa anterior de “fila por padrão + imediato explícito” foi uma regressão conceitual: ela tratava `queue` como
-fila canônica de turno SDK, o que pode consumir PR. Isso contradiz o objetivo central deste trabalho: **o padrão deve ser
-zero-PR**.
+A tentativa anterior de “fila por padrão + imediato explícito” foi uma regressão conceitual: ela
+tratava `queue` como fila canônica de turno SDK, o que pode consumir PR. Isso contradiz o objetivo
+central deste trabalho: **o padrão deve ser zero-PR**.
 
 O contrato corrigido é:
 
 1. mensagem comum de usuário/LLM-A deve ir para mailbox zero-PR;
 2. `mode=queue`, `/queue`, `!!queue`, `!!fila` e `!!mailbox` também significam mailbox zero-PR;
-3. abrir turno SDK que pode consumir PR só é permitido por intenção explícita: `mode=turn`, `mode=dialog`, `/turn`,
-   `!!turn` ou `!!dialog`;
-4. `steer/immediate` continua uma intenção explícita, mas fica bloqueada por padrão porque `SDK immediate` pode consumir
-   PR; quando bloqueada, a mensagem é preservada no mailbox.
+3. abrir turno SDK que pode consumir PR só é permitido por intenção explícita: `mode=turn`,
+   `mode=dialog`, `/turn`, `!!turn` ou `!!dialog`;
+4. `steer/immediate` continua uma intenção explícita, mas fica bloqueada por padrão porque
+   `SDK immediate` pode consumir PR; quando bloqueada, a mensagem é preservada no mailbox.
 
 ### Achado Z32-1 — `queue` era ambíguo e podia significar PR
 
@@ -516,17 +542,20 @@ Essa ambiguidade era perigosa porque “quero queue” podia virar “abra um no
 **Correção aplicada:**
 
 - `src/copilot/presentation/agent-control.js`
-  - `mode=queue`, `mode=mailbox`, `mode=defer` e `mode=deferred` agora resolvem para `intervene`, isto é, mailbox
-    zero-PR;
-  - `mode=turn` e `mode=dialog` são os únicos aliases de API que entram no caminho interno `queue`/turno canônico;
+  - `mode=queue`, `mode=mailbox`, `mode=defer` e `mode=deferred` agora resolvem para `intervene`,
+    isto é, mailbox zero-PR;
+  - `mode=turn` e `mode=dialog` são os únicos aliases de API que entram no caminho interno
+    `queue`/turno canônico;
   - `/inject` sem `mode` usa mailbox zero-PR por default;
   - `from=system` também passa pela proteção zero-PR, evitando PR acidental por origem operacional.
 
-**Resultado:** `queue` deixou de ser nome para turno PR. Turno PR agora precisa ser dito como `turn` ou `dialog`.
+**Resultado:** `queue` deixou de ser nome para turno PR. Turno PR agora precisa ser dito como `turn`
+ou `dialog`.
 
 ### Achado Z32-2 — REPL precisava separar `/queue` de `/turn`
 
-**Problema:** no terminal, texto livre e comandos de fila podiam ser interpretados como turno canônico.
+**Problema:** no terminal, texto livre e comandos de fila podiam ser interpretados como turno
+canônico.
 
 **Correção aplicada:**
 
@@ -537,7 +566,8 @@ Essa ambiguidade era perigosa porque “quero queue” podia virar “abra um no
 - `src/copilot/terminal/repl/repl-command-router.js`
   - `/queue <msg>` enfileira no mailbox zero-PR e tenta responder `ask_user` pendente antes;
   - `/turn <msg>` abre um turno explicitamente e alerta que pode consumir PR;
-  - `/steer <msg>` fica bloqueado por padrão e cai no mailbox quando `TERMINAL_ZERO_PR_ALLOW_STEER=false`;
+  - `/steer <msg>` fica bloqueado por padrão e cai no mailbox quando
+    `TERMINAL_ZERO_PR_ALLOW_STEER=false`;
   - `/interrupt <msg>` aborta o turno ativo e, por padrão, guarda substituição no mailbox zero-PR.
 - `src/copilot/terminal/commands/help.js`
   - UX/help atualizada para refletir “mailbox zero-PR por padrão” e “/turn quando aceitar PR”.
@@ -573,8 +603,8 @@ A investigação confirmou que o mailbox já é a fila correta para zero-PR:
   - truncamento por `TERMINAL_INTERVENTION_MAILBOX_MAX_MESSAGE_CHARS`;
   - consumo FIFO por `consumeRuntimeInterventionMailbox(...)`.
 - `src/copilot/terminal/events/sdk-session-events.js`
-  - em `user_input.requested`, quando `DialogProtocol.classify(question) === 'question'`, consome uma entrada do
-    mailbox e responde via `answerTerminalPendingQuestion(...)`;
+  - em `user_input.requested`, quando `DialogProtocol.classify(question) === 'question'`, consome
+    uma entrada do mailbox e responde via `answerTerminalPendingQuestion(...)`;
   - se a resposta não puder ser aplicada, re-enfileira a entrada.
 
 Esse caminho não chama `session.send()` e, portanto, não abre PR.
@@ -604,7 +634,8 @@ Esse caminho não chama `session.send()` e, portanto, não abre PR.
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_handlers_agent.spec.js tests/unit/copilot/terminal/test_repl_input_routing.spec.js`
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal`
 
-Resultado: **OK — 38 testes focados passaram; suíte unitária terminal completa passou com 324 testes**.
+Resultado: **OK — 38 testes focados passaram; suíte unitária terminal completa passou com 324
+testes**.
 
 ### Estado canônico após 3.2 corrigida
 
@@ -614,7 +645,8 @@ Resultado: **OK — 38 testes focados passaram; suíte unitária terminal comple
 - `/inject` sem `mode`: mailbox zero-PR.
 - `/inject mode=queue|mailbox|defer|deferred`: mailbox zero-PR.
 - `/inject mode=turn|dialog`: turno explícito, pode consumir PR.
-- `/inject mode=steer|immediate`: intenção imediata explícita, mas bloqueada por default e preservada no mailbox.
+- `/inject mode=steer|immediate`: intenção imediata explícita, mas bloqueada por default e
+  preservada no mailbox.
 - `/inject mode=interrupt`: aborta turno ativo e guarda substituição no mailbox por default.
 - `/inject mode=abort`: abort puro, sem mensagem substituta.
 
@@ -624,14 +656,14 @@ Resultado: **OK — 38 testes focados passaram; suíte unitária terminal comple
 
 ### Objetivo desta rodada
 
-Depois da retificação 3.2, ainda havia risco de leitura equivocada por causa de um detalhe nominal: o código interno
-historicamente usa `queue` para o caminho de turno do dialog loop, enquanto o contrato externo agora exige que
-`queue` signifique **mailbox zero-PR**.
+Depois da retificação 3.2, ainda havia risco de leitura equivocada por causa de um detalhe nominal:
+o código interno historicamente usa `queue` para o caminho de turno do dialog loop, enquanto o
+contrato externo agora exige que `queue` signifique **mailbox zero-PR**.
 
 Esta rodada consolida a separação em termos explícitos:
 
-- **SDK direto / turno explícito:** chama `session.send()` direta ou indiretamente e pode emitir `assistant.usage` /
-  `pr.consumed`;
+- **SDK direto / turno explícito:** chama `session.send()` direta ou indiretamente e pode emitir
+  `assistant.usage` / `pr.consumed`;
 - **mailbox do nosso dialog loop:** armazena intervenção em `runtime-ui-state-store` e só aplica via
   `ask_user(kind=question)` + `answerPendingQuestion`, sem abrir novo turno SDK.
 
@@ -646,13 +678,14 @@ Esta rodada consolida a separação em termos explícitos:
 - texto livre no terminal, com política zero-PR ativa, escreve no mailbox;
 - `!!queue`, `!!fila` e `!!mailbox` também escrevem no mailbox.
 
-O nome interno `queue` ainda existe em `agent-control.js`, mas agora representa somente o caminho explícito de turno
-após aliases `turn`/`dialog`. Essa distinção foi documentada em JSDoc no próprio arquivo para evitar regressão futura.
+O nome interno `queue` ainda existe em `agent-control.js`, mas agora representa somente o caminho
+explícito de turno após aliases `turn`/`dialog`. Essa distinção foi documentada em JSDoc no próprio
+arquivo para evitar regressão futura.
 
 #### Pergunta 2 — `steer` é zero-PR?
 
-**Resposta:** não como garantia arquitetural. `steer/immediate` usa o caminho SDK immediate e pode produzir usage /
-PR. Por isso:
+**Resposta:** não como garantia arquitetural. `steer/immediate` usa o caminho SDK immediate e pode
+produzir usage / PR. Por isso:
 
 - `mode=steer|immediate` é intenção explícita de intervenção imediata;
 - por padrão fica bloqueada para origens operacionais zero-PR;
@@ -661,9 +694,10 @@ PR. Por isso:
 
 #### Pergunta 3 — o mailbox é um segundo loop paralelo?
 
-**Resposta:** não. Ele é uma fila de intenção paralela ao ponto de vista da UI/API, mas não um segundo loop SDK. A
-serialização continua pertencendo ao dialog loop. O mailbox só é drenado quando o próprio loop alcança uma mediação
-formal (`ask_user(kind=question)`), e a aplicação ocorre por `answerPendingQuestion`.
+**Resposta:** não. Ele é uma fila de intenção paralela ao ponto de vista da UI/API, mas não um
+segundo loop SDK. A serialização continua pertencendo ao dialog loop. O mailbox só é drenado quando
+o próprio loop alcança uma mediação formal (`ask_user(kind=question)`), e a aplicação ocorre por
+`answerPendingQuestion`.
 
 #### Pergunta 4 — o que acontece se a drenagem falhar?
 
@@ -684,7 +718,8 @@ formal (`ask_user(kind=question)`), e a aplicação ocorre por `answerPendingQue
 - `src/copilot/server/routes/copilot-api/control.js` em `_handleSteer(...)`;
 - rotas SDK diretas em `src/copilot/server/routes/sdk/session-core-routes.js`;
 - helpers diretos em `src/copilot/server/routes/sdk/session-send-helpers.js`;
-- `sendAgentSdkSession(...)`, `sendAndWaitWithInactivityTimeout(...)` e wrappers de `sendSession(...)`.
+- `sendAgentSdkSession(...)`, `sendAndWaitWithInactivityTimeout(...)` e wrappers de
+  `sendSession(...)`.
 
 Esses caminhos são válidos para operação deliberada, mas não são o padrão zero-PR.
 
@@ -701,7 +736,8 @@ Esses caminhos são válidos para operação deliberada, mas não são o padrão
   - JSDoc reforça que `steer/immediate` é SDK immediate e, portanto, não é zero-PR garantido.
 
 - `src/copilot/presentation/runtime-ui-state-store.js`
-  - `RuntimeInterventionMailboxEntry` passou a documentar que `modeHint='queue'` é intenção de mailbox, não fila SDK;
+  - `RuntimeInterventionMailboxEntry` passou a documentar que `modeHint='queue'` é intenção de
+    mailbox, não fila SDK;
   - correções de nullable strict em `peek` e coalescência com `entries.at(-1)`.
 
 - `src/copilot/channel/inject.js`
@@ -710,7 +746,8 @@ Esses caminhos são válidos para operação deliberada, mas não são o padrão
   - `reply: null` é preservado para respostas assíncronas/mailbox.
 
 - `src/copilot/core/schemas.js`
-  - schema de resposta de `/inject` aceita `reply: null`, `mode` e `messageId`, alinhado ao contrato real.
+  - schema de resposta de `/inject` aceita `reply: null`, `mode` e `messageId`, alinhado ao contrato
+    real.
 
 - `src/copilot/server/routes/agent.js`
   - tipagem strict do corpo aceita `mode?: unknown`, evitando buraco entre validação Zod e JSDoc.
@@ -719,7 +756,8 @@ Esses caminhos são válidos para operação deliberada, mas não são o padrão
   - `_handleSteer(...)` agora tem aviso JSDoc: é rota SDK direta e pode emitir `pr.consumed`.
 
 - `src/copilot/server/routes/sdk/session-send-helpers.js`
-  - helper direto recebeu aviso JSDoc equivalente: zero-PR deve usar mailbox + `ask_user`, não `sendSession`.
+  - helper direto recebeu aviso JSDoc equivalente: zero-PR deve usar mailbox + `ask_user`, não
+    `sendSession`.
 
 ### Regressões cobertas
 
@@ -747,7 +785,8 @@ Resultado: **OK**.
 - `queue` externo significa mailbox, não turno SDK.
 - Turno SDK/PR-capable só por `turn`/`dialog` ou por rotas SDK diretas deliberadas.
 - `steer/immediate` não é tratado como zero-PR; é bloqueado por default e preservado no mailbox.
-- O sistema “paralelo” é uma fila de intenção mediada pelo nosso dialog loop, não uma segunda conversa SDK.
+- O sistema “paralelo” é uma fila de intenção mediada pelo nosso dialog loop, não uma segunda
+  conversa SDK.
 
 ---
 
@@ -762,29 +801,33 @@ Foi aberto `npm run terminal:llm-b` e validado:
 - `/queue <msg>` no REPL incrementa mailbox zero-PR;
 - `/mailbox status` mostra fila, fonte e `modeHint`;
 - `/turn <msg>` abre turno explícito e pode consumir PR;
-- `mode=turn` com conteúdo começando por `!!queue` preserva o prefixo como texto literal quando a diretiva conflita
-  com o modo explícito.
+- `mode=turn` com conteúdo começando por `!!queue` preserva o prefixo como texto literal quando a
+  diretiva conflita com o modo explícito.
 
 ### Achado live Z34-1 — a LLM-B confundiu PR com pull request
 
-No primeiro turno operacional, a LLM-B descreveu “zero-PR” como se PR significasse “pull request pendente”. Isso era um
-gap de prompt/UX, não do handler: o código já separava mailbox zero-PR de turno explícito, mas a própria LLM-B não
-tinha a definição suficientemente explícita no boot/system prompt.
+No primeiro turno operacional, a LLM-B descreveu “zero-PR” como se PR significasse “pull request
+pendente”. Isso era um gap de prompt/UX, não do handler: o código já separava mailbox zero-PR de
+turno explícito, mas a própria LLM-B não tinha a definição suficientemente explícita no boot/system
+prompt.
 
 ### Correção aplicada
 
 - `src/copilot/terminal/dialog/output.js`
-  - boot prompt padrão agora define que, neste terminal, PR significa paid/prompt request do SDK/modelo, não pull
-    request do GitHub;
-  - explica que mailbox zero-PR é aplicado via `ask_user`/`answerPendingQuestion`, sem novo `session.send()`;
-  - explica que `/turn`, `mode=turn`, `mode=dialog`, `!!turn`, `!!dialog`, `steer/immediate` e rotas SDK diretas são
-    PR-capable quando usados deliberadamente.
+  - boot prompt padrão agora define que, neste terminal, PR significa paid/prompt request do
+    SDK/modelo, não pull request do GitHub;
+  - explica que mailbox zero-PR é aplicado via `ask_user`/`answerPendingQuestion`, sem novo
+    `session.send()`;
+  - explica que `/turn`, `mode=turn`, `mode=dialog`, `!!turn`, `!!dialog`, `steer/immediate` e rotas
+    SDK diretas são PR-capable quando usados deliberadamente.
 
 - `src/copilot/config/system-prompt/sections/guidelines.js`
-  - a mesma definição foi adicionada ao system prompt modular para cobrir live reload e sessões futuras.
+  - a mesma definição foi adicionada ao system prompt modular para cobrir live reload e sessões
+    futuras.
 
 - `src/copilot/terminal/repl/repl-banner.js`
-  - o banner inicial agora expõe `/queue <msg>`, `/turn <msg>` e `/mailbox [status|consume|clear]` como linha própria.
+  - o banner inicial agora expõe `/queue <msg>`, `/turn <msg>` e `/mailbox [status|consume|clear]`
+    como linha própria.
 
 - `src/copilot/terminal/terminal-phases/boot-banner.js`
   - o quadro curto de boot também cita `/queue`, `/turn` e `/mailbox`.

@@ -202,7 +202,9 @@ async function applyRoutes(app) {
                     lastInitError: null,
                 };
 
-                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { mcp: true });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, {
+                    mcp: true,
+                });
             } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
@@ -235,7 +237,9 @@ async function applyRoutes(app) {
                     lastInitAt: new Date().toISOString(),
                     lastInitError: error && _e.message ? _e.message : String(error),
                 };
-                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { mcp: false });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, {
+                    mcp: false,
+                });
             } catch (/** @type {any} */ e) {
                 // noop
             }
@@ -279,7 +283,9 @@ async function applyRoutes(app) {
                     lastInitAt: new Date().toISOString(),
                 };
 
-                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { openai: true });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, {
+                    openai: true,
+                });
             } catch (/** @type {any} */ e) {
                 // Non-fatal observability failure
             }
@@ -299,7 +305,9 @@ async function applyRoutes(app) {
                     lastInitAt: new Date().toISOString(),
                     lastInitError: _e.message,
                 };
-                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, { openai: false });
+                app.locals['runtimeReadiness'] = Object.assign({}, app.locals['runtimeReadiness'] || null, {
+                    openai: false,
+                });
             } catch (/** @type {any} */ e) {
                 // noop
             }

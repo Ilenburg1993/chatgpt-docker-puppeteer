@@ -97,7 +97,12 @@ export class EnvSecretRegistry {
     #workspaceId;
 
     /**
-     * @param {{ env?: Record<string, string | undefined>; keys?: readonly string[]; accountId?: string; workspaceId?: string }} [options]
+     * @param {{
+     *     env?: Record<string, string | undefined>;
+     *     keys?: readonly string[];
+     *     accountId?: string;
+     *     workspaceId?: string;
+     * }} [options]
      */
     constructor(options = {}) {
         this.#env = options.env ?? process.env;
@@ -108,16 +113,23 @@ export class EnvSecretRegistry {
 
     /**
      * @param {string} ref
-     * @returns {Array<{ scope: 'account' | 'workspace' | 'global'; envKey: string }>}
+     * @returns {{ scope: 'account' | 'workspace' | 'global'; envKey: string }[]}
      */
     candidateRefs(ref) {
         const key = optionalString(ref);
         if (!key || !this.#keys.has(key)) return [];
-        /** @type {Array<{ scope: 'account' | 'workspace' | 'global'; envKey: string }>} */
+        /** @type {{ scope: 'account' | 'workspace' | 'global'; envKey: string }[]} */
         const candidates = [];
-        if (this.#accountId) candidates.push({ scope: 'account', envKey: buildScopedSecretEnvKey({ scope: 'account', scopeId: this.#accountId, ref: key }) });
+        if (this.#accountId)
+            candidates.push({
+                scope: 'account',
+                envKey: buildScopedSecretEnvKey({ scope: 'account', scopeId: this.#accountId, ref: key }),
+            });
         if (this.#workspaceId) {
-            candidates.push({ scope: 'workspace', envKey: buildScopedSecretEnvKey({ scope: 'workspace', scopeId: this.#workspaceId, ref: key }) });
+            candidates.push({
+                scope: 'workspace',
+                envKey: buildScopedSecretEnvKey({ scope: 'workspace', scopeId: this.#workspaceId, ref: key }),
+            });
         }
         candidates.push({ scope: 'global', envKey: key });
         return candidates;
@@ -145,7 +157,14 @@ export class EnvSecretRegistry {
 
     /**
      * @param {string} ref
-     * @returns {{ ref: string; configured: boolean; source: 'env'; scope: 'account' | 'workspace' | 'global' | null; checkedEnvKeys: string[]; safeLabel: string }}
+     * @returns {{
+     *     ref: string;
+     *     configured: boolean;
+     *     source: 'env';
+     *     scope: 'account' | 'workspace' | 'global' | null;
+     *     checkedEnvKeys: string[];
+     *     safeLabel: string;
+     * }}
      */
     describe(ref) {
         const key = optionalString(ref) ?? '';
@@ -162,7 +181,7 @@ export class EnvSecretRegistry {
     }
 
     /**
-     * @returns {Array<ReturnType<EnvSecretRegistry['describe']>>}
+     * @returns {ReturnType<EnvSecretRegistry['describe']>[]}
      */
     listConfigured() {
         return [...this.#keys].map((key) => this.describe(key)).filter((entry) => entry.configured);
@@ -170,7 +189,12 @@ export class EnvSecretRegistry {
 }
 
 /**
- * @param {{ env?: Record<string, string | undefined>; keys?: readonly string[]; accountId?: string; workspaceId?: string }} [options]
+ * @param {{
+ *     env?: Record<string, string | undefined>;
+ *     keys?: readonly string[];
+ *     accountId?: string;
+ *     workspaceId?: string;
+ * }} [options]
  * @returns {EnvSecretRegistry}
  */
 export function createEnvSecretRegistry(options = {}) {

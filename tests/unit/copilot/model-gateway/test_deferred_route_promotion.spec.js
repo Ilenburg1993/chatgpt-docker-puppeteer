@@ -39,16 +39,8 @@ function handoff(id, providerModel, requestedAt) {
 
 describe('promoteModelGatewayDeferredRouteSwitchAtTurnBoundary', () => {
     it('promove apenas a intenção mais recente da sessão e supersede as anteriores', async () => {
-        const newest = handoff(
-            'same-session-route-switch:newest',
-            'qwen3-coder-next',
-            '2026-06-16T12:00:02.000Z',
-        );
-        const older = handoff(
-            'same-session-route-switch:older',
-            'deepseek-r1',
-            '2026-06-16T12:00:01.000Z',
-        );
+        const newest = handoff('same-session-route-switch:newest', 'qwen3-coder-next', '2026-06-16T12:00:02.000Z');
+        const older = handoff('same-session-route-switch:older', 'deepseek-r1', '2026-06-16T12:00:01.000Z');
         const store = {
             readDeferredSdkSessionHandoffRecords: vi.fn().mockResolvedValue([newest, older]),
             supersedeDeferredSdkSessionHandoffRecords: vi.fn().mockResolvedValue({ superseded: 1 }),
@@ -125,13 +117,11 @@ describe('promoteModelGatewayDeferredRouteSwitchAtTurnBoundary', () => {
 
     it('não promove operação expirada', async () => {
         const store = {
-            readDeferredSdkSessionHandoffRecords: vi.fn().mockResolvedValue([
-                handoff(
-                    'same-session-route-switch:expired',
-                    'qwen3-coder-next',
-                    '2026-06-16T12:00:00.000Z',
-                ),
-            ]),
+            readDeferredSdkSessionHandoffRecords: vi
+                .fn()
+                .mockResolvedValue([
+                    handoff('same-session-route-switch:expired', 'qwen3-coder-next', '2026-06-16T12:00:00.000Z'),
+                ]),
             supersedeDeferredSdkSessionHandoffRecords: vi.fn(),
         };
         const switchRoute = vi.fn();
@@ -144,7 +134,10 @@ describe('promoteModelGatewayDeferredRouteSwitchAtTurnBoundary', () => {
         });
 
         expect(result).toMatchObject({ promoted: 0, skipped: 1, errors: 0 });
-        expect(result.records[0]).toMatchObject({ classification: 'expired', skippedReason: 'deferred_operation_expired' });
+        expect(result.records[0]).toMatchObject({
+            classification: 'expired',
+            skippedReason: 'deferred_operation_expired',
+        });
         expect(switchRoute).not.toHaveBeenCalled();
     });
 });

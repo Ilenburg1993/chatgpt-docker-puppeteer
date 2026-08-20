@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,15 +7,30 @@ const mocks = vi.hoisted(() => ({
     classifySdkRateLimitScope: vi.fn(() => 'session'),
     defaultHookBus: { on: vi.fn(), off: vi.fn() },
     modelSelector: { suggestFallback: vi.fn(() => null) },
-    getCopilotFallbackModel: /** @type {import('vitest').Mock<typeof import('#copilot/config').getCopilotFallbackModel>} */ (vi.fn(() => null)),
-    readConfiguredByokSummary: /** @type {import('vitest').Mock<typeof import('#copilot/config').readConfiguredByokSummary>} */ (vi.fn(() => ({
-        enabled: false, ready: false, preset: null, profile: null, providerType: null, baseUrl: null, model: null, wireApi: null, azureApiVersion: null,
-        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
-        modelList: { configured: false, count: 0 },
-        capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 },
-        limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
-        warnings: [], errors: [],
-    }))),
+    getCopilotFallbackModel:
+        /** @type {import('vitest').Mock<typeof import('#copilot/config').getCopilotFallbackModel>} */ (
+            vi.fn(() => null)
+        ),
+    readConfiguredByokSummary:
+        /** @type {import('vitest').Mock<typeof import('#copilot/config').readConfiguredByokSummary>} */ (
+            vi.fn(() => ({
+                enabled: false,
+                ready: false,
+                preset: null,
+                profile: null,
+                providerType: null,
+                baseUrl: null,
+                model: null,
+                wireApi: null,
+                azureApiVersion: null,
+                auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+                modelList: { configured: false, count: 0 },
+                capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 },
+                limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
+                warnings: [],
+                errors: [],
+            }))
+        ),
     recordBlockedToolCall: vi.fn(),
     defaultAuditLog: { record: vi.fn() },
     log: vi.fn(),
@@ -46,16 +60,27 @@ vi.mock('../../../../src/copilot/agent/ports/logging-port.js', () => ({
     log: mocks.log,
 }));
 
-const { buildAgentBusHooks, withAgentRuntimeToolPolicy } = await import(
-    '../../../../src/copilot/agent/ports/hook-port.js'
-);
+const { buildAgentBusHooks, withAgentRuntimeToolPolicy } =
+    await import('../../../../src/copilot/agent/ports/hook-port.js');
 
 /** @returns {ReturnType<typeof import('#copilot/config').readConfiguredByokSummary>} */
 function disabledByokSummaryFixture() {
     return {
-        enabled: false, ready: false, preset: null, profile: null, providerType: null, baseUrl: null, model: null, wireApi: null, azureApiVersion: null,
-        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false }, modelList: { configured: false, count: 0 },
-        capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 }, limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null }, warnings: [], errors: [],
+        enabled: false,
+        ready: false,
+        preset: null,
+        profile: null,
+        providerType: null,
+        baseUrl: null,
+        model: null,
+        wireApi: null,
+        azureApiVersion: null,
+        auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+        modelList: { configured: false, count: 0 },
+        capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 },
+        limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
+        warnings: [],
+        errors: [],
     };
 }
 
@@ -64,9 +89,21 @@ describe('agent/ports/hook-port', () => {
         vi.clearAllMocks();
         mocks.getCopilotFallbackModel.mockReturnValue(null);
         mocks.readConfiguredByokSummary.mockReturnValue({
-            enabled: false, ready: false, preset: null, profile: null, providerType: null, baseUrl: null, model: null, wireApi: null, azureApiVersion: null,
-            auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false }, modelList: { configured: false, count: 0 },
-            capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 }, limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null }, warnings: [], errors: [],
+            enabled: false,
+            ready: false,
+            preset: null,
+            profile: null,
+            providerType: null,
+            baseUrl: null,
+            model: null,
+            wireApi: null,
+            azureApiVersion: null,
+            auth: { apiKeyConfigured: false, bearerTokenConfigured: false, headersConfigured: false },
+            modelList: { configured: false, count: 0 },
+            capabilities: { reasoningEffort: false, vision: false, contextWindowTokens: 128000 },
+            limits: { maxRequestTokens: null, tokensPerMinute: null, requestsPerMinute: null, dailyRequests: null },
+            warnings: [],
+            errors: [],
         });
     });
 

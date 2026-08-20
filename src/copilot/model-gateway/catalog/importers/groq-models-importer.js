@@ -107,7 +107,7 @@ function modalitiesFromModelId(providerModel) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -138,7 +138,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.groq.maxCompletionTokens', value: finiteNumber(row['max_completion_tokens']) },
         { fieldPath: 'providerMetadata.groq.publicApps', value: row['public_apps'] ?? null },
         { fieldPath: 'providerMetadata.groq.batchEndpoint', value: '/openai/v1/batches' },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'groq' },
     ];
@@ -179,7 +182,7 @@ export function createGroqModelsImporter(options = {}) {
             if (!includeModelDetails) return payload;
             /** @type {Record<string, unknown>[]} */
             const data = [];
-            /** @type {Array<{ model: string; status: number }>} */
+            /** @type {{ model: string; status: number }[]} */
             const retrieveErrors = [];
             for (const row of rows) {
                 const providerModel = stringValue(row['id']);

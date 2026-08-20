@@ -8,15 +8,7 @@
  * @see EventBus
  */
 
-import {
-    gitBranch,
-    gitDiff,
-    gitLog,
-    gitPull,
-    gitStash,
-    gitStashList,
-    gitStatus,
-} from '#copilot/bridges';
+import { gitBranch, gitDiff, gitLog, gitPull, gitStash, gitStashList, gitStatus } from '#copilot/bridges';
 import {
     renderTerminalDiffPreview,
     renderTerminalPreviewSummary,
@@ -100,7 +92,7 @@ function stringField(value, fallback = '-') {
 }
 
 /**
- * @param {Array<{ xy?: string; path?: string; label?: string }>} entries
+ * @param {{ xy?: string; path?: string; label?: string }[]} entries
  * @returns {string[]}
  */
 function renderGitStatusEntries(entries) {
@@ -114,7 +106,7 @@ function renderGitStatusEntries(entries) {
 }
 
 /**
- * @param {Array<{ abbrevHash?: string; subject?: string; authorName?: string; authorDate?: string; refNames?: string }>} entries
+ * @param {{ abbrevHash?: string; subject?: string; authorName?: string; authorDate?: string; refNames?: string }[]} entries
  * @returns {string[]}
  */
 function renderGitLogEntries(entries) {
@@ -123,7 +115,12 @@ function renderGitLogEntries(entries) {
         const refs = stringField(entry.refNames, '');
         return terminalThemeWrappedRow(
             stringField(entry.abbrevHash, 'commit'),
-            [stringField(entry.subject, 'sem assunto'), stringField(entry.authorName, ''), stringField(entry.authorDate, ''), refs]
+            [
+                stringField(entry.subject, 'sem assunto'),
+                stringField(entry.authorName, ''),
+                stringField(entry.authorDate, ''),
+                refs,
+            ]
                 .filter(Boolean)
                 .join(' · '),
             { role: 'command', columns: 116, width: 12 },
@@ -132,7 +129,7 @@ function renderGitLogEntries(entries) {
 }
 
 /**
- * @param {Array<{ name?: string; current?: boolean; upstream?: string; lastCommit?: string }>} branches
+ * @param {{ name?: string; current?: boolean; upstream?: string; lastCommit?: string }[]} branches
  * @returns {string[]}
  */
 function renderGitBranches(branches) {
@@ -202,11 +199,9 @@ export async function cmdGit({ println }, args) {
         println('');
         println(terminalThemeHeadline('tool', 'Git diff', [staged ? 'staged' : 'working tree', file || null]));
         println(
-            terminalThemeRow(
-                'Preview',
-                renderTerminalPreviewSummary(rendered),
-                { role: terminalPreviewSummaryRole(rendered) },
-            ),
+            terminalThemeRow('Preview', renderTerminalPreviewSummary(rendered), {
+                role: terminalPreviewSummaryRole(rendered),
+            }),
         );
         println(rendered.output);
         return;

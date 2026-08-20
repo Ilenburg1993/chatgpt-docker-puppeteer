@@ -1,9 +1,10 @@
 # Canonical Model Gateway Runtime Operations Roadmap - 2026-06-02
 
-Este documento passa a ser o guia de continuidade para tornar o `src/copilot/model-gateway` operacional de ponta a
-ponta no terminal, para operador humano ou LLM. O foco nao e apenas selecionar um modelo: o objetivo e manter uma lista
-grande de modelos prontos, aplicar defaults seguros, permitir troca automatica quando houver falha/quota/esgotamento,
-preservar explicabilidade, e testar o fluxo no mesmo ambiente do operador.
+Este documento passa a ser o guia de continuidade para tornar o `src/copilot/model-gateway`
+operacional de ponta a ponta no terminal, para operador humano ou LLM. O foco nao e apenas
+selecionar um modelo: o objetivo e manter uma lista grande de modelos prontos, aplicar defaults
+seguros, permitir troca automatica quando houver falha/quota/esgotamento, preservar explicabilidade,
+e testar o fluxo no mesmo ambiente do operador.
 
 Documentos operacionais relacionados:
 
@@ -73,7 +74,8 @@ O sistema ideal deve permitir:
 - [x] SDK confirmations existem.
 - [x] Recovery attempts existem.
 - [x] Live scenario runs existem.
-- [x] `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:proof-plan`, `auto:standby` existem.
+- [x] `auto:status`, `auto:ready`, `auto:doctor`, `auto:explain`, `auto:proof-plan`, `auto:standby`
+      existem.
 - [x] `auto:scenarios` existe.
 - [x] `/byok auto ...` existe no terminal.
 - [x] `/byok health clear ...` existe no terminal.
@@ -88,7 +90,8 @@ O sistema ideal deve permitir:
 - [x] Live BYOK real no-PR passou em `artifacts/terminal-live/2026-06-02T01-11-14-561Z/summary.md`.
 - [x] Live auto-probe passou em `artifacts/terminal-live/2026-06-02T02-44-38-191Z/summary.md`.
 - [x] Live control no-PR passou em `artifacts/terminal-live/2026-06-02T02-45-10-607Z/summary.md`.
-- [x] Live BYOK fixture no-PR passou em `artifacts/terminal-live/2026-06-02T02-45-29-920Z/summary.md`.
+- [x] Live BYOK fixture no-PR passou em
+      `artifacts/terminal-live/2026-06-02T02-45-29-920Z/summary.md`.
 - [x] Live BYOK real no-PR passou em `artifacts/terminal-live/2026-06-02T02-45-55-239Z/summary.md`.
 - [x] `model-gateway:commands:json` roda pelo runner.
 - [x] `model-gateway:live:readiness -- --fail` roda pelo runner.
@@ -101,20 +104,25 @@ O sistema ideal deve permitir:
 
 ### 2.2 Lacunas De Base Ainda Abertas
 
-- [ ] O default auto ainda precisa de uma definicao operacional final: quando ligar, quando aplicar, quando apenas sugerir.
+- [ ] O default auto ainda precisa de uma definicao operacional final: quando ligar, quando aplicar,
+      quando apenas sugerir.
 - [ ] O fallback real em turno ainda precisa ser fechado para falha durante runtime.
 - [x] A lista de standby virou artefato persistivel de primeira classe.
 - [x] A lista de standby aparece no cockpit com gerado agora vs persistido.
 - [ ] A lista de standby ainda precisa ganhar fluxo manual de troca por item/rank.
-- [x] O terminal expõe "modelo vivo", "modelo preparado", rota selecionada, proximos substitutos e comandos por standby.
+- [x] O terminal expõe "modelo vivo", "modelo preparado", rota selecionada, proximos substitutos e
+      comandos por standby.
 - [x] A policy deve ter presets claros para humano, LLM operadora e modo conservador.
-- [ ] A troca automatica por quota esgotada precisa diferenciar quota temporaria, creditos, auth, modelo inexistente e timeout.
+- [ ] A troca automatica por quota esgotada precisa diferenciar quota temporaria, creditos, auth,
+      modelo inexistente e timeout.
 - [ ] O sistema precisa saber quando nao tentar de novo antes do reset.
 - [ ] O sistema precisa mostrar quando deve rodar probe descartavel antes de promover candidato.
 - [ ] O sistema precisa preservar historico sem deixar lixo operacional ressuscitar selecao.
-- [ ] A camada de comandos canonicos precisa incluir "status de pronto para operar" em uma saida unica e didatica.
+- [ ] A camada de comandos canonicos precisa incluir "status de pronto para operar" em uma saida
+      unica e didatica.
 - [ ] Live tests com LLM-B ainda precisam cobrir turnos reais, falhas simuladas e fallback efetivo.
-- [ ] Vision nao deve ser tratado como bloqueio geral: falha de vision deve bloquear apenas capacidades multimodais.
+- [ ] Vision nao deve ser tratado como bloqueio geral: falha de vision deve bloquear apenas
+      capacidades multimodais.
 - [ ] Side-channel GitHub Copilot quota deve continuar separado de BYOK quota/creditos/rate-limit.
 
 ## 3. Invariantes
@@ -206,7 +214,8 @@ metadata importers
 - [x] A.8 Adicionar `make model-gateway-operator-ready`.
 - [x] A.9 Mover executaveis internos para `scripts/model-gateway/commands/`.
 - [x] A.10 Mover helper dotenv para `scripts/model-gateway/lib/env.mjs`.
-- [x] A.11 Expor manifesto JSON do runner via `npm run model-gateway:scripts` e `make model-gateway-scripts`.
+- [x] A.11 Expor manifesto JSON do runner via `npm run model-gateway:scripts` e
+      `make model-gateway-scripts`.
 - [x] A.12 Proteger por teste que comandos package usam o runner, nao caminhos fisicos internos.
 - [x] A.13 Documentar IDs do runner no inventario canonico.
 - [x] A.14 Expor `/byok gateway operator-ready`.
@@ -225,7 +234,8 @@ metadata importers
 
 ### Faixa C - Default Auto
 
-- [x] C.1 Definir policy default: off em repouso, `auto_same_boundary` para `/byok auto on` sem preset.
+- [x] C.1 Definir policy default: off em repouso, `auto_same_boundary` para `/byok auto on` sem
+      preset.
 - [x] C.2 Criar preset `operator_manual`.
 - [x] C.3 Criar preset `llm_operator_guarded`.
 - [x] C.4 Criar preset `auto_same_boundary`.

@@ -8,8 +8,8 @@
  * @module copilot/model-gateway/account-access/resolver
  */
 
-import { normalizeModelGatewayAccountLimitState } from './limits.js';
 import { evaluateModelGatewayAccountOverlayFreshness } from './freshness.js';
+import { normalizeModelGatewayAccountLimitState } from './limits.js';
 
 export const MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS = Object.freeze({
     VISIBLE: 'visible',
@@ -91,7 +91,9 @@ function truthy(value) {
  * @returns {string}
  */
 function keyToken(value) {
-    return String(value ?? '').trim().toLowerCase();
+    return String(value ?? '')
+        .trim()
+        .toLowerCase();
 }
 
 /**
@@ -144,9 +146,11 @@ function firstSecretRef(overlays) {
  * @returns {string}
  */
 function resolveStatus(hardReasons, softReasons, modelVisible) {
-    if (hardReasons.some((reason) => reason.startsWith('secret_missing'))) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_SECRET;
+    if (hardReasons.some((reason) => reason.startsWith('secret_missing')))
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.MISSING_SECRET;
     if (hardReasons.includes('account_key_disabled')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.KEY_DISABLED;
-    if (hardReasons.includes('account_spending_exhausted')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.SPENDING_EXHAUSTED;
+    if (hardReasons.includes('account_spending_exhausted'))
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.SPENDING_EXHAUSTED;
     if (hardReasons.includes('account_quota_exhausted')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.QUOTA_EXHAUSTED;
     if (hardReasons.includes('account_rate_limited')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.RATE_LIMITED;
     if (hardReasons.includes('account_model_blocked')) return MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.BLOCKED;
@@ -179,8 +183,10 @@ function classifyFailure(status, hardReasons, softReasons) {
     ) {
         return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_LIMITS;
     }
-    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.KEY_DISABLED) return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_KEY;
-    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.BLOCKED) return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.POLICY_BLOCK;
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.KEY_DISABLED)
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.ACCOUNT_KEY;
+    if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.BLOCKED)
+        return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.POLICY_BLOCK;
     if (status === MODEL_GATEWAY_ACCOUNT_ACCESS_STATUS.NOT_VISIBLE) {
         return MODEL_GATEWAY_ACCOUNT_ACCESS_FAILURE_CLASS.MODEL_VISIBILITY;
     }
@@ -246,32 +252,32 @@ function overlayExpired(overlay, nowMs) {
  * @param {boolean} [input.localPrivate]
  * @param {string | number | Date | undefined} [input.now]
  * @returns {{
- *   providerId: string;
- *   providerModel: string;
- *   accountScope: string;
- *   status: string;
- *   canAttempt: boolean;
- *   secretRef: string | null;
- *   secretConfigured: boolean | null;
- *   modelVisible: boolean;
- *   modelIdentifiers: string[];
- *   accessConfidence: string;
- *   failureClass: string;
- *   overlays: Record<string, unknown>[];
- *   overlayRefs: string[];
- *   resetWindows: Array<{
+ *     providerId: string;
+ *     providerModel: string;
+ *     accountScope: string;
  *     status: string;
- *     class: string;
- *     source: string;
- *     resetAt: string | null;
- *     nextRefreshAfter: string | null;
- *     retentionExpiresAt: string | null;
- *     autoUnblocksAt: string | null;
- *     blocksUntilRefresh: boolean;
- *   }>;
- *   hardReasons: string[];
- *   softReasons: string[];
- *   reasons: string[];
+ *     canAttempt: boolean;
+ *     secretRef: string | null;
+ *     secretConfigured: boolean | null;
+ *     modelVisible: boolean;
+ *     modelIdentifiers: string[];
+ *     accessConfidence: string;
+ *     failureClass: string;
+ *     overlays: Record<string, unknown>[];
+ *     overlayRefs: string[];
+ *     resetWindows: {
+ *         status: string;
+ *         class: string;
+ *         source: string;
+ *         resetAt: string | null;
+ *         nextRefreshAfter: string | null;
+ *         retentionExpiresAt: string | null;
+ *         autoUnblocksAt: string | null;
+ *         blocksUntilRefresh: boolean;
+ *     }[];
+ *     hardReasons: string[];
+ *     softReasons: string[];
+ *     reasons: string[];
  * }}
  */
 export function resolveModelGatewayAccountAccess(input) {
@@ -281,11 +287,14 @@ export function resolveModelGatewayAccountAccess(input) {
     const requestedAccountScope = optionalString(input.accountScope);
     const accountScope = requestedAccountScope ?? 'default';
     const nowMs = dateMs(input.now) ?? Date.now();
-    const matchedOverlays = (Array.isArray(input.accountOverlays) ? input.accountOverlays.filter(isRecord) : []).filter((overlay) =>
-        overlayMatches(overlay, providerId, requestedAccountScope),
+    const matchedOverlays = (Array.isArray(input.accountOverlays) ? input.accountOverlays.filter(isRecord) : []).filter(
+        (overlay) => overlayMatches(overlay, providerId, requestedAccountScope),
     );
     const expiredOverlays = matchedOverlays.filter((overlay) => overlayExpired(overlay, nowMs));
-    const overlays = input.allowExpiredAccountOverlay === true ? matchedOverlays : matchedOverlays.filter((overlay) => !overlayExpired(overlay, nowMs));
+    const overlays =
+        input.allowExpiredAccountOverlay === true
+            ? matchedOverlays
+            : matchedOverlays.filter((overlay) => !overlayExpired(overlay, nowMs));
     const secretRef = optionalString(input.secretRef) ?? firstSecretRef(overlays);
     const hardReasons = [];
     const softReasons = [];
@@ -332,7 +341,9 @@ export function resolveModelGatewayAccountAccess(input) {
             hardReasons.push('account_model_blocked');
         }
         const overlaysWithEnabledModels = overlays.filter((overlay) => stringList(overlay['enabledModels']).length > 0);
-        modelVisible = overlaysWithEnabledModels.some((overlay) => modelListIncludesAny(modelIdentifiers, overlay['enabledModels']));
+        modelVisible = overlaysWithEnabledModels.some((overlay) =>
+            modelListIncludesAny(modelIdentifiers, overlay['enabledModels']),
+        );
         if (modelVisible) reasons.push('account_model_visible');
         else if (overlaysWithEnabledModels.length > 0 && input.treatEnabledModelsAsClosed !== false) {
             hardReasons.push('account_model_not_visible');

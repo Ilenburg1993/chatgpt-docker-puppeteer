@@ -56,7 +56,11 @@ export async function cmdSkills({ println }, arg) {
             if (!skills.paths.length) {
                 println(terminalThemeRow('Skills', 'nenhum caminho configurado', { role: 'muted' }));
             } else {
-                println(terminalThemeHeadline('command', 'Skills', [countLabel(skills.paths.length, 'caminho', 'caminhos')]));
+                println(
+                    terminalThemeHeadline('command', 'Skills', [
+                        countLabel(skills.paths.length, 'caminho', 'caminhos'),
+                    ]),
+                );
                 for (const p of skills.paths) println(terminalThemeRow('Caminho', p, { role: 'fileRead' }));
             }
             break;
@@ -100,12 +104,16 @@ export async function cmdSkills({ println }, arg) {
             // RF-055: PinnedFilesLoader não expõe método reload() público.
             // Para recarregar, reiniciar o processo ou redefinir os paths via /skills add|remove.
             println(terminalThemeRow('Reload', 'manual não disponível via REPL', { role: 'warn' }));
-            println(terminalThemeText('muted', '  Use /skills add|remove para atualizar os paths, ou reinicie o processo.'));
+            println(
+                terminalThemeText('muted', '  Use /skills add|remove para atualizar os paths, ou reinicie o processo.'),
+            );
             break;
         }
 
         default:
             println(terminalThemeRow('Subcomando', `desconhecido: ${sub}`, { role: 'warn' }));
-            println(terminalThemeRow('Uso', '/skills [list | add <path> | remove <path> | reload]', { role: 'command' }));
+            println(
+                terminalThemeRow('Uso', '/skills [list | add <path> | remove <path> | reload]', { role: 'command' }),
+            );
     }
 }

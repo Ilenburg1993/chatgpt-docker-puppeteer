@@ -52,15 +52,15 @@ Camada 4: actions/cache@v4 — packages Python
 O workflow espelha **exatamente** as versões definidas como `ARG` no `.devcontainer/Dockerfile`. Ao
 atualizar o Dockerfile, **atualize também as variáveis `env:` do workflow**.
 
-| Variável                   | Versão atual | Equivalente no Dockerfile  |
-| -------------------------- | ------------ | -------------------------- |
-| `NPM_VERSION`              | `12.0.2`     | `ARG NPM_VERSION`          |
-| `GH_VERSION`               | `2.92.0`     | `ARG GH_VERSION`           |
-| `ACTIONLINT_VERSION`       | `1.7.12`     | `ARG ACTIONLINT_VERSION`   |
-| `HADOLINT_VERSION`         | `2.14.0`     | `ARG HADOLINT_VERSION`     |
-| `YQ_VERSION`               | `4.53.2`     | `ARG YQ_VERSION`           |
-| `TS_VERSION`               | `7.0.2`      | `ARG TYPESCRIPT_VERSION`   |
-| `DEVCONTAINER_CLI_VERSION` | `0.86.1`     | @devcontainers/cli         |
+| Variável                   | Versão atual | Equivalente no Dockerfile |
+| -------------------------- | ------------ | ------------------------- |
+| `NPM_VERSION`              | `12.0.2`     | `ARG NPM_VERSION`         |
+| `GH_VERSION`               | `2.92.0`     | `ARG GH_VERSION`          |
+| `ACTIONLINT_VERSION`       | `1.7.12`     | `ARG ACTIONLINT_VERSION`  |
+| `HADOLINT_VERSION`         | `2.14.0`     | `ARG HADOLINT_VERSION`    |
+| `YQ_VERSION`               | `4.53.2`     | `ARG YQ_VERSION`          |
+| `TS_VERSION`               | `7.0.2`      | `ARG TYPESCRIPT_VERSION`  |
+| `DEVCONTAINER_CLI_VERSION` | `0.86.1`     | @devcontainers/cli        |
 
 ---
 

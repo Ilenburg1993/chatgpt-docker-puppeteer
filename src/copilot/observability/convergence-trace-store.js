@@ -8,8 +8,8 @@
  * @module copilot/observability/convergence-trace-store
  */
 
-import { createHistogram } from './metrics-histogram.js';
 import { redactSecretText } from '../core/security/redaction.js';
+import { createHistogram } from './metrics-histogram.js';
 
 // ─── Persistência SQLite (opcional, L2) ──────────────────────────────────────
 
@@ -266,7 +266,7 @@ export function createConvergenceTraceStore(
         let trace = traces.get(traceId);
         if (!trace) {
             trace = {
-            traceId: redactSecretText(traceId),
+                traceId: redactSecretText(traceId),
                 operation: event.operation,
                 sessionId: event.sessionId,
                 status: event.status === 'failed' ? 'failed' : 'running',

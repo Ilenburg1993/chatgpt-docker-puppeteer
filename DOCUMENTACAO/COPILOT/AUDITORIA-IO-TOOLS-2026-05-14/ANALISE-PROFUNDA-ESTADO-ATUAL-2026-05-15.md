@@ -1,8 +1,7 @@
 # Análise Profunda da Situação Atual — 2026-05-15
 
-**Status**: Checkpoint de análise pré-transformações amplas.
-**Commit de referência**: `53936143` (refactor: complete facade consolidation).
-**Executado**: 2026-05-15 às 12:45 UTC.
+**Status**: Checkpoint de análise pré-transformações amplas. **Commit de referência**: `53936143`
+(refactor: complete facade consolidation). **Executado**: 2026-05-15 às 12:45 UTC.
 
 ---
 
@@ -11,11 +10,13 @@
 ### 1.1 Consolidação de Boundaries (Barrel-First Pattern)
 
 ✅ **CONCLUÍDO**:
+
 - `#copilot/infra/public/io` — 19 exports (18 operações + `readIoRuntimeHealthSnapshot`)
 - `#copilot/infra/public/session` — 8 exports (escopo de sessão + índice simbólico)
 - Todas as importações diretas de consumidores externos → consolidadas em façades
 
 ✅ **GATES VALIDADOS**:
+
 - `typecheck:strict:src.copilot` — 0 errors
 - `lint:src -- src/copilot` — 0 errors
 - `test:copilot:unit` — 2737/2737 passing | 933 suites | 62.6s
@@ -43,7 +44,8 @@
 • webhooks.js — Webhooks/notificações
 ```
 
-**Risco observado**: Estes módulos ainda podem ser importados diretamente por consumidores internos, quebrando o padrão barrel-first. Candidates para consolidação futura.
+**Risco observado**: Estes módulos ainda podem ser importados diretamente por consumidores internos,
+quebrando o padrão barrel-first. Candidates para consolidação futura.
 
 ### 1.3 Padrão de Consumo Atual
 
@@ -81,6 +83,7 @@
 ```
 
 **Características**:
+
 - Roda APENAS tests/unit (418 arquivos)
 - Usa log profile **compacto** (WARN/ERROR/FAIL apenas)
 - Duração: ~62s
@@ -93,6 +96,7 @@
 ```
 
 **Características**:
+
 - Roda TODOS os testes (unit + integration + regression = 422 arquivos)
 - Usa log profile **compacto** (WARN/ERROR/FAIL apenas)
 - Duração: ~120s+ (some integration/regression suites podem ser lentas)
@@ -101,6 +105,7 @@
 ### 2.4 Consolidação Recomendada
 
 **PROPOSIÇÃO**:
+
 ```
 MANTER: npm run test:copilot:unit (para fast-path desenvolvimento)
 PADRONIZAR: npm run test:copilot (para CI/validation — mas com logging consistente)
@@ -108,6 +113,7 @@ REMOVER: "test:copilot:raw" ou renomear para "test:copilot:verbose"
 ```
 
 **Justificativa**:
+
 1. `test:copilot` já roda com o mesmo log profile compacto que `test:copilot:unit`
 2. A integração e regressão são poucas (4 arquivos), impacto mínimo na duração
 3. CI deve rodar TODOS os testes, não só unit
@@ -122,11 +128,13 @@ REMOVER: "test:copilot:raw" ou renomear para "test:copilot:verbose"
 **Escopo**: `scripts/ci/run-vitest-copilot.mjs`
 
 **Achado**:
+
 - O script já suporta múltiplos padrões de arquivo via passthrough args
 - `test:copilot` sem args roda tudo
 - `test:copilot:unit` com `tests/unit/copilot/**/*.spec.js` filtra
 
 **Oportunidade**: Extrair configuração em arquivo `vitest-test-profiles.json`:
+
 ```json
 {
   "profiles": {
@@ -145,6 +153,7 @@ REMOVER: "test:copilot:raw" ou renomear para "test:copilot:verbose"
 **Escopo**: `src/copilot/infra/public/*`
 
 **Módulos candidatos para nova fachada `#copilot/infra/public/cache`**:
+
 ```javascript
 export { getIoCacheStats } from '../io-cache.js';
 export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from '../io-cache-tiering.js';
@@ -153,12 +162,14 @@ export { invalidateIoCachePath, registerInvalidationHook } from '../io-cache.js'
 ```
 
 **Módulos candidatos para nova fachada `#copilot/infra/public/locks`**:
+
 ```javascript
 export { withIoResourceLock } from '../io-locks.js';
 export { readLockfileSync, writeLockfileSync } from '../lockfile.js';
 ```
 
 **Benefício**:
+
 - Reduce direct imports de módulos internos
 - Explícita a API de cache (importante para tools de file manipulation)
 - Facilita future refactoring de cache internamente
@@ -170,12 +181,14 @@ export { readLockfileSync, writeLockfileSync } from '../lockfile.js';
 **Achado**: Todos os tools importam de `src/copilot/tools/infra/di-tokens.js` + `tool-factory.js`
 
 **Oportunidade**: Criar fachada `#copilot/tools/public/index.js`:
+
 ```javascript
 export { createFileTools, createGitTools, createSessionTools, ... } from '../infra/tool-factory.js';
 export * from '../../sdk/tools/index.js';
 ```
 
 **Benefício**:
+
 - Tools torna-se "plug-and-play" via single import
 - Reduz boilerplate de 15 módulos
 - Facilita feature-flagging de tools
@@ -185,6 +198,7 @@ export * from '../../sdk/tools/index.js';
 **Escopo**: `src/copilot/infra/public/observability.js` (NOVA)
 
 **Exportaria**:
+
 ```javascript
 export { readIoRuntimeHealthSnapshot } from '../io-health.js';
 export { getIoLatencyStats } from '../io-observability.js';
@@ -192,6 +206,7 @@ export { buildIoMeta } from '../io-contracts.js'; // se houver
 ```
 
 **Benefício**:
+
 - Centraliza todas as APIs de observabilidade em um lugar
 - Terminal/server não precisa importar de múltiplos lugares
 - Facilita monitoração do runtime
@@ -203,12 +218,15 @@ export { buildIoMeta } from '../io-contracts.js'; // se houver
 ### 4.1 **Status Atual**
 
 `npm run test:copilot` foi executado com timeout 120s. Output mostra:
+
 - Última linha visível: "Did you forget to return it from `vi.mock`?"
 - Erro em mock de `#copilot/core` → `registerShutdownHandler` ausente
 
 ### 4.2 **Raiz Provável**
 
-Teste de integration ou regression está mockando `#copilot/core` mas não exportando `registerShutdownHandler`. Cenários:
+Teste de integration ou regression está mockando `#copilot/core` mas não exportando
+`registerShutdownHandler`. Cenários:
+
 - O test foi criado antes da função ser adicionada
 - O mock está desatualizado em relação ao atual
 - A função é nova e o mock não foi atualizado
@@ -216,6 +234,7 @@ Teste de integration ou regression está mockando `#copilot/core` mas não expor
 ### 4.3 **Ação Recomendada**
 
 Antes de consolidar `test:copilot` como padrão:
+
 1. Rodar com `--full-output` para ver stack completo
 2. Localizar o teste que está falhando
 3. Atualizar o mock ou a função conforme necessário
@@ -247,6 +266,7 @@ Antes de consolidar `test:copilot` como padrão:
 ### Immediato (Próximo Turno):
 
 1. **Validar `test:copilot` completo**
+
    ```bash
    npm run test:copilot:raw  # com --full-output para ver erro
    ```
@@ -267,6 +287,5 @@ Antes de consolidar `test:copilot` como padrão:
 
 ---
 
-**Relatório finalizado em**: 2026-05-15 12:50 UTC
-**Autor**: Análise automatizada pré-transformação
+**Relatório finalizado em**: 2026-05-15 12:50 UTC **Autor**: Análise automatizada pré-transformação
 **Status**: Pronto para execução

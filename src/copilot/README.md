@@ -2,19 +2,20 @@
 
 Hub arquitetural do runtime Copilot local.
 
-Baseline operacional atual (2026-08): o runtime trata uso GitHub Copilot por **AI Credits/tokens/`copilotUsage`** e
-mantém conceitos request-based apenas como compatibilidade legacy quando explicitamente recebidos/restaurados. O MCP
-expõe um control plane governado para Git stage/commit/push, reload do próprio stack e execução/readiness do harness
-LLM-B sem abrir arbitrary shell.
+Baseline operacional atual (2026-08): o runtime trata uso GitHub Copilot por **AI
+Credits/tokens/`copilotUsage`** e mantém conceitos request-based apenas como compatibilidade legacy
+quando explicitamente recebidos/restaurados. O MCP expõe um control plane governado para Git
+stage/commit/push, reload do próprio stack e execução/readiness do harness LLM-B sem abrir arbitrary
+shell.
 
 Este diretório tem uma regra simples:
 
 > sempre que existir um conceito análogo no `@github/copilot-sdk`, o código local deve **partir do
 > SDK vanilla** e só depois ampliar ergonomia, UX ou governança.
 
-A autoridade e a precedência dos documentos amplos ficam em [`docs/INDEX.md`](./docs/INDEX.md). Auditorias datadas são
-fotografias históricas até reconciliação explícita com o `HEAD`; este README e os READMEs locais descrevem a topologia
-canônica vigente.
+A autoridade e a precedência dos documentos amplos ficam em [`docs/INDEX.md`](./docs/INDEX.md).
+Auditorias datadas são fotografias históricas até reconciliação explícita com o `HEAD`; este README
+e os READMEs locais descrevem a topologia canônica vigente.
 
 ## Fluxo canônico de ponta a ponta
 
@@ -56,7 +57,7 @@ SDK/agent events
 | `conversation-hub/` | store/orquestração de sessões/turnos persistidos                                         |
 | `hooks/`            | policies e callbacks configuráveis sobre a sessão SDK                                    |
 | `tools/`            | custom tools registradas sobre a superfície do SDK                                       |
-| `model-gateway/`    | control plane de catálogo, BYOK, elegibilidade, roteamento e binding de modelos           |
+| `model-gateway/`    | control plane de catálogo, BYOK, elegibilidade, roteamento e binding de modelos          |
 | `infra/`            | primitivas compartilhadas de I/O, cache, índice, locks, storage e SSE                    |
 | `config/`           | defaults, builders e configuração declarativa                                            |
 | `core/`             | erros, constantes, contratos centrais e utilitários base                                 |
@@ -116,8 +117,8 @@ Em resumo:
 
 - comece em `sdk/`
 - se fizer sentido como API pública do runtime, exponha via `agent/facades/agent-sdk-access.js`
-- se a UX do terminal precisar de projeção pronta, use `terminal/frontend/gateways/sdk-session.js` ou
-  `terminal/frontend/projections/*`
+- se a UX do terminal precisar de projeção pronta, use `terminal/frontend/gateways/sdk-session.js`
+  ou `terminal/frontend/projections/*`
 
 ### “Quero reagir a um evento do SDK”
 

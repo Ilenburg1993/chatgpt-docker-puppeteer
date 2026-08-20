@@ -5,10 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-    readJsonlTail,
-    repairJsonlTrailingPartial,
-} from '../../../../src/copilot/infra/io/jsonl-reader.js';
+import { readJsonlTail, repairJsonlTrailingPartial } from '../../../../src/copilot/infra/io/jsonl-reader.js';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];

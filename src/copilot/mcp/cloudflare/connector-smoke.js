@@ -32,34 +32,36 @@ function asRecord(value) {
 
 /**
  * @typedef {Record<string, unknown> & {
- *   ok: boolean;
- *   status: number | null;
- *   tools: number;
- *   expectedLocalTools: number;
- *   toolsMatchLocalRegistry: boolean;
- *   missingLocalTools: string[];
- *   unexpectedRemoteTools: string[];
+ *     ok: boolean;
+ *     status: number | null;
+ *     tools: number;
+ *     expectedLocalTools: number;
+ *     toolsMatchLocalRegistry: boolean;
+ *     missingLocalTools: string[];
+ *     unexpectedRemoteTools: string[];
  * }} AuthenticatedToolsListProjection
  *
+ *
  * @typedef {{
- *   ok: boolean;
- *   durationMs: number | null;
- *   phaseTimings: Record<string, unknown>;
- *   failedChecks: string[];
- *   runtimeHealth: Record<string, unknown> | null;
- *   authenticatedToolsList: AuthenticatedToolsListProjection | null;
- *   authenticatedSse: Record<string, unknown> | null;
+ *     ok: boolean;
+ *     durationMs: number | null;
+ *     phaseTimings: Record<string, unknown>;
+ *     failedChecks: string[];
+ *     runtimeHealth: Record<string, unknown> | null;
+ *     authenticatedToolsList: AuthenticatedToolsListProjection | null;
+ *     authenticatedSse: Record<string, unknown> | null;
  * }} AuthenticatedOAuthSmokeProjection
  *
+ *
  * @typedef {Record<string, unknown> & {
- *   ok: boolean;
- *   orchestrationTimings: {
- *     strategy: 'parallel-unauthenticated-and-oauth';
- *     totalMs: number;
- *     unauthenticatedMs: number | null;
- *     authenticatedOauthMs: number | null;
- *   };
- *   authenticatedOAuthSmoke: AuthenticatedOAuthSmokeProjection;
+ *     ok: boolean;
+ *     orchestrationTimings: {
+ *         strategy: 'parallel-unauthenticated-and-oauth';
+ *         totalMs: number;
+ *         unauthenticatedMs: number | null;
+ *         authenticatedOauthMs: number | null;
+ *     };
+ *     authenticatedOAuthSmoke: AuthenticatedOAuthSmokeProjection;
  * }} CanonicalConnectorSmokeReport
  */
 
@@ -75,15 +77,15 @@ function finiteNumber(value) {
 
 /**
  * @param {{
- *   config: import('./config.js').CloudflareTunnelConfig;
- *   env?: NodeJS.ProcessEnv;
- *   persistState?: boolean;
- *   localToolNames?: string[];
- *   deps?: {
- *     runUnauthenticatedSmoke?: typeof runCloudflareSmoke;
- *     runOauthSmoke?: (options: Record<string, unknown>) => Promise<Record<string, unknown>>;
- *     writeState?: typeof writeConnectorSmokeState;
- *   };
+ *     config: import('./config.js').CloudflareTunnelConfig;
+ *     env?: NodeJS.ProcessEnv;
+ *     persistState?: boolean;
+ *     localToolNames?: string[];
+ *     deps?: {
+ *         runUnauthenticatedSmoke?: typeof runCloudflareSmoke;
+ *         runOauthSmoke?: (options: Record<string, unknown>) => Promise<Record<string, unknown>>;
+ *         writeState?: typeof writeConnectorSmokeState;
+ *     };
  * }} input
  * @returns {Promise<CanonicalConnectorSmokeReport>}
  */

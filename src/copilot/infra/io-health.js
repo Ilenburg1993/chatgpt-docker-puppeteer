@@ -7,22 +7,25 @@
  * @module copilot/infra/io-health
  */
 
+import { getIoPathPolicyCacheStats } from '#copilot/core';
+import { getIoAdvisoryBudgetStats } from './io-advisory-budget.js';
 import { getIoL2CacheStats } from './io-cache-l2-registry.js';
 import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 import { getIoCacheStats } from './io-cache.js';
-import { getIoAdvisoryBudgetStats } from './io-advisory-budget.js';
 import { getIoIndexAutoRefreshStats, getIoIndexStats } from './io-index-registry.js';
 import { getIoLockStats } from './io-locks.js';
-import { getIoDurabilityStats, getIoLatencyStats } from './io-observability.js';
+import { getIoDurabilityStats, getIoLatencyStats, getIoMutationStateStats } from './io-observability.js';
+import { getParserCacheStats } from './io-parser.js';
+import { getScopeStats, listScopes } from './io-session-scope.js';
 import { getLineOffsetCacheStats } from './io/fs/line-offset-cache.js';
+import { getByteLineIndexStats } from './io/fs/read-chunks.js';
+import { getIoReadHashStats } from './io/fs/read-services.js';
 import { getIoInvalidationBusStats } from './io/invalidation/bus.js';
 import { getIoExternalWatchStats } from './io/invalidation/external-watch.js';
 import {
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
 } from './io/policy/validated-path.js';
-import { getParserCacheStats } from './io-parser.js';
-import { getScopeStats, listScopes } from './io-session-scope.js';
 
 const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
 const isError =
@@ -97,7 +100,13 @@ function readCoherenceHealthStats() {
             error: isError(error) ? /** @type {Error} */ (error).message : String(error),
             hooks: 0,
             pending: 0,
+            pendingReplications: 0,
             debounceMs: 0,
+            localDispatches: 0,
+            replicationQueued: 0,
+            replicationCoalesced: 0,
+            replicationFlushes: 0,
+            replicationPublished: 0,
             externalWatch,
             crossProcess: {
                 enabled: false,
@@ -127,6 +136,9 @@ function readCoherenceHealthStats() {
  *         };
  *         l3: Record<string, unknown>;
  *         lineOffsets: ReturnType<typeof getLineOffsetCacheStats>;
+ *         byteLineIndex: ReturnType<typeof getByteLineIndexStats>;
+ *         readHashes: ReturnType<typeof getIoReadHashStats>;
+ *         pathPolicy: ReturnType<typeof getIoPathPolicyCacheStats>;
  *         coherence: ReturnType<typeof readCoherenceHealthStats>;
  *         validatedReadPath: ReturnType<typeof getValidatedReadWorkspacePathStats>;
  *         validatedMutablePath: ReturnType<typeof getValidatedMutableWorkspacePathStats>;
@@ -137,6 +149,7 @@ function readCoherenceHealthStats() {
  *     index: ReturnType<typeof getIoIndexStats>;
  *     latency: ReturnType<typeof getIoLatencyStats>;
  *     durability: ReturnType<typeof getIoDurabilityStats>;
+ *     mutationState: ReturnType<typeof getIoMutationStateStats>;
  *     advisoryBudget: ReturnType<typeof getIoAdvisoryBudgetStats>;
  *     locks: ReturnType<typeof getIoLockStats>;
  *     alerts: { code: string; severity: string; message: string }[];
@@ -170,9 +183,7 @@ export function readIoRuntimeHealthSnapshot() {
     };
     const aggregate = aggregateIoCacheTierStats({ l1, l2, l3 });
     const ids = safeCall(listScopes, []);
-    const allScopeStats = ids
-        .map((id) => safeCall(() => getScopeStats(id), null))
-        .filter((stats) => stats !== null);
+    const allScopeStats = ids.map((id) => safeCall(() => getScopeStats(id), null)).filter((stats) => stats !== null);
     const recent = allScopeStats.slice(0, 10);
 
     const circuitOpen =
@@ -212,12 +223,19 @@ export function readIoRuntimeHealthSnapshot() {
             tempPathMs: 0,
             capacityPreflightMs: 0,
             tempWriteMs: 0,
+            modeApplyMs: 0,
+            fileSyncMs: 0,
             prePublishCheckMs: 0,
             publishMs: 0,
             directorySyncMs: 0,
             totalMs: 0,
         },
         lastFailure: null,
+    });
+    const mutationState = safeCall(getIoMutationStateStats, {
+        appliedButUnconfirmed: 0,
+        byOperation: {},
+        last: null,
     });
     const locks = getIoLockStats();
     const advisoryBudget = getIoAdvisoryBudgetStats();
@@ -249,6 +267,14 @@ export function readIoRuntimeHealthSnapshot() {
             message: 'L2 cache em circuit-open; runtime operando predominantemente em L1.',
         });
     }
+    if (mutationState.appliedButUnconfirmed > 0) {
+        alerts.push({
+            code: 'IO_MUTATION_APPLIED_UNCONFIRMED',
+            severity: 'high',
+            message:
+                'Ao menos uma mutação foi fisicamente aplicada antes de falhar sua confirmação/hook de durability.',
+        });
+    }
     if (durability.fileSync.failed > 0 || durability.directorySync.failed > 0) {
         alerts.push({
             code: 'IO_DURABILITY_SYNC_FAILED',
@@ -274,7 +300,8 @@ export function readIoRuntimeHealthSnapshot() {
         alerts.push({
             code: 'IO_LOCK_PROFILE_INVALID',
             severity: 'high',
-            message: 'COPILOT_IO_FILE_LOCKS_ENABLED possui um perfil inválido; ativações automáticas estão desabilitadas.',
+            message:
+                'COPILOT_IO_FILE_LOCKS_ENABLED possui um perfil inválido; ativações automáticas estão desabilitadas.',
         });
     }
     const crossProcess = /** @type {Record<string, unknown>} */ (coherence.crossProcess ?? {});
@@ -286,14 +313,16 @@ export function readIoRuntimeHealthSnapshot() {
         alerts.push({
             code: 'IO_CROSS_PROCESS_INVALIDATION_ERROR',
             severity: 'medium',
-            message: 'Cross-process cache invalidation journal observed an initialization/read/write error; filesystem fingerprints remain the fallback.',
+            message:
+                'Cross-process cache invalidation journal observed an initialization/read/write error; filesystem fingerprints remain the fallback.',
         });
     }
     if (Number(crossProcess['gapDetections'] ?? 0) > 0) {
         alerts.push({
             code: 'IO_CROSS_PROCESS_INVALIDATION_GAP',
             severity: 'medium',
-            message: 'Cross-process invalidation consumer observed a journal sequence gap; a full index/cache reconciliation should be scheduled.',
+            message:
+                'Cross-process invalidation consumer observed a journal sequence gap; a full index/cache reconciliation should be scheduled.',
         });
     }
     if (advisoryBudget.pressure) {
@@ -329,6 +358,56 @@ export function readIoRuntimeHealthSnapshot() {
                 maxTextChars: 0,
                 maxBytes: 0,
             }),
+            byteLineIndex: safeCall(getByteLineIndexStats, {
+                hits: 0,
+                hitPrevalidationElisions: 0,
+                misses: 0,
+                builds: 0,
+                extensions: 0,
+                partialBuilds: 0,
+                fullBuilds: 0,
+                stale: 0,
+                evictions: 0,
+                memoryEvictions: 0,
+                indexBytesScanned: 0,
+                rangeBytesRead: 0,
+                capturedRangeReuses: 0,
+                rangeBytesAvoided: 0,
+                streamSeeds: 0,
+                streamSeedBytes: 0,
+                streamSeedPromotions: 0,
+                busInvalidations: 0,
+                recursiveInvalidations: 0,
+                clears: 0,
+                size: 0,
+                sizeBytes: 0,
+                maxEntries: 0,
+                maxBytes: 0,
+            }),
+            readHashes: safeCall(getIoReadHashStats, {
+                reads: 0,
+                hashComputations: 0,
+                fullHashComputations: 0,
+                returnedSliceHashComputations: 0,
+                knownFullHashReuses: 0,
+                fullWindowReturnedHashReuses: 0,
+                fullHashOutputSkips: 0,
+                returnedHashOutputSkips: 0,
+            }),
+            pathPolicy: safeCall(getIoPathPolicyCacheStats, {
+                hits: 0,
+                misses: 0,
+                sets: 0,
+                expirations: 0,
+                evictions: 0,
+                bypasses: 0,
+                invalidationEvents: 0,
+                invalidatedEntries: 0,
+                size: 0,
+                ttlMs: 0,
+                maxEntries: 0,
+                policyVersion: 'unavailable',
+            }),
             coherence,
             validatedReadPath: getValidatedReadWorkspacePathStats(),
             validatedMutablePath: getValidatedMutableWorkspacePathStats(),
@@ -349,6 +428,7 @@ export function readIoRuntimeHealthSnapshot() {
         parser: readParserHealthStats(),
         latency: safeCall(getIoLatencyStats, {}),
         durability,
+        mutationState,
         advisoryBudget,
         locks,
         alerts,

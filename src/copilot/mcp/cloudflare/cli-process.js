@@ -1,12 +1,18 @@
 // @ts-check
 /** Process supervision helpers for Cloudflare MCP CLI. */
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, openSync } from 'node:fs';
-import { mkdir, readFile, rm, stat } from 'node:fs/promises';
+
+import { moveFileLocked } from '#copilot/infra/public/io';
+import {
+    deleteFileTrusted,
+    mkdirPathTrusted,
+    openDetachedAppendSinkTrusted,
+    readTextFreshTrusted,
+    statPathTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/trusted-io';
 import path from 'node:path';
 import process from 'node:process';
-import { moveFileLocked } from '#copilot/infra/public/io';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 export const CLOUDFLARED_TOKEN_FILE_MIN_VERSION = '2025.4.0';
 const DEFAULT_STOP_TIMEOUT_MS = 5_000;
@@ -18,13 +24,13 @@ const DEFAULT_DETACHED_LOG_ROTATE_BYTES = 2 * 1024 * 1024;
  * @typedef {{ ok: true; version: string; parsedVersion?: string } | { ok: false; error: string }} CloudflaredVersion
  *
  * @typedef {{
- *   name: string;
- *   command: string;
- *   args: string[];
- *   pidFile: string;
- *   logFile: string;
- *   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
- *   stateWriter?: (filePath: string, content: string) => Promise<void>;
+ *     name: string;
+ *     command: string;
+ *     args: string[];
+ *     pidFile: string;
+ *     logFile: string;
+ *     env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
+ *     stateWriter?: (filePath: string, content: string) => Promise<void>;
  * }} DetachedProcessOptions
  */
 
@@ -32,7 +38,8 @@ const DEFAULT_DETACHED_LOG_ROTATE_BYTES = 2 * 1024 * 1024;
 export function readCloudflaredVersion() {
     const result = spawnSync('cloudflared', ['--version'], { encoding: 'utf8' });
     if (result.error) return { ok: false, error: result.error.message };
-    if (result.status !== 0) return { ok: false, error: result.stderr.trim() || `cloudflared exited with ${result.status}` };
+    if (result.status !== 0)
+        return { ok: false, error: result.stderr.trim() || `cloudflared exited with ${result.status}` };
     const version = result.stdout.trim();
     const parsedVersion = parseCloudflaredVersion(version);
     return parsedVersion ? { ok: true, version, parsedVersion } : { ok: true, version };
@@ -47,9 +54,20 @@ export function assessCloudflaredCompatibility(cloudflared, config) {
     if (!cloudflared.ok) return { ok: false, reason: cloudflared.error ?? 'cloudflared-not-available' };
     if (!config.hasTunnelTokenFile) return { ok: true };
     const detectedVersion = cloudflared.parsedVersion ?? parseCloudflaredVersion(cloudflared.version);
-    if (!detectedVersion) return { ok: false, minimumVersion: CLOUDFLARED_TOKEN_FILE_MIN_VERSION, detectedVersion: null, reason: 'could-not-parse-cloudflared-version' };
+    if (!detectedVersion)
+        return {
+            ok: false,
+            minimumVersion: CLOUDFLARED_TOKEN_FILE_MIN_VERSION,
+            detectedVersion: null,
+            reason: 'could-not-parse-cloudflared-version',
+        };
     if (compareVersions(detectedVersion, CLOUDFLARED_TOKEN_FILE_MIN_VERSION) < 0) {
-        return { ok: false, minimumVersion: CLOUDFLARED_TOKEN_FILE_MIN_VERSION, detectedVersion, reason: 'token-file-requires-newer-cloudflared' };
+        return {
+            ok: false,
+            minimumVersion: CLOUDFLARED_TOKEN_FILE_MIN_VERSION,
+            detectedVersion,
+            reason: 'token-file-requires-newer-cloudflared',
+        };
     }
     return { ok: true, minimumVersion: CLOUDFLARED_TOKEN_FILE_MIN_VERSION, detectedVersion };
 }
@@ -73,21 +91,43 @@ function compareVersions(left, right) {
 
 /**
  * @param {string} pidFile
- * @returns {Promise<{ pidFile: string; pid: number | null; alive: boolean; state: 'alive' | 'dead' | 'missing' | 'invalid'; error: string | null }>}
+ * @returns {Promise<{
+ *     pidFile: string;
+ *     pid: number | null;
+ *     alive: boolean;
+ *     state: 'alive' | 'dead' | 'missing' | 'invalid';
+ *     error: string | null;
+ * }>}
  */
 export async function readPidFileStatus(pidFile) {
     try {
-        const pid = Number((await readFile(pidFile, 'utf8')).trim());
-        if (!Number.isInteger(pid) || pid <= 0) return { pidFile, pid: null, alive: false, state: 'invalid', error: 'invalid-pid-file' };
+        const pid = Number(
+            (await readTextFreshTrusted(pidFile, { caller: 'mcp.cloudflare.cli-process' })).content.trim(),
+        );
+        if (!Number.isInteger(pid) || pid <= 0)
+            return { pidFile, pid: null, alive: false, state: 'invalid', error: 'invalid-pid-file' };
         try {
             process.kill(pid, 0);
             return { pidFile, pid, alive: true, state: 'alive', error: null };
         } catch (error) {
-            return { pidFile, pid, alive: false, state: 'dead', error: error instanceof Error ? error.message : String(error) };
+            return {
+                pidFile,
+                pid,
+                alive: false,
+                state: 'dead',
+                error: error instanceof Error ? error.message : String(error),
+            };
         }
     } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return { pidFile, pid: null, alive: false, state: 'missing', error: null };
-        return { pidFile, pid: null, alive: false, state: 'invalid', error: error instanceof Error ? error.message : String(error) };
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+            return { pidFile, pid: null, alive: false, state: 'missing', error: null };
+        return {
+            pidFile,
+            pid: null,
+            alive: false,
+            state: 'invalid',
+            error: error instanceof Error ? error.message : String(error),
+        };
     }
 }
 
@@ -100,12 +140,13 @@ export async function readPidFileStatus(pidFile) {
  * @returns {Promise<{ rotated: boolean; previousBytes: number; rotatedPath: string | null }>}
  */
 export async function rotateDetachedProcessLogIfOversized(logFile, options = {}) {
-    const maxBytes = Number.isFinite(options.maxBytes) && Number(options.maxBytes) > 0
-        ? Math.trunc(Number(options.maxBytes))
-        : DEFAULT_DETACHED_LOG_ROTATE_BYTES;
+    const maxBytes =
+        Number.isFinite(options.maxBytes) && Number(options.maxBytes) > 0
+            ? Math.trunc(Number(options.maxBytes))
+            : DEFAULT_DETACHED_LOG_ROTATE_BYTES;
     let currentStats;
     try {
-        currentStats = await stat(logFile);
+        currentStats = (await statPathTrusted(logFile, { caller: 'mcp.cloudflare.cli-process' })).stats;
     } catch (error) {
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
             return { rotated: false, previousBytes: 0, rotatedPath: null };
@@ -122,22 +163,48 @@ export async function rotateDetachedProcessLogIfOversized(logFile, options = {})
 
 /**
  * @param {DetachedProcessOptions} options
- * @returns {Promise<{ name: string; pidFile: string; logFile: string; metadataFile: string; pid: number; alreadyRunning: boolean; restarted: boolean }>}
+ * @returns {Promise<{
+ *     name: string;
+ *     pidFile: string;
+ *     logFile: string;
+ *     metadataFile: string;
+ *     pid: number;
+ *     alreadyRunning: boolean;
+ *     restarted: boolean;
+ * }>}
  */
 export async function ensureDetachedProcess(options) {
     const metadataFile = `${options.pidFile}.json`;
     const signature = { command: options.command, args: options.args, env: redactEnv(options.env ?? {}) };
     const existing = await readPidFileStatus(options.pidFile);
-    if (existing.alive && existing.pid !== null) return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: existing.pid, alreadyRunning: true, restarted: false };
-    await mkdir(path.dirname(options.pidFile), { recursive: true });
-    await mkdir(path.dirname(options.logFile), { recursive: true });
+    if (existing.alive && existing.pid !== null)
+        return {
+            name: options.name,
+            pidFile: options.pidFile,
+            logFile: options.logFile,
+            metadataFile,
+            pid: existing.pid,
+            alreadyRunning: true,
+            restarted: false,
+        };
+    await mkdirPathTrusted(path.dirname(options.pidFile), {
+        caller: 'mcp.cloudflare.cli-process',
+        recursive: true,
+    });
     await rotateDetachedProcessLogIfOversized(options.logFile);
-    const out = openSync(options.logFile, 'a');
+    const logSink = await openDetachedAppendSinkTrusted(options.logFile, {
+        caller: 'mcp.cloudflare.cli-process',
+        mode: 0o600,
+    });
     let child;
     try {
-        child = spawn(options.command, options.args, { detached: true, stdio: ['ignore', out, out], env: { ...process.env, ...(options.env ?? {}) } });
+        child = spawn(options.command, options.args, {
+            detached: true,
+            stdio: ['ignore', logSink.handle.fd, logSink.handle.fd],
+            env: { ...process.env, ...(options.env ?? {}) },
+        });
     } finally {
-        closeSync(out);
+        await logSink.handle.close();
     }
     if (!child.pid) throw new Error(`Could not start ${options.name}`);
     child.unref();
@@ -164,10 +231,21 @@ export async function ensureDetachedProcess(options) {
         await stateWriter(options.pidFile, `${child.pid}\n`);
     } catch (error) {
         await terminateDetachedProcess(child.pid);
-        await Promise.all([rm(options.pidFile, { force: true }), rm(metadataFile, { force: true })]);
+        await Promise.all([
+            deleteFileTrusted(options.pidFile, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
+            deleteFileTrusted(metadataFile, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
+        ]);
         throw error;
     }
-    return { name: options.name, pidFile: options.pidFile, logFile: options.logFile, metadataFile, pid: child.pid, alreadyRunning: false, restarted: existing.state === 'dead' };
+    return {
+        name: options.name,
+        pidFile: options.pidFile,
+        logFile: options.logFile,
+        metadataFile,
+        pid: child.pid,
+        alreadyRunning: false,
+        restarted: existing.state === 'dead',
+    };
 }
 
 /**
@@ -199,7 +277,16 @@ async function terminateDetachedProcess(pid) {
 
 /**
  * @param {string} pidFile
- * @returns {Promise<{ pidFile: string; pid: number | null; wasAlive: boolean; stopped: boolean; error: string | null; processGroupSignalled: boolean; forcedKilled: boolean; stopWaitMs: number }>}
+ * @returns {Promise<{
+ *     pidFile: string;
+ *     pid: number | null;
+ *     wasAlive: boolean;
+ *     stopped: boolean;
+ *     error: string | null;
+ *     processGroupSignalled: boolean;
+ *     forcedKilled: boolean;
+ *     stopWaitMs: number;
+ * }>}
  */
 export async function stopPidFileProcess(pidFile) {
     const status = await readPidFileStatus(pidFile);
@@ -261,8 +348,10 @@ export async function stopPidFileProcess(pidFile) {
             };
         }
     }
-    await rm(pidFile, { force: true });
-    await rm(`${pidFile}.json`, { force: true });
+    await Promise.all([
+        deleteFileTrusted(pidFile, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
+        deleteFileTrusted(`${pidFile}.json`, { caller: 'mcp.cloudflare.cli-process', ignoreMissing: true }),
+    ]);
     return {
         pidFile,
         pid: status.pid,
@@ -321,10 +410,16 @@ function readStopTimeoutMs(env) {
 
 /** @param {string} metadataFile @returns {Promise<unknown | null>} */
 export async function readProcessMetadata(metadataFile) {
-    try { return JSON.parse(await readFile(metadataFile, 'utf8')); } catch { return null; }
+    try {
+        return JSON.parse((await readTextFreshTrusted(metadataFile, { caller: 'mcp.cloudflare.cli-process' })).content);
+    } catch {
+        return null;
+    }
 }
 
 /** @param {NodeJS.ProcessEnv | Record<string, string | undefined>} env @returns {Record<string, string | undefined>} */
 function redactEnv(env) {
-    return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, /TOKEN|SECRET|PASSWORD|KEY/u.test(key) ? '<redacted>' : value]));
+    return Object.fromEntries(
+        Object.entries(env).map(([key, value]) => [key, /TOKEN|SECRET|PASSWORD|KEY/u.test(key) ? '<redacted>' : value]),
+    );
 }

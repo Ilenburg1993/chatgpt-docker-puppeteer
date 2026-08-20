@@ -190,8 +190,7 @@ export function registerSessionCoreRoutes(router) {
             if (runtimeSessionId === id && verification.verifiedSwitch) {
                 routeDeps.sdkRuntimeProjection.observeRuntimeModelChangeProjection(
                     {
-                        previousModel:
-                            typeof runtimeSnapshot?.['model'] === 'string' ? runtimeSnapshot['model'] : null,
+                        previousModel: typeof runtimeSnapshot?.['model'] === 'string' ? runtimeSnapshot['model'] : null,
                         newModel: effectiveModel,
                         ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
                     },

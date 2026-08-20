@@ -8,12 +8,12 @@
  * @see EventBus
  */
 
-import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
 import {
     compactTerminalOperatorToolText,
     formatTerminalToolPathForOperator,
     humanizeTerminalToolSurfaceText,
 } from '../events/presenters/tools/index.js';
+import { readTerminalConfigProjection, readTerminalMetricsProjection } from '../frontend/index.js';
 import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
@@ -63,7 +63,9 @@ function readKnownMetricContextLimit(configProjection) {
  * @returns {string}
  */
 function humanMetricStatus(value) {
-    const status = String(value ?? '').trim().toLowerCase();
+    const status = String(value ?? '')
+        .trim()
+        .toLowerCase();
     if (status === 'completed' || status === 'success' || status === 'ok') return 'concluído';
     if (status === 'idle') return 'ocioso';
     if (status === 'processing') return 'trabalhando';
@@ -172,12 +174,7 @@ function humanMetricSyncStatus(value) {
  * @returns {string}
  */
 function humanMetricActivityText(value) {
-    const text =
-        typeof value === 'string'
-            ? value
-            : value == null
-              ? ''
-              : String(value);
+    const text = typeof value === 'string' ? value : value == null ? '' : String(value);
     return humanizeTerminalToolSurfaceText(compactTerminalOperatorToolText(text.replace(/\s+/gu, ' ').trim(), 120))
         .replace(/\bmodelo=/giu, 'modelo ')
         .replace(/\bcusto=/giu, 'custo ')
@@ -275,7 +272,10 @@ export function cmdMetrics({ println }, arg = '') {
         ? `configurado ${modelBilling.configuredModel ?? '-'} · cobrado ${modelBilling.billedModel ?? '-'}`
         : `rota ${modelBilling.displayModel}${modelBilling.observedModel && modelBilling.observedModel !== modelBilling.displayModel ? ` · observado ${modelBilling.observedModel}` : ''}`;
     const costStr = modelBilling.cost === null ? '-' : `$${modelBilling.cost.toFixed(4)}`;
-    const billingStatus = terminalThemeText(modelBilling.mismatch ? 'error' : 'success', modelBilling.mismatch ? 'divergente' : 'ok');
+    const billingStatus = terminalThemeText(
+        modelBilling.mismatch ? 'error' : 'success',
+        modelBilling.mismatch ? 'divergente' : 'ok',
+    );
     const byokRouteLabel = byok?.preset ?? byok?.providerType ?? '-';
     const byokModelLabel = byok?.model ?? '-';
     const billingLine = byokActive
@@ -362,16 +362,26 @@ export function cmdMetrics({ println }, arg = '') {
     println(terminalThemeHeadline('command', 'Métricas da sessão'));
     println(terminalThemeDivider(52));
     println(terminalThemeRow('Sessão', sessionId, { role: 'muted' }));
-    println(terminalThemeRow('Ambiente alvo', renderMetricRuntimeTarget(projection.runtimeId, detail), { role: 'muted' }));
-    println(terminalThemeRow('Sessão SDK', renderMetricBinding(binding.sdkSessionId, detail, 'ativa'), { role: 'muted' }));
-    println(terminalThemeRow('Sessão hub', renderMetricBinding(binding.hubSessionId, detail, 'ativa'), { role: 'muted' }));
+    println(
+        terminalThemeRow('Ambiente alvo', renderMetricRuntimeTarget(projection.runtimeId, detail), { role: 'muted' }),
+    );
+    println(
+        terminalThemeRow('Sessão SDK', renderMetricBinding(binding.sdkSessionId, detail, 'ativa'), { role: 'muted' }),
+    );
+    println(
+        terminalThemeRow('Sessão hub', renderMetricBinding(binding.hubSessionId, detail, 'ativa'), { role: 'muted' }),
+    );
     println(terminalThemeRow('Status', humanMetricStatus(status), { role: 'info' }));
     println(terminalThemeRow('Modelo', String(model), { role: 'assistant' }));
     println(terminalThemeRow('Modo SDK', humanMetricSdkMode(configProjection.sdkSessionMode), { role: 'muted' }));
     println(terminalThemeRow('Plano', configProjection.sdkPlanOperation ?? '(sem alterações)', { role: 'muted' }));
 
     println(terminalThemeHeadline('command', 'Uso'));
-    println(terminalThemeRow('Turnos', `${turnCount} ${terminalThemeText('muted', '(timeline canônica)')}`, { role: 'info' }));
+    println(
+        terminalThemeRow('Turnos', `${turnCount} ${terminalThemeText('muted', '(timeline canônica)')}`, {
+            role: 'info',
+        }),
+    );
     println(
         terminalThemeRow(
             'Conversa viva',
@@ -400,10 +410,18 @@ export function cmdMetrics({ println }, arg = '') {
 
     println(terminalThemeHeadline('tool', 'Ferramentas'));
     println(terminalThemeRow('Chamadas', String(toolCallCount), { role: 'info' }));
-    println(terminalThemeRow('Erros', toolErrorCount > 0 ? String(toolErrorCount) : '0', { role: toolErrorCount > 0 ? 'error' : 'success' }));
+    println(
+        terminalThemeRow('Erros', toolErrorCount > 0 ? String(toolErrorCount) : '0', {
+            role: toolErrorCount > 0 ? 'error' : 'success',
+        }),
+    );
 
     println(terminalThemeHeadline('error', 'Erros'));
-    println(terminalThemeRow('Total', errorStats.total > 0 ? String(errorStats.total) : '0', { role: errorStats.total > 0 ? 'error' : 'success' }));
+    println(
+        terminalThemeRow('Total', errorStats.total > 0 ? String(errorStats.total) : '0', {
+            role: errorStats.total > 0 ? 'error' : 'success',
+        }),
+    );
     println(terminalThemeRow('Buffer', String(errorStats.buffered), { role: 'info' }));
 
     println(terminalThemeHeadline('thinking', 'Atividade'));
@@ -422,14 +440,48 @@ export function cmdMetrics({ println }, arg = '') {
     );
 
     println(terminalThemeHeadline('info', 'Streaming público'));
-    println(terminalThemeRow('Deltas', `aceitos ${streamDiagnostics.counters.deltaAccepted} · normalizados ${streamDiagnostics.counters.deltaNormalized} · suprimidos ${streamDiagnostics.counters.deltaSuppressed}`, { role: 'info' }));
-    println(terminalThemeRow('Causal', `aceitos ${streamDiagnostics.counters.deltaCausalAccepted} · duplicados ${streamDiagnostics.counters.deltaCausalDuplicateSuppressed} · fallback temporal ${streamDiagnostics.counters.deltaTemporalFallbackSuppressed}`, { role: 'muted' }));
-    println(terminalThemeRow('Cumulativo', `normalizados ${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos ${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap ${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup ${streamDiagnostics.counters.deltaDuplicateSuppressed}`, { role: 'muted' }));
-    println(terminalThemeRow('Final', `ok ${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo ${streamDiagnostics.counters.finalSuffix} · divergências ${streamDiagnostics.counters.finalMismatch} · sem delta ${streamDiagnostics.counters.finalNoVisibleStream} · vazio ${streamDiagnostics.counters.finalEmpty}`, { role: 'info' }));
+    println(
+        terminalThemeRow(
+            'Deltas',
+            `aceitos ${streamDiagnostics.counters.deltaAccepted} · normalizados ${streamDiagnostics.counters.deltaNormalized} · suprimidos ${streamDiagnostics.counters.deltaSuppressed}`,
+            { role: 'info' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Causal',
+            `aceitos ${streamDiagnostics.counters.deltaCausalAccepted} · duplicados ${streamDiagnostics.counters.deltaCausalDuplicateSuppressed} · fallback temporal ${streamDiagnostics.counters.deltaTemporalFallbackSuppressed}`,
+            { role: 'muted' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Cumulativo',
+            `normalizados ${streamDiagnostics.counters.deltaCumulativeNormalized} · suprimidos ${streamDiagnostics.counters.deltaCumulativeSuppressed} · overlap ${streamDiagnostics.counters.deltaOverlapNormalized} · sufixo dup ${streamDiagnostics.counters.deltaDuplicateSuppressed}`,
+            { role: 'muted' },
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Final',
+            `ok ${streamDiagnostics.counters.finalAlreadyStreamed} · sufixo ${streamDiagnostics.counters.finalSuffix} · divergências ${streamDiagnostics.counters.finalMismatch} · sem delta ${streamDiagnostics.counters.finalNoVisibleStream} · vazio ${streamDiagnostics.counters.finalEmpty}`,
+            { role: 'info' },
+        ),
+    );
 
     println(terminalThemeHeadline('info', 'Registro SSE'));
-    println(terminalThemeRow('Eventos', `${sseEventArchive.events} (último id ${sseEventArchive.lastEventId ?? '-'})`, { role: 'info' }));
-    println(terminalThemeRow('Fila', `${sseEventArchive.queueDepth} (flush ${sseEventArchive.flushInFlight ? 'em andamento' : sseEventArchive.flushScheduled ? 'agendado' : 'ocioso'} · falhas ${sseEventArchive.failedEvents} · descartados ${sseEventArchive.droppedEvents})`, { role: 'muted' }));
+    println(
+        terminalThemeRow('Eventos', `${sseEventArchive.events} (último id ${sseEventArchive.lastEventId ?? '-'})`, {
+            role: 'info',
+        }),
+    );
+    println(
+        terminalThemeRow(
+            'Fila',
+            `${sseEventArchive.queueDepth} (flush ${sseEventArchive.flushInFlight ? 'em andamento' : sseEventArchive.flushScheduled ? 'agendado' : 'ocioso'} · falhas ${sseEventArchive.failedEvents} · descartados ${sseEventArchive.droppedEvents})`,
+            { role: 'muted' },
+        ),
+    );
     const archivePath =
         sseEventArchive.enabled && sseEventArchive.path
             ? formatTerminalToolPathForOperator(sseEventArchive.path)
@@ -440,9 +492,23 @@ export function cmdMetrics({ println }, arg = '') {
     if (sseEventArchive.error) println(terminalThemeRow('Erro SSE', sseEventArchive.error, { role: 'error' }));
 
     println(terminalThemeHeadline('command', 'Injeção'));
-    println(terminalThemeRow('Último', latestInject ? `${humanMetricStatus(latestInjectOutcome)} · ${latestInject.durationMs}ms${latestInjectTimeout}` : '(nenhum)', { role: latestInject ? 'info' : 'muted' }));
+    println(
+        terminalThemeRow(
+            'Último',
+            latestInject
+                ? `${humanMetricStatus(latestInjectOutcome)} · ${latestInject.durationMs}ms${latestInjectTimeout}`
+                : '(nenhum)',
+            { role: latestInject ? 'info' : 'muted' },
+        ),
+    );
     println(terminalThemeRow('Transporte', latestInjectTransport, { role: 'muted' }));
-    println(terminalThemeRow('Prompt', detail ? `${latestInjectPrompt} · ${latestInjectFreshness}` : humanMetricPromptState(latestInjectFreshness), { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Prompt',
+            detail ? `${latestInjectPrompt} · ${latestInjectFreshness}` : humanMetricPromptState(latestInjectFreshness),
+            { role: 'muted' },
+        ),
+    );
     println(terminalThemeRow('Motivo', latestInjectReason, { role: 'muted' }));
     println(
         terminalThemeRow(
@@ -456,6 +522,12 @@ export function cmdMetrics({ println }, arg = '') {
             { role: 'muted' },
         ),
     );
-    println(terminalThemeRow('Retomada', `auto-início ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`, { role: 'muted' }));
+    println(
+        terminalThemeRow(
+            'Retomada',
+            `auto-início ${yesNoPt(latestInjectAutoStart)} · recuperação ${yesNoPt(latestInjectRecovery)}`,
+            { role: 'muted' },
+        ),
+    );
     println(terminalThemeDivider(52));
 }

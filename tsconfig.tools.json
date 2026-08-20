@@ -5,15 +5,8 @@
     "tsBuildInfoFile": "/home/node/.cache/typescript/tsconfig.tools.tsbuildinfo",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": [
-      "ES2024",
-      "ES2022.Error",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "node"
-    ]
+    "lib": ["ES2024", "ES2022.Error", "DOM", "DOM.Iterable"],
+    "types": ["node"]
   },
   "include": [
     "scripts/**/*.mjs",

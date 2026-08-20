@@ -78,14 +78,22 @@ test('wave9: SIGPIPE/SIGCHLD optional policy is explicit, non-shutdown, and clea
                 assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'] + 1, 'SIGPIPE should be installed on POSIX');
                 /** @type {any} */ (handlers).sigpipe();
             } else {
-                assert.equal(afterSetup['SIGPIPE'], before['SIGPIPE'], 'SIGPIPE count should stay stable when unsupported');
+                assert.equal(
+                    afterSetup['SIGPIPE'],
+                    before['SIGPIPE'],
+                    'SIGPIPE count should stay stable when unsupported',
+                );
             }
 
             if (typeof handlers['sigchld'] === 'function') {
                 assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'] + 1, 'SIGCHLD should be installed on POSIX');
                 /** @type {any} */ (handlers).sigchld();
             } else {
-                assert.equal(afterSetup['SIGCHLD'], before['SIGCHLD'], 'SIGCHLD count should stay stable when unsupported');
+                assert.equal(
+                    afterSetup['SIGCHLD'],
+                    before['SIGCHLD'],
+                    'SIGCHLD count should stay stable when unsupported',
+                );
             }
 
             assert.equal(

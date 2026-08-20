@@ -137,7 +137,7 @@ export {
 
 // model-resolution-port.js — excluído: lifecycle.js já re-exporta setSessionAutoModelResolver.
 
-export { createConfiguredPermissionHandler, PermissionController } from './permission-controller.js';
+export { PermissionController, createConfiguredPermissionHandler } from './permission-controller.js';
 export {
     classifyPermissionDecision,
     normalizePermissionCompletedEvent,

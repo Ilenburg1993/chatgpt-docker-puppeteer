@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {ContractDefinitionV1} from "./load_registry.mjs" */
+/** @import {ContractDefinitionV1} from './load_registry.mjs' */
 
 /**
  * Contratos legados usados para paridade durante migração híbrida.

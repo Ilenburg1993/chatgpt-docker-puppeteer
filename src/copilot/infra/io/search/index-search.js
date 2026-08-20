@@ -82,16 +82,15 @@ export function formatIndexSearchRows(rows) {
             const path = row.relativePath || row.filePath;
             const startLine = Number(row.startLine ?? 0);
             const endLine = Number(row.endLine ?? startLine);
-            const location =
-                startLine > 0 ? `${path}:${startLine}${endLine > startLine ? `-${endLine}` : ''}` : path;
+            const location = startLine > 0 ? `${path}:${startLine}${endLine > startLine ? `-${endLine}` : ''}` : path;
             return `${location}: ${snippet}`;
         })
         .join('\n');
 }
 
 /**
- * Formata resultados de substring literal do índice como linhas exatas no mesmo formato do grep (`path:line:text`).
- * O SQLite filtra os chunks candidatos; a expansão em JS preserva o contrato de `repo_search_text` sem subprocesso.
+ * Formata resultados de substring literal do índice como linhas exatas no mesmo formato do grep (`path:line:text`). O
+ * SQLite filtra os chunks candidatos; a expansão em JS preserva o contrato de `repo_search_text` sem subprocesso.
  *
  * @param {{ filePath: string; relativePath: string; startLine: number; content?: string }[]} rows
  * @param {string} query

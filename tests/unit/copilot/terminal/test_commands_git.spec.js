@@ -6,17 +6,13 @@ const bridgeMocks = vi.hoisted(() => ({
     formatBranch: vi.fn(() => ''),
     formatLog: vi.fn(() => ''),
     formatStatus: vi.fn(() => ''),
-    gitBranch: vi.fn(
-        async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitBranch>>} */ ([]),
-    ),
+    gitBranch: vi.fn(async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitBranch>>} */ ([])),
     gitDiff: vi.fn(async () => ''),
     gitLog: vi.fn(async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitLog>>} */ ([])),
     gitPull: vi.fn(async () => ''),
     gitStash: vi.fn(async () => ''),
     gitStashList: vi.fn(async () => ''),
-    gitStatus: vi.fn(
-        async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitStatus>>} */ ([]),
-    ),
+    gitStatus: vi.fn(async () => /** @type {Awaited<ReturnType<typeof import('#copilot/bridges').gitStatus>>} */ ([])),
 }));
 
 vi.mock('#copilot/bridges', () => bridgeMocks);

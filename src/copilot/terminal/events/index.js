@@ -7,22 +7,13 @@ export {
     renderTerminalAssistantTranscript,
     __test__ as terminalAssistantTranscriptRendererTestHarness,
 } from './assistant-transcript-renderer.js';
-export { renderTerminalIntent, __test__ as terminalIntentRendererTestHarness } from './intent-renderer.js';
 export {
-    compactTerminalIntentText,
-    formatTerminalIntentTechnicalEnvelope,
-    humanTerminalIntentRiskLabel,
-    humanTerminalIntentSource,
-    terminalIntentRiskTheme,
-} from './intent-presenter.js';
-export { buildTerminalHumanQuestionCard, printTerminalHumanQuestionCard } from './human-question-renderer.js';
-export {
-    EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS,
+    AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS,
     EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
+    EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS,
     EMPTY_AFTER_USER_INPUT_MODEL_COMMAND,
     EMPTY_AFTER_USER_INPUT_RESUME_COMMAND,
     EMPTY_AFTER_USER_INPUT_RESUME_MESSAGE,
-    AFTER_USER_INPUT_CONTINUATION_DIAGNOSTIC_COMMANDS,
     buildEmptyAfterUserInputAutoRecoveryRows,
     buildEmptyAfterUserInputRecoveryRows,
     buildEmptyAfterUserInputResumeMessage,
@@ -31,24 +22,28 @@ export {
     summarizeEmptyAfterUserInputRecovery,
 } from './dialog-recovery-presenter.js';
 export {
-    createTaskTranscriptAccumulator,
-    getTaskTranscriptKey,
-    isInternalTaskTranscriptKey,
-} from './task-transcript-accumulator.js';
-export {
     TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS,
     TERMINAL_EXPLICIT_AGENT_EVENTS,
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
     findTerminalPublicStreamSourcePolicyByEvent,
-    listTerminalPublicStreamSourcePolicies,
     listTerminalIgnoredAgentEvents,
+    listTerminalPublicStreamSourcePolicies,
 } from './event-adapter-events.js';
 export {
     setupTerminalEventAdapters,
     setupTerminalHeadlessEventAdapters,
     setupTerminalInteractiveEventAdapters,
 } from './event-adapters.js';
+export { buildTerminalHumanQuestionCard, printTerminalHumanQuestionCard } from './human-question-renderer.js';
+export {
+    compactTerminalIntentText,
+    formatTerminalIntentTechnicalEnvelope,
+    humanTerminalIntentRiskLabel,
+    humanTerminalIntentSource,
+    terminalIntentRiskTheme,
+} from './intent-presenter.js';
+export { renderTerminalIntent, __test__ as terminalIntentRendererTestHarness } from './intent-renderer.js';
 export {
     clearTerminalIoActivityProjection,
     readTerminalIoActivityProjection,
@@ -56,15 +51,16 @@ export {
     __test__ as terminalIoActivityEventsTestHarness,
 } from './io-activity-events.js';
 export {
-    isTerminalImplicitOperationalTrace,
-    renderTerminalTraceFlowSummary,
-    renderTerminalTraceSummaryTitle,
-} from './turn-trace-presentation.js';
-export {
+    buildTerminalModelTransitionPresentation,
     formatTerminalModelTransitionIsoTimestamp,
     renderTerminalModelTransitionSourceLabel,
-    buildTerminalModelTransitionPresentation,
 } from './model-transition-presentation.js';
+export { setupTerminalTaskStreamListeners } from './task-stream-events.js';
+export {
+    createTaskTranscriptAccumulator,
+    getTaskTranscriptKey,
+    isInternalTaskTranscriptKey,
+} from './task-transcript-accumulator.js';
 export {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -80,4 +76,8 @@ export {
     mapTerminalToolOperationRole,
     normalizeTerminalToolArgsPayload,
 } from './tool-activity-presenter.js';
-export { setupTerminalTaskStreamListeners } from './task-stream-events.js';
+export {
+    isTerminalImplicitOperationalTrace,
+    renderTerminalTraceFlowSummary,
+    renderTerminalTraceSummaryTitle,
+} from './turn-trace-presentation.js';

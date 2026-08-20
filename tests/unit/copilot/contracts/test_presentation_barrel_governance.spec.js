@@ -6,6 +6,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 
 import { parse } from '@babel/parser';
 import { describe, it } from 'vitest';
+import { resolveBabelParserOptions } from '../../../../src/copilot/infra/parse/babel-policy.js';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 const PRESENTATION_ROOT = join(COPILOT_ROOT, 'presentation');
@@ -63,9 +64,10 @@ function listJsFilesRecursive(dir) {
  * @returns {import('@babel/parser').ParseResult<import('@babel/types').File>}
  */
 function parseModule(filePath) {
-    return parse(readFileSync(filePath, 'utf8'), {
-        sourceType: 'module',
-    });
+    return parse(
+        readFileSync(filePath, 'utf8'),
+        /** @type {any} */ (resolveBabelParserOptions(filePath, 'js', { profile: 'structure' })),
+    );
 }
 
 /**

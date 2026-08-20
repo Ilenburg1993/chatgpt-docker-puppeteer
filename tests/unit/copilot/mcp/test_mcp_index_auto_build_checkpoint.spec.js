@@ -1,7 +1,7 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
@@ -85,7 +85,10 @@ describe('MCP index startup checkpoint', () => {
         );
         const dirty = planIndexStartup({
             checkpoint: base,
-            gitSnapshot: { ...cleanSnapshot(), worktreeChanges: [{ status: ' M', path: 'src/copilot/a.js', deleted: false }] },
+            gitSnapshot: {
+                ...cleanSnapshot(),
+                worktreeChanges: [{ status: ' M', path: 'src/copilot/a.js', deleted: false }],
+            },
             schemaVersion: 2,
             indexFiles: 100,
             nowMs: 2_000,
@@ -167,11 +170,57 @@ describe('MCP index startup checkpoint', () => {
         assert.equal(replay.reason, 'journal-replay');
 
         for (const [journalReplay, expectedReason] of [
-            [{ available: false, gapDetected: true, truncated: false, replayablePathCount: 0, recursiveScopeInvalidation: false }, 'journal-evidence-unavailable'],
-            [{ available: true, gapDetected: true, truncated: false, replayablePathCount: 0, recursiveScopeInvalidation: false }, 'journal-gap-detected'],
-            [{ available: true, gapDetected: false, truncated: true, replayablePathCount: 1, recursiveScopeInvalidation: false }, 'journal-replay-truncated'],
-            [{ available: true, gapDetected: false, truncated: false, replayablePathCount: 0, recursiveScopeInvalidation: false, invalidPathRows: 1 }, 'journal-invalid-path'],
-            [{ available: true, gapDetected: false, truncated: false, replayablePathCount: 1, recursiveScopeInvalidation: true }, 'journal-recursive-invalidation'],
+            [
+                {
+                    available: false,
+                    gapDetected: true,
+                    truncated: false,
+                    replayablePathCount: 0,
+                    recursiveScopeInvalidation: false,
+                },
+                'journal-evidence-unavailable',
+            ],
+            [
+                {
+                    available: true,
+                    gapDetected: true,
+                    truncated: false,
+                    replayablePathCount: 0,
+                    recursiveScopeInvalidation: false,
+                },
+                'journal-gap-detected',
+            ],
+            [
+                {
+                    available: true,
+                    gapDetected: false,
+                    truncated: true,
+                    replayablePathCount: 1,
+                    recursiveScopeInvalidation: false,
+                },
+                'journal-replay-truncated',
+            ],
+            [
+                {
+                    available: true,
+                    gapDetected: false,
+                    truncated: false,
+                    replayablePathCount: 0,
+                    recursiveScopeInvalidation: false,
+                    invalidPathRows: 1,
+                },
+                'journal-invalid-path',
+            ],
+            [
+                {
+                    available: true,
+                    gapDetected: false,
+                    truncated: false,
+                    replayablePathCount: 1,
+                    recursiveScopeInvalidation: true,
+                },
+                'journal-recursive-invalidation',
+            ],
         ]) {
             const plan = planIndexStartup({ ...common, journalReplay: /** @type {any} */ (journalReplay) });
             assert.equal(plan.mode, 'full-reconcile');
@@ -195,21 +244,38 @@ describe('MCP index startup checkpoint', () => {
         `);
         const checkpoint = readIndexStartupCheckpoint('src/copilot', db);
         assert.equal(checkpoint?.journalSequence, 0);
-        const columns = /** @type {Array<{ name: string }>} */ (
+        const columns = /** @type {{ name: string }[]} */ (
             db.prepare('PRAGMA table_info(copilot_mcp_index_startup_checkpoint)').all()
         );
-        assert.equal(columns.some((column) => column.name === 'journal_sequence'), true);
+        assert.equal(
+            columns.some((column) => column.name === 'journal_sequence'),
+            true,
+        );
         db.close();
     });
 
     it('persists checkpoint while preserving the last full-reconcile clock on incremental/skip writes', () => {
         const db = new Database(':memory:');
         writeIndexStartupCheckpoint(
-            { scopePath: 'src/copilot', head: 'abc', schemaVersion: 2, mode: 'full-reconcile', nowMs: 1_000, journalSequence: 7 },
+            {
+                scopePath: 'src/copilot',
+                head: 'abc',
+                schemaVersion: 2,
+                mode: 'full-reconcile',
+                nowMs: 1_000,
+                journalSequence: 7,
+            },
             db,
         );
         writeIndexStartupCheckpoint(
-            { scopePath: 'src/copilot', head: 'def', schemaVersion: 2, mode: 'incremental', nowMs: 2_000, journalSequence: 9 },
+            {
+                scopePath: 'src/copilot',
+                head: 'def',
+                schemaVersion: 2,
+                mode: 'incremental',
+                nowMs: 2_000,
+                journalSequence: 9,
+            },
             db,
         );
         const checkpoint = readIndexStartupCheckpoint('src/copilot', db);

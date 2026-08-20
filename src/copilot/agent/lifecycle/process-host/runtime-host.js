@@ -4,9 +4,8 @@
  *
  * Helpers do host de processo do runtime do agente.
  *
- * Aqui "host" significa a borda do processo Node que hospeda o runtime compatível do agent: sinais, IPC e shutdown.
- * Não é o mesmo "host" dos contratos internos do dialog loop, onde "host" significa um adapter estreito de
- * capacidades.
+ * Aqui "host" significa a borda do processo Node que hospeda o runtime compatível do agent: sinais, IPC e shutdown. Não
+ * é o mesmo "host" dos contratos internos do dialog loop, onde "host" significa um adapter estreito de capacidades.
  *
  * Este módulo não é boot canônico. Ele encapsula preocupações de processo usadas pelo entrypoint compatível
  * (`agent/lifecycle/entrypoints/entry.js`).

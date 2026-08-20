@@ -765,8 +765,7 @@ watch(taskId, () => void fetchDetail());
                         <div class="text-sm text-slate-200 font-semibold">{{ e.event_type }}</div>
                         <pre
                             class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56"
-                            >{{ JSON.stringify(e.payload, null, 2) }}</pre
-                        >
+                            >{{ JSON.stringify(e.payload, null, 2) }}</pre>
                     </div>
                 </div>
             </div>

@@ -151,7 +151,7 @@ endif
    ```bash
    # Linux/macOS
    curl -s http://localhost:2998/api/health
-   
+
    # Windows (PowerShell)
    Invoke-WebRequest -Uri http://localhost:2998/api/health -UseBasicParsing
    ```

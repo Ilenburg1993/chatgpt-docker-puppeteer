@@ -2,22 +2,19 @@
 /**
  * Detached, allowlisted Cloudflare transport benchmark runner.
  *
- * It benchmarks the current control plus the remaining canonical transport profiles with a fixed workload,
- * persists compact evidence, and always restores the original control. It never promotes a candidate.
+ * It benchmarks the current control plus the remaining canonical transport profiles with a fixed workload, persists
+ * compact evidence, and always restores the original control. It never promotes a candidate.
  *
  * @module copilot/mcp/scripts/scheduled-transport-benchmark-runner
  */
 
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { getTransportBenchmarkStateFile, readCloudflaredMetricsSnapshot } from '#copilot/mcp/cloudflare';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import process from 'node:process';
 import { dirname, resolve } from 'node:path';
+import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
-import {
-    getTransportBenchmarkStateFile,
-    readCloudflaredMetricsSnapshot,
-} from '#copilot/mcp/cloudflare';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
@@ -58,7 +55,7 @@ function parseArgs(argv) {
     /** @param {string} name */
     const read = (name) => {
         const index = argv.indexOf(name);
-        return index >= 0 ? argv[index + 1] ?? '' : '';
+        return index >= 0 ? (argv[index + 1] ?? '') : '';
     };
     const requestId = read('--request-id');
     const controlProfile = read('--control-profile');
@@ -142,7 +139,11 @@ function runFixedNode(args, timeoutMs, env = process.env) {
             finish({
                 exitCode: Number(code ?? (signal ? 1 : 0)),
                 timedOut,
-                error: timedOut ? `child timed out after ${String(timeoutMs)}ms` : signal ? `child terminated by ${signal}` : null,
+                error: timedOut
+                    ? `child timed out after ${String(timeoutMs)}ms`
+                    : signal
+                      ? `child terminated by ${signal}`
+                      : null,
             }),
         );
     });
@@ -150,7 +151,7 @@ function runFixedNode(args, timeoutMs, env = process.env) {
 
 /** @returns {Promise<Record<string, unknown> & { ok: boolean }>} */
 async function readMetricsWithRetry() {
-    /** @type {Record<string, unknown> & { ok: boolean } | null} */
+    /** @type {(Record<string, unknown> & { ok: boolean }) | null} */
     let latest = null;
     for (let attempt = 1; attempt <= 5; attempt += 1) {
         latest = await readCloudflaredMetricsSnapshot({ timeoutMs: METRICS_TIMEOUT_MS });
@@ -322,14 +323,23 @@ export function buildComparison(windows, controlProfile) {
         controlProfile,
         controlP95Ms: controlP95,
         maxP95RegressionPercent: MAX_P95_REGRESSION_PERCENT,
-        requestErrorPolicy: 'advisory: raw cloudflared origin-proxy error deltas require review alongside response-code deltas and fresh smoke/origin diagnostics; they do not veto an otherwise green comparable window',
+        requestErrorPolicy:
+            'advisory: raw cloudflared origin-proxy error deltas require review alongside response-code deltas and fresh smoke/origin diagnostics; they do not veto an otherwise green comparable window',
         autoPromotion: false,
         candidates,
     };
 }
 
 /**
- * @param {{ allSmokesPassed: boolean; smokeSampleCount: number; requiredSampleCount: number; beforeOk: boolean; afterOk: boolean; haConnections: number | null; requestErrorsDelta: number | null }} input
+ * @param {{
+ *     allSmokesPassed: boolean;
+ *     smokeSampleCount: number;
+ *     requiredSampleCount: number;
+ *     beforeOk: boolean;
+ *     afterOk: boolean;
+ *     haConnections: number | null;
+ *     requestErrorsDelta: number | null;
+ * }} input
  */
 export function classifyTransportWindow(input) {
     const comparable =
@@ -387,7 +397,10 @@ async function main() {
                 autoPromotion: false,
             });
             const restart = await runRestart(profile);
-            if (restart.exitCode !== 0) throw new Error(`Restart failed for ${profile}: ${restart.error ?? `exit ${String(restart.exitCode)}`}`);
+            if (restart.exitCode !== 0)
+                throw new Error(
+                    `Restart failed for ${profile}: ${restart.error ?? `exit ${String(restart.exitCode)}`}`,
+                );
             await sleep(WARMUP_MS);
             const before = compactMetrics(await readMetricsWithRetry());
             const smokeRuns = [];
@@ -441,10 +454,14 @@ async function main() {
                 throw new Error(`Connector smoke failed for ${profile}; benchmark stopped before the next profile.`);
             }
             if (before['ok'] !== true || after['ok'] !== true) {
-                throw new Error(`Cloudflared metrics were unavailable for ${profile}; benchmark stopped before the next profile.`);
+                throw new Error(
+                    `Cloudflared metrics were unavailable for ${profile}; benchmark stopped before the next profile.`,
+                );
             }
             if (after['haConnections'] !== 4) {
-                throw new Error(`Cloudflared HA connections were not 4 for ${profile}; benchmark stopped before the next profile.`);
+                throw new Error(
+                    `Cloudflared HA connections were not 4 for ${profile}; benchmark stopped before the next profile.`,
+                );
             }
         }
     } catch (error) {
@@ -499,7 +516,7 @@ async function main() {
                     fatalError ??
                     (restoredControl
                         ? null
-                        : restore.error ?? restoreSmoke.error ?? 'Control restore or reconciliation smoke failed.'),
+                        : (restore.error ?? restoreSmoke.error ?? 'Control restore or reconciliation smoke failed.')),
             });
         } catch {
             process.exitCode = 1;

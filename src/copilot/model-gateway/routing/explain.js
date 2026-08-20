@@ -31,7 +31,10 @@ function candidateId(candidate) {
     const model = isRecord(candidate['model']) ? candidate['model'] : {};
     return (
         optionalString(model['id']) ??
-        [optionalString(model['providerId']) ?? 'unknown-provider', optionalString(model['providerModel']) ?? 'unknown-model'].join(':')
+        [
+            optionalString(model['providerId']) ?? 'unknown-provider',
+            optionalString(model['providerModel']) ?? 'unknown-model',
+        ].join(':')
     );
 }
 
@@ -50,20 +53,20 @@ function reasonCounts(reasons) {
  * @param {Record<string, unknown> | null} health
  * @param {ReturnType<typeof summarizeGatewayRuntimeProofFreshness> | null} [precomputedRuntimeProof]
  * @returns {{
- *   status: string | null;
- *   agentProbeStatus: string | null;
- *   chatOk: boolean;
- *   agentProbeVerified: boolean;
- *   freshProof: boolean;
- *   historicalProof: boolean;
- *   stale: boolean;
- *   proofAgeMs: number | null;
- *   proofMaxAgeMs: number;
- *   verifiedProbes: string[];
- *   staleProbes: string[];
- *   failedProbes: string[];
- *   liveToolProtocolStatus: string | null;
- *   liveAskUserStatus: string | null;
+ *     status: string | null;
+ *     agentProbeStatus: string | null;
+ *     chatOk: boolean;
+ *     agentProbeVerified: boolean;
+ *     freshProof: boolean;
+ *     historicalProof: boolean;
+ *     stale: boolean;
+ *     proofAgeMs: number | null;
+ *     proofMaxAgeMs: number;
+ *     verifiedProbes: string[];
+ *     staleProbes: string[];
+ *     failedProbes: string[];
+ *     liveToolProtocolStatus: string | null;
+ *     liveAskUserStatus: string | null;
  * }}
  */
 function probeSummary(health, precomputedRuntimeProof = null) {
@@ -120,20 +123,27 @@ function candidateSummary(candidate) {
         routeLayer: optionalString(normalizedPolicy['routeLayer']),
         wireApi: optionalString(normalizedPolicy['wireApi'] ?? normalizedPolicy['directWireApi']),
         candidateSource: optionalString(provenance['candidateSource']) ?? optionalString(provenance['source']),
-        runtimeObservedOnly: provenance['candidateSource'] === 'runtime_health' || runtimeEvidence['source'] === 'runtime_health',
+        runtimeObservedOnly:
+            provenance['candidateSource'] === 'runtime_health' || runtimeEvidence['source'] === 'runtime_health',
         runtimeEvidence: Object.keys(runtimeEvidence).length > 0 ? runtimeEvidence : null,
         score: typeof candidate['score'] === 'number' ? candidate['score'] : null,
         included: candidate['include'] === true,
         rejectedReasons: Array.isArray(candidate['rejectedReasons'])
             ? candidate['rejectedReasons'].map(optionalString).filter((item) => item !== null)
             : [],
-        positiveReasons: Array.isArray(candidate['reasons']) ? candidate['reasons'].map(optionalString).filter((item) => item !== null) : [],
+        positiveReasons: Array.isArray(candidate['reasons'])
+            ? candidate['reasons'].map(optionalString).filter((item) => item !== null)
+            : [],
         eligibility: eligibility
             ? {
                   include: eligibility['include'] === true,
                   disposition: optionalString(eligibility['disposition']),
-                  hardExclusions: Array.isArray(eligibility['hardExclusions']) ? eligibility['hardExclusions'].map(String) : [],
-                  softPenalties: Array.isArray(eligibility['softPenalties']) ? eligibility['softPenalties'].map(String) : [],
+                  hardExclusions: Array.isArray(eligibility['hardExclusions'])
+                      ? eligibility['hardExclusions'].map(String)
+                      : [],
+                  softPenalties: Array.isArray(eligibility['softPenalties'])
+                      ? eligibility['softPenalties'].map(String)
+                      : [],
                   overlayRefs: Array.isArray(eligibility['overlayRefs']) ? eligibility['overlayRefs'].map(String) : [],
               }
             : null,
@@ -194,8 +204,10 @@ function decisionLayers(candidates) {
  */
 function nextActions(reasons) {
     const actions = [];
-    if (reasons.some((reason) => reason.startsWith('eligibility:secret_missing'))) actions.push('configure_required_secret');
-    if (reasons.includes('eligibility:account_model_not_visible')) actions.push('refresh_account_overlay_or_choose_visible_model');
+    if (reasons.some((reason) => reason.startsWith('eligibility:secret_missing')))
+        actions.push('configure_required_secret');
+    if (reasons.includes('eligibility:account_model_not_visible'))
+        actions.push('refresh_account_overlay_or_choose_visible_model');
     if (reasons.includes('eligibility:account_access_unknown')) actions.push('collect_account_overlay_before_runtime');
     if (
         reasons.includes('missing_capability:local') ||
@@ -204,19 +216,26 @@ function nextActions(reasons) {
     ) {
         actions.push('start_or_configure_explicit_local_provider');
     }
-    if (reasons.some((reason) => reason.startsWith('missing_capability:'))) actions.push('choose_model_with_required_capabilities');
-    if (reasons.some((reason) => reason.startsWith('context_too_small:'))) actions.push('choose_larger_context_model_or_compact');
-    if (reasons.some((reason) => reason.startsWith('route_layer_blocked:'))) actions.push('relax_route_layer_policy_or_choose_allowed_route');
-    if (reasons.some((reason) => reason.startsWith('wire_api_blocked:'))) actions.push('relax_wire_api_policy_or_choose_allowed_adapter');
+    if (reasons.some((reason) => reason.startsWith('missing_capability:')))
+        actions.push('choose_model_with_required_capabilities');
+    if (reasons.some((reason) => reason.startsWith('context_too_small:')))
+        actions.push('choose_larger_context_model_or_compact');
+    if (reasons.some((reason) => reason.startsWith('route_layer_blocked:')))
+        actions.push('relax_route_layer_policy_or_choose_allowed_route');
+    if (reasons.some((reason) => reason.startsWith('wire_api_blocked:')))
+        actions.push('relax_wire_api_policy_or_choose_allowed_adapter');
     if (reasons.some((reason) => reason.startsWith('upstream_provider_'))) {
         actions.push('choose_allowed_upstream_provider_or_relax_policy');
     }
     if (reasons.some((reason) => reason.startsWith('data_policy_'))) {
         actions.push('choose_model_matching_data_policy_or_relax_policy');
     }
-    if (reasons.some((reason) => reason.startsWith('price_above_limit:'))) actions.push('raise_budget_or_choose_lower_cost_model');
-    if (reasons.some((reason) => reason.startsWith('confidence_below_minimum:'))) actions.push('refresh_catalog_or_run_probe_to_raise_confidence');
-    if (reasons.some((reason) => reason.includes('health') || reason.includes('failed'))) actions.push('wait_or_clear_provider_health_after_fix');
+    if (reasons.some((reason) => reason.startsWith('price_above_limit:')))
+        actions.push('raise_budget_or_choose_lower_cost_model');
+    if (reasons.some((reason) => reason.startsWith('confidence_below_minimum:')))
+        actions.push('refresh_catalog_or_run_probe_to_raise_confidence');
+    if (reasons.some((reason) => reason.includes('health') || reason.includes('failed')))
+        actions.push('wait_or_clear_provider_health_after_fix');
     if (actions.length === 0 && reasons.length > 0) actions.push('inspect_rejected_reasons');
     if (actions.length === 0) actions.push('route_decision_ready');
     return [...new Set(actions)];
@@ -230,7 +249,9 @@ export function explainGatewayRouteDecision(route) {
     const rejected = Array.isArray(route['rejected']) ? route['rejected'].filter(isRecord) : [];
     const selected = isRecord(route['selected']) ? route['selected'] : null;
     const reasons = rejected.flatMap((candidate) =>
-        Array.isArray(candidate['rejectedReasons']) ? candidate['rejectedReasons'].map(optionalString).filter((item) => item !== null) : [],
+        Array.isArray(candidate['rejectedReasons'])
+            ? candidate['rejectedReasons'].map(optionalString).filter((item) => item !== null)
+            : [],
     );
     const counts = reasonCounts(reasons);
     const topRejectedReasons = Object.entries(counts)

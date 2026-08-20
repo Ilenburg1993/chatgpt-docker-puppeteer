@@ -98,8 +98,7 @@ export function persistAgentRuntimeStatePartial(data, options = {}) {
  *     getSendCountSnapshot?: (() => number) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     trackBackgroundTask?:
- *         | ((task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>)
- *         | undefined;
+ *         ((task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>) | undefined;
  * }} AgentRuntimeStateContext
  *
  *
@@ -137,7 +136,11 @@ export function readAgentRuntimeSessionId(ctx) {
 /**
  * Lê o bootstrap persistido do dialog loop para inicialização síncrona do runtime.
  *
- * @returns {{ dialogPaused: boolean; usageMetrics: Record<string, unknown> | null; prMetrics: Record<string, unknown> | null }}
+ * @returns {{
+ *     dialogPaused: boolean;
+ *     usageMetrics: Record<string, unknown> | null;
+ *     prMetrics: Record<string, unknown> | null;
+ * }}
  */
 export function readAgentRuntimeDialogBootstrapState() {
     return readAgentRuntimeDialogBootstrapStateImpl();

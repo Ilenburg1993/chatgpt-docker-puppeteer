@@ -2,29 +2,28 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createArgReader } from '../cli-args.mjs';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
-import { buildModelGatewayLiveReadiness } from './model-gateway-live-readiness.mjs';
 
 const ROOT = REPO_ROOT;
 const DEFAULT_OUT_DIR = path.join(ROOT, 'artifacts/model-gateway-live-plan');
 const TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS = 900_000;
-import { createArgReader } from '../cli-args.mjs';
 
 const args = process.argv.slice(2);
 const readArg = createArgReader(args);
 const argSet = new Set(args);
 
-/** @typedef {Awaited<ReturnType<typeof buildModelGatewayLiveReadiness>>} LiveReadiness */
+/** @typedef {Awaited<ReturnType<typeof import('./model-gateway-live-readiness.mjs').buildModelGatewayLiveReadiness>>} LiveReadiness */
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--local-private-strict] [--out-dir DIR]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-live-plan.mjs [--json] [--fail] [--no-write] [--allow-active-overlays] [--local-private-strict] [--out-dir DIR]
 
 Create a no-runtime terminal llm-b live-test plan from model-gateway readiness. This does not start the terminal, fetch
 providers, run models or execute probes.
 `);
     process.exit(0);
 }
-
 
 function nowStamp() {
     return new Date().toISOString().replace(/[:.]/gu, '-');
@@ -62,7 +61,11 @@ function runLocalPrivateStrictSelection() {
     return {
         ok: result.status === 0,
         status: result.status,
-        detail: (result.stderr || result.stdout || `exit=${result.status}`).trim().split(/\r?\n/u).slice(0, 4).join(' | '),
+        detail: (result.stderr || result.stdout || `exit=${result.status}`)
+            .trim()
+            .split(/\r?\n/u)
+            .slice(0, 4)
+            .join(' | '),
     };
 }
 
@@ -76,22 +79,26 @@ function readinessCheck(readiness, id) {
 
 /** @param {LiveReadiness} readiness */
 function effectiveOverlaySummary(readiness) {
-    return readiness?.selection?.effectiveStrict?.runtimeAccountOverlaySummary ?? {
-        total: 0,
-        activeCount: 0,
-        expiredCount: 0,
-        byProvider: {},
-        byFailureKind: {},
-        items: [],
-    };
+    return (
+        readiness?.selection?.effectiveStrict?.runtimeAccountOverlaySummary ?? {
+            total: 0,
+            activeCount: 0,
+            expiredCount: 0,
+            byProvider: {},
+            byFailureKind: {},
+            items: [],
+        }
+    );
 }
 
 /** @param {Record<string, unknown> | null | undefined} counts */
 function countMapText(counts) {
-    return Object.entries(counts ?? {})
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, count]) => `${key}:${count}`)
-        .join(',') || '-';
+    return (
+        Object.entries(counts ?? {})
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, count]) => `${key}:${count}`)
+            .join(',') || '-'
+    );
 }
 
 /**
@@ -105,15 +112,16 @@ function countMapValue(counts, key) {
 
 /** @param {LiveReadiness | ReturnType<typeof buildPlan>['readiness']} readiness */
 function terminalLiveRouteMatrix(readiness) {
-    const routes = 'selection' in readiness
-        ? readiness.selection.terminalLiveRuntimeSelectorPlan?.selectedRoutes
-        : readiness.terminalLiveRuntimeSelectorPlan?.selectedRoutes;
+    const routes =
+        'selection' in readiness
+            ? readiness.selection.terminalLiveRuntimeSelectorPlan?.selectedRoutes
+            : readiness.terminalLiveRuntimeSelectorPlan?.selectedRoutes;
     return Array.isArray(routes) ? routes : [];
 }
 
 /**
  * @param {LiveReadiness} readiness
- * @param {{ allowActiveOverlays?: boolean, localPrivateStrict?: boolean }} [options]
+ * @param {{ allowActiveOverlays?: boolean; localPrivateStrict?: boolean }} [options]
  */
 function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict = false } = {}) {
     const generatedAt = new Date().toISOString();
@@ -166,8 +174,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'active_runtime_overlays',
             ok: allowActiveOverlays || blockingActiveOverlayCount === 0,
-            detail:
-                `blockingActive=${blockingActiveOverlayCount}, active=${overlaySummary.activeCount}, syntheticFixtureActive=${syntheticFixtureActiveCount}, expired=${overlaySummary.expiredCount}, activeProviders=${countMapText(overlaySummary.activeByProvider)}, providers=${countMapText(overlaySummary.byProvider)}, failures=${countMapText(overlaySummary.byFailureKind)}`,
+            detail: `blockingActive=${blockingActiveOverlayCount}, active=${overlaySummary.activeCount}, syntheticFixtureActive=${syntheticFixtureActiveCount}, expired=${overlaySummary.expiredCount}, activeProviders=${countMapText(overlaySummary.activeByProvider)}, providers=${countMapText(overlaySummary.byProvider)}, failures=${countMapText(overlaySummary.byFailureKind)}`,
         },
         {
             id: 'local_private_strict_selection',
@@ -194,7 +201,8 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
-            purpose: 'Persist a fixed baseline of already-observed runtime health so every later live phase can be diffed against the same pre-live file.',
+            purpose:
+                'Persist a fixed baseline of already-observed runtime health so every later live phase can be diffed against the same pre-live file.',
         },
         {
             id: 'control_only',
@@ -203,12 +211,14 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
-            purpose: 'Validate terminal boot, session cockpit, command output, event stream and redaction without an LLM turn.',
+            purpose:
+                'Validate terminal boot, session cockpit, command output, event stream and redaction without an LLM turn.',
         },
         {
             id: 'byok_fixture_control_plane',
             order: 4,
-            command: 'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000',
+            command:
+                'npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --control-only --timeout-ms=240000',
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
@@ -217,8 +227,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'byok_real_control_only_probes',
             order: 5,
-            command:
-                `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
+            command: `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --control-only --timeout-ms=240000`,
             executesModelTurn: false,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
@@ -228,8 +237,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'byok_real_full_turn',
             order: 6,
-            command:
-                `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
+            command: `npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=${TERMINAL_LIVE_TEMPORARY_FAILURE_COOLDOWN_MS} --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --timeout-ms=900000`,
             executesModelTurn: true,
             executesRuntimeProbes: true,
             consumesProviderQuota: true,
@@ -241,8 +249,7 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
         {
             id: 'runtime_health_after_live_diff',
             order: 1,
-            command:
-                `npm run model-gateway:runtime-health:diff -- --baseline ${baselinePath} --write-snapshot --out-dir ${postLiveOutDir} --fail-on-regression`,
+            command: `npm run model-gateway:runtime-health:diff -- --baseline ${baselinePath} --write-snapshot --out-dir ${postLiveOutDir} --fail-on-regression`,
             executesModelTurn: false,
             executesRuntimeProbes: false,
             consumesProviderQuota: false,
@@ -313,28 +320,35 @@ function buildPlan(readiness, { allowActiveOverlays = false, localPrivateStrict 
 
 /** @param {Record<string, unknown>} route */
 function renderTerminalLiveRoute(route) {
-    const runtimeHealth = route['runtimeHealth'] && typeof route['runtimeHealth'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (route['runtimeHealth'])
-        : {};
-    const probeStatuses = runtimeHealth['probeStatuses'] && typeof runtimeHealth['probeStatuses'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (runtimeHealth['probeStatuses'])
-        : {};
-    const preferredProbeProofs = runtimeHealth['preferredProbeProofs'] && typeof runtimeHealth['preferredProbeProofs'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (runtimeHealth['preferredProbeProofs'])
-        : {};
-    const blockingProbeFailures = runtimeHealth['blockingProbeFailures'] && typeof runtimeHealth['blockingProbeFailures'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (runtimeHealth['blockingProbeFailures'])
-        : {};
-    const probes = Object.entries(probeStatuses)
-        .map(([kind, status]) => `${kind}:${status}`)
-        .join(',') || '-';
-    const preferred = Object.entries(preferredProbeProofs)
-        .map(([kind, ok]) => `${kind}:${ok ? 'ok' : 'missing'}`)
-        .join(',') || '-';
-    const blocking = Object.entries(blockingProbeFailures)
-        .filter(([, failed]) => failed)
-        .map(([kind]) => kind)
-        .join(',') || '-';
+    const runtimeHealth =
+        route['runtimeHealth'] && typeof route['runtimeHealth'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (route['runtimeHealth'])
+            : {};
+    const probeStatuses =
+        runtimeHealth['probeStatuses'] && typeof runtimeHealth['probeStatuses'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (runtimeHealth['probeStatuses'])
+            : {};
+    const preferredProbeProofs =
+        runtimeHealth['preferredProbeProofs'] && typeof runtimeHealth['preferredProbeProofs'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (runtimeHealth['preferredProbeProofs'])
+            : {};
+    const blockingProbeFailures =
+        runtimeHealth['blockingProbeFailures'] && typeof runtimeHealth['blockingProbeFailures'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (runtimeHealth['blockingProbeFailures'])
+            : {};
+    const probes =
+        Object.entries(probeStatuses)
+            .map(([kind, status]) => `${kind}:${status}`)
+            .join(',') || '-';
+    const preferred =
+        Object.entries(preferredProbeProofs)
+            .map(([kind, ok]) => `${kind}:${ok ? 'ok' : 'missing'}`)
+            .join(',') || '-';
+    const blocking =
+        Object.entries(blockingProbeFailures)
+            .filter(([, failed]) => failed)
+            .map(([kind]) => kind)
+            .join(',') || '-';
     return [
         `- ${route['profileId']}: ${route['providerId'] ?? '-'} / ${route['providerModel'] ?? '-'} · routeProfile=${route['routeProfile'] ?? '-'} · healthProfile=${runtimeHealth['healthRouteProfile'] ?? '-'} · exact=${runtimeHealth['exactRouteProfileMatch'] ? 'true' : 'false'} · profileless=${runtimeHealth['profilelessHealth'] ? 'true' : 'false'}`,
         `  - probes: ${probes}`,

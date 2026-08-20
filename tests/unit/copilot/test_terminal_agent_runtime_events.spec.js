@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * tests/unit/copilot/test_terminal_agent_runtime_events.spec.js
  *
@@ -665,7 +664,9 @@ describe('terminal/events/agent-runtime-events.js — contrato', () => {
         await vi.advanceTimersByTimeAsync(10_000);
 
         expect(println).toHaveBeenCalledWith(expect.stringContaining('Executar comando'));
-        expect(println).toHaveBeenCalledWith(expect.stringContaining('Executar comando ainda trabalhando · 10s sem novo progresso'));
+        expect(println).toHaveBeenCalledWith(
+            expect.stringContaining('Executar comando ainda trabalhando · 10s sem novo progresso'),
+        );
         expect(writeInlineStatus).toHaveBeenCalledWith(
             expect.stringContaining('LLM-B ferramenta · Executar comando · 10s'),
         );

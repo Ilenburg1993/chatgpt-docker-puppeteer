@@ -3,7 +3,8 @@
  * Best-effort durability helpers for low-level filesystem mutations.
  *
  * Node can flush file descriptors through `FileHandle.sync()`, but directory fsync is platform/filesystem dependent.
- * These helpers deliberately treat unsupported directory sync as a reported best-effort miss rather than a hard failure.
+ * These helpers deliberately treat unsupported directory sync as a reported best-effort miss rather than a hard
+ * failure.
  *
  * @module copilot/infra/io/fs/durability
  */
@@ -58,18 +59,24 @@ export function assertSuccessfulSync(result, options) {
 }
 
 /**
- * @param {string} filePath
- * @returns {Promise<{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string; durationMs: number }>}
+ * Flush an already-open file descriptor without reopening the path. This is the preferred primitive while the caller
+ * still owns a staging handle because data and metadata mutations on that handle are ordered before the durability
+ * barrier.
+ *
+ * @param {import('node:fs/promises').FileHandle} handle
+ * @returns {Promise<{
+ *     attempted: boolean;
+ *     ok: boolean;
+ *     skippedReason?: string;
+ *     errorCode?: string;
+ *     durationMs: number;
+ * }>}
  */
-export async function syncFileBestEffort(filePath) {
+export async function syncFileHandleBestEffort(handle) {
     const startedAt = performance.now();
     /** @param {{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string }} value */
     const finish = (value) => ({ ...value, durationMs: Math.max(0, performance.now() - startedAt) });
-    if (typeof fs.open !== 'function') return finish({ attempted: false, ok: false, skippedReason: 'fs.open-unavailable' });
-    /** @type {import('node:fs/promises').FileHandle | null} */
-    let handle = null;
     try {
-        handle = await fs.open(filePath, 'r');
         await handle.sync();
         return finish({ attempted: true, ok: true });
     } catch (error) {
@@ -78,6 +85,36 @@ export async function syncFileBestEffort(filePath) {
             return finish({ attempted: true, ok: false, skippedReason: 'file-sync-unsupported', errorCode: code });
         }
         return finish({ attempted: true, ok: false, errorCode: code });
+    }
+}
+
+/**
+ * @param {string} filePath
+ * @returns {Promise<{
+ *     attempted: boolean;
+ *     ok: boolean;
+ *     skippedReason?: string;
+ *     errorCode?: string;
+ *     durationMs: number;
+ * }>}
+ */
+export async function syncFileBestEffort(filePath) {
+    const startedAt = performance.now();
+    /** @param {{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string }} value */
+    const finish = (value) => ({ ...value, durationMs: Math.max(0, performance.now() - startedAt) });
+    if (typeof fs.open !== 'function')
+        return finish({ attempted: false, ok: false, skippedReason: 'fs.open-unavailable' });
+    /** @type {import('node:fs/promises').FileHandle | null} */
+    let handle = null;
+    try {
+        handle = await fs.open(filePath, 'r');
+        const result = await syncFileHandleBestEffort(handle);
+        const { durationMs: _syncDurationMs, ...rest } = result;
+        void _syncDurationMs;
+        return finish(rest);
+    } catch (error) {
+        const code = String(/** @type {{ code?: unknown }} */ (error)?.code ?? 'UNKNOWN');
+        return finish({ attempted: false, ok: false, errorCode: code });
     } finally {
         if (handle) await handle.close().catch(() => undefined);
     }
@@ -85,13 +122,20 @@ export async function syncFileBestEffort(filePath) {
 
 /**
  * @param {string} targetPath
- * @returns {Promise<{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string; durationMs: number }>}
+ * @returns {Promise<{
+ *     attempted: boolean;
+ *     ok: boolean;
+ *     skippedReason?: string;
+ *     errorCode?: string;
+ *     durationMs: number;
+ * }>}
  */
 export async function syncParentDirectoryBestEffort(targetPath) {
     const startedAt = performance.now();
     /** @param {{ attempted: boolean; ok: boolean; skippedReason?: string; errorCode?: string }} value */
     const finish = (value) => ({ ...value, durationMs: Math.max(0, performance.now() - startedAt) });
-    if (typeof fs.open !== 'function') return finish({ attempted: false, ok: false, skippedReason: 'fs.open-unavailable' });
+    if (typeof fs.open !== 'function')
+        return finish({ attempted: false, ok: false, skippedReason: 'fs.open-unavailable' });
     /** @type {import('node:fs/promises').FileHandle | null} */
     let handle = null;
     try {

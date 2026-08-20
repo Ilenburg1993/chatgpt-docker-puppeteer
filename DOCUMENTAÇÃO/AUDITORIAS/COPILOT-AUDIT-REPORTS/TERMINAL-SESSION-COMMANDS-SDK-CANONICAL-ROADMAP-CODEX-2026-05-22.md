@@ -1,13 +1,12 @@
 # Terminal Copilot - Guia Canonico de Sessao, Comandos SDK e BYOK
 
-Data: 2026-05-22
-Autor: Codex
-Escopo primario: `src/copilot`
-Fonte anterior consolidada: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/TERMINAL-STREAMING-MODEL-RECOVERY-CODEX-2026-05-20.md`
+Data: 2026-05-22 Autor: Codex Escopo primario: `src/copilot` Fonte anterior consolidada:
+`DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/TERMINAL-STREAMING-MODEL-RECOVERY-CODEX-2026-05-20.md`
 
 ## 1. Proposito
 
-Este documento substitui o roadmap operacional disperso por um guia mais sobrio para a proxima fase do terminal LLM-B. O foco e manter um fluxo unico, observavel e auditavel para:
+Este documento substitui o roadmap operacional disperso por um guia mais sobrio para a proxima fase
+do terminal LLM-B. O foco e manter um fluxo unico, observavel e auditavel para:
 
 - sessoes SDK;
 - sessoes do conversation hub;
@@ -18,7 +17,8 @@ Este documento substitui o roadmap operacional disperso por um guia mais sobrio 
 - BYOK universal e selecao inteligente de modelos;
 - streaming, tools, deltas e materializacao no terminal.
 
-O terminal nao deve mascarar falhas arquiteturais. A UX e parte do backend operacional: se ela duplica, omite ou rotula mal um evento, o operador fica cego e a arquitetura fica menos verificavel.
+O terminal nao deve mascarar falhas arquiteturais. A UX e parte do backend operacional: se ela
+duplica, omite ou rotula mal um evento, o operador fica cego e a arquitetura fica menos verificavel.
 
 ## 2. Contratos lidos no SDK local 0.3.0
 
@@ -36,18 +36,26 @@ Contratos confirmados:
 - `UserInputRequest`: `question`, `choices?`, `allowFreeform?`
 - `UserInputResponse`: `answer`, `wasFreeform`
 - `UserInputHandler`
-- `ElicitationSchemaField`, `ElicitationSchema`, `ElicitationFieldValue`, `ElicitationResult`, `ElicitationParams`, `ElicitationContext`, `ElicitationHandler`
-- `SessionConfig` e `ResumeSessionConfig`: aceitam `commands`, `onUserInputRequest`, `onElicitationRequest`, `provider`, `model`, `reasoningEffort`, `modelCapabilities`, `streaming`, `includeSubAgentStreamingEvents`, `createSessionFsHandler`, `enableConfigDiscovery`, tools, hooks e outros campos de sessao.
+- `ElicitationSchemaField`, `ElicitationSchema`, `ElicitationFieldValue`, `ElicitationResult`,
+  `ElicitationParams`, `ElicitationContext`, `ElicitationHandler`
+- `SessionConfig` e `ResumeSessionConfig`: aceitam `commands`, `onUserInputRequest`,
+  `onElicitationRequest`, `provider`, `model`, `reasoningEffort`, `modelCapabilities`, `streaming`,
+  `includeSubAgentStreamingEvents`, `createSessionFsHandler`, `enableConfigDiscovery`, tools, hooks
+  e outros campos de sessao.
 - `SessionEventType`, `SessionEventPayload`, `TypedSessionEventHandler`, `SessionEventHandler`
 - `ConnectionState`
 - `SessionContext`, `SessionFsConfig`, `SessionListFilter`, `SessionMetadata`
-- `SessionLifecycleEventType`, `SessionLifecycleEvent`, `SessionLifecycleHandler`, `TypedSessionLifecycleHandler`
+- `SessionLifecycleEventType`, `SessionLifecycleEvent`, `SessionLifecycleHandler`,
+  `TypedSessionLifecycleHandler`
 - `ForegroundSessionInfo`
-- `CopilotSession`: `send`, `sendAndWait`, `on`, `registerCommands`, `registerTools`, `registerElicitationHandler`, `registerUserInputHandler`, `registerPermissionHandler`, `getMessages`, `disconnect`, `abort`, `setModel`, `log`, `[Symbol.asyncDispose]`.
+- `CopilotSession`: `send`, `sendAndWait`, `on`, `registerCommands`, `registerTools`,
+  `registerElicitationHandler`, `registerUserInputHandler`, `registerPermissionHandler`,
+  `getMessages`, `disconnect`, `abort`, `setModel`, `log`, `[Symbol.asyncDispose]`.
 
 Contrato negativo tambem confirmado no pacote local:
 
-- `session.keepAlive` e `session.updateMetadata` nao aparecem como APIs publicas no SDK local instalado. Devem continuar fora do roadmap de implementacao direta ate existirem no pacote real.
+- `session.keepAlive` e `session.updateMetadata` nao aparecem como APIs publicas no SDK local
+  instalado. Devem continuar fora do roadmap de implementacao direta ate existirem no pacote real.
 
 ## 3. Situacao atual consolidada
 
@@ -56,36 +64,50 @@ Contrato negativo tambem confirmado no pacote local:
 - Streaming assistant/tool/user input ja passa por trilhas normalizadas antes de chegar ao terminal.
 - `broadcastSse()` e o ponto unico mais importante de fanout publico para terminal/SSE/JSONL.
 - Deltas finais duplicados e algumas duplicacoes de ask_user foram reduzidas em rodadas anteriores.
-- `usage` foi reclassificado: uso de LLM nao e automaticamente Premium Request; BYOK nunca deve ser narrado como Premium Request.
-- BYOK ja possui perfis, catalogo, health, shortlist, recommend, admissao de modelo, safe default, testes reais no runner e cockpit de binding.
+- `usage` foi reclassificado: uso de LLM nao e automaticamente Premium Request; BYOK nunca deve ser
+  narrado como Premium Request.
+- BYOK ja possui perfis, catalogo, health, shortlist, recommend, admissao de modelo, safe default,
+  testes reais no runner e cockpit de binding.
 - `/session sdk` ja informa provider vivo, BYOK preparado e boundary de sessao.
-- `/byok status`, `/byok use`, `/byok model`, `/byok recommend`, `/byok health` ja formam a base do cockpit do operador.
+- `/byok status`, `/byok use`, `/byok model`, `/byok recommend`, `/byok health` ja formam a base do
+  cockpit do operador.
 
 ### 3.2 O que ainda esta ambiguo
 
-- Comandos locais do terminal e `CommandDefinition` do SDK ainda nao nascem de uma fonte canonica unica.
-- O SDK lifecycle ja e observado no boot do agent, mas o terminal ainda nao materializa esse canal com a mesma riqueza de tools, usage e question.
-- `SessionUiApi` existe em comandos diagnosticos, mas ainda nao virou uma trilha canonicamente integrada de UX, teste e historico.
+- Comandos locais do terminal e `CommandDefinition` do SDK ainda nao nascem de uma fonte canonica
+  unica.
+- O SDK lifecycle ja e observado no boot do agent, mas o terminal ainda nao materializa esse canal
+  com a mesma riqueza de tools, usage e question.
+- `SessionUiApi` existe em comandos diagnosticos, mas ainda nao virou uma trilha canonicamente
+  integrada de UX, teste e historico.
 - `Elicitation` ainda precisa de teste live e trilha de materializacao comparavel a ask_user.
-- A diferenca entre session SDK, hub session, dialog loop, turn e runtime ainda aparece dispersa na UX.
-- A gestao de sessao pelo operador ainda e mais diagnostica do que operacional: faltam cockpit de nova sessao, trocar sessao, retomar sessao especifica, encerrar/desconectar e pre-sessao assistida.
-- O catalogo BYOK ainda precisa calibrar tokens/limites por provider/modelo e expor filtros de gratuidade/capacidade de forma mais direta.
+- A diferenca entre session SDK, hub session, dialog loop, turn e runtime ainda aparece dispersa na
+  UX.
+- A gestao de sessao pelo operador ainda e mais diagnostica do que operacional: faltam cockpit de
+  nova sessao, trocar sessao, retomar sessao especifica, encerrar/desconectar e pre-sessao
+  assistida.
+- O catalogo BYOK ainda precisa calibrar tokens/limites por provider/modelo e expor filtros de
+  gratuidade/capacidade de forma mais direta.
 
 ## 4. Arquitetura canonica TO-BE
 
 ### 4.1 Identidades
 
-- SDK session: unidade real do SDK; contem modelo/provider, handlers, tools, commands e historico do SDK.
+- SDK session: unidade real do SDK; contem modelo/provider, handlers, tools, commands e historico do
+  SDK.
 - Hub session: unidade local persistida para conversa, auditoria e retomada.
 - Dialog loop: protocolo ask_user/READY que mantem uma conversa operacional dentro da sessao.
-- Turn: uma interacao materializavel, com deltas, tools, usage, arquivos, perguntas, resultado e possivel erro.
+- Turn: uma interacao materializavel, com deltas, tools, usage, arquivos, perguntas, resultado e
+  possivel erro.
 - Runtime: processo local que orquestra boot, agent, terminal, HTTP, SSE, JSONL e estado.
 - Provider binding: provider/modelo efetivamente ligados a sessao viva.
-- BYOK prepared selection: provider/modelo escolhido pelo operador para proxima sessao ou tentativa de binding.
+- BYOK prepared selection: provider/modelo escolhido pelo operador para proxima sessao ou tentativa
+  de binding.
 
 ### 4.2 Regra de fanout
 
-Todos os eventos publicos devem convergir para um envelope canonico antes de serem renderizados, exportados ou transmitidos:
+Todos os eventos publicos devem convergir para um envelope canonico antes de serem renderizados,
+exportados ou transmitidos:
 
 1. SDK/local runtime event
 2. Normalizacao e correlacao de turno/sessao
@@ -93,15 +115,18 @@ Todos os eventos publicos devem convergir para um envelope canonico antes de ser
 4. `broadcastSse()`
 5. Render terminal, SSE, JSONL, export e diagnosticos
 
-Nao deve haver emissores paralelos que renderizem a mesma mensagem final ou o mesmo delta final independentemente.
+Nao deve haver emissores paralelos que renderizem a mesma mensagem final ou o mesmo delta final
+independentemente.
 
 ### 4.3 Comandos
 
 Fonte ideal:
 
-- Um catalogo canonico de comandos com metadados (`name`, aliases, categoria, descricao, permissao, escopo, handler local, elegibilidade SDK).
+- Um catalogo canonico de comandos com metadados (`name`, aliases, categoria, descricao, permissao,
+  escopo, handler local, elegibilidade SDK).
 - O REPL local e os `CommandDefinition[]` do SDK derivam desse catalogo.
-- O `handler` SDK nao deve reimplementar logica. Ele deve chamar o mesmo nucleo do comando local ou emitir uma solicitacao rastreavel para o runtime.
+- O `handler` SDK nao deve reimplementar logica. Ele deve chamar o mesmo nucleo do comando local ou
+  emitir uma solicitacao rastreavel para o runtime.
 
 ### 4.4 Sessao e lifecycle
 
@@ -113,20 +138,25 @@ Eventos SDK de lifecycle devem ser visiveis como eventos de primeira classe:
 - `session.foreground`
 - `session.background`
 
-O operador deve conseguir ver a sessao viva, sessoes resumiveis, provider/modelo de cada uma, status de binding, origem do boot, erros e eventos recentes.
+O operador deve conseguir ver a sessao viva, sessoes resumiveis, provider/modelo de cada uma, status
+de binding, origem do boot, erros e eventos recentes.
 
 ### 4.5 UI SDK, ask_user e elicitation
 
 - `ask_user` e `onUserInputRequest` continuam sendo o caminho canonico do dialog loop.
-- `SessionUiApi.input/select/confirm` deve aparecer como canal explicito de UI SDK, nao confundido com ask_user do dialog loop.
-- Elicitation deve materializar schema, campos, resposta, cancelamento/decline e origem em um envelope canonico.
-- Testes live devem cobrir delta parcial, delta final, tool, ask_user, resposta do operador, elicitation e pos-ask_user.
+- `SessionUiApi.input/select/confirm` deve aparecer como canal explicito de UI SDK, nao confundido
+  com ask_user do dialog loop.
+- Elicitation deve materializar schema, campos, resposta, cancelamento/decline e origem em um
+  envelope canonico.
+- Testes live devem cobrir delta parcial, delta final, tool, ask_user, resposta do operador,
+  elicitation e pos-ask_user.
 
 ### 4.6 BYOK
 
 - Um unico arquivo local seguro de perfis BYOK deve concentrar configuracao do operador.
 - O terminal deve carregar perfis, catalogos, health e limites automaticamente.
-- Operador deve conseguir listar providers, filtrar modelos por gratuidade/capacidade/risco, testar modelo em live fake, selecionar, trocar provider/modelo e voltar ao SDK sem corromper sessao.
+- Operador deve conseguir listar providers, filtrar modelos por gratuidade/capacidade/risco, testar
+  modelo em live fake, selecionar, trocar provider/modelo e voltar ao SDK sem corromper sessao.
 - A troca de provider/modelo deve distinguir claramente:
   - selecao preparada;
   - binding vivo;
@@ -137,27 +167,37 @@ O operador deve conseguir ver a sessao viva, sessoes resumiveis, provider/modelo
 
 ### BUG-SDK-LIFE-001 - Lifecycle SDK pouco visivel no terminal
 
-`boot-wiring.js` observa lifecycle do `CopilotClient` e emite `sdk.lifecycle`, mas `terminal/events/agent-runtime-events.js` nao trata esse canal. Resultado: eventos importantes de criacao, delecao, foreground/background e update podem existir no runtime, mas nao entram na UX viva, SSE terminal e timeline do operador com semantica propria.
+`boot-wiring.js` observa lifecycle do `CopilotClient` e emite `sdk.lifecycle`, mas
+`terminal/events/agent-runtime-events.js` nao trata esse canal. Resultado: eventos importantes de
+criacao, delecao, foreground/background e update podem existir no runtime, mas nao entram na UX
+viva, SSE terminal e timeline do operador com semantica propria.
 
 ### GAP-CMD-001 - Comandos locais e SDK commands ainda sao duas arquiteturas
 
-`SessionConfigBuilder.commands()` existe e os tipos SDK estao importados, mas os comandos do REPL vivem em roteadores locais sem uma fonte de metadados unica. Isso impede `/help` dinamico, `CommandDefinition[]` completo e telemetria uniforme.
+`SessionConfigBuilder.commands()` existe e os tipos SDK estao importados, mas os comandos do REPL
+vivem em roteadores locais sem uma fonte de metadados unica. Isso impede `/help` dinamico,
+`CommandDefinition[]` completo e telemetria uniforme.
 
 ### GAP-UI-001 - SessionUiApi existe, mas ainda e diagnostico
 
-`SessionUiApi` aparece em comandos `/sdk`, mas a experiencia ainda nao e tratada como workflow de operador com timeline, artefatos e testes live completos.
+`SessionUiApi` aparece em comandos `/sdk`, mas a experiencia ainda nao e tratada como workflow de
+operador com timeline, artefatos e testes live completos.
 
 ### GAP-ELICIT-001 - Elicitation ainda nao tem circuito completo comparavel a ask_user
 
-Schemas, respostas, cancelamentos e declinios precisam virar eventos materializados, testaveis e exportaveis.
+Schemas, respostas, cancelamentos e declinios precisam virar eventos materializados, testaveis e
+exportaveis.
 
 ### GAP-SESS-001 - Gestao de sessao ainda nao tem cockpit operacional completo
 
-Faltam comandos e UX para escolher entre retomar anterior, criar nova, trocar sessao, desconectar, deletar, listar por filtros e entender riscos de provider/modelo por sessao.
+Faltam comandos e UX para escolher entre retomar anterior, criar nova, trocar sessao, desconectar,
+deletar, listar por filtros e entender riscos de provider/modelo por sessao.
 
 ### GAP-BYOK-001 - Catalogo ainda precisa de limites/capacidades melhores
 
-O operador ja consegue selecionar e testar providers, mas precisa de filtros mais ricos: free/paid, contexto, vision, tools, JSON, reasoning, limites free, saude local e compatibilidade com fluxo terminal.
+O operador ja consegue selecionar e testar providers, mas precisa de filtros mais ricos: free/paid,
+contexto, vision, tools, JSON, reasoning, limites free, saude local e compatibilidade com fluxo
+terminal.
 
 ## 6. Roadmap
 
@@ -165,7 +205,8 @@ O operador ja consegue selecionar e testar providers, mas precisa de filtros mai
 
 - A1. Persistir evidencia do ultimo live fake e live real por provider/modelo.
 - A2. Calibrar estimativa de tokens por provider/modelo.
-- A3. Expandir `/byok models` com filtros `free`, `vision`, `tools`, `reasoning`, `json`, `healthy`, `terminal-safe`.
+- A3. Expandir `/byok models` com filtros `free`, `vision`, `tools`, `reasoning`, `json`, `healthy`,
+  `terminal-safe`.
 - A4. Fazer `/byok recommend all-providers safe` considerar health por alias de provider/modelo.
 - A5. Separar claramente modelo recomendado, modelo preparado e modelo vivo.
 - A6. Adicionar resumo de limites conhecidos por provider/modelo quando disponivel.
@@ -177,7 +218,8 @@ O operador ja consegue selecionar e testar providers, mas precisa de filtros mai
 - B1. Materializar `sdk.lifecycle` no terminal com SSE, activity e JSONL.
 - B2. Criar `/session events [n]` ou integrar lifecycle recente ao `/session sdk`.
 - B3. Distinguir no prompt: SDK session, hub session, dialog loop, provider binding e prepared BYOK.
-- B4. Implementar cockpit de nova sessao: criar nova, retomar anterior, selecionar antiga, deletar, desconectar.
+- B4. Implementar cockpit de nova sessao: criar nova, retomar anterior, selecionar antiga, deletar,
+  desconectar.
 - B5. Avaliar pre-sessao assistida no boot sem quebrar retomada padrao.
 - B6. Expor `SessionListFilter` nos comandos de lista.
 - B7. Expor `SessionMetadata` com provider/modelo/boundary quando possivel.
@@ -223,7 +265,8 @@ O operador ja consegue selecionar e testar providers, mas precisa de filtros mai
 
 ### Faixa G - Testes live e fake
 
-- G1. Runner live padrao deve cobrir: delta parcial, delta final, tool, ask_user, resposta, usage, session cockpit e provider cockpit.
+- G1. Runner live padrao deve cobrir: delta parcial, delta final, tool, ask_user, resposta, usage,
+  session cockpit e provider cockpit.
 - G2. Runner BYOK deve cobrir pelo menos dois providers reais e troca de modelo dentro de provider.
 - G3. Live fake deve testar chat sem contaminar a sessao canonica do operador.
 - G4. Fake SDK deve reproduzir `SessionEventType`, lifecycle, commands, user input e elicitation.
@@ -242,7 +285,8 @@ O operador ja consegue selecionar e testar providers, mas precisa de filtros mai
 Prioridade imediata:
 
 1. Tratar `sdk.lifecycle` no terminal como evento de primeira classe. **Concluido em 2026-05-22.**
-2. Registrar lifecycle em activity/SSE sem poluir a resposta do assistente. **Concluido em 2026-05-22.**
+2. Registrar lifecycle em activity/SSE sem poluir a resposta do assistente. **Concluido em
+   2026-05-22.**
 3. Atualizar testes de `agent-runtime-events`. **Concluido em 2026-05-22.**
 4. Atualizar este documento com a fatia concluida.
 5. Em seguida, iniciar catalogo canonico de comandos SDK/local.
@@ -250,221 +294,258 @@ Prioridade imediata:
 Implementacao inicial concluida:
 
 - `src/copilot/terminal/events/agent-runtime-events.js` agora escuta `EMITTER_SDK_LIFECYCLE`.
-- Eventos `session.created`, `session.deleted`, `session.foreground` e `session.background` entram em activity/SSE como eventos visiveis, respeitando o toggle de atividade de sessao.
-- `session.updated` continua materializado, mas discreto, para nao poluir streaming e blocos de resposta.
+- Eventos `session.created`, `session.deleted`, `session.foreground` e `session.background` entram
+  em activity/SSE como eventos visiveis, respeitando o toggle de atividade de sessao.
+- `session.updated` continua materializado, mas discreto, para nao poluir streaming e blocos de
+  resposta.
 - Metadados sensiveis de lifecycle sao redigidos antes de fanout.
-- Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+- Teste focado:
+  `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
 
 Segunda fatia concluida:
 
-- `src/copilot/agent/session/commands/terminal-sdk-command-definitions.js` registra uma safelist inicial de
-  `CommandDefinition[]`: `terminal_status`, `terminal_health`, `terminal_session`, `terminal_byok` e
-  `terminal_events`.
+- `src/copilot/agent/session/commands/terminal-sdk-command-definitions.js` registra uma safelist
+  inicial de `CommandDefinition[]`: `terminal_status`, `terminal_health`, `terminal_session`,
+  `terminal_byok` e `terminal_events`.
 - `buildSessionOptions()` injeta esses comandos no `SessionConfigBuilder.commands()`.
-- Os handlers SDK nao duplicam o REPL: emitem `sdk.command.executed` com `CommandContext` normalizado.
-- `src/copilot/terminal/events/agent-runtime-events.js` materializa `sdk.command.executed` em activity/SSE e respeita o
-  toggle de atividade de sessao.
-- `agent/session/module-map.js`, `agent/session/README.md` e `agent/session/commands/index.js` agora declaram o papel
-  `commands` sem bypass cross-folder.
-- `events/event-adapter-events.js` foi reclassificado como hotspot no module-map do terminal, alinhando governanca com
-  tamanho real do arquivo.
-- Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_session_setup.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
+- Os handlers SDK nao duplicam o REPL: emitem `sdk.command.executed` com `CommandContext`
+  normalizado.
+- `src/copilot/terminal/events/agent-runtime-events.js` materializa `sdk.command.executed` em
+  activity/SSE e respeita o toggle de atividade de sessao.
+- `agent/session/module-map.js`, `agent/session/README.md` e `agent/session/commands/index.js` agora
+  declaram o papel `commands` sem bypass cross-folder.
+- `events/event-adapter-events.js` foi reclassificado como hotspot no module-map do terminal,
+  alinhando governanca com tamanho real do arquivo.
+- Teste focado:
+  `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/test_session_setup.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
 
 Proximo passo da Faixa C:
 
-- Extrair um catalogo comum de metadados de comando para deixar `/help`, `/menu`, `CMD_ROUTES` e `CommandDefinition[]`
-  derivados da mesma fonte.
+- Extrair um catalogo comum de metadados de comando para deixar `/help`, `/menu`, `CMD_ROUTES` e
+  `CommandDefinition[]` derivados da mesma fonte.
 
 Evidencia live apos as duas primeiras fatias:
 
 - Runner: `artifacts/terminal-live/2026-05-22T00-36-22-750Z/summary.md`.
 - Status: PASS.
 - BYOK: `kilo-code` / `kilo-auto/free`.
-- Validou deltas parciais, bloco final, `report_intent`, `read_file_content`, `ask_user` real, resposta `SIM`,
-  mensagem pos-ask, usage sem Premium Request, `/tools diag`, `/events`, `/errors`, `/health`, export Markdown e
-  ausencia de duplicacao obvia.
-- O archive SSE mostrou `sdk.lifecycle` como evento publico materializado, com `session.updated` discreto.
+- Validou deltas parciais, bloco final, `report_intent`, `read_file_content`, `ask_user` real,
+  resposta `SIM`, mensagem pos-ask, usage sem Premium Request, `/tools diag`, `/events`, `/errors`,
+  `/health`, export Markdown e ausencia de duplicacao obvia.
+- O archive SSE mostrou `sdk.lifecycle` como evento publico materializado, com `session.updated`
+  discreto.
 
 Terceira fatia concluida:
 
-- `/session sdk events [n]` agora resume `sdk.lifecycle` e `sdk.command.executed` diretamente a partir do archive SSE
-  canonico, sem criar novo emissor.
-- Eventos repetidos consecutivos, como rajadas de `session.updated`, sao colapsados na lente de operador, mas continuam
-  integrais no JSONL bruto para auditoria.
-- `/session sdk waits [n]` agrega `user_input.*`, `elicitation.*` e `permission.*` publicados no mesmo fanout canonico,
-  criando uma visao operacional unica para ask_user, SessionUiApi/elicitation e permissoes.
+- `/session sdk events [n]` agora resume `sdk.lifecycle` e `sdk.command.executed` diretamente a
+  partir do archive SSE canonico, sem criar novo emissor.
+- Eventos repetidos consecutivos, como rajadas de `session.updated`, sao colapsados na lente de
+  operador, mas continuam integrais no JSONL bruto para auditoria.
+- `/session sdk waits [n]` agrega `user_input.*`, `elicitation.*` e `permission.*` publicados no
+  mesmo fanout canonico, criando uma visao operacional unica para ask_user, SessionUiApi/elicitation
+  e permissoes.
 - `/help` passou a expor a lente nova junto do cockpit de sessao.
 - O runner live `scripts/copilot/run-terminal-llm-b-live-test.mjs --no-pr` agora executa e valida
-  `/session sdk events` e `/session sdk waits`, para que a regressao seja visivel sem abrir turno LLM explicito.
-- Teste focado: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_session.spec.js`.
-- Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-49-31-572Z/summary.md` (PASS, BYOK kilo-code,
-  zero turno explicito, criterios `sdk-session-events-cockpit-visible` e `sdk-session-waits-cockpit-visible` verdes).
+  `/session sdk events` e `/session sdk waits`, para que a regressao seja visivel sem abrir turno
+  LLM explicito.
+- Teste focado:
+  `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-49-31-572Z/summary.md` (PASS, BYOK
+  kilo-code, zero turno explicito, criterios `sdk-session-events-cockpit-visible` e
+  `sdk-session-waits-cockpit-visible` verdes).
 
 Proximo passo da Faixa B/C:
 
-- Usar a mesma lente de eventos para conectar `SessionUiApi`/elicitation e comandos SDK no cockpit, distinguindo
-  claramente "arquivo bruto completo" de "visao operacional agregada".
+- Usar a mesma lente de eventos para conectar `SessionUiApi`/elicitation e comandos SDK no cockpit,
+  distinguindo claramente "arquivo bruto completo" de "visao operacional agregada".
 
 Quarta fatia concluida:
 
-- `CommandDefinition[]` ganhou os comandos seguros `terminal_session_events` e `terminal_session_waits`.
-- `/session sdk commands` lista a safelist registrada no SDK, com comando local correspondente e explicacao de que a
-  execucao observavel publica `sdk.command.executed` em vez de criar um REPL paralelo.
+- `CommandDefinition[]` ganhou os comandos seguros `terminal_session_events` e
+  `terminal_session_waits`.
+- `/session sdk commands` lista a safelist registrada no SDK, com comando local correspondente e
+  explicacao de que a execucao observavel publica `sdk.command.executed` em vez de criar um REPL
+  paralelo.
 - O runner live no-PR passou a executar `/session sdk commands` e validar o criterio
   `sdk-session-command-catalog-visible`.
-- Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-52-07-706Z/summary.md` (PASS; criterios
-  `sdk-session-command-catalog-visible`, `sdk-session-events-cockpit-visible` e
+- Evidencia live no-PR: `artifacts/terminal-live/2026-05-22T00-52-07-706Z/summary.md` (PASS;
+  criterios `sdk-session-command-catalog-visible`, `sdk-session-events-cockpit-visible` e
   `sdk-session-waits-cockpit-visible` verdes).
 
 Quinta fatia concluida - Faixa F:
 
-- Investigacao SDK local 0.3.0 confirmou que `SessionFsConfig` e `createSessionFsHandler` existem, mas
-  `session.updateMetadata` continua ausente. A correcao, portanto, nao tenta escrever metadata no SDK; ela persiste
-  metadata local redigida no estado do agent.
+- Investigacao SDK local 0.3.0 confirmou que `SessionFsConfig` e `createSessionFsHandler` existem,
+  mas `session.updateMetadata` continua ausente. A correcao, portanto, nao tenta escrever metadata
+  no SDK; ela persiste metadata local redigida no estado do agent.
 - `src/copilot/sdk/session/session-fs.js` agora expoe `describeConfiguredSessionFs()` e
-  `readConfiguredSessionFsState()`, reaproveitando a configuracao canonica de boot e retornando paths seguros
-  (`workspace:<relativo>` ou `external:<basename>`) com estado `exists/missing/unknown`.
-- `src/copilot/agent/session/initializers/initializer.js` persiste `sdkSessionLocalMetadata` por `sessionId`, contendo
-  modelo, reasoning, provider redigido e boundary/decisao de boot. O mapa e limitado para evitar crescimento indefinido.
-- `src/copilot/presentation/runtime/sdk-session.js` enriquece o inventario de sessoes com `sessionFs` e metadata local,
-  sem depender de API SDK inexistente e enriquecendo com I/O apenas a janela solicitada pelo terminal.
-- `/session sdk` agora mostra Session FS, metadata local provider/modelo/boundary, filtros `cwd`, `gitRoot`, `repo`/
-  `repository`, `branch`, e paginacao `offset=<n>`/`limit` numerico.
-- A exclusao continua protegendo a sessao SDK viva; os novos metadados sao somente diagnosticos/operacionais e nao
-  reabrem caminho paralelo de delete ou resume.
-- Testes focados: `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/sdk/test_sdk_session_fs.spec.js
-  tests/unit/copilot/terminal/test_commands_session.spec.js`.
-- Validadores executados nesta fatia: `npm run typecheck:strict:src.copilot` PASS; `npm run lint:copilot` PASS;
-  testes focados PASS.
-- `npm run test:copilot` completo foi executado e falhou em achados globais ja fora da Faixa F imediata. Uma violacao
-  introduzida durante a fatia (`presentation/runtime/sdk-session.js` importando `#copilot/sdk/session`) foi corrigida,
-  movendo o acesso a SessionFs para a facade do agent. O rerun focado de soberania deixou apenas o achado preexistente
-  de `hooks/session-hooks.js`.
+  `readConfiguredSessionFsState()`, reaproveitando a configuracao canonica de boot e retornando
+  paths seguros (`workspace:<relativo>` ou `external:<basename>`) com estado
+  `exists/missing/unknown`.
+- `src/copilot/agent/session/initializers/initializer.js` persiste `sdkSessionLocalMetadata` por
+  `sessionId`, contendo modelo, reasoning, provider redigido e boundary/decisao de boot. O mapa e
+  limitado para evitar crescimento indefinido.
+- `src/copilot/presentation/runtime/sdk-session.js` enriquece o inventario de sessoes com
+  `sessionFs` e metadata local, sem depender de API SDK inexistente e enriquecendo com I/O apenas a
+  janela solicitada pelo terminal.
+- `/session sdk` agora mostra Session FS, metadata local provider/modelo/boundary, filtros `cwd`,
+  `gitRoot`, `repo`/ `repository`, `branch`, e paginacao `offset=<n>`/`limit` numerico.
+- A exclusao continua protegendo a sessao SDK viva; os novos metadados sao somente
+  diagnosticos/operacionais e nao reabrem caminho paralelo de delete ou resume.
+- Testes focados:
+  `node scripts/ci/run-vitest-copilot.mjs tests/unit/copilot/sdk/test_sdk_session_fs.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`.
+- Validadores executados nesta fatia: `npm run typecheck:strict:src.copilot` PASS;
+  `npm run lint:copilot` PASS; testes focados PASS.
+- `npm run test:copilot` completo foi executado e falhou em achados globais ja fora da Faixa F
+  imediata. Uma violacao introduzida durante a fatia (`presentation/runtime/sdk-session.js`
+  importando `#copilot/sdk/session`) foi corrigida, movendo o acesso a SessionFs para a facade do
+  agent. O rerun focado de soberania deixou apenas o achado preexistente de
+  `hooks/session-hooks.js`.
 
 Sexta fatia correlata - MCP/OAuth/Cloudflare:
 
-- A analise das telas reais do ChatGPT mostrou que o conector publico `https://mcp.aurelin.org/mcp` ja era descoberto,
-  mas o issuer dev nao anunciava CIMD, o OIDC nao tinha `userinfo_endpoint` real e os escopos iniciais ficavam amplos
-  demais.
-- `src/copilot/mcp/control-plane/dev-oauth.js` passou a publicar `client_id_metadata_document_supported: true`,
-  aceitar Client ID Metadata Documents HTTPS com validacao de metadata/redirect, expor `/oauth/userinfo` e emitir
-  `id_token` quando `openid` for concedido.
-- `src/copilot/mcp/control-plane/auth.js` passou a separar escopos suportados de escopos iniciais do protected resource
-  metadata. A reducao temporaria do primeiro linking para `repo:read` e `repo:validate` foi revogada na nona fatia:
-  o default canonico voltou a ser max-power.
-- `src/copilot/mcp/adapters/http.js` passou a expor `MCP-Protocol-Version` em CORS e validar `Origin` quando presente,
-  alinhando o transporte HTTP com a leitura MCP 2025-11-25 sem quebrar o modo stateless atual.
-- `mcp_oauth_issuer_diagnostics` e o smoke OAuth agora reportam CIMD, userinfo/OIDC e escopos anunciados.
+- A analise das telas reais do ChatGPT mostrou que o conector publico `https://mcp.aurelin.org/mcp`
+  ja era descoberto, mas o issuer dev nao anunciava CIMD, o OIDC nao tinha `userinfo_endpoint` real
+  e os escopos iniciais ficavam amplos demais.
+- `src/copilot/mcp/control-plane/dev-oauth.js` passou a publicar
+  `client_id_metadata_document_supported: true`, aceitar Client ID Metadata Documents HTTPS com
+  validacao de metadata/redirect, expor `/oauth/userinfo` e emitir `id_token` quando `openid` for
+  concedido.
+- `src/copilot/mcp/control-plane/auth.js` passou a separar escopos suportados de escopos iniciais do
+  protected resource metadata. A reducao temporaria do primeiro linking para `repo:read` e
+  `repo:validate` foi revogada na nona fatia: o default canonico voltou a ser max-power.
+- `src/copilot/mcp/adapters/http.js` passou a expor `MCP-Protocol-Version` em CORS e validar
+  `Origin` quando presente, alinhando o transporte HTTP com a leitura MCP 2025-11-25 sem quebrar o
+  modo stateless atual.
+- `mcp_oauth_issuer_diagnostics` e o smoke OAuth agora reportam CIMD, userinfo/OIDC e escopos
+  anunciados.
 - Validadores focados desta fatia: `npm run typecheck:strict:src.copilot`, `npm run lint:copilot` e
   `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`.
-- O `npm run test:copilot:unit` amplo foi reexecutado apos a estabilizacao da fatia e passou com 3084/3084.
-- Publicacao operacional: `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
-  `make copilot-mcp-oauth-smoke` passaram. A metadata publica em `https://mcp.aurelin.org` confirmou CIMD,
-  `userinfo_endpoint` e, naquela fatia, escopos iniciais reduzidos; essa decisao foi substituida pela nona fatia.
+- O `npm run test:copilot:unit` amplo foi reexecutado apos a estabilizacao da fatia e passou com
+  3084/3084.
+- Publicacao operacional: `make copilot-mcp-restart`, `make copilot-mcp-status`,
+  `make copilot-mcp-smoke` e `make copilot-mcp-oauth-smoke` passaram. A metadata publica em
+  `https://mcp.aurelin.org` confirmou CIMD, `userinfo_endpoint` e, naquela fatia, escopos iniciais
+  reduzidos; essa decisao foi substituida pela nona fatia.
 
 Setima fatia correlata - prova operacional CIMD:
 
-- O issuer dev passou a servir `/.well-known/oauth-client/codex-smoke.json` para smoke CIMD com `client_id` HTTPS
-  autoconsistente.
-- `copilot:mcp:oauth:smoke` agora valida DCR e CIMD. O fluxo CIMD confirma `id_token` e `/oauth/userinfo`.
-- `copilot:mcp:cloudflare:smoke` agora falha se OAuth metadata, CIMD, userinfo ou escopos iniciais regredirem.
-- `.env.example`, `.env.local.example` e `.env.schema.json` cobrem `COPILOT_MCP_OAUTH_INITIAL_SCOPES` e
-  `COPILOT_MCP_ALLOWED_ORIGINS`.
-- Validacao desta continuidade: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes Copilot,
-  env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
-  `make copilot-mcp-oauth-smoke`.
+- O issuer dev passou a servir `/.well-known/oauth-client/codex-smoke.json` para smoke CIMD com
+  `client_id` HTTPS autoconsistente.
+- `copilot:mcp:oauth:smoke` agora valida DCR e CIMD. O fluxo CIMD confirma `id_token` e
+  `/oauth/userinfo`.
+- `copilot:mcp:cloudflare:smoke` agora falha se OAuth metadata, CIMD, userinfo ou escopos iniciais
+  regredirem.
+- `.env.example`, `.env.local.example` e `.env.schema.json` cobrem
+  `COPILOT_MCP_OAUTH_INITIAL_SCOPES` e `COPILOT_MCP_ALLOWED_ORIGINS`.
+- Validacao desta continuidade: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes
+  Copilot, env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`,
+  `make copilot-mcp-smoke` e `make copilot-mcp-oauth-smoke`.
 
 Oitava fatia correlata - diagnostico MCP CIMD:
 
-- `mcp_oauth_issuer_diagnostics` passou a validar tambem o documento CIMD quando o issuer e o proprio resource MCP.
-- A readiness do diagnostico agora inclui falhas no client metadata document quando ele deveria existir.
+- `mcp_oauth_issuer_diagnostics` passou a validar tambem o documento CIMD quando o issuer e o
+  proprio resource MCP.
+- A readiness do diagnostico agora inclui falhas no client metadata document quando ele deveria
+  existir.
 - Validacao: typecheck strict Copilot, lint Copilot e 85 testes MCP.
 
 Nona fatia correlata - correcao max-power ChatGPT:
 
-- A direcao de reduzir `scopes_supported` inicial para `repo:read`/`repo:validate` foi reclassificada como desalinhada
-  do objetivo canonico deste repo. Para o conector ChatGPT, o default deve maximizar liberdade e autonomia sobre o
-  workspace/repo.
-- `COPILOT_MCP_OAUTH_INITIAL_SCOPES`, o protected resource metadata, o smoke OAuth, o smoke Cloudflare e o preview de
-  `WWW-Authenticate` agora usam por default `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
+- A direcao de reduzir `scopes_supported` inicial para `repo:read`/`repo:validate` foi
+  reclassificada como desalinhada do objetivo canonico deste repo. Para o conector ChatGPT, o
+  default deve maximizar liberdade e autonomia sobre o workspace/repo.
+- `COPILOT_MCP_OAUTH_INITIAL_SCOPES`, o protected resource metadata, o smoke OAuth, o smoke
+  Cloudflare e o preview de `WWW-Authenticate` agora usam por default `repo:read`, `repo:write`,
+  `repo:validate` e `repo:admin`.
 - DCR e CIMD devem provar tokens max-power; CIMD continua somando `openid profile email` para OIDC.
-- Os exemplos e o schema de ambiente documentam max-power como default, preservando override explicito apenas para
-  operacao excepcional.
-- Validacao desta correcao: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes Copilot unit,
-  env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`, `make copilot-mcp-smoke` e
-  `make copilot-mcp-oauth-smoke`.
-- Evidencia publica apos restart: protected resource metadata anuncia os quatro escopos repo; DCR emitiu
-  `repo:read repo:write repo:validate repo:admin`; CIMD emitiu
-  `repo:read repo:write repo:validate repo:admin openid profile email`, com `id_token` e `/oauth/userinfo` verdes.
+- Os exemplos e o schema de ambiente documentam max-power como default, preservando override
+  explicito apenas para operacao excepcional.
+- Validacao desta correcao: typecheck strict Copilot, lint Copilot, 85 testes MCP, 3084 testes
+  Copilot unit, env audit/validate/check, `make copilot-mcp-restart`, `make copilot-mcp-status`,
+  `make copilot-mcp-smoke` e `make copilot-mcp-oauth-smoke`.
+- Evidencia publica apos restart: protected resource metadata anuncia os quatro escopos repo; DCR
+  emitiu `repo:read repo:write repo:validate repo:admin`; CIMD emitiu
+  `repo:read repo:write repo:validate repo:admin openid profile email`, com `id_token` e
+  `/oauth/userinfo` verdes.
 
 Decima fatia correlata - introspeccao max-power:
 
-- `mcp_capabilities_summary` agora retorna `authProfile.initialScopes` e `authProfile.maxPowerDefault`, evitando que o
-  proprio ChatGPT receba uma leitura ambigua do contrato OAuth vigente.
-- `mcp_autonomy_power_score` agora inclui `auth.initialScopes`, `auth.maxPowerRepoScopesByDefault` e blocker dedicado
-  se o pacote `repo:read`/`repo:write`/`repo:validate`/`repo:admin` deixar de ser default.
-- `metadataProfile.securitySchemes` foi atualizado para descrever OAuth registry-wide com max-power por default; a
-  descricao antiga de dev/noauth deixou de ser o sinal canonico.
-- Validacao: typecheck strict Copilot, lint Copilot, teste focado `test_mcp_tools` 30/30, testes MCP 85/85,
-  testes Copilot unit 3084/3084, restart/status/smoke Cloudflare e smoke OAuth max-power.
+- `mcp_capabilities_summary` agora retorna `authProfile.initialScopes` e
+  `authProfile.maxPowerDefault`, evitando que o proprio ChatGPT receba uma leitura ambigua do
+  contrato OAuth vigente.
+- `mcp_autonomy_power_score` agora inclui `auth.initialScopes`, `auth.maxPowerRepoScopesByDefault` e
+  blocker dedicado se o pacote `repo:read`/`repo:write`/`repo:validate`/`repo:admin` deixar de ser
+  default.
+- `metadataProfile.securitySchemes` foi atualizado para descrever OAuth registry-wide com max-power
+  por default; a descricao antiga de dev/noauth deixou de ser o sinal canonico.
+- Validacao: typecheck strict Copilot, lint Copilot, teste focado `test_mcp_tools` 30/30, testes MCP
+  85/85, testes Copilot unit 3084/3084, restart/status/smoke Cloudflare e smoke OAuth max-power.
 
 Decima primeira fatia correlata - auditoria WORKSPACE pos-transformacoes:
 
-- A auditoria `src/copilot/docs/Auditoria profunda — WORKSPACE MCP após.md` foi lida integralmente e usada como guia
-  da nova fatia.
-- Corrigido `mcp_tunnel_status.chatgpt.authentication`, que ainda retornava `none-dev`; agora o display de auth vem da
-  mesma leitura efetiva usada pelo perfil do conector.
-- O quick tunnel temporario stale deixa de ser sinal principal quando o tunnel permanente `mcp.aurelin.org` esta
-  configurado; aparece como fallback e pode ser ignorado para readiness operacional.
+- A auditoria `src/copilot/docs/Auditoria profunda — WORKSPACE MCP após.md` foi lida integralmente e
+  usada como guia da nova fatia.
+- Corrigido `mcp_tunnel_status.chatgpt.authentication`, que ainda retornava `none-dev`; agora o
+  display de auth vem da mesma leitura efetiva usada pelo perfil do conector.
+- O quick tunnel temporario stale deixa de ser sinal principal quando o tunnel permanente
+  `mcp.aurelin.org` esta configurado; aparece como fallback e pode ser ignorado para readiness
+  operacional.
 - `copilot:mcp:cloudflare:smoke` passa a persistir o smoke do connector permanente em
   `src/copilot/.ai/cloudflare/connector-smoke.json`, e `mcp_runtime_health` passa a ler esse estado.
-- Auto-build de index passa a ser default no boot HTTP (`COPILOT_MCP_INDEX_AUTO_BUILD=true`, path `src/copilot`,
-  `maxFiles=5000`), preservando override para desligar.
-- `mcp_smoke_workspace` agora emite warning proprio `INDEX_UNAVAILABLE` quando o indice IO esta habilitado, mas vazio
-  ou indisponivel.
-- `mcp_last_validation_summary` agora retorna `effectiveChecks`, permitindo que suites recentes passem a representar
-  efetivamente `typecheck`, `lint`, `unit-mcp` e `unit-copilot`.
-- `.gitignore` cobre `src/copilot/.ai/quarantine/*` para evitar dirty workspace por metadados de quarantine.
-- O tema das janelas do ChatGPT foi classificado corretamente: OAuth max-power concede escopos, mas confirmacao de
-  write action e controle do host. A mitigacao legitima e reduzir chamadas mutantes separadas com plan-only, suites,
-  runners fixos e remember approval quando a UI oferecer.
-- Validacao: typecheck strict Copilot, lint Copilot, testes MCP 86/86, testes Copilot unit 3085/3085,
-  env audit/validate/check, restart/status/smoke Cloudflare, smoke OAuth max-power e `/health` confirmando
-  `indexAutoBuild.status=completed` com 999 arquivos indexados.
+- Auto-build de index passa a ser default no boot HTTP (`COPILOT_MCP_INDEX_AUTO_BUILD=true`, path
+  `src/copilot`, `maxFiles=5000`), preservando override para desligar.
+- `mcp_smoke_workspace` agora emite warning proprio `INDEX_UNAVAILABLE` quando o indice IO esta
+  habilitado, mas vazio ou indisponivel.
+- `mcp_last_validation_summary` agora retorna `effectiveChecks`, permitindo que suites recentes
+  passem a representar efetivamente `typecheck`, `lint`, `unit-mcp` e `unit-copilot`.
+- `.gitignore` cobre `src/copilot/.ai/quarantine/*` para evitar dirty workspace por metadados de
+  quarantine.
+- O tema das janelas do ChatGPT foi classificado corretamente: OAuth max-power concede escopos, mas
+  confirmacao de write action e controle do host. A mitigacao legitima e reduzir chamadas mutantes
+  separadas com plan-only, suites, runners fixos e remember approval quando a UI oferecer.
+- Validacao: typecheck strict Copilot, lint Copilot, testes MCP 86/86, testes Copilot unit
+  3085/3085, env audit/validate/check, restart/status/smoke Cloudflare, smoke OAuth max-power e
+  `/health` confirmando `indexAutoBuild.status=completed` com 999 arquivos indexados.
 
 Decima segunda fatia correlata - lote de file ops para reduzir janelas:
 
-- Criada `repo_apply_file_batch` para agrupar `create_file`, `move_file`, `quarantine_file` e `remove_file` explicito em
-  uma unica tool call auditavel.
-- A tool usa `dryRun=true` por default; aplicacao real exige `dryRun=false` e `confirmBatch=true`; delete dentro do lote
-  tambem exige `confirm=true` por operacao.
-- Esta fatia nao falsifica `readOnlyHint`: a documentacao oficial do Apps SDK reserva esse hint para tools sem efeitos
-  de criacao/alteracao/delete. Como o lote pode deletar, ele permanece com `destructiveHint=true`.
-- Objetivo pratico: reduzir multiplas confirmacoes potenciais em chatgpt.com para uma unica chamada confiavel, sem
-  prometer controle sobre a UI host-side.
-- Validacao: typecheck strict Copilot, lint Copilot, testes focados repo-write/registry/tools 45/45, testes MCP 87/87,
-  testes Copilot unit 3086/3086, restart/status/smoke Cloudflare com 68/68 tools e smoke OAuth max-power.
+- Criada `repo_apply_file_batch` para agrupar `create_file`, `move_file`, `quarantine_file` e
+  `remove_file` explicito em uma unica tool call auditavel.
+- A tool usa `dryRun=true` por default; aplicacao real exige `dryRun=false` e `confirmBatch=true`;
+  delete dentro do lote tambem exige `confirm=true` por operacao.
+- Esta fatia nao falsifica `readOnlyHint`: a documentacao oficial do Apps SDK reserva esse hint para
+  tools sem efeitos de criacao/alteracao/delete. Como o lote pode deletar, ele permanece com
+  `destructiveHint=true`.
+- Objetivo pratico: reduzir multiplas confirmacoes potenciais em chatgpt.com para uma unica chamada
+  confiavel, sem prometer controle sobre a UI host-side.
+- Validacao: typecheck strict Copilot, lint Copilot, testes focados repo-write/registry/tools 45/45,
+  testes MCP 87/87, testes Copilot unit 3086/3086, restart/status/smoke Cloudflare com 68/68 tools e
+  smoke OAuth max-power.
 
 Decima terceira fatia correlata - OAuth refresh-token e auditoria de friccao:
 
-- `src/copilot/docs/# Plano completo de patches OAuth.md` foi lido integralmente e usado como guia da nova revisao.
-- A implementacao anterior de `mcp_oauth_friction_audit` foi reclassificada como quebrada: o arquivo havia sido gravado
-  como uma unica linha com `\n` literais e nao seguia o contrato real do registry MCP.
+- `src/copilot/docs/# Plano completo de patches OAuth.md` foi lido integralmente e usado como guia
+  da nova revisao.
+- A implementacao anterior de `mcp_oauth_friction_audit` foi reclassificada como quebrada: o arquivo
+  havia sido gravado como uma unica linha com `\n` literais e nao seguia o contrato real do registry
+  MCP.
 - `src/copilot/mcp/control-plane/dev-oauth.js` agora usa nomes canônicos para refresh token, anuncia
-  `refresh_token` em issuer metadata, DCR e CIMD, emite access tokens de 24h e refresh tokens rotativos de 30 dias.
-- O token endpoint foi endurecido para invalidar refresh token somente apos validar client/resource/expiracao, evitando
-  invalidacao por tentativa incorreta de outro cliente.
+  `refresh_token` em issuer metadata, DCR e CIMD, emite access tokens de 24h e refresh tokens
+  rotativos de 30 dias.
+- O token endpoint foi endurecido para invalidar refresh token somente apos validar
+  client/resource/expiracao, evitando invalidacao por tentativa incorreta de outro cliente.
 - `readDevOAuthTokenLifetimePolicy()` centraliza a leitura de
   `COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS` e
   `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS`.
-- `mcp_oauth_friction_audit` foi refeito como tool read-only real com `okResult()`, annotations canonicas, leitura da
-  metadata protegida, leitura da metadata do issuer dev, checagem de CIMD, PKCE S256, `authorization_code`,
-  `refresh_token`, escopos max-power e fronteira OAuth versus aprovacao host-side.
-- `copilot:mcp:oauth:smoke` agora valida refresh-token em DCR e CIMD e usa token renovado para chamar
-  `mcp_runtime_health`.
+- `mcp_oauth_friction_audit` foi refeito como tool read-only real com `okResult()`, annotations
+  canonicas, leitura da metadata protegida, leitura da metadata do issuer dev, checagem de CIMD,
+  PKCE S256, `authorization_code`, `refresh_token`, escopos max-power e fronteira OAuth versus
+  aprovacao host-side.
+- `copilot:mcp:oauth:smoke` agora valida refresh-token em DCR e CIMD e usa token renovado para
+  chamar `mcp_runtime_health`.
 - `.env.example`, `.env.local.example` e `.env.schema.json` cobrem os TTLs do OAuth dev e
   `COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS`.
-- Validacao: typecheck strict Copilot, lint Copilot, testes MCP 91/91, testes Copilot unit 3090/3090 no rerun limpo,
-  env audit/validate/check, `git diff --check`, restart/status/smoke Cloudflare com 71/71 tools, smoke OAuth com
-  DCR/CIMD max-power + `refresh_token`, `id_token` e `/oauth/userinfo`, e `/health` com index auto-build completo
-  (`indexed=1002`, `symbols=5815`, `imports=2405`).
+- Validacao: typecheck strict Copilot, lint Copilot, testes MCP 91/91, testes Copilot unit 3090/3090
+  no rerun limpo, env audit/validate/check, `git diff --check`, restart/status/smoke Cloudflare com
+  71/71 tools, smoke OAuth com DCR/CIMD max-power + `refresh_token`, `id_token` e `/oauth/userinfo`,
+  e `/health` com index auto-build completo (`indexed=1002`, `symbols=5815`, `imports=2405`).

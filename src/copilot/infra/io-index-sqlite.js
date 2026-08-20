@@ -19,8 +19,8 @@ import {
     DEFAULT_INDEX_EXTENSIONS,
     ensureIoIndexSchema,
     flattenScanEntries,
-    iterateLineChunks,
     IO_INDEX_SCHEMA_VERSION,
+    iterateLineChunks,
     normalizeIndexExtensions,
     normalizeIndexMaxResults,
     normalizeIndexPath,
@@ -36,6 +36,7 @@ import { parseFileSymbols } from './io-parser.js';
 import { scanDirectory } from './io-scanner.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { statPathSnapshot } from './io/fs/stat.js';
+import { BABEL_PARSER_POLICY_VERSION } from './parse/babel-policy.js';
 import { utf8ByteLength } from './shared/buffer.js';
 import { readEnvPositiveInt } from './shared/env.js';
 import { fingerprintMatches, richFingerprintMatches } from './shared/fingerprint-match.js';
@@ -50,7 +51,9 @@ const DEFAULT_INDEX_HASH_VERIFY_INTERVAL_MS = readEnvPositiveInt(
     6 * 60 * 60 * 1000,
 );
 const DEFAULT_INDEX_RECHECK_UNCHANGED_SNAPSHOT = !['0', 'false', 'off'].includes(
-    String(process.env['IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT'] ?? '0').trim().toLowerCase(),
+    String(process.env['IO_INDEX_RECHECK_UNCHANGED_SNAPSHOT'] ?? '0')
+        .trim()
+        .toLowerCase(),
 );
 const DEFAULT_INDEX_SNAPSHOT_RETRIES = 2;
 
@@ -175,6 +178,8 @@ export function createIoIndexSqlite(options) {
         hashVerificationMisses: 0,
         unchangedFingerprintFastPath: 0,
         unchangedSnapshotRechecks: 0,
+        parserPolicyRefreshes: 0,
+        parsedSymbolPolicyRejects: 0,
         snapshotConflicts: 0,
         errors: 0,
     };
@@ -182,17 +187,51 @@ export function createIoIndexSqlite(options) {
     /**
      * @param {Record<string, unknown> | undefined} metadata
      * @param {number} [maxBytes=4096] Default is `4096`
+     * @param {Record<string, unknown>} [criticalMetadata]
      * @returns {string}
      */
-    function safeMetaJson(metadata, maxBytes = 4096) {
+    function safeMetaJson(metadata, maxBytes = 4096, criticalMetadata = {}) {
         try {
             const json = JSON.stringify(metadata ?? {});
-            if (typeof json !== 'string') return JSON.stringify({ _error: 'non-serializable' });
+            if (typeof json !== 'string') return JSON.stringify({ ...criticalMetadata, _error: 'non-serializable' });
             if (utf8ByteLength(json, 'index metadata') <= maxBytes) return json;
-            return JSON.stringify({ _truncated: true, _maxBytes: maxBytes });
+            return JSON.stringify({ ...criticalMetadata, _truncated: true, _maxBytes: maxBytes });
         } catch {
-            return JSON.stringify({ _error: 'non-serializable' });
+            return JSON.stringify({ ...criticalMetadata, _error: 'non-serializable' });
         }
+    }
+
+    /**
+     * @param {string} filePath
+     * @param {string | null | undefined} metadataJson
+     * @returns {boolean}
+     */
+    function parserProjectionIsCurrent(filePath, metadataJson) {
+        if (!SYMBOL_EXTENSIONS.has(extname(filePath).toLowerCase())) return true;
+        if (typeof metadataJson !== 'string' || metadataJson.length === 0) return false;
+        try {
+            const metadata = /** @type {{ parserPolicyVersion?: unknown }} */ (JSON.parse(metadataJson));
+            return metadata.parserPolicyVersion === BABEL_PARSER_POLICY_VERSION;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * @param {string} filePath
+     * @param {Record<string, unknown> | undefined} metadata
+     * @param {Record<string, unknown>} fingerprint
+     * @returns {string}
+     */
+    function buildIndexMetadataJson(filePath, metadata, fingerprint) {
+        const critical = {
+            indexVersion: IO_INDEX_SCHEMA_VERSION,
+            ...(SYMBOL_EXTENSIONS.has(extname(filePath).toLowerCase())
+                ? { parserPolicyVersion: BABEL_PARSER_POLICY_VERSION }
+                : {}),
+            fingerprint,
+        };
+        return safeMetaJson({ ...(metadata ?? {}), ...critical }, 4096, critical);
     }
 
     const stmtDeleteFile = db.prepare(`
@@ -282,6 +321,7 @@ export function createIoIndexSqlite(options) {
                ino,
                content_hash as contentHash,
                refreshed_at_ms as refreshedAtMs,
+               metadata_json as metadataJson,
                status
         FROM copilot_io_index_files
         WHERE file_path = ?
@@ -547,7 +587,12 @@ export function createIoIndexSqlite(options) {
      *     ino?: number | null;
      *     metadata?: Record<string, unknown>;
      * }} input
-     * @param {{ confirmCurrent?: boolean; attempt?: number; signal?: AbortSignal; parsedSymbols?: import('./io-parser.js').FileSymbols }} [internal]
+     * @param {{
+     *     confirmCurrent?: boolean;
+     *     attempt?: number;
+     *     signal?: AbortSignal;
+     *     parsedSymbols?: import('./io-parser.js').FileSymbols;
+     * }} [internal]
      */
     async function indexTextFile(input, internal = {}) {
         internal.signal?.throwIfAborted();
@@ -559,6 +604,14 @@ export function createIoIndexSqlite(options) {
         const indexedAtMs = now();
 
         let symbols = /** @type {import('./io-parser.js').FileSymbols | null} */ (internal.parsedSymbols ?? null);
+        if (
+            SYMBOL_EXTENSIONS.has(extension) &&
+            symbols &&
+            symbols.parserPolicyVersion !== BABEL_PARSER_POLICY_VERSION
+        ) {
+            stats.parsedSymbolPolicyRejects += 1;
+            symbols = null;
+        }
         let parseError = symbols?.parseError ?? /** @type {string | null} */ (null);
         if (SYMBOL_EXTENSIONS.has(extension) && !symbols) {
             try {
@@ -614,17 +667,13 @@ export function createIoIndexSqlite(options) {
                 parseError,
                 indexedAtMs,
                 refreshedAtMs: indexedAtMs,
-                metadataJson: safeMetaJson({
-                    ...(input.metadata ?? {}),
-                    indexVersion: IO_INDEX_SCHEMA_VERSION,
-                    fingerprint: {
-                        mtimeMs: input.mtimeMs,
-                        ctimeMs: input.ctimeMs ?? null,
-                        dev: input.dev ?? null,
-                        ino: input.ino ?? null,
-                        sizeBytes: input.sizeBytes,
-                        contentHash,
-                    },
+                metadataJson: buildIndexMetadataJson(filePath, input.metadata, {
+                    mtimeMs: input.mtimeMs,
+                    ctimeMs: input.ctimeMs ?? null,
+                    dev: input.dev ?? null,
+                    ino: input.ino ?? null,
+                    sizeBytes: input.sizeBytes,
+                    contentHash,
                 }),
             });
             for (const chunk of iterateLineChunks(input.content)) {
@@ -691,26 +740,35 @@ export function createIoIndexSqlite(options) {
          * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number }} snapshot
          */
         matchesFileFingerprint(filePath, snapshot) {
-            const existing = /** @type {{ sizeBytes: number; mtimeMs: number; ctimeMs: number | null; dev: number | null; ino: number | null; status: string } | undefined} */ (
-                stmtGetFingerprint.get(normalizeIndexPath(filePath))
-            );
+            const normalizedFilePath = normalizeIndexPath(filePath);
+            const existing = /** @type {{
+          sizeBytes: number;
+          mtimeMs: number;
+          ctimeMs: number | null;
+          dev: number | null;
+          ino: number | null;
+          metadataJson?: string | null;
+          status: string;
+      }
+    | undefined} */ (stmtGetFingerprint.get(normalizedFilePath));
             return Boolean(
                 existing &&
-                    existing.status === 'fresh' &&
-                    existing.ctimeMs != null &&
-                    existing.dev != null &&
-                    existing.ino != null &&
-                    richFingerprintMatches(
-                        {
-                            sizeBytes: existing.sizeBytes,
-                            mtimeMs: existing.mtimeMs,
-                            ctimeMs: existing.ctimeMs,
-                            dev: existing.dev,
-                            ino: existing.ino,
-                        },
-                        snapshot,
-                        { mtimeToleranceMs: 0 },
-                    ),
+                existing.status === 'fresh' &&
+                parserProjectionIsCurrent(normalizedFilePath, existing.metadataJson) &&
+                existing.ctimeMs != null &&
+                existing.dev != null &&
+                existing.ino != null &&
+                richFingerprintMatches(
+                    {
+                        sizeBytes: existing.sizeBytes,
+                        mtimeMs: existing.mtimeMs,
+                        ctimeMs: existing.ctimeMs,
+                        dev: existing.dev,
+                        ino: existing.ino,
+                    },
+                    snapshot,
+                    { mtimeToleranceMs: 0 },
+                ),
             );
         },
 
@@ -818,6 +876,7 @@ export function createIoIndexSqlite(options) {
                     let buildHashVerificationMisses = 0;
                     let buildUnchangedFingerprintFastPath = 0;
                     let buildUnchangedSnapshotRechecks = 0;
+                    let buildParserPolicyRefreshes = 0;
                     let buildSnapshotConflicts = 0;
                     const indexed = [];
 
@@ -827,19 +886,34 @@ export function createIoIndexSqlite(options) {
                                 try {
                                     options.signal?.throwIfAborted();
                                     const normalizedFilePath = normalizeIndexPath(entry.absolutePath);
-                                    const existing = /**
-                                     * @type {{
-                                     *     sizeBytes?: number;
-                                     *     mtimeMs?: number;
-                                     *     ctimeMs?: number | null;
-                                     *     dev?: number | null;
-                                     *     ino?: number | null;
-                                     *     contentHash?: string | null;
-                                     *     refreshedAtMs?: number;
-                                     *     status?: string;
-                                     * } | undefined}
-                                     */ (stmtGetFingerprint.get(normalizedFilePath));
+                                    const existing =
+                                        /**
+                                         * @type {{
+                                         *           sizeBytes?: number;
+                                         *           mtimeMs?: number;
+                                         *           ctimeMs?: number | null;
+                                         *           dev?: number | null;
+                                         *           ino?: number | null;
+                                         *           contentHash?: string | null;
+                                         *           refreshedAtMs?: number;
+                                         *           metadataJson?: string | null;
+                                         *           status?: string;
+                                         *       }
+                                         *     | undefined}
+                                         */ (stmtGetFingerprint.get(normalizedFilePath));
                                     const scannerFingerprint = entry.fingerprint;
+                                    const parserProjectionCurrent = parserProjectionIsCurrent(
+                                        normalizedFilePath,
+                                        existing?.metadataJson,
+                                    );
+                                    if (
+                                        existing?.status === 'fresh' &&
+                                        SYMBOL_EXTENSIONS.has(extname(normalizedFilePath).toLowerCase()) &&
+                                        !parserProjectionCurrent
+                                    ) {
+                                        stats.parserPolicyRefreshes += 1;
+                                        buildParserPolicyRefreshes += 1;
+                                    }
                                     const basicFingerprintMatches =
                                         existing?.status === 'fresh' &&
                                         scannerFingerprint !== undefined &&
@@ -858,16 +932,14 @@ export function createIoIndexSqlite(options) {
                                         Number(existing.ctimeMs) === Number(scannerFingerprint?.ctimeMs) &&
                                         Number(existing.dev) === Number(scannerFingerprint?.dev) &&
                                         Number(existing.ino) === Number(scannerFingerprint?.ino);
-                                    const verificationAgeMs = Math.max(
-                                        0,
-                                        now() - Number(existing?.refreshedAtMs ?? 0),
-                                    );
+                                    const verificationAgeMs = Math.max(0, now() - Number(existing?.refreshedAtMs ?? 0));
+                                    const reusableProjection = richFingerprintMatched && parserProjectionCurrent;
                                     const periodicHashDue =
-                                        richFingerprintMatched &&
+                                        reusableProjection &&
                                         verificationAgeMs >= hashVerifyIntervalMs &&
                                         Number(existing?.sizeBytes) <= hashVerifyMaxBytes &&
                                         typeof existing?.contentHash === 'string';
-                                    if (richFingerprintMatched && !periodicHashDue && scannerFingerprint) {
+                                    if (reusableProjection && !periodicHashDue && scannerFingerprint) {
                                         if (!recheckUnchangedSnapshot) {
                                             // No index row is committed on this branch. Re-statting an unchanged file only narrows a
                                             // TOCTOU window that remains open immediately afterwards, while adding one filesystem call
@@ -896,8 +968,7 @@ export function createIoIndexSqlite(options) {
                                             return;
                                         } catch (error) {
                                             if (
-                                                /** @type {{ code?: string }} */ (error).code !==
-                                                'ESTALEINDEXSNAPSHOT'
+                                                /** @type {{ code?: string }} */ (error).code !== 'ESTALEINDEXSNAPSHOT'
                                             ) {
                                                 throw error;
                                             }
@@ -906,7 +977,11 @@ export function createIoIndexSqlite(options) {
                                         }
                                     }
 
-                                    for (let snapshotAttempt = 1; snapshotAttempt <= snapshotRetries + 1; snapshotAttempt += 1) {
+                                    for (
+                                        let snapshotAttempt = 1;
+                                        snapshotAttempt <= snapshotRetries + 1;
+                                        snapshotAttempt += 1
+                                    ) {
                                         try {
                                             const text = await readTextFileSnapshot(
                                                 entry.absolutePath,
@@ -915,6 +990,7 @@ export function createIoIndexSqlite(options) {
                                             options.signal?.throwIfAborted();
                                             const hashVerificationEligible =
                                                 existing?.status === 'fresh' &&
+                                                parserProjectionCurrent &&
                                                 text.sizeBytes === Number(existing.sizeBytes) &&
                                                 text.sizeBytes <= hashVerifyMaxBytes &&
                                                 typeof existing.contentHash === 'string';
@@ -923,11 +999,10 @@ export function createIoIndexSqlite(options) {
                                                 buildHashVerifications += 1;
                                                 const currentHash = sha256(text.content);
                                                 if (currentHash === existing.contentHash) {
-                                                    await assertCurrentFileSnapshot(
-                                                        normalizedFilePath,
-                                                        text,
-                                                        { action: 'hash-refresh', attempt: snapshotAttempt },
-                                                    );
+                                                    await assertCurrentFileSnapshot(normalizedFilePath, text, {
+                                                        action: 'hash-refresh',
+                                                        attempt: snapshotAttempt,
+                                                    });
                                                     const refreshedAtMs = now();
                                                     stmtRefreshFingerprint.run({
                                                         filePath: normalizedFilePath,
@@ -937,11 +1012,14 @@ export function createIoIndexSqlite(options) {
                                                         dev: text.dev,
                                                         ino: text.ino,
                                                         refreshedAtMs,
-                                                        metadataJson: safeMetaJson({
-                                                            source: 'indexDirectory.hashVerification',
-                                                            indexTraceId: traceId,
-                                                            scanTraceId: scan.io.traceId,
-                                                            fingerprint: {
+                                                        metadataJson: buildIndexMetadataJson(
+                                                            normalizedFilePath,
+                                                            {
+                                                                source: 'indexDirectory.hashVerification',
+                                                                indexTraceId: traceId,
+                                                                scanTraceId: scan.io.traceId,
+                                                            },
+                                                            {
                                                                 mtimeMs: text.mtimeMs,
                                                                 ctimeMs: text.ctimeMs,
                                                                 sizeBytes: text.sizeBytes,
@@ -949,7 +1027,7 @@ export function createIoIndexSqlite(options) {
                                                                 ino: text.ino,
                                                                 contentHash: currentHash,
                                                             },
-                                                        }),
+                                                        ),
                                                     });
                                                     stats.hashVerificationHits += 1;
                                                     buildHashVerificationHits += 1;
@@ -1004,8 +1082,7 @@ export function createIoIndexSqlite(options) {
                                             return;
                                         } catch (error) {
                                             if (
-                                                /** @type {{ code?: string }} */ (error).code !==
-                                                'ESTALEINDEXSNAPSHOT'
+                                                /** @type {{ code?: string }} */ (error).code !== 'ESTALEINDEXSNAPSHOT'
                                             ) {
                                                 throw error;
                                             }
@@ -1042,6 +1119,7 @@ export function createIoIndexSqlite(options) {
                         hashVerificationMisses: buildHashVerificationMisses,
                         unchangedFingerprintFastPath: buildUnchangedFingerprintFastPath,
                         unchangedSnapshotRechecks: buildUnchangedSnapshotRechecks,
+                        parserPolicyRefreshes: buildParserPolicyRefreshes,
                         snapshotConflicts: buildSnapshotConflicts,
                         skipped,
                         failed,
@@ -1069,6 +1147,7 @@ export function createIoIndexSqlite(options) {
                         hashVerificationMisses: buildHashVerificationMisses,
                         unchangedFingerprintFastPath: buildUnchangedFingerprintFastPath,
                         unchangedSnapshotRechecks: buildUnchangedSnapshotRechecks,
+                        parserPolicyRefreshes: buildParserPolicyRefreshes,
                         snapshotConflicts: buildSnapshotConflicts,
                         failed,
                         pruned,
@@ -1076,7 +1155,8 @@ export function createIoIndexSqlite(options) {
                         durationMs: Math.max(0, Date.now() - startedAt),
                         limitMode: 'enforced-max-files',
                         freshnessPolicy: {
-                            strategy: 'mtime-size-ctime-dev-ino-periodic-hash',
+                            strategy: 'mtime-size-ctime-dev-ino-parser-policy-periodic-hash',
+                            parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
                             hashVerifyMaxBytes,
                             hashVerifyIntervalMs,
                             recheckUnchangedSnapshot,
@@ -1110,11 +1190,12 @@ export function createIoIndexSqlite(options) {
         },
 
         /**
-         * Exact literal substring search over indexed raw chunks. This avoids an `rg` subprocess for fixed-string queries
-         * that FTS tokenization cannot represent faithfully (punctuation-heavy source code is the common case).
+         * Exact literal substring search over indexed raw chunks. This avoids an `rg` subprocess for fixed-string
+         * queries that FTS tokenization cannot represent faithfully (punctuation-heavy source code is the common
+         * case).
          *
-         * Case-insensitive mode is intentionally exposed for ASCII queries only by the higher-level search adapter because
-         * SQLite lower() is not a full Unicode case-fold implementation.
+         * Case-insensitive mode is intentionally exposed for ASCII queries only by the higher-level search adapter
+         * because SQLite lower() is not a full Unicode case-fold implementation.
          *
          * @param {string} query
          * @param {{ pathPrefix?: string; maxResults?: number; caseSensitive?: boolean }} [options]
@@ -1133,14 +1214,7 @@ export function createIoIndexSqlite(options) {
             const range = buildIndexPathTreeRange(prefix);
             const statement = caseSensitive ? stmtLiteralSearchScoped : stmtLiteralSearchInsensitiveScoped;
             return /** @type {IoIndexSearchResult[]} */ (
-                statement.all(
-                    literal,
-                    range.exact,
-                    range.descendantStart,
-                    range.descendantEnd,
-                    literal,
-                    maxResults,
-                )
+                statement.all(literal, range.exact, range.descendantStart, range.descendantEnd, literal, maxResults)
             );
         },
 
@@ -1254,7 +1328,8 @@ export function createIoIndexSqlite(options) {
                 latestIndexedAtMs,
                 freshness: latestIndexedAtMs ? 'fresh-or-aging' : 'empty',
                 freshnessPolicy: {
-                    strategy: 'mtime-size-ctime-dev-ino-periodic-hash',
+                    strategy: 'mtime-size-ctime-dev-ino-parser-policy-periodic-hash',
+                    parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
                     hashVerifyMaxBytes,
                     hashVerifyIntervalMs,
                     recheckUnchangedSnapshot,

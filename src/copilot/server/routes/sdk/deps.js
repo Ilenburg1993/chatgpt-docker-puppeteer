@@ -91,6 +91,7 @@ import {
 } from '../../../presentation/routing/index.js';
 import * as runtimeSdkSessionOps from '../../../presentation/runtime/index.js';
 import {
+    observeRuntimeModelChangeProjection,
     paginateAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjection,
     readAgentRuntimeToolsProjectionForRuntime,
@@ -98,7 +99,6 @@ import {
     readAgentStatusSnapshotForRuntime,
     readAgentStatusValue,
     readAgentStatusValueForRuntime,
-    observeRuntimeModelChangeProjection,
     setRuntimeReasoningProjection,
 } from '../../../presentation/runtime/index.js';
 import {

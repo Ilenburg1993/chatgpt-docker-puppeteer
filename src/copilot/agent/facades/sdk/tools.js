@@ -7,8 +7,8 @@
  * @module copilot/agent/facades/sdk/tools
  */
 
-import { pickDefined } from '#copilot/sdk/utils';
 import { createRegistry, getToolsConfig, loadToolsConfigAsync } from '#copilot/sdk/tools';
+import { pickDefined } from '#copilot/sdk/utils';
 
 /**
  * @returns {import('#copilot/sdk/types').ToolRegistry}

@@ -90,8 +90,12 @@ describe('system-prompt-modular › user config', () => {
                 COPILOT_SYSTEM_PROMPT_APPEND_TEXT: 'INLINE USER CONTENT',
             },
             async () => {
-                const { readResolvedSystemPromptUserConfigSync, readUserAppendContentSync } =
-                    await import('../../../../src/copilot/config/system-prompt/index.js');
+                const {
+                    readResolvedSystemPromptUserConfigSync,
+                    readUserAppendContentSync,
+                    refreshSystemPromptUserConfigSnapshot,
+                } = await import('../../../../src/copilot/config/system-prompt/index.js');
+                await refreshSystemPromptUserConfigSnapshot();
                 const cfg = readResolvedSystemPromptUserConfigSync();
                 expect(cfg.appendFiles).toContain(file);
                 const content = readUserAppendContentSync(cfg);

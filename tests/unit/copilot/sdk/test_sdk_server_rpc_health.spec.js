@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * Testes — Faixa 9: sdk/server-rpc.js + sdk/health.js
  *

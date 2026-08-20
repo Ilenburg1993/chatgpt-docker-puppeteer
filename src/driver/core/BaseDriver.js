@@ -59,8 +59,8 @@ import { SubmissionController } from '../modules/submission_controller.js';
 /** Classe exportada: default. */
 class BaseDriver extends TargetDriver {
     /**
-     * @override
      * @type {string}
+     * @override
      */
     name = '';
 

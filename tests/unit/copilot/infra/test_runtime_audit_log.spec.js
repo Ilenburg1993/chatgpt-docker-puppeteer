@@ -6,14 +6,14 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
-    completeIoOperationEnvelope,
-    createIoOperationEnvelope,
-} from '../../../../src/copilot/infra/runtime/operation.js';
-import {
     buildIoMutationAuditRecord,
     getIoMutationAuditLogPath,
     recordIoMutationAudit,
 } from '../../../../src/copilot/infra/runtime/audit-log.js';
+import {
+    completeIoOperationEnvelope,
+    createIoOperationEnvelope,
+} from '../../../../src/copilot/infra/runtime/operation.js';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];

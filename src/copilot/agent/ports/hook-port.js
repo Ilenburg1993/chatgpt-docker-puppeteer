@@ -25,11 +25,7 @@ import {
 import { log } from './logging/index.js';
 import { decideModelCallAutoFallback, decideModelCallErrorHandling } from './model-error-recovery.js';
 
-export {
-    createQueuedElicitationHandler,
-    normalizeElicitationCompletedEvent,
-    normalizeElicitationPendingEvent,
-};
+export { createQueuedElicitationHandler, normalizeElicitationCompletedEvent, normalizeElicitationPendingEvent };
 
 /**
  * Contexto mínimo de invocação exposto pelos hooks do SDK e extensões de runtime.
@@ -305,12 +301,15 @@ function createRuntimeDisableHook(isDisabledFn) {
  *     emitWebhook: (event: string, payload: object) => Promise<void>;
  *     getModel: () => string | undefined;
  *     scheduleFallback: (model: string) => void;
- *     applyModelFallback?: (model: string, event: {
- *         previousModel: string | null;
- *         reason: string;
- *         errorMessage: string;
- *         sessionId: string;
- *     }) => boolean;
+ *     applyModelFallback?: (
+ *         model: string,
+ *         event: {
+ *             previousModel: string | null;
+ *             reason: string;
+ *             errorMessage: string;
+ *             sessionId: string;
+ *         },
+ *     ) => boolean;
  *     emit: (event: string, payload: object) => void;
  *     abortCurrentMessage?: (() => Promise<void>) | undefined;
  *     metrics: { recordSessionStart: () => void; recordSessionEnd: () => void };

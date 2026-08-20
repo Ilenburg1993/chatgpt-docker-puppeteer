@@ -2,19 +2,27 @@
 /**
  * Registro canônico de solicitações de troca de modelo vivo BYOK no terminal.
  *
- * A solicitação local (`setModel`) e a confirmação observada (`session.model_changed`) são eventos
- * diferentes. Esta unidade registra a intenção humana/automática sem disputar a confirmação do SDK.
+ * A solicitação local (`setModel`) e a confirmação observada (`session.model_changed`) são eventos diferentes. Esta
+ * unidade registra a intenção humana/automática sem disputar a confirmação do SDK.
  *
  * @module copilot/terminal/byok/live-model-switch
  */
 
-import * as modelSelectionProjection from '../frontend/projections/model-selection/index.js';
 import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
+import * as modelSelectionProjection from '../frontend/projections/model-selection/index.js';
 import { recordTerminalActivity } from '../state/index.js';
 
 const MODEL_SWITCH_REQUEST_TTL_MS = 10 * 60_000;
 
-/** @type {{ model: string; previousModel: string | null; source: string; reason: string | null; confidence: string | null; requestedAt: number; detail: string } | null} */
+/** @type {{
+    model: string;
+    previousModel: string | null;
+    source: string;
+    reason: string | null;
+    confidence: string | null;
+    requestedAt: number;
+    detail: string;
+} | null} */
 let latestLiveByokModelSwitchRequest = null;
 
 /**
@@ -62,8 +70,9 @@ function renderLiveModelSwitchRequestDetail(previousModel, currentModel, reason,
  *     currentReasoningEffort: string | null;
  *     reasoningAdjusted: boolean;
  *     runtimeId: string | null;
- *     projection: Awaited<ReturnType<typeof modelSelectionProjection.switchTerminalModelProjection>>
- *       | ReturnType<typeof modelSelectionProjection.setTerminalModelProjection>;
+ *     projection:
+ *         | Awaited<ReturnType<typeof modelSelectionProjection.switchTerminalModelProjection>>
+ *         | ReturnType<typeof modelSelectionProjection.setTerminalModelProjection>;
  *     detail: string;
  * }>}
  */
@@ -183,7 +192,15 @@ function isRecord(value) {
 }
 
 /**
- * @returns {{ model: string; previousModel: string | null; source: string; reason: string | null; confidence: string | null; requestedAt: number; detail: string } | null}
+ * @returns {{
+ *     model: string;
+ *     previousModel: string | null;
+ *     source: string;
+ *     reason: string | null;
+ *     confidence: string | null;
+ *     requestedAt: number;
+ *     detail: string;
+ * } | null}
  */
 export function readTerminalLiveByokModelSwitchRequest() {
     if (!latestLiveByokModelSwitchRequest) return null;
@@ -196,7 +213,15 @@ export function readTerminalLiveByokModelSwitchRequest() {
 
 /**
  * @param {{ previousModel?: string | null; newModel?: string | null; timestamp?: number }} confirmation
- * @returns {{ model: string; previousModel: string | null; source: string; reason: string | null; confidence: string | null; requestedAt: number; detail: string } | null}
+ * @returns {{
+ *     model: string;
+ *     previousModel: string | null;
+ *     source: string;
+ *     reason: string | null;
+ *     confidence: string | null;
+ *     requestedAt: number;
+ *     detail: string;
+ * } | null}
  */
 export function consumeTerminalLiveByokModelSwitchConfirmation(confirmation) {
     const pending = readTerminalLiveByokModelSwitchRequest();

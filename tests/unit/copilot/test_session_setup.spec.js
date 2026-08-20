@@ -177,7 +177,13 @@ describe('session-setup (F63)', () => {
             const result = buildSessionHooks(ctx, host);
             const decision = await result.busHooks.onPreToolUse?.(
                 /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
-                { sessionId: 's1', toolName: 'custom-danger', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
+                {
+                    sessionId: 's1',
+                    toolName: 'custom-danger',
+                    toolArgs: {},
+                    timestamp: new Date(0),
+                    workingDirectory: '/',
+                },
                 { sessionId: 's1' },
             );
 
@@ -191,7 +197,13 @@ describe('session-setup (F63)', () => {
             const result = buildSessionHooks(ctx, host);
             const decision = await result.busHooks.onPreToolUse?.(
                 /** @type {import('#copilot/sdk/types').PreToolUseHookInput} */
-                { sessionId: 's1', toolName: 'danger_tool', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
+                {
+                    sessionId: 's1',
+                    toolName: 'danger_tool',
+                    toolArgs: {},
+                    timestamp: new Date(0),
+                    workingDirectory: '/',
+                },
                 { sessionId: 's1' },
             );
 
@@ -319,9 +331,10 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const onUserInputRequest = /**
-             * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
-             */ (options['onUserInputRequest']);
+            const onUserInputRequest =
+                /**
+                 * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
+                 */ (options['onUserInputRequest']);
 
             await onUserInputRequest({ question: 'Qual o próximo passo?', choices: ['A', 'B'] });
 
@@ -346,9 +359,10 @@ describe('session-setup (F63)', () => {
             const tools = /** @type {any} */ (['t1']);
             const busHooks = /** @type {any} */ ({ mock: true });
             const options = buildSessionOptions(ctx, host, { tools, busHooks });
-            const onUserInputRequest = /**
-             * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
-             */ (options['onUserInputRequest']);
+            const onUserInputRequest =
+                /**
+                 * @type {(input: { question: string; choices?: string[]; allowFreeform?: boolean }) => Promise<unknown>}
+                 */ (options['onUserInputRequest']);
 
             await onUserInputRequest({ question: 'Escolha', allowFreeform: false });
 

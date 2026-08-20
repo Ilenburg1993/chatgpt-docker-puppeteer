@@ -4,10 +4,12 @@
  *
  * Regra de arquitetura:
  *
- * - `devcontainer`: provisionamento automático e deliberadamente enxuto;
- * - `optional`: capacidades úteis, porém carregadas sob demanda;
+ * - `devcontainer`: provisionamento automático deliberadamente enxuto;
+ * - `recommended`: baseline + preferências úteis, sem transformá-las em custo obrigatório;
+ * - `optional`: capacidades instaláveis sob demanda por perfil;
  * - `hostOnly`: extensões de transporte/remote que pertencem ao VS Code host, não ao Extension Host remoto;
- * - `unwanted`: redundantes, obsoletas, conflitantes ou com custo conhecido superior ao benefício neste workspace.
+ * - `unwanted`: não recomendadas pelo workspace, mas não necessariamente removíveis;
+ * - `prunable`: subconjunto legado/conflitante cuja remoção automática do Extension Host remoto é segura.
  *
  * O DevContainer e `.vscode/extensions.json` são projeções deste catálogo. Execute `npm run vscode:sync` após editar.
  */
@@ -19,28 +21,25 @@ function unique(...groups) {
 
 export const VSCODE_EXTENSION_PROFILES = Object.freeze({
     foundation: Object.freeze([
+        // Cliente LSP oficial do TypeScript 7. O Marketplace ID é histórico: o engine servido é TS7 GA. Remover esta
+        // extensão quando o cliente nativo estiver efetivamente bundled no VS Code usado pelo workspace.
         'TypeScriptTeam.native-preview',
         'dbaeumer.vscode-eslint',
         'esbenp.prettier-vscode',
-        'usernamehw.errorlens',
         'ms-azuretools.vscode-containers',
         'ms-vscode.makefile-tools',
-        'eamodio.gitlens',
         'timonwong.shellcheck',
         'redhat.vscode-yaml',
         'EditorConfig.EditorConfig',
-        'ms-vscode.powershell',
-        'MS-CEINTL.vscode-language-pack-pt-BR',
         'Vue.volar',
     ]),
-    github: Object.freeze([
-        // O VS Code atual entrega chat + completions no builtin unificado GitHub.copilot-chat.
+    github: Object.freeze(['github.vscode-github-actions']),
+    githubFull: Object.freeze([
+        // O VS Code atual pode entregar Copilot Chat como builtin; o instalador reconhece builtins e não duplica capacidade.
         'GitHub.copilot-chat',
-        'github.vscode-github-actions',
         'GitHub.vscode-pull-request-github',
     ]),
-    ai: Object.freeze([
-        // Mantidas no perfil automático: ampliar liberdade de escolha de agente é requisito do workspace.
+    agents: Object.freeze([
         'Anthropic.claude-code',
         'coderabbit.coderabbit-vscode',
         'openai.chatgpt',
@@ -49,48 +48,63 @@ export const VSCODE_EXTENSION_PROFILES = Object.freeze({
         'kilocode.kilo-code',
         'sst-dev.opencode',
     ]),
-    docs: Object.freeze([
-        'humao.rest-client',
-        'aaron-bond.better-comments',
-        'yzhang.markdown-all-in-one',
-        'DavidAnson.vscode-markdownlint',
+    docs: Object.freeze(['DavidAnson.vscode-markdownlint']),
+    docsFull: Object.freeze(['humao.rest-client', 'aaron-bond.better-comments', 'yzhang.markdown-all-in-one']),
+    ux: Object.freeze([
+        'usernamehw.errorlens',
+        'eamodio.gitlens',
+        'ms-vscode.powershell',
+        'MS-CEINTL.vscode-language-pack-pt-BR',
+        'oderwat.indent-rainbow',
     ]),
     python: Object.freeze(['ms-python.python', 'ms-python.vscode-pylance', 'ms-python.debugpy']),
 });
 
+// Somente capacidades técnicas necessárias em praticamente toda sessão remota.
 export const VSCODE_DEVCONTAINER_EXTENSIONS = Object.freeze(
+    unique(VSCODE_EXTENSION_PROFILES.foundation, VSCODE_EXTENSION_PROFILES.github, VSCODE_EXTENSION_PROFILES.docs),
+);
+
+// Recomendações podem ser mais amplas que o auto-install sem transformar preferências em processos residentes obrigatórios.
+export const VSCODE_RECOMMENDED_EXTENSIONS = Object.freeze(
     unique(
-        VSCODE_EXTENSION_PROFILES.foundation,
-        VSCODE_EXTENSION_PROFILES.github,
-        VSCODE_EXTENSION_PROFILES.ai,
-        VSCODE_EXTENSION_PROFILES.docs,
+        VSCODE_DEVCONTAINER_EXTENSIONS,
+        VSCODE_EXTENSION_PROFILES.githubFull,
+        VSCODE_EXTENSION_PROFILES.docsFull,
+        VSCODE_EXTENSION_PROFILES.ux,
     ),
 );
 
-export const VSCODE_OPTIONAL_EXTENSIONS = Object.freeze([
-    // Visual / documentação especializada
-    'PKief.material-icon-theme',
-    'gruntfuggly.todo-tree',
-    'pflannery.vscode-versionlens',
-    'bierner.markdown-preview-github-styles',
-    'tintinweb.graphviz-interactive-preview',
-    // Ferramentas especializadas que não justificam ativação em toda sessão
-    'ryanluker.vscode-coverage-gutters',
-    'docker.docker',
-    'cmstead.js-codeformer',
-    'cmstead.jsrefactor',
-    'chris-noring.node-snippets',
-    'howardzuo.vscode-npm-dependency',
-    'jasonnutter.search-node-modules',
-    'ms-azuretools.vscode-docker',
-    'ms-vscode.azure-repos',
-    'ms-vscode.vscode-github-issue-notebooks',
-    'GitHub.github-vscode-theme',
-    ...VSCODE_EXTENSION_PROFILES.python,
-    // Ortografia permanece opt-in: o workspace canônico usa cSpell.enabled=false.
-    'streetsidesoftware.code-spell-checker',
-    'streetsidesoftware.code-spell-checker-portuguese-brazilian',
-]);
+export const VSCODE_OPTIONAL_EXTENSIONS = Object.freeze(
+    unique(
+        VSCODE_EXTENSION_PROFILES.agents,
+        VSCODE_EXTENSION_PROFILES.githubFull,
+        VSCODE_EXTENSION_PROFILES.docsFull,
+        VSCODE_EXTENSION_PROFILES.ux,
+        VSCODE_EXTENSION_PROFILES.python,
+        [
+            'PKief.material-icon-theme',
+            'gruntfuggly.todo-tree',
+            'pflannery.vscode-versionlens',
+            'bierner.markdown-preview-github-styles',
+            'tintinweb.graphviz-interactive-preview',
+            'ryanluker.vscode-coverage-gutters',
+            'docker.docker',
+            'cmstead.js-codeformer',
+            'cmstead.jsrefactor',
+            'chris-noring.node-snippets',
+            'howardzuo.vscode-npm-dependency',
+            'jasonnutter.search-node-modules',
+            'ms-azuretools.vscode-docker',
+            'ms-vscode.azure-repos',
+            'ms-vscode.vscode-github-issue-notebooks',
+            'GitHub.github-vscode-theme',
+            // Ortografia permanece opt-in: o workspace canônico usa cSpell.enabled=false.
+            'streetsidesoftware.code-spell-checker',
+            'streetsidesoftware.code-spell-checker-portuguese-brazilian',
+        ],
+    ),
+);
 
 export const VSCODE_HOST_ONLY_EXTENSIONS = Object.freeze([
     'ms-vscode-remote.remote-containers',
@@ -111,7 +125,6 @@ export const VSCODE_UNWANTED_EXTENSIONS = Object.freeze([
     'christian-kohler.npm-intellisense',
     'hbenl.vscode-test-explorer',
     'mhutchie.git-graph',
-    'oderwat.indent-rainbow',
     'ZainChen.json',
     'MermaidChart.vscode-mermaid-chart',
     'bierner.markdown-mermaid',
@@ -144,11 +157,26 @@ export const VSCODE_UNWANTED_EXTENSIONS = Object.freeze([
     'vscodevim.vim',
 ]);
 
-export const VSCODE_RECOMMENDED_EXTENSIONS = VSCODE_DEVCONTAINER_EXTENSIONS;
+export const VSCODE_PRUNABLE_EXTENSIONS = Object.freeze([
+    // Legado ou conflito direto com capacidades canônicas atuais.
+    'ms-vscode.node-debug',
+    'ms-vscode.node-debug2',
+    'eg2.vscode-npm-script',
+    'octref.vetur',
+    'CoenraadS.bracket-pair-colorizer',
+    'CoenraadS.bracket-pair-colorizer-2',
+    '2gua.rainbow-brackets',
+    'ms-vscode.vscode-typescript-tslint-plugin',
+    'standard.vscode-standard',
+    'dbaeumer.jshint',
+    'HookyQR.beautify',
+    'esbenp.beautify',
+]);
 
 export function getExtensionProfile(name = 'devcontainer') {
     if (name === 'devcontainer' || name === 'core') return [...VSCODE_DEVCONTAINER_EXTENSIONS];
     if (name === 'optional') return [...VSCODE_OPTIONAL_EXTENSIONS];
+    if (name === 'ai') return [...VSCODE_EXTENSION_PROFILES.agents];
     if (name === 'python') return [...VSCODE_EXTENSION_PROFILES.python];
     if (name === 'all') return unique(VSCODE_DEVCONTAINER_EXTENSIONS, VSCODE_OPTIONAL_EXTENSIONS);
     if (Object.hasOwn(VSCODE_EXTENSION_PROFILES, name)) {
@@ -172,7 +200,7 @@ export function planExtensionReconciliation(
     const installedLower = new Set(installedExtensions.map((extension) => extension.toLowerCase()));
     const availableLower = new Set(availableExtensions.map((extension) => extension.toLowerCase()));
     const install = target.filter((extension) => !availableLower.has(extension.toLowerCase()));
-    const prohibited = unique(VSCODE_UNWANTED_EXTENSIONS, VSCODE_HOST_ONLY_EXTENSIONS);
-    const remove = prune ? prohibited.filter((extension) => installedLower.has(extension.toLowerCase())) : [];
+    const removable = unique(VSCODE_PRUNABLE_EXTENSIONS, VSCODE_HOST_ONLY_EXTENSIONS);
+    const remove = prune ? removable.filter((extension) => installedLower.has(extension.toLowerCase())) : [];
     return { profile, target, install, remove };
 }

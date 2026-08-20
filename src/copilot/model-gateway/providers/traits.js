@@ -77,17 +77,26 @@ export function createProviderGatewayTraits(inventory, spec = null) {
     const routeSelectors = stringList(inventory['routeSelectors']);
     const baseUrls = stringList(inventory['baseUrls']);
     const specProviderIds = stringList(spec?.['providerIds']);
-    const specGateway = spec?.['gateway'] && typeof spec['gateway'] === 'object' ? /** @type {Record<string, unknown>} */ (spec['gateway']) : {};
+    const specGateway =
+        spec?.['gateway'] && typeof spec['gateway'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (spec['gateway'])
+            : {};
     const specDirectBinding =
         spec?.['directBinding'] && typeof spec['directBinding'] === 'object'
             ? /** @type {Record<string, unknown>} */ (spec['directBinding'])
             : {};
-    const catalogKinds = uniqueSorted(catalogSources.map((source) => optionalString(source?.['kind'])).filter((item) => item !== null));
-    const runtimeKinds = uniqueSorted(runtimeEndpoints.map((endpoint) => optionalString(endpoint?.['kind'])).filter((item) => item !== null));
+    const catalogKinds = uniqueSorted(
+        catalogSources.map((source) => optionalString(source?.['kind'])).filter((item) => item !== null),
+    );
+    const runtimeKinds = uniqueSorted(
+        runtimeEndpoints.map((endpoint) => optionalString(endpoint?.['kind'])).filter((item) => item !== null),
+    );
     const richnessSummaries = catalogSources.map((source) => normalizeProviderEndpointRichness(source?.['richness']));
     const richnessTags = uniqueSorted(richnessSummaries.flatMap((summary) => summary.tags));
     const richnessCategories = uniqueSorted(richnessSummaries.flatMap((summary) => summary.categories));
-    const publicCatalogSourceCount = catalogSources.filter((source) => isPublicCatalogKind(optionalString(source?.['kind']) ?? '')).length;
+    const publicCatalogSourceCount = catalogSources.filter((source) =>
+        isPublicCatalogKind(optionalString(source?.['kind']) ?? ''),
+    ).length;
     const authenticatedCatalogSourceCount = catalogSources.filter((source) =>
         isAuthenticatedCatalogKind(optionalString(source?.['kind']) ?? ''),
     ).length;
@@ -95,9 +104,16 @@ export function createProviderGatewayTraits(inventory, spec = null) {
         hasParameterizedLocator(optionalString(source?.['url']) ?? optionalString(source?.['path']) ?? ''),
     ).length;
     const isGateway = providerKind === 'gateway' || routeSelectors.some((selector) => /gateway/iu.test(selector));
-    const isAggregator = providerKind === 'aggregator' || routeSelectors.some((selector) => /aggregator|provider_order|fallback/iu.test(selector));
-    const isLocal = providerKind === 'local' || runtimeKinds.some((kind) => /local/iu.test(kind)) || baseUrls.some((url) => /localhost|127\.0\.0\.1/iu.test(url));
-    const openAICompatibleRuntime = runtimeKinds.some((kind) => /chat_completions|responses|fim_completions|embeddings/iu.test(kind));
+    const isAggregator =
+        providerKind === 'aggregator' ||
+        routeSelectors.some((selector) => /aggregator|provider_order|fallback/iu.test(selector));
+    const isLocal =
+        providerKind === 'local' ||
+        runtimeKinds.some((kind) => /local/iu.test(kind)) ||
+        baseUrls.some((url) => /localhost|127\.0\.0\.1/iu.test(url));
+    const openAICompatibleRuntime = runtimeKinds.some((kind) =>
+        /chat_completions|responses|fim_completions|embeddings/iu.test(kind),
+    );
     return {
         providerId,
         adapterId,
@@ -134,13 +150,14 @@ export function createProviderGatewayTraits(inventory, spec = null) {
             openAICompatibleRuntime,
         },
         directBinding: {
-            configRepresentability:
-                optionalString(specDirectBinding['configRepresentability']) ?? 'full',
+            configRepresentability: optionalString(specDirectBinding['configRepresentability']) ?? 'full',
             requiredHeaders: stringList(specDirectBinding['requiredHeaders']),
             reason: optionalString(specDirectBinding['reason']),
         },
         routing: {
-            supportsAutoSelection: routeSelectors.some((selector) => /auto|fastest|cheapest|preferred/iu.test(selector)),
+            supportsAutoSelection: routeSelectors.some((selector) =>
+                /auto|fastest|cheapest|preferred/iu.test(selector),
+            ),
             supportsFallback: routeSelectors.some((selector) => /fallback/iu.test(selector)),
             supportsProviderOrder: routeSelectors.some((selector) => /provider_order/iu.test(selector)),
             supportsGatewayByok: routeSelectors.some((selector) => /byok/iu.test(selector)),
@@ -167,12 +184,16 @@ export function createProviderGatewayTraits(inventory, spec = null) {
  */
 export function listProviderGatewayTraits(options = {}) {
     const specs = Array.isArray(options.specs) ? options.specs : OPENAI_PROVIDER_FAMILY_SPECS;
-    const inventories = Array.isArray(options.inventories) ? options.inventories : MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY;
+    const inventories = Array.isArray(options.inventories)
+        ? options.inventories
+        : MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY;
     return inventories.map((inventory) => {
         const providerId = optionalString(inventory['providerId']);
         const spec =
             specs.find((candidate) => {
-                const ids = [optionalString(candidate['id']), ...stringList(candidate['providerIds'])].filter((item) => item !== null);
+                const ids = [optionalString(candidate['id']), ...stringList(candidate['providerIds'])].filter(
+                    (item) => item !== null,
+                );
                 return providerId ? ids.includes(providerId) : false;
             }) ?? null;
         return createProviderGatewayTraits(inventory, spec);

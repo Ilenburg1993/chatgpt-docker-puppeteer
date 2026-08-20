@@ -10,9 +10,9 @@ import { handleStatefulMcpHttpRequest } from '#copilot/mcp/adapters';
 import { createMcpHttpSessionRuntime, createMcpInMemoryEventStore } from '#copilot/mcp/control-plane';
 import {
     createMcpTransportErrorCollector,
+    fakeMcpTransport,
     fakeMcpRequest as fakeReq,
     fakeMcpResponse as fakeRes,
-    fakeMcpTransport,
     readFakeMcpHeader as readHeader,
 } from './helpers/http-fakes.js';
 
@@ -98,7 +98,8 @@ describe('MCP HTTP stateful router', () => {
                 statusCode: 503,
                 error: {
                     error: 'server_overloaded',
-                    error_description: 'MCP stateful session capacity reached. Retry after active sessions expire or close.',
+                    error_description:
+                        'MCP stateful session capacity reached. Retry after active sessions expire or close.',
                 },
             },
         ]);
@@ -142,7 +143,9 @@ describe('MCP HTTP stateful router', () => {
         let firstEventId = null;
 
         /** @type {(sessionId: string) => void} */
-        let initializeSession = () => { throw new Error('transport was not initialized'); };
+        let initializeSession = () => {
+            throw new Error('transport was not initialized');
+        };
         const transport = fakeMcpTransport({
             async handleRequest(req, _res, body) {
                 if (String(req.method ?? '').toUpperCase() === 'POST') {
@@ -153,7 +156,9 @@ describe('MCP HTTP stateful router', () => {
                 const lastEventId = readHeader(req, 'last-event-id');
                 assert.equal(lastEventId, firstEventId);
                 await eventStore.replayEventsAfter(String(lastEventId), {
-                    send(message) { replayed.push(message); },
+                    send(message) {
+                        replayed.push(message);
+                    },
                 });
             },
         });
@@ -172,7 +177,9 @@ describe('MCP HTTP stateful router', () => {
             createServer: () => ({ async connect() {}, async close() {} }),
             createEventStore: () => eventStore,
             createTransport: (options) => {
-                initializeSession = (sessionId) => { options.onsessioninitialized?.(sessionId); };
+                initializeSession = (sessionId) => {
+                    options.onsessioninitialized?.(sessionId);
+                };
                 return transport;
             },
         });
@@ -209,7 +216,9 @@ describe('MCP HTTP stateful router', () => {
         /** @type {unknown[]} */
         const replayed = [];
         /** @type {(sessionId: string) => void} */
-        let initializeSession = () => { throw new Error('transport was not initialized'); };
+        let initializeSession = () => {
+            throw new Error('transport was not initialized');
+        };
         const transport = fakeMcpTransport({
             async handleRequest(req, _res, body) {
                 if (String(req.method ?? '').toUpperCase() === 'POST') {
@@ -220,7 +229,9 @@ describe('MCP HTTP stateful router', () => {
                 const lastEventId = readHeader(req, 'last-event-id');
                 assert.ok(lastEventId);
                 await eventStore.replayEventsAfter(String(lastEventId), {
-                    send(message) { replayed.push(message); },
+                    send(message) {
+                        replayed.push(message);
+                    },
                 });
             },
         });
@@ -239,7 +250,9 @@ describe('MCP HTTP stateful router', () => {
             createServer: () => ({ async connect() {}, async close() {} }),
             createEventStore: () => eventStore,
             createTransport: (options) => {
-                initializeSession = (sessionId) => { options.onsessioninitialized?.(sessionId); };
+                initializeSession = (sessionId) => {
+                    options.onsessioninitialized?.(sessionId);
+                };
                 return transport;
             },
         });
@@ -266,11 +279,13 @@ describe('MCP HTTP stateful router', () => {
 
         assert.equal(errors.length, 0);
         assert.equal(res.headers['x-copilot-mcp-sse-replay-probe'], 'seeded-same-stream');
-        assert.deepEqual(replayed, [{
-            jsonrpc: '2.0',
-            method: 'notifications/message',
-            params: { level: 'info', logger: 'copilot-mcp-sdk-replay-probe', data: { sequence: 2 } },
-        }]);
+        assert.deepEqual(replayed, [
+            {
+                jsonrpc: '2.0',
+                method: 'notifications/message',
+                params: { level: 'info', logger: 'copilot-mcp-sdk-replay-probe', data: { sequence: 2 } },
+            },
+        ]);
     });
 
     it('answers the explicit SSE diagnostic probe without entering the long-lived SDK stream', async () => {
@@ -278,7 +293,11 @@ describe('MCP HTTP stateful router', () => {
         let handled = 0;
         runtime.register({
             sessionId: 'session-probe',
-            transport: { async handleRequest() { handled += 1; } },
+            transport: {
+                async handleRequest() {
+                    handled += 1;
+                },
+            },
             server: {},
         });
         const { errors, writeTransportError } = createMcpTransportErrorCollector();
@@ -305,7 +324,7 @@ describe('MCP HTTP stateful router', () => {
         assert.equal(handled, 0);
         assert.equal(res.statusCode, 200);
         assert.equal(res.headers['x-copilot-mcp-sse-probe'], 'ok');
-                const contentType = res.headers['content-type'];
+        const contentType = res.headers['content-type'];
         assert.ok(contentType);
         assert.match(contentType, /text\/event-stream/u);
         assert.match(res.body, /copilot-mcp-sse-probe/u);
@@ -366,7 +385,11 @@ describe('MCP HTTP stateful router', () => {
         const { errors, writeTransportError } = createMcpTransportErrorCollector();
 
         await handleStatefulMcpHttpRequest({
-            req: fakeReq('GET', { accept: 'text/event-stream', 'mcp-session-id': 'session-3', 'last-event-id': 'bad id' }),
+            req: fakeReq('GET', {
+                accept: 'text/event-stream',
+                'mcp-session-id': 'session-3',
+                'last-event-id': 'bad id',
+            }),
             res: fakeRes(),
             url: new URL('https://mcp.aurelin.org/mcp'),
             parsedMcpBody: undefined,

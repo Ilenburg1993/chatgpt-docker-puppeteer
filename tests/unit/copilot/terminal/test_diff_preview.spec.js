@@ -26,11 +26,14 @@ describe('terminal/capabilities/diff-preview', () => {
     });
 
     it('trunca fallback JS por linhas antes de retornar ao terminal', () => {
-        const rendered = renderTerminalDiffPreview(`${SAMPLE_DIFF}\n${Array.from({ length: 20 }, (_, i) => `+line ${i}`).join('\n')}`, {
-            forceJs: true,
-            lineLimit: 4,
-            color: 'never',
-        });
+        const rendered = renderTerminalDiffPreview(
+            `${SAMPLE_DIFF}\n${Array.from({ length: 20 }, (_, i) => `+line ${i}`).join('\n')}`,
+            {
+                forceJs: true,
+                lineLimit: 4,
+                color: 'never',
+            },
+        );
 
         expect(rendered.renderer).toBe('js');
         expect(rendered.output).toContain('linhas omitidas');

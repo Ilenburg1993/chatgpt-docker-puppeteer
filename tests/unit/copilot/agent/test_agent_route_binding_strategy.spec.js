@@ -54,10 +54,9 @@ function registerIngressRoute(route, options = {}) {
     return defaultModelGatewayIngressRouteRegistry.register({
         ingressRoute,
         localApiKey: options.localApiKey ?? createModelGatewayIngressLocalApiKey(),
-        expectedRevision:
-            Object.prototype.hasOwnProperty.call(options, 'expectedRevision')
-                ? options.expectedRevision ?? null
-                : null,
+        expectedRevision: Object.prototype.hasOwnProperty.call(options, 'expectedRevision')
+            ? (options.expectedRevision ?? null)
+            : null,
         ...(typeof options.now === 'number' ? { now: options.now } : {}),
     });
 }
@@ -93,9 +92,8 @@ describe('agent route binding strategy authority', () => {
     });
 
     it('enriquece rota manual para ingress antes da transação quando direct é estruturalmente não confiável', async () => {
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
         const ctx = createContext();
 
         const result = await switchAgentRouteTransactional(
@@ -163,9 +161,8 @@ describe('agent route binding strategy authority', () => {
                 requiresNewSession: false,
             };
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         const result = await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -215,9 +212,8 @@ describe('agent route binding strategy authority', () => {
             sampleSize: 2,
             latestStatus: 'route_rollback_confirmed_same_session',
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -270,9 +266,8 @@ describe('agent route binding strategy authority', () => {
             sampleSize: 3,
             latestStatus: 'route_confirmed_same_session',
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -305,9 +300,8 @@ describe('agent route binding strategy authority', () => {
 
     it('degrada para decisão estática e sinaliza warning quando o ledger está indisponível', async () => {
         mocks.readDirectEvidence.mockRejectedValueOnce(new Error('sqlite unavailable'));
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         const result = await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -357,9 +351,8 @@ describe('agent route binding strategy authority', () => {
                 reconciliationRequired: false,
             };
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         const result = await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -407,9 +400,8 @@ describe('agent route binding strategy authority', () => {
                 reconciliationRequired: false,
             };
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         const result = await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -474,9 +466,8 @@ describe('agent route binding strategy authority', () => {
                 reconciliationRequired: false,
             };
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         const result = await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -559,9 +550,8 @@ describe('agent route binding strategy authority', () => {
                 reconciliationRequired: false,
             };
         });
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
 
         const result = await switchAgentRouteTransactional(
             /** @type {any} */ (createContext()),
@@ -596,9 +586,8 @@ describe('agent route binding strategy authority', () => {
     });
 
     it('bloqueia rota incompatível antes do executor e sem persistir estado', async () => {
-        const { switchAgentRouteTransactional } = await import(
-            '../../../../src/copilot/agent/facades/agent-route-config.js'
-        );
+        const { switchAgentRouteTransactional } =
+            await import('../../../../src/copilot/agent/facades/agent-route-config.js');
         const ctx = createContext();
 
         const result = await switchAgentRouteTransactional(

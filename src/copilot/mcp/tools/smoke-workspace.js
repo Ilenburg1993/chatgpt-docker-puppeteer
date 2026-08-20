@@ -5,10 +5,8 @@
  * @module copilot/mcp/tools/smoke-workspace
  */
 
-import { parseFileForContext } from '#copilot/infra';
-import { getIoIndexStats } from '#copilot/infra/public/indexing';
+import { getIoIndexStats, parseFileForContext } from '#copilot/infra/public/indexing';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
-import { WORKSPACE_ROOT } from '#copilot/tools';
 import { readCloudflareTunnelConfig, readQuickTunnelState, summarizeQuickTunnelState } from '#copilot/mcp/cloudflare';
 import {
     okResult,
@@ -17,6 +15,7 @@ import {
     recordMcpWorkspaceSmokeSummary,
     resolveReadPath,
 } from '#copilot/mcp/control-plane';
+import { WORKSPACE_ROOT } from '#copilot/tools';
 import { projectDoctorTool } from './project-doctor.js';
 import { repoStatusHandler } from './repo-status.js';
 
@@ -121,7 +120,7 @@ export const mcpSmokeWorkspaceTool = {
             if (!resolved.ok) throw new Error(resolved.reason);
             const snapshot = await readTextValidated(resolved.validatedReadPath);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content, {
-                contentHash: snapshot.contentHash,
+                ...(typeof snapshot.contentHash === 'string' ? { contentHash: snapshot.contentHash } : {}),
             });
             return { symbols: parsed.symbols.symbols.length, exports: parsed.symbols.exports.length };
         });
@@ -153,7 +152,8 @@ export const mcpSmokeWorkspaceTool = {
                 metricsCalls: metrics.totals.calls,
                 tunnelMode: tunnelConfig.mode,
                 publicMcpUrl: tunnelConfig.publicMcpUrl ?? tunnel.connectorUrl ?? null,
-                tunnelAction: tunnelConfig.mode === 'named-permanent' ? 'use-permanent-hostname' : tunnel.recommendedAction,
+                tunnelAction:
+                    tunnelConfig.mode === 'named-permanent' ? 'use-permanent-hostname' : tunnel.recommendedAction,
             };
         });
 

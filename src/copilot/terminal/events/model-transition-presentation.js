@@ -2,9 +2,8 @@
 /**
  * Nucleo puro da apresentacao de transicoes de modelo.
  *
- * Este modulo nao importa tema, UI, SDK ou BYOK. Ele existe para que comandos,
- * eventos e automacoes possam compartilhar a mesma linguagem sem puxar a camada
- * visual inteira para caminhos quentes ou testes com mocks estreitos.
+ * Este modulo nao importa tema, UI, SDK ou BYOK. Ele existe para que comandos, eventos e automacoes possam compartilhar
+ * a mesma linguagem sem puxar a camada visual inteira para caminhos quentes ou testes com mocks estreitos.
  *
  * @module copilot/terminal/events/model-transition-presentation
  */

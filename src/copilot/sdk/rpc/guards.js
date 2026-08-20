@@ -11,12 +11,12 @@
 
 /**
  * @typedef {{
- *   sessionId: string;
- *   rpc: import('@github/copilot-sdk').CopilotSession['rpc'];
+ *     sessionId: string;
+ *     rpc: import('@github/copilot-sdk').CopilotSession['rpc'];
  * }} RpcSessionPort
  *
  * @typedef {{
- *   rpc: import('@github/copilot-sdk').CopilotClient['rpc'];
+ *     rpc: import('@github/copilot-sdk').CopilotClient['rpc'];
  * }} RpcClientPort
  */
 
@@ -43,7 +43,7 @@ export function assertRpcSession(session, caller) {
 /**
  * @param {unknown} client
  * @param {string} caller
- * @param {string} [scope='server-rpc']
+ * @param {string} [scope='server-rpc'] Default is `'server-rpc'`
  * @returns {asserts client is RpcClientPort}
  */
 export function assertRpcClient(client, caller, scope = 'server-rpc') {

@@ -27,8 +27,4 @@ export {
     verifyToolOperationResultFieldsForCategory,
     verifyToolRegistryContracts,
 } from './tool-contract-verifier.js';
-export {
-    buildToolDefinitionMetadata,
-    isHighImpactToolRisk,
-    permissionModeSkipsPrompts,
-} from './tool-metadata.js';
+export { buildToolDefinitionMetadata, isHighImpactToolRisk, permissionModeSkipsPrompts } from './tool-metadata.js';

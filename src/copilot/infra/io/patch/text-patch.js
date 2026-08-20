@@ -120,6 +120,16 @@ function normalizePatchWhitespace(value) {
 }
 
 /**
+ * Diagnostic-only normalization for accidental literal quote escaping in exact anchors. It never authorizes a write:
+ * the real patch still requires byte-exact old_string matching.
+ *
+ * @param {string} value
+ */
+function normalizePatchQuoteEscapes(value) {
+    return value.replace(/\\(["'`])/gu, '$1');
+}
+
+/**
  * @param {string} content
  * @param {string} needle
  */
@@ -167,8 +177,8 @@ function selectPatchRecoveryFragments(oldString) {
 }
 
 /**
- * Produce bounded, non-mutating evidence from the same content snapshot that failed exact matching.
- * Candidate heuristics are diagnostic only; they never authorize a write.
+ * Produce bounded, non-mutating evidence from the same content snapshot that failed exact matching. Candidate
+ * heuristics are diagnostic only; they never authorize a write.
  *
  * @param {string} content
  * @param {{ oldString: string; newString: string }} options
@@ -185,8 +195,7 @@ function buildPatchNotFoundEvidence(content, options) {
     };
     if (!scanEligible) return base;
 
-    const desired =
-        options.newString.length > 0 ? boundedPatchOccurrenceEvidence(content, options.newString) : null;
+    const desired = options.newString.length > 0 ? boundedPatchOccurrenceEvidence(content, options.newString) : null;
     const normalizedContent = normalizePatchLineEndings(content);
     const normalizedOld = normalizePatchLineEndings(options.oldString);
     const lineEndingEvidence =
@@ -198,6 +207,11 @@ function buildPatchNotFoundEvidence(content, options) {
     const whitespaceEvidence =
         whitespaceOld !== normalizedOld || whitespaceContent !== normalizedContent
             ? boundedPatchOccurrenceEvidence(whitespaceContent, whitespaceOld)
+            : null;
+    const quoteEscapeNormalizedOld = normalizePatchQuoteEscapes(options.oldString);
+    const quoteEscapeEvidence =
+        quoteEscapeNormalizedOld !== options.oldString
+            ? boundedPatchOccurrenceEvidence(content, quoteEscapeNormalizedOld)
             : null;
 
     const candidateLines = new Set();
@@ -245,6 +259,12 @@ function buildPatchNotFoundEvidence(content, options) {
             ? {
                   whitespaceNormalizedOccurrenceCount: whitespaceEvidence.occurrenceCount,
                   whitespaceNormalizedOccurrenceCountExact: whitespaceEvidence.occurrenceCountExact,
+              }
+            : {}),
+        ...(quoteEscapeEvidence
+            ? {
+                  quoteEscapeNormalizedOccurrenceCount: quoteEscapeEvidence.occurrenceCount,
+                  quoteEscapeNormalizedOccurrenceCountExact: quoteEscapeEvidence.occurrenceCountExact,
               }
             : {}),
         candidateFragmentCount: fragments.length,

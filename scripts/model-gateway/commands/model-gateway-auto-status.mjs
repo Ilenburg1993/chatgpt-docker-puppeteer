@@ -15,14 +15,14 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-status.mjs [--json] [--profile ID] [--allow-live-set-model] [--allow-new-session] [--allow-local-private] [--write-sqlite] [--live-profile ID] [--live-preset ID] [--live-model ID] [--live-base-url URL]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-status.mjs [--json] [--profile ID] [--allow-live-set-model] [--allow-new-session] [--allow-local-private] [--write-sqlite] [--live-profile ID] [--live-preset ID] [--live-model ID] [--live-base-url URL]
 
 Build a pure model-gateway runtime automation decision. This command does not execute providers and does not mutate the
 terminal session.
 `);
     process.exit(0);
 }
-
 
 /** @param {unknown} value */
 function optional(value) {
@@ -110,7 +110,9 @@ const summary = {
 if (argSet.has('--json')) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } else {
-    process.stdout.write(`model-gateway auto status: ok=${summary.ok ? 'yes' : 'no'} action=${decision.action} route=${decision.selectedRouteKey ?? '-'}\n`);
+    process.stdout.write(
+        `model-gateway auto status: ok=${summary.ok ? 'yes' : 'no'} action=${decision.action} route=${decision.selectedRouteKey ?? '-'}\n`,
+    );
     process.stdout.write(`  ${decision.operatorSummary}\n`);
     if (decision.blockers.length > 0) process.stdout.write(`  blockers=${decision.blockers.join(',')}\n`);
     process.stdout.write(`  next=${decision.nextCommands.join(' && ')}\n`);

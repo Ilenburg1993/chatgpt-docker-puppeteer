@@ -11,7 +11,7 @@
  * @module copilot/config/system-prompt/sdk-defaults/snapshot
  */
 
-import { writeFileSync } from 'node:fs';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYSTEM_PROMPT_SECTIONS } from '../../sdk-config-port.js';
@@ -50,6 +50,9 @@ const snapshot = generateSnapshot();
 const date = new Date().toISOString().slice(0, 10);
 const outPath = join(__dirname, `captured-${date}.json`);
 
-writeFileSync(outPath, JSON.stringify(snapshot, null, 2) + '\n', 'utf-8');
+await writeFileAtomicTrusted(outPath, `${JSON.stringify(snapshot, null, 2)}\n`, {
+    caller: 'config.system-prompt.sdk-defaults.snapshot',
+    mode: 0o600,
+});
 console.log(`[sdk-defaults/snapshot] Salvo em: ${outPath}`);
 console.log(`[sdk-defaults/snapshot] ${Object.keys(snapshot.sections).length} seções capturadas.`);

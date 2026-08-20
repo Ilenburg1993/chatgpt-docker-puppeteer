@@ -161,60 +161,74 @@ Resultado geral: **estado funcional bom**, **robustez média**, **governança co
 
 > Lista objetiva, priorizada e acionável para implementação incremental.
 
-| ID   | Prioridade | Categoria       | Proposta                                                                                                                 |
-| ---- | ---------- | --------------- | ------------------------------------------------------------------------------------------------------------------------ | ---- |
-| P-01 | Alta       | Contrato        | Gerar fallback de `session_id` em UUID válido (não `sess_<ts>`).                                                         |
-| P-02 | Alta       | Contrato        | Validar `session_id` de entrada contra regex UUID e marcar `session_id_invalid=true` em caso de desvio.                  |
-| P-03 | Média      | Contrato        | Capturar `hook_event_name` no parser e validar `SessionStart`.                                                           |
-| P-04 | Média      | Contrato        | Expandir `source` com enum validado (`new`, `inline_restart`, `reconnect_rollover`, `manual_recovery`, `auto_recovery`). |
-| P-05 | Média      | Contrato        | Mapear `source=auto_recovery` para `SESSIONSTART_TRIGGER_KIND` explícito.                                                |
-| P-06 | Alta       | Contrato        | Harmonizar `session_stats.turn_unauthorized` → `turn_no_askQuestions` no contexto inicial.                               |
-| P-07 | Alta       | Contrato        | Incluir rotina de migração de chave legada no `session-start` para contextos antigos.                                    |
-| P-08 | Média      | Contrato        | Incluir `schema_version` explícito no JSON inicial de sessão.                                                            |
-| P-09 | Média      | Contrato        | Garantir presença inicial de `current_turn.section_id` alinhado ao `INITIAL_SECTION_ID`.                                 |
-| P-10 | Média      | Contrato        | Inicializar `current_turn.subturn` no bootstrap do `session-start` para invariância estrutural.                          |
-| P-11 | Média      | Contrato        | Definir `required_docs_set_at` no contexto inicial.                                                                      |
-| P-12 | Baixa      | Contrato        | Adicionar `session_start_version`/`template_version` para rastrear versão do briefing.                                   |
-| P-13 | Alta       | Estado          | Recalcular `LOGICAL_SESSION_NUMBER` quando inline fallback muda `SOURCE` para `new`.                                     |
-| P-14 | Alta       | Estado          | Encapsular escritas de contexto (`persist_initial_context`, `prepare_recovery_alerts`) com lock unificado.               |
-| P-15 | Alta       | Estado          | Reutilizar helper transacional (`ctx_update`/equivalente) em vez de `mv/cp` direto.                                      |
-| P-16 | Média      | Estado          | Definir `umask 077` antes de criar arquivos de estado sensíveis.                                                         |
-| P-17 | Média      | Estado          | Ajustar permissões de `session-context-*.json` e `audit-*.jsonl` para 600.                                               |
-| P-18 | Média      | Estado          | Garantir criação (`touch`) de `PER_AUDIT_FILE` antes da troca de ponteiros e emissão de eventos.                         |
-| P-19 | Média      | Estado          | Validar e normalizar `TIMESTAMP` vazio para `SESSION_DATE` já no parser de input.                                        |
-| P-20 | Média      | Estado          | Persistir `cwd` normalizado (trim/sanitização) para evitar ruído no contexto.                                            |
-| P-21 | Média      | Estado          | Evitar mutação global de `AUDIT_FILE` em `session_start_compute_trends` (usar var local).                                |
-| P-22 | Média      | Estado          | Adicionar `trap` de cleanup para arquivos temporários (`mktemp`) nas funções de trends/recovery.                         |
-| P-23 | Baixa      | Estado          | Incluir contador de retries/erros de escrita no contexto para troubleshooting.                                           |
-| P-24 | Baixa      | Estado          | Marcar contexto com `bootstrap_completed=true` ao final do hook (commit lógico).                                         |
-| P-25 | Alta       | Recovery        | Trocar detecção de reconnect por `jq` estruturado (evento + `session_id`) em vez de `grep`.                              |
-| P-26 | Alta       | Recovery        | Calcular `PREV_RECONNECT_COUNT` com `jq` (contagem exata), removendo `grep                                               | wc`. |
-| P-27 | Média      | Recovery        | Adicionar prioridade explícita de decisão para `PREV_CLOSE_MODE` (authorized > clean > reconnect > abrupt).              |
-| P-28 | Média      | Recovery        | Limitar varredura de checkpoints (ex.: top 100) para evitar custo em diretórios grandes.                                 |
-| P-29 | Média      | Recovery        | Validar `checkpoint_ts` com parser robusto e registrar motivo de parse inválido.                                         |
-| P-30 | Média      | Recovery        | Ignorar checkpoints mais antigos que janela configurável (ex.: 30/90 dias).                                              |
-| P-31 | Baixa      | Recovery        | Registrar evento quando nenhum checkpoint elegível é encontrado.                                                         |
-| P-32 | Média      | Recovery        | Persistir `recovery_reason_code` canônico no contexto para facilitar dashboards.                                         |
-| P-33 | Baixa      | Recovery        | Incluir `prev_session_end_detected_source` (audit/archive/flag) para auditoria de decisão.                               |
-| P-34 | Média      | Recovery        | Adicionar proteção contra substrings acidentais de `session_id` na classificação de reconnect.                           |
-| P-35 | Alta       | Segurança       | Não logar `close_key` em texto puro no `sessionStart`; logar hash curto/censorado.                                       |
-| P-36 | Média      | Segurança       | Redigir `close_key` também no `additionalContext` quando não estritamente necessária.                                    |
-| P-37 | Média      | Segurança       | Adicionar teste de regressão para garantir ausência de `close_key` plaintext em `audit-*`.                               |
-| P-38 | Média      | Observabilidade | Incluir `correlation_id` comum para `sessionStart` e `sectionStart`.                                                     |
-| P-39 | Média      | Observabilidade | Emitir evento `sessionStart_stage_failed` com `stage` e `reason` em falhas de bootstrap.                                 |
-| P-40 | Baixa      | Observabilidade | Adicionar medição de latência por estágio (`parse`, `bootstrap`, `recovery`, `briefing`, `emit`).                        |
-| P-41 | Média      | Observabilidade | Limitar `hookSpecificOutput.additionalContext` por bytes (ex.: 16KB) com truncamento explícito.                          |
-| P-42 | Baixa      | Observabilidade | Inserir checksum do briefing no contexto para detectar drift de template.                                                |
-| P-43 | Baixa      | Observabilidade | Reduzir banner em stderr em modo quiet para minimizar ruído em logs de automação.                                        |
-| P-44 | Alta       | Resiliência     | Envolver `watchdog.sh` e `rotate-audit.sh` com timeout (`run_aux_block`).                                                |
-| P-45 | Média      | Resiliência     | Tornar cálculo de trends/health opcional por feature flag (`HOOKS_SESSIONSTART_ENRICHMENT`).                             |
-| P-46 | Média      | Resiliência     | Executar enriquecimentos pesados em fail-open com tempo máximo acumulado.                                                |
-| P-47 | Baixa      | Operação        | Tornar ping de rede opcional (`HOOKS_HEALTH_NET_CHECK_ENABLED`) para ambientes isolados.                                 |
-| P-48 | Baixa      | Operação        | Permitir host de health check configurável por lista, não valor fixo único.                                              |
-| P-49 | Alta       | Testabilidade   | Criar suíte dedicada `smoke-session-start.sh` com cenários adversos do hook modular.                                     |
-| P-50 | Alta       | Testabilidade   | Adicionar teste de integração para `inline_restart` com contexto corrompido + recomputação de sessão lógica.             |
-| P-51 | Média      | Testabilidade   | Adicionar teste de contrato para alinhar `session-context.schema.json` e payload real do `session-start`.                |
-| P-52 | Média      | Governança      | Extrair texto estático do briefing para template versionado central, reduzindo drift com protocolo canônico.             |
+| ID | Prioridade | Categoria | Proposta | | ---- | ---------- | --------------- |
+------------------------------------------------------------------------------------------------------------------------
+
+| ---- | | P-01 | Alta | Contrato | Gerar fallback de `session_id` em UUID válido (não `sess_<ts>`).
+| | P-02 | Alta | Contrato | Validar `session_id` de entrada contra regex UUID e marcar
+`session_id_invalid=true` em caso de desvio. | | P-03 | Média | Contrato | Capturar
+`hook_event_name` no parser e validar `SessionStart`. | | P-04 | Média | Contrato | Expandir
+`source` com enum validado (`new`, `inline_restart`, `reconnect_rollover`, `manual_recovery`,
+`auto_recovery`). | | P-05 | Média | Contrato | Mapear `source=auto_recovery` para
+`SESSIONSTART_TRIGGER_KIND` explícito. | | P-06 | Alta | Contrato | Harmonizar
+`session_stats.turn_unauthorized` → `turn_no_askQuestions` no contexto inicial. | | P-07 | Alta |
+Contrato | Incluir rotina de migração de chave legada no `session-start` para contextos antigos. | |
+P-08 | Média | Contrato | Incluir `schema_version` explícito no JSON inicial de sessão. | | P-09 |
+Média | Contrato | Garantir presença inicial de `current_turn.section_id` alinhado ao
+`INITIAL_SECTION_ID`. | | P-10 | Média | Contrato | Inicializar `current_turn.subturn` no bootstrap
+do `session-start` para invariância estrutural. | | P-11 | Média | Contrato | Definir
+`required_docs_set_at` no contexto inicial. | | P-12 | Baixa | Contrato | Adicionar
+`session_start_version`/`template_version` para rastrear versão do briefing. | | P-13 | Alta |
+Estado | Recalcular `LOGICAL_SESSION_NUMBER` quando inline fallback muda `SOURCE` para `new`. | |
+P-14 | Alta | Estado | Encapsular escritas de contexto (`persist_initial_context`,
+`prepare_recovery_alerts`) com lock unificado. | | P-15 | Alta | Estado | Reutilizar helper
+transacional (`ctx_update`/equivalente) em vez de `mv/cp` direto. | | P-16 | Média | Estado |
+Definir `umask 077` antes de criar arquivos de estado sensíveis. | | P-17 | Média | Estado | Ajustar
+permissões de `session-context-*.json` e `audit-*.jsonl` para 600. | | P-18 | Média | Estado |
+Garantir criação (`touch`) de `PER_AUDIT_FILE` antes da troca de ponteiros e emissão de eventos. | |
+P-19 | Média | Estado | Validar e normalizar `TIMESTAMP` vazio para `SESSION_DATE` já no parser de
+input. | | P-20 | Média | Estado | Persistir `cwd` normalizado (trim/sanitização) para evitar ruído
+no contexto. | | P-21 | Média | Estado | Evitar mutação global de `AUDIT_FILE` em
+`session_start_compute_trends` (usar var local). | | P-22 | Média | Estado | Adicionar `trap` de
+cleanup para arquivos temporários (`mktemp`) nas funções de trends/recovery. | | P-23 | Baixa |
+Estado | Incluir contador de retries/erros de escrita no contexto para troubleshooting. | | P-24 |
+Baixa | Estado | Marcar contexto com `bootstrap_completed=true` ao final do hook (commit lógico). |
+| P-25 | Alta | Recovery | Trocar detecção de reconnect por `jq` estruturado (evento + `session_id`)
+em vez de `grep`. | | P-26 | Alta | Recovery | Calcular `PREV_RECONNECT_COUNT` com `jq` (contagem
+exata), removendo `grep                                               | wc`. | | P-27 | Média |
+Recovery | Adicionar prioridade explícita de decisão para `PREV_CLOSE_MODE` (authorized > clean >
+reconnect > abrupt). | | P-28 | Média | Recovery | Limitar varredura de checkpoints (ex.: top 100)
+para evitar custo em diretórios grandes. | | P-29 | Média | Recovery | Validar `checkpoint_ts` com
+parser robusto e registrar motivo de parse inválido. | | P-30 | Média | Recovery | Ignorar
+checkpoints mais antigos que janela configurável (ex.: 30/90 dias). | | P-31 | Baixa | Recovery |
+Registrar evento quando nenhum checkpoint elegível é encontrado. | | P-32 | Média | Recovery |
+Persistir `recovery_reason_code` canônico no contexto para facilitar dashboards. | | P-33 | Baixa |
+Recovery | Incluir `prev_session_end_detected_source` (audit/archive/flag) para auditoria de
+decisão. | | P-34 | Média | Recovery | Adicionar proteção contra substrings acidentais de
+`session_id` na classificação de reconnect. | | P-35 | Alta | Segurança | Não logar `close_key` em
+texto puro no `sessionStart`; logar hash curto/censorado. | | P-36 | Média | Segurança | Redigir
+`close_key` também no `additionalContext` quando não estritamente necessária. | | P-37 | Média |
+Segurança | Adicionar teste de regressão para garantir ausência de `close_key` plaintext em
+`audit-*`. | | P-38 | Média | Observabilidade | Incluir `correlation_id` comum para `sessionStart` e
+`sectionStart`. | | P-39 | Média | Observabilidade | Emitir evento `sessionStart_stage_failed` com
+`stage` e `reason` em falhas de bootstrap. | | P-40 | Baixa | Observabilidade | Adicionar medição de
+latência por estágio (`parse`, `bootstrap`, `recovery`, `briefing`, `emit`). | | P-41 | Média |
+Observabilidade | Limitar `hookSpecificOutput.additionalContext` por bytes (ex.: 16KB) com
+truncamento explícito. | | P-42 | Baixa | Observabilidade | Inserir checksum do briefing no contexto
+para detectar drift de template. | | P-43 | Baixa | Observabilidade | Reduzir banner em stderr em
+modo quiet para minimizar ruído em logs de automação. | | P-44 | Alta | Resiliência | Envolver
+`watchdog.sh` e `rotate-audit.sh` com timeout (`run_aux_block`). | | P-45 | Média | Resiliência |
+Tornar cálculo de trends/health opcional por feature flag (`HOOKS_SESSIONSTART_ENRICHMENT`). | |
+P-46 | Média | Resiliência | Executar enriquecimentos pesados em fail-open com tempo máximo
+acumulado. | | P-47 | Baixa | Operação | Tornar ping de rede opcional
+(`HOOKS_HEALTH_NET_CHECK_ENABLED`) para ambientes isolados. | | P-48 | Baixa | Operação | Permitir
+host de health check configurável por lista, não valor fixo único. | | P-49 | Alta | Testabilidade |
+Criar suíte dedicada `smoke-session-start.sh` com cenários adversos do hook modular. | | P-50 | Alta
+| Testabilidade | Adicionar teste de integração para `inline_restart` com contexto corrompido +
+recomputação de sessão lógica. | | P-51 | Média | Testabilidade | Adicionar teste de contrato para
+alinhar `session-context.schema.json` e payload real do `session-start`. | | P-52 | Média |
+Governança | Extrair texto estático do briefing para template versionado central, reduzindo drift
+com protocolo canônico. |
 
 ---
 

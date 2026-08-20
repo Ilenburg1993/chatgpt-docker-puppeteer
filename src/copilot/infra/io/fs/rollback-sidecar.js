@@ -10,9 +10,11 @@ import { constants as fsConstants } from 'node:fs';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { acquireIoResourceLock } from '../../io-locks.js';
-import { toOwnedBuffer } from '../../shared/buffer.js';
+import { toBufferView, toOwnedBuffer } from '../../shared/buffer.js';
 import { sha256 } from '../../shared/hash.js';
 import { assertSuccessfulSync, syncParentDirectoryBestEffort } from './durability.js';
+import { mkdirPathUnlocked } from './mkdir.js';
+import { markMutationAppliedError } from './mutation-state.js';
 
 const DEFAULT_ROLLBACK_ENABLED = false;
 const DEFAULT_ROLLBACK_TTL_MS = 24 * 60 * 60 * 1000;
@@ -21,6 +23,27 @@ const DEFAULT_ROLLBACK_MAX_BYTES = 32 * 1024 * 1024;
 const DEFAULT_CLEANUP_MAX_ENTRIES = 512;
 const SIDECAR_FILE_PATTERN = /^(\d+)-([a-f0-9]{64})-([0-9a-f-]{36})\.rollback$/;
 const PENDING_FILE_PATTERN = /^\.pending-(\d+)-(\d+)-([0-9a-f-]{36})$/;
+
+/** @param {unknown} error */
+function isMissingDirectoryError(error) {
+    const code = /** @type {{ code?: unknown }} */ (error)?.code;
+    return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
+function emptyRollbackCleanupResult() {
+    return {
+        scanned: 0,
+        removed: 0,
+        removedBytes: 0,
+        expiredRemoved: 0,
+        budgetRemoved: 0,
+        purged: 0,
+        failed: 0,
+        remainingCount: 0,
+        remainingBytes: 0,
+        limited: false,
+    };
+}
 
 /**
  * @typedef {object} IoRollbackSidecar
@@ -137,7 +160,12 @@ async function writeAll(handle, chunk) {
 /**
  * Abre um sidecar temporário e o publica somente após hash/tamanho serem conhecidos.
  *
- * @param {{ directory?: string; ttlMs?: number; nowMs?: number }} [options]
+ * @param {{
+ *     directory?: string;
+ *     ttlMs?: number;
+ *     nowMs?: number;
+ *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ * }} [options]
  */
 export async function createRollbackSidecarWriter(options = {}) {
     const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
@@ -145,7 +173,11 @@ export async function createRollbackSidecarWriter(options = {}) {
     const ttlMs = positiveIntegerOr(options.ttlMs, getRollbackSidecarTtlMs());
     const expiresAtMs = createdAtMs + ttlMs;
     const tempPath = path.join(directory, `.pending-${expiresAtMs}-${process.pid}-${randomUUID()}`);
-    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    await mkdirPathUnlocked(directory, {
+        recursive: true,
+        mode: 0o700,
+        ...(options.syncDirectory === undefined ? {} : { syncDirectory: options.syncDirectory }),
+    });
     const handle = await fs.open(tempPath, 'wx', 0o600);
     let bytesWritten = 0;
     let closed = false;
@@ -158,7 +190,9 @@ export async function createRollbackSidecarWriter(options = {}) {
          */
         async write(chunk) {
             if (closed) throw new Error('Sidecar de rollback já foi finalizado.');
-            const buffer = toOwnedBuffer(chunk);
+            // The chunk is consumed completely before this method resolves; a zero-copy view is safe and avoids one
+            // allocation/copy per streamed mutation-snapshot chunk.
+            const buffer = toBufferView(chunk);
             await writeAll(handle, buffer);
             bytesWritten += buffer.byteLength;
         },
@@ -186,7 +220,7 @@ export async function createRollbackSidecarWriter(options = {}) {
             closed = true;
             await fs.rename(tempPath, finalPath);
             publishedPath = finalPath;
-            const directorySync = await syncParentDirectoryBestEffort(finalPath);
+            const directorySync = await (options.syncDirectory ?? syncParentDirectoryBestEffort)(finalPath);
             assertSuccessfulSync(directorySync, {
                 code: 'EDIRECTORYSYNC',
                 message: `Falha ao sincronizar diretório do sidecar de rollback: ${directory}`,
@@ -218,7 +252,24 @@ export async function createRollbackSidecarWriter(options = {}) {
                 closed = true;
                 await handle.close().catch(() => undefined);
             }
-            await fs.unlink(publishedPath ?? tempPath).catch(() => undefined);
+            const cleanupPath = publishedPath ?? tempPath;
+            const published = publishedPath !== null;
+            await fs.unlink(cleanupPath).catch(() => undefined);
+            if (published) {
+                try {
+                    const cleanupSync = await (options.syncDirectory ?? syncParentDirectoryBestEffort)(cleanupPath);
+                    assertSuccessfulSync(cleanupSync, {
+                        code: 'EDIRECTORYSYNC',
+                        message: `Falha ao sincronizar cleanup do sidecar de rollback: ${directory}`,
+                    });
+                    publishedPath = null;
+                } catch (error) {
+                    throw markMutationAppliedError(error, {
+                        phase: 'rollback-sidecar-cleanup',
+                        paths: [cleanupPath],
+                    });
+                }
+            }
         },
     };
 }
@@ -227,7 +278,13 @@ export async function createRollbackSidecarWriter(options = {}) {
  * Persiste um Buffer já materializado como sidecar durável.
  *
  * @param {Buffer | Uint8Array} content
- * @param {{ contentHash?: string; directory?: string; ttlMs?: number; nowMs?: number }} [options]
+ * @param {{
+ *     contentHash?: string;
+ *     directory?: string;
+ *     ttlMs?: number;
+ *     nowMs?: number;
+ *     syncDirectory?: typeof syncParentDirectoryBestEffort;
+ * }} [options]
  * @returns {Promise<IoRollbackSidecar>}
  */
 export async function persistRollbackSidecar(content, options = {}) {
@@ -314,8 +371,11 @@ export async function listRollbackSidecars(options = {}) {
     const directory = path.resolve(options.directory ?? getRollbackSidecarDirectory());
     const nowMs = Math.trunc(options.nowMs ?? Date.now());
     const maxEntries = positiveIntegerOr(options.maxEntries, 100);
-    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-    const candidates = (await fs.readdir(directory, { withFileTypes: true }))
+    const directoryEntries = await fs.readdir(directory, { withFileTypes: true }).catch((error) => {
+        if (isMissingDirectoryError(error)) return [];
+        throw error;
+    });
+    const candidates = directoryEntries
         .filter((entry) => entry.isFile() && SIDECAR_FILE_PATTERN.test(entry.name))
         .sort((left, right) => left.name.localeCompare(right.name));
     const entries = candidates.slice(0, maxEntries);
@@ -397,7 +457,14 @@ export async function cleanupRollbackSidecars(options = {}) {
     const purgeAll = options.purgeAll === true;
     const enforceBudget = options.enforceBudget !== false;
     const preservePath = options.preservePath ? path.resolve(options.preservePath) : null;
-    await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+    const directoryExists = await fs
+        .readdir(directory, { withFileTypes: true })
+        .then(() => true)
+        .catch((error) => {
+            if (isMissingDirectoryError(error)) return false;
+            throw error;
+        });
+    if (!directoryExists) return emptyRollbackCleanupResult();
     const lease = await acquireIoResourceLock(path.join(directory, '.cleanup'), {
         fileLock: true,
         fileLockDir: path.join(directory, '.locks'),
@@ -408,7 +475,8 @@ export async function cleanupRollbackSidecars(options = {}) {
         return await lease.run(async () => {
             const entries = await fs.readdir(directory, { withFileTypes: true });
             const recognizedCount = entries.filter(
-                (entry) => entry.isFile() && (SIDECAR_FILE_PATTERN.test(entry.name) || PENDING_FILE_PATTERN.test(entry.name)),
+                (entry) =>
+                    entry.isFile() && (SIDECAR_FILE_PATTERN.test(entry.name) || PENDING_FILE_PATTERN.test(entry.name)),
             ).length;
             const recognized = [];
             for (const entry of entries) {
@@ -438,7 +506,7 @@ export async function cleanupRollbackSidecars(options = {}) {
                 let retainedCount = 0;
                 let retainedBytes = 0;
                 const preserved = preservePath
-                    ? activeSidecars.find((item) => path.resolve(item.path) === preservePath) ?? null
+                    ? (activeSidecars.find((item) => path.resolve(item.path) === preservePath) ?? null)
                     : null;
                 if (preserved) {
                     retained.add(preserved.path);

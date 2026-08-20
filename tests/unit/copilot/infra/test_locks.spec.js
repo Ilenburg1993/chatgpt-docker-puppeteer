@@ -1,7 +1,7 @@
 // @ts-check
 
-import { existsSync, writeFileSync } from 'node:fs';
 import { channel } from 'node:diagnostics_channel';
+import { existsSync, writeFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -222,9 +222,9 @@ describe('infra locks', () => {
             expect(JSON.stringify(staleEvents)).not.toContain(resource);
             expect(JSON.stringify(active)).not.toContain(resource);
 
-            await expect(acquireIoResourceLock(resource, { timeoutMs: 5, operation: 'unit-timeout' })).rejects.toMatchObject(
-                { code: 'ETIMEDOUT' },
-            );
+            await expect(
+                acquireIoResourceLock(resource, { timeoutMs: 5, operation: 'unit-timeout' }),
+            ).rejects.toMatchObject({ code: 'ETIMEDOUT' });
             const after = getIoLockStats();
             expect(after.contended).toBe(before.contended + 1);
             expect(after.timeouts).toBe(before.timeouts + 1);

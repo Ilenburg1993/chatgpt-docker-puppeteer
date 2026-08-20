@@ -21,6 +21,7 @@ import {
     pingDefaultAgentDialogWatchdog,
     readAgentHandoffHistory,
     readAgentRuntimeControlState,
+    readAgentRuntimeOverviewProjection,
     readAgentRuntimePermissionMode,
     resumeAgentDialogLoop,
     saveAgentRuntimeSnapshot,
@@ -29,7 +30,6 @@ import {
     steerAgentRuntimeMessage,
     stopAgentRuntime,
     stopAgentRuntimeDialogLoopAuthorized,
-    readAgentRuntimeOverviewProjection,
 } from '#copilot/runtime';
 
 // ---------------------------------------------------------------------------
@@ -53,7 +53,8 @@ import {
  *     pendingQuestionKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionShadow: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadow | null;
  *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
+ *     pendingQuestionShadowState:
+ *         import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
@@ -84,14 +85,15 @@ export function readTerminalRuntimeState(runtimeId) {
         pendingQuestionShadowExpiresAt: runtime.pendingQuestionShadowExpiresAt,
         pendingQuestionShadowRemainingMs: runtime.pendingQuestionShadowRemainingMs,
         contextWindow: runtime.contextWindow,
-        lastPrInfo: /**
-         * @type {{
-         *     model?: string;
-         *     cost?: number;
-         *     quotaSnapshots?: Record<string, unknown>;
-         *     ts: number;
-         * } | null}
-         */ (runtime.lastPrInfo),
+        lastPrInfo:
+            /**
+             * @type {{
+             *     model?: string;
+             *     cost?: number;
+             *     quotaSnapshots?: Record<string, unknown>;
+             *     ts: number;
+             * } | null}
+             */ (runtime.lastPrInfo),
         lastLlmUsage: /** @type {Record<string, unknown> | null} */ (runtime.lastLlmUsage),
     };
 }

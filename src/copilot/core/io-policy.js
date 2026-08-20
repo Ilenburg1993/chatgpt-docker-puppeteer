@@ -56,10 +56,10 @@ export const DEFAULT_BLOCKED_READ_PATH_PATTERNS = Object.freeze([
 ]);
 
 /**
- * Write policy blocks secrets/credential material and opaque native/binary executables.
- * Textual scripts (.sh/.ps1/.bat/.cmd) remain repository source: editing them is not execution, and execution is
- * governed by a separate tool boundary. Treating text scripts as unconditionally unwritable made legitimate
- * DevContainer/CI maintenance impossible while JS/TS with equivalent execution power remained editable.
+ * Write policy blocks secrets/credential material and opaque native/binary executables. Textual scripts
+ * (.sh/.ps1/.bat/.cmd) remain repository source: editing them is not execution, and execution is governed by a separate
+ * tool boundary. Treating text scripts as unconditionally unwritable made legitimate DevContainer/CI maintenance
+ * impossible while JS/TS with equivalent execution power remained editable.
  *
  * @type {ReadonlyArray<RegExp>}
  */
@@ -106,7 +106,83 @@ export const DEFAULT_BLOCKED_PATH_SEGMENTS = Object.freeze([
 
 /**
  * @typedef {IoPathPolicySuccess | IoPathPolicyFailure} IoPathPolicyResult
+ *
+ * @typedef {{ result: IoPathPolicySuccess; cachedAtMs: number; absolutePath: string; realPath: string }} IoPathPolicyCacheEntry
  */
+
+const DEFAULT_IO_PATH_POLICY_CACHE_TTL_MS = 250;
+const HARD_IO_PATH_POLICY_CACHE_TTL_MS = 2_000;
+const DEFAULT_IO_PATH_POLICY_CACHE_MAX_ENTRIES = 2_048;
+const HARD_IO_PATH_POLICY_CACHE_MAX_ENTRIES = 10_000;
+/** @type {Map<string, IoPathPolicyCacheEntry>} */
+const ioPathPolicyCache = new Map();
+const ioPathPolicyCacheStats = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    expirations: 0,
+    evictions: 0,
+    bypasses: 0,
+    invalidationEvents: 0,
+    invalidatedEntries: 0,
+};
+
+/** @param {NodeJS.ProcessEnv} [env] */
+export function readIoPathPolicyCacheConfig(env = process.env) {
+    return {
+        ttlMs: readBoundedEnvInteger(
+            env['IO_PATH_POLICY_CACHE_TTL_MS'],
+            DEFAULT_IO_PATH_POLICY_CACHE_TTL_MS,
+            0,
+            HARD_IO_PATH_POLICY_CACHE_TTL_MS,
+        ),
+        maxEntries: readBoundedEnvInteger(
+            env['IO_PATH_POLICY_CACHE_MAX_ENTRIES'],
+            DEFAULT_IO_PATH_POLICY_CACHE_MAX_ENTRIES,
+            16,
+            HARD_IO_PATH_POLICY_CACHE_MAX_ENTRIES,
+        ),
+    };
+}
+
+export function getIoPathPolicyCacheStats() {
+    return {
+        ...ioPathPolicyCacheStats,
+        size: ioPathPolicyCache.size,
+        ...readIoPathPolicyCacheConfig(),
+        policyVersion: IO_POLICY_VERSION,
+    };
+}
+
+/**
+ * Invalidate cached read-only realpath decisions after canonical or externally observed filesystem mutations.
+ *
+ * @param {string} filePath
+ * @param {{ recursive?: boolean }} [options]
+ */
+export function invalidateIoPathPolicyCache(filePath, options = {}) {
+    const target = path.resolve(filePath);
+    let removed = 0;
+    for (const [key, entry] of ioPathPolicyCache) {
+        if (
+            pathMatchesInvalidation(entry.absolutePath, target, options.recursive === true) ||
+            pathMatchesInvalidation(entry.realPath, target, options.recursive === true)
+        ) {
+            ioPathPolicyCache.delete(key);
+            removed += 1;
+        }
+    }
+    ioPathPolicyCacheStats.invalidationEvents += 1;
+    ioPathPolicyCacheStats.invalidatedEntries += removed;
+    return removed;
+}
+
+export function resetIoPathPolicyCacheForTest() {
+    ioPathPolicyCache.clear();
+    for (const key of Object.keys(ioPathPolicyCacheStats)) {
+        ioPathPolicyCacheStats[/** @type {keyof typeof ioPathPolicyCacheStats} */ (key)] = 0;
+    }
+}
 
 /**
  * @param {string} inputPath
@@ -127,6 +203,7 @@ export const DEFAULT_BLOCKED_PATH_SEGMENTS = Object.freeze([
  *         | 'delete'
  *         | 'patch'
  *         | 'mkdir'
+ *         | 'metadata'
  *         | 'stat';
  * }} [options]
  * @returns {IoPathPolicyResult}
@@ -194,6 +271,18 @@ export async function evaluateIoPathPolicyAsync(inputPath, options = {}) {
     const mode = normalizePathPolicyMode(options.mode);
     const blockedSegments = normalizeBlockedSegments(options.blockedSegments || DEFAULT_BLOCKED_PATH_SEGMENTS);
     const blockedPatterns = normalizeBlockedPatterns(options.blockedPatterns, mode);
+    const cacheConfig = readIoPathPolicyCacheConfig();
+    const cacheKey =
+        mode === 'read' && !allowOutsideWorkspace && cacheConfig.ttlMs > 0
+            ? buildIoPathPolicyCacheKey(base, blockedSegments, blockedPatterns)
+            : null;
+    if (cacheKey) {
+        const cached = readIoPathPolicyCacheEntry(cacheKey, cacheConfig.ttlMs);
+        if (cached) return cached;
+    } else {
+        ioPathPolicyCacheStats.bypasses += 1;
+    }
+
     const realTarget = await resolveRealTargetForPolicy(base.absolutePath);
     const containment = evaluatePathContainment(base.workspaceRoot, realTarget.realPath);
 
@@ -215,12 +304,14 @@ export async function evaluateIoPathPolicyAsync(inputPath, options = {}) {
         );
     }
 
-    return {
+    const result = {
         ...base,
         relativePath: containment.relativePath,
         realPath: realTarget.realPath,
         symlinkResolved: realTarget.realPath !== base.absolutePath,
     };
+    if (cacheKey) rememberIoPathPolicyCacheEntry(cacheKey, result, cacheConfig.maxEntries);
+    return result;
 }
 
 /**
@@ -361,7 +452,7 @@ function normalizePathPolicyMode(mode) {
     const normalized = typeof mode === 'string' ? mode.trim().toLowerCase() : '';
     if (normalized === 'write' || normalized === 'append' || normalized === 'delete') return normalized;
     if (normalized === 'move' || normalized === 'copy' || normalized === 'patch') return 'write';
-    if (normalized === 'mkdir') return 'write';
+    if (normalized === 'mkdir' || normalized === 'metadata') return 'write';
     return 'read';
 }
 
@@ -416,6 +507,76 @@ async function resolveRealTargetForPolicy(absolutePath) {
             candidate = parent;
         }
     }
+}
+
+/** @param {IoPathPolicySuccess} base @param {readonly string[]} blockedSegments @param {readonly RegExp[]}
+  blockedPatterns */
+function buildIoPathPolicyCacheKey(base, blockedSegments, blockedPatterns) {
+    return JSON.stringify([
+        IO_POLICY_VERSION,
+        base.workspaceRoot,
+        base.absolutePath,
+        blockedSegments,
+        blockedPatterns.map((pattern) => [pattern.source, pattern.flags]),
+    ]);
+}
+
+/** @param {string} cacheKey @param {number} ttlMs @returns {IoPathPolicySuccess | null} */
+function readIoPathPolicyCacheEntry(cacheKey, ttlMs) {
+    const entry = ioPathPolicyCache.get(cacheKey);
+    if (!entry) {
+        ioPathPolicyCacheStats.misses += 1;
+        return null;
+    }
+    if (Date.now() - entry.cachedAtMs > ttlMs) {
+        ioPathPolicyCache.delete(cacheKey);
+        ioPathPolicyCacheStats.expirations += 1;
+        ioPathPolicyCacheStats.misses += 1;
+        return null;
+    }
+    ioPathPolicyCacheStats.hits += 1;
+    // LRU touch sem renovar cachedAtMs: a freshness window é fixa, nunca deslizante.
+    ioPathPolicyCache.delete(cacheKey);
+    ioPathPolicyCache.set(cacheKey, entry);
+    return { ...entry.result };
+}
+
+/** @param {string} cacheKey @param {IoPathPolicySuccess} result @param {number} maxEntries */
+function rememberIoPathPolicyCacheEntry(cacheKey, result, maxEntries) {
+    const storedResult = /** @type {IoPathPolicySuccess} */ ({
+        ...result,
+        blockedSegments: Object.freeze([...result.blockedSegments]),
+    });
+    ioPathPolicyCache.delete(cacheKey);
+    ioPathPolicyCache.set(cacheKey, {
+        result: storedResult,
+        cachedAtMs: Date.now(),
+        absolutePath: result.absolutePath,
+        realPath: result.realPath,
+    });
+    ioPathPolicyCacheStats.sets += 1;
+    while (ioPathPolicyCache.size > maxEntries) {
+        const oldest = ioPathPolicyCache.keys().next().value;
+        if (typeof oldest !== 'string') break;
+        ioPathPolicyCache.delete(oldest);
+        ioPathPolicyCacheStats.evictions += 1;
+    }
+}
+
+/** @param {string} candidate @param {string} target @param {boolean} recursive */
+function pathMatchesInvalidation(candidate, target, recursive) {
+    const normalizedCandidate = path.resolve(candidate);
+    if (normalizedCandidate === target) return true;
+    if (!recursive) return false;
+    const relativePath = path.relative(target, normalizedCandidate);
+    return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+}
+
+/** @param {string | undefined} raw @param {number} fallback @param {number} min @param {number} max */
+function readBoundedEnvInteger(raw, fallback, min, max) {
+    const numeric = Number(raw ?? fallback);
+    if (!Number.isFinite(numeric)) return fallback;
+    return Math.min(max, Math.max(min, Math.floor(numeric)));
 }
 
 /**

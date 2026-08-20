@@ -10,12 +10,14 @@
 
 import { getCopilotDb } from '#copilot/db';
 import { extname, relative, resolve } from 'node:path';
+import pLimit from 'p-limit';
+import { DEFAULT_INDEX_EXTENSIONS } from './index-store/index.js';
 import { beginIoAdvisoryBudget } from './io-advisory-budget.js';
 import { registerInvalidationHook } from './io-cache.js';
-import { DEFAULT_INDEX_EXTENSIONS } from './index-store/index.js';
+import { createIoIndexSqlite } from './io-index-sqlite.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { statPathSnapshot } from './io/fs/stat.js';
-import { createIoIndexSqlite } from './io-index-sqlite.js';
+import { BABEL_PARSER_POLICY_VERSION } from './parse/babel-policy.js';
 import { loadGitignoreMatcher } from './scan/gitignore.js';
 import { matchesAnyPattern } from './scan/glob.js';
 import { readEnvNonNegativeInt, readEnvPositiveInt } from './shared/env.js';
@@ -31,7 +33,14 @@ const _inflightIndexBuilds = new Map();
 let _indexInvalidationUnregister = null;
 /** @type {string | null} */
 let _indexWorkspaceRoot = null;
-/** @typedef {{ scopeRoot: string; workspaceRoot: string; extensions: Set<string>; respectGitignore: boolean; include: string[]; exclude: string[] }} IndexAutoRefreshDomain */
+/** @typedef {{
+    scopeRoot: string;
+    workspaceRoot: string;
+    extensions: Set<string>;
+    respectGitignore: boolean;
+    include: string[];
+    exclude: string[];
+}} IndexAutoRefreshDomain */
 /** @type {IndexAutoRefreshDomain | null} */
 let _indexAutoRefreshDomain = null;
 /** @type {Map<string, number>} */
@@ -59,11 +68,14 @@ const _indexAutoRefreshStats = {
     lastLagMs: /** @type {number | null} */ (null),
     maxLagMs: 0,
     highWater: 0,
+    explicitConvergences: 0,
 };
 
 /** Runtime configuration for the derived-state refresh scheduler. */
 export function readIoIndexAutoRefreshConfig() {
-    const enabledRaw = String(process.env['IO_INDEX_AUTO_REFRESH_ENABLED'] ?? '1').trim().toLowerCase();
+    const enabledRaw = String(process.env['IO_INDEX_AUTO_REFRESH_ENABLED'] ?? '1')
+        .trim()
+        .toLowerCase();
     return {
         enabled: !['0', 'false', 'off'].includes(enabledRaw),
         debounceMs: readEnvNonNegativeInt('IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS', 100),
@@ -73,8 +85,15 @@ export function readIoIndexAutoRefreshConfig() {
 
 /**
  * Keep runtime refresh inside the exact semantic domain of the last canonical build/startup refresh.
+ *
  * @param {string} scopeRoot
- * @param {{ workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} [options]
+ * @param {{
+ *     workspaceRoot?: string;
+ *     extensions?: readonly string[];
+ *     respectGitignore?: boolean;
+ *     include?: readonly string[];
+ *     exclude?: readonly string[];
+ * }} [options]
  */
 function configureIndexAutoRefreshDomain(scopeRoot, options = {}) {
     const domain = createIndexAutoRefreshDomain(scopeRoot, options);
@@ -84,7 +103,13 @@ function configureIndexAutoRefreshDomain(scopeRoot, options = {}) {
 
 /**
  * @param {string} scopeRoot
- * @param {{ workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} [options]
+ * @param {{
+ *     workspaceRoot?: string;
+ *     extensions?: readonly string[];
+ *     respectGitignore?: boolean;
+ *     include?: readonly string[];
+ *     exclude?: readonly string[];
+ * }} [options]
  * @returns {IndexAutoRefreshDomain}
  */
 function createIndexAutoRefreshDomain(scopeRoot, options = {}) {
@@ -124,7 +149,14 @@ function isIndexAutoRefreshDomainCandidate(filePath) {
  * scheduler state. Intended for startup/checkpoint replay and other evidence-gathering callers.
  *
  * @param {readonly string[]} filePaths
- * @param {{ scopeRoot: string; workspaceRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[] }} options
+ * @param {{
+ *     scopeRoot: string;
+ *     workspaceRoot?: string;
+ *     extensions?: readonly string[];
+ *     respectGitignore?: boolean;
+ *     include?: readonly string[];
+ *     exclude?: readonly string[];
+ * }} options
  */
 export async function filterIoIndexRefreshDomainPaths(filePaths, options) {
     const domain = createIndexAutoRefreshDomain(options.scopeRoot, options);
@@ -181,6 +213,23 @@ function scheduleIoIndexAutoRefresh(filePath, event = {}) {
     armIoIndexAutoRefreshTimer(config.debounceMs);
 }
 
+/**
+ * Remove do scheduler um path que já convergiu por refresh explícito. Isso evita que scope/startup façam o mesmo
+ * refresh novamente depois do debounce. Falhas não chamam este helper e permanecem elegíveis ao retry assíncrono.
+ *
+ * @param {string} filePath
+ */
+function settlePendingIndexAutoRefresh(filePath) {
+    const normalized = resolve(filePath);
+    if (!_pendingIndexRefreshPaths.delete(normalized)) return false;
+    _indexAutoRefreshStats.explicitConvergences += 1;
+    if (_pendingIndexRefreshPaths.size === 0 && _indexRefreshTimer && !_indexRefreshRunning) {
+        clearTimeout(_indexRefreshTimer);
+        _indexRefreshTimer = null;
+    }
+    return true;
+}
+
 /** @param {number} delayMs */
 function armIoIndexAutoRefreshTimer(delayMs) {
     if (
@@ -190,10 +239,13 @@ function armIoIndexAutoRefreshTimer(delayMs) {
         _pendingIndexRefreshPaths.size === 0
     )
         return;
-    _indexRefreshTimer = setTimeout(() => {
-        _indexRefreshTimer = null;
-        void flushIoIndexAutoRefresh();
-    }, Math.max(0, delayMs));
+    _indexRefreshTimer = setTimeout(
+        () => {
+            _indexRefreshTimer = null;
+            void flushIoIndexAutoRefresh();
+        },
+        Math.max(0, delayMs),
+    );
     _indexRefreshTimer.unref?.();
 }
 
@@ -270,7 +322,13 @@ export async function reconcileIoIndexAutoRefreshDomain() {
     const index = getIoIndex();
     const domain = _indexAutoRefreshDomain;
     if (!index || !domain) {
-        return { available: Boolean(index), domainKnown: Boolean(domain), inspected: 0, explicitRefreshRows: 0, pruned: 0 };
+        return {
+            available: Boolean(index),
+            domainKnown: Boolean(domain),
+            inspected: 0,
+            explicitRefreshRows: 0,
+            pruned: 0,
+        };
     }
     const matcher = domain.respectGitignore ? await loadGitignoreMatcher(domain.workspaceRoot) : null;
     const rows = index.listIndexedFiles();
@@ -353,7 +411,9 @@ export function getIoIndexStats() {
 
 /**
  * @param {string} directory
- * @param {(Parameters<NonNullable<ReturnType<typeof getIoIndex>>['indexDirectory']>[1] & { adoptAutoRefreshDomain?: boolean })} [options]
+ * @param {Parameters<NonNullable<ReturnType<typeof getIoIndex>>['indexDirectory']>[1] & {
+ *     adoptAutoRefreshDomain?: boolean;
+ * }} [options]
  */
 export async function buildIoIndexForDirectory(directory, options = {}) {
     if (options.adoptAutoRefreshDomain === true) configureIndexAutoRefreshDomain(directory, options);
@@ -399,7 +459,8 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
         } finally {
             budget.finish();
             if (mayCoalesce) _inflightIndexBuilds.delete(key);
-            if (_pendingIndexRefreshPaths.size > 0) armIoIndexAutoRefreshTimer(readIoIndexAutoRefreshConfig().debounceMs);
+            if (_pendingIndexRefreshPaths.size > 0)
+                armIoIndexAutoRefreshTimer(readIoIndexAutoRefreshConfig().debounceMs);
         }
     })();
 
@@ -412,15 +473,43 @@ export async function buildIoIndexForDirectory(directory, options = {}) {
  * used by incremental startup so MCP/LLM-B edits do not require a directory-wide scan.
  *
  * @param {readonly string[]} filePaths
- * @param {{ workspaceRoot: string; scopeRoot?: string; extensions?: readonly string[]; respectGitignore?: boolean; include?: readonly string[]; exclude?: readonly string[]; snapshots?: ReadonlyMap<string, import('./io/fs/read-text.js').TextFileSnapshot>; parsedSymbols?: ReadonlyMap<string, import('./io-parser.js').FileSymbols>; signal?: AbortSignal }} options
+ * @param {{
+ *     workspaceRoot: string;
+ *     scopeRoot?: string;
+ *     extensions?: readonly string[];
+ *     respectGitignore?: boolean;
+ *     include?: readonly string[];
+ *     exclude?: readonly string[];
+ *     snapshots?: ReadonlyMap<string, import('./io/fs/read-text.js').TextFileSnapshot>;
+ *     parsedSymbols?: ReadonlyMap<string, import('./io-parser.js').FileSymbols>;
+ *     concurrency?: number;
+ *     signal?: AbortSignal;
+ * }} options
  */
 export async function refreshIoIndexPaths(filePaths, options) {
     if (options.scopeRoot) configureIndexAutoRefreshDomain(options.scopeRoot, options);
     else _indexWorkspaceRoot = resolve(options.workspaceRoot);
     const index = getIoIndex();
-    if (!index) return { available: false, requested: filePaths.length, indexed: 0, invalidated: 0, skipped: 0, failed: 0 };
+    if (!index) {
+        return {
+            available: false,
+            requested: filePaths.length,
+            indexed: 0,
+            invalidated: 0,
+            unchanged: 0,
+            snapshotReuses: 0,
+            parsedSymbolReuses: 0,
+            parsedSymbolPolicyRejects: 0,
+            skipped: 0,
+            failed: 0,
+            concurrency: 0,
+            durationMs: 0,
+        };
+    }
     const workspaceRoot = resolve(options.workspaceRoot);
-    const extensions = new Set((options.extensions ?? DEFAULT_INDEX_EXTENSIONS).map((value) => String(value).toLowerCase()));
+    const extensions = new Set(
+        (options.extensions ?? DEFAULT_INDEX_EXTENSIONS).map((value) => String(value).toLowerCase()),
+    );
     const domain = options.scopeRoot ? _indexAutoRefreshDomain : null;
     const gitignore = domain?.respectGitignore ? await loadGitignoreMatcher(domain.workspaceRoot) : null;
     let indexed = 0;
@@ -428,101 +517,127 @@ export async function refreshIoIndexPaths(filePaths, options) {
     let unchanged = 0;
     let snapshotReuses = 0;
     let parsedSymbolReuses = 0;
+    let parsedSymbolPolicyRejects = 0;
     let skipped = 0;
     let failed = 0;
     const startedAt = Date.now();
-    for (const rawPath of new Set(filePaths.map((value) => resolve(value)))) {
-        options.signal?.throwIfAborted();
-        if (domain && !isIndexAutoRefreshDomainCandidate(rawPath)) {
-            if (index.invalidatePath(rawPath)) invalidated += 1;
-            skipped += 1;
-            continue;
-        }
-        if (gitignore) {
-            const relativePath = relative(domain?.workspaceRoot ?? workspaceRoot, rawPath).replace(/\\/gu, '/');
-            if (relativePath && gitignore.ignores(relativePath)) {
-                if (index.invalidatePath(rawPath)) invalidated += 1;
-                skipped += 1;
-                continue;
-            }
-        }
-        if (!extensions.has(extname(rawPath).toLowerCase())) {
-            if (index.invalidatePath(rawPath)) invalidated += 1;
-            skipped += 1;
-            continue;
-        }
-        try {
-            const stat = await statPathSnapshot(rawPath);
-            if (!stat.isFile()) {
-                if (index.invalidatePath(rawPath)) invalidated += 1;
-                skipped += 1;
-                continue;
-            }
-            if (
-                index.matchesFileFingerprint(rawPath, {
-                    sizeBytes: stat.size,
-                    mtimeMs: stat.mtimeMs,
-                    ctimeMs: stat.ctimeMs,
-                    dev: Number(stat.dev),
-                    ino: Number(stat.ino),
-                })
-            ) {
-                unchanged += 1;
-                continue;
-            }
-            const suppliedSnapshot = options.snapshots?.get(rawPath) ?? null;
-            const snapshot =
-                suppliedSnapshot &&
-                richFingerprintMatches(
-                    {
-                        sizeBytes: suppliedSnapshot.sizeBytes,
-                        mtimeMs: suppliedSnapshot.mtimeMs,
-                        ctimeMs: suppliedSnapshot.ctimeMs,
-                        dev: suppliedSnapshot.dev,
-                        ino: suppliedSnapshot.ino,
-                    },
-                    {
-                        sizeBytes: stat.size,
-                        mtimeMs: stat.mtimeMs,
-                        ctimeMs: stat.ctimeMs,
-                        dev: Number(stat.dev),
-                        ino: Number(stat.ino),
-                    },
-                    { mtimeToleranceMs: 0 },
-                )
-                    ? suppliedSnapshot
-                    : await readTextFileSnapshot(rawPath, options.signal ? { signal: options.signal } : {});
-            if (snapshot === suppliedSnapshot) snapshotReuses += 1;
-            const suppliedSymbols = snapshot === suppliedSnapshot ? options.parsedSymbols?.get(rawPath) : undefined;
-            if (suppliedSymbols) parsedSymbolReuses += 1;
-            await index.indexTextFile(
-                {
-                    filePath: rawPath,
-                    workspaceRoot,
-                    content: snapshot.content,
-                    sizeBytes: snapshot.sizeBytes,
-                    mtimeMs: snapshot.mtimeMs,
-                    ctimeMs: snapshot.ctimeMs,
-                    dev: snapshot.dev,
-                    ino: snapshot.ino,
-                    metadata: { refreshMode: 'explicit-path' },
-                },
-                {
-                    ...(options.signal ? { signal: options.signal } : {}),
-                    ...(suppliedSymbols ? { parsedSymbols: suppliedSymbols } : {}),
-                },
-            );
-            indexed += 1;
-        } catch (error) {
-            options.signal?.throwIfAborted();
-            const code = error && typeof error === 'object' && 'code' in error ? String(error.code ?? '') : '';
-            if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR') {
-                if (index.invalidatePath(rawPath)) invalidated += 1;
-                continue;
-            }
-            failed += 1;
-        }
-    }
+    const concurrency = Math.min(
+        32,
+        Number.isFinite(options.concurrency) && Number(options.concurrency) > 0
+            ? Math.max(1, Math.floor(Number(options.concurrency)))
+            : readEnvPositiveInt('IO_INDEX_REFRESH_CONCURRENCY', 8),
+    );
+    const limit = pLimit(concurrency);
+    const uniquePaths = [...new Set(filePaths.map((value) => resolve(value)))];
+    await Promise.all(
+        uniquePaths.map((rawPath) =>
+            limit(async () => {
+                options.signal?.throwIfAborted();
+                if (domain && !isIndexAutoRefreshDomainCandidate(rawPath)) {
+                    if (index.invalidatePath(rawPath)) invalidated += 1;
+                    skipped += 1;
+                    settlePendingIndexAutoRefresh(rawPath);
+                    return;
+                }
+                if (gitignore) {
+                    const relativePath = relative(domain?.workspaceRoot ?? workspaceRoot, rawPath).replace(/\\/gu, '/');
+                    if (relativePath && gitignore.ignores(relativePath)) {
+                        if (index.invalidatePath(rawPath)) invalidated += 1;
+                        skipped += 1;
+                        settlePendingIndexAutoRefresh(rawPath);
+                        return;
+                    }
+                }
+                if (!extensions.has(extname(rawPath).toLowerCase())) {
+                    if (index.invalidatePath(rawPath)) invalidated += 1;
+                    skipped += 1;
+                    settlePendingIndexAutoRefresh(rawPath);
+                    return;
+                }
+                try {
+                    const stat = await statPathSnapshot(rawPath);
+                    if (!stat.isFile()) {
+                        if (index.invalidatePath(rawPath)) invalidated += 1;
+                        skipped += 1;
+                        settlePendingIndexAutoRefresh(rawPath);
+                        return;
+                    }
+                    if (
+                        index.matchesFileFingerprint(rawPath, {
+                            sizeBytes: stat.size,
+                            mtimeMs: stat.mtimeMs,
+                            ctimeMs: stat.ctimeMs,
+                            dev: Number(stat.dev),
+                            ino: Number(stat.ino),
+                        })
+                    ) {
+                        unchanged += 1;
+                        settlePendingIndexAutoRefresh(rawPath);
+                        return;
+                    }
+                    const suppliedSnapshot = options.snapshots?.get(rawPath) ?? null;
+                    const snapshot =
+                        suppliedSnapshot &&
+                        richFingerprintMatches(
+                            {
+                                sizeBytes: suppliedSnapshot.sizeBytes,
+                                mtimeMs: suppliedSnapshot.mtimeMs,
+                                ctimeMs: suppliedSnapshot.ctimeMs,
+                                dev: suppliedSnapshot.dev,
+                                ino: suppliedSnapshot.ino,
+                            },
+                            {
+                                sizeBytes: stat.size,
+                                mtimeMs: stat.mtimeMs,
+                                ctimeMs: stat.ctimeMs,
+                                dev: Number(stat.dev),
+                                ino: Number(stat.ino),
+                            },
+                            { mtimeToleranceMs: 0 },
+                        )
+                            ? suppliedSnapshot
+                            : await readTextFileSnapshot(rawPath, options.signal ? { signal: options.signal } : {});
+                    if (snapshot === suppliedSnapshot) snapshotReuses += 1;
+                    const candidateSymbols =
+                        snapshot === suppliedSnapshot ? options.parsedSymbols?.get(rawPath) : undefined;
+                    const suppliedSymbols =
+                        candidateSymbols?.parserPolicyVersion === BABEL_PARSER_POLICY_VERSION
+                            ? candidateSymbols
+                            : undefined;
+                    if (suppliedSymbols) parsedSymbolReuses += 1;
+                    else if (candidateSymbols) parsedSymbolPolicyRejects += 1;
+                    await index.indexTextFile(
+                        {
+                            filePath: rawPath,
+                            workspaceRoot,
+                            content: snapshot.content,
+                            sizeBytes: snapshot.sizeBytes,
+                            mtimeMs: snapshot.mtimeMs,
+                            ctimeMs: snapshot.ctimeMs,
+                            dev: snapshot.dev,
+                            ino: snapshot.ino,
+                            metadata: { refreshMode: 'explicit-path' },
+                        },
+                        {
+                            ...(options.signal ? { signal: options.signal } : {}),
+                            ...(suppliedSymbols ? { parsedSymbols: suppliedSymbols } : {}),
+                        },
+                    );
+                    indexed += 1;
+                    settlePendingIndexAutoRefresh(rawPath);
+                } catch (error) {
+                    options.signal?.throwIfAborted();
+                    const code = error && typeof error === 'object' && 'code' in error ? String(error.code ?? '') : '';
+                    if (code === 'ENOENT' || code === 'ENOTDIR' || code === 'EISDIR') {
+                        if (index.invalidatePath(rawPath)) invalidated += 1;
+                        settlePendingIndexAutoRefresh(rawPath);
+                        return;
+                    }
+                    failed += 1;
+                }
+            }),
+        ),
+    );
     return {
         available: true,
         requested: filePaths.length,
@@ -531,8 +646,10 @@ export async function refreshIoIndexPaths(filePaths, options) {
         unchanged,
         snapshotReuses,
         parsedSymbolReuses,
+        parsedSymbolPolicyRejects,
         skipped,
         failed,
+        concurrency,
         durationMs: Math.max(0, Date.now() - startedAt),
     };
 }

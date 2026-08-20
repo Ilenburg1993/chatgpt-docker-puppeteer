@@ -11,6 +11,7 @@
 **Arquivo**: `src/copilot/sdk/models/helpers.js`
 
 **Cache em Memória**:
+
 ```javascript
 const MODELS_CACHE_TTL_MS = 5 * 60_000;  // 5 minutos
 let _modelsCache = null;
@@ -131,6 +132,7 @@ Error handling:
 ### 3.1 Locations & Filenames
 
 **Usar existente `persistent-paths` helper**:
+
 ```javascript
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -140,6 +142,7 @@ const modelListMetaPath = resolvePersistentConfigFile('modellist-meta.json');
 ```
 
 **Validação**: `resolvePersistentConfigFile` já faz:
+
 - ✅ Reject absolute paths
 - ✅ Reject path traversal (`../..`)
 - ✅ Reject directory separators
@@ -148,6 +151,7 @@ const modelListMetaPath = resolvePersistentConfigFile('modellist-meta.json');
 ### 3.2 Data Structures
 
 **modellist-cache.json**:
+
 ```json
 {
   "schema": "ModelInfo[]",
@@ -168,6 +172,7 @@ const modelListMetaPath = resolvePersistentConfigFile('modellist-meta.json');
 ```
 
 **modellist-meta.json**:
+
 ```json
 {
   "lastUpdate": 1234567890000,
@@ -190,6 +195,7 @@ const modelListMetaPath = resolvePersistentConfigFile('modellist-meta.json');
 ### 3.4 TypeScript Strict Compliance
 
 **Tipos necessários**:
+
 ```typescript
 /**
  * @typedef {object} PersistentModelListCache
@@ -357,6 +363,7 @@ listModels()
 **Problem**: Two calls both fetch network, both try to write disk.
 
 **Solution**:
+
 - Last-write-wins (timestamp ordering)
 - Both writes can happen, newer timestamp wins
 - No lock needed (JSON write is atomic enough on most FS)
@@ -367,6 +374,7 @@ listModels()
 **Problem**: `modellist-cache.json` is invalid JSON.
 
 **Solution**:
+
 - `readPersistentModelCache()` catches JSON.parse() error
 - Returns null gracefully
 - Fallback to network
@@ -377,6 +385,7 @@ listModels()
 **Problem**: No write permission to disk.
 
 **Solution**:
+
 - `writePersistentModelCacheAsync()` catches error
 - Logs warning, doesn't throw
 - Continues with L1-only cache (degraded mode)
@@ -387,6 +396,7 @@ listModels()
 **Problem**: Not enough space to write cache.
 
 **Solution**:
+
 - Write fails, error caught
 - Degrade to L1-only
 - User still gets models from network
@@ -397,6 +407,7 @@ listModels()
 **Problem**: SDK version 0.4.0 has different ModelInfo schema.
 
 **Solution**:
+
 - Store `version: 2` in cache file
 - If `data.version !== 2`, reject cache
 - Force network fetch
@@ -407,6 +418,7 @@ listModels()
 **Problem**: 10KB+ models could slow down serialization.
 
 **Solution**:
+
 - No action needed (JSON serialization is fast)
 - 1000 models = ~500KB JSON
 - Write async + non-blocking anyway
@@ -429,11 +441,13 @@ listModels()
 ### 7.2 Cleanup Strategy
 
 **When to delete cache?**:
+
 1. User calls `clearModelsCache()` explicitly
 2. L2 cache > 7 days old (optional maintenance)
 3. SDK version changes (incompatible schema)
 
 **Do NOT auto-delete** if fetch succeeds:
+
 - Allows offline fallback
 - No harm keeping old cache
 
@@ -444,31 +458,30 @@ listModels()
 ### Phase A: Core I/O Layer
 
 **Files to create**:
+
 - `src/copilot/sdk/models/persistent-cache.js`
   - `readPersistentModelCache()` — read from disk
   - `writePersistentModelCacheAsync()` — write to disk
   - Type defs
 
-**Typecheck**: Strict ✅
-**Tests**: 3-4 unit tests
-**Gates**: typecheck + lint + test
+**Typecheck**: Strict ✅ **Tests**: 3-4 unit tests **Gates**: typecheck + lint + test
 
 ### Phase B: Integration with helpers.js
 
 **Modify**:
+
 - `src/copilot/sdk/models/helpers.js`
   - Add L2 check after L1 miss
   - Add fallback after network fail
   - Async write after network success
   - Update `clearModelsCache()` to also clear disk
 
-**Typecheck**: Strict ✅
-**Tests**: 2-3 integration tests
-**Gates**: typecheck + lint + test
+**Typecheck**: Strict ✅ **Tests**: 2-3 integration tests **Gates**: typecheck + lint + test
 
 ### Phase C: Testing
 
 **Scenarios to test**:
+
 1. Network ok: write to disk
 2. Network fail: fallback to disk
 3. Disk missing: fallback fails gracefully
@@ -554,12 +567,14 @@ try {
 ## 11. Post-Implementation Validation
 
 **Gates**:
+
 1. Typecheck Strict: 0 errors
 2. ESLint: 0 violations
 3. Tests: 2603+ (all pass)
 4. No regressions in existing tests
 
 **Performance Benchmark**:
+
 - L1 hit: < 1ms (baseline)
 - L2 hit (after miss): < 50ms
 - Network ok: 100-500ms (unchanged)

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { analyzeEdgeRulesets } from '#copilot/mcp/cloudflare';
+import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/edge-audit', () => {
     it('accepts explicit cache bypass and rate-limit rules for the MCP hostname', () => {
@@ -40,8 +40,7 @@ describe('mcp/cloudflare/edge-audit', () => {
                             ref: null,
                             description: 'OAuth token protection',
                             action: 'block',
-                            expression:
-                                '(http.host eq "mcp.aurelin.org" and http.request.uri.path eq "/oauth/token")',
+                            expression: '(http.host eq "mcp.aurelin.org" and http.request.uri.path eq "/oauth/token")',
                             enabled: true,
                             actionParameterKeys: [],
                             cacheEnabled: null,

@@ -5,9 +5,13 @@
  * @module copilot/mcp/cloudflare/edge-backup
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import {
+    listDirectoryNamesFreshTrusted,
+    lstatPathTrusted,
+    readTextFreshTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/trusted-io';
 import { createHash } from 'node:crypto';
-import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR } from './config.js';
 import { buildCloudflareEdgeSnapshot } from './edge-snapshot.js';
@@ -120,9 +124,13 @@ export async function listCloudflareEdgeBackups(options = {}) {
     const absoluteDir = path.resolve(dir);
     let entries;
     try {
-        entries = await readdir(absoluteDir, { withFileTypes: true });
+        entries = (
+            await listDirectoryNamesFreshTrusted(absoluteDir, {
+                caller: 'mcp.cloudflare.edge-backup',
+            })
+        ).entries;
     } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        if (isMissingBackupPathError(error)) {
             return {
                 ok: true,
                 success: true,
@@ -136,11 +144,18 @@ export async function listCloudflareEdgeBackups(options = {}) {
     }
 
     const backups = [];
-    for (const entry of entries) {
-        if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
-        const absolutePath = path.join(absoluteDir, entry.name);
-        const fileStat = await stat(absolutePath);
-        backups.push(await summarizeBackupFile(absolutePath, fileStat.size, fileStat.mtime.toISOString()));
+    for (const entryName of entries) {
+        if (!entryName.endsWith('.json')) continue;
+        const absolutePath = path.join(absoluteDir, entryName);
+        try {
+            const { stats } = await lstatPathTrusted(absolutePath, { caller: 'mcp.cloudflare.edge-backup' });
+            if (!stats.isFile() || stats.isSymbolicLink()) continue;
+            backups.push(await summarizeBackupFile(absolutePath, stats.size, stats.mtime.toISOString()));
+        } catch (error) {
+            // Concurrent retention may remove a candidate between listing and lstat.
+            if (isMissingBackupPathError(error)) continue;
+            throw error;
+        }
     }
     backups.sort((left, right) => String(right['createdAt']).localeCompare(String(left['createdAt'])));
     return {
@@ -210,7 +225,9 @@ function normalizeLimit(limit) {
  */
 async function summarizeBackupFile(absolutePath, bytes, modifiedAt) {
     try {
-        const parsed = JSON.parse(await readFile(absolutePath, 'utf8'));
+        const parsed = JSON.parse(
+            (await readTextFreshTrusted(absolutePath, { caller: 'mcp.cloudflare.edge-backup' })).content,
+        );
         const record = asRecord(parsed);
         const backup = asRecord(record['backup']);
         const snapshot = asRecord(record['snapshot']);
@@ -236,6 +253,12 @@ async function summarizeBackupFile(absolutePath, bytes, modifiedAt) {
             error: error instanceof Error ? error.message : String(error),
         };
     }
+}
+
+/** @param {unknown} error */
+function isMissingBackupPathError(error) {
+    const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
+    return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
 /**

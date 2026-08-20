@@ -11,11 +11,14 @@ const createMockTask = (/** @type {string} */ taskId) => ({
         prompt: 'Test prompt',
         target: 'chatgpt',
     },
-    result: /** @type {{
-     *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
-     *     generation?: unknown;
-     *     file_path?: string;
-     * }} */ ({}),
+    result:
+        /**
+         * @type {{
+         *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
+         *     generation?: unknown;
+         *     file_path?: string;
+         * }}
+         */ ({}),
 });
 
 /** @param {unknown} error @returns {string} */

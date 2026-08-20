@@ -19,15 +19,15 @@ import {
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
 import {
+    formatTerminalTimeLabel,
     getTerminalDetailLevel,
     readTerminalActivitySnapshot,
-    formatTerminalTimeLabel,
     readTerminalPromptDisplayPolicy,
     readTerminalTurnMaterialization,
+    renderTerminalPendingQuestionPromptTag,
     terminalThemeDivider,
     terminalThemeDuration,
     terminalThemeHeadline,
-    renderTerminalPendingQuestionPromptTag,
     terminalThemeText,
 } from '../state/dialog/index.js';
 
@@ -54,21 +54,25 @@ let _terminalRenderLockDepth = 0;
 /**
  * @template T
  * @typedef {{
- *     ok: true;
- *     value: T;
- *     reason: null;
- *     reasons: [];
- *     error: null;
- * } | {
- *     ok: false;
- *     value: null;
- *     reason: string;
- *     reasons: string[];
- *     error: unknown;
- * }} TerminalExclusiveTtyResult
+ *           ok: true;
+ *           value: T;
+ *           reason: null;
+ *           reasons: [];
+ *           error: null;
+ *       }
+ *     | {
+ *           ok: false;
+ *           value: null;
+ *           reason: string;
+ *           reasons: string[];
+ *           error: unknown;
+ *       }} TerminalExclusiveTtyResult
  */
 
-/** @type {WeakMap<object, { prompt: ScheduledPrompt; force: boolean; finalizeTurn: boolean; immediate: NodeJS.Immediate }>} */
+/** @type {WeakMap<
+    object,
+    { prompt: ScheduledPrompt; force: boolean; finalizeTurn: boolean; immediate: NodeJS.Immediate }
+>} */
 const _scheduledPromptRedraws = new WeakMap();
 /** @type {WeakMap<object, { prompt: string; at: number }>} */
 const _lastPromptPaints = new WeakMap();
@@ -76,7 +80,10 @@ const _lastPromptPaints = new WeakMap();
 let _terminalIdlePromptDeferredUntil = 0;
 /** @type {NodeJS.Timeout | null} */
 let _terminalIdlePromptDeferredTimer = null;
-/** @type {{ rl: { setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }; prompt: ScheduledPrompt } | null} */
+/** @type {{
+    rl: { setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean };
+    prompt: ScheduledPrompt;
+} | null} */
 let _terminalIdlePromptDeferredRequest = null;
 
 const ANSI_ESCAPE = String.fromCharCode(27);
@@ -421,7 +428,12 @@ function shortenPromptToken(value, max = 18) {
 
 /**
  * @param {ReturnType<typeof readTerminalRuntimeState>} state
- * @returns {{ displayModel: string; configuredModel: string | null; observedModel: string | null; mismatch: boolean }}
+ * @returns {{
+ *     displayModel: string;
+ *     configuredModel: string | null;
+ *     observedModel: string | null;
+ *     mismatch: boolean;
+ * }}
  */
 function resolvePromptModelProjection(state) {
     const lastPrInfo = /** @type {Record<string, unknown> | null} */ (state.lastPrInfo ?? null);
@@ -507,10 +519,7 @@ export function buildUserPrompt() {
             terminalThemeText('question', '[PERG]'),
         );
     } else if (getTerminalPendingStructuredUserInputCount() > 0) {
-        pushPromptTag(
-            terminalThemeText('question', '[PERGUNTA]'),
-            terminalThemeText('question', '[PERG]'),
-        );
+        pushPromptTag(terminalThemeText('question', '[PERGUNTA]'), terminalThemeText('question', '[PERG]'));
     } else if (state.pendingQuestionShadowState) {
         const shadowTag =
             state.pendingQuestionShadowState === 'expired'
@@ -669,7 +678,9 @@ function readCurrentTerminalActivityPhase() {
             ? /** @type {{ current?: unknown }} */ (snapshot).current
             : snapshot;
     const phase =
-        current && typeof current === 'object' && typeof /** @type {{ phase?: unknown }} */ (current).phase === 'string'
+        current &&
+        typeof current === 'object' &&
+        typeof (/** @type {{ phase?: unknown }} */ (current).phase) === 'string'
             ? /** @type {{ phase: string }} */ (current).phase
             : '';
     return phase;
@@ -779,7 +790,7 @@ function hasActiveHumanInputPromptState() {
     const runtime = readTerminalRuntimeState();
     return Boolean(
         runtime?.status === 'waiting_for_input' ||
-            (runtime?.pendingQuestion && runtime?.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready'),
+        (runtime?.pendingQuestion && runtime?.pendingQuestionKind && runtime.pendingQuestionKind !== 'ready'),
     );
 }
 
@@ -907,9 +918,9 @@ function queueDeferredTerminalIdlePromptRedraw(rl, prompt) {
 /**
  * Adia brevemente o prompt idle depois de um turno materializado.
  *
- * O SDK pode entregar `assistant.message` e, poucos milissegundos depois, iniciar uma pergunta humana (`ask_user`).
- * Sem esta janela, o terminal pinta `você›` e logo abaixo o card de pergunta, o que parece que a pergunta invadiu o
- * prompt. Comandos explícitos usam `{ force: true }` e continuam repintando imediatamente.
+ * O SDK pode entregar `assistant.message` e, poucos milissegundos depois, iniciar uma pergunta humana (`ask_user`). Sem
+ * esta janela, o terminal pinta `você›` e logo abaixo o card de pergunta, o que parece que a pergunta invadiu o prompt.
+ * Comandos explícitos usam `{ force: true }` e continuam repintando imediatamente.
  *
  * @param {number} [durationMs]
  * @returns {void}
@@ -924,7 +935,10 @@ export function deferTerminalIdlePromptRedraw(durationMs = 80) {
         _terminalIdlePromptDeferredTimer = null;
     }
     if (_terminalIdlePromptDeferredRequest) {
-        queueDeferredTerminalIdlePromptRedraw(_terminalIdlePromptDeferredRequest.rl, _terminalIdlePromptDeferredRequest.prompt);
+        queueDeferredTerminalIdlePromptRedraw(
+            _terminalIdlePromptDeferredRequest.rl,
+            _terminalIdlePromptDeferredRequest.prompt,
+        );
     }
 }
 
@@ -982,7 +996,9 @@ export function redrawTerminalPrompt(rl, prompt = buildUserPrompt(), options = {
  */
 export function scheduleTerminalPromptRedraw(rl, prompt = () => buildUserPrompt(), options = {}) {
     if (!isTerminalReadlineOpen(rl)) return;
-    const openReadline = /** @type {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} */ (rl);
+    const openReadline = /** @type {{ setPrompt: (prompt: string) => void; prompt: () => void; closed?: boolean }} */ (
+        rl
+    );
     if (shouldSuppressPromptRedrawForContinuation(options)) return;
     if (shouldDeferTerminalIdlePromptRedraw(options)) {
         queueDeferredTerminalIdlePromptRedraw(openReadline, prompt);
@@ -1072,9 +1088,9 @@ export function isTerminalRenderLocked() {
 /**
  * Verifica se o terminal pode entregar controle exclusivo de stdin/stdout para uma TUI externa.
  *
- * Este contrato e intencionalmente mais estrito que `process.stdout.isTTY`: o prompt vivo tambem precisa estar
- * ocioso, sem input humano parcialmente digitado e sem render lock ativo. Qualquer comando que venha a usar
- * `fzf`, `gum` ou pager interativo deve passar por este gateway em vez de pausar readline localmente.
+ * Este contrato e intencionalmente mais estrito que `process.stdout.isTTY`: o prompt vivo tambem precisa estar ocioso,
+ * sem input humano parcialmente digitado e sem render lock ativo. Qualquer comando que venha a usar `fzf`, `gum` ou
+ * pager interativo deve passar por este gateway em vez de pausar readline localmente.
  *
  * @param {{ line?: string; closed?: boolean } | null | undefined} rl
  * @param {{ requireTty?: boolean; allowBusy?: boolean; allowBufferedInput?: boolean; ignoreRenderLock?: boolean }} [options]
@@ -1104,11 +1120,21 @@ export function readTerminalExclusiveTtyReadiness(rl, options = {}) {
 /**
  * Executa uma operação com controle exclusivo temporário do TTY e restaura prompt/linha viva no fim.
  *
- * A função nao executa nenhum binário por conta própria; ela só cria o envelope seguro para adapters interativos.
- * Isso mantém a regra: tool externa opcional nunca compete diretamente com readline, streaming ou pergunta humana.
+ * A função nao executa nenhum binário por conta própria; ela só cria o envelope seguro para adapters interativos. Isso
+ * mantém a regra: tool externa opcional nunca compete diretamente com readline, streaming ou pergunta humana.
  *
  * @template T
- * @param {{ pause?: () => void; resume?: () => void; getPrompt?: () => string; setPrompt: (prompt: string) => void; prompt: () => void; line?: string; closed?: boolean } | null | undefined} rl
+ * @param {{
+ *           pause?: () => void;
+ *           resume?: () => void;
+ *           getPrompt?: () => string;
+ *           setPrompt: (prompt: string) => void;
+ *           prompt: () => void;
+ *           line?: string;
+ *           closed?: boolean;
+ *       }
+ *     | null
+ *     | undefined} rl
  * @param {() => T | Promise<T>} operation
  * @param {{ requireTty?: boolean; allowBusy?: boolean; allowBufferedInput?: boolean; ignoreRenderLock?: boolean }} [options]
  * @returns {Promise<TerminalExclusiveTtyResult<T>>}
@@ -1413,7 +1439,9 @@ export function printExchange(actor, message, reply, durationMs) {
     }
 
     lines.push(SEPARATOR);
-    lines.push(terminalThemeHeadline('assistant', 'LLM-B', [`[${ts}]`, model, effort, terminalThemeDuration(durationMs)]));
+    lines.push(
+        terminalThemeHeadline('assistant', 'LLM-B', [`[${ts}]`, model, effort, terminalThemeDuration(durationMs)]),
+    );
     lines.push('');
     const replyLines = reply.split('\n');
     let inCodeBlock = false;

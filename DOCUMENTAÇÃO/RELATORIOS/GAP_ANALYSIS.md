@@ -348,7 +348,7 @@ extensibilidade.
    class ChromeConnectionError extends Error {
      constructor(port) {
        super(`Cannot connect to Chrome on port ${port}.
-   
+
    Troubleshooting:
    1. Is Chrome running with --remote-debugging-port=${port}?
    2. Check if port is accessible: curl http://localhost:${port}/json

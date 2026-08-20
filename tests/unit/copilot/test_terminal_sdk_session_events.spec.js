@@ -32,7 +32,9 @@ const mocks = vi.hoisted(() => ({
     beginTerminalTurnTrace: vi.fn(),
     completeTerminalTurnTrace: vi.fn(),
     readTerminalTurnTraceProjection: vi.fn(
-        /** @returns {ReturnType<typeof import('../../../src/copilot/terminal/state/turn-trace-state.js').readTerminalTurnTraceProjection>} */
+        /** @returns {ReturnType<
+    typeof import('../../../src/copilot/terminal/state/turn-trace-state.js').readTerminalTurnTraceProjection
+>} */
         () => ({ current: null, recent: [] }),
     ),
     recordTerminalTurnFileActivity: vi.fn(),
@@ -50,7 +52,9 @@ const mocks = vi.hoisted(() => ({
     readSdkSessionHandoffRecords: vi.fn(() => Promise.resolve([])),
     writeSdkSessionConfirmationRecords: vi.fn(() => Promise.resolve({ sdkSessionConfirmations: 1 })),
     consumeTerminalLiveByokModelSwitchConfirmation: vi.fn(
-        /** @returns {ReturnType<typeof import('../../../src/copilot/terminal/byok/live-model-switch.js').consumeTerminalLiveByokModelSwitchConfirmation>} */
+        /** @returns {ReturnType<
+    typeof import('../../../src/copilot/terminal/byok/live-model-switch.js').consumeTerminalLiveByokModelSwitchConfirmation
+>} */
         () => null,
     ),
     promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary: vi.fn(async () => ({

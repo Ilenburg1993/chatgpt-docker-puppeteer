@@ -73,24 +73,21 @@ describe('SqliteModelGatewayCatalogStore deferred route operations', () => {
             includeExpired: true,
             limit: 10,
         });
-        const transitions = await store.readSdkSessionHandoffTransitionRecords(
-            'same-session-route-switch:sqlite-test',
-        );
+        const transitions = await store.readSdkSessionHandoffTransitionRecords('same-session-route-switch:sqlite-test');
 
         expect(sameSession).toHaveLength(1);
         expect(otherSession).toHaveLength(0);
-        expect(transitions.map((entry) => entry['state'])).toEqual([
-            'planned',
-            'deferred_until_turn_boundary',
-        ]);
+        expect(transitions.map((entry) => entry['state'])).toEqual(['planned', 'deferred_until_turn_boundary']);
 
         const relational = db
-            .prepare(`
+            .prepare(
+                `
                 SELECT operation_kind, idempotency_key, provider_id, provider_model, defer_reason,
                        promotion_policy, promotion_authorized, expires_at_ms
                 FROM copilot_model_gateway_sdk_session_handoffs
                 WHERE handoff_id = ?
-            `)
+            `,
+            )
             .get('same-session-route-switch:sqlite-test');
         expect(relational).toMatchObject({
             operation_kind: 'model-gateway.same-session-route-switch.v1',

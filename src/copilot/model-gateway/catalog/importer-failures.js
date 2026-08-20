@@ -67,22 +67,22 @@ function isLocalDaemonSource(sourceKind) {
  * @param {boolean} [options.failOnAccountImporterFailures]
  * @param {boolean} [options.failOnLocalImporterFailures]
  * @returns {{
- *   importerId: string | null;
- *   providerId: string | null;
- *   sourceId: string | null;
- *   sourceKind: string | null;
- *   requiresAuth: boolean;
- *   errors: string[];
- *   failureKind: string;
- *   statusCode: number | null;
- *   errorContext: string;
- *   retryAfterSeconds: number | null;
- *   resetAt: string | null;
- *   limitHeaders: Record<string, string | number>;
- *   buildBlocking: boolean;
- *   disposition: string;
- *   operatorLabel: string;
- *   operatorAction: string;
+ *     importerId: string | null;
+ *     providerId: string | null;
+ *     sourceId: string | null;
+ *     sourceKind: string | null;
+ *     requiresAuth: boolean;
+ *     errors: string[];
+ *     failureKind: string;
+ *     statusCode: number | null;
+ *     errorContext: string;
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ *     limitHeaders: Record<string, string | number>;
+ *     buildBlocking: boolean;
+ *     disposition: string;
+ *     operatorLabel: string;
+ *     operatorAction: string;
  * }}
  */
 export function classifyModelGatewayCatalogImporterFailure(input, options = {}) {

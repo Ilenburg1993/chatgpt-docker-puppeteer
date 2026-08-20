@@ -16,12 +16,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks (hoisted) ────────────────────────────────────────────────────────
 
-const { mockLog, mockBuildTool, mockLogSwallowed, mockWriteFileAtomicTrusted } = vi.hoisted(() => ({
-    mockLog: vi.fn(),
-    mockBuildTool: vi.fn((opts) => ({ name: opts.name, handler: opts.handler, _handler: opts.handler })),
-    mockLogSwallowed: vi.fn(),
-    mockWriteFileAtomicTrusted: vi.fn(() => Promise.resolve()),
-}));
+const { mockLog, mockBuildTool, mockLogSwallowed, mockReadTextFreshTrusted, mockWriteFileAtomicTrusted } = vi.hoisted(
+    () => ({
+        mockLog: vi.fn(),
+        mockBuildTool: vi.fn((opts) => ({ name: opts.name, handler: opts.handler, _handler: opts.handler })),
+        mockLogSwallowed: vi.fn(),
+        mockReadTextFreshTrusted: vi.fn(() => Promise.resolve({ content: '[]' })),
+        mockWriteFileAtomicTrusted: vi.fn(() => Promise.resolve()),
+    }),
+);
 
 vi.mock('#copilot/observability/logger', () => ({
     log: mockLog,
@@ -36,8 +39,14 @@ vi.mock('#copilot/tools', async (importOriginal) => {
         buildTool: mockBuildTool,
     };
 });
-vi.mock('#copilot/core/error-handlers', () => ({ logSwallowed: mockLogSwallowed }));
-vi.mock('#copilot/infra/public/trusted-io', () => ({ writeFileAtomicTrusted: mockWriteFileAtomicTrusted }));
+vi.mock('#copilot/core/error-handlers', () => ({
+    logSwallowed: mockLogSwallowed,
+    toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
+}));
+vi.mock('#copilot/infra/public/trusted-io', () => ({
+    readTextFreshTrusted: mockReadTextFreshTrusted,
+    writeFileAtomicTrusted: mockWriteFileAtomicTrusted,
+}));
 vi.mock('#copilot/core/safe-json', () => ({
     safeJsonParse: vi.fn((raw) => {
         try {
@@ -64,13 +73,6 @@ vi.mock('node:fs', () => ({
     renameSync: vi.fn(),
 }));
 
-// Mock node:fs/promises — usado pelo loadCustomToolsAsync
-vi.mock('node:fs/promises', () => ({
-    readFile: vi.fn(() => Promise.resolve('[]')),
-    writeFile: vi.fn(() => Promise.resolve()),
-    rename: vi.fn(() => Promise.resolve()),
-}));
-
 // ─── Import após mocks ──────────────────────────────────────────────────────
 
 const {
@@ -84,12 +86,12 @@ const {
     _resetRegistry,
 } = await import('#copilot/sdk/tools');
 
-const { readFile } = await import('node:fs/promises');
-
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mockReadTextFreshTrusted.mockReset();
+    mockReadTextFreshTrusted.mockResolvedValue({ content: '[]' });
     _resetRegistry();
     setCustomToolsBuilder(mockBuildTool);
 });
@@ -336,38 +338,34 @@ describe('F39 — buildCustomTools', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F39 — loadCustomToolsAsync', () => {
-    it('carrega tools do disco via fs/promises', async () => {
-        /** @type {import('vitest').Mock} */
-        const mockReadFile = /** @type {any} */ (readFile);
-        mockReadFile.mockResolvedValue(
-            JSON.stringify([{ name: 'disk_tool', description: 'From disk', handlerId: 'echo' }]),
-        );
+    it('carrega tools do disco pela capability trusted fresh', async () => {
+        mockReadTextFreshTrusted.mockResolvedValue({
+            content: JSON.stringify([{ name: 'disk_tool', description: 'From disk', handlerId: 'echo' }]),
+        });
 
         await loadCustomToolsAsync();
 
         const defs = getCustomToolDefinitions();
         expect(defs).toHaveLength(1);
         expect(defs[0]?.name).toBe('disk_tool');
+        expect(mockReadTextFreshTrusted).toHaveBeenCalledWith(expect.any(String), { caller: 'sdk.tools.custom' });
     });
 
     it('ignora arquivo json inválido', async () => {
-        /** @type {import('vitest').Mock} */
-        const mockReadFile = /** @type {any} */ (readFile);
-        mockReadFile.mockResolvedValue('not-json{{{');
+        mockReadTextFreshTrusted.mockResolvedValue({ content: 'not-json{{{' });
 
         await loadCustomToolsAsync();
 
         expect(getCustomToolDefinitions()).toHaveLength(0);
     });
 
-    it('swallows file-not-found via logSwallowed', async () => {
-        /** @type {import('vitest').Mock} */
-        const mockReadFile = /** @type {any} */ (readFile);
-        mockReadFile.mockRejectedValue(new Error('ENOENT'));
+    it('trata file-not-found como registry opcional vazio', async () => {
+        mockReadTextFreshTrusted.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
 
         await loadCustomToolsAsync();
 
-        expect(mockLogSwallowed).toHaveBeenCalled();
+        expect(getCustomToolDefinitions()).toEqual([]);
+        expect(mockLogSwallowed).not.toHaveBeenCalled();
     });
 });
 

@@ -1,14 +1,16 @@
 # Auditoria Canônica — `src/copilot/infra` + `src/copilot/tools`
 
-**Data:** 2026-05-14
-**Base externa crítica:** `DOCUMENTAÇÃO/COPILOT/AUDITORIA-IO-TOOLS-2026-05-14/AUDIT_EXT.md`
-**Escopo validado:** `src/copilot/infra/**`, `src/copilot/tools/**` (com checagens transversais em `src/copilot/sdk/**` quando necessário)
+**Data:** 2026-05-14 **Base externa crítica:**
+`DOCUMENTAÇÃO/COPILOT/AUDITORIA-IO-TOOLS-2026-05-14/AUDIT_EXT.md` **Escopo validado:**
+`src/copilot/infra/**`, `src/copilot/tools/**` (com checagens transversais em `src/copilot/sdk/**`
+quando necessário)
 
 ## Resultado executivo
 
 - A auditoria externa é **majoritariamente correta** em direção técnica.
 - Parte relevante dos itens já tinha mitigação parcial no repositório.
-- Foi iniciada execução do roadmap com correções imediatas de Sprint 1 (ver `EXECUCAO_SPRINT1_2026-05-14.md`).
+- Foi iniciada execução do roadmap com correções imediatas de Sprint 1 (ver
+  `EXECUCAO_SPRINT1_2026-05-14.md`).
 
 ## Critério de classificação
 
@@ -90,7 +92,8 @@
 
 ## 1.5 Modernização Node.js 24+
 
-Todos os itens MOD-01..MOD-15 foram classificados como **Oportunidade** (não bugs obrigatórios). Priorização deve seguir risco/impacto operacional e maturidade de runtime.
+Todos os itens MOD-01..MOD-15 foram classificados como **Oportunidade** (não bugs obrigatórios).
+Priorização deve seguir risco/impacto operacional e maturidade de runtime.
 
 ## 1.6 Alinhamento SDK 0.3.0
 
@@ -104,7 +107,8 @@ Todos os itens MOD-01..MOD-15 foram classificados como **Oportunidade** (não bu
 
 ## 1.7 Propostas arquiteturais (ARCH-01..ARCH-06)
 
-Classificadas como **direção válida** para roadmap evolutivo. Priorização recomendada após estabilização da Sprint 1+2 (bugs e segurança).
+Classificadas como **direção válida** para roadmap evolutivo. Priorização recomendada após
+estabilização da Sprint 1+2 (bugs e segurança).
 
 ---
 
@@ -112,7 +116,8 @@ Classificadas como **direção válida** para roadmap evolutivo. Priorização r
 
 1. **Confiabilidade de concorrência**: locks/mutexes reentrantes e previsíveis.
 2. **Segurança por padrão**: saneamento rigoroso de input/path/env/query + limites de payload.
-3. **Observabilidade operacional**: progressos intermediários e latência por operação com snapshots resilientes.
+3. **Observabilidade operacional**: progressos intermediários e latência por operação com snapshots
+   resilientes.
 4. **I/O modular**: engine quebrada em submódulos com contratos estáveis.
 5. **SDK alignment completo**: políticas de permission e sessão sincronizadas com RPC nativo.
 
@@ -121,23 +126,41 @@ Classificadas como **direção válida** para roadmap evolutivo. Priorização r
 ## 3) Estado atual da execução
 
 - Sprint 1 concluída com validação técnica em cache (typecheck/lint/test unit).
-- Sprint 2 avançada com novo lote concluído (segurança, observabilidade, fila/prioridade e resiliência operacional).
-- Coerência documental reforçada: roadmap atualizado com matriz explícita Atual ↔ Ideal para orientar a transformação ampla.
-- Drift de defaults ilimitados reduzido: file-tools e web-search agora operam com defaults altos/finitos e paginação por padrão.
-- Transformação ampla iniciada no eixo de modularização: `io-prefetch` foi desacoplado de leituras via `io-engine` e migrou para portas baixas `io/fs/*` com priming canônico de cache L1.
-- Qualidade de patch/diff elevada: `io/patch/text-diff` ganhou merge de hunks próximos com testes de regressão para evitar duplicação de contexto.
-- Modularização incremental de busca aplicada: `searchText` e `searchWorkspaceSymbols` foram extraídas de `io-engine` para `infra/io/search/text-search.js`, mantendo assinatura pública estável e gates verdes.
-- Nova extração da F1.2 aplicada: mutações com lock (`delete/remove/copy/move/patch`) migradas para `infra/io/fs/locked-mutations.js`, com `io-engine` atuando como facade de compatibilidade.
-- Nova extração da F1.2 aplicada: escritas lockadas (`write/create-or-replace/append/mkdir`) migradas para `infra/io/fs/locked-writes.js`, reduzindo o `io-engine` sem quebrar contratos públicos.
-- Nova extração da F1.2 aplicada: `diffText` movido para `infra/io/patch/text-diff-service.js`, mantendo assinatura pública do `io-engine` via delegação.
-- Nova extração da F1.2 aplicada: bloco de leitura/metadata (`readBytes/readText/readLines/readTextChunks/statPath`) movido para `infra/io/fs/read-services.js`, com `io-engine` mantendo API estável por delegação.
-- Hardening de consistência aplicado: validação de path (`assertValidIoFilePath`) centralizada em `infra/policy/path-resource.js` e adotada nos módulos de facade/leitura/escrita/mutação.
-- Redução adicional da facade aplicada: `io-engine.diffText` passou para alias direto de `infra/io/patch/text-diff-service`, removendo wrapper residual no engine.
-- Boundary barrel-first ampliado: `sdk/session/session-fs.js` migrou imports diretos de `io-engine`/`io-scanner` para `#copilot/infra/public/io`.
-- Facade pública de IO reduzida: `infra/public/io.js` agora reexporta leitura/escrita de `io/fs`, busca de
-	`io/search` e diff de `io/patch` diretamente, diminuindo dependência pública do legado em `io-engine`.
-- Boundary interno de `tools/` reforçado: autoimport cíclico do barrel raiz `#copilot/tools` foi identificado em
-	módulos internos, revertido para `tools/infra/*` e coberto por governança ESLint anti-regressão.
-- Avaliação de gates concluída: `test:copilot` já compartilha o mesmo runner/log compacto de `test:copilot:unit`, mas
-	ainda falha por suites ampliadas fora do corte imediato de IO/tools; `test:copilot:unit` permanece gate canônico de
-	mudança local até nova estabilização transversal.
+- Sprint 2 avançada com novo lote concluído (segurança, observabilidade, fila/prioridade e
+  resiliência operacional).
+- Coerência documental reforçada: roadmap atualizado com matriz explícita Atual ↔ Ideal para
+  orientar a transformação ampla.
+- Drift de defaults ilimitados reduzido: file-tools e web-search agora operam com defaults
+  altos/finitos e paginação por padrão.
+- Transformação ampla iniciada no eixo de modularização: `io-prefetch` foi desacoplado de leituras
+  via `io-engine` e migrou para portas baixas `io/fs/*` com priming canônico de cache L1.
+- Qualidade de patch/diff elevada: `io/patch/text-diff` ganhou merge de hunks próximos com testes de
+  regressão para evitar duplicação de contexto.
+- Modularização incremental de busca aplicada: `searchText` e `searchWorkspaceSymbols` foram
+  extraídas de `io-engine` para `infra/io/search/text-search.js`, mantendo assinatura pública
+  estável e gates verdes.
+- Nova extração da F1.2 aplicada: mutações com lock (`delete/remove/copy/move/patch`) migradas para
+  `infra/io/fs/locked-mutations.js`, com `io-engine` atuando como facade de compatibilidade.
+- Nova extração da F1.2 aplicada: escritas lockadas (`write/create-or-replace/append/mkdir`)
+  migradas para `infra/io/fs/locked-writes.js`, reduzindo o `io-engine` sem quebrar contratos
+  públicos.
+- Nova extração da F1.2 aplicada: `diffText` movido para `infra/io/patch/text-diff-service.js`,
+  mantendo assinatura pública do `io-engine` via delegação.
+- Nova extração da F1.2 aplicada: bloco de leitura/metadata
+  (`readBytes/readText/readLines/readTextChunks/statPath`) movido para
+  `infra/io/fs/read-services.js`, com `io-engine` mantendo API estável por delegação.
+- Hardening de consistência aplicado: validação de path (`assertValidIoFilePath`) centralizada em
+  `infra/policy/path-resource.js` e adotada nos módulos de facade/leitura/escrita/mutação.
+- Redução adicional da facade aplicada: `io-engine.diffText` passou para alias direto de
+  `infra/io/patch/text-diff-service`, removendo wrapper residual no engine.
+- Boundary barrel-first ampliado: `sdk/session/session-fs.js` migrou imports diretos de
+  `io-engine`/`io-scanner` para `#copilot/infra/public/io`.
+- Facade pública de IO reduzida: `infra/public/io.js` agora reexporta leitura/escrita de `io/fs`,
+  busca de `io/search` e diff de `io/patch` diretamente, diminuindo dependência pública do legado em
+  `io-engine`.
+- Boundary interno de `tools/` reforçado: autoimport cíclico do barrel raiz `#copilot/tools` foi
+  identificado em módulos internos, revertido para `tools/infra/*` e coberto por governança ESLint
+  anti-regressão.
+- Avaliação de gates concluída: `test:copilot` já compartilha o mesmo runner/log compacto de
+  `test:copilot:unit`, mas ainda falha por suites ampliadas fora do corte imediato de IO/tools;
+  `test:copilot:unit` permanece gate canônico de mudança local até nova estabilização transversal.

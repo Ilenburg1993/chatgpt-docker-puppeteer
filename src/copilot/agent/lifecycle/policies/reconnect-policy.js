@@ -195,10 +195,7 @@ export async function tryReconnect(originalError, client, currentStatus, callbac
                     emit('ready', { sessionId: session.sessionId, isResumed, reconnected: true });
 
                     if (dialogLoop.active && preserveDialogLoopOnReconnect) {
-                        log(
-                            'INFO',
-                            '[AlwaysAlive] Reconexão preservou dialog loop ativo por solicitação do chamador.',
-                        );
+                        log('INFO', '[AlwaysAlive] Reconexão preservou dialog loop ativo por solicitação do chamador.');
                     } else if (dialogLoop.active) {
                         log(
                             'INFO',

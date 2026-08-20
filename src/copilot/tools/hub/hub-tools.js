@@ -70,10 +70,12 @@ A sessão persiste no SQLite e sobrevive a restarts do servidor.`,
     parameters: z.object({
         title: z
             .string()
-            .optional()['describe']('Título descritivo da conversa (ex: "Análise de arquitetura Sprint Hub")'),
+            .optional()
+            ['describe']('Título descritivo da conversa (ex: "Análise de arquitetura Sprint Hub")'),
         metadata: z
             .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-            .optional()['describe']('Metadados extras em JSON (apenas primitivos: string, number, boolean, null)'),
+            .optional()
+            ['describe']('Metadados extras em JSON (apenas primitivos: string, number, boolean, null)'),
     }),
     handler: async (/** @type {{ title?: string; metadata?: Record<string, unknown> }} */ { title, metadata }) => {
         try {
@@ -114,17 +116,21 @@ Se useStructured=true (padrão), usa o protocolo StructuredMessage para resposta
         priority: z
             .enum(['low', 'medium', 'high', 'critical'])
             .optional()
-            .default('medium')['describe']('Prioridade da mensagem'),
+            .default('medium')
+            ['describe']('Prioridade da mensagem'),
         responseType: z
             .enum(['diagnostic', 'plan', 'code', 'question', 'acknowledgment', 'error'])
-            .optional()['describe']('Tipo de resposta esperado de LLM-B'),
+            .optional()
+            ['describe']('Tipo de resposta esperado de LLM-B'),
         useStructured: z
             .boolean()
             .optional()
-            .default(true)['describe']('Se true, usa chatStructured() com protocolo StructuredMessage'),
+            .default(true)
+            ['describe']('Se true, usa chatStructured() com protocolo StructuredMessage'),
         timeoutMs: z
             .union([z.number(), z.null()])
-            .optional()['describe'](
+            .optional()
+            ['describe'](
                 'Timeout por inatividade em ms para aguardar resposta de LLM-B. Use 0/null para watchdog-only (sem timeout absoluto).',
             ),
     }),

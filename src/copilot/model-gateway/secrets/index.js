@@ -5,6 +5,7 @@
  * @module copilot/model-gateway/secrets
  */
 
+export { diagnoseModelGatewayProviderSecretRefs } from './diagnostics.js';
 export {
     DEFAULT_MODEL_GATEWAY_SECRET_ENV_KEYS,
     EnvSecretRegistry,
@@ -13,17 +14,16 @@ export {
     createEnvSecretRegistry,
 } from './env-secret-registry.js';
 export {
-    MODEL_GATEWAY_GENERIC_BYOK_SECRET_REFS,
-    MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS,
-    evaluateModelGatewayProviderEnvRequirements,
-    resolveModelGatewayProviderSecretRefs,
-    summarizeModelGatewayProviderEnvRequirements,
-} from './requirements.js';
-export {
     auditModelGatewayValueRedaction,
     collectModelGatewaySecretAuditEnvValues,
     redactModelGatewayAuditedValue,
     summarizeModelGatewayRedactionAudits,
 } from './redaction-audit.js';
 export { redactSecretRecord, redactSecretText } from './redaction.js';
-export { diagnoseModelGatewayProviderSecretRefs } from './diagnostics.js';
+export {
+    MODEL_GATEWAY_GENERIC_BYOK_SECRET_REFS,
+    MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS,
+    evaluateModelGatewayProviderEnvRequirements,
+    resolveModelGatewayProviderSecretRefs,
+    summarizeModelGatewayProviderEnvRequirements,
+} from './requirements.js';

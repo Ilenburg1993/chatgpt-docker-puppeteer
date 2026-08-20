@@ -15,6 +15,5 @@ export { createQueuedElicitationHandler, normalizeElicitationResult } from '#cop
  *
  * @typedef {import('#copilot/sdk/types').CompletedQueuedElicitationEntry} CompletedQueuedElicitationEntry
  *
- *
  * @typedef {import('#copilot/sdk/types').QueuedElicitationHandlerOptions} QueuedElicitationHandlerOptions
  */

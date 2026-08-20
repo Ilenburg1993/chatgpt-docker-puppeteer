@@ -368,7 +368,6 @@ class TelemetryAggregator {
                 /** @type {any} */ (this.socketHub).emit('telemetry:metrics', metrics);
             }
         } catch (/** @type {any} */ err) {
-
             // Ignora erros de broadcast
         }
     }
@@ -384,7 +383,6 @@ class TelemetryAggregator {
                 /** @type {any} */ (this.socketHub).notify('alert:triggered', alert);
             }
         } catch (/** @type {any} */ err) {
-
             // Ignora erros
         }
     }

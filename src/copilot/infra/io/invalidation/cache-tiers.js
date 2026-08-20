@@ -7,7 +7,6 @@
 
 import { getIoL2Cache } from '../../io-cache-l2-registry.js';
 import { invalidateIoCachePath, invalidateIoCacheSubtree } from '../../io-cache.js';
-import { flushIoInvalidationQueue } from './bus.js';
 
 /**
  * @param {string} filePath
@@ -26,7 +25,6 @@ export function invalidateIoCacheTiers(filePath) {
             // best-effort: falha em L2 não pode interromper mutação canônica
         }
     }
-    flushIoInvalidationQueue();
 }
 
 /**
@@ -46,5 +44,4 @@ export function invalidateIoCacheTierSubtrees(filePath) {
             // best-effort: falha em L2 não pode interromper mutação canônica
         }
     }
-    flushIoInvalidationQueue();
 }

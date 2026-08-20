@@ -10,14 +10,14 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-ops.mjs [--json] [--fail] [--profile ID] [--subcommand-timeout-ms N]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-ops.mjs [--json] [--fail] [--profile ID] [--subcommand-timeout-ms N]
 
 Read-only model-gateway cockpit for operators and LLM agents. It summarizes SQLite diagnostics, live readiness,
 canonical commands and the pure automation status without fetching providers, running models or mutating the terminal.
 `);
     process.exit(0);
 }
-
 
 /** @param {unknown} value */
 function optionalString(value) {
@@ -70,9 +70,7 @@ function runJson(scriptId, scriptArgs = []) {
             status: result.status,
             durationMs,
             timedOut,
-            error: timedOut
-                ? `${scriptId} exceeded ${subcommandTimeoutMs}ms`
-                : result.error.message,
+            error: timedOut ? `${scriptId} exceeded ${subcommandTimeoutMs}ms` : result.error.message,
             json: null,
         };
     }
@@ -163,12 +161,7 @@ function readDatabaseSummary(diagnostics) {
             runId: optionalString(latestLiveScenarioRun?.['runId']),
             scenarioKind: optionalString(latestLiveScenarioRun?.['scenarioKind']),
             status: optionalString(latestLiveScenarioRun?.['status']),
-            ok:
-                latestLiveScenarioRun?.['ok'] === true
-                    ? true
-                    : latestLiveScenarioRun?.['ok'] === false
-                      ? false
-                      : null,
+            ok: latestLiveScenarioRun?.['ok'] === true ? true : latestLiveScenarioRun?.['ok'] === false ? false : null,
             completedAtMs: optionalNumber(latestLiveScenarioRun?.['completedAtMs']),
             summaryPath: optionalString(latestLiveScenarioRun?.['summaryPath']),
         },
@@ -221,7 +214,9 @@ function readAutomationSummary(auto) {
         action: optionalString(decision?.['action']),
         selectedRouteKey: optionalString(decision?.['selectedRouteKey']),
         blockers: Array.isArray(decision?.['blockers']) ? decision['blockers'].map(optionalString).filter(Boolean) : [],
-        nextCommands: Array.isArray(decision?.['nextCommands']) ? decision['nextCommands'].map(optionalString).filter(Boolean) : [],
+        nextCommands: Array.isArray(decision?.['nextCommands'])
+            ? decision['nextCommands'].map(optionalString).filter(Boolean)
+            : [],
     };
 }
 
@@ -234,7 +229,8 @@ function readCommandsSummary(commands) {
         commandCount: commandRows.length,
         packageCommandCount: commandRows.filter((command) => optionalRecord(command)?.['surface'] === 'package').length,
         makeCommandCount: commandRows.filter((command) => optionalRecord(command)?.['surface'] === 'make').length,
-        terminalCommandCount: commandRows.filter((command) => optionalRecord(command)?.['surface'] === 'terminal').length,
+        terminalCommandCount: commandRows.filter((command) => optionalRecord(command)?.['surface'] === 'terminal')
+            .length,
     };
 }
 

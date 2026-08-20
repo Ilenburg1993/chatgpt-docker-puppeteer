@@ -34,9 +34,8 @@ describe('terminal BYOK live model switch', () => {
     });
 
     it('conclui route switch diferido com reattach explícito no terminal sem nova sessão', async () => {
-        const { requestTerminalLiveByokRouteSwitch } = await import(
-            '../../../../../src/copilot/terminal/byok/live-model-switch.js'
-        );
+        const { requestTerminalLiveByokRouteSwitch } =
+            await import('../../../../../src/copilot/terminal/byok/live-model-switch.js');
 
         const result = await requestTerminalLiveByokRouteSwitch(
             {

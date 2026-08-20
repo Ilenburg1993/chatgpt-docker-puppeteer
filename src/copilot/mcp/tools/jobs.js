@@ -5,8 +5,7 @@
  * @module copilot/mcp/tools/jobs
  */
 
-import { z } from 'zod';
-import { runBoundedOperationBatch } from '#copilot/infra';
+import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
 import {
     boundedWriteAnnotations,
     cancelJob,
@@ -16,26 +15,29 @@ import {
     listJobs,
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
-    readJobOutput,
     readCopilotValidatorCapacityState,
+    readJobOutput,
     readOnlyAnnotations,
     spawnValidatorJob,
     waitForJobCompletion,
     withResultExecutionHint,
 } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 import { projectDoctorTool } from './project-doctor.js';
 
 const validatorSchema = z
     .string()
     .min(1)
-    .max(64)['regex'](/^[a-z0-9-]+$/u)
+    .max(64)
+    ['regex'](/^[a-z0-9-]+$/u)
     .describe(
         'Allowlisted validator name. The descriptor intentionally uses a bounded string instead of an enum so newly added fixed validators do not require a host-schema refresh; the server still enforces the current runtime allowlist.',
     );
 const focusedTestFileSchema = z
     .string()
     .min(1)
-    .max(1024)['describe']('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
+    .max(1024)
+    ['describe']('Explicit tests/unit/copilot/**/*.spec.js path for unit-focused.');
 const validatorTimeoutMsSchema = z.number().int().min(1000).max(3600000);
 const validatorWaitMsSchema = z.number().int().min(0).max(120000);
 const validatorFailureTailBytesSchema = z.number().int().min(1000).max(12000);
@@ -92,11 +94,14 @@ function compactValidatorResourceSnapshot(value) {
     };
 }
 
-/** @param {ReturnType<typeof compactValidatorResourceSnapshot>} before @param {ReturnType<typeof compactValidatorResourceSnapshot>} after */
+/** @param {ReturnType<typeof compactValidatorResourceSnapshot>} before @param {ReturnType<typeof
+  compactValidatorResourceSnapshot>} after */
 function summarizeValidatorResourceDelta(before, after) {
     if (!before || !after) return null;
     const numberDelta = (/** @type {unknown} */ left, /** @type {unknown} */ right) =>
-        typeof left === 'number' && typeof right === 'number' ? Math.round((right - left) * 1_000_000) / 1_000_000 : null;
+        typeof left === 'number' && typeof right === 'number'
+            ? Math.round((right - left) * 1_000_000) / 1_000_000
+            : null;
     return {
         mcpProcessRssBytes: numberDelta(before.mcpProcessRssBytes, after.mcpProcessRssBytes),
         systemFreeRatio: numberDelta(before.systemFreeRatio, after.systemFreeRatio),
@@ -232,12 +237,12 @@ const SAFE_VALIDATION_SUITE_TO_VALIDATOR = {
  * Execute one validator request through the canonical job manager. Single-call and batch modes share this exact path.
  *
  * @param {{
- *   validator: string;
- *   testFile?: string;
- *   timeoutMs?: number;
- *   waitForCompletion?: boolean;
- *   waitMs?: number;
- *   failureTailBytes?: number;
+ *     validator: string;
+ *     testFile?: string;
+ *     timeoutMs?: number;
+ *     waitForCompletion?: boolean;
+ *     waitMs?: number;
+ *     failureTailBytes?: number;
  * }} request
  * @returns {Promise<import('../control-plane/result.js').StructuredCallToolResult>}
  */
@@ -292,9 +297,7 @@ async function executeValidatorRequest(request) {
         const compatibilityMaintenance = COMPATIBILITY_MAINTENANCE_VALIDATORS.has(validator);
         const failureOutput = failed ? await readJobOutput(job.id, failureTailBytes ?? 4000) : { output: '' };
         const maintenanceOutput =
-            compatibilityMaintenance && completedWithinWait
-                ? await readJobOutput(job.id, 50_000)
-                : { output: '' };
+            compatibilityMaintenance && completedWithinWait ? await readJobOutput(job.id, 50_000) : { output: '' };
         return okResult(
             {
                 success: waitedJob.status === 'completed',
@@ -339,7 +342,14 @@ async function executeValidatorRequest(request) {
 }
 
 /**
- * @param {Awaited<ReturnType<typeof runBoundedOperationBatch<Record<string, unknown>, import('../control-plane/result.js').StructuredCallToolResult>>>} execution
+ * @param {Awaited<
+ *     ReturnType<
+ *         typeof runBoundedOperationBatch<
+ *             Record<string, unknown>,
+ *             import('../control-plane/result.js').StructuredCallToolResult
+ *         >
+ *     >
+ * >} execution
  * @param {Record<string, unknown>[]} requests
  */
 function compactValidatorBatchResults(execution, requests) {
@@ -377,8 +387,14 @@ function compactValidatorBatchResults(execution, requests) {
         return {
             ...base,
             success: false,
-            code: row.status === 'failed' ? row.code ?? 'ERR_VALIDATOR_BATCH_EXECUTION' : 'ERR_VALIDATOR_BATCH_EXECUTION',
-            error: row.status === 'failed' ? row.error ?? 'Validator batch item failed.' : 'Validator batch item failed.',
+            code:
+                row.status === 'failed'
+                    ? (row.code ?? 'ERR_VALIDATOR_BATCH_EXECUTION')
+                    : 'ERR_VALIDATOR_BATCH_EXECUTION',
+            error:
+                row.status === 'failed'
+                    ? (row.error ?? 'Validator batch item failed.')
+                    : 'Validator batch item failed.',
         };
     });
 }
@@ -466,30 +482,44 @@ export const jobTools = [
         description:
             'Run one allowlisted validator or batch up to 8 validator requests in one call. Batch defaults sequential to avoid CPU/memory contention.',
         inputSchema: {
-            validator: validatorSchema.optional().describe('Single allowlisted validator name; required outside batch mode. Prefer unit-focused for JS/TS causal gates.'),
+            validator: validatorSchema
+                .optional()
+                .describe(
+                    'Single allowlisted validator name; required outside batch mode. Prefer unit-focused for JS/TS causal gates.',
+                ),
             testFile: focusedTestFileSchema.optional(),
             timeoutMs: validatorTimeoutMsSchema.optional()['describe']('Optional validator timeout in ms.'),
             waitForCompletion: z
                 .boolean()
-                .optional()['describe']('Wait in this same call. Defaults true for typecheck/lint/unit-focused/devcontainer-shell and false for broad suites.'),
+                .optional()
+                ['describe'](
+                    'Wait in this same call. Defaults true for typecheck/lint/unit-focused/devcontainer-shell and false for broad suites.',
+                ),
             waitMs: validatorWaitMsSchema
-                .optional()['describe']('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
+                .optional()
+                ['describe']('Bounded completion wait. Default 30000ms when waitForCompletion=true.'),
             failureTailBytes: validatorFailureTailBytesSchema
-                .optional()['describe']('Short log tail returned in the same call only when a waited validator fails. Default 4000.'),
+                .optional()
+                ['describe'](
+                    'Short log tail returned in the same call only when a waited validator fails. Default 4000.',
+                ),
             batch: z
                 .array(validatorRequestSchema)
                 .min(1)
                 .max(MAX_VALIDATOR_BATCH_REQUESTS)
-                .optional()['describe']('Batch up to 8 validator requests; do not mix with single-validator fields.'),
+                .optional()
+                ['describe']('Batch up to 8 validator requests; do not mix with single-validator fields.'),
             batchFailureMode: z
                 .enum(['best-effort', 'fail-fast'])
-                .optional()['describe']('Batch failure policy. Default: best-effort.'),
+                .optional()
+                ['describe']('Batch failure policy. Default: best-effort.'),
             batchConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_VALIDATOR_ACCEPTED_INPUT_CONCURRENCY)
-                .optional()['describe'](
+                .optional()
+                ['describe'](
                     'Compatibility input accepts 1-2 for stale clients, but execution is always serialized at 1 to protect WSL/DevContainer headroom.',
                 ),
         },
@@ -610,9 +640,7 @@ export const jobTools = [
                     hint: 'Provide validator, and testFile only when validator=unit-focused.',
                 });
             }
-            return executeValidatorRequest(
-                /** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data),
-            );
+            return executeValidatorRequest(/** @type {Parameters<typeof executeValidatorRequest>[0]} */ (parsed.data));
         },
     },
     {

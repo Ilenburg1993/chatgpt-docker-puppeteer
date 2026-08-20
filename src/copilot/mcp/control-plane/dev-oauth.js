@@ -10,8 +10,8 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import {
     calculateJwkThumbprint,
     createLocalJWKSet,
@@ -25,7 +25,6 @@ import {
 } from 'jose';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { lookup as lookupDns } from 'node:dns/promises';
-import { readFile } from 'node:fs/promises';
 import { request as httpsRequest } from 'node:https';
 import { BlockList, isIP } from 'node:net';
 import {
@@ -214,10 +213,12 @@ const dpopReplayCache = new Map();
 /** @type {Map<string, number>} */
 const dpopNonces = new Map();
 
-/** @type {Map<
-    string,
-    { clientId: string; scope: string; resource: string; expiresAt: number; familyId: string; dpopJkt?: string }
->} */
+/**
+ * @type {Map<
+ *     string,
+ *     { clientId: string; scope: string; resource: string; expiresAt: number; familyId: string; dpopJkt?: string }
+ * >}
+ */
 const renewCredentials = new Map();
 
 /** @type {Map<string, { clientId: string; familyId: string; expiresAt: number }>} */
@@ -591,7 +592,6 @@ export async function handleBuiltInDevOAuthRequest(req, res, url, config) {
         return true;
     }
 
-
     if (req.method === 'POST' && url.pathname === '/oauth/par') {
         await handlePushedAuthorizationRequest(req, res, config);
         return true;
@@ -805,7 +805,7 @@ async function readOrCreatePrivateKey(alg = readDevOAuthSigningAlgorithm()) {
     const keyFile = readDevOAuthKeyFile(alg);
     if (!isDevOAuthKeyRotationRequested()) {
         try {
-            const pem = await readFile(keyFile, 'utf8');
+            const pem = (await readTextFreshTrusted(keyFile, { caller: 'mcp.control-plane.dev-oauth' })).content;
             if (pem.trim()) return importPKCS8(pem, alg, { extractable: true });
         } catch {
             // Missing or unreadable key files are repaired by generating a new dev key.
@@ -886,7 +886,6 @@ function isDevOAuthKeyRotationRequested() {
         .toLowerCase();
     return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
-
 
 /**
  * @param {import('node:http').IncomingMessage} req
@@ -1097,7 +1096,8 @@ async function handleAuthorize(res, url, config) {
 
     const authorizationRequestErrors = [];
     if (responseType !== 'code') authorizationRequestErrors.push('unsupported_response_type');
-    if (pushed && authorizeQueryClientId && authorizeQueryClientId !== pushed.clientId) authorizationRequestErrors.push('request_uri_client_mismatch');
+    if (pushed && authorizeQueryClientId && authorizeQueryClientId !== pushed.clientId)
+        authorizationRequestErrors.push('request_uri_client_mismatch');
     if (!client) authorizationRequestErrors.push('unknown_client');
     if (client && !client.redirectUris.includes(redirectUri)) authorizationRequestErrors.push('redirect_uri_mismatch');
     if (isResourceParameterRequired() && !resourceParam) authorizationRequestErrors.push('resource_missing');
@@ -1417,7 +1417,12 @@ async function resolveOAuthClientById(clientId) {
  * @param {string} [expectedAudience]
  * @returns {Promise<boolean>}
  */
-async function verifyClientTokenEndpointAuthentication(body, client, config, expectedAudience = `${config.resource}/oauth/token`) {
+async function verifyClientTokenEndpointAuthentication(
+    body,
+    client,
+    config,
+    expectedAudience = `${config.resource}/oauth/token`,
+) {
     const method = client.tokenEndpointAuthMethod ?? 'none';
     if (method === 'none') return true;
     if (method !== 'private_key_jwt') return false;
@@ -1606,7 +1611,9 @@ function trimPrivateKeyJwtReplayCache(maxSize) {
 /**
  * @param {import('node:http').IncomingMessage} req
  * @param {import('./auth.js').McpAuthConfig} config
- * @returns {Promise<{ ok: true; jkt: string } | { ok: true; jkt: '' } | { ok: false; error: string; errorCode?: string }>}
+ * @returns {Promise<
+ *     { ok: true; jkt: string } | { ok: true; jkt: '' } | { ok: false; error: string; errorCode?: string }
+ * >}
  */
 async function resolveDpopBindingForRequest(req, config) {
     const proof = firstHeaderValue(req.headers['dpop']);
@@ -1678,11 +1685,7 @@ async function verifyDpopProof(proof, expected) {
         const replayKey = `${jkt}:${jti}`;
         if (dpopReplayCache.has(replayKey)) return { ok: false, error: 'DPoP proof replay detected.' };
         const expMs = Number(payload.exp) ? Number(payload.exp) * 1000 : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
-        const persistentReplay = rememberPersistentOAuthReplay(
-            OAUTH_REPLAY_NAMESPACES.issuerDpop,
-            replayKey,
-            expMs,
-        );
+        const persistentReplay = rememberPersistentOAuthReplay(OAUTH_REPLAY_NAMESPACES.issuerDpop, replayKey, expMs);
         if (!persistentReplay.available) {
             return { ok: false, error: 'Persistent DPoP replay protection is unavailable.' };
         }
@@ -2246,7 +2249,7 @@ function writeRateLimitExceeded(req, res, name) {
     res.setHeader('Retry-After', String(retryAfterSeconds));
     res.setHeader('X-RateLimit-Limit', String(limit));
     res.setHeader('X-RateLimit-Remaining', '0');
-    res.setHeader('X-RateLimit-Reset', String(Math.floor(((current?.resetAt ?? nowMs) / 1000))));
+    res.setHeader('X-RateLimit-Reset', String(Math.floor((current?.resetAt ?? nowMs) / 1000)));
     writeJson(res, 429, { error: 'temporarily_unavailable' });
 }
 
@@ -2778,7 +2781,7 @@ async function loadRenewCredentials(env = process.env) {
     renewCredentialsLastLoadedAt = new Date().toISOString();
     renewCredentialsLastPersistenceError = null;
     try {
-        const text = await readFile(refreshTokenFile, 'utf8');
+        const text = (await readTextFreshTrusted(refreshTokenFile, { caller: 'mcp.control-plane.dev-oauth' })).content;
         const parsed = JSON.parse(text);
         const records = parseRefreshTokenRecords(parsed);
         for (const record of records) {
@@ -2982,7 +2985,7 @@ async function loadRegisteredClients(env = process.env) {
     registeredClientsLastLoadedAt = new Date().toISOString();
     registeredClientsLastPersistenceError = null;
     try {
-        const text = await readFile(clientFile, 'utf8');
+        const text = (await readTextFreshTrusted(clientFile, { caller: 'mcp.control-plane.dev-oauth' })).content;
         const parsed = JSON.parse(text);
         for (const client of parseRegisteredClientRecords(parsed, env)) registeredClients.set(client.clientId, client);
         pruneRegisteredClients();
@@ -3169,10 +3172,7 @@ async function readRequestBody(req, options) {
         }
         chunks.push(buffer);
     }
-    const text = decodeUtf8Buffer(
-        concatBufferViews(chunks, totalBytes),
-        'OAuth request body contains invalid UTF-8.',
-    );
+    const text = decodeUtf8Buffer(concatBufferViews(chunks, totalBytes), 'OAuth request body contains invalid UTF-8.');
     if (!text.trim()) return {};
     const contentType = normalizeContentType(req.headers['content-type']);
     if (contentType === JSON_CONTENT_TYPE) {
@@ -4034,7 +4034,10 @@ function setBearerChallenge(res, config, error = '', description = '', scope = '
     if (error) params.push(['error', error]);
     if (description) params.push(['error_description', description]);
     if (scope) params.push(['scope', scope]);
-    res.setHeader('WWW-Authenticate', `Bearer ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`);
+    res.setHeader(
+        'WWW-Authenticate',
+        `Bearer ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`,
+    );
 }
 
 /**
@@ -4047,7 +4050,10 @@ function setDpopChallenge(res, error, description) {
     /** @type {[string, string][]} */
     const params = [['error', error]];
     if (description) params.push(['error_description', description]);
-    res.setHeader('WWW-Authenticate', `DPoP ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`);
+    res.setHeader(
+        'WWW-Authenticate',
+        `DPoP ${params.map(([name, value]) => `${name}=${quoteAuthParam(value)}`).join(', ')}`,
+    );
 }
 
 /**

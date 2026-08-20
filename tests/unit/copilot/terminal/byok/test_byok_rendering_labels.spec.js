@@ -18,7 +18,10 @@ describe('terminal BYOK rendering labels', () => {
     it('preserva a taxonomia textual usada pelo cockpit', () => {
         assert.equal(renderByokSourceLabel('model-gateway:model'), 'catálogo normalizado');
         assert.equal(renderByokTokenLabel('deferred_until_turn_boundary'), 'diferido até limite do turno');
-        assert.equal(renderByokTokenLabel('blocked:provider_health_cooldown:rate-limit'), 'bloqueada por cooldown de limite de taxa');
+        assert.equal(
+            renderByokTokenLabel('blocked:provider_health_cooldown:rate-limit'),
+            'bloqueada por cooldown de limite de taxa',
+        );
         assert.equal(renderByokTokenList(['chat', 'vision']), 'chat, visão');
     });
 
@@ -30,7 +33,12 @@ describe('terminal BYOK rendering labels', () => {
         assert.equal(formatTerminalDurationSeconds(7200), '2h');
         assert.equal(yesNoPlain(undefined), '-');
         assert.equal(
-            renderByokCapabilityLine({ reasoningEffort: true, sdkReasoningEffort: false, vision: true, contextWindowTokens: 128000 }),
+            renderByokCapabilityLine({
+                reasoningEffort: true,
+                sdkReasoningEffort: false,
+                vision: true,
+                contextWindowTokens: 128000,
+            }),
             'raciocínio sim · SDK não · visão sim · contexto 128000',
         );
     });

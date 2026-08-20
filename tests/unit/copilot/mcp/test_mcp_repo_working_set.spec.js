@@ -179,7 +179,12 @@ describe('mcp/repo_working_set', () => {
 
     it('refresh auto/include/omit materializa contexto somente quando a política exige', async () => {
         const opened = structured(
-            await repoWorkingSetTool.handler({ action: 'open', path: 'src/copilot', indexMode: 'off', contextMode: 'omit' }),
+            await repoWorkingSetTool.handler({
+                action: 'open',
+                path: 'src/copilot',
+                indexMode: 'off',
+                contextMode: 'omit',
+            }),
         );
         const id = String(opened['workingSetId']);
         expect(mocks.getScopeContext).not.toHaveBeenCalled();
@@ -257,7 +262,9 @@ describe('mcp/repo_working_set', () => {
     });
 
     it('compõe find, refresh, status, context e close sobre o mesmo working set', async () => {
-        const opened = structured(await repoWorkingSetTool.handler({ action: 'open', path: 'src/copilot', indexMode: 'off' }));
+        const opened = structured(
+            await repoWorkingSetTool.handler({ action: 'open', path: 'src/copilot', indexMode: 'off' }),
+        );
         const id = String(opened['workingSetId']);
 
         const found = structured(

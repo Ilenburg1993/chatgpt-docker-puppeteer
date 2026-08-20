@@ -37,10 +37,10 @@ import { log } from '../logger.js';
  * Executable local tool. Unlike the SDK's declaration-capable `Tool`, project factories guarantee a handler at runtime.
  * The wrapper is async even when the source callback is synchronous, so callers have one stable invocation contract.
  *
- * @template [TArgs=unknown]
- * @template [TResult=unknown]
+ * @template [TArgs=unknown] Default is `unknown`
+ * @template [TResult=unknown] Default is `unknown`
  * @typedef {Omit<import('@github/copilot-sdk').Tool<TArgs>, 'handler'> & {
- *   handler: (args: TArgs, invocation?: import('@github/copilot-sdk').ToolInvocation) => Promise<TResult>;
+ *     handler: (args: TArgs, invocation?: import('@github/copilot-sdk').ToolInvocation) => Promise<TResult>;
  * }} ExecutableTool
  */
 
@@ -59,11 +59,12 @@ function isRecordObject(value) {
  * @returns {{ converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean }}
  */
 function getZodConverterState() {
-    const fn = /**
-     * @type {typeof getZodConverterState & {
-     *     _state?: { converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean };
-     * }}
-     */ (getZodConverterState);
+    const fn =
+        /**
+         * @type {typeof getZodConverterState & {
+         *     _state?: { converter: typeof import('zod-to-json-schema').zodToJsonSchema | null; attempted: boolean };
+         * }}
+         */ (getZodConverterState);
     if (!fn._state) {
         fn._state = { converter: null, attempted: false };
     }
@@ -480,13 +481,16 @@ export function createTool({
         return withSdkToolTelemetry(name, result, Date.now() - startedAt);
     };
 
-    return requireExecutableTool(name, defineToolSafe(name, {
-        description,
-        ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
-        handler: wrappedHandler,
-        skipPermission,
-        ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-    }));
+    return requireExecutableTool(
+        name,
+        defineToolSafe(name, {
+            description,
+            ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
+            handler: wrappedHandler,
+            skipPermission,
+            ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
+        }),
+    );
 }
 
 /**
@@ -551,11 +555,14 @@ export function createToolSync({
 
     const jsonSchema = normalizeToolParametersSchema(/** @type {ToolParameterInput | undefined} */ (parameters), name);
 
-    return requireExecutableTool(name, defineToolSafe(name, {
-        description,
-        ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
-        handler: wrappedHandler,
-        skipPermission,
-        ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
-    }));
+    return requireExecutableTool(
+        name,
+        defineToolSafe(name, {
+            description,
+            ...(jsonSchema !== undefined ? { parameters: jsonSchema } : {}),
+            handler: wrappedHandler,
+            skipPermission,
+            ...(overridesBuiltInTool ? { overridesBuiltInTool: true } : {}),
+        }),
+    );
 }

@@ -6,11 +6,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
+import { copilotSessionTools } from '#copilot/mcp/tools';
 import {
     clearActiveSdkSessions,
     registerActiveSdkSession,
 } from '../../../../src/copilot/sdk/session/session-registry.js';
-import { copilotSessionTools } from '#copilot/mcp/tools';
 
 const listTool = copilotSessionTools.find((tool) => tool.name === 'copilot_sessions_list');
 const getTool = copilotSessionTools.find((tool) => tool.name === 'copilot_session_get');

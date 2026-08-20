@@ -42,13 +42,13 @@ describe('terminal/dialog/dialog-runtime', () => {
         expect(src).toContain("'Conectando conversa'");
         expect(src).toContain('Orçamento BYOK');
         expect(src).not.toContain('BYOK budget');
-        expect(src).not.toContain("println(`[erro]");
+        expect(src).not.toContain('println(`[erro]');
         expect(src).not.toContain('\\x1b[');
         expect(src).not.toContain("'Conectando ao dialog loop'");
         expect(src).not.toContain("'Boot do dialog loop bloqueado pela policy SDK'");
-        expect(src).not.toContain('println(\'\\x1b[90m  Iniciando AlwaysAliveAgent');
-        expect(src).not.toContain('println(\'\\x1b[90m  Conectando ao agente');
-        expect(src).not.toContain('println(\'\\x1b[90m  Reanexando sessão SDK');
+        expect(src).not.toContain("println('\\x1b[90m  Iniciando AlwaysAliveAgent");
+        expect(src).not.toContain("println('\\x1b[90m  Conectando ao agente");
+        expect(src).not.toContain("println('\\x1b[90m  Reanexando sessão SDK");
         expect(src).not.toContain("detail: 'AlwaysAliveAgent start()'");
 
         const repl = await readFile(new URL('../../../../src/copilot/terminal/repl/repl.js', import.meta.url), 'utf8');
@@ -73,8 +73,12 @@ describe('terminal/dialog/dialog-runtime', () => {
         expect(agentEvents).toContain("'Pergunta ao operador reconciliada'");
         expect(agentEvents).toContain('/^relay question\\.answered answers into hook tools resolver$/i');
         expect(agentEvents).toContain('/^clear persisted pendingQuestion$/i');
-        expect(agentEvents).toContain("const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.foreground', 'session.background'])");
-        expect(agentEvents).not.toContain("['session.created', 'session.deleted', 'session.foreground', 'session.background']");
+        expect(agentEvents).toContain(
+            "const SDK_LIFECYCLE_VISIBLE_TYPES = new Set(['session.created', 'session.foreground', 'session.background'])",
+        );
+        expect(agentEvents).not.toContain(
+            "['session.created', 'session.deleted', 'session.foreground', 'session.background']",
+        );
         expect(agentEvents).not.toContain("'question.pending reconciliado pelo ask_user SDK'");
         expect(agentEvents).not.toContain('Tarefa em segundo plano falhou:');
         expect(agentEvents).not.toContain('Tarefa em segundo plano concluída:');

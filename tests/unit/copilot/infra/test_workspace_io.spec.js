@@ -1,8 +1,8 @@
 // @ts-check
 
 import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { IO_PATH_POLICY_VERSION } from '#copilot/core';
@@ -182,13 +182,16 @@ describe('workspace IO capability', () => {
         const capability = createValidatedMutableWorkspacePath({ realPath: filePath, workspaceRoot });
 
         await expect(
-            io.patchTextLockedValidated({
-                realPath: filePath,
-                workspaceRoot,
-                policyVersion: capability.policyVersion,
-                access: 'mutable',
-                policyClass: 'write',
-            }, { oldString: 'inside', newString: 'outside' }),
+            io.patchTextLockedValidated(
+                {
+                    realPath: filePath,
+                    workspaceRoot,
+                    policyVersion: capability.policyVersion,
+                    access: 'mutable',
+                    policyClass: 'write',
+                },
+                { oldString: 'inside', newString: 'outside' },
+            ),
         ).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDMUTABLEPATH' });
 
         const otherWorkspaceCapability = createValidatedMutableWorkspacePath({
@@ -198,9 +201,9 @@ describe('workspace IO capability', () => {
         await expect(io.writeFileAtomicValidated(otherWorkspaceCapability, 'outside')).rejects.toMatchObject({
             code: 'EVALIDATEDMUTABLEPATHWORKSPACE',
         });
-        expect(() =>
-            resolveValidatedMutableWorkspacePath(capability, { workspaceRoot, mode: 'delete' }),
-        ).toThrowError(expect.objectContaining({ code: 'EVALIDATEDMUTABLEPATHMODE' }));
+        expect(() => resolveValidatedMutableWorkspacePath(capability, { workspaceRoot, mode: 'delete' })).toThrowError(
+            expect.objectContaining({ code: 'EVALIDATEDMUTABLEPATHMODE' }),
+        );
         await expect(io.readTextValidated(capability)).rejects.toMatchObject({ code: 'EINVALIDVALIDATEDPATH' });
         await expect(readFile(filePath, 'utf8')).resolves.toBe('inside');
     });
@@ -227,9 +230,9 @@ describe('workspace IO capability', () => {
         await expect(io.readTextValidated(otherWorkspaceCapability)).rejects.toMatchObject({
             code: 'EVALIDATEDPATHWORKSPACE',
         });
-        expect(() =>
-            resolveValidatedReadWorkspacePath(capability, { workspaceRoot, mode: 'write' }),
-        ).toThrowError(expect.objectContaining({ code: 'EVALIDATEDPATHMODE' }));
+        expect(() => resolveValidatedReadWorkspacePath(capability, { workspaceRoot, mode: 'write' })).toThrowError(
+            expect.objectContaining({ code: 'EVALIDATEDPATHMODE' }),
+        );
     });
 
     it('confirma remoção recursiva relativa e protege a raiz do workspace', async () => {

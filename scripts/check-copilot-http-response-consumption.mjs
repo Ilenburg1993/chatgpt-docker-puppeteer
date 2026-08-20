@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // @ts-check
 
+import { parse } from '@babel/parser';
+import traverseModule from '@babel/traverse';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse } from '@babel/parser';
-import traverseModule from '@babel/traverse';
 import { resolveBabelParserOptions } from '../src/copilot/infra/parse/babel-policy.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -45,12 +45,17 @@ function unwrapExpression(node) {
     while (
         current &&
         typeof current === 'object' &&
-        ['AwaitExpression', 'TSAsExpression', 'TSTypeAssertion', 'TypeCastExpression', 'ParenthesizedExpression'].includes(
-            /** @type {{ type?: string }} */ (current).type ?? '',
-        )
+        [
+            'AwaitExpression',
+            'TSAsExpression',
+            'TSTypeAssertion',
+            'TypeCastExpression',
+            'ParenthesizedExpression',
+        ].includes(/** @type {{ type?: string }} */ (current).type ?? '')
     ) {
-        current = /** @type {{ argument?: unknown; expression?: unknown }} */ (current).argument
-            ?? /** @type {{ expression?: unknown }} */ (current).expression;
+        current =
+            /** @type {{ argument?: unknown; expression?: unknown }} */ (current).argument ??
+            /** @type {{ expression?: unknown }} */ (current).expression;
     }
     return current;
 }
@@ -67,8 +72,12 @@ function isFetchCall(node) {
     if (callee?.type !== 'MemberExpression' && callee?.type !== 'OptionalMemberExpression') return false;
     const property = callee.property;
     return (
-        (!callee.computed && property?.type === 'Identifier' && (property.name === 'fetch' || property.name === 'fetchImpl')) ||
-        (callee.computed && property?.type === 'StringLiteral' && (property.value === 'fetch' || property.value === 'fetchImpl'))
+        (!callee.computed &&
+            property?.type === 'Identifier' &&
+            (property.name === 'fetch' || property.name === 'fetchImpl')) ||
+        (callee.computed &&
+            property?.type === 'StringLiteral' &&
+            (property.value === 'fetch' || property.value === 'fetchImpl'))
     );
 }
 
@@ -91,7 +100,7 @@ function promiseAllInputs(node) {
         return null;
     }
     const first = current.arguments?.[0];
-    return first?.type === 'ArrayExpression' ? first.elements ?? [] : null;
+    return first?.type === 'ArrayExpression' ? (first.elements ?? []) : null;
 }
 
 /**
@@ -161,10 +170,7 @@ export function checkHttpResponseConsumption(options = {}) {
         if (allowedFiles.has(relativeFile)) continue;
         const source = fs.readFileSync(file, 'utf8');
         if (!RESPONSE_CONSUMER_HINT.test(source)) continue;
-        const ast = parse(source, {
-            ...resolveBabelParserOptions(file, 'js'),
-            attachComment: false,
-        });
+        const ast = parse(source, resolveBabelParserOptions(file, 'js', { profile: 'structure' }));
         const fetchBindings = new Set();
         /** @type {any[]} */
         const calls = [];

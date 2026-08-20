@@ -212,11 +212,14 @@ describe('mcp-tool-bridge › SDK 1.0 tool result conversion', () => {
 
         const tools = await bridge.buildMcpTools();
         assert.equal(tools.length, 1);
-        const result = /** @type {{
-         *   textResultForLlm: string,
-         *   resultType: string,
-         *   toolTelemetry: { copilot: { toolName: string, resultType: string, durationMs: number } }
-         * }} */ (await requireExecutableTool(tools[0]).handler({ path: '.' }));
+        const result =
+            /**
+             * @type {{
+             *     textResultForLlm: string;
+             *     resultType: string;
+             *     toolTelemetry: { copilot: { toolName: string; resultType: string; durationMs: number } };
+             * }}
+             */ (await requireExecutableTool(tools[0]).handler({ path: '.' }));
 
         assert.deepEqual(calls, ['tools/list', 'tools/call']);
         assert.deepEqual(result, {

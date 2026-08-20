@@ -5,8 +5,8 @@
  * @module copilot/infra/io/fs/read-lines
  */
 
-import { readTextFileSnapshot } from './read-text.js';
 import { splitPhysicalTextLines } from '../../shared/text-lines.js';
+import { readTextFileSnapshot } from './read-text.js';
 
 /**
  * @param {string} filePath

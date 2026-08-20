@@ -3,11 +3,7 @@
  * Projection family: config.
  */
 
-import {
-    BYOK_ENV_KEYS,
-    readConfiguredByokModelsFromEnv,
-    readConfiguredByokSummary,
-} from '#copilot/config';
+import { BYOK_ENV_KEYS, readConfiguredByokModelsFromEnv, readConfiguredByokSummary } from '#copilot/config';
 import {
     buildEnvByokModelGatewaySnapshot,
     buildModelGatewayOperatorProjection,
@@ -149,12 +145,13 @@ export function readTerminalByokRuntimeConfigProjection(runtimeId) {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {Promise<{ currentModel: string; models: import('../../../presentation/contracts/index.js').RuntimeModelInfo[] }>}
+ * @returns {Promise<{
+ *     currentModel: string;
+ *     models: import('../../../presentation/contracts/index.js').RuntimeModelInfo[];
+ * }>}
  */
 export async function listTerminalAvailableModelsProjection(runtimeId) {
-    return /** @type {Promise<{ currentModel: string; models: import('../../../presentation/contracts/index.js').RuntimeModelInfo[] }>} */ (
-        listRuntimeAvailableModelsProjection(runtimeId)
-    );
+    return listRuntimeAvailableModelsProjection(runtimeId);
 }
 
 /**

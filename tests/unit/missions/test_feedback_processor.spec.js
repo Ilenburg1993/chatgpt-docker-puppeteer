@@ -1,8 +1,8 @@
 // @ts-check
-import assert from 'node:assert';
-import { describe, it, beforeEach } from 'node:test';
-import { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT } from '#missions/feedback_processor';
+import { FEEDBACK_CATEGORY, FeedbackProcessor, INJECTION_FORMAT } from '#missions/feedback_processor';
 import { ContextManager } from '#orchestrator/context_manager';
+import assert from 'node:assert';
+import { beforeEach, describe, it } from 'node:test';
 
 describe('FeedbackProcessor Unit Tests', () => {
     /** @type {any} */ let feedbackProcessor;
@@ -187,8 +187,8 @@ describe('FeedbackProcessor Unit Tests', () => {
             assert.ok(result.actionItems.length >= 1);
             assert.ok(
                 result.actionItems.some(
-                    (/** @type {any} */ item) => item.includes('examples') || item.includes('typos')
-                )
+                    (/** @type {any} */ item) => item.includes('examples') || item.includes('typos'),
+                ),
             );
         });
 

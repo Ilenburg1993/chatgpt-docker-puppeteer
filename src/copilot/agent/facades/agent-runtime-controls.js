@@ -44,7 +44,8 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     isDialogLoopActive?: (() => boolean) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     start?: (() => Promise<void>) | undefined;
- *     stop?: ((opts?: { shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }) => Promise<void>) | undefined;
+ *     stop?:
+ *         ((opts?: { shutdownTimeoutMs?: number; preserveDialogLoopIntent?: boolean }) => Promise<void>) | undefined;
  *     abortCurrentMessage?: (() => Promise<void>) | undefined;
  *     steerMessage?: ((prompt: string, opts?: { signal?: AbortSignal }) => Promise<string>) | undefined;
  *     answerPendingQuestion?: ((answer: string) => boolean) | undefined;
@@ -58,7 +59,7 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *     dialogPaused?: boolean | undefined;
  *     dialogUsageMetrics?: import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null | undefined;
  *     dialogPrMetrics?: import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null | undefined;
-     *     lastPrInfo?:
+ *     lastPrInfo?:
  *         | {
  *               model?: string;
  *               configuredModel?: string;
@@ -69,8 +70,8 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *               quotaSnapshots?: Record<string, unknown>;
  *               ts: number;
  *           }
-     *         | null
-     *         | undefined;
+ *         | null
+ *         | undefined;
  *     lastLlmUsage?: Record<string, unknown> | null | undefined;
  *     pendingQuestion?: import('../types.js').PendingQuestion | null | undefined;
  *     pendingQuestionKind?: import('../types.js').PendingQuestionKind | null | undefined;
@@ -145,11 +146,9 @@ import { createSnapshot, listSnapshotsAsync, loadSnapshotAsync, saveSnapshotAsyn
  *         | (() => ReturnType<import('../agent-context.js').AgentContext['getContextFactoryCapabilitiesSnapshot']>)
  *         | undefined;
  *     getToolRegistrySnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistrySnapshot']>)
- *         | undefined;
+ *         (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistrySnapshot']>) | undefined;
  *     getToolRegistryEntriesSnapshot?:
- *         | (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistryEntriesSnapshot']>)
- *         | undefined;
+ *         (() => ReturnType<import('../agent-context.js').AgentContext['getToolRegistryEntriesSnapshot']>) | undefined;
  * }} AgentRuntimeGovernanceTarget
  *
  *
@@ -199,8 +198,7 @@ export function readRuntimeControlState(runtime) {
 export function readRuntimeUsageBudgetSnapshot(runtime) {
     const snap = readAgentRuntimeStatusSnapshot(/** @type {import('../types.js').IAlwaysAliveAgent} */ (runtime));
     const controlState = readRuntimeControlState(runtime);
-    const usageMetrics =
-        runtime.dialogUsageMetrics ??
+    const usageMetrics = runtime.dialogUsageMetrics ??
         runtime.dialogPrMetrics ?? {
             boots: 0,
             resumesWithAdditionalModelCall: 0,

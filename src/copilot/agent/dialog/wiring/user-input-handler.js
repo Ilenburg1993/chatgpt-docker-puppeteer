@@ -120,10 +120,10 @@ function buildPendingQuestionMeta({ kind, askedAt, allowFreeform, choices }) {
  * @param {string[] | undefined} choices
  * @param {boolean} allowFreeform
  * @returns {{
- *           ok: true;
- *           answer: string;
- *           wasFreeform: boolean;
- *       }}
+ *     ok: true;
+ *     answer: string;
+ *     wasFreeform: boolean;
+ * }}
  */
 function normalizeUserInputAnswer(rawAnswer, choices, allowFreeform) {
     const answer = rawAnswer.trim();

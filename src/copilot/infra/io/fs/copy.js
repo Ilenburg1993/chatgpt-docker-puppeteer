@@ -7,10 +7,11 @@
 
 import * as nodeFs from 'node:fs';
 import { copyFile, link, rename, stat, unlink } from 'node:fs/promises';
+import { preflightIoCapacity } from './capacity-preflight.js';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
+import { markMutationAppliedError } from './mutation-state.js';
 import { readBinaryMutationSnapshot } from './snapshot.js';
-import { preflightIoCapacity } from './capacity-preflight.js';
 import { prepareSiblingTempPath } from './temp-path.js';
 
 /**
@@ -37,7 +38,8 @@ import { prepareSiblingTempPath } from './temp-path.js';
 export async function copyFileUnlocked(source, destination, options = {}) {
     const tmpDestination = await prepareSiblingTempPath(destination, 'copy');
     let tmpCreated = false;
-    const sourceBytes = (await stat(source)).size;
+    let published = false;
+    const sourceBytes = options.expectedSourceBytes ?? (await stat(source)).size;
     const capacityPreflight = await (options.capacityPreflight ?? preflightIoCapacity)(destination, sourceBytes);
     try {
         await copyFile(source, tmpDestination, nodeFs.constants.COPYFILE_EXCL);
@@ -63,20 +65,42 @@ export async function copyFileUnlocked(source, destination, options = {}) {
         }
         await emitMutationPhase(options, 'before-file-sync', { source, destination, target: tmpDestination });
         const syncResult = await (options.syncFile ?? syncFileBestEffort)(tmpDestination);
-        await emitMutationPhase(options, 'after-file-sync', { source, destination, target: tmpDestination, ...syncResult });
+        await emitMutationPhase(options, 'after-file-sync', {
+            source,
+            destination,
+            target: tmpDestination,
+            ...syncResult,
+        });
         assertSuccessfulSync(syncResult, {
             code: 'EFILESYNC',
             message: `Falha ao sincronizar cópia staged: ${tmpDestination}`,
         });
         if (options.exclusive) {
-            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: true });
+            await emitMutationPhase(options, 'before-publish', {
+                source,
+                destination,
+                tmpDestination,
+                exclusive: true,
+            });
             await link(tmpDestination, destination);
+            published = true;
             await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: true });
             await unlink(tmpDestination);
         } else {
-            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: false });
+            await emitMutationPhase(options, 'before-publish', {
+                source,
+                destination,
+                tmpDestination,
+                exclusive: false,
+            });
             await rename(tmpDestination, destination);
-            await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: false });
+            published = true;
+            await emitMutationPhase(options, 'after-publish', {
+                source,
+                destination,
+                tmpDestination,
+                exclusive: false,
+            });
         }
         tmpCreated = false;
         await emitMutationPhase(options, 'before-destination-directory-sync', { source, destination });
@@ -96,6 +120,9 @@ export async function copyFileUnlocked(source, destination, options = {}) {
         };
     } catch (error) {
         if (tmpCreated) await unlink(tmpDestination).catch(() => undefined);
+        if (published) {
+            throw markMutationAppliedError(error, { phase: 'post-publish', paths: [destination] });
+        }
         throw error;
     }
 }

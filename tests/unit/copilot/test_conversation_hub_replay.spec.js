@@ -13,8 +13,8 @@
  * 5. Hub encerrado corretamente via close()
  */
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import { HubOrchestrator } from '../../../src/copilot/conversation-hub/orchestrator.js';
@@ -59,7 +59,6 @@ beforeAll(() => {
 
     store = new ConversationStore();
     store.init(testDb);
-
 });
 
 afterAll(() => {

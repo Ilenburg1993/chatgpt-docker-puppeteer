@@ -213,7 +213,7 @@ function parseBindSafe(value, defaultValue) {
  *
  * @example
  *     if (isLikelyContainer()) {
- *         console.log('Running in container, using host.docker.internal');
+ *     console.log('Running in container, using host.docker.internal');
  *     }
  *
  * @returns {boolean} True if likely running in a container
@@ -425,7 +425,10 @@ async function main() {
 
     // Ports/bind
     const CHROME_PORT = parseIntSafe(process.env['CHROME_PORT'], 9225, 'CHROME_PORT', { min: 1, max: 65535 });
-    const PROXY_PORT = parseIntSafe(process.env['CHROME_PROXY_PORT'], 9224, 'CHROME_PROXY_PORT', { min: 1, max: 65535 });
+    const PROXY_PORT = parseIntSafe(process.env['CHROME_PROXY_PORT'], 9224, 'CHROME_PROXY_PORT', {
+        min: 1,
+        max: 65535,
+    });
     const PROXY_BIND = parseBindSafe(process.env['CHROME_PROXY_BIND'], '0.0.0.0');
 
     // Docker-friendly host auto-detect (explicit env still wins)

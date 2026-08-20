@@ -2,37 +2,52 @@
 
 ## Diagnóstico profundo do estado atual, estado-alvo e roadmap de transformação — 2026-08-18
 
-> **Status:** CANÔNICO / ATIVO — roadmap especializado para redução de round-trips, convergência de tools, preflight adaptativo, recuperação de falhas e autonomia operacional do WORKSPACE MCP.
+> **Status:** CANÔNICO / ATIVO — roadmap especializado para redução de round-trips, convergência de
+> tools, preflight adaptativo, recuperação de falhas e autonomia operacional do WORKSPACE MCP.
 >
 > **Workspace:** `/workspaces/chatgpt-docker-puppeteer`.
 >
 > **Branch:** `main`.
 >
-> **Baseline sincronizado antes desta investigação:** `HEAD = origin/main = c4f09836c1174f636f8a6cd03da5991660cfdca4`, worktree limpa.
+> **Baseline sincronizado antes desta investigação:**
+> `HEAD = origin/main = c4f09836c1174f636f8a6cd03da5991660cfdca4`, worktree limpa.
 >
-> **Relação com documentos existentes:** este documento **não substitui** `WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md` nem `DEVCONTAINER_NETWORK_CONTROL_PLANE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md`. O primeiro continua sendo o roadmap mestre da onda MCP/I/O/autonomia; o segundo continua sendo a autoridade especializada do Interaction Latency Control Plane (ILCP), Network Control Plane, ChatGPT/OpenAI/Cloudflare e atribuição causal end-to-end. Este arquivo passa a ser a autoridade especializada para **round-trip economics, preflight/recovery semantics, tool-schema convergence e composição de workflows**.
+> **Relação com documentos existentes:** este documento **não substitui**
+> `WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md` nem
+> `DEVCONTAINER_NETWORK_CONTROL_PLANE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-18.md`. O primeiro
+> continua sendo o roadmap mestre da onda MCP/I/O/autonomia; o segundo continua sendo a autoridade
+> especializada do Interaction Latency Control Plane (ILCP), Network Control Plane,
+> ChatGPT/OpenAI/Cloudflare e atribuição causal end-to-end. Este arquivo passa a ser a autoridade
+> especializada para **round-trip economics, preflight/recovery semantics, tool-schema convergence e
+> composição de workflows**.
 >
-> **Regra de precedência:** código + testes validados no `HEAD` vencem qualquer descrição histórica. Quando este documento divergir do código futuro, a divergência deve ser tratada como drift documental e corrigida no mesmo change-set.
+> **Regra de precedência:** código + testes validados no `HEAD` vencem qualquer descrição histórica.
+> Quando este documento divergir do código futuro, a divergência deve ser tratada como drift
+> documental e corrigida no mesmo change-set.
 
 ---
 
 # 1. Síntese executiva
 
-A investigação atual parte de uma constatação que já foi demonstrada pelo ILCP e que muda a economia de toda a tool surface:
+A investigação atual parte de uma constatação que já foi demonstrada pelo ILCP e que muda a economia
+de toda a tool surface:
 
-> **O custo dominante da interação não é, em geral, executar uma tool; é devolver o controle ao host/modelo e esperar a próxima tool começar.**
+> **O custo dominante da interação não é, em geral, executar uma tool; é devolver o controle ao
+> host/modelo e esperar a próxima tool começar.**
 
 Na janela de 24 h reconstruída pelo audit do origin:
 
 - p50 de gap inter-tool natural: aproximadamente **10,8 s**;
 - p95: aproximadamente **32,9 s**;
 - em janelas recentes lentas, p50 observado chegou a **15–17 s**;
-- o tempo até o primeiro trabalho MCP discreto (`initialize`) representa tipicamente **~92–98%** do gap;
+- o tempo até o primeiro trabalho MCP discreto (`initialize`) representa tipicamente **~92–98%** do
+  gap;
 - `preHandler`/`postHandler` permanecem em poucos milissegundos;
 - public MCP self-loop p50 permanece em ~**0,25 s**;
 - OpenAI/ChatGPT endpoint TTFB visto do DevContainer permanece na ordem de **~0,1–0,4 s**.
 
-Portanto, qualquer fluxo lógico que use cinco chamadas quando poderia usar uma paga potencialmente quatro impostos externos de vários segundos, mesmo que cada handler individual custe 5–50 ms.
+Portanto, qualquer fluxo lógico que use cinco chamadas quando poderia usar uma paga potencialmente
+quatro impostos externos de vários segundos, mesmo que cada handler individual custe 5–50 ms.
 
 A consequência não é simplesmente “criar batches maiores”. O problema observado é mais sutil:
 
@@ -41,9 +56,12 @@ A consequência não é simplesmente “criar batches maiores”. O problema obs
 3. **falhas de precondition/contexto frequentemente devolvem evidência insuficiente**;
 4. o modelo então precisa fazer `falha → read/search → novo patch`;
 5. o servidor e o ChatGPT podem divergir sobre o schema/capacidade atual da tool;
-6. o caller pode escolher `plan→apply` ou `global-preflight` por metadata antiga, embora o runtime já suporte caminho direto melhor;
-7. uma falha causal em um target pode ser apresentada como várias operações falhas, dificultando priorização;
-8. analytics históricos ainda não registram de forma first-class a classe causal do bloqueio e o custo de recuperação.
+6. o caller pode escolher `plan→apply` ou `global-preflight` por metadata antiga, embora o runtime
+   já suporte caminho direto melhor;
+7. uma falha causal em um target pode ser apresentada como várias operações falhas, dificultando
+   priorização;
+8. analytics históricos ainda não registram de forma first-class a classe causal do bloqueio e o
+   custo de recuperação.
 
 A prioridade desta frente é, portanto:
 
@@ -63,40 +81,48 @@ reduzir devoluções desnecessárias ao host/modelo
 
 A regra arquitetural central deste roadmap é:
 
-> **Preflight por risco; recovery por evidência; one-shot no caminho feliz; decomposição somente na exceção.**
+> **Preflight por risco; recovery por evidência; one-shot no caminho feliz; decomposição somente na
+> exceção.**
 
 ---
 
 # 2. Por que “preflight” é um rótulo amplo demais
 
-Durante o trabalho recente ocorreram bloqueios que superficialmente pareciam todos “preflight”, mas tinham naturezas diferentes.
+Durante o trabalho recente ocorreram bloqueios que superficialmente pareciam todos “preflight”, mas
+tinham naturezas diferentes.
 
 Exemplos reais da investigação:
 
-- um batch de seis operações foi inteiramente bloqueado porque um exact-string de teste diferia por escaping;
+- um batch de seis operações foi inteiramente bloqueado porque um exact-string de teste diferia por
+  escaping;
 - outro batch foi bloqueado porque a última âncora não existia;
 - um batch foi bloqueado por uma operação no-op;
-- chamadas rotuladas `global-preflight` no audit tinham `targetCount=1` e `preflightElided=true`: **não houve whole-batch preview**; a falha veio do compute-before-write atômico do próprio arquivo;
-- em `per-target-fast`, vários batches de dois targets aplicaram um target e falharam no outro, preservando progresso independente;
-- o host desta conversa continuou projetando um schema antigo de `repo_apply_patch_batch` mesmo depois de o servidor já aceitar limites e defaults novos.
+- chamadas rotuladas `global-preflight` no audit tinham `targetCount=1` e `preflightElided=true`:
+  **não houve whole-batch preview**; a falha veio do compute-before-write atômico do próprio
+  arquivo;
+- em `per-target-fast`, vários batches de dois targets aplicaram um target e falharam no outro,
+  preservando progresso independente;
+- o host desta conversa continuou projetando um schema antigo de `repo_apply_patch_batch` mesmo
+  depois de o servidor já aceitar limites e defaults novos.
 
 Logo, o termo “preflight block” precisa ser decomposto ao menos nestas classes:
 
-| classe | exemplo | deve bloquear mutação? | recovery ideal |
-|---|---|---:|---|
-| **integrity** | symlink escape, protected path, hash mismatch relevante | sim | evidência + decisão do caller |
-| **stale-context** | exact anchor não existe mais | sim naquela âncora | candidate evidence / convergência |
-| **ambiguous-context** | âncora aparece >1 vez | sim | occurrence lines + escolha explícita |
-| **already-converged** | old ausente, new já presente exatamente | não deve virar erro operacional cego | sucesso idempotente ou no-op explícito |
-| **shape/config** | `replace_all + occurrence_index` | sim | erro local completo, sem reread |
-| **capacity/envelope** | ops/targets/bytes acima do hard bound | sim | limites reais + split plan automático |
-| **risk-gate** | delete/overwrite | sim | preview/confirm somente para o subset de risco |
-| **dependency-abort** | operação 2 falha e 3–8 dependem do estado virtual | sim no target | 1 causa + N dependentes, não N causas |
-| **host-schema** | argumento válido no servidor não existe no schema projetado | bloqueia antes do MCP | schema convergence/reconnect |
-| **host-approval** | ChatGPT pede aprovação/nega ação | depende do host | annotations/workflow alternativo |
-| **external-state** | upstream Git mudou, tunnel/origin caiu | sim quando afeta precondition | refresh bounded + retry governado |
+| classe                | exemplo                                                     |               deve bloquear mutação? | recovery ideal                                 |
+| --------------------- | ----------------------------------------------------------- | -----------------------------------: | ---------------------------------------------- |
+| **integrity**         | symlink escape, protected path, hash mismatch relevante     |                                  sim | evidência + decisão do caller                  |
+| **stale-context**     | exact anchor não existe mais                                |                   sim naquela âncora | candidate evidence / convergência              |
+| **ambiguous-context** | âncora aparece >1 vez                                       |                                  sim | occurrence lines + escolha explícita           |
+| **already-converged** | old ausente, new já presente exatamente                     | não deve virar erro operacional cego | sucesso idempotente ou no-op explícito         |
+| **shape/config**      | `replace_all + occurrence_index`                            |                                  sim | erro local completo, sem reread                |
+| **capacity/envelope** | ops/targets/bytes acima do hard bound                       |                                  sim | limites reais + split plan automático          |
+| **risk-gate**         | delete/overwrite                                            |                                  sim | preview/confirm somente para o subset de risco |
+| **dependency-abort**  | operação 2 falha e 3–8 dependem do estado virtual           |                        sim no target | 1 causa + N dependentes, não N causas          |
+| **host-schema**       | argumento válido no servidor não existe no schema projetado |                bloqueia antes do MCP | schema convergence/reconnect                   |
+| **host-approval**     | ChatGPT pede aprovação/nega ação                            |                      depende do host | annotations/workflow alternativo               |
+| **external-state**    | upstream Git mudou, tunnel/origin caiu                      |        sim quando afeta precondition | refresh bounded + retry governado              |
 
-O objetivo não é reduzir o número de gates; é reduzir o número de **round-trips improdutivos causados por gates sem recovery suficiente**.
+O objetivo não é reduzir o número de gates; é reduzir o número de **round-trips improdutivos
+causados por gates sem recovery suficiente**.
 
 ---
 
@@ -121,29 +147,31 @@ Na reconstrução natural de 24 h:
 - p95 ≈ 32,86 s;
 - p99 ≈ 47,42 s.
 
-O audit é grande (~19 MiB) e a attribution atual lê tail bounded de 4 MiB; logo alguns números históricos são **conservadores/truncados**.
+O audit é grande (~19 MiB) e a attribution atual lê tail bounded de 4 MiB; logo alguns números
+históricos são **conservadores/truncados**.
 
 ## 3.2 Transições de maior custo em 24 h
 
-| transição | n | gap acumulado | p50 |
-|---|---:|---:|---:|
-| `repo_read_file → repo_apply_patch_batch` | 101 | ~2.274 s | ~21,2 s |
-| `repo_apply_patch_batch → repo_apply_patch_batch` | 69 | ~1.553 s | ~21,7 s |
-| `repo_apply_patch → repo_apply_patch` | 121 | ~1.532 s | ~12,1 s |
-| `repo_read_file → repo_apply_patch` | 75 | ~1.285 s | ~14,4 s |
-| `repo_read_file → repo_search_text` | 83 | ~1.102 s | ~10,5 s |
-| `repo_search_text → repo_read_file` | 131 | ~1.012 s | ~7,0 s |
-| `repo_read_file → repo_read_file` | 94 | ~848 s | ~7,0 s |
-| `repo_apply_patch_batch → run_copilot_validator` | 67 | ~826 s | ~11,5 s |
-| `repo_search_text → repo_apply_patch_batch` | 32 | ~736 s | ~19,7 s |
-| `repo_apply_patch_batch → repo_read_file` | 65 | ~721 s | ~8,6 s |
-| `repo_apply_patch → run_copilot_validator` | 60 | ~682 s | ~10,4 s |
-| `repo_search_text → repo_search_text` | 64 | ~647 s | ~8,0 s |
-| `repo_bulk_inspect → repo_apply_patch_batch` | 21 | ~526 s | ~22,7 s |
-| `repo_file_stats → repo_apply_patch` | 25 | ~523 s | ~20,1 s |
-| `repo_file_stats → repo_apply_patch_batch` | 20 | ~395 s | ~17,9 s |
+| transição                                         |   n | gap acumulado |     p50 |
+| ------------------------------------------------- | --: | ------------: | ------: |
+| `repo_read_file → repo_apply_patch_batch`         | 101 |      ~2.274 s | ~21,2 s |
+| `repo_apply_patch_batch → repo_apply_patch_batch` |  69 |      ~1.553 s | ~21,7 s |
+| `repo_apply_patch → repo_apply_patch`             | 121 |      ~1.532 s | ~12,1 s |
+| `repo_read_file → repo_apply_patch`               |  75 |      ~1.285 s | ~14,4 s |
+| `repo_read_file → repo_search_text`               |  83 |      ~1.102 s | ~10,5 s |
+| `repo_search_text → repo_read_file`               | 131 |      ~1.012 s |  ~7,0 s |
+| `repo_read_file → repo_read_file`                 |  94 |        ~848 s |  ~7,0 s |
+| `repo_apply_patch_batch → run_copilot_validator`  |  67 |        ~826 s | ~11,5 s |
+| `repo_search_text → repo_apply_patch_batch`       |  32 |        ~736 s | ~19,7 s |
+| `repo_apply_patch_batch → repo_read_file`         |  65 |        ~721 s |  ~8,6 s |
+| `repo_apply_patch → run_copilot_validator`        |  60 |        ~682 s | ~10,4 s |
+| `repo_search_text → repo_search_text`             |  64 |        ~647 s |  ~8,0 s |
+| `repo_bulk_inspect → repo_apply_patch_batch`      |  21 |        ~526 s | ~22,7 s |
+| `repo_file_stats → repo_apply_patch`              |  25 |        ~523 s | ~20,1 s |
+| `repo_file_stats → repo_apply_patch_batch`        |  20 |        ~395 s | ~17,9 s |
 
-Estes números não significam que toda transição possa ser removida. Eles definem **onde cada round-trip evitado tem maior ROI**.
+Estes números não significam que toda transição possa ser removida. Eles definem **onde cada
+round-trip evitado tem maior ROI**.
 
 ## 3.3 Valor contrafactual de composição
 
@@ -155,7 +183,9 @@ Se `silent gap p50 = 10 s`, então:
 10 calls → 1 call  ≈ até 90 s
 ```
 
-Isso é contrafactual, não medição de economia garantida. Parte do tempo é reasoning necessário. Ainda assim, o audit mostra que ferramentas locais frequentemente terminam em milissegundos enquanto o origin permanece sem nova atividade por segundos.
+Isso é contrafactual, não medição de economia garantida. Parte do tempo é reasoning necessário.
+Ainda assim, o audit mostra que ferramentas locais frequentemente terminam em milissegundos enquanto
+o origin permanece sem nova atividade por segundos.
 
 ---
 
@@ -261,7 +291,8 @@ explicit path validation
 → final verification
 ```
 
-As tools granulares continuam úteis para exceções/forense, mas não devem ser o default de rotina quando a worktree já está normalizada.
+As tools granulares continuam úteis para exceções/forense, mas não devem ser o default de rotina
+quando a worktree já está normalizada.
 
 ---
 
@@ -288,7 +319,8 @@ Logo, metadata interna stale pode ensinar o próprio modelo a subutilizar a tool
 
 ## 5.2 Drift entre servidor e host ChatGPT
 
-Na mesma conversa desta investigação, após reload/reconnect e servidor já em nova geração, o schema projetado pelo host para `repo_apply_patch_batch` ainda dizia:
+Na mesma conversa desta investigação, após reload/reconnect e servidor já em nova geração, o schema
+projetado pelo host para `repo_apply_patch_batch` ainda dizia:
 
 ```text
 max 64 operations
@@ -322,16 +354,23 @@ O servidor atual:
 - porém lê `COPILOT_MCP_SERVER_TOOLS_LIST_CHANGED` com default **false**;
 - não existe chamada explícita a `sendToolListChanged()`.
 
-A especificação MCP 2025-11-25 prevê `notifications/tools/list_changed` quando a capacidade é anunciada. A documentação atual do TypeScript SDK expõe `sendToolListChanged()` e atualização automática por handles de registration/update.
+A especificação MCP 2025-11-25 prevê `notifications/tools/list_changed` quando a capacidade é
+anunciada. A documentação atual do TypeScript SDK expõe `sendToolListChanged()` e atualização
+automática por handles de registration/update.
 
 Fontes primárias consultadas:
 
-- MCP tools, versão 2025-11-25: <https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx>
-- MCP TypeScript SDK — notifications: <https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/servers/notifications.md>
-- MCP schema 2026-07-28, para evolução futura/subscriptions: <https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2026-07-28/schema.ts>
-- OpenAI — Developer mode e apps MCP em ChatGPT: <https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt-beta>
+- MCP tools, versão 2025-11-25:
+  <https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx>
+- MCP TypeScript SDK — notifications:
+  <https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/servers/notifications.md>
+- MCP schema 2026-07-28, para evolução futura/subscriptions:
+  <https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/schema/2026-07-28/schema.ts>
+- OpenAI — Developer mode e apps MCP em ChatGPT:
+  <https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt-beta>
 
-A documentação pública da OpenAI consultada não estabelece garantia de que um restart do servidor force imediatamente um refresh de descriptors já projetados na conversa. Portanto:
+A documentação pública da OpenAI consultada não estabelece garantia de que um restart do servidor
+force imediatamente um refresh de descriptors já projetados na conversa. Portanto:
 
 > **Não devemos assumir que restart == schema refresh.**
 
@@ -367,7 +406,8 @@ patch
 → patch novamente
 ```
 
-Com p50 inter-tool de 10–20 s, esta recuperação pode custar dezenas de segundos apesar de o engine local poder coletar diagnóstico bounded em milissegundos.
+Com p50 inter-tool de 10–20 s, esta recuperação pode custar dezenas de segundos apesar de o engine
+local poder coletar diagnóstico bounded em milissegundos.
 
 ## 6.1 Recovery evidence desejada
 
@@ -398,7 +438,8 @@ Não:
 
 # 7. Descoberta P0 — audit não mede causal failure corretamente
 
-O audit atual registra eventos agregados de patch, mas não persiste de forma first-class uma distribuição sanitizada de códigos como:
+O audit atual registra eventos agregados de patch, mas não persiste de forma first-class uma
+distribuição sanitizada de códigos como:
 
 - `ERR_PATCH_NOT_FOUND`;
 - `ERR_PATCH_AMBIGUOUS_MATCH`;
@@ -406,7 +447,9 @@ O audit atual registra eventos agregados de patch, mas não persiste de forma fi
 - `ERR_PATCH_NOOP`;
 - `ERR_PATCH_CONFLICTING_MODE`.
 
-Além disso, generic `tool_call_completed` pode coexistir com `structuredContent.success=false`/partial workflow, pois o transporte da tool completou corretamente.
+Além disso, generic `tool_call_completed` pode coexistir com
+`structuredContent.success=false`/partial workflow, pois o transporte da tool completou
+corretamente.
 
 Logo, `tool errors` não são iguais a `workflow failures`.
 
@@ -463,7 +506,8 @@ Métricas futuras:
 
 **Estado:** fortemente enfraquecida.
 
-O patch atual já usa fast mode por default. File batch é adaptativo. Muitos eventos chamados “global-preflight” eram single-target com preflight elidido.
+O patch atual já usa fast mode por default. File batch é adaptativo. Muitos eventos chamados
+“global-preflight” eram single-target com preflight elidido.
 
 ## H-RT-002 — caller ainda força `global-preflight` por hábito/metadata stale
 
@@ -475,7 +519,8 @@ Mitigação: guidance canônica + schema convergence + policy lint.
 
 **Estado:** confirmada por incidentes recentes.
 
-Mitigação: candidate evidence, anchor quality diagnostics, structural alternatives onde justificadas.
+Mitigação: candidate evidence, anchor quality diagnostics, structural alternatives onde
+justificadas.
 
 ## H-RT-004 — `expected_occurrences` é usado quando unique-exact já seria suficiente
 
@@ -505,7 +550,8 @@ Mitigação: schema epoch/fingerprint + listChanged + compatibility envelopes + 
 
 **Estado:** rejeitada como causa central.
 
-`tools/list` ~134 KiB está dentro do budget. Payload pode afetar context pressure, mas não explica bloqueios de anchor/schema.
+`tools/list` ~134 KiB está dentro do budget. Payload pode afetar context pressure, mas não explica
+bloqueios de anchor/schema.
 
 ## H-RT-009 — número de tools é a causa dos bloqueios
 
@@ -517,7 +563,8 @@ Mitigação: schema epoch/fingerprint + listChanged + compatibility envelopes + 
 
 **Estado:** rejeitada.
 
-Apply tools revalidam. Plan separado só deve existir quando preview/human approval/forensics agrega informação.
+Apply tools revalidam. Plan separado só deve existir quando preview/human approval/forensics agrega
+informação.
 
 ## H-RT-011 — partial progress é perigoso demais e deve ser desativado
 
@@ -601,7 +648,8 @@ Preferir composites estreitos, bounded e auditáveis.
 
 **Estado:** condicional.
 
-Útil para I/O independente; perigoso para validators/processos pesados. Resource class deve governar concurrency.
+Útil para I/O independente; perigoso para validators/processos pesados. Resource class deve governar
+concurrency.
 
 ## H-RT-025 — result truncation pode gerar rereads
 
@@ -685,7 +733,8 @@ Pode reduzir fricção se o block é approval/risk, mas não se schema está sta
 
 **Estado:** impossível integralmente.
 
-Server conhece seu descriptor, não o schema já materializado no modelo. Precisa evidence do host/caller.
+Server conhece seu descriptor, não o schema já materializado no modelo. Precisa evidence do
+host/caller.
 
 ## H-RT-039 — tool description drift é apenas documentação
 
@@ -775,7 +824,9 @@ O nome `global-preflight` induz diagnóstico causal errado.
 
 ### B-RT-019 — audit JSONL grande exigia tail truncation
 
-**estado:** `[x]` mitigado estruturalmente para round-trip analytics com índice incremental derivado. A attribution legacy ainda pode usar tail bounded para outras evidências, mas esta frente não depende mais de revarrer os 19+MiB para métricas longitudinais.
+**estado:** `[x]` mitigado estruturalmente para round-trip analytics com índice incremental
+derivado. A attribution legacy ainda pode usar tail bounded para outras evidências, mas esta frente
+não depende mais de revarrer os 19+MiB para métricas longitudinais.
 
 ### B-RT-020 — audit schema histórico variou
 
@@ -839,7 +890,8 @@ Idempotência operacional inconsistente.
 
 ### B-RT-035 — `tools/list` descriptor bytes concentram-se em descriptions de inputSchema
 
-Não é causa central, mas há ~29 KiB de descriptions dentro de schemas; compaction futura pode preservar semântica com menos contexto.
+Não é causa central, mas há ~29 KiB de descriptions dentro de schemas; compaction futura pode
+preservar semântica com menos contexto.
 
 ### B-RT-036 — docs index ainda não conhece este roadmap especializado
 
@@ -911,11 +963,14 @@ external
 
 ### G-RT-018 — analytics incremental completo sobre audit JSONL
 
-**estado:** `[x]` fechado na arquitetura atual: reader por byte offset/newline, file identity, SQLite derivado, idempotência por source offset, retention bounded, monitor non-blocking e testes de rotação/idempotência.
+**estado:** `[x]` fechado na arquitetura atual: reader por byte offset/newline, file identity,
+SQLite derivado, idempotência por source offset, retention bounded, monitor non-blocking e testes de
+rotação/idempotência.
 
 ### G-RT-019 — não existe schema-version migration normalizer para audit histórico
 
-**estado:** `[~]` legacy rows já recebem fallbacks `unknown-or-legacy`; falta migração mais rica se análises antigas exigirem semântica equivalente aos novos eventos causais.
+**estado:** `[~]` legacy rows já recebem fallbacks `unknown-or-legacy`; falta migração mais rica se
+análises antigas exigirem semântica equivalente aos novos eventos causais.
 
 ### G-RT-020 — não existe plan-value metric
 
@@ -1047,7 +1102,8 @@ recognize-only        # reporta converged, sem tratar como write
 accept-converged      # workflowSuccess=true, mutationState=already-converged
 ```
 
-Default inicial sugerido: `recognize-only` ou `accept-converged` apenas em batch/composite onde idempotência é explícita.
+Default inicial sugerido: `recognize-only` ou `accept-converged` apenas em batch/composite onde
+idempotência é explícita.
 
 ## 14.3 Nível 2 — bounded diagnostics
 
@@ -1116,7 +1172,8 @@ Caminho: explicit confirmation/preflight suficiente para o risco.
 
 **Nunca promover R3 para R1 apenas para reduzir round-trip.**
 
-O ganho deve vir de fundir preflight e apply dentro da mesma tool governada quando a plataforma permitir confirmação explícita no mesmo request, não de retirar o gate.
+O ganho deve vir de fundir preflight e apply dentro da mesma tool governada quando a plataforma
+permitir confirmação explícita no mesmo request, não de retirar o gate.
 
 ---
 
@@ -1183,7 +1240,8 @@ host-refresh-required
 
 # 17. Stable compatibility envelopes
 
-Campos que mudam com frequência não devem necessariamente virar enums rígidos no schema materializado pelo host.
+Campos que mudam com frequência não devem necessariamente virar enums rígidos no schema
+materializado pelo host.
 
 Padrão já usado com validator:
 
@@ -1237,7 +1295,8 @@ Estado-alvo:
 Policy:
 
 - default direct apply para bounded write;
-- plan só se `previewRequired=true`, risco alto, user pediu preview ou caller ainda não tem intent suficiente.
+- plan só se `previewRequired=true`, risco alto, user pediu preview ou caller ainda não tem intent
+  suficiente.
 
 ## 18.4 validator → poll → tail
 
@@ -1446,12 +1505,17 @@ Legenda:
 
 ### B0 — outcome model
 
-- [~] `failureClass` implementado inicialmente para patch (`stale-context`, `ambiguous-context`, `integrity`, `dependency-abort`, `already-converged`, `shape-config`, `unknown`); falta promover a contrato transversal;
+- [~] `failureClass` implementado inicialmente para patch (`stale-context`, `ambiguous-context`,
+  `integrity`, `dependency-abort`, `already-converged`, `shape-config`, `unknown`); falta promover a
+  contrato transversal;
 - [~] `failureScope` implementado em patch (`target`/`dependency-group`); falta generalização;
 - [~] `retryability` implementado em patch; falta registry transversal;
-- [~] `mutationState` implementado em patch (`none`, `already-converged-candidate`, `already-converged`, `fully-applied`); falta envelope comum;
-- [~] `workflowSuccess` já existe/foi propagado nos paths principais de patch; falta transversalidade;
-- [~] `alreadyConverged` reconhecido informacionalmente como candidato; promoção automática continua deliberadamente pendente.
+- [~] `mutationState` implementado em patch (`none`, `already-converged-candidate`,
+  `already-converged`, `fully-applied`); falta envelope comum;
+- [~] `workflowSuccess` já existe/foi propagado nos paths principais de patch; falta
+  transversalidade;
+- [~] `alreadyConverged` reconhecido informacionalmente como candidato; promoção automática continua
+  deliberadamente pendente.
 
 ### B1 — compatibility
 
@@ -1469,23 +1533,28 @@ Legenda:
 - [x] desired string presence/count/linhas bounded;
 - [x] candidate line windows bounded por fragmentos do próprio `old_string`;
 - [x] whitespace-normalized evidence;
-- [x] scan/result budget estrito (scan rico apenas até 4 MiB de chars, linhas/ocorrências limitadas);
+- [x] scan/result budget estrito (scan rico apenas até 4 MiB de chars, linhas/ocorrências
+      limitadas);
 - [x] zero fuzzy mutation — heurísticas são somente evidência.
 
 ### C1 — convergence
 
 - [x] detect desired already present exatamente e cardinalidade bounded;
-- [x] `recognize-only` policy: `convergenceCandidate=true`, `mutationState=already-converged-candidate`, zero write;
+- [x] `recognize-only` policy: `convergenceCandidate=true`,
+      `mutationState=already-converged-candidate`, zero write;
 - [ ] avaliar `accept-converged` em composite idempotente;
 - [x] tests CRLF/BOM/whitespace;
-- [~] hash do estado locked/virtual testado; stress específico de concurrent hash drift ainda pendente.
+- [~] hash do estado locked/virtual testado; stress específico de concurrent hash drift ainda
+  pendente.
 
 ### C2 — batch propagation
 
 - [x] preserve one causal row por target;
 - [x] dependents separados como `dependency-abort`;
-- [x] independent progress preservado em `per-target-fast` e provado durante a própria implementação;
-- [x] `nextAction` usa currentHash/normalization/candidateLines e evita reread somente-diagnóstico quando possível.
+- [x] independent progress preservado em `per-target-fast` e provado durante a própria
+      implementação;
+- [x] `nextAction` usa currentHash/normalization/candidateLines e evita reread somente-diagnóstico
+      quando possível.
 
 ## FAIXA D — audit e analytics
 
@@ -1500,18 +1569,24 @@ Legenda:
 ### D1 — incremental analyzer
 
 - [x] schema version do índice derivado;
-- [x] cursor por byte offset + identidade do arquivo, com ingestão idempotente por `(source_identity, source_offset)`;
-- [x] SQLite compartilhado em WAL como índice reconstruível, mantendo JSONL append-only como source-of-record;
-- [~] historical normalizer indexa schema legacy com fallbacks `unknown-or-legacy`; ampliar migração semântica quando necessário;
+- [x] cursor por byte offset + identidade do arquivo, com ingestão idempotente por
+      `(source_identity, source_offset)`;
+- [x] SQLite compartilhado em WAL como índice reconstruível, mantendo JSONL append-only como
+      source-of-record;
+- [~] historical normalizer indexa schema legacy com fallbacks `unknown-or-legacy`; ampliar migração
+  semântica quando necessário;
 - [x] janelas configuráveis até 14 dias, com default 24h;
-- [x] eliminada dependência estrutural do tail de 4MiB: primeiro backfill pode consumir chunks incrementais e ciclos seguintes apenas bytes novos;
+- [x] eliminada dependência estrutural do tail de 4MiB: primeiro backfill pode consumir chunks
+      incrementais e ciclos seguintes apenas bytes novos;
 - [x] eventos de fixtures `/.ai/jobs/` marcados `synthetic` e excluídos por default;
 - [x] rotação/truncamento detectados sem continuidade silenciosa;
-- [x] monitor non-blocking de baixa frequência implementado no lifecycle HTTP; readiness não depende dele.
+- [x] monitor non-blocking de baixa frequência implementado no lifecycle HTTP; readiness não depende
+      dele.
 
 ### D2 — workflow traces
 
-- [x] `fail→inspect→retry` reconstruído em janela bounded de recovery, com round-trips e wall-clock tax;
+- [x] `fail→inspect→retry` reconstruído em janela bounded de recovery, com round-trips e wall-clock
+      tax;
 - [x] `plan→apply` contado para patch/file/Git pairs conhecidos;
 - [ ] `patch→validate` ganha trace dedicado em vez de depender apenas de transition ranking;
 - [x] validator polling/tail contado via `job_get_summary`/`job_get_output`;
@@ -1549,23 +1624,39 @@ Legenda:
 
 ### F1 — MCP listChanged
 
-- [x] comportamento do método `sendToolListChanged()` coberto com fake determinístico e envio live aceito pelo SDK/transport;
+- [x] comportamento do método `sendToolListChanged()` coberto com fake determinístico e envio live
+      aceito pelo SDK/transport;
 - [x] capability `tools.listChanged=true` habilitada por default com env rollback existente;
-- [x] nudge bootstrap one-shot por descriptor revision, fire-and-forget e sem fan-out por session churn;
+- [x] nudge bootstrap one-shot por descriptor revision, fire-and-forget e sem fan-out por session
+      churn;
 - [ ] verify tools/list refresh com inspector dedicado;
-- [x] ChatGPT connector verificado live: notification enviada com sucesso, mas após 5 sessões `toolsListObservedCount=0`; host **não** relistou automaticamente nesta conversa;
+- [x] ChatGPT connector verificado live: notification enviada com sucesso, mas após 5 sessões
+      `toolsListObservedCount=0`; host **não** relistou automaticamente nesta conversa;
 - [x] rollback switch: `COPILOT_MCP_SERVER_TOOLS_LIST_CHANGED=false`.
 
-**Prova live 2026-08-18:** runtime epoch `ab77be78-...`, descriptor revision 1, tool count 125, `listChangedAdvertised=true`, `listChangedAttemptCount=1`, `listChangedSentCount=1`, `listChangedErrorCount=0`, `toolsListObservedCount=0`, status `notification-sent-awaiting-refresh`. Antes do nudge, a geração anterior ficou `server-descriptor-unlisted` com 2 sessões e zero `tools/list`. Portanto notification correta é insuficiente para forçar o refresh do host; repetir/spammar notifications não é a estratégia alvo.
+**Prova live 2026-08-18:** runtime epoch `ab77be78-...`, descriptor revision 1, tool count 125,
+`listChangedAdvertised=true`, `listChangedAttemptCount=1`, `listChangedSentCount=1`,
+`listChangedErrorCount=0`, `toolsListObservedCount=0`, status `notification-sent-awaiting-refresh`.
+Antes do nudge, a geração anterior ficou `server-descriptor-unlisted` com 2 sessões e zero
+`tools/list`. Portanto notification correta é insuficiente para forçar o refresh do host;
+repetir/spammar notifications não é a estratégia alvo.
 
 ### F2 — client fallback
 
-- [~] estados `server-descriptor-unlisted`, `notification-sent-awaiting-refresh`, `converged-observed` e `server-changed-client-unverified` já existem; `mcp_host_block_diagnostics` agora aceita evidence explícita de schema rejection antes do MCP;
-- [x] `mcp_host_block_diagnostics` classifica `LIKELY_STALE_CLIENT_SCHEMA_PROJECTION`, projeta capability truth e instrui a **não** inserir uma plan call apenas para contornar schema stale;
-- [x] compatibility envelope live no validator: cliente stale pode pedir `batchConcurrency=2`, mas runtime normaliza para `effectiveConcurrency=1`, retorna `compatibilityNormalized=true` e preserva headroom;
-- [~] compatibility envelope já usado em validator bounded-string/legacy concurrency; expandir seletivamente para outros campos high-churn onde safety permanecer server-enforced;
-- [x] `mcp_tools_status` virou compact truth surface com `executionLimitsVersion`, limits reais, schema convergence e `planFirstWorkflows=[]`;
-- [!] lifecycle/cache total da projeção de schema no ChatGPT host — externo e, no experimento live, não reativo a `tools/list_changed`.
+- [~] estados `server-descriptor-unlisted`, `notification-sent-awaiting-refresh`,
+  `converged-observed` e `server-changed-client-unverified` já existem; `mcp_host_block_diagnostics`
+  agora aceita evidence explícita de schema rejection antes do MCP;
+- [x] `mcp_host_block_diagnostics` classifica `LIKELY_STALE_CLIENT_SCHEMA_PROJECTION`, projeta
+      capability truth e instrui a **não** inserir uma plan call apenas para contornar schema stale;
+- [x] compatibility envelope live no validator: cliente stale pode pedir `batchConcurrency=2`, mas
+      runtime normaliza para `effectiveConcurrency=1`, retorna `compatibilityNormalized=true` e
+      preserva headroom;
+- [~] compatibility envelope já usado em validator bounded-string/legacy concurrency; expandir
+  seletivamente para outros campos high-churn onde safety permanecer server-enforced;
+- [x] `mcp_tools_status` virou compact truth surface com `executionLimitsVersion`, limits reais,
+      schema convergence e `planFirstWorkflows=[]`;
+- [!] lifecycle/cache total da projeção de schema no ChatGPT host — externo e, no experimento live,
+  não reativo a `tools/list_changed`.
 
 ## FAIXA G — preflight adaptativo
 
@@ -1612,11 +1703,16 @@ Legenda:
 
 - [x] server-side `postValidate` projetado e utilizável pelo host atual;
 - [x] anti-nesting/capacity guards;
-- [x] duas provas live via tool projetada: patch único + teste focado e batch 7 patches/2 targets + teste focado, ambos com validator concluído na mesma resposta;
-- [x] `workflowSuccess` separa apply de post-validation e o resultado devolve job/status/tempo bounded;
-- [~] analyzer incremental agora separa `patchThenValidatorTransitions` de `compositePostValidationCount`; acumular série pós-rollout;
-- [x] prova de custo local: apply ~25–31ms; validator ~1,2–2,6s na mesma call, evitando um novo gap externo de vários segundos;
-- [ ] fault injection específico: write aplicado + post-validation falha, confirmando semantics de não-retry do patch.
+- [x] duas provas live via tool projetada: patch único + teste focado e batch 7 patches/2 targets +
+      teste focado, ambos com validator concluído na mesma resposta;
+- [x] `workflowSuccess` separa apply de post-validation e o resultado devolve job/status/tempo
+      bounded;
+- [~] analyzer incremental agora separa `patchThenValidatorTransitions` de
+  `compositePostValidationCount`; acumular série pós-rollout;
+- [x] prova de custo local: apply ~25–31ms; validator ~1,2–2,6s na mesma call, evitando um novo gap
+      externo de vários segundos;
+- [ ] fault injection específico: write aplicado + post-validation falha, confirmando semantics de
+      não-retry do patch.
 
 ## FAIXA K — validation control plane
 
@@ -1624,31 +1720,44 @@ Legenda:
 - [x] concurrency efetiva 1;
 - [x] inline completion;
 - [x] bounded failure tail;
-- [x] guidance removeu validation plan do happy path; `run_copilot_validator` está em `directBatchWorkflows`;
+- [x] guidance removeu validation plan do happy path; `run_copilot_validator` está em
+      `directBatchWorkflows`;
 - [x] `mcp_validation_plan` marcado como escalation-only no status compacto;
-- [x] compatibility input `batchConcurrency<=2` é normalizado para 1, evitando rejeição por schema stale sem reabrir concorrência;
-- [~] `validatorPollCount` já é mensurável no analyzer incremental; meta é fazê-lo tender a zero no caminho normal.
+- [x] compatibility input `batchConcurrency<=2` é normalizado para 1, evitando rejeição por schema
+      stale sem reabrir concorrência;
+- [~] `validatorPollCount` já é mensurável no analyzer incremental; meta é fazê-lo tender a zero no
+  caminho normal.
 
 ## FAIXA L — Git publication
 
-- [x] `git_publish_changes` existe e cobre stage→commit→optional push→final verification com paths explícitos;
-- [x] `mcp_tools_status.publicationWorkflow.preferred=git_publish_changes` torna one-shot o happy path explícito;
-- [x] granular fallback matrix explicitada: staged index preexistente, merge/rebase, HEAD/upstream drift, preview/forensics ou partial publish failure;
+- [x] `git_publish_changes` existe e cobre stage→commit→optional push→final verification com paths
+      explícitos;
+- [x] `mcp_tools_status.publicationWorkflow.preferred=git_publish_changes` torna one-shot o happy
+      path explícito;
+- [x] granular fallback matrix explicitada: staged index preexistente, merge/rebase, HEAD/upstream
+      drift, preview/forensics ou partial publish failure;
 - [x] preserve explicit paths, expected HEAD/upstream e proibição de force/refspec arbitrário;
 - [x] analyzer decompõe `planThenApplyByPair` e `gitGranularByTool`;
-- [x] baseline live 24h: 84 calls Git granulares vs 5 one-shot (ratio 16,8×); os 37 `plan→apply` são integralmente Git: stage 11, commit 13, push 13;
-- [~] este próprio milestone será publicado por `git_publish_changes` para provar o caminho one-shot end-to-end;
+- [x] baseline live 24h: 84 calls Git granulares vs 5 one-shot (ratio 16,8×); os 37 `plan→apply` são
+      integralmente Git: stage 11, commit 13, push 13;
+- [~] este próprio milestone será publicado por `git_publish_changes` para provar o caminho one-shot
+  end-to-end;
 - [ ] acompanhar queda longitudinal do ratio granular/one-shot após adoção.
 
 ## FAIXA M — host approval/block friction
 
 - [~] annotations existem e continuam sendo refinadas;
-- [x] `mcp_host_block_diagnostics` separa host-precall, schema projection stale, OAuth e server/tool result;
+- [x] `mcp_host_block_diagnostics` separa host-precall, schema projection stale, OAuth e server/tool
+      result;
 - [ ] stable host-block evidence record persistente (bloqueios precall não chegam ao audit MCP);
 - [x] `reached-server` é discriminador first-class no diagnóstico manual;
 - [x] schema-error vs generic approval/safety vs OAuth taxonomy disponível;
-- [x] fallback por classe: schema stale usa capability truth/reprojection, e plan só é sugerido quando preview/risk boundary agrega informação;
-- [x] A/B live: uma call de 4 exact patches/2 targets foi bloqueada precall pelo host; 3 operações no mesmo target e o patch único do segundo target passaram. Evidência sugere que shape/complexidade pode aumentar friction mesmo com risco material semelhante; não inferir threshold determinístico ainda;
+- [x] fallback por classe: schema stale usa capability truth/reprojection, e plan só é sugerido
+      quando preview/risk boundary agrega informação;
+- [x] A/B live: uma call de 4 exact patches/2 targets foi bloqueada precall pelo host; 3 operações
+      no mesmo target e o patch único do segundo target passaram. Evidência sugere que
+      shape/complexidade pode aumentar friction mesmo com risco material semelhante; não inferir
+      threshold determinístico ainda;
 - [!] host safety policy permanece externa.
 
 ## FAIXA N — payload/result pressure
@@ -1773,7 +1882,8 @@ A meta é remover **cerimônia sem informação**, não controles de integridade
 
 ### ADR-RTR-001 — round-trip é budget arquitetural
 
-Toda nova tool/composite deve justificar quantas devoluções ao host/modelo exige para o objetivo lógico normal.
+Toda nova tool/composite deve justificar quantas devoluções ao host/modelo exige para o objetivo
+lógico normal.
 
 ### ADR-RTR-002 — preflight é risk-adaptive
 
@@ -2010,15 +2120,19 @@ A execução deve seguir esta ordem, evitando abrir muitas frentes simultâneas:
 14. broader composites only after evidence
 ```
 
-A razão desta ordem é simples: **primeiro reduzir falhas que desperdiçam calls; depois reduzir calls que já eram bem-sucedidas**.
+A razão desta ordem é simples: **primeiro reduzir falhas que desperdiçam calls; depois reduzir calls
+que já eram bem-sucedidas**.
 
 ---
 
 # 29. Conclusão
 
-O problema de round-trip no WORKSPACE MCP não é falta de poder bruto. O servidor já possui batches, locks, atomicidade por arquivo, bulk inspect, working sets, validators allowlisted, Git one-shot e uma extensa tool surface.
+O problema de round-trip no WORKSPACE MCP não é falta de poder bruto. O servidor já possui batches,
+locks, atomicidade por arquivo, bulk inspect, working sets, validators allowlisted, Git one-shot e
+uma extensa tool surface.
 
-O gargalo arquitetural atual é a **convergência entre intenção, precondition, recovery evidence e schema efetivamente visto pelo host**.
+O gargalo arquitetural atual é a **convergência entre intenção, precondition, recovery evidence e
+schema efetivamente visto pelo host**.
 
 A prioridade P0 não é criar um “super batch”. É fazer com que as tools existentes:
 
@@ -2044,4 +2158,7 @@ unsafe/ambiguous path:
 intent → block → explicit evidence → human/model decision
 ```
 
-Essa arquitetura é compatível com autonomia elevada **sem confundir autonomia com remoção de garantias**. Ela ataca exatamente o custo que o ILCP demonstrou ser dominante: cada devolução desnecessária ao host/modelo pode custar segundos ou dezenas de segundos, enquanto a correção local geralmente custa milissegundos.
+Essa arquitetura é compatível com autonomia elevada **sem confundir autonomia com remoção de
+garantias**. Ela ataca exatamente o custo que o ILCP demonstrou ser dominante: cada devolução
+desnecessária ao host/modelo pode custar segundos ou dezenas de segundos, enquanto a correção local
+geralmente custa milissegundos.

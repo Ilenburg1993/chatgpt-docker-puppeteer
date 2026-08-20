@@ -15,11 +15,19 @@ const MAX_RECOVERABLE_ALERT_KEYS = 512;
 
 /**
  * @typedef {import('../../core/event-bus.js').EventBus} EventBus
+ *
  * @typedef {import('../error-tracker.js').ErrorTracker} ErrorTracker
  */
 
 /**
- * @param {{ type: string; errorContext?: unknown; recoverable?: unknown; sessionId?: unknown; errorMessage?: unknown; message?: unknown }} evt
+ * @param {{
+ *     type: string;
+ *     errorContext?: unknown;
+ *     recoverable?: unknown;
+ *     sessionId?: unknown;
+ *     errorMessage?: unknown;
+ *     message?: unknown;
+ * }} evt
  * @returns {boolean}
  */
 function isRecoverableModelCallHookError(evt) {
@@ -27,9 +35,9 @@ function isRecoverableModelCallHookError(evt) {
 }
 
 /**
- * Alguns eventos de erro do bus são envelopes de alerta para uma falha causal já rastreada por outro dono
- * canônico (`sdk:session.error`, `agent:task:error`, tool lifecycle etc.). O alerter pode narrar/logar esses
- * eventos, mas não deve criar uma segunda entrada sintética em `/errors`.
+ * Alguns eventos de erro do bus são envelopes de alerta para uma falha causal já rastreada por outro dono canônico
+ * (`sdk:session.error`, `agent:task:error`, tool lifecycle etc.). O alerter pode narrar/logar esses eventos, mas não
+ * deve criar uma segunda entrada sintética em `/errors`.
  *
  * @param {{ type: string }} evt
  * @returns {boolean}
@@ -52,7 +60,13 @@ function buildAlertDedupeKey(evt) {
 }
 
 /**
- * @param {{ bus: EventBus; onAlert?: (evt: { type: string; timestamp: number }) => void; errorTracker?: { trackError: (error: unknown, options?: import('../error-tracker.js').TrackErrorOptions) => unknown } | null }} deps
+ * @param {{
+ *     bus: EventBus;
+ *     onAlert?: (evt: { type: string; timestamp: number }) => void;
+ *     errorTracker?: {
+ *         trackError: (error: unknown, options?: import('../error-tracker.js').TrackErrorOptions) => unknown;
+ *     } | null;
+ * }} deps
  * @returns {{ unsub: () => void; hasAction: true; name: string }}
  */
 export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) {
@@ -62,7 +76,13 @@ export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) 
     const lastRecoverableAlertAtByKey = new Map();
 
     /**
-     * @param {{ type: string; errorContext?: unknown; sessionId?: unknown; errorMessage?: unknown; message?: unknown }} evt
+     * @param {{
+     *     type: string;
+     *     errorContext?: unknown;
+     *     sessionId?: unknown;
+     *     errorMessage?: unknown;
+     *     message?: unknown;
+     * }} evt
      * @param {number} now
      * @returns {boolean}
      */
@@ -88,7 +108,17 @@ export function createErrorAlerterAction({ bus, onAlert, errorTracker = null }) 
 
     const alertFn =
         onAlert ??
-        ((/** @type {{ type: string; errorMessage?: string; message?: string; source?: string; errorContext?: unknown; recoverable?: unknown; sessionId?: unknown }} */ evt) => {
+        ((
+            /** @type {{
+    type: string;
+    errorMessage?: string;
+    message?: string;
+    source?: string;
+    errorContext?: unknown;
+    recoverable?: unknown;
+    sessionId?: unknown;
+}} */ evt,
+        ) => {
             const detail = evt.errorMessage || evt.message || '';
             const source = evt.source ? ` · source=${evt.source}` : '';
             if (isRecoverableModelCallHookError(evt)) {

@@ -11,8 +11,8 @@
 import {
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
-    buildModelGatewayRuntimeAutomationDecision,
     buildModelGatewayRuntimeAutomationControllerStep,
+    buildModelGatewayRuntimeAutomationDecision,
     buildModelGatewayRuntimeSelectorPlan,
     compareModelGatewaySelectionAudits,
     createEnvSecretRegistry,
@@ -32,10 +32,7 @@ import {
     listTerminalSdkSessionInventory,
     readTerminalConfiguredSessionFsState,
 } from '../frontend/gateways/session/index.js';
-import {
-    requestTerminalLiveByokModelSwitch,
-    requestTerminalLiveByokRouteSwitch,
-} from './live-model-switch.js';
+import { requestTerminalLiveByokModelSwitch, requestTerminalLiveByokRouteSwitch } from './live-model-switch.js';
 
 /**
  * @param {unknown} value
@@ -126,7 +123,17 @@ function renderAutomationTokenLabel(value) {
 /**
  * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
  * @param {Record<string, unknown>} turnFailure
- * @returns {{ routeProfile: string; providerId: string | null; providerModel: string | null; failureKind: string; message: string | null; errorContext: string | null; failureStatusCode: number | null; retryAfterSeconds: number | null; resetAt: string | null }}
+ * @returns {{
+ *     routeProfile: string;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     failureKind: string;
+ *     message: string | null;
+ *     errorContext: string | null;
+ *     failureStatusCode: number | null;
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ * }}
  */
 function resolvePostTurnHealthFailure(status, turnFailure) {
     const targetBoundary =
@@ -147,8 +154,10 @@ function resolvePostTurnHealthFailure(status, turnFailure) {
         failureKind,
         message: optionalScalarString(turnFailure['message']) ?? `BYOK post-turn failure: ${failureKind}`,
         errorContext: optionalScalarString(turnFailure['errorContext']) ?? 'terminal.byok.post_turn_failure',
-        failureStatusCode: optionalFiniteNumber(turnFailure['failureStatusCode']) ?? defaultFailureStatusCode(failureKind),
-        retryAfterSeconds: optionalFiniteNumber(turnFailure['retryAfterSeconds']) ?? defaultRetryAfterSeconds(failureKind),
+        failureStatusCode:
+            optionalFiniteNumber(turnFailure['failureStatusCode']) ?? defaultFailureStatusCode(failureKind),
+        retryAfterSeconds:
+            optionalFiniteNumber(turnFailure['retryAfterSeconds']) ?? defaultRetryAfterSeconds(failureKind),
         resetAt: optionalIsoTimestamp(turnFailure['resetAt']),
     };
 }
@@ -170,7 +179,9 @@ export function describeTerminalByokGatewayAutoEffect(effect) {
         if (previousModel && currentModel && previousModel !== currentModel) {
             return `modelo vivo solicitado ${previousModel} → ${currentModel}${confidenceSuffix}`;
         }
-        return currentModel ? `modelo vivo solicitado ${currentModel}${confidenceSuffix}` : `modelo vivo solicitado${confidenceSuffix}`;
+        return currentModel
+            ? `modelo vivo solicitado ${currentModel}${confidenceSuffix}`
+            : `modelo vivo solicitado${confidenceSuffix}`;
     }
     if (effect['applied'] === true && kind === 'prepare_new_sdk_session') {
         return model ? `novo boot SDK preparado para ${model}` : 'novo boot SDK preparado';
@@ -191,11 +202,19 @@ export function describeTerminalByokGatewayAutoEffect(effect) {
 /**
  * @param {string[]} rest
  * @param {{ env?: NodeJS.ProcessEnv; policy?: ReturnType<typeof readModelGatewayRuntimeAutomationPolicy> }} [options]
- * @returns {{ profileId: string; presetId: string; allowLiveSetModel: boolean; allowNewSession: boolean; allowLocalPrivate: boolean }}
+ * @returns {{
+ *     profileId: string;
+ *     presetId: string;
+ *     allowLiveSetModel: boolean;
+ *     allowNewSession: boolean;
+ *     allowLocalPrivate: boolean;
+ * }}
  */
 export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
     const envPolicy = options.policy ?? readModelGatewayRuntimeAutomationPolicy(options.env);
-    const presetToken = rest.find((item) => /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item));
+    const presetToken = rest.find((item) =>
+        /^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu.test(item),
+    );
     const requestedPresetId = optionalScalarString(
         presetToken?.replace(/^(?:preset|policyPreset|policy-preset|autoPreset|auto-preset)[:=]/iu, ''),
     );
@@ -215,7 +234,9 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
             ),
         ) ??
         'repo_agent';
-    const allowLiveSetModel = rest.some((item) => /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item));
+    const allowLiveSetModel = rest.some((item) =>
+        /^(?:--)?allow-live-set-model|live-set-model|set-model$/iu.test(item),
+    );
     const denyLiveSetModel = rest.some((item) => /^(?:--)?(?:deny|no)-live-set-model|no-set-model$/iu.test(item));
     const allowNewSession = rest.some((item) => /^(?:--)?allow-new-session|new-session$/iu.test(item));
     const denyNewSession = rest.some((item) => /^(?:--)?(?:deny|no)-new-session$/iu.test(item));
@@ -232,7 +253,9 @@ export function parseTerminalByokGatewayAutoArgs(rest, options = {}) {
 
 /**
  * @param {unknown} error
- * @returns {Promise<Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }>}
+ * @returns {Promise<
+ *     Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }
+ * >}
  */
 async function createUnavailableSdkSessionInventory(error) {
     const message = error instanceof Error ? error.message : String(error ?? 'SDK indisponível');
@@ -249,7 +272,9 @@ async function createUnavailableSdkSessionInventory(error) {
 }
 
 /**
- * @returns {Promise<Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }>}
+ * @returns {Promise<
+ *     Awaited<ReturnType<typeof listTerminalSdkSessionInventory>> & { unavailableReason?: string | null }
+ * >}
  */
 async function readTerminalSdkSessionInventoryForAutomation() {
     try {
@@ -261,7 +286,13 @@ async function readTerminalSdkSessionInventoryForAutomation() {
 
 /**
  * @param {string[]} rest
- * @param {{ allowEffects?: boolean; catalogPath?: string; env?: NodeJS.ProcessEnv; persistAutomationDecision?: boolean; turnFailure?: Record<string, unknown> | null }} [options]
+ * @param {{
+ *     allowEffects?: boolean;
+ *     catalogPath?: string;
+ *     env?: NodeJS.ProcessEnv;
+ *     persistAutomationDecision?: boolean;
+ *     turnFailure?: Record<string, unknown> | null;
+ * }} [options]
  * @returns {Promise<{
  *     schema: 'terminal-byok-gateway-auto-status';
  *     args: ReturnType<typeof parseTerminalByokGatewayAutoArgs>;
@@ -277,7 +308,9 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
     const envOptions = options.env ? { env: options.env } : {};
     const policy = await readModelGatewayRuntimeAutomationEffectivePolicy(envOptions);
     const args = parseTerminalByokGatewayAutoArgs(rest, { ...envOptions, policy });
-    const store = new JsonModelGatewayCatalogStore({ filePath: options.catalogPath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
+    const store = new JsonModelGatewayCatalogStore({
+        filePath: options.catalogPath ?? DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    });
     const snapshot = await store.readSnapshot();
     const secretRegistry = createEnvSecretRegistry(options.env);
     const healthRecords = listByokProviderModelHealth();
@@ -363,8 +396,8 @@ export async function buildTerminalByokGatewayAutoStatus(rest, options = {}) {
 }
 
 /**
- * @param {{ effects?: Array<Record<string, unknown>> }} controllerStep
- * @returns {Promise<{ applied: Array<Record<string, unknown>>; skipped: Array<Record<string, unknown>> }>}
+ * @param {{ effects?: Record<string, unknown>[] }} controllerStep
+ * @returns {Promise<{ applied: Record<string, unknown>[]; skipped: Record<string, unknown>[] }>}
  */
 export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
     const effects = Array.isArray(controllerStep.effects) ? controllerStep.effects : [];
@@ -372,7 +405,10 @@ export async function applyTerminalByokGatewayAutoEffects(controllerStep) {
     const skipped = [];
     for (const effect of effects) {
         if (effect['execute'] !== true) {
-            skipped.push({ ...effect, skippedReason: optionalScalarString(effect['blockedReason']) ?? 'effect_not_authorized' });
+            skipped.push({
+                ...effect,
+                skippedReason: optionalScalarString(effect['blockedReason']) ?? 'effect_not_authorized',
+            });
             continue;
         }
         if (effect['kind'] === 'replan_after_turn_failure') {
@@ -502,7 +538,9 @@ export function createTerminalByokGatewayRecoveryAttemptRecords(status, applicat
             const applied = effect['applied'] === true;
             const skippedReason = optionalScalarString(effect['skippedReason']);
             const failureKind = optionalScalarString(effect['failureKind']) ?? 'unknown_failure';
-            const recoveryScope = optionalScalarString(effect['recoveryScope']) ?? (effect['accountWideFailure'] === true ? 'account' : 'route');
+            const recoveryScope =
+                optionalScalarString(effect['recoveryScope']) ??
+                (effect['accountWideFailure'] === true ? 'account' : 'route');
             const effectId =
                 optionalScalarString(effect['effectId']) ??
                 `${decisionId ?? 'terminal-auto'}:effect:${effectIndex}:replan_after_turn_failure`;
@@ -528,7 +566,11 @@ export function createTerminalByokGatewayRecoveryAttemptRecords(status, applicat
  * @param {Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>>} status
  * @param {Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>>} application
  * @param {{ source?: string; timestamp?: string }} [options]
- * @returns {Promise<{ automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null>}
+ * @returns {Promise<{
+ *     automationEffectApplications: number;
+ *     recoveryAttempts: number;
+ *     sdkSessionHandoffs: number;
+ * } | null>}
  */
 export async function persistTerminalByokGatewayAutoEffectApplications(status, application, options = {}) {
     const records = createTerminalByokGatewayAutoEffectApplicationRecords(status, application, options);
@@ -541,7 +583,9 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
             ? await store.writeAutomationEffectApplicationRecords(records)
             : { automationEffectApplications: 0 };
     const recoveryResult =
-        recoveryAttempts.length > 0 ? await store.writeRecoveryAttemptRecords(recoveryAttempts) : { recoveryAttempts: 0 };
+        recoveryAttempts.length > 0
+            ? await store.writeRecoveryAttemptRecords(recoveryAttempts)
+            : { recoveryAttempts: 0 };
     const handoffResult =
         handoffs.length > 0 ? await store.writeSdkSessionHandoffRecords(handoffs) : { sdkSessionHandoffs: 0 };
     return {
@@ -554,11 +598,15 @@ export async function persistTerminalByokGatewayAutoEffectApplications(status, a
 /**
  * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
  * @returns {Promise<{
- *   ran: boolean;
- *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
- *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
- *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
- *   effectPersistence: { automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null;
+ *     ran: boolean;
+ *     policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
+ *     status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
+ *     application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
+ *     effectPersistence: {
+ *         automationEffectApplications: number;
+ *         recoveryAttempts: number;
+ *         sdkSessionHandoffs: number;
+ *     } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
@@ -596,25 +644,36 @@ export async function runTerminalByokGatewayPreTurnAutomation(options = {}) {
 
 /**
  * @param {{
- *   profile?: string | null;
- *   provider?: string | null;
- *   model?: string | null;
- *   failureKind?: string | null;
- *   message?: string | null;
- *   errorContext?: string | null;
- *   failureStatusCode?: number | string | null;
- *   retryAfterSeconds?: number | string | null;
- *   resetAt?: string | number | Date | null;
+ *     profile?: string | null;
+ *     provider?: string | null;
+ *     model?: string | null;
+ *     failureKind?: string | null;
+ *     message?: string | null;
+ *     errorContext?: string | null;
+ *     failureStatusCode?: number | string | null;
+ *     retryAfterSeconds?: number | string | null;
+ *     resetAt?: string | number | Date | null;
  * }} [turnFailure]
  * @param {{ env?: NodeJS.ProcessEnv; catalogPath?: string }} [options]
  * @returns {Promise<{
- *   ran: boolean;
- *   policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
- *   status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
- *   controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep> | null;
- *   application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
- *   effectPersistence: { automationEffectApplications: number; recoveryAttempts: number; sdkSessionHandoffs: number } | null;
- *   healthPersistence: { recorded: boolean; providerId: string | null; providerModel: string | null; routeProfile: string | null; failureKind: string; sqlite: Awaited<ReturnType<typeof flushAndMirrorByokProviderHealthToSqlite>> | null } | null;
+ *     ran: boolean;
+ *     policy: Awaited<ReturnType<typeof readModelGatewayRuntimeAutomationEffectivePolicy>>;
+ *     status: Awaited<ReturnType<typeof buildTerminalByokGatewayAutoStatus>> | null;
+ *     controllerStep: ReturnType<typeof buildModelGatewayRuntimeAutomationControllerStep> | null;
+ *     application: Awaited<ReturnType<typeof applyTerminalByokGatewayAutoEffects>> | null;
+ *     effectPersistence: {
+ *         automationEffectApplications: number;
+ *         recoveryAttempts: number;
+ *         sdkSessionHandoffs: number;
+ *     } | null;
+ *     healthPersistence: {
+ *         recorded: boolean;
+ *         providerId: string | null;
+ *         providerModel: string | null;
+ *         routeProfile: string | null;
+ *         failureKind: string;
+ *         sqlite: Awaited<ReturnType<typeof flushAndMirrorByokProviderHealthToSqlite>> | null;
+ *     } | null;
  * }>}
  */
 export async function runTerminalByokGatewayPostTurnAutomation(turnFailure = {}, options = {}) {

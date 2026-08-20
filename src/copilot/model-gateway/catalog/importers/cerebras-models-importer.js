@@ -60,7 +60,7 @@ export function parseCerebrasModelsRows(raw) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -74,12 +74,21 @@ function modelEvidenceValues(row) {
         { fieldPath: 'displayName', value: providerModel },
         { fieldPath: 'aliases.providerModel', value: providerModel },
         ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
-        { fieldPath: 'providerMetadata.ownedBy', value: stringValue(row['owned_by']) ?? stringValue(row['ownedBy']) ?? 'cerebras' },
+        {
+            fieldPath: 'providerMetadata.ownedBy',
+            value: stringValue(row['owned_by']) ?? stringValue(row['ownedBy']) ?? 'cerebras',
+        },
         { fieldPath: 'providerMetadata.cerebras.object', value: stringValue(row['object']) },
         { fieldPath: 'providerMetadata.cerebras.authenticatedVisibility', value: true },
         { fieldPath: 'providerMetadata.cerebras.openAICompatibleBaseUrl', value: CEREBRAS_OPENAI_BASE_URL },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
-        { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? stringValue(row['ownedBy']) ?? 'cerebras' },
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
+        {
+            fieldPath: 'openai.owned_by',
+            value: stringValue(row['owned_by']) ?? stringValue(row['ownedBy']) ?? 'cerebras',
+        },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
 }

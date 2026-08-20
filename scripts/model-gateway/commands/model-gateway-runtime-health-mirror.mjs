@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
-import { SqliteModelGatewayCatalogStore, flushAndMirrorByokProviderHealthToSqlite } from '../../../src/copilot/model-gateway/index.js';
+import {
+    SqliteModelGatewayCatalogStore,
+    flushAndMirrorByokProviderHealthToSqlite,
+} from '../../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 const argSet = new Set(args);

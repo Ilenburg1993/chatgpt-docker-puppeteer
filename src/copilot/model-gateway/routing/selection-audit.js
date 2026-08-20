@@ -2,8 +2,8 @@
 /**
  * Pre-runtime selection audit.
  *
- * This layer validates whether the metadata database can produce deterministic route choices before runtime probes.
- * It deliberately does not require probe proof and does not execute providers or models.
+ * This layer validates whether the metadata database can produce deterministic route choices before runtime probes. It
+ * deliberately does not require probe proof and does not execute providers or models.
  *
  * @module copilot/model-gateway/routing/selection-audit
  */
@@ -75,7 +75,8 @@ function modelRouteBoolean(model, field) {
     const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
     const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
     const providerSpecific = isRecord(model['providerSpecific']) ? model['providerSpecific'] : {};
-    const value = model[field] ?? routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field];
+    const value =
+        model[field] ?? routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field];
     return typeof value === 'boolean' ? value : null;
 }
 
@@ -116,9 +117,17 @@ function selectedSummary(selected) {
         canonicalModelId: optionalString(model['canonicalModelId']),
         routeProfile: optionalString(model['routeProfile']),
         routeOptionRef: optionalString(model['routeOptionRef']),
-        routeOptionRefs: Array.isArray(model['routeOptionRefs']) ? model['routeOptionRefs'].map(optionalString).filter((item) => item !== null).slice(0, 8) : [],
+        routeOptionRefs: Array.isArray(model['routeOptionRefs'])
+            ? model['routeOptionRefs']
+                  .map(optionalString)
+                  .filter((item) => item !== null)
+                  .slice(0, 8)
+            : [],
         selectorKind: optionalString(model['selectorKind']) ?? 'exact_model',
-        selectorSyntax: optionalString(model['selectorSyntax']) ?? optionalString(model['providerModel']) ?? optionalString(model['id']),
+        selectorSyntax:
+            optionalString(model['selectorSyntax']) ??
+            optionalString(model['providerModel']) ??
+            optionalString(model['id']),
         routeLayer: modelRouteString(model, 'routeLayer'),
         wireApi: modelRouteString(model, 'wireApi'),
         runtimeKind: modelRouteString(model, 'runtimeKind'),
@@ -131,7 +140,8 @@ function selectedSummary(selected) {
         supportsFallback: modelRouteBoolean(model, 'supportsFallback'),
         localPrivate: modelRouteBoolean(model, 'localPrivate'),
         candidateSource: optionalString(provenance['candidateSource']) ?? optionalString(provenance['source']),
-        runtimeObservedOnly: provenance['candidateSource'] === 'runtime_health' || runtimeEvidence['source'] === 'runtime_health',
+        runtimeObservedOnly:
+            provenance['candidateSource'] === 'runtime_health' || runtimeEvidence['source'] === 'runtime_health',
         runtimeEvidence: Object.keys(runtimeEvidence).length > 0 ? runtimeEvidence : null,
         score: typeof selected['score'] === 'number' && Number.isFinite(selected['score']) ? selected['score'] : null,
         scoreBreakdown: isRecord(selected['scoreBreakdown']) ? selected['scoreBreakdown'] : null,
@@ -142,11 +152,14 @@ function selectedSummary(selected) {
         accountAccess: {
             status: optionalString(accountAccess['status']),
             canAttempt: accountAccess['canAttempt'] === true,
-            secretConfigured: typeof accountAccess['secretConfigured'] === 'boolean' ? accountAccess['secretConfigured'] : null,
+            secretConfigured:
+                typeof accountAccess['secretConfigured'] === 'boolean' ? accountAccess['secretConfigured'] : null,
             modelVisible: accountAccess['modelVisible'] === true,
             failureClass: optionalString(accountAccess['failureClass']),
             accessConfidence: optionalString(accountAccess['accessConfidence']),
-            resetWindows: Array.isArray(accountAccess['resetWindows']) ? accountAccess['resetWindows'].filter(isRecord).slice(0, 4) : [],
+            resetWindows: Array.isArray(accountAccess['resetWindows'])
+                ? accountAccess['resetWindows'].filter(isRecord).slice(0, 4)
+                : [],
             hardReasons: stringList(accountAccess['hardReasons']).slice(0, 8),
             softReasons: stringList(accountAccess['softReasons']).slice(0, 8),
         },
@@ -159,7 +172,9 @@ function selectedSummary(selected) {
                   liveToolProtocolStatus: isRecord(probes['live_tool_protocol'])
                       ? optionalString(probes['live_tool_protocol']['status'])
                       : null,
-                  liveAskUserStatus: isRecord(probes['live_ask_user']) ? optionalString(probes['live_ask_user']['status']) : null,
+                  liveAskUserStatus: isRecord(probes['live_ask_user'])
+                      ? optionalString(probes['live_ask_user']['status'])
+                      : null,
               }
             : null,
         reasons: stringList(selected['reasons']).slice(0, 8),
@@ -167,12 +182,15 @@ function selectedSummary(selected) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} candidates
+ * @param {Record<string, unknown>[]} candidates
  * @param {number} limit
  * @returns {Array<NonNullable<ReturnType<typeof selectedSummary>>>}
  */
 function candidateSummaries(candidates, limit = 96) {
-    return candidates.map(selectedSummary).filter((summary) => summary !== null).slice(0, Math.max(0, Math.floor(limit)));
+    return candidates
+        .map(selectedSummary)
+        .filter((summary) => summary !== null)
+        .slice(0, Math.max(0, Math.floor(limit)));
 }
 
 /**
@@ -216,13 +234,13 @@ function hasCapability(row, capability) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} candidates
+ * @param {Record<string, unknown>[]} candidates
  * @param {Record<string, unknown> | null} profile
  * @returns {{
- *   candidateCount: number;
- *   required: Record<string, number>;
- *   softRequired: Record<string, number>;
- *   preferred: Record<string, number>;
+ *     candidateCount: number;
+ *     required: Record<string, number>;
+ *     softRequired: Record<string, number>;
+ *     preferred: Record<string, number>;
  * }}
  */
 function capabilitySupply(candidates, profile) {
@@ -307,74 +325,74 @@ function profileExplicitlyRequestsLocal(profileId, requestedProfiles) {
 /**
  * @param {Record<string, unknown>} snapshot
  * @param {{
- *   profiles?: string[];
- *   strict?: boolean;
- *   includeProjectionOnly?: boolean;
- *   secretRegistry?: { has(ref: string): boolean };
- *   eligibilityPolicy?: Record<string, unknown>;
- *   runtimeHealthRecords?: Record<string, unknown>[];
- *   runtimeHealthIndex?: Record<string, unknown>;
- *   runtimeRouteProfile?: string | null;
- *   requireRuntimeProof?: boolean;
- *   now?: string | number | Date;
- *   maxRuntimeProofAgeMs?: number;
- *   runtimeProofWeights?: Partial<typeof import('./policy-engine.js').DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS>;
- *   temporaryFailureCooldownMs?: number;
- *   requiredProbeKinds?: string[];
- *   preferredProbeKinds?: string[];
- *   blockFailedProbeKinds?: string[];
- *   providerCooldownWindowMs?: number;
- *   providerCooldownMinFailedModels?: number;
- *   providerCooldownFailureKinds?: string[];
+ *     profiles?: string[];
+ *     strict?: boolean;
+ *     includeProjectionOnly?: boolean;
+ *     secretRegistry?: { has(ref: string): boolean };
+ *     eligibilityPolicy?: Record<string, unknown>;
+ *     runtimeHealthRecords?: Record<string, unknown>[];
+ *     runtimeHealthIndex?: Record<string, unknown>;
+ *     runtimeRouteProfile?: string | null;
+ *     requireRuntimeProof?: boolean;
+ *     now?: string | number | Date;
+ *     maxRuntimeProofAgeMs?: number;
+ *     runtimeProofWeights?: Partial<typeof import('./policy-engine.js').DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS>;
+ *     temporaryFailureCooldownMs?: number;
+ *     requiredProbeKinds?: string[];
+ *     preferredProbeKinds?: string[];
+ *     blockFailedProbeKinds?: string[];
+ *     providerCooldownWindowMs?: number;
+ *     providerCooldownMinFailedModels?: number;
+ *     providerCooldownFailureKinds?: string[];
  * }} options
  * @param {{
- *   schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
- *   ignoreRuntimeHealth: boolean;
- *   runtimeMode: 'metadata_only' | 'observed_runtime_health';
+ *     schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
+ *     ignoreRuntimeHealth: boolean;
+ *     runtimeMode: 'metadata_only' | 'observed_runtime_health';
  * }} auditOptions
  * @returns {{
- *   schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
- *   ok: boolean;
- *   mode: 'strict_access_only' | 'allow_probe_unknown';
- *   runtimeMode: 'metadata_only' | 'observed_runtime_health';
- *   snapshotContext: Record<string, number>;
- *   summary: {
- *     profileCount: number;
- *     selectedProfileCount: number;
- *     unselectedProfileCount: number;
- *     candidateCount: number;
- *     rejectedCount: number;
- *     healthRecordCount: number;
- *     runtimeChatOkCount: number;
- *     runtimeAgentProbeProofCount: number;
- *     runtimeProbeProofCount: number;
- *     runtimeLiveToolProtocolProofCount: number;
- *     runtimeLiveAskUserProofCount: number;
- *     runtimeLiveProtocolFailureCount: number;
- *     runtimeHealthProofCount: number;
- *     selectedProviders: Record<string, number>;
- *     selectedSelectorKinds: Record<string, number>;
- *     rejectedReasonCounts: Record<string, number>;
- *   };
- *   profiles: Array<{
- *     profileId: string;
- *     selected: ReturnType<typeof selectedSummary>;
- *     candidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
- *     candidateCount: number;
- *     rejectedCount: number;
- *     fallbackChain: string[];
- *     topRejectedReasons: string[];
- *     nextActions: string[];
- *     capabilitySupply: {
- *       candidateCount: number;
- *       required: Record<string, number>;
- *       softRequired: Record<string, number>;
- *       preferred: Record<string, number>;
- *     };
- *     supplyWarnings: string[];
- *     decisionLayers: Record<string, unknown>;
+ *     schema: 'model-gateway-pre-runtime-selection-audit' | 'model-gateway-post-runtime-selection-audit';
+ *     ok: boolean;
+ *     mode: 'strict_access_only' | 'allow_probe_unknown';
+ *     runtimeMode: 'metadata_only' | 'observed_runtime_health';
  *     snapshotContext: Record<string, number>;
- *   }>;
+ *     summary: {
+ *         profileCount: number;
+ *         selectedProfileCount: number;
+ *         unselectedProfileCount: number;
+ *         candidateCount: number;
+ *         rejectedCount: number;
+ *         healthRecordCount: number;
+ *         runtimeChatOkCount: number;
+ *         runtimeAgentProbeProofCount: number;
+ *         runtimeProbeProofCount: number;
+ *         runtimeLiveToolProtocolProofCount: number;
+ *         runtimeLiveAskUserProofCount: number;
+ *         runtimeLiveProtocolFailureCount: number;
+ *         runtimeHealthProofCount: number;
+ *         selectedProviders: Record<string, number>;
+ *         selectedSelectorKinds: Record<string, number>;
+ *         rejectedReasonCounts: Record<string, number>;
+ *     };
+ *     profiles: Array<{
+ *         profileId: string;
+ *         selected: ReturnType<typeof selectedSummary>;
+ *         candidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
+ *         candidateCount: number;
+ *         rejectedCount: number;
+ *         fallbackChain: string[];
+ *         topRejectedReasons: string[];
+ *         nextActions: string[];
+ *         capabilitySupply: {
+ *             candidateCount: number;
+ *             required: Record<string, number>;
+ *             softRequired: Record<string, number>;
+ *             preferred: Record<string, number>;
+ *         };
+ *         supplyWarnings: string[];
+ *         decisionLayers: Record<string, unknown>;
+ *         snapshotContext: Record<string, number>;
+ *     }>;
  * }}
  */
 function auditModelGatewaySelection(snapshot, options, auditOptions) {
@@ -406,13 +424,14 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (options.secretRegistry !== undefined) routeOptions.secretRegistry = options.secretRegistry;
         if (options.runtimeProofWeights !== undefined) routeOptions.runtimeProofWeights = options.runtimeProofWeights;
         if (options.now !== undefined) routeOptions.now = options.now;
-        if (typeof options.maxRuntimeProofAgeMs === 'number') routeOptions.maxRuntimeProofAgeMs = options.maxRuntimeProofAgeMs;
-        if (Array.isArray(options.runtimeHealthRecords)) routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
+        if (typeof options.maxRuntimeProofAgeMs === 'number')
+            routeOptions.maxRuntimeProofAgeMs = options.maxRuntimeProofAgeMs;
+        if (Array.isArray(options.runtimeHealthRecords))
+            routeOptions.runtimeHealthRecords = options.runtimeHealthRecords;
         if (options.runtimeHealthIndex !== undefined) {
-            routeOptions.runtimeHealthIndex =
-                /** @type {NonNullable<NonNullable<Parameters<typeof routePreparedModelGatewayCatalogSnapshot>[2]>['runtimeHealthIndex']>} */ (
-                    options.runtimeHealthIndex
-                );
+            routeOptions.runtimeHealthIndex = /** @type {NonNullable<
+    NonNullable<Parameters<typeof routePreparedModelGatewayCatalogSnapshot>[2]>['runtimeHealthIndex']
+>} */ (options.runtimeHealthIndex);
         }
         if (typeof options.temporaryFailureCooldownMs === 'number') {
             routeOptions.temporaryFailureCooldownMs = options.temporaryFailureCooldownMs;
@@ -426,9 +445,12 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         if (Array.isArray(options.providerCooldownFailureKinds)) {
             routeOptions.providerCooldownFailureKinds = stringList(options.providerCooldownFailureKinds);
         }
-        if (Array.isArray(options.requiredProbeKinds)) routeOptions.requiredProbeKinds = stringList(options.requiredProbeKinds);
-        if (Array.isArray(options.preferredProbeKinds)) routeOptions.preferredProbeKinds = stringList(options.preferredProbeKinds);
-        if (Array.isArray(options.blockFailedProbeKinds)) routeOptions.blockFailedProbeKinds = stringList(options.blockFailedProbeKinds);
+        if (Array.isArray(options.requiredProbeKinds))
+            routeOptions.requiredProbeKinds = stringList(options.requiredProbeKinds);
+        if (Array.isArray(options.preferredProbeKinds))
+            routeOptions.preferredProbeKinds = stringList(options.preferredProbeKinds);
+        if (Array.isArray(options.blockFailedProbeKinds))
+            routeOptions.blockFailedProbeKinds = stringList(options.blockFailedProbeKinds);
         const profile = resolveModelGatewayTaskProfile(profileId);
         const route = routePreparedModelGatewayCatalogSnapshot(preparedSnapshot, profileId, routeOptions);
         const explanation = explainGatewayRouteDecision(route);
@@ -456,15 +478,13 @@ function auditModelGatewaySelection(snapshot, options, auditOptions) {
         schema: auditOptions.schema,
         mode: strict ? 'strict_access_only' : 'allow_probe_unknown',
         runtimeMode: auditOptions.runtimeMode,
-        snapshotContext:
-            profileAudits[0]?.snapshotContext ??
-            {
-                projectionCount: 0,
-                routeOptionCount: 0,
-                accountOverlayCount: 0,
-                eligibilityDecisionCount: 0,
-                candidateCount: 0,
-            },
+        snapshotContext: profileAudits[0]?.snapshotContext ?? {
+            projectionCount: 0,
+            routeOptionCount: 0,
+            accountOverlayCount: 0,
+            eligibilityDecisionCount: 0,
+            candidateCount: 0,
+        },
         summary: {
             profileCount: profileAudits.length,
             selectedProfileCount,
@@ -590,30 +610,30 @@ function profilesById(profiles) {
  * @param {ReturnType<typeof auditModelGatewayPostRuntimeSelection>} postRuntimeSelection
  * @param {{ profiles?: string[] }} [options]
  * @returns {{
- *   schema: 'model-gateway-selection-comparison';
- *   ok: boolean;
- *   summary: {
- *     profileCount: number;
- *     changedCount: number;
- *     unchangedCount: number;
- *     preSelectedCount: number;
- *     postSelectedCount: number;
- *     postRuntimeProofSelectedCount: number;
- *     postRuntimeHealthProofCount: number;
- *     postRuntimeProbeProofCount: number;
- *   };
- *   rows: Array<{
- *     profileId: string;
- *     changed: boolean;
- *     preSelected: ReturnType<typeof selectedSummary>;
- *     postSelected: ReturnType<typeof selectedSummary>;
- *     preCandidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
- *     postCandidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
- *     preRouteKey: string | null;
- *     postRouteKey: string | null;
- *     postSelectedHasRuntimeProof: boolean;
- *     postDecisionLayers: Record<string, unknown>;
- *   }>;
+ *     schema: 'model-gateway-selection-comparison';
+ *     ok: boolean;
+ *     summary: {
+ *         profileCount: number;
+ *         changedCount: number;
+ *         unchangedCount: number;
+ *         preSelectedCount: number;
+ *         postSelectedCount: number;
+ *         postRuntimeProofSelectedCount: number;
+ *         postRuntimeHealthProofCount: number;
+ *         postRuntimeProbeProofCount: number;
+ *     };
+ *     rows: Array<{
+ *         profileId: string;
+ *         changed: boolean;
+ *         preSelected: ReturnType<typeof selectedSummary>;
+ *         postSelected: ReturnType<typeof selectedSummary>;
+ *         preCandidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
+ *         postCandidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
+ *         preRouteKey: string | null;
+ *         postRouteKey: string | null;
+ *         postSelectedHasRuntimeProof: boolean;
+ *         postDecisionLayers: Record<string, unknown>;
+ *     }>;
  * }}
  */
 export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRuntimeSelection, options = {}) {
@@ -623,7 +643,9 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
     const preProfilesById = profilesById(allPreProfiles);
     const preProfiles =
         requestedProfiles.size > 0
-            ? requestedProfileIds.map((profileId) => preProfilesById.get(profileId)).filter((profile) => profile !== undefined)
+            ? requestedProfileIds
+                  .map((profileId) => preProfilesById.get(profileId))
+                  .filter((profile) => profile !== undefined)
             : allPreProfiles;
     const postProfiles = profilesById(postRuntimeSelection.profiles);
     const rows = preProfiles.map((preProfile) => {
@@ -651,7 +673,8 @@ export function compareModelGatewaySelectionAudits(preRuntimeSelection, postRunt
     const changedCount = rows.filter((row) => row.changed).length;
     const scopedOk =
         requestedProfiles.size > 0
-            ? rows.length === requestedProfiles.size && rows.every((row) => row.preSelected !== null && row.postSelected !== null)
+            ? rows.length === requestedProfiles.size &&
+              rows.every((row) => row.preSelected !== null && row.postSelected !== null)
             : preRuntimeSelection.ok === true && postRuntimeSelection.ok === true;
     const postRuntimeHealthProofCount = rows.reduce((sum, row) => {
         const value = row.postDecisionLayers['runtimeHealthProofCount'];
@@ -686,9 +709,15 @@ function selectionComparisonReason(row) {
     const preSelected = isRecord(row['preSelected']);
     const postSelected = isRecord(row['postSelected']);
     if (!preSelected && !postSelected) return 'both_unselected';
-    if (!preSelected && postSelected) return row['postSelectedHasRuntimeProof'] === true ? 'post_runtime_discovered_route' : 'post_runtime_fallback_route';
+    if (!preSelected && postSelected)
+        return row['postSelectedHasRuntimeProof'] === true
+            ? 'post_runtime_discovered_route'
+            : 'post_runtime_fallback_route';
     if (preSelected && !postSelected) return 'post_runtime_lost_route';
-    if (row['changed'] === true) return row['postSelectedHasRuntimeProof'] === true ? 'post_runtime_proved_better_route' : 'post_runtime_changed_route';
+    if (row['changed'] === true)
+        return row['postSelectedHasRuntimeProof'] === true
+            ? 'post_runtime_proved_better_route'
+            : 'post_runtime_changed_route';
     if (row['postSelectedHasRuntimeProof'] === true) return 'same_route_runtime_proved';
     return 'same_route_no_runtime_proof';
 }
@@ -716,25 +745,25 @@ function selectionComparisonNextActions(reason) {
  *
  * @param {ReturnType<typeof compareModelGatewaySelectionAudits>} comparison
  * @returns {{
- *   schema: 'model-gateway-selection-comparison-explain';
- *   ok: boolean;
- *   summary: {
- *     profileCount: number;
- *     changedCount: number;
- *     unchangedCount: number;
- *     runtimeProofCount: number;
- *     reasonCounts: Record<string, number>;
- *     nextActions: string[];
- *   };
- *   rows: Array<{
- *     profileId: string;
- *     changed: boolean;
- *     reason: string;
- *     nextActions: string[];
- *     preRouteKey: string | null;
- *     postRouteKey: string | null;
- *     postSelectedHasRuntimeProof: boolean;
- *   }>;
+ *     schema: 'model-gateway-selection-comparison-explain';
+ *     ok: boolean;
+ *     summary: {
+ *         profileCount: number;
+ *         changedCount: number;
+ *         unchangedCount: number;
+ *         runtimeProofCount: number;
+ *         reasonCounts: Record<string, number>;
+ *         nextActions: string[];
+ *     };
+ *     rows: {
+ *         profileId: string;
+ *         changed: boolean;
+ *         reason: string;
+ *         nextActions: string[];
+ *         preRouteKey: string | null;
+ *         postRouteKey: string | null;
+ *         postSelectedHasRuntimeProof: boolean;
+ *     }[];
  * }}
  */
 export function explainModelGatewaySelectionComparison(comparison) {
@@ -785,28 +814,32 @@ function normalizeSelectionPolicyMode(value) {
  * @param {ReturnType<typeof compareModelGatewaySelectionAudits>} comparison
  * @param {{ mode?: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof' | string }} [options]
  * @returns {{
- *   schema: 'model-gateway-selection-policy-resolution';
- *   ok: boolean;
- *   mode: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof';
- *   summary: {
- *     profileCount: number;
- *     selectedCount: number;
- *     unselectedCount: number;
- *     metadataWinnerCount: number;
- *     postRuntimeWinnerCount: number;
- *     runtimeProofSelectedCount: number;
- *     changedFromPreRuntimeCount: number;
- *   };
- *   rows: Array<{
- *     profileId: string;
- *     selected: ReturnType<typeof selectedSummary>;
- *     source: 'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing';
- *     changedFromPreRuntime: boolean;
- *     hasRuntimeProof: boolean;
- *     preSelected: ReturnType<typeof selectedSummary>;
- *     postSelected: ReturnType<typeof selectedSummary>;
- *     candidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
- *   }>;
+ *     schema: 'model-gateway-selection-policy-resolution';
+ *     ok: boolean;
+ *     mode: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof';
+ *     summary: {
+ *         profileCount: number;
+ *         selectedCount: number;
+ *         unselectedCount: number;
+ *         metadataWinnerCount: number;
+ *         postRuntimeWinnerCount: number;
+ *         runtimeProofSelectedCount: number;
+ *         changedFromPreRuntimeCount: number;
+ *     };
+ *     rows: Array<{
+ *         profileId: string;
+ *         selected: ReturnType<typeof selectedSummary>;
+ *         source:
+ *             | 'pre_runtime_metadata'
+ *             | 'post_runtime_proved'
+ *             | 'post_runtime_fallback'
+ *             | 'blocked_runtime_proof_missing';
+ *         changedFromPreRuntime: boolean;
+ *         hasRuntimeProof: boolean;
+ *         preSelected: ReturnType<typeof selectedSummary>;
+ *         postSelected: ReturnType<typeof selectedSummary>;
+ *         candidateAlternates: Array<NonNullable<ReturnType<typeof selectedSummary>>>;
+ *     }>;
  * }}
  */
 export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
@@ -815,7 +848,10 @@ export function resolveModelGatewaySelectionPolicy(comparison, options = {}) {
         let selected = row.preSelected;
         const preCandidateAlternates = row.preCandidateAlternates;
         const postCandidateAlternates = row.postCandidateAlternates;
-        /** @type {'pre_runtime_metadata' | 'post_runtime_proved' | 'post_runtime_fallback' | 'blocked_runtime_proof_missing'} */
+        /** @type {'pre_runtime_metadata'
+    | 'post_runtime_proved'
+    | 'post_runtime_fallback'
+    | 'blocked_runtime_proof_missing'} */
         let source = 'pre_runtime_metadata';
         if (mode === MODEL_GATEWAY_SELECTION_POLICY_MODE.REQUIRE_RUNTIME_PROOF) {
             selected = row.postSelectedHasRuntimeProof ? row.postSelected : null;

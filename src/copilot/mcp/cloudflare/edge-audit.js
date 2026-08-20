@@ -224,7 +224,9 @@ async function auditCloudflareEdgeRulesetsUncached(edgeConfig, snapshotOptions) 
  */
 function readEdgeAuditCacheTtlMs(value) {
     if (value === undefined) return DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
-    return Number.isFinite(value) && value >= 0 && value <= 300_000 ? Math.floor(value) : DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 300_000
+        ? Math.floor(value)
+        : DEFAULT_EDGE_AUDIT_CACHE_TTL_MS;
 }
 
 /**
@@ -244,7 +246,13 @@ function buildEdgeAuditCacheKey(config) {
 /**
  * @param {CloudflareEdgeAuditClient} client
  * @param {EdgeAuditConfig} config
- * @returns {Promise<{ zoneId: string | null; source: string | null; zoneName: string; zoneIdRedaction: string | null; warnings: string[] }>}
+ * @returns {Promise<{
+ *     zoneId: string | null;
+ *     source: string | null;
+ *     zoneName: string;
+ *     zoneIdRedaction: string | null;
+ *     warnings: string[];
+ * }>}
  */
 async function resolveZoneId(client, config) {
     const configuredZoneId = String(config.zoneId ?? '').trim();
@@ -391,13 +399,14 @@ export function analyzeEdgeRulesets(rulesets, context) {
             !expressionMentionsAnyPath(rule.expression, ['/admin', '/internal', '/metrics']),
     );
     if (hostWideChallengeRules.length > blockingMcpRules.length) {
-        critical.push(
-            'Detected an enabled host-wide Cloudflare WAF/block/challenge rule that may catch MCP clients.',
-        );
+        critical.push('Detected an enabled host-wide Cloudflare WAF/block/challenge rule that may catch MCP clients.');
     }
 
     const oauthTokenRateLimits = hostRules.filter(
-        (rule) => rule.enabled && rule.phase === 'http_ratelimit' && expressionMentionsAnyPath(rule.expression, ['/oauth/token']),
+        (rule) =>
+            rule.enabled &&
+            rule.phase === 'http_ratelimit' &&
+            expressionMentionsAnyPath(rule.expression, ['/oauth/token']),
     );
     if (oauthTokenRateLimits.length === 0) {
         warnings.push('No explicit /oauth/token rate limit was detected; consider a moderate token-endpoint limit.');
@@ -511,10 +520,12 @@ function buildDesiredEdgePolicy(config) {
             expected: 'no managed_challenge, js_challenge, challenge or broad block on /mcp',
         },
         rateLimit: {
-            expected: 'moderate /oauth/token protection and bounded anonymous /mcp abuse without throttling authenticated MCP sessions',
+            expected:
+                'moderate /oauth/token protection and bounded anonymous /mcp abuse without throttling authenticated MCP sessions',
         },
         transforms: {
-            expected: 'do not modify Authorization, WWW-Authenticate, Set-Cookie, Location, Content-Type, Cache-Control or CORS headers',
+            expected:
+                'do not modify Authorization, WWW-Authenticate, Set-Cookie, Location, Content-Type, Cache-Control or CORS headers',
         },
     };
 }

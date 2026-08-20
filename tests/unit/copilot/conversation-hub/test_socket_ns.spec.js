@@ -6,8 +6,8 @@
  * para evitar dependência de servidor real.
  */
 
-import EventEmitter from 'node:events';
 import Database from 'better-sqlite3';
+import EventEmitter from 'node:events';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { HubOrchestrator } from '../../../../src/copilot/conversation-hub/orchestrator.js';

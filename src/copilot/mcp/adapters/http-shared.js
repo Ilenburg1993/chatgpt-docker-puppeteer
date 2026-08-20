@@ -24,15 +24,10 @@ import { isIP } from 'node:net';
 import { resolve } from 'node:path';
 import { buildChatGptConnectorProfile } from '../connection/profile.js';
 import { logMcp } from '../control-plane/audit.js';
+import { readMcpAuthJwksWarmupState, scheduleMcpAuthJwksWarmup } from '../control-plane/auth-jwks-warmup.js';
 import { buildProtectedResourceMetadata, parseBearerToken, readMcpAuthConfig } from '../control-plane/auth.js';
-import {
-    readMcpAuthJwksWarmupState,
-    scheduleMcpAuthJwksWarmup,
-} from '../control-plane/auth-jwks-warmup.js';
 import { handleBuiltInDevOAuthRequest } from '../control-plane/dev-oauth.js';
 import { readMcpIndexAutoBuildState, startMcpIndexAutoBuildInBackground } from '../control-plane/index-auto-build.js';
-import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
-import { recordMcpToolsListObserved } from '../control-plane/schema-convergence.js';
 import {
     activateMcpHttpRequestActivity,
     activateMcpHttpToolRequestTiming,
@@ -41,16 +36,15 @@ import {
     recordMcpHttpTransportMode,
     runWithMcpHttpToolTimingContext,
 } from '../control-plane/metrics.js';
-import {
-    readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
-    readMcpHttpStatefulSessionPolicy,
-} from '../control-plane/session-runtime.js';
-import {
-    readMcpStartupMaintenanceState,
-    scheduleMcpStartupMaintenance,
-} from '../control-plane/startup-maintenance.js';
 import { scheduleOpenAiEndpointLatencyMonitor } from '../control-plane/openai-endpoint-monitor.js';
+import { getMcpWorkspaceRoot } from '../control-plane/paths.js';
 import { scheduleMcpRoundTripAnalyticsMonitor } from '../control-plane/round-trip-analytics-monitor.js';
+import { recordMcpToolsListObserved } from '../control-plane/schema-convergence.js';
+import {
+    readMcpHttpStatefulSessionPolicy,
+    readMcpHttpSessionRuntimeState as readStatefulMcpHttpSessionRuntimeState,
+} from '../control-plane/session-runtime.js';
+import { readMcpStartupMaintenanceState, scheduleMcpStartupMaintenance } from '../control-plane/startup-maintenance.js';
 import { getDefaultMcpHttpStreamRegistry } from '../control-plane/stream-registry.js';
 import { createCopilotMcpServer } from '../server.js';
 import { classifyMcpPostSessionRequirement, readMcpHttpJsonBody } from './http-body.js';
@@ -214,7 +208,14 @@ export function readMcpHttpServerTimingPolicy(env = process.env) {
  * explicitly opts in with COPILOT_MCP_HTTP_STATEFUL_SESSIONS and does not enable stateless compatibility fallback.
  *
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {{ enabled: boolean; requested: boolean; statelessCompat: boolean; ttlMs: number; maxSessions: number; reason: string }}
+ * @returns {{
+ *     enabled: boolean;
+ *     requested: boolean;
+ *     statelessCompat: boolean;
+ *     ttlMs: number;
+ *     maxSessions: number;
+ *     reason: string;
+ * }}
  */
 export function readMcpHttpSessionPolicy(env = process.env) {
     return readMcpHttpStatefulSessionPolicy(env);
@@ -277,7 +278,13 @@ export function readMcpHttpCorsPolicy(env = process.env) {
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {{ enabled: boolean; windowMs: number; requestsPerWindow: number; maxBuckets: number; activeBuckets: number }}
+ * @returns {{
+ *     enabled: boolean;
+ *     windowMs: number;
+ *     requestsPerWindow: number;
+ *     maxBuckets: number;
+ *     activeBuckets: number;
+ * }}
  */
 export function readMcpAnonymousRateLimitPolicy(env = process.env) {
     return {
@@ -359,224 +366,238 @@ export function createMcpHttpRequestHandler(options) {
         return runWithMcpHttpToolTimingContext(
             { requestId: requestTimingId, receivedAt: requestReceivedAt, edgeColo },
             async () => {
-        try {
-            setDefaultSecurityHeaders(req, res, options);
-            const protocolSample = options.protocolState.lastRequest;
-            if (protocolSample) setMcpHttpProtocolResponseHeaders(res, protocolSample);
-
-            const url = buildRequestUrl(req, options);
-            const finishRequestActivity = activateMcpHttpRequestActivity({
-                httpMethod: req.method ?? 'UNKNOWN',
-                routeClass: classifyMcpHttpRoute(url.pathname, req.method),
-            });
-            if (finishRequestActivity) {
-                const finishActivity = () => {
-                    const response = /** @type {import('node:http').ServerResponse} */ (/** @type {unknown} */ (res));
-                    finishRequestActivity(response.statusCode);
-                };
-                res.once('finish', finishActivity);
-                res.once('close', finishActivity);
-            }
-            const corsPolicy = readCorsRoutePolicy(url.pathname);
-            const requestOrigin = readHeader(req, 'origin');
-
-            if (requestOrigin && !isAllowedOrigin(requestOrigin)) {
-                writeCorsForbidden(
-                    res,
-                    corsPolicy ?? buildCorsPolicy([req.method || 'GET'], { jsonRpcErrors: url.pathname === MCP_PATH }),
-                );
-                return;
-            }
-
-            if (corsPolicy) {
-                setCorsHeaders(res, requestOrigin, corsPolicy);
-            }
-
-            if (req.method === 'OPTIONS') {
-                if (corsPolicy) {
-                    writeEmpty(res, 204);
-                    return;
-                }
-                if (url.pathname === '/oauth/authorize') {
-                    writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS['/oauth/authorize'] ?? ['GET']);
-                    return;
-                }
-                writeText(res, 404, 'Not Found');
-                return;
-            }
-
-            if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
-                writeJson(res, 200, buildHealthPayload(options.protocolState));
-                return;
-            }
-
-            if (req.method === 'GET' && url.pathname === '/chatgpt-connector.json') {
-                const publicMcpUrl = url.searchParams.get('publicMcpUrl') ?? undefined;
-                writeJson(
-                    res,
-                    200,
-                    buildChatGptConnectorProfile(publicMcpUrl === undefined ? {} : { publicMcpUrl }),
-                    PUBLIC_METADATA_CACHE_CONTROL,
-                );
-                return;
-            }
-
-            if (
-                req.method === 'GET' &&
-                (url.pathname === '/.well-known/oauth-protected-resource' ||
-                    url.pathname === '/.well-known/oauth-protected-resource/mcp')
-            ) {
-                const config = readMcpAuthConfig();
-                const resource = url.pathname.endsWith('/mcp') ? `${config.resource}/mcp` : config.resource;
-                writeJson(
-                    res,
-                    200,
-                    buildProtectedResourceMetadata(config, { resource }),
-                    PUBLIC_METADATA_CACHE_CONTROL,
-                );
-                return;
-            }
-
-            if (
-                await handleBuiltInDevOAuthRequest(
-                    /** @type {import('node:http').IncomingMessage} */ (/** @type {unknown} */ (req)),
-                    /** @type {import('node:http').ServerResponse} */ (/** @type {unknown} */ (res)),
-                    url,
-                    readMcpAuthConfig(),
-                )
-            ) {
-                return;
-            }
-
-            if (url.pathname === MCP_PATH) {
-                const envelopeError = validateMcpRequestEnvelope(req);
-                if (envelopeError) {
-                    writeMcpTransportError(res, envelopeError.statusCode, envelopeError.error);
-                    return;
-                }
-                const protocolVersionError = validateMcpProtocolVersionHeader(req);
-                if (protocolVersionError) {
-                    writeMcpTransportError(res, 400, protocolVersionError);
-                    return;
-                }
-                const acceptHeaderError = validateMcpAcceptHeader(req);
-                if (acceptHeaderError) {
-                    writeMcpTransportError(res, 406, acceptHeaderError);
-                    return;
-                }
-                const mcpRouteMethods = KNOWN_ROUTE_METHODS[MCP_PATH] ?? ['POST', 'GET', 'DELETE'];
-                if (!req.method || !mcpRouteMethods.includes(req.method)) {
-                    writeMethodNotAllowed(res, mcpRouteMethods);
-                    return;
-                }
-                if (rejectAccessTokenInUri(url, res)) return;
-
-                const anonymousRateLimit = consumeAnonymousMcpRateLimit(req);
-                if (!anonymousRateLimit.allowed) {
-                    writeMcpRateLimited(res, anonymousRateLimit.retryAfterSeconds);
-                    return;
-                }
-
-                const authConfig = readMcpAuthConfig();
-                if (shouldIssueMcpUnauthorizedChallenge(req, authConfig)) {
-                    writeMcpUnauthorizedChallenge(res, authConfig);
-                    return;
-                }
-
-                setNoStoreResponseHeaders(res);
                 try {
-                    /** @type {unknown} */
-                    let parsedMcpBody;
-                    if (String(req.method ?? '').toUpperCase() === 'POST') {
-                        const bodyResult = await readMcpHttpJsonBody(req, { maxBytes: readMaxMcpRequestBodyBytes() });
-                        if (!bodyResult.ok) {
-                            writeMcpTransportError(res, bodyResult.statusCode, bodyResult.error);
-                            return;
-                        }
-                        parsedMcpBody = bodyResult.body;
-                        const rpcMethod = readMcpJsonRpcMethodLabel(parsedMcpBody);
-                        recordMcpHttpRequestRpcMethod(rpcMethod);
-                        if (rpcMethod === 'tools/list') {
-                            recordMcpToolsListObserved({
-                                protocolVersion: readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
-                            });
-                        }
-                        const toolCallName = readMcpToolCallName(parsedMcpBody);
-                        if (toolCallName !== undefined) {
-                            const finishToolRequestTiming = activateMcpHttpToolRequestTiming(toolCallName);
-                            if (finishToolRequestTiming) {
-                                const finishTimingOnce = () => finishToolRequestTiming();
-                                res.once('finish', finishTimingOnce);
-                                res.once('close', finishTimingOnce);
-                            }
-                        }
-                        const postSessionContract = classifyMcpPostSessionRequirement({
-                            method: req.method,
-                            sessionId: readHeader(req, 'mcp-session-id') ?? null,
-                            body: parsedMcpBody,
-                        });
-                        if (!postSessionContract.ok) {
-                            if (readMcpPostSessionContractEnforcement()) {
-                                writeMcpTransportError(res, postSessionContract.statusCode, postSessionContract.error);
-                                return;
-                            }
-                            logMcp('WARN', 'MCP POST request violates future stateful session contract; report-only during Faixa 1.', {
-                                kind: postSessionContract.kind,
-                                initializeRequest: postSessionContract.initializeRequest,
-                                sessionIdPresent: Boolean(postSessionContract.sessionId),
-                            });
-                        }
+                    setDefaultSecurityHeaders(req, res, options);
+                    const protocolSample = options.protocolState.lastRequest;
+                    if (protocolSample) setMcpHttpProtocolResponseHeaders(res, protocolSample);
+
+                    const url = buildRequestUrl(req, options);
+                    const finishRequestActivity = activateMcpHttpRequestActivity({
+                        httpMethod: req.method ?? 'UNKNOWN',
+                        routeClass: classifyMcpHttpRoute(url.pathname, req.method),
+                    });
+                    if (finishRequestActivity) {
+                        const finishActivity = () => {
+                            const response = /** @type {import('node:http').ServerResponse} */ (
+                                /** @type {unknown} */ (res)
+                            );
+                            finishRequestActivity(response.statusCode);
+                        };
+                        res.once('finish', finishActivity);
+                        res.once('close', finishActivity);
                     }
-                    const sessionPolicy = readMcpHttpSessionPolicy();
-                    if (sessionPolicy.enabled) {
-                        recordMcpHttpTransportMode('stateful');
-                        await handleStatefulMcpHttpRequest({
-                            req,
+                    const corsPolicy = readCorsRoutePolicy(url.pathname);
+                    const requestOrigin = readHeader(req, 'origin');
+
+                    if (requestOrigin && !isAllowedOrigin(requestOrigin)) {
+                        writeCorsForbidden(
                             res,
-                            url,
-                            parsedMcpBody,
-                            authContext: buildAuthContext(req, url),
-                            protocolVersion: readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
-                            readHeader,
-                            writeTransportError: writeMcpTransportError,
-                        });
+                            corsPolicy ??
+                                buildCorsPolicy([req.method || 'GET'], { jsonRpcErrors: url.pathname === MCP_PATH }),
+                        );
                         return;
                     }
-                    recordMcpHttpTransportMode('stateless-fallback');
-                    logMcp('WARN', 'MCP HTTP stateless fallback request handled.', {
-                        sessionPolicyReason: sessionPolicy.reason,
-                        statefulRequested: sessionPolicy.requested,
-                        statelessCompat: sessionPolicy.statelessCompat,
-                    });
-                    await handleMcpRequest(req, res, url, parsedMcpBody);
+
+                    if (corsPolicy) {
+                        setCorsHeaders(res, requestOrigin, corsPolicy);
+                    }
+
+                    if (req.method === 'OPTIONS') {
+                        if (corsPolicy) {
+                            writeEmpty(res, 204);
+                            return;
+                        }
+                        if (url.pathname === '/oauth/authorize') {
+                            writeMethodNotAllowed(res, KNOWN_ROUTE_METHODS['/oauth/authorize'] ?? ['GET']);
+                            return;
+                        }
+                        writeText(res, 404, 'Not Found');
+                        return;
+                    }
+
+                    if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
+                        writeJson(res, 200, buildHealthPayload(options.protocolState));
+                        return;
+                    }
+
+                    if (req.method === 'GET' && url.pathname === '/chatgpt-connector.json') {
+                        const publicMcpUrl = url.searchParams.get('publicMcpUrl') ?? undefined;
+                        writeJson(
+                            res,
+                            200,
+                            buildChatGptConnectorProfile(publicMcpUrl === undefined ? {} : { publicMcpUrl }),
+                            PUBLIC_METADATA_CACHE_CONTROL,
+                        );
+                        return;
+                    }
+
+                    if (
+                        req.method === 'GET' &&
+                        (url.pathname === '/.well-known/oauth-protected-resource' ||
+                            url.pathname === '/.well-known/oauth-protected-resource/mcp')
+                    ) {
+                        const config = readMcpAuthConfig();
+                        const resource = url.pathname.endsWith('/mcp') ? `${config.resource}/mcp` : config.resource;
+                        writeJson(
+                            res,
+                            200,
+                            buildProtectedResourceMetadata(config, { resource }),
+                            PUBLIC_METADATA_CACHE_CONTROL,
+                        );
+                        return;
+                    }
+
+                    if (
+                        await handleBuiltInDevOAuthRequest(
+                            /** @type {import('node:http').IncomingMessage} */ (/** @type {unknown} */ (req)),
+                            /** @type {import('node:http').ServerResponse} */ (/** @type {unknown} */ (res)),
+                            url,
+                            readMcpAuthConfig(),
+                        )
+                    ) {
+                        return;
+                    }
+
+                    if (url.pathname === MCP_PATH) {
+                        const envelopeError = validateMcpRequestEnvelope(req);
+                        if (envelopeError) {
+                            writeMcpTransportError(res, envelopeError.statusCode, envelopeError.error);
+                            return;
+                        }
+                        const protocolVersionError = validateMcpProtocolVersionHeader(req);
+                        if (protocolVersionError) {
+                            writeMcpTransportError(res, 400, protocolVersionError);
+                            return;
+                        }
+                        const acceptHeaderError = validateMcpAcceptHeader(req);
+                        if (acceptHeaderError) {
+                            writeMcpTransportError(res, 406, acceptHeaderError);
+                            return;
+                        }
+                        const mcpRouteMethods = KNOWN_ROUTE_METHODS[MCP_PATH] ?? ['POST', 'GET', 'DELETE'];
+                        if (!req.method || !mcpRouteMethods.includes(req.method)) {
+                            writeMethodNotAllowed(res, mcpRouteMethods);
+                            return;
+                        }
+                        if (rejectAccessTokenInUri(url, res)) return;
+
+                        const anonymousRateLimit = consumeAnonymousMcpRateLimit(req);
+                        if (!anonymousRateLimit.allowed) {
+                            writeMcpRateLimited(res, anonymousRateLimit.retryAfterSeconds);
+                            return;
+                        }
+
+                        const authConfig = readMcpAuthConfig();
+                        if (shouldIssueMcpUnauthorizedChallenge(req, authConfig)) {
+                            writeMcpUnauthorizedChallenge(res, authConfig);
+                            return;
+                        }
+
+                        setNoStoreResponseHeaders(res);
+                        try {
+                            /** @type {unknown} */
+                            let parsedMcpBody;
+                            if (String(req.method ?? '').toUpperCase() === 'POST') {
+                                const bodyResult = await readMcpHttpJsonBody(req, {
+                                    maxBytes: readMaxMcpRequestBodyBytes(),
+                                });
+                                if (!bodyResult.ok) {
+                                    writeMcpTransportError(res, bodyResult.statusCode, bodyResult.error);
+                                    return;
+                                }
+                                parsedMcpBody = bodyResult.body;
+                                const rpcMethod = readMcpJsonRpcMethodLabel(parsedMcpBody);
+                                recordMcpHttpRequestRpcMethod(rpcMethod);
+                                if (rpcMethod === 'tools/list') {
+                                    recordMcpToolsListObserved({
+                                        protocolVersion:
+                                            readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
+                                    });
+                                }
+                                const toolCallName = readMcpToolCallName(parsedMcpBody);
+                                if (toolCallName !== undefined) {
+                                    const finishToolRequestTiming = activateMcpHttpToolRequestTiming(toolCallName);
+                                    if (finishToolRequestTiming) {
+                                        const finishTimingOnce = () => finishToolRequestTiming();
+                                        res.once('finish', finishTimingOnce);
+                                        res.once('close', finishTimingOnce);
+                                    }
+                                }
+                                const postSessionContract = classifyMcpPostSessionRequirement({
+                                    method: req.method,
+                                    sessionId: readHeader(req, 'mcp-session-id') ?? null,
+                                    body: parsedMcpBody,
+                                });
+                                if (!postSessionContract.ok) {
+                                    if (readMcpPostSessionContractEnforcement()) {
+                                        writeMcpTransportError(
+                                            res,
+                                            postSessionContract.statusCode,
+                                            postSessionContract.error,
+                                        );
+                                        return;
+                                    }
+                                    logMcp(
+                                        'WARN',
+                                        'MCP POST request violates future stateful session contract; report-only during Faixa 1.',
+                                        {
+                                            kind: postSessionContract.kind,
+                                            initializeRequest: postSessionContract.initializeRequest,
+                                            sessionIdPresent: Boolean(postSessionContract.sessionId),
+                                        },
+                                    );
+                                }
+                            }
+                            const sessionPolicy = readMcpHttpSessionPolicy();
+                            if (sessionPolicy.enabled) {
+                                recordMcpHttpTransportMode('stateful');
+                                await handleStatefulMcpHttpRequest({
+                                    req,
+                                    res,
+                                    url,
+                                    parsedMcpBody,
+                                    authContext: buildAuthContext(req, url),
+                                    protocolVersion: readHeader(req, 'mcp-protocol-version') ?? MCP_PROTOCOL_VERSION,
+                                    readHeader,
+                                    writeTransportError: writeMcpTransportError,
+                                });
+                                return;
+                            }
+                            recordMcpHttpTransportMode('stateless-fallback');
+                            logMcp('WARN', 'MCP HTTP stateless fallback request handled.', {
+                                sessionPolicyReason: sessionPolicy.reason,
+                                statefulRequested: sessionPolicy.requested,
+                                statelessCompat: sessionPolicy.statelessCompat,
+                            });
+                            await handleMcpRequest(req, res, url, parsedMcpBody);
+                        } catch (error) {
+                            logMcp('ERROR', 'Error handling MCP HTTP request.', {
+                                error: error instanceof Error ? error.message : String(error),
+                            });
+                            if (!res.headersSent) {
+                                writeText(res, 500, 'Internal server error');
+                            }
+                        }
+                        return;
+                    }
+
+                    const allowedMethods = KNOWN_ROUTE_METHODS[url.pathname];
+                    if (allowedMethods && req.method && !allowedMethods.includes(req.method)) {
+                        writeMethodNotAllowed(res, allowedMethods);
+                        return;
+                    }
+
+                    writeText(res, 404, 'Not Found');
                 } catch (error) {
-                    logMcp('ERROR', 'Error handling MCP HTTP request.', {
+                    logMcp('ERROR', 'Unhandled MCP HTTP adapter error.', {
                         error: error instanceof Error ? error.message : String(error),
                     });
                     if (!res.headersSent) {
-                        writeText(res, 500, 'Internal server error');
+                        writeText(res, 400, 'Bad Request');
+                    } else {
+                        safeEnd(res);
                     }
                 }
-                return;
-            }
-
-            const allowedMethods = KNOWN_ROUTE_METHODS[url.pathname];
-            if (allowedMethods && req.method && !allowedMethods.includes(req.method)) {
-                writeMethodNotAllowed(res, allowedMethods);
-                return;
-            }
-
-            writeText(res, 404, 'Not Found');
-        } catch (error) {
-            logMcp('ERROR', 'Unhandled MCP HTTP adapter error.', {
-                error: error instanceof Error ? error.message : String(error),
-            });
-            if (!res.headersSent) {
-                writeText(res, 400, 'Bad Request');
-            } else {
-                safeEnd(res);
-            }
-        }
             },
         );
     };
@@ -1135,7 +1156,12 @@ function buildAnonymousRateLimitKey(req) {
             }
         }
     }
-    return createHash('sha256').update(source).update('\0').update(value || 'unknown').digest('hex').slice(0, 32);
+    return createHash('sha256')
+        .update(source)
+        .update('\0')
+        .update(value || 'unknown')
+        .digest('hex')
+        .slice(0, 32);
 }
 
 /**
@@ -1332,8 +1358,8 @@ export function readHeader(req, name) {
 }
 
 /**
- * Extract only the non-sensitive Cloudflare colo suffix from CF-Ray.
- * The full Ray ID is deliberately discarded and never enters MCP metrics.
+ * Extract only the non-sensitive Cloudflare colo suffix from CF-Ray. The full Ray ID is deliberately discarded and
+ * never enters MCP metrics.
  *
  * @param {string | undefined} value
  * @returns {string | null}
@@ -1359,8 +1385,9 @@ function classifyMcpHttpRoute(pathname, method) {
 }
 
 /**
- * Return a sanitized JSON-RPC method label without retaining params or arbitrary
- * payload data. Mixed batches are represented only as `batch:mixed`.
+ * Return a sanitized JSON-RPC method label without retaining params or arbitrary payload data. Mixed batches are
+ * represented only as `batch:mixed`.
+ *
  * @param {unknown} body
  * @returns {string | null}
  */
@@ -1379,9 +1406,8 @@ function readMcpJsonRpcMethodLabel(body) {
 }
 
 /**
- * Return the tool name for a JSON-RPC tools/call body. `undefined` means the
- * request is not a tools/call; `null` means it is a tools/call whose name is not
- * structurally available yet. Batch tool calls are labeled conservatively.
+ * Return the tool name for a JSON-RPC tools/call body. `undefined` means the request is not a tools/call; `null` means
+ * it is a tools/call whose name is not structurally available yet. Batch tool calls are labeled conservatively.
  *
  * @param {unknown} body
  * @returns {string | null | undefined}

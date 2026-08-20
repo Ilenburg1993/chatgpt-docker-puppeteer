@@ -3,8 +3,8 @@
  * Helpers compartilhados das projection families do terminal frontend.
  */
 
-import { buildRuntimeFallbackWarning } from '../../../presentation/routing/index.js';
 import { isAutoModelSelector, resolveModelSelectionMismatch } from '#copilot/core';
+import { buildRuntimeFallbackWarning } from '../../../presentation/routing/index.js';
 import {
     normalizeAgentContextWindowProjection,
     readAgentRuntimeOverviewProjection,
@@ -57,7 +57,8 @@ import { readTerminalSessionBinding } from '../gateways/index.js';
  *     pendingQuestionKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionShadow: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadow | null;
  *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
- *     pendingQuestionShadowState: import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
+ *     pendingQuestionShadowState:
+ *         import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
  *     pendingQuestionShadowExpiresAt: number | null;
@@ -112,7 +113,7 @@ export function normalizeTerminalModelBillingProjection(lastPrInfo, fallbackMode
     const displayModel =
         configuredModel && !isAutoModelSelector(configuredModel)
             ? configuredModel
-            : fallbackModel ?? configuredModel ?? effectiveModel ?? billedModel ?? '-';
+            : (fallbackModel ?? configuredModel ?? effectiveModel ?? billedModel ?? '-');
     return {
         billedModel,
         configuredModel,

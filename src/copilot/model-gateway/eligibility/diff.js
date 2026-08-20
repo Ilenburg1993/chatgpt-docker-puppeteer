@@ -49,16 +49,28 @@ function classifyEligibilityChangedFields(fields) {
     const kinds = new Set();
     for (const field of fields) {
         if (field === 'include' || field === 'disposition') kinds.add('disposition_changed');
-        else if (field === 'hardExclusions' || field === 'softPenalties' || field === 'reasons') kinds.add('access_gate_changed');
-        else if (field === 'policyProfile' || field === 'taskProfile' || field === 'accountScope' || field === 'policyInputs') {
+        else if (field === 'hardExclusions' || field === 'softPenalties' || field === 'reasons')
+            kinds.add('access_gate_changed');
+        else if (
+            field === 'policyProfile' ||
+            field === 'taskProfile' ||
+            field === 'accountScope' ||
+            field === 'policyInputs'
+        ) {
             kinds.add('policy_scope_changed');
-        } else if (field === 'selectorKind' || field === 'selectorSyntax' || field === 'routeProfile' || field === 'routeOptionRefs') {
+        } else if (
+            field === 'selectorKind' ||
+            field === 'selectorSyntax' ||
+            field === 'routeProfile' ||
+            field === 'routeOptionRefs'
+        ) {
             kinds.add('route_scope_changed');
         } else if (field === 'overlayRefs') kinds.add('account_overlay_changed');
         else if (field === 'evidenceRefs') kinds.add('metadata_evidence_changed');
         else if (field === 'requiredRuntimeProbes') kinds.add('runtime_probe_requirement_changed');
         else if (field === 'secretRef') kinds.add('secret_binding_changed');
-        else if (!['observedAt', 'expiresAt', 'redactionStatus', 'schemaVersion'].includes(field)) kinds.add('other_changed');
+        else if (!['observedAt', 'expiresAt', 'redactionStatus', 'schemaVersion'].includes(field))
+            kinds.add('other_changed');
     }
     return [...kinds].sort();
 }
@@ -66,7 +78,19 @@ function classifyEligibilityChangedFields(fields) {
 /**
  * @param {Record<string, unknown>[]} previous
  * @param {Record<string, unknown>[]} next
- * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[]; previousDisposition: string | null; nextDisposition: string | null; previousInclude: boolean | null; nextInclude: boolean | null }> }}
+ * @returns {{
+ *     added: string[];
+ *     removed: string[];
+ *     changed: {
+ *         key: string;
+ *         changedFields: string[];
+ *         changedKinds: string[];
+ *         previousDisposition: string | null;
+ *         nextDisposition: string | null;
+ *         previousInclude: boolean | null;
+ *         nextInclude: boolean | null;
+ *     }[];
+ * }}
  */
 export function diffModelGatewayEligibilityDecisions(previous, next) {
     const previousByKey = new Map(records(previous).map((item) => [modelEligibilityDecisionKey(item), item]));
@@ -98,8 +122,20 @@ export function diffModelGatewayEligibilityDecisions(previous, next) {
 }
 
 /**
- * @param {{ added?: unknown[]; removed?: unknown[]; changed?: Array<{ changedKinds?: unknown[]; previousInclude?: unknown; nextInclude?: unknown }> }} diff
- * @returns {{ addedCount: number; removedCount: number; changedCount: number; changedKinds: string[]; changedKindCounts: Record<string, number>; becameEligibleCount: number; becameExcludedCount: number }}
+ * @param {{
+ *     added?: unknown[];
+ *     removed?: unknown[];
+ *     changed?: { changedKinds?: unknown[]; previousInclude?: unknown; nextInclude?: unknown }[];
+ * }} diff
+ * @returns {{
+ *     addedCount: number;
+ *     removedCount: number;
+ *     changedCount: number;
+ *     changedKinds: string[];
+ *     changedKindCounts: Record<string, number>;
+ *     becameEligibleCount: number;
+ *     becameExcludedCount: number;
+ * }}
  */
 export function summarizeModelGatewayEligibilityDiff(diff) {
     const changed = Array.isArray(diff.changed) ? diff.changed : [];
@@ -112,7 +148,9 @@ export function summarizeModelGatewayEligibilityDiff(diff) {
     for (const item of changed) {
         if (item.previousInclude === false && item.nextInclude === true) becameEligibleCount += 1;
         if (item.previousInclude === true && item.nextInclude === false) becameExcludedCount += 1;
-        const itemKinds = new Set(Array.isArray(item.changedKinds) ? item.changedKinds.filter((kind) => typeof kind === 'string') : []);
+        const itemKinds = new Set(
+            Array.isArray(item.changedKinds) ? item.changedKinds.filter((kind) => typeof kind === 'string') : [],
+        );
         for (const kind of itemKinds) {
             changedKindCounts[kind] = (changedKindCounts[kind] ?? 0) + 1;
             if (!changedKinds.includes(kind)) changedKinds.push(kind);

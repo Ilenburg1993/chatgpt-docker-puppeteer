@@ -4,10 +4,12 @@ import { Network, type Edge, type Node, type Options } from 'vis-network';
 import 'vis-network/styles/vis-network.min.css';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 
-const props = withDefaults(
-    defineProps<{ nodes?: Node[]; edges?: Edge[]; height?: string; options?: Options }>(),
-    { nodes: () => [], edges: () => [], height: '420px', options: () => ({}) },
-);
+const props = withDefaults(defineProps<{ nodes?: Node[]; edges?: Edge[]; height?: string; options?: Options }>(), {
+    nodes: () => [],
+    edges: () => [],
+    height: '420px',
+    options: () => ({}),
+});
 
 const containerRef = ref<HTMLDivElement | null>(null);
 let network: Network | null = null;

@@ -11,6 +11,7 @@
 import { logSwallowed, toError } from '#copilot/core';
 import { channel } from 'node:diagnostics_channel';
 import { createHistogram, performance } from 'node:perf_hooks';
+import { readMutationAppliedState } from './io/fs/mutation-state.js';
 
 const ioOperationChannel = channel('copilot.io.operation');
 const ioCacheChannel = channel('copilot.io.cache');
@@ -33,6 +34,13 @@ const MAX_IO_LATENCY_HISTOGRAMS = 64;
 
 /** @type {Map<string, ReturnType<typeof createHistogram>>} */
 const _latencyHistograms = new Map();
+const _mutationStateStats = {
+    appliedButUnconfirmed: 0,
+    /** @type {Map<string, number>} */
+    byOperation: new Map(),
+    /** @type {{ operation: string; phase: string | null; pathCount: number; at: number } | null} */
+    last: null,
+};
 const _durabilityStats = {
     operationsObserved: 0,
     operationsWithMetadata: 0,
@@ -45,6 +53,8 @@ const _durabilityStats = {
         tempPathMs: 0,
         capacityPreflightMs: 0,
         tempWriteMs: 0,
+        modeApplyMs: 0,
+        fileSyncMs: 0,
         prePublishCheckMs: 0,
         publishMs: 0,
         directorySyncMs: 0,
@@ -87,6 +97,7 @@ export function publishIoOperation(io, opts) {
     try {
         recordIoLatency(io.operation, io.durationMs);
         recordIoDurability(io);
+        recordIoMutationState(io, opts.error);
         ioOperationChannel.publish({
             ts: Date.now(),
             success: opts.success,
@@ -105,6 +116,23 @@ export function publishIoOperation(io, opts) {
 
 /**
  * @param {import('#copilot/core/io-contracts').IoMeta} io
+ * @param {unknown} error
+ */
+function recordIoMutationState(io, error) {
+    const state = readMutationAppliedState(error);
+    if (!state.applied) return;
+    _mutationStateStats.appliedButUnconfirmed += 1;
+    _mutationStateStats.byOperation.set(io.operation, (_mutationStateStats.byOperation.get(io.operation) ?? 0) + 1);
+    _mutationStateStats.last = {
+        operation: io.operation,
+        phase: state.phase,
+        pathCount: state.paths.length,
+        at: Date.now(),
+    };
+}
+
+/**
+ * @param {import('#copilot/core/io-contracts').IoMeta} io
  */
 function recordIoDurability(io) {
     _durabilityStats.operationsObserved += 1;
@@ -118,7 +146,13 @@ function recordIoDurability(io) {
         if (mode === 'none' || mode === 'file' || mode === 'file-and-directory') _durabilityStats.modes[mode] += 1;
         if (durability['fileFlushRequested'] === true) _durabilityStats.fileFlushRequested += 1;
         recordAtomicWritePhaseTimings(durability['phaseTimings']);
+        recordSyncResult('file', durability['fileSync'], io.operation);
         recordSyncResult('directory', durability['directorySync'], io.operation);
+        if (Array.isArray(durability['directorySyncs'])) {
+            for (const entry of durability['directorySyncs']) {
+                recordSyncResult('directory', asRecord(entry)?.['result'], io.operation);
+            }
+        }
     }
     const syncFields = /** @type {const} */ ([
         ['file', 'fileSync'],
@@ -173,6 +207,8 @@ function recordAtomicWritePhaseTimings(value) {
         'tempPathMs',
         'capacityPreflightMs',
         'tempWriteMs',
+        'modeApplyMs',
+        'fileSyncMs',
         'prePublishCheckMs',
         'publishMs',
         'directorySyncMs',
@@ -225,6 +261,21 @@ export function getIoLatencyStats() {
         };
     }
     return stats;
+}
+
+/**
+ * @returns {{
+ *     appliedButUnconfirmed: number;
+ *     byOperation: Record<string, number>;
+ *     last: { operation: string; phase: string | null; pathCount: number; at: number } | null;
+ * }}
+ */
+export function getIoMutationStateStats() {
+    return {
+        appliedButUnconfirmed: _mutationStateStats.appliedButUnconfirmed,
+        byOperation: Object.fromEntries(_mutationStateStats.byOperation),
+        last: _mutationStateStats.last ? { ..._mutationStateStats.last } : null,
+    };
 }
 
 /**

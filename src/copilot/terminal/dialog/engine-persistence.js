@@ -35,13 +35,14 @@ export function drainPendingNotifications() {
     if (!isTerminalHubReady() || _pendingNotifications.length === 0) return 0;
     let drained = 0;
     while (_pendingNotifications.length > 0) {
-        const n = /**
-         * @type {{
-         *     hubSessionId: string;
-         *     userTurn: { turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number; source?: string };
-         *     llmBTurn: { turnId: number; content: string; turnNumber: number; durationMs: number };
-         * }}
-         */ (_pendingNotifications.shift());
+        const n =
+            /**
+             * @type {{
+             *     hubSessionId: string;
+             *     userTurn: { turnId: number; role: 'user' | 'llm_a'; content: string; turnNumber: number; source?: string };
+             *     llmBTurn: { turnId: number; content: string; turnNumber: number; durationMs: number };
+             * }}
+             */ (_pendingNotifications.shift());
         try {
             notifyTerminalHubTurn(n.hubSessionId, n.userTurn, n.llmBTurn);
             drained++;

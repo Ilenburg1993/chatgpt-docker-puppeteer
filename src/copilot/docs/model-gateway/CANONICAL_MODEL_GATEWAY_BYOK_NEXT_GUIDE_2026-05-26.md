@@ -620,7 +620,8 @@ O novo guia deve tornar a sequencia oficial mais explicita.
 
 `catalog/contracts.js` define `MODEL_GATEWAY_CATALOG_SCHEMA_VERSION`.
 
-`catalog/contracts.js` define source, evidence, provider evidence, projection, route option e account overlay.
+`catalog/contracts.js` define source, evidence, provider evidence, projection, route option e
+account overlay.
 
 `catalog/contracts.js` redige campos sensiveis por chave e por texto.
 
@@ -658,7 +659,8 @@ O novo guia deve tornar a sequencia oficial mais explicita.
 
 `catalog/refresh.js` suporta eligibility refresh opcional.
 
-`catalog/sqlite-schema.js` reserva tabelas para catalogo, overlays, eligibility, runtime probes, health e route decisions.
+`catalog/sqlite-schema.js` reserva tabelas para catalogo, overlays, eligibility, runtime probes,
+health e route decisions.
 
 `catalog/sqlite-catalog-store.js` materializa o snapshot em tabelas normalizadas.
 
@@ -846,7 +848,8 @@ A camada account/key existe e esta no caminho correto.
 
 Gap:
 
-Ainda precisamos unificar melhor provider quotas, SDK quota snapshots e runtime failures no mesmo modelo mental.
+Ainda precisamos unificar melhor provider quotas, SDK quota snapshots e runtime failures no mesmo
+modelo mental.
 
 ### 3.5 Camada `eligibility`
 
@@ -892,7 +895,8 @@ Pre-runtime existe de verdade.
 
 Gap:
 
-Ainda precisa de criterios mais finos para acesso account-scoped por route selector e provider upstream.
+Ainda precisa de criterios mais finos para acesso account-scoped por route selector e provider
+upstream.
 
 ### 3.6 Camada `routing`
 
@@ -934,7 +938,8 @@ Selecao pre-runtime e efetiva existe.
 
 Gap:
 
-Ainda falta separar formalmente ranking de metadados, exclusao pre-runtime e runtime selection final em artefatos persistidos.
+Ainda falta separar formalmente ranking de metadados, exclusao pre-runtime e runtime selection final
+em artefatos persistidos.
 
 ### 3.7 Camada `probes`
 
@@ -1564,7 +1569,8 @@ Route decisions existem, mas ainda precisam de contrato de retention e explain m
 
 Selections efetivas ainda sao calculadas como preview nao persistido.
 
-Account/key quota snapshots existem, mas precisam de relacao mais clara com provider-specific quota APIs.
+Account/key quota snapshots existem, mas precisam de relacao mais clara com provider-specific quota
+APIs.
 
 SDK quota snapshots precisam ser avaliados cuidadosamente para BYOK.
 
@@ -2594,8 +2600,10 @@ Quota/account overlay mais rico.
 - [x] Metricas de coverage.
 - [x] Metricas de provider freshness.
 - [x] Metricas de exclusion reason.
-- [x] Eventos de runtime probe podem ser materializados no SQLite por mirror explicito ou mirror instalado.
-- [x] Eventos de health observation podem ser materializados no SQLite por mirror explicito ou mirror instalado.
+- [x] Eventos de runtime probe podem ser materializados no SQLite por mirror explicito ou mirror
+      instalado.
+- [x] Eventos de health observation podem ser materializados no SQLite por mirror explicito ou
+      mirror instalado.
 - [ ] Eventos de account quota refresh.
 - [ ] Eventos de build metadata progress em UI terminal.
 - [ ] Eventos de SQLite retention.
@@ -2977,7 +2985,8 @@ Um bloqueio expirado deve aparecer para auditoria, mas nao deve continuar bloque
 
 `quota_exhausted` e `rate_limited` sao bloqueios temporarios quando a janela ainda esta ativa.
 
-`key_disabled` e `spending_exhausted` tendem a ser bloqueios de conta/key ate intervencao do operador.
+`key_disabled` e `spending_exhausted` tendem a ser bloqueios de conta/key ate intervencao do
+operador.
 
 Runtime health pode gerar overlay volatil, mas esse overlay continua sendo account/runtime scoped.
 
@@ -2985,7 +2994,8 @@ Runtime health nao reescreve catalogo canonico.
 
 `/byok gateway limits` mostra active, expired e temporary antes de qualquer chamada de modelo.
 
-`/byok gateway limits` combina overlays persistidos do catalogo com overlays derivados de runtime health ja observado.
+`/byok gateway limits` combina overlays persistidos do catalogo com overlays derivados de runtime
+health ja observado.
 
 `/byok gateway limits` tambem explicita `nextAction` para cada bloqueio.
 
@@ -2997,9 +3007,11 @@ Runtime health nao reescreve catalogo canonico.
 
 `AssistantUsageQuotaSnapshot` pode bloquear ou alertar rotas nativas do SDK.
 
-`AssistantUsageQuotaSnapshot` nao deve ser usado como verdade de quota de OpenRouter, Kilo, Groq, Gemini ou outro provider BYOK externo.
+`AssistantUsageQuotaSnapshot` nao deve ser usado como verdade de quota de OpenRouter, Kilo, Groq,
+Gemini ou outro provider BYOK externo.
 
-Se um dia for integrado ao gateway, deve entrar como overlay separado com `scope=copilot_sdk_entitlement`.
+Se um dia for integrado ao gateway, deve entrar como overlay separado com
+`scope=copilot_sdk_entitlement`.
 
 Essa separacao evita paralelismo falso entre quota do host e quota do provider externo.
 
@@ -3768,7 +3780,8 @@ Depois:
 - nao ha flush em voo
 - `pending=false`
 
-O script canonico de mirror explicito continua usando `mirrorByokProviderHealthToSqlite` diretamente.
+O script canonico de mirror explicito continua usando `mirrorByokProviderHealthToSqlite`
+diretamente.
 
 Assim:
 
@@ -3811,7 +3824,8 @@ Isso era insuficiente para decidir se o banco tinha:
 - sinais recentes
 - concentracao de falhas
 
-`scripts/model-gateway-sqlite-diagnostics.mjs` agora imprime uma linha runtime compacta no modo humano.
+`scripts/model-gateway-sqlite-diagnostics.mjs` agora imprime uma linha runtime compacta no modo
+humano.
 
 Mudanca 15:
 
@@ -3863,9 +3877,11 @@ Runtime account overlays agora entendem campos persistidos do SQLite.
 
 Isso conecta:
 
-SQLite runtime persistence -> runtime health records -> account/key overlays -> pre-runtime exclusion.
+SQLite runtime persistence -> runtime health records -> account/key overlays -> pre-runtime
+exclusion.
 
-Sem essa ponte, uma falha probe-only persistida no SQLite poderia aparecer no explain, mas nao bloquear corretamente na selecao efetiva.
+Sem essa ponte, uma falha probe-only persistida no SQLite poderia aparecer no explain, mas nao
+bloquear corretamente na selecao efetiva.
 
 Testes adicionados/fortalecidos:
 
@@ -3902,7 +3918,8 @@ Usa `ROW_NUMBER() OVER (PARTITION BY ...)`.
 
 Motivo:
 
-Selection effective e live readiness nao devem varrer historico bruto quando so precisam do estado runtime efetivo atual.
+Selection effective e live readiness nao devem varrer historico bruto quando so precisam do estado
+runtime efetivo atual.
 
 Historico completo continua disponivel em:
 
@@ -3959,9 +3976,11 @@ Problema encontrado:
 
 O mirror de runtime health recebe fatos operacionais de uma camada viva.
 
-Essa camada pode evoluir, receber payloads parciais, sofrer bug transitorio, ou carregar registros antigos com formato incompleto.
+Essa camada pode evoluir, receber payloads parciais, sofrer bug transitorio, ou carregar registros
+antigos com formato incompleto.
 
-Antes desta mudanca, um registro sem provider/model podia contaminar a persistencia com valores `unknown` ou interromper o flush inteiro.
+Antes desta mudanca, um registro sem provider/model podia contaminar a persistencia com valores
+`unknown` ou interromper o flush inteiro.
 
 Isso era ruim por tres motivos:
 
@@ -4036,18 +4055,22 @@ Redaction de payloads operacionais foi fortalecida antes do primeiro build/live.
 
 Problema encontrado:
 
-Alguns caminhos ja eram seguros por contrato porque os construtores de catalogo sanitizavam records antes da persistencia.
+Alguns caminhos ja eram seguros por contrato porque os construtores de catalogo sanitizavam records
+antes da persistencia.
 
 Mas a arquitetura nao deve depender apenas de callers disciplinados.
 
 Havia dois pontos de defesa em profundidade a fortalecer:
 
-- `JsonModelGatewayCatalogStore` redigia chaves sensiveis, mas strings soltas em campos nao sensiveis podiam ficar intactas se um caller pulasse os construtores;
-- `SqliteModelGatewayCatalogStore` usava `payloadJson` em runtime health e route decisions, apesar de esses payloads serem operacionais e potencialmente carregarem mensagens/erros de provider.
+- `JsonModelGatewayCatalogStore` redigia chaves sensiveis, mas strings soltas em campos nao
+  sensiveis podiam ficar intactas se um caller pulasse os construtores;
+- `SqliteModelGatewayCatalogStore` usava `payloadJson` em runtime health e route decisions, apesar
+  de esses payloads serem operacionais e potencialmente carregarem mensagens/erros de provider.
 
 Nova semantica:
 
-`JsonModelGatewayCatalogStore` agora aplica `redactSecretText` a qualquer string antes de escrever/normalizar snapshot.
+`JsonModelGatewayCatalogStore` agora aplica `redactSecretText` a qualquer string antes de
+escrever/normalizar snapshot.
 
 Payloads SQLite operacionais agora usam `operationalPayloadJson` em:
 
@@ -4073,7 +4096,8 @@ Tambem nao mistura runtime proof com metadados canonicos.
 
 Efeito esperado:
 
-Antes de rodarmos live tests ou build amplo, a base de persistencia passa a tratar segredo como um problema de borda, nao apenas como responsabilidade dos importers.
+Antes de rodarmos live tests ou build amplo, a base de persistencia passa a tratar segredo como um
+problema de borda, nao apenas como responsabilidade dos importers.
 
 Validacao focada:
 
@@ -4093,7 +4117,8 @@ Criado gate executavel de redaction para JSON/SQLite.
 
 Motivo:
 
-Antes de build/live, precisamos saber se o banco de metadados e as camadas operacionais persistidas contem qualquer segredo bruto.
+Antes de build/live, precisamos saber se o banco de metadados e as camadas operacionais persistidas
+contem qualquer segredo bruto.
 
 So ter redaction nos writers nao basta.
 
@@ -4134,7 +4159,8 @@ Ela nao deve marcar nomes legitimos de modelos como vazamento apenas por comecar
 
 Licao importante:
 
-O primeiro detector baseado no redactor agressivo gerou falsos positivos em nomes legitimos de modelos e campos como `skipped`.
+O primeiro detector baseado no redactor agressivo gerou falsos positivos em nomes legitimos de
+modelos e campos como `skipped`.
 
 Por isso, redaction de persistencia e deteccao de auditoria foram separadas.
 
@@ -4161,7 +4187,8 @@ Nao imprime segredos crus.
 
 Descoberta real neste turno:
 
-SQLite local continha payloads antigos com valores exatos de env embutidos em refs/IDs de overlay/eligibility.
+SQLite local continha payloads antigos com valores exatos de env embutidos em refs/IDs de
+overlay/eligibility.
 
 Executado:
 
@@ -4188,7 +4215,8 @@ Resultado:
 
 Contrato futuro:
 
-`createProviderAccountOverlay` agora redige `accountOverlayId` e `sourceId` quando eles contem token/secret bruto.
+`createProviderAccountOverlay` agora redige `accountOverlayId` e `sourceId` quando eles contem
+token/secret bruto.
 
 Isso evita que rebuilds futuros recriem o mesmo problema.
 
@@ -4358,7 +4386,8 @@ Build real do banco de metadados passou a preservar identidade publica e barrar 
 
 Problema encontrado apos a Mudanca 22:
 
-Mesmo com redaction menos agressiva para nomes de modelo, a auditoria ainda podia interpretar referencias publicas como atribuicoes de segredo.
+Mesmo com redaction menos agressiva para nomes de modelo, a auditoria ainda podia interpretar
+referencias publicas como atribuicoes de segredo.
 
 Exemplo:
 
@@ -4370,7 +4399,8 @@ Isso gerava falso positivo de redaction.
 
 Pior:
 
-Se o reparo de redaction fosse aplicado de modo amplo, poderia transformar ids publicos de account overlay em `[redacted]`.
+Se o reparo de redaction fosse aplicado de modo amplo, poderia transformar ids publicos de account
+overlay em `[redacted]`.
 
 Correcao:
 
@@ -4403,7 +4433,8 @@ Quando `sourceKind` e desconhecido:
 
 Isso evita que um importer injete acidentalmente segredo real em identidade de overlay.
 
-`src/copilot/model-gateway/catalog/refresh.js` tambem normaliza overlays retidos de snapshots anteriores.
+`src/copilot/model-gateway/catalog/refresh.js` tambem normaliza overlays retidos de snapshots
+anteriores.
 
 Isso corrige o caso em que um catalogo antigo ja continha ids danificados.
 
@@ -4414,7 +4445,8 @@ Isso corrige o caso em que um catalogo antigo ja continha ids danificados.
 - rodar audit de integridade;
 - rodar audit de redaction.
 
-A sanitizacao do build usa segredos exatos do ambiente e padroes de token reais, mas nao redige referencias publicas do tipo `*_API_KEY`.
+A sanitizacao do build usa segredos exatos do ambiente e padroes de token reais, mas nao redige
+referencias publicas do tipo `*_API_KEY`.
 
 Validacao focada executada:
 
@@ -4523,7 +4555,8 @@ Isso nao invalida o banco canonico.
 
 Isso pertence a camada de account/key state.
 
-O build deve preservar o catalogo e expor a falha ao operador sem derrubar toda a coleta de metadados.
+O build deve preservar o catalogo e expor a falha ao operador sem derrubar toda a coleta de
+metadados.
 
 Checklist atualizada por esta mudanca:
 
@@ -4536,7 +4569,8 @@ Checklist atualizada por esta mudanca:
 - [x] Confirmar zero vazamentos em JSON e SQLite.
 - [x] Confirmar zero identidades redigidas no catalogo persistido.
 - [x] Confirmar selecao pre-runtime sem executar runtime.
-- [x] Investigar selecao `local_private`: ela nao seleciona Ollama por default, mas ainda podia escolher remoto quando nao ha local opt-in.
+- [x] Investigar selecao `local_private`: ela nao seleciona Ollama por default, mas ainda podia
+      escolher remoto quando nao ha local opt-in.
 
 Mudanca 24:
 
@@ -4557,7 +4591,8 @@ E tratava:
 - `privacy`
 - `no_remote_secrets`
 
-como preferencias/supply warnings, o roteador podia selecionar um modelo remoto para um perfil chamado `local_private`.
+como preferencias/supply warnings, o roteador podia selecionar um modelo remoto para um perfil
+chamado `local_private`.
 
 Isso era semanticamente perigoso.
 
@@ -4586,7 +4621,8 @@ Assim:
 - o default nao avalia `local_private`;
 - `local_private` explicito nao seleciona remoto por fallback;
 - `local_private` explicito falha antes de runtime se nao houver local elegivel;
-- `local_private_strict` permanece como perfil/alias estrito para comandos canonicos e checks dedicados.
+- `local_private_strict` permanece como perfil/alias estrito para comandos canonicos e checks
+  dedicados.
 
 `src/copilot/model-gateway/routing/explain.js`
 
@@ -4618,7 +4654,8 @@ Resultado observado:
 - `profileCount=7`
 - `selectedProfileCount=7`
 - `selectedProviders={zai:1,chutes:5,cerebras:1}`
-- perfis default: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`, `deep_reasoning`
+- perfis default: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`,
+  `deep_reasoning`
 - `localProviderOptIn.hasBlocks=false`
 
 Selecao efetiva explicita local/private:
@@ -4642,7 +4679,8 @@ Checklist atualizada por esta mudanca:
 - [x] Impedir fallback remoto silencioso para perfil local/private.
 - [x] Manter Ollama/local como suporte opt-in, nao default.
 - [x] Adicionar next action explicita para configurar provider local.
-- [ ] Decidir se `local_private` e `local_private_strict` devem ser fundidos no futuro ou se um deles deve permanecer como alias operacional.
+- [ ] Decidir se `local_private` e `local_private_strict` devem ser fundidos no futuro ou se um
+      deles deve permanecer como alias operacional.
 
 Mudanca 25:
 
@@ -4650,7 +4688,8 @@ Primeira bateria live `llm-b` do model-gateway executada em fases.
 
 Contexto:
 
-Depois do build real do banco de metadados, da paridade SQLite, da redaction audit e da selecao pre-runtime verde, avancamos para os testes live planejados.
+Depois do build real do banco de metadados, da paridade SQLite, da redaction audit e da selecao
+pre-runtime verde, avancamos para os testes live planejados.
 
 A ordem seguiu o plano canonico:
 
@@ -4865,14 +4904,17 @@ Resultado:
 
 Observacao importante:
 
-Embora os probes reais tenham confirmado Kilo com sucesso, a selecao efetiva canonica ainda escolhe outros providers para varios perfis.
+Embora os probes reais tenham confirmado Kilo com sucesso, a selecao efetiva canonica ainda escolhe
+outros providers para varios perfis.
 
 Isso e esperado nesta fase porque:
 
 - runtime proof nao deve contaminar metadados canonicos;
 - runtime health e account state ficam em camada operacional separada;
-- a politica de selecao ainda usa os perfis e o catalogo amplo, nao uma promocao automatica do provider testado manualmente;
-- a etapa futura de selecao pos-runtime deve decidir como combinar runtime proofs recentes com preferencias do operador.
+- a politica de selecao ainda usa os perfis e o catalogo amplo, nao uma promocao automatica do
+  provider testado manualmente;
+- a etapa futura de selecao pos-runtime deve decidir como combinar runtime proofs recentes com
+  preferencias do operador.
 
 Checklist atualizada por esta mudanca:
 
@@ -4885,9 +4927,12 @@ Checklist atualizada por esta mudanca:
 - [x] Espelhar runtime health para SQLite apos probes.
 - [x] Confirmar readiness verde pos-live.
 - [x] Confirmar runtime proof nao promove facts para o catalogo canonico.
-- [x] Criar camada de selecao pos-runtime que combine metadados, account/key state e provas runtime recentes sem misturar as tabelas canonicas.
-- [ ] Melhorar UX de vision: quando provider retorna 404 em attachment, sugerir modelos vision-capable provados ou degradar para texto explicitamente.
-- [ ] Planejar fase live full-turn com modelo real apenas depois de revisar custos/quota e risco de consumo.
+- [x] Criar camada de selecao pos-runtime que combine metadados, account/key state e provas runtime
+      recentes sem misturar as tabelas canonicas.
+- [ ] Melhorar UX de vision: quando provider retorna 404 em attachment, sugerir modelos
+      vision-capable provados ou degradar para texto explicitamente.
+- [ ] Planejar fase live full-turn com modelo real apenas depois de revisar custos/quota e risco de
+      consumo.
 
 Validacoes executadas:
 
@@ -4961,10 +5006,13 @@ A auditoria pos-runtime nao recebe `routeProfile` automaticamente como o id do t
 
 Motivo:
 
-- `routeProfile` nos health records vivos representa muitas vezes perfil operacional BYOK ou perfil terminal;
+- `routeProfile` nos health records vivos representa muitas vezes perfil operacional BYOK ou perfil
+  terminal;
 - task profiles como `repo_agent`, `tool_agent` e `json_extraction` sao perfis de decisao;
-- misturar esses dois conceitos faria os health records reais de `kilo`, `openrouter/free` e afins deixarem de ser considerados;
-- quando um caller quiser filtrar por runtime route profile especifico, pode passar `runtimeRouteProfile`.
+- misturar esses dois conceitos faria os health records reais de `kilo`, `openrouter/free` e afins
+  deixarem de ser considerados;
+- quando um caller quiser filtrar por runtime route profile especifico, pode passar
+  `runtimeRouteProfile`.
 
 Separacao de camadas apos esta mudanca:
 
@@ -5012,7 +5060,8 @@ Interpretacao:
 - a camada pre-runtime permaneceu pura;
 - a camada pos-runtime ja consegue alterar ranking a partir de health observado;
 - os probes vivos atuais ainda nao casam como probe proof por task profile nas rotas escolhidas;
-- isso e aceitavel nesta etapa, porque post-runtime ainda e leitura/auditoria, nao decisao final automatica de runtime.
+- isso e aceitavel nesta etapa, porque post-runtime ainda e leitura/auditoria, nao decisao final
+  automatica de runtime.
 
 Resultado observado em readiness:
 
@@ -5054,7 +5103,8 @@ Checklist atualizada por esta mudanca:
 - [x] Provar em teste que runtime health explicito nao hidrata estado global.
 - [x] Provar em teste que pre-runtime continua com proof count zero.
 - [x] Provar em teste que pos-runtime conta health/probe sem mutar confidence.
-- [ ] Refinar semantica de probe proof por tipo quando o runtime profile operacional e diferente do task profile.
+- [ ] Refinar semantica de probe proof por tipo quando o runtime profile operacional e diferente do
+      task profile.
 - [ ] Criar decisao final de runtime selection com politica explicita do operador.
 - [ ] Expor no terminal um explain comparando pre-runtime vs pos-runtime.
 
@@ -5067,7 +5117,8 @@ Problema observado:
 - a selecao pos-runtime tinha `healthRecordCount>0`;
 - algumas rotas recebiam `agent_probe_verified`;
 - mesmo assim o resumo mostrava apenas `runtimeProbeProofCount=0`;
-- isso era tecnicamente correto para probes tipados em `probes`, mas insuficiente como explicacao operacional.
+- isso era tecnicamente correto para probes tipados em `probes`, mas insuficiente como explicacao
+  operacional.
 
 Correcao:
 
@@ -5082,7 +5133,8 @@ Semantica:
 
 - `runtimeChatOkCount`: candidatos com chat/call health `ok`;
 - `runtimeAgentProbeProofCount`: candidatos com agent probe dedicado `ok`;
-- `runtimeProbeProofCount`: candidatos com probes tipados verificados, como `json`, `streaming`, `vision` ou `agent` quando registrados em `probes`;
+- `runtimeProbeProofCount`: candidatos com probes tipados verificados, como `json`, `streaming`,
+  `vision` ou `agent` quando registrados em `probes`;
 - `runtimeHealthProofCount`: uniao logica de chat ok, agent probe ok e probes tipados verificados.
 
 Tambem foi ajustado o scoring de `runtime_proved`.
@@ -5131,8 +5183,10 @@ Checklist atualizada por esta mudanca:
 - [x] Atualizar `runtime_proved` para usar qualquer prova runtime real.
 - [x] Atualizar readiness/effective selection para mostrar health proofs e agent proofs.
 - [x] Atualizar testes de explain e post-runtime audit.
-- [ ] Criar normalizador de probes tipados por capability independente do runtime profile operacional.
-- [x] Registrar, quando possivel, probe kind `agent` tambem em `probes` ao lado de `agentProbeStatus`.
+- [ ] Criar normalizador de probes tipados por capability independente do runtime profile
+      operacional.
+- [x] Registrar, quando possivel, probe kind `agent` tambem em `probes` ao lado de
+      `agentProbeStatus`.
 - [ ] Expor no terminal ranking pos-runtime com explicacao dos contadores.
 
 Mudanca 28:
@@ -5144,14 +5198,16 @@ Antes:
 - o campo dedicado `agentProbeStatus` registrava sucesso/falha do probe agent;
 - o mapa `probes.agent` podia nao existir;
 - isso fazia `runtimeAgentProbeProofCount>0`, mas `runtimeProbeProofCount=0`;
-- a explicacao ficava tecnicamente possivel, mas menos coerente para uma camada universal de probes por capability.
+- a explicacao ficava tecnicamente possivel, mas menos coerente para uma camada universal de probes
+  por capability.
 
 Depois:
 
 - `recordByokProviderModelAgentProbeSuccess` grava tambem `probes.agent`;
 - `recordByokProviderModelAgentProbeFailure` grava tambem `probes.agent`;
 - registros legados carregados por `mergeByokProviderHealthRecords` sao normalizados;
-- registros com `agentProbeStatus` mas sem `probes.agent` passam a sintetizar `probes.agent` durante normalizacao;
+- registros com `agentProbeStatus` mas sem `probes.agent` passam a sintetizar `probes.agent` durante
+  normalizacao;
 - o campo dedicado continua existindo por compatibilidade e leitura rapida.
 
 Resultado observado:
@@ -5182,18 +5238,21 @@ Checklist atualizada por esta mudanca:
 - [x] Escrever `probes.agent` em agent probe failure.
 - [x] Normalizar health records legados durante merge.
 - [x] Fazer selection effective enxergar agent probe tambem como probe tipado.
-- [x] Criar politica para pesos distintos entre chat ok, agent probe e probes de capability especifica.
+- [x] Criar politica para pesos distintos entre chat ok, agent probe e probes de capability
+      especifica.
 - [ ] Criar explain terminal com diff pre-runtime vs pos-runtime.
 
 Mudanca 29:
 
-O terminal passou a exibir a auditoria pos-runtime dentro de `/byok gateway selection audit effective`.
+O terminal passou a exibir a auditoria pos-runtime dentro de
+`/byok gateway selection audit effective`.
 
 Antes:
 
 - o comando efetivo calculava eligibility com health observado;
 - depois chamava apenas a auditoria pre-runtime sobre o snapshot effective;
-- o operador via `observedHealth` e `runtimeOverlays`, mas nao via como runtime proofs afetariam ranking.
+- o operador via `observedHealth` e `runtimeOverlays`, mas nao via como runtime proofs afetariam
+  ranking.
 
 Depois:
 
@@ -5347,7 +5406,8 @@ Checklist atualizada por esta mudanca:
 
 ## 19. Mudanca 31 - Policy Resolver Explicito Para Selecao Final
 
-Depois da comparacao entre pre-runtime e pos-runtime, faltava uma camada clara que respondesse uma pergunta simples:
+Depois da comparacao entre pre-runtime e pos-runtime, faltava uma camada clara que respondesse uma
+pergunta simples:
 
 qual rota final o operador quer considerar vencedora neste momento?
 
@@ -5391,7 +5451,8 @@ Esse e o default conservador.
 
 Ele preserva a decisao da auditoria pre-runtime.
 
-Ele so usa pos-runtime como fallback quando a auditoria pre-runtime nao selecionou nada e existe uma selecao pos-runtime disponivel.
+Ele so usa pos-runtime como fallback quando a auditoria pre-runtime nao selecionou nada e existe uma
+selecao pos-runtime disponivel.
 
 Ele e o modo correto para:
 
@@ -5495,7 +5556,8 @@ A saida textual agora inclui uma linha:
 
 `policy: mode=... selected=... postWinners=... changed=...`
 
-Isso torna o script util para humanos e LLMs sem exigir que cada consumidor reimplemente a semantica.
+Isso torna o script util para humanos e LLMs sem exigir que cada consumidor reimplemente a
+semantica.
 
 ### 19.6 Integracao No Terminal
 
@@ -5552,7 +5614,8 @@ Ela nao transforma saude volatil em metadado canonico.
 
 Isso e correto nesta fase.
 
-Persistencia de decision trace deve vir em camada propria, e selecao efetiva real deve continuar separada dela.
+Persistencia de decision trace deve vir em camada propria, e selecao efetiva real deve continuar
+separada dela.
 
 ### 19.9 Checklist Da Mudanca 31
 
@@ -5700,7 +5763,8 @@ E o alias:
 
 Por default, o diff compara os dois traces historicos mais recentes do diretorio.
 
-`latest.json` e ignorado para descoberta automatica, porque ele e ponteiro operacional e pode duplicar o trace mais recente.
+`latest.json` e ignorado para descoberta automatica, porque ele e ponteiro operacional e pode
+duplicar o trace mais recente.
 
 Tambem aceita:
 
@@ -5723,7 +5787,8 @@ O diff mede:
 
 Esse diff e uma base importante antes do runtime selector real.
 
-Ele permite comparar duas policies ou duas execucoes de auditoria sem chamar provider e sem mutar catalogo.
+Ele permite comparar duas policies ou duas execucoes de auditoria sem chamar provider e sem mutar
+catalogo.
 
 Tambem foi adicionado:
 
@@ -5761,7 +5826,8 @@ Tambem pode receber:
 - `--trace-id=<id>`
 - `--trace-dir=<path>`
 
-`write-trace` implica modo efetivo, pois o trace precisa da comparacao pre-runtime/post-runtime e da policy final.
+`write-trace` implica modo efetivo, pois o trace precisa da comparacao pre-runtime/post-runtime e da
+policy final.
 
 O output mostra:
 
@@ -5809,7 +5875,8 @@ Essa separacao e essencial para as proximas fases:
 
 ## 21. Mudanca 33 - Base Nao-Executora Do Runtime Selector Real
 
-Com policy resolver, decision trace, retention e diff prontos, a proxima base era transformar a decisao final em um plano que o runtime real possa consumir.
+Com policy resolver, decision trace, retention e diff prontos, a proxima base era transformar a
+decisao final em um plano que o runtime real possa consumir.
 
 Foi criada a camada:
 
@@ -5875,14 +5942,17 @@ Essa funcao limpa overrides BYOK herdados do provider atual do terminal e fixa:
 - `COPILOT_BYOK_PROVIDER_PRESET=<providerId da rota>`;
 - `COPILOT_BYOK_MODEL=<providerModel da rota>`.
 
-Ela preserva as chaves de provider reais do ambiente, como `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `KILO_API_KEY`, etc.
+Ela preserva as chaves de provider reais do ambiente, como `OPENROUTER_API_KEY`, `GROQ_API_KEY`,
+`KILO_API_KEY`, etc.
 
-Isso fecha um gap arquitetural importante: o runtime selector nao pode executar uma rota `openrouter:*` herdando `baseUrl`,
-`providerPreset` ou auth generica de uma configuracao atual `groq`, `kilo` ou outra.
+Isso fecha um gap arquitetural importante: o runtime selector nao pode executar uma rota
+`openrouter:*` herdando `baseUrl`, `providerPreset` ou auth generica de uma configuracao atual
+`groq`, `kilo` ou outra.
 
 `evaluateModelGatewayRuntimeSelectorRouteEnv`
 
-Avalia, sem expor segredos e sem executar provider, se o env route-aware satisfaz os requisitos do provider selecionado.
+Avalia, sem expor segredos e sem executar provider, se o env route-aware satisfaz os requisitos do
+provider selecionado.
 
 Ela retorna:
 
@@ -5893,8 +5963,8 @@ Ela retorna:
 - `providerPreset`;
 - `model`.
 
-Quando `buildModelGatewayRuntimeSelectorPlan` recebe `requireRuntimeEnvReady=true`, rotas cujo env esta `missing` ou
-`partial` sao bloqueadas antes de qualquer live test.
+Quando `buildModelGatewayRuntimeSelectorPlan` recebe `requireRuntimeEnvReady=true`, rotas cujo env
+esta `missing` ou `partial` sao bloqueadas antes de qualquer live test.
 
 `executeModelGatewayRuntimeSelectorPlan`
 
@@ -5931,7 +6001,8 @@ Quando uma excecao chega sem `providerFailure` normalizado, o executor ainda gra
 - `resetAt`;
 - `errorContext`.
 
-Isso evita perder sinais de quota, rate-limit, auth e rota invalida durante a primeira execucao real.
+Isso evita perder sinais de quota, rate-limit, auth e rota invalida durante a primeira execucao
+real.
 
 `executeModelGatewayRuntimeSelectorPlanWithFallbacks`
 
@@ -5972,7 +6043,8 @@ Resolve, sem executar provider, o que fazer depois de cada tentativa:
 - `credits`: fallback e sem retry da mesma rota;
 - `model-or-route`: fallback e sem retry da mesma rota;
 - `rate-limit`: retry somente se a janela couber no orcamento `maxRetryDelayMs`;
-- `timeout`, `network`, `upstream`, `unknown`: retry da mesma rota quando ainda houver tentativa disponivel.
+- `timeout`, `network`, `upstream`, `unknown`: retry da mesma rota quando ainda houver tentativa
+  disponivel.
 
 A decisao preserva:
 
@@ -5985,8 +6057,8 @@ A decisao preserva:
 
 O executor com fallback agora usa essa decisao dinamica entre tentativas.
 
-Com isso, quota/auth/modelo inexistente deixam de consumir retries repetidos na mesma rota, enquanto falhas transientes ainda
-podem tentar novamente antes de cair para outro profile.
+Com isso, quota/auth/modelo inexistente deixam de consumir retries repetidos na mesma rota, enquanto
+falhas transientes ainda podem tentar novamente antes de cair para outro profile.
 
 ### 21.2 Integracao Ao Script Efetivo
 
@@ -6057,7 +6129,8 @@ Ele respeita:
 
 O script bloqueia execucao quando o plano nao esta pronto.
 
-Assim, a entrada futura para runtime real existe, mas continua segura ate decidirmos iniciar live tests.
+Assim, a entrada futura para runtime real existe, mas continua segura ate decidirmos iniciar live
+tests.
 
 ### 21.4 Snapshot E Diff De Runtime Health
 
@@ -6294,7 +6367,8 @@ Isso era insuficiente para um sistema BYOK universal.
 
 Uma decisao de `accountScope=default` nao pode excluir uma rota de `accountScope=org-alpha`.
 
-Uma decisao de uma policy/task tambem nao deve ser reaplicada cegamente quando a selecao pediu outro scope.
+Uma decisao de uma policy/task tambem nao deve ser reaplicada cegamente quando a selecao pediu outro
+scope.
 
 Agora `findEligibilityDecisionForModel()` tambem valida:
 
@@ -6306,7 +6380,8 @@ Decisoes legadas sem policy/task explicita continuam aproveitaveis quando o scop
 
 `policyProfile=default` e `taskProfile=default` funcionam como decisoes gerais.
 
-Foi adicionado teste para garantir que uma decisao excluida de um scope nao bloqueia outro scope elegivel.
+Foi adicionado teste para garantir que uma decisao excluida de um scope nao bloqueia outro scope
+elegivel.
 
 Essa correcao fortalece a camada pre-runtime antes do runtime selector real.
 
@@ -6354,7 +6429,8 @@ O terminal ganhou:
 
 Esse comando nao chama provider.
 
-Esse comando ajuda o operador e a LLM a entender quando uma exclusao pre-runtime pode ser objetiva e quando so runtime failure pode produzir overlay.
+Esse comando ajuda o operador e a LLM a entender quando uma exclusao pre-runtime pode ser objetiva e
+quando so runtime failure pode produzir overlay.
 
 O inventario canonico de comandos tambem foi atualizado.
 
@@ -6384,7 +6460,8 @@ Isso nao muda a selecao.
 
 Isso muda a auditabilidade.
 
-Agora, ao trocar key, account, organization, workspace ou policy, o operador consegue ver qual scope gerou a decisao.
+Agora, ao trocar key, account, organization, workspace ou policy, o operador consegue ver qual scope
+gerou a decisao.
 
 Essa informacao sera importante antes dos live tests com llm-b.
 
@@ -6412,7 +6489,8 @@ O caso `token gsk-secret-that-must-not-leak rejected` volta a persistir como:
 
 `token [redacted] rejected`
 
-Esse ajuste e importante antes de build e live tests porque runtime failures podem carregar mensagens de provider com formato de token nao uniforme.
+Esse ajuste e importante antes de build e live tests porque runtime failures podem carregar
+mensagens de provider com formato de token nao uniforme.
 
 ## 21.39 Mudanca 39 - Freshness De Account Overlays
 
@@ -6535,7 +6613,8 @@ Flags novas:
 - `--account-rate-limit-max-rows=<n>`;
 - `--account-spending-max-rows=<n>`.
 
-Isso e importante porque rate-limit pode gerar muitas amostras curtas, enquanto spending/quota tendem a mudar em outra cadencia.
+Isso e importante porque rate-limit pode gerar muitas amostras curtas, enquanto spending/quota
+tendem a mudar em outra cadencia.
 
 Tambem preserva o caminho para:
 
@@ -6567,7 +6646,8 @@ Exemplo:
 
 Se o overlay habilita apenas `openai/gpt-oss-120b:fastest`, a rota agora fica visivel.
 
-Se o overlay bloqueia `openai/gpt-oss-120b:fastest`, a rota fica excluida mesmo que o modelo base esteja habilitado.
+Se o overlay bloqueia `openai/gpt-oss-120b:fastest`, a rota fica excluida mesmo que o modelo base
+esteja habilitado.
 
 Isso prepara:
 
@@ -6640,7 +6720,8 @@ Novos campos aceitos em policy:
 - `wireApi`;
 - `upstreamProvider`.
 
-Isso evita que uma rota de gateway entre no ranking quando a politica do operador ou tarefa ja exclui o upstream ou a API de fio.
+Isso evita que uma rota de gateway entre no ranking quando a politica do operador ou tarefa ja
+exclui o upstream ou a API de fio.
 
 Tambem alinha eligibility com o que o scorer de selecao ja fazia de modo mais tardio.
 
@@ -6873,7 +6954,8 @@ As chaves atuais sao derivadas de:
 - `projections`;
 - `routeOptions`.
 
-Antes de fazer upsert das novas decisions, a funcao remove decisions antigas cujo modelo/rota nao existe mais.
+Antes de fazer upsert das novas decisions, a funcao remove decisions antigas cujo modelo/rota nao
+existe mais.
 
 O historico permanece em `modelEligibilityRuns`.
 
@@ -6888,7 +6970,8 @@ Foi adicionado teste explicito de provider/model removal.
 
 Esse comportamento e essencial para refresh incremental seguro.
 
-Tambem evita corrupcao logica quando providers forem removidos, renomeados ou deixarem de listar modelos.
+Tambem evita corrupcao logica quando providers forem removidos, renomeados ou deixarem de listar
+modelos.
 
 ## 21.50 Mudanca 50 - Selection Audit Persistido Com Status Correto
 
@@ -6896,7 +6979,8 @@ O terminal ja possuia caminho de persistencia para decision trace.
 
 O problema era a UX declarar `persisted=nao` mesmo quando `write-trace` gravava artefato.
 
-`/byok gateway selection audit effective write-trace` agora informa `persisted=sim` quando a gravacao ocorre.
+`/byok gateway selection audit effective write-trace` agora informa `persisted=sim` quando a
+gravacao ocorre.
 
 Em falha de persistencia, informa `persisted=falha`.
 
@@ -7177,7 +7261,8 @@ Isto preserva o comportamento atual:
 - Ollama/local nao selecionado por default;
 - local selecionado apenas por opt-in explicito.
 
-Quando `excludeLocalProvidersByDefault=false`, o caller assume conscientemente a responsabilidade de permitir local sem o bloqueio global.
+Quando `excludeLocalProvidersByDefault=false`, o caller assume conscientemente a responsabilidade de
+permitir local sem o bloqueio global.
 
 O bloqueio por default continua emitindo:
 
@@ -7391,7 +7476,8 @@ Consolidacao final da ponte pre-runtime -> runtime selector antes dos testes liv
 
 Problema identificado:
 
-- o build real de metadados podia terminar com importer de conta falhando sem deixar isso visivel no resumo humano;
+- o build real de metadados podia terminar com importer de conta falhando sem deixar isso visivel no
+  resumo humano;
 - o importer `gemini-models` registrou falha nao bloqueante por chave expirada;
 - o runtime selector carregava status de conta `expired` em algumas rotas sem mostrar `canAttempt`;
 - o plano live precisava deixar claro que nenhuma rota selecionada estava bloqueada por conta/key.
@@ -7399,12 +7485,14 @@ Problema identificado:
 Correcoes aplicadas:
 
 - `selection-audit` agora preserva `accountAccess.canAttempt`;
-- `selection-audit` agora preserva `secretConfigured`, `modelVisible`, `hardReasons` e `softReasons`;
+- `selection-audit` agora preserva `secretConfigured`, `modelVisible`, `hardReasons` e
+  `softReasons`;
 - `selection-trace` preserva os mesmos campos;
 - `runtime-selector` bloqueia qualquer rota selecionada cujo `accountAccess.canAttempt === false`;
 - `runtime-selector` inclui `accountAccessBlockedCount`;
 - `live-readiness` mostra `accessBlocked=0` no gate do runtime selector;
-- `model-gateway:metadata:build` imprime falhas de importer no resumo humano, mesmo quando nao bloqueiam o build.
+- `model-gateway:metadata:build` imprime falhas de importer no resumo humano, mesmo quando nao
+  bloqueiam o build.
 
 Estado observado depois do build remoto sem Ollama local:
 
@@ -7424,7 +7512,8 @@ Falha de importer observada:
 - `gemini-models`;
 - causa: `API key expired`;
 - classificacao: falha de conta/key, nao de metadado publico;
-- efeito: nao bloqueia o build quando ha fontes publicas/doc suficientes e a selecao default nao depende de Gemini;
+- efeito: nao bloqueia o build quando ha fontes publicas/doc suficientes e a selecao default nao
+  depende de Gemini;
 - acao futura: trocar ou renovar `GEMINI_API_KEY`, depois rodar refresh seletivo do provider.
 
 Validacoes focadas:
@@ -7487,7 +7576,8 @@ Sequencia executada:
 - controle terminal sem PR;
 - fixture BYOK sem provider real;
 - probes BYOK reais sem PR;
-- turno BYOK real completo com tools, streaming, `ask_user`, troca de modelo e troca de provider alternativo.
+- turno BYOK real completo com tools, streaming, `ask_user`, troca de modelo e troca de provider
+  alternativo.
 
 Comandos executados:
 
@@ -7524,9 +7614,12 @@ Resultado observado:
 - segredos locais nao vazaram no output;
 - telemetria BYOK nao foi renderizada como Premium Request;
 - `kilo-auto/free` executou chat, streaming, JSON, agent probe e turno real;
-- `kilo-auto/free` registrou falha de vision probe, e o terminal passou a refletir `no-vision` via cache/health;
-- `moonshotai/kimi-k2.6:free` teve sucesso em uma fase e depois `agent probe empty` em shortlist posterior;
-- apos o `empty`, `/byok recommend ... safe` nao promoveu `moonshotai/kimi-k2.6:free`, porque `safe` exige `agentProbeStatus=ok`.
+- `kilo-auto/free` registrou falha de vision probe, e o terminal passou a refletir `no-vision` via
+  cache/health;
+- `moonshotai/kimi-k2.6:free` teve sucesso em uma fase e depois `agent probe empty` em shortlist
+  posterior;
+- apos o `empty`, `/byok recommend ... safe` nao promoveu `moonshotai/kimi-k2.6:free`, porque `safe`
+  exige `agentProbeStatus=ok`.
 
 Estado pos-live:
 
@@ -7544,7 +7637,8 @@ Estado pos-live:
 
 Lacuna identificada no pos-live:
 
-O diff de runtime health tratava o `moonshotai/kimi-k2.6:free` como registro adicionado e falho, mas nao possuia contador proprio para:
+O diff de runtime health tratava o `moonshotai/kimi-k2.6:free` como registro adicionado e falho, mas
+nao possuia contador proprio para:
 
 - falha nova;
 - rota que passou de desconhecida para falha;
@@ -7552,19 +7646,22 @@ O diff de runtime health tratava o `moonshotai/kimi-k2.6:free` como registro adi
 
 Isso confundia a leitura operacional.
 
-Nao e correto transformar toda falha nova em regressao fatal, pois live tests tambem descobrem candidatos ruins.
+Nao e correto transformar toda falha nova em regressao fatal, pois live tests tambem descobrem
+candidatos ruins.
 
 Mas tambem nao e correto esconder essa informacao dentro de `added`.
 
 Correcoes aplicadas:
 
 - criado modulo canonico `src/copilot/model-gateway/health/runtime-health-diff.js`;
-- o script `model-gateway:runtime-health:diff` passou a usar o modulo do gateway, nao logica privada solta;
+- o script `model-gateway:runtime-health:diff` passou a usar o modulo do gateway, nao logica privada
+  solta;
 - o diff agora expõe `newFailures`;
 - o diff agora expõe `becameFailed`;
 - o diff agora expõe `recovered`;
 - o resumo humano imprime esses contadores;
-- a chave comparavel agora cai para identidade `routeProfile|providerId|providerModel` quando o registro ainda nao tem chave persistida;
+- a chave comparavel agora cai para identidade `routeProfile|providerId|providerModel` quando o
+  registro ainda nao tem chave persistida;
 - o barrel `health/index.js` exporta os helpers;
 - o barrel principal `model-gateway/index.js` exporta os helpers;
 - contrato unitario cobre regressao, falha nova e recuperacao.
@@ -7589,7 +7686,8 @@ Interpretacao:
 - nao houve regressao de rota antes saudavel;
 - houve descoberta de candidato que falhou no agent probe;
 - a camada `safe` ja remove esse candidato de recomendacao operacional;
-- o proximo ciclo pode investigar se `empty` deve gerar backoff temporal mais forte, sem contaminar metadados canonicos.
+- o proximo ciclo pode investigar se `empty` deve gerar backoff temporal mais forte, sem contaminar
+  metadados canonicos.
 
 Validacoes focadas:
 
@@ -7666,8 +7764,10 @@ Problema identificado:
 
 - o runtime selector registrava a decisao antes da tentativa;
 - o ledger sabia qual rota seria tentada;
-- o ledger nao registrava, no mesmo contrato de route decision, o resultado sanitizado da tentativa runtime;
-- isso deixava sucesso, falha de provider e fallback dependentes de health/probe em vez de tambem existirem como decisao operacional auditavel.
+- o ledger nao registrava, no mesmo contrato de route decision, o resultado sanitizado da tentativa
+  runtime;
+- isso deixava sucesso, falha de provider e fallback dependentes de health/probe em vez de tambem
+  existirem como decisao operacional auditavel.
 
 Correcoes aplicadas:
 
@@ -7726,7 +7826,8 @@ Problema identificado:
 Correcoes aplicadas:
 
 - `executeModelGatewayRuntimeSelectorPlanWithFallbacks` retorna `routeDecisionRecordedCount`;
-- sucesso com fallback soma todos os eventos gravados nas tentativas anteriores e na tentativa vencedora;
+- sucesso com fallback soma todos os eventos gravados nas tentativas anteriores e na tentativa
+  vencedora;
 - falha final tambem soma os eventos gravados;
 - comentario do modulo foi atualizado para refletir a arquitetura atual:
   - planning continua nao-executante;
@@ -7756,7 +7857,8 @@ Problema identificado:
 - `copilot_model_gateway_route_decisions` usa `decision_id` como chave primaria;
 - o `decisionId` anterior usava timestamp, task profile e model id;
 - apos a Mudanca 63, uma mesma rota pode gerar pre-decision e runtime outcome em sequencia;
-- se ambos cairem no mesmo milissegundo, o SQLite poderia sobrescrever o primeiro evento pelo segundo.
+- se ambos cairem no mesmo milissegundo, o SQLite poderia sobrescrever o primeiro evento pelo
+  segundo.
 
 Correcoes aplicadas:
 
@@ -7788,9 +7890,11 @@ Baseline fixo por execucao no plano de live tests.
 
 Problema identificado:
 
-- o plano live gerava a fase `runtime_health_baseline` com `model-gateway:runtime-health:diff -- --write-snapshot`;
+- o plano live gerava a fase `runtime_health_baseline` com
+  `model-gateway:runtime-health:diff -- --write-snapshot`;
 - a fase pos-live sugeria `--baseline artifacts/model-gateway-runtime-health/latest.json`;
-- depois de uma primeira diff pos-live, `latest.json` pode deixar de representar o baseline pre-live;
+- depois de uma primeira diff pos-live, `latest.json` pode deixar de representar o baseline
+  pre-live;
 - em sequencias longas, isso cria comparacoes contra a fase anterior, nao contra o inicio do plano.
 
 Correcoes aplicadas:
@@ -7810,7 +7914,8 @@ Resultado observado:
 
 - `ok=true`;
 - baseline command usa `--out-dir artifacts/model-gateway-runtime-health-baselines/<runId>`;
-- post-live command usa `--baseline artifacts/model-gateway-runtime-health-baselines/<runId>/latest.json`;
+- post-live command usa
+  `--baseline artifacts/model-gateway-runtime-health-baselines/<runId>/latest.json`;
 - post-live command nao usa `artifacts/model-gateway-runtime-health/latest.json`.
 
 `npm run model-gateway:typecheck`
@@ -7826,7 +7931,8 @@ Persistencia SQLite dos outcomes do runtime selector no comando canonico.
 Problema identificado:
 
 - o executor runtime passou a gerar dois eventos por tentativa: pre-decision e outcome;
-- o script `model-gateway:runtime-selector -- --execute` ainda coletava apenas `attempt.route.decisionEvent`;
+- o script `model-gateway:runtime-selector -- --execute` ainda coletava apenas
+  `attempt.route.decisionEvent`;
 - isso persistiria no SQLite apenas a decisao pre-runtime;
 - os outcomes sanitizados ficariam no retorno da execucao, mas nao na camada operacional SQLite.
 
@@ -7837,7 +7943,8 @@ Correcoes aplicadas:
 - a persistencia SQLite usa esse stream completo;
 - pre-decision e runtime outcome passam a ser persistidos juntos;
 - o output humano mostra `routeDecisionEvents=<n>`;
-- o tipo de `executeModelGatewayRuntimeSelectorPlanWithFallbacks` passou a declarar `recordRouteDecision` em `deps`.
+- o tipo de `executeModelGatewayRuntimeSelectorPlanWithFallbacks` passou a declarar
+  `recordRouteDecision` em `deps`.
 
 Separacao preservada:
 
@@ -7868,7 +7975,8 @@ Captura testavel de route decisions do runtime selector.
 
 Problema identificado:
 
-- o comando canonico `model-gateway:runtime-selector -- --execute` tinha logica propria para capturar e deduplicar eventos;
+- o comando canonico `model-gateway:runtime-selector -- --execute` tinha logica propria para
+  capturar e deduplicar eventos;
 - isso deixava a persistencia SQLite do outcome menos reutilizavel;
 - tambem dificultava testar o caminho sem chamar provider real.
 
@@ -7878,7 +7986,8 @@ Correcoes aplicadas:
 - criado `dedupeModelGatewayRouteDecisionEvents`;
 - o capturador preserva o formato de `recordModelGatewayRouteDecision`;
 - o capturador retorna listas clonadas para evitar mutacao acidental;
-- a deduplicacao mantem a ordem de primeira ocorrencia e usa o payload mais recente por `decisionId`;
+- a deduplicacao mantem a ordem de primeira ocorrencia e usa o payload mais recente por
+  `decisionId`;
 - o script `model-gateway-runtime-selector.mjs` passou a usar essa primitiva;
 - os exports seguem o modelo de barrels em `observability/index.js` e `model-gateway/index.js`.
 
@@ -7931,14 +8040,16 @@ Problema identificado:
 
 - o executor aceita `--fallback-profiles`;
 - o comando canonico filtrava o planejamento inicial apenas por `--profile` e `--profiles`;
-- quando o operador passava `--execute --profile repo_agent --fallback-profiles tool_agent`, a rota `tool_agent` podia ser removida antes de chegar ao executor;
+- quando o operador passava `--execute --profile repo_agent --fallback-profiles tool_agent`, a rota
+  `tool_agent` podia ser removida antes de chegar ao executor;
 - isso tornava a fallback chain declarada na CLI ilusoria em cenarios filtrados.
 
 Correcoes aplicadas:
 
 - `readProfiles()` agora inclui `--fallback-profiles`;
 - perfis sao normalizados, aparados e deduplicados antes da auditoria de selecao;
-- o executor continua recebendo `fallbackProfileIds` separadamente para preservar a ordem de tentativa;
+- o executor continua recebendo `fallbackProfileIds` separadamente para preservar a ordem de
+  tentativa;
 - o dry-run passa a mostrar todos os perfis que poderao participar da execucao real.
 - o shape de execucao bloqueada no script agora inclui `routeDecisionRecordedCount=0`.
 
@@ -7987,7 +8098,8 @@ Flush deterministico de runtime health antes do mirror SQLite.
 Problema identificado:
 
 - scripts e terminal espelhavam health BYOK para SQLite lendo o estado em memoria/arquivo;
-- o caminho correto para live tests exige garantir que o ledger JSON foi flushado antes da leitura operacional;
+- o caminho correto para live tests exige garantir que o ledger JSON foi flushado antes da leitura
+  operacional;
 - sem uma primitiva unica, cada consumidor precisava lembrar a sequencia `flush -> mirror`;
 - isso aumentava risco de divergencia entre artefato JSON, SQLite e readiness apos uma fase live.
 
@@ -7997,7 +8109,8 @@ Correcoes aplicadas:
 - a funcao chama `flushByokProviderHealth()` e depois `mirrorByokProviderHealthToSqlite()`;
 - o retorno inclui `flushed=true`;
 - `model-gateway-runtime-health-mirror.mjs` passou a usar a nova primitiva;
-- `model-gateway-runtime-selector.mjs -- --execute` passou a usar a nova primitiva depois da tentativa runtime;
+- `model-gateway-runtime-selector.mjs -- --execute` passou a usar a nova primitiva depois da
+  tentativa runtime;
 - `/byok gateway health sqlite` passou a usar a nova primitiva e exibir `flushed=sim`;
 - os exports seguem os barrels de `health/index.js` e `model-gateway/index.js`;
 - mocks de terminal foram atualizados para o novo contrato.
@@ -8070,7 +8183,8 @@ Problema identificado:
 - alguns retornam Unix epoch em milissegundos;
 - outros retornam duracao relativa;
 - o classificador tratava numero de reset como duracao relativa;
-- isso podia transformar `1779930123` em uma janela muitos anos no futuro, em vez de `2026-05-28T01:02:03.000Z`.
+- isso podia transformar `1779930123` em uma janela muitos anos no futuro, em vez de
+  `2026-05-28T01:02:03.000Z`.
 
 Correcoes aplicadas:
 
@@ -8121,18 +8235,22 @@ Effective runtime overlay nao substitui eligibility canonica por unknown blocker
 
 Problema identificado:
 
-- apos espelhar mais health observado para SQLite, `live-readiness` caiu para `0/7` rotas selecionadas;
+- apos espelhar mais health observado para SQLite, `live-readiness` caiu para `0/7` rotas
+  selecionadas;
 - a causa era a reavaliacao effective com `unknownAccessPolicy=block`;
 - essa reavaliacao gerava milhares de decisions `account_access_unknown`;
-- ao montar o snapshot effective, essas decisions substituiam a eligibility persistida que ja estava apta;
+- ao montar o snapshot effective, essas decisions substituiam a eligibility persistida que ja estava
+  apta;
 - o resultado era um falso bloqueio total antes dos live tests, mesmo sem overlays runtime ativos.
 
 Principio arquitetural consolidado:
 
 - health/runtime observado pode sobrepor bloqueadores concretos;
 - ausencia generica de account visibility nao deve apagar eligibility canonica;
-- unknown access precisa continuar sendo tratado na camada de account overlay/refresh, nao como regressao runtime;
-- effective snapshot deve preservar catalog eligibility e adicionar apenas blockers runtime/account concretos.
+- unknown access precisa continuar sendo tratado na camada de account overlay/refresh, nao como
+  regressao runtime;
+- effective snapshot deve preservar catalog eligibility e adicionar apenas blockers runtime/account
+  concretos.
 
 Correcoes aplicadas:
 
@@ -8146,7 +8264,8 @@ Correcoes aplicadas:
   - `account_rate_limited`;
   - `account_model_blocked`;
 - `account_access_unknown` e `account_overlay_missing` nao sao promovidos para overlay runtime;
-- `model-gateway-runtime-selector.mjs` passou a preservar `snapshot.modelEligibilityDecisions` e anexar apenas overlay decisions concretas;
+- `model-gateway-runtime-selector.mjs` passou a preservar `snapshot.modelEligibilityDecisions` e
+  anexar apenas overlay decisions concretas;
 - `model-gateway-live-readiness.mjs` passou a usar a mesma regra;
 - a saida JSON informa `runtimeOverlayDecisionCount`/`runtimeOverlayDecisions`.
 
@@ -8218,7 +8337,8 @@ Resultado:
 - artefato: `artifacts/terminal-live/2026-05-28T13-08-08-672Z/summary.md`;
 - terminal pronto em TTY interativo;
 - nenhum turno LLM explicito aberto;
-- `/usage now`, `/activity`, `/session sdk commands`, `/session sdk events`, `/session sdk waits`, `/metrics`, `/events` e `/errors` renderizaram corretamente;
+- `/usage now`, `/activity`, `/session sdk commands`, `/session sdk events`, `/session sdk waits`,
+  `/metrics`, `/events` e `/errors` renderizaram corretamente;
 - SSE conectado com ids monotonicos;
 - nenhum erro rastreado pelo terminal.
 
@@ -8235,9 +8355,11 @@ Runner live real passa a aplicar a rota do runtime selector.
 Problema identificado:
 
 - `model-gateway:runtime-selector` ja escolhia rotas por perfil de tarefa;
-- o runner `terminal:llm-b:live-test -- --byok-real` ainda podia iniciar usando um perfil BYOK legado do `.env.local`;
+- o runner `terminal:llm-b:live-test -- --byok-real` ainda podia iniciar usando um perfil BYOK
+  legado do `.env.local`;
 - isso permitia testar um provider/modelo diferente daquele que a selecao canonica havia escolhido;
-- em live real, esse desalinhamento poderia produzir falsos positivos, consumo de quota no provider errado, ou falhas que nao pertenciam a rota selecionada.
+- em live real, esse desalinhamento poderia produzir falsos positivos, consumo de quota no provider
+  errado, ou falhas que nao pertenciam a rota selecionada.
 
 Correcoes aplicadas:
 
@@ -8245,14 +8367,18 @@ Correcoes aplicadas:
 - adicionado `--byok-real-route-fallback-profiles=<a,b>` ao runner live;
 - o runner chama `scripts/model-gateway-runtime-selector.mjs --json --fail`;
 - a rota selecionada e aplicada no ambiente inicial do terminal;
-- a rota selecionada tambem e aplicada explicitamente por `/byok provider <provider> <model> [baseUrl]`;
-- quando o modo runtime-selector esta ativo, o runner nao troca para alt profiles depois da rota canonica;
+- a rota selecionada tambem e aplicada explicitamente por
+  `/byok provider <provider> <model> [baseUrl]`;
+- quando o modo runtime-selector esta ativo, o runner nao troca para alt profiles depois da rota
+  canonica;
 - o plano live e o readiness passaram a recomendar:
   - `--byok-real-route-profile=repo_agent`;
   - `--byok-real-route-fallback-profiles=code,tool_agent`;
 - o inventario canonico de comandos agora lista os comandos live control, fixture e real;
-- o criterio `byok-real-runtime-selector-route` valida que o terminal renderizou o provider/modelo selecionado;
-- corrigido detalhe de reason em `buildModelGatewayRuntimeSelectorPlan`: `blocked:runtime_proof_required` so aparece quando a prova realmente esta ausente.
+- o criterio `byok-real-runtime-selector-route` valida que o terminal renderizou o provider/modelo
+  selecionado;
+- corrigido detalhe de reason em `buildModelGatewayRuntimeSelectorPlan`:
+  `blocked:runtime_proof_required` so aparece quando a prova realmente esta ausente.
 
 Evidencia sem runtime:
 
@@ -8302,7 +8428,8 @@ Baseline associado:
 
 Resultado:
 
-- snapshot escrito em `artifacts/model-gateway-runtime-health-baselines/2026-05-28T13-18-runtime-selector-handoff/latest.json`;
+- snapshot escrito em
+  `artifacts/model-gateway-runtime-health-baselines/2026-05-28T13-18-runtime-selector-handoff/latest.json`;
 - `diff.summary.regressions=0`;
 - `diff.summary.newFailures=0`;
 - estado observado antes do live real preservado para comparacao posterior.
@@ -8359,7 +8486,8 @@ Impacto:
 
 - falhas dinamicas de conta, quota, creditos e access passam a bloquear retries obvios;
 - metadado canonico permanece separado de runtime/account state;
-- o pre-runtime evita gastar chamadas repetidas em rotas que acabaram de provar indisponibilidade de conta;
+- o pre-runtime evita gastar chamadas repetidas em rotas que acabaram de provar indisponibilidade de
+  conta;
 - esta regra e essencial antes de full-turn real.
 
 Mudanca 77:
@@ -8411,12 +8539,14 @@ Fallback runtime selector nao repete a mesma rota por perfis diferentes.
 Problema identificado:
 
 - o plano pode selecionar a mesma rota concreta em mais de um perfil;
-- quando a primeira tentativa falhava, o fallback podia tentar o mesmo provider/model de novo por outro perfil;
+- quando a primeira tentativa falhava, o fallback podia tentar o mesmo provider/model de novo por
+  outro perfil;
 - isso consumia tempo/quota e nao acrescentava informacao nova.
 
 Correcoes aplicadas:
 
-- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` agora deduplica tentativas por rota concreta;
+- `executeModelGatewayRuntimeSelectorPlanWithFallbacks` agora deduplica tentativas por rota
+  concreta;
 - a chave usa `selectedRouteKey` ou `providerId:providerModel`;
 - perfis distintos continuam elegiveis quando apontam para modelos concretos diferentes;
 - teste novo valida:
@@ -8429,7 +8559,8 @@ Impacto:
 - menos chamadas repetidas;
 - fallback passa a representar alternativas reais;
 - logs de tentativa ficam mais limpos;
-- selecao runtime fica pronta para mais provedores e mais perfis sem multiplicar retries redundantes.
+- selecao runtime fica pronta para mais provedores e mais perfis sem multiplicar retries
+  redundantes.
 
 Mudanca 79:
 
@@ -8437,13 +8568,15 @@ Shutdown e cleanup de probes SDK foram fortificados.
 
 Problemas identificados:
 
-- `model-gateway:runtime-selector --execute` podia produzir JSON completo e ainda assim manter processo vivo;
+- `model-gateway:runtime-selector --execute` podia produzir JSON completo e ainda assim manter
+  processo vivo;
 - uma sessao efemera com provider timeout podia demorar para limpar;
 - falha em `sendAndWait` nao abortava explicitamente a sessao antes do cleanup.
 
 Correcoes aplicadas:
 
-- `scripts/model-gateway-runtime-selector.mjs` chama `shutdownClient({ force: true })` depois de execucao runtime;
+- `scripts/model-gateway-runtime-selector.mjs` chama `shutdownClient({ force: true })` depois de
+  execucao runtime;
 - `withEphemeralSession` passou a ter timeout de cleanup para:
   - `asyncDispose`;
   - `disconnectSession`;
@@ -8466,7 +8599,8 @@ Problema identificado:
 
 - apos a rota NVIDIA passar runtime, a pontuacao de metadados ainda podia dominar;
 - rotas com score estatico maior, mas sem prova recente, continuavam competindo forte demais;
-- isso contrariava a finalidade da camada observada: depois do runtime, prova real deve pesar bastante.
+- isso contrariava a finalidade da camada observada: depois do runtime, prova real deve pesar
+  bastante.
 
 Correcoes aplicadas:
 
@@ -8529,10 +8663,12 @@ Resultado:
 
 Ajustes de criterio do runner:
 
-- `byok-real-route-decision` aceita o caminho diagnostico sem candidatos quando o endpoint ativo nao retorna catalogo roteavel;
+- `byok-real-route-decision` aceita o caminho diagnostico sem candidatos quando o endpoint ativo nao
+  retorna catalogo roteavel;
 - `byok-real-shortlist-probe` aceita shortlist vazia como diagnostico operacional valido;
 - `byok-real-recommendation` aceita recomendacao vazia quando filtros excluem todos os candidatos;
-- `byok-real-vision-probe` aceita resultado explicito `empty` como capacidade observada, sem transformar vision em hard exclusion automatica.
+- `byok-real-vision-probe` aceita resultado explicito `empty` como capacidade observada, sem
+  transformar vision em hard exclusion automatica.
 
 Snapshot pos-live:
 
@@ -8552,7 +8688,8 @@ Resultado:
 
 Resultado:
 
-- snapshot escrito em `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-00-real-selector-nvidia-pass/latest.json`;
+- snapshot escrito em
+  `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-00-real-selector-nvidia-pass/latest.json`;
 - `diff.summary.regressions=0`;
 - `diff.summary.newFailures=0`;
 - `diff.summary.becameFailed=0`;
@@ -8560,7 +8697,8 @@ Resultado:
 
 Impacto:
 
-- a cadeia `metadata -> eligibility -> runtime selector execute -> terminal BYOK live no-pr` esta comprovada em provider real;
+- a cadeia `metadata -> eligibility -> runtime selector execute -> terminal BYOK live no-pr` esta
+  comprovada em provider real;
 - a rota ruim por creditos foi aprendida como estado runtime/account;
 - a rota alternativa comprovada foi promovida;
 - a fase seguinte pode avançar para full-turn real apenas depois de novo readiness e validadores.
@@ -8572,17 +8710,22 @@ Cockpit `/byok models route ... active provider:<preset>` preserva o provider op
 Problema identificado:
 
 - endpoints OpenAI-compatible podem devolver `owned_by` ou `provider` com o dono do modelo;
-- em NVIDIA NIM, o modelo selecionado foi `openai/gpt-oss-120b`, mas a fronteira operacional era `nvidia-nim`;
+- em NVIDIA NIM, o modelo selecionado foi `openai/gpt-oss-120b`, mas a fronteira operacional era
+  `nvidia-nim`;
 - o terminal podia filtrar ou rotear pelo dono `openai` em vez do preset operacional;
-- isso explicava parte dos diagnosticos `Nenhum candidato encontrado para roteamento` em comandos focados no provider ativo.
+- isso explicava parte dos diagnosticos `Nenhum candidato encontrado para roteamento` em comandos
+  focados no provider ativo.
 
 Correcoes aplicadas:
 
-- `withByokCatalogSource` agora distingue provider operacional de owner do modelo em modelos descobertos por provider ativo;
-- para modelos `remote/static` vindos do provider ativo, `byok.provider` passa a refletir o preset operacional;
+- `withByokCatalogSource` agora distingue provider operacional de owner do modelo em modelos
+  descobertos por provider ativo;
+- para modelos `remote/static` vindos do provider ativo, `byok.provider` passa a refletir o preset
+  operacional;
 - o owner anterior fica preservado em `byok.providerOwner`;
 - `byok.profile` tambem recebe o preset quando nao ha profile nomeado;
-- `toGatewayRouteCandidate` passa a enxergar o provider operacional correto sem mudar a arquitetura do policy engine.
+- `toGatewayRouteCandidate` passa a enxergar o provider operacional correto sem mudar a arquitetura
+  do policy engine.
 
 Teste adicionado:
 
@@ -8635,7 +8778,8 @@ Resultado:
 
 Resultado:
 
-- snapshot escrito em `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-08-real-selector-nvidia-route-cockpit-pass/latest.json`;
+- snapshot escrito em
+  `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-08-real-selector-nvidia-route-cockpit-pass/latest.json`;
 - `diff.summary.regressions=0`;
 - `diff.summary.newFailures=0`;
 
@@ -8647,8 +8791,10 @@ Impacto:
 
 Lacunas ainda abertas apos Mudanca 82:
 
-- full-turn real deve ser executado so depois de validar esses pontos ou aceitar conscientemente o risco operacional;
-- resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao automatica.
+- full-turn real deve ser executado so depois de validar esses pontos ou aceitar conscientemente o
+  risco operacional;
+- resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao
+  automatica.
 
 Mudanca 83:
 
@@ -8657,9 +8803,11 @@ Runner live reaplica provider runtime imediatamente apos `/byok reload`.
 Problema identificado:
 
 - o roteiro live real carregava `.env.local`;
-- em seguida, antes de reaplicar a rota runtime-selector, ainda imprimia paineis como `/byok env`, `/byok providers`, `/byok health` e `/byok profiles`;
+- em seguida, antes de reaplicar a rota runtime-selector, ainda imprimia paineis como `/byok env`,
+  `/byok providers`, `/byok health` e `/byok profiles`;
 - nesse intervalo, o operador via o perfil legado do arquivo local;
-- depois a rota correta era reaplicada, mas o cockpit inicial ficava ruidoso e podia confundir analise automatica.
+- depois a rota correta era reaplicada, mas o cockpit inicial ficava ruidoso e podia confundir
+  analise automatica.
 
 Correcao aplicada:
 
@@ -8669,8 +8817,10 @@ Correcao aplicada:
   - `/byok provider <provider> <model> <baseUrl>`;
   - somente entao `/byok env`, `/byok providers`, `/byok health`, `/byok profiles`;
 - o caminho sem runtime-selector continua usando `/byok use` e `/byok model`;
-- o comportamento de `--dry-run` permanece sem executar probes runtime reais, portanto pode mostrar a rota dry quando `--byok-real-route-execute` esta desativado por dry-run.
-- `/byok reload --no-status` recarrega `.env.local`, omite o cockpit legado e instrui o operador a aplicar a rota preparada antes de chamar `/byok`.
+- o comportamento de `--dry-run` permanece sem executar probes runtime reais, portanto pode mostrar
+  a rota dry quando `--byok-real-route-execute` esta desativado por dry-run.
+- `/byok reload --no-status` recarrega `.env.local`, omite o cockpit legado e instrui o operador a
+  aplicar a rota preparada antes de chamar `/byok`.
 
 Evidencia:
 
@@ -8705,14 +8855,18 @@ Impacto:
 
 Mudanca 84:
 
-Executor do runtime selector prioriza rotas com prova quando a politica pede `prefer_runtime_proved`.
+Executor do runtime selector prioriza rotas com prova quando a politica pede
+`prefer_runtime_proved`.
 
 Problema identificado:
 
 - o plano `prefer_runtime_proved` ja conseguia identificar rotas com prova runtime;
-- porem `executeModelGatewayRuntimeSelectorPlanWithFallbacks` ainda tentava primeiro o perfil solicitado;
-- no caso real, isso significava tentar `repo_agent/cerebras/gpt-oss-120b`, que vinha dando timeout, antes de chegar em `code/nvidia-nim/openai/gpt-oss-120b`, que ja tinha prova;
-- a politica dizia preferir runtime provado, mas a ordem de execucao ainda privilegiava a ordem textual de perfil.
+- porem `executeModelGatewayRuntimeSelectorPlanWithFallbacks` ainda tentava primeiro o perfil
+  solicitado;
+- no caso real, isso significava tentar `repo_agent/cerebras/gpt-oss-120b`, que vinha dando timeout,
+  antes de chegar em `code/nvidia-nim/openai/gpt-oss-120b`, que ja tinha prova;
+- a politica dizia preferir runtime provado, mas a ordem de execucao ainda privilegiava a ordem
+  textual de perfil.
 
 Correcao aplicada:
 
@@ -8746,7 +8900,8 @@ Resultado:
   - provider `nvidia-nim`;
   - model `openai/gpt-oss-120b`;
   - `error=null`;
-- artefato: `artifacts/model-gateway-runtime-selector/2026-05-28T14-14-prefer-runtime-proved-first.json`.
+- artefato:
+  `artifacts/model-gateway-runtime-selector/2026-05-28T14-14-prefer-runtime-proved-first.json`.
 
 Impacto:
 
@@ -8758,9 +8913,12 @@ Impacto:
 Lacunas ainda abertas apos Mudanca 84:
 
 - full-turn real ainda precisa ser executado e auditado;
-- resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao automatica;
-- o warning de `shutdownClient({ force: true })` no selector executado ainda e ruidoso, embora o encerramento seja deterministico;
-- a rota `repo_agent` sem prova continua disponivel para policy metadata-first, mas nao deve prevalecer em prefer-runtime-proved.
+- resultados de vision devem alimentar refinamento de capability runtime, sem virar exclusao
+  automatica;
+- o warning de `shutdownClient({ force: true })` no selector executado ainda e ruidoso, embora o
+  encerramento seja deterministico;
+- a rota `repo_agent` sem prova continua disponivel para policy metadata-first, mas nao deve
+  prevalecer em prefer-runtime-proved.
 
 Mudanca 85:
 
@@ -8769,8 +8927,10 @@ Live no-pr confirmou handoff statusless e prova runtime antes do full-turn.
 Problema investigado:
 
 - a correcao anterior precisava ser validada dentro do terminal real;
-- o risco era o cockpit ainda imprimir o perfil legado de `.env.local` antes de aplicar a rota runtime;
-- tambem era necessario confirmar que a ordenacao por runtime proof nao era apenas unidade isolada, mas afetava o runner live.
+- o risco era o cockpit ainda imprimir o perfil legado de `.env.local` antes de aplicar a rota
+  runtime;
+- tambem era necessario confirmar que a ordenacao por runtime proof nao era apenas unidade isolada,
+  mas afetava o runner live.
 
 Evidencia live:
 
@@ -8814,20 +8974,23 @@ Resultado:
 - `runtimeProbeResults=1577`;
 - `regressions=0`;
 - `newFailures=0`;
-- snapshot: `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-17-statusless-proof-first-no-pr/latest.json`.
+- snapshot:
+  `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-17-statusless-proof-first-no-pr/latest.json`.
 
 Impacto:
 
 - o caminho no-pr esta pronto para servir de preflight imediato do full-turn;
 - a selecao `prefer_runtime_proved` agora corta timeout conhecido antes de acionar a sessao real;
-- o cockpit terminal mostra a fronteira correta entre estado carregado, rota preparada e provider ativo;
+- o cockpit terminal mostra a fronteira correta entre estado carregado, rota preparada e provider
+  ativo;
 - a evidencia de runtime continua fora do catalogo canonico.
 
 Lacunas ainda abertas apos Mudanca 85:
 
 - executar full-turn real com a mesma rota comprovada;
 - analisar custo, quota e classificacao de uso do full-turn;
-- decidir se o resultado `vision=empty` deve virar health observation fraca ou capability override explicito;
+- decidir se o resultado `vision=empty` deve virar health observation fraca ou capability override
+  explicito;
 - manter Ollama local fora dos defaults ate opt-in do operador.
 
 Mudanca 86:
@@ -8870,7 +9033,8 @@ Correcao aplicada no runner:
   - JSON textual de pergunta;
   - declaracoes textuais de execucao;
 - o runner passa a bloquear cedo em vez de esperar timeout quando a tool viva foi textificada;
-- diagnostics de protocolo devem aguardar retorno ao prompt para nao intercalar comandos no meio do streaming;
+- diagnostics de protocolo devem aguardar retorno ao prompt para nao intercalar comandos no meio do
+  streaming;
 - o detalhe do probe vision no runner separa prova positiva de resultado explicito nao conclusivo.
 
 Correcao aplicada no terminal:
@@ -8885,7 +9049,8 @@ Interpretacao arquitetural:
 - o turno vivo ainda expõe uma lacuna especifica no final do fluxo: `ask_user` pode ser textificado;
 - isso nao deve ser promovido como runtime proof completo de automacao;
 - o selector precisa distinguir `agent_probe_ok` de `live_ask_user_ok`;
-- enquanto `live_ask_user_ok` nao existir, esse modelo pode ser bom para chat/codigo, mas nao deve ser preferido para automacao que dependa de ask_user vivo.
+- enquanto `live_ask_user_ok` nao existir, esse modelo pode ser bom para chat/codigo, mas nao deve
+  ser preferido para automacao que dependa de ask_user vivo.
 
 Lacunas abertas apos Mudanca 86:
 
@@ -8893,7 +9058,8 @@ Lacunas abertas apos Mudanca 86:
 - evitar que agent probe descartavel seja interpretada como equivalencia plena ao turno vivo;
 - reexecutar full-turn apos sincronizacao de diagnostics;
 - investigar se outro modelo NVIDIA com tool-calling mais forte passa `ask_user` vivo;
-- investigar se o problema e do provider, do SDK boundary, do prompt, ou da ponte terminal de `ask_user`.
+- investigar se o problema e do provider, do SDK boundary, do prompt, ou da ponte terminal de
+  `ask_user`.
 
 Mudanca 87:
 
@@ -8901,9 +9067,11 @@ Runner live agora bloqueia protocolo textificado sem poluir streaming e sem fals
 
 Problema identificado apos Mudanca 86:
 
-- o detector de pseudo-tool estava certo, mas acionava diagnostics enquanto o modelo ainda transmitia;
+- o detector de pseudo-tool estava certo, mas acionava diagnostics enquanto o modelo ainda
+  transmitia;
 - isso podia intercalar `/activity 40` dentro do bloco publico em streaming;
-- o criterio de vision no runner podia atravessar a proxima secao e ler `resultado: ok` do agent probe;
+- o criterio de vision no runner podia atravessar a proxima secao e ler `resultado: ok` do agent
+  probe;
 - o comando `/byok probe vision` tambem narrava `empty` como se a imagem tivesse sido interpretada.
 
 Correcao aplicada:
@@ -8951,7 +9119,8 @@ Resultado:
 - `runtimeProbeResults=2305`;
 - `regressions=0`;
 - `newFailures=0`;
-- snapshot: `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-30-full-turn-live-ask-user-blocked/latest.json`.
+- snapshot:
+  `artifacts/model-gateway-runtime-health-post-live/2026-05-28T14-30-full-turn-live-ask-user-blocked/latest.json`.
 
 Impacto:
 
@@ -8973,7 +9142,8 @@ Status: implementado em 2026-05-28.
 Objetivo:
 
 - separar definitivamente `agent_probe_ok` de prova de protocolo vivo;
-- impedir que uma rota com `ask_user` textificado continue sendo tentada como se fosse apenas "chat/probe OK";
+- impedir que uma rota com `ask_user` textificado continue sendo tentada como se fosse apenas
+  "chat/probe OK";
 - persistir fatos de live full-turn no mesmo health store usado pelo selector e pelo SQLite mirror;
 - manter o banco canonico de metadados imutavel diante de fatos volateis de runtime.
 
@@ -9011,7 +9181,8 @@ Semantica nova:
 
 - `agent` continua sendo probe descartavel de capacidade basica de tool/ask_user;
 - `live_tool_protocol` e prova de que o turno terminal real materializou tools SDK;
-- `live_ask_user` e prova de que o turno terminal real materializou pergunta, resposta humana e final pos-resposta;
+- `live_ask_user` e prova de que o turno terminal real materializou pergunta, resposta humana e
+  final pos-resposta;
 - falha de `live_ask_user` nao apaga o modelo do catalogo canonico;
 - falha de `live_ask_user` pode bloquear a rota em uma handoff live posterior;
 - a decisao fica no overlay de health/runtime, nao nos metadados canonicos.
@@ -9052,7 +9223,8 @@ Impacto arquitetural:
   - live protocol proof;
 - o runtime selector deixa de depender apenas de "modelo respondeu";
 - uma live bloqueada agora produz memoria operacional reutilizavel;
-- o proximo live test deve gravar a falha atual no health e, depois do mirror, permitir que o selector evite a mesma rota.
+- o proximo live test deve gravar a falha atual no health e, depois do mirror, permitir que o
+  selector evite a mesma rota.
 
 Lacunas abertas apos Mudanca 88:
 
@@ -9071,11 +9243,13 @@ Problema revelado pela Mudanca 88:
 - isso acontecia porque:
   - o plano final do runtime consumia apenas a rota vencedora da policy row;
   - health global sem `routeProfile` nao servia como fallback para uma rota com `routeProfile`;
-  - o harness live gravava `live_tool_protocol/live_ask_user=failed` tambem quando o bloqueio ocorria em preflight.
+  - o harness live gravava `live_tool_protocol/live_ask_user=failed` tambem quando o bloqueio
+    ocorria em preflight.
 
 Correcoes aplicadas:
 
-- `readGatewayModelHealth` e `readGatewayModelHealthFromRecords` agora usam health profileless como fallback;
+- `readGatewayModelHealth` e `readGatewayModelHealthFromRecords` agora usam health profileless como
+  fallback;
 - `buildModelGatewayRuntimeSelectorPlan` recebe `runtimeHealthRecords`;
 - o plano final bloqueia rota com:
   - `chat_health_failed`;
@@ -9083,13 +9257,15 @@ Correcoes aplicadas:
   - probe bloqueado por `--block-failed-probes`;
   - account access negando tentativa;
   - env runtime ausente quando exigido.
-- o plano final pode usar `postSelected` como fallback quando o primario foi bloqueado por health/probe runtime;
+- o plano final pode usar `postSelected` como fallback quando o primario foi bloqueado por
+  health/probe runtime;
 - o fallback e marcado com `runtime_selector_fallback:postSelected`;
 - o harness live agora grava `live_tool_protocol/live_ask_user` apenas quando:
   - o full-turn vivo foi realmente tentado; ou
   - o blocker foi `byok-live-tool-protocol-missed`.
 - blockers de preflight, admission, quota e provider nao gravam falso `live_ask_user=failed`;
-- o registro incorreto de `repo_agent|mistral|devstral-medium-2507` criado durante a transicao foi limpo.
+- o registro incorreto de `repo_agent|mistral|devstral-medium-2507` criado durante a transicao foi
+  limpo.
 
 Evidencia live gravada:
 
@@ -9113,7 +9289,8 @@ Mirror apos live:
 - `healthObservations=2487`;
 - `runtimeProbeRuns=109`;
 - `runtimeProbeResults=2587`;
-- snapshot: `artifacts/model-gateway-runtime-health-post-live/2026-05-28T15-11-live-protocol-health-recorded/latest.json`.
+- snapshot:
+  `artifacts/model-gateway-runtime-health-post-live/2026-05-28T15-11-live-protocol-health-recorded/latest.json`.
 
 Evidencia de selector:
 
@@ -9154,11 +9331,13 @@ Impacto arquitetural:
 - health global agora protege rotas especificas do mesmo provider/model;
 - preflight e live protocol proof ficam separados;
 - o selector agora tem memoria operacional para desviar de falhas reais;
-- o proximo trabalho deve consolidar account/provider-level blocking para falhas de cota/credito repetidas.
+- o proximo trabalho deve consolidar account/provider-level blocking para falhas de cota/credito
+  repetidas.
 
 Lacunas abertas apos Mudanca 89:
 
-- consolidar bloqueio por provider/account quando varios modelos do mesmo provider falham por credito/cota;
+- consolidar bloqueio por provider/account quando varios modelos do mesmo provider falham por
+  credito/cota;
 - classificar melhor `429` sem body de Mistral como rate-limit em vez de provider.unknown;
 - impedir que preflight agent failed faca o cockpit narrar texto ambiguo de sucesso;
 - executar probe bounded para Zai `glm-4.5-flash`;
@@ -9197,13 +9376,16 @@ Implementacao:
   - falhas `timeout`;
   - falhas `network`;
   - falhas `upstream`;
-  - falhas `model-or-route` quando aparecem em modelos distintos do mesmo provider, pois isso normalmente indica base URL,
-    catalogo remoto ou acesso da key incompatível com a rota OpenAI-normalizada atual;
+  - falhas `model-or-route` quando aparecem em modelos distintos do mesmo provider, pois isso
+    normalmente indica base URL, catalogo remoto ou acesso da key incompatível com a rota
+    OpenAI-normalizada atual;
   - janela curta de 15 minutos;
   - minimo de 2 modelos distintos falhando;
   - sucesso posterior do provider desfaz o cooldown.
-- `scoreGatewayModelCandidate` rejeita candidatos de provider em cooldown quando recebe `runtimeHealthRecords`;
-- `buildModelGatewayRuntimeSelectorPlan` tambem bloqueia a rota final se a policy ainda trouxer provider em cooldown;
+- `scoreGatewayModelCandidate` rejeita candidatos de provider em cooldown quando recebe
+  `runtimeHealthRecords`;
+- `buildModelGatewayRuntimeSelectorPlan` tambem bloqueia a rota final se a policy ainda trouxer
+  provider em cooldown;
 - o plano expõe `providerCooldownBlockedCount`;
 - a rota bloqueada inclui:
   - `blocked:provider_health_cooldown:<kinds>`;
@@ -9213,7 +9395,8 @@ Overlay account/key:
 
 - `deriveModelGatewayRuntimeAccountOverlaysFromHealth` agora aceita `accountWideFailureKinds`;
 - o runtime selector usa `auth`, `credits` e `rate-limit` como account-wide;
-- isso evita repetir modelos do mesmo provider quando a propria key/conta ja demonstrou bloqueio externo;
+- isso evita repetir modelos do mesmo provider quando a propria key/conta ja demonstrou bloqueio
+  externo;
 - por default historico, a funcao continua model-scoped quando a opcao nao e informada.
 
 Evidencia que motivou:
@@ -9263,7 +9446,8 @@ Evidencia do help:
 
 - `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`;
 - `node scripts/copilot/run-terminal-llm-b-live-test.mjs --help`;
-- saida mostra `--byok-real-route-profile`, `--byok-real-route-fallback-profiles`, `--byok-real-route-execute` e demais flags.
+- saida mostra `--byok-real-route-profile`, `--byok-real-route-fallback-profiles`,
+  `--byok-real-route-execute` e demais flags.
 
 Evidencia live gerada pelo acionamento acidental:
 
@@ -9307,10 +9491,12 @@ Falhas descobertas no handoff real:
 - o CLI do selector pode sair com falha global se alguns perfis ficaram bloqueados;
 - isso nao significa que a rota de fallback e inutilizavel;
 - o harness agora considera `selectedRoute` e `execution.ok` para aceitar fallback;
-- se a rota obrigatoria nao existir, o harness neutraliza `COPILOT_BYOK_PROFILE`, `COPILOT_BYOK_PROVIDER_PRESET`, `COPILOT_BYOK_MODEL` e `COPILOT_BYOK_BASE_URL` herdados;
+- se a rota obrigatoria nao existir, o harness neutraliza `COPILOT_BYOK_PROFILE`,
+  `COPILOT_BYOK_PROVIDER_PRESET`, `COPILOT_BYOK_MODEL` e `COPILOT_BYOK_BASE_URL` herdados;
 - assim ele nao cai silenciosamente no provider default do `.env.local`.
 - o harness agora bloqueia antes de iniciar o terminal quando a rota obrigatoria esta indisponivel;
-- o blocker prioriza `summary.execution.error` do runtime selector em vez de uma linha genérica de stderr.
+- o blocker prioriza `summary.execution.error` do runtime selector em vez de uma linha genérica de
+  stderr.
 
 Evidencia apos a correcao:
 
@@ -9330,7 +9516,8 @@ Evidencia de selector apos Mudanca 90:
 - o runtime selector passou a promover `zai/glm-4.7-flash` como `post_runtime_proved`;
 - todos os perfis ficaram selecionados no plano apos a prova.
 - em seguida, `repo_agent|zai|glm-4.7-flash` e `repo_agent|zai|glm-4.7-flashx` falharam por timeout;
-- o limiar default foi reduzido de 3 para 2 modelos distintos para evitar insistir no mesmo provider durante handoff live.
+- o limiar default foi reduzido de 3 para 2 modelos distintos para evitar insistir no mesmo provider
+  durante handoff live.
 
 ### Mudanca 92 - Alternativas reais, diversidade de fallback e health cross-profile
 
@@ -9339,18 +9526,24 @@ Status: implementado em 2026-05-28.
 Problema identificado nos probes de handoff:
 
 - o runtime selector tinha apenas a rota vencedora por perfil;
-- quando `repo_agent`, `code` e `tool_agent` apontavam para o mesmo provider/model, o fallback por perfil nao era fallback real;
-- uma falha `code|cerebras|zai-glm-4.7` nao bloqueava automaticamente `repo_agent|cerebras|zai-glm-4.7`;
-- isso permitia repetir o mesmo provider/model em outro perfil, gastando tempo e quota em uma rota ja provada ruim;
-- rotas `model-or-route` da NVIDIA tambem mostraram que catalogo remoto e acesso real da key podem divergir.
+- quando `repo_agent`, `code` e `tool_agent` apontavam para o mesmo provider/model, o fallback por
+  perfil nao era fallback real;
+- uma falha `code|cerebras|zai-glm-4.7` nao bloqueava automaticamente
+  `repo_agent|cerebras|zai-glm-4.7`;
+- isso permitia repetir o mesmo provider/model em outro perfil, gastando tempo e quota em uma rota
+  ja provada ruim;
+- rotas `model-or-route` da NVIDIA tambem mostraram que catalogo remoto e acesso real da key podem
+  divergir.
 
 Implementacao:
 
 - `auditModelGatewaySelection` agora preserva `candidateAlternates` por perfil;
 - `compareModelGatewaySelectionAudits` carrega alternativas pre-runtime e post-runtime;
 - `resolveModelGatewaySelectionPolicy` entrega essas alternativas ao runtime selector;
-- `buildModelGatewayRuntimeSelectorPlan` avalia `selected`, `postSelected`, `preSelected` e alternativas rankeadas;
-- o plano agora expõe `alternativeSummary` por rota, com contagens de alternativas avaliadas, usáveis e bloqueadas;
+- `buildModelGatewayRuntimeSelectorPlan` avalia `selected`, `postSelected`, `preSelected` e
+  alternativas rankeadas;
+- o plano agora expõe `alternativeSummary` por rota, com contagens de alternativas avaliadas,
+  usáveis e bloqueadas;
 - o summary do plano expõe `alternativeEvaluatedCount` e `alternativeUsableCount`;
 - o plano prefere o primeiro candidato nao bloqueado por:
   - account access;
@@ -9359,13 +9552,14 @@ Implementacao:
   - probes live bloqueantes;
   - cooldown provider-scoped.
 - entre perfis, o plano evita repetir `provider/model`;
-- quando possivel, tambem evita repetir provider, para que `fallback-profiles` representem familias distintas;
+- quando possivel, tambem evita repetir provider, para que `fallback-profiles` representem familias
+  distintas;
 - `readGatewayModelHealthFromRecords` agora prefere:
   - health exato do perfil;
   - health global sem perfil;
   - health cross-profile do mesmo provider/model.
-- o harness live ganhou `--byok-real-route-allow-probe`, para testes explicitos em modo max-autonomy quando strict
-  nao encontra rotas env-ready conhecidas.
+- o harness live ganhou `--byok-real-route-allow-probe`, para testes explicitos em modo max-autonomy
+  quando strict nao encontra rotas env-ready conhecidas.
 
 Efeito esperado:
 
@@ -9392,8 +9586,8 @@ Evidencia local apos Mudanca 92:
 - ambos os lives foram bloqueados antes do turno final por preflight agent:
   - Groq: `property parsed is unsupported` em mensagem assistant do wire OpenAI-compatible;
   - Mistral: `429` durante agent probe.
-- `property parsed is unsupported` passa a ser classificado como `model-or-route`, pois representa incompatibilidade de
-  schema/wire da rota com o provider OpenAI-compatible, nao erro desconhecido.
+- `property parsed is unsupported` passa a ser classificado como `model-or-route`, pois representa
+  incompatibilidade de schema/wire da rota com o provider OpenAI-compatible, nao erro desconhecido.
 
 Lacunas restantes apos Mudanca 92:
 
@@ -9417,15 +9611,17 @@ Proximo passo correto:
 
 ## Mudanca 93 - Separacao De Familias Nao Conversacionais Antes Do Runtime
 
-Durante a retomada dos testes live, o seletor caiu para `nvidia-nim:baai/bge-m3` como fallback do perfil `code`.
+Durante a retomada dos testes live, o seletor caiu para `nvidia-nim:baai/bge-m3` como fallback do
+perfil `code`.
 
 Isso revelou uma falha de camada baixa:
 
-- o importer autenticado da NVIDIA marcava todos os modelos do endpoint `/v1/models` como `chat=true` e `streaming=true`;
-- modelos BGE, embeddings, rerank, ASR, TTS e image-generation podiam entrar no fluxo de chat por ausencia de taxonomia
-  negativa;
-- o catalogo antigo ainda tinha `modalities.output=["text"]` para `baai/bge-m3`, portanto a politica precisava ter uma defesa
-  independente do rebuild;
+- o importer autenticado da NVIDIA marcava todos os modelos do endpoint `/v1/models` como
+  `chat=true` e `streaming=true`;
+- modelos BGE, embeddings, rerank, ASR, TTS e image-generation podiam entrar no fluxo de chat por
+  ausencia de taxonomia negativa;
+- o catalogo antigo ainda tinha `modalities.output=["text"]` para `baai/bge-m3`, portanto a politica
+  precisava ter uma defesa independente do rebuild;
 - o problema nao era runtime selector em si, mas classificacao de familia antes do runtime.
 
 Alteracoes estruturais aplicadas:
@@ -9478,11 +9674,13 @@ Evidencia local:
 
 Lacunas restantes:
 
-- criar perfis explicitos para embeddings/rerank quando o gateway passar a expor tarefas nao conversacionais;
+- criar perfis explicitos para embeddings/rerank quando o gateway passar a expor tarefas nao
+  conversacionais;
 - enriquecer importers de outros provedores com a mesma classificacao negativa;
-- auditar `bigcode/starcoder2-15b` por probe, pois ele pode ser text/code-generation sem tools, mas ainda precisa provar
-  compatibilidade com chat OpenAI-compatible;
-- executar refresh provider-scoped da NVIDIA para substituir o snapshot antigo por metadados corrigidos.
+- auditar `bigcode/starcoder2-15b` por probe, pois ele pode ser text/code-generation sem tools, mas
+  ainda precisa provar compatibilidade com chat OpenAI-compatible;
+- executar refresh provider-scoped da NVIDIA para substituir o snapshot antigo por metadados
+  corrigidos.
 
 ## Mudanca 94 - Executor De Runtime Com Alternativas Reais E Health Por Perfil
 
@@ -9490,8 +9688,10 @@ O probe posterior a Mudanca 93 revelou um problema de execucao:
 
 - o plano dizia haver dezenas de alternativas utilizaveis;
 - o executor tentava apenas a rota selecionada do perfil;
-- se a primeira rota falhasse com `model-or-route`, a execucao encerrava mesmo havendo alternativas no mesmo perfil;
-- falhas de agent/vision registradas em health profileless tambem podiam bloquear perfis simples de `code`.
+- se a primeira rota falhasse com `model-or-route`, a execucao encerrava mesmo havendo alternativas
+  no mesmo perfil;
+- falhas de agent/vision registradas em health profileless tambem podiam bloquear perfis simples de
+  `code`.
 
 Alteracoes aplicadas:
 
@@ -9504,13 +9704,17 @@ Alteracoes aplicadas:
   - respeitando `attemptsPerRoute`;
   - respeitando `maxAttempts`.
 - `model-gateway-runtime-selector.mjs` recebeu `--max-attempts`;
-- `run-terminal-llm-b-live-test.mjs` recebeu `--byok-real-route-max-attempts`, default `8`, para lives controlados;
-- `evaluateGatewayModelHealthRoute` passou a bloquear `agent_probe_failed` apenas quando o perfil exige prova agentica;
-- o runtime selector passa `requireAgentProbeOk` para `repo_agent` e `tool_agent`, mas nao para `code`.
+- `run-terminal-llm-b-live-test.mjs` recebeu `--byok-real-route-max-attempts`, default `8`, para
+  lives controlados;
+- `evaluateGatewayModelHealthRoute` passou a bloquear `agent_probe_failed` apenas quando o perfil
+  exige prova agentica;
+- o runtime selector passa `requireAgentProbeOk` para `repo_agent` e `tool_agent`, mas nao para
+  `code`.
 
 Evidencia live/pre-live:
 
-- `model-gateway-runtime-selector --execute --attempts-per-route=1 --timeout-ms=20000` percorreu 7 rotas;
+- `model-gateway-runtime-selector --execute --attempts-per-route=1 --timeout-ms=20000` percorreu 7
+  rotas;
 - falhas registradas:
   - `zai/glm-4.6`: timeout;
   - `zai/glm-4.7`: timeout;
@@ -9526,33 +9730,37 @@ Consequencia:
 - o primeiro full live deve usar a rota provada pelo executor, nao a primeira rota metadata-only;
 - `code` pode usar modelos com chat/streaming provado mesmo quando agent probe falhou;
 - `repo_agent` e `tool_agent` continuam exigindo saude agentica;
-- lives ficam bounded por `--byok-real-route-max-attempts` para evitar varrer catalogos enormes sem limite.
+- lives ficam bounded por `--byok-real-route-max-attempts` para evitar varrer catalogos enormes sem
+  limite.
 
 Achado adicional:
 
-- `artifacts/terminal-live/2026-05-28T16-59-41-371Z/summary.md` mostrou que ruido de shutdown do SDK podia impedir o
-  harness de parsear JSON do selector;
+- `artifacts/terminal-live/2026-05-28T16-59-41-371Z/summary.md` mostrou que ruido de shutdown do SDK
+  podia impedir o harness de parsear JSON do selector;
 - o parser do harness agora extrai o objeto JSON mesmo se houver texto antes/depois;
-- `artifacts/terminal-live/2026-05-28T17-01-04-508Z/summary.md` mostrou bloqueio real posterior: depois de novos
-  timeouts/404 em NIM, o plano ficou sem rota executavel;
-- isso reforca a necessidade de uma camada de catalog stale/provider-cooldown mais seletiva antes de novos lives amplos.
+- `artifacts/terminal-live/2026-05-28T17-01-04-508Z/summary.md` mostrou bloqueio real posterior:
+  depois de novos timeouts/404 em NIM, o plano ficou sem rota executavel;
+- isso reforca a necessidade de uma camada de catalog stale/provider-cooldown mais seletiva antes de
+  novos lives amplos.
 - o executor recebeu tambem limite por provider:
   - `--max-attempts-per-provider`;
   - `--byok-real-route-max-attempts-per-provider`;
   - default `4`.
-- objetivo: permitir descoberta dentro de um provider, mas impedir que um catalogo stale monopolize todo o budget de live.
-- a lista de alternativas preservada pela auditoria subiu de 24 para 96 itens por perfil, porque provedores sem env ou
-  com health bloqueado podem ocupar os primeiros slots e esconder rotas realmente tentaveis;
-- o harness aumentou o `maxBuffer` do selector para 16 MiB, pois planos com alternativas amplas podem ultrapassar o
-  tamanho padrao de stdout do `spawnSync`.
-- falhas temporarias de chat runtime (`timeout`, `network`, `upstream`, `rate-limit`, `unknown`) passaram a ter cooldown
-  model-scoped default de 15 minutos;
-- falhas duraveis como `model-or-route`, `auth` e `credits` continuam bloqueando ate sucesso posterior, clear explicito
-  ou refresh/overlay adequado.
-- `model-gateway-runtime-selector.mjs` recebeu `--temporary-failure-cooldown-ms` para auditorias controladas sem apagar
-  o health store.
-- `run-terminal-llm-b-live-test.mjs` recebeu `--byok-real-route-temporary-failure-cooldown-ms` para propagar esse mesmo
-  controle ao live harness.
+- objetivo: permitir descoberta dentro de um provider, mas impedir que um catalogo stale monopolize
+  todo o budget de live.
+- a lista de alternativas preservada pela auditoria subiu de 24 para 96 itens por perfil, porque
+  provedores sem env ou com health bloqueado podem ocupar os primeiros slots e esconder rotas
+  realmente tentaveis;
+- o harness aumentou o `maxBuffer` do selector para 16 MiB, pois planos com alternativas amplas
+  podem ultrapassar o tamanho padrao de stdout do `spawnSync`.
+- falhas temporarias de chat runtime (`timeout`, `network`, `upstream`, `rate-limit`, `unknown`)
+  passaram a ter cooldown model-scoped default de 15 minutos;
+- falhas duraveis como `model-or-route`, `auth` e `credits` continuam bloqueando ate sucesso
+  posterior, clear explicito ou refresh/overlay adequado.
+- `model-gateway-runtime-selector.mjs` recebeu `--temporary-failure-cooldown-ms` para auditorias
+  controladas sem apagar o health store.
+- `run-terminal-llm-b-live-test.mjs` recebeu `--byok-real-route-temporary-failure-cooldown-ms` para
+  propagar esse mesmo controle ao live harness.
 - Evidencia adicional:
   - com `--temporary-failure-cooldown-ms=1`, a execucao limitada tentou `cerebras/gpt-oss-120b`,
     `cerebras/zai-glm-4.7`, `zai/glm-4-32b-0414-128k`;
@@ -9560,8 +9768,8 @@ Achado adicional:
 
 ## Mudanca 95 - Vision Como Diagnostico Opcional No Live Full
 
-O primeiro full live real depois da rota `zai/glm-4.5-flash` provou o fluxo principal, mas falhou no status final porque
-o harness ainda tratava `vision` como criterio obrigatorio.
+O primeiro full live real depois da rota `zai/glm-4.5-flash` provou o fluxo principal, mas falhou no
+status final porque o harness ainda tratava `vision` como criterio obrigatorio.
 
 Artefato:
 
@@ -9582,7 +9790,8 @@ Resultado observado:
   - `ask_user`;
   - resposta humana;
   - final pos-ask;
-- `vision` falhou com erro do provider, mas isso nao degradou chat, tools, JSON, streaming nem ask_user.
+- `vision` falhou com erro do provider, mas isso nao degradou chat, tools, JSON, streaming nem
+  ask_user.
 
 Decisao arquitetural:
 
@@ -9627,7 +9836,8 @@ Comando recomendado para live multimodal estrito:
 Lacunas restantes:
 
 - separar health `vision` de health `chat` no cockpit para evitar leitura ambigua pelo operador;
-- criar runtime live dedicado para perfil `vision`, com prompt e fixture multimodal como objetivo primario;
+- criar runtime live dedicado para perfil `vision`, com prompt e fixture multimodal como objetivo
+  primario;
 - registrar falhas multimodais como capability runtime especifica, sem contaminar selecao textual.
 
 ## Mudanca 96 - Active/Current Preserva Modelo Ativo Mesmo Quando O Catalogo Remoto O Omite
@@ -9637,14 +9847,16 @@ O live de `2026-05-28T17-23-22-050Z` tambem revelou um desalinhamento no cockpit
 - o runtime selector promoveu `zai/glm-4.5-flash`;
 - o terminal ficou corretamente bound em `glm-4.5-flash`;
 - probes chat/streaming/JSON/agent passaram nesse modelo;
-- mas `/byok models route code active --show-rejected provider:zai` olhava o endpoint remoto `/models`;
+- mas `/byok models route code active --show-rejected provider:zai` olhava o endpoint remoto
+  `/models`;
 - o endpoint remoto nao listava `glm-4.5-flash`;
 - a rota de preview escolhia `glm-4.5`, que tinha health de timeout.
 
 Decisao arquitetural:
 
 - `active/current` e uma intencao operacional, nao apenas um filtro de catalogo;
-- quando o operador pede `active/current`, o modelo atualmente preparado/bound deve entrar como candidato;
+- quando o operador pede `active/current`, o modelo atualmente preparado/bound deve entrar como
+  candidato;
 - isso deve acontecer mesmo quando o provider remoto omite o modelo ativo;
 - o catalogo canonico nao deve ser alterado por esse fato sozinho;
 - a inclusao e uma projection efemera de terminal para preview/diagnostico.
@@ -9653,7 +9865,8 @@ Alteracoes aplicadas:
 
 - `parseRecommendArgs` passou a registrar `activeOnly`;
 - o label de filtros agora mostra `active`;
-- `discoverByokCatalogForCommand` injeta o modelo ativo como candidato quando `active/current` e usado;
+- `discoverByokCatalogForCommand` injeta o modelo ativo como candidato quando `active/current` e
+  usado;
 - se o modelo ja existir nos modelos locais/gateway, ele e reaproveitado;
 - se nao existir, o terminal sintetiza um candidato `active-runtime` com:
   - provider operacional;
@@ -9666,7 +9879,8 @@ Alteracoes aplicadas:
 Teste adicionado:
 
 - `mantem o modelo ativo como candidato quando active/current e o endpoint remoto o omite`;
-- cobre exatamente o caso `zai/glm-4.5-flash` ausente do endpoint remoto, mas presente como modelo ativo.
+- cobre exatamente o caso `zai/glm-4.5-flash` ausente do endpoint remoto, mas presente como modelo
+  ativo.
 
 Efeito esperado:
 
@@ -9691,9 +9905,10 @@ Alteracoes aplicadas:
   - `protocol=live_ask_user=... live_tool_protocol=...`;
   - `probes=...` para demais provas;
 - probes de capability nao ficam misturadas com `chatHealth` ou `agentHealth`;
-- `recordByokProbeHealth` passou a chamar `flushByokProviderHealth()` tambem para probes nao-chat/nao-agent;
-- isso torna `vision`, `json` e `streaming` persistidos antes do comando retornar, sem transformar falha de capability em
-  falha de chat.
+- `recordByokProbeHealth` passou a chamar `flushByokProviderHealth()` tambem para probes
+  nao-chat/nao-agent;
+- isso torna `vision`, `json` e `streaming` persistidos antes do comando retornar, sem transformar
+  falha de capability em falha de chat.
 
 Teste adicionado/fortalecido:
 
@@ -9708,13 +9923,14 @@ Efeito esperado:
   - saude agentica (`agent=`);
   - capacidades opcionais (`capabilities=`);
   - protocolo live do terminal (`protocol=`);
-- o runtime selector pode continuar usando `live_tool_protocol` e `live_ask_user` como provas fortes sem depender de
-  sucesso multimodal.
+- o runtime selector pode continuar usando `live_tool_protocol` e `live_ask_user` como provas fortes
+  sem depender de sucesso multimodal.
 
 ## Mudanca 98 - Provas Live Preferidas Dominam Provas Genericas De Chat
 
-Depois que o live full gravou `live_tool_protocol=ok` e `live_ask_user=ok`, o selector seco ainda preferia uma rota com
-provas genericas de chat/JSON/streaming, mas sem prova do protocolo live do terminal.
+Depois que o live full gravou `live_tool_protocol=ok` e `live_ask_user=ok`, o selector seco ainda
+preferia uma rota com provas genericas de chat/JSON/streaming, mas sem prova do protocolo live do
+terminal.
 
 Achado:
 
@@ -9727,9 +9943,12 @@ Achado:
 Decisao arquitetural:
 
 - probes preferidos nao sao meros detalhes de ranking;
-- quando o caller declara `preferredProbeKinds`, esse e o sinal da camada superior sobre qual evidencia importa;
-- `live_tool_protocol` e `live_ask_user` sao provas mais fortes para o terminal do que uma resposta de chat isolada;
-- isso deve valer sem tornar esses probes hard requirements, pois a politica ainda pode usar fallback se nao houver prova.
+- quando o caller declara `preferredProbeKinds`, esse e o sinal da camada superior sobre qual
+  evidencia importa;
+- `live_tool_protocol` e `live_ask_user` sao provas mais fortes para o terminal do que uma resposta
+  de chat isolada;
+- isso deve valer sem tornar esses probes hard requirements, pois a politica ainda pode usar
+  fallback se nao houver prova.
 
 Alteracoes aplicadas:
 
@@ -9754,8 +9973,8 @@ Efeito esperado:
 
 - lives futuros reusam primeiro modelos que ja materializaram o protocolo real do terminal;
 - modelos que apenas responderam chat continuam aproveitaveis como fallback;
-- a selecao fica coerente com a fase superior do roadmap: runtime selector real precisa escolher pela prova que mais
-  corresponde ao fluxo que sera executado.
+- a selecao fica coerente com a fase superior do roadmap: runtime selector real precisa escolher
+  pela prova que mais corresponde ao fluxo que sera executado.
 
 ## Mudanca 99 - Dry-Run Do Selector Considera Fallback Selecionado Como Cadeia Roteavel
 
@@ -9768,8 +9987,8 @@ Depois da Mudanca 98, o plano `repo_agent -> code -> tool_agent` ficou semantica
 
 Problema:
 
-- quando o operador chama `--profile=repo_agent --fallback-profiles=code,tool_agent`, a unidade de sucesso nao e "todos
-  os perfis estao selected";
+- quando o operador chama `--profile=repo_agent --fallback-profiles=code,tool_agent`, a unidade de
+  sucesso nao e "todos os perfis estao selected";
 - a unidade de sucesso e "a cadeia solicitada tem pelo menos uma rota selecionada e executavel";
 - isso ja era verdade em `--execute`, mas nao no dry-run.
 
@@ -9778,8 +9997,10 @@ Alteracoes aplicadas:
 - `model-gateway-runtime-selector.mjs` agora calcula os perfis solicitados:
   - profile primario;
   - fallback profiles;
-- em dry-run, se houver profile/fallback solicitado, `ok=true` quando qualquer rota dessa cadeia estiver selected;
-- sem profile/fallback explicito, o comportamento antigo permanece: todos os perfis do plano precisam estar selected;
+- em dry-run, se houver profile/fallback solicitado, `ok=true` quando qualquer rota dessa cadeia
+  estiver selected;
+- sem profile/fallback explicito, o comportamento antigo permanece: todos os perfis do plano
+  precisam estar selected;
 - `routeRequest` passou a expor `dryRunOkCanSucceedWithSelectedFallbackProfile`.
 
 Evidencia seca:
@@ -9840,7 +10061,8 @@ Arquitetura aplicada:
 - `evaluateGatewayProviderHealthCooldown` aceita records brutos ou indice;
 - `routeGatewayModels` cria o indice uma vez por chamada quando recebe records brutos;
 - `auditModelGatewayPostRuntimeSelection` consegue receber o indice e repassa ao policy engine;
-- `buildModelGatewayRuntimeSelectorPlan` reusa o mesmo indice para health/cooldown das rotas selecionadas;
+- `buildModelGatewayRuntimeSelectorPlan` reusa o mesmo indice para health/cooldown das rotas
+  selecionadas;
 - `model-gateway-runtime-selector.mjs` constroi o indice uma vez e expoe timings.
 
 Evidencia:
@@ -9855,16 +10077,19 @@ Evidencia:
   - `node --check scripts/model-gateway-runtime-selector.mjs`;
   - resultado: passou.
 - selector seco:
-  - comando com `--profile=code`, `prefer_runtime_proved`, provas live preferidas e cooldown temporario de 1ms;
+  - comando com `--profile=code`, `prefer_runtime_proved`, provas live preferidas e cooldown
+    temporario de 1ms;
   - resultado: `ok=true`;
   - `health.build_runtime_index` ficou em poucos ms;
-  - `selection.post_runtime_audit` caiu de aproximadamente 12,8s para cerca de 1,7-2,1s no mesmo ambiente.
+  - `selection.post_runtime_audit` caiu de aproximadamente 12,8s para cerca de 1,7-2,1s no mesmo
+    ambiente.
 
 Consequencias:
 
 - o runtime selector deixa de pagar o custo de varrer health bruto para cada candidato;
 - a auditoria post-runtime fica viavel para uso frequente antes dos testes live;
-- a mesma estrutura pode ser reutilizada depois por cockpit, explain, dry-runs por profile e execucao com fallbacks;
+- a mesma estrutura pode ser reutilizada depois por cockpit, explain, dry-runs por profile e
+  execucao com fallbacks;
 - a separacao conceitual continua intacta:
   - catalogo canonico: metadados estaveis;
   - health index: vista volatil, derivada e descartavel;
@@ -9875,7 +10100,8 @@ Proximas lacunas antes da mudanca seguinte:
 
 - reduzir tambem o custo de `selection.pre_runtime_audit`, que agora fica proximo de 1,7-2,0s;
 - investigar se `buildModelGatewayRouteCandidates` pode ser compartilhado entre perfis na auditoria;
-- evitar recomputar eligibility matching por candidato quando o snapshot ja trouxe decisions efetivas;
+- evitar recomputar eligibility matching por candidato quando o snapshot ja trouxe decisions
+  efetivas;
 - manter o selector com timings sempre disponiveis para diagnostico operacional.
 
 ## Mudanca 100 - Indice de eligibility decisions para auditoria pre-runtime
@@ -10002,7 +10228,8 @@ Fluxo terminal comprovado:
 - `ask_user` real abriu pergunta persistente;
 - resposta humana `SIM` foi registrada;
 - mensagem pos-ask final apareceu apenas apos a resposta;
-- `/activity`, `/tools diag`, `/events`, `/events --raw`, `/usage now`, `/byok health` e export funcionaram.
+- `/activity`, `/tools diag`, `/events`, `/events --raw`, `/usage now`, `/byok health` e export
+  funcionaram.
 
 Gap detectado:
 
@@ -10042,7 +10269,8 @@ Contexto:
   - health global/profileless com `agent=ok`;
   - health `code` com protocolo live ok;
   - health `repo_agent` antigo com timeout ja expirado.
-- uma consulta sem `routeProfile` podia escolher o registro route-scoped mais recente em vez do global;
+- uma consulta sem `routeProfile` podia escolher o registro route-scoped mais recente em vez do
+  global;
 - isso era heranca do caminho antigo e ficou mais visivel depois da indexacao.
 
 Regra corrigida:
@@ -10076,8 +10304,10 @@ Contexto:
 
 - a live provou `zai/glm-4.5-flash` com agent probe global ok;
 - ao mesmo tempo, havia registro antigo route-scoped de `repo_agent` com timeout;
-- como o timeout era temporario e o cooldown ja tinha expirado, o chat nao deveria ficar bloqueado para sempre;
-- porem a rota ainda era rejeitada por `agent_probe_not_verified`, pois o registro exact `repo_agent` nao continha agent probe.
+- como o timeout era temporario e o cooldown ja tinha expirado, o chat nao deveria ficar bloqueado
+  para sempre;
+- porem a rota ainda era rejeitada por `agent_probe_not_verified`, pois o registro exact
+  `repo_agent` nao continha agent probe.
 
 Regra aplicada:
 
@@ -10101,7 +10331,8 @@ Motivo arquitetural:
 - agent probe global prova que o provider/model sabe chamar tools e `ask_user`;
 - route profile prova/nega adequacao operacional daquele perfil;
 - uma falha temporaria antiga nao deve impedir nova tentativa quando ha prova global mais recente;
-- o seletor ainda pode usar fallback profiles, mas nao deve bloquear uma rota recuperavel por falta de duplicacao exact da mesma prova.
+- o seletor ainda pode usar fallback profiles, mas nao deve bloquear uma rota recuperavel por falta
+  de duplicacao exact da mesma prova.
 
 Teste adicionado:
 
@@ -10109,7 +10340,8 @@ Teste adicionado:
 - health global posterior com `agent=ok`;
 - `temporaryFailureCooldownMs=1`;
 - avaliacao com `requireAgentProbeOk=true`;
-- resultado esperado: `health_allowed`, preservando `routeProfile=repo_agent` e copiando apenas a prova agentica global.
+- resultado esperado: `health_allowed`, preservando `routeProfile=repo_agent` e copiando apenas a
+  prova agentica global.
 
 ## Mudanca 104 - Diversidade de provider deixa de ser trava default do runtime selector
 
@@ -10117,16 +10349,21 @@ Status: concluido.
 
 Contexto:
 
-- no plano multi-profile `repo_agent -> code -> tool_agent`, o selector selecionava `zai/glm-4.5-flash` para
-  `repo_agent`, mas desviava `code` para outro provider mesmo quando `zai/glm-4.5-flash` era a melhor rota isolada;
-- isso ocorria por uma regra interna de diversidade que evitava repetir provider/route no mesmo plano;
-- para o objetivo de maxima autonomia e melhor rota por perfil, essa regra nao deve ser default silencioso.
+- no plano multi-profile `repo_agent -> code -> tool_agent`, o selector selecionava
+  `zai/glm-4.5-flash` para `repo_agent`, mas desviava `code` para outro provider mesmo quando
+  `zai/glm-4.5-flash` era a melhor rota isolada;
+- isso ocorria por uma regra interna de diversidade que evitava repetir provider/route no mesmo
+  plano;
+- para o objetivo de maxima autonomia e melhor rota por perfil, essa regra nao deve ser default
+  silencioso.
 
 Nova regra:
 
-- default: cada profile escolhe a melhor rota elegivel, mesmo que outro profile use o mesmo provider/model;
+- default: cada profile escolhe a melhor rota elegivel, mesmo que outro profile use o mesmo
+  provider/model;
 - opcional: `preferProviderDiversity=true` preserva o comportamento de diversificar provider;
-- opcional: `avoidDuplicateRoutes=true` evita repetir a mesma route key sem exigir provider diferente;
+- opcional: `avoidDuplicateRoutes=true` evita repetir a mesma route key sem exigir provider
+  diferente;
 - CLI: `model-gateway-runtime-selector.mjs --prefer-provider-diversity` ativa a diversificacao.
 
 Motivo:
@@ -10152,12 +10389,15 @@ Contexto:
 - o runtime selector calculava `route.hasRuntimeProof=true` corretamente;
 - porem `route.selected.hasRuntimeProof` podia sair ausente quando a prova vinha da linha de policy;
 - isso criava dois caminhos de leitura para a mesma verdade operacional;
-- scripts, terminal e executores tendem a consumir `route.selected`, porque e esse objeto que vira env/probe/execucao.
+- scripts, terminal e executores tendem a consumir `route.selected`, porque e esse objeto que vira
+  env/probe/execucao.
 
 Regra aplicada:
 
-- quando a rota escolhida tem prova de runtime, o objeto `selected` serializado tambem recebe `hasRuntimeProof=true`;
-- quando uma alternativa candidata tem prova de runtime, sua entrada em `candidateAlternatives[].selected` tambem recebe a flag;
+- quando a rota escolhida tem prova de runtime, o objeto `selected` serializado tambem recebe
+  `hasRuntimeProof=true`;
+- quando uma alternativa candidata tem prova de runtime, sua entrada em
+  `candidateAlternatives[].selected` tambem recebe a flag;
 - `selectedRouteKey`, `decisionEvent` e reasons passam a usar o mesmo objeto normalizado;
 - a rota bloqueada continua com `selected=null`, sem inventar prova.
 
@@ -10165,7 +10405,8 @@ Motivo arquitetural:
 
 - runtime proof e estado volatil de decisao, nao metadado canonico;
 - dentro do plano runtime, entretanto, a informacao precisa ser autoconsistente;
-- consumidores nao devem precisar reconciliar `route.hasRuntimeProof`, `row.hasRuntimeProof` e `selected.hasRuntimeProof`;
+- consumidores nao devem precisar reconciliar `route.hasRuntimeProof`, `row.hasRuntimeProof` e
+  `selected.hasRuntimeProof`;
 - isso prepara o seletor real para executar sem criar heuristicas duplicadas no terminal.
 
 Teste adicionado:
@@ -10185,7 +10426,8 @@ Contexto:
 - `executeModelGatewayRuntimeSelectorPlanWithFallbacks` recebia `maxAttempts`;
 - o codigo aplicava esse limite como fatia previa de rotas candidatas;
 - depois disso, `maxAttemptsPerProvider` podia pular rotas do mesmo provider;
-- nesse caso, uma alternativa valida de outro provider podia ficar fora da fatia sem nunca ser tentada.
+- nesse caso, uma alternativa valida de outro provider podia ficar fora da fatia sem nunca ser
+  tentada.
 
 Regra aplicada:
 
@@ -10193,13 +10435,15 @@ Regra aplicada:
 - `maxAttemptsPerProvider` continua limitando tentativas por provider;
 - candidatos pulados por provider cap nao consomem o limite global;
 - `attemptsPerRoute` tambem passa a respeitar o limite global de tentativas reais.
-- quando `maxAttempts` nao e informado, o default continua permitindo as tentativas por rota configuradas.
+- quando `maxAttempts` nao e informado, o default continua permitindo as tentativas por rota
+  configuradas.
 
 Motivo arquitetural:
 
 - o operador configura `maxAttempts` para controlar gasto de quota, tempo e risco;
 - rotas puladas por policy/cap nao gastam quota e nao devem consumir esse orcamento;
-- lives com muitos modelos de um mesmo provider precisam conseguir chegar a alternativa de provider diferente;
+- lives com muitos modelos de um mesmo provider precisam conseguir chegar a alternativa de provider
+  diferente;
 - o runtime selector deve ser bounded sem perder fallback util por contagem prematura.
 
 Teste adicionado:
@@ -10215,9 +10459,12 @@ Status: concluido.
 
 Contexto:
 
-- depois de corrigir `maxAttempts`, rotas puladas por `maxAttemptsPerProvider` continuavam invisiveis;
-- em live tests, isso dificultava saber se uma rota nao foi tentada por bug, por cap de provider ou por falta de budget;
-- o runner llm-b mostrava `attemptedCount`, mas nao o numero de rotas ignoradas por policy operacional.
+- depois de corrigir `maxAttempts`, rotas puladas por `maxAttemptsPerProvider` continuavam
+  invisiveis;
+- em live tests, isso dificultava saber se uma rota nao foi tentada por bug, por cap de provider ou
+  por falta de budget;
+- o runner llm-b mostrava `attemptedCount`, mas nao o numero de rotas ignoradas por policy
+  operacional.
 
 Regra aplicada:
 
@@ -10230,7 +10477,8 @@ Regra aplicada:
   - `maxAttemptsPerProvider`;
 - o CLI canonico imprime `skipped=<n>` na linha de execution;
 - o runner llm-b preserva `skippedAttemptCount` no resumo redigido.
-- skips por cap de provider tambem viram route-decision outcome `runtime_selector_skipped:provider_attempt_cap`.
+- skips por cap de provider tambem viram route-decision outcome
+  `runtime_selector_skipped:provider_attempt_cap`.
 
 Motivo arquitetural:
 
@@ -10255,7 +10503,8 @@ Contexto:
 
 - o runner live extraia a rota selecionada do JSON do runtime selector;
 - porem a decisao "rota usavel" dependia quase so de `selectedRoute`;
-- se o CLI retornasse `summary.ok=false` por falha de persistencia, health mirror ou outro erro operacional, a rota poderia parecer usavel;
+- se o CLI retornasse `summary.ok=false` por falha de persistencia, health mirror ou outro erro
+  operacional, a rota poderia parecer usavel;
 - em live real isso poderia continuar para o terminal mesmo quando o handoff do seletor falhou.
 
 Regra aplicada:
@@ -10315,14 +10564,18 @@ Resultado:
 Observacoes:
 
 - a falha de vision continua sendo capacidade especifica, nao criterio excludente default;
-- o catalogo remoto Zai nao lista `glm-4.5-flash`, mas a rota configurada tem prova viva e agent probe ok;
-- essa diferenca reforca a separacao entre metadado remoto, overlay de conta, runtime health e runtime proof;
+- o catalogo remoto Zai nao lista `glm-4.5-flash`, mas a rota configurada tem prova viva e agent
+  probe ok;
+- essa diferenca reforca a separacao entre metadado remoto, overlay de conta, runtime health e
+  runtime proof;
 - safe filtering remove candidatos sem agent proof quando a policy pede seguranca operacional;
-- o gate do runner agora confirmou que `summary.ok`, exit code e `execution.ok` precisam estar coerentes antes do terminal prosseguir.
+- o gate do runner agora confirmou que `summary.ok`, exit code e `execution.ok` precisam estar
+  coerentes antes do terminal prosseguir.
 
 Proximas lacunas identificadas:
 
-- classificar melhor HTTP 400 de vision como incompatibilidade multimodal especifica, nao `unknown` generico;
+- classificar melhor HTTP 400 de vision como incompatibilidade multimodal especifica, nao `unknown`
+  generico;
 - expor no cockpit quando um modelo comprovado por runtime nao aparece no endpoint remoto atual;
 - manter `glm-4.5-flash` como runtime-proved route sem promove-lo a metadado canonico remoto;
 - continuar fortalecendo health/probe classification antes de lives full com PR.
@@ -10335,7 +10588,8 @@ Contexto:
 
 - no live no-pr, o vision probe de `zai/glm-4.5-flash` falhou com HTTP 400 `Invalid API parameter`;
 - o terminal classificava isso como `provider.unknown`;
-- mensagens de schema/tool como `property parsed is unsupported` tambem podiam ser tratadas como `model-or-route`;
+- mensagens de schema/tool como `property parsed is unsupported` tambem podiam ser tratadas como
+  `model-or-route`;
 - isso mistura tres coisas diferentes:
   - modelo/rota inexistente;
   - capability/parametro recusado;
@@ -10344,7 +10598,8 @@ Contexto:
 Regra aplicada:
 
 - a taxonomia BYOK ganhou `capability-unsupported`;
-- HTTP 400 com parametro invalido, capability unsupported, attachment/image/vision/tool/schema unsupported passa a essa classe;
+- HTTP 400 com parametro invalido, capability unsupported, attachment/image/vision/tool/schema
+  unsupported passa a essa classe;
 - `errorContext=provider.capability_unsupported`;
 - `resolveModelGatewayRuntimeRetryDecision` trata essa classe como permanente para a rota/chamada;
 - health routing normaliza `provider.capability_unsupported`.
@@ -10368,9 +10623,11 @@ Status: concluido.
 
 Contexto:
 
-- no dry-run real, a rota escolhida para `repo_agent` podia carregar `selected.routeProfile=default`;
+- no dry-run real, a rota escolhida para `repo_agent` podia carregar
+  `selected.routeProfile=default`;
 - o plano em si tinha `profileId=repo_agent`;
-- a execucao gravava health com `route.profileId`, mas decision events podiam olhar para `selected.routeProfile`;
+- a execucao gravava health com `route.profileId`, mas decision events podiam olhar para
+  `selected.routeProfile`;
 - isso podia poluir ledger/SQLite com profile incorreto.
 
 Regra aplicada:
@@ -10388,7 +10645,8 @@ Motivo arquitetural:
 - route option source profile e runtime execution profile sao conceitos diferentes;
 - o executor precisa registrar o profile efetivo da tentativa;
 - a origem ainda e util para diagnostico e nao deve ser apagada;
-- isso prepara SQLite/ledger para consultas por `repo_agent`, `code`, `tool_agent` sem misturar `default`.
+- isso prepara SQLite/ledger para consultas por `repo_agent`, `code`, `tool_agent` sem misturar
+  `default`.
 
 Teste adicionado:
 
@@ -10428,7 +10686,8 @@ Motivo arquitetural:
 
 Validacao:
 
-- `model-gateway-runtime-selector --execute` confirmou `routeProfile=repo_agent` e `sourceRouteProfile=default`;
+- `model-gateway-runtime-selector --execute` confirmou `routeProfile=repo_agent` e
+  `sourceRouteProfile=default`;
 - persistiu 2 route decision events;
 - espelhou 72 health records e 52 probe results para SQLite sem erro.
 
@@ -10482,14 +10741,17 @@ Regra aplicada:
 - a API grava apenas tabelas runtime, sem tocar catalogo canonico, account overlays ou eligibility;
 - resultados invalidos sao contados como skipped, nao quebram o run inteiro;
 - payloads passam por redaction operacional antes de entrar no banco;
-- `buildModelGatewayRuntimeSelectorProbeRun` converte execucoes do selector em resultados `chat` tipados;
-- `scripts/model-gateway-runtime-selector.mjs` grava a trilha direta de probes quando `--execute` e usado;
+- `buildModelGatewayRuntimeSelectorProbeRun` converte execucoes do selector em resultados `chat`
+  tipados;
+- `scripts/model-gateway-runtime-selector.mjs` grava a trilha direta de probes quando `--execute` e
+  usado;
 - o espelho de health continua existindo como camada complementar para health/selection.
 
 Motivo arquitetural:
 
 - prova runtime e metadado canonico devem permanecer separados;
-- o banco precisa saber que uma chamada real foi tentada mesmo se o health ledger for limpo, espelhado depois ou agregado;
+- o banco precisa saber que uma chamada real foi tentada mesmo se o health ledger for limpo,
+  espelhado depois ou agregado;
 - route decisions explicam por que a rota foi escolhida;
 - probe runs explicam o que foi executado;
 - health observations explicam o estado operacional derivado;
@@ -10508,7 +10770,8 @@ Validacao esperada:
 - teste unitario cobre o builder do runtime selector;
 - teste unitario cobre `writeRuntimeProbeRun`;
 - `model-gateway-runtime-selector --execute --json` deve mostrar `runtimeProbePersistence`;
-- `runtimeProbePersistence.ok=false` passa a reprovar o comando, como acontece com route decisions e health.
+- `runtimeProbePersistence.ok=false` passa a reprovar o comando, como acontece com route decisions e
+  health.
 
 ## Mudanca 115 - SQLite runtime source passa a enxergar probes diretos
 
@@ -10518,23 +10781,29 @@ Contexto:
 
 - a mudanca anterior gravou probes diretamente em `runtime_probe_results`;
 - `listLatestRuntimeHealthRecords()` ainda lia apenas `health_observations`;
-- isso criava uma dependencia indevida do espelho de health para que o selector enxergasse provas runtime persistidas;
-- em execucoes futuras, um run direto de probes poderia existir no banco sem influenciar a selecao pos-runtime.
+- isso criava uma dependencia indevida do espelho de health para que o selector enxergasse provas
+  runtime persistidas;
+- em execucoes futuras, um run direto de probes poderia existir no banco sem influenciar a selecao
+  pos-runtime.
 
 Regra aplicada:
 
-- `listLatestRuntimeHealthRecords()` agora mescla as ultimas health observations com os ultimos probes por tipo;
+- `listLatestRuntimeHealthRecords()` agora mescla as ultimas health observations com os ultimos
+  probes por tipo;
 - quando nao ha health observation, o metodo sintetiza um registro runtime `probe-only`;
-- probes diretos continuam separados no banco, mas passam a alimentar a leitura operacional do selector;
+- probes diretos continuam separados no banco, mas passam a alimentar a leitura operacional do
+  selector;
 - o merge preserva `probes.<kind>` para contadores de proof tipados;
-- quando o probe e mais recente que a health observation, o status operacional derivado acompanha o probe;
+- quando o probe e mais recente que a health observation, o status operacional derivado acompanha o
+  probe;
 - quando existe health mais recente, ela continua tendo precedencia para o status geral.
 
 Motivo arquitetural:
 
 - persistir uma prova runtime so e util se a selecao efetiva puder le-la;
 - o catalogo canonico continua imutavel;
-- o SQLite passa a ser fonte runtime completa mesmo quando o health ledger externo foi limpo ou ainda nao espelhado;
+- o SQLite passa a ser fonte runtime completa mesmo quando o health ledger externo foi limpo ou
+  ainda nao espelhado;
 - isso reduz risco de repetir chamadas reais desnecessarias depois de um live ou probe bem-sucedido.
 
 Validacao esperada:
@@ -10577,7 +10846,8 @@ Motivo arquitetural:
 Validacao esperada:
 
 - `npm run model-gateway:live:readiness -- --json` deve conter `runtimeProbeOnlyRecords`;
-- `byok.real.redacted.json` deve conter `runtimeSelector.runtimeProbePersistence` em lives BYOK reais;
+- `byok.real.redacted.json` deve conter `runtimeSelector.runtimeProbePersistence` em lives BYOK
+  reais;
 - falhas de persistencia direta devem aparecer como erro do runtime selector.
 
 ## Mudanca 117 - Pesos configuraveis para prova runtime por tipo
@@ -10595,7 +10865,8 @@ Regra aplicada:
 
 - `DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS` foi criado e exportado pelos barrels;
 - `scoreGatewayModelCandidate` aceita `runtimeProofWeights`;
-- `routeGatewayModels`, `routeModelGatewayCatalogSnapshot` e auditorias recebem esses pesos pelo mesmo objeto de options;
+- `routeGatewayModels`, `routeModelGatewayCatalogSnapshot` e auditorias recebem esses pesos pelo
+  mesmo objeto de options;
 - pesos customizados sao normalizados com limite defensivo;
 - os motivos textuais permanecem estaveis para nao quebrar explain, terminal e testes existentes.
 
@@ -10631,7 +10902,8 @@ Contexto:
 
 - pesos configuraveis existiam na API;
 - sem CLI, humanos e LLMs ainda precisariam editar codigo para experimentar politicas;
-- `effective-selection` e `runtime-selector` sao os dois pontos canonicos de decisao sem runtime novo.
+- `effective-selection` e `runtime-selector` sao os dois pontos canonicos de decisao sem runtime
+  novo.
 
 Regra aplicada:
 
@@ -10717,7 +10989,8 @@ Critérios relevantes:
 - terminal chegou a ready;
 - nenhum turno LLM explicito foi aberto em `--no-pr`;
 - SSE conectou sem erro;
-- `/usage`, `/activity`, `/metrics`, `/events`, `/session sdk`, `/byok`, `/byok providers`, `/byok profiles` renderizaram;
+- `/usage`, `/activity`, `/metrics`, `/events`, `/session sdk`, `/byok`, `/byok providers`,
+  `/byok profiles` renderizaram;
 - chat probe real passou;
 - streaming probe real passou;
 - JSON probe real passou;
@@ -10728,10 +11001,13 @@ Critérios relevantes:
 
 Lacunas observadas:
 
-- provider Z.AI listou catalogo remoto sem `glm-4.5-flash`, mas a rota continua utilizavel via env/route provada;
+- provider Z.AI listou catalogo remoto sem `glm-4.5-flash`, mas a rota continua utilizavel via
+  env/route provada;
 - filtro `safe` removeu candidatos Z.AI remotos por falta de prova agent positiva ou health ruim;
-- vision segue como diagnostico opcional e precisa UX melhor para sugerir rota vision-capable provada;
-- alguns modelos remotos Z.AI aparecem como custo desconhecido e sem safety suficiente para promocao automatica.
+- vision segue como diagnostico opcional e precisa UX melhor para sugerir rota vision-capable
+  provada;
+- alguns modelos remotos Z.AI aparecem como custo desconhecido e sem safety suficiente para promocao
+  automatica.
 
 Decisao:
 
@@ -10746,11 +11022,12 @@ Status: concluido.
 
 Motivo:
 
-- o teste live comprovou que uma rota pode funcionar em runtime mesmo quando o catalogo canonico ainda nao possui uma
-  projecao suficiente, ou quando a evidencia esta em uma camada operacional;
-- o seletor dependia de `projections` para formar candidatos, portanto provas persistidas em SQLite ficavam sem uso
-  caso o modelo/provedor ainda nao tivesse uma projecao canonica;
-- promover runtime facts para `projections` seria errado, pois runtime e account/key state sao volateis.
+- o teste live comprovou que uma rota pode funcionar em runtime mesmo quando o catalogo canonico
+  ainda nao possui uma projecao suficiente, ou quando a evidencia esta em uma camada operacional;
+- o seletor dependia de `projections` para formar candidatos, portanto provas persistidas em SQLite
+  ficavam sem uso caso o modelo/provedor ainda nao tivesse uma projecao canonica;
+- promover runtime facts para `projections` seria errado, pois runtime e account/key state sao
+  volateis.
 
 Implementacao:
 
@@ -10758,7 +11035,8 @@ Implementacao:
   `runtimeHealthIndex.records`;
 - esses candidatos so existem durante a chamada de selecao;
 - a origem fica marcada como `provenance.candidateSource=runtime_health`;
-- `provenance.canonicalMetadataMutation=false` deixa explicito que nenhuma observacao runtime virou metadado canonico;
+- `provenance.canonicalMetadataMutation=false` deixa explicito que nenhuma observacao runtime virou
+  metadado canonico;
 - `runtimeEvidence` inclui status, profile e probes verificados;
 - capacidades minimas sao inferidas apenas da prova operacional:
   - `chat`/`streaming` por sucesso de chamada/probe;
@@ -10766,7 +11044,8 @@ Implementacao:
   - `jsonMode`/`structuredOutputs` por probe JSON;
   - `vision` apenas por probe vision positiva;
 - falha de vision observada vira `unsupportedParameters: ["vision"]`, sem bloquear chat/agent;
-- candidatos runtime-only precisam de provider conhecido na matriz de endpoints para terem caminho executavel;
+- candidatos runtime-only precisam de provider conhecido na matriz de endpoints para terem caminho
+  executavel;
 - providers locais continuam sujeitos ao opt-in explicito de Ollama/local.
 
 Garantias:
@@ -10783,11 +11062,8 @@ Validacao executada:
 - `node --check src/copilot/model-gateway/routing/policy-engine.js`;
 - `node --check src/copilot/model-gateway/routing/selection-audit.js`;
 - `node --check src/copilot/model-gateway/routing/explain.js`;
-- focused vitest:
-  `runtime-only proved routes`,
-  `task-relevant runtime probe proofs`,
-  `runtime proof weights`,
-  `routes against an indexed runtime health view`.
+- focused vitest: `runtime-only proved routes`, `task-relevant runtime probe proofs`,
+  `runtime proof weights`, `routes against an indexed runtime health view`.
 
 ## Mudanca 121 - Explain e aliases de provider para rotas provadas sem projecao
 
@@ -10795,15 +11071,16 @@ Status: concluido.
 
 Motivo:
 
-- operadores e LLMs precisam distinguir "nao existe no catalogo canonico" de "existe prova operacional";
-- `kilo-code` e `kilo-gateway` sao presets reais do terminal/SDK, mas a matriz de endpoints consolidava a familia como
-  `kilo`;
+- operadores e LLMs precisam distinguir "nao existe no catalogo canonico" de "existe prova
+  operacional";
+- `kilo-code` e `kilo-gateway` sao presets reais do terminal/SDK, mas a matriz de endpoints
+  consolidava a familia como `kilo`;
 - sem aliases, um candidato runtime-only podia ficar sem base URL/env check coerente.
 
 Implementacao:
 
-- `explainModelGatewayCatalogEntry` agora retorna `operationalFound=true` quando o seletor textual nao encontra
-  projecao, mas encontra runtime health/probes para o provider/model;
+- `explainModelGatewayCatalogEntry` agora retorna `operationalFound=true` quando o seletor textual
+  nao encontra projecao, mas encontra runtime health/probes para o provider/model;
 - `nextActions` diferencia:
   - `runtime_route_proved_but_catalog_projection_missing`;
   - `refresh_catalog_or_collect_provider_model_metadata`;
@@ -10821,11 +11098,8 @@ Implementacao:
 Validacao executada:
 
 - `node --check` em endpoint inventory, Kilo endpoints, requirements e policy engine;
-- focused vitest:
-  `runtime-proved routes that are still absent`,
-  `runtime-only proved routes`,
-  `provider env requirements`,
-  `provider endpoint inventory`;
+- focused vitest: `runtime-proved routes that are still absent`, `runtime-only proved routes`,
+  `provider env requirements`, `provider endpoint inventory`;
 - dry-run:
   `npm run model-gateway:runtime-selector -- --json --allow-probe --allow-env-missing --profile=repo_agent --selection-policy=prefer_runtime_proved`.
 
@@ -10835,17 +11109,18 @@ Status: concluido.
 
 Motivo:
 
-- o runtime selector ja conseguia declarar env `ready`, mas a elegibilidade do candidato efemero ainda podia mostrar
-  `secretConfigured=null`;
-- isso deixava a camada account/key menos didatica, especialmente quando nao havia account overlay persistido para o
-  modelo provado;
+- o runtime selector ja conseguia declarar env `ready`, mas a elegibilidade do candidato efemero
+  ainda podia mostrar `secretConfigured=null`;
+- isso deixava a camada account/key menos didatica, especialmente quando nao havia account overlay
+  persistido para o modelo provado;
 - a selecao precisa diferenciar falta de overlay/account visibility de falta real de chave.
 
 Implementacao:
 
 - candidatos runtime-only consultam `MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS`;
 - o primeiro secret ref configurado no `secretRegistry` e escolhido;
-- se nenhum estiver configurado, o primeiro secret ref obrigatorio do provider fica associado ao candidato;
+- se nenhum estiver configurado, o primeiro secret ref obrigatorio do provider fica associado ao
+  candidato;
 - `normalizedPolicy.secretRef` passa a alimentar a elegibilidade sem expor segredo;
 - aliases `kilo-code`/`kilo-gateway` tambem sao considerados nessa resolucao.
 
@@ -10853,8 +11128,8 @@ Resultado observado:
 
 - dry-run `repo_agent` com `prefer_runtime_proved` selecionou `kilo-code/kilo-auto/free`;
 - `accountAccess.secretConfigured=true`;
-- `accountAccess.status=missing_overlay`, deixando claro que a chave existe, mas a visibilidade por account overlay ainda
-  nao esta materializada;
+- `accountAccess.status=missing_overlay`, deixando claro que a chave existe, mas a visibilidade por
+  account overlay ainda nao esta materializada;
 - env do runtime selector permaneceu `ready`.
 
 Validacao executada:
@@ -10870,10 +11145,11 @@ Status: concluido.
 
 Motivo:
 
-- `policyResolution.rows[].selected` ja carregava `candidateSource=runtime_health` e `runtimeObservedOnly=true`;
+- `policyResolution.rows[].selected` ja carregava `candidateSource=runtime_health` e
+  `runtimeObservedOnly=true`;
 - ao montar `runtimeSelectorPlan.routes[].selected`, o resumo de runtime descartava esses campos;
-- isso reduzia a clareza do plano live, principalmente quando a rota escolhida vinha de prova operacional e nao de
-  projecao canonica.
+- isso reduzia a clareza do plano live, principalmente quando a rota escolhida vinha de prova
+  operacional e nao de projecao canonica.
 
 Implementacao:
 
@@ -10881,9 +11157,10 @@ Implementacao:
   - `candidateSource`;
   - `runtimeObservedOnly`;
   - `runtimeEvidence`;
-- planos bloqueados por env continuam podendo ocultar `selected`, mas planos selecionaveis mantem a origem operacional;
-- dry-run com `repo_agent,code,tool_agent` confirmou `source=runtime_health` e `runtimeOnly=true` nos tres perfis
-  selecionados.
+- planos bloqueados por env continuam podendo ocultar `selected`, mas planos selecionaveis mantem a
+  origem operacional;
+- dry-run com `repo_agent,code,tool_agent` confirmou `source=runtime_health` e `runtimeOnly=true`
+  nos tres perfis selecionados.
 
 Validacao executada:
 
@@ -10899,8 +11176,9 @@ Status: concluido.
 
 Motivo:
 
-- depois de admitir candidatos runtime-only e preservar sua origem, era preciso confirmar que o caminho real ainda
-  seleciona uma rota executavel, registra decision/probe/health e mantem SQLite consistente;
+- depois de admitir candidatos runtime-only e preservar sua origem, era preciso confirmar que o
+  caminho real ainda seleciona uma rota executavel, registra decision/probe/health e mantem SQLite
+  consistente;
 - a execucao deveria ser pequena, sem live terminal full-turn, e com limites claros.
 
 Comando efetivo:
@@ -10967,16 +11245,18 @@ Observacao operacional:
 Problema identificado:
 
 - o runtime selector ja montava env isolado com `COPILOT_BYOK_WIRE_API` para probes diretos;
-- o runner live `terminal:llm-b:live-test`, entretanto, ao entregar a rota para o terminal real, repassava provider,
-  model e baseUrl, mas nao repassava o wire API;
+- o runner live `terminal:llm-b:live-test`, entretanto, ao entregar a rota para o terminal real,
+  repassava provider, model e baseUrl, mas nao repassava o wire API;
 - em seguida o proprio preflight chamava `/byok provider ...`, que limpa seletores efemeros antigos;
-- esse fluxo podia apagar `COPILOT_BYOK_WIRE_API` e deixar a sessao viva cair no wire default do provider/perfil,
-  apesar de a rota ter sido escolhida por metadados/provas de outro wire;
-- isso era especialmente arriscado para rotas OpenAI-compatible que precisam fixar `completions` ou `responses`.
+- esse fluxo podia apagar `COPILOT_BYOK_WIRE_API` e deixar a sessao viva cair no wire default do
+  provider/perfil, apesar de a rota ter sido escolhida por metadados/provas de outro wire;
+- isso era especialmente arriscado para rotas OpenAI-compatible que precisam fixar `completions` ou
+  `responses`.
 
 Correcao estrutural:
 
-- `run-terminal-llm-b-live-test.mjs` agora normaliza o wire canonico da rota do gateway para o contrato do SDK:
+- `run-terminal-llm-b-live-test.mjs` agora normaliza o wire canonico da rota do gateway para o
+  contrato do SDK:
   - `openai_chat_completions`, `chat_completions` e `completions` viram `completions`;
   - `openai_responses` e `responses` viram `responses`;
 - o resumo redigido `byok.real.redacted.json` passa a expor:
@@ -10986,40 +11266,44 @@ Correcao estrutural:
   - `runtimeObservedOnly`;
   - `runtimeEvidence`;
 - o env do terminal live passa a receber `COPILOT_BYOK_WIRE_API` quando a rota tem wire compativel;
-- o comando interno de preflight passou a chamar `/byok provider ... wire:<sdkWireApi>` quando aplicavel;
+- o comando interno de preflight passou a chamar `/byok provider ... wire:<sdkWireApi>` quando
+  aplicavel;
 - `/byok provider` agora aceita o argumento opcional `wire:<completions|responses>`;
 - `/byok provider` rejeita wire invalido antes de alterar o processo;
-- quando wire e omitido, o comando continua limpando herancas antigas, preservando o comportamento seguro anterior.
+- quando wire e omitido, o comando continua limpando herancas antigas, preservando o comportamento
+  seguro anterior.
 
 Evidencia:
 
 - `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`;
 - `node --check src/copilot/terminal/commands/byok.js`;
 - `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/terminal/test_commands_byok.spec.js -t "provider efemero|wireApi invalido"`;
-- dry-run BYOK real com runtime selector e `--no-pr` gerou prompt de preflight sem executar turno real.
+- dry-run BYOK real com runtime selector e `--no-pr` gerou prompt de preflight sem executar turno
+  real.
 
 Impacto:
 
 - o handoff selector -> terminal agora usa o mesmo contrato de wire dos probes diretos;
 - lives futuros ficam menos sujeitos a divergencia entre rota provada e sessao viva;
-- a auditoria redigida passa a carregar dados suficientes para diagnosticar se a falha veio do provider, do modelo,
-  do baseUrl ou do wire API;
+- a auditoria redigida passa a carregar dados suficientes para diagnosticar se a falha veio do
+  provider, do modelo, do baseUrl ou do wire API;
 - isso fortalece a ponte entre runtime selector real e os testes live com `llm-b`.
 
 ## Mudanca 126 - Lives pre-full-turn e wire default explicito para OpenAI-compatible
 
 Problema identificado apos a mudanca anterior:
 
-- o dry-run BYOK real ainda podia gerar `/byok provider ...` sem `wire:*` quando a rota era `openai_compatible`, mas o
-  catalogo nao trazia `wireApi` explicito;
-- para `zai/glm-4.5-flash`, isso funcionava por default do SDK, mas deixava uma ambiguidade desnecessaria exatamente
-  na ponte que estamos endurecendo antes do full turn;
-- a regra correta para rotas OpenAI-compatible sem wire explicito e declarar `completions`, pois esse e o default
-  operacional do provider customizado no SDK.
+- o dry-run BYOK real ainda podia gerar `/byok provider ...` sem `wire:*` quando a rota era
+  `openai_compatible`, mas o catalogo nao trazia `wireApi` explicito;
+- para `zai/glm-4.5-flash`, isso funcionava por default do SDK, mas deixava uma ambiguidade
+  desnecessaria exatamente na ponte que estamos endurecendo antes do full turn;
+- a regra correta para rotas OpenAI-compatible sem wire explicito e declarar `completions`, pois
+  esse e o default operacional do provider customizado no SDK.
 
 Correcao:
 
-- `buildModelGatewayRuntimeSelectorProbeEnv` agora infere `COPILOT_BYOK_WIRE_API=completions` quando:
+- `buildModelGatewayRuntimeSelectorProbeEnv` agora infere `COPILOT_BYOK_WIRE_API=completions`
+  quando:
   - a rota tem `routeLayer` contendo `openai_compatible`;
   - existe `openAICompatibleBaseUrl` ou `baseUrl`;
   - nao ha `wireApi` canonico mais especifico;
@@ -11034,15 +11318,17 @@ Lives executados:
   - artefato: `artifacts/terminal-live/2026-05-28T22-27-46-399Z/summary.md`;
   - resultado: `ok=true`, `blocked=false`, `hardFailures=[]`, `warnings=[]`;
 - controle BYOK fixture sem PR:
-  - comando: `npm --silent run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`;
+  - comando:
+    `npm --silent run terminal:llm-b:live-test -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`;
   - artefato: `artifacts/terminal-live/2026-05-28T22-28-08-609Z/summary.md`;
   - resultado: `ok=true`, `blocked=false`, `hardFailures=[]`, `warnings=[]`;
 - BYOK real sem PR com runtime selector executando probe descartavel:
-  - comando: `npm --silent run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`;
+  - comando:
+    `npm --silent run terminal:llm-b:live-test -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=1 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000`;
   - artefato: `artifacts/terminal-live/2026-05-28T22-28-40-833Z/summary.md`;
   - resultado: `ok=true`, `blocked=false`, `hardFailures=[]`;
-  - warning esperado: `byok-real-vision-probe`, porque `glm-4.5-flash` recusou parametro/capability de vision com
-    HTTP 400 sem degradar chat/agent;
+  - warning esperado: `byok-real-vision-probe`, porque `glm-4.5-flash` recusou parametro/capability
+    de vision com HTTP 400 sem degradar chat/agent;
   - runtime selector:
     - `requested=true`;
     - `ok=true`;
@@ -11089,10 +11375,12 @@ Conclusao operacional:
 
 - as fases pre-full-turn estao verdes;
 - a rota real atual mais forte continua `zai/glm-4.5-flash`;
-- o full turn ainda deve ser tratado como fase separada porque consome turno real e exercita protocolo live completo;
+- o full turn ainda deve ser tratado como fase separada porque consome turno real e exercita
+  protocolo live completo;
 - antes dele, manter bloqueio de vision como warning para esta rota e nao como exclusao global;
-- o proximo passo natural e rodar o full turn com o mesmo selector e, se houver falha de protocolo, registrar
-  `live_tool_protocol` e `live_ask_user` como prova/falha especifica, sem contaminar metadados canonicos.
+- o proximo passo natural e rodar o full turn com o mesmo selector e, se houver falha de protocolo,
+  registrar `live_tool_protocol` e `live_ask_user` como prova/falha especifica, sem contaminar
+  metadados canonicos.
 
 ## 21.127. Mudanca 127 - Full-turn negativo alimenta `live_turn` e health por perfil
 
@@ -11100,23 +11388,24 @@ Data: 2026-05-28.
 
 Contexto:
 
-- o full-turn BYOK real em `artifacts/terminal-live/2026-05-28T22-33-02-008Z/summary.md` foi bloqueado por
-  `byok-provider-turn-failed`;
+- o full-turn BYOK real em `artifacts/terminal-live/2026-05-28T22-33-02-008Z/summary.md` foi
+  bloqueado por `byok-provider-turn-failed`;
 - o terminal conteve corretamente a falha:
   - sem fallback para Copilot auto;
   - sem Premium Request;
   - sem vazamento de segredo;
   - com cockpit e health visiveis ao operador;
 - porem o harness live nao gravava essa falha como dado operacional reutilizavel pelo seletor;
-- resultado: o seletor podia voltar a preferir uma rota com `agent/chat/json/streaming` descartaveis positivos, mesmo
-  depois de um turno vivo longo falhar no provider.
+- resultado: o seletor podia voltar a preferir uma rota com `agent/chat/json/streaming` descartaveis
+  positivos, mesmo depois de um turno vivo longo falhar no provider.
 
 Correcao aplicada:
 
 - `run-terminal-llm-b-live-test.mjs` passou a distinguir tres classes:
   - `live_tool_protocol`: materializacao real das tools no transcript vivo;
   - `live_ask_user`: materializacao real de pergunta, resposta humana e final pos-ask;
-  - `live_turn`: o turno canonico completo, incluindo sucesso/falha do provider durante o turno vivo;
+  - `live_turn`: o turno canonico completo, incluindo sucesso/falha do provider durante o turno
+    vivo;
 - quando o blocker e `byok-provider-turn-failed`, o harness agora grava:
   - `recordByokProviderModelCallFailure`;
   - `recordByokProviderModelProbeResult` com `probeKind=live_turn`;
@@ -11135,10 +11424,11 @@ Correcao de selecao:
 
 Bug estrutural descoberto no no-PR seguinte:
 
-- a rota `kilo-code/openrouter/free` foi promovida usando uma prova `agent=ok` gravada para `routeProfile=kilo`;
+- a rota `kilo-code/openrouter/free` foi promovida usando uma prova `agent=ok` gravada para
+  `routeProfile=kilo`;
 - em seguida, o agent probe descartavel para o uso vivo falhou por timeout;
-- raiz: a leitura de health permitia fallback de qualquer `routeProfile` do mesmo provider/model quando faltava health
-  exato ou profileless.
+- raiz: a leitura de health permitia fallback de qualquer `routeProfile` do mesmo provider/model
+  quando faltava health exato ou profileless.
 
 Correcao de escopo:
 
@@ -11149,8 +11439,8 @@ Correcao de escopo:
   - health exato do mesmo `routeProfile`;
   - health profileless/global;
   - nunca health de outro `routeProfile` como prova automatica;
-- leituras permissivas para cockpit ainda podem mostrar health recente de outro perfil quando chamadas diretamente sem
-  o modo estrito.
+- leituras permissivas para cockpit ainda podem mostrar health recente de outro perfil quando
+  chamadas diretamente sem o modo estrito.
 
 Evidencias:
 
@@ -11170,8 +11460,8 @@ Estado atual:
 - `live_turn` agora existe como camada operacional separada;
 - falhas de provider no turno vivo deixam rastro consumivel pelo seletor;
 - provas de agente ficam amarradas ao perfil correto;
-- o proximo full-turn deve ser rodado somente apos novo no-PR confirmar que a rota promovida tem agent proof no perfil
-  alvo ou health profileless real.
+- o proximo full-turn deve ser rodado somente apos novo no-PR confirmar que a rota promovida tem
+  agent proof no perfil alvo ou health profileless real.
 
 ## 21.128. Mudanca 128 - Primeiro full-turn BYOK real positivo e readiness terminal-live
 
@@ -11179,15 +11469,16 @@ Data: 2026-05-28.
 
 Contexto:
 
-- depois de corrigir a persistencia de `live_turn` e o vazamento de health entre `routeProfile`s, foi executado novo
-  no-PR BYOK real com runtime selector;
+- depois de corrigir a persistencia de `live_turn` e o vazamento de health entre `routeProfile`s,
+  foi executado novo no-PR BYOK real com runtime selector;
 - o no-PR positivo confirmou que a rota promovida ja nao vinha de prova agent de outro perfil:
   - artefato: `artifacts/terminal-live/2026-05-28T22-43-48-235Z/summary.md`;
   - resultado: `PASS`;
   - warning esperado: `byok-real-vision-probe`;
   - rota: `zai/glm-4.5-flash`;
-- em seguida foi executado o full-turn BYOK real com `llm-b`, tool real, leitura real, ask_user real, resposta humana,
-  continuacao pos-ask, `/usage`, `/activity`, `/tools diag`, `/events`, `/byok health` e export.
+- em seguida foi executado o full-turn BYOK real com `llm-b`, tool real, leitura real, ask_user
+  real, resposta humana, continuacao pos-ask, `/usage`, `/activity`, `/tools diag`, `/events`,
+  `/byok health` e export.
 
 Evidencia principal:
 
@@ -11218,7 +11509,8 @@ O que o full-turn provou:
 - a resposta humana `SIM` foi registrada;
 - a continuacao pos-ask gerou `POST-ASK-CANONICAL-FINAL`;
 - `/usage` classificou BYOK sem Premium Request;
-- `/activity`, `/tools diag`, `/events` e `/byok health` expuseram diagnostico operacional suficiente;
+- `/activity`, `/tools diag`, `/events` e `/byok health` expuseram diagnostico operacional
+  suficiente;
 - o export foi criado e preservou transcript, envelope e diagnosticos.
 
 Correcao adicional aplicada depois do live:
@@ -11245,14 +11537,14 @@ Correcao adicional aplicada depois do live:
 
 Motivo arquitetural:
 
-- antes, o readiness podia ficar verde mesmo sem provar que o modo exato usado pelo live test estava coerente;
+- antes, o readiness podia ficar verde mesmo sem provar que o modo exato usado pelo live test estava
+  coerente;
 - agora, uma regressao como:
   - `live_turn=failed` recente;
   - `live_tool_protocol=failed`;
   - `live_ask_user=failed`;
   - mistura indevida de prova entre `routeProfile`s;
-  - env ausente para a rota terminal;
-  deve aparecer antes de abrir uma sessao viva com `llm-b`.
+  - env ausente para a rota terminal; deve aparecer antes de abrir uma sessao viva com `llm-b`.
 
 Evidencia pos-live:
 
@@ -11270,7 +11562,8 @@ Evidencia pos-live:
   - comando: `npm --silent run model-gateway:live:readiness -- --json`;
   - resultado: `ok=true`;
   - `terminal_live_runtime_selector_plan_ready=true`;
-  - detalhe: `3/3 terminal routes selected, blocked=0, accessBlocked=0, envReady=3, envBlocked=0, proofSelected=3, probeBlocked=0`;
+  - detalhe:
+    `3/3 terminal routes selected, blocked=0, accessBlocked=0, envReady=3, envBlocked=0, proofSelected=3, probeBlocked=0`;
 - runtime selector terminal-live direto:
   - comando:
     `node scripts/model-gateway-runtime-selector.mjs --json --allow-probe --profile=repo_agent --fallback-profiles=code,tool_agent --selection-policy=prefer_runtime_proved --preferred-probes=live_tool_protocol,live_ask_user --block-failed-probes=live_tool_protocol,live_ask_user,live_turn --temporary-failure-cooldown-ms=900000`;
@@ -11278,20 +11571,23 @@ Evidencia pos-live:
     - `repo_agent` selecionou `zai/glm-4.5-flash`;
     - `selection_source=post_runtime_proved`;
     - `runtimeHealth.health.routeProfile=repo_agent`;
-    - probes positivos: `chat`, `streaming`, `json`, `agent`, `live_turn`, `live_tool_protocol`, `live_ask_user`;
+    - probes positivos: `chat`, `streaming`, `json`, `agent`, `live_turn`, `live_tool_protocol`,
+      `live_ask_user`;
     - `vision=failed` permaneceu nao bloqueante.
 
 Consequencias para proximas fases:
 
 - o primeiro full-turn BYOK real positivo passa a ser baseline de comportamento vivo;
-- falhas futuras de turno vivo devem ser comparadas contra esse baseline, nao tratadas como incerteza inicial;
+- falhas futuras de turno vivo devem ser comparadas contra esse baseline, nao tratadas como
+  incerteza inicial;
 - o readiness canônico deve ser executado antes de novos lives amplos;
 - o proximo avanço de maior retorno e reduzir a diferenca entre:
   - probes descartaveis `chat/json/streaming/agent`;
   - provas full-turn `live_turn/live_tool_protocol/live_ask_user`;
   - selecao final por perfil;
-- tambem e importante decidir quando `tool_agent` deve exigir probes live proprios em vez de aceitar health
-  profileless de agent, porque hoje isso e aceitavel para fallback, mas ainda nao e tao forte quanto `repo_agent`.
+- tambem e importante decidir quando `tool_agent` deve exigir probes live proprios em vez de aceitar
+  health profileless de agent, porque hoje isso e aceitavel para fallback, mas ainda nao e tao forte
+  quanto `repo_agent`.
 
 ## 21.129. Mudanca 129 - Diff pos-live persiste relatorio comparativo
 
@@ -11312,7 +11608,8 @@ Problema identificado:
 
 Correcao:
 
-- `scripts/model-gateway-runtime-health-diff.mjs` agora persiste dois artefatos quando `--write-snapshot` e usado:
+- `scripts/model-gateway-runtime-health-diff.mjs` agora persiste dois artefatos quando
+  `--write-snapshot` e usado:
   - snapshot bruto:
     - `<stamp>.json`;
     - `latest.json`;
@@ -11355,8 +11652,8 @@ Leitura dos `newFailures`:
   - `default|kilo-code|openrouter/free`;
   - `-|openai|glm-4.5-flash`;
   - `default|openai|glm-4.5-flash`;
-- o caso `-|kilo-code|openrouter/free` mostra `lastStatus=ok` mas `agentProbeStatus=failed`, portanto aparece como
-  falha operacional por superficie agent, nao como falha de chat;
+- o caso `-|kilo-code|openrouter/free` mostra `lastStatus=ok` mas `agentProbeStatus=failed`,
+  portanto aparece como falha operacional por superficie agent, nao como falha de chat;
 - isso reforca a necessidade futura de tornar o diff mais didatico por superficie:
   - chat;
   - agent;
@@ -11370,7 +11667,8 @@ Impacto:
 - o operador e a LLM agora conseguem auditar regressao pos-live sem depender do scroll do terminal;
 - `latest.json` permanece adequado para baseline bruto;
 - `latest-diff.json` passa a ser o ponto certo para auditorias comparativas;
-- isso fecha uma lacuna da preparacao para rodadas longas de lives e probes sem perder diagnostico entre turnos.
+- isso fecha uma lacuna da preparacao para rodadas longas de lives e probes sem perder diagnostico
+  entre turnos.
 
 ## 21.130. Mudanca 130 - Runtime health diff passa a comparar superficies de probe
 
@@ -11378,11 +11676,13 @@ Data: 2026-05-28.
 
 Problema:
 
-- depois de introduzir `live_turn`, `live_tool_protocol` e `live_ask_user`, o snapshot comparavel de runtime health
-  ainda ignorava `record.probes`;
+- depois de introduzir `live_turn`, `live_tool_protocol` e `live_ask_user`, o snapshot comparavel de
+  runtime health ainda ignorava `record.probes`;
 - isso fazia o diff enxergar apenas `lastStatus`, `agentProbeStatus` e campos de falha do provider;
-- uma regressao futura como `live_turn: ok -> failed` poderia ficar escondida dentro do payload bruto;
-- por outro lado, tratar qualquer probe falho como falha global reintroduziria o problema ja decidido:
+- uma regressao futura como `live_turn: ok -> failed` poderia ficar escondida dentro do payload
+  bruto;
+- por outro lado, tratar qualquer probe falho como falha global reintroduziria o problema ja
+  decidido:
   - `vision=failed` nao deve excluir automaticamente uma rota de chat/agent.
 
 Correcao:
@@ -11397,7 +11697,8 @@ Correcao:
 - `diffModelGatewayRuntimeHealthSnapshots` agora inclui `probeStatusFingerprint` em `changedFields`;
 - regressao por probe so e considerada quando ha transicao explicita:
   - `probe: ok -> failed`;
-- probe ausente no baseline e falho no health atual e classificado como descoberta de superficie, nao como regressao;
+- probe ausente no baseline e falho no health atual e classificado como descoberta de superficie,
+  nao como regressao;
 - `vision` continua em `failedProbeKinds`, mas nao entra em `blockingFailedProbeKinds`.
 
 Evidencia unit:
@@ -11450,7 +11751,8 @@ Data: 2026-05-28.
 
 Problema:
 
-- `model-gateway-live-readiness.mjs` ja validava o gate especifico `terminal_live_runtime_selector_plan_ready`;
+- `model-gateway-live-readiness.mjs` ja validava o gate especifico
+  `terminal_live_runtime_selector_plan_ready`;
 - o runner live ja usava cooldown temporario `900000ms`;
 - porem `scripts/model-gateway-live-plan.mjs` ainda emitia:
   - comandos BYOK reais com `--byok-real-route-temporary-failure-cooldown-ms=1`;
@@ -11468,8 +11770,7 @@ Correcao:
 
 Evidencia:
 
-- comando:
-  `npm --silent run model-gateway:live:plan -- --json --no-write`;
+- comando: `npm --silent run model-gateway:live:plan -- --json --no-write`;
 - resultado:
   - `ok=true`;
   - prerequisito `terminal_live_runtime_selector_plan_ready=true`;
@@ -11493,14 +11794,14 @@ Data: 2026-05-28.
 
 Problema:
 
-- `npm run model-gateway:commands -- --phase=live-readiness` ainda mostrava os comandos BYOK reais antigos com
-  `--byok-real-route-temporary-failure-cooldown-ms=1`;
+- `npm run model-gateway:commands -- --phase=live-readiness` ainda mostrava os comandos BYOK reais
+  antigos com `--byok-real-route-temporary-failure-cooldown-ms=1`;
 - isso contradizia:
   - `run-terminal-llm-b-live-test.mjs`;
   - `model-gateway-live-readiness.mjs`;
   - `model-gateway-live-plan.mjs`;
-- o cockpit de comandos e a fonte que operador humano e LLM tendem a copiar, entao essa divergencia poderia reabrir
-  rotas com `live_turn` falho recente.
+- o cockpit de comandos e a fonte que operador humano e LLM tendem a copiar, entao essa divergencia
+  poderia reabrir rotas com `live_turn` falho recente.
 
 Correcao:
 
@@ -11513,8 +11814,7 @@ Correcao:
 
 Evidencia:
 
-- comando:
-  `npm --silent run model-gateway:commands -- --phase=live-readiness`;
+- comando: `npm --silent run model-gateway:commands -- --phase=live-readiness`;
 - resultado:
   - comandos BYOK reais exibem `--byok-real-route-temporary-failure-cooldown-ms=900000`;
   - `runtime-health.diff` informa `latest-diff.json`;
@@ -11541,8 +11841,8 @@ Problema:
   - health profileless/global;
   - probes live especificos;
   - probes agent/chat/json/streaming descartaveis;
-- para lives longos, esse resumo era pouco didatico: uma rota fallback podia aparecer como provada sem deixar claro que
-  nao tinha `live_turn` proprio.
+- para lives longos, esse resumo era pouco didatico: uma rota fallback podia aparecer como provada
+  sem deixar claro que nao tinha `live_turn` proprio.
 
 Correcao:
 
@@ -11561,8 +11861,7 @@ Correcao:
 
 Evidencia atual:
 
-- comando:
-  `npm --silent run model-gateway:live:readiness -- --json`;
+- comando: `npm --silent run model-gateway:live:readiness -- --json`;
 - resultado:
   - `ok=true`;
   - `repo_agent|zai|glm-4.5-flash`:
@@ -11587,7 +11886,8 @@ Impacto:
 
 - o readiness continua nao executando provider;
 - o gate nao fica mais opaco;
-- o operador consegue distinguir prova full-turn primaria, prova live parcial e fallback profileless;
+- o operador consegue distinguir prova full-turn primaria, prova live parcial e fallback
+  profileless;
 - a proxima decisao arquitetural fica mais clara:
   - manter `tool_agent` aceitando health profileless como fallback;
   - ou exigir prova live propria antes de promover `tool_agent` em cenarios futuros.
@@ -11610,7 +11910,8 @@ Problema:
 Correcao:
 
 - `scripts/model-gateway-live-plan.mjs` agora copia
-  `readiness.selection.terminalLiveRuntimeSelectorPlan` para `plan.readiness.terminalLiveRuntimeSelectorPlan`;
+  `readiness.selection.terminalLiveRuntimeSelectorPlan` para
+  `plan.readiness.terminalLiveRuntimeSelectorPlan`;
 - o Markdown do plano ganhou secao:
   - `Terminal Live Route Matrix`;
 - cada rota mostra:
@@ -11625,8 +11926,7 @@ Correcao:
 
 Evidencia:
 
-- comando:
-  `node scripts/model-gateway-live-plan.mjs --out-dir /tmp/model-gateway-live-plan-check`;
+- comando: `node scripts/model-gateway-live-plan.mjs --out-dir /tmp/model-gateway-live-plan-check`;
 - trecho de `latest.md`:
   - `repo_agent`: exact=true, `live_turn=ok`, `live_tool_protocol=ok`, `live_ask_user=ok`;
   - `code`: exact=true, `live_tool_protocol=ok`, `live_ask_user=ok`;
@@ -11636,8 +11936,8 @@ Impacto:
 
 - o plano executavel deixa de ser apenas uma lista de comandos;
 - ele passa a registrar a evidencia operacional que justifica cada rota antes da execucao;
-- isso reduz retrabalho quando um live futuro falhar e precisarmos saber se o fallback tinha prova propria ou apenas
-  prova global.
+- isso reduz retrabalho quando um live futuro falhar e precisarmos saber se o fallback tinha prova
+  propria ou apenas prova global.
 
 ## 21.135. Mudanca 135 - Ranking prefere prova runtime exata por perfil
 
@@ -11646,17 +11946,20 @@ Data: 2026-05-28.
 Problema:
 
 - depois de expor a diferenca entre prova exata e proof profileless, faltava refletir isso no score;
-- duas rotas equivalentes podiam empatar mesmo quando uma tinha runtime health do proprio `routeProfile` e outra apenas
-  health global/profileless;
-- fallback profileless deve continuar valido, mas nao deve ser tao forte quanto prova do perfil solicitado.
+- duas rotas equivalentes podiam empatar mesmo quando uma tinha runtime health do proprio
+  `routeProfile` e outra apenas health global/profileless;
+- fallback profileless deve continuar valido, mas nao deve ser tao forte quanto prova do perfil
+  solicitado.
 
 Correcao:
 
 - `DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS` ganhou:
   - `exactRouteProfileProof=60`;
 - `scoreGatewayModelCandidate` agora adiciona:
-  - razao `runtime_health_exact_route_profile` quando `health.routeProfile === options.routeProfile`;
-  - razao `runtime_health_profileless_fallback` quando o perfil foi solicitado mas a prova e profileless;
+  - razao `runtime_health_exact_route_profile` quando
+    `health.routeProfile === options.routeProfile`;
+  - razao `runtime_health_profileless_fallback` quando o perfil foi solicitado mas a prova e
+    profileless;
 - o fallback profileless continua elegivel;
 - a prova exata ganha desempate/pontuacao natural.
 
@@ -11676,7 +11979,8 @@ Impacto:
 
 - o seletor passa a alinhar score com a semantica que o readiness ja expõe;
 - fallback profileless permanece um caminho de continuidade;
-- quando existir prova exata para `tool_agent`, ela tendera a superar fallback global sem necessidade de regra especial.
+- quando existir prova exata para `tool_agent`, ela tendera a superar fallback global sem
+  necessidade de regra especial.
 
 ## 21.136. Mudanca 136 - Runtime selector preserva explicabilidade do policy engine
 
@@ -11687,7 +11991,8 @@ Problema:
 - o policy engine ja produzia `reasons`, `rejectedReasons` e `scoreBreakdown`;
 - o selection audit tambem preservava esses sinais;
 - mas, ao montar a rota executavel, `runtimeRoute()` reduzia `selected` a campos operacionais;
-- isso fazia o JSON do runtime selector mostrar a rota final sem as razoes de score que explicavam a escolha.
+- isso fazia o JSON do runtime selector mostrar a rota final sem as razoes de score que explicavam a
+  escolha.
 
 Correcao:
 
@@ -11712,7 +12017,8 @@ Evidencia:
 Impacto:
 
 - humanos e LLMs passam a auditar a decisao final sem reabrir artefatos intermediarios;
-- a ponte `policy engine -> selection audit -> runtime selector -> live plan` preserva explicabilidade;
+- a ponte `policy engine -> selection audit -> runtime selector -> live plan` preserva
+  explicabilidade;
 - futuras regressions de ranking ficam mais faceis de diagnosticar.
 
 ## 21.137. Mudanca 137 - Route decision ledger preserva razoes e score do runtime selector
@@ -11723,9 +12029,10 @@ Problema:
 
 - `runtimeSelectorPlan.routes[].selected` passou a preservar `reasons` e `scoreBreakdown`;
 - mas os eventos persistidos em route decision ainda podiam perder parte dessa explicabilidade;
-- eventos de pre-decision e outcome registravam razoes genericas do seletor, sem carregar integralmente os sinais do
-  candidato quando eles estavam disponiveis;
-- o truncamento de razoes tambem era agressivo demais para uma decisao com muitos sinais de policy/health/probe.
+- eventos de pre-decision e outcome registravam razoes genericas do seletor, sem carregar
+  integralmente os sinais do candidato quando eles estavam disponiveis;
+- o truncamento de razoes tambem era agressivo demais para uma decisao com muitos sinais de
+  policy/health/probe.
 
 Correcao:
 
@@ -11754,8 +12061,8 @@ Impacto:
 
 - o ledger SQLite de decisoes passa a explicar melhor por que a rota foi escolhida;
 - pre-decision e runtime-result ficam correlacionaveis sem perder sinais de score;
-- auditorias futuras conseguem diferenciar problema de policy, health, probe e outcome sem depender apenas do JSON
-  temporario do runtime selector.
+- auditorias futuras conseguem diferenciar problema de policy, health, probe e outcome sem depender
+  apenas do JSON temporario do runtime selector.
 
 ## 22. Fim Do Documento Inicial
 

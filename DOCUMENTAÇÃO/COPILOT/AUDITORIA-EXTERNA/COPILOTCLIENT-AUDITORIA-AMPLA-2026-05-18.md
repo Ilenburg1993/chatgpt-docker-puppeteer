@@ -14,7 +14,9 @@
 
 ## 1. Objetivo
 
-Esta auditoria verifica se a camada local de wrapper/fachada cobre **de forma completa, canônica e arquiteturalmente coerente** a superfície disponibilizada pela classe `CopilotClient` do SDK instalado.
+Esta auditoria verifica se a camada local de wrapper/fachada cobre **de forma completa, canônica e
+arquiteturalmente coerente** a superfície disponibilizada pela classe `CopilotClient` do SDK
+instalado.
 
 O critério usado aqui não é “tem algo parecido em algum ponto do código”.
 
@@ -22,19 +24,23 @@ O critério é:
 
 1. a capability existe no SDK instalado;
 2. o repositório a expõe de forma usável na sua superfície local;
-3. a implementação segue a trilha canônica (`sdk/session` → `sdk` root → adapters/rotas/runtime), sem reabrir caminhos paralelos desnecessários;
-4. a ausência, se existir, está explicitamente classificada como **full / partial / missing / not-applicable**.
+3. a implementação segue a trilha canônica (`sdk/session` → `sdk` root → adapters/rotas/runtime),
+   sem reabrir caminhos paralelos desnecessários;
+4. a ausência, se existir, está explicitamente classificada como **full / partial / missing /
+   not-applicable**.
 
 ---
 
 ## 2. Observação importante sobre a fonte de verdade
 
-Durante a auditoria foi identificado um drift entre a documentação pública do README e os typings instalados no workspace.
+Durante a auditoria foi identificado um drift entre a documentação pública do README e os typings
+instalados no workspace.
 
 ### Drift confirmado
 
 - o README público menciona `copilotHome?: string` no construtor;
-- o pacote instalado neste workspace (`dist/types.d.ts` + `dist/client.d.ts`) **não** expõe esse campo em `CopilotClientOptions`.
+- o pacote instalado neste workspace (`dist/types.d.ts` + `dist/client.d.ts`) **não** expõe esse
+  campo em `CopilotClientOptions`.
 
 ### Decisão canônica
 
@@ -44,7 +50,8 @@ Para esta execução contínua, a fonte de verdade passa a ser:
 2. depois o README oficial, usado como confirmação e contexto;
 3. nunca o contrário.
 
-Portanto, `copilotHome` **não** entra como gap local a ser implementado nesta rodada, porque ele não faz parte do contrato tipado instalado que o repositório está consumindo.
+Portanto, `copilotHome` **não** entra como gap local a ser implementado nesta rodada, porque ele não
+faz parte do contrato tipado instalado que o repositório está consumindo.
 
 ---
 
@@ -74,14 +81,16 @@ Portanto, `copilotHome` **não** entra como gap local a ser implementado nesta r
 
 ### Observação sobre lifecycle `.on(...)`
 
-A superfície local não replica literalmente `client.on(...)` em `CopilotClientManager`, mas a capability está **completamente coberta** por:
+A superfície local não replica literalmente `client.on(...)` em `CopilotClientManager`, mas a
+capability está **completamente coberta** por:
 
 - `onLifecycleEvent(...)`
 - `onAllLifecycleEvents(...)`
 - `onLifecycleEvents(...)`
 - acesso direto ao client real quando o adapter precisa disso (`/agent/stream`, por exemplo)
 
-Minha conclusão é: isso já era **funcionalmente full**, embora com uma ergonomia helper-based em vez de method-alias 1:1.
+Minha conclusão é: isso já era **funcionalmente full**, embora com uma ergonomia helper-based em vez
+de method-alias 1:1.
 
 ---
 
@@ -130,7 +139,8 @@ Isso era funcional, mas não era paridade full do `CopilotClient` nem a forma ca
 
 ### CLIENT-002 — builder de options estava incompleto
 
-O `ClientOptionsBuilder` já cobria o grosso do contrato, mas ainda tinha uma lacuna de ergonomia e completude para:
+O `ClientOptionsBuilder` já cobria o grosso do contrato, mas ainda tinha uma lacuna de ergonomia e
+completude para:
 
 - `cwd`
 - `isChildProcess`
@@ -144,13 +154,15 @@ O `ClientOptionsBuilder` já cobria o grosso do contrato, mas ainda tinha uma la
 
 ### CLIENT-003 — documentação/SSOT do provider estava imprecisa
 
-Havia um comentário afirmando que `provider?: ProviderConfig` era campo de `CopilotClientOptions`, quando na prática ele pertence a `SessionConfig`/`ResumeSessionConfig`.
+Havia um comentário afirmando que `provider?: ProviderConfig` era campo de `CopilotClientOptions`,
+quando na prática ele pertence a `SessionConfig`/`ResumeSessionConfig`.
 
 **Correção aplicada:** comentário corrigido.
 
 ### CLIENT-004 — o contrato de boot não rastreava `client.getSessionMetadata`
 
-O baseline declarativo do boot já reconhecia várias capacidades do client, mas ainda não incluía o lookup dedicado de metadata.
+O baseline declarativo do boot já reconhecia várias capacidades do client, mas ainda não incluía o
+lookup dedicado de metadata.
 
 **Correção aplicada:** baseline e surface validation foram atualizados.
 
@@ -162,8 +174,10 @@ A situação ideal para a camada local de `CopilotClient` é:
 
 1. paridade explícita com o contrato tipado realmente instalado;
 2. façade local oferecendo nomes suficientemente claros para o runtime do projeto;
-3. rotas e projections usando os métodos dedicados do SDK quando eles existem, sem downgrade para scans lineares desnecessários;
-4. helpers locais documentando claramente quando cobrem uma API por abstração equivalente, em vez de fingir inexistência ou duplicar tudo dogmaticamente.
+3. rotas e projections usando os métodos dedicados do SDK quando eles existem, sem downgrade para
+   scans lineares desnecessários;
+4. helpers locais documentando claramente quando cobrem uma API por abstração equivalente, em vez de
+   fingir inexistência ou duplicar tudo dogmaticamente.
 
 ---
 
@@ -186,6 +200,8 @@ Minha avaliação final é:
 - **métodos do `client.d.ts`: full**;
 - **options do `client.d.ts`: full**;
 - **surface lifecycle do client: full via helper layer**;
-- **drift README vs pacote instalado: documentado e neutralizado pela política de fonte de verdade local**.
+- **drift README vs pacote instalado: documentado e neutralizado pela política de fonte de verdade
+  local**.
 
-O próximo passo coerente não é mais “fechar buracos do `CopilotClient`”, e sim voltar ao roadmap principal do terminal/agent com essa camada agora estabilizada e explicitamente auditada.
+O próximo passo coerente não é mais “fechar buracos do `CopilotClient`”, e sim voltar ao roadmap
+principal do terminal/agent com essa camada agora estabilizada e explicitamente auditada.

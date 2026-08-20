@@ -8,7 +8,8 @@ Branch/HEAD observado: `main` / `e69ec3d8`
 
 ## 1. Resultado executivo
 
-Após o restart, confirmei que o runtime subiu corretamente e que a primeira transformação P1 anterior (`mcp_latency_dashboard`) passou a ser anunciada no conector vivo.
+Após o restart, confirmei que o runtime subiu corretamente e que a primeira transformação P1
+anterior (`mcp_latency_dashboard`) passou a ser anunciada no conector vivo.
 
 Em seguida apliquei uma segunda onda de transformações profundas focadas em:
 
@@ -166,7 +167,8 @@ Comportamento:
 - `historyLimit`: controla quantos snapshots recentes são retornados no resumo.
 - `maxHistorySnapshots`: controla retenção máxima ao persistir.
 
-Observação operacional: essa evolução precisa de novo restart para aparecer no runtime vivo, porque foi implementada depois do restart que carregou a versão inicial da dashboard.
+Observação operacional: essa evolução precisa de novo restart para aparecer no runtime vivo, porque
+foi implementada depois do restart que carregou a versão inicial da dashboard.
 
 ---
 
@@ -260,7 +262,8 @@ Ele verifica que:
 - `cloudflare`;
 - `safe/claude/research`.
 
-Racional: a própria tool de observabilidade de latência precisa continuar disponível justamente quando a superfície é reduzida para melhorar startup, reduzir `tools/list` e diminuir atrito.
+Racional: a própria tool de observabilidade de latência precisa continuar disponível justamente
+quando a superfície é reduzida para melhorar startup, reduzir `tools/list` e diminuir atrito.
 
 ---
 
@@ -298,7 +301,8 @@ Tests: 174 passed
 
 ## 8. Estado operacional após a rodada
 
-O repo continua `dirty`, como esperado, porque esta rodada aplicou mudanças reais e também já havia alterações anteriores. Arquivos novos desta rodada:
+O repo continua `dirty`, como esperado, porque esta rodada aplicou mudanças reais e também já havia
+alterações anteriores. Arquivos novos desta rodada:
 
 ```text
 src/copilot/mcp/control-plane/latency-history.js
@@ -343,6 +347,10 @@ COPILOT_MCP_TOOL_SURFACE=claude
 
 ## 10. Veredito
 
-A plataforma avançou de observabilidade instantânea para observabilidade com memória. Também passou a ter uma superfície segura explicitamente pensada para Claude, Research e uso read/validate, sem sacrificar o perfil full/max-autonomy usado no ChatGPT principal.
+A plataforma avançou de observabilidade instantânea para observabilidade com memória. Também passou
+a ter uma superfície segura explicitamente pensada para Claude, Research e uso read/validate, sem
+sacrificar o perfil full/max-autonomy usado no ChatGPT principal.
 
-Essas mudanças melhoram latência e compatibilidade em duas frentes: reduzem a superfície anunciável quando desejado e criam um mecanismo persistente para medir regressões em vez de depender de impressões subjetivas.
+Essas mudanças melhoram latência e compatibilidade em duas frentes: reduzem a superfície anunciável
+quando desejado e criam um mecanismo persistente para medir regressões em vez de depender de
+impressões subjetivas.

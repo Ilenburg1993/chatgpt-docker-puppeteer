@@ -1,21 +1,25 @@
 // @ts-check
 
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { invalidateIoCachePath } from '../../../../src/copilot/infra/io-cache.js';
 import {
     cleanupExpiredRollbackSidecars,
     cleanupRollbackSidecars,
+    getByteLineIndexStats,
     getIoRollbackPolicy,
     persistRollbackSidecar,
     readBinaryMutationSnapshot,
+    readBytesFileRangeSnapshot,
     readBytesFileSnapshot,
     readTextLineChunks,
     readTextLineChunksStream,
     readTextLinesSnapshot,
+    resetByteLineIndexCacheForTest,
 } from '../../../../src/copilot/infra/io/fs/index.js';
 import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
@@ -112,6 +116,60 @@ describe('infra/io/fs read line ports', () => {
         expect(Number.isFinite(result.ctimeMs)).toBe(true);
     });
 
+    it('readBytesFileRangeSnapshot lê range forward sem materializar o arquivo inteiro', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'range-forward.txt');
+        await writeFile(file, '0123456789', 'utf8');
+
+        const result = await readBytesFileRangeSnapshot(file, { start: 3, maxBytes: 4 });
+
+        expect(result.content.toString('utf8')).toBe('3456');
+        expect(result.bytesRead).toBe(4);
+        expect(result.startByte).toBe(3);
+        expect(result.endByteExclusive).toBe(7);
+        expect(result.truncatedBefore).toBe(true);
+        expect(result.truncatedAfter).toBe(true);
+        expect(result.consistent).toBe(true);
+    });
+
+    it('readBytesFileRangeSnapshot lê tail bounded a partir do fim', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'range-tail.txt');
+        await writeFile(file, 'abcdefghij', 'utf8');
+
+        const result = await readBytesFileRangeSnapshot(file, { maxBytes: 3, fromEnd: true });
+
+        expect(result.content.toString('utf8')).toBe('hij');
+        expect(result.startByte).toBe(7);
+        expect(result.truncatedBefore).toBe(true);
+        expect(result.truncatedAfter).toBe(false);
+    });
+
+    it('readBytesFileRangeSnapshot trata offset além do EOF como range vazio consistente', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'range-eof.txt');
+        await writeFile(file, 'abc', 'utf8');
+
+        const result = await readBytesFileRangeSnapshot(file, { start: 99, maxBytes: 10 });
+
+        expect(result.content).toHaveLength(0);
+        expect(result.startByte).toBe(3);
+        expect(result.endByteExclusive).toBe(3);
+        expect(result.truncatedAfter).toBe(false);
+    });
+
+    it('readBytesFileRangeSnapshot rejeita symlink quando a capability exige arquivo lexical regular', async () => {
+        const dir = await createTempDir();
+        const target = join(dir, 'target.txt');
+        const link = join(dir, 'link.txt');
+        await writeFile(target, 'secret', 'utf8');
+        await symlink(target, link);
+
+        await expect(
+            readBytesFileRangeSnapshot(link, { start: 0, maxBytes: 6, rejectSymlink: true }),
+        ).rejects.toMatchObject({ code: 'ELOOP' });
+    });
+
     it('readTextLineChunks aborta quando signal já está cancelado', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'abort.txt');
@@ -145,6 +203,7 @@ describe('infra/io/fs read line ports', () => {
         const file = join(dir, 'stream-bytes.txt');
         const content = 'ação\r\nbeta\ngamma\nomega';
         await writeFile(file, content, 'utf8');
+        resetByteLineIndexCacheForTest();
 
         const result = await readTextLineChunks(file, {
             chunkLines: 1,
@@ -158,7 +217,114 @@ describe('infra/io/fs read line ports', () => {
             { index: 1, startLine: 3, endLine: 3, content: 'gamma', bytes: Buffer.byteLength('gamma', 'utf8') },
         ]);
         expect(result.bytesRead).toBeGreaterThan(Buffer.byteLength('beta\ngamma', 'utf8'));
-        expect(result.bytesRead).toBeLessThanOrEqual(Buffer.byteLength(content, 'utf8'));
+        expect(result.indexBytesRead).toBeGreaterThan(0);
+        expect(result.rangeBytesRead).toBe(0);
+        expect(result.bytesRead).toBe(result.indexBytesRead);
+        expect(result.indexCacheState).toBe('build');
+        expect(result.rangeSource).toBe('index-capture');
+        const indexStats = getByteLineIndexStats();
+        expect(indexStats.capturedRangeReuses).toBe(1);
+        expect(indexStats.rangeBytesAvoided).toBe(Buffer.byteLength('beta\ngamma\n', 'utf8'));
+    });
+
+    it('readTextLineChunks semeia byte-index na primeira página e evita reindexar a segunda', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'first-page-seed.txt');
+        const lines = Array.from({ length: 10_000 }, (_, index) => `linha-${String(index + 1).padStart(5, '0')}`);
+        await writeFile(file, lines.join('\n'), 'utf8');
+        resetByteLineIndexCacheForTest();
+
+        const first = await readTextLineChunks(file, { startLine: 1, endLine: 100, chunkLines: 100 });
+        const afterFirst = getByteLineIndexStats();
+        const second = await readTextLineChunks(file, { startLine: 101, endLine: 120, chunkLines: 20 });
+        const afterSecond = getByteLineIndexStats();
+
+        expect(first.engine).toBe('io-engine.fs.createReadStream.textChunks');
+        expect(first.bytesRead).toBeLessThanOrEqual(32 * 1024);
+        expect(afterFirst.streamSeeds).toBe(1);
+        expect(afterFirst.streamSeedBytes).toBe(first.bytesRead);
+        expect(afterFirst.builds).toBe(0);
+        expect(afterFirst.size).toBe(1);
+        expect(second.indexCacheState).toBe('hit');
+        expect(second.indexBytesRead).toBe(0);
+        expect(second.rangeSource).toBe('file-range');
+        expect(second.chunks.flatMap((chunk) => chunk.content.split('\n'))).toEqual(lines.slice(100, 120));
+        expect(afterSecond.hits).toBe(1);
+        expect(afterSecond.builds).toBe(0);
+        expect(afterSecond.extensions).toBe(0);
+    });
+
+    it('byte-line index respeita orçamento agregado de memória e não retém entrada oversized', async () => {
+        vi.stubEnv('COPILOT_IO_BYTE_LINE_INDEX_MAX_BYTES', '4096');
+        const dir = await createTempDir();
+        const file = join(dir, 'byte-index-memory-budget.txt');
+        await writeFile(file, 'x\n'.repeat(20_000), 'utf8');
+        resetByteLineIndexCacheForTest();
+
+        await readTextLineChunks(file, { startLine: 1, endLine: 100, chunkLines: 100 });
+        const stats = getByteLineIndexStats();
+
+        expect(stats.maxBytes).toBe(4096);
+        expect(stats.size).toBe(0);
+        expect(stats.sizeBytes).toBe(0);
+        expect(stats.evictions).toBe(1);
+        expect(stats.memoryEvictions).toBe(1);
+    });
+
+    it('readTextLineChunks evolui byte-index como build -> extend -> hit sem reler a janela durante expansão', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'progressive-byte-index.txt');
+        const lines = Array.from({ length: 1000 }, (_, index) => `linha-${String(index + 1).padStart(4, '0')}`);
+        await writeFile(file, lines.join('\n'), 'utf8');
+        resetByteLineIndexCacheForTest();
+
+        const first = await readTextLineChunks(file, {
+            startLine: 101,
+            endLine: 120,
+            chunkLines: 20,
+            highWaterMark: 64,
+        });
+        const second = await readTextLineChunks(file, {
+            startLine: 121,
+            endLine: 140,
+            chunkLines: 20,
+            highWaterMark: 64,
+        });
+        const third = await readTextLineChunks(file, {
+            startLine: 101,
+            endLine: 120,
+            chunkLines: 20,
+            highWaterMark: 64,
+        });
+
+        expect(first).toMatchObject({
+            indexCacheState: 'build',
+            rangeSource: 'index-capture',
+            rangeBytesRead: 0,
+            totalLinesKnown: false,
+            cacheFingerprintStrategy: 'byte-line-index-progressive',
+        });
+        expect(second).toMatchObject({
+            indexCacheState: 'extend',
+            rangeSource: 'index-capture',
+            rangeBytesRead: 0,
+            totalLinesKnown: false,
+        });
+        expect(third.indexCacheState).toBe('hit');
+        expect(third.rangeSource).toBe('file-range');
+        expect(third.rangeBytesRead).toBeGreaterThan(0);
+        expect(third.chunks.flatMap((chunk) => chunk.content.split('\n'))).toEqual(lines.slice(100, 120));
+        const stats = getByteLineIndexStats();
+        expect(stats.builds).toBe(1);
+        expect(stats.extensions).toBe(1);
+        expect(stats.hits).toBe(1);
+        expect(stats.capturedRangeReuses).toBe(2);
+
+        invalidateIoCachePath(file);
+        const invalidated = getByteLineIndexStats();
+        expect(invalidated.busInvalidations).toBe(1);
+        expect(invalidated.clears).toBe(1);
+        expect(invalidated.size).toBe(0);
     });
 
     it('readTextLineChunks preserva CRLF quando o CR termina um chunk físico', async () => {
@@ -238,11 +404,30 @@ describe('infra/io/fs read line ports', () => {
         expect(result).toMatchObject({
             attempts: 2,
             consistent: true,
-            cacheFingerprintStrategy: 'byte-line-index',
+            cacheFingerprintStrategy: 'byte-line-index-progressive',
             snapshotFingerprintStrategy: 'mtime-size-ctime-dev-ino',
         });
         expect(result.chunks.map((chunk) => chunk.content)).toEqual(['new-02\nnew-03\nnew-04']);
         expect(result.snapshotVersion).toMatch(/^[a-f0-9]{24}$/);
+    });
+
+    it('readTextLineChunks detecta índice hit stale no snapshot do range e reconstrói sem pre-stat redundante', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'byte-index-hit-stale.txt');
+        const oldLines = Array.from({ length: 200 }, (_, index) => `old-${String(index + 1).padStart(3, '0')}`);
+        const newLines = Array.from({ length: 200 }, (_, index) => `new-${String(index + 1).padStart(3, '0')}`);
+        await writeFile(file, oldLines.join('\n'), 'utf8');
+        resetByteLineIndexCacheForTest();
+
+        await readTextLineChunks(file, { startLine: 1, endLine: 100, chunkLines: 100 });
+        await replaceTextFileFromChild(file, newLines.join('\n'));
+        const result = await readTextLineChunks(file, { startLine: 20, endLine: 30, chunkLines: 11 });
+        const stats = getByteLineIndexStats();
+
+        expect(result.attempts).toBe(2);
+        expect(result.chunks.flatMap((chunk) => chunk.content.split('\n'))).toEqual(newLines.slice(19, 30));
+        expect(stats.hitPrevalidationElisions).toBeGreaterThanOrEqual(1);
+        expect(stats.stale).toBeGreaterThanOrEqual(1);
     });
 
     it('readTextLineChunks propaga highWaterMark para index e byte-seek', async () => {

@@ -161,7 +161,8 @@ export class PermissionController {
                 const defaultShellTools = ['run_shell_command', 'run_npm_script', 'run_node_script'];
                 const configuredDenyShellTools = process.env['AGENT_DENY_SHELL_TOOLS'];
                 const shellTools = configuredDenyShellTools
-                    ? configuredDenyShellTools.split(',')
+                    ? configuredDenyShellTools
+                          .split(',')
                           .map((t) => t.trim())
                           .filter((t) => Boolean(t) && TOOL_NAME_RE.test(t))
                     : defaultShellTools;

@@ -23,7 +23,9 @@ function optionalString(value) {
  * @returns {Record<string, unknown> | null}
  */
 function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -31,7 +33,9 @@ function optionalRecord(value) {
  * @returns {string}
  */
 function probeStatusOf(probe) {
-    return optionalString(probe['status']) ?? (probe['ok'] === true ? 'ok' : probe['ok'] === false ? 'failed' : 'unknown');
+    return (
+        optionalString(probe['status']) ?? (probe['ok'] === true ? 'ok' : probe['ok'] === false ? 'failed' : 'unknown')
+    );
 }
 
 /**
@@ -41,7 +45,7 @@ function probeStatusOf(probe) {
 function probeStatusesOf(record) {
     const probes = optionalRecord(record['probes']);
     if (!probes) return {};
-    /** @type {Array<[string, string]>} */
+    /** @type {[string, string][]} */
     const entries = [];
     for (const [kind, probe] of Object.entries(probes)) {
         const normalizedProbe = optionalRecord(probe);
@@ -110,22 +114,22 @@ function optionalNumber(value) {
 /**
  * @param {Record<string, unknown>} record
  * @returns {{
- *   key: string;
- *   routeProfile: string | null;
- *   providerId: string | null;
- *   providerModel: string | null;
- *   lastStatus: string | null;
- *   failureKind: string | null;
- *   lastFailureStatusCode: number | null;
- *   lastRetryAfterSeconds: number | null;
- *   lastResetAt: string | null;
- *   agentProbeStatus: string | null;
- *   probeStatuses: Record<string, string>;
- *   probeStatusFingerprint: string;
- *   failedProbeKinds: string[];
- *   blockingFailedProbeKinds: string[];
- *   observedAt: number;
- *   status: string;
+ *     key: string;
+ *     routeProfile: string | null;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     lastStatus: string | null;
+ *     failureKind: string | null;
+ *     lastFailureStatusCode: number | null;
+ *     lastRetryAfterSeconds: number | null;
+ *     lastResetAt: string | null;
+ *     agentProbeStatus: string | null;
+ *     probeStatuses: Record<string, string>;
+ *     probeStatusFingerprint: string;
+ *     failedProbeKinds: string[];
+ *     blockingFailedProbeKinds: string[];
+ *     observedAt: number;
+ *     status: string;
  * }}
  */
 export function comparableModelGatewayRuntimeHealthRecord(record) {
@@ -159,7 +163,13 @@ export function comparableModelGatewayRuntimeHealthRecord(record) {
 
 /**
  * @param {ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[]} records
- * @returns {{ total: number; byProvider: Record<string, number>; byStatus: Record<string, number>; byFailureKind: Record<string, number>; byProbeStatus: Record<string, number> }}
+ * @returns {{
+ *     total: number;
+ *     byProvider: Record<string, number>;
+ *     byStatus: Record<string, number>;
+ *     byFailureKind: Record<string, number>;
+ *     byProbeStatus: Record<string, number>;
+ * }}
  */
 export function summarizeModelGatewayRuntimeHealthRecords(records) {
     /** @type {Record<string, number>} */
@@ -226,11 +236,17 @@ function ok(record) {
 }
 
 /**
- * @param {{ before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }} item
+ * @param {{
+ *     before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *     after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *     changedFields: string[];
+ * }} item
  * @returns {boolean}
  */
 function hasNonProbeSurfaceRegression(item) {
-    return item.changedFields.some((field) => field !== 'probeStatusFingerprint') && ok(item.before) && failed(item.after);
+    return (
+        item.changedFields.some((field) => field !== 'probeStatusFingerprint') && ok(item.before) && failed(item.after)
+    );
 }
 
 /**
@@ -245,7 +261,11 @@ function hasProbeStatusRegression(before, after) {
 }
 
 /**
- * @param {{ before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }} item
+ * @param {{
+ *     before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *     after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *     changedFields: string[];
+ * }} item
  * @returns {boolean}
  */
 function hasAnyRegression(item) {
@@ -256,14 +276,42 @@ function hasAnyRegression(item) {
  * @param {ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[]} beforeRecords
  * @param {ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[]} afterRecords
  * @returns {{
- *   added: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[];
- *   removed: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[];
- *   changed: Array<{ key: string; before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }>;
- *   regressions: Array<{ key: string; before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }>;
- *   newFailures: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[];
- *   becameFailed: Array<{ key: string; before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }>;
- *   recovered: Array<{ key: string; before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>; changedFields: string[] }>;
- *   summary: { added: number; removed: number; changed: number; regressions: number; newFailures: number; becameFailed: number; recovered: number };
+ *     added: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[];
+ *     removed: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[];
+ *     changed: {
+ *         key: string;
+ *         before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         changedFields: string[];
+ *     }[];
+ *     regressions: {
+ *         key: string;
+ *         before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         changedFields: string[];
+ *     }[];
+ *     newFailures: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>[];
+ *     becameFailed: {
+ *         key: string;
+ *         before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         changedFields: string[];
+ *     }[];
+ *     recovered: {
+ *         key: string;
+ *         before: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         after: ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>;
+ *         changedFields: string[];
+ *     }[];
+ *     summary: {
+ *         added: number;
+ *         removed: number;
+ *         changed: number;
+ *         regressions: number;
+ *         newFailures: number;
+ *         becameFailed: number;
+ *         recovered: number;
+ *     };
  * }}
  */
 export function diffModelGatewayRuntimeHealthSnapshots(beforeRecords, afterRecords) {
@@ -278,7 +326,7 @@ export function diffModelGatewayRuntimeHealthSnapshots(beforeRecords, afterRecor
             added.push(record);
             continue;
         }
-        /** @type {Array<keyof ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>>} */
+        /** @type {(keyof ReturnType<typeof comparableModelGatewayRuntimeHealthRecord>)[]} */
         const fields = [
             'status',
             'failureKind',

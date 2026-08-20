@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {ContractDefinitionV1} from "./load_registry.mjs" */
+/** @import {ContractDefinitionV1} from './load_registry.mjs' */
 
 /**
  * @param {ContractDefinitionV1[]} contracts

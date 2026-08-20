@@ -5,12 +5,15 @@
  */
 
 import { resolveHooksStateDir } from '#copilot/boot';
-import { access, readdir, readFile, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
 import { SNAPSHOT_DIR as _SNAPSHOT_DIR_ENV, MAX_SNAPSHOTS } from '#copilot/config/agent';
-import { safeJsonParse } from '#copilot/core';
-import { SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '#copilot/core';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { safeJsonParse, SessionSnapshotDataSchema, SnapshotIdSchema, SnapshotListItemSchema } from '#copilot/core';
+import {
+    deleteFileTrusted,
+    listDirectoryNamesFreshTrusted,
+    readTextFreshTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/trusted-io';
+import { join, resolve } from 'node:path';
 import { logSwallowed } from '../../ports/core-runtime-port.js';
 import { log } from '../../ports/logging/index.js';
 import { startSpan } from '../../ports/tracing-port.js';
@@ -82,21 +85,26 @@ export async function saveSnapshotFileAsync(snapshot) {
  * @returns {Promise<SnapshotListItem[]>}
  */
 export async function listSnapshotFilesAsync() {
+    let entries;
     try {
-        await access(SNAPSHOT_DIR);
-    } catch {
-        return [];
+        entries = (await listDirectoryNamesFreshTrusted(SNAPSHOT_DIR, { caller: 'agent.session.state.snapshot-store' }))
+            .entries;
+    } catch (error) {
+        const code = /** @type {{ code?: unknown }} */ (error)?.code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return [];
+        throw error;
     }
 
     /** @type {SnapshotListItem[]} */
     const result = [];
-    for (const f of await readdir(SNAPSHOT_DIR)) {
+    for (const f of entries) {
         if (!f.endsWith('.json')) continue;
         const fileSnapshotId = normalizeSnapshotId(f.slice(0, -'.json'.length));
         if (!fileSnapshotId) continue;
         const filepath = join(SNAPSHOT_DIR, f);
         try {
-            const text = await readFile(filepath, 'utf8');
+            const text = (await readTextFreshTrusted(filepath, { caller: 'agent.session.state.snapshot-store' }))
+                .content;
             const jsonResult = safeJsonParse(text, `[SessionSnapshot/listAsync/${f}]`);
             if (!jsonResult.ok) continue;
             const parsed = SnapshotListItemSchema.safeParse(jsonResult.data);
@@ -133,16 +141,11 @@ export async function loadSnapshotFileAsync(snapshotId) {
     return startSpan('copilot.snapshot.load', { extra: { snapshotId } }, async () => {
         const normalizedSnapshotId = normalizeSnapshotId(snapshotId);
         if (!normalizedSnapshotId) return null;
-        try {
-            await access(SNAPSHOT_DIR);
-        } catch {
-            return null;
-        }
-
         const filepath = join(SNAPSHOT_DIR, `${normalizedSnapshotId}.json`);
 
         try {
-            const text = await readFile(filepath, 'utf8');
+            const text = (await readTextFreshTrusted(filepath, { caller: 'agent.session.state.snapshot-store' }))
+                .content;
             const jsonResult = safeJsonParse(text, `[SessionSnapshot/loadAsync/${filepath}]`);
             if (!jsonResult.ok) return null;
             const parsed = SessionSnapshotDataSchema.safeParse(jsonResult.data);
@@ -177,8 +180,11 @@ export async function pruneSnapshotFilesAsync(keep = MAX_SNAPSHOTS) {
     for (const snap of toRemove) {
         try {
             if (snap?.filepath) {
-                await rm(snap.filepath, { force: true });
-                removed++;
+                const deletion = await deleteFileTrusted(snap.filepath, {
+                    caller: 'agent.session.state.snapshot-store',
+                    ignoreMissing: true,
+                });
+                if (deletion) removed++;
             }
         } catch (e) {
             logSwallowed(e, 'snapshot.pruneAsync.rmFile');

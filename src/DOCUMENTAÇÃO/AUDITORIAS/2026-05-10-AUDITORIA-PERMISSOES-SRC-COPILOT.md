@@ -1,13 +1,14 @@
 # Auditoria Ampla — Permissões em `src/copilot`
 
-> Data: 2026-05-10
-> Escopo: arquitetura de permissão, enforcement de camada (`hooks`), fluxos de decisão e hardening de fallback.
+> Data: 2026-05-10 Escopo: arquitetura de permissão, enforcement de camada (`hooks`), fluxos de
+> decisão e hardening de fallback.
 
 ---
 
 ## 1) Decisão arquitetural consolidada
 
-**Decisão:** `hooks/` é camada final. Nenhum módulo fora de `src/copilot/hooks/**` deve depender de `#copilot/hooks` ou `hooks/**` via import relativo.
+**Decisão:** `hooks/` é camada final. Nenhum módulo fora de `src/copilot/hooks/**` deve depender de
+`#copilot/hooks` ou `hooks/**` via import relativo.
 
 ### Enforcement implementado
 
@@ -50,9 +51,11 @@ Resultado validado por:
 
 ### 3.2 Riscos observados
 
-- Risco histórico de **fallback permissivo implícito** em auditoria de permissão (approve-all em erro).
+- Risco histórico de **fallback permissivo implícito** em auditoria de permissão (approve-all em
+  erro).
 - Acoplamento do runtime de policy com camada hooks (`agent/ports/permission-port`), agora reduzido.
-- Múltiplos pontos de decisão (`onPreToolUse` + `onPermissionRequest`) ainda sem avaliador único compartilhado por preset.
+- Múltiplos pontos de decisão (`onPreToolUse` + `onPermissionRequest`) ainda sem avaliador único
+  compartilhado por preset.
 
 ---
 
@@ -81,8 +84,8 @@ Resultado validado por:
    - regra F24 adicionada e validada em arquivos infratores.
 
 6. **Migração de runtime de hooks para superfícies neutras**
-   - novos módulos canônicos: `sdk/session/hook-bus`, `sdk/session/hook-registry`, `sdk/session/hook-logger`,
-     `audit/hook-audit-trail`.
+   - novos módulos canônicos: `sdk/session/hook-bus`, `sdk/session/hook-registry`,
+     `sdk/session/hook-logger`, `audit/hook-audit-trail`.
    - módulos legados em `hooks/*` convertidos para compat re-export.
    - consumers fora de hooks migrados para `#copilot/sdk` / `#copilot/audit`.
 
@@ -101,7 +104,8 @@ Objetivo: eliminar drift semântico entre “pré-decisão” e “decisão form
 
 ### P1 — Consolidação de semântica de decisão
 
-Unificar as decisões de permissão entre `onPreToolUse` e `onPermissionRequest` com avaliador canônico compartilhado por preset/perfil.
+Unificar as decisões de permissão entre `onPreToolUse` e `onPermissionRequest` com avaliador
+canônico compartilhado por preset/perfil.
 
 ### P2 — Hardening contínuo da F24
 

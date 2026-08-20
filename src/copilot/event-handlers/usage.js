@@ -13,8 +13,8 @@ import {
     EMITTER_SESSION_USAGE_CHECKPOINT,
     SESSION_EVENTS,
 } from '#copilot/events';
-import { log } from '#copilot/observability';
 import { onSessionEvent } from '#copilot/events/sdk-events';
+import { log } from '#copilot/observability';
 import { createAssistantUsageClassifier, normalizeAssistantUsageEvent } from './usage-classifier.js';
 
 /** @param {unknown} value @returns {Record<string, unknown>} */

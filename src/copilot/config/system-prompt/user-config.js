@@ -8,8 +8,7 @@
  * @module copilot/config/system-prompt/user-config
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { readFile as readFileAsync } from 'node:fs/promises';
+import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import { isAbsolute, resolve } from 'node:path';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -64,6 +63,11 @@ import {
 export const SYSTEM_PROMPT_DEFAULT_MODE = /** @type {const} */ ('append');
 export const SYSTEM_PROMPT_DEFAULT_RELOAD_STRATEGY = /** @type {const} */ ('sdk-transform');
 export const SYSTEM_PROMPT_CONFIG_PATH = resolvePersistentConfigFile('system-prompt.json');
+
+/** Last successfully observed declarative file payloads, keyed by canonical configured path. */
+const systemPromptConfigSnapshots = new Map();
+/** Last successfully observed append-file text, keyed by configured absolute path. */
+const systemPromptAppendTextSnapshots = new Map();
 
 /**
  * @param {string | undefined} value
@@ -146,18 +150,13 @@ function readBoolean(value, fallback) {
 }
 
 /**
+ * Return the last asynchronously hydrated file snapshot. Sync projections never touch the filesystem.
+ *
  * @param {string} filePath
  * @returns {SystemPromptUserConfig}
  */
-function readConfigFileSync(filePath) {
-    if (!existsSync(filePath)) return {};
-    try {
-        const raw = readFileSync(filePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? /** @type {SystemPromptUserConfig} */ (parsed) : {};
-    } catch {
-        return {};
-    }
+function readConfigFileSnapshot(filePath) {
+    return systemPromptConfigSnapshots.get(filePath) ?? {};
 }
 
 /**
@@ -165,13 +164,16 @@ function readConfigFileSync(filePath) {
  * @returns {Promise<SystemPromptUserConfig>}
  */
 async function readConfigFileAsync(filePath) {
-    if (!existsSync(filePath)) return {};
     try {
-        const raw = await readFileAsync(filePath, 'utf8');
+        const raw = (await readTextFreshTrusted(filePath, { caller: 'config.system-prompt.user-config' })).content;
         const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? /** @type {SystemPromptUserConfig} */ (parsed) : {};
+        const snapshot = parsed && typeof parsed === 'object' ? /** @type {SystemPromptUserConfig} */ (parsed) : {};
+        systemPromptConfigSnapshots.set(filePath, snapshot);
+        return snapshot;
     } catch {
-        return {};
+        const snapshot = {};
+        systemPromptConfigSnapshots.set(filePath, snapshot);
+        return snapshot;
     }
 }
 
@@ -195,14 +197,15 @@ export function getSystemPromptConfigFilePath(env = process.env) {
 }
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv; cwd?: string }} [opts]
+ * Resolve one immutable effective config from process/env inputs plus an already-observed file payload.
+ *
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} cwd
+ * @param {string} configPath
+ * @param {SystemPromptUserConfig} fileConfig
  * @returns {ResolvedSystemPromptUserConfig}
  */
-export function readResolvedSystemPromptUserConfigSync(opts = {}) {
-    const env = opts.env ?? process.env;
-    const cwd = opts.cwd ?? process.cwd();
-    const configPath = getSystemPromptConfigFilePath(env);
-    const fileConfig = readConfigFileSync(configPath);
+function resolveSystemPromptUserConfigSnapshot(env, cwd, configPath, fileConfig) {
     const appendFiles = resolveAppendFiles(
         [
             ...readStringArray(fileConfig.appendFiles),
@@ -266,6 +269,22 @@ export function readResolvedSystemPromptUserConfigSync(opts = {}) {
 }
 
 /**
+ * Synchronous projection of the latest hydrated config snapshot. It never performs filesystem IO. Before first
+ * hydration, file-backed fields use defaults/env; async session bootstrap hydrates them before live use.
+ *
+ * @param {{ env?: NodeJS.ProcessEnv; cwd?: string }} [opts]
+ * @returns {ResolvedSystemPromptUserConfig}
+ */
+export function readResolvedSystemPromptUserConfigSync(opts = {}) {
+    const env = opts.env ?? process.env;
+    const cwd = opts.cwd ?? process.cwd();
+    const configPath = getSystemPromptConfigFilePath(env);
+    return resolveSystemPromptUserConfigSnapshot(env, cwd, configPath, readConfigFileSnapshot(configPath));
+}
+
+/**
+ * Hydrate the declarative file physically and return the resulting effective config.
+ *
  * @param {{ env?: NodeJS.ProcessEnv; cwd?: string }} [opts]
  * @returns {Promise<ResolvedSystemPromptUserConfig>}
  */
@@ -273,67 +292,7 @@ export async function readResolvedSystemPromptUserConfig(opts = {}) {
     const env = opts.env ?? process.env;
     const cwd = opts.cwd ?? process.cwd();
     const configPath = getSystemPromptConfigFilePath(env);
-    const fileConfig = await readConfigFileAsync(configPath);
-    const appendFiles = resolveAppendFiles(
-        [
-            ...readStringArray(fileConfig.appendFiles),
-            ...splitList(env['COPILOT_SYSTEM_PROMPT_APPEND_FILES']),
-            ...splitList(env['COPILOT_SYSTEM_PROMPT_APPEND_FILE']),
-        ],
-        cwd,
-    );
-
-    return {
-        configPath,
-        mode: normalizeSystemPromptMode(env['COPILOT_SYSTEM_PROMPT_MODE'] ?? fileConfig.mode),
-        appendFiles,
-        appendText:
-            (typeof env['COPILOT_SYSTEM_PROMPT_APPEND_TEXT'] === 'string'
-                ? env['COPILOT_SYSTEM_PROMPT_APPEND_TEXT']
-                : undefined) ?? (typeof fileConfig.appendText === 'string' ? fileConfig.appendText : ''),
-        autoReload: readBoolean(env['COPILOT_SYSTEM_PROMPT_AUTO_RELOAD'] ?? fileConfig.autoReload, true),
-        reloadStrategy: normalizeSystemPromptReloadStrategy(
-            env['COPILOT_SYSTEM_PROMPT_RELOAD_STRATEGY'] ?? fileConfig.reloadStrategy,
-        ),
-        objective: resolveTextSetting(
-            env['COPILOT_SYSTEM_PROMPT_OBJECTIVE'],
-            fileConfig.objective,
-            SYSTEM_PROMPT_DEFAULT_OBJECTIVE,
-        ),
-        personality: resolveTextSetting(
-            env['COPILOT_SYSTEM_PROMPT_PERSONALITY'],
-            fileConfig.personality,
-            SYSTEM_PROMPT_DEFAULT_PERSONALITY,
-        ),
-        collaborationContract: resolveTextSetting(
-            env['COPILOT_SYSTEM_PROMPT_COLLABORATION_CONTRACT'],
-            fileConfig.collaborationContract,
-            SYSTEM_PROMPT_DEFAULT_COLLABORATION_CONTRACT,
-        ),
-        northStar: resolveTextSetting(
-            env['COPILOT_SYSTEM_PROMPT_NORTH_STAR'],
-            fileConfig.northStar,
-            SYSTEM_PROMPT_DEFAULT_NORTH_STAR,
-        ),
-        engineeringDoctrine: resolveTextSetting(
-            env['COPILOT_SYSTEM_PROMPT_ENGINEERING_DOCTRINE'],
-            fileConfig.engineeringDoctrine,
-            SYSTEM_PROMPT_DEFAULT_ENGINEERING_DOCTRINE,
-        ),
-        evolutionLoop: resolveTextSetting(
-            env['COPILOT_SYSTEM_PROMPT_EVOLUTION_LOOP'],
-            fileConfig.evolutionLoop,
-            SYSTEM_PROMPT_DEFAULT_EVOLUTION_LOOP,
-        ),
-        focusPaths: resolveFocusPaths(
-            [
-                ...readStringArray(fileConfig.focusPaths),
-                ...splitList(env['COPILOT_SYSTEM_PROMPT_FOCUS_PATHS']),
-                ...splitList(env['COPILOT_SYSTEM_PROMPT_FOCUS_PATH']),
-            ],
-            SYSTEM_PROMPT_DEFAULT_FOCUS_PATHS,
-        ),
-    };
+    return resolveSystemPromptUserConfigSnapshot(env, cwd, configPath, await readConfigFileAsync(configPath));
 }
 
 /**
@@ -343,22 +302,12 @@ export async function readResolvedSystemPromptUserConfig(opts = {}) {
 export function readUserAppendContentSync(resolved = readResolvedSystemPromptUserConfigSync()) {
     /** @type {string[]} */
     const parts = [];
-
     for (const filePath of resolved.appendFiles) {
-        if (!existsSync(filePath)) continue;
-        try {
-            const content = readFileSync(filePath, 'utf8').trim();
-            if (!content) continue;
-            parts.push(`<!-- user-system-prompt:${filePath} -->\n${content}\n<!-- /user-system-prompt:${filePath} -->`);
-        } catch {
-            // Silencioso: config do usuário não deve quebrar o boot.
-        }
+        const content = (systemPromptAppendTextSnapshots.get(filePath) ?? '').trim();
+        if (!content) continue;
+        parts.push(`<!-- user-system-prompt:${filePath} -->\n${content}\n<!-- /user-system-prompt:${filePath} -->`);
     }
-
-    if (resolved.appendText.trim()) {
-        parts.push(resolved.appendText.trim());
-    }
-
+    if (resolved.appendText.trim()) parts.push(resolved.appendText.trim());
     return parts.join('\n\n');
 }
 
@@ -373,10 +322,14 @@ export async function readUserAppendContent(resolved) {
 
     for (const filePath of effective.appendFiles) {
         try {
-            const content = (await readFileAsync(filePath, 'utf8')).trim();
+            const content = (
+                await readTextFreshTrusted(filePath, { caller: 'config.system-prompt.user-config' })
+            ).content.trim();
+            systemPromptAppendTextSnapshots.set(filePath, content);
             if (!content) continue;
             parts.push(`<!-- user-system-prompt:${filePath} -->\n${content}\n<!-- /user-system-prompt:${filePath} -->`);
         } catch {
+            systemPromptAppendTextSnapshots.delete(filePath);
             // Silencioso: config do usuário não deve quebrar a sessão.
         }
     }
@@ -386,4 +339,15 @@ export async function readUserAppendContent(resolved) {
     }
 
     return parts.join('\n\n');
+}
+
+/**
+ * Explicitly hydrate both declarative config and append-file snapshots for sync projections/builders.
+ *
+ * @param {{ env?: NodeJS.ProcessEnv; cwd?: string }} [opts]
+ */
+export async function refreshSystemPromptUserConfigSnapshot(opts = {}) {
+    const config = await readResolvedSystemPromptUserConfig(opts);
+    const userAppendContent = await readUserAppendContent(config);
+    return { config, userAppendContent };
 }

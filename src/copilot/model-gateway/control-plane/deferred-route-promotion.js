@@ -37,24 +37,26 @@ function optionalString(value) {
 
 /**
  * @typedef {{
- *   store?: Pick<SqliteModelGatewayCatalogStore,
- *     'readDeferredSdkSessionHandoffRecords' | 'supersedeDeferredSdkSessionHandoffRecords'>;
- *   sessionId: string;
- *   runtimeId?: string | null;
- *   limit?: number;
- *   maxAgeMs?: number;
- *   now?: number;
- *   source?: string;
- *   switchRoute: (
- *     route: Record<string, unknown>,
- *     runtimeId: string | null,
- *     options: {
- *       idempotencyKey: string;
- *       source: string;
- *       allowActiveDialogLoopReattach: true;
- *       forceApplyDeferred: true;
- *     },
- *   ) => Promise<Record<string, unknown>>;
+ *     store?: Pick<
+ *         SqliteModelGatewayCatalogStore,
+ *         'readDeferredSdkSessionHandoffRecords' | 'supersedeDeferredSdkSessionHandoffRecords'
+ *     >;
+ *     sessionId: string;
+ *     runtimeId?: string | null;
+ *     limit?: number;
+ *     maxAgeMs?: number;
+ *     now?: number;
+ *     source?: string;
+ *     switchRoute: (
+ *         route: Record<string, unknown>,
+ *         runtimeId: string | null,
+ *         options: {
+ *             idempotencyKey: string;
+ *             source: string;
+ *             allowActiveDialogLoopReattach: true;
+ *             forceApplyDeferred: true;
+ *         },
+ *     ) => Promise<Record<string, unknown>>;
  * }} DeferredRoutePromotionInput
  */
 
@@ -66,13 +68,13 @@ function optionalString(value) {
  *
  * @param {DeferredRoutePromotionInput} input
  * @returns {Promise<{
- *   sessionId: string;
- *   scanned: number;
- *   promoted: number;
- *   superseded: number;
- *   skipped: number;
- *   errors: number;
- *   records: Record<string, unknown>[];
+ *     sessionId: string;
+ *     scanned: number;
+ *     promoted: number;
+ *     superseded: number;
+ *     skipped: number;
+ *     errors: number;
+ *     records: Record<string, unknown>[];
  * }>}
  */
 export async function promoteModelGatewayDeferredRouteSwitchAtTurnBoundary(input) {
@@ -98,7 +100,8 @@ export async function promoteModelGatewayDeferredRouteSwitchAtTurnBoundary(input
 
     const newestHandoff = handoffs[0];
     const newestOperation = isRecord(newestHandoff?.['operation']) ? newestHandoff['operation'] : null;
-    const newestOperationId = optionalString(newestOperation?.['operationId']) ?? optionalString(newestHandoff?.['handoffId']);
+    const newestOperationId =
+        optionalString(newestOperation?.['operationId']) ?? optionalString(newestHandoff?.['handoffId']);
     let superseded = 0;
     if (newestOperationId && handoffs.length > 1) {
         const result = await store.supersedeDeferredSdkSessionHandoffRecords({

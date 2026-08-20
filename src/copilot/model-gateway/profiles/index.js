@@ -1,10 +1,10 @@
 // @ts-check
 
 export {
+    ModelGatewayEnvProfileStore,
     activateModelGatewayByokProfileEnv,
     createModelGatewayEnvProfileStore,
     materializeModelGatewayActiveByokProfileEnv,
-    ModelGatewayEnvProfileStore,
     readModelGatewayByokProfileCostHint,
     readModelGatewayByokProfileSummaries,
     removeModelGatewayByokProfileEnv,

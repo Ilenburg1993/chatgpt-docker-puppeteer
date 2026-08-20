@@ -243,7 +243,8 @@ function updateMission(missionId, updates = {}) {
         .run({
             id: missionId,
             title: updates['title'] !== undefined ? String(updates['title']) : existing.title,
-            description: updates['description'] !== undefined ? String(updates['description'] || '') : existing.description,
+            description:
+                updates['description'] !== undefined ? String(updates['description'] || '') : existing.description,
             status,
             autonomy_mode,
             policy_json: JSON.stringify(policy),

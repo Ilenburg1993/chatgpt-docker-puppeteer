@@ -1,7 +1,7 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
 import {
@@ -11,8 +11,7 @@ import {
     summarizeMcpRoundTripRows,
 } from '#copilot/mcp/control-plane';
 
-
-/** @type {Array<import('better-sqlite3').Database>} */
+/** @type {import('better-sqlite3').Database[]} */
 const databases = [];
 
 afterEach(() => {
@@ -77,7 +76,15 @@ describe('MCP incremental round-trip analytics', () => {
 
     it('summarizes fail→inspect→retry, plan→apply, validator polling and Git strategy pressure', () => {
         const rows = [
-            { id: 1, ts_ms: 1_000, event: 'repo_apply_patch_failed', tool: 'repo_apply_patch', code: 'ERR_PATCH_NOT_FOUND', failure_class: 'stale-context', retryability: 'caller-refresh' },
+            {
+                id: 1,
+                ts_ms: 1_000,
+                event: 'repo_apply_patch_failed',
+                tool: 'repo_apply_patch',
+                code: 'ERR_PATCH_NOT_FOUND',
+                failure_class: 'stale-context',
+                retryability: 'caller-refresh',
+            },
             { id: 2, ts_ms: 2_000, event: 'tool_call_started', tool: 'repo_read_file' },
             { id: 3, ts_ms: 2_100, event: 'tool_call_completed', tool: 'repo_read_file' },
             { id: 4, ts_ms: 4_000, event: 'tool_call_started', tool: 'repo_apply_patch_batch' },
@@ -113,7 +120,11 @@ describe('MCP incremental round-trip analytics', () => {
         });
         assert.equal(summary.workflowPressure.gitOneShotCalls, 1);
         assert.equal(summary.workflowPressure.gitGranularToOneShotRatio, 2);
-        assert.ok(summary.topTransitions.some((row) => row.from === 'repo_patch_batch_plan' && row.to === 'repo_apply_patch_batch'));
+        assert.ok(
+            summary.topTransitions.some(
+                (row) => row.from === 'repo_patch_batch_plan' && row.to === 'repo_apply_patch_batch',
+            ),
+        );
     });
 
     it('segments long idle/recovery gaps instead of ranking them as interactive round trips', () => {
@@ -244,7 +255,14 @@ describe('MCP incremental round-trip analytics', () => {
         const events = [
             entry(0, { ts: iso(90_000), event: 'tool_call_started', tool: 'repo_read_file' }),
             entry(100, { ts: iso(91_000), event: 'tool_call_completed', tool: 'repo_read_file' }),
-            entry(200, { ts: iso(92_000), event: 'repo_apply_patch_failed', tool: 'repo_apply_patch', path: 'src/copilot/.ai/jobs/test/target.txt', code: 'ERR_PATCH_NOT_FOUND', failureClass: 'stale-context' }),
+            entry(200, {
+                ts: iso(92_000),
+                event: 'repo_apply_patch_failed',
+                tool: 'repo_apply_patch',
+                path: 'src/copilot/.ai/jobs/test/target.txt',
+                code: 'ERR_PATCH_NOT_FOUND',
+                failureClass: 'stale-context',
+            }),
         ];
         const readSlice = async ({ offset = 0 } = {}) => {
             requestedOffsets.push(offset);
@@ -304,7 +322,7 @@ describe('MCP incremental round-trip analytics', () => {
         const db = createDb();
         const nowMs = 100_000;
         let generation = 'a';
-        /** @type {Array<{ generation: string; offset: number }>} */
+        /** @type {{ generation: string; offset: number }[]} */
         const calls = [];
         const readSlice = async ({ offset = 0 } = {}) => {
             calls.push({ generation, offset });
@@ -321,7 +339,10 @@ describe('MCP incremental round-trip analytics', () => {
                     resetRequired: false,
                     parsedEvents: offset === 0 ? 1 : 0,
                     invalidLines: 0,
-                    entries: offset === 0 ? [entry(0, { ts: iso(90_000), event: 'tool_call_started', tool: 'repo_read_file' })] : [],
+                    entries:
+                        offset === 0
+                            ? [entry(0, { ts: iso(90_000), event: 'tool_call_started', tool: 'repo_read_file' })]
+                            : [],
                     events: [],
                     error: null,
                 };
@@ -369,10 +390,7 @@ describe('MCP incremental round-trip analytics', () => {
         assert.equal(second.ingestion?.reset, true);
         assert.equal(second.ingestion?.cursor?.fileIdentity, 'dev:ino-b');
         assert.equal(second.indexedRows, 2);
-        assert.deepEqual(
-            second.toolStarts.map((row) => row.tool).sort(),
-            ['repo_read_file', 'repo_search_text'],
-        );
+        assert.deepEqual(second.toolStarts.map((row) => row.tool).sort(), ['repo_read_file', 'repo_search_text']);
         assert.deepEqual(calls, [
             { generation: 'a', offset: 0 },
             { generation: 'b', offset: 100 },

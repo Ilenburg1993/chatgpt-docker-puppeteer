@@ -46,17 +46,18 @@ function createInitialState() {
 
 /**
  * @param {{
- *   enabled?: boolean;
- *   initialDelayMs?: number;
- *   intervalMs?: number;
- *   setTimeoutFn?: typeof setTimeout;
- *   syncFn?: () => Promise<Record<string, unknown>>;
+ *     enabled?: boolean;
+ *     initialDelayMs?: number;
+ *     intervalMs?: number;
+ *     setTimeoutFn?: typeof setTimeout;
+ *     syncFn?: () => Promise<Record<string, unknown>>;
  * }} [options]
  */
 export function scheduleMcpRoundTripAnalyticsMonitor(options = {}) {
     if (monitorTimer || monitorState.scheduled || monitorState.running) return false;
     const defaultEnabled = process.env['NODE_ENV'] !== 'test' && !process.env['VITEST'];
-    const enabled = options.enabled ?? readBooleanEnv('COPILOT_MCP_ROUND_TRIP_ANALYTICS_MONITOR_ENABLED', defaultEnabled);
+    const enabled =
+        options.enabled ?? readBooleanEnv('COPILOT_MCP_ROUND_TRIP_ANALYTICS_MONITOR_ENABLED', defaultEnabled);
     if (!enabled) {
         monitorState = { ...monitorState, enabled: false, scheduled: false, nextRunAt: null };
         return false;
@@ -205,7 +206,9 @@ function boundedDelay(value, fallback, min, max) {
 
 /** @param {string} name @param {boolean} fallback */
 function readBooleanEnv(name, fallback) {
-    const value = String(process.env[name] ?? '').trim().toLowerCase();
+    const value = String(process.env[name] ?? '')
+        .trim()
+        .toLowerCase();
     if (!value) return fallback;
     return ['1', 'true', 'yes', 'on'].includes(value);
 }

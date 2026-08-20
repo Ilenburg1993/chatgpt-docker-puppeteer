@@ -26,7 +26,9 @@ const runtimeMocks = vi.hoisted(() => {
         createTerminalSdkWorkspaceFile: vi.fn(async (path, content) => ({ path, content })),
         getTerminalPendingStructuredUserInputCount: vi.fn(() => pendingStructuredInputs.length),
         getTerminalSdkQuota: vi.fn(
-            /** @returns {Promise<{ quotaSnapshots: Record<string, { remainingPercentage: number; resetDate: string }> }>} */
+            /** @returns {Promise<{
+    quotaSnapshots: Record<string, { remainingPercentage: number; resetDate: string }>;
+}>} */
             async () => ({
                 quotaSnapshots: { chat: { remainingPercentage: 0.91, resetDate: '2026-05-01' } },
             }),
@@ -467,7 +469,10 @@ describe('terminal/commands/sdk', () => {
 
     it('/sdk simulate pergunta cria pendência estruturada diagnóstica', async () => {
         const ctx = mockCtx();
-        await cmdSdk({ println: ctx.println }, 'simulate pergunta --choices sim|nao --required Continuar teste visual?');
+        await cmdSdk(
+            { println: ctx.println },
+            'simulate pergunta --choices sim|nao --required Continuar teste visual?',
+        );
 
         expect(runtimeMocks.createTerminalPendingStructuredUserInput).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -486,7 +491,10 @@ describe('terminal/commands/sdk', () => {
 
     it('/sdk simulate request-user-input continua como alias legado sem vazar ID', async () => {
         const ctx = mockCtx();
-        await cmdSdk({ println: ctx.println }, 'simulate request-user-input --choices sim|nao --required Alias legado funciona?');
+        await cmdSdk(
+            { println: ctx.println },
+            'simulate request-user-input --choices sim|nao --required Alias legado funciona?',
+        );
 
         expect(runtimeMocks.createTerminalPendingStructuredUserInput).toHaveBeenCalledWith(
             expect.objectContaining({

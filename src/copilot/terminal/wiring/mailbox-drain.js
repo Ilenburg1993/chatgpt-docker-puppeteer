@@ -36,8 +36,8 @@ import {
     getBusy,
 } from '../../presentation/state/index.js';
 import { broadcastSse, getTurnQueueDepth, println, sendTurn } from '../dialog/index.js';
-import { terminalThemeRow } from '../state/repl/index.js';
 import { withTerminalTurnCorrelation } from '../state/events/index.js';
+import { terminalThemeRow } from '../state/repl/index.js';
 
 /**
  * Resultado de uma operação de drenagem da fila de intervenção.
@@ -106,8 +106,8 @@ function renderDrainTriggerLabel(trigger) {
  * Se o modelo ainda estiver ocupado (turno em andamento ou fila não-vazia), recoloca a entrada na fila para ser drenada
  * na próxima oportunidade.
  *
- * @param {import('../../presentation/state/index.js').RuntimeInterventionMailboxEntry} entry Entrada
- *   previamente consumida (via `consumeRuntimeInterventionMailbox`).
+ * @param {import('../../presentation/state/index.js').RuntimeInterventionMailboxEntry} entry Entrada previamente
+ *   consumida (via `consumeRuntimeInterventionMailbox`).
  * @param {string} trigger Identificador do contexto que originou a drenagem (ex: `'turn_end'`, `'dialog_ready'`,
  *   `'manual_consume'`).
  * @returns {MailboxDrainResult} - `'sent'`: turno enfileirado com sucesso.

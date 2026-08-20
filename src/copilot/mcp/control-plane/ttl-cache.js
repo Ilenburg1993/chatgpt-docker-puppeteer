@@ -2,10 +2,10 @@
 /**
  * Small in-memory TTL cache with in-flight de-duplication for MCP control-plane paths.
  *
- * The cache is intentionally process-local, bounded and dependency-free. It is appropriate for
- * short-lived diagnostics, metadata fetches and other idempotent read paths where repeated calls
- * happen in bursts. It must not be used for authorization decisions that require immediate revocation
- * unless the caller chooses a suitably tiny TTL or force-refreshes.
+ * The cache is intentionally process-local, bounded and dependency-free. It is appropriate for short-lived diagnostics,
+ * metadata fetches and other idempotent read paths where repeated calls happen in bursts. It must not be used for
+ * authorization decisions that require immediate revocation unless the caller chooses a suitably tiny TTL or
+ * force-refreshes.
  *
  * @module copilot/mcp/control-plane/ttl-cache
  */
@@ -173,7 +173,18 @@ export class TtlCache {
     }
 
     /**
-     * @returns {{ name: string; ttlMs: number; maxEntries: number; size: number; inFlight: number; hits: number; misses: number; inFlightHits: number; sets: number; evictions: number }}
+     * @returns {{
+     *     name: string;
+     *     ttlMs: number;
+     *     maxEntries: number;
+     *     size: number;
+     *     inFlight: number;
+     *     hits: number;
+     *     misses: number;
+     *     inFlightHits: number;
+     *     sets: number;
+     *     evictions: number;
+     * }}
      */
     stats() {
         return {
@@ -203,7 +214,18 @@ export function createTtlCache(options) {
 }
 
 /**
- * @returns {Array<{ name: string; ttlMs: number; maxEntries: number; size: number; inFlight: number; hits: number; misses: number; inFlightHits: number; sets: number; evictions: number }>}
+ * @returns {{
+ *     name: string;
+ *     ttlMs: number;
+ *     maxEntries: number;
+ *     size: number;
+ *     inFlight: number;
+ *     hits: number;
+ *     misses: number;
+ *     inFlightHits: number;
+ *     sets: number;
+ *     evictions: number;
+ * }[]}
  */
 export function getTtlCacheStats() {
     return Array.from(ttlCacheRegistry, (cache) => cache.stats()).sort((left, right) =>

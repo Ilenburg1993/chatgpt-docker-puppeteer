@@ -52,10 +52,6 @@ import {
 import { defaultErrorTracker } from '#copilot/observability';
 import { getShowSessionActivity, getShowToolActivity, getShowUsage } from '../../presentation/state/index.js';
 import {
-    renderTerminalLlmUsageClassification,
-    renderTerminalLlmUsageReason,
-} from './usage-presenter.js';
-import {
     broadcastSse,
     buildUserPrompt,
     isTerminalRenderLocked,
@@ -94,6 +90,7 @@ import {
     handleTerminalNativeToolProgress,
     handleTerminalNativeToolStart,
 } from './tool-lifecycle-runtime.js';
+import { renderTerminalLlmUsageClassification, renderTerminalLlmUsageReason } from './usage-presenter.js';
 
 const AGENT_SHELL_COMPLETED_EVENT = 'agent.shell.completed';
 const AGENT_SHELL_DETACHED_COMPLETED_EVENT = 'agent.shell.detached_completed';
@@ -285,8 +282,8 @@ function shouldPersistToolHeartbeatNarration() {
 
 /**
  * Heartbeats de `ask_user`/`request_user_input` não são progresso de tool para o operador: são estado de pergunta
- * humana, já coberto pelo renderer dedicado e pela linha viva. Esta checagem usa nome cru, canonicalName, apresentação e
- * detalhe para cobrir eventos incompletos de SDK/MCP.
+ * humana, já coberto pelo renderer dedicado e pela linha viva. Esta checagem usa nome cru, canonicalName, apresentação
+ * e detalhe para cobrir eventos incompletos de SDK/MCP.
  *
  * @param {ReturnType<ReturnType<typeof createToolCallRegistry>['getAllInFlight']>[number]} entry
  * @returns {boolean}
@@ -318,7 +315,9 @@ function isHumanQuestionToolHeartbeat(entry) {
  * @returns {string}
  */
 function renderProviderFailureMessageForOperator(value) {
-    const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
+    const text = String(value ?? '')
+        .replace(/\s+/gu, ' ')
+        .trim();
     if (/^Erro do SDK sem mensagem estruturada\.?$/iu.test(text)) {
         return 'falha sem mensagem estruturada do SDK';
     }
@@ -644,7 +643,9 @@ function formatLlmUsageOperatorDetail(evt, billing) {
  * @returns {string}
  */
 function renderLlmUsageModelRowDetail(detail) {
-    return String(detail ?? '').replace(/^modelo\s+/iu, '').trim();
+    return String(detail ?? '')
+        .replace(/^modelo\s+/iu, '')
+        .trim();
 }
 
 /**
@@ -671,10 +672,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             const compactDetail = getTerminalDetailLevel() === 'compact';
             for (const entry of inFlight) {
                 const toolCallId = entry.toolCallId;
-                if (
-                    entry.suppressLiveNarration === true ||
-                    isHumanQuestionToolHeartbeat(entry)
-                ) {
+                if (entry.suppressLiveNarration === true || isHumanQuestionToolHeartbeat(entry)) {
                     continue;
                 }
                 const elapsedMs = now - entry.t0;
@@ -695,8 +693,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                 if (getShowToolActivity()) {
                     const historyLine =
                         `  ${terminalThemeText('muted', '↳')} ${terminalThemeText('tool', compactDetail ? compactTerminalToolText(displayName, 32) : displayName)} ${terminalThemeText('muted', `ainda trabalhando · ${elapsed}s sem novo progresso`)}`.trimEnd();
-                    const inlineLine =
-                        `LLM-B ferramenta · ${terminalThemeText('tool', compactTerminalToolText(displayName, 32))} · ${elapsed}s`;
+                    const inlineLine = `LLM-B ferramenta · ${terminalThemeText('tool', compactTerminalToolText(displayName, 32))} · ${elapsed}s`;
                     if (shouldPersistToolHeartbeatNarration()) {
                         println(historyLine);
                     }
@@ -892,7 +889,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
               ? 'Erro recuperável de modelo SDK'
               : 'Erro do agente';
         const severity = isRecoverableModelCall ? 'warn' : 'error';
-        const detail = isRecoverableModelCall ? `${operatorMessage} · ${operatorDetail}` : `[${errorContext}] ${operatorMessage}`;
+        const detail = isRecoverableModelCall
+            ? `${operatorMessage} · ${operatorDetail}`
+            : `[${errorContext}] ${operatorMessage}`;
         const renderKey = `${errorContext}|${msg}`;
         const now = Date.now();
         const lastRenderedAt = recoverableModelErrorPrintedAtByKey.get(renderKey) ?? 0;
@@ -954,8 +953,7 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
                     errorContext,
                     recoverable,
                     byokEnabled: evt?.['byokEnabled'] === true,
-                    byokProviderType:
-                        typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'] : null,
+                    byokProviderType: typeof evt?.['byokProviderType'] === 'string' ? evt['byokProviderType'] : null,
                     byokProfile: typeof evt?.['byokProfile'] === 'string' ? evt['byokProfile'] : null,
                     byokModel: typeof evt?.['byokModel'] === 'string' ? evt['byokModel'] : null,
                     operatorMeaning: operatorDetail,
@@ -1148,7 +1146,9 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
             detail: description,
             source: 'agent',
         });
-        printlnWhenRenderUnlocked(terminalThemeRow('Shell', `destacada concluída · ${description}`, { role: 'success' }));
+        printlnWhenRenderUnlocked(
+            terminalThemeRow('Shell', `destacada concluída · ${description}`, { role: 'success' }),
+        );
         broadcastSse(
             AGENT_SHELL_DETACHED_COMPLETED_EVENT,
             withAgentSseEnvelope({ ...evt }, 'agent/shell.detached_completed'),
@@ -1217,7 +1217,8 @@ export function setupTerminalAgentRuntimeEventListeners({ agent, rl = null, regi
 
     const onLlmUsage = (/** @type {Record<string, unknown>} */ evt) => {
         const billing = normalizeUsageBilling(evt);
-        const billingSource = evt?.['billingSource'] === 'byok' || evt?.['byokProvider'] === true ? 'byok' : 'github_copilot';
+        const billingSource =
+            evt?.['billingSource'] === 'byok' || evt?.['byokProvider'] === true ? 'byok' : 'github_copilot';
         broadcastSse(EMITTER_LLM_USAGE, withAgentSseEnvelope(evt, 'agent/llm.usage'));
 
         if (billingSource === 'byok') {

@@ -69,6 +69,25 @@ describe('infra/io/patch', () => {
         }
     });
 
+    it('identifica escaping literal de aspas como divergência diagnóstica sem relaxar o exact match', () => {
+        const content = 'return fail(`Access to protected real path segment "${blockedHit}" is blocked`);\n';
+        try {
+            computeTextPatch(content, {
+                oldString: 'return fail(`Access to protected real path segment \\"${blockedHit}\\" is blocked`);',
+                newString: 'replacement',
+            });
+            throw new Error('patch deveria falhar');
+        } catch (error) {
+            expect(error).toMatchObject({
+                code: 'ERR_PATCH_NOT_FOUND',
+                details: {
+                    quoteEscapeNormalizedOccurrenceCount: 1,
+                    quoteEscapeNormalizedOccurrenceCountExact: true,
+                },
+            });
+        }
+    });
+
     it('reconhece desired text já presente como candidato de convergência sem mutar', () => {
         const content = 'header\nconst valueName = 2;\nfooter\n';
         try {

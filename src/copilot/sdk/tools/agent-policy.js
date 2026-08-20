@@ -7,8 +7,7 @@
  * A carga útil dos hooks do SDK nem sempre identifica o agente customizado ativo. Quando identifica, esta política
  * aplica a lista de permissão por agente derivada de `customAgents[].tools`. Quando não identifica, ela ainda aplica
  * listas globais de permissão/negação e deixa a filtragem local do agente para a própria declaração de ferramentas do
- * SDK.
- * O SDK mantém a policy genérica e recebe normalizadores de nomes por injeção. Aliases de produto vivem em
+ * SDK. O SDK mantém a policy genérica e recebe normalizadores de nomes por injeção. Aliases de produto vivem em
  * `#copilot/config`, não nesta camada.
  *
  * @module copilot/sdk/tools/agent-policy

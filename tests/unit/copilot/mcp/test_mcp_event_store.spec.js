@@ -3,8 +3,8 @@
  * Tests for bounded MCP Streamable HTTP event stores.
  */
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
@@ -34,7 +34,11 @@ describe('MCP HTTP event stores', () => {
 
         /** @type {unknown[]} */
         const replayed = [];
-        const streamId = await store.replayEventsAfter(first, { send: (message) => { replayed.push(message); } });
+        const streamId = await store.replayEventsAfter(first, {
+            send: (message) => {
+                replayed.push(message);
+            },
+        });
         assert.equal(streamId, 'stream-a');
         assert.deepEqual(
             replayed.map((message) => /** @type {{ method?: string }} */ (message).method),
@@ -45,7 +49,11 @@ describe('MCP HTTP event stores', () => {
         now = 20_001;
         /** @type {unknown[]} */
         const expiredReplay = [];
-        await store.replayEventsAfter(first, { send: (message) => { expiredReplay.push(message); } });
+        await store.replayEventsAfter(first, {
+            send: (message) => {
+                expiredReplay.push(message);
+            },
+        });
         assert.deepEqual(expiredReplay, []);
     });
 
@@ -53,13 +61,22 @@ describe('MCP HTTP event stores', () => {
         const db = new Database(':memory:');
         try {
             ensureMcpEventStoreSchema(db);
-            const store = createSqliteMcpEventStore({ db, eventTtlMs: 10_000, maxEventsPerStream: 10, now: () => 1_000 });
+            const store = createSqliteMcpEventStore({
+                db,
+                eventTtlMs: 10_000,
+                maxEventsPerStream: 10,
+                now: () => 1_000,
+            });
             const first = await store.storeEvent('stream-sql', { jsonrpc: '2.0', method: 'first' });
             await store.storeEvent('stream-sql', { jsonrpc: '2.0', method: 'second' });
 
             /** @type {unknown[]} */
             const replayed = [];
-            const streamId = await store.replayEventsAfter(first, { send: (message) => { replayed.push(message); } });
+            const streamId = await store.replayEventsAfter(first, {
+                send: (message) => {
+                    replayed.push(message);
+                },
+            });
             assert.equal(streamId, 'stream-sql');
             assert.deepEqual(replayed, [{ jsonrpc: '2.0', method: 'second' }]);
             assert.equal(store.snapshot()['durable'], true);

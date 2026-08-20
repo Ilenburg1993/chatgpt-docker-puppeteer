@@ -15,7 +15,18 @@ export const MCP_STREAM_REGISTRY_VERSION = '0.2.0';
 
 /**
  * @typedef {'standalone-get-sse' | 'post-sse'} McpHttpStreamKind
- * @typedef {{ streamKey: string; sessionIdHash: string; sessionIdPreview: string; kind: McpHttpStreamKind; openedAtMs: number; lastSeenAtMs: number; closedAtMs: number | null; closeReason: string | null }} McpHttpStreamRecord
+ *
+ * @typedef {{
+ *     streamKey: string;
+ *     sessionIdHash: string;
+ *     sessionIdPreview: string;
+ *     kind: McpHttpStreamKind;
+ *     openedAtMs: number;
+ *     lastSeenAtMs: number;
+ *     closedAtMs: number | null;
+ *     closeReason: string | null;
+ * }} McpHttpStreamRecord
+ *
  * @typedef {{ now?: () => number }} McpHttpStreamRegistryOptions
  */
 

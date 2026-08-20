@@ -5,15 +5,20 @@
  * @module copilot/mcp/control-plane/jobs
  */
 
+import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/io';
+import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/node-runtime';
+import {
+    listDirectoryNamesFreshTrusted,
+    lstatPathTrusted,
+    readBytesRangeFreshTrusted,
+    readTextFreshTrusted,
+} from '#copilot/infra/public/trusted-io';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readFile, readdir, realpath } from 'node:fs/promises';
 import { availableParallelism, freemem, loadavg, totalmem } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { appendTextLocked, writeFileAtomic } from '#copilot/infra/public/io';
-import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/node-runtime';
-import { getMcpWorkspaceRoot } from './paths.js';
+import { getMcpWorkspaceRoot, resolveReadPath } from './paths.js';
 
 const MCP_JOBS_DIR = fileURLToPath(new URL('../../.ai/jobs/', import.meta.url));
 const DEFAULT_JOB_TIMEOUT_MS = 20 * 60 * 1000;
@@ -76,7 +81,13 @@ const JOB_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]
  * @property {number | null} systemFreeRatio
  * @property {[number, number, number]} loadAverage
  * @property {number} availableParallelism
- * @property {{ memoryCurrentBytes: number | null; memoryMaxBytes: number | null; memoryUsageRatio: number | null; events: Record<string, number> | null }} cgroup
+ * @property {{
+ *     memoryCurrentBytes: number | null;
+ *     memoryMaxBytes: number | null;
+ *     memoryUsageRatio: number | null;
+ *     events: Record<string, number> | null;
+ * }} cgroup
+ *
  *
  * @typedef {object} JobRecord
  * @property {string} id
@@ -208,7 +219,9 @@ export function normalizeFocusedUnitTestFiles(testFiles) {
             candidate.includes('\\') ||
             ['*', '?', '[', ']', '{', '}'].some((token) => candidate.includes(token))
         ) {
-            throw new Error('Focused unit-test paths must be explicit canonical workspace-relative POSIX paths without globs.');
+            throw new Error(
+                'Focused unit-test paths must be explicit canonical workspace-relative POSIX paths without globs.',
+            );
         }
         const canonical = path.posix.normalize(candidate);
         if (
@@ -246,17 +259,20 @@ export function resolveFocusedUnitTestCommand(testFiles) {
  * @returns {Promise<void>}
  */
 async function assertFocusedUnitTestFilesExist(testFiles) {
-    const workspaceRoot = await realpath(getMcpWorkspaceRoot());
-    const allowedRoot = await realpath(path.join(workspaceRoot, FOCUSED_UNIT_TEST_PREFIX));
+    const workspaceRoot = getMcpWorkspaceRoot();
     for (const testFile of testFiles) {
         const candidatePath = path.join(workspaceRoot, testFile);
-        const stats = await lstat(candidatePath);
+        const { stats } = await lstatPathTrusted(candidatePath, { caller: 'mcp.control-plane.jobs.focused-test' });
         if (stats.isSymbolicLink() || !stats.isFile()) {
             throw new Error(`Focused unit-test path must resolve to a regular non-symlink file: ${testFile}`);
         }
-        const resolved = await realpath(candidatePath);
-        const relativeToAllowedRoot = path.relative(allowedRoot, resolved);
-        if (relativeToAllowedRoot.startsWith('..') || path.isAbsolute(relativeToAllowedRoot)) {
+        const resolved = await resolveReadPath(testFile);
+        if (!resolved.ok) throw new Error(`Focused unit-test path is denied: ${testFile}: ${resolved.reason}`);
+        const canonicalRelative = resolved.relative.replace(/\\/gu, '/');
+        if (
+            !canonicalRelative.startsWith(FOCUSED_UNIT_TEST_PREFIX) ||
+            !canonicalRelative.endsWith(FOCUSED_UNIT_TEST_SUFFIX)
+        ) {
             throw new Error(`Focused unit-test path resolves outside ${FOCUSED_UNIT_TEST_PREFIX}: ${testFile}`);
         }
     }
@@ -339,21 +355,21 @@ export async function spawnValidatorJob(validator, options = {}) {
     const focusedTestFiles =
         validator === 'unit-focused' ? normalizeFocusedUnitTestFiles(options.testFiles) : undefined;
     if (focusedTestFiles) await assertFocusedUnitTestFilesExist(focusedTestFiles);
-    const command = resolveValidatorCommand(
-        validator,
-        focusedTestFiles ? { testFiles: focusedTestFiles } : {},
-    );
+    const command = resolveValidatorCommand(validator, focusedTestFiles ? { testFiles: focusedTestFiles } : {});
     const timeoutMs = resolveJobTimeoutMs(options.timeoutMs);
     const artifacts = resolveJobArtifactPaths(id);
     if (!artifacts) throw new Error('Generated validator job id is invalid.');
     const { logFile, manifestFile } = artifacts;
     if (!canRunCopilotValidatorInline()) {
         throw Object.assign(
-            new Error('Validator subprocess fan-out is disabled inside test runners; run the integration check from the normal MCP runtime instead.'),
+            new Error(
+                'Validator subprocess fan-out is disabled inside test runners; run the integration check from the normal MCP runtime instead.',
+            ),
             { code: 'ERR_VALIDATOR_NESTED_RUNNER_BLOCKED' },
         );
     }
-    const activeJob = [...JOBS.values()].find((record) => record.status === 'running' && record.process !== null) ?? null;
+    const activeJob =
+        [...JOBS.values()].find((record) => record.status === 'running' && record.process !== null) ?? null;
     if (validatorSpawnReserved || activeJob) {
         throw Object.assign(
             new Error(
@@ -371,7 +387,10 @@ export async function spawnValidatorJob(validator, options = {}) {
     }
     validatorSpawnReserved = true;
     try {
-        await mkdir(MCP_JOBS_DIR, { recursive: true });
+        await mkdirPathLocked(MCP_JOBS_DIR, {
+            recursive: true,
+            advisoryLimits: { domain: 'mcp-validator-jobs' },
+        });
         await writeFileAtomic(
             logFile,
             `$ ${command.command} ${command.args.join(' ')}\n[job:timeoutMs] ${timeoutMs}\n\n`,
@@ -407,25 +426,25 @@ export async function spawnValidatorJob(validator, options = {}) {
             resourceAfter: null,
             process: child,
         };
-    JOBS.set(id, record);
-    pruneCompletedJobRecords(JOBS);
-    await persistJobRecord(record);
+        JOBS.set(id, record);
+        pruneCompletedJobRecords(JOBS);
+        await persistJobRecord(record);
 
-    const timeout = setTimeout(() => {
-        if (record.status !== 'running' || !record.process) return;
-        record.status = 'failed';
-        record.timedOut = true;
-        record.endedAt = Date.now();
-        void enqueueJobIo(record, 'persist timeout', async () => {
-            await appendJobLog(record.logFile, `\n[job:timeout] timeoutMs=${timeoutMs}\n`);
-            await persistJobRecord(record);
-        });
-        record.process.kill('SIGTERM');
-    }, timeoutMs);
-    timeout.unref();
+        const timeout = setTimeout(() => {
+            if (record.status !== 'running' || !record.process) return;
+            record.status = 'failed';
+            record.timedOut = true;
+            record.endedAt = Date.now();
+            void enqueueJobIo(record, 'persist timeout', async () => {
+                await appendJobLog(record.logFile, `\n[job:timeout] timeoutMs=${timeoutMs}\n`);
+                await persistJobRecord(record);
+            });
+            record.process.kill('SIGTERM');
+        }, timeoutMs);
+        timeout.unref();
 
-    attachJobOutputStream(record, child.stdout, 'stdout', logFile);
-    attachJobOutputStream(record, child.stderr, 'stderr', logFile);
+        attachJobOutputStream(record, child.stdout, 'stdout', logFile);
+        attachJobOutputStream(record, child.stderr, 'stderr', logFile);
         child.on('close', (code, signal) => {
             clearTimeout(timeout);
             record.endedAt = Date.now();
@@ -540,7 +559,7 @@ export function parseCgroupMemoryLimit(text) {
 /** @param {string} filePath */
 async function readOptionalCgroupText(filePath) {
     try {
-        return await readFile(filePath, 'utf8');
+        return (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.jobs.cgroup' })).content;
     } catch {
         return null;
     }
@@ -601,16 +620,17 @@ export function readCopilotValidatorCapacityState() {
 }
 
 /**
- * Run one canonical allowlisted validator and wait for a bounded completion window.
- * This is the shared primitive used by higher-level composite workflows that
- * need validation feedback without paying another model→tool round trip.
+ * Run one canonical allowlisted validator and wait for a bounded completion window. This is the shared primitive used
+ * by higher-level composite workflows that need validation feedback without paying another model→tool round trip.
  *
  * @param {CopilotValidatorName} validator
  * @param {{ timeoutMs?: number; waitMs?: number; failureTailBytes?: number; testFiles?: string[] }} [options]
  */
 export async function runCopilotValidatorInline(validator, options = {}) {
     if (!canRunCopilotValidatorInline()) {
-        throw new Error('Inline validator fan-out is disabled inside test runners to prevent recursive Node/Vitest process trees.');
+        throw new Error(
+            'Inline validator fan-out is disabled inside test runners to prevent recursive Node/Vitest process trees.',
+        );
     }
     if (!isCopilotValidatorName(validator)) throw new Error(`Unsupported validator: ${String(validator)}`);
     const focused = validator === 'unit-focused';
@@ -687,8 +707,9 @@ export async function listJobs(options = {}) {
     for (const record of JOBS.values()) {
         records.set(record.id, publicJobRecord(record));
     }
-    await mkdir(MCP_JOBS_DIR, { recursive: true });
-    const entries = await readdir(MCP_JOBS_DIR).catch(() => []);
+    const entries = await listDirectoryNamesFreshTrusted(MCP_JOBS_DIR, { caller: 'mcp.control-plane.jobs' })
+        .then((result) => result.entries)
+        .catch(() => []);
     for (const entry of entries) {
         if (!entry.endsWith('.json')) continue;
         const id = entry.slice(0, -'.json'.length);
@@ -725,7 +746,10 @@ function publicJobRecord(record) {
  * @returns {Promise<void>}
  */
 async function persistJobRecord(record) {
-    await mkdir(MCP_JOBS_DIR, { recursive: true });
+    await mkdirPathLocked(MCP_JOBS_DIR, {
+        recursive: true,
+        advisoryLimits: { domain: 'mcp-validator-job-manifest-parent' },
+    });
     await writeFileAtomic(record.manifestFile, `${JSON.stringify(publicJobRecord(record), null, 2)}\n`, {
         encoding: 'utf8',
         mode: 0o600,
@@ -743,9 +767,11 @@ async function readJobManifest(id) {
     if (!artifacts) return null;
     const { logFile, manifestFile } = artifacts;
     try {
-        const stats = await lstat(manifestFile);
+        const { stats } = await lstatPathTrusted(manifestFile, { caller: 'mcp.control-plane.jobs' });
         if (stats.isSymbolicLink() || !stats.isFile() || stats.size > MAX_JOB_MANIFEST_BYTES) return null;
-        const parsed = JSON.parse(await readFile(manifestFile, 'utf8'));
+        const parsed = JSON.parse(
+            (await readTextFreshTrusted(manifestFile, { caller: 'mcp.control-plane.jobs' })).content,
+        );
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
         if (!('id' in parsed) || parsed.id !== id) return null;
         return /** @type {JobRecord} */ ({ ...parsed, logFile, manifestFile, process: null });
@@ -770,28 +796,14 @@ async function readJobLogTail(id, requestedTailBytes) {
         ),
     );
     try {
-        const stats = await lstat(artifacts.logFile);
-        if (stats.isSymbolicLink() || !stats.isFile()) return '';
-        const bytesToRead = Math.min(stats.size, tailBytes);
-        if (bytesToRead <= 0) return '';
-        const buffer = Buffer.allocUnsafe(bytesToRead);
-        const handle = await open(artifacts.logFile, 'r');
-        try {
-            let offset = 0;
-            while (offset < bytesToRead) {
-                const { bytesRead } = await handle.read(
-                    buffer,
-                    offset,
-                    bytesToRead - offset,
-                    stats.size - bytesToRead + offset,
-                );
-                if (bytesRead <= 0) break;
-                offset += bytesRead;
-            }
-            return buffer.subarray(0, offset).toString('utf8');
-        } finally {
-            await handle.close();
-        }
+        const snapshot = await readBytesRangeFreshTrusted(artifacts.logFile, {
+            caller: 'mcp.control-plane.jobs',
+            maxBytes: tailBytes,
+            fromEnd: true,
+            rejectSymlink: true,
+        });
+        if (!snapshot.isFile || snapshot.bytesRead <= 0) return '';
+        return snapshot.content.toString('utf8');
     } catch {
         return '';
     }

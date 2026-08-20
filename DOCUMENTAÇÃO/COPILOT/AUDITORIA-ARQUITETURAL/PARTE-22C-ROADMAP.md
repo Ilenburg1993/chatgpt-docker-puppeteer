@@ -531,19 +531,16 @@ state
 **Objetivo**: Verificar que todos os critérios PARTE-22 foram atingidos **Dependências**: Todas as
 faixas anteriores **Critério de conclusão**: Score PARTE-22 ≥ 90/100
 
-| Sub   | Verificação                               | Script/Método                             |
-| ----- | ----------------------------------------- | ----------------------------------------- | ----------- | ------------- |
-| R3-1  | Zero god files (>300 LoC lógica)          | `find src/                                | xargs wc -l | awk '$1>300'` |
-| R3-2  | Zero EventEmitter direto                  | `grep -r 'new EventEmitter' src/copilot/` |
-| R3-3  | DI tokens ≥ 40                            | `arch-health.mjs --json`                  |
-| R3-4  | Deep imports = 0                          | `arch-health.mjs`                         |
-| R3-5  | Typecheck errors = 0                      | `npm run typecheck:node`                  |
-| R3-6  | Test coverage ≥ 70% por módulo            | Coverage report                           |
-| R3-7  | Fan-out ≤ 8 por módulo                    | `arch-health.mjs`                         |
-| R3-8  | services/ cobertura = 100%                | Revisar importadores                      |
-| R3-9  | events/ module = 100% adoção              | grep de strings inline                    |
-| R3-10 | Circuit breakers ≥ 6 ativos               | health/ endpoint                          |
-| R3-11 | Atualizar PARTE-22F com resultados finais | Documentação                              |
+| Sub | Verificação | Script/Método | | ----- | ----------------------------------------- |
+----------------------------------------- | ----------- | ------------- | | R3-1 | Zero god files
+(>300 LoC lógica) | `find src/                                | xargs wc -l | awk '$1>300'` | | R3-2
+| Zero EventEmitter direto | `grep -r 'new EventEmitter' src/copilot/` | | R3-3 | DI tokens ≥ 40 |
+`arch-health.mjs --json` | | R3-4 | Deep imports = 0 | `arch-health.mjs` | | R3-5 | Typecheck errors
+= 0 | `npm run typecheck:node` | | R3-6 | Test coverage ≥ 70% por módulo | Coverage report | | R3-7
+| Fan-out ≤ 8 por módulo | `arch-health.mjs` | | R3-8 | services/ cobertura = 100% | Revisar
+importadores | | R3-9 | events/ module = 100% adoção | grep de strings inline | | R3-10 | Circuit
+breakers ≥ 6 ativos | health/ endpoint | | R3-11 | Atualizar PARTE-22F com resultados finais |
+Documentação |
 
 ---
 

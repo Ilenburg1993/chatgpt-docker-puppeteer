@@ -5,27 +5,28 @@ import * as logger from '#core/logger';
  * Categorias de feedback reconhecidas pelo sistema.
  */
 const FEEDBACK_CATEGORY = {
-    TECHNICAL: 'TECHNICAL',       // Bugs, errors, technical issues
-    STYLE: 'STYLE',               // Format, tone, writing style
-    CONTENT: 'CONTENT',           // Add content, examples, details
-    STRUCTURE: 'STRUCTURE',       // Organization, sections, flow
-    QUALITY: 'QUALITY',           // Improve overall quality
-    GENERAL: 'GENERAL'            // Uncategorized feedback
+    TECHNICAL: 'TECHNICAL', // Bugs, errors, technical issues
+    STYLE: 'STYLE', // Format, tone, writing style
+    CONTENT: 'CONTENT', // Add content, examples, details
+    STRUCTURE: 'STRUCTURE', // Organization, sections, flow
+    QUALITY: 'QUALITY', // Improve overall quality
+    GENERAL: 'GENERAL', // Uncategorized feedback
 };
 
 /**
  * Formatos de injeção de feedback em prompts.
  */
 const INJECTION_FORMAT = {
-    DEFAULT: 'default',           // Feedback em seção separada
-    INLINE: 'inline',             // Feedback inline no prompt
-    STRUCTURED: 'structured'      // Feedback estruturado com action items
+    DEFAULT: 'default', // Feedback em seção separada
+    INLINE: 'inline', // Feedback inline no prompt
+    STRUCTURED: 'structured', // Feedback estruturado com action items
 };
 
 /**
  * FeedbackProcessor - Processa feedback do usuário e integra com sistema.
  *
  * Responsabilidades:
+ *
  * 1. Receber feedback textual bruto
  * 2. Normalizar e categorizar
  * 3. Extrair action items
@@ -34,6 +35,7 @@ const INJECTION_FORMAT = {
  * 6. Injetar de forma inteligente em prompts
  *
  * Integração:
+ *
  * - MissionManager.addFeedback() → FeedbackProcessor.processFeedback()
  * - FeedbackProcessor → ContextManager.addPattern() → MemoryStore
  * - Task generation → FeedbackProcessor.injectIntoStep()
@@ -49,25 +51,64 @@ class FeedbackProcessor {
         // Keywords para categorização automática
         this.categoryKeywords = {
             [FEEDBACK_CATEGORY.TECHNICAL]: [
-                'bug', 'error', 'fix', 'issue', 'crash', 'fail', 'broken',
-                'exception', 'timeout', 'undefined', 'null'
+                'bug',
+                'error',
+                'fix',
+                'issue',
+                'crash',
+                'fail',
+                'broken',
+                'exception',
+                'timeout',
+                'undefined',
+                'null',
             ],
             [FEEDBACK_CATEGORY.STYLE]: [
-                'format', 'style', 'tone', 'voice', 'casual', 'formal',
-                'professional', 'friendly', 'concise', 'verbose'
+                'format',
+                'style',
+                'tone',
+                'voice',
+                'casual',
+                'formal',
+                'professional',
+                'friendly',
+                'concise',
+                'verbose',
             ],
             [FEEDBACK_CATEGORY.CONTENT]: [
-                'add', 'include', 'more', 'detail', 'example', 'explain',
-                'describe', 'expand', 'elaborate', 'cover', 'missing'
+                'add',
+                'include',
+                'more',
+                'detail',
+                'example',
+                'explain',
+                'describe',
+                'expand',
+                'elaborate',
+                'cover',
+                'missing',
             ],
             [FEEDBACK_CATEGORY.STRUCTURE]: [
-                'organize', 'structure', 'section', 'chapter', 'order',
-                'arrangement', 'hierarchy', 'flow', 'sequence'
+                'organize',
+                'structure',
+                'section',
+                'chapter',
+                'order',
+                'arrangement',
+                'hierarchy',
+                'flow',
+                'sequence',
             ],
             [FEEDBACK_CATEGORY.QUALITY]: [
-                'improve', 'enhance', 'better', 'quality', 'polish',
-                'refine', 'optimize', 'upgrade'
-            ]
+                'improve',
+                'enhance',
+                'better',
+                'quality',
+                'polish',
+                'refine',
+                'optimize',
+                'upgrade',
+            ],
         };
 
         // Regex patterns para extração de patterns
@@ -79,14 +120,30 @@ class FeedbackProcessor {
             { regex: /avoid (.+?)(?:\.|$)/gi, template: 'Avoid: {match}' },
             { regex: /remove (.+?)(?:\.|$)/gi, template: 'Remove: {match}' },
             { regex: /fix (.+?)(?:\.|$)/gi, template: 'Fix: {match}' },
-            { regex: /change (.+?)(?:\.|$)/gi, template: 'Change: {match}' }
+            { regex: /change (.+?)(?:\.|$)/gi, template: 'Change: {match}' },
         ];
 
         // Verbos imperativos comuns em feedback
         this.imperativeVerbs = [
-            'add', 'include', 'improve', 'fix', 'change', 'remove', 'update',
-            'enhance', 'avoid', 'use', 'prefer', 'ensure', 'make', 'create',
-            'explain', 'describe', 'organize', 'refactor', 'optimize'
+            'add',
+            'include',
+            'improve',
+            'fix',
+            'change',
+            'remove',
+            'update',
+            'enhance',
+            'avoid',
+            'use',
+            'prefer',
+            'ensure',
+            'make',
+            'create',
+            'explain',
+            'describe',
+            'organize',
+            'refactor',
+            'optimize',
         ];
 
         logger.info('[FeedbackProcessor] Initialized with ContextManager support');
@@ -95,24 +152,24 @@ class FeedbackProcessor {
     /**
      * Processa feedback textual bruto do usuário.
      *
-     * @param {string} feedbackText - Texto do feedback
-     * @param {any} [metadata={}] - Metadata adicional (mission_id, step_id, etc)
-     * @returns {any} Feedback processado com categorização e patterns
-     *
      * @example
-     * const processed = feedbackProcessor.processFeedback(
-     *     'Add more code examples and improve the explanations',
-     *     { mission_id: 'mission-123', step_id: 'step-2' }
-     * );
-     * // {
-     * //   id: 'feedback-1643000000-abc123',
-     * //   original: 'Add more code examples...',
-     * //   normalized: 'add more code examples and improve the explanations',
-     * //   category: 'CONTENT',
-     * //   actionItems: ['Add more code examples', 'Improve the explanations'],
-     * //   patterns: ['Add: more code examples', 'Improve: the explanations'],
-     * //   metadata: { mission_id: 'mission-123', processed_at: 1643000000 }
-     * // }
+     *     const processed = feedbackProcessor.processFeedback('Add more code examples and improve the explanations', {
+     *         mission_id: 'mission-123',
+     *         step_id: 'step-2',
+     *     });
+     *     // {
+     *     //   id: 'feedback-1643000000-abc123',
+     *     //   original: 'Add more code examples...',
+     *     //   normalized: 'add more code examples and improve the explanations',
+     *     //   category: 'CONTENT',
+     *     //   actionItems: ['Add more code examples', 'Improve the explanations'],
+     *     //   patterns: ['Add: more code examples', 'Improve: the explanations'],
+     *     //   metadata: { mission_id: 'mission-123', processed_at: 1643000000 }
+     *     // }
+     *
+     * @param {string} feedbackText - Texto do feedback
+     * @param {any} [metadata={}] - Metadata adicional (mission_id, step_id, etc). Default is `{}`
+     * @returns {any} Feedback processado com categorização e patterns
      */
     processFeedback(feedbackText, metadata = {}) {
         if (!feedbackText || typeof feedbackText !== 'string') {
@@ -131,8 +188,8 @@ class FeedbackProcessor {
             patterns: this.extractPatterns(normalized),
             metadata: {
                 ...metadata,
-                processed_at: Date.now()
-            }
+                processed_at: Date.now(),
+            },
         };
 
         // Se tem ContextManager, salva patterns no MemoryStore
@@ -145,18 +202,18 @@ class FeedbackProcessor {
                         category: processed.category,
                         source: 'user_feedback',
                         mission_id: metadata.mission_id,
-                        step_id: metadata.step_id
-                    }
+                        step_id: metadata.step_id,
+                    },
                 });
             }
 
             logger.info(
-                `[FeedbackProcessor] Stored ${processed.patterns.length} patterns in MemoryStore (category: ${processed.category})`
+                `[FeedbackProcessor] Stored ${processed.patterns.length} patterns in MemoryStore (category: ${processed.category})`,
             );
         }
 
         logger.info(
-            `[FeedbackProcessor] Processed feedback: ${processed.actionItems.length} action items, ${processed.patterns.length} patterns`
+            `[FeedbackProcessor] Processed feedback: ${processed.actionItems.length} action items, ${processed.patterns.length} patterns`,
         );
 
         return processed;
@@ -165,12 +222,12 @@ class FeedbackProcessor {
     /**
      * Extrai patterns reutilizáveis do feedback usando regex.
      *
+     * @example
+     *     extractPatterns('Add more examples and avoid technical jargon');
+     *     // ['Add: more examples', 'Avoid: technical jargon']
+     *
      * @param {string} feedbackText - Texto do feedback
      * @returns {string[]} Lista de patterns extraídos
-     *
-     * @example
-     * extractPatterns('Add more examples and avoid technical jargon')
-     * // ['Add: more examples', 'Avoid: technical jargon']
      */
     extractPatterns(feedbackText) {
         const patterns = [];
@@ -193,27 +250,23 @@ class FeedbackProcessor {
     /**
      * Injeta feedback processado em prompt de step.
      *
+     * @example
+     *     const augmented = feedbackProcessor.injectIntoStep(
+     *         'Write a chapter about Rust memory management',
+     *         processedFeedback,
+     *         { format: 'structured' },
+     *     );
+     *
      * @param {string} stepPrompt - Prompt original do step
      * @param {any} processedFeedback - Feedback processado (resultado de processFeedback)
-     * @param {object} [options={}] - Opções de injeção
-     * @param {string} [options.format='default'] - Formato: 'default', 'inline', 'structured'
-     * @param {boolean} [options.includeCategory=true] - Incluir categoria do feedback
-     * @param {boolean} [options.includeActionItems=true] - Incluir action items
+     * @param {object} [options={}] - Opções de injeção. Default is `{}`
+     * @param {string} [options.format='default'] - Formato: 'default', 'inline', 'structured'. Default is `'default'`
+     * @param {boolean} [options.includeCategory=true] - Incluir categoria do feedback. Default is `true`
+     * @param {boolean} [options.includeActionItems=true] - Incluir action items. Default is `true`
      * @returns {string} Prompt com feedback injetado
-     *
-     * @example
-     * const augmented = feedbackProcessor.injectIntoStep(
-     *     'Write a chapter about Rust memory management',
-     *     processedFeedback,
-     *     { format: 'structured' }
-     * );
      */
     injectIntoStep(stepPrompt, processedFeedback, options = {}) {
-        const {
-            format = INJECTION_FORMAT.DEFAULT,
-            includeCategory = true,
-            includeActionItems = true
-        } = options;
+        const { format = INJECTION_FORMAT.DEFAULT, includeCategory = true, includeActionItems = true } = options;
 
         if (!processedFeedback) {
             return stepPrompt;
@@ -258,10 +311,7 @@ class FeedbackProcessor {
      * Normaliza texto do feedback (lowercase, remove espaços extras).
      */
     _normalize(/** @type {any} */ text) {
-        return text
-            .trim()
-            .replace(/\s+/g, ' ')
-            .replace(/\n+/g, ' ');
+        return text.trim().replace(/\s+/g, ' ').replace(/\n+/g, ' ');
     }
 
     /**
@@ -303,6 +353,7 @@ class FeedbackProcessor {
      * Extrai action items do feedback.
      *
      * Detecta:
+     *
      * - Listas numeradas ou bullet points
      * - Sentenças imperativas (começam com verbo)
      */
@@ -349,9 +400,9 @@ class FeedbackProcessor {
             categories: Object.keys(this.categoryKeywords).length,
             pattern_regexes: this.patternRegexes.length,
             imperative_verbs: this.imperativeVerbs.length,
-            context_manager_enabled: !!this.contextManager
+            context_manager_enabled: !!this.contextManager,
         };
     }
 }
 
-export { FeedbackProcessor, FEEDBACK_CATEGORY, INJECTION_FORMAT };
+export { FEEDBACK_CATEGORY, FeedbackProcessor, INJECTION_FORMAT };

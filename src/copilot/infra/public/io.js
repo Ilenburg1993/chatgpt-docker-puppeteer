@@ -11,6 +11,7 @@
 
 export {
     appendTextLocked,
+    chmodFileLocked,
     copyFileLocked,
     createOrReplaceFileAtomic,
     deleteFileLocked,

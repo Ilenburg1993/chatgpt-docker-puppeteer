@@ -3,7 +3,7 @@ export default {
     forbidden: [
         {
             name: 'no-circular',
-            severity: 'warn',
+            severity: 'error',
             from: {},
             to: { circular: true },
         },

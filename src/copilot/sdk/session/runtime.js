@@ -41,6 +41,7 @@ import { verifyModelSwitchWithRetry } from './model-switch-verify-retry.js';
  *     modelCapabilities?: ModelCapabilitiesOverride;
  * }} SessionModelOptions
  *
+ *
  * @typedef {{ level?: 'info' | 'warning' | 'error'; ephemeral?: boolean }} SessionLogOptions
  */
 
@@ -57,9 +58,9 @@ function assertSession(session, caller) {
 
 /**
  * Normaliza opções de troca de modelo antes de atravessar o SDK. BYOK/OpenAI-compatible providers frequentemente usam
- * `:` como parte literal do ID (`deepseek/foo:free`, `Qwen/bar:fastest`). O SDK/CLI também usa `:` em rotas internas
- * de opções de modelo; combinar esse ID com `reasoningEffort` pode produzir erros como
- * `Unknown model option key: free:defaultReasoningEffort`.
+ * `:` como parte literal do ID (`deepseek/foo:free`, `Qwen/bar:fastest`). O SDK/CLI também usa `:` em rotas internas de
+ * opções de modelo; combinar esse ID com `reasoningEffort` pode produzir erros como `Unknown model option key:
+ * free:defaultReasoningEffort`.
  *
  * @param {string} model
  * @param {SessionModelOptions | undefined} options
@@ -81,10 +82,7 @@ function normalizeSessionModelOptionsForModelId(model, options) {
         changed = true;
     }
     if (changed) {
-        log(
-            'INFO',
-            `[session-runtime] reasoningEffort omitido para modelo provider-literal '${model}' com ':' no ID.`,
-        );
+        log('INFO', `[session-runtime] reasoningEffort omitido para modelo provider-literal '${model}' com ':' no ID.`);
     }
     return Object.keys(next).length > 0 ? next : undefined;
 }
@@ -396,7 +394,9 @@ export async function setSessionModel(session, model, options) {
                           ...(safeOptions.reasoningEffort ? { reasoningEffort: safeOptions.reasoningEffort } : {}),
                           ...(safeOptions.reasoningSummary ? { reasoningSummary: safeOptions.reasoningSummary } : {}),
                           ...(safeOptions.contextTier ? { contextTier: safeOptions.contextTier } : {}),
-                          ...(safeOptions.modelCapabilities ? { modelCapabilities: safeOptions.modelCapabilities } : {}),
+                          ...(safeOptions.modelCapabilities
+                              ? { modelCapabilities: safeOptions.modelCapabilities }
+                              : {}),
                       }
                     : undefined,
             );

@@ -3,7 +3,8 @@
  * Facade legado do buffer de `assistant.message`.
  *
  * A materialização canônica do turno vive em `turn-materialization-state.js` e também captura deltas incrementais. Este
- * módulo permanece para compatibilidade com testes/callers antigos enquanto todo fluxo novo usa a API de materialização.
+ * módulo permanece para compatibilidade com testes/callers antigos enquanto todo fluxo novo usa a API de
+ * materialização.
  *
  * @module copilot/terminal/state/assistant-message-buffer-state
  */

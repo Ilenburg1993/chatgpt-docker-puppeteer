@@ -1,9 +1,9 @@
 # Auditoria Profunda — Repo DevContainer MCP
 
 **Data:** 2026-06-10 a 2026-06-12 **Auditoria externa:** Claude Sonnet 4.6 (Anthropic), acesso via
-MCP **Revalidação e remediação:** Codex **Workspace:** `/workspaces/chatgpt-docker-puppeteer`
-**Base publicada antes desta revisão:** `main` @ `45f74116` **Escopo efetivo:** `src/copilot`
-inteiro, seu MCP e os testes/validadores que provam esse código
+MCP **Revalidação e remediação:** Codex **Workspace:** `/workspaces/chatgpt-docker-puppeteer` **Base
+publicada antes desta revisão:** `main` @ `45f74116` **Escopo efetivo:** `src/copilot` inteiro, seu
+MCP e os testes/validadores que provam esse código
 
 ---
 
@@ -18,10 +18,11 @@ corrigidos **50 achados adicionais**. O gate `test:copilot:unit` agora descobre 
 arquivos e fechou em `6389/6417` testes, `1946/1946` suites, zero falhas e 28 pendências esperadas.
 Typecheck strict e lint Copilot também estão em PASS.
 
-As causas de `degraded` controláveis por `src/copilot` foram tratadas: smoke de workspace agendado no
-startup, cleanup bounded executado sobre 513 artefatos, quick-tunnel stale reconciliado e worktree
-publicado. Em 2026-06-12, o processo permanente foi reiniciado no novo HEAD: origin HTTP/2 saudável,
-quatro conexões HA Cloudflare, startup maintenance concluída e OAuth completo com `100/100` tools.
+As causas de `degraded` controláveis por `src/copilot` foram tratadas: smoke de workspace agendado
+no startup, cleanup bounded executado sobre 513 artefatos, quick-tunnel stale reconciliado e
+worktree publicado. Em 2026-06-12, o processo permanente foi reiniciado no novo HEAD: origin HTTP/2
+saudável, quatro conexões HA Cloudflare, startup maintenance concluída e OAuth completo com
+`100/100` tools.
 
 Persistem como trabalho relevante: benchmark controlado de transporte, decisão medida sobre ativar
 L2 por perfil, plano de rotação de chaves OAuth com grace period e futuras avaliações de SDK v2
@@ -48,14 +49,14 @@ somente após release estável.
 
 ### 2.2 Validação pós-remediação
 
-| Suite                                  | Status  | Detalhes                                                                 |
-| -------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| `npm run typecheck:strict:src.copilot` | ✅ PASS | Última execução após CDEX-049, 0 erros                                  |
-| `npm run lint:copilot`                 | ✅ PASS | Gate espaçado pós-transformações                                         |
+| Suite                                  | Status  | Detalhes                                                               |
+| -------------------------------------- | ------- | ---------------------------------------------------------------------- |
+| `npm run typecheck:strict:src.copilot` | ✅ PASS | Última execução após CDEX-049, 0 erros                                 |
+| `npm run lint:copilot`                 | ✅ PASS | Gate espaçado pós-transformações                                       |
 | `npm run test:copilot:unit`            | ✅ PASS | 535 arquivos; `6389/6417`; `1946/1946` suites; 28 pendências esperadas |
-| Testes focados finais                  | ✅ PASS | `3/3` no smoke autenticado após `25/25` de turn trace/error alerter      |
-| Runtime live                           | ✅ PASS | HTTP/2 200; 2 processos vivos; 4 HA; startup maintenance e OAuth OK       |
-| Git                                    | ✅ PASS | `main` publicada e sincronizada após cada lote                           |
+| Testes focados finais                  | ✅ PASS | `3/3` no smoke autenticado após `25/25` de turn trace/error alerter    |
+| Runtime live                           | ✅ PASS | HTTP/2 200; 2 processos vivos; 4 HA; startup maintenance e OAuth OK    |
+| Git                                    | ✅ PASS | `main` publicada e sincronizada após cada lote                         |
 
 #### Falhas unit-copilot do baseline externo, já corrigidas
 
@@ -317,11 +318,11 @@ O estado ideal é o servidor iniciando sem `degraded`:
 
 ### Baseline reproduzido e fechamento
 
-| Validador                              | Baseline inicial                         | Fechamento publicado                                      |
-| -------------------------------------- | ---------------------------------------- | --------------------------------------------------------- |
-| `npm run typecheck:strict:src.copilot` | PASS                                     | PASS após CDEX-046                                        |
-| `npm run lint:copilot`                 | PASS                                     | PASS no gate espaçado                                     |
-| `npm run test:copilot:unit`            | FAIL 3.880/3.882 no gate raso            | PASS 6.389/6.417 no gate recursivo, 28 pendências esperadas |
+| Validador                              | Baseline inicial              | Fechamento publicado                                        |
+| -------------------------------------- | ----------------------------- | ----------------------------------------------------------- |
+| `npm run typecheck:strict:src.copilot` | PASS                          | PASS após CDEX-046                                          |
+| `npm run lint:copilot`                 | PASS                          | PASS no gate espaçado                                       |
+| `npm run test:copilot:unit`            | FAIL 3.880/3.882 no gate raso | PASS 6.389/6.417 no gate recursivo, 28 pendências esperadas |
 
 O runtime permanente também foi verificado: `named-permanent`, URL `https://mcp.aurelin.org/mcp`,
 origin HTTP/2, edge QUIC, health 200, processos MCP e `cloudflared` vivos. O quick tunnel salvo está
@@ -333,15 +334,15 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | ------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1.1 barrels do terminal        | **CONFIRMADO E RESOLVIDO**          | Imports migrados aos barrels públicos e gate recursivo em PASS.                                                                                                                                                          |
 | 1.2 workspace/root cleanup     | **N/A**                             | Fora de `src/copilot`; o worktree contém alterações intencionais em OAuth/docs que devem ser preservadas.                                                                                                                |
-| 1.3 artefatos AI               | **CONFIRMADO E RESOLVIDO**          | Cleanup bounded removeu 513 candidatos e preservou 240 recentes, stores e arquivos não UUID.                                                                                                                            |
-| 1.4 quick tunnel stale         | **CONFIRMADO E RESOLVIDO**          | Startup maintenance remove state apenas quando válido, stale e com PID comprovadamente morto.                                                                                                                          |
+| 1.3 artefatos AI               | **CONFIRMADO E RESOLVIDO**          | Cleanup bounded removeu 513 candidatos e preservou 240 recentes, stores e arquivos não UUID.                                                                                                                             |
+| 1.4 quick tunnel stale         | **CONFIRMADO E RESOLVIDO**          | Startup maintenance remove state apenas quando válido, stale e com PID comprovadamente morto.                                                                                                                            |
 | 1.5/1.6 organização da raiz    | **N/A**                             | Fora do escopo solicitado.                                                                                                                                                                                               |
 | 2.1 smoke no startup           | **CONFIRMADO E RESOLVIDO**          | Smoke read-only é agendado uma vez por processo, não bloqueante e configurável.                                                                                                                                          |
-| 2.2 JWKS warmup                | **CONFIRMADO E IMPLEMENTADO**       | `createRemoteJWKSet` era lazy. O HTTP startup agora agenda `reload()` deduplicado, expõe estado/tempo/chaves em health e usa o cache TTL existente; a meta fixa `<30ms` ainda exige benchmark live controlado.                                                                          |
+| 2.2 JWKS warmup                | **CONFIRMADO E IMPLEMENTADO**       | `createRemoteJWKSet` era lazy. O HTTP startup agora agenda `reload()` deduplicado, expõe estado/tempo/chaves em health e usa o cache TTL existente; a meta fixa `<30ms` ainda exige benchmark live controlado.           |
 | 2.3 L2 SQLite                  | **CONFIRMADO PARCIAL**              | Implementação, invalidação, pruning, circuit breaker e métricas existem; default está off. `IO_L2_CACHE_PATH` não existe: o L2 usa `copilot.sqlite`.                                                                     |
 | 2.4/5.6 QUIC p99               | **PENDENTE DE EXPERIMENTO**         | O p99 1.314ms é histórico e não prova causalidade do transporte; QUIC atual tem health/smoke OK.                                                                                                                         |
-| 2.5 rate limit anônimo         | **ORIGIN RESOLVIDO; EDGE PENDENTE** | Origin valida confiança de proxy/IP e aplica teto real de buckets; regra Cloudflare continua operação externa.                                                                                                          |
-| 2.6 cleanup bounded            | **CONFIRMADO E RESOLVIDO**          | Tool destructive/admin, dry-run por default, retenção e lote máximos implementados/testados.                                                                                                                            |
+| 2.5 rate limit anônimo         | **ORIGIN RESOLVIDO; EDGE PENDENTE** | Origin valida confiança de proxy/IP e aplica teto real de buckets; regra Cloudflare continua operação externa.                                                                                                           |
+| 2.6 cleanup bounded            | **CONFIRMADO E RESOLVIDO**          | Tool destructive/admin, dry-run por default, retenção e lote máximos implementados/testados.                                                                                                                             |
 | 3.1 replay persistente         | **CONFIRMADO E RESOLVIDO**          | DPoP resource/issuer e `private_key_jwt` usam replay store SQLite, hash-only e resistente a restart/processos.                                                                                                           |
 | 3.2 expiração/rotação OAuth    | **INVALIDADO**                      | DCR já tem TTL, pruning e persistência; refresh tokens já são one-time rotating, persistidos como hash e revogam família em reuse.                                                                                       |
 | 3.3 surface profiles           | **INVALIDADO COMO AUSENTE**         | Já existem `full`, `latency`, `minimal`, `cloudflare`, `readonly`, `claude`, `safe`, `research`; 99 tools full e 37 no perfil safe/claude/research. Falta apenas nomenclatura/contrato `dev` e `ci`, se ainda desejados. |
@@ -352,14 +353,14 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 | 4.3 worker pool dinâmico       | **MAJORITARIAMENTE INVALIDADO**     | `IO_PARSER_WORKER_POOL_SIZE` e métricas já existem; somente o default continua 2.                                                                                                                                        |
 | 4.6 AbortSignal global         | **NÃO ACEITO COMO REGRA GLOBAL**    | Vários timers representam debounce, shutdown, socket timeout ou retry e não são substituíveis mecanicamente.                                                                                                             |
 | 5.1 prefetch                   | **INVALIDADO COMO AUSENTE**         | `io-prefetch.js` e `io-session-scope.js` já fazem warmup; falta apenas provar hotset específico do MCP.                                                                                                                  |
-| 5.2 alertas de latência        | **INVALIDADO COMO AUSENTE**         | Dashboard já possui budgets configuráveis por fase/tool/error rate e warnings; não foi criada duplicação.                                                                                                               |
+| 5.2 alertas de latência        | **INVALIDADO COMO AUSENTE**         | Dashboard já possui budgets configuráveis por fase/tool/error rate e warnings; não foi criada duplicação.                                                                                                                |
 | 5.3 Apps SDK/Company Knowledge | **BACKLOG DE PRODUTO**              | Não é correção operacional e `ai-plugin.json` não deve ser presumido requisito MCP atual.                                                                                                                                |
 | 5.4 compressão/paginação       | **INVALIDADO PARCIAL**              | Edge desabilita compressão por benchmark anterior; `repo_tree` já limita depth 8 e 2.000 entries.                                                                                                                        |
 | 5.5 OTEL                       | **INVALIDADO COMO AUSENTE**         | Export file/OTLP, spans e correlation tracing já existem; instrumentação MCP por fase pode ser ampliada.                                                                                                                 |
-| 6.1 write schemas/path safety  | **INVALIDADO E ENDURECIDO**         | Schemas e containment já existiam; testes MCP agora cobrem traversal, manifesto/path forjado, symlink e divergência de hash.                                                                                            |
-| 6.2 SSRF DCR/CIMD              | **CONFIRMADO PARCIAL E RESOLVIDO**  | Timeout/redirect/HTTPS/DNS pin existentes foram complementados com classificação IPv4/IPv6 robusta e testes focados.                                                                                                    |
+| 6.1 write schemas/path safety  | **INVALIDADO E ENDURECIDO**         | Schemas e containment já existiam; testes MCP agora cobrem traversal, manifesto/path forjado, symlink e divergência de hash.                                                                                             |
+| 6.2 SSRF DCR/CIMD              | **CONFIRMADO PARCIAL E RESOLVIDO**  | Timeout/redirect/HTTPS/DNS pin existentes foram complementados com classificação IPv4/IPv6 robusta e testes focados.                                                                                                     |
 | 6.3 key rotation               | **CONFIRMADO COMO BACKLOG**         | Não há rotação periódica/grace window documentada no módulo.                                                                                                                                                             |
-| 6.4 DNS rebinding              | **INVALIDADO E COBERTO**            | Lookup pinado conecta ao endereço público validado; classificação IPv6 e self-SSRF estão cobertas.                                                                                                                      |
+| 6.4 DNS rebinding              | **INVALIDADO E COBERTO**            | Lookup pinado conecta ao endereço público validado; classificação IPv6 e self-SSRF estão cobertas.                                                                                                                       |
 | 7.1 hooks tests                | **INVALIDADO**                      | Existem múltiplas suítes dedicadas para factory, registry, bus, presets, elicitation e otimizações.                                                                                                                      |
 | 7.2 agent lifecycle tests      | **INVALIDADO E ENDURECIDO**         | Suites já existiam; handoff recebeu TTL/pruning e cobertura com relógio injetável.                                                                                                                                       |
 | 7.3 surface contracts          | **RESOLVIDO PARA MODOS ATUAIS**     | `full`, `latency`, `minimal`, `cloudflare`, `readonly`, `claude`, `safe` e `research` possuem contratos.                                                                                                                 |
@@ -367,58 +368,58 @@ morto e stale, mas é fallback legado e não representa indisponibilidade do tú
 
 ### Novos achados confirmados
 
-| ID       | Severidade | Estado | Achado                                                                                                                                                                                                                                                                                                                         |
-| -------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| CDEX-001 | 🔴 alto    | [x]    | `dev-oauth.js` classifica IPv6 de forma incompleta: IPv4-mapped privados como `::ffff:169.254.169.254`, parte de `fe80::/10` e multicast IPv6 podem passar como públicos. Corrigido com `BlockList` IPv4/IPv6 e testes focados.                                                                                                |
-| CDEX-002 | 🟠 médio   | [x]    | `IO_L2_CACHE_ENABLED=true` não ativa L2; o registry aceita somente o literal `1`, divergindo do padrão booleano do projeto e do roadmap externo. Corrigido para `1/true/yes/on`.                                                                                                                                               |
-| CDEX-003 | 🟠 médio   | [x]    | `cloudflare/cli-smoke.js` ainda usa `2025-06-18` por default, então o smoke principal não exercita a versão corrente `2025-11-25`. Default alinhado e coberto.                                                                                                                                                                 |
-| CDEX-004 | 🟠 médio   | [x]    | Rate limit anônimo do MCP usava `cf-connecting-ip`/`x-forwarded-for` sem validar confiança da origem. Corrigido com política `loopback/true/false`, validação de IP e opt-in separado para XFF.                                                                                                                                |
-| CDEX-005 | 🟡 baixo   | [x]    | O fast-path Claude CIMD presente no worktree não tem teste de integração dedicado nem aparece no status OAuth. Teste exato de authorize/callback e flag diagnóstica adicionados.                                                                                                                                               |
-| CDEX-006 | 🟡 baixo   | [x]    | `HandoffManager` mantinha handoffs pendentes indefinidamente. Adicionados `expiresAt`, TTL configurável, pruning determinístico, histórico `expired` e teste com relógio injetável.                                                                                                                                            |
-| CDEX-007 | 🟠 médio   | [x]    | `createErrorHandler` e `createCircuitBreakerHandler` mantinham mapas por sessão/contexto sem TTL ou limite, retendo sessões encerradas em processos longevos. Corrigido com poda oportunista, TTL de 30 minutos, LRU de 1.000 contextos e limpeza em abort fatal/irrecuperável.                                                |
-| CDEX-008 | 🟡 baixo   | [x]    | `repo-index.js` guardava indefinidamente cada candidato de resolução de import em um `Map`; scans sobre árvores variáveis podiam causar crescimento monotônico. Migrado para o `TtlCache` canônico, com TTL de 5 minutos, LRU de 10.000 entradas e invalidação preservada.                                                     |
-| CDEX-009 | 🟠 médio   | [x]    | O job manager mantinha todos os jobs concluídos do processo no `Map` global, embora os manifests persistidos já permitissem reload. Agora retém no máximo 200 registros em memória, remove somente terminais mais antigos e nunca sacrifica jobs ativos.                                                                       |
-| CDEX-010 | 🟠 médio   | [x]    | `createTimingEnricherHook` usava apenas `sessionId:toolName`: chamadas concorrentes colidiam, a primeira conclusão apagava a segunda e falhas não limpavam o estado. Agora usa sessão runtime, filas FIFO, cleanup em sucesso/falha, TTL de 30 minutos e teto de 1.000 pendências.                                             |
-| CDEX-011 | 🔴 alto    | [x]    | O rate limiter anônimo declarava `maxBuckets`, mas o sweep removia apenas expirados; um flood de identidades únicas dentro da janela ultrapassava o teto indefinidamente. Corrigido com expiração prioritária e evicção determinística do bucket ativo mais antigo.                                                            |
-| CDEX-012 | 🔴 alto    | [x]    | `readJobManifest` aceitava `jobId` como path fragment e confiava em `logFile` vindo do JSON persistido, permitindo traversal/confused deputy com manifesto preparado. Corrigido com UUID estrito, paths reconstruídos, arquivos regulares sem symlink e tail real limitado a 1 MiB.                                            |
-| CDEX-013 | 🟠 médio   | [x]    | Escritas de chunks/log/status de jobs eram fire-and-forget concorrentes, podendo reordenar output e gerar rejeições não observadas em falha de disco. Agora passam por fila serial por job, preservam ordem, emitem warning observado e liberam a fila ao drenar.                                                              |
-| CDEX-014 | 🟠 médio   | [x]    | O histórico de latência executava `append → read-all → rewrite` sem lock sobre o ciclo completo; chamadas MCP concorrentes podiam perder snapshots durante trim. Corrigido com lock canônico reentrante por path e rewrite atômico, coberto por 20 writers concorrentes.                                                       |
-| CDEX-015 | 🟠 médio   | [x]    | Manifests de validator jobs eram serializados, mas ainda gravados diretamente no destino; crash/kill durante a escrita podia deixar JSON truncado e ocultar o job persistido. Migrados para o writer atômico canônico, com modo `0600`.                                                                                        |
-| CDEX-016 | 🟠 médio   | [x]    | State e smoke JSON do Cloudflare eram escritos diretamente no destino; kill/crash podia deixar arquivos truncados e forçar restart/diagnóstico incorreto. Agora usam writer portátil, atômico, serializado por path, com temp no mesmo diretório e modo `0600`.                                                                |
-| CDEX-017 | 🔴 alto    | [x]    | `ensureDetachedProcess` destacava o filho antes de persistir PID/metadata e não fazia rollback se a persistência falhasse, podendo deixar MCP/cloudflared vivo sem supervisão. Agora grava metadata primeiro, PID por último e encerra o grupo/remover arquivos em falha.                                                      |
-| CDEX-018 | 🔴 alto    | [x]    | Snapshot IDs aceitavam qualquer string e eram concatenados a `SNAPSHOT_DIR`; além do traversal direto, listagem aceitava payload cujo ID divergia do filename e o reutilizava em load. Corrigido com schema basename-safe, igualdade filename/payload, lookup exato e save atômico `0600`.                                     |
-| CDEX-019 | 🟠 médio   | [x]    | Chamadas concorrentes de `patchToolsConfig()` escreviam diretamente e podiam concluir fora de ordem, persistindo configuração anterior à memória atual. Corrigido com snapshot por operação, fila serial e atomic write portátil `0600`.                                                                                       |
-| CDEX-020 | 🟠 médio   | [x]    | Model cache disparava writes paralelos e `clearPersistentModelCache()` aguardava apenas o writer mais recente; um writer anterior podia terminar depois do clear e recriar o cache. Write e clear agora compartilham uma fila única e writes são atômicos `0600`.                                                              |
-| CDEX-021 | 🔴 alto    | [x]    | Quarantine MCP movia o arquivo antes de gravar diretamente o manifesto; falha/crash podia deixar conteúdo órfão, e restore substituía o destino antes do commit. Agora usa ID/manifesto estritos, journal reconciliável, lock por item, atomic write `0600`, hash e rollback com backup.                                       |
-| CDEX-022 | 🔴 alto    | [x]    | Estado Always-Alive era sobrescrito in-place e clears descartavam a fila ativa; clear assíncrono nem incrementava geração, permitindo write em voo recriar estado removido. Agora write/clear compartilham fila, snapshot é atômico `0600`, path configurado cria pai e leitura rejeita symlink.                               |
-| CDEX-023 | 🔴 alto    | [x]    | O gate `test:copilot:unit` sofria expansão do glob pelo shell e executava somente suites exatamente um nível abaixo de `tests/unit/copilot`: 220 arquivos ficavam fora. Glob agora é citado e expandido recursivamente, ordenado e deduplicado dentro do runner.                                                               |
-| CDEX-024 | 🔴 alto    | [x]    | Após corrigir o gate, o baseline real passou de `3928/3928` sobre 315 arquivos para `6276/6349` sobre 535 arquivos: 45 falhas em 29 suites antes fora do gate. Mocks/contratos obsoletos foram alinhados e o gate real fechou em `6389/6417`, 28 pendências esperadas e zero falhas/warnings.                                  |
-| CDEX-025 | 🟠 médio   | [x]    | O registry de custom tools usava um único `custom-tools.json.tmp` e disparava persistências concorrentes sobre estado mutável; operações sobrepostas podiam colidir no temp ou concluir com snapshot antigo. Agora captura snapshot por mutação e usa fila + writer portátil atômico `0600`.                                   |
-| CDEX-026 | 🟠 médio   | [x]    | O alias store disparava writes concorrentes fire-and-forget diretamente no destino; além de truncamento em crash, uma gravação antiga podia concluir por último. Agora captura cada snapshot, serializa a fila observada, aguarda writes antes de load e usa atomic write `0600`.                                              |
-| CDEX-027 | 🟠 médio   | [x]    | Backups de snapshot Cloudflare eram gravados diretamente no destino final, permitindo JSON truncado em crash/kill. Migrados para o writer portátil atômico, serializado por path e privado (`0600`).                                                                                                                           |
-| CDEX-028 | 🔴 alto    | [x]    | Writers JSONL de auditoria/observabilidade liberavam o flag `scheduled` antes do I/O terminar; novos flushes podiam disputar rotação e causar perda, sobrescrita do `.1` ou contabilidade incorreta. Ciclos de JSONL genérico, tool audit, permission audit e event collector agora são serializados e aguardados no shutdown. |
-| CDEX-029 | 🟠 médio   | [x]    | Selection trace, policy e provider health do model gateway usavam temps baseados apenas em PID+milissegundo; writes concorrentes podiam colidir e `latest.json` podia regredir. Migrados para atomic write `0600`; selection trace serializa o ciclo trace+latest em ordem lógica.                                             |
-| CDEX-030 | 🔴 alto    | [x]    | Chamadas concorrentes de `/byok persist` executavam `read → mutate → write` sem serialização, permitindo lost update de `.env.local`. O ciclo inteiro agora passa por uma fila única e preserva a ordem das mutações.                                                                                                          |
-| CDEX-031 | 🟠 médio   | [x]    | Snapshots periódicos de métricas iniciavam um novo append mesmo com o tick anterior ainda em voo, acumulando writes concorrentes sob disco lento. Agora capturam snapshot por tick e usam uma cadeia observada única.                                                                                                          |
-| CDEX-032 | 🟠 médio   | [x]    | Streams públicos da assistant sem evento `finalize` ficavam retidos indefinidamente com estado de renderização. Agora são podados por TTL de 10 minutos e teto de 64 streams, sem afetar streams finalizados normalmente.                                                                                                      |
-| CDEX-033 | 🟠 médio   | [x]    | O mapa diagnóstico de contadores do `EventBus` aceitava cardinalidade arbitrária de tipos dinâmicos. Agora retém no máximo 1.000 tipos (configurável), descartando o contador mais antigo sem bloquear a entrega do evento.                                                                                                    |
-| CDEX-034 | 🔴 alto    | [x]    | O acumulador de transcripts de `task.delta` aceitava tarefas abandonadas sem limite, cada uma com teto individual de 32 MiB. Agora aplica limite de 64 tarefas e orçamento agregado de 64 MiB, com evicção dos abandonados mais antigos e truncamento explícito.                                                                |
-| CDEX-035 | 🟠 médio   | [x]    | Histogramas diagnósticos de I/O eram criados para qualquer string de operação sem limite. A cardinalidade agora é limitada a 64 operações, com evicção do histograma mais antigo.                                                                                                                                            |
-| CDEX-036 | 🔴 alto    | [x]    | A chave privada PEM do issuer OAuth de desenvolvimento era sobrescrita diretamente; crash/kill durante geração/rotação podia truncar a chave e provocar rotação silenciosa no boot seguinte. Persistência migrada para atomic write privado `0600`.                                                                          |
-| CDEX-037 | 🔴 alto    | [x]    | O cache de clientes Cloudflare usava `length:first8:last8` como identidade do API token, expondo fragmentos do segredo e colidindo tokens distintos com mesmas bordas; a colisão podia reutilizar o cliente autenticado errado. Chave migrada para SHA-256 e cache para LRU estrito de quatro clientes.                         |
-| CDEX-038 | 🔴 alto    | [x]    | O rate limiter por tool mantinha bearer tokens brutos como chaves de cache e não limitava combinações subject × tool dentro da janela. O cache de tokens foi eliminado, subjects são derivados sem retenção do segredo e budgets possuem teto determinístico de 4.096 entradas com diagnóstico sem subjects.                  |
-| CDEX-039 | 🟠 médio   | [x]    | Métricas MCP aceitavam tools e fases dinâmicas sem limite; fases como `__proto__` ainda atravessavam objetos com protótipo. Agora tools são limitadas a 1.000, fases a 64 por tool e snapshots/phase maps usam objetos sem protótipo.                                                                                           |
-| CDEX-040 | 🟠 médio   | [x]    | O `ToolCallRegistry` expirava tools ativas, mas deixava índices por `requestId` apontando para entradas expiradas; aliases externos sem lifecycle também não tinham TTL/teto. Expiração agora limpa todos os índices e aliases têm TTL de 2 minutos e limite de 1.024.                                                          |
-| CDEX-041 | 🟠 médio   | [x]    | O estado de interações SDK limitava somente entradas concluídas; elicitações, permissões e user inputs abandonados como `pending` podiam crescer indefinidamente. Pendências agora têm TTL de 24 horas e teto de 128 por tipo, preservando as mais recentes.                                                                    |
-| CDEX-042 | 🔴 alto    | [x]    | `COPILOT_MCP_AUDIT_SYNC=true` escrevia fora da fila assíncrona já pendente, permitindo que um evento posterior fosse persistido antes dos anteriores. Escritas sync/async agora compartilham uma cadeia serial e há flush explícito reutilizado no `beforeExit`.                                                               |
-| CDEX-043 | 🟠 médio   | [x]    | A telemetria geral de tools aceitava cardinalidade e aliases arbitrários, e snapshots por nome podiam interpretar `__proto__` como protótipo. Agora usa LRU de 1.000 tools, até 32 aliases por identidade e define chaves dinâmicas como propriedades próprias enumeráveis.                                                     |
-| CDEX-044 | 🟠 médio   | [x]    | O correlation tracer limitava o número de correlation IDs, mas uma única correlação podia acumular eventos indefinidamente. Cada correlação agora retém no máximo 100 eventos recentes, configurável por instância.                                                                                                         |
-| CDEX-045 | 🟠 médio   | [x]    | O archive SSE calculava o filename diário apenas na primeira gravação; processos atravessando UTC midnight continuavam escrevendo no arquivo do dia anterior. A resolução agora reavalia o dia e rotaciona automaticamente sem reiniciar o terminal.                                                                        |
-| CDEX-046 | 🟠 médio   | [x]    | A projeção diagnóstica de lifecycle de tools mantinha toda entrada sem completion para sempre. Entradas ativas agora expiram após 10 minutos e são limitadas às 128 mais recentes, sem alterar o registry operacional session-scoped.                                                                                         |
-| CDEX-047 | 🟠 médio   | [x]    | Um único turn trace podia acumular tools, arquivos, user inputs, escolhas e `dedupeKeys` sem teto até `turn_end`. Agora preserva apenas os eventos recentes sob limites explícitos (128/256/64), limita listas/campos variáveis e clona arrays internos ao produzir snapshots públicos.                                      |
-| CDEX-048 | 🟡 baixo   | [x]    | O throttle de alertas recuperáveis guardava mensagens/contextos distintos indefinidamente. Agora o dedupe vale para qualquer callback, remove chaves após 30s e impõe teto de 512 assinaturas, com evicção determinística da mais antiga.                                                                                    |
-| CDEX-049 | 🟡 baixo   | [x]    | `cloudflare oauth-smoke` entrava em modo autenticado sem validar `COPILOT_MCP_SMOKE_BEARER_TOKEN`, enviava `tools/list` sem bearer e reportava um falso negativo 401. Agora usa o env injetado e falha antes da rede com diagnóstico explícito, preservando o último smoke válido.                                               |
-| CDEX-050 | 🟠 médio   | [x]    | O pool do parser tinha default fixo 2 e `IO_PARSER_WORKER_POOL_SIZE` inválido virava `NaN`, inicializando zero workers silenciosamente. Agora o default deriva de `availableParallelism()` (1–4), override é limitado a 16 e métricas expõem tamanho, origem e paralelismo detectado.                                           |
+| ID       | Severidade | Estado | Achado                                                                                                                                                                                                                                                                                                                                                     |
+| -------- | ---------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CDEX-001 | 🔴 alto    | [x]    | `dev-oauth.js` classifica IPv6 de forma incompleta: IPv4-mapped privados como `::ffff:169.254.169.254`, parte de `fe80::/10` e multicast IPv6 podem passar como públicos. Corrigido com `BlockList` IPv4/IPv6 e testes focados.                                                                                                                            |
+| CDEX-002 | 🟠 médio   | [x]    | `IO_L2_CACHE_ENABLED=true` não ativa L2; o registry aceita somente o literal `1`, divergindo do padrão booleano do projeto e do roadmap externo. Corrigido para `1/true/yes/on`.                                                                                                                                                                           |
+| CDEX-003 | 🟠 médio   | [x]    | `cloudflare/cli-smoke.js` ainda usa `2025-06-18` por default, então o smoke principal não exercita a versão corrente `2025-11-25`. Default alinhado e coberto.                                                                                                                                                                                             |
+| CDEX-004 | 🟠 médio   | [x]    | Rate limit anônimo do MCP usava `cf-connecting-ip`/`x-forwarded-for` sem validar confiança da origem. Corrigido com política `loopback/true/false`, validação de IP e opt-in separado para XFF.                                                                                                                                                            |
+| CDEX-005 | 🟡 baixo   | [x]    | O fast-path Claude CIMD presente no worktree não tem teste de integração dedicado nem aparece no status OAuth. Teste exato de authorize/callback e flag diagnóstica adicionados.                                                                                                                                                                           |
+| CDEX-006 | 🟡 baixo   | [x]    | `HandoffManager` mantinha handoffs pendentes indefinidamente. Adicionados `expiresAt`, TTL configurável, pruning determinístico, histórico `expired` e teste com relógio injetável.                                                                                                                                                                        |
+| CDEX-007 | 🟠 médio   | [x]    | `createErrorHandler` e `createCircuitBreakerHandler` mantinham mapas por sessão/contexto sem TTL ou limite, retendo sessões encerradas em processos longevos. Corrigido com poda oportunista, TTL de 30 minutos, LRU de 1.000 contextos e limpeza em abort fatal/irrecuperável.                                                                            |
+| CDEX-008 | 🟡 baixo   | [x]    | `repo-index.js` guardava indefinidamente cada candidato de resolução de import em um `Map`; scans sobre árvores variáveis podiam causar crescimento monotônico. Migrado para o `TtlCache` canônico, com TTL de 5 minutos, LRU de 10.000 entradas e invalidação preservada.                                                                                 |
+| CDEX-009 | 🟠 médio   | [x]    | O job manager mantinha todos os jobs concluídos do processo no `Map` global, embora os manifests persistidos já permitissem reload. Agora retém no máximo 200 registros em memória, remove somente terminais mais antigos e nunca sacrifica jobs ativos.                                                                                                   |
+| CDEX-010 | 🟠 médio   | [x]    | `createTimingEnricherHook` usava apenas `sessionId:toolName`: chamadas concorrentes colidiam, a primeira conclusão apagava a segunda e falhas não limpavam o estado. Agora usa sessão runtime, filas FIFO, cleanup em sucesso/falha, TTL de 30 minutos e teto de 1.000 pendências.                                                                         |
+| CDEX-011 | 🔴 alto    | [x]    | O rate limiter anônimo declarava `maxBuckets`, mas o sweep removia apenas expirados; um flood de identidades únicas dentro da janela ultrapassava o teto indefinidamente. Corrigido com expiração prioritária e evicção determinística do bucket ativo mais antigo.                                                                                        |
+| CDEX-012 | 🔴 alto    | [x]    | `readJobManifest` aceitava `jobId` como path fragment e confiava em `logFile` vindo do JSON persistido, permitindo traversal/confused deputy com manifesto preparado. Corrigido com UUID estrito, paths reconstruídos, arquivos regulares sem symlink e tail real limitado a 1 MiB.                                                                        |
+| CDEX-013 | 🟠 médio   | [x]    | Escritas de chunks/log/status de jobs eram fire-and-forget concorrentes, podendo reordenar output e gerar rejeições não observadas em falha de disco. Agora passam por fila serial por job, preservam ordem, emitem warning observado e liberam a fila ao drenar.                                                                                          |
+| CDEX-014 | 🟠 médio   | [x]    | O histórico de latência executava `append → read-all → rewrite` sem lock sobre o ciclo completo; chamadas MCP concorrentes podiam perder snapshots durante trim. Corrigido com lock canônico reentrante por path e rewrite atômico, coberto por 20 writers concorrentes.                                                                                   |
+| CDEX-015 | 🟠 médio   | [x]    | Manifests de validator jobs eram serializados, mas ainda gravados diretamente no destino; crash/kill durante a escrita podia deixar JSON truncado e ocultar o job persistido. Migrados para o writer atômico canônico, com modo `0600`.                                                                                                                    |
+| CDEX-016 | 🟠 médio   | [x]    | State e smoke JSON do Cloudflare eram escritos diretamente no destino; kill/crash podia deixar arquivos truncados e forçar restart/diagnóstico incorreto. Agora usam writer portátil, atômico, serializado por path, com temp no mesmo diretório e modo `0600`.                                                                                            |
+| CDEX-017 | 🔴 alto    | [x]    | `ensureDetachedProcess` destacava o filho antes de persistir PID/metadata e não fazia rollback se a persistência falhasse, podendo deixar MCP/cloudflared vivo sem supervisão. Agora grava metadata primeiro, PID por último e encerra o grupo/remover arquivos em falha.                                                                                  |
+| CDEX-018 | 🔴 alto    | [x]    | Snapshot IDs aceitavam qualquer string e eram concatenados a `SNAPSHOT_DIR`; além do traversal direto, listagem aceitava payload cujo ID divergia do filename e o reutilizava em load. Corrigido com schema basename-safe, igualdade filename/payload, lookup exato e save atômico `0600`.                                                                 |
+| CDEX-019 | 🟠 médio   | [x]    | Chamadas concorrentes de `patchToolsConfig()` escreviam diretamente e podiam concluir fora de ordem, persistindo configuração anterior à memória atual. Corrigido com snapshot por operação, fila serial e atomic write portátil `0600`.                                                                                                                   |
+| CDEX-020 | 🟠 médio   | [x]    | Model cache disparava writes paralelos e `clearPersistentModelCache()` aguardava apenas o writer mais recente; um writer anterior podia terminar depois do clear e recriar o cache. Write e clear agora compartilham uma fila única e writes são atômicos `0600`.                                                                                          |
+| CDEX-021 | 🔴 alto    | [x]    | Quarantine MCP movia o arquivo antes de gravar diretamente o manifesto; falha/crash podia deixar conteúdo órfão, e restore substituía o destino antes do commit. Agora usa ID/manifesto estritos, journal reconciliável, lock por item, atomic write `0600`, hash e rollback com backup.                                                                   |
+| CDEX-022 | 🔴 alto    | [x]    | Estado Always-Alive era sobrescrito in-place e clears descartavam a fila ativa; clear assíncrono nem incrementava geração, permitindo write em voo recriar estado removido. Agora write/clear compartilham fila, snapshot é atômico `0600`, path configurado cria pai e leitura rejeita symlink.                                                           |
+| CDEX-023 | 🔴 alto    | [x]    | O gate `test:copilot:unit` sofria expansão do glob pelo shell e executava somente suites exatamente um nível abaixo de `tests/unit/copilot`: 220 arquivos ficavam fora. Glob agora é citado e expandido recursivamente, ordenado e deduplicado dentro do runner.                                                                                           |
+| CDEX-024 | 🔴 alto    | [x]    | Após corrigir o gate, o baseline real passou de `3928/3928` sobre 315 arquivos para `6276/6349` sobre 535 arquivos: 45 falhas em 29 suites antes fora do gate. Mocks/contratos obsoletos foram alinhados e o gate real fechou em `6389/6417`, 28 pendências esperadas e zero falhas/warnings.                                                              |
+| CDEX-025 | 🟠 médio   | [x]    | O registry de custom tools usava um único `custom-tools.json.tmp` e disparava persistências concorrentes sobre estado mutável; operações sobrepostas podiam colidir no temp ou concluir com snapshot antigo. Agora captura snapshot por mutação e usa fila + writer portátil atômico `0600`.                                                               |
+| CDEX-026 | 🟠 médio   | [x]    | O alias store disparava writes concorrentes fire-and-forget diretamente no destino; além de truncamento em crash, uma gravação antiga podia concluir por último. Agora captura cada snapshot, serializa a fila observada, aguarda writes antes de load e usa atomic write `0600`.                                                                          |
+| CDEX-027 | 🟠 médio   | [x]    | Backups de snapshot Cloudflare eram gravados diretamente no destino final, permitindo JSON truncado em crash/kill. Migrados para o writer portátil atômico, serializado por path e privado (`0600`).                                                                                                                                                       |
+| CDEX-028 | 🔴 alto    | [x]    | Writers JSONL de auditoria/observabilidade liberavam o flag `scheduled` antes do I/O terminar; novos flushes podiam disputar rotação e causar perda, sobrescrita do `.1` ou contabilidade incorreta. Ciclos de JSONL genérico, tool audit, permission audit e event collector agora são serializados e aguardados no shutdown.                             |
+| CDEX-029 | 🟠 médio   | [x]    | Selection trace, policy e provider health do model gateway usavam temps baseados apenas em PID+milissegundo; writes concorrentes podiam colidir e `latest.json` podia regredir. Migrados para atomic write `0600`; selection trace serializa o ciclo trace+latest em ordem lógica.                                                                         |
+| CDEX-030 | 🔴 alto    | [x]    | Chamadas concorrentes de `/byok persist` executavam `read → mutate → write` sem serialização, permitindo lost update de `.env.local`. O ciclo inteiro agora passa por uma fila única e preserva a ordem das mutações.                                                                                                                                      |
+| CDEX-031 | 🟠 médio   | [x]    | Snapshots periódicos de métricas iniciavam um novo append mesmo com o tick anterior ainda em voo, acumulando writes concorrentes sob disco lento. Agora capturam snapshot por tick e usam uma cadeia observada única.                                                                                                                                      |
+| CDEX-032 | 🟠 médio   | [x]    | Streams públicos da assistant sem evento `finalize` ficavam retidos indefinidamente com estado de renderização. Agora são podados por TTL de 10 minutos e teto de 64 streams, sem afetar streams finalizados normalmente.                                                                                                                                  |
+| CDEX-033 | 🟠 médio   | [x]    | O mapa diagnóstico de contadores do `EventBus` aceitava cardinalidade arbitrária de tipos dinâmicos. Agora retém no máximo 1.000 tipos (configurável), descartando o contador mais antigo sem bloquear a entrega do evento.                                                                                                                                |
+| CDEX-034 | 🔴 alto    | [x]    | O acumulador de transcripts de `task.delta` aceitava tarefas abandonadas sem limite, cada uma com teto individual de 32 MiB. Agora aplica limite de 64 tarefas e orçamento agregado de 64 MiB, com evicção dos abandonados mais antigos e truncamento explícito.                                                                                           |
+| CDEX-035 | 🟠 médio   | [x]    | Histogramas diagnósticos de I/O eram criados para qualquer string de operação sem limite. A cardinalidade agora é limitada a 64 operações, com evicção do histograma mais antigo.                                                                                                                                                                          |
+| CDEX-036 | 🔴 alto    | [x]    | A chave privada PEM do issuer OAuth de desenvolvimento era sobrescrita diretamente; crash/kill durante geração/rotação podia truncar a chave e provocar rotação silenciosa no boot seguinte. Persistência migrada para atomic write privado `0600`.                                                                                                        |
+| CDEX-037 | 🔴 alto    | [x]    | O cache de clientes Cloudflare usava `length:first8:last8` como identidade do API token, expondo fragmentos do segredo e colidindo tokens distintos com mesmas bordas; a colisão podia reutilizar o cliente autenticado errado. Chave migrada para SHA-256 e cache para LRU estrito de quatro clientes.                                                    |
+| CDEX-038 | 🔴 alto    | [x]    | O rate limiter por tool mantinha bearer tokens brutos como chaves de cache e não limitava combinações subject × tool dentro da janela. O cache de tokens foi eliminado, subjects são derivados sem retenção do segredo e budgets possuem teto determinístico de 4.096 entradas com diagnóstico sem subjects.                                               |
+| CDEX-039 | 🟠 médio   | [x]    | Métricas MCP aceitavam tools e fases dinâmicas sem limite; fases como `__proto__` ainda atravessavam objetos com protótipo. Agora tools são limitadas a 1.000, fases a 64 por tool e snapshots/phase maps usam objetos sem protótipo.                                                                                                                      |
+| CDEX-040 | 🟠 médio   | [x]    | O `ToolCallRegistry` expirava tools ativas, mas deixava índices por `requestId` apontando para entradas expiradas; aliases externos sem lifecycle também não tinham TTL/teto. Expiração agora limpa todos os índices e aliases têm TTL de 2 minutos e limite de 1.024.                                                                                     |
+| CDEX-041 | 🟠 médio   | [x]    | O estado de interações SDK limitava somente entradas concluídas; elicitações, permissões e user inputs abandonados como `pending` podiam crescer indefinidamente. Pendências agora têm TTL de 24 horas e teto de 128 por tipo, preservando as mais recentes.                                                                                               |
+| CDEX-042 | 🔴 alto    | [x]    | `COPILOT_MCP_AUDIT_SYNC=true` escrevia fora da fila assíncrona já pendente, permitindo que um evento posterior fosse persistido antes dos anteriores. Escritas sync/async agora compartilham uma cadeia serial e há flush explícito reutilizado no `beforeExit`.                                                                                           |
+| CDEX-043 | 🟠 médio   | [x]    | A telemetria geral de tools aceitava cardinalidade e aliases arbitrários, e snapshots por nome podiam interpretar `__proto__` como protótipo. Agora usa LRU de 1.000 tools, até 32 aliases por identidade e define chaves dinâmicas como propriedades próprias enumeráveis.                                                                                |
+| CDEX-044 | 🟠 médio   | [x]    | O correlation tracer limitava o número de correlation IDs, mas uma única correlação podia acumular eventos indefinidamente. Cada correlação agora retém no máximo 100 eventos recentes, configurável por instância.                                                                                                                                        |
+| CDEX-045 | 🟠 médio   | [x]    | O archive SSE calculava o filename diário apenas na primeira gravação; processos atravessando UTC midnight continuavam escrevendo no arquivo do dia anterior. A resolução agora reavalia o dia e rotaciona automaticamente sem reiniciar o terminal.                                                                                                       |
+| CDEX-046 | 🟠 médio   | [x]    | A projeção diagnóstica de lifecycle de tools mantinha toda entrada sem completion para sempre. Entradas ativas agora expiram após 10 minutos e são limitadas às 128 mais recentes, sem alterar o registry operacional session-scoped.                                                                                                                      |
+| CDEX-047 | 🟠 médio   | [x]    | Um único turn trace podia acumular tools, arquivos, user inputs, escolhas e `dedupeKeys` sem teto até `turn_end`. Agora preserva apenas os eventos recentes sob limites explícitos (128/256/64), limita listas/campos variáveis e clona arrays internos ao produzir snapshots públicos.                                                                    |
+| CDEX-048 | 🟡 baixo   | [x]    | O throttle de alertas recuperáveis guardava mensagens/contextos distintos indefinidamente. Agora o dedupe vale para qualquer callback, remove chaves após 30s e impõe teto de 512 assinaturas, com evicção determinística da mais antiga.                                                                                                                  |
+| CDEX-049 | 🟡 baixo   | [x]    | `cloudflare oauth-smoke` entrava em modo autenticado sem validar `COPILOT_MCP_SMOKE_BEARER_TOKEN`, enviava `tools/list` sem bearer e reportava um falso negativo 401. Agora usa o env injetado e falha antes da rede com diagnóstico explícito, preservando o último smoke válido.                                                                         |
+| CDEX-050 | 🟠 médio   | [x]    | O pool do parser tinha default fixo 2 e `IO_PARSER_WORKER_POOL_SIZE` inválido virava `NaN`, inicializando zero workers silenciosamente. Agora o default deriva de `availableParallelism()` (1–4), override é limitado a 16 e métricas expõem tamanho, origem e paralelismo detectado.                                                                      |
 | CDEX-051 | 🟠 médio   | [x]    | O auditor de `tools/list` serializava objetos Zod internos e superestimava o envelope em 159.861 bytes. Agora conecta `McpServer` e `Client` pelo transporte em memória e mede o descriptor wire real: 113.236 bytes, `inputSchema` 42.008, maior tool 2.770 e folga de 17.836 sob budget regressivo de 128KiB; smoke OAuth também registra bytes remotos. |
 
 ### Roadmap booleano revisado e autoritativo
@@ -505,14 +506,15 @@ Execução de `R1.2` em 2026-06-11:
 - [x] R2.16 — Limitar cardinalidade de métricas MCP e usar mapas seguros para chaves especiais.
 - [x] R2.17 — Limpar índices expirados do lifecycle de tool calls e limitar aliases por request ID.
 - [x] R2.18 — Limitar pendências abandonadas de elicitation, permission e user input SDK.
-- [x] R2.19 — Limitar tools/aliases da telemetria geral e proteger snapshots contra chaves especiais.
+- [x] R2.19 — Limitar tools/aliases da telemetria geral e proteger snapshots contra chaves
+      especiais.
 - [x] R2.20 — Limitar eventos por correlation ID no tracer.
 - [x] R2.21 — Expirar e limitar a projeção diagnóstica de lifecycle de tools.
 - [x] R2.22 — Limitar cardinalidade, listas internas e tamanho dos campos de um único turn trace.
 - [x] R2.23 — Aplicar TTL de 30s e teto de 512 chaves ao dedupe de alertas recuperáveis.
 - [x] R2.24 — Fazer o smoke Cloudflare autenticado rejeitar credencial ausente antes de tocar rede.
-- [x] R2.25 — Substituir a medição Zod incorreta pelo envelope wire real, impor budget regressivo
-      de 128KiB e preservar integralmente validação/contratos dos schemas batch.
+- [x] R2.25 — Substituir a medição Zod incorreta pelo envelope wire real, impor budget regressivo de
+      128KiB e preservar integralmente validação/contratos dos schemas batch.
 
 Transformações consolidadas nesta rodada:
 
@@ -589,11 +591,11 @@ Validação focada adicional de `R2.15`: task transcript + histogramas I/O e fam
 Validação focada adicional de `R0.7`/`R0.8`: OAuth/SSRF `27/27`, Cloudflare remote e recorte
 relacionado `34/34`, e `typecheck:strict:src.copilot` em PASS.
 
-Validação focada adicional de `R0.9`/`R1.21`/`R2.16`/`R2.17`/`R2.18`: registry, métricas, audit
-MCP, lifecycle de tool calls e interações SDK `58/58`.
+Validação focada adicional de `R0.9`/`R1.21`/`R2.16`/`R2.17`/`R2.18`: registry, métricas, audit MCP,
+lifecycle de tool calls e interações SDK `58/58`.
 
-Validação focada adicional de `R1.22`/`R2.19`/`R2.20`/`R2.21`: telemetria geral, correlation
-tracer, archive SSE diário, lifecycle diagnóstico e recorte MCP relacionado `80/80`, com
+Validação focada adicional de `R1.22`/`R2.19`/`R2.20`/`R2.21`: telemetria geral, correlation tracer,
+archive SSE diário, lifecycle diagnóstico e recorte MCP relacionado `80/80`, com
 `typecheck:strict:src.copilot` em PASS.
 
 Validação focada adicional de `R2.22`/`R2.23`: turn trace e error alerter `25/25`, sem
@@ -602,17 +604,16 @@ warnings/errors, com `typecheck:strict:src.copilot` em PASS. Resumo:
 
 Validação focada adicional de `R2.24`: Cloudflare CLI probe `3/3`, ESLint focado e
 `typecheck:strict:src.copilot` em PASS. O comando real sem token agora falha antes da rede com
-diagnóstico explícito. Resumo:
-`artifacts/test-runs/copilot/2026-06-12T03-09-40-428Z/summary.md`.
+diagnóstico explícito. Resumo: `artifacts/test-runs/copilot/2026-06-12T03-09-40-428Z/summary.md`.
 
 Validação focada adicional de `R1.23`: warmup JWKS, auth hardening, startup maintenance e HTTP smoke
 `18/18`, zero warnings/errors, com `typecheck:strict:src.copilot` e ESLint focado em PASS. Resumo:
-`artifacts/test-runs/copilot/2026-06-12T03-14-21-813Z/summary.md`.
-O contrato de layout mais o warmup fecharam adicionalmente em `59/59`:
-`artifacts/test-runs/copilot/2026-06-12T03-16-02-677Z/summary.md`.
-Após publicar `0c604a7d` e reiniciar o runtime, `/health.authJwksWarmup` confirmou `success=true`,
-`source=remote`, `keyCount=2`, `durationMs=614`; o OAuth smoke completo passou com `100/100` tools e
-a primeira chamada autenticada registrou `authorization.lastDurationMs=2`.
+`artifacts/test-runs/copilot/2026-06-12T03-14-21-813Z/summary.md`. O contrato de layout mais o
+warmup fecharam adicionalmente em `59/59`:
+`artifacts/test-runs/copilot/2026-06-12T03-16-02-677Z/summary.md`. Após publicar `0c604a7d` e
+reiniciar o runtime, `/health.authJwksWarmup` confirmou `success=true`, `source=remote`,
+`keyCount=2`, `durationMs=614`; o OAuth smoke completo passou com `100/100` tools e a primeira
+chamada autenticada registrou `authorization.lastDurationMs=2`.
 
 Validação focada adicional de `CDEX-050`: parser + governança do barrel infra `27/27`, zero
 warnings/errors, com `typecheck:strict:src.copilot` e ESLint focado em PASS. No runtime atual,
@@ -623,25 +624,25 @@ Validação focada adicional de `CDEX-051`: o novo auditor executa `tools/list` 
 memória, mede `113.236/131.072` bytes e `17.836` bytes de headroom; os dois testes regressivos,
 ESLint focado e `typecheck:strict:src.copilot` passaram. A medição anterior de `159.861` bytes era
 41% maior por incluir estado interno do Zod, e os quatro descriptors batch reais somam ~10,1KB em
-vez de ~28,9KB. O smoke OAuth agora inclui `authenticatedTools.responseBytes` para confirmação
-live após restart. Publicado em `7d783bf2`; o runtime reiniciado nos PIDs `71127`/`71133`
-confirmou health 200, warmup JWKS remoto de 2 chaves em 275ms, quatro conexões QUIC e OAuth smoke
-completo em PASS. O `tools/list` remoto mediu exatamente os mesmos `113.236` bytes e `100/100`
-tools, eliminando diferença entre a medição local e a resposta Cloudflare.
+vez de ~28,9KB. O smoke OAuth agora inclui `authenticatedTools.responseBytes` para confirmação live
+após restart. Publicado em `7d783bf2`; o runtime reiniciado nos PIDs `71127`/`71133` confirmou
+health 200, warmup JWKS remoto de 2 chaves em 275ms, quatro conexões QUIC e OAuth smoke completo em
+PASS. O `tools/list` remoto mediu exatamente os mesmos `113.236` bytes e `100/100` tools, eliminando
+diferença entre a medição local e a resposta Cloudflare.
 
 Validação canônica pós-transformações em 2026-06-11:
 
-| Gate                                   | Resultado final                                                        |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| `npm run typecheck:strict:src.copilot` | ✅ PASS                                                                |
-| `npm run lint:copilot`                 | ✅ PASS                                                                |
+| Gate                                   | Resultado final                                                                                  |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `npm run typecheck:strict:src.copilot` | ✅ PASS                                                                                          |
+| `npm run lint:copilot`                 | ✅ PASS                                                                                          |
 | `npm run test:copilot:unit`            | ✅ PASS — `6389/6417` testes, `1946/1946` suites, 28 pendências esperadas e zero warnings/errors |
 
 O baseline inicial raso de `3880/3882` foi integralmente corrigido e o gate passou a descobrir
-recursivamente todas as suites Copilot. A suíte final também cobre os novos
-contratos de replay persistente, SSRF IPv6, proxy trust, startup maintenance, cleanup bounded,
-surfaces do registry, expiração de handoff, bounds de hooks/jobs/cache, rate-limit cardinality e
-confinamento de artefatos de jobs. Último resumo canônico recursivo:
+recursivamente todas as suites Copilot. A suíte final também cobre os novos contratos de replay
+persistente, SSRF IPv6, proxy trust, startup maintenance, cleanup bounded, surfaces do registry,
+expiração de handoff, bounds de hooks/jobs/cache, rate-limit cardinality e confinamento de artefatos
+de jobs. Último resumo canônico recursivo:
 `artifacts/test-runs/copilot/2026-06-12T02-20-30-203Z/summary.md`.
 
 #### P3 — experimentos e backlog
@@ -808,8 +809,8 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
       `*.pid`
 - [x] 2.6.4 — Adicionar ao registry com scope `repo:admin` e `destructiveHint: true`
 - [x] 2.6.5 — Adicionar testes unitários em `tests/unit/copilot/mcp/`
-- [x] 2.6.6 — N/A: a tool entrou no allowlist de metadata/maintenance; não é uma suite de
-      validação executável
+- [x] 2.6.6 — N/A: a tool entrou no allowlist de metadata/maintenance; não é uma suite de validação
+      executável
 
 ---
 
@@ -820,8 +821,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 #### 3.1 Replay cache persistente OAuth 🔴
 
 - [x] 3.1.1 — Analisar impacto de restart na janela de replay para DPoP e `private_key_jwt`
-- [x] 3.1.2 — Criar módulo `control-plane/oauth-replay-store.js` com backend SQLite
-      banco dedicado)
+- [x] 3.1.2 — Criar módulo `control-plane/oauth-replay-store.js` com backend SQLite banco dedicado)
 - [x] 3.1.3 — Migrar replay DPoP para store persistido com TTL automático
 - [x] 3.1.4 — Migrar `private_key_jwt` idem
 - [x] 3.1.5 — Ao inicializar/operação: purgar entradas expiradas do banco
@@ -833,8 +833,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 - [x] 3.2.1 — Confirmado existente: `pruneRegisteredClients()` remove clientes expirados
       `client_secret_expires_at < now`
 - [x] 3.2.2 — Confirmado existente: stores removem tokens/famílias expirados e revogam família em
-      reuse
-      tokens expirados
+      reuse tokens expirados
 - [x] 3.2.3 — Premissa ajustada: pruning ocorre no load e oportunisticamente nas operações, sem
       timer global adicional
 - [x] 3.2.4 — N/A: load/pruning é comportamento canônico, sem opt-out inseguro
@@ -869,10 +868,9 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### 3.6 Verificar MCP Protocol Version 🟠
 
-- [x] 3.6.1 — Revisar spec `2025-06-18` vs `2025-11-25`; `2025-11-25` é posterior/corrente
-      breaking
-- [x] 3.6.2 — Checar `@modelcontextprotocol/sdk` v1.29.x e estado ainda não estável do v2
-      branch v1.x
+- [x] 3.6.1 — Revisar spec `2025-06-18` vs `2025-11-25`; `2025-11-25` é posterior/corrente breaking
+- [x] 3.6.2 — Checar `@modelcontextprotocol/sdk` v1.29.x e estado ainda não estável do v2 branch
+      v1.x
 - [x] 3.6.3 — Manter `COPILOT_MCP_PROTOCOL_VERSION=2025-11-25`
 - [x] 3.6.4 — Documentar decisão de versão em `src/copilot/mcp/README.md`
 
@@ -885,21 +883,18 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 #### 4.1 `node:sqlite` built-in para L2 cache 🟢
 
 - [x] 4.1.1 — Avaliado: `node:sqlite` ainda é release candidate no Node usado; não substituir
-      `better-sqlite3` agora
-      no L2
-- [x] 4.1.2 — Comparar API: `DatabaseSync` não oferece ganho que justifique migração imediata
-      uso assíncrono
+      `better-sqlite3` agora no L2
+- [x] 4.1.2 — Comparar API: `DatabaseSync` não oferece ganho que justifique migração imediata uso
+      assíncrono
 - [x] 4.1.3 — Decisão: não criar backend alternativo enquanto a API permanecer experimental
       `io-cache-l2-sqlite.js`
-- [x] 4.1.4 — N/A nesta decisão: manter backend atual e reavaliar após estabilização
-      bloquear)
+- [x] 4.1.4 — N/A nesta decisão: manter backend atual e reavaliar após estabilização bloquear)
 - [x] 4.1.5 — `better-sqlite3` permanece backend canônico
 
 #### 4.2 `await using` para cleanup de recursos 🟢
 
 - [x] 4.2.1 — Migração global rejeitada: recursos têm semânticas distintas e teardown já
-      centralizado
-      `io-session-scope.js`, session lifecycle
+      centralizado `io-session-scope.js`, session lifecycle
 - [x] 4.2.2 — N/A sem recurso concreto com ganho comprovado
 - [x] 4.2.3 — N/A; preservar `try/finally` explícito
 - [x] 4.2.4 — N/A; não ampliar target/lib sem necessidade de produto
@@ -928,8 +923,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 - [ ] 5.1.1 — Identificar os 20 arquivos mais lidos (barrels, package.json, tsconfig, arquivos de
       config)
-- [x] 5.1.2 — Confirmado existente: `io-prefetch.js` já pré-carrega arquivos no L1
-      L1
+- [x] 5.1.2 — Confirmado existente: `io-prefetch.js` já pré-carrega arquivos no L1 L1
 - [ ] 5.1.3 — Adicionar lista de prefetch em `src/copilot/infra/io-prefetch.js` via env ou config
 - [ ] 5.1.4 — Disparar prefetch assíncrono no startup do MCP (após index build)
 - [ ] 5.1.5 — Medir impacto: L1 hit ratio deve subir de ~18% para > 50% nas primeiras chamadas
@@ -959,8 +953,7 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 #### 5.5 Telemetria OTEL exportável 🟢
 
 - [x] 5.5.1 — Verificado: exporter file/OTLP já existe
-- [x] 5.5.2 — Export OTLP já é configurável por env
-      `OTEL_EXPORTER_OTLP_ENDPOINT`
+- [x] 5.5.2 — Export OTLP já é configurável por env `OTEL_EXPORTER_OTLP_ENDPOINT`
 - [ ] 5.5.3 — Instrumentar spans para fases de autorização, handler, resultSize no MCP registry
 - [x] 5.5.4 — Correlation tracing já existe e agora é bounded por correlação
 
@@ -1049,72 +1042,94 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 ## 5-B. Reinvestigação GPT-5.5 — 2026-06-12 — `src/copilot`, Node 24.5+
 
-**Escopo desta rodada:** reabrir a auditoria a partir do estado real do workspace, restringindo a análise a `src/copilot`, `package.json`, validators MCP/Copilot e documentação oficial atualizada de MCP, GitHub Copilot SDK, GitHub MCP/Copilot e Node SQLite. Estado local observado: branch `main`, `HEAD 403252ca`, worktree limpo.
+**Escopo desta rodada:** reabrir a auditoria a partir do estado real do workspace, restringindo a
+análise a `src/copilot`, `package.json`, validators MCP/Copilot e documentação oficial atualizada de
+MCP, GitHub Copilot SDK, GitHub MCP/Copilot e Node SQLite. Estado local observado: branch `main`,
+`HEAD 403252ca`, worktree limpo.
 
 ### 5-B.1 Baseline técnico atual
 
-| Eixo | Estado observado em 2026-06-12 | Implicação |
-| ---- | ------------------------------ | ---------- |
-| SDK GitHub Copilot | `@github/copilot-sdk` está em `^1.0.0` no `package.json` | Tratar 0.3.0 como baseline histórico de migração, não como estado corrente |
-| MCP TypeScript SDK | `@modelcontextprotocol/sdk` está em `^1.29.0` | Compatível com o ciclo 1.x; SDK v2 upstream ainda não é alvo produtivo |
-| Runtime | `engines.node >=24.0.0`; Volta aponta Node 24.13.0; validação rodou em cache Node 24.15.0 | O alvo “Node 24.5+” está atendido; cuidado com APIs que mudaram dentro da linha 24.x |
-| SQLite | Projeto mantém `better-sqlite3 ^12.10.0` | Decisão continua defensável: `node:sqlite` só virou release candidate em Node 25.7.0; em Node 24.x deve permanecer tratado como API experimental/instável para produção |
-| Superfície MCP | `mcp_tools_status`: 100 tools; 76 read-only; 21 bounded-write; 3 destructive; 0 open-world | Boa postura de autonomia, mas há risco de contexto/tool selection por excesso de superfície |
-| Apps SDK/CK | `mcp_apps_sdk_readiness`: sem widget resource, sem CSP aplicável, sem Company Knowledge `search/fetch` | Gap de produto; não é fonte atual de prompts, mas limita UX rica e integração CK |
-| Validação | `suite-copilot-fast` job `f9a9dcfa-790a-40a3-a750-c6d0ce9040f6`: PASS | Novo baseline canônico para `src/copilot` no HEAD atual |
+| Eixo               | Estado observado em 2026-06-12                                                                         | Implicação                                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SDK GitHub Copilot | `@github/copilot-sdk` está em `^1.0.0` no `package.json`                                               | Tratar 0.3.0 como baseline histórico de migração, não como estado corrente                                                                                              |
+| MCP TypeScript SDK | `@modelcontextprotocol/sdk` está em `^1.29.0`                                                          | Compatível com o ciclo 1.x; SDK v2 upstream ainda não é alvo produtivo                                                                                                  |
+| Runtime            | `engines.node >=24.0.0`; Volta aponta Node 24.13.0; validação rodou em cache Node 24.15.0              | O alvo “Node 24.5+” está atendido; cuidado com APIs que mudaram dentro da linha 24.x                                                                                    |
+| SQLite             | Projeto mantém `better-sqlite3 ^12.10.0`                                                               | Decisão continua defensável: `node:sqlite` só virou release candidate em Node 25.7.0; em Node 24.x deve permanecer tratado como API experimental/instável para produção |
+| Superfície MCP     | `mcp_tools_status`: 100 tools; 76 read-only; 21 bounded-write; 3 destructive; 0 open-world             | Boa postura de autonomia, mas há risco de contexto/tool selection por excesso de superfície                                                                             |
+| Apps SDK/CK        | `mcp_apps_sdk_readiness`: sem widget resource, sem CSP aplicável, sem Company Knowledge `search/fetch` | Gap de produto; não é fonte atual de prompts, mas limita UX rica e integração CK                                                                                        |
+| Validação          | `suite-copilot-fast` job `f9a9dcfa-790a-40a3-a750-c6d0ce9040f6`: PASS                                  | Novo baseline canônico para `src/copilot` no HEAD atual                                                                                                                 |
 
 **Resultado de validação desta rodada:**
 
 - `npm run typecheck:strict:src.copilot`: PASS em 5.068ms.
 - `npm run lint:copilot`: PASS em 34.300ms.
 - `npm run test:copilot:unit`: PASS em 137.637ms.
-- Vitest compacto: 539 arquivos selecionados; 6.450 testes totais; 6.422 passed; 0 failed; 28 pending; 1.956 suítes passed; 0 warnings/errors únicos.
+- Vitest compacto: 539 arquivos selecionados; 6.450 testes totais; 6.422 passed; 0 failed; 28
+  pending; 1.956 suítes passed; 0 warnings/errors únicos.
 
 ### 5-B.2 Atualização por documentação oficial
 
-- **MCP:** a especificação oficial mais recente observada é `2025-11-25`, que define MCP como protocolo JSON-RPC 2.0 e enfatiza consentimento, controle do usuário, privacidade de dados, segurança de tools e descrições/annotations como material não confiável. Referência: https://modelcontextprotocol.io/specification/2025-11-25
-- **MCP TypeScript SDK:** o repositório oficial indica que o branch principal contém v2 em desenvolvimento/pre-alpha, enquanto v1.x continua a recomendação produtiva até a estabilização upstream. Referência: https://github.com/modelcontextprotocol/typescript-sdk
-- **GitHub Copilot SDK:** a documentação oficial de Getting Started exige Node.js 20+ para TypeScript e instala `@github/copilot-sdk`; a documentação também expõe streaming, tools, MCP e telemetria/OpenTelemetry como trilhas nativas. Referências: https://docs.github.com/en/copilot/how-tos/copilot-sdk/getting-started e https://docs.github.com/en/copilot/how-tos/copilot-sdk/observability/opentelemetry
-- **GitHub Copilot + MCP:** MCP é agora documentado como integração transversal para IDEs, Copilot CLI, Copilot app, cloud agent e code review; a própria documentação recomenda toolsets menores para performance, segurança, acurácia de seleção e economia de tokens. Referência: https://docs.github.com/en/copilot/concepts/context/mcp
-- **Node SQLite:** a documentação oficial atual mostra `node:sqlite` como release candidate somente a partir de Node 25.7.0 e lista histórico de opções dentro de 24.x; para Node 24.5+ a decisão de não migrar automaticamente de `better-sqlite3` permanece correta até benchmark e contrato de estabilidade. Referência: https://nodejs.org/api/sqlite.html
+- **MCP:** a especificação oficial mais recente observada é `2025-11-25`, que define MCP como
+  protocolo JSON-RPC 2.0 e enfatiza consentimento, controle do usuário, privacidade de dados,
+  segurança de tools e descrições/annotations como material não confiável. Referência:
+  https://modelcontextprotocol.io/specification/2025-11-25
+- **MCP TypeScript SDK:** o repositório oficial indica que o branch principal contém v2 em
+  desenvolvimento/pre-alpha, enquanto v1.x continua a recomendação produtiva até a estabilização
+  upstream. Referência: https://github.com/modelcontextprotocol/typescript-sdk
+- **GitHub Copilot SDK:** a documentação oficial de Getting Started exige Node.js 20+ para
+  TypeScript e instala `@github/copilot-sdk`; a documentação também expõe streaming, tools, MCP e
+  telemetria/OpenTelemetry como trilhas nativas. Referências:
+  https://docs.github.com/en/copilot/how-tos/copilot-sdk/getting-started e
+  https://docs.github.com/en/copilot/how-tos/copilot-sdk/observability/opentelemetry
+- **GitHub Copilot + MCP:** MCP é agora documentado como integração transversal para IDEs, Copilot
+  CLI, Copilot app, cloud agent e code review; a própria documentação recomenda toolsets menores
+  para performance, segurança, acurácia de seleção e economia de tokens. Referência:
+  https://docs.github.com/en/copilot/concepts/context/mcp
+- **Node SQLite:** a documentação oficial atual mostra `node:sqlite` como release candidate somente
+  a partir de Node 25.7.0 e lista histórico de opções dentro de 24.x; para Node 24.5+ a decisão de
+  não migrar automaticamente de `better-sqlite3` permanece correta até benchmark e contrato de
+  estabilidade. Referência: https://nodejs.org/api/sqlite.html
 
 ### 5-B.3 Novos achados CDEX adicionados
 
-| ID | Severidade | Achado | Evidência local | Recomendação |
-| -- | ---------- | ------ | --------------- | ------------ |
-| CDEX-052 | 🟠 Alta | O documento ainda referencia MCP 2025-06-18, enquanto o código e a documentação atual já apontam para MCP 2025-11-25 | `dev-oauth.js` menciona MCP 2025-11-25 em comentários de `CIMD` e resource indicators; refs finais ainda listavam 2025-06-18 | Atualizar matriz de compatibilidade para 2025-11-25; manter testes de OAuth/resource indicator contra esse baseline |
-| CDEX-053 | 🟡 Média | Baseline histórico do relatório cita SHAs anteriores; estado atual real é `HEAD 403252ca` | `repo_status`: branch `main`, worktree limpo, head `403252ca` | Toda revalidação futura deve registrar HEAD, job id e data absoluta antes de marcar PASS |
-| CDEX-054 | 🟠 Alta | Dashboard de validação pode induzir leitura errada quando há jobs antigos falhos | Antes do novo run, `unit-copilot` efetivo apontava job antigo `97959911...` com falha; após `suite-copilot-fast`, efetivo passou | Manter política de “rodar dashboard + job novo” antes de decisões; opcional: ocultar falhas históricas quando há job mais novo e efetivo verde |
-| CDEX-055 | 🟡 Média | Arquivos com `#` existem dentro do escopo `src/copilot/docs`, não apenas na raiz | `src/copilot/docs/# Auditoria Cloudflare — MCP externo.md`; `src/copilot/docs/# Plano completo de patches OAuth.md` | Renomear para nomes ASCII/slug sem `#` e atualizar links; mitiga glob/shell/markdown tooling bugs |
-| CDEX-056 | 🟠 Alta | Monólito crítico de OAuth concentra issuer, PAR, DCR/CIMD, PKCE, DPoP, refresh rotation, JWKS, SSRF e logs no mesmo arquivo | `src/copilot/mcp/control-plane/dev-oauth.js`: ~157KB, versão interna 1.6.0, mais de 4.200 linhas, 12 exports | Dividir por módulos: issuer metadata, request parsing, client metadata fetch, token service, refresh store, DPoP/private_key_jwt, diagnostics/logging |
-| CDEX-057 | 🟠 Alta | Comando BYOK/model-gateway virou macroarquivo de altíssima entropia | `src/copilot/terminal/commands/byok.js`: 376.989 bytes, modificado em 2026-06-12 | Separar parser, renderers, provider commands, sqlite/catalog actions, live-test commands e redaction; manter façade compatível |
-| CDEX-058 | 🟡 Média | Outros arquivos de terminal ainda excedem orçamento saudável de manutenção | `session.js` ~127KB; `sdk.js` ~113KB; `events/sdk-session-events.js` ~106KB | Adotar budget por arquivo (ex: soft 40KB, hard 80KB) com exceções documentadas; refatorar por subdomínio |
-| CDEX-059 | 🟠 Alta | Store SQLite do model-gateway é monolítica e security/performance-critical | `src/copilot/model-gateway/catalog/sqlite-catalog-store.js`: 141.743 bytes; depende de decisões L2/cache/catalog | Separar migrations/schema, prepared statements, retention, query/search, refresh log e diagnostics; adicionar contract tests de lock/busy timeout |
-| CDEX-060 | 🟡 Média | `src/copilot/docs` contém documentos gigantes dentro do hot path de árvore/índice | Docs em `terminal` e `model-gateway` passam de centenas de KB; um roadmap terminal passa de 695KB | Mover docs históricas para archive fora do hot path ou marcar exclusões no índice; manter docs operacionais curtas no escopo ativo |
-| CDEX-061 | 🟠 Alta | Superfície de 100 tools é poderosa, mas pode degradar tool selection e custo de contexto | `mcp_tools_status`: 100 tools; GitHub recomenda toolsets menores por performance/segurança/acurácia | Criar perfis por host: `chatgpt-default`, `chatgpt-maintenance`, `claude-audit`, `local-admin`; medir envelope `tools/list` por perfil |
-| CDEX-062 | 🟡 Média | Apps SDK widget/CSP e Company Knowledge ainda não existem | `mcp_apps_sdk_readiness`: `hasWidgetResource=false`, `searchFetchToolsDetected=false` | Não gastar tempo com CSP antes de widget; planejar resource widget só se houver UX concreta; para CK, criar ferramentas `search/fetch` exatas quando o corpus justificar |
-| CDEX-063 | 🟠 Alta | OTEL existe, mas os spans de fases MCP continuam pendentes | Roadmap 5.5.3 permanece aberto; docs oficiais do Copilot SDK tratam OTEL como trilha nativa | Instrumentar `authorization`, `handler`, `resultSize`, `cloudflareEdge`, `toolPayloadAudit`, propagando `traceparent` em tool invocations |
-| CDEX-064 | 🟡 Média | Prefetch L1 ainda não é orientado por telemetria real | Roadmap 5.1.3/5.1.4 abertos | Derivar hotset dos últimos jobs/sessões, invalidar por mtime/hash e medir L1 hit ratio antes/depois |
-| CDEX-065 | 🟠 Alta | Benchmark QUIC vs auto/http2 segue como decisão aberta apesar de scripts prontos | Scripts `copilot:mcp:quic:*`, `h2:*` e `mcp_cloudflare_transport_benchmark_plan` existem; roadmap 5.6 aberto | Executar benchmark controlado com p50/p95/p99 e registrar artefato canônico em docs Cloudflare |
-| CDEX-066 | 🟠 Alta | Rotação de chaves OAuth continua sem runbook final | Roadmap 6.3 aberto; `dev-oauth.js` já tem ES256, legacy overlap, `kid`, key file e key rotation flag | Criar `MCP-OAUTH-KEY-ROTATION.md`, tool plan-only e testes de rollover com JWKS overlap/grace period |
-| CDEX-067 | 🟡 Média | Node 24.5+ permite estudar `node:sqlite`, mas migração imediata seria prematura | `better-sqlite3` em produção; Node docs indicam release candidate só em Node 25.7 | Manter `better-sqlite3`; criar branch experimental de compat layer para `node:sqlite` somente com benchmark e feature flag |
-| CDEX-068 | 🟡 Média | Exports/import maps do SDK interno já são amplos e podem cristalizar APIs experimentais | `package.json` exporta `./copilot/sdk/rpc/experimental` e vários aliases `#copilot/sdk/*` | Definir semver interno: `experimental` sempre feature-gated; gerar API report para evitar vazamento de contrato instável |
-| CDEX-069 | 🟡 Média | O pacote usa `@types/node ^25.9.2` enquanto runtime alvo declarado é Node 24+ | `package.json`: engines Node >=24; devDependency `@types/node ^25.9.2` | Avaliar pin para tipos Node 24 LTS ou matriz dupla; evita usar tipos/APIs Node 25 por acidente no código Node 24.5+ |
-| CDEX-070 | 🟢 Oportunidade | GitHub Copilot SDK 1.0 já tem trilhas oficiais de MCP, BYOK, streaming events e OTEL | `package.json` em `@github/copilot-sdk ^1.0.0`; docs oficiais confirmam trilhas | Transformar o wrapper `src/copilot/sdk` em camada de compat/observabilidade, não em fork conceitual do SDK oficial |
+| ID       | Severidade      | Achado                                                                                                                      | Evidência local                                                                                                                  | Recomendação                                                                                                                                                             |
+| -------- | --------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| CDEX-052 | 🟠 Alta         | O documento ainda referencia MCP 2025-06-18, enquanto o código e a documentação atual já apontam para MCP 2025-11-25        | `dev-oauth.js` menciona MCP 2025-11-25 em comentários de `CIMD` e resource indicators; refs finais ainda listavam 2025-06-18     | Atualizar matriz de compatibilidade para 2025-11-25; manter testes de OAuth/resource indicator contra esse baseline                                                      |
+| CDEX-053 | 🟡 Média        | Baseline histórico do relatório cita SHAs anteriores; estado atual real é `HEAD 403252ca`                                   | `repo_status`: branch `main`, worktree limpo, head `403252ca`                                                                    | Toda revalidação futura deve registrar HEAD, job id e data absoluta antes de marcar PASS                                                                                 |
+| CDEX-054 | 🟠 Alta         | Dashboard de validação pode induzir leitura errada quando há jobs antigos falhos                                            | Antes do novo run, `unit-copilot` efetivo apontava job antigo `97959911...` com falha; após `suite-copilot-fast`, efetivo passou | Manter política de “rodar dashboard + job novo” antes de decisões; opcional: ocultar falhas históricas quando há job mais novo e efetivo verde                           |
+| CDEX-055 | 🟡 Média        | Arquivos com `#` existem dentro do escopo `src/copilot/docs`, não apenas na raiz                                            | `src/copilot/docs/# Auditoria Cloudflare — MCP externo.md`; `src/copilot/docs/# Plano completo de patches OAuth.md`              | Renomear para nomes ASCII/slug sem `#` e atualizar links; mitiga glob/shell/markdown tooling bugs                                                                        |
+| CDEX-056 | 🟠 Alta         | Monólito crítico de OAuth concentra issuer, PAR, DCR/CIMD, PKCE, DPoP, refresh rotation, JWKS, SSRF e logs no mesmo arquivo | `src/copilot/mcp/control-plane/dev-oauth.js`: ~157KB, versão interna 1.6.0, mais de 4.200 linhas, 12 exports                     | Dividir por módulos: issuer metadata, request parsing, client metadata fetch, token service, refresh store, DPoP/private_key_jwt, diagnostics/logging                    |
+| CDEX-057 | 🟠 Alta         | Comando BYOK/model-gateway virou macroarquivo de altíssima entropia                                                         | `src/copilot/terminal/commands/byok.js`: 376.989 bytes, modificado em 2026-06-12                                                 | Separar parser, renderers, provider commands, sqlite/catalog actions, live-test commands e redaction; manter façade compatível                                           |
+| CDEX-058 | 🟡 Média        | Outros arquivos de terminal ainda excedem orçamento saudável de manutenção                                                  | `session.js` ~127KB; `sdk.js` ~113KB; `events/sdk-session-events.js` ~106KB                                                      | Adotar budget por arquivo (ex: soft 40KB, hard 80KB) com exceções documentadas; refatorar por subdomínio                                                                 |
+| CDEX-059 | 🟠 Alta         | Store SQLite do model-gateway é monolítica e security/performance-critical                                                  | `src/copilot/model-gateway/catalog/sqlite-catalog-store.js`: 141.743 bytes; depende de decisões L2/cache/catalog                 | Separar migrations/schema, prepared statements, retention, query/search, refresh log e diagnostics; adicionar contract tests de lock/busy timeout                        |
+| CDEX-060 | 🟡 Média        | `src/copilot/docs` contém documentos gigantes dentro do hot path de árvore/índice                                           | Docs em `terminal` e `model-gateway` passam de centenas de KB; um roadmap terminal passa de 695KB                                | Mover docs históricas para archive fora do hot path ou marcar exclusões no índice; manter docs operacionais curtas no escopo ativo                                       |
+| CDEX-061 | 🟠 Alta         | Superfície de 100 tools é poderosa, mas pode degradar tool selection e custo de contexto                                    | `mcp_tools_status`: 100 tools; GitHub recomenda toolsets menores por performance/segurança/acurácia                              | Criar perfis por host: `chatgpt-default`, `chatgpt-maintenance`, `claude-audit`, `local-admin`; medir envelope `tools/list` por perfil                                   |
+| CDEX-062 | 🟡 Média        | Apps SDK widget/CSP e Company Knowledge ainda não existem                                                                   | `mcp_apps_sdk_readiness`: `hasWidgetResource=false`, `searchFetchToolsDetected=false`                                            | Não gastar tempo com CSP antes de widget; planejar resource widget só se houver UX concreta; para CK, criar ferramentas `search/fetch` exatas quando o corpus justificar |
+| CDEX-063 | 🟠 Alta         | OTEL existe, mas os spans de fases MCP continuam pendentes                                                                  | Roadmap 5.5.3 permanece aberto; docs oficiais do Copilot SDK tratam OTEL como trilha nativa                                      | Instrumentar `authorization`, `handler`, `resultSize`, `cloudflareEdge`, `toolPayloadAudit`, propagando `traceparent` em tool invocations                                |
+| CDEX-064 | 🟡 Média        | Prefetch L1 ainda não é orientado por telemetria real                                                                       | Roadmap 5.1.3/5.1.4 abertos                                                                                                      | Derivar hotset dos últimos jobs/sessões, invalidar por mtime/hash e medir L1 hit ratio antes/depois                                                                      |
+| CDEX-065 | 🟠 Alta         | Benchmark QUIC vs auto/http2 segue como decisão aberta apesar de scripts prontos                                            | Scripts `copilot:mcp:quic:*`, `h2:*` e `mcp_cloudflare_transport_benchmark_plan` existem; roadmap 5.6 aberto                     | Executar benchmark controlado com p50/p95/p99 e registrar artefato canônico em docs Cloudflare                                                                           |
+| CDEX-066 | 🟠 Alta         | Rotação de chaves OAuth continua sem runbook final                                                                          | Roadmap 6.3 aberto; `dev-oauth.js` já tem ES256, legacy overlap, `kid`, key file e key rotation flag                             | Criar `MCP-OAUTH-KEY-ROTATION.md`, tool plan-only e testes de rollover com JWKS overlap/grace period                                                                     |
+| CDEX-067 | 🟡 Média        | Node 24.5+ permite estudar `node:sqlite`, mas migração imediata seria prematura                                             | `better-sqlite3` em produção; Node docs indicam release candidate só em Node 25.7                                                | Manter `better-sqlite3`; criar branch experimental de compat layer para `node:sqlite` somente com benchmark e feature flag                                               |
+| CDEX-068 | 🟡 Média        | Exports/import maps do SDK interno já são amplos e podem cristalizar APIs experimentais                                     | `package.json` exporta `./copilot/sdk/rpc/experimental` e vários aliases `#copilot/sdk/*`                                        | Definir semver interno: `experimental` sempre feature-gated; gerar API report para evitar vazamento de contrato instável                                                 |
+| CDEX-069 | 🟡 Média        | O pacote usa `@types/node ^25.9.2` enquanto runtime alvo declarado é Node 24+                                               | `package.json`: engines Node >=24; devDependency `@types/node ^25.9.2`                                                           | Avaliar pin para tipos Node 24 LTS ou matriz dupla; evita usar tipos/APIs Node 25 por acidente no código Node 24.5+                                                      |
+| CDEX-070 | 🟢 Oportunidade | GitHub Copilot SDK 1.0 já tem trilhas oficiais de MCP, BYOK, streaming events e OTEL                                        | `package.json` em `@github/copilot-sdk ^1.0.0`; docs oficiais confirmam trilhas                                                  | Transformar o wrapper `src/copilot/sdk` em camada de compat/observabilidade, não em fork conceitual do SDK oficial                                                       |
 
 ### 5-B.4 Roadmap incremental desta rodada
 
 #### P0 — Baseline e segurança documental
 
-- [ ] Atualizar todas as referências MCP 2025-06-18 para 2025-11-25 onde a semântica realmente mudou.
-- [ ] Renomear os dois arquivos `src/copilot/docs/# ...md` para slugs sem `#` e corrigir links internos.
+- [ ] Atualizar todas as referências MCP 2025-06-18 para 2025-11-25 onde a semântica realmente
+      mudou.
+- [ ] Renomear os dois arquivos `src/copilot/docs/# ...md` para slugs sem `#` e corrigir links
+      internos.
 - [ ] Adicionar cabeçalho “validated at HEAD/job id” em futuras auditorias.
 
 #### P1 — Manutenibilidade dos monólitos críticos
 
 - [ ] Refatorar `dev-oauth.js` em módulos de OAuth sem mudar superfície pública.
 - [ ] Refatorar `terminal/commands/byok.js` por subcomandos e renderers.
-- [ ] Refatorar `model-gateway/catalog/sqlite-catalog-store.js` por store/migrations/retention/queries.
+- [ ] Refatorar `model-gateway/catalog/sqlite-catalog-store.js` por
+      store/migrations/retention/queries.
 - [ ] Criar gate de filesize por `src/copilot` com allowlist explícita para exceções.
 
 #### P2 — Observabilidade e performance
@@ -1126,24 +1141,27 @@ confinamento de artefatos de jobs. Último resumo canônico recursivo:
 
 #### P3 — Produto e integração rica
 
-- [ ] Planejar Apps SDK widget apenas após caso de uso concreto; antes disso, manter CSP fora da prioridade.
-- [ ] Implementar Company Knowledge `search/fetch` somente se houver corpus indexável com benefício claro.
-- [ ] Transformar `src/copilot/sdk` em façade explícita do `@github/copilot-sdk` 1.0, com API report e testes de compatibilidade.
+- [ ] Planejar Apps SDK widget apenas após caso de uso concreto; antes disso, manter CSP fora da
+      prioridade.
+- [ ] Implementar Company Knowledge `search/fetch` somente se houver corpus indexável com benefício
+      claro.
+- [ ] Transformar `src/copilot/sdk` em façade explícita do `@github/copilot-sdk` 1.0, com API report
+      e testes de compatibilidade.
 
 ---
 
 ## 6. Prioridade de Execução Atualizada
 
-| Prioridade | Item                                                 | Estado         | Próxima evidência necessária                       |
-| ---------- | ---------------------------------------------------- | -------------- | -------------------------------------------------- |
-| P1         | JWKS warmup não bloqueante                          | Validado live  | 2 chaves; warmup 614ms; primeira auth 2ms          |
-| P2         | Decisão medida sobre ativação do L2 por perfil      | Em aberto      | Hit ratio, latência e custo no `copilot.sqlite`    |
-| P2         | Benchmark QUIC vs auto/http2                        | Em aberto      | p50/p95/p99 controlados                            |
-| P2         | Orçamento do envelope `tools/list`                  | Validado live  | 113.236/131.072 bytes local e remoto                |
-| P2         | Rotação de chaves OAuth com grace period            | Em aberto      | Design, runbook e testes de rollover               |
-| P3         | Instrumentar spans MCP por fase                     | Parcial        | Traces authorization/handler/resultSize            |
-| P3         | Hotset de prefetch MCP                              | Parcial        | Top arquivos e ganho medido de L1                  |
-| P4         | SDK v2                                              | Bloqueado upstream | Release estável oficial                         |
+| Prioridade | Item                                           | Estado             | Próxima evidência necessária                    |
+| ---------- | ---------------------------------------------- | ------------------ | ----------------------------------------------- |
+| P1         | JWKS warmup não bloqueante                     | Validado live      | 2 chaves; warmup 614ms; primeira auth 2ms       |
+| P2         | Decisão medida sobre ativação do L2 por perfil | Em aberto          | Hit ratio, latência e custo no `copilot.sqlite` |
+| P2         | Benchmark QUIC vs auto/http2                   | Em aberto          | p50/p95/p99 controlados                         |
+| P2         | Orçamento do envelope `tools/list`             | Validado live      | 113.236/131.072 bytes local e remoto            |
+| P2         | Rotação de chaves OAuth com grace period       | Em aberto          | Design, runbook e testes de rollover            |
+| P3         | Instrumentar spans MCP por fase                | Parcial            | Traces authorization/handler/resultSize         |
+| P3         | Hotset de prefetch MCP                         | Parcial            | Top arquivos e ganho medido de L1               |
+| P4         | SDK v2                                         | Bloqueado upstream | Release estável oficial                         |
 
 ---
 
@@ -1153,23 +1171,26 @@ Para cada fase, os critérios de conclusão são:
 
 | Fase | Critério de Sucesso                                                                       |
 | ---- | ----------------------------------------------------------------------------------------- |
-| 1    | `unit-copilot` 0 falhas, workspace publicado e runtime live saudável                       |
+| 1    | `unit-copilot` 0 falhas, workspace publicado e runtime live saudável                      |
 | 2    | Autorização cold-start < 30ms; L1 hit ratio > 50% em sessão quente; smoke OK no startup   |
 | 3    | 0 barrels violados e surface profiles funcionais; docs globais são N/A neste escopo       |
 | 4    | Decisão de manter `better-sqlite3` documentada; SDK v2 aguarda release estável            |
 | 5    | L2 hit ratio > 40% em sessão quente; p99 QUIC < 500ms ou decisão de transport documentada |
-| 6    | SSRF/DNS privado bloqueados e replay cache sobrevive restart; rotação de chaves pendente   |
-| 7    | Contract tests de surface passando; percentual de coverage hooks ainda não medido          |
+| 6    | SSRF/DNS privado bloqueados e replay cache sobrevive restart; rotação de chaves pendente  |
+| 7    | Contract tests de surface passando; percentual de coverage hooks ainda não medido         |
 
 ---
 
 ## 8. Referências Consultadas
 
 - MCP Specification 2025-11-25: https://modelcontextprotocol.io/specification/2025-11-25
-- @modelcontextprotocol/sdk v1.29.x / v2 pre-alpha: https://github.com/modelcontextprotocol/typescript-sdk
-- GitHub Copilot SDK Getting Started: https://docs.github.com/en/copilot/how-tos/copilot-sdk/getting-started
+- @modelcontextprotocol/sdk v1.29.x / v2 pre-alpha:
+  https://github.com/modelcontextprotocol/typescript-sdk
+- GitHub Copilot SDK Getting Started:
+  https://docs.github.com/en/copilot/how-tos/copilot-sdk/getting-started
 - GitHub Copilot SDK MCP: https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/mcp
-- GitHub Copilot SDK OpenTelemetry: https://docs.github.com/en/copilot/how-tos/copilot-sdk/observability/opentelemetry
+- GitHub Copilot SDK OpenTelemetry:
+  https://docs.github.com/en/copilot/how-tos/copilot-sdk/observability/opentelemetry
 - GitHub Copilot MCP overview/toolsets: https://docs.github.com/en/copilot/concepts/context/mcp
 - OpenAI Apps SDK: https://developers.openai.com/apps-sdk/reference
 - RFC 9728 (PRM): https://www.rfc-editor.org/rfc/rfc9728.html

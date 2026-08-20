@@ -286,9 +286,7 @@ describe('terminal/io-activity-events', () => {
     });
 
     it('não imprime I/O vivo quando a tool correlacionada ficou silenciosa por pergunta humana', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
         const { clearTerminalIoActivityProjection, setupTerminalIoActivityEvents } =
             await import('../../../../src/copilot/terminal/events/io-activity-events.js');
         const registry = createToolCallRegistry();

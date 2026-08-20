@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,6 +10,7 @@ import {
     comparableModelGatewayRuntimeHealthRecord,
     diffModelGatewayRuntimeHealthSnapshots,
     flushByokProviderHealth,
+    hydrateByokProviderHealthFromDisk,
     readByokProviderHealthState,
     readByokProviderModelHealth,
     recordByokProviderModelAgentProbeFailure,
@@ -59,6 +59,7 @@ describe('BYOK provider chat health state', () => {
         });
         await flushByokProviderHealth();
         resetByokProviderHealthForTests();
+        await hydrateByokProviderHealthFromDisk();
 
         const health = readByokProviderModelHealth({
             routeProfile: 'cerebras-free',
@@ -100,6 +101,7 @@ describe('BYOK provider chat health state', () => {
         });
         await flushByokProviderHealth();
         resetByokProviderHealthForTests();
+        await hydrateByokProviderHealthFromDisk();
 
         const health = readByokProviderModelHealth({
             routeProfile: 'kilo',
@@ -141,6 +143,7 @@ describe('BYOK provider chat health state', () => {
         });
         await flushByokProviderHealth();
         resetByokProviderHealthForTests();
+        await hydrateByokProviderHealthFromDisk();
 
         const health = readByokProviderModelHealth({
             routeProfile: 'kilo',
@@ -179,6 +182,7 @@ describe('BYOK provider chat health state', () => {
             })}\n`,
             'utf8',
         );
+        await hydrateByokProviderHealthFromDisk();
 
         const health = readByokProviderModelHealth({
             routeProfile: 'legacy',
@@ -227,6 +231,7 @@ describe('BYOK provider chat health state', () => {
         });
         await flushByokProviderHealth();
         resetByokProviderHealthForTests();
+        await hydrateByokProviderHealthFromDisk();
 
         const health = readByokProviderModelHealth({
             routeProfile: 'openrouter-free',

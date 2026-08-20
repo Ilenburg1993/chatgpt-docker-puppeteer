@@ -16,15 +16,12 @@ vi.mock('../../../../../src/copilot/terminal/byok/live-model-switch.js', () => (
 }));
 
 vi.mock('#copilot/model-gateway', async () => ({
-    ...(await vi.importActual(
-        '../../../../../src/copilot/model-gateway/control-plane/deferred-route-operation.js'
-    )),
+    ...(await vi.importActual('../../../../../src/copilot/model-gateway/control-plane/deferred-route-operation.js')),
     SqliteModelGatewayCatalogStore: class {},
 }));
 
-const { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } = await import(
-    '../../../../../src/copilot/terminal/byok/deferred-route-promotion.js'
-);
+const { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } =
+    await import('../../../../../src/copilot/terminal/byok/deferred-route-promotion.js');
 
 function deferredOperation() {
     return {

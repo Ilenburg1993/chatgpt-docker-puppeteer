@@ -6,6 +6,11 @@
  */
 
 export {
+    applyModelGatewayEligibilityToSnapshot,
+    evaluateModelGatewayCatalogEligibility,
+    modelEligibilityDecisionKey,
+} from './catalog-snapshot.js';
+export {
     MODEL_GATEWAY_ELIGIBILITY_DISPOSITION,
     MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS,
     MODEL_GATEWAY_ELIGIBILITY_RUN_STATUS,
@@ -14,9 +19,9 @@ export {
     createModelEligibilityDecision,
     createModelEligibilityRun,
 } from './contracts.js';
+export { diffModelGatewayEligibilityDecisions, summarizeModelGatewayEligibilityDiff } from './diff.js';
 export { evaluateModelGatewayEligibility } from './evaluator.js';
 export { explainModelGatewayEligibilityDecision } from './explain.js';
-export { diffModelGatewayEligibilityDecisions, summarizeModelGatewayEligibilityDiff } from './diff.js';
 export {
     MODEL_GATEWAY_ELIGIBILITY_POLICY_PRESET,
     getModelGatewayEligibilityPolicyPreset,
@@ -27,8 +32,3 @@ export {
     filterModelGatewayRuntimeEligibilityOverlayDecisions,
     isModelGatewayRuntimeEligibilityOverlayDecision,
 } from './runtime-overlay-decisions.js';
-export {
-    applyModelGatewayEligibilityToSnapshot,
-    evaluateModelGatewayCatalogEligibility,
-    modelEligibilityDecisionKey,
-} from './catalog-snapshot.js';

@@ -1,18 +1,18 @@
 #!/usr/bin/env node
+import { config as loadDotenv } from 'dotenv';
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { config as loadDotenv } from 'dotenv';
 import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
+    auditModelGatewayCatalogSnapshotIntegrity,
+    auditModelGatewayValueRedaction,
+    classifyModelGatewayCatalogImporterFailure,
+    collectModelGatewaySecretAuditEnvValues,
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
     JsonModelGatewayCatalogStore,
-    auditModelGatewayCatalogSnapshotIntegrity,
-    auditModelGatewayValueRedaction,
-    classifyModelGatewayCatalogImporterFailure,
-    collectModelGatewaySecretAuditEnvValues,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     planModelGatewayCatalogRefresh,
     redactModelGatewayAuditedValue,
@@ -302,11 +302,7 @@ if (result.writePolicy.committed) {
 const importerFailures = progressEvents
     .filter((event) => event['phase'] === 'importer:importer_failed')
     .map((event) => ({
-        importerId: String(
-            isRecord(event['importer'])
-                ? event['importer']['importerId']
-                : event['importerId'],
-        ),
+        importerId: String(isRecord(event['importer']) ? event['importer']['importerId'] : event['importerId']),
         providerId: String(event['providerId'] ?? ''),
         sourceId: String(event['sourceId'] ?? ''),
         sourceKind: String(event['sourceKind'] ?? ''),

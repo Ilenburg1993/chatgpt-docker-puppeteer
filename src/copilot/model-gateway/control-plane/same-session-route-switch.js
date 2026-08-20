@@ -12,31 +12,30 @@ import { createHash, randomUUID } from 'node:crypto';
 
 export const MODEL_GATEWAY_SAME_SESSION_ROUTE_SWITCH_DEFAULT_TIMEOUT_MS = 45_000;
 
-
 /**
  * @typedef {Record<string, unknown> & {
- *   schemaVersion: string;
- *   operationId: string;
- *   idempotencyKey: string;
- *   sessionId: string;
- *   previousRoute: Record<string, unknown>;
- *   targetRoute: Record<string, unknown>;
- *   state: string;
- *   verified: boolean;
- *   rollback: unknown;
- *   error: string | null;
- *   requiresNewSession: boolean;
- *   reconciliationRequired: boolean;
- *   timeoutMs: number;
- *   transitions: Array<Record<string, unknown>>;
- *   createdAt: string;
- *   updatedAt: string;
- *   deferred?: boolean;
- *   deferReason?: string;
- *   deferDetails?: Record<string, unknown>;
- *   promotionAuthorization?: unknown;
- *   retryable?: boolean;
- *   replayed?: boolean;
+ *     schemaVersion: string;
+ *     operationId: string;
+ *     idempotencyKey: string;
+ *     sessionId: string;
+ *     previousRoute: Record<string, unknown>;
+ *     targetRoute: Record<string, unknown>;
+ *     state: string;
+ *     verified: boolean;
+ *     rollback: unknown;
+ *     error: string | null;
+ *     requiresNewSession: boolean;
+ *     reconciliationRequired: boolean;
+ *     timeoutMs: number;
+ *     transitions: Record<string, unknown>[];
+ *     createdAt: string;
+ *     updatedAt: string;
+ *     deferred?: boolean;
+ *     deferReason?: string;
+ *     deferDetails?: Record<string, unknown>;
+ *     promotionAuthorization?: unknown;
+ *     retryable?: boolean;
+ *     replayed?: boolean;
  * }} ModelGatewaySameSessionRouteSwitchResult
  */
 
@@ -97,7 +96,7 @@ export async function executeModelGatewaySameSessionRouteSwitch(input) {
         ? createModelGatewaySameSessionRouteSwitchOperationId(input.idempotencyKey)
         : `same-session-route-switch:${randomUUID()}`;
     const record = input.record ?? (async () => undefined);
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const transitions = [];
     /** @type {ModelGatewaySameSessionRouteSwitchResult} */
     const operation = {
@@ -150,7 +149,11 @@ export async function executeModelGatewaySameSessionRouteSwitch(input) {
         }
         await transition('reattach_requested');
         targetReattachStarted = true;
-        const target = await withTimeout(input.reattach(input.targetRoute, input.sessionId), timeoutMs, 'reattach_target');
+        const target = await withTimeout(
+            input.reattach(input.targetRoute, input.sessionId),
+            timeoutMs,
+            'reattach_target',
+        );
         if (target.sessionId !== input.sessionId) {
             throw new Error(
                 `SAME_SESSION_IDENTITY_CHANGED: expected='${input.sessionId}' actual='${target.sessionId}'`,
@@ -179,9 +182,7 @@ export async function executeModelGatewaySameSessionRouteSwitch(input) {
             });
             return { ...operation, transitions: [...transitions] };
         }
-        const targetOutcomeUnknown = failure.startsWith(
-            'SAME_SESSION_ROUTE_SWITCH_TIMEOUT: phase=reattach_target ',
-        );
+        const targetOutcomeUnknown = failure.startsWith('SAME_SESSION_ROUTE_SWITCH_TIMEOUT: phase=reattach_target ');
         operation['reconciliationRequired'] = targetOutcomeUnknown;
         if (targetOutcomeUnknown) {
             operation['rollback'] = {

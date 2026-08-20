@@ -14,14 +14,14 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-health-clear.mjs [--json] [--provider ID] [--model ID] [--profile ID] [--all] [--apply]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-health-clear.mjs [--json] [--provider ID] [--model ID] [--profile ID] [--all] [--apply]
 
 Preview or clear already-observed BYOK runtime health. This never calls providers and never mutates canonical metadata.
 Without --apply it is a dry-run preview. Use --all --apply only for deliberate full operational health reset.
 `);
     process.exit(0);
 }
-
 
 /** @param {unknown} value */
 function clean(value) {
@@ -37,7 +37,7 @@ function readColonArg(name) {
 
 /**
  * @param {ReturnType<typeof listByokProviderModelHealth>[number]} record
- * @param {{ providerId: string | null, providerModel: string | null, routeProfile: string | null }} scope
+ * @param {{ providerId: string | null; providerModel: string | null; routeProfile: string | null }} scope
  * @param {boolean} all
  */
 function matchesScope(record, scope, all) {

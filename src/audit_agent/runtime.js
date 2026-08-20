@@ -46,9 +46,10 @@ function _derivePatchDraftFromContext(job, contextPack) {
     const targetFile = String(scope.filePath || scope.file_path || 'src/main.js');
     const ragResults = _asArray(payloads?.rag_search?.result?.structuredContent?.data?.results);
     const ragFirst = ragResults[0];
-    const ragRecord = ragFirst && typeof ragFirst === 'object' && !Array.isArray(ragFirst)
-        ? /** @type {Record<string, unknown>} */ (ragFirst)
-        : null;
+    const ragRecord =
+        ragFirst && typeof ragFirst === 'object' && !Array.isArray(ragFirst)
+            ? /** @type {Record<string, unknown>} */ (ragFirst)
+            : null;
     const referencesCount = Number(mcpTools?.lsp_references?.locations_count || 0);
     const diagnosticsCount = Number(mcpTools?.lsp_diagnostics?.diagnostics_count || 0);
     const symbolsCount = Number(mcpTools?.lsp_document_symbols?.symbols_count || 0);

@@ -52,12 +52,13 @@ import {
  *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  *
- * @typedef {Partial<SessionConfig> & Partial<ResumeSessionConfig> & {
- *     configDir?: string;
- *     createSessionFsHandler?: CreateSessionFsProvider;
- *     disableResume?: boolean;
- *     cloud?: unknown;
- * }} CompatSessionConfig
+ * @typedef {Partial<SessionConfig> &
+ *     Partial<ResumeSessionConfig> & {
+ *         configDir?: string;
+ *         createSessionFsHandler?: CreateSessionFsProvider;
+ *         disableResume?: boolean;
+ *         cloud?: unknown;
+ *     }} CompatSessionConfig
  */
 
 /**
@@ -396,8 +397,8 @@ export class SessionConfigBuilder {
     }
 
     /**
-     * Define o soft cap de AI Credits da janela contábil da sessão. Omitir mantém o comportamento do SDK sem cap
-     * local; valores não positivos não são aceitos para evitar um bloqueio acidental de todas as chamadas de modelo.
+     * Define o soft cap de AI Credits da janela contábil da sessão. Omitir mantém o comportamento do SDK sem cap local;
+     * valores não positivos não são aceitos para evitar um bloqueio acidental de todas as chamadas de modelo.
      *
      * @param {SessionLimitsConfig} limits
      * @returns {this}

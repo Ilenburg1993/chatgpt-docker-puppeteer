@@ -121,10 +121,7 @@ export async function runConfiguredByokChatProbe(options = {}) {
             finalContent: '',
             observedFinalEvent: false,
             sessionId: null,
-            errors:
-                byokState.errors.length > 0
-                    ? [...byokState.errors]
-                    : ['BYOK não está ativo/pronto para probe.'],
+            errors: byokState.errors.length > 0 ? [...byokState.errors] : ['BYOK não está ativo/pronto para probe.'],
             warnings: [...byokState.warnings],
             providerFailure: null,
         };

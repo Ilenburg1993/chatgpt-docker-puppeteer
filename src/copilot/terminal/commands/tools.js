@@ -85,10 +85,14 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
     }
     if ((entry.filters?.length ?? 0) > 0) {
         lines.push(
-            terminalThemeRow('Filtros', entry.filters.map((filter) => compactTerminalDiagnosticText(filter, 48)).join(' · '), {
-                role: 'muted',
-                width: 22,
-            }),
+            terminalThemeRow(
+                'Filtros',
+                entry.filters.map((filter) => compactTerminalDiagnosticText(filter, 48)).join(' · '),
+                {
+                    role: 'muted',
+                    width: 22,
+                },
+            ),
         );
     }
     if ((entry.directoryTargets?.length ?? 0) > 0) {
@@ -123,7 +127,9 @@ function renderLifecycleDiagnosticLine(entry, options = {}) {
         lines.push(terminalThemeRow('Rastreio', refs, { role: 'muted', width: 13 }));
     }
     if (includeRawDetails && typeof entry.updatedAt === 'number') {
-        lines.push(terminalThemeRow('Atualizado', new Date(entry.updatedAt).toISOString(), { role: 'muted', width: 13 }));
+        lines.push(
+            terminalThemeRow('Atualizado', new Date(entry.updatedAt).toISOString(), { role: 'muted', width: 13 }),
+        );
     }
     return lines.join('\n');
 }
@@ -216,9 +222,10 @@ function renderFsToolMetadataSummary(metadata) {
     const risk = typeof metadata['risk'] === 'string' ? metadata['risk'] : 'unknown';
     const sideEffect = typeof metadata['sideEffect'] === 'string' ? metadata['sideEffect'] : 'unknown';
     const skip = metadata['effectiveSkipPermission'] === true ? 'autonomia' : 'prompt seletivo';
-    const caps = metadata['capabilities'] && typeof metadata['capabilities'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (metadata['capabilities'])
-        : {};
+    const caps =
+        metadata['capabilities'] && typeof metadata['capabilities'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (metadata['capabilities'])
+            : {};
     const capabilityLabels = [
         caps['dryRun'] === true ? 'dry-run' : null,
         caps['hashPrecondition'] === true ? 'hash' : null,
@@ -275,7 +282,13 @@ function printFilesystemToolDiagnostic(println) {
         ),
     );
     if (entries.length === 0) {
-        println(terminalThemeRow('Estado', 'snapshot sem metadata de filesystem; rode /tools contract para contrato completo', { role: 'warn' }));
+        println(
+            terminalThemeRow(
+                'Estado',
+                'snapshot sem metadata de filesystem; rode /tools contract para contrato completo',
+                { role: 'warn' },
+            ),
+        );
         return;
     }
     for (const metadata of entries) {
@@ -289,9 +302,11 @@ function printFilesystemToolDiagnostic(println) {
             }),
         );
     }
-    println(terminalThemeRow('Mais detalhes', '/tools contract · /tools diag · /fs read <path> · /fs search <pattern>', {
-        role: 'command',
-    }));
+    println(
+        terminalThemeRow('Mais detalhes', '/tools contract · /tools diag · /fs read <path> · /fs search <pattern>', {
+            role: 'command',
+        }),
+    );
 }
 
 /**
@@ -314,9 +329,7 @@ function printToolFailureDiagnostic(println, projection, options = {}) {
         })
         .filter((entry) => entry.errors > 0 || entry.blocked > 0)
         .sort((a, b) => b.errors + b.blocked - (a.errors + a.blocked) || b.calls - a.calls);
-    const failedRecent = (projection.lifecycle?.recent ?? [])
-        .filter((entry) => entry.status === 'failed')
-        .slice(0, 10);
+    const failedRecent = (projection.lifecycle?.recent ?? []).filter((entry) => entry.status === 'failed').slice(0, 10);
 
     println('');
     println(
@@ -327,9 +340,11 @@ function printToolFailureDiagnostic(println, projection, options = {}) {
     );
     if (problematicEntries.length === 0 && failedRecent.length === 0) {
         println(terminalThemeRow('Estado', 'nenhuma falha ou bloqueio observado nesta sessão', { role: 'success' }));
-        println(terminalThemeRow('Mais detalhes', '/tools diag · /events --raw · /events --json compact · /errors', {
-            role: 'command',
-        }));
+        println(
+            terminalThemeRow('Mais detalhes', '/tools diag · /events --raw · /events --json compact · /errors', {
+                role: 'command',
+            }),
+        );
         return;
     }
     for (const entry of problematicEntries.slice(0, 12)) {
@@ -423,7 +438,10 @@ function renderCompactCategorySummary(categories) {
         .slice(0, 6);
     if (entries.length === 0) return 'sem categorias observadas';
     return entries
-        .map((entry) => `${renderCategoryLabel(entry.category)} ${entry.calls}${entry.errors > 0 ? `/${entry.errors} falhas` : ''}`)
+        .map(
+            (entry) =>
+                `${renderCategoryLabel(entry.category)} ${entry.calls}${entry.errors > 0 ? `/${entry.errors} falhas` : ''}`,
+        )
         .join(' · ');
 }
 
@@ -560,7 +578,9 @@ function printToolContractDiagnostic(println, contract, options = {}) {
     println(terminalThemeHeadline('tool', 'Contrato das ferramentas'));
     println(terminalThemeRow('Status', renderContractStatusSummary(contract), { role: renderContractRole(contract) }));
     if (options.includeRisk !== false) {
-        println(terminalThemeRow('Autonomia', renderContractRiskSummary(contract), { role: renderContractRole(contract) }));
+        println(
+            terminalThemeRow('Autonomia', renderContractRiskSummary(contract), { role: renderContractRole(contract) }),
+        );
     }
     const coverage = contract['metadataCoverage'];
     if (options.includeCoverage !== false && coverage && typeof coverage === 'object') {
@@ -575,7 +595,11 @@ function printToolContractDiagnostic(println, contract, options = {}) {
     const issues = Array.isArray(contract['issues']) ? contract['issues'] : [];
     if (issues.length > 0 && maxIssues > 0) {
         const visible = issues.slice(0, maxIssues);
-        println(terminalThemeRow('Achados', countLabel(visible.length, 'achado exibido', 'achados exibidos'), { role: 'muted' }));
+        println(
+            terminalThemeRow('Achados', countLabel(visible.length, 'achado exibido', 'achados exibidos'), {
+                role: 'muted',
+            }),
+        );
         for (const issue of visible) {
             const severity = typeof issue?.['severity'] === 'string' ? issue['severity'] : 'notice';
             const code = typeof issue?.['code'] === 'string' ? issue['code'] : 'ISSUE';
@@ -590,7 +614,12 @@ function printToolContractDiagnostic(println, contract, options = {}) {
             );
         }
         if (issues.length > maxIssues) {
-            println(terminalThemeRow('Omitidas', countLabel(issues.length - maxIssues, 'achado adicional', 'achados adicionais')));
+            println(
+                terminalThemeRow(
+                    'Omitidas',
+                    countLabel(issues.length - maxIssues, 'achado adicional', 'achados adicionais'),
+                ),
+            );
         }
     }
 }
@@ -781,28 +810,43 @@ export function cmdTools({ println }, arg = '') {
     } else {
         println('');
         println(terminalThemeHeadline('tool', 'Ferramentas observadas'));
-        println(terminalThemeRow('Resumo', `${countLabel(entries.length, 'grupo de ação', 'grupos de ação')} já apareceram nesta sessão`));
+        println(
+            terminalThemeRow(
+                'Resumo',
+                `${countLabel(entries.length, 'grupo de ação', 'grupos de ação')} já apareceram nesta sessão`,
+            ),
+        );
         println(terminalThemeRow('Categorias', renderCompactCategorySummary(projection.byCategory ?? {})));
         println('');
     }
 
     if (entries.length === 0) {
         println('');
-        println(terminalThemeHeadline('tool', 'Ferramentas', ['nenhuma observada', wantsDeepDiag ? 'diagnóstico completo' : 'diagnóstico humano']));
-        println(terminalThemeRow('Sessão', 'nenhuma tool usada ainda; mostrando contrato e superfícies carregadas', { role: 'muted' }));
+        println(
+            terminalThemeHeadline('tool', 'Ferramentas', [
+                'nenhuma observada',
+                wantsDeepDiag ? 'diagnóstico completo' : 'diagnóstico humano',
+            ]),
+        );
+        println(
+            terminalThemeRow('Sessão', 'nenhuma tool usada ainda; mostrando contrato e superfícies carregadas', {
+                role: 'muted',
+            }),
+        );
     }
 
     for (const [name, data] of entries) {
-        const d = /**
-         * @type {{
-         *     calls?: number;
-         *     errors?: number;
-         *     blocked?: number;
-         *     avgLatencyMs?: number;
-         *     aliases?: string[];
-         *     kind?: string;
-         * }}
-         */ (data);
+        const d =
+            /**
+             * @type {{
+             *     calls?: number;
+             *     errors?: number;
+             *     blocked?: number;
+             *     avgLatencyMs?: number;
+             *     aliases?: string[];
+             *     kind?: string;
+             * }}
+             */ (data);
         const calls = d.calls ?? 0;
         const errors = d.errors ?? 0;
         const blocked = d.blocked ?? 0;
@@ -831,14 +875,15 @@ export function cmdTools({ println }, arg = '') {
         println('');
         println(terminalThemeHeadline('tool', 'Categorias'));
         for (const [cat, agg] of categoryEntries) {
-            const info = /**
-             * @type {{
-             *     totalCalls?: number;
-             *     totalErrors?: number;
-             *     totalBlocked?: number;
-             *     avgLatencyMs?: number;
-             * }}
-             */ (agg);
+            const info =
+                /**
+                 * @type {{
+                 *     totalCalls?: number;
+                 *     totalErrors?: number;
+                 *     totalBlocked?: number;
+                 *     avgLatencyMs?: number;
+                 * }}
+                 */ (agg);
             println(
                 terminalThemeRow(
                     renderCategoryLabel(cat),
@@ -856,11 +901,33 @@ export function cmdTools({ println }, arg = '') {
         const toolLoad = status.toolLoad;
         println('');
         println(terminalThemeHeadline('tool', 'Superfícies operacionais'));
-        println(terminalThemeRow('Arquivos locais', renderActiveLabel(toolLoad.hasCanonicalLocalFsTools), { role: renderActiveRole(toolLoad.hasCanonicalLocalFsTools) }));
-        println(terminalThemeRow('Terminal local', renderActiveLabel(toolLoad.hasCanonicalLocalExecTools), { role: renderActiveRole(toolLoad.hasCanonicalLocalExecTools) }));
-        println(terminalThemeRow('Workspace via SDK', renderActiveLabel(toolLoad.hasSdkWorkspaceTooling), { role: renderActiveRole(toolLoad.hasSdkWorkspaceTooling) }));
-        println(terminalThemeRow('Terminal SDK legado', toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado', { role: toolLoad.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' }));
-        println(terminalThemeRow('Desabilitadas', renderDisabledToolSummary(toolLoad.disabled.length), { role: toolLoad.disabled.length > 0 ? 'warn' : 'success' }));
+        println(
+            terminalThemeRow('Arquivos locais', renderActiveLabel(toolLoad.hasCanonicalLocalFsTools), {
+                role: renderActiveRole(toolLoad.hasCanonicalLocalFsTools),
+            }),
+        );
+        println(
+            terminalThemeRow('Terminal local', renderActiveLabel(toolLoad.hasCanonicalLocalExecTools), {
+                role: renderActiveRole(toolLoad.hasCanonicalLocalExecTools),
+            }),
+        );
+        println(
+            terminalThemeRow('Workspace via SDK', renderActiveLabel(toolLoad.hasSdkWorkspaceTooling), {
+                role: renderActiveRole(toolLoad.hasSdkWorkspaceTooling),
+            }),
+        );
+        println(
+            terminalThemeRow(
+                'Terminal SDK legado',
+                toolLoad.hasLegacySdkShellToolsLoaded ? 'carregado' : 'não carregado',
+                { role: toolLoad.hasLegacySdkShellToolsLoaded ? 'warn' : 'muted' },
+            ),
+        );
+        println(
+            terminalThemeRow('Desabilitadas', renderDisabledToolSummary(toolLoad.disabled.length), {
+                role: toolLoad.disabled.length > 0 ? 'warn' : 'success',
+            }),
+        );
         if (toolLoad.disabled.length > 0) {
             const disabledRecords = Array.isArray(toolLoad.disabledRecords)
                 ? toolLoad.disabledRecords.map(renderDisabledToolRecord).filter(Boolean)
@@ -875,7 +942,9 @@ export function cmdTools({ println }, arg = '') {
         }
 
         const detailedContract = readTerminalToolRegistrySnapshot().toolContract;
-        printToolContractDiagnostic(println, /** @type {Record<string, any>} */ (detailedContract), { maxIssues: wantsDeepDiag ? 20 : 10 });
+        printToolContractDiagnostic(println, /** @type {Record<string, any>} */ (detailedContract), {
+            maxIssues: wantsDeepDiag ? 20 : 10,
+        });
 
         const lifecycle = projection.lifecycle;
         if (lifecycle) {
@@ -921,7 +990,11 @@ export function cmdTools({ println }, arg = '') {
                       : '/tools all · FS: /tools fs · falhas: /tools failures · contrato: /tools contract · nomes crus: /tools raw · eventos: /events --json compact',
                   { role: 'command' },
               )
-            : terminalThemeRow('Mais detalhes', '/tools diag · /tools fs · /tools failures · contrato: /tools contract · nomes crus: /tools raw', { role: 'command' }),
+            : terminalThemeRow(
+                  'Mais detalhes',
+                  '/tools diag · /tools fs · /tools failures · contrato: /tools contract · nomes crus: /tools raw',
+                  { role: 'command' },
+              ),
     );
     println('');
 }

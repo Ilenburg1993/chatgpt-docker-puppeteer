@@ -10,7 +10,8 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-ready.mjs [--json] [--fail] [--profile ID]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-ready.mjs [--json] [--fail] [--profile ID]
 
 Read-only readiness gate for model-gateway terminal auto mode. It does not call providers, run models or mutate terminal
 state.
@@ -18,10 +19,11 @@ state.
     process.exit(0);
 }
 
-
 /** @returns {Record<string, unknown> | null} */
 function optionalRecord(/** @type {unknown} */ value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value))
+        : null;
 }
 
 function runOps(/** @type {string} */ profile) {
@@ -67,7 +69,11 @@ const automation = optionalRecord(ops?.['automation']);
 const commands = optionalRecord(ops?.['commands']);
 const checks = [
     createCheck('ops_command_ok', opsResult.ok, opsResult.error ?? 'model-gateway:ops returned JSON'),
-    createCheck('catalog_snapshot_active', database?.['activeSnapshotExists'] === true, `source=${database?.['activeSnapshotSource'] ?? '-'}`),
+    createCheck(
+        'catalog_snapshot_active',
+        database?.['activeSnapshotExists'] === true,
+        `source=${database?.['activeSnapshotSource'] ?? '-'}`,
+    ),
     createCheck(
         'sqlite_operational_layers_visible',
         optionalNumber(database?.['automationDecisionRows']) !== null &&
@@ -93,7 +99,11 @@ const checks = [
         `nextCommands=${Array.isArray(automation?.['nextCommands']) ? automation['nextCommands'].length : '-'}`,
         'warn',
     ),
-    createCheck('canonical_commands_available', (optionalNumber(commands?.['commandCount']) ?? 0) >= 20, `commands=${commands?.['commandCount'] ?? '-'}`),
+    createCheck(
+        'canonical_commands_available',
+        (optionalNumber(commands?.['commandCount']) ?? 0) >= 20,
+        `commands=${commands?.['commandCount'] ?? '-'}`,
+    ),
     createCheck(
         'canonical_command_surfaces_available',
         (optionalNumber(commands?.['packageCommandCount']) ?? 0) > 0 &&

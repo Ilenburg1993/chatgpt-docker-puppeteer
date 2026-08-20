@@ -7,12 +7,14 @@ import { mkdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createIoIndexSqlite } from '../../../../src/copilot/infra/io-index-sqlite.js';
+import { buildIndexPathTreeRange } from '../../../../src/copilot/infra/index-store/sqlite/paths.js';
 import {
     ensureIoIndexSchema,
     IO_INDEX_SCHEMA_VERSION,
 } from '../../../../src/copilot/infra/index-store/sqlite/schema.js';
-import { buildIndexPathTreeRange } from '../../../../src/copilot/infra/index-store/sqlite/paths.js';
+import { createIoIndexSqlite } from '../../../../src/copilot/infra/io-index-sqlite.js';
+import { parseFileSymbols } from '../../../../src/copilot/infra/io-parser.js';
+import { BABEL_PARSER_POLICY_VERSION } from '../../../../src/copilot/infra/parse/babel-policy.js';
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 
@@ -97,12 +99,14 @@ function createLegacyIoIndex(db, content) {
             content
         );
     `);
-    db.prepare(`
+    db.prepare(
+        `
         INSERT INTO copilot_io_index_files(
             file_path, workspace_root, relative_path, file_name, extension, content_kind,
             size_bytes, mtime_ms, line_count, status, indexed_at_ms, refreshed_at_ms
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `,
+    ).run(
         '/workspace/legacy.md',
         '/workspace',
         'legacy.md',
@@ -197,23 +201,27 @@ describe('createIoIndexSqlite', () => {
         expect(ensureIoIndexSchema(db)).toBe(IO_INDEX_SCHEMA_VERSION);
 
         const chunks = db
-            .prepare(`
+            .prepare(
+                `
                 SELECT chunk_index AS chunkIndex, start_line AS startLine, end_line AS endLine
                 FROM copilot_io_index_chunks
                 ORDER BY chunk_index
-            `)
+            `,
+            )
             .all();
         expect(chunks).toEqual([
             { chunkIndex: 0, startLine: 1, endLine: 200 },
             { chunkIndex: 1, startLine: 201, endLine: 205 },
         ]);
         const hit = db
-            .prepare(`
+            .prepare(
+                `
                 SELECT chunks.start_line AS startLine, chunks.end_line AS endLine
                 FROM copilot_io_index_fts
                 JOIN copilot_io_index_chunks AS chunks ON chunks.id = copilot_io_index_fts.rowid
                 WHERE copilot_io_index_fts MATCH ?
-            `)
+            `,
+            )
             .get('"migration"');
         expect(hit).toEqual({ startLine: 201, endLine: 205 });
     });
@@ -344,7 +352,11 @@ describe('createIoIndexSqlite', () => {
         await mkdir(join(root, 'many'), { recursive: true });
         await mkdir(join(root, 'wanted'), { recursive: true });
         for (let i = 0; i < 12; i += 1) {
-            await writeFile(join(root, 'many', `outside-${i}.js`), 'export function sharedSymbol() { return 1; }\n', 'utf8');
+            await writeFile(
+                join(root, 'many', `outside-${i}.js`),
+                'export function sharedSymbol() { return 1; }\n',
+                'utf8',
+            );
         }
         await writeFile(join(root, 'wanted', 'inside.js'), 'export function sharedSymbol() { return 2; }\n', 'utf8');
 
@@ -428,6 +440,71 @@ describe('createIoIndexSqlite', () => {
         });
     });
 
+    it('reprojeta símbolos quando a policy Babel muda mesmo com fingerprint idêntico', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = /** @type {string} */ (tmpDir);
+        const filePath = join(root, 'alpha.js');
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+        await index.indexDirectory(root, { extensions: ['.js'], recursive: true });
+
+        const before = /** @type {{ metadataJson: string }} */ (
+            db
+                .prepare('SELECT metadata_json AS metadataJson FROM copilot_io_index_files WHERE file_path = ?')
+                .get(filePath)
+        );
+        expect(JSON.parse(before.metadataJson).parserPolicyVersion).toBe(BABEL_PARSER_POLICY_VERSION);
+        db.prepare(
+            'UPDATE copilot_io_index_files SET metadata_json = json_set(metadata_json, ?, ?) WHERE file_path = ?',
+        ).run('$.parserPolicyVersion', 'legacy-policy', filePath);
+
+        const second = await index.indexDirectory(root, { extensions: ['.js'], recursive: true });
+        expect(second).toMatchObject({ indexed: 1, unchanged: 1, parserPolicyRefreshes: 1 });
+
+        const after = /** @type {{ metadataJson: string }} */ (
+            db
+                .prepare('SELECT metadata_json AS metadataJson FROM copilot_io_index_files WHERE file_path = ?')
+                .get(filePath)
+        );
+        expect(JSON.parse(after.metadataJson).parserPolicyVersion).toBe(BABEL_PARSER_POLICY_VERSION);
+    });
+
+    it('rejeita projeção FileSymbols produzida por policy Babel antiga', async () => {
+        expect(tmpDir).toBeTruthy();
+        const root = /** @type {string} */ (tmpDir);
+        const filePath = join(root, 'alpha.js');
+        const content =
+            "import { betaValue } from './nested/beta.js';\nexport function alphaHelper() { return betaValue; }\n";
+        const fileStat = await stat(filePath);
+        const currentSymbols = await parseFileSymbols(filePath, content);
+        const staleSymbols = {
+            ...currentSymbols,
+            parserPolicyVersion: 'legacy-policy',
+            symbols: [{ kind: /** @type {const} */ ('variable'), name: 'staleOnly', exported: true, line: 1 }],
+            exports: ['staleOnly'],
+        };
+        const db = new Database(':memory:');
+        const index = createIoIndexSqlite({ db });
+
+        await index.indexTextFile(
+            {
+                filePath,
+                workspaceRoot: root,
+                content,
+                sizeBytes: Buffer.byteLength(content),
+                mtimeMs: fileStat.mtimeMs,
+                ctimeMs: fileStat.ctimeMs,
+                dev: Number(fileStat.dev),
+                ino: Number(fileStat.ino),
+            },
+            { parsedSymbols: staleSymbols },
+        );
+
+        expect(index.findSymbol('staleOnly')).toEqual([]);
+        expect(index.findSymbol('alphaHelper')).toHaveLength(1);
+        expect(index.getStats().parsedSymbolPolicyRejects).toBe(1);
+    });
+
     it('mantém second-stat estrito como opção explícita para unchanged fingerprints', async () => {
         expect(tmpDir).toBeTruthy();
         const root = join(/** @type {string} */ (tmpDir), 'freshness-strict-recheck');
@@ -494,11 +571,13 @@ describe('createIoIndexSqlite', () => {
         await writeFile(filePath, 'newfresh\n', 'utf8');
         await utimes(filePath, before.atime, before.mtime);
         const after = await stat(filePath);
-        db.prepare(`
+        db.prepare(
+            `
             UPDATE copilot_io_index_files
             SET mtime_ms = ?, ctime_ms = ?, size_bytes = ?, dev = ?, ino = ?
             WHERE file_path = ?
-        `).run(after.mtimeMs, after.ctimeMs, after.size, Number(after.dev), Number(after.ino), filePath);
+        `,
+        ).run(after.mtimeMs, after.ctimeMs, after.size, Number(after.dev), Number(after.ino), filePath);
         currentTime = 1_101;
 
         const second = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
@@ -515,7 +594,7 @@ describe('createIoIndexSqlite', () => {
             hashVerificationHits: 0,
             hashVerificationMisses: 1,
             freshnessPolicy: {
-                strategy: 'mtime-size-ctime-dev-ino-periodic-hash',
+                strategy: 'mtime-size-ctime-dev-ino-parser-policy-periodic-hash',
                 hashVerifyMaxBytes: 1024,
                 hashVerifyIntervalMs: 100,
             },
@@ -610,7 +689,11 @@ describe('createIoIndexSqlite', () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
         const index = createIoIndexSqlite({ db });
-        await writeFile(join(/** @type {string} */ (tmpDir), 'nested', 'notes-nested.md'), '# Nested\n\nsemantic index token\n', 'utf8');
+        await writeFile(
+            join(/** @type {string} */ (tmpDir), 'nested', 'notes-nested.md'),
+            '# Nested\n\nsemantic index token\n',
+            'utf8',
+        );
         await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.md'], recursive: true });
 
         const rootResults = index.search('semantic index token', { pathPrefix: /** @type {string} */ (tmpDir) });
@@ -624,12 +707,14 @@ describe('createIoIndexSqlite', () => {
 
         const range = buildIndexPathTreeRange(join(/** @type {string} */ (tmpDir), 'nested'));
         const plan = db
-            .prepare(`
+            .prepare(
+                `
                 EXPLAIN QUERY PLAN
                 SELECT id
                 FROM copilot_io_index_chunks
                 WHERE file_path = ? OR (file_path >= ? AND file_path < ?)
-            `)
+            `,
+            )
             .all(range.exact, range.descendantStart, range.descendantEnd)
             .map((row) => String(/** @type {{ detail?: unknown }} */ (row).detail ?? ''));
         expect(plan.some((detail) => detail.includes('idx_io_index_chunks_file'))).toBe(true);

@@ -2,12 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-    AlwaysAliveAgent,
-    alwaysAliveAgent,
-    getAgent,
-    resetAgent,
-} from '#copilot/agent/always-alive';
+import { AlwaysAliveAgent, alwaysAliveAgent, getAgent, resetAgent } from '#copilot/agent/always-alive';
 
 describe('AlwaysAliveAgent lazy singleton (K8)', () => {
     afterEach(() => {

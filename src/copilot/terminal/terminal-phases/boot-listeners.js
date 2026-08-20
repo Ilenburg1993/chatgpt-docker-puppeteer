@@ -62,7 +62,9 @@ function shouldEnableModelGatewayRuntimeHealthMirror() {
 function ensureModelGatewayRuntimeHealthMirror() {
     if (_modelGatewayRuntimeHealthMirror) return _modelGatewayRuntimeHealthMirror;
     const enabled = shouldEnableModelGatewayRuntimeHealthMirror();
-    const debounceMs = optionalNonNegativeInteger(process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS']);
+    const debounceMs = optionalNonNegativeInteger(
+        process.env['MODEL_GATEWAY_RUNTIME_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS'],
+    );
     _modelGatewayRuntimeHealthMirror = installByokProviderHealthSqliteMirror({
         sqliteStore: enabled
             ? new SqliteModelGatewayCatalogStore()
@@ -88,9 +90,8 @@ function ensureModelGatewayRuntimeHealthMirror() {
 }
 
 /**
- * SIGHUP é o sinal esperado no terminal POSIX quando o painel é reaberto/fechado.
- * No Windows esse sinal não é suportado de forma confiável pelo Node; registrar o handler lá
- * cria ruído de boot sem capacidade operacional real.
+ * SIGHUP é o sinal esperado no terminal POSIX quando o painel é reaberto/fechado. No Windows esse sinal não é suportado
+ * de forma confiável pelo Node; registrar o handler lá cria ruído de boot sem capacidade operacional real.
  *
  * @param {NodeJS.Platform} [platform]
  * @returns {boolean}

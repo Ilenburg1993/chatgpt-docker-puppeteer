@@ -6,8 +6,8 @@
  * facade methods, isReady, stop, close.
  */
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'vitest';
 
 import { ConversationHub } from '../../../../src/copilot/conversation-hub/hub.js';

@@ -33,4 +33,3 @@ describe('terminal/events/turn-trace-presentation', () => {
         );
     });
 });
-

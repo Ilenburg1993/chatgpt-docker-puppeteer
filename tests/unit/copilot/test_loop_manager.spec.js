@@ -148,7 +148,7 @@ function createMockHost() {
 /** @typedef {Awaited<ReturnType<typeof executeTurnImpl>>} DialogTurnSemanticResult */
 
 /**
- * @param {string} [reply='REPLY: ok']
+ * @param {string} [reply='REPLY: ok'] Default is `'REPLY: ok'`
  * @param {Partial<DialogTurnSemanticResult>} [overrides]
  * @returns {DialogTurnSemanticResult}
  */
@@ -188,7 +188,12 @@ describe('DialogLoopManager', () => {
         });
         vi.mocked(readAgentRuntimeDialogBootstrapState).mockReturnValue({
             dialogPaused: false,
-            usageMetrics: { boots: 0, resumesWithAdditionalModelCall: 0, resumesWithoutAdditionalModelCall: 0, totalModelCalls: 0 },
+            usageMetrics: {
+                boots: 0,
+                resumesWithAdditionalModelCall: 0,
+                resumesWithoutAdditionalModelCall: 0,
+                totalModelCalls: 0,
+            },
             prMetrics: null,
         });
         dlm = new DialogLoopManager({ bootTimeoutMs: 500, watchdogIntervalMs: 60000, watchdogStallMs: 120000 });

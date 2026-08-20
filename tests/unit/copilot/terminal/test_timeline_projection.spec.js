@@ -8,8 +8,15 @@ const gateways = vi.hoisted(() => ({
     countTerminalHubTurns: vi.fn(() => 0),
     readTerminalHistoryFeed: vi.fn(/** @returns {{ role: string; content: string; timestamp?: number }[]} */ () => []),
     readTerminalHubTurns: vi.fn(/** @returns {Record<string, unknown>[]} */ () => []),
-    readTerminalSessionBinding: vi.fn(/** @returns {{ hubSessionId: string | null; sdkSessionId: string | null }} */ () => ({ hubSessionId: null, sdkSessionId: null })),
-    readTerminalTranscriptFeed: vi.fn(/** @returns {import('../../../../src/copilot/terminal/state/transcript-state.js').TerminalTranscriptTurn[]} */ () => []),
+    readTerminalSessionBinding: vi.fn(
+        /** @returns {{ hubSessionId: string | null; sdkSessionId: string | null }} */ () => ({
+            hubSessionId: null,
+            sdkSessionId: null,
+        }),
+    ),
+    readTerminalTranscriptFeed: vi.fn(
+        /** @returns {import('../../../../src/copilot/terminal/state/transcript-state.js').TerminalTranscriptTurn[]} */ () => [],
+    ),
     seedTerminalHistoryFeed: vi.fn(),
     writeTerminalHubTimelineTurn: vi.fn(async () => undefined),
 }));
@@ -48,16 +55,17 @@ vi.mock('../../../../src/copilot/presentation/runtime/index.js', () => ({
     sendRuntimeDialogTurnForRuntime: vi.fn(async () => ({ reply: 'ok' })),
 }));
 
-const { readTerminalTimelineProjection } = await import(
-    '../../../../src/copilot/terminal/frontend/projections/timeline.js'
-);
+const { readTerminalTimelineProjection } =
+    await import('../../../../src/copilot/terminal/frontend/projections/timeline.js');
 
 let _transcriptFixtureId = 0;
 /**
- * @param {Pick<import('../../../../src/copilot/terminal/state/transcript-state.js').TerminalTranscriptTurn,
- *   'role' | 'rawRole' | 'content' | 'timestamp'> & {
- *   metadata?: Record<string, unknown> | null;
- *   source?: string;
+ * @param {Pick<
+ *     import('../../../../src/copilot/terminal/state/transcript-state.js').TerminalTranscriptTurn,
+ *     'role' | 'rawRole' | 'content' | 'timestamp'
+ * > & {
+ *     metadata?: Record<string, unknown> | null;
+ *     source?: string;
  * }} input
  * @returns {import('../../../../src/copilot/terminal/state/transcript-state.js').TerminalTranscriptTurn}
  */

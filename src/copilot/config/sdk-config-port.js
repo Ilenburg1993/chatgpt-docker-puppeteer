@@ -9,23 +9,22 @@
  * @internal
  */
 
-export {
-    INFINITE_SESSION_DEFAULTS,
-    REASONING_EFFORTS,
-} from '#copilot/sdk/constants';
+export { INFINITE_SESSION_DEFAULTS, REASONING_EFFORTS } from '#copilot/sdk/constants';
 
 export {
-    ClientOptionsBuilder,
     BYOK_ENV_KEYS,
     BYOK_SECRET_ENV_KEYS,
+    ClientOptionsBuilder,
+    SYSTEM_MESSAGE_SECTIONS,
+    SYSTEM_PROMPT_SECTIONS,
     appendSystemMessage,
     approveAll,
+    buildConfiguredByokModelListHandler,
     buildCopilotClientOptionsFromEnv,
     buildServerCopilotClientOptions,
     buildTerminalCopilotClientOptions,
-    buildConfiguredByokModelListHandler,
-    customizeSystemMessage,
     createConfiguredPermissionHandler,
+    customizeSystemMessage,
     discoverConfiguredByokModelsFromEnv,
     getSectionDescription,
     getSectionNames,
@@ -38,8 +37,6 @@ export {
     redactProviderConfig,
     replaceSystemMessage,
     sectionOverride,
-    SYSTEM_MESSAGE_SECTIONS,
-    SYSTEM_PROMPT_SECTIONS,
     supportsCustomizeMode,
     validateProviderConfig,
 } from '#copilot/sdk/session';

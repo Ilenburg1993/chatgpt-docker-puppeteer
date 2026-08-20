@@ -9,31 +9,12 @@
  * @see EventBus
  */
 
-import { COPILOT_OPERATIONAL_PROFILE, getEffectiveSdkAgentSelection, listTerminalSdkCommandSpecs } from '#copilot/config';
+import {
+    COPILOT_OPERATIONAL_PROFILE,
+    getEffectiveSdkAgentSelection,
+    listTerminalSdkCommandSpecs,
+} from '#copilot/config';
 import { toError } from '#copilot/core';
-import {
-    clearPendingTerminalQuestionShadow,
-    clearTerminalHistory,
-    listTerminalSnapshotsProjection,
-    loadTerminalSnapshotProjection,
-    readTerminalActivityProjection,
-    readTerminalConfigProjection,
-    readTerminalCountProjection,
-    readTerminalDbHistoryProjection,
-    readTerminalDbSessionsProjection,
-    readTerminalDisplayProjection,
-    readTerminalLiveFlowProjection,
-    readTerminalStatusProjection,
-    readTerminalTimelineProjection,
-    readTerminalByokProjection,
-    saveTerminalSnapshotProjection,
-} from '../frontend/projections/index.js';
-import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
-import {
-    shouldConsumeTerminalPendingAnswerInput,
-    tryAnswerTerminalPendingQuestionInput,
-} from '../state/repl-runtime/index.js';
-import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel, withRuntimeTarget } from './runtime-target.js';
 import {
     classifyTerminalByokSdkBinding,
     renderTerminalByokBindingMachineAlias,
@@ -54,8 +35,34 @@ import {
     isTerminalInternalCallIdentifier,
 } from '../events/presenters/tools/index.js';
 import {
-    readTerminalSseEventArchiveTail,
+    deleteTerminalSdkSession,
+    readTerminalSdkSessionBootSelection,
+} from '../frontend/gateways/sdk-session/index.js';
+import {
+    listTerminalSdkSessionInventory,
+    scheduleTerminalSdkSessionBootSelection,
+} from '../frontend/gateways/session/index.js';
+import { buildTerminalOperationalGuidance } from '../frontend/operational-guidance/index.js';
+import {
+    clearPendingTerminalQuestionShadow,
+    clearTerminalHistory,
+    listTerminalSnapshotsProjection,
+    loadTerminalSnapshotProjection,
+    readTerminalActivityProjection,
+    readTerminalByokProjection,
+    readTerminalConfigProjection,
+    readTerminalCountProjection,
+    readTerminalDbHistoryProjection,
+    readTerminalDbSessionsProjection,
+    readTerminalDisplayProjection,
+    readTerminalLiveFlowProjection,
+    readTerminalStatusProjection,
+    readTerminalTimelineProjection,
+    saveTerminalSnapshotProjection,
+} from '../frontend/projections/index.js';
+import {
     formatTerminalTimeLabel,
+    readTerminalSseEventArchiveTail,
     renderTerminalPendingQuestionKindLabel,
     terminalPermissionModeSkipsSdkPrompts,
     terminalThemeDivider,
@@ -65,13 +72,15 @@ import {
     terminalThemeText,
 } from '../state/index.js';
 import {
-    listTerminalSdkSessionInventory,
-    scheduleTerminalSdkSessionBootSelection,
-} from '../frontend/gateways/session/index.js';
+    shouldConsumeTerminalPendingAnswerInput,
+    tryAnswerTerminalPendingQuestionInput,
+} from '../state/repl-runtime/index.js';
 import {
-    deleteTerminalSdkSession,
-    readTerminalSdkSessionBootSelection,
-} from '../frontend/gateways/sdk-session/index.js';
+    callWithRuntimeTarget,
+    extractRuntimeTarget,
+    renderRuntimeTargetLabel,
+    withRuntimeTarget,
+} from './runtime-target.js';
 
 const DISABLED_BYOK_SUMMARY = Object.freeze({
     enabled: false,
@@ -317,7 +326,12 @@ function renderTerminalParserUsage(parser) {
 }
 
 /**
- * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: unknown }} ioRuntime
+ * @param {{
+ *     cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> };
+ *     index?: unknown;
+ *     scopes: { active: number };
+ *     parser: unknown;
+ * }} ioRuntime
  * @returns {{ cache: string; scope: string }}
  */
 function renderTerminalIoStatusLines(ioRuntime) {
@@ -396,7 +410,9 @@ function renderDbSessionStatusLabel(value) {
  * @returns {string}
  */
 function normalizeTerminalHistoryContent(value) {
-    return String(value ?? '').replace(/\s+/gu, ' ').trim();
+    return String(value ?? '')
+        .replace(/\s+/gu, ' ')
+        .trim();
 }
 
 /**
@@ -551,7 +567,9 @@ function renderLiveFlowStateRole(value) {
  * @returns {string}
  */
 function renderLiveSourceLabel(value) {
-    const source = String(value ?? '').trim().toLowerCase();
+    const source = String(value ?? '')
+        .trim()
+        .toLowerCase();
     if (!source) return 'terminal';
     if (source === 'sdk' || source.startsWith('sdk/')) return 'SDK';
     if (source === 'agent' || source.startsWith('agent/')) return 'agente';
@@ -660,7 +678,12 @@ function renderLiveRuntimeTarget(value) {
 }
 
 /**
- * @param {{ cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> }; index?: unknown; scopes: { active: number }; parser: unknown }} ioRuntime
+ * @param {{
+ *     cache: { l1: Record<string, unknown>; l2: Record<string, unknown>; aggregate: Record<string, unknown> };
+ *     index?: unknown;
+ *     scopes: { active: number };
+ *     parser: unknown;
+ * }} ioRuntime
  * @returns {string}
  */
 function renderLiveContextLine(ioRuntime) {
@@ -695,7 +718,14 @@ function renderLiveActivitySummary(activity, options = {}) {
 }
 
 /**
- * @param {{ toolName?: string; operation?: string; path?: string | null; target?: string | null; status?: string | null; source?: string | null }} tool
+ * @param {{
+ *     toolName?: string;
+ *     operation?: string;
+ *     path?: string | null;
+ *     target?: string | null;
+ *     status?: string | null;
+ *     source?: string | null;
+ * }} tool
  * @param {{ detail: boolean }} options
  * @returns {string}
  */
@@ -761,7 +791,8 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             projection.pendingPermissions +
             projection.pendingUserInputs +
             projection.pendingStructuredUserInputs;
-        const waitLine = waitCount > 0 ? `${countLabel(waitCount, 'pendência', 'pendências')} · /sdk waits` : 'nenhuma pendência';
+        const waitLine =
+            waitCount > 0 ? `${countLabel(waitCount, 'pendência', 'pendências')} · /sdk waits` : 'nenhuma pendência';
         const queue = Number(snap['queueSize'] ?? 0);
         const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
         const byokLabel = byok.enabled
@@ -793,7 +824,11 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
                 { role: active ? 'success' : 'warn' },
             ),
         );
-        println(terminalThemeRow('Saúde', health ? renderHumanTerminalHealth(health['status']) : 'sem leitura', { role: health?.['status'] === 'healthy' ? 'success' : 'warn' }));
+        println(
+            terminalThemeRow('Saúde', health ? renderHumanTerminalHealth(health['status']) : 'sem leitura', {
+                role: health?.['status'] === 'healthy' ? 'success' : 'warn',
+            }),
+        );
         println(terminalThemeRow('Entrada', waitLine, { role: waitCount > 0 ? 'warn' : 'success' }));
         println(
             terminalThemeRow('Modelo', `${modelLabel} · raciocínio ${configProjection.currentReasoningEffort}`, {
@@ -951,7 +986,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     const permissionModeDetail = `${renderTerminalPermissionModeLabel(projection.permissionMode)} · prompts SDK ${permissionModeSkipsSdkPrompts ? 'ignorados' : 'seletivos'}`;
     println('');
     println(terminalThemeHeadline('assistant', 'Status do Terminal LLM-B', ['detalhado']));
-    println(terminalThemeRow('Agente', `${renderHumanTerminalStatus(snap['status'])} · saúde ${health ? renderHumanTerminalHealth(health['status']) : 'sem leitura'}`));
+    println(
+        terminalThemeRow(
+            'Agente',
+            `${renderHumanTerminalStatus(snap['status'])} · saúde ${health ? renderHumanTerminalHealth(health['status']) : 'sem leitura'}`,
+        ),
+    );
     println(terminalThemeRow('Conversa', `${active ? 'ativa' : 'inativa'} · fila ${snap['queueSize'] ?? 0}`));
     println(terminalThemeRow('Pergunta', askUserStatus));
     println(
@@ -961,7 +1001,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ),
     );
     println(terminalThemeRow('Esperas SDK', sdkInterruptions.length > 0 ? sdkInterruptions.join(' · ') : 'nenhuma'));
-    println(terminalThemeRow('UI SDK', `formulários ${uiElicitationFlag == null ? 'sem leitura' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}`));
+    println(
+        terminalThemeRow(
+            'UI SDK',
+            `formulários ${uiElicitationFlag == null ? 'sem leitura' : uiElicitationFlag ? 'disponíveis' : 'indisponíveis'}`,
+        ),
+    );
     println(terminalThemeRow('Modelo', `${snap['model']} · raciocínio ${effort}`));
     if (byokLine) println(terminalThemeRow('Rota BYOK', byokLine, { role: byok.ready ? 'success' : 'warn' }));
     println(terminalThemeRow('SDK', renderLiveSdkMode(sdkMode)));
@@ -969,7 +1014,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     println(terminalThemeRow('Plano arquivo', sdkPlanOpLabel));
     println(terminalThemeRow('Segundo plano', String(health?.['backgroundPendingCount'] ?? 0)));
     println(terminalThemeRow('Alertas', String(Array.isArray(health?.['issues']) ? health['issues'].length : 0)));
-    println(terminalThemeRow('Próximo passo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
+    println(
+        terminalThemeRow('Próximo passo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }),
+    );
     println(terminalThemeRow('Sessão local', projection.runtimeSessionId ?? 'sem sessão'));
     println(terminalThemeRow('Ambiente alvo', renderRuntimeTargetLabel(projection.runtimeId)));
     println(terminalThemeRow('Perfil local', projection.agentProfileId ?? 'sem perfil'));
@@ -981,7 +1028,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         ),
     );
     println(terminalThemeRow('Prompt', promptBindingDigest ? 'vinculado' : 'sem vínculo'));
-    println(terminalThemeRow('Prompt frescor', `${promptFreshnessLabel} · ${renderTerminalActionLabel(promptRecommendedAction)}`));
+    println(
+        terminalThemeRow(
+            'Prompt frescor',
+            `${promptFreshnessLabel} · ${renderTerminalActionLabel(promptRecommendedAction)}`,
+        ),
+    );
     println(
         terminalThemeRow(
             'Ferramentas',
@@ -1016,7 +1068,12 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     );
     println(terminalThemeRow('Porta entrada', String(projection.injectPort)));
     println(terminalThemeRow('Atividade', `${renderSessionActivityText(activity.label)}${activityProgress}`));
-    println(terminalThemeRow('Fluxo', `${renderLivePhaseLabel(activity.phase)} · ${renderLiveSourceLabel(activity.source)}`));
+    println(
+        terminalThemeRow(
+            'Fluxo',
+            `${renderLivePhaseLabel(activity.phase)} · ${renderLiveSourceLabel(activity.source)}`,
+        ),
+    );
     println(terminalThemeRow('Inicialização', bootLine));
     println(terminalThemeRow('Encerramento', shutdownLine));
     println(
@@ -1035,7 +1092,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
             { role: modelBilling.mismatch ? 'error' : 'success' },
         ),
     );
-    println(terminalThemeRow('Custo último PR', modelBilling.cost == null ? 'sem leitura' : modelBilling.cost.toFixed(4)));
+    println(
+        terminalThemeRow('Custo último PR', modelBilling.cost == null ? 'sem leitura' : modelBilling.cost.toFixed(4)),
+    );
     println(
         terminalThemeRow(
             'Perfil modelo',
@@ -1108,10 +1167,16 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
         );
     }
     if (projection.sdkSessionMode === 'plan') {
-        println(terminalThemeRow('Nota', 'a sessão SDK está em modo plano; use /plan off para voltar ao modo interativo.'));
+        println(
+            terminalThemeRow('Nota', 'a sessão SDK está em modo plano; use /plan off para voltar ao modo interativo.'),
+        );
     }
     if (projection.pendingElicitations > 0) {
-        println(terminalThemeRow('Ação', 'há formulário pendente; use /elicitation list e /elicitation show latest.', { role: 'warn' }));
+        println(
+            terminalThemeRow('Ação', 'há formulário pendente; use /elicitation list e /elicitation show latest.', {
+                role: 'warn',
+            }),
+        );
     }
     if (projection.pendingPermissions > 0) {
         println(
@@ -1122,9 +1187,13 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     }
     if (projection.pendingUserInputs > 0) {
         println(
-            terminalThemeRow('Ação', 'há pergunta humana pendente; responda via conversa normal ou use /answer <texto>.', {
-                role: 'warn',
-            }),
+            terminalThemeRow(
+                'Ação',
+                'há pergunta humana pendente; responda via conversa normal ou use /answer <texto>.',
+                {
+                    role: 'warn',
+                },
+            ),
         );
         if (projection.latestUserInput) {
             const latest = projection.latestUserInput;
@@ -1167,7 +1236,9 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
     }
     if (projection.usedDefaultRuntimeFallback) {
         const requestedRuntimeLabel =
-            projection.requestedRuntimeId == null ? 'desconhecido' : renderRuntimeTargetLabel(projection.requestedRuntimeId);
+            projection.requestedRuntimeId == null
+                ? 'desconhecido'
+                : renderRuntimeTargetLabel(projection.requestedRuntimeId);
         println(
             terminalThemeRow(
                 'Nota',
@@ -1199,9 +1270,13 @@ export function cmdStatus({ hubSessionId, injectPort, println }, arg = '') {
                 ? ` próxima tentativa ${formatTerminalTimeLabel(projection.timelineSyncNextRetryAt, { mode: 'dual' })}`
                 : '';
         println(
-            terminalThemeRow('Sincronização', `falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}`, {
-                role: 'warn',
-            }),
+            terminalThemeRow(
+                'Sincronização',
+                `falhou: ${projection.timelineSyncLastError ?? 'erro desconhecido'}${retryLabel}`,
+                {
+                    role: 'warn',
+                },
+            ),
         );
     }
 }
@@ -1265,7 +1340,9 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
               ? `pergunta salva (${projection.pendingQuestionShadowState})`
               : 'sem pergunta pendente';
         const waitLine =
-            waitCount > 0 ? `${countLabel(waitCount, 'pendência humana', 'pendências humanas')} · /sdk waits` : 'sem pendências humanas';
+            waitCount > 0
+                ? `${countLabel(waitCount, 'pendência humana', 'pendências humanas')} · /sdk waits`
+                : 'sem pendências humanas';
         const modelLine = renderTerminalModelSelectionLine(modelBilling, 'revisar /status full');
         println('');
         println(terminalThemeHeadline('assistant', 'Agora'));
@@ -1287,11 +1364,17 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
             );
         }
         if (projection.activity?.label) {
-            const detail = projection.activity.detail ? ` · ${renderSessionActivityText(projection.activity.detail)}` : '';
+            const detail = projection.activity.detail
+                ? ` · ${renderSessionActivityText(projection.activity.detail)}`
+                : '';
             println(terminalThemeRow('Atividade', `${renderSessionActivityText(projection.activity.label)}${detail}`));
         }
         if (projection.recommendedAction && projection.recommendedAction !== 'none') {
-            println(terminalThemeRow('Próximo', renderTerminalActionLabel(projection.recommendedAction), { role: 'command' }));
+            println(
+                terminalThemeRow('Próximo', renderTerminalActionLabel(projection.recommendedAction), {
+                    role: 'command',
+                }),
+            );
         }
         println(terminalThemeDivider(37));
         return;
@@ -1357,7 +1440,12 @@ export function cmdNow({ hubSessionId, injectPort, println }, arg = '') {
     }
     if (projection.activity?.label) {
         const detail = projection.activity.detail ? ` · ${renderSessionActivityText(projection.activity.detail)}` : '';
-        println(terminalThemeRow('Atividade', `${projection.activity.phase} · ${renderSessionActivityText(projection.activity.label)}${detail}`));
+        println(
+            terminalThemeRow(
+                'Atividade',
+                `${projection.activity.phase} · ${renderSessionActivityText(projection.activity.label)}${detail}`,
+            ),
+        );
     }
     if (projection.recommendedAction) {
         println(terminalThemeRow('Próximo', projection.recommendedAction, { role: 'command' }));
@@ -1408,7 +1496,9 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             projection.stream.usage ? 'uso visível' : null,
         ].filter(Boolean);
         const traceSummary = [
-            projection.counters.toolCount > 0 ? countLabel(projection.counters.toolCount, 'ferramenta', 'ferramentas') : null,
+            projection.counters.toolCount > 0
+                ? countLabel(projection.counters.toolCount, 'ferramenta', 'ferramentas')
+                : null,
             projection.counters.fileCount > 0 ? countLabel(projection.counters.fileCount, 'arquivo', 'arquivos') : null,
             projection.counters.recentIoCount > 0 ? `${projection.counters.recentIoCount} I/O recente` : null,
         ].filter(Boolean);
@@ -1416,7 +1506,12 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
         const flowSummary = renderTerminalTraceFlowSummary(projection.summary, activeTrace);
         const activityLine = renderLiveActivitySummary(current);
         println('');
-        println(terminalThemeHeadline('assistant', renderTerminalTraceSummaryTitle('Fluxo da conversa', 'Fluxo operacional', activeTrace)));
+        println(
+            terminalThemeHeadline(
+                'assistant',
+                renderTerminalTraceSummaryTitle('Fluxo da conversa', 'Fluxo operacional', activeTrace),
+            ),
+        );
         println(terminalThemeDivider(37));
         println(
             terminalThemeRow('Estado', `${stateLabel} · ${flowSummary}`, {
@@ -1443,7 +1538,12 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
                 `${renderCompactSseLine(projection.sse)} · timeline ${countLabel(projection.counters.timelineTurns, 'turno', 'turnos')}`,
             ),
         );
-        println(terminalThemeRow('Mais detalhes', renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`])));
+        println(
+            terminalThemeRow(
+                'Mais detalhes',
+                renderCommandList(['/live full', `/activity ${requestedLimit} detail`, `/events ${requestedLimit}`]),
+            ),
+        );
         println(terminalThemeDivider(37));
         return;
     }
@@ -1492,12 +1592,7 @@ export function cmdLive({ hubSessionId, injectPort, println }, arg = '') {
             `${renderTerminalTimelineSourceLabel(projection.timeline.timelineSource)} · ${renderTerminalTimelineReconciliationLabel(projection.timeline.reconciliationStatus)} · sincronização ${renderTerminalSyncStatusLabel(projection.timeline.sync.status)} · ${countLabel(projection.counters.timelineTurns, 'turno', 'turnos')}`,
         ),
     );
-    println(
-        terminalThemeRow(
-            'Contexto',
-            renderLiveContextLine(ioRuntime),
-        ),
-    );
+    println(terminalThemeRow('Contexto', renderLiveContextLine(ioRuntime)));
     println(terminalThemeRow('Atividade', renderLiveActivitySummary(current, { includePhase: true })));
     println(
         terminalThemeRow(
@@ -1618,7 +1713,11 @@ export function cmdHistory({ println }, n = 10) {
             ),
         );
     } else if (timeline.sync.status === 'failed') {
-        println(terminalThemeRow('Sincronização', `falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.`, { role: 'warn' }));
+        println(
+            terminalThemeRow('Sincronização', `falhou: ${timeline.sync.lastError ?? 'erro desconhecido'}.`, {
+                role: 'warn',
+            }),
+        );
     }
     println(terminalThemeDivider(64));
 }
@@ -1661,7 +1760,10 @@ export function cmdDbHistory({ hubSessionId, println }, n = 20, offset = 0) {
             println(terminalThemeRow(actor.label, `${time} · ${preview}`, { role: actor.role }));
         }
         println(
-            terminalThemeRow('Janela', `${projection.effectiveOffset}..${projection.effectiveOffset + turns.length - 1} de ${projection.totalTurns} turnos persistidos`),
+            terminalThemeRow(
+                'Janela',
+                `${projection.effectiveOffset}..${projection.effectiveOffset + turns.length - 1} de ${projection.totalTurns} turnos persistidos`,
+            ),
         );
         println(terminalThemeDivider(52));
         println('');
@@ -1727,7 +1829,11 @@ export function cmdWho({ injectPort, println }, arg = '') {
     println(terminalThemeHeadline('assistant', 'Atores ativos nesta sessão'));
     println(terminalThemeRow('Você', 'digita diretamente no terminal', { role: 'user' }));
     println(terminalThemeRow('LLM-A', `envia mensagens pela porta ${injectPort}`, { role: 'system' }));
-    println(terminalThemeRow('LLM-B', `conversa permanente · ${currentModel} · raciocínio ${currentReasoningEffort}`, { role: 'assistant' }));
+    println(
+        terminalThemeRow('LLM-B', `conversa permanente · ${currentModel} · raciocínio ${currentReasoningEffort}`, {
+            role: 'assistant',
+        }),
+    );
     println(terminalThemeRow('Eventos', `stream local na porta ${injectPort}`));
     println('');
 }
@@ -1799,7 +1905,11 @@ export function cmdAnswer({ println }, arg) {
         return;
     }
     if (result.reason === 'protocol_controlled') {
-        println(terminalThemeRow('/answer', 'A conversa aguarda uma mensagem. Digite o texto normalmente, sem /answer.', { role: 'warn' }));
+        println(
+            terminalThemeRow('/answer', 'A conversa aguarda uma mensagem. Digite o texto normalmente, sem /answer.', {
+                role: 'warn',
+            }),
+        );
         return;
     }
     if (result.reason === 'answer_failed') {
@@ -1824,7 +1934,13 @@ export function cmdAnswer({ println }, arg) {
     }
     const projection = readTerminalStatusProjection(withRuntimeTarget({}, runtimeId));
     if (result.shadowExpired || projection.pendingQuestionShadowExpired) {
-        println(terminalThemeRow('/answer', 'Nenhuma pergunta viva. Há uma pergunta restaurada expirada pendente de limpeza.', { role: 'warn' }));
+        println(
+            terminalThemeRow(
+                '/answer',
+                'Nenhuma pergunta viva. Há uma pergunta restaurada expirada pendente de limpeza.',
+                { role: 'warn' },
+            ),
+        );
         return;
     }
     println(terminalThemeRow('/answer', 'Nenhuma pergunta pendente.'));
@@ -1901,7 +2017,9 @@ function renderSdkSessionBootDecision(decision) {
     if (!decision) return null;
     const outcome = decision['outcome'] === 'created' || decision['outcome'] === 'resumed' ? decision['outcome'] : null;
     const requestedMode =
-        decision['requestedMode'] === 'auto' || decision['requestedMode'] === 'new' || decision['requestedMode'] === 'resume'
+        decision['requestedMode'] === 'auto' ||
+        decision['requestedMode'] === 'new' ||
+        decision['requestedMode'] === 'resume'
             ? decision['requestedMode']
             : null;
     const selectedSessionId =
@@ -1934,7 +2052,12 @@ function renderSdkSessionSummaryPreview(summary) {
  * @param {string} action
  * @param {string} rawAction
  * @param {string[]} rest
- * @returns {{ limit: number; offset: number; filter: import('../../presentation/contracts/index.js').RuntimeSessionListFilter | undefined; filterLabel: string }}
+ * @returns {{
+ *     limit: number;
+ *     offset: number;
+ *     filter: import('../../presentation/contracts/index.js').RuntimeSessionListFilter | undefined;
+ *     filterLabel: string;
+ * }}
  */
 function parseSdkSessionInventoryArgs(action, rawAction, rest) {
     const tokens = action === 'status' || action === 'list' || action === 'ls' ? rest : [rawAction, ...rest];
@@ -1967,7 +2090,8 @@ function parseSdkSessionInventoryArgs(action, rawAction, rest) {
         limit,
         offset,
         filter: filterEntries.length > 0 ? filter : undefined,
-        filterLabel: filterEntries.length > 0 ? filterEntries.map(([key, value]) => `${key} ${value}`).join(' · ') : 'nenhum',
+        filterLabel:
+            filterEntries.length > 0 ? filterEntries.map(([key, value]) => `${key} ${value}`).join(' · ') : 'nenhum',
     };
 }
 
@@ -1979,17 +2103,25 @@ function renderSdkSessionFsState(state) {
     if (!state || typeof state !== 'object') return 'n/d';
     const record = /** @type {Record<string, unknown>} */ (state);
     if (record['enabled'] !== true) return 'desativado';
-    const root = record['storageRoot'] && typeof record['storageRoot'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (record['storageRoot'])
-        : null;
-    const session = record['session'] && typeof record['session'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (record['session'])
-        : null;
+    const root =
+        record['storageRoot'] && typeof record['storageRoot'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (record['storageRoot'])
+            : null;
+    const session =
+        record['session'] && typeof record['session'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (record['session'])
+            : null;
     const rootDisplay = typeof root?.['display'] === 'string' ? root['display'] : '(root n/d)';
     const rootExists = root?.['exists'] === true ? 'existe' : root?.['exists'] === false ? 'ausente' : 'desconhecido';
     const sessionDisplay = typeof session?.['display'] === 'string' ? session['display'] : null;
     const sessionExists =
-        session?.['exists'] === true ? 'existe' : session?.['exists'] === false ? 'ausente' : session ? 'desconhecido' : null;
+        session?.['exists'] === true
+            ? 'existe'
+            : session?.['exists'] === false
+              ? 'ausente'
+              : session
+                ? 'desconhecido'
+                : null;
     const statePath = typeof record['sessionStatePath'] === 'string' ? record['sessionStatePath'] : '(state n/d)';
     return `ativo · raiz ${rootDisplay} (${rootExists}) · estado ${statePath}${
         sessionDisplay ? ` · sessão ${sessionDisplay} (${sessionExists ?? 'desconhecido'})` : ''
@@ -2003,12 +2135,14 @@ function renderSdkSessionFsState(state) {
 function renderSdkSessionLocalMetadata(metadata) {
     if (!metadata) return null;
     const model = typeof metadata['model'] === 'string' && metadata['model'] ? metadata['model'] : null;
-    const provider = metadata['provider'] && typeof metadata['provider'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (metadata['provider'])
-        : null;
-    const boundary = metadata['boundary'] && typeof metadata['boundary'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (metadata['boundary'])
-        : null;
+    const provider =
+        metadata['provider'] && typeof metadata['provider'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (metadata['provider'])
+            : null;
+    const boundary =
+        metadata['boundary'] && typeof metadata['boundary'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (metadata['boundary'])
+            : null;
     const providerKind = typeof provider?.['kind'] === 'string' ? provider['kind'] : null;
     const providerModel = typeof provider?.['model'] === 'string' ? provider['model'] : null;
     const reason = typeof boundary?.['reason'] === 'string' ? boundary['reason'] : null;
@@ -2123,7 +2257,10 @@ function renderSdkSessionInventoryBadges(entry, inventory) {
  */
 function renderSdkSessionNextBootLabel(bootSelection, sessions) {
     if (bootSelection?.mode === 'resume') {
-        const handle = typeof bootSelection.sessionId === 'string' ? findSdkSessionHandle(bootSelection.sessionId, sessions) : null;
+        const handle =
+            typeof bootSelection.sessionId === 'string'
+                ? findSdkSessionHandle(bootSelection.sessionId, sessions)
+                : null;
         return handle ? `retomar sessão ${handle}` : 'retomar sessão informada';
     }
     if (bootSelection?.mode === 'new') return 'criar nova sessão';
@@ -2277,7 +2414,7 @@ function summarizeSdkWaitArchiveEntry(entry) {
     const sessionId = readPayloadString(record, ['sessionId', 'sdkSessionId']);
     const type =
         readPayloadString(record, ['permissionType', 'mode', 'action', 'kind', 'type']) ??
-        (entry.event.includes('.') ? entry.event.split('.').at(-1) ?? entry.event : entry.event);
+        (entry.event.includes('.') ? (entry.event.split('.').at(-1) ?? entry.event) : entry.event);
     const message = readPayloadString(record, ['question', 'message']);
     const answer = readPayloadString(record, ['answer', 'result']);
     const source = compactSdkSessionEventValue(entry.eventSource ?? entry.source ?? '-', 48);
@@ -2286,7 +2423,9 @@ function summarizeSdkWaitArchiveEntry(entry) {
     const content = readPayloadValue(record, ['content']);
     const contentKeys =
         content && typeof content === 'object'
-            ? Object.keys(/** @type {Record<string, unknown>} */ (content)).slice(0, 4).join(',')
+            ? Object.keys(/** @type {Record<string, unknown>} */ (content))
+                  .slice(0, 4)
+                  .join(',')
             : '';
     const detailParts = [
         renderSdkPermissionTypeLabel(type),
@@ -2344,7 +2483,11 @@ async function cmdSessionSdkEvents({ println }, tokens) {
         ),
     );
     if (lifecycle.state.error || commands.state.error) {
-        println(terminalThemeRow('Erro', lifecycle.state.error ?? commands.state.error ?? 'erro desconhecido', { role: 'error' }));
+        println(
+            terminalThemeRow('Erro', lifecycle.state.error ?? commands.state.error ?? 'erro desconhecido', {
+                role: 'error',
+            }),
+        );
     }
     if (merged.length === 0) {
         println(
@@ -2376,11 +2519,18 @@ async function cmdSessionSdkEvents({ println }, tokens) {
     }
     const now = Date.now();
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? formatTerminalTimeLabel(entry.firstTimestamp, { now, mode: 'dual' }) : 'sem horário';
+        const time = entry.firstTimestamp
+            ? formatTerminalTimeLabel(entry.firstTimestamp, { now, mode: 'dual' })
+            : 'sem horário';
         const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
         println(terminalThemeRow('Evento', `${time} · ${entry.line}${repeats}`));
     }
-    println(terminalThemeRow('Nota', 'este comando não cria eventos; ele resume o mesmo JSONL usado por /events e pelos testes live'));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'este comando não cria eventos; ele resume o mesmo JSONL usado por /events e pelos testes live',
+        ),
+    );
     println('');
 }
 
@@ -2446,11 +2596,18 @@ async function cmdSessionSdkWaits({ println }, tokens) {
     }
     const now = Date.now();
     for (const entry of collapsed) {
-        const time = entry.firstTimestamp ? formatTerminalTimeLabel(entry.firstTimestamp, { now, mode: 'dual' }) : 'sem horário';
+        const time = entry.firstTimestamp
+            ? formatTerminalTimeLabel(entry.firstTimestamp, { now, mode: 'dual' })
+            : 'sem horário';
         const repeats = entry.count > 1 ? ` ×${entry.count}` : '';
         println(terminalThemeRow('Espera', `${time} · ${entry.line}${repeats}`));
     }
-    println(terminalThemeRow('Nota', 'perguntas humanas, formulários e permissões continuam com comandos próprios; esta é só a trilha agregada'));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'perguntas humanas, formulários e permissões continuam com comandos próprios; esta é só a trilha agregada',
+        ),
+    );
     println('');
 }
 
@@ -2464,12 +2621,22 @@ function cmdSessionSdkCommands({ println }) {
     const specs = listTerminalSdkCommandSpecs();
     println('');
     println(terminalThemeHeadline('assistant', 'Comandos SDK expostos ao Copilot'));
-    println(terminalThemeRow('Fonte', `agent/session/commands · ${countLabel(specs.length, 'comando', 'comandos')} · lista segura observável; execução local continua no REPL`));
+    println(
+        terminalThemeRow(
+            'Fonte',
+            `agent/session/commands · ${countLabel(specs.length, 'comando', 'comandos')} · lista segura observável; execução local continua no REPL`,
+        ),
+    );
     for (const spec of specs) {
         println(terminalThemeRow(spec.name, `${spec.localCommand}${spec.safe ? ' · seguro' : ''}`));
         println(terminalThemeRow('Descrição', spec.description));
     }
-    println(terminalThemeRow('Nota', 'quando o SDK chama um desses comandos, o terminal publica sdk.command.executed na emissão canônica'));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'quando o SDK chama um desses comandos, o terminal publica sdk.command.executed na emissão canônica',
+        ),
+    );
     println('');
 }
 
@@ -2493,7 +2660,10 @@ async function renderSdkCommandCatalogArchiveSummary() {
         if (!last) {
             return `${exposed} · nenhum comando chamado nesta janela · /session sdk commands`;
         }
-        const payload = last.payload && typeof last.payload === 'object' ? /** @type {Record<string, unknown>} */ (last.payload) : {};
+        const payload =
+            last.payload && typeof last.payload === 'object'
+                ? /** @type {Record<string, unknown>} */ (last.payload)
+                : {};
         const commandName = compactHumanTerminalText(payload['commandName'] ?? payload['name'] ?? last.event);
         return `${exposed} · ${countLabel(commands.entries.length, 'chamada', 'chamadas')} na janela · último ${commandName} · /session sdk events`;
     } catch (error) {
@@ -2502,8 +2672,8 @@ async function renderSdkCommandCatalogArchiveSummary() {
 }
 
 /**
- * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão viva
- * por um caminho paralelo.
+ * Cockpit de sessão SDK persistente. Diferencia sessão SDK, dialog loop, hub e snapshots locais sem trocar a sessão
+ * viva por um caminho paralelo.
  *
  * @param {SessionContext} ctx
  * @param {string} [arg]
@@ -2535,7 +2705,11 @@ export async function cmdSessionSdk({ println }, arg = '') {
         } else if (mode === 'resume') {
             const target = modeRest.join(' ').trim();
             if (!target) {
-                println(terminalThemeRow('Uso', '/session sdk next resume <id|#n|atual|última|primeiro-plano>', { role: 'warn' }));
+                println(
+                    terminalThemeRow('Uso', '/session sdk next resume <id|#n|atual|última|primeiro-plano>', {
+                        role: 'warn',
+                    }),
+                );
                 return;
             }
             let resolved;
@@ -2544,12 +2718,22 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 try {
                     inventory = await listTerminalSdkSessionInventory(runtimeId);
                 } catch (error) {
-                    println(terminalThemeRow('Erro', `não foi possível resolver o atalho de sessão SDK: ${toError(error).message}`, { role: 'error' }));
+                    println(
+                        terminalThemeRow(
+                            'Erro',
+                            `não foi possível resolver o atalho de sessão SDK: ${toError(error).message}`,
+                            { role: 'error' },
+                        ),
+                    );
                     return;
                 }
                 resolved = resolveSdkSessionResumeTarget(target, inventory);
                 if (!resolved) {
-                    println(terminalThemeRow('Atalho', `${target} indisponível · rode /session sdk para ver o inventário`, { role: 'warn' }));
+                    println(
+                        terminalThemeRow('Atalho', `${target} indisponível · rode /session sdk para ver o inventário`, {
+                            role: 'warn',
+                        }),
+                    );
                     return;
                 }
             } else {
@@ -2561,7 +2745,13 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 });
             }
             if (!resolved) {
-                println(terminalThemeRow('Sessão SDK', `não resolvida para ${target} · rode /session sdk para ver o inventário`, { role: 'warn' }));
+                println(
+                    terminalThemeRow(
+                        'Sessão SDK',
+                        `não resolvida para ${target} · rode /session sdk para ver o inventário`,
+                        { role: 'warn' },
+                    ),
+                );
                 return;
             }
             const result = await scheduleTerminalSdkSessionBootSelection({
@@ -2579,42 +2769,85 @@ export async function cmdSessionSdk({ println }, arg = '') {
         } else if (mode === 'auto' || mode === 'clear') {
             const result = await scheduleTerminalSdkSessionBootSelection(null);
             if (!result.ok) throw result.error;
-            println(terminalThemeRow('Próximo boot', 'seleção automática restaurada; a sessão persistida anterior volta a ser o padrão', { role: 'success' }));
+            println(
+                terminalThemeRow(
+                    'Próximo boot',
+                    'seleção automática restaurada; a sessão persistida anterior volta a ser o padrão',
+                    { role: 'success' },
+                ),
+            );
         } else {
-            println(terminalThemeRow('Uso', '/session sdk next <new|resume <id|#n|atual|última|primeiro-plano>|auto>', { role: 'warn' }));
+            println(
+                terminalThemeRow('Uso', '/session sdk next <new|resume <id|#n|atual|última|primeiro-plano>|auto>', {
+                    role: 'warn',
+                }),
+            );
             return;
         }
-        println(terminalThemeRow('Nota', 'a diretiva é consumida pelo initializer no próximo boot; /restart executa esse boot agora'));
+        println(
+            terminalThemeRow(
+                'Nota',
+                'a diretiva é consumida pelo initializer no próximo boot; /restart executa esse boot agora',
+            ),
+        );
         return;
     }
     if (action === 'delete' || action === 'remove') {
         const target = rest.join(' ').trim();
         if (!target) {
             println(terminalThemeRow('Uso', '/session sdk delete <sessionId|#n>', { role: 'warn' }));
-            println(terminalThemeRow('Proteção', 'a sessão SDK viva é protegida; para sair dela, agende /session sdk next new'));
+            println(
+                terminalThemeRow(
+                    'Proteção',
+                    'a sessão SDK viva é protegida; para sair dela, agende /session sdk next new',
+                ),
+            );
             return;
         }
         let inventory;
         try {
             inventory = await listTerminalSdkSessionInventory(runtimeId);
         } catch (error) {
-            println(terminalThemeRow('Erro', `não foi possível listar sessões SDK antes da exclusão: ${toError(error).message}`, { role: 'error' }));
+            println(
+                terminalThemeRow(
+                    'Erro',
+                    `não foi possível listar sessões SDK antes da exclusão: ${toError(error).message}`,
+                    { role: 'error' },
+                ),
+            );
             return;
         }
         const resolved = resolveSdkSessionResumeTarget(target, inventory);
         if (!resolved) {
-            println(terminalThemeRow('Sessão SDK', `não resolvida para exclusão: ${target} · rode /session sdk para ver o inventário`, { role: 'warn' }));
+            println(
+                terminalThemeRow(
+                    'Sessão SDK',
+                    `não resolvida para exclusão: ${target} · rode /session sdk para ver o inventário`,
+                    { role: 'warn' },
+                ),
+            );
             return;
         }
         if (resolved.sessionId === inventory.currentSessionId) {
             println(terminalThemeRow('Proteção', 'sessão SDK viva não apagada', { role: 'error' }));
-            println(terminalThemeRow('Ação', 'agende /session sdk next new ou retome outra sessão no próximo boot antes de apagar esta'));
+            println(
+                terminalThemeRow(
+                    'Ação',
+                    'agende /session sdk next new ou retome outra sessão no próximo boot antes de apagar esta',
+                ),
+            );
             return;
         }
         try {
             await deleteTerminalSdkSession(resolved.sessionId, runtimeId);
         } catch (error) {
-            println(terminalThemeRow('Erro', `falha ao apagar sessão SDK ${resolved.sessionId}: ${toError(error).message}`, { role: 'error' }));
+            println(
+                terminalThemeRow(
+                    'Erro',
+                    `falha ao apagar sessão SDK ${resolved.sessionId}: ${toError(error).message}`,
+                    { role: 'error' },
+                ),
+            );
             return;
         }
         println(
@@ -2624,7 +2857,12 @@ export async function cmdSessionSdk({ println }, arg = '') {
                 { role: 'success' },
             ),
         );
-        println(terminalThemeRow('Nota', 'deleteSession remove estado persistido; /session sdk next controla apenas o próximo attach/create'));
+        println(
+            terminalThemeRow(
+                'Nota',
+                'deleteSession remove estado persistido; /session sdk next controla apenas o próximo attach/create',
+            ),
+        );
         return;
     }
 
@@ -2637,7 +2875,11 @@ export async function cmdSessionSdk({ println }, arg = '') {
             enrichLimit: inventoryArgs.limit,
         });
     } catch (error) {
-        println(terminalThemeRow('Erro', `não foi possível listar sessões SDK: ${toError(error).message}`, { role: 'error' }));
+        println(
+            terminalThemeRow('Erro', `não foi possível listar sessões SDK: ${toError(error).message}`, {
+                role: 'error',
+            }),
+        );
         println(terminalThemeRow('Nota', '/resume atua no hub; /session save|list|restore atua em snapshots locais'));
         return;
     }
@@ -2646,16 +2888,24 @@ export async function cmdSessionSdk({ println }, arg = '') {
     println('');
     println(terminalThemeHeadline('assistant', 'Sessão SDK'));
     println(terminalThemeRow('Atual', renderSdkSessionTopReference(inventory.currentSessionId, inventory.sessions)));
-    println(terminalThemeRow('Última usada', renderSdkSessionTopReference(inventory.lastSessionId, inventory.sessions)));
-    println(terminalThemeRow('Primeiro plano', renderSdkSessionTopReference(inventory.foregroundSessionId, inventory.sessions)));
+    println(
+        terminalThemeRow('Última usada', renderSdkSessionTopReference(inventory.lastSessionId, inventory.sessions)),
+    );
+    println(
+        terminalThemeRow(
+            'Primeiro plano',
+            renderSdkSessionTopReference(inventory.foregroundSessionId, inventory.sessions),
+        ),
+    );
     println(terminalThemeRow('Próximo boot', nextLabel));
     println(terminalThemeRow('Arquivos', renderSdkSessionFsState(inventory.sessionFs)));
     println(terminalThemeRow('CommandDefinitions', await renderSdkCommandCatalogArchiveSummary()));
     const byokProjection = readTerminalByokProjection();
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
-    const gatewayProjection = configProjection.modelGatewayProjection ?? byokProjection.modelGatewayProjection ?? {
-        effectiveRoute: null,
-    };
+    const gatewayProjection = configProjection.modelGatewayProjection ??
+        byokProjection.modelGatewayProjection ?? {
+            effectiveRoute: null,
+        };
     const gatewayEffectiveRoute =
         gatewayProjection.effectiveRoute && typeof gatewayProjection.effectiveRoute === 'object'
             ? gatewayProjection.effectiveRoute
@@ -2693,13 +2943,17 @@ export async function cmdSessionSdk({ println }, arg = '') {
         println(terminalThemeRow('Último boot', bootDecision));
     }
     println(
-        terminalThemeRows('Comandos', [
-            '/session sdk controla sessões SDK',
-            '/restart reinicia a sessão SDK',
-            '/conversation-restart reinicia só a conversa',
-            '/resume injeta histórico do hub',
-            '/session save|list|restore usa snapshots locais',
-        ], { role: 'command' }),
+        terminalThemeRows(
+            'Comandos',
+            [
+                '/session sdk controla sessões SDK',
+                '/restart reinicia a sessão SDK',
+                '/conversation-restart reinicia só a conversa',
+                '/resume injeta histórico do hub',
+                '/session save|list|restore usa snapshots locais',
+            ],
+            { role: 'command' },
+        ),
     );
     if (inventory.sessions.length === 0) {
         println(terminalThemeRow('Sessões', 'nenhuma sessão SDK listada pelo client atual'));
@@ -2753,26 +3007,36 @@ export async function cmdSessionSdk({ println }, arg = '') {
     }
     println('');
     println(
-        terminalThemeRows('Próximo boot', [
-            '/session sdk next new',
-            '/session sdk next resume <id|#n|atual|última|primeiro-plano>',
-            '/session sdk next auto',
-            '/session sdk restart new',
-            '/session sdk restart resume <id|#n|atual|última|primeiro-plano>',
-        ], { role: 'command' }),
+        terminalThemeRows(
+            'Próximo boot',
+            [
+                '/session sdk next new',
+                '/session sdk next resume <id|#n|atual|última|primeiro-plano>',
+                '/session sdk next auto',
+                '/session sdk restart new',
+                '/session sdk restart resume <id|#n|atual|última|primeiro-plano>',
+            ],
+            { role: 'command' },
+        ),
     );
     println(
-        terminalThemeRows('Filtros', [
-            '/session sdk <n> offset=<n>',
-            'cwd=<path> (diretório) · gitRoot=<path> (raiz Git)',
-            'repo=<owner/repo> · branch=<nome>',
-        ], { role: 'command' }),
+        terminalThemeRows(
+            'Filtros',
+            [
+                '/session sdk <n> offset=<n>',
+                'cwd=<path> (diretório) · gitRoot=<path> (raiz Git)',
+                'repo=<owner/repo> · branch=<nome>',
+            ],
+            { role: 'command' },
+        ),
     );
     println(terminalThemeRow('Limpeza', '/session sdk delete <id|#n>; sessão viva é protegida', { role: 'command' }));
-    println(terminalThemeRows('Diagnósticos', [
-        'sessões marcadas como diagnóstico antigo vieram de canários persistidos',
-        'probes novos usam sessão efêmera',
-    ]));
+    println(
+        terminalThemeRows('Diagnósticos', [
+            'sessões marcadas como diagnóstico antigo vieram de canários persistidos',
+            'probes novos usam sessão efêmera',
+        ]),
+    );
     println('');
 }
 
@@ -2816,9 +3080,7 @@ export async function cmdSessionList({ println }) {
         const snapshotId = renderTerminalSnapshotReference(s['snapshotId']);
         const model = compactHumanTerminalText(s['model'] || 'modelo desconhecido');
         const reason = compactHumanTerminalText(s['reason'] || 'sem motivo');
-        println(
-            terminalThemeRow(`#${index + 1}`, `${snapshotId} · ${date} · ${model} · ${reason}`, { role: 'info' }),
-        );
+        println(terminalThemeRow(`#${index + 1}`, `${snapshotId} · ${date} · ${model} · ${reason}`, { role: 'info' }));
     });
 }
 
@@ -2838,12 +3100,18 @@ export async function cmdSessionRestore({ println }, snapshotId) {
 
     const snap = await loadTerminalSnapshotProjection(snapshotId);
     if (!snap) {
-        println(terminalThemeRow('Snapshot', `não encontrado · ${renderTerminalSnapshotReference(snapshotId)}`, { role: 'error' }));
+        println(
+            terminalThemeRow('Snapshot', `não encontrado · ${renderTerminalSnapshotReference(snapshotId)}`, {
+                role: 'error',
+            }),
+        );
         println(terminalThemeRow('Ação', 'use /session list para conferir ids disponíveis', { role: 'command' }));
         return;
     }
 
-    println(terminalThemeHeadline('assistant', 'Snapshot da sessão', [renderTerminalSnapshotReference(snap['snapshotId'])]));
+    println(
+        terminalThemeHeadline('assistant', 'Snapshot da sessão', [renderTerminalSnapshotReference(snap['snapshotId'])]),
+    );
     const createdAt = snap['createdAt'];
     const createdAtIso =
         typeof createdAt === 'number' || typeof createdAt === 'string'
@@ -2901,13 +3169,16 @@ export async function cmdSessionRestore({ println }, snapshotId) {
     }
     const rawUsageMetrics = snap['usageMetrics'] ?? snap['prMetrics'];
     if (rawUsageMetrics && typeof rawUsageMetrics === 'object') {
-        const usageMetrics = /** @type {{
-         *   boots?: number;
-         *   resumesWithAdditionalModelCall?: number;
-         *   resumesWithoutAdditionalModelCall?: number;
-         *   resumesWithPR?: number;
-         *   resumesZeroPR?: number;
-         * }} */ (rawUsageMetrics);
+        const usageMetrics =
+            /**
+             * @type {{
+             *     boots?: number;
+             *     resumesWithAdditionalModelCall?: number;
+             *     resumesWithoutAdditionalModelCall?: number;
+             *     resumesWithPR?: number;
+             *     resumesZeroPR?: number;
+             * }}
+             */ (rawUsageMetrics);
         const withCall = Number(usageMetrics.resumesWithAdditionalModelCall ?? usageMetrics.resumesWithPR ?? 0);
         const withoutCall = Number(usageMetrics.resumesWithoutAdditionalModelCall ?? usageMetrics.resumesZeroPR ?? 0);
         println(
@@ -2917,5 +3188,7 @@ export async function cmdSessionRestore({ println }, snapshotId) {
             ),
         );
     }
-    println(terminalThemeRow('Nota', 'restore automático ocorre no boot via PM2; use /session save antes de reiniciar'));
+    println(
+        terminalThemeRow('Nota', 'restore automático ocorre no boot via PM2; use /session save antes de reiniciar'),
+    );
 }

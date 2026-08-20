@@ -1,9 +1,8 @@
 # src/integration/lsp
 
 **Propósito**: compatibilidade opt-in das ferramentas MCP com o LSP nativo do TypeScript 7.
-**Status**: preservado, desligado por padrão.
-**Público**: Mantenedores de integrações de tooling de desenvolvimento e auditoria de código.
-**Última atualização**: 19 de agosto de 2026.
+**Status**: preservado, desligado por padrão. **Público**: Mantenedores de integrações de tooling de
+desenvolvimento e auditoria de código. **Última atualização**: 19 de agosto de 2026.
 
 ## O que esta pasta contém
 
@@ -18,10 +17,10 @@
 
 ## Entradas principais
 
-| Arquivo | Descrição |
-| --- | --- |
+| Arquivo               | Descrição                                            |
+| --------------------- | ---------------------------------------------------- |
 | `tsgo-lsp-daemon.mjs` | Implementação canônica preservada do cliente LSP TS7 |
-| `tsserver-daemon.mjs` | Alias de compatibilidade de nomes |
+| `tsserver-daemon.mjs` | Alias de compatibilidade de nomes                    |
 
 ## Regras de manutenção
 

@@ -2,9 +2,9 @@
 /**
  * Planejamento seguro de pickers interativos (`fzf`/`gum`).
  *
- * O terminal LLM-B tem linha viva e `readline` próprios. Antes de rodar qualquer TUI externa, o runtime precisa entregar
- * controle exclusivo do TTY. Enquanto essa pausa coordenada não existe, este módulo só produz decisão/diagnóstico e
- * fallback textual.
+ * O terminal LLM-B tem linha viva e `readline` próprios. Antes de rodar qualquer TUI externa, o runtime precisa
+ * entregar controle exclusivo do TTY. Enquanto essa pausa coordenada não existe, este módulo só produz
+ * decisão/diagnóstico e fallback textual.
  *
  * @module copilot/terminal/capabilities/picker-plan
  */
@@ -26,7 +26,13 @@ import { readTerminalExternalToolCapabilities } from './external-tools.js';
  */
 
 /**
- * @param {{ allowInteractive?: boolean; pendingQuestion?: boolean; preferred?: 'auto' | 'fzf' | 'gum'; tools?: ReturnType<typeof readTerminalExternalToolCapabilities>; blockReasons?: string[] }} [options]
+ * @param {{
+ *     allowInteractive?: boolean;
+ *     pendingQuestion?: boolean;
+ *     preferred?: 'auto' | 'fzf' | 'gum';
+ *     tools?: ReturnType<typeof readTerminalExternalToolCapabilities>;
+ *     blockReasons?: string[];
+ * }} [options]
  * @returns {TerminalPickerPlan}
  */
 export function buildTerminalPickerPlan(options = {}) {
@@ -34,12 +40,7 @@ export function buildTerminalPickerPlan(options = {}) {
     const tools = options.tools ?? readTerminalExternalToolCapabilities();
     const fzf = tools.find((tool) => tool.id === 'fzf' && tool.available) ?? null;
     const gum = tools.find((tool) => tool.id === 'gum' && tool.available) ?? null;
-    const chosen =
-        preferred === 'gum'
-            ? gum
-            : preferred === 'fzf'
-              ? fzf
-              : fzf ?? gum;
+    const chosen = preferred === 'gum' ? gum : preferred === 'fzf' ? fzf : (fzf ?? gum);
     /** @type {string[]} */
     const reasons = [];
     if (options.pendingQuestion) reasons.push('pergunta humana pendente');

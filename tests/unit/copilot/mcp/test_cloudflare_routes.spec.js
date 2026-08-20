@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import {
     buildCloudflareAnonymousMcpExpression,
     buildCloudflareCacheBypassRoutesExpression,
@@ -8,6 +7,7 @@ import {
     buildCloudflareOAuthTokenExpression,
     buildCloudflarePublicMetadataCacheExpression,
 } from '#copilot/mcp/cloudflare';
+import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/routes', () => {
     it('matches the MCP endpoint exactly or under explicit MCP subroutes', () => {
@@ -20,8 +20,12 @@ describe('mcp/cloudflare/routes', () => {
         expect(buildCloudflareDynamicRoutesExpression('mcp.example.test')).toContain('http.host eq "mcp.example.test"');
         expect(buildCloudflareDynamicRoutesExpression('mcp.example.test')).toContain('/.well-known/');
         expect(buildCloudflareDynamicRoutesExpression('mcp.example.test')).toContain('/chatgpt-connector.json');
-        expect(buildCloudflareAnonymousMcpExpression('mcp.example.test')).toContain('not any(http.request.headers.names[*] eq "authorization")');
-        expect(buildCloudflareOAuthTokenExpression('mcp.example.test')).toBe('(http.host eq "mcp.example.test" and http.request.uri.path eq "/oauth/token")');
+        expect(buildCloudflareAnonymousMcpExpression('mcp.example.test')).toContain(
+            'not any(http.request.headers.names[*] eq "authorization")',
+        );
+        expect(buildCloudflareOAuthTokenExpression('mcp.example.test')).toBe(
+            '(http.host eq "mcp.example.test" and http.request.uri.path eq "/oauth/token")',
+        );
     });
 
     it('separates dynamic cache bypass from public metadata cache candidates', () => {

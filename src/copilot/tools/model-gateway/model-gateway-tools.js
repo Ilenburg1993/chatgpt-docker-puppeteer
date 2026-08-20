@@ -13,26 +13,26 @@ import {
     createModelGatewaySameSessionRouteSwitchOperationId,
     executeModelGatewayProbe,
     readModelGatewayProbeOperation,
-    removeModelGatewayByokProfileEnv,
     redactModelGatewayAuditedValue,
+    removeModelGatewayByokProfileEnv,
     resolveModelGatewaySessionBinding,
     SqliteModelGatewayCatalogStore,
     upsertModelGatewayByokProfileEnv,
 } from '#copilot/model-gateway';
 import { buildTool } from '../infra/tool-factory.js';
 import {
-    MODEL_GATEWAY_CATALOG_SEARCH_INPUT_SCHEMA,
     MODEL_GATEWAY_CATALOG_REFRESH_INPUT_SCHEMA,
+    MODEL_GATEWAY_CATALOG_SEARCH_INPUT_SCHEMA,
     MODEL_GATEWAY_CONTROL_PLANE_GUIDE_INPUT_SCHEMA,
-    MODEL_GATEWAY_MODEL_EVALUATE_INPUT_SCHEMA,
     MODEL_GATEWAY_MAINTENANCE_INPUT_SCHEMA,
-    MODEL_GATEWAY_OPERATION_STATUS_INPUT_SCHEMA,
+    MODEL_GATEWAY_MODEL_EVALUATE_INPUT_SCHEMA,
     MODEL_GATEWAY_MODEL_SWITCH_INPUT_SCHEMA,
+    MODEL_GATEWAY_OPERATION_STATUS_INPUT_SCHEMA,
     MODEL_GATEWAY_OVERVIEW_INPUT_SCHEMA,
-    MODEL_GATEWAY_PROFILE_MANAGE_INPUT_SCHEMA,
     MODEL_GATEWAY_POLICY_PROPOSE_INPUT_SCHEMA,
     MODEL_GATEWAY_PROBE_EXECUTE_INPUT_SCHEMA,
     MODEL_GATEWAY_PROBE_PLAN_INPUT_SCHEMA,
+    MODEL_GATEWAY_PROFILE_MANAGE_INPUT_SCHEMA,
     MODEL_GATEWAY_ROUTE_PLAN_INPUT_SCHEMA,
     MODEL_GATEWAY_ROUTE_SWITCH_INPUT_SCHEMA,
     MODEL_GATEWAY_RUNTIME_RECONCILE_INPUT_SCHEMA,
@@ -63,8 +63,22 @@ import {
  * @typedef {{
  *     readCapabilities: (runtimeId?: string | null) => Record<string, unknown>;
  *     readStats: (runtimeId?: string | null) => { currentModel: string; stats: unknown };
- *     switchModel: (modelId: string, runtimeId?: string | null, options?: { idempotencyKey?: string; source?: string }) => Promise<Record<string, any>>;
- *     switchRoute: (route: Record<string, unknown>, runtimeId?: string | null, options?: { idempotencyKey?: string; timeoutMs?: number; source?: string; allowActiveDialogLoopReattach?: boolean; forceApplyDeferred?: boolean }) => Promise<Record<string, any>>;
+ *     switchModel: (
+ *         modelId: string,
+ *         runtimeId?: string | null,
+ *         options?: { idempotencyKey?: string; source?: string },
+ *     ) => Promise<Record<string, any>>;
+ *     switchRoute: (
+ *         route: Record<string, unknown>,
+ *         runtimeId?: string | null,
+ *         options?: {
+ *             idempotencyKey?: string;
+ *             timeoutMs?: number;
+ *             source?: string;
+ *             allowActiveDialogLoopReattach?: boolean;
+ *             forceApplyDeferred?: boolean;
+ *         },
+ *     ) => Promise<Record<string, any>>;
  * }} ModelGatewayRuntimeControl
  */
 
@@ -83,7 +97,9 @@ export function setModelGatewayRuntimeControl(control) {
  */
 function requireRuntimeControl() {
     if (!runtimeControl) {
-        throw new Error('MODEL_GATEWAY_RUNTIME_CONTROL_UNAVAILABLE: runtime composition has not injected model control');
+        throw new Error(
+            'MODEL_GATEWAY_RUNTIME_CONTROL_UNAVAILABLE: runtime composition has not injected model control',
+        );
     }
     return runtimeControl;
 }
@@ -128,9 +144,10 @@ function toolOperationMeta(toolName, input = {}) {
  * @returns {Record<string, unknown>}
  */
 function withOperationMeta(result, operationMeta) {
-    const data = result['data'] && typeof result['data'] === 'object' && !Array.isArray(result['data'])
-        ? /** @type {Record<string, unknown>} */ (result['data'])
-        : {};
+    const data =
+        result['data'] && typeof result['data'] === 'object' && !Array.isArray(result['data'])
+            ? /** @type {Record<string, unknown>} */ (result['data'])
+            : {};
     return { ...result, data: { ...data, operationMeta } };
 }
 
@@ -152,9 +169,10 @@ function serializeResult(result) {
  * @returns {Record<string, unknown>}
  */
 function withRuntimeOverview(result, runtime) {
-    const data = result['data'] && typeof result['data'] === 'object' && !Array.isArray(result['data'])
-        ? /** @type {Record<string, unknown>} */ (result['data'])
-        : {};
+    const data =
+        result['data'] && typeof result['data'] === 'object' && !Array.isArray(result['data'])
+            ? /** @type {Record<string, unknown>} */ (result['data'])
+            : {};
     return { ...result, data: { ...data, runtime } };
 }
 
@@ -216,9 +234,8 @@ function readRouteReattachApplySafety(runtimeId) {
     const snapshot = asRecord(runtimeControl.readCapabilities(runtimeId ?? undefined));
     const capabilities = Array.isArray(snapshot['capabilities']) ? snapshot['capabilities'] : [];
     const capability =
-        capabilities
-            .map((item) => asRecord(item))
-            .find((item) => item['id'] === 'sdk.same-session-route-reattach') ?? null;
+        capabilities.map((item) => asRecord(item)).find((item) => item['id'] === 'sdk.same-session-route-reattach') ??
+        null;
     const details = asRecord(capability?.['details']);
     const deferredUntilTurnBoundary = details['deferredUntilTurnBoundary'] === true;
     const dialogLoopActive = details['dialogLoopActive'] === true;
@@ -501,7 +518,11 @@ export const modelGatewayControlPlaneGuideTool = buildTool({
                 },
                 warnings: [],
                 errors: [],
-                nextActions: ['call_model_gateway_workflow_plan', 'keep_same_session_boundary', 'use_confirmed_apply_only_after_plan'],
+                nextActions: [
+                    'call_model_gateway_workflow_plan',
+                    'keep_same_session_boundary',
+                    'use_confirmed_apply_only_after_plan',
+                ],
             }),
         );
     },
@@ -635,11 +656,18 @@ export const modelGatewayWorkflowPlanTool = buildTool({
         const steps = [];
         let order = 1;
         steps.push(
-            workflowStep(order++, 'overview', 'model_gateway_overview', 'read', 'Inspecionar readiness, BYOK, catálogo e runtime alvo.', {
-                runtimeId,
-                maxSnapshotAgeHours: args.maxSnapshotAgeHours,
-                operationLimit: 10,
-            }),
+            workflowStep(
+                order++,
+                'overview',
+                'model_gateway_overview',
+                'read',
+                'Inspecionar readiness, BYOK, catálogo e runtime alvo.',
+                {
+                    runtimeId,
+                    maxSnapshotAgeHours: args.maxSnapshotAgeHours,
+                    operationLimit: 10,
+                },
+            ),
         );
         if (shouldPlanCatalogRefresh) {
             steps.push(
@@ -893,7 +921,10 @@ export const modelGatewayWorkflowPlanTool = buildTool({
             );
         }
         if (args.objective === 'runtime_reconcile' && selectedModelId) {
-            const reconcileKey = workflowIdempotencyKey(args.idempotencyKeyPrefix, `runtime-reconcile-${selectedModelId}`);
+            const reconcileKey = workflowIdempotencyKey(
+                args.idempotencyKeyPrefix,
+                `runtime-reconcile-${selectedModelId}`,
+            );
             steps.push(
                 workflowStep(
                     order++,
@@ -946,7 +977,10 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                             apiKeyEnv: '<ENV_VAR_NAME>',
                             baseUrl: '<optional-base-url>',
                         },
-                        idempotencyKey: workflowIdempotencyKey(args.idempotencyKeyPrefix, 'profile-manage-profile-name'),
+                        idempotencyKey: workflowIdempotencyKey(
+                            args.idempotencyKeyPrefix,
+                            'profile-manage-profile-name',
+                        ),
                         confirm: false,
                     },
                     ['overview'],
@@ -1016,9 +1050,11 @@ export const modelGatewayWorkflowPlanTool = buildTool({
                   catalogRefreshPlan: catalogRefreshPlan ? operationData(catalogRefreshPlan) : null,
               }
             : null;
-        const switchingObjective = ['same_session_model_switch', 'same_session_route_switch', 'runtime_reconcile'].includes(
-            args.objective,
-        );
+        const switchingObjective = [
+            'same_session_model_switch',
+            'same_session_route_switch',
+            'runtime_reconcile',
+        ].includes(args.objective);
         const errors = [];
         if (switchingObjective && selectionDecision.status === 'blocked') {
             errors.push({
@@ -1240,9 +1276,8 @@ export const modelGatewayProbeExecuteTool = buildTool({
             correlationId: operationId,
             expectedResult: args.mode === 'plan' ? 'dry_run_plan' : 'persisted_runtime_probe',
         });
-        const replay = args.mode === 'apply' && args.confirm
-            ? await readModelGatewayProbeOperation(args.idempotencyKey)
-            : null;
+        const replay =
+            args.mode === 'apply' && args.confirm ? await readModelGatewayProbeOperation(args.idempotencyKey) : null;
         if (replay) {
             const replayFailureScope =
                 optionalToolString(replay.failureScope) ?? optionalToolString(replay.result?.['failureScope']);
@@ -1302,14 +1337,15 @@ export const modelGatewayProbeExecuteTool = buildTool({
         });
         const planData = /** @type {Record<string, any>} */ (plan['data']);
         const executionRoutes = Array.isArray(planData['execution']?.['routes']) ? planData['execution']['routes'] : [];
-        const selectedExecution = executionRoutes.find((entry) => {
-            const route = asRecord(entry?.['route']);
-            return (
-                entry?.['kind'] === args.probeKind &&
-                optionalWorkflowString(route['providerId']) === args.providerId &&
-                optionalWorkflowString(route['providerModel']) === args.modelId
-            );
-        }) ?? null;
+        const selectedExecution =
+            executionRoutes.find((entry) => {
+                const route = asRecord(entry?.['route']);
+                return (
+                    entry?.['kind'] === args.probeKind &&
+                    optionalWorkflowString(route['providerId']) === args.providerId &&
+                    optionalWorkflowString(route['providerModel']) === args.modelId
+                );
+            }) ?? null;
         const authorizedRoute = selectedExecution ? asRecord(selectedExecution['route']) : null;
         const authorizedByPlan = authorizedRoute !== null;
         if (args.mode === 'plan' || !authorizedByPlan) {
@@ -1434,22 +1470,21 @@ export const modelGatewayProbeExecuteTool = buildTool({
                         : []),
                     ...(providerMatches ? [] : ['probe_result_provider_mismatch']),
                 ],
-                errors:
-                    executionOk
-                        ? []
-                        : [
-                              {
-                                  code: !providerMatches
-                                      ? 'MODEL_GATEWAY_PROBE_RESULT_PROVIDER_MISMATCH'
-                                      : failureScope === 'controller_substrate'
-                                        ? 'MODEL_GATEWAY_PROBE_CONTROLLER_SUBSTRATE_UNAVAILABLE'
-                                        : 'MODEL_GATEWAY_PROBE_FAILED',
-                                  message: providerMatches
-                                      ? String(executed.result?.['status'] ?? executed.status ?? 'unknown')
-                                      : `Esperado ${args.providerId}, observado ${String(actualProviderId ?? 'unknown')}.`,
-                                  retryable: providerMatches,
-                              },
-                          ],
+                errors: executionOk
+                    ? []
+                    : [
+                          {
+                              code: !providerMatches
+                                  ? 'MODEL_GATEWAY_PROBE_RESULT_PROVIDER_MISMATCH'
+                                  : failureScope === 'controller_substrate'
+                                    ? 'MODEL_GATEWAY_PROBE_CONTROLLER_SUBSTRATE_UNAVAILABLE'
+                                    : 'MODEL_GATEWAY_PROBE_FAILED',
+                              message: providerMatches
+                                  ? String(executed.result?.['status'] ?? executed.status ?? 'unknown')
+                                  : `Esperado ${args.providerId}, observado ${String(actualProviderId ?? 'unknown')}.`,
+                              retryable: providerMatches,
+                          },
+                      ],
                 nextActions:
                     failureScope === 'controller_substrate'
                         ? ['retry_controller_substrate_before_changing_provider', 'inspect_operation_status']
@@ -1558,7 +1593,9 @@ export const modelGatewayModelSwitchTool = buildTool({
                     operation,
                     operationMeta: toolOperationMeta('model_gateway_model_switch', {
                         idempotencyKey: args.idempotencyKey,
-                        correlationId: String(operation['operationId'] ?? createModelGatewayModelSwitchOperationId(args.idempotencyKey)),
+                        correlationId: String(
+                            operation['operationId'] ?? createModelGatewayModelSwitchOperationId(args.idempotencyKey),
+                        ),
                         expectedResult: committed ? 'committed' : 'not_committed',
                     }),
                 },
@@ -1572,7 +1609,9 @@ export const modelGatewayModelSwitchTool = buildTool({
                               retryable: operation['state'] !== 'rolled_back',
                           },
                       ],
-                nextActions: committed ? ['inspect_operation_status'] : ['inspect_operation_status', 'review_runtime_state'],
+                nextActions: committed
+                    ? ['inspect_operation_status']
+                    : ['inspect_operation_status', 'review_runtime_state'],
             }),
         );
     },
@@ -1684,7 +1723,11 @@ export const modelGatewayRouteSwitchTool = buildTool({
                     operationMeta: toolOperationMeta('model_gateway_route_switch', {
                         idempotencyKey: args.idempotencyKey,
                         correlationId: String(operation?.['operationId'] ?? correlationId),
-                        expectedResult: committed ? 'committed' : deferred ? 'accepted_for_turn_boundary' : 'not_committed',
+                        expectedResult: committed
+                            ? 'committed'
+                            : deferred
+                              ? 'accepted_for_turn_boundary'
+                              : 'not_committed',
                     }),
                 },
                 warnings: committed
@@ -1810,16 +1853,14 @@ export const modelGatewayRuntimeReconcileTool = buildTool({
             const { handoff, operation } = await readRouteSwitchOperation(routeOperationId);
             const operationState = optionalToolString(operation?.['state']) ?? 'missing';
             const targetRoute = operation ? routeSwitchTargetRoute(operation) : null;
-            const routeIdempotencyKey =
-                optionalToolString(operation?.['idempotencyKey']) ?? args.idempotencyKey;
+            const routeIdempotencyKey = optionalToolString(operation?.['idempotencyKey']) ?? args.idempotencyKey;
             const safety = readRouteReattachApplySafety(args.runtimeId);
             const deferred = operationState === 'deferred_until_turn_boundary';
             const committed = operationState === 'committed';
             const deferredClassification = operation
                 ? classifyModelGatewayDeferredRouteOperation(operation, { now: Date.now() })
                 : null;
-            const promotable =
-                deferred && targetRoute !== null && deferredClassification?.promotable === true;
+            const promotable = deferred && targetRoute !== null && deferredClassification?.promotable === true;
             const operationMeta = toolOperationMeta('model_gateway_runtime_reconcile', {
                 idempotencyKey: routeIdempotencyKey,
                 correlationId: routeOperationId,
@@ -1997,7 +2038,9 @@ export const modelGatewayRuntimeReconcileTool = buildTool({
                         : [
                               {
                                   code: 'ROUTE_RUNTIME_RECONCILE_NOT_COMMITTED',
-                                  message: String(promotedOperation['error'] ?? promotedOperation['state'] ?? 'unknown'),
+                                  message: String(
+                                      promotedOperation['error'] ?? promotedOperation['state'] ?? 'unknown',
+                                  ),
                                   retryable: true,
                               },
                           ],

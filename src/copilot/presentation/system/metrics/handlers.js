@@ -590,13 +590,12 @@ export function handleGetUsageBudget(params = {}) {
         body: {
             ok: true,
             runtimeId,
-            usageMetrics:
-                usageMetrics ?? {
-                    boots: 0,
-                    resumesWithAdditionalModelCall: 0,
-                    resumesWithoutAdditionalModelCall: 0,
-                    totalModelCalls: 0,
-                },
+            usageMetrics: usageMetrics ?? {
+                boots: 0,
+                resumesWithAdditionalModelCall: 0,
+                resumesWithoutAdditionalModelCall: 0,
+                totalModelCalls: 0,
+            },
             sendCount: Number(snapshot?.['sendCount'] ?? 0),
             dialogLoopActive,
             sessionId,

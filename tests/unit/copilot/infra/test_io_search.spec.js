@@ -82,17 +82,19 @@ describe('infra/io/search', () => {
     it('monta padrões e globs de busca simbólica', () => {
         expect(buildSymbolPattern('runTask', 'function')).toContain('function\\s+runTask\\b');
         expect(kindToGlobs('type')).toContain('*.d.ts');
-        expect(formatIndexSymbolRows([
-            {
-                filePath: '/x/a.ts',
-                relativePath: 'a.ts',
-                symbolName: 'runTask',
-                symbolKind: 'function',
-                exported: 1,
-                line: 3,
-                docComment: 'Runs task',
-            },
-        ])).toContain('a.ts:3: function runTask export');
+        expect(
+            formatIndexSymbolRows([
+                {
+                    filePath: '/x/a.ts',
+                    relativePath: 'a.ts',
+                    symbolName: 'runTask',
+                    symbolKind: 'function',
+                    exported: 1,
+                    line: 3,
+                    docComment: 'Runs task',
+                },
+            ]),
+        ).toContain('a.ts:3: function runTask export');
     });
 
     it('normaliza janela de busca e pagina itens com lookahead de comando', () => {

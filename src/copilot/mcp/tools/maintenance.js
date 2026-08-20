@@ -6,8 +6,6 @@
  */
 
 import { buildIoIndexForDirectory, getIoIndexStats } from '#copilot/infra/public/indexing';
-import { WORKSPACE_ROOT } from '#copilot/tools';
-import { z } from 'zod';
 import {
     boundedWriteAnnotations,
     buildAiArtifactsReport,
@@ -21,11 +19,19 @@ import {
     readOnlyAnnotations,
     upgradeRootDependenciesToLatest,
 } from '#copilot/mcp/control-plane';
+import { WORKSPACE_ROOT } from '#copilot/tools';
+import { z } from 'zod';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
 
-const maintenanceFixSchema = z.enum(['ai-artifacts-report', 'refresh-index', 'run-mcp-smoke', 'summarize-tools', 'workspace-status']);
+const maintenanceFixSchema = z.enum([
+    'ai-artifacts-report',
+    'refresh-index',
+    'run-mcp-smoke',
+    'summarize-tools',
+    'workspace-status',
+]);
 
 const DEFAULT_FIXES = ['workspace-status', 'summarize-tools', 'ai-artifacts-report', 'run-mcp-smoke'];
 
@@ -104,7 +110,13 @@ export const maintenanceTools = [
         description:
             'Compare the root package dependencies with npm registry latest versions using the fixed local npm-check-updates workflow. No arbitrary package, registry, command, cwd or environment input is accepted.',
         inputSchema: {
-            timeoutMs: z.number().int().min(30_000).max(1_800_000).optional()['describe']('Fixed audit timeout. Default: 180000ms.'),
+            timeoutMs: z
+                .number()
+                .int()
+                .min(30_000)
+                .max(1_800_000)
+                .optional()
+                ['describe']('Fixed audit timeout. Default: 180000ms.'),
         },
         annotations: openWorldReadOnlyAnnotations(),
         handler: async ({ timeoutMs } = {}) => okResult(await inspectRootDependencyUpdates({ timeoutMs })),
@@ -116,8 +128,17 @@ export const maintenanceTools = [
             'Upgrade every root dependency/devDependency reported by npm-check-updates to the npm registry latest tag using the packageManager-pinned npm version. Lock resolution disables lifecycle scripts; the final install enables them and runs fixed native-binding smoke checks. Requires explicit confirmation and never accepts arbitrary packages or commands.',
         inputSchema: {
             confirmUpgrade: z.literal(true)['describe']('Explicitly confirm the full root dependency upgrade.'),
-            install: z.boolean().optional()['describe']('Install node_modules after resolving the lockfile. Default: true.'),
-            timeoutMs: z.number().int().min(30_000).max(1_800_000).optional()['describe']('Per-step timeout. Default: 900000ms.'),
+            install: z
+                .boolean()
+                .optional()
+                ['describe']('Install node_modules after resolving the lockfile. Default: true.'),
+            timeoutMs: z
+                .number()
+                .int()
+                .min(30_000)
+                .max(1_800_000)
+                .optional()
+                ['describe']('Per-step timeout. Default: 900000ms.'),
         },
         annotations: openWorldBoundedWriteAnnotations(),
         handler: async ({ confirmUpgrade, install, timeoutMs }) => {
@@ -138,11 +159,26 @@ export const maintenanceTools = [
             'Delete a bounded set of strict UUID-named validator artifacts beyond retention. Rollback sidecars can be purged only by explicit request while automatic rollback is disabled; OAuth, tunnel, pid and quarantine state stay unreachable.',
         inputSchema: {
             dryRun: z.boolean().optional()['describe']('Preview without deleting. Default: true.'),
-            retainNewest: z.number().int().min(20).max(10_000).optional()['describe']('Number of newest artifacts to retain. Default: 240.'),
-            maxDeleteCount: z.number().int().min(1).max(500).optional()['describe']('Maximum files deleted in one cleanup domain per call. Default: 100.'),
+            retainNewest: z
+                .number()
+                .int()
+                .min(20)
+                .max(10_000)
+                .optional()
+                ['describe']('Number of newest artifacts to retain. Default: 240.'),
+            maxDeleteCount: z
+                .number()
+                .int()
+                .min(1)
+                .max(500)
+                .optional()
+                ['describe']('Maximum files deleted in one cleanup domain per call. Default: 100.'),
             purgeDisabledRollback: z
                 .boolean()
-                .optional()['describe']('Purge strict rollback sidecars/pending files only when automatic rollback is disabled. Default: false.'),
+                .optional()
+                ['describe'](
+                    'Purge strict rollback sidecars/pending files only when automatic rollback is disabled. Default: false.',
+                ),
         },
         annotations: destructiveAnnotations(),
         handler: async ({ dryRun, retainNewest, maxDeleteCount, purgeDisabledRollback } = {}) =>
@@ -179,7 +215,8 @@ export const maintenanceTools = [
         inputSchema: {
             fixes: z
                 .array(maintenanceFixSchema)
-                .optional()['describe']('Allowlisted maintenance fixes. Default: safe reads.'),
+                .optional()
+                ['describe']('Allowlisted maintenance fixes. Default: safe reads.'),
             dryRun: z.boolean().optional()['describe']('Plan without mutation. Default: true.'),
         },
         annotations: boundedWriteAnnotations(),

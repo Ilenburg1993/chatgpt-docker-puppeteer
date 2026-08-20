@@ -5,8 +5,14 @@ import { readFile } from 'node:fs/promises';
 import { describe, it } from 'vitest';
 
 const skillUrl = new URL('../../../../.github/skills/llm-b-route-operator/SKILL.md', import.meta.url);
-const protocolUrl = new URL('../../../../.github/skills/llm-b-route-operator/references/route-protocol.md', import.meta.url);
-const promptUrl = new URL('../../../../src/copilot/config/system-prompt/sections/custom-instructions.js', import.meta.url);
+const protocolUrl = new URL(
+    '../../../../.github/skills/llm-b-route-operator/references/route-protocol.md',
+    import.meta.url,
+);
+const promptUrl = new URL(
+    '../../../../src/copilot/config/system-prompt/sections/custom-instructions.js',
+    import.meta.url,
+);
 
 describe('LLM-B route operator skill', () => {
     it('is discoverable and preserves the same-session promotion contract', async () => {

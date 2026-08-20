@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // @ts-check
 
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import Database from 'better-sqlite3';
 
 import { buildIndexPathTreeRange } from '../../src/copilot/infra/index-store/sqlite/paths.js';
 import { createIoIndexSqlite } from '../../src/copilot/infra/io-index-sqlite.js';
@@ -125,12 +125,14 @@ async function main() {
 
         const range = buildIndexPathTreeRange(scopedPath);
         const queryPlan = db
-            .prepare(`
+            .prepare(
+                `
                 EXPLAIN QUERY PLAN
                 SELECT id
                 FROM copilot_io_index_chunks
                 WHERE file_path = ? OR (file_path >= ? AND file_path < ?)
-            `)
+            `,
+            )
             .all(range.exact, range.descendantStart, range.descendantEnd)
             .map((row) => String(/** @type {{ detail?: unknown }} */ (row).detail ?? ''));
         assert.ok(queryPlan.some((detail) => detail.includes('idx_io_index_chunks_file')));

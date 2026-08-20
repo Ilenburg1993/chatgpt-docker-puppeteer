@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { buildEdgePolicyDiff } from '#copilot/mcp/cloudflare';
+import { describe, expect, it } from 'vitest';
 
 const desired = {
     ok: true,

@@ -57,10 +57,7 @@ describe('patch-plan', () => {
 
     it('rejeita plano inválido com erros estruturados', () => {
         const result = normalizePatchPlan({
-            operations: [
-                { path: '', oldString: '', newString: 'x', expectedOccurrences: 0 },
-                null,
-            ],
+            operations: [{ path: '', oldString: '', newString: 'x', expectedOccurrences: 0 }, null],
         });
 
         expect(result).toMatchObject({ ok: false });

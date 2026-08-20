@@ -1,22 +1,28 @@
 # Status — diffPreview desligado por padrão e redução de payloads
 
-**Data:** 2026-05-24
-**Objetivo:** reduzir interrupções de streaming do ChatGPT web e payloads grandes retornados por tools MCP, principalmente `diffPreview`/diff textual.
-**Validação:** nenhum validador foi rodado nesta etapa, conforme solicitado. A validação deve ser feita localmente depois do restart.
+**Data:** 2026-05-24 **Objetivo:** reduzir interrupções de streaming do ChatGPT web e payloads
+grandes retornados por tools MCP, principalmente `diffPreview`/diff textual. **Validação:** nenhum
+validador foi rodado nesta etapa, conforme solicitado. A validação deve ser feita localmente depois
+do restart.
 
 ---
 
 ## 1. Contexto
 
-Foi observado que chamadas de escrita/plano retornavam `diffPreview` textual por padrão. Mesmo com `maxDiffLines` reduzido nas chamadas feitas pelo ChatGPT, o runtime atual ainda inclui `diffPreview` no retorno das tools porque o servidor MCP em execução ainda não foi reiniciado depois das alterações de código.
+Foi observado que chamadas de escrita/plano retornavam `diffPreview` textual por padrão. Mesmo com
+`maxDiffLines` reduzido nas chamadas feitas pelo ChatGPT, o runtime atual ainda inclui `diffPreview`
+no retorno das tools porque o servidor MCP em execução ainda não foi reiniciado depois das
+alterações de código.
 
-A mudança implementada nesta etapa torna o diff textual **opt-in** por meio de `includeDiffPreview: true`. O default esperado, após restart, passa a ser:
+A mudança implementada nesta etapa torna o diff textual **opt-in** por meio de
+`includeDiffPreview: true`. O default esperado, após restart, passa a ser:
 
 ```text
 includeDiffPreview=false
 ```
 
-Assim, as tools retornam metadados, hashes, contagem de linhas/bytes e indicação de que o diff está disponível, mas não enviam o texto completo do diff salvo quando solicitado explicitamente.
+Assim, as tools retornam metadados, hashes, contagem de linhas/bytes e indicação de que o diff está
+disponível, mas não enviam o texto completo do diff salvo quando solicitado explicitamente.
 
 ---
 
@@ -134,7 +140,8 @@ repo_patch_plan includeDiffPreview=false
 repo_apply_patch expectedHash=<sha256 from plan> includeDiffPreview=false
 ```
 
-O motivo agora explicita que diffs textuais são suprimidos por padrão para evitar interrupções de streaming no ChatGPT web.
+O motivo agora explicita que diffs textuais são suprimidos por padrão para evitar interrupções de
+streaming no ChatGPT web.
 
 ### 3.5 `meta.js`
 
@@ -148,8 +155,10 @@ Keep includeDiffPreview=false by default for repo_patch_plan, repo_create_file_p
 
 Corrigido conflito em `approvalFrictionProfile`:
 
-- `job_cancel` não deve aparecer simultaneamente em `rememberApprovalCandidates` e `neverRememberApproval`.
-- Foi adicionado `manualSet` para excluir ferramentas manuais/destrutivas do conjunto de remember approval.
+- `job_cancel` não deve aparecer simultaneamente em `rememberApprovalCandidates` e
+  `neverRememberApproval`.
+- Foi adicionado `manualSet` para excluir ferramentas manuais/destrutivas do conjunto de remember
+  approval.
 
 ### 3.7 `jobs.js`
 
@@ -168,7 +177,8 @@ Isso implementa o padrão summary-first sem criar nova tool.
 
 ### 4.1 `mcp_validation_dashboard`
 
-A criação/inserção da nova tool `mcp_validation_dashboard` foi bloqueada pelo host ChatGPT quando enviada como patch maior.
+A criação/inserção da nova tool `mcp_validation_dashboard` foi bloqueada pelo host ChatGPT quando
+enviada como patch maior.
 
 Mitigação já aplicada:
 
@@ -191,7 +201,8 @@ Ainda não foi criada uma tool exclusiva do tipo:
 repo_diff_preview
 ```
 
-Por enquanto, o comportamento opt-in via `includeDiffPreview=true` cobre a necessidade. Uma tool dedicada pode ser melhor no futuro para evitar que tools de escrita carreguem diffs por acidente.
+Por enquanto, o comportamento opt-in via `includeDiffPreview=true` cobre a necessidade. Uma tool
+dedicada pode ser melhor no futuro para evitar que tools de escrita carreguem diffs por acidente.
 
 ---
 
@@ -199,7 +210,8 @@ Por enquanto, o comportamento opt-in via `includeDiffPreview=true` cobre a neces
 
 Essas mudanças só entram no runtime do MCP após restart do servidor.
 
-Antes do restart, chamadas como `repo_apply_patch` ainda podem retornar `diffPreview` porque o processo atual carregou a implementação antiga.
+Antes do restart, chamadas como `repo_apply_patch` ainda podem retornar `diffPreview` porque o
+processo atual carregou a implementação antiga.
 
 Depois do restart, o uso recomendado é:
 
@@ -233,7 +245,8 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp
 
 Smoke manual recomendado no ChatGPT depois do restart:
 
-1. Chamar `mcp_tools_status` e confirmar que schemas expõem `includeDiffPreview` nas tools relevantes.
+1. Chamar `mcp_tools_status` e confirmar que schemas expõem `includeDiffPreview` nas tools
+   relevantes.
 2. Chamar `repo_patch_plan` sem `includeDiffPreview` e confirmar que não há `diffPreview` textual.
 3. Chamar `repo_patch_plan includeDiffPreview=true` e confirmar que o diff textual aparece.
 4. Chamar `repo_apply_patch` com `includeDiffPreview=false` em um patch pequeno controlado.
@@ -248,4 +261,5 @@ Sem validação ainda, os principais riscos são:
 - algum teste existente esperando `diffPreview` textual sempre presente;
 - alguma tool consumidora esperando `diffPreview` em plan/apply por padrão.
 
-A intenção da mudança é compatível com o objetivo operacional: reduzir payloads por padrão e tornar diffs textuais explícitos.
+A intenção da mudança é compatível com o objetivo operacional: reduzir payloads por padrão e tornar
+diffs textuais explícitos.

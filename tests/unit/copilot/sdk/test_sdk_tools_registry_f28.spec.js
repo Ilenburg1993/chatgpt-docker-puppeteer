@@ -304,8 +304,6 @@ describe('F138 — zero-bypass: nenhum consumidor direto de sdk/tools-registry f
 
     it('server/routes/sdk/ não importa alias folha de registry', () => {
         const removedAlias = "from '#copilot/sdk/" + "tools-registry'";
-        expect(
-            findFilesContaining(join(ROOT, 'src/copilot/server/routes/sdk'), removedAlias),
-        ).toEqual([]);
+        expect(findFilesContaining(join(ROOT, 'src/copilot/server/routes/sdk'), removedAlias)).toEqual([]);
     });
 });

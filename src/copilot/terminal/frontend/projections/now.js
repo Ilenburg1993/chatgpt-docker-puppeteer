@@ -8,8 +8,7 @@
 
 import { getMcpStatus } from '#copilot/bridges';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
-import { readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
-import { listActiveRuntimeTodosProjection } from '../../../presentation/runtime/index.js';
+import { listActiveRuntimeTodosProjection, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
 import {
     getLastSdkPlanChangedAt,
     getLastSdkPlanOperation,
@@ -71,7 +70,9 @@ export function readTerminalActivityProjection(limit = 10) {
 }
 
 /**
- * @returns {ReturnType<typeof readTerminalDisplayState> & { inlineStatus: ReturnType<typeof readTerminalInlineStatusPolicy> }}
+ * @returns {ReturnType<typeof readTerminalDisplayState> & {
+ *     inlineStatus: ReturnType<typeof readTerminalInlineStatusPolicy>;
+ * }}
  */
 export function readTerminalDisplayProjection() {
     return {

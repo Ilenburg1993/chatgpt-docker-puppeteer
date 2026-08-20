@@ -80,7 +80,8 @@ import { createTtlCache } from './ttl-cache.js';
  * @property {string} audience
  * @property {string[]} scopes
  *
- * @typedef {{ ok: true; binding: McpSessionAuthBinding; verified: boolean } | { ok: false; statusCode: number; error: { error: string; error_description: string }; challenge?: string }} McpSessionAuthBindingResolution
+ * @typedef {{ ok: true; binding: McpSessionAuthBinding; verified: boolean }
+ *     | { ok: false; statusCode: number; error: { error: string; error_description: string }; challenge?: string }} McpSessionAuthBindingResolution
  */
 
 export const MCP_AUTH_SCOPES = /** @type {const} */ ({
@@ -818,9 +819,12 @@ export function buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, option
         config.expectedAudience ??
         '';
     const tokenResource =
-        typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : options.tokenResource ?? '';
+        typeof payload['resource'] === 'string'
+            ? normalizeAudience(payload['resource'], '')
+            : (options.tokenResource ?? '');
     const clientId = firstStringClaim(payload, ['client_id', 'azp', 'cid']);
-    const subject = firstStringClaim(payload, ['sub', 'uid', 'user_id']) || clientId || firstStringClaim(payload, ['jti']);
+    const subject =
+        firstStringClaim(payload, ['sub', 'uid', 'user_id']) || clientId || firstStringClaim(payload, ['jti']);
     const scopes = uniqueStrings(
         [...normalizeScopeClaim(payload['scope']), ...normalizeScopeClaim(payload['scp'])]
             .filter((scope) => config.scopesSupported.includes(/** @type {McpAuthScope} */ (scope)))
@@ -832,7 +836,8 @@ export function buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, option
         issuerHash: hashSessionAuthComponent(firstStringClaim(payload, ['iss'])),
         subjectHash: hashSessionAuthComponent(subject),
         clientIdHash: hashSessionAuthComponent(clientId),
-        resource: tokenResource || normalizeAudience(options.resourceUrl, '') || config.expectedAudience || config.resource,
+        resource:
+            tokenResource || normalizeAudience(options.resourceUrl, '') || config.expectedAudience || config.resource,
         audience: normalizeAudience(audience, config.expectedAudience || config.resource),
         scopes,
     };
@@ -840,8 +845,8 @@ export function buildMcpSessionAuthBindingFromVerifiedJwtPayload(payload, option
 
 /**
  * Resolve a per-request MCP HTTP session binding. OAuth/JWT bearer tokens are verified before claims become part of the
- * binding; static bearer fallback is represented only as a token hash and should remain an operational fallback, not the
- * preferred production path.
+ * binding; static bearer fallback is represented only as a token hash and should remain an operational fallback, not
+ * the preferred production path.
  *
  * @param {McpAuthContext} context
  * @param {string} resourceUrl
@@ -904,7 +909,12 @@ export async function resolveMcpSessionAuthBinding(
         };
     }
 
-    if (!config.jwksUri || !config.expectedIssuer || !config.expectedAudience || config.acceptedAudiences.length === 0) {
+    if (
+        !config.jwksUri ||
+        !config.expectedIssuer ||
+        !config.expectedAudience ||
+        config.acceptedAudiences.length === 0
+    ) {
         return {
             ok: false,
             statusCode: 401,
@@ -937,7 +947,8 @@ export async function resolveMcpSessionAuthBinding(
                 statusCode: 401,
                 error: {
                     error: 'invalid_token',
-                    error_description: dpopDecision.hint ?? dpopDecision.message ?? 'DPoP-bound token validation failed.',
+                    error_description:
+                        dpopDecision.hint ?? dpopDecision.message ?? 'DPoP-bound token validation failed.',
                 },
                 ...(dpopDecision.challenge ? { challenge: dpopDecision.challenge } : {}),
             };
@@ -945,10 +956,18 @@ export async function resolveMcpSessionAuthBinding(
         const audienceValues = normalizeAudienceClaim(payload.aud);
         const tokenResource = typeof payload['resource'] === 'string' ? normalizeAudience(payload['resource'], '') : '';
         if (tokenResource && !audienceMatchesAnyAccepted(tokenResource, config.acceptedAudiences)) {
-            return sessionBindingInvalidToken(config, resourceUrl, 'Bearer token resource claim does not match this MCP resource.');
+            return sessionBindingInvalidToken(
+                config,
+                resourceUrl,
+                'Bearer token resource claim does not match this MCP resource.',
+            );
         }
         if (config.requireResourceClaim && !tokenResource) {
-            return sessionBindingInvalidToken(config, resourceUrl, 'Bearer token is missing the required resource claim.');
+            return sessionBindingInvalidToken(
+                config,
+                resourceUrl,
+                'Bearer token is missing the required resource claim.',
+            );
         }
         if (audienceValues.length === 0) {
             return sessionBindingInvalidToken(config, resourceUrl, 'Bearer token is missing an audience claim.');
@@ -1143,8 +1162,8 @@ function getRemoteJwks(jwksUri) {
 /**
  * Preloads the configured remote JWKS without requiring a bearer token.
  *
- * `jose` de-duplicates concurrent reloads internally, while `REMOTE_JWKS_CACHE` keeps a single
- * resolver per URI for subsequent authorization calls.
+ * `jose` de-duplicates concurrent reloads internally, while `REMOTE_JWKS_CACHE` keeps a single resolver per URI for
+ * subsequent authorization calls.
  *
  * @param {{ env?: NodeJS.ProcessEnv }} [options]
  * @returns {Promise<{
@@ -1296,11 +1315,7 @@ async function verifyResourceDpopProof(proof, expectedJkt, context) {
         const expMs = Number(verified.payload.exp)
             ? Number(verified.payload.exp) * 1000
             : Date.now() + DPOP_MAX_TTL_SECONDS * 1000;
-        const persistentReplay = rememberPersistentOAuthReplay(
-            OAUTH_REPLAY_NAMESPACES.resourceDpop,
-            replayKey,
-            expMs,
-        );
+        const persistentReplay = rememberPersistentOAuthReplay(OAUTH_REPLAY_NAMESPACES.resourceDpop, replayKey, expMs);
         if (!persistentReplay.available) {
             return { ok: false, error: 'Persistent DPoP replay protection is unavailable.' };
         }

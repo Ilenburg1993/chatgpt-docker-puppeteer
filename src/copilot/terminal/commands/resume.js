@@ -12,7 +12,12 @@
 
 import { toError } from '#copilot/core';
 import { readTerminalResumeListProjection, readTerminalResumeProjection } from '../frontend/index.js';
-import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from '../state/index.js';
+import {
+    formatTerminalTimeLabel,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeWrappedRow,
+} from '../state/index.js';
 
 /**
  * Handler do comando `/resume`.
@@ -43,7 +48,9 @@ export async function cmdResume({ println, hubSessionId }, arg) {
                 println(
                     terminalThemeWrappedRow(
                         String(s['id'] ?? '').slice(0, 8),
-                        [String(s['title'] ?? 'sem título'), String(s['status'] ?? 'unknown'), ts, current].filter(Boolean).join(' · '),
+                        [String(s['title'] ?? 'sem título'), String(s['status'] ?? 'unknown'), ts, current]
+                            .filter(Boolean)
+                            .join(' · '),
                         { role: current ? 'success' : 'muted', width: 10, columns: 110 },
                     ),
                 );
@@ -63,9 +70,13 @@ export async function cmdResume({ println, hubSessionId }, arg) {
         if (!projection.found || !projection.target) {
             if (projection.reason === 'session-empty') {
                 println(
-                    terminalThemeRow('Sessão', `${String(projection.target?.['id'] ?? trimmed).slice(0, 8)} · sem turnos registrados`, {
-                        role: 'muted',
-                    }),
+                    terminalThemeRow(
+                        'Sessão',
+                        `${String(projection.target?.['id'] ?? trimmed).slice(0, 8)} · sem turnos registrados`,
+                        {
+                            role: 'muted',
+                        },
+                    ),
                 );
                 return;
             }

@@ -56,39 +56,37 @@ npm run copilot:mcp:cloudflare:smoke
 npm run copilot:mcp:oauth:smoke
 ```
 
-`status` mostra a URL permanente `https://mcp.aurelin.org/mcp` para colar no ChatGPT.
-O modo canônico de autenticação é `OAuth`; `none-dev` fica apenas como fallback controlado.
-O issuer OAuth dev embutido persiste sua chave RS256 em
-`src/copilot/.ai/mcp/oauth-dev-private-key.pem` para evitar relinking desnecessário após restart.
-Os refresh tokens rotativos tambem persistem, mas somente como hashes SHA-256, em
-`src/copilot/.ai/mcp/oauth-refresh-tokens.json`; isso preserva o linking do ChatGPT durante restarts
-sem gravar refresh token em claro.
-Clientes DCR publicos ficam em `src/copilot/.ai/mcp/oauth-clients.json`, tambem ignorado por git, para que
-um `client_id` emitido antes do restart continue valido quando o ChatGPT repetir o fluxo OAuth.
-Replay de DPoP e `private_key_jwt` também sobrevive a restart no `copilot.sqlite`: somente SHA-256 da
-chave de replay é persistido, separado por namespace e com expiração/limite por namespace.
-Use `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave.
-Use `npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o estado
-canônico local sem imprimir tokens. O perfil remoto canônico do tunnel usa `https://127.0.0.1:3333`,
-`http2Origin=true` e `originServerName=mcp.aurelin.org`. O endpoint `http://127.0.0.1:3333` acima continua sendo
-uma superfície local/manual de compatibilidade e não deve ser confundido com o origin atual do Cloudflare Tunnel.
-Use `npm run copilot:mcp:cloudflare:edge-audit` para auditar, quando o token permitir, rulesets da zona
-que possam interferir em MCP/OAuth: cache, WAF, rate limit e transform rules. Se o token atual ainda nao
-tiver `Zone:Read`/`Zone Rulesets:Read`, o comando retorna estado parcial com permissoes faltantes em vez de
-expor segredos.
-Use `npm run copilot:mcp:cloudflare:edge-policy-plan` para gerar a proposta canonica plan-only de rulesets
-Cloudflare antes de qualquer alteracao manual ou futura automacao de mutacao.
-Use `npm run copilot:mcp:cloudflare:edge-policy-diff` para comparar o estado real da edge com essa proposta
-canonico sem aplicar nenhuma alteracao.
-Use `npm run copilot:mcp:cloudflare:edge-snapshot` para capturar tunnel, DNS, rulesets e diff em um unico JSON
-antes de qualquer mudanca Cloudflare.
-Use `npm run copilot:mcp:cloudflare:edge-backup-create` para persistir esse snapshot em
-`src/copilot/.ai/cloudflare/edge-snapshots/`, ignorado pelo Git, antes de mudar cache, WAF ou rate limits.
-Use `npm run copilot:mcp:cloudflare:edge-backup-list` para localizar o backup mais recente antes/depois de
-uma alteracao operacional.
-Use `npm run copilot:mcp:cloudflare:edge-policy-apply` para dry-run do aplicador com backup obrigatorio.
-Aplicacao real exige chamar o CLI com `edge-policy-apply --apply --confirm-apply` ou a tool MCP com
-`dryRun=false` e `confirmApply=true`.
+`status` mostra a URL permanente `https://mcp.aurelin.org/mcp` para colar no ChatGPT. O modo
+canônico de autenticação é `OAuth`; `none-dev` fica apenas como fallback controlado. O issuer OAuth
+dev embutido persiste sua chave RS256 em `src/copilot/.ai/mcp/oauth-dev-private-key.pem` para evitar
+relinking desnecessário após restart. Os refresh tokens rotativos tambem persistem, mas somente como
+hashes SHA-256, em `src/copilot/.ai/mcp/oauth-refresh-tokens.json`; isso preserva o linking do
+ChatGPT durante restarts sem gravar refresh token em claro. Clientes DCR publicos ficam em
+`src/copilot/.ai/mcp/oauth-clients.json`, tambem ignorado por git, para que um `client_id` emitido
+antes do restart continue valido quando o ChatGPT repetir o fluxo OAuth. Replay de DPoP e
+`private_key_jwt` também sobrevive a restart no `copilot.sqlite`: somente SHA-256 da chave de replay
+é persistido, separado por namespace e com expiração/limite por namespace. Use
+`COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true` apenas quando quiser forçar rotação da chave. Use
+`npm run copilot:mcp:cloudflare:remote-audit` para comparar a config remota Cloudflare contra o
+estado canônico local sem imprimir tokens. O perfil remoto canônico do tunnel usa
+`https://127.0.0.1:3333`, `http2Origin=true` e `originServerName=mcp.aurelin.org`. O endpoint
+`http://127.0.0.1:3333` acima continua sendo uma superfície local/manual de compatibilidade e não
+deve ser confundido com o origin atual do Cloudflare Tunnel. Use
+`npm run copilot:mcp:cloudflare:edge-audit` para auditar, quando o token permitir, rulesets da zona
+que possam interferir em MCP/OAuth: cache, WAF, rate limit e transform rules. Se o token atual ainda
+nao tiver `Zone:Read`/`Zone Rulesets:Read`, o comando retorna estado parcial com permissoes
+faltantes em vez de expor segredos. Use `npm run copilot:mcp:cloudflare:edge-policy-plan` para gerar
+a proposta canonica plan-only de rulesets Cloudflare antes de qualquer alteracao manual ou futura
+automacao de mutacao. Use `npm run copilot:mcp:cloudflare:edge-policy-diff` para comparar o estado
+real da edge com essa proposta canonico sem aplicar nenhuma alteracao. Use
+`npm run copilot:mcp:cloudflare:edge-snapshot` para capturar tunnel, DNS, rulesets e diff em um
+unico JSON antes de qualquer mudanca Cloudflare. Use
+`npm run copilot:mcp:cloudflare:edge-backup-create` para persistir esse snapshot em
+`src/copilot/.ai/cloudflare/edge-snapshots/`, ignorado pelo Git, antes de mudar cache, WAF ou rate
+limits. Use `npm run copilot:mcp:cloudflare:edge-backup-list` para localizar o backup mais recente
+antes/depois de uma alteracao operacional. Use `npm run copilot:mcp:cloudflare:edge-policy-apply`
+para dry-run do aplicador com backup obrigatorio. Aplicacao real exige chamar o CLI com
+`edge-policy-apply --apply --confirm-apply` ou a tool MCP com `dryRun=false` e `confirmApply=true`.
 Quick Tunnel continua disponivel como fallback explicito:
 
 ```bash
@@ -106,17 +104,17 @@ OAuth Client ID: deixar vazio
 OAuth Client Secret: deixar vazio
 ```
 
-O servidor publica metadata OAuth raiz e path-specific em `/.well-known/oauth-protected-resource/mcp`.
-Veja também:
+O servidor publica metadata OAuth raiz e path-specific em
+`/.well-known/oauth-protected-resource/mcp`. Veja também:
 
 - `src/copilot/docs/CLAUDE_MCP_CONNECTOR_RUNBOOK.md`
 - `src/copilot/docs/INVESTIGACAO-CLAUDE-MCP-OAUTH-CLOUDFLARE-STDIO-2026-06-11.md`
 
 ## Superfície operacional
 
-O registry atual expõe leitura, escrita controlada, Git governado, reload do próprio MCP, control plane LLM-B,
-manutenção e diagnóstico. `mcp_capabilities_summary` é a autoridade para a lista completa; os itens abaixo destacam as
-superfícies centrais, não um inventário exaustivo.
+O registry atual expõe leitura, escrita controlada, Git governado, reload do próprio MCP, control
+plane LLM-B, manutenção e diagnóstico. `mcp_capabilities_summary` é a autoridade para a lista
+completa; os itens abaixo destacam as superfícies centrais, não um inventário exaustivo.
 
 - `repo_status`
 - `repo_tree`
@@ -190,8 +188,8 @@ command, args, timeout, exit code, signal and `timedOut` flag.
 - Headers de proxy são confiados apenas de peer loopback por default. Use
   `COPILOT_MCP_HTTP_TRUST_PROXY_HEADERS=true|false|loopback`; `X-Forwarded-For` requer ainda
   `COPILOT_MCP_HTTP_TRUST_X_FORWARDED_FOR=true`.
-- O registry avisa antes do teto de tools por
-  `COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT` (default 80%).
+- O registry avisa antes do teto de tools por `COPILOT_MCP_REGISTRY_TOOL_COUNT_WARN_PERCENT`
+  (default 80%).
 - Handoffs pendentes expiram por default em cinco minutos; ajuste com
   `COPILOT_HANDOFF_PENDING_TTL_MS`.
 
@@ -210,32 +208,39 @@ node src/copilot/mcp/cli.js --transport stdio
 ```
 
 By default `COPILOT_MCP_SERVERS` remains empty, so LLM-B boots normally when the MCP server is
-offline. `copilot_sessions_list` continua descrevendo apenas sessões SDK registradas **no processo MCP atual**; o
-terminal externo é outro processo. Para evidência operacional desse runtime separado, use o control plane allowlisted:
+offline. `copilot_sessions_list` continua descrevendo apenas sessões SDK registradas **no processo
+MCP atual**; o terminal externo é outro processo. Para evidência operacional desse runtime separado,
+use o control plane allowlisted:
 
 - `llmb_live_readiness`: executa somente o readiness canônico, sem provider/model turn;
 - `llmb_live_runs`: lê o histórico live persistido no SQLite;
-- `llmb_live_test_cancel`: cancela somente um run detached pelo `runId` estrito depois de verificar em `/proc` que o PID ainda pertence ao harness e ao `out-dir` registrados, evitando o risco de PID reciclado;
-- `llmb_live_test_plan`: mostra script, cenário, transporte e se pode haver AI Credits/quota externa;
-- `llmb_live_test_run`: usa exclusivamente `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
-  o default é `control-only`; turn/provider real exige `confirmModelUsage=true`.
+- `llmb_live_test_cancel`: cancela somente um run detached pelo `runId` estrito depois de verificar
+  em `/proc` que o PID ainda pertence ao harness e ao `out-dir` registrados, evitando o risco de PID
+  reciclado;
+- `llmb_live_test_plan`: mostra script, cenário, transporte e se pode haver AI Credits/quota
+  externa;
+- `llmb_live_test_run`: usa exclusivamente
+  `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`; o default é
+  `control-only`; turn/provider real exige `confirmModelUsage=true`.
 
-O contrato canônico do harness é `--control-only`. `--no-pr` existe apenas como alias deprecated para automações
-anteriores ao billing usage-based de 2026.
+O contrato canônico do harness é `--control-only`. `--no-pr` existe apenas como alias deprecated
+para automações anteriores ao billing usage-based de 2026.
 
 ### Git governado
 
-Git mutation não é um shell Git. `git_stage` aceita apenas paths relativos explícitos e rejeita `.`, globs, pathspec
-magic e valores option-like. `git_commit` opera somente sobre o index já staged, com precondition de HEAD e identidade
-Git configurada. `git_push` não aceita remote/refspec/force: resolve exclusivamente o upstream existente da branch,
-executa `push --dry-run` antes do push real e exige `expectedHead`, `expectedUpstream` e `confirmPush=true`.
+Git mutation não é um shell Git. `git_stage` aceita apenas paths relativos explícitos e rejeita `.`,
+globs, pathspec magic e valores option-like. `git_commit` opera somente sobre o index já staged, com
+precondition de HEAD e identidade Git configurada. `git_push` não aceita remote/refspec/force:
+resolve exclusivamente o upstream existente da branch, executa `push --dry-run` antes do push real e
+exige `expectedHead`, `expectedUpstream` e `confirmPush=true`.
 
 ### Reload do próprio MCP
 
-`mcp_reload_schedule` agenda um helper detached allowlisted e devolve a resposta JSON-RPC **antes** do restart. O helper
-aceita somente os perfis `quic`, `h2` ou `auto`, reutiliza o restart stateful/Cloudflare canônico e persiste o estado em
-`src/copilot/.ai/mcp/mcp-reload-state.json`. Não existe argumento de shell, comando, path ou env arbitrário. Após a
-reconexão, consulte `mcp_reload_status` e `mcp_post_restart_readiness`.
+`mcp_reload_schedule` agenda um helper detached allowlisted e devolve a resposta JSON-RPC **antes**
+do restart. O helper aceita somente os perfis `quic`, `h2` ou `auto`, reutiliza o restart
+stateful/Cloudflare canônico e persiste o estado em `src/copilot/.ai/mcp/mcp-reload-state.json`. Não
+existe argumento de shell, comando, path ou env arbitrário. Após a reconexão, consulte
+`mcp_reload_status` e `mcp_post_restart_readiness`.
 
 As ferramentas usam a política de path existente e permanecem sob a raiz do workspace. As tools de
 escrita controlada retornam diff unificado, suportam `dryRun` quando aplicável e gravam metadados de

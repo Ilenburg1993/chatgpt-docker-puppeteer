@@ -17,7 +17,8 @@
 
 import { writeFileSync } from 'node:fs';
 import process from 'node:process';
-import madge from 'madge';
+
+import { buildDependencyGraph } from './analysis/dependency-graph.mjs';
 
 /**
  * @typedef {{
@@ -196,9 +197,14 @@ function parseArgs(args) {
  * @returns {Promise<HotspotReport>}
  */
 async function analyzeHotspots(root, focusModule, top) {
-    const result = await madge(root, { fileExtensions: ['js'] });
-    /** @type {Record<string, string[]>} */
-    const graph = result.obj();
+    const dependencyReport = buildDependencyGraph(root);
+    if (dependencyReport.parseErrors.length > 0) {
+        const first = dependencyReport.parseErrors[0];
+        throw new Error(
+            `Dependency graph parse failed (${dependencyReport.parseErrors.length} errors): ${first?.file ?? '?'}: ${first?.message ?? 'unknown'}`,
+        );
+    }
+    const graph = dependencyReport.graph;
     const fanInMap = buildFanInMap(graph);
     const crossModuleInMap = buildCrossModuleInMap(graph);
 

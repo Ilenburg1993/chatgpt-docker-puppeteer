@@ -39,10 +39,7 @@ export {
     switchModelTransactional,
     switchRuntimeModelTransactional,
 } from './agent-model-config.js';
-export {
-    switchAgentRouteTransactional,
-    switchRuntimeRouteTransactional,
-} from './agent-route-config.js';
+export { switchAgentRouteTransactional, switchRuntimeRouteTransactional } from './agent-route-config.js';
 export { readAgentRuntimeCapabilities } from './agent-runtime-capabilities.js';
 export {
     abortRuntimeCurrentMessage,
@@ -65,17 +62,17 @@ export {
     readRuntimePermissionMode,
     readRuntimePermissionPolicySnapshot,
     readRuntimePrBudgetSnapshot,
-    readRuntimeUsageBudgetSnapshot,
     readRuntimeToolRegistry,
     readRuntimeToolRegistryEntries,
     readRuntimeToolSessionContext,
+    readRuntimeUsageBudgetSnapshot,
     resumeRuntimeDialogLoop,
     saveRuntimeSnapshot,
     setRuntimeBackgroundCompactionThreshold,
     setRuntimePermissionMode,
     startRuntime,
-    stopRuntime,
     steerRuntimeMessage,
+    stopRuntime,
 } from './agent-runtime-controls.js';
 export { readAgentRuntimeEventBridgeSources, wireAgentRuntimeEventBusBridge } from './agent-runtime-event-bridge.js';
 export { clearRuntimeSdkSessionOwnership, syncRuntimeSdkSessionOwnership } from './agent-runtime-ownership.js';

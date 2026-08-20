@@ -28,7 +28,7 @@ const DEFAULT_DIFF_LINE_LIMIT = 220;
 
 /**
  * @param {string} text
- * @param {number} [max=MAX_DIFF_PREVIEW_CHARS]
+ * @param {number} [max=MAX_DIFF_PREVIEW_CHARS] Default is `MAX_DIFF_PREVIEW_CHARS`
  * @returns {{ output: string; truncated: boolean }}
  */
 function truncateDiffPreviewText(text, max = MAX_DIFF_PREVIEW_CHARS) {
@@ -48,7 +48,8 @@ function renderDiffFallbackLine(line) {
     if (line.startsWith('@@')) return terminalThemeText('tool', line);
     if (line.startsWith('+') && !line.startsWith('+++')) return terminalThemeText('success', line);
     if (line.startsWith('-') && !line.startsWith('---')) return terminalThemeText('error', line);
-    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('index ')) return terminalThemeText('muted', line);
+    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('index '))
+        return terminalThemeText('muted', line);
     return line;
 }
 
@@ -60,7 +61,10 @@ function renderDiffFallbackLine(line) {
 function renderJsDiffFallback(diff, lineLimit) {
     const lines = diff.split('\n');
     const visible = lines.slice(0, lineLimit).map(renderDiffFallbackLine);
-    const suffix = lines.length > lineLimit ? `\n${terminalThemeText('muted', `... (${lines.length - lineLimit} linhas omitidas)`)}` : '';
+    const suffix =
+        lines.length > lineLimit
+            ? `\n${terminalThemeText('muted', `... (${lines.length - lineLimit} linhas omitidas)`)}`
+            : '';
     return truncateDiffPreviewText(`${visible.join('\n')}${suffix}`);
 }
 

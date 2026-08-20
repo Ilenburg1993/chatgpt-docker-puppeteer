@@ -5,10 +5,10 @@
  * @module copilot/mcp/scripts/smoke-http
  */
 
-import { pathToFileURL } from 'node:url';
 import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import { pathToFileURL } from 'node:url';
 import { getCanonicalMcpTools } from '../registry.js';
 
 const DEFAULT_LOCAL_MCP_URL = 'http://127.0.0.1:3333/mcp';

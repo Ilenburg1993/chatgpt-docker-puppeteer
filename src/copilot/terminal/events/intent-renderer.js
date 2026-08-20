@@ -113,7 +113,11 @@ export function renderTerminalIntent(input) {
     });
 
     if (input.print !== false) {
-        const lines = [SEPARATOR, terminalThemeRow('Intenção capturada', `${renderedRisk}${sourceLabel}`, { role: theme }), ''];
+        const lines = [
+            SEPARATOR,
+            terminalThemeRow('Intenção capturada', `${renderedRisk}${sourceLabel}`, { role: theme }),
+            '',
+        ];
         for (const line of intent.split('\n')) {
             lines.push(`  ${terminalThemeText(theme, '│')}  ${line}`);
         }

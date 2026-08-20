@@ -152,10 +152,10 @@ function buildPreToolUseHandler({
                 }
                 // askHandler aprovou → early return com allow (bypass resolveToolDecision)
                 if (auditLog || debugTools) {
-                log(
-                    'DEBUG',
-                    `[hooks/factory] onPreToolUse: tool='${toolName}' decision='allow' (askHandler) sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
-                );
+                    log(
+                        'DEBUG',
+                        `[hooks/factory] onPreToolUse: tool='${toolName}' decision='allow' (askHandler) sessionId='${invocation?.sessionId}' ${hookTraceSuffix(input)}`.trim(),
+                    );
                 }
                 return { permissionDecision: /** @type {'allow'} */ ('allow') };
             }
@@ -334,7 +334,7 @@ export function createHooks(cfg = {}) {
             askHandler,
             argsModifier,
         });
-	    }
+    }
 
     // ── onPreMcpToolCall ─────────────────────────────────────────────────────
     if (cfg.onPreMcpToolCall) {

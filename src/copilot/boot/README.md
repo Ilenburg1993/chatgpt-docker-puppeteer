@@ -18,29 +18,32 @@ Regras:
   executa rollbacks best-effort quando uma fase falha.
 - `boot/surface-validation.js` valida, antes de HTTP/REPL, se SDK, agent, terminal e handlers do
   plano foram carregados com as superfícies mínimas esperadas.
-- `sdk/telemetry/preflight.js` é o owner do preflight SDK/CLI; `agent/lifecycle` não participa dessa checagem.
+- `sdk/telemetry/preflight.js` é o owner do preflight SDK/CLI; `agent/lifecycle` não participa dessa
+  checagem.
 
 Semântica importante:
 
 - `sdk.enabled` no boot config governa a superfície HTTP `/sdk/*`; ele **não** significa que o
   runtime deixou de depender do SDK, porque o boot canônico, o preflight e o `AlwaysAliveAgent`
   continuam sendo SDK-first.
-- `terminal.enabled` é uma flag declarativa do perfil canônico do processo; o entrypoint
-  operacional continua sendo `terminal/bootstrap.js`.
+- `terminal.enabled` é uma flag declarativa do perfil canônico do processo; o entrypoint operacional
+  continua sendo `terminal/bootstrap.js`.
 
 Fronteiras:
 
-- `boot/` não importa `terminal/`; ele apenas orquestra fases via host surface injetado pela borda terminal.
+- `boot/` não importa `terminal/`; ele apenas orquestra fases via host surface injetado pela borda
+  terminal.
 - `server/` só hospeda HTTP/Socket.IO.
 - `terminal/` só hospeda UX e compõe o server recebido por injeção.
 - `agent/` só governa sessões e runtime SDK depois que o boot já definiu o ambiente.
 - `config/` declara defaults e knobs; `boot/` transforma isso em perfil efetivo de processo;
-  `agent/session` aplica o perfil em uma sessão concreta; `dialog/` governa o loop de input sobre
-  a sessão viva.
+  `agent/session` aplica o perfil em uma sessão concreta; `dialog/` governa o loop de input sobre a
+  sessão viva.
 
 Lifecycle:
 
-- `boot/runtime-bootstrap.js` monta o plano com `createCopilotBootPlan()` e executa via `runCopilotBootPlan()`.
+- `boot/runtime-bootstrap.js` monta o plano com `createCopilotBootPlan()` e executa via
+  `runCopilotBootPlan()`.
 - as fases do terminal são executadas separadamente: `terminal-init`, `terminal-aliases`,
   `terminal-runtime-config`, `terminal-pinned-context`, `terminal-conversation-hub`,
   `copilot-http-server`, `terminal-runtime-listeners` e `repl`;

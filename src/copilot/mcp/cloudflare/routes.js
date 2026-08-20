@@ -2,8 +2,7 @@
 /**
  * Canonical Cloudflare route expressions for the Copilot MCP hostname.
  *
- * Keep MCP/OAuth/Cloudflare path matching in one local module so plan, diff,
- * apply and audit code do not drift.
+ * Keep MCP/OAuth/Cloudflare path matching in one local module so plan, diff, apply and audit code do not drift.
  *
  * @module copilot/mcp/cloudflare/routes
  */
@@ -40,7 +39,8 @@ export function buildCloudflareCacheBypassRoutesExpression(hostname) {
 }
 
 /**
- * Public GET-only metadata routes that are safe to cache with a short TTL when the edge rule also constrains method=GET.
+ * Public GET-only metadata routes that are safe to cache with a short TTL when the edge rule also constrains
+ * method=GET.
  *
  * @returns {string}
  */
@@ -100,8 +100,7 @@ export function buildCloudflareDynamicPathExpression() {
 }
 
 /**
- * Match the actual Streamable HTTP endpoint exactly, while allowing future
- * explicit MCP subroutes only under /mcp/.
+ * Match the actual Streamable HTTP endpoint exactly, while allowing future explicit MCP subroutes only under /mcp/.
  *
  * @returns {string}
  */
@@ -126,8 +125,8 @@ export function buildCloudflareOAuthTokenExpression(hostname) {
 }
 
 /**
- * Single-rule fallback for Cloudflare plans that allow only one http_ratelimit rule.
- * It protects the OAuth token endpoint and anonymous /mcp probes without throttling authenticated MCP traffic.
+ * Single-rule fallback for Cloudflare plans that allow only one http_ratelimit rule. It protects the OAuth token
+ * endpoint and anonymous /mcp probes without throttling authenticated MCP traffic.
  *
  * @param {string} hostname
  * @returns {string}

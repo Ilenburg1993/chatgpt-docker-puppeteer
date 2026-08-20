@@ -2,8 +2,8 @@
 /**
  * Contrato puro para planos transacionais de patch multi-arquivo.
  *
- * Este módulo não executa mutações; ele normaliza e valida plano antes de qualquer
- * futura integração com `patch_file`/rollback.
+ * Este módulo não executa mutações; ele normaliza e valida plano antes de qualquer futura integração com
+ * `patch_file`/rollback.
  *
  * @module copilot/tools/file/write/patch-plan
  */
@@ -18,6 +18,7 @@
  *     occurrenceIndex?: number;
  * }} PatchPlanOperation
  *
+ *
  * @typedef {{
  *     dryRun: boolean;
  *     atomic: boolean;
@@ -30,7 +31,9 @@
  * @returns {Record<string, unknown> | null}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -162,7 +165,9 @@ export function normalizePatchPlan(value) {
                 path,
                 oldString,
                 newString,
-                ...(typeof op['expectedHash'] === 'string' && op['expectedHash'] ? { expectedHash: op['expectedHash'] } : {}),
+                ...(typeof op['expectedHash'] === 'string' && op['expectedHash']
+                    ? { expectedHash: op['expectedHash'] }
+                    : {}),
                 ...(expectedOccurrences !== undefined ? { expectedOccurrences } : {}),
                 ...(occurrenceIndex !== undefined ? { occurrenceIndex } : {}),
             });
@@ -202,7 +207,7 @@ export function summarizePatchPlan(plan) {
 export function dryRunPatchPlan(plan, fileContents) {
     /** @type {Record<string, string>} */
     const working = { ...fileContents };
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const operationResults = [];
     /** @type {string[]} */
     const errors = [];
@@ -237,7 +242,9 @@ export function dryRunPatchPlan(plan, fileContents) {
         });
     }
     const files = [...new Set(plan.operations.map((operation) => operation.path))];
-    const filePreviews = files.map((file) => buildContentPreview(fileContents[file] ?? '', working[file] ?? fileContents[file] ?? ''));
+    const filePreviews = files.map((file) =>
+        buildContentPreview(fileContents[file] ?? '', working[file] ?? fileContents[file] ?? ''),
+    );
     return {
         ok: errors.length === 0,
         dryRun: true,

@@ -2,9 +2,8 @@
 /**
  * Presenters canonicos para transicoes de modelo no terminal.
  *
- * O SDK, o model-gateway e comandos BYOK emitem eventos diferentes para o mesmo
- * fluxo humano: uma troca pode ter sido solicitada, confirmada, observada como
- * fallback ou apenas reconfirmada sem mudanca. Este presenter mantem a linguagem
+ * O SDK, o model-gateway e comandos BYOK emitem eventos diferentes para o mesmo fluxo humano: uma troca pode ter sido
+ * solicitada, confirmada, observada como fallback ou apenas reconfirmada sem mudanca. Este presenter mantem a linguagem
  * curta e consistente entre transcript, /activity e SSE.
  *
  * @module copilot/terminal/events/model-transition-presenter

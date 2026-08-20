@@ -148,9 +148,7 @@ describe('F150 — observability/ usa events como porta semântica', () => {
     });
 
     it('dialog-task-handlers.js não importa de #copilot/sdk/models', () => {
-        expect(src('observability/observers/dialog-task-handlers.js')).not.toContain(
-            "from '#copilot/sdk/models'",
-        );
+        expect(src('observability/observers/dialog-task-handlers.js')).not.toContain("from '#copilot/sdk/models'");
     });
 
     it('dialog-task-handlers.js não depende mais do sdk barrel para modelStatsTracker', () => {

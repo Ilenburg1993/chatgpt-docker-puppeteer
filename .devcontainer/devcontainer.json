@@ -607,36 +607,27 @@
         "TypeScriptTeam.native-preview",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "usernamehw.errorlens",
         "ms-azuretools.vscode-containers",
         "ms-vscode.makefile-tools",
-        "eamodio.gitlens",
         "timonwong.shellcheck",
         "redhat.vscode-yaml",
         "EditorConfig.EditorConfig",
-        "ms-vscode.powershell",
-        "MS-CEINTL.vscode-language-pack-pt-BR",
         "Vue.volar",
-        "GitHub.copilot-chat",
         "github.vscode-github-actions",
-        "GitHub.vscode-pull-request-github",
-        "Anthropic.claude-code",
-        "coderabbit.coderabbit-vscode",
-        "openai.chatgpt",
-        "google.geminicodeassist",
-        "HuggingFace.huggingface-vscode-chat",
-        "kilocode.kilo-code",
-        "sst-dev.opencode",
-        "humao.rest-client",
-        "aaron-bond.better-comments",
-        "yzhang.markdown-all-in-one",
         "DavidAnson.vscode-markdownlint"
       ],
       "settings": {
-        // TypeScript 7 native is the canonical JS/TS language service. `TypeScriptTeam.native-preview` is the
-        // historical Marketplace ID of the official TypeScript 7 VS Code client; its bundled engine is stable TS7.
+        // TypeScript 7.0.x is GA. VS Code 1.134 still ships the legacy Node/tsserver.js client, so the external
+        // official LSP client remains required for now under its historical Marketplace ID `TypeScriptTeam.native-preview`.
+        // Its bundled server is stable TS7 (`tsc --lsp`). Remove the external client once the same client is bundled by VS Code.
         // Toggle this flag to false only for a deliberate fallback to the built-in Node/tsserver.js service.
         "js/ts.experimental.useTsgo": true,
+        // O cliente TS7 nativo é Go: esta é a chave efetiva de GOMEMLIMIT. O antigo `js/ts.tsserver.maxMemory`
+        // configura apenas o fallback Node/tsserver e não limita `tsc --lsp`.
+        "js/ts.server.goMemLimit": "1024MiB",
+        // O cliente LSP externo atual (ID histórico `native-preview`) tem trace LSP verboso por default; desabilitamos para não reter tráfego no
+        // Extension Host nem pagar serialização/logging em toda interação JS/TS.
+        "js/ts.trace.server": "off",
         // In DevContainer, Codex must run in-container instead of being redirected to host-side WSL.
         "chatgpt.runCodexInWindowsSubsystemForLinux": false,
         "debug.javascript.autoAttachFilter": "onlyWithFlag",
@@ -1149,9 +1140,11 @@
     // • Extensões (incluindo Copilot)
     // • Estado de autenticação e UX
     //
-    // ⚠️ Volume sensível — purge apenas se necessário
+    // ⚠️ Volume sensível — purge apenas se necessário.
+    // Geração TS7 v1: inicia o servidor remoto sem extensões herdadas do volume pré-migração.
+    // O volume `devcontainer-vscode-server` anterior permanece intacto para rollback/forense.
     // =====================================================================
-    "source=devcontainer-vscode-server,target=/home/node/.vscode-server,type=volume",
+    "source=devcontainer-vscode-server-ts7-v1,target=/home/node/.vscode-server,type=volume",
     // =====================================================================
     // UX — HISTÓRICO DE SHELL (FORA DO $HOME POR DESIGN)
     // ---------------------------------------------------------------------

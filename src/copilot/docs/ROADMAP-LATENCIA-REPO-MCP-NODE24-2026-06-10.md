@@ -2,19 +2,28 @@
 
 Data: 2026-06-10  
 Runtime assumido: **Node 24.x**  
-Escopo: MCP repo tools, OAuth/auth, registry hot path, repo IO/patch/search/tree, HTTP/2/QUIC/Cloudflare, startup/jobs.
+Escopo: MCP repo tools, OAuth/auth, registry hot path, repo IO/patch/search/tree,
+HTTP/2/QUIC/Cloudflare, startup/jobs.
 
 ---
 
 ## 1. Mudança de premissa: Node 24
 
-Este roadmap substitui a leitura anterior que tratava compile cache como recurso ainda cauteloso/experimental. Em Node 24.15+, segundo a documentação oficial do Node 24, `module.enableCompileCache()` já não é experimental e o module compile cache pode ser ativado por API ou pela variável `NODE_COMPILE_CACHE=dir`. A documentação também registra `portable`/`NODE_COMPILE_CACHE_PORTABLE=1` como modo para cache reutilizável quando o projeto muda de caminho.
+Este roadmap substitui a leitura anterior que tratava compile cache como recurso ainda
+cauteloso/experimental. Em Node 24.15+, segundo a documentação oficial do Node 24,
+`module.enableCompileCache()` já não é experimental e o module compile cache pode ser ativado por
+API ou pela variável `NODE_COMPILE_CACHE=dir`. A documentação também registra
+`portable`/`NODE_COMPILE_CACHE_PORTABLE=1` como modo para cache reutilizável quando o projeto muda
+de caminho.
 
 Implicação direta:
 
-- `NODE_COMPILE_CACHE` entra no roadmap como otimização prática para startup, validators, job runner e processos filhos.
-- Não deve ser vendido como principal ganho para chamadas MCP quentes dentro do processo já carregado.
-- O ganho estrutural de calls quentes continua em auth-cache, byte-accounting, repo IO cache, index routing e batching.
+- `NODE_COMPILE_CACHE` entra no roadmap como otimização prática para startup, validators, job runner
+  e processos filhos.
+- Não deve ser vendido como principal ganho para chamadas MCP quentes dentro do processo já
+  carregado.
+- O ganho estrutural de calls quentes continua em auth-cache, byte-accounting, repo IO cache, index
+  routing e batching.
 
 ---
 
@@ -35,7 +44,8 @@ rpcClientLatency p50: 350 ms
 rpcClientLatency p95: 1170 ms
 ```
 
-Interpretação: o transporte externo está saudável. Deve ser benchmarkado, mas não é o primeiro gargalo a atacar.
+Interpretação: o transporte externo está saudável. Deve ser benchmarkado, mas não é o primeiro
+gargalo a atacar.
 
 ### 2.2 MCP runtime/auth
 
@@ -48,7 +58,8 @@ handler: 13 ms
 resultSize: 1 ms
 ```
 
-Interpretação: o hot path de autorização/registry tem prioridade sobre micro-otimizações prematuras de handler.
+Interpretação: o hot path de autorização/registry tem prioridade sobre micro-otimizações prematuras
+de handler.
 
 ### 2.3 Repo/index
 
@@ -60,7 +71,8 @@ symbols: 9677
 chunks: 2507
 ```
 
-Interpretação: search/tree devem usar índice de forma mais agressiva quando semanticamente seguro, preservando fallback por scan/rg.
+Interpretação: search/tree devem usar índice de forma mais agressiva quando semanticamente seguro,
+preservando fallback por scan/rg.
 
 ---
 
@@ -71,7 +83,8 @@ Interpretação: search/tree devem usar índice de forma mais agressiva quando s
 3. Reduzir trabalho repetido no hot path.
 4. Aumentar batching quando isso reduz chamadas/autorização/aprovação.
 5. Tornar os gargalos visíveis por fase e por tool.
-6. Usar Node 24 onde ele já é vantagem objetiva: compile cache, HTTP/2 metrics, fs streams/direct reads, worker threads para CPU-bound.
+6. Usar Node 24 onde ele já é vantagem objetiva: compile cache, HTTP/2 metrics, fs streams/direct
+   reads, worker threads para CPU-bound.
 
 ---
 
@@ -103,7 +116,8 @@ Motivo: a amostra mostrou autorização em 259 ms contra handler em 13 ms.
 
 ### P0.2 Memoização de auth config
 
-Memoizar `readMcpAuthConfig(process.env)` por fingerprint das envs relevantes. Chamadas com env customizado continuam fresh para testes.
+Memoizar `readMcpAuthConfig(process.env)` por fingerprint das envs relevantes. Chamadas com env
+customizado continuam fresh para testes.
 
 ### P0.3 Registry runtime scope map
 
@@ -258,7 +272,8 @@ Garantir que `includeDiffPreview=false` não gere diff textual completo desneces
 
 ### P6.1 HTTP/2 origin metrics
 
-Node 24 mantém API HTTP/2 estável e permite observar métricas com `PerformanceObserver` para `Http2Session` e `Http2Stream`. Adicionar:
+Node 24 mantém API HTTP/2 estável e permite observar métricas com `PerformanceObserver` para
+`Http2Session` e `Http2Stream`. Adicionar:
 
 - TTFB local;
 - bytes in/out;
@@ -368,7 +383,8 @@ no cache of /mcp at edge
 
 ## 7. Veredito
 
-Com Node 24, há uma linha adicional forte para startup/jobs via compile cache estável. Mas para latência média das repo tools mais usadas, a prioridade correta permanece:
+Com Node 24, há uma linha adicional forte para startup/jobs via compile cache estável. Mas para
+latência média das repo tools mais usadas, a prioridade correta permanece:
 
 1. cache seguro de auth positiva;
 2. menor serialização/result-size;

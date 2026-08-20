@@ -2,9 +2,9 @@
 /**
  * Disposable BYOK vision probe.
  *
- * Uses the same SDK session path as live turns, with a tiny inline PNG fixture. The probe is intentionally
- * behavioral: the prompt does not reveal the color, so a passing result means the provider accepted and interpreted
- * the image attachment rather than only completing a text canary.
+ * Uses the same SDK session path as live turns, with a tiny inline PNG fixture. The probe is intentionally behavioral:
+ * the prompt does not reveal the color, so a passing result means the provider accepted and interpreted the image
+ * attachment rather than only completing a text canary.
  *
  * @module copilot/model-gateway/probes/vision-probe
  */

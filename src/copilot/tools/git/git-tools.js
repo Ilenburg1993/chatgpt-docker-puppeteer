@@ -79,7 +79,8 @@ const gitDiffTool = buildTool({
                 staged: z
                     .boolean()
                     .optional()
-                    .default(false)['describe']('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
+                    .default(false)
+                    ['describe']('Se true, mostra apenas as mudanças já staged (git diff --staged)'),
                 path: z.string().optional()['describe']('Caminho específico para ver diff'),
             })
         )
@@ -106,7 +107,8 @@ const gitCommitTool = buildTool({
                 message: z.string()['describe']('Mensagem do commit (formato: "tipo: descrição")'),
                 paths: z
                     .array(z.string())
-                    .optional()['describe']('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
+                    .optional()
+                    ['describe']('Arquivos a adicionar (omitir = add somente arquivos já tracked modificados)'),
                 all: z.boolean().optional().default(false)['describe']('Se true, executa git add -A (adiciona tudo)'),
             })
         )
@@ -164,7 +166,8 @@ const gitPushTool = buildTool({
                 setUpstream: z
                     .boolean()
                     .optional()
-                    .default(false)['describe']('Se true, define branch upstream (--set-upstream)'),
+                    .default(false)
+                    ['describe']('Se true, define branch upstream (--set-upstream)'),
             })
         )
     ),

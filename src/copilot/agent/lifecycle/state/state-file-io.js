@@ -8,9 +8,13 @@
 
 import { resolveHooksStateDir, resolveHooksStateFile } from '#copilot/boot';
 import { STATE_FILE as _STATE_FILE_ENV } from '#copilot/config/agent';
-import { withIoResourceLock } from '#copilot/infra/public/io';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { lstat, mkdir, readFile, rm } from 'node:fs/promises';
+import {
+    deleteFileTrusted,
+    lstatPathTrusted,
+    mkdirPathTrusted,
+    readTextFreshTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/trusted-io';
 import { dirname, resolve } from 'node:path';
 
 /** @type {string} */
@@ -30,7 +34,11 @@ export async function ensureStateDirReady() {
     if (_stateDirReady) {
         return;
     }
-    await mkdir(STATE_DIR, { recursive: true });
+    await mkdirPathTrusted(STATE_DIR, {
+        caller: 'agent.lifecycle.state-file-io',
+        recursive: true,
+        mode: 0o700,
+    });
     _stateDirReady = true;
 }
 
@@ -41,14 +49,14 @@ export async function ensureStateDirReady() {
  */
 export async function readStateFileIfExists() {
     try {
-        const stats = await lstat(STATE_FILE);
+        const stats = (await lstatPathTrusted(STATE_FILE, { caller: 'agent.lifecycle.state-file-io' })).stats;
         if (!stats.isFile() || stats.isSymbolicLink()) return null;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code !== 'ENOENT' && code !== 'ENOTDIR') throw error;
         return null;
     }
-    return readFile(STATE_FILE, 'utf8');
+    return (await readTextFreshTrusted(STATE_FILE, { caller: 'agent.lifecycle.state-file-io' })).content;
 }
 
 /**
@@ -93,13 +101,10 @@ export async function writeStateFileJson(payload) {
  * @returns {Promise<void>}
  */
 export async function removeStateFileIfExists() {
-    await withIoResourceLock(
-        STATE_FILE,
-        async () => {
-            await rm(STATE_FILE, { force: true });
-        },
-        { operation: 'agent-state-delete', target: STATE_FILE, riskClass: 'high' },
-    );
+    await deleteFileTrusted(STATE_FILE, {
+        caller: 'agent.lifecycle.state-file-io',
+        ignoreMissing: true,
+    });
 }
 
 /**

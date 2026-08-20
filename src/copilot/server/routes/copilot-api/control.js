@@ -15,14 +15,13 @@ import { sanitizeToolNames as sanitizePermissionToolNames } from '#copilot/core'
 import { log } from '#copilot/observability';
 import { toError } from '../../../core/error-handlers.js';
 import { projectAgentHttpError } from '../../../presentation/agent/index.js';
-import { buildAgentRuntimeCapabilitiesFromRoute } from '../../../presentation/runtime/index.js';
-import { readAgentRuntimeControlStateFromRoute } from '../../../presentation/runtime/index.js';
-import { buildCopilotApiHealthHttpResponseFromRoute } from '../../../presentation/runtime/index.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
+import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import {
+    buildAgentRuntimeCapabilitiesFromRoute,
     buildAgentSessionHttpPayloadFromRoute,
     buildAgentStatusHttpPayloadFromRoute,
+    buildCopilotApiHealthHttpResponseFromRoute,
+    readAgentRuntimeControlStateFromRoute,
 } from '../../../presentation/runtime/index.js';
 import { sanitizeHttpErrorMessage } from '../../middleware/error-handler.js';
 
@@ -312,10 +311,9 @@ function _handleSetPermissions(req, res, deps) {
  * GAP-SE-001b: Envia uma mensagem em modo steering (immediate) para redirecionar o agente mid-turn.
  *
  * Atenção arquitetural: esta rota é uma superfície direta do SDK (`agent.steerMessage()` → `session.send({ mode:
- * 'immediate' })`) e pode gerar `assistant.usage`, tokens e AI usage. Clientes que precisam reutilizar interação
- * humana sem abrir uma chamada adicional de modelo devem usar o contrato mediado por `/inject mode=queue|mailbox`
- * ou pelo mailbox do terminal, que só drena em
- * `ask_user(kind=question)`.
+ * 'immediate' })`) e pode gerar `assistant.usage`, tokens e AI usage. Clientes que precisam reutilizar interação humana
+ * sem abrir uma chamada adicional de modelo devem usar o contrato mediado por `/inject mode=queue|mailbox` ou pelo
+ * mailbox do terminal, que só drena em `ask_user(kind=question)`.
  *
  * @param {Req} req
  * @param {Res} res

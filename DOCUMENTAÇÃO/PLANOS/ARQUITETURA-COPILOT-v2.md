@@ -2439,13 +2439,18 @@ vez de heurísticas
 
 #### Subfases:
 
-| Sprint | Código | Título                                             | Esforço  | Arquivo principal                                           |
-| ------ | ------ | -------------------------------------------------- | -------- | ----------------------------------------------------------- | -------- | -------- | ------------------------------------------------ |
-| AG-1   | AG.1   | PinnedFilesLoader com fs.watch + EventEmitter      | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO)          |
-| AG-2   | AG.2   | Custom Agents factory (`buildDefaultCustomAgents`) | 🟠 Médio | `src/copilot/config/custom-agents.js` (NOVO)                |
-| AG-3   | AG.3   | Endpoint `GET/PUT /config/skills`                  | 🟢 Baixo | `src/copilot/terminal/http-handlers.js`                     |
-| AG-4   | AG.4   | Comando REPL `/skills [list                        | add      | remove                                                      | reload]` | 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO) |
-| AG-5   | AG.5   | Integração terminal ↔ workspace SessionContext     | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` (`/st`, `/context`) |
+| Sprint | Código | Título | Esforço | Arquivo principal | | ------ | ------ |
+-------------------------------------------------- | -------- |
+----------------------------------------------------------- | -------- | -------- |
+------------------------------------------------ | | AG-1 | AG.1 | PinnedFilesLoader com fs.watch +
+EventEmitter | 🟠 Médio | `src/copilot/config/pinned-files-loader.js` (NOVO) | | AG-2 | AG.2 |
+Custom Agents factory (`buildDefaultCustomAgents`) | 🟠 Médio |
+`src/copilot/config/custom-agents.js` (NOVO) | | AG-3 | AG.3 | Endpoint `GET/PUT /config/skills` |
+🟢 Baixo | `src/copilot/terminal/http-handlers.js` | | AG-4 | AG.4 | Comando REPL
+`/skills [list                        | add      | remove                                                      | reload]`
+| 🟢 Baixo | `src/copilot/terminal/commands/skills.js` (NOVO) | | AG-5 | AG.5 | Integração terminal
+↔ workspace SessionContext | 🟢 Baixo | `src/copilot/terminal/http-handlers.js` (`/st`, `/context`)
+|
 
 **Contexto de execução**:
 

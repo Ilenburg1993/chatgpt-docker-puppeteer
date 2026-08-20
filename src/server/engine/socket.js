@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {VerifyOptions} from "jsonwebtoken" */
+/** @import {VerifyOptions} from 'jsonwebtoken' */
 import CONFIG from '#core/config';
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
@@ -63,7 +63,9 @@ function normalizeOrigins(/** @type {any} */ originsLike) {
 }
 
 function refreshAllowedOrigins() {
-    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env['DASHBOARD_ORIGIN']].filter(Boolean);
+    const defaults = ['http://localhost:3008', 'http://127.0.0.1:3008', process.env['DASHBOARD_ORIGIN']].filter(
+        Boolean,
+    );
     const merged = new Set([...defaults, ...normalizeOrigins(CONFIG.ALLOWED_ORIGINS)]);
     dashboardAllowedOrigins = merged;
 }

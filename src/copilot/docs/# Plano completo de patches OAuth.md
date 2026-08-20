@@ -1,19 +1,28 @@
 # Plano completo de patches OAuth — WORKSPACE MCP
 
-**Data:** 2026-05-23
-**Escopo:** reduzir reautenticação OAuth, ambiguidade de metadata, risco de `401 Reauthentication required`, e criar diagnóstico permanente.
-**Modo de aplicação:** manual/local, sem usar as tools MCP de escrita/patch/remove.
+**Data:** 2026-05-23 **Escopo:** reduzir reautenticação OAuth, ambiguidade de metadata, risco de
+`401 Reauthentication required`, e criar diagnóstico permanente. **Modo de aplicação:**
+manual/local, sem usar as tools MCP de escrita/patch/remove.
 
-> Base de código analisada: arquivo anexado `Código colado.js`, equivalente a `src/copilot/mcp/control-plane/dev-oauth.js`.
-> Estado atual importante: o arquivo já tem `DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60`, `DEFAULT_REFRESH_TOKEN_TTL_SECONDS`, `RENEW_GRANT` e `RENEW_PREFIX`, mas os itens de renovação ainda estão parcialmente sem uso, causando `TS6133` até completar a implementação.
+> Base de código analisada: arquivo anexado `Código colado.js`, equivalente a
+> `src/copilot/mcp/control-plane/dev-oauth.js`. Estado atual importante: o arquivo já tem
+> `DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 24 * 60 * 60`, `DEFAULT_REFRESH_TOKEN_TTL_SECONDS`,
+> `RENEW_GRANT` e `RENEW_PREFIX`, mas os itens de renovação ainda estão parcialmente sem uso,
+> causando `TS6133` até completar a implementação.
 
 ---
 
 ## 1. Limite real: OAuth reduz reauth, não desliga aprovação de tool-call
 
-A documentação oficial da OpenAI separa as responsabilidades: o MCP server verifica access tokens em cada request; o authorization server emite tokens e publica metadata; ChatGPT é o cliente e suporta CIMD, DCR, clientes predefinidos e PKCE. Ela também lista os requisitos principais: protected resource metadata, OAuth metadata, ecoar `resource`, escolher CIMD/DCR/predefined client e publicar métodos aceitos pelo token endpoint.
+A documentação oficial da OpenAI separa as responsabilidades: o MCP server verifica access tokens em
+cada request; o authorization server emite tokens e publica metadata; ChatGPT é o cliente e suporta
+CIMD, DCR, clientes predefinidos e PKCE. Ela também lista os requisitos principais: protected
+resource metadata, OAuth metadata, ecoar `resource`, escolher CIMD/DCR/predefined client e publicar
+métodos aceitos pelo token endpoint.
 
-A mesma documentação afirma que ChatGPT usa o authorization-code flow com PKCE S256 e que o servidor precisa validar assinatura, issuer, audience, expiração e scopes. Quando a validação falha, o servidor deve responder `401` com `WWW-Authenticate` apontando para a protected-resource metadata.
+A mesma documentação afirma que ChatGPT usa o authorization-code flow com PKCE S256 e que o servidor
+precisa validar assinatura, issuer, audience, expiração e scopes. Quando a validação falha, o
+servidor deve responder `401` com `WWW-Authenticate` apontando para a protected-resource metadata.
 
 Logo, estes patches reduzem:
 
@@ -22,7 +31,9 @@ Logo, estes patches reduzem:
 - erro por scope/audience/issuer/JWKS sem diagnóstico;
 - bloqueio por não conseguir diagnosticar OAuth quando o token quebrou.
 
-Eles **não** podem desligar a caixinha de aprovação de tool-call de escrita/destrutiva no ChatGPT. Para isso, o caminho continua sendo annotations, plan tools, batch, narrower schemas e remembered approvals quando o host oferecer.
+Eles **não** podem desligar a caixinha de aprovação de tool-call de escrita/destrutiva no ChatGPT.
+Para isso, o caminho continua sendo annotations, plan tools, batch, narrower schemas e remembered
+approvals quando o host oferecer.
 
 ---
 
@@ -36,17 +47,21 @@ Eles **não** podem desligar a caixinha de aprovação de tool-call de escrita/d
    - Implementa `refresh_token` de 30 dias por default.
    - Anuncia `refresh_token` em `grant_types_supported`, DCR e CIMD client metadata.
    - Refatora emissão de token para `issueTokenSet`.
-   - Observação: refresh tokens ficam em memória neste patch; restart do MCP invalida refresh tokens. Isso é aceitável para dev/permanent tunnel, mas uma versão production deveria persistir hash do refresh token ou usar IdP externo.
+   - Observação: refresh tokens ficam em memória neste patch; restart do MCP invalida refresh
+     tokens. Isso é aceitável para dev/permanent tunnel, mas uma versão production deveria persistir
+     hash do refresh token ou usar IdP externo.
 
 2. `auth.js`
-   - Alinha `token_endpoint_auth_methods_supported` da protected resource metadata para `['none']`, igual ao issuer dev.
+   - Alinha `token_endpoint_auth_methods_supported` da protected resource metadata para `['none']`,
+     igual ao issuer dev.
    - Adiciona classificação granular de falhas JWT:
      - `MCP_AUTH_TOKEN_EXPIRED`
      - `MCP_AUTH_AUDIENCE_INVALID`
      - `MCP_AUTH_ISSUER_INVALID`
      - `MCP_AUTH_JWKS_ERROR`
      - fallback `MCP_AUTH_TOKEN_INVALID`
-   - Adiciona uma exceção pública/sanitizada para `mcp_oauth_friction_audit`, permitindo diagnóstico quando o OAuth quebra.
+   - Adiciona uma exceção pública/sanitizada para `mcp_oauth_friction_audit`, permitindo diagnóstico
+     quando o OAuth quebra.
 
 3. Nova tool `mcp_oauth_friction_audit`
    - Read-only.
@@ -698,7 +713,8 @@ diff --git a/src/copilot/mcp/tools/meta.js b/src/copilot/mcp/tools/meta.js
 
 ## 8. Patch F — atualizar template OAuth em `connection.js`
 
-Este patch é opcional, mas recomendado para que `mcp_auth_profile` mostre os envs corretos para o modo 24h/30d.
+Este patch é opcional, mas recomendado para que `mcp_auth_profile` mostre os envs corretos para o
+modo 24h/30d.
 
 ```diff
 diff --git a/src/copilot/mcp/tools/connection.js b/src/copilot/mcp/tools/connection.js
@@ -815,17 +831,20 @@ Depois reinicie o MCP e teste no ChatGPT:
 5. Verifique se mcp_oauth_friction_audit.reauthRisk é low ou, se medium, leia warnings.
 ```
 
-Se o ChatGPT continuar exigindo aprovação por tool-call de escrita, isso não indica falha OAuth: OAuth reduz reautenticação/401/linking; aprovação de tool-call é a camada de segurança do host. Para essa camada, a redução vem de readOnlyHint, plan tools, batch e ferramentas menos destrutivas.
-
+Se o ChatGPT continuar exigindo aprovação por tool-call de escrita, isso não indica falha OAuth:
+OAuth reduz reautenticação/401/linking; aprovação de tool-call é a camada de segurança do host. Para
+essa camada, a redução vem de readOnlyHint, plan tools, batch e ferramentas menos destrutivas.
 
 ---
 
 ## 12. Observações de segurança
 
 - `refresh_token` longo melhora autonomia, mas amplia janela de risco se um token vazar.
-- Como este servidor é dev/permanent tunnel e repo-scoped, 24h/30d é aceitável para seu objetivo atual.
+- Como este servidor é dev/permanent tunnel e repo-scoped, 24h/30d é aceitável para seu objetivo
+  atual.
 - Em produção, prefira um IdP real, refresh tokens persistidos com hash, rotação e revogação.
-- Não exponha tools reais de repo como `noauth`; o patch só propõe `noauth` para `mcp_oauth_friction_audit`, que é sanitizada.
+- Não exponha tools reais de repo como `noauth`; o patch só propõe `noauth` para
+  `mcp_oauth_friction_audit`, que é sanitizada.
 - Mantenha `resource` e `audience` como `https://mcp.aurelin.org`, sem `/mcp`.
 - Mantenha o endpoint de conector como `https://mcp.aurelin.org/mcp`.
 
@@ -877,8 +896,7 @@ mcp_oauth_issuer_diagnostics.ready === true
 3. Se falhar por `TS6133`, confira se todos os usos de:
    - `DEFAULT_REFRESH_TOKEN_TTL_SECONDS`
    - `RENEW_GRANT`
-   - `RENEW_PREFIX`
-   foram adicionados.
+   - `RENEW_PREFIX` foram adicionados.
 4. Depois aplique Patch B.
 5. Depois aplique C/D/E/G/H.
 6. Só então aplique Patch F se o contexto em `connection.js` bater.
@@ -891,13 +909,14 @@ Data de aplicação: 2026-05-23/2026-05-24.
 
 Revisão do plano:
 
-1. O plano estava correto ao separar OAuth de aprovação host-side: OAuth reduz `401`, relinking e reauth; ele não
-   desliga as confirmações de write/destructive tool-call do chatgpt.com.
-2. A implementação anterior deixou `src/copilot/mcp/tools/oauth-friction-audit.js` inválido na prática: o arquivo
-   estava gravado como uma única linha com `\n` literais, fora do padrão `// @ts-check`, sem `okResult()`, sem
-   annotations canônicas e com inferências frágeis.
-3. O código anterior usava nomes internos `RENEW_*` para o fluxo de refresh token. O valor de wire era
-   `refresh_token`, mas a semântica estava opaca e não havia smoke end-to-end provando renovação.
+1. O plano estava correto ao separar OAuth de aprovação host-side: OAuth reduz `401`, relinking e
+   reauth; ele não desliga as confirmações de write/destructive tool-call do chatgpt.com.
+2. A implementação anterior deixou `src/copilot/mcp/tools/oauth-friction-audit.js` inválido na
+   prática: o arquivo estava gravado como uma única linha com `\n` literais, fora do padrão
+   `// @ts-check`, sem `okResult()`, sem annotations canônicas e com inferências frágeis.
+3. O código anterior usava nomes internos `RENEW_*` para o fluxo de refresh token. O valor de wire
+   era `refresh_token`, mas a semântica estava opaca e não havia smoke end-to-end provando
+   renovação.
 4. As novas variáveis de TTL/diagnóstico estavam parcialmente fora da governança de ambiente.
 
 Correções e upgrades aplicados:
@@ -907,30 +926,32 @@ Correções e upgrades aplicados:
    - `access_token` com TTL default de 86400 segundos;
    - `refresh_token` rotativo em memória;
    - `refresh_token_expires_in` default de 2592000 segundos.
-2. O refresh token passou a ser rotacionado somente após validação de `client_id`, resource e expiração, evitando
-   invalidar token por tentativa inválida de outro cliente.
+2. O refresh token passou a ser rotacionado somente após validação de `client_id`, resource e
+   expiração, evitando invalidar token por tentativa inválida de outro cliente.
 3. `readDevOAuthTokenLifetimePolicy()` virou helper exportado e usado pela auditoria OAuth.
 4. `mcp_oauth_friction_audit` foi refeito como tool MCP real:
    - `readOnlyAnnotations()`;
    - `okResult()`;
    - leitura de protected resource metadata e issuer metadata;
-   - checagem de CIMD, PKCE S256, `authorization_code`, `refresh_token`, escopos max-power, issuer/audience/resource;
+   - checagem de CIMD, PKCE S256, `authorization_code`, `refresh_token`, escopos max-power,
+     issuer/audience/resource;
    - resumo de tool scopes e fronteira OAuth versus aprovação host-side.
-5. O OAuth smoke agora testa também refresh-token real para DCR e CIMD e usa token renovado para chamar
-   `mcp_runtime_health`.
+5. O OAuth smoke agora testa também refresh-token real para DCR e CIMD e usa token renovado para
+   chamar `mcp_runtime_health`.
 6. `.env.example`, `.env.local.example` e `.env.schema.json` documentam:
    - `COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS=86400`;
    - `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS=2592000`;
    - `COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS=true`.
-7. Os testes de conexão confirmam que o issuer dev anuncia `refresh_token` e `token_endpoint_auth_methods_supported`
-   como `["none"]`.
+7. Os testes de conexão confirmam que o issuer dev anuncia `refresh_token` e
+   `token_endpoint_auth_methods_supported` como `["none"]`.
 
 Estado operacional confirmado:
 
 1. Protected resource metadata publica resource `https://mcp.aurelin.org`, authorization server
    `https://mcp.aurelin.org`, escopos `repo:read`, `repo:write`, `repo:validate`, `repo:admin` e
    `token_endpoint_auth_methods_supported=["none"]`.
-2. Issuer metadata publica CIMD, OIDC/userinfo, JWKS, PKCE S256, DCR, `authorization_code` e `refresh_token`.
+2. Issuer metadata publica CIMD, OIDC/userinfo, JWKS, PKCE S256, DCR, `authorization_code` e
+   `refresh_token`.
 3. DCR emite token max-power e refresh token 30d.
 4. CIMD emite token max-power + `openid profile email`, `id_token`, userinfo e refresh token 30d.
 5. O endpoint público `https://mcp.aurelin.org/mcp` expõe 71 tools e bate com o registry local.
@@ -939,9 +960,11 @@ Validação executada:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 91/91.
-4. `npm run test:copilot:unit`: passou no rerun limpo com 3090/3090. A primeira execução completa teve um flake de
-   timeout em `ConversationHub`; o teste focado passou 9/9 e o rerun completo passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 91/91.
+4. `npm run test:copilot:unit`: passou no rerun limpo com 3090/3090. A primeira execução completa
+   teve um flake de timeout em `ConversationHub`; o teste focado passou 9/9 e o rerun completo
+   passou.
 5. `node scripts/env/audit-env-surface.mjs`: passou, com 276 envs referenciadas e 417 cobertas.
 6. `node scripts/env/validate-env.js`: passou.
 7. `node scripts/env/check-env-local.mjs`: passou.
@@ -949,14 +972,16 @@ Validação executada:
 9. `make copilot-mcp-restart`: passou, reiniciando `mcp-http` PID 71023 e `cloudflared` PID 71029.
 10. `make copilot-mcp-status`: passou com `ready=true` e `authentication="OAuth"`.
 11. `make copilot-mcp-smoke`: passou com 71/71 tools remotas e `permanentSmokeUpdated=true`.
-12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, refresh token, `id_token` e `/oauth/userinfo`.
-13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, 1002 arquivos indexados,
-    5815 símbolos e 2405 imports.
+12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, refresh token, `id_token` e
+    `/oauth/userinfo`.
+13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, 1002
+    arquivos indexados, 5815 símbolos e 2405 imports.
 
 Conclusão:
 
-O plano foi aplicado e corrigido na raiz. A autonomia OAuth agora está mais forte por três vias: escopos max-power por
-default, access tokens longos e refresh tokens rotativos validados em smoke público. O limite remanescente continua sendo
-o mesmo da documentação e da UI do chatgpt.com: confirmações host-side de escrita/destruição não são desligáveis pelo
-servidor MCP sem falsificar annotations; a mitigação legítima continua sendo batch, plan-only, suites agregadas e
-remember approval quando o host oferecer.
+O plano foi aplicado e corrigido na raiz. A autonomia OAuth agora está mais forte por três vias:
+escopos max-power por default, access tokens longos e refresh tokens rotativos validados em smoke
+público. O limite remanescente continua sendo o mesmo da documentação e da UI do chatgpt.com:
+confirmações host-side de escrita/destruição não são desligáveis pelo servidor MCP sem falsificar
+annotations; a mitigação legítima continua sendo batch, plan-only, suites agregadas e remember
+approval quando o host oferecer.

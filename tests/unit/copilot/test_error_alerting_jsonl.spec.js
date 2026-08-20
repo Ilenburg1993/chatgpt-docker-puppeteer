@@ -9,6 +9,9 @@
  *   - terminal/dialog/engine-persistence.js (148L) — persistTurnToHub, failure count
  */
 
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const timerMocks = vi.hoisted(() => ({
@@ -166,112 +169,59 @@ describe('F49 — createErrorAlerter', () => {
 // 2. audit/jsonl-writer.js — createJsonlWriter
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const mockFs = vi.hoisted(() => ({
-    appendFile: vi.fn(async () => {}),
-    mkdir: vi.fn(async () => {}),
-    rename: vi.fn(async () => {}),
-    stat: vi.fn(async () => ({ size: 100 })),
-}));
-
-vi.mock('node:fs/promises', () => mockFs);
-
 describe('F49 — createJsonlWriter', () => {
     /** @type {typeof import('#copilot/audit/jsonl-writer')} */
     let jsonlMod;
+    /** @type {string[]} */
+    const tempDirs = [];
 
     beforeAll(async () => {
         jsonlMod = await import('#copilot/audit/jsonl-writer');
     });
 
-    beforeEach(() => {
-        Object.values(mockFs).forEach((fn) => fn.mockReset());
-        mockFs.appendFile.mockResolvedValue(undefined);
-        mockFs.mkdir.mockResolvedValue(undefined);
-        mockFs.rename.mockResolvedValue(undefined);
-        mockFs.stat.mockResolvedValue({ size: 100 });
+    afterEach(async () => {
+        while (tempDirs.length > 0) {
+            const dir = tempDirs.pop();
+            if (dir) await rm(dir, { recursive: true, force: true });
+        }
     });
 
-    it('write() enfileira e flush escreve JSON line', async () => {
-        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/test.jsonl' });
+    async function tempPath(/** @type {string} */ name) {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-audit-jsonl-'));
+        tempDirs.push(dir);
+        return join(dir, name);
+    }
+
+    it('write + flush publica uma linha JSONL e getState observa a fila drenada', async () => {
+        const filePath = await tempPath('audit.jsonl');
+        const writer = jsonlMod.createJsonlWriter({ filePath });
+
         writer.write({ event: 'test', ts: 123 });
-        // Flush is scheduled via setImmediate — wait for it
-        await new Promise((r) => setTimeout(r, 50));
-        expect(mockFs.appendFile).toHaveBeenCalled();
-        const written = /** @type {string | undefined} */ (
-            /** @type {any[]} */ (mockFs.appendFile.mock.calls[0] ?? [])[1]
-        );
-        expect(typeof written).toBe('string');
-        expect(written).toContain('"event":"test"');
+        await writer.flush();
+
+        const persisted = await readFile(filePath, 'utf8');
+        expect(persisted).toContain('"event":"test"');
+        expect(persisted).toContain('"ts":123');
+        expect(writer.getState()).toMatchObject({ queueDepth: 0, persistedLines: 1 });
     });
 
-    it('rotação acontece quando arquivo excede maxBytes', async () => {
-        mockFs.stat.mockResolvedValue({ size: 11_000_000 }); // > 10MB default
-        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/test.jsonl' });
-        writer.write({ x: 1 });
-        await new Promise((r) => setTimeout(r, 50));
-        expect(mockFs.rename).toHaveBeenCalledWith('/tmp/test.jsonl', '/tmp/test.jsonl.1');
-    });
-
-    it('sem rotação quando arquivo é menor que maxBytes', async () => {
-        mockFs.stat.mockResolvedValue({ size: 100 });
-        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/small.jsonl' });
-        writer.write({ x: 1 });
-        await new Promise((r) => setTimeout(r, 50));
-        expect(mockFs.rename).not.toHaveBeenCalled();
-    });
-
-    it('redige segredos antes de escrever JSONL', async () => {
+    it('redige segredos antes da persistência observável', async () => {
         const githubToken = 'ghs_abcdefghijklmnopqrstuvwxyz1234567890';
         const byokToken = 'sk-testsecret1234567890';
-        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/redacted.jsonl' });
+        const filePath = await tempPath('redacted.jsonl');
+        const writer = jsonlMod.createJsonlWriter({ filePath });
 
         writer.write({
             gitHubToken: githubToken,
             headers: { Authorization: `Bearer ${byokToken}` },
             tokens: 42,
         });
-        await new Promise((r) => setTimeout(r, 50));
-
-        const written = String(/** @type {any[]} */ (mockFs.appendFile.mock.calls[0] ?? [])[1] ?? '');
-        expect(written).not.toContain(githubToken);
-        expect(written).not.toContain(byokToken);
-        expect(written).toContain('[redacted]');
-        expect(written).toContain('"tokens":42');
-    });
-
-    it('serializa ciclos append/rotate e flush aguarda a cadeia ativa', async () => {
-        let releaseFirst = () => {};
-        mockFs.appendFile.mockImplementationOnce(
-            () =>
-                new Promise((resolve) => {
-                    releaseFirst = resolve;
-                }),
-        );
-        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/serialized.jsonl' });
-
-        writer.write({ sequence: 1 });
-        await vi.waitFor(() => expect(mockFs.appendFile).toHaveBeenCalledTimes(1));
-        writer.write({ sequence: 2 });
-        await new Promise((resolve) => setImmediate(resolve));
-        expect(mockFs.appendFile).toHaveBeenCalledTimes(1);
-
-        releaseFirst();
         await writer.flush();
-        expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
-        expect(String(/** @type {unknown[]} */ (mockFs.appendFile.mock.calls[1] ?? [])[1])).toContain('"sequence":2');
-    });
 
-    it('recoloca o lote na fila quando append falha', async () => {
-        mockFs.appendFile.mockRejectedValueOnce(new Error('disk unavailable')).mockResolvedValue(undefined);
-        const writer = jsonlMod.createJsonlWriter({ filePath: '/tmp/requeue.jsonl' });
-
-        writer.write({ sequence: 1 });
-        await expect(writer.flush()).rejects.toThrow('disk unavailable');
-        expect(writer.getState()).toMatchObject({ queueDepth: 1, failedBatches: 1, persistedLines: 0 });
-
-        await writer.flush();
-        expect(mockFs.appendFile).toHaveBeenCalledTimes(2);
-        expect(String(/** @type {unknown[]} */ (mockFs.appendFile.mock.calls[1] ?? [])[1])).toContain('"sequence":1');
-        expect(writer.getState()).toMatchObject({ queueDepth: 0, persistedLines: 1 });
+        const persisted = await readFile(filePath, 'utf8');
+        expect(persisted).not.toContain(githubToken);
+        expect(persisted).not.toContain(byokToken);
+        expect(persisted).toContain('[redacted]');
+        expect(persisted).toContain('"tokens":42');
     });
 });

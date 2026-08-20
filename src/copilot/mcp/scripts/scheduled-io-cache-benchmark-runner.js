@@ -5,13 +5,12 @@
  * @module copilot/mcp/scripts/scheduled-io-cache-benchmark-runner
  */
 
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { getIoCacheBenchmarkStateFile } from '#copilot/mcp/control-plane';
 import { spawn } from 'node:child_process';
-import { lstat } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
-import { getIoCacheBenchmarkStateFile } from '#copilot/mcp/control-plane';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '../../../..');
@@ -37,7 +36,7 @@ async function writeState(state) {
 /** @param {string[]} argv */
 function parseArgs(argv) {
     const index = argv.indexOf('--request-id');
-    const requestId = index >= 0 ? argv[index + 1] ?? '' : '';
+    const requestId = index >= 0 ? (argv[index + 1] ?? '') : '';
     if (!REQUEST_ID_RE.test(requestId)) throw new Error('Invalid generated IO cache benchmark request id.');
     return { requestId };
 }
@@ -95,7 +94,9 @@ function runWorker(mode, requestId) {
             });
         };
         child.once('error', (error) => finish(1, error.message));
-        child.once('exit', (code, signal) => finish(Number(code ?? (signal ? 1 : 0)), signal ? `worker terminated by ${signal}` : null));
+        child.once('exit', (code, signal) =>
+            finish(Number(code ?? (signal ? 1 : 0)), signal ? `worker terminated by ${signal}` : null),
+        );
     });
 }
 
@@ -115,7 +116,9 @@ function summarizeDurations(values) {
     };
     return {
         count: sorted.length,
-        averageMs: sorted.length ? Number((sorted.reduce((sum, value) => sum + value, 0) / sorted.length).toFixed(3)) : null,
+        averageMs: sorted.length
+            ? Number((sorted.reduce((sum, value) => sum + value, 0) / sorted.length).toFixed(3))
+            : null,
         p50Ms: quantile(0.5),
         p95Ms: quantile(0.95),
         p99Ms: quantile(0.99),
@@ -133,21 +136,40 @@ function summarizePhase(samples, expectedCacheState) {
         if (!states || typeof states !== 'object' || Array.isArray(states)) return sum;
         return sum + Number(/** @type {Record<string, unknown>} */ (states)[expectedCacheState] ?? 0);
     }, 0);
-    const workloadFiles = successful.length > 0 && Array.isArray(successful[0]?.['files']) ? successful[0]['files'].length : 0;
+    const workloadFiles =
+        successful.length > 0 && Array.isArray(successful[0]?.['files']) ? successful[0]['files'].length : 0;
     const expectedHitsRequired = successful.length * workloadFiles;
+    /** @param {string} field */
+    const aggregateCounters = (field) => {
+        const totals = /** @type {Record<string, number>} */ ({});
+        for (const sample of successful) {
+            const record = sample[field];
+            if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
+            for (const [key, value] of Object.entries(/** @type {Record<string, unknown>} */ (record))) {
+                const numeric = Number(value);
+                if (Number.isFinite(numeric)) totals[key] = Number(totals[key] ?? 0) + numeric;
+            }
+        }
+        return totals;
+    };
     return {
         expectedCacheState,
         sampleCount: samples.length,
         successfulSamples: successful.length,
         expectedHits,
         expectedHitsRequired,
-        allExpectedCacheHits: successful.length === SAMPLE_COUNT && expectedHitsRequired > 0 && expectedHits === expectedHitsRequired,
+        allExpectedCacheHits:
+            successful.length === SAMPLE_COUNT && expectedHitsRequired > 0 && expectedHits === expectedHitsRequired,
         latency: summarizeDurations(durations),
+        pathPolicy: aggregateCounters('pathPolicy'),
+        readHashes: aggregateCounters('readHashes'),
         samples: samples.map((sample) => ({
             success: sample['success'] === true,
             durationMs: sample['durationMs'] ?? null,
             totalBytes: sample['totalBytes'] ?? null,
             cacheStates: sample['cacheStates'] ?? null,
+            pathPolicy: sample['pathPolicy'] ?? null,
+            readHashes: sample['readHashes'] ?? null,
             error: sample['error'] ?? null,
         })),
     };
@@ -157,9 +179,10 @@ function summarizePhase(samples, expectedCacheState) {
 function buildDecision(cold, l1, l2) {
     const coldP95 = Number(/** @type {Record<string, unknown>} */ (cold['latency'])?.['p95Ms']);
     const l2P95 = Number(/** @type {Record<string, unknown>} */ (l2['latency'])?.['p95Ms']);
-    const improvementPercent = Number.isFinite(coldP95) && coldP95 > 0 && Number.isFinite(l2P95)
-        ? Number((((coldP95 - l2P95) / coldP95) * 100).toFixed(2))
-        : null;
+    const improvementPercent =
+        Number.isFinite(coldP95) && coldP95 > 0 && Number.isFinite(l2P95)
+            ? Number((((coldP95 - l2P95) / coldP95) * 100).toFixed(2))
+            : null;
     const representativeBenchmarkPassed =
         cold['allExpectedCacheHits'] === true &&
         l1['allExpectedCacheHits'] === true &&
@@ -182,15 +205,18 @@ async function collectPhase(mode, requestId) {
     const samples = [];
     for (let sample = 1; sample <= SAMPLE_COUNT; sample += 1) {
         const worker = await runWorker(mode, requestId);
-        const result = worker.result && typeof worker.result === 'object' && !Array.isArray(worker.result)
-            ? /** @type {Record<string, unknown>} */ (worker.result)
-            : {};
+        const result =
+            worker.result && typeof worker.result === 'object' && !Array.isArray(worker.result)
+                ? /** @type {Record<string, unknown>} */ (worker.result)
+                : {};
         samples.push({
             sample,
             success: worker.exitCode === 0 && result['success'] === true,
             durationMs: result['durationMs'] ?? null,
             totalBytes: result['totalBytes'] ?? null,
             cacheStates: result['cacheStates'] ?? null,
+            pathPolicy: result['pathPolicy'] ?? null,
+            readHashes: result['readHashes'] ?? null,
             files: result['files'] ?? null,
             error: worker.error ?? result['error'] ?? worker.stderr,
         });
@@ -203,7 +229,7 @@ async function main() {
     const { requestId } = parseArgs(process.argv.slice(2));
     const benchmarkRoot = path.join(repoRoot, 'src/copilot/.ai/mcp/io-cache-benchmark');
     await workspaceIo.mkdirPathLocked(benchmarkRoot, { recursive: true });
-    const rootStats = await lstat(benchmarkRoot);
+    const rootStats = (await workspaceIo.lstatPath(benchmarkRoot)).stats;
     if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
         throw new Error('IO cache benchmark root must be a regular directory.');
     }
@@ -215,18 +241,41 @@ async function main() {
         recursiveConfirmation: benchmarkDir,
     });
     await workspaceIo.mkdirPathLocked(benchmarkDir, { recursive: true });
-    await writeState({ schemaVersion: 1, status: 'running', requestId, startedAt, sampleCountPerPhase: SAMPLE_COUNT, autoEnable: false });
+    await writeState({
+        schemaVersion: 2,
+        status: 'running',
+        requestId,
+        startedAt,
+        sampleCountPerPhase: SAMPLE_COUNT,
+        autoEnable: false,
+    });
 
     /** @type {Record<string, any>} */
     let finalState = { status: 'failed' };
     try {
         const coldSamples = await collectPhase('cold', requestId);
         const cold = summarizePhase(coldSamples, 'l1-miss');
-        await writeState({ schemaVersion: 1, status: 'running', requestId, startedAt, stage: 'cold-complete', phases: { cold }, autoEnable: false });
+        await writeState({
+            schemaVersion: 2,
+            status: 'running',
+            requestId,
+            startedAt,
+            stage: 'cold-complete',
+            phases: { cold },
+            autoEnable: false,
+        });
 
         const l1Samples = await collectPhase('l1', requestId);
         const l1 = summarizePhase(l1Samples, 'l1-hit');
-        await writeState({ schemaVersion: 1, status: 'running', requestId, startedAt, stage: 'l1-complete', phases: { cold, l1 }, autoEnable: false });
+        await writeState({
+            schemaVersion: 2,
+            status: 'running',
+            requestId,
+            startedAt,
+            stage: 'l1-complete',
+            phases: { cold, l1 },
+            autoEnable: false,
+        });
 
         const prime = await runWorker('l2-prime', requestId);
         if (prime.exitCode !== 0 || !prime.result || prime.result.success !== true) {
@@ -237,14 +286,14 @@ async function main() {
         const decision = buildDecision(cold, l1, l2);
         const completedAt = Date.now();
         finalState = {
-            schemaVersion: 1,
+            schemaVersion: 2,
             status: 'completed',
             requestId,
             startedAt,
             completedAt,
             durationMs: completedAt - startedAt,
             sampleCountPerPhase: SAMPLE_COUNT,
-            workloadKind: 'fixed-representative-repo-text-read',
+            workloadKind: 'fixed-representative-workspace-io-text-read',
             phases: { cold, l1, l2 },
             decision,
             autoEnable: false,
@@ -255,7 +304,7 @@ async function main() {
     } catch (error) {
         const completedAt = Date.now();
         finalState = {
-            schemaVersion: 1,
+            schemaVersion: 2,
             status: 'failed',
             requestId,
             startedAt,
@@ -269,10 +318,10 @@ async function main() {
     } finally {
         try {
             await workspaceIo.removePathLocked(benchmarkDir, {
-        recursive: true,
-        force: true,
-        recursiveConfirmation: benchmarkDir,
-    });
+                recursive: true,
+                force: true,
+                recursiveConfirmation: benchmarkDir,
+            });
             finalState['cleanedTemporaryDb'] = true;
         } catch (error) {
             finalState['cleanedTemporaryDb'] = false;
@@ -286,7 +335,13 @@ async function main() {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     main().catch(async (error) => {
         try {
-            await writeState({ schemaVersion: 1, status: 'failed', completedAt: Date.now(), autoEnable: false, error: error instanceof Error ? error.message : String(error) });
+            await writeState({
+                schemaVersion: 2,
+                status: 'failed',
+                completedAt: Date.now(),
+                autoEnable: false,
+                error: error instanceof Error ? error.message : String(error),
+            });
         } catch {
             // Best effort only.
         }

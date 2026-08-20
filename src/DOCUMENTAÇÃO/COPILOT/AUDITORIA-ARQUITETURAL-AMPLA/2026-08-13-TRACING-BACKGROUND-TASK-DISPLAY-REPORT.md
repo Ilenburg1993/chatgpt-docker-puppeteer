@@ -9,17 +9,21 @@
 
 ## 1. Pergunta operacional
 
-Por que a frase **“Promote an authorized same-session route switch after dialog.turn_end”** aparece para o operador depois das respostas?
+Por que a frase **“Promote an authorized same-session route switch after dialog.turn_end”** aparece
+para o operador depois das respostas?
 
 ---
 
 ## 2. Hipótese confirmada
 
-É um **vazamento de detalhe interno de background task** para a superfície de atividade/eventos do terminal.
+É um **vazamento de detalhe interno de background task** para a superfície de atividade/eventos do
+terminal.
 
 - A string **não** vem do conteúdo da resposta da LLM-B.
-- Ela nasce como `description` de uma **background task** registrada pelo agent no boundary do turno de diálogo.
-- Depois, é consumida por caminhos do terminal que aceitam `label ?? description` como texto visível.
+- Ela nasce como `description` de uma **background task** registrada pelo agent no boundary do turno
+  de diálogo.
+- Depois, é consumida por caminhos do terminal que aceitam `label ?? description` como texto
+  visível.
 
 ---
 
@@ -38,8 +42,10 @@ ctx.trackBackgroundTask(task, {
 });
 ```
 
-- A task executa promoção diferida de rota do Model Gateway **na mesma sessão SDK** após o fim do turno.
-- O comportamento é intencional do ponto de vista de roteamento; o problema é a **exposição da descrição em UI operacional**.
+- A task executa promoção diferida de rota do Model Gateway **na mesma sessão SDK** após o fim do
+  turno.
+- O comportamento é intencional do ponto de vista de roteamento; o problema é a **exposição da
+  descrição em UI operacional**.
 
 ---
 
@@ -51,7 +57,8 @@ ctx.trackBackgroundTask(task, {
 
 - Método relevante: `track(task, meta = {})`
 - Armazena `label` e `description` por task.
-- Emite callback `onCompleted` com `{ label, description, status, error, durationMs, pendingCount, ts }`.
+- Emite callback `onCompleted` com
+  `{ label, description, status, error, durationMs, pendingCount, ts }`.
 - Esse callback é a porta de saída estrutural para superfícies externas.
 
 ### 4.2 Evento/atividade do terminal
@@ -94,8 +101,10 @@ Esse é um ponto onde a descrição da task pode aparecer diretamente no texto d
 
 **Arquivo**: `src/copilot/terminal/commands/session.js`
 
-- Renderiza `projection.activity.label` e `projection.activity.detail` em comandos de status da sessão.
-- Portanto, se `activity` for preenchida a partir de eventos de background/task, a descrição interna pode aparecer no painel do operador.
+- Renderiza `projection.activity.label` e `projection.activity.detail` em comandos de status da
+  sessão.
+- Portanto, se `activity` for preenchida a partir de eventos de background/task, a descrição interna
+  pode aparecer no painel do operador.
 
 ### 4.3 Adapter/contratos do terminal
 
@@ -107,33 +116,40 @@ Esse é um ponto onde a descrição da task pode aparecer diretamente no texto d
   - `agent.background.completed`
   - `agent.background.idle`
 
-Isso indica que essas superfícies são consideradas **first-class para o terminal** e, portanto, têm alta probabilidade de se tornar visíveis ao operador por design.
+Isso indica que essas superfícies são consideradas **first-class para o terminal** e, portanto, têm
+alta probabilidade de se tornar visíveis ao operador por design.
 
 ---
 
 ## 5. Por que aparece após respostas
 
 - O agendamento da promoção está amarrado a `dialog.turn_end`.
-- Após cada turno em que a rota diferida é armada/completada, o `BackgroundTasks` notifica conclusão ou mudança de estado.
+- Após cada turno em que a rota diferida é armada/completada, o `BackgroundTasks` notifica conclusão
+  ou mudança de estado.
 - O terminal recebe esse sinal e atualiza atividade/eventos.
-- Em pelo menos um caminho visível, o texto usa `description` quando `label` não é suficiente, exibindo a frase exata.
+- Em pelo menos um caminho visível, o texto usa `description` quando `label` não é suficiente,
+  exibindo a frase exata.
 
 ---
 
 ## 6. Diagnóstico final
 
-- **Causa raiz**: uso de `description` como texto humano visível em um fluxo que não distingue “detalhe operacional interno” de “evento voltado ao operador”.
+- **Causa raiz**: uso de `description` como texto humano visível em um fluxo que não distingue
+  “detalhe operacional interno” de “evento voltado ao operador”.
 - **Comportamento funcional**: correto. A promoção pós-turno é intencional.
-- **Problema de UX**: a mensagem exibida é uma descrição interna em inglês, não uma status line humana em pt-BR.
+- **Problema de UX**: a mensagem exibida é uma descrição interna em inglês, não uma status line
+  humana em pt-BR.
 - **Risco de ruído**: pode aparecer repetidamente após turnos, gerando sensação de loop/telemetria.
 
 ---
 
 ## 7. Achados estruturais relevantes
 
-- `src/copilot/agent/background-tasks.js`: owner canônico de rastreamento; trata `description` como texto legível sem filtrar por público.
+- `src/copilot/agent/background-tasks.js`: owner canônico de rastreamento; trata `description` como
+  texto legível sem filtrar por público.
 - `src/copilot/terminal/commands/events.js`: consome `label ?? description` sem sanitização.
-- `src/copilot/terminal/events/sdk-session-events.js`: converte mudanças em atividade/SSE do terminal.
+- `src/copilot/terminal/events/sdk-session-events.js`: converte mudanças em atividade/SSE do
+  terminal.
 - `src/copilot/terminal/commands/session.js`: exibe atividade atual no status da sessão.
 
 ---
@@ -148,7 +164,8 @@ Para eliminar esse vazamento sem quebrar observabilidade:
 2. Manter `label` como chave estável.
 3. Introduzir um mapeamento local de `label -> texto humano pt-BR` na superfície do terminal.
 4. Fazer `summarizeBackgroundPayload` preferir o mapeamento humano em vez de `description` crua.
-5. Garantir que `session.background_tasks_changed` continue informando apenas quantidade e estado, não descrição livre.
+5. Garantir que `session.background_tasks_changed` continue informando apenas quantidade e estado,
+   não descrição livre.
 
 ---
 
@@ -168,4 +185,7 @@ Para eliminar esse vazamento sem quebrar observabilidade:
 
 ## 10. Conclusão
 
-A frase **é um detalhe interno** de uma background task de promoção de rota do Model Gateway, exibida acidentalmente pelo terminal por meio de `label ?? description` em fluxos de eventos/atividade. A causa está na ausência de separação entre “texto para humanos” e “texto para telemetria/observabilidade”.
+A frase **é um detalhe interno** de uma background task de promoção de rota do Model Gateway,
+exibida acidentalmente pelo terminal por meio de `label ?? description` em fluxos de
+eventos/atividade. A causa está na ausência de separação entre “texto para humanos” e “texto para
+telemetria/observabilidade”.

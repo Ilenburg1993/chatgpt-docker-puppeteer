@@ -122,8 +122,7 @@ const formatDate = (date?: string | number) => {
                 <h3 class="text-sm font-semibold text-foreground mb-2">Result</h3>
                 <pre
                     class="text-xs text-foreground-muted bg-background-tertiary rounded-lg p-3 overflow-x-auto max-h-40"
-                    >{{ JSON.stringify(task['result'], null, 2) }}</pre
-                >
+                    >{{ JSON.stringify(task['result'], null, 2) }}</pre>
             </div>
         </div>
 

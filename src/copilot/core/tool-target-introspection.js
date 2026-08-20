@@ -164,7 +164,13 @@ function addIfPresent(target, value) {
 function asSafePreview(value, maxLength) {
     const text = asCleanString(value);
     if (!text) return null;
-    return redactSecretText(text.replace(/[\r\n\t]+/gu, ' ').replace(/\s+/gu, ' ').trim(), { maxLength });
+    return redactSecretText(
+        text
+            .replace(/[\r\n\t]+/gu, ' ')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+        { maxLength },
+    );
 }
 
 /**

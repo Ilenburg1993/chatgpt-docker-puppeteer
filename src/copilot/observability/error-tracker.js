@@ -110,7 +110,11 @@ function extractErrorInfo(err) {
                 errorType: err.constructor?.name ?? 'object',
             };
         } catch {
-            return { message: redactSecretText(String(err)), stack: undefined, errorType: err.constructor?.name ?? 'object' };
+            return {
+                message: redactSecretText(String(err)),
+                stack: undefined,
+                errorType: err.constructor?.name ?? 'object',
+            };
         }
     }
     return { message: redactSecretText(String(err)), stack: undefined, errorType: typeof err };
@@ -220,7 +224,9 @@ export function createErrorTracker(opts = {}) {
             buffered: _buffer.length,
             byType: { ..._byType },
             bySource: { ..._bySource },
-            last: _buffer[_buffer.length - 1] ? redactErrorEntry(/** @type {ErrorEntry} */ (_buffer[_buffer.length - 1])) : undefined,
+            last: _buffer[_buffer.length - 1]
+                ? redactErrorEntry(/** @type {ErrorEntry} */ (_buffer[_buffer.length - 1]))
+                : undefined,
         };
     }
 

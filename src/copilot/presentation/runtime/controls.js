@@ -27,9 +27,9 @@ import {
     saveRuntimeSnapshot,
     setRuntimeBackgroundCompactionThreshold,
     startRuntime,
-    stopRuntime,
     steerRuntimeMessage,
     stopAgentDialogLoopAuthorized,
+    stopRuntime,
 } from '#copilot/agent/facades';
 import {
     getAgentRuntime,

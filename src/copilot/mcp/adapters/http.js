@@ -373,7 +373,8 @@ function installHttp1GracefulClose(server, policy) {
  * @returns {number}
  */
 function destroyTrackedSockets(server) {
-    const runtimeServer = /** @type {import('node:http').Server & { __mcpHttp1Sockets?: Set<import('node:net').Socket> }} */ (server);
+    const runtimeServer =
+        /** @type {import('node:http').Server & { __mcpHttp1Sockets?: Set<import('node:net').Socket> }} */ (server);
     const sockets = runtimeServer.__mcpHttp1Sockets;
     let destroyed = 0;
     if (typeof server.closeAllConnections === 'function') {

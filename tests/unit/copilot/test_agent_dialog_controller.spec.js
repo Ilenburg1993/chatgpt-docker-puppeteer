@@ -178,12 +178,13 @@ describe('agent-dialog-controller › dialogStop', () => {
         if (!keepaliveOptions) {
             throw new Error('dialogStop não forneceu opções de keepalive');
         }
-        const restartOptions = /**
-         * @type {{
-         *     isIdle?: () => boolean;
-         *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
-         * }}
-         */ (keepaliveOptions);
+        const restartOptions =
+            /**
+             * @type {{
+             *     isIdle?: () => boolean;
+             *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+             * }}
+             */ (keepaliveOptions);
         assert.equal(typeof restartOptions.onKeepalive, 'function');
     });
 });

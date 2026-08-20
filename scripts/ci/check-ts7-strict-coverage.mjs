@@ -9,10 +9,10 @@
  * @module check-ts7-strict-coverage
  */
 
+import { execFile } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { execFile } from 'node:child_process';
 
 const execFileAsync = promisify(execFile);
 const ROOT = resolve('.');

@@ -114,16 +114,18 @@ if (Buffer.byteLength(prompt, 'utf8') > MAX_PROMPT_BYTES) {
 
 ## Achados — P5
 
-| ID     | Arquivo            | Título                                                                       |
-| ------ | ------------------ | ---------------------------------------------------------------------------- | ---- | ------------------------------------------------ |
-| C14-04 | `middleware.js`    | `e.message` exposto na resposta HTTP — information leakage                   |
-| C14-05 | `client.js`        | Endpoints `/client/start                                                     | stop | force-stop` sem auth própria (depende do parent) |
-| C14-06 | `client.js`        | `alwaysAliveAgent.toolsRegistry` acessado via cast inseguro                  |
-| C14-07 | `observability.js` | `POST log-level` usa dynamic import — padrão incomum, funcionalmente correto |
-| C14-08 | `observability.js` | `POST .../clear` e `POST .../flush` sem auth própria                         |
-| C14-09 | `sessions.js`      | `_rlWindowMap` purge O(n) em toda requisição — perf concern em alta escala   |
-| C14-10 | `sessions.js`      | Double-timeout em `sendAndWait` redundante (seguro, mas confuso)             |
-| C14-11 | `webhooks.js`      | `GET /webhooks` sem paginação                                                |
+| ID | Arquivo | Título | | ------ | ------------------ |
+---------------------------------------------------------------------------- | ---- |
+------------------------------------------------ | | C14-04 | `middleware.js` | `e.message` exposto
+na resposta HTTP — information leakage | | C14-05 | `client.js` | Endpoints
+`/client/start                                                     | stop | force-stop` sem auth
+própria (depende do parent) | | C14-06 | `client.js` | `alwaysAliveAgent.toolsRegistry` acessado via
+cast inseguro | | C14-07 | `observability.js` | `POST log-level` usa dynamic import — padrão
+incomum, funcionalmente correto | | C14-08 | `observability.js` | `POST .../clear` e
+`POST .../flush` sem auth própria | | C14-09 | `sessions.js` | `_rlWindowMap` purge O(n) em toda
+requisição — perf concern em alta escala | | C14-10 | `sessions.js` | Double-timeout em
+`sendAndWait` redundante (seguro, mas confuso) | | C14-11 | `webhooks.js` | `GET /webhooks` sem
+paginação |
 
 ---
 

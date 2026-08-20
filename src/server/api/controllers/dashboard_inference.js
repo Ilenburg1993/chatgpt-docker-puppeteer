@@ -188,7 +188,9 @@ router.get('/inference/runtime', authenticate, async (req, res) => {
     try {
         const appLocals = req.app?.locals || {};
         const runtimeSummary =
-            typeof appLocals['getRuntimeResourcesStatus'] === 'function' ? appLocals['getRuntimeResourcesStatus']() : null;
+            typeof appLocals['getRuntimeResourcesStatus'] === 'function'
+                ? appLocals['getRuntimeResourcesStatus']()
+                : null;
         const urls = getBaseUrls();
 
         const [gatewayHealth, auditAgentHealth] = await Promise.all([

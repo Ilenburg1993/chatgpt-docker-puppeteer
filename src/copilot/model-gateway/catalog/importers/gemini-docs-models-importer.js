@@ -6,6 +6,7 @@
  * metadata for Developer API, Vertex AI and OpenAI-compatible access before any account or runtime proof.
  *
  * Sources checked 2026-05-26:
+ *
  * - https://ai.google.dev/gemini-api/docs/models
  * - https://ai.google.dev/gemini-api/docs/pricing
  * - https://ai.google.dev/gemini-api/docs/openai
@@ -31,7 +32,8 @@ export const GEMINI_OPENAI_COMPATIBILITY_DOCS_URL = 'https://ai.google.dev/gemin
 export const GEMINI_VERTEX_MODELS_DOCS_URL = 'https://cloud.google.com/vertex-ai/generative-ai/docs/models';
 
 const GEMINI_MODEL_ID_PATTERN = /\bgemini-\d(?:\.\d)?-[a-z0-9][a-z0-9_.-]*\b/giu;
-const GEMINI_DISPLAY_NAME_PATTERN = /\bGemini\s+\d(?:\.\d)?\s+(?:Pro Image|Flash Image|Flash-Lite|Flash|Pro|Live API)\b/gu;
+const GEMINI_DISPLAY_NAME_PATTERN =
+    /\bGemini\s+\d(?:\.\d)?\s+(?:Pro Image|Flash Image|Flash-Lite|Flash|Pro|Live API)\b/gu;
 
 /**
  * @typedef {{ id: string; docsText: string; pricingText: string; openaiText: string; vertexText: string }} GeminiDocsModelRow
@@ -108,7 +110,14 @@ function compactTokenLimit(value) {
     const amount = Number(match[1]);
     if (!Number.isFinite(amount)) return null;
     const suffix = match[2]?.toLowerCase();
-    const multiplier = suffix === 'k' ? 1_000 : suffix === 'm' || suffix === 'million' ? 1_000_000 : suffix === 'b' ? 1_000_000_000 : 1;
+    const multiplier =
+        suffix === 'k'
+            ? 1_000
+            : suffix === 'm' || suffix === 'million'
+              ? 1_000_000
+              : suffix === 'b'
+                ? 1_000_000_000
+                : 1;
     return Math.round(amount * multiplier);
 }
 
@@ -117,7 +126,9 @@ function compactTokenLimit(value) {
  * @returns {number[]}
  */
 function pricesFromText(value) {
-    return [...value.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)].map((match) => Number(match[1])).filter(Number.isFinite);
+    return [...value.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)]
+        .map((match) => Number(match[1]))
+        .filter(Number.isFinite);
 }
 
 /**
@@ -128,11 +139,21 @@ function geminiModelTraits(providerModel) {
     const match = providerModel.match(/^gemini-(\d(?:\.\d)?)-(.+)$/u);
     const generation = match?.[1] ?? null;
     const suffix = match?.[2] ?? providerModel.replace(/^gemini-/u, '');
-    const tier = suffix.includes('pro') ? 'pro' : suffix.includes('flash-lite') ? 'flash-lite' : suffix.includes('flash') ? 'flash' : suffix.includes('image') ? 'image' : null;
+    const tier = suffix.includes('pro')
+        ? 'pro'
+        : suffix.includes('flash-lite')
+          ? 'flash-lite'
+          : suffix.includes('flash')
+            ? 'flash'
+            : suffix.includes('image')
+              ? 'image'
+              : null;
     const displayName = `Gemini ${generation ?? ''} ${suffix
         .split('-')
         .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
-        .join(' ')}`.replace(/\s+/gu, ' ').trim();
+        .join(' ')}`
+        .replace(/\s+/gu, ' ')
+        .trim();
     return { family: 'gemini', tier, generation, displayName };
 }
 
@@ -142,8 +163,10 @@ function geminiModelTraits(providerModel) {
  */
 function modalitiesForModel(providerModel) {
     const lower = providerModel.toLowerCase();
-    if (lower.includes('image')) return normalizeModelModalities({ input: ['text', 'image'], output: ['image', 'text'] });
-    if (lower.includes('live')) return normalizeModelModalities({ input: ['text', 'image', 'audio', 'video'], output: ['text', 'audio'] });
+    if (lower.includes('image'))
+        return normalizeModelModalities({ input: ['text', 'image'], output: ['image', 'text'] });
+    if (lower.includes('live'))
+        return normalizeModelModalities({ input: ['text', 'image', 'audio', 'video'], output: ['text', 'audio'] });
     return normalizeModelModalities({ input: ['text', 'image', 'audio', 'video'], output: ['text'] });
 }
 
@@ -162,7 +185,8 @@ function capabilitiesForModel(providerModel, combinedWindow) {
         jsonMode: true,
         tokenCounting: true,
     };
-    if (/thinking|reasoning|agentic|coding/iu.test(combinedWindow) || lower.includes('2.5') || lower.includes('3-')) capabilities['reasoning'] = true;
+    if (/thinking|reasoning|agentic|coding/iu.test(combinedWindow) || lower.includes('2.5') || lower.includes('3-'))
+        capabilities['reasoning'] = true;
     if (/grounding|search/iu.test(combinedWindow)) capabilities['grounding'] = true;
     if (lower.includes('image')) capabilities['imageGeneration'] = true;
     if (lower.includes('live') || /Live API|audio/iu.test(combinedWindow)) capabilities['liveApi'] = true;
@@ -179,8 +203,14 @@ function tokenLimitsForModel(providerModel, combinedWindow) {
         combinedWindow.match(/([0-9.,]+\s*(?:k|m|million)?)\s+token context/iu)?.[1] ??
         combinedWindow.match(/context window\s+(?:of\s+)?([0-9.,]+\s*(?:k|m|million)?)/iu)?.[1];
     const lower = providerModel.toLowerCase();
-    const inferredContext = lower.includes('1.5-pro') ? 2_000_000 : lower.includes('2.5') || lower.includes('3-') ? 1_000_000 : null;
-    return normalizeModelTokenLimits({ contextWindowTokens: compactTokenLimit(contextFromDocs ?? '') ?? inferredContext });
+    const inferredContext = lower.includes('1.5-pro')
+        ? 2_000_000
+        : lower.includes('2.5') || lower.includes('3-')
+          ? 1_000_000
+          : null;
+    return normalizeModelTokenLimits({
+        contextWindowTokens: compactTokenLimit(contextFromDocs ?? '') ?? inferredContext,
+    });
 }
 
 /**
@@ -206,13 +236,15 @@ function pricingForDisplayName(displayName, pricingText) {
 
 /**
  * @param {GeminiDocsModelRow} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function evidenceValues(row) {
     const traits = geminiModelTraits(row.id);
     const docsWindow = textWindow(row.docsText, row.id, 1400) || textWindow(row.docsText, traits.displayName, 1400);
-    const vertexWindow = textWindow(row.vertexText, row.id, 1400) || textWindow(row.vertexText, traits.displayName, 1400);
-    const pricingWindow = textWindow(row.pricingText, row.id, 900) || textWindow(row.pricingText, traits.displayName, 900);
+    const vertexWindow =
+        textWindow(row.vertexText, row.id, 1400) || textWindow(row.vertexText, traits.displayName, 1400);
+    const pricingWindow =
+        textWindow(row.pricingText, row.id, 900) || textWindow(row.pricingText, traits.displayName, 900);
     const combinedWindow = `${docsWindow} ${vertexWindow} ${pricingWindow} ${row.openaiText}`;
     const aliases = normalizeModelAliases({ providerModel: row.id, canonicalSlug: row.id });
     const lifecycle = normalizeModelLifecycle({
@@ -247,7 +279,10 @@ function evidenceValues(row) {
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         ...Object.entries(tokenLimits).map(([key, value]) => ({ fieldPath: `limits.${key}`, value })),
         ...Object.entries(pricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'google' },
     ];
     return values.filter((item) => {
@@ -268,7 +303,14 @@ export function parseGeminiDocsRows(raw) {
     const pricingText = normalizeDocsText(String(record['pricing'] ?? ''));
     const openaiText = normalizeDocsText(String(record['openai'] ?? ''));
     const vertexText = normalizeDocsText(String(record['vertex'] ?? ''));
-    const ids = [...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(pricingText), ...modelIdsFromText(openaiText), ...modelIdsFromText(vertexText)])].sort();
+    const ids = [
+        ...new Set([
+            ...modelIdsFromText(docsText),
+            ...modelIdsFromText(pricingText),
+            ...modelIdsFromText(openaiText),
+            ...modelIdsFromText(vertexText),
+        ]),
+    ].sort();
     return ids.map((id) => ({ id, docsText, pricingText, openaiText, vertexText }));
 }
 
@@ -299,7 +341,9 @@ export function createGeminiDocsModelsImporter(options = {}) {
             if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Gemini docs catalog import');
             /** @param {string} url */
             const fetchText = async (url) => {
-                const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
+                const response = await fetchImpl(url, {
+                    headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' },
+                });
                 if (!response.ok) throw new Error(`Gemini docs fetch failed for ${url} with HTTP ${response.status}`);
                 return readCatalogResponseText(response, { label: `Gemini docs ${url}` });
             };

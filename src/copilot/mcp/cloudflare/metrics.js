@@ -103,7 +103,9 @@ function parsePrometheusLabels(rawLabels) {
  * @returns {Record<string, unknown>}
  */
 export function summarizeCloudflaredMetrics(samples, options = {}) {
-    const metricNames = [...new Set(samples.map((sample) => sample.name))].sort((left, right) => left.localeCompare(right));
+    const metricNames = [...new Set(samples.map((sample) => sample.name))].sort((left, right) =>
+        left.localeCompare(right),
+    );
     const buildInfo = samples.find((sample) => sample.name === 'build_info');
     const configVersion = latestValue(samples, 'cloudflared_orchestration_config_version');
     const localConfigPushes = latestValue(samples, 'cloudflared_config_local_config_pushes');
@@ -142,7 +144,18 @@ export function summarizeCloudflaredMetrics(samples, options = {}) {
 /**
  * @param {PrometheusSample[]} samples
  * @param {string[]} metricNames
- * @returns {{ present: boolean; metricCount: number; totalConnections: number | null; closedConnections: number | null; latestRttMs: number | null; smoothedRttMs: number | null; rttUnit: string; mtu: number | null; maxUdpPayload: number | null; packetTooBigDropped: number | null }}
+ * @returns {{
+ *     present: boolean;
+ *     metricCount: number;
+ *     totalConnections: number | null;
+ *     closedConnections: number | null;
+ *     latestRttMs: number | null;
+ *     smoothedRttMs: number | null;
+ *     rttUnit: string;
+ *     mtu: number | null;
+ *     maxUdpPayload: number | null;
+ *     packetTooBigDropped: number | null;
+ * }}
  */
 function summarizeCloudflaredQuicMetrics(samples, metricNames) {
     const quicMetricNames = metricNames.filter((name) => name.startsWith('quic_client_'));
@@ -163,8 +176,8 @@ function summarizeCloudflaredQuicMetrics(samples, metricNames) {
 }
 
 /**
- * Cloudflared QUIC RTT metrics have appeared as fractional seconds in fixtures and as integer milliseconds
- * in live Prometheus snapshots. Normalize both forms without weakening the operational gates.
+ * Cloudflared QUIC RTT metrics have appeared as fractional seconds in fixtures and as integer milliseconds in live
+ * Prometheus snapshots. Normalize both forms without weakening the operational gates.
  *
  * @param {number | null} value
  * @returns {{ ms: number | null; unit: 'seconds' | 'milliseconds' | 'unknown' }}

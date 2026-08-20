@@ -152,7 +152,8 @@ function latestObservedMs(health) {
  */
 function inferRuntimeFailureKind(health) {
     for (const signal of failureSignals(health)) {
-        if (/^(?:auth|credits|rate-limit)$/u.test(signal)) return /** @type {'auth' | 'credits' | 'rate-limit'} */ (signal);
+        if (/^(?:auth|credits|rate-limit)$/u.test(signal))
+            return /** @type {'auth' | 'credits' | 'rate-limit'} */ (signal);
         if (/provider\.credits|credit|credits|insufficient[_\s-]?quota|quota[_\s-]?exhausted|402\b/iu.test(signal)) {
             return 'credits';
         }
@@ -253,27 +254,27 @@ export function deriveModelGatewayRuntimeAccountOverlaysFromHealth(healthRecords
  * @param {number} [options.maxModelsPerOverlay]
  * @param {string | number | Date} [options.now]
  * @returns {{
- *   total: number,
- *   activeCount: number,
- *   expiredCount: number,
- *   byProvider: Record<string, number>,
- *   byFailureKind: Record<string, number>,
- *   activeByProvider: Record<string, number>,
- *   expiredByProvider: Record<string, number>,
- *   activeByFailureKind: Record<string, number>,
- *   expiredByFailureKind: Record<string, number>,
- *   items: Array<{
- *     providerId: string,
- *     failureKind: string,
- *     modelCount: number,
- *     models: string[],
- *     sourceKind: string | null,
- *     expired: boolean,
- *     disabled: boolean,
- *     retryAfterSeconds: number | null,
- *     resetAt: string | null,
- *     expiresAt: string | null,
- *   }>,
+ *     total: number;
+ *     activeCount: number;
+ *     expiredCount: number;
+ *     byProvider: Record<string, number>;
+ *     byFailureKind: Record<string, number>;
+ *     activeByProvider: Record<string, number>;
+ *     expiredByProvider: Record<string, number>;
+ *     activeByFailureKind: Record<string, number>;
+ *     expiredByFailureKind: Record<string, number>;
+ *     items: {
+ *         providerId: string;
+ *         failureKind: string;
+ *         modelCount: number;
+ *         models: string[];
+ *         sourceKind: string | null;
+ *         expired: boolean;
+ *         disabled: boolean;
+ *         retryAfterSeconds: number | null;
+ *         resetAt: string | null;
+ *         expiresAt: string | null;
+ *     }[];
  * }}
  */
 export function summarizeModelGatewayRuntimeAccountOverlays(overlays, options = {}) {
@@ -303,7 +304,9 @@ export function summarizeModelGatewayRuntimeAccountOverlays(overlays, options = 
         const expiresAtMs = dateMs(expiresAt);
         const expired = expiresAtMs !== null && expiresAtMs <= nowMs;
         const enabledModels = Array.isArray(overlay['enabledModels'])
-            ? overlay['enabledModels'].filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim())
+            ? overlay['enabledModels']
+                  .filter((item) => typeof item === 'string' && item.trim())
+                  .map((item) => item.trim())
             : [];
         byProvider[providerId] = (byProvider[providerId] ?? 0) + 1;
         byFailureKind[failureKind] = (byFailureKind[failureKind] ?? 0) + 1;

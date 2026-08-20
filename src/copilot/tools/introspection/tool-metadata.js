@@ -24,9 +24,11 @@
  *     | 'inspect'
  *     | 'unknown'} ToolOperation
  *
+ *
  * @typedef {'low' | 'medium' | 'high' | 'destructive'} ToolRisk
  *
  * @typedef {'none' | 'filesystem' | 'process' | 'network' | 'session' | 'permission' | 'mixed' | 'unknown'} ToolSideEffect
+ *
  *
  * @typedef {'approve_all' | 'audit_only' | 'selective'} ToolPermissionMode
  *
@@ -39,6 +41,7 @@
  *     diff: boolean;
  *     preview: boolean;
  * }} ToolCapabilityMetadata
+ *
  *
  * @typedef {{
  *     name: string;

@@ -138,78 +138,70 @@ async function createTempDir() {
 }
 
 describe('infra/io multiprocess proofs', () => {
-    it(
-        'preserva exclusividade e integridade em create/copy/move/write concorrentes',
-        async () => {
-            const dir = await createTempDir();
-            const lockDir = path.join(dir, '.locks');
+    it('preserva exclusividade e integridade em create/copy/move/write concorrentes', async () => {
+        const dir = await createTempDir();
+        const lockDir = path.join(dir, '.locks');
 
-            const createTarget = path.join(dir, 'create.txt');
-            const createResults = await Promise.all([
-                runChild(lockDir, 'create', { target: createTarget, content: 'create-a' }),
-                runChild(lockDir, 'create', { target: createTarget, content: 'create-b' }),
-            ]);
-            expect(createResults.filter((result) => result.ok)).toHaveLength(1);
-            expect(createResults.find((result) => !result.ok)?.code).toBe('EEXIST');
-            expect(['create-a', 'create-b']).toContain(await readFile(createTarget, 'utf8'));
+        const createTarget = path.join(dir, 'create.txt');
+        const createResults = await Promise.all([
+            runChild(lockDir, 'create', { target: createTarget, content: 'create-a' }),
+            runChild(lockDir, 'create', { target: createTarget, content: 'create-b' }),
+        ]);
+        expect(createResults.filter((result) => result.ok)).toHaveLength(1);
+        expect(createResults.find((result) => !result.ok)?.code).toBe('EEXIST');
+        expect(['create-a', 'create-b']).toContain(await readFile(createTarget, 'utf8'));
 
-            const copySourceA = path.join(dir, 'copy-a.txt');
-            const copySourceB = path.join(dir, 'copy-b.txt');
-            const copyTarget = path.join(dir, 'copy-target.txt');
-            await Promise.all([writeFile(copySourceA, 'copy-a'), writeFile(copySourceB, 'copy-b')]);
-            const copyResults = await Promise.all([
-                runChild(lockDir, 'copy', { source: copySourceA, destination: copyTarget }),
-                runChild(lockDir, 'copy', { source: copySourceB, destination: copyTarget }),
-            ]);
-            expect(copyResults.filter((result) => result.ok)).toHaveLength(1);
-            expect(copyResults.find((result) => !result.ok)?.code).toBe('EEXIST');
-            expect(['copy-a', 'copy-b']).toContain(await readFile(copyTarget, 'utf8'));
+        const copySourceA = path.join(dir, 'copy-a.txt');
+        const copySourceB = path.join(dir, 'copy-b.txt');
+        const copyTarget = path.join(dir, 'copy-target.txt');
+        await Promise.all([writeFile(copySourceA, 'copy-a'), writeFile(copySourceB, 'copy-b')]);
+        const copyResults = await Promise.all([
+            runChild(lockDir, 'copy', { source: copySourceA, destination: copyTarget }),
+            runChild(lockDir, 'copy', { source: copySourceB, destination: copyTarget }),
+        ]);
+        expect(copyResults.filter((result) => result.ok)).toHaveLength(1);
+        expect(copyResults.find((result) => !result.ok)?.code).toBe('EEXIST');
+        expect(['copy-a', 'copy-b']).toContain(await readFile(copyTarget, 'utf8'));
 
-            const moveSourceA = path.join(dir, 'move-a.txt');
-            const moveSourceB = path.join(dir, 'move-b.txt');
-            const moveTarget = path.join(dir, 'move-target.txt');
-            await Promise.all([writeFile(moveSourceA, 'move-a'), writeFile(moveSourceB, 'move-b')]);
-            const moveResults = await Promise.all([
-                runChild(lockDir, 'move', { source: moveSourceA, destination: moveTarget }),
-                runChild(lockDir, 'move', { source: moveSourceB, destination: moveTarget }),
-            ]);
-            expect(moveResults.filter((result) => result.ok)).toHaveLength(1);
-            expect(moveResults.find((result) => !result.ok)?.code).toBe('EEXIST');
-            const moved = await readFile(moveTarget, 'utf8');
-            expect(['move-a', 'move-b']).toContain(moved);
-            const losingSource = moved === 'move-a' ? moveSourceB : moveSourceA;
-            expect(await readFile(losingSource, 'utf8')).toBe(moved === 'move-a' ? 'move-b' : 'move-a');
+        const moveSourceA = path.join(dir, 'move-a.txt');
+        const moveSourceB = path.join(dir, 'move-b.txt');
+        const moveTarget = path.join(dir, 'move-target.txt');
+        await Promise.all([writeFile(moveSourceA, 'move-a'), writeFile(moveSourceB, 'move-b')]);
+        const moveResults = await Promise.all([
+            runChild(lockDir, 'move', { source: moveSourceA, destination: moveTarget }),
+            runChild(lockDir, 'move', { source: moveSourceB, destination: moveTarget }),
+        ]);
+        expect(moveResults.filter((result) => result.ok)).toHaveLength(1);
+        expect(moveResults.find((result) => !result.ok)?.code).toBe('EEXIST');
+        const moved = await readFile(moveTarget, 'utf8');
+        expect(['move-a', 'move-b']).toContain(moved);
+        const losingSource = moved === 'move-a' ? moveSourceB : moveSourceA;
+        expect(await readFile(losingSource, 'utf8')).toBe(moved === 'move-a' ? 'move-b' : 'move-a');
 
-            const writeTarget = path.join(dir, 'write-target.bin');
-            const payloadA = Buffer.alloc(512 * 1024, 0x41);
-            const payloadB = Buffer.alloc(512 * 1024, 0x42);
-            const writeResults = await Promise.all([
-                runChild(lockDir, 'write', { target: writeTarget, size: payloadA.byteLength, fillByte: 0x41 }),
-                runChild(lockDir, 'write', { target: writeTarget, size: payloadB.byteLength, fillByte: 0x42 }),
-            ]);
-            expect(writeResults.every((result) => result.ok)).toBe(true);
-            const written = await readFile(writeTarget);
-            expect(written.equals(payloadA) || written.equals(payloadB)).toBe(true);
-        },
-        30_000,
-    );
+        const writeTarget = path.join(dir, 'write-target.bin');
+        const payloadA = Buffer.alloc(512 * 1024, 0x41);
+        const payloadB = Buffer.alloc(512 * 1024, 0x42);
+        const writeResults = await Promise.all([
+            runChild(lockDir, 'write', { target: writeTarget, size: payloadA.byteLength, fillByte: 0x41 }),
+            runChild(lockDir, 'write', { target: writeTarget, size: payloadB.byteLength, fillByte: 0x42 }),
+        ]);
+        expect(writeResults.every((result) => result.ok)).toBe(true);
+        const written = await readFile(writeTarget);
+        expect(written.equals(payloadA) || written.equals(payloadB)).toBe(true);
+    }, 30_000);
 
-    it(
-        'recupera lock L1 após crash do processo holder',
-        async () => {
-            const dir = await createTempDir();
-            const lockDir = path.join(dir, '.locks');
-            const target = path.join(dir, 'crash-recovery.txt');
-            const holder = await startHoldingChild(lockDir, target);
+    it('recupera lock L1 após crash do processo holder', async () => {
+        const dir = await createTempDir();
+        const lockDir = path.join(dir, '.locks');
+        const target = path.join(dir, 'crash-recovery.txt');
+        const holder = await startHoldingChild(lockDir, target);
 
-            expect(await readdir(lockDir)).toHaveLength(1);
-            holder.kill('SIGKILL');
-            await new Promise((resolve) => holder.once('close', resolve));
+        expect(await readdir(lockDir)).toHaveLength(1);
+        holder.kill('SIGKILL');
+        await new Promise((resolve) => holder.once('close', resolve));
 
-            const recovered = await runChild(lockDir, 'lock-once', { target });
-            expect(recovered.ok).toBe(true);
-            expect(await readdir(lockDir)).toEqual([]);
-        },
-        30_000,
-    );
+        const recovered = await runChild(lockDir, 'lock-once', { target });
+        expect(recovered.ok).toBe(true);
+        expect(await readdir(lockDir)).toEqual([]);
+    }, 30_000);
 });

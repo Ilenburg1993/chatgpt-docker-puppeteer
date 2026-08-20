@@ -3623,36 +3623,35 @@
 ### 11.43 Runtime do agente e renderers sem tags técnicas
 
 - [x] Achado: `agent-runtime-events.js` ainda imprimia badges técnicos em eventos centrais:
-      `PERGUNTA`, `LLM-B`, `BYOK`, `ERROR`, `MODEL`, `COMPACTAR`, `OK`, `FALHA`,
-      `SUBAGENTE`, `PR`, `LLM`, `DIALOG`, `SESSION` e `COMMAND`.
+      `PERGUNTA`, `LLM-B`, `BYOK`, `ERROR`, `MODEL`, `COMPACTAR`, `OK`, `FALHA`, `SUBAGENTE`, `PR`,
+      `LLM`, `DIALOG`, `SESSION` e `COMMAND`.
 - [x] Achado: esses rótulos eram exatamente o tipo de ruído observado nas screenshots: linhas
       parecidas com tool trace, desalinhadas semanticamente e misturando estado humano com
       identificadores internos.
 - [x] Decisão: eventos operacionais do agente devem usar nomes humanos estáveis e curtos:
       `Pergunta ao operador`, `Sessão`, `Erro BYOK`, `Modelo`, `Contexto`, `Compactação`,
-      `Subagente`, `Premium Request`, `Uso do modelo`, `Diálogo`, `Sessão SDK` e
-      `Comando SDK`.
+      `Subagente`, `Premium Request`, `Uso do modelo`, `Diálogo`, `Sessão SDK` e `Comando SDK`.
 - [x] Implementação: `agent-runtime-events.js` passou a renderizar esses eventos com
       `terminalThemeRow`, preservando `recordTerminalActivity`, SSE, traces e health BYOK.
-- [x] Implementação: erro recuperável de modelo deixa de imprimir `MODEL`; fallback passa a
-      aparecer como `Modelo  fallback aplicado: origem -> destino`.
+- [x] Implementação: erro recuperável de modelo deixa de imprimir `MODEL`; fallback passa a aparecer
+      como `Modelo  fallback aplicado: origem -> destino`.
 - [x] Implementação: boot recovery passa a aparecer como `Diálogo  boot recovery ...`, sem badge
       técnico.
-- [x] Implementação: lifecycle SDK e comando SDK agora aparecem como `Sessão SDK` e
-      `Comando SDK`, sem prefixos `SESSION`/`COMMAND`.
+- [x] Implementação: lifecycle SDK e comando SDK agora aparecem como `Sessão SDK` e `Comando SDK`,
+      sem prefixos `SESSION`/`COMMAND`.
 - [x] Achado: `intent-renderer.js` ainda imprimia `INTENÇÃO CAPTURADA`; o default agora mostra
       `Intenção  risco ... · origem ...`.
 - [x] Achado: `io-activity-events.js` ainda imprimia `[ARQUIVO] [LER]`/`[MOVER]`; o default agora
       mostra `Arquivo  leitura/movimento · caminho · ok/falhou`.
-- [x] Achado: `assistant-transcript-renderer.js` ainda imprimia badge `LLM-B`; o cabeçalho agora
-      usa `terminalThemeRow(title, source + detail)`.
+- [x] Achado: `assistant-transcript-renderer.js` ainda imprimia badge `LLM-B`; o cabeçalho agora usa
+      `terminalThemeRow(title, source + detail)`.
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/terminal/test_intent_renderer.spec.js tests/unit/copilot/terminal/test_io_activity_events.spec.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
 
 ### 11.44 Tool lifecycle, menu e GitHub sem badges visíveis no default
 
-- [x] Achado: `tool-lifecycle-runtime.js` ainda mostrava `PERGUNTA`, badges de operação
-      (`LER`, `CRIAR`, `MOVER`), status `OK`/`FALHA` e `SYNC`.
+- [x] Achado: `tool-lifecycle-runtime.js` ainda mostrava `PERGUNTA`, badges de operação (`LER`,
+      `CRIAR`, `MOVER`), status `OK`/`FALHA` e `SYNC`.
 - [x] Achado: tools genéricas de baixa fidelidade podiam renderizar `callId=...` ou `tool#...`,
       vazando ID interno na superfície padrão.
 - [x] Decisão: lifecycle de tool deve ser narrado como evento operacional, não como log de SDK:
@@ -3660,8 +3659,8 @@
 - [x] Implementação: início/progresso/fim de tool foram convertidos para `terminalThemeRow` onde
       havia badge técnico; detalhes semânticos de tool continuam preservados.
 - [x] Implementação: quando a tool é genérica e só há ID técnico, o terminal mostra
-      `Ferramenta interna` e orienta que detalhes técnicos estão em `/tools diag`, sem expor o ID
-      no default.
+      `Ferramenta interna` e orienta que detalhes técnicos estão em `/tools diag`, sem expor o ID no
+      default.
 - [x] Implementação: reconciliação de tool no fim do turno agora mostra
       `Sincronização  <tool> · conclusão inferida no fim do turno`.
 - [x] Achado: `/menu` usava badge `AGIR`; agora usa texto humano `Agora` com papel de aviso.
@@ -3674,8 +3673,8 @@
 - [x] Live PTY `--ux-cycle` executado após o lote:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/default-ux-cycle-terminal-ux-clean-20260603-1511`.
   - Resultado: PASS em 16/16 critérios, incluindo `/help`, `/help full`, `/status`, `/now`,
-        `/health`, `/tools`, `/sdk`, `/sdk capabilities`, `/workspace list`, `/live`,
-        `/activity` e `/sdk waits`.
+    `/health`, `/tools`, `/sdk`, `/sdk capabilities`, `/workspace list`, `/live`, `/activity` e
+    `/sdk waits`.
   - Logs: `artifacts/terminal-live/default-ux-cycle-terminal-ux-clean-20260603-1511/summary.md`.
 - [x] Próxima lacuna: adicionar um ciclo diagnóstico curto para eventos de pergunta, tool, I/O e
       intenção, comparando a renderização real com as screenshots originais.
@@ -3686,37 +3685,36 @@
       `/sdk waits` de forma humana, mas a linha viva ainda mostrava `LLM-B PERGUNTA`.
 - [x] Decisão: o prompt compacto pode manter `[PERG]` como estado operacional curto, mas a linha
       viva deve usar frase humana em caixa normal.
-- [x] Implementação: `live-status-line.js` agora renderiza pending question e
-      `request_user_input` estruturado como `LLM-B Pergunta · ...`.
+- [x] Implementação: `live-status-line.js` agora renderiza pending question e `request_user_input`
+      estruturado como `LLM-B Pergunta · ...`.
 - [x] Harness live atualizado: critério `structured-input-live-status` agora exige a frase humana
       `Pergunta`, não o badge técnico `PERGUNTA`.
 - [x] Teste unitário passou:
   - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/structured-input-terminal-ux-question-human-20260603-1520`.
-  - Resultado: PASS em 11/11 critérios, sem vazamento de `request_user_input`, IDs internos ou
-        spam durável.
+  - Resultado: PASS em 11/11 critérios, sem vazamento de `request_user_input`, IDs internos ou spam
+    durável.
 - [x] Próxima lacuna: construir ou ampliar um ciclo live para atividade real de tool/I/O/intent,
       preferencialmente sem consumir PR quando possível; quando exigir LLM real, executar apenas
       após o harness passivo e estruturado permanecerem verdes.
 
 ### 11.46 `/fs` temático e ciclo diagnóstico sem PR
 
-- [x] Achado: `/fs` ainda usava ANSI literal direto em quase todas as superfícies (`Uso`,
-      sucesso, falha, listagem, leitura, busca e I/O), apesar de ser um comando central para
-      operações reais de arquivo.
-- [x] Decisão: `/fs` deve seguir a mesma gramática visual do restante do terminal:
-      `FS local`, `Arquivo`, `Item`, `FS search`, `resultados`, `I/O read/write/search`,
-      `Próximo` e `Guia`.
+- [x] Achado: `/fs` ainda usava ANSI literal direto em quase todas as superfícies (`Uso`, sucesso,
+      falha, listagem, leitura, busca e I/O), apesar de ser um comando central para operações reais
+      de arquivo.
+- [x] Decisão: `/fs` deve seguir a mesma gramática visual do restante do terminal: `FS local`,
+      `Arquivo`, `Item`, `FS search`, `resultados`, `I/O read/write/search`, `Próximo` e `Guia`.
 - [x] Implementação: `src/copilot/terminal/commands/fs.js` foi migrado para `terminalThemeRow`,
       removendo ANSI literal sem mudar a execução das file-tools.
-- [x] Implementação: os resumos de I/O preservam pistas operacionais úteis (`I/O write`,
-      `I/O read`, `I/O search`) sem retornar a key-value cru.
+- [x] Implementação: os resumos de I/O preservam pistas operacionais úteis (`I/O write`, `I/O read`,
+      `I/O search`) sem retornar a key-value cru.
 - [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_fs.spec.js` agora valida ausência
       de ANSI nos caminhos create/read/list/search/failure.
 - [x] Harness live ampliado: `model-gateway-terminal-llm-b-live-test.mjs` ganhou
-      `--diagnostic-ux-cycle`, que executa `/fs create`, `/fs read`, `/fs search`,
-      `/activity`, `/tools` e `/events` sem abrir turno LLM/PR.
+      `--diagnostic-ux-cycle`, que executa `/fs create`, `/fs read`, `/fs search`, `/activity`,
+      `/tools` e `/events` sem abrir turno LLM/PR.
 - [x] Primeiro live diagnóstico identificou critério de ordem ruim em `FS search`; o critério foi
       corrigido de `I/O search -> resultados` para `resultados -> I/O search`.
 - [x] Segundo live diagnóstico passou, mas ler `package.json` produzia log excessivo; o ciclo foi
@@ -3726,16 +3724,16 @@
   - Resultado: PASS em 7/7 critérios.
   - Logs: `artifacts/terminal-live/diagnostic-ux-fs-io-events-small-20260603-1525/summary.md`.
 - [x] Próxima lacuna: revisar `/events` e `/activity detail` para reduzir densidade de
-      `rastreamento implicit`, `hub ...` e timestamps longos no default, mantendo tudo acessível
-      em detail/raw.
+      `rastreamento implicit`, `hub ...` e timestamps longos no default, mantendo tudo acessível em
+      detail/raw.
 
 ### 11.47 `/events` default sem IDs densos
 
 - [x] Achado live: `/events 12` default ainda mostrava `#eventId`, `rastreamento implicit:...`,
       `hub ...` e `turno ...` em todas as linhas, mesmo sem filtro explícito.
 - [x] Decisão: `/events` é diagnóstico, mas o default deve ser escaneável; identificadores longos
-      entram quando o operador pede filtros técnicos (`trace`, `turn`, `tool`, `request`, `hub`)
-      ou raw/json.
+      entram quando o operador pede filtros técnicos (`trace`, `turn`, `tool`, `request`, `hub`) ou
+      raw/json.
 - [x] Implementação: `cmdEvents` agora calcula `showDiagnosticIds` a partir dos filtros técnicos.
       Sem esses filtros, cada linha mostra tempo, origem humana e resumo do payload; com filtros,
       preserva `#id`, rastreamento, turno, hub e IDs compactos.
@@ -3746,10 +3744,10 @@
 - [x] Live diagnóstico repetido:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-events-id-guard-20260603-1528`.
   - Resultado: PASS; `/events` default passou a mostrar linhas como
-        `Ferramenta  timestamp · io · ferramenta Leitura local · estado io op`, sem
-        `rastreamento implicit`, `#id` e `hub`.
-- [x] Harness reforçado: `diagnostic-ux-events-human` agora falha se o default voltar a mostrar
-      IDs de tool crus, `rastreamento implicit`, `#id` ou `hub`.
+    `Ferramenta  timestamp · io · ferramenta Leitura local · estado io op`, sem
+    `rastreamento implicit`, `#id` e `hub`.
+- [x] Harness reforçado: `diagnostic-ux-events-human` agora falha se o default voltar a mostrar IDs
+      de tool crus, `rastreamento implicit`, `#id` ou `hub`.
 - [x] Próxima lacuna: revisar `/activity` default/detail para separar melhor timeline humana de
       timeline técnica e reduzir truncamentos confusos em caminhos longos.
 
@@ -3758,33 +3756,33 @@
 - [x] Achado: `/activity` default ainda imprimia timestamps ISO entre colchetes em I/O real e
       timeline recente. Na prática, isso fazia a tela parecer dump de log, justamente a estética
       ruim vista nas screenshots.
-- [x] Decisão: o caminho padrão deve responder "o que aconteceu e há quanto tempo"; o modo
-      `detail` responde "qual timestamp exato, engine e identificadores técnicos".
+- [x] Decisão: o caminho padrão deve responder "o que aconteceu e há quanto tempo"; o modo `detail`
+      responde "qual timestamp exato, engine e identificadores técnicos".
 - [x] Implementação: `activity.js` passou a renderizar I/O e timeline como `há 4s`, `há 2m`,
       `há 3h`, `há 1d` no default.
-- [x] Implementação: `/activity detail` preserva os timestamps ISO completos, engines de I/O,
-      trace IDs e request IDs para auditoria profunda.
-- [x] Implementação: a idade da atividade atual passou a usar duração compacta (`10s`, `2m`,
-      `1h`) em vez de segundos crus potencialmente longos.
+- [x] Implementação: `/activity detail` preserva os timestamps ISO completos, engines de I/O, trace
+      IDs e request IDs para auditoria profunda.
+- [x] Implementação: a idade da atividade atual passou a usar duração compacta (`10s`, `2m`, `1h`)
+      em vez de segundos crus potencialmente longos.
 - [x] Implementação estrutural: `time-format.js` agora expõe helpers canônicos
-      `formatTerminalRelativeAge` e `formatTerminalElapsedDuration`, evitando lógica local
-      duplicada em comandos.
+      `formatTerminalRelativeAge` e `formatTerminalElapsedDuration`, evitando lógica local duplicada
+      em comandos.
 - [x] Implementação: `search` em I/O recente de `/activity` passou a aparecer como `busca`.
 - [x] Implementação: `/events` default passou a usar idade relativa e reservou ISO para filtros
       técnicos/raw/json, alinhando o archive SSE com a mesma gramática visual de `/activity`.
 - [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_activity.spec.js` agora garante
       que o default não contém timestamp ISO e que o modo `detail` continua contendo.
-- [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_events.spec.js` agora cobre
-      tempo relativo no resumo default sem remover timestamp técnico nos caminhos diagnósticos.
+- [x] Teste reforçado: `tests/unit/copilot/terminal/test_commands_events.spec.js` agora cobre tempo
+      relativo no resumo default sem remover timestamp técnico nos caminhos diagnósticos.
 - [x] Harness live reforçado: `--diagnostic-ux-cycle` agora separa as superfícies de `/activity`,
-      `/tools` e `/events`, e falha se `/activity` ou `/events` default voltarem a mostrar
-      timestamp ISO.
+      `/tools` e `/events`, e falha se `/activity` ou `/events` default voltarem a mostrar timestamp
+      ISO.
 - [x] Validação escopada passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-relative-time-events-20260603-1535`.
-  - Resultado: PASS em 7/7; `/activity` e `/events` default ficaram sem ISO, IDs densos e
-        badges técnicos.
+  - Resultado: PASS em 7/7; `/activity` e `/events` default ficaram sem ISO, IDs densos e badges
+    técnicos.
 - [x] Próxima lacuna: revisar `/tools` porque operações distintas ainda podiam colapsar em nomes
       repetidos como `Escrita local` para mkdir/write.
 - [x] Implementação: `tool-activity-presenter.js` agora distingue `Pasta local`, `Escrita local`,
@@ -3792,12 +3790,12 @@
       `Exclusão local` para ferramentas `io.*`.
 - [x] Testes reforçados:
   - `tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js` cobre os nomes granulares.
-  - `tests/unit/copilot/terminal/test_commands_tools.spec.js` garante que `/tools` default não
-        vaze motores `io-engine.*`.
+  - `tests/unit/copilot/terminal/test_commands_tools.spec.js` garante que `/tools` default não vaze
+    motores `io-engine.*`.
 - [x] Live PTY diagnóstico repetido:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-tools-granular-20260603-1537`.
   - Resultado: PASS em 7/7; `/tools` mostrou `Pasta local`, `Leitura local`, `Busca local` e
-        `Escrita local`.
+    `Escrita local`.
 - [x] Próxima lacuna: revisar `/live` e `/session` porque ainda havia trechos com `Origem`,
       `phase/source`, timestamps ISO e detalhes técnicos em superfícies default.
 
@@ -3821,13 +3819,14 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-live-full-labels-20260603-1543`.
-  - Resultado observado: `/live full` exibiu `Sessão SDK interativo · sessão ativa · permissões
-        automáticas` e `Timeline sem histórico · sem divergência · sincronização dispensada`.
+  - Resultado observado: `/live full` exibiu
+    `Sessão SDK interativo · sessão ativa · permissões     automáticas` e
+    `Timeline sem histórico · sem divergência · sincronização dispensada`.
 - [x] Harness reforçado e live repetido:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-live-full-id-guard-20260603-1544`.
-  - Resultado: PASS em 8/8; o critério `diagnostic-ux-live-full-human` agora falha se
-        `/live full` voltar a mostrar ISO bracketado, `search`, `phase:`, `approve_all`,
-        `empty`, `not_needed` ou UUID cru.
+  - Resultado: PASS em 8/8; o critério `diagnostic-ux-live-full-human` agora falha se `/live full`
+    voltar a mostrar ISO bracketado, `search`, `phase:`, `approve_all`, `empty`, `not_needed` ou
+    UUID cru.
 - [x] Próxima lacuna: revisar `/session sdk events` e `/session sdk waits`, porque ainda havia
       superfícies com timestamps ISO, `#eventId`, fontes cruas e IDs de pedido.
 
@@ -3835,16 +3834,16 @@
 
 - [x] Achado: `/session sdk events` resumiam archive SSE com linhas `#eventId`, fonte
       `agent/sdk.lifecycle`, tipos como `session.updated` e timestamp ISO como label da linha.
-- [x] Achado: `/session sdk waits` expunha `#eventId`, `sdk/user_input.requested`, request IDs
-      como `ask-1` e permissões como `fs.write`.
+- [x] Achado: `/session sdk waits` expunha `#eventId`, `sdk/user_input.requested`, request IDs como
+      `ask-1` e permissões como `fs.write`.
 - [x] Decisão: esses comandos são agregadores operacionais; detalhes crus devem ficar em
       `/events --raw`/`--json`.
 - [x] Implementação: `summarizeSdkSessionArchiveEntry` removeu `#eventId` e fonte crua da linha
       default, usando eventos humanos e tipos traduzidos como `sessão atualizada`.
-- [x] Implementação: `summarizeSdkWaitArchiveEntry` removeu request/session IDs da linha default
-      e traduz permissões como `fs.write` para `escrita de arquivo`.
-- [x] Implementação: ambos os comandos usam `formatTerminalRelativeAge` e `terminalThemeRow`
-      com labels fixos (`Evento`, `Espera`), evitando timestamps ISO como coluna primária.
+- [x] Implementação: `summarizeSdkWaitArchiveEntry` removeu request/session IDs da linha default e
+      traduz permissões como `fs.write` para `escrita de arquivo`.
+- [x] Implementação: ambos os comandos usam `formatTerminalRelativeAge` e `terminalThemeRow` com
+      labels fixos (`Evento`, `Espera`), evitando timestamps ISO como coluna primária.
 - [x] Implementação: estados vazios deixaram de sugerir filtros crus (`event=sdk.lifecycle`,
       `event=user_input.requested`) e passaram a apontar para `/events sources` ou `/events --raw`.
 - [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/session sdk events 8` e
@@ -3869,79 +3868,80 @@
 - [x] Implementação: `renderTerminalActorLabel` trata `assistant` como `LLM-B`, evitando ator cru.
 - [x] Implementação: timeline source/authority/reconciliation agora usa rótulos humanos como
       `misto`, `reconciliada`, `divergente`, `sem histórico` e `sem divergência`.
-- [x] Implementação: `/history` e `/db-history` passaram para `terminalThemeRow`, com tempo
-      relativo e sem badge `[live]`.
+- [x] Implementação: `/history` e `/db-history` passaram para `terminalThemeRow`, com tempo relativo
+      e sem badge `[live]`.
 - [x] Implementação: `/db-sessions` passou a `Últimas N sessões persistidas`, status `ativa` /
       `concluída`, tempo relativo e sem IDs no default.
 - [x] Teste escopado reforçado:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
   - Cobertura adicionada contra ISO em `/history`, `/db-history` e `/db-sessions`.
-- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/history 6`,
-      `/db-history 6` e `/db-sessions 6`.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/history 6`, `/db-history 6` e
+      `/db-sessions 6`.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-db-sessions-no-ids-20260603-1555`.
   - Resultado: PASS em 13/13 critérios.
-- [x] Próxima lacuna: revisar `/count`, `/who`, `/clear` e comandos pequenos que ainda podem
-      usar ANSI literal ou IDs compactos desnecessários.
+- [x] Próxima lacuna: revisar `/count`, `/who`, `/clear` e comandos pequenos que ainda podem usar
+      ANSI literal ou IDs compactos desnecessários.
 
 ### 11.52 Comandos pequenos sem vazamento técnico nem ANSI cru
 
 - [x] Achado: `/who` ainda misturava papel humano com detalhes de implementação (`stdin`,
-      `POST http://localhost`, `GET /events`, `AlwaysAliveAgent`), criando ruído visual e
-      reforçando a sensação de "dump de ferramenta" apontada nas screenshots.
-- [x] Achado: `/count` mostrava ANSI literal, IDs compactos de hub/session SDK e labels em
-      inglês (`Hub session`, `SDK session`), apesar de ser um comando de status rápido.
-- [x] Achado: `/clear` imprimia escape ANSI manual e frase menos consistente com a gramática
-      dos demais comandos de sessão.
-- [x] Decisão: comandos pequenos devem ser micro-painéis operacionais; endpoints, agentes
-      internos, IDs e códigos de cor só devem aparecer em diagnósticos explícitos.
-- [x] Implementação: `/who` passou a mostrar `Você`, `LLM-A`, `LLM-B` e `Eventos` com descrições
-      de função, usando porta como contexto humano em vez de URL HTTP crua.
+      `POST http://localhost`, `GET /events`, `AlwaysAliveAgent`), criando ruído visual e reforçando
+      a sensação de "dump de ferramenta" apontada nas screenshots.
+- [x] Achado: `/count` mostrava ANSI literal, IDs compactos de hub/session SDK e labels em inglês
+      (`Hub session`, `SDK session`), apesar de ser um comando de status rápido.
+- [x] Achado: `/clear` imprimia escape ANSI manual e frase menos consistente com a gramática dos
+      demais comandos de sessão.
+- [x] Decisão: comandos pequenos devem ser micro-painéis operacionais; endpoints, agentes internos,
+      IDs e códigos de cor só devem aparecer em diagnósticos explícitos.
+- [x] Implementação: `/who` passou a mostrar `Você`, `LLM-A`, `LLM-B` e `Eventos` com descrições de
+      função, usando porta como contexto humano em vez de URL HTTP crua.
 - [x] Implementação: `/count` passou a usar `terminalThemeHeadline`, `terminalThemeDivider` e
       `terminalThemeRow`, com contagens por ator, memórias e presença de sessões como
       `hub ativa · SDK ativa`, sem IDs.
-- [x] Implementação: `/count` sem sessão agora responde `nenhuma sessão persistida ativa` via
-      tema do terminal, sem ANSI literal.
+- [x] Implementação: `/count` sem sessão agora responde `nenhuma sessão persistida ativa` via tema
+      do terminal, sem ANSI literal.
 - [x] Implementação: `/clear` agora responde `Histórico  memória local limpa`, também via tema.
 - [x] Teste escopado reforçado:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
   - Cobertura adicionada contra `AlwaysAliveAgent`, `POST http`, `Hub session` e `\x1b[` nos
-        comandos pequenos.
-- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/who`, `/count` e `/clear`
-      após os painéis de histórico/DB.
+    comandos pequenos.
+- [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/who`, `/count` e `/clear` após
+      os painéis de histórico/DB.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-small-commands-20260603-1558`.
-  - Resultado: PASS; `/who` mostrou atores humanos, `/count` mostrou estatísticas sem IDs e
-        `/clear` confirmou memória local limpa sem ANSI cru.
-- [x] Próxima lacuna: revisar `/session sdk` fora dos subcomandos `events/waits`, pois o
-      inventário de sessões e ações de resume/next ainda pode expor índices, estados e
-      metadados técnicos demais sem explicar o que o operador deve fazer.
+  - Resultado: PASS; `/who` mostrou atores humanos, `/count` mostrou estatísticas sem IDs e `/clear`
+    confirmou memória local limpa sem ANSI cru.
+- [x] Próxima lacuna: revisar `/session sdk` fora dos subcomandos `events/waits`, pois o inventário
+      de sessões e ações de resume/next ainda pode expor índices, estados e metadados técnicos
+      demais sem explicar o que o operador deve fazer.
 
 ### 11.53 `/session sdk` default como inventário operacional
 
-- [x] Achado: o painel principal de `/session sdk` ainda imprimia `Foreground`, IDs de sessão,
-      flags como `last`, `foreground`, `remote/local`, `probe-residue` e timestamps ISO.
+- [x] Achado: o painel principal de `/session sdk` ainda imprimia `Foreground`, IDs de sessão, flags
+      como `last`, `foreground`, `remote/local`, `probe-residue` e timestamps ISO.
 - [x] Achado live: mesmo após remover IDs, o painel ainda vazava motivos técnicos como
       `sdk-resume-fallback-created-new-session` e `operator-next-boot-new-session`.
 - [x] Decisão: `/session sdk` default deve ser uma lista acionável com alças `#n`, status em
       português e tempo relativo; IDs crus e diagnósticos de baixo nível pertencem a comandos
       explícitos.
-- [x] Implementação: `resolveSdkSessionResumeTarget` passou a aceitar atalhos em português
-      (`atual`, `última`, `primeiro-plano`) sem quebrar os atalhos antigos.
-- [x] Implementação: o topo do painel passou a mostrar `Atual`, `Última usada` e `Primeiro
-      plano` como `sessão #n`, `ausente` ou `sessão não listada nesta página`, em vez de IDs.
+- [x] Implementação: `resolveSdkSessionResumeTarget` passou a aceitar atalhos em português (`atual`,
+      `última`, `primeiro-plano`) sem quebrar os atalhos antigos.
+- [x] Implementação: o topo do painel passou a mostrar `Atual`, `Última usada` e
+      `Primeiro     plano` como `sessão #n`, `ausente` ou `sessão não listada nesta página`, em vez
+      de IDs.
 - [x] Implementação: o inventário passou a renderizar badges como `atual`, `última usada`,
       `em primeiro plano`, `diagnóstico antigo`, `local` e `remota`.
 - [x] Implementação: início/alteração de sessões passaram a usar tempo relativo.
 - [x] Implementação: o resumo de sessão saiu da linha `Tempo` e ganhou linha própria `Resumo`,
       reduzindo quebra visual e linhas desalinhadas.
-- [x] Implementação: razões de boot/metadados passaram por normalizador humano, traduzindo
-      códigos como `provider-boundary`, `operator-next-boot-new-session` e
+- [x] Implementação: razões de boot/metadados passaram por normalizador humano, traduzindo códigos
+      como `provider-boundary`, `operator-next-boot-new-session` e
       `sdk-resume-fallback-created-new-session`.
-- [x] Implementação: provedores em metadados passaram a aparecer como `GitHub Copilot`, `BYOK`
-      ou `OpenAI`, quando aplicável.
-- [x] Implementação: probes antigos agora reconhecem sufixos como `BYOK_PROBE_OK` e aparecem
-      como `diagnóstico antigo`.
+- [x] Implementação: provedores em metadados passaram a aparecer como `GitHub Copilot`, `BYOK` ou
+      `OpenAI`, quando aplicável.
+- [x] Implementação: probes antigos agora reconhecem sufixos como `BYOK_PROBE_OK` e aparecem como
+      `diagnóstico antigo`.
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js`.
   - Cobertura reforçada contra IDs/ISO/flags cruas no default e contra códigos de motivo crus.
@@ -3950,20 +3950,20 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=120000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-session-sdk-reasons-20260603-1608`.
   - Resultado: PASS em 15/15 critérios; `/session sdk` mostrou alças `#n`, tempo relativo,
-        `Última usada`, `Primeiro plano`, motivo de boot traduzido e metadados sem códigos crus.
-- [x] Próxima lacuna: auditar `/sdk` e `/scope`, pois buscas no código ainda indicam ANSI
-      literal, IDs de sessão em linhas default e nomes técnicos que podem reaparecer na UX.
+    `Última usada`, `Primeiro plano`, motivo de boot traduzido e metadados sem códigos crus.
+- [x] Próxima lacuna: auditar `/sdk` e `/scope`, pois buscas no código ainda indicam ANSI literal,
+      IDs de sessão em linhas default e nomes técnicos que podem reaparecer na UX.
 
 ### 11.54 `/scope` e `/sdk status` no mesmo idioma visual do terminal
 
 - [x] Achado: `/scope` ainda usava ANSI manual em todas as rotas principais (`declare`, `list`,
       `context`, `find`, `refresh`, `close`, uso e erro).
-- [x] Achado: `/scope` imprimia `ready`, `warming`, bullets manuais e aparência de log, destoando
-      do restante da UX que já usa `terminalThemeRow`.
+- [x] Achado: `/scope` imprimia `ready`, `warming`, bullets manuais e aparência de log, destoando do
+      restante da UX que já usa `terminalThemeRow`.
 - [x] Achado: `/sdk status` imprimia ID cru da sessão SDK e reset de quota em ISO no painel
       principal.
-- [x] Decisão: `/scope` pode manter o nome do escopo quando ele é a alça operacional escolhida
-      pelo operador, mas deve abandonar ANSI cru, key=value legado e estados em inglês.
+- [x] Decisão: `/scope` pode manter o nome do escopo quando ele é a alça operacional escolhida pelo
+      operador, mas deve abandonar ANSI cru, key=value legado e estados em inglês.
 - [x] Implementação: `/scope declare` passou a exibir `Escopo declarado`, `Escopo`, `Fonte`,
       `Opções` e estatísticas via tema.
 - [x] Implementação: `/scope list`, `/scope context`, `/scope find`, `/scope refresh` e
@@ -3973,8 +3973,8 @@
 - [x] Implementação: estados `ready`/`warming` passaram a `pronto`/`aquecendo`.
 - [x] Implementação: `/sdk status` e `/sdk prompt` passaram a renderizar presença de sessão
       (`sessão ativa`) em vez de ID cru.
-- [x] Implementação: resets de quota SDK passaram a usar tempo relativo (`há 3s`, `em 2m`) em
-      vez de timestamp ISO no status default.
+- [x] Implementação: resets de quota SDK passaram a usar tempo relativo (`há 3s`, `em 2m`) em vez de
+      timestamp ISO no status default.
 - [x] Testes escopados passaram:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_scope.spec.js`.
   - Cobertura reforçada contra ANSI, `sdk-1`, ISO de reset e key=value legado.
@@ -3983,24 +3983,24 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-sdk-quota-relative-20260603-1615`.
   - Resultado: PASS em 17/17 critérios; `/sdk status` ficou sem ID/ISO e `/scope` ficou sem ANSI
-        literal ou labels `ready/warming`.
+    literal ou labels `ready/warming`.
 - [x] Próxima lacuna: revisar `/permission`, `/plan`, `/queue`, `/mailbox` e superfícies de
-      intervenção humana, porque ainda são as áreas mais propensas a repetir tool names,
-      permissões cruas e prompts que parecem "outra tool qualquer".
+      intervenção humana, porque ainda são as áreas mais propensas a repetir tool names, permissões
+      cruas e prompts que parecem "outra tool qualquer".
 
 ### 11.55 Permissões sem constantes cruas no painel operacional
 
 - [x] Achado: `/permission mode` ainda mostrava `approve_all`, `audit_only` e `selective`.
 - [x] Achado: `/permission list`, `/permission pending`, `/permission show` e `/permission cockpit`
-      ainda mostravam tipos como `file_write`, decisões como `approve-once`/`approved` e
-      timestamps ISO.
-- [x] Decisão: comandos de permissão devem deixar claro ao operador se o sistema está em
-      autorização automática, auditoria sem janelas ou modo seletivo; constantes do SDK ficam
-      restritas a comandos de ação quando inevitáveis.
-- [x] Implementação: normalizadores canônicos de modo, tipo e decisão de permissão foram
-      adicionados em `sdk.js`.
-- [x] Implementação: `/permission mode` passou a mostrar `automáticas`, `auditoria sem janelas`
-      e `seletivas`, aceitando aliases humanos como `automatico`, `auditoria` e `seletivo`.
+      ainda mostravam tipos como `file_write`, decisões como `approve-once`/`approved` e timestamps
+      ISO.
+- [x] Decisão: comandos de permissão devem deixar claro ao operador se o sistema está em autorização
+      automática, auditoria sem janelas ou modo seletivo; constantes do SDK ficam restritas a
+      comandos de ação quando inevitáveis.
+- [x] Implementação: normalizadores canônicos de modo, tipo e decisão de permissão foram adicionados
+      em `sdk.js`.
+- [x] Implementação: `/permission mode` passou a mostrar `automáticas`, `auditoria sem janelas` e
+      `seletivas`, aceitando aliases humanos como `automatico`, `auditoria` e `seletivo`.
 - [x] Implementação: `/permission list/show/pending/cockpit` passou a traduzir `file_write` para
       `escrita de arquivo`, `shell` para `execução no terminal`, `approve-once` para
       `aprovada uma vez` e equivalentes.
@@ -4010,16 +4010,17 @@
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
   - Cobertura reforçada contra `approve_all`, `file_write`, `approved`, `approve-once` e ISO nos
-        painéis default relevantes.
+    painéis default relevantes.
 - [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/permission mode` e
       `/permission cockpit`.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=160000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-permission-human-20260603-1620`.
-  - Resultado: PASS em 18/18 critérios; o painel mostrou `automáticas`, `sem janelas SDK por
-        padrão` e nenhum `approve_all`, `file_write`, `requestId` ou timestamp ISO.
-- [x] Próxima lacuna: revisar os fluxos de `/queue`, `/mailbox`, `/interrupt` e aplicação
-      automática de intervenção humana, reduzindo termos `mailbox zero-PR`, IDs de entry e
-      repetição visual quando uma pergunta estruturada aguarda resposta.
+  - Resultado: PASS em 18/18 critérios; o painel mostrou `automáticas`,
+    `sem janelas SDK por     padrão` e nenhum `approve_all`, `file_write`, `requestId` ou timestamp
+    ISO.
+- [x] Próxima lacuna: revisar os fluxos de `/queue`, `/mailbox`, `/interrupt` e aplicação automática
+      de intervenção humana, reduzindo termos `mailbox zero-PR`, IDs de entry e repetição visual
+      quando uma pergunta estruturada aguarda resposta.
 
 ### 11.56 Fila de intervenção sem jargão de mailbox
 
@@ -4028,25 +4029,24 @@
       manual em alguns caminhos.
 - [x] Decisão: a UX deve falar em `fila de intervenção` e `próxima pergunta humana`; mailbox,
       entryId e modeHint são detalhes internos de implementação.
-- [x] Implementação: `repl-command-router.js` ganhou renderizadores de origem e modo de
-      intervenção.
-- [x] Implementação: `/queue` agora confirma `intervenção guardada para a próxima pergunta
-      humana`.
+- [x] Implementação: `repl-command-router.js` ganhou renderizadores de origem e modo de intervenção.
+- [x] Implementação: `/queue` agora confirma
+      `intervenção guardada para a próxima pergunta     humana`.
 - [x] Implementação: `/mailbox status`, `/mailbox consume` e `/mailbox clear` agora renderizam
       `Fila de intervenção`, sem runtime ID no default.
-- [x] Implementação: `/steer` bloqueado e `/interrupt` em política de preservação passaram a
-      falar em intervenção/substituição guardada, não em mailbox.
-- [x] Implementação: `deliverEntryAsTurnIfIdle` deixou de imprimir ANSI e `[mailbox→turn]`,
-      usando `terminalThemeRow('Fila de intervenção', ...)`.
+- [x] Implementação: `/steer` bloqueado e `/interrupt` em política de preservação passaram a falar
+      em intervenção/substituição guardada, não em mailbox.
+- [x] Implementação: `deliverEntryAsTurnIfIdle` deixou de imprimir ANSI e `[mailbox→turn]`, usando
+      `terminalThemeRow('Fila de intervenção', ...)`.
 - [x] Harness live ampliado: `--diagnostic-ux-cycle` agora executa `/queue`, `/mailbox status` e
       `/mailbox clear`, sem abrir novo turno de modelo.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-intervention-queue-20260603-1625`.
-  - Resultado: PASS em 19/19 critérios; a superfície mostrou `Fila de intervenção`, `origem
-        terminal`, `fila`, e não mostrou `mailbox zero-PR`, runtime ID, `modeHint`, `entryId` ou
-        ANSI.
-- [x] Próxima lacuna: revisar textos do banner/help/menu que ainda ensinam `mailbox zero-PR`,
-      além de eventos de aplicação automática em `sdk-session-events.js` que ainda citam mailbox.
+  - Resultado: PASS em 19/19 critérios; a superfície mostrou `Fila de intervenção`,
+    `origem     terminal`, `fila`, e não mostrou `mailbox zero-PR`, runtime ID, `modeHint`,
+    `entryId` ou ANSI.
+- [x] Próxima lacuna: revisar textos do banner/help/menu que ainda ensinam `mailbox zero-PR`, além
+      de eventos de aplicação automática em `sdk-session-events.js` que ainda citam mailbox.
 
 ### 11.57 Banner, help e aplicação automática alinhados à fila de intervenção
 
@@ -4058,16 +4058,16 @@
 - [x] Implementação: banner curto passou a `texto livre → fila de intervenção`.
 - [x] Implementação: `/help` passou a explicar `/queue` como intervenção guardada para a próxima
       pergunta humana e `/mailbox` como fila de intervenção.
-- [x] Implementação: eventos de aplicação automática passaram a `Fila de intervenção aplicada em
-      pergunta humana`.
+- [x] Implementação: eventos de aplicação automática passaram a
+      `Fila de intervenção aplicada em     pergunta humana`.
 - [x] Implementação: comentários e exemplos internos foram alinhados para evitar regressão de
       nomenclatura.
-- [x] Harness live reforçado: `diagnostic-ux-no-old-intervention-jargon` falha se o terminal
-      voltar a mostrar `mailbox zero-PR`, `texto livre → fila zero-PR` ou `[mailbox`.
+- [x] Harness live reforçado: `diagnostic-ux-no-old-intervention-jargon` falha se o terminal voltar
+      a mostrar `mailbox zero-PR`, `texto livre → fila zero-PR` ou `[mailbox`.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-intervention-jargon-20260603-1628`.
   - Resultado: PASS em 20/20 critérios; banner, help e ciclo `/queue`/`/mailbox` não exibiram
-        `mailbox zero-PR`, `texto livre → fila zero-PR`, `[mailbox`, IDs de runtime ou ANSI.
+    `mailbox zero-PR`, `texto livre → fila zero-PR`, `[mailbox`, IDs de runtime ou ANSI.
 
 ## 12. UX v2: terminal como produto operacional elegante
 
@@ -4092,23 +4092,25 @@
 
 - [x] Live PTY de 2026-06-03 mostrou melhora grande nas superfícies de `/fs`, `/activity`,
       `/events`, `/session sdk`, `/permission`, `/scope`, `/queue` e `/mailbox`.
-- [x] Gap observado na live: `/session sdk events` ainda exibiu `session deleted · sessão sessão
-      ativa`, demonstrando que lifecycle SDK ainda precisava de tradução semântica.
+- [x] Gap observado na live: `/session sdk events` ainda exibiu
+      `session deleted · sessão sessão     ativa`, demonstrando que lifecycle SDK ainda precisava de
+      tradução semântica.
 - [x] Gap observado em código: o boot prompt ainda ensinava `Mailbox zero-PR` para a LLM-B, criando
       risco de a própria LLM repetir jargão antigo.
-- [x] Gap observado em código: `mailbox-drain`, `repl-lifecycle`, `terminal-agent-wiring` e
-      comandos de intervenção ainda continham mensagens ou comentários visíveis com `mailbox`/
-      `zero-PR` em caminhos de borda.
-- [x] Gap observado em arquitetura: a função de tempo existente separava `formatTerminalIsoTimestamp`
-      e `formatTerminalRelativeAge`, mas não havia contrato único para "ISO + relativo" configurável.
+- [x] Gap observado em código: `mailbox-drain`, `repl-lifecycle`, `terminal-agent-wiring` e comandos
+      de intervenção ainda continham mensagens ou comentários visíveis com `mailbox`/ `zero-PR` em
+      caminhos de borda.
+- [x] Gap observado em arquitetura: a função de tempo existente separava
+      `formatTerminalIsoTimestamp` e `formatTerminalRelativeAge`, mas não havia contrato único para
+      "ISO + relativo" configurável.
 - [x] Gap observado em testes live: critérios antigos reprovavam ISO no default; eles precisarão ser
       revisados para exigir ISO até segundos + relativo e continuar proibindo IDs/tool names crus.
 
 ### 12.3 Situação ideal UX v2
 
 - [ ] Tempo canônico: todos os eventos e timelines humanos devem usar uma API central como
-      `formatTerminalTimeLabel`, com `dual` como default operacional: `YYYY-MM-DDTHH:mm:ss-03:00
-      (há 4s)`.
+      `formatTerminalTimeLabel`, com `dual` como default operacional:
+      `YYYY-MM-DDTHH:mm:ss-03:00     (há 4s)`.
 - [ ] Linha viva: deve usar duração compacta por ergonomia (`12s`, `2m03s`) e nunca roubar o input;
       histórico e painéis persistentes devem usar ISO+relativo.
 - [ ] Tema: cada papel deve ter cor estável: operador, LLM-B, thinking, tool, pergunta, erro, aviso,
@@ -4154,8 +4156,8 @@
 
 ### 12.5 Evidência da primeira rodada UX v2
 
-- [x] Implementação: `time-format.js` passou a expor `formatTerminalTimeLabel`, com modos
-      `dual`, `iso`, `relative` e `elapsed`.
+- [x] Implementação: `time-format.js` passou a expor `formatTerminalTimeLabel`, com modos `dual`,
+      `iso`, `relative` e `elapsed`.
 - [x] Implementação: ISO humano dual usa precisão até segundos por padrão, evitando ruído de
       milissegundos em telas persistentes.
 - [x] Implementação: parser de timestamp aceita `Date`, número, ISO string e string numérica,
@@ -4163,8 +4165,8 @@
 - [x] Implementação: `/activity`, `/live full`, `/events`, `/history`, `/db-history`,
       `/db-sessions`, `/session sdk events`, `/session sdk waits` e inventário SDK passaram a usar
       ISO+relativo nas linhas de timeline.
-- [x] Implementação: lifecycle SDK `session.created/deleted/updated/foreground/background` passou
-      a ser traduzido em `/session sdk events` e `/events`.
+- [x] Implementação: lifecycle SDK `session.created/deleted/updated/foreground/background` passou a
+      ser traduzido em `/session sdk events` e `/events`.
 - [x] Implementação: boot prompt e superfícies de intervenção deixam de ensinar `Mailbox zero-PR`
       como linguagem operacional.
 - [x] Testes escopados passaram:
@@ -4173,16 +4175,16 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-time-dual-20260603-1717`.
   - Resultado: PASS em 20/20 critérios, exigindo ISO até segundos + tempo relativo e bloqueando
-        regressões como `tempo inválido`, `session deleted`, `sessão sessão`, IDs crus e jargão
-        antigo de mailbox.
+    regressões como `tempo inválido`, `session deleted`, `sessão sessão`, IDs crus e jargão antigo
+    de mailbox.
 
 ### 12.6 Próxima faixa: pergunta humana como card nobre
 
 - [x] Achado: há pelo menos três produtores visuais de pergunta humana: `sdk-session-events.js`,
       `agent-runtime-events.js` e `tool-lifecycle-runtime.js`.
-- [x] Achado: esses produtores usam layouts diferentes (`Pergunta`, `Pergunta ao operador`,
-      linhas soltas de ação/atalho), o que aumenta a chance de duplicação visual e sensação de
-      tool genérica.
+- [x] Achado: esses produtores usam layouts diferentes (`Pergunta`, `Pergunta ao operador`, linhas
+      soltas de ação/atalho), o que aumenta a chance de duplicação visual e sensação de tool
+      genérica.
 - [x] Decisão: `ask_user` e `request_user_input` devem ter um card compartilhado, com título,
       pergunta, opções, estado e ação, usando o mesmo tema e o mesmo contrato de tempo dual.
 - [x] Implementar `human-question-renderer.js` como renderer único de pergunta humana.
@@ -4200,9 +4202,9 @@
 - [x] Implementação: `human-question-renderer.js` passou a ser o renderer compartilhado para
       perguntas humanas, com `Pergunta ao operador`, `[PERGUNTA]`, opções numeradas, ação clara,
       atalhos úteis e tempo dual.
-- [x] Implementação: `sdk-session-events.js`, `agent-runtime-events.js`,
-      `tool-lifecycle-runtime.js` e `/sdk simulate request-user-input` passaram a usar o mesmo
-      card, reduzindo paralelismo visual entre pergunta real, replay, lifecycle e diagnóstico.
+- [x] Implementação: `sdk-session-events.js`, `agent-runtime-events.js`, `tool-lifecycle-runtime.js`
+      e `/sdk simulate request-user-input` passaram a usar o mesmo card, reduzindo paralelismo
+      visual entre pergunta real, replay, lifecycle e diagnóstico.
 - [x] Implementação: o harness live foi atualizado para separar superfície default, diagnóstico e
       raw. IDs crus continuam proibidos na UX default, mas `/events --raw` pode expor JSON e
       `toolCallId` como diagnóstico explícito.
@@ -4213,8 +4215,8 @@
 
 - [x] Documento canônico complementar criado:
       `src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_INTEGRATION_AUDIT_2026-06-03.md`.
-- [x] Fontes oficiais consultadas para `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`,
-      `zoxide`, `jq` e `yq`.
+- [x] Fontes oficiais consultadas para `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq`
+      e `yq`.
 - [x] Decisão arquitetural: adoção começa por detecção/capability registry, não por uso de TUI.
 - [x] Decisão arquitetural: nenhuma lib externa será obrigatória ou instalada automaticamente.
 - [x] Decisão arquitetural: `fzf`, `bat`, `glow`, `delta`, `jq` e `yq` são aceitos como
@@ -4223,21 +4225,21 @@
 - [x] Decisão UX: pickers/pagers externos só podem ocorrer por comando explícito ou preferência,
       nunca durante streaming automático da LLM-B ou pergunta humana pendente.
 - [x] Próxima implementação: criar registry read-only de capacidades externas.
-- [x] Próxima implementação: criar comando humano/JSON para inspecionar libs disponíveis,
-      decisões e fallbacks.
+- [x] Próxima implementação: criar comando humano/JSON para inspecionar libs disponíveis, decisões e
+      fallbacks.
 - [x] Implementação: `terminal/capabilities/external-tools.js` detecta `gum`, `fzf`, `bat`,
-      `batcat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` por `PATH`, com version probe,
-      cache e `defaultEnabled=false`.
-- [x] Implementação: `/terminal libs` e `/libs` mostram superfície humana compacta, `detail`,
-      `json` e `refresh`.
+      `batcat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` por `PATH`, com version probe, cache
+      e `defaultEnabled=false`.
+- [x] Implementação: `/terminal libs` e `/libs` mostram superfície humana compacta, `detail`, `json`
+      e `refresh`.
 - [x] Implementação: `/help` e `/menu` expõem a nova superfície canônica.
 - [x] Testes escopados passaram:
       `npx vitest run tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js`.
 - [x] Resultado: 5 arquivos, 17 testes.
-- [x] Próxima implementação: adapter read-only de preview, começando por `bat`/`batcat` com
-      fallback JS.
-- [x] Implementação: `terminal/capabilities/file-preview.js` oferece preview read-only explícito
-      com `bat`/`batcat`, fallback JS, timeout, `maxBuffer` e limite de linhas.
+- [x] Próxima implementação: adapter read-only de preview, começando por `bat`/`batcat` com fallback
+      JS.
+- [x] Implementação: `terminal/capabilities/file-preview.js` oferece preview read-only explícito com
+      `bat`/`batcat`, fallback JS, timeout, `maxBuffer` e limite de linhas.
 - [x] Implementação: `/fs preview <path>` e `/fs read <path> --preview` usam o adapter sem alterar
       `/fs read` default.
 - [x] Achado de execução real: `read_file_content` imprimia log técnico cru antes da superfície
@@ -4251,37 +4253,36 @@
       `npx vitest run tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js`.
 - [x] Resultado: 3 arquivos, 15 testes.
 - [x] Lint escopado passou nos arquivos alterados de terminal/capabilities/commands e testes.
-- [x] Typecheck strict de `src/copilot` passou:
-      `npm run typecheck:strict:src.copilot`.
+- [x] Typecheck strict de `src/copilot` passou: `npm run typecheck:strict:src.copilot`.
 - [x] Live PTY diagnóstico passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=190000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-aux-libs-20260603-1950`.
 - [x] Resultado live: PASS em 24/24 critérios, incluindo `diagnostic-ux-fs-preview` e
       `diagnostic-ux-terminal-libs`.
 - [x] Próxima implementação: detecção fina de arquivo binário antes de preview externo.
-- [x] Implementação: `file-preview.js` omite conteúdo com NUL, bytes inválidos ou muitos
-      caracteres de controle antes de chamar `bat`/`batcat` ou fallback textual bruto.
+- [x] Implementação: `file-preview.js` omite conteúdo com NUL, bytes inválidos ou muitos caracteres
+      de controle antes de chamar `bat`/`batcat` ou fallback textual bruto.
 - [x] Testes/lint D.5 passaram:
       `node --check src/copilot/terminal/capabilities/file-preview.js && npx eslint src/copilot/terminal/capabilities/file-preview.js tests/unit/copilot/terminal/test_file_preview.spec.js`.
 - [x] Testes D.5 passaram:
       `npx vitest run tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
 - [x] Resultado: 2 arquivos, 9 testes.
 - [x] Próxima implementação: adapter Markdown explícito com `glow`, mantendo fallback texto.
-- [x] Implementação: `terminal/capabilities/markdown-preview.js` renderiza Markdown com `glow`
-      via stdin, sem pager/TUI automático, e fallback JS com truncamento.
-- [x] Implementação: `/fs preview <path> --markdown` e `/fs read <path> --preview --markdown`
-      ativam Markdown explicitamente.
+- [x] Implementação: `terminal/capabilities/markdown-preview.js` renderiza Markdown com `glow` via
+      stdin, sem pager/TUI automático, e fallback JS com truncamento.
+- [x] Implementação: `/fs preview <path> --markdown` e `/fs read <path> --preview --markdown` ativam
+      Markdown explicitamente.
 - [x] Testes/lint Faixa E passaram:
       `node --check src/copilot/terminal/capabilities/markdown-preview.js && node --check src/copilot/terminal/commands/fs.js && npx eslint src/copilot/terminal/capabilities/markdown-preview.js src/copilot/terminal/commands/fs.js tests/unit/copilot/terminal/test_markdown_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
 - [x] Testes Faixa E passaram:
       `npx vitest run tests/unit/copilot/terminal/test_markdown_preview.spec.js tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
 - [x] Resultado: 3 arquivos, 13 testes.
 - [x] Typecheck strict de `src/copilot` passou após Faixa E.
-- [x] Implementação: `terminal/capabilities/diff-preview.js` renderiza unified diff com `delta`
-      via stdin, sem pager, e fallback JS com truncamento.
-- [x] Implementação: `/git diff [--staged] [--plain] [file]` e `/gh pr diff <n> [--plain]`
-      usam o adapter comum, com cabeçalho humano e renderer explícito.
-- [x] Achado live corrigido: os bridges Git de leitura/escrita executavam a partir de `/src`,
-      mas o operador usa paths repo-relativos; ambos agora executam na raiz do repositório.
+- [x] Implementação: `terminal/capabilities/diff-preview.js` renderiza unified diff com `delta` via
+      stdin, sem pager, e fallback JS com truncamento.
+- [x] Implementação: `/git diff [--staged] [--plain] [file]` e `/gh pr diff <n> [--plain]` usam o
+      adapter comum, com cabeçalho humano e renderer explícito.
+- [x] Achado live corrigido: os bridges Git de leitura/escrita executavam a partir de `/src`, mas o
+      operador usa paths repo-relativos; ambos agora executam na raiz do repositório.
 - [x] Testes/lint Faixa F passaram:
       `node --check src/copilot/bridges/git-bridge-read.js && node --check src/copilot/bridges/git-bridge-write.js && node --check src/copilot/terminal/capabilities/diff-preview.js && node --check src/copilot/terminal/commands/git.js && node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
 - [x] Lint escopado Faixa F passou:
@@ -4292,10 +4293,10 @@
 - [x] Live PTY Faixa F passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-diff-preview-20260603-2030`.
 - [x] Resultado live: PASS em 26/26 critérios, incluindo `diagnostic-ux-git-diff-preview`.
-- [x] Implementação: `terminal/capabilities/structured-preview.js` renderiza JSON/YAML com
-      `jq`/`yq` opcionais e fallback JS/`js-yaml`.
-- [x] Implementação: `/fs preview <path> --json|--yaml [--query filtro] [--plain]` ativa
-      preview estruturado explicitamente sem alterar `/fs read` default.
+- [x] Implementação: `terminal/capabilities/structured-preview.js` renderiza JSON/YAML com `jq`/`yq`
+      opcionais e fallback JS/`js-yaml`.
+- [x] Implementação: `/fs preview <path> --json|--yaml [--query filtro] [--plain]` ativa preview
+      estruturado explicitamente sem alterar `/fs read` default.
 - [x] Segurança: `jq`/`yq` rodam por stdin e array de args; `yq` desativa operações de arquivo/env.
 - [x] Testes/lint Faixa H passaram:
       `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/structured-preview.js && node --check src/copilot/terminal/commands/fs.js`.
@@ -4315,7 +4316,8 @@
 - [x] Implementação: `/menu picker` usa o planner e renderiza uma opção textual segura quando o
       terminal ainda nao possui handoff exclusivo de TTY para `fzf`/`gum`.
 - [x] Harness live ampliado: `--diagnostic-ux-cycle` executa `/menu picker` e adiciona o critério
-      `diagnostic-ux-menu-picker-guard`, que reprova lançamento indevido de TUI externa no prompt vivo.
+      `diagnostic-ux-menu-picker-guard`, que reprova lançamento indevido de TUI externa no prompt
+      vivo.
 - [x] Testes/lint Faixa G.0 passaram:
       `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs && node --check src/copilot/terminal/capabilities/picker-plan.js && node --check src/copilot/terminal/commands/menu.js`.
 - [x] Lint escopado Faixa G.0 passou:
@@ -4326,12 +4328,12 @@
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-picker-guard-20260603-2050`.
 - [x] Resultado live: PASS em 29/29 critérios, incluindo `diagnostic-ux-menu-picker-guard`.
 - [x] Implementação: `readTerminalExclusiveTtyReadiness()` e `withTerminalExclusiveTty()`
-      centralizam o handoff de TTY no output layer, bloqueando TTY ausente, turno ativo,
-      render lock e input humano parcialmente digitado.
+      centralizam o handoff de TTY no output layer, bloqueando TTY ausente, turno ativo, render lock
+      e input humano parcialmente digitado.
 - [x] Implementação: o router do REPL passa a prontidão real para `/menu picker`, que agora pode
       explicar bloqueios concretos além da guarda textual genérica.
-- [x] Achado live corrigido: `/menu picker` nao deve transformar o render lock do próprio
-      dispatcher em bloqueio visível; a leitura de prontidão ignora esse lock externo no router.
+- [x] Achado live corrigido: `/menu picker` nao deve transformar o render lock do próprio dispatcher
+      em bloqueio visível; a leitura de prontidão ignora esse lock externo no router.
 - [x] Testes Faixa G.5 base passaram:
       `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js tests/unit/copilot/terminal/test_picker_plan.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js`.
 - [x] Resultado: 3 arquivos, 20 testes.
@@ -4365,24 +4367,24 @@
       seleção/cancelamento de `fzf` e, quando instalado, `gum`.
 - [x] Live PTY estruturado passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --timeout-ms=150000 --transport=pty --out-dir=artifacts/terminal-live/structured-question-card-20260603-1723`.
-  - Resultado: PASS em 11/11 critérios, cobrindo prompt `[PERGUNTA]`, resposta roteada, waits
-        limpos e ausência de `request_user_input`/IDs no default.
+  - Resultado: PASS em 11/11 critérios, cobrindo prompt `[PERGUNTA]`, resposta roteada, waits limpos
+    e ausência de `request_user_input`/IDs no default.
 - [x] Live PTY canônico com LLM-B real passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=210000 --transport=pty --out-dir=artifacts/terminal-live/canonical-human-question-card-20260603-1731`.
   - Resultado: PASS em todos os critérios; a pergunta real foi renderizada por uma única fonte SDK,
-        a resposta humana não apareceu como fala da LLM-B, o export preservou autoria humana e o
-        SSE manteve correlação de `traceId`.
+    a resposta humana não apareceu como fala da LLM-B, o export preservou autoria humana e o SSE
+    manteve correlação de `traceId`.
 
 ### 12.8 Próxima faixa: diagnósticos densos e saúde visual
 
 - [x] Achado live: `/health full` ainda usa caixa pesada com borda dupla e ANSI manual; está correto
       funcionalmente, mas destoante do tema minimalista das demais superfícies.
 - [x] Achado live: `/tools diag` ainda expõe `Nome técnico`, `chamada chatcmpl-too…` e
-      `requisição ...` por padrão dentro de diagnóstico explícito. Isso é aceitável para `diag`,
-      mas precisa de hierarquia visual mais clara e opção default menos verborrágica.
+      `requisição ...` por padrão dentro de diagnóstico explícito. Isso é aceitável para `diag`, mas
+      precisa de hierarquia visual mais clara e opção default menos verborrágica.
 - [x] Decisão: a próxima faixa deve preservar diagnósticos ricos, mas dividir claramente `default`,
-      `detail` e `raw`, usando alças humanas estáveis no default e IDs apenas quando o operador
-      pede detalhe.
+      `detail` e `raw`, usando alças humanas estáveis no default e IDs apenas quando o operador pede
+      detalhe.
 - [ ] Fase 12.8.A: auditar `/health`, `/status`, `/now`, `/diagnose`, `/tools diag` e `/model` como
       superfícies de saúde/diagnóstico.
 - [x] Fase 12.8.B: substituir caixa antiga de `/health full` por tema compartilhado ou painel
@@ -4396,20 +4398,20 @@
 
 ### 12.9 Evidência da saúde visual em `/health full`
 
-- [x] Implementação: `/health full` passou a usar `terminalThemeHeadline`,
-      `terminalThemeRow` e `terminalThemeDivider`, com blocos humanos `Agente`, `Atividade`,
-      `Infraestrutura`, `Pendências` e `Ferramentas por latência`.
+- [x] Implementação: `/health full` passou a usar `terminalThemeHeadline`, `terminalThemeRow` e
+      `terminalThemeDivider`, com blocos humanos `Agente`, `Atividade`, `Infraestrutura`,
+      `Pendências` e `Ferramentas por latência`.
 - [x] Implementação: a caixa dupla antiga foi removida da superfície full, mantendo o diagnóstico
       rico e preservando `/health` compacto como entrada operacional padrão.
-- [x] Implementação: labels crus como `runtime id`, `sdk prompts=`, `quota monitor`,
-      `keepalive`, `bg tasks` e `sdk↔fs route` continuam fora das superfícies humanas validadas.
+- [x] Implementação: labels crus como `runtime id`, `sdk prompts=`, `quota monitor`, `keepalive`,
+      `bg tasks` e `sdk↔fs route` continuam fora das superfícies humanas validadas.
 - [x] Teste escopado passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js`.
   - Resultado: 1 arquivo, 5 testes.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-full-themed-20260603-1741`.
   - Resultado: PASS; o critério `diagnostic-ux-health-full-themed` confirmou ausência da caixa
-        decorativa antiga e presença das seções temáticas principais.
+    decorativa antiga e presença das seções temáticas principais.
 - [ ] Lacuna remanescente: `diagnose.js` ainda usa ANSI manual em alguns valores internos antes de
       passá-los para `terminalThemeRow`; a próxima limpeza deve centralizar esses papéis no tema.
 - [ ] Lacuna remanescente: `/tools diag` ainda precisa de hierarquia mais humana para IDs e nomes
@@ -4420,15 +4422,15 @@
 - [x] Implementação: `/tools diag` passou a separar a linha operacional humana da linha `Técnico`,
       da `Classe`, das `Refs` compactas e do `Alvo`, evitando que IDs, nomes SDK e metadados
       apareçam como a narrativa principal.
-- [x] Implementação: `Nome técnico`, `tipo file`, `chamada ...`, `requisição ...`,
-      `tool(s)` e `Superfícies de tools` deixaram de ser labels do diagnóstico humano.
+- [x] Implementação: `Nome técnico`, `tipo file`, `chamada ...`, `requisição ...`, `tool(s)` e
+      `Superfícies de tools` deixaram de ser labels do diagnóstico humano.
 - [x] Implementação: `Superfícies de tools` virou `Superfícies operacionais`, com linhas
       independentes para `Arquivos locais`, `Terminal local`, `Workspace SDK`, `Shell legado` e
       `Desabilitadas`.
 - [x] Implementação: categorias e lifecycle de I/O local passaram a usar `I/O local`, `busca`,
       `leitura`, `escrita` e `criação de pasta`, em vez de `io · search`/`io · mkdir`.
-- [x] Implementação: `/health full` traduziu o rodapé de latência de tools de `avg ... (calls)`
-      para `média ... (uso/usos)`.
+- [x] Implementação: `/health full` traduziu o rodapé de latência de tools de `avg ... (calls)` para
+      `média ... (uso/usos)`.
 - [x] Harness live: o ciclo diagnóstico agora executa `/tools diag` logo após `/tools` e valida o
       critério `diagnostic-ux-tools-diag-hierarchy`.
 - [x] Bug do harness corrigido: o recorte de `/tools diag` agora procura comando real após o prompt
@@ -4439,7 +4441,7 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/tools-diag-hierarchy-20260603-1751`.
   - Resultado: PASS; 22/22 critérios, incluindo `/tools` default humano, `/tools diag` hierárquico,
-        `/health full` temático e ausência de labels antigos.
+    `/health full` temático e ausência de labels antigos.
 - [x] Lacuna resolvida: `/events` não deve mostrar estados compactos como `estado io op`; a
       superfície default deve distinguir `estado`, `tipo` e `classe`.
 - [ ] Lacuna remanescente: o banner inicial e algumas sessões ainda repetem comandos longos em uma
@@ -4447,8 +4449,8 @@
 
 ### 12.11 Evidência de eventos I/O humanos
 
-- [x] Implementação: `/events` deixou de tratar `payload.type` como `status`; agora `status`,
-      `type` e `classification` viram respectivamente `estado`, `tipo` e `classe`.
+- [x] Implementação: `/events` deixou de tratar `payload.type` como `status`; agora `status`, `type`
+      e `classification` viram respectivamente `estado`, `tipo` e `classe`.
 - [x] Implementação: fontes `io` e `io/...` aparecem como `I/O local` no default.
 - [x] Implementação: `io_op` aparece como `tipo I/O local`, não como `estado io op`.
 - [x] Harness live: o critério `diagnostic-ux-events-human` passou a reprovar `estado io op` e
@@ -4459,7 +4461,7 @@
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/events-io-human-20260603-1754`.
   - Resultado: PASS; `/events` mostrou `I/O local · ferramenta ... · tipo I/O local` e manteve
-        ausência de IDs crus, `io_op`, timestamps com milissegundos e `chatcmpl-tool`.
+    ausência de IDs crus, `io_op`, timestamps com milissegundos e `chatcmpl-tool`.
 - [x] Próxima lacuna tratada em 12.12: primeiro viewport deixou de carregar o bloco de comandos
       gigante e passou a explicar entrada direta sem jargão antigo de intervenção.
 
@@ -4468,13 +4470,13 @@
 - [x] Achado: a live PTY ainda mostrava muitas instruções horizontais no primeiro viewport, com
       `texto livre -> fila de intervenção`, linhas de ambiente vagas e uma ajuda operacional que
       competia visualmente com o prompt.
-- [x] Decisão UX: o primeiro viewport default deve responder somente a três perguntas:
-      como operar agora, como enviar entrada e onde ver estado do sistema. Catálogo completo fica
-      em `/help`, `/tools`, `/session sdk` e diagnósticos explícitos.
-- [x] Implementação: `renderReplBanner` trocou a lista longa por três linhas compactas:
-      `Operar`, `Entrada` e `Sistema`.
-- [x] Implementação: a linha de entrada passou a dizer `texto direto = próxima pergunta`,
-      removendo o vocabulário antigo de fila/intervenção do banner.
+- [x] Decisão UX: o primeiro viewport default deve responder somente a três perguntas: como operar
+      agora, como enviar entrada e onde ver estado do sistema. Catálogo completo fica em `/help`,
+      `/tools`, `/session sdk` e diagnósticos explícitos.
+- [x] Implementação: `renderReplBanner` trocou a lista longa por três linhas compactas: `Operar`,
+      `Entrada` e `Sistema`.
+- [x] Implementação: a linha de entrada passou a dizer `texto direto = próxima pergunta`, removendo
+      o vocabulário antigo de fila/intervenção do banner.
 - [x] Implementação: o boot standalone passou a mostrar `FS/terminal locais ativos`, deixando claro
       que MCP remoto ausente não bloqueia as ferramentas locais.
 - [x] Harness live: `diagnostic-ux-no-old-intervention-jargon` agora exige o novo banner compacto e
@@ -4485,8 +4487,8 @@
   - Resultado: 2 arquivos, 4 testes.
 - [x] Live PTY diagnóstico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/first-viewport-compact-20260603-1759`.
-  - Resultado: PASS; 22 critérios, com o primeiro viewport mostrando `Operar`, `Entrada`,
-        `Sistema`, `texto direto = próxima pergunta` e `FS/terminal locais ativos`.
+  - Resultado: PASS; 22 critérios, com o primeiro viewport mostrando `Operar`, `Entrada`, `Sistema`,
+    `texto direto = próxima pergunta` e `FS/terminal locais ativos`.
 - [x] Achado pós-live: `/session sdk 6` e `/sdk status` ainda eram corretos semanticamente, mas
       continham linhas longas (`Comandos`, `Próximo boot`, `Filtros`, `Uso`) que excediam a leitura
       confortável do terminal.
@@ -4518,7 +4520,7 @@
 - [x] Live PTY pós-humanização de `/health full` passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/health-human-compact-blocks-20260603-1808`.
   - Resultado: PASS; `/health full` mostrou `Status ocioso`, `Modo SDK interativo` e
-        `Permissões automáticas`.
+    `Permissões automáticas`.
 - [x] Nova lacuna observada na live: `/history` e `/db-history` podiam renderizar várias linhas
       `Você <timestamp>` sem conteúdo quando o ciclo tem comandos internos/entradas vazias. A UX
       deve ocultar turnos vazios ou explicar que são comandos de terminal, sem poluir o histórico.
@@ -4533,14 +4535,14 @@
 - [x] Live PTY pós-correção de histórico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=170000 --transport=pty --out-dir=artifacts/terminal-live/history-no-empty-rows-20260603-1814`.
   - Resultado: PASS; `/history` mostrou `sem mensagens visíveis nesta janela` e `/db-history`
-        mostrou `A janela persistida não tem mensagens visíveis.`, sem linhas fantasma.
+    mostrou `A janela persistida não tem mensagens visíveis.`, sem linhas fantasma.
 - [x] Validadores formais do pacote passaram:
   - `npm run lint:copilot`.
   - `npm run typecheck:strict:src.copilot`.
   - `npx vitest run tests/unit/copilot/terminal/test_repl_banner.spec.js tests/unit/copilot/terminal/test_boot_banner.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js`.
-- [x] Próxima lacuna em andamento: auditar comandos com ANSI cru ainda fora do tema central
-      (`/gh`, `/skills`, `/memory`, `/plan`, `/alias`, trechos de `/byok`) e decidir ordem de
-      migração pelo impacto na live.
+- [x] Próxima lacuna em andamento: auditar comandos com ANSI cru ainda fora do tema central (`/gh`,
+      `/skills`, `/memory`, `/plan`, `/alias`, trechos de `/byok`) e decidir ordem de migração pelo
+      impacto na live.
 
 ### 12.13 Comandos pequenos sem ANSI manual
 
@@ -4548,19 +4550,19 @@
       checkmarks, `Uso:` solto e modos SDK crus como `interactive -> plan`.
 - [x] Decisão UX: comandos pequenos devem seguir o mesmo tema central do restante do terminal,
       usando `terminalThemeRow`, `terminalThemeRows`, `terminalThemeHeadline` e divisores temáticos.
-- [x] Implementação: `/plan` passou a mostrar `Plano SDK`, `Modo SDK interativo`, comandos de uso
-      em blocos e mudanças como `interativo -> plano`, sem constantes cruas.
+- [x] Implementação: `/plan` passou a mostrar `Plano SDK`, `Modo SDK interativo`, comandos de uso em
+      blocos e mudanças como `interativo -> plano`, sem constantes cruas.
 - [x] Implementação: `/skills` passou a mostrar usos e subcomandos desconhecidos em linhas
       temáticas, sem `  Uso:` manual.
 - [x] Implementação: `/memory` passou a renderizar salvar/listar/remover memórias com tema central,
       sem checkmark ANSI nem blocos coloridos manuais.
-- [x] Implementação: `/alias` e `formatAliases` passaram a renderizar aliases sem ANSI manual,
-      com set/remove/uso em tema central e setas ASCII estáveis.
+- [x] Implementação: `/alias` e `formatAliases` passaram a renderizar aliases sem ANSI manual, com
+      set/remove/uso em tema central e setas ASCII estáveis.
 - [x] Testes escopados atualizados passaram:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_plan.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/terminal/test_commands_skills.spec.js tests/unit/copilot/terminal/test_commands_alias.spec.js tests/unit/copilot/terminal/test_alias_store.spec.js`.
   - Resultado: 5 arquivos, 36 testes.
-- [x] Implementação: `/usage now` passou a renderizar contexto, quota/PR, telemetria LLM, vínculo
-      e modo SDK com tema central, sem ANSI manual e sem `interactive` cru.
+- [x] Implementação: `/usage now` passou a renderizar contexto, quota/PR, telemetria LLM, vínculo e
+      modo SDK com tema central, sem ANSI manual e sem `interactive` cru.
 - [x] Teste escopado de `/usage` passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`.
   - Resultado: 1 arquivo, 8 testes.
@@ -4571,37 +4573,38 @@
       roteador, preservando `/memory` como fonte única de renderização.
 - [x] Guarda de regressão adicionada:
   - `tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js` garante que o cluster
-        anunciado de memória permanece roteado.
+    anunciado de memória permanece roteado.
 - [x] Rodada escopada pós-correção passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_plan.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/terminal/test_commands_skills.spec.js tests/unit/copilot/terminal/test_commands_alias.spec.js tests/unit/copilot/terminal/test_alias_store.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_repl_command_router_routes.spec.js`.
   - Resultado: 7 arquivos, 45 testes.
 - [x] Live PTY focado do cluster `/memory` passou em `npm run terminal:llm-b`:
   - Sequência: `/remember ux: terminal bonito`, `/recall ux`, `/forget mem-12345678`, `/quit`.
   - Resultado: `/recall ux` listou memórias com ISO 8601 completo e não exibiu mais
-        `Comando /recall não existe`.
+    `Comando /recall não existe`.
 
 ### 12.14 Próxima faixa: GitHub, fallback de sessão e eventos background sem superfície crua
 
 - [x] Auditoria inicial pós-commit:
   - `git status` limpo exceto `.codex/config.toml` local do operador.
   - Busca de vazamentos localizou `/gh`, fallback de `/session` no roteador e eventos
-        `agent.background.*` como próximos pontos de alto retorno.
+    `agent.background.*` como próximos pontos de alto retorno.
 - [x] Achado `/gh`: o comando já remove ANSI herdado via `normalizeGhTerminalOutput`, mas isso
       transforma mensagens próprias em texto plano solto (`Uso: ...`, `Buscando...`, títulos em
       bloco), sem hierarquia visual nem roles estáveis.
 - [x] Achado `/session`: `_cmdSessionDispatch` ainda tem fallback com ANSI manual e uma linha de uso
       longa demais, exatamente o tipo de ruído que piora a primeira leitura do operador.
 - [x] Achado eventos background: conclusão/falha/ocioso ainda imprimem ANSI literal direto em
-      `agent-runtime-events.js`, apesar de subagente, erro, uso e modelo já usarem `terminalThemeRow`.
+      `agent-runtime-events.js`, apesar de subagente, erro, uso e modelo já usarem
+      `terminalThemeRow`.
 - [x] Decisão UX:
   - Mensagens próprias do terminal devem usar tema central, headline/row/divider e vocabulário
-        humano.
+    humano.
   - Saídas vindas de bridges GitHub podem continuar passando por normalização, mas o envelope do
-        comando deve ser temático.
+    comando deve ser temático.
   - Eventos background devem ter labels curtos (`Tarefa`) e status humano (`concluída`, `falhou`,
-        `ociosa`) sem ANSI manual.
-- [x] Implementar helpers locais de `/gh` para `status`, `uso`, `seção`, `resultado vazio` e
-      `erro`, sem quebrar os formatadores externos.
+    `ociosa`) sem ANSI manual.
+- [x] Implementar helpers locais de `/gh` para `status`, `uso`, `seção`, `resultado vazio` e `erro`,
+      sem quebrar os formatadores externos.
 - [x] Migrar fallback de `/session` para `terminalThemeRows`.
 - [x] Migrar prints background para `terminalThemeRow`.
 - [x] Adicionar testes contra ANSI em `/gh`, fallback de `/session` e prints background quando
@@ -4612,9 +4615,9 @@
 - [x] Live PTY curta passou em `npm run terminal:llm-b`:
   - Sequência: `/gh`, `/gh issue create`, `/session xpto`, `/quit`.
   - Resultado: `/gh` exibiu painel compacto temático; `/gh issue create` exibiu uso sem `Uso:`;
-        `/session xpto` quebrou o uso em linhas alinhadas sem ANSI cru.
-- [ ] Próxima lacuna: auditar `/help`, `/tools` default e `/byok` default, porque são superfícies
-      de alta exposição e ainda podem carregar densidade técnica em excesso.
+    `/session xpto` quebrou o uso em linhas alinhadas sem ANSI cru.
+- [ ] Próxima lacuna: auditar `/help`, `/tools` default e `/byok` default, porque são superfícies de
+      alta exposição e ainda podem carregar densidade técnica em excesso.
 
 ### 12.15 Cockpit BYOK default sem rodapé monstruoso
 
@@ -4646,10 +4649,10 @@
 
 - [x] Auditoria pós-push: `main` sincronizado e worktree limpo exceto `.codex/config.toml` local.
 - [x] Achado: `/byok env`, `/byok persist`, `/byok reload`, `/byok providers` e `/byok profiles`
-      ainda usavam blocos ANSI manuais e vocabulário herdado, apesar de serem telas de
-      configuração frequentes.
-- [x] Decisão UX: esses subcomandos são navegação operacional, não prova runtime. Devem ser
-      migrados antes de `models/recommend/probe`, que exigem uma faixa maior por risco e volume.
+      ainda usavam blocos ANSI manuais e vocabulário herdado, apesar de serem telas de configuração
+      frequentes.
+- [x] Decisão UX: esses subcomandos são navegação operacional, não prova runtime. Devem ser migrados
+      antes de `models/recommend/probe`, que exigem uma faixa maior por risco e volume.
 - [x] Implementação: `/byok env` virou painel temático com arquivo, chaves, perfis e uso.
 - [x] Implementação: `/byok persist` e `/byok reload` passaram a renderizar sucesso/erro com
       `terminalThemeRow`, sem ANSI manual.
@@ -4660,35 +4663,35 @@
 - [x] Live PTY curto passou:
   - Sequência: `/byok providers`, `/byok profiles`, `/byok env`, `/quit`.
   - Achados do live: resumo de presets ainda longo, coluna curta para `cloudflare-workers-ai` e
-        custo `true` bruto em perfis.
+    custo `true` bruto em perfis.
 - [x] Correções pós-live:
   - Resumo de presets agora mostra preview limitado e contagem omitida.
   - Colunas de perfis/configuração/comandos foram alargadas.
   - `custo perfil gratuito(true)` virou apenas `custo perfil gratuito`.
-- [x] Correção de health associada: idade passou de `atras` para `atrás` e `provider.timeout`
-      passou a `timeout do provedor` no texto humano.
+- [x] Correção de health associada: idade passou de `atras` para `atrás` e `provider.timeout` passou
+      a `timeout do provedor` no texto humano.
 - [x] Testes escopados atualizados em `test_commands_byok.spec.js` para `profiles` e `providers`.
 - [x] Validação escopada final passou:
   - `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js --testNamePattern "mostra .env.local|lista perfis|lista providers|reload|persiste perfil|persiste volta"`.
   - `npm run typecheck:strict:src.copilot`.
-- [x] Live PTY repetido de `/byok providers` e `/byok profiles` confirmou alinhamento melhorado
-      para `cloudflare-workers-ai`, resumo de presets compacto e custo booleano removido.
-- [ ] Próxima faixa BYOK: `models`, `recommend`, `probe` e `probe shortlist`, separando modo
-      humano default de detalhe/raw diagnóstico.
+- [x] Live PTY repetido de `/byok providers` e `/byok profiles` confirmou alinhamento melhorado para
+      `cloudflare-workers-ai`, resumo de presets compacto e custo booleano removido.
+- [ ] Próxima faixa BYOK: `models`, `recommend`, `probe` e `probe shortlist`, separando modo humano
+      default de detalhe/raw diagnóstico.
 
 ### 12.17 BYOK models/recommend/probe: envelope humano sem alterar execução
 
 - [x] Auditoria: `models`, `recommend`, `probe` e `probe shortlist` ainda misturavam cabeçalhos
       ANSI, escopo longo, avisos soltos e rodapés explicativos crus com listas de modelos/probes.
 - [x] Decisão técnica: nesta faixa, migrar apenas o envelope humano seguro: cabeçalho, fonte,
-      filtros, contexto, avisos, vazio, guia e rodapé. As linhas de modelo/probe permanecem para
-      uma próxima faixa porque envolvem ranking, orçamento, health e resultado runtime.
+      filtros, contexto, avisos, vazio, guia e rodapé. As linhas de modelo/probe permanecem para uma
+      próxima faixa porque envolvem ranking, orçamento, health e resultado runtime.
 - [x] Implementação: `probe shortlist` passou a usar `BYOK shortlist agent probe`, `Escopo`,
       `Aviso`, `Shortlist`, `Próximo` e `Sessão viva` em linhas temáticas.
-- [x] Implementação: `probe chat/agent/streaming/json/vision` passou a renderizar cabeçalho,
-      escopo e guia final com tema central.
-- [x] Implementação: `models` passou a renderizar cabeçalho, fonte, ordenação, avisos e estado
-      vazio com tema central.
+- [x] Implementação: `probe chat/agent/streaming/json/vision` passou a renderizar cabeçalho, escopo
+      e guia final com tema central.
+- [x] Implementação: `models` passou a renderizar cabeçalho, fonte, ordenação, avisos e estado vazio
+      com tema central.
 - [x] Implementação: `recommend` passou a renderizar cabeçalho, fonte, filtros, contexto, avisos,
       estado vazio, guia de probe agent e troca viva com tema central.
 - [x] Validação escopada passou:
@@ -4698,10 +4701,10 @@
   - Sequência: `/byok models 2`, `/byok recommend 2`, `/quit`.
   - Resultado: envelopes `BYOK models` e `BYOK recommend` ficaram temáticos e legíveis.
   - Achado remanescente: linhas individuais de modelos ainda imprimem ANSI manual, IDs/tags muito
-        densos e orçamento colorido diretamente.
+    densos e orçamento colorido diretamente.
 - [x] Próxima etapa executada: linhas de modelo/recomendação/probe individual passaram para tema
-      central, removendo ANSI manual
-      das linhas com `model.id`, tags, orçamento, cor de budget e resultado de probe.
+      central, removendo ANSI manual das linhas com `model.id`, tags, orçamento, cor de budget e
+      resultado de probe.
 - [x] Implementação: `renderByokModelCatalogRow` e `renderByokRecommendationRow` concentram as
       linhas de catálogo/recomendação com `Modelo`, `Detalhes`, `Orçamento` e `Ação`.
 - [x] Implementação: `renderByokProbeResult` passou a renderizar `Resultado`, `Sinal`, `Agente`,
@@ -4711,21 +4714,20 @@
   - `npm run typecheck:strict:src.copilot`.
 - [x] Live PTY repetido passou:
   - Sequência: `/byok models 2`, `/byok recommend 2`, `/quit`.
-  - Resultado: linhas individuais apareceram como `Modelo`, `Detalhes`, `Orçamento` e `Ação`,
-        sem ANSI manual visível.
+  - Resultado: linhas individuais apareceram como `Modelo`, `Detalhes`, `Orçamento` e `Ação`, sem
+    ANSI manual visível.
 
 ### 12.18 `/health full` sem IDs de sessão em superfície humana
 
-- [x] Auditoria pós-live: `/health full` e `/diagnose full` ainda mostravam IDs compactos de
-      sessão runtime, sessão SDK, sessão hub e storage do hub, apesar de a tela ser operacional e
-      humana.
+- [x] Auditoria pós-live: `/health full` e `/diagnose full` ainda mostravam IDs compactos de sessão
+      runtime, sessão SDK, sessão hub e storage do hub, apesar de a tela ser operacional e humana.
 - [x] Decisão UX: superfícies humanas (`/health`, `/health full`, `/diagnose full`, `/status`,
       `/now`) devem comunicar presença, saúde e ação recomendada; identificadores completos ou
       compactos ficam reservados para `detail`, `debug`, `raw` e comandos explicitamente técnicos.
-- [x] Implementação: `cmdDiagnose` passou a renderizar `Sessão runtime ativa`, `Sessão SDK ativa`
-      e `Sessão hub ativo` em modo `full`, preservando IDs completos apenas em `detail/debug`.
-- [x] Implementação: `Hub storage` passou a trocar `sessão <id>…` por `sessão ativa` em modo
-      humano, mantendo o resumo bruto no modo detalhado.
+- [x] Implementação: `cmdDiagnose` passou a renderizar `Sessão runtime ativa`, `Sessão SDK ativa` e
+      `Sessão hub ativo` em modo `full`, preservando IDs completos apenas em `detail/debug`.
+- [x] Implementação: `Hub storage` passou a trocar `sessão <id>…` por `sessão ativa` em modo humano,
+      mantendo o resumo bruto no modo detalhado.
 - [x] Harness live reforçado: `diagnostic-ux-health-full-themed` agora reprova se `/health full`
       voltar a exibir UUIDs, IDs compactos de sessão ou o storage do hub com identificador.
 - [x] Validação escopada passou:
@@ -4756,7 +4758,7 @@
 - [x] Live PTY diagnóstica repetida passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-human-infra-20260603-2136`.
   - Resultado: PASS em 29/29 critérios; `/health full` ficou com infraestrutura humana e sem
-        IDs/constantes cruas na superfície principal.
+    IDs/constantes cruas na superfície principal.
 - [x] Próxima lacuna tratada parcialmente: boot/banner inicial e `/live full` deixaram de expor
       `Fluxo local-fs-primary`, `Runtime default` e `Timeline persistent only` na superfície humana.
 - [ ] Próxima lacuna: revisar `/session`, `/status full`, `/sdk status` e painéis de sessão porque
@@ -4764,11 +4766,11 @@
 
 ### 12.19 Auto-brief pronto sem modo interno de rota
 
-- [x] Auditoria pós-live: o painel inicial da sessão pronta ainda mostrava
-      `Fluxo local-fs-primary`, logo no first viewport, antes de qualquer comando do operador.
-- [x] Decisão UX: o auto-brief deve continuar derivado do contrato canônico
-      `guidance.mode`, mas a tela humana deve traduzir esse modo para linguagem operacional:
-      `arquivos locais primeiro`, `workspace SDK apenas` ou `degradado`.
+- [x] Auditoria pós-live: o painel inicial da sessão pronta ainda mostrava `Fluxo local-fs-primary`,
+      logo no first viewport, antes de qualquer comando do operador.
+- [x] Decisão UX: o auto-brief deve continuar derivado do contrato canônico `guidance.mode`, mas a
+      tela humana deve traduzir esse modo para linguagem operacional: `arquivos locais primeiro`,
+      `workspace SDK apenas` ou `degradado`.
 - [x] Implementação: `auto-brief.js` ganhou helper de renderização para o modo de rota, usado no
       brief pronto e também no brief detalhado explícito.
 - [x] Harness live reforçado: `diagnostic-ux-ready` agora reprova se a primeira tela voltar a
@@ -4781,16 +4783,16 @@
 - [x] Live PTY diagnóstica passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-boot-routing-human-20260603-2140`.
   - Resultado: PASS em 29/29 critérios; first viewport exibiu
-        `Fluxo     arquivos locais primeiro · próximo /fs list → /activity 5`.
+    `Fluxo     arquivos locais primeiro · próximo /fs list → /activity 5`.
 - [x] Próxima lacuna executada: `/live full` foi transformado para rótulos humanos mantendo detalhe
       técnico em comandos explicitamente detalhados quando necessário.
 
 ### 12.20 `/live full` sem rótulos internos de runtime e timeline
 
-- [x] Auditoria pós-live: `/live full` já tinha ficado muito mais útil, mas a própria tela
-      detalhada ainda expunha constantes internas (`Runtime default`, `Timeline persistent only`,
-      `Cache/escopo` e `não pausada`) que quebravam a gramática humana criada para `/health full`
-      e para o auto-brief.
+- [x] Auditoria pós-live: `/live full` já tinha ficado muito mais útil, mas a própria tela detalhada
+      ainda expunha constantes internas (`Runtime default`, `Timeline persistent only`,
+      `Cache/escopo` e `não pausada`) que quebravam a gramática humana criada para `/health full` e
+      para o auto-brief.
 - [x] Decisão UX: `full` significa diagnóstico humano completo, não despejo cru. O operador deve
       entender o estado operacional sem conhecer nomes internos de storage, runtime ou cache.
 - [x] Decisão técnica: os nomes brutos continuam válidos como contrato interno e podem aparecer em
@@ -4802,11 +4804,11 @@
       removendo a mistura ingles/contrato interno no painel humano.
 - [x] Implementação: a linha `Cache/escopo` virou `Contexto`, reunindo L1, L2, taxa de acerto,
       índice, escopos ativos e parser com rótulos consistentes (`ativo`, `inativo`, `arquivo(s)`).
-- [x] Harness live reforçado: `diagnostic-ux-live-full-human` agora reprova se `/live full` voltar
-      a exibir `Runtime default`, `persistent only`, `Cache/escopo` ou `não pausada`.
+- [x] Harness live reforçado: `diagnostic-ux-live-full-human` agora reprova se `/live full` voltar a
+      exibir `Runtime default`, `persistent only`, `Cache/escopo` ou `não pausada`.
 - [x] Teste unitário reforçado:
   - `cmdLive full preserva fluxo operacional live consolidado` agora exige `Runtime principal` e
-        `Contexto`, além de bloquear os rótulos crus removidos.
+    `Contexto`, além de bloquear os rótulos crus removidos.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/session.js`.
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
@@ -4815,7 +4817,7 @@
 - [x] Live PTY diagnóstica passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-live-full-human-20260603-2145`.
   - Resultado: PASS em 29/29 critérios; `/live full` mostrou `Runtime principal`,
-        `Timeline hub · histórico persistido`, `Contexto L1 ativo ...`, sem os rótulos crus.
+    `Timeline hub · histórico persistido`, `Contexto L1 ativo ...`, sem os rótulos crus.
 - [ ] Próxima lacuna: `/session sdk`, `/status full` e `/sdk status` ainda precisam de auditoria
       visual semelhante, especialmente títulos como `default`, rotas `local-fs-primary`, campos
       `offset=` e nomes internos de binding BYOK.
@@ -4827,11 +4829,11 @@
 - [x] Auditoria live: `/sdk status` ainda abria com `SDK do Terminal · default`, mostrava
       `escopo copilot_sdk_entitlement` e expunha `premium_interactions` como nome de quota.
 - [x] Auditoria de código: `/status full` ainda renderizava `Runtime alvo default`,
-      `Mapa runtime *default:model/status`, `Rota SDK/FS local-fs-primary · ready`,
-      `L2 off` e `índice ativo:<n>` em uma superfície humana.
-- [x] Decisão UX: `default`, `local-fs-primary`, `copilot_sdk_entitlement`,
-      `premium_interactions`, separadores técnicos e flags compactas continuam válidos como
-      contrato interno, mas devem ser traduzidos nas telas de operador.
+      `Mapa runtime *default:model/status`, `Rota SDK/FS local-fs-primary · ready`, `L2 off` e
+      `índice ativo:<n>` em uma superfície humana.
+- [x] Decisão UX: `default`, `local-fs-primary`, `copilot_sdk_entitlement`, `premium_interactions`,
+      separadores técnicos e flags compactas continuam válidos como contrato interno, mas devem ser
+      traduzidos nas telas de operador.
 - [x] Implementação: `runtime-target.js` ganhou `renderRuntimeTargetLabel`, tornando `default` →
       `principal` uma regra central para comandos do terminal.
 - [x] Implementação: `/status full` passou a humanizar runtime alvo, mapa runtime, rota SDK/FS e
@@ -4840,16 +4842,15 @@
   - `local-fs-primary · ready` → `arquivos locais primeiro · FS local canônico disponível...`;
   - `off` → `inativo`;
   - `índice ativo:<n>` → `índice <n> arquivo(s)`.
-- [x] Implementação: `/session sdk` trocou o rótulo `Vínculo BYOK` por `Vínculo SDK`, removendo
-      a duplicação visual quando o valor começa com `BYOK`.
+- [x] Implementação: `/session sdk` trocou o rótulo `Vínculo BYOK` por `Vínculo SDK`, removendo a
+      duplicação visual quando o valor começa com `BYOK`.
 - [x] Implementação: `/sdk status` agora usa `principal` no título e traduz escopo/quotas:
   - `copilot_sdk_entitlement` → `entitlement do SDK`;
   - `premium_interactions` → `Premium Requests`.
 - [x] Harness live reforçado:
-  - `diagnostic-ux-session-sdk-inventory-human` exige `Vínculo SDK` e bloqueia
-        `Vínculo BYOK BYOK`;
+  - `diagnostic-ux-session-sdk-inventory-human` exige `Vínculo SDK` e bloqueia `Vínculo BYOK BYOK`;
   - `diagnostic-ux-sdk-status-human` exige `SDK do Terminal · principal` e bloqueia `default`,
-        `copilot_sdk_entitlement` e `premium_interactions`.
+    `copilot_sdk_entitlement` e `premium_interactions`.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/session.js`.
   - `node --check src/copilot/terminal/commands/sdk.js`.
@@ -4860,10 +4861,10 @@
 - [x] Live PTY diagnóstica passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-sdk-quota-labels-20260603-2230`.
   - Resultado observado: `/session sdk 6` exibiu `Vínculo SDK`; `/sdk status` exibiu
-        `SDK do Terminal · principal` e `Premium Requests · ... · escopo entitlement do SDK`.
-- [ ] Próxima lacuna: `/health full` ainda mostra `Lifecycle mx boot sdk-preflight`, e os
-      previews Markdown via `glow` ainda podem emitir sequências ANSI estranhas em PTY
-      (`ESC[;;1m`). Investigar sanitização/fallback antes de expandir mais o uso de libs.
+    `SDK do Terminal · principal` e `Premium Requests · ... · escopo entitlement do SDK`.
+- [ ] Próxima lacuna: `/health full` ainda mostra `Lifecycle mx boot sdk-preflight`, e os previews
+      Markdown via `glow` ainda podem emitir sequências ANSI estranhas em PTY (`ESC[;;1m`).
+      Investigar sanitização/fallback antes de expandir mais o uso de libs.
 
 ### 12.22 Health lifecycle e preview Markdown sem ANSI malformado
 
@@ -4887,7 +4888,7 @@
 - [x] Harness live reforçado:
   - `/health full` reprova se `Lifecycle mx` ou `sdk-preflight` voltarem;
   - ciclo diagnóstico reprova se o raw do PTY voltar a conter `ESC[;;`, preservando ANSI normal do
-        tema.
+    tema.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/diagnose.js`.
   - `node --check src/copilot/terminal/capabilities/markdown-preview.js`.
@@ -4898,39 +4899,37 @@
 - [x] Live PTY diagnóstica passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-health-glow-clean-20260603-2236`.
   - Resultado observado: Markdown preview via `glow` ficou limpo; `/health full` exibiu
-        `Ciclo vida   boot preflight SDK · média ...`.
+    `Ciclo vida   boot preflight SDK · média ...`.
 - [ ] Próxima lacuna: revisar previews com `bat`/`delta` para decidir se ANSI externo deve ser
-      preservado, reduzido ou sanitizado por modo; hoje `bat` ainda colore a linha de preview,
-      o que é aceitável em TTY, mas deve ter política clara por superfície.
+      preservado, reduzido ou sanitizado por modo; hoje `bat` ainda colore a linha de preview, o que
+      é aceitável em TTY, mas deve ter política clara por superfície.
 
 ### 12.23 Live canônico de `ask_user`, métricas humanas e pós-pergunta
 
 - [x] Live PTY canônico executado com fluxo real de operador:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-ask-user-canonical-audit-20260603-2241`.
-  - O cenário executou prompt real, `report_intent`, `read_file_content`, deltas públicos,
-        pergunta `ask_user`, resposta humana `SIM`, final pós-pergunta, `/usage now`,
-        `/activity`, `/tools diag`, `/events`, `/events --raw`, `/errors`, `/health full` e
-        `/export`.
+  - O cenário executou prompt real, `report_intent`, `read_file_content`, deltas públicos, pergunta
+    `ask_user`, resposta humana `SIM`, final pós-pergunta, `/usage now`, `/activity`, `/tools diag`,
+    `/events`, `/events --raw`, `/errors`, `/health full` e `/export`.
 - [x] Resultado funcional observado:
   - deltas públicos e final pós-pergunta materializados sem duplicação visual;
   - `ask_user` apareceu como `Pergunta ao operador`, com prompt `[PERG]`, linha viva dedicada e
-        resposta humana aceita;
-  - não houve spam antigo de `request_user_input ainda executando`, `LLM-B ainda trabalhando`,
-        IDs `chatcmpl-tool-*` ou timeout por falta de resposta;
+    resposta humana aceita;
+  - não houve spam antigo de `request_user_input ainda executando`, `LLM-B ainda trabalhando`, IDs
+    `chatcmpl-tool-*` ou timeout por falta de resposta;
   - `/errors 10` mostrou zero erros;
   - export Markdown e SSE mantiveram envelopes técnicos para auditoria.
-- [x] Falha identificada no harness, não no fluxo real: `ux-health-human-tool-stats` ainda
-      procurava a seção legada `TOOL STATS`, embora `/health full` já use
-      `Ferramentas por latência`.
+- [x] Falha identificada no harness, não no fluxo real: `ux-health-human-tool-stats` ainda procurava
+      a seção legada `TOOL STATS`, embora `/health full` já use `Ferramentas por latência`.
 - [x] Implementação: o extrator do runner live agora reconhece tanto o nome legado quanto
       `Ferramentas por latência`, mantendo o bloqueio contra `read_file_content` e
       `report_intent_local` na superfície default.
 - [x] Auditoria visual adicional do live:
   - a linha `Uso do modelo` ainda repetia `modelo kilo-auto/free`;
   - a atividade pós-pergunta ainda podia mostrar o tipo cru `question` em
-        `Mensagem da LLM-B recebida`.
-- [x] Implementação: a linha impressa de uso remove o prefixo redundante quando o próprio label
-      já é `Uso do modelo`, preservando `modelo ...` em timelines e telemetria onde a frase é
+    `Mensagem da LLM-B recebida`.
+- [x] Implementação: a linha impressa de uso remove o prefixo redundante quando o próprio label já é
+      `Uso do modelo`, preservando `modelo ...` em timelines e telemetria onde a frase é
       independente.
 - [x] Implementação: `assistant.message` fora de turno ativo ganhou rótulos humanos de protocolo:
   - `question` → `Resposta pós-pergunta`;
@@ -4942,9 +4941,9 @@
   - o teste de `assistant.message` espera `Resposta` no lugar de `reply` na superfície humana.
 - [ ] Próxima validação obrigatória: repetir o live canônico após estes ajustes e exigir PASS em
       `ux-health-human-tool-stats`.
-- [ ] Próxima lacuna UX: revisar a seção `/events` default para reduzir repetições de
-      `Sessão SDK` quando há muitos `session.updated`, talvez por agregação temporal; raw/json
-      continuam preservando todos os eventos.
+- [ ] Próxima lacuna UX: revisar a seção `/events` default para reduzir repetições de `Sessão SDK`
+      quando há muitos `session.updated`, talvez por agregação temporal; raw/json continuam
+      preservando todos os eventos.
 - [ ] Próxima lacuna UX: investigar se `SDK info configuration` e a linha inicial de tools
       desabilitadas devem virar bloco compacto único em boot, especialmente em tela pequena.
 
@@ -4953,15 +4952,15 @@
 - [x] Repetição do live canônico após o ajuste de `ux-health-human-tool-stats`:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-ask-user-canonical-health-stats-fix-20260603-2246`.
 - [x] Resultado observado: o terminal iniciou corretamente, executou `report_intent` e
-      `read_file_content`, mas a LLM-B invocou `exec_command` fora da allowlist do cenário
-      canônico e depois terminou sem saída pública, sem `ask_user`.
+      `read_file_content`, mas a LLM-B invocou `exec_command` fora da allowlist do cenário canônico
+      e depois terminou sem saída pública, sem `ask_user`.
 - [x] Diagnóstico: o cenário tinha allowlist textual (`report_intent`, `read_file_content`,
       `ask_user`), mas a sessão real ainda expunha `exec_command` ao modelo. A allowlist global
-      existente em `sdk/tools/state` governa hooks/policy, mas não é uma remoção dinâmica
-      isolada de visibilidade por cenário live.
-- [x] Decisão técnica imediata: o runner live deve preservar a causa raiz. `assistant-empty-turn`
-      é sintoma final; quando há `tool.lifecycle` de uma tool não permitida pelo cenário, o
-      blocker correto passa a ser `unexpected-scenario-tool`.
+      existente em `sdk/tools/state` governa hooks/policy, mas não é uma remoção dinâmica isolada de
+      visibilidade por cenário live.
+- [x] Decisão técnica imediata: o runner live deve preservar a causa raiz. `assistant-empty-turn` é
+      sintoma final; quando há `tool.lifecycle` de uma tool não permitida pelo cenário, o blocker
+      correto passa a ser `unexpected-scenario-tool`.
 - [x] Implementação: `detectLiveBlocker` ganhou `findUnexpectedScenarioTool`, usando SSE
       `tool.lifecycle`, aliases já normalizados por `isLifecycleTool`, e ignorando I/O interno
       (`io.*`). O summary futuro deve mostrar `tool=<nome>`, `allowed=<lista>` e `sse=#<id>`.
@@ -4969,20 +4968,20 @@
   - aplicar allowlist temporária de sessão sem tocar no `tools-config.json` canônico do operador;
   - aplicar hook bloqueante que interrompa claramente tool fora de cenário;
   - ou manter todas as tools visíveis e tratar desvio como dado de confiabilidade do modelo.
-- [ ] Próxima lacuna UX: quando uma tool fora de cenário é detectada em live/harness, a tela
-      humana deveria explicar em português: `Cenário live interrompido: tool fora do contrato`,
-      com lista curta de permitidas e comando de retentativa.
+- [ ] Próxima lacuna UX: quando uma tool fora de cenário é detectada em live/harness, a tela humana
+      deveria explicar em português: `Cenário live interrompido: tool fora do contrato`, com lista
+      curta de permitidas e comando de retentativa.
 
 ### 12.25 Boot verbose compacto para configuração, skills, tools e título
 
-- [x] Auditoria live: o boot em `TERMINAL_DISPLAY_PRESET=full` ainda podia exibir linhas
-      visualmente ruidosas:
+- [x] Auditoria live: o boot em `TERMINAL_DISPLAY_PRESET=full` ainda podia exibir linhas visualmente
+      ruidosas:
   - `SDK info configuration · Disabled tools: ...`;
   - `Skills SDK · Skills SDK: ...`;
   - `Ferramentas SDK · Ferramentas dinâmicas do SDK atualizadas: ...`;
   - `Título da sessão: <prompt completo enorme>`.
-- [x] Decisão UX: preset `full` pode mostrar eventos de sessão, mas não deve despejar strings
-      cruas do SDK na primeira tela. A cópia default deve ser compacta, alinhada e em português;
+- [x] Decisão UX: preset `full` pode mostrar eventos de sessão, mas não deve despejar strings cruas
+      do SDK na primeira tela. A cópia default deve ser compacta, alinhada e em português;
       SSE/export/raw continuam sendo a trilha técnica completa.
 - [x] Implementação:
   - `session.info configuration` agora imprime `Config SDK · tools nativas desativadas · ...`;
@@ -4992,7 +4991,7 @@
 - [x] Testes unitários:
   - `test_terminal_sdk_session_events.spec.js` cobre os novos textos de skills/tools;
   - o teste `compacta config e título de sessão na narrativa verbose` bloqueia retorno de
-        `SDK info`, `Disabled tools:` e `Título da sessão:`.
+    `SDK info`, `Disabled tools:` e `Título da sessão:`.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/events/sdk-session-events.js`.
   - `npx eslint src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js`.
@@ -5001,26 +5000,25 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=250000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-boot-compact-session-events-20260603-2253`.
   - Resultado: PASS em 29/29 critérios.
   - Busca no log plain confirmou ausência de `SDK info`, `Disabled tools:`, `Título da sessão:`,
-        `Skills SDK:` e `Ferramentas dinâmicas do SDK atualizadas`.
-- [ ] Próxima lacuna: `/events` default ainda mostra repetições de `Atividade`/`Ferramenta`
-      quando o ciclo tem muitos I/O locais próximos. Avaliar agregação por janela sem afetar
-      `/events --raw`.
+    `Skills SDK:` e `Ferramentas dinâmicas do SDK atualizadas`.
+- [ ] Próxima lacuna: `/events` default ainda mostra repetições de `Atividade`/`Ferramenta` quando o
+      ciclo tem muitos I/O locais próximos. Avaliar agregação por janela sem afetar `/events --raw`.
 
 ### 12.26 `/events` default com agregação visual leve
 
-- [x] Auditoria live: em ciclos de diagnóstico com muitos I/O locais, `/events 12` mostrava
-      várias linhas repetidas como `Ferramenta · I/O local · ferramenta Leitura local` e
+- [x] Auditoria live: em ciclos de diagnóstico com muitos I/O locais, `/events 12` mostrava várias
+      linhas repetidas como `Ferramenta · I/O local · ferramenta Leitura local` e
       `Atividade · I/O local · ferramenta Leitura local`, criando ruído sem agregar contexto.
 - [x] Decisão UX: `/events` default é uma superfície humana de triagem; pode agrupar eventos
-      idênticos por rótulo, origem e resumo. Já `/events --raw`, `/events --json` e consultas
-      com `trace`, `turn`, `tool`, `request` ou `hub` continuam linha a linha.
+      idênticos por rótulo, origem e resumo. Já `/events --raw`, `/events --json` e consultas com
+      `trace`, `turn`, `tool`, `request` ou `hub` continuam linha a linha.
 - [x] Implementação: `cmdEvents` cria linhas renderizadas intermediárias e, quando não há filtro
       diagnóstico, agrega linhas equivalentes exibindo `×N` no detalhe temporal.
 - [x] Implementação: a agregação usa chave de rótulo humano + origem humana + resumo + hint de
       transcript/export, preservando eventos semanticamente distintos.
 - [x] Testes unitários:
-  - `agrega eventos default repetidos sem alterar consultas diagnosticas` cobre três eventos
-        iguais de I/O local renderizados como uma única linha `×3`.
+  - `agrega eventos default repetidos sem alterar consultas diagnosticas` cobre três eventos iguais
+    de I/O local renderizados como uma única linha `×3`.
 - [x] Validação passou:
   - `node --check src/copilot/terminal/commands/events.js`.
   - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
@@ -5032,42 +5030,42 @@
 ### 12.27 Prompt vivo de espera sem bracket técnico de modelo
 
 - [x] Auditoria visual: screenshots e PTY mostravam o prompt vivo com formato
-      `LLM-B pensando [kilo-auto/free/high]`, que é curto, mas parece metadado cru colado no
-      input humano e compete com o espaço de digitação.
-- [x] Decisão UX: o prompt vivo de espera é uma superfície humana, não um envelope técnico. O
-      modelo e o esforço continuam visíveis, mas como sufixo textual: `modelo ... · raciocínio
-      ...`. Tags operacionais como `[PERGUNTA]` continuam existindo porque indicam estado de
-      interação e não apenas diagnóstico interno.
+      `LLM-B pensando [kilo-auto/free/high]`, que é curto, mas parece metadado cru colado no input
+      humano e compete com o espaço de digitação.
+- [x] Decisão UX: o prompt vivo de espera é uma superfície humana, não um envelope técnico. O modelo
+      e o esforço continuam visíveis, mas como sufixo textual: `modelo ... · raciocínio     ...`.
+      Tags operacionais como `[PERGUNTA]` continuam existindo porque indicam estado de interação e
+      não apenas diagnóstico interno.
 - [x] Implementação: `buildWaitingPrompt` substitui `[modelo/effort]` por
       `· modelo <id> · raciocínio <effort>`, com truncamento explícito para preservar largura.
-- [x] Implementação: a fase interna do activity no prompt de espera passou por rótulo humano:
-      `turn` → `turno`, `streaming` → `respondendo`, `question` → `aguardando operador`,
-      `tool` → `ferramenta` etc.
+- [x] Implementação: a fase interna do activity no prompt de espera passou por rótulo humano: `turn`
+      → `turno`, `streaming` → `respondendo`, `question` → `aguardando operador`, `tool` →
+      `ferramenta` etc.
 - [x] Testes unitários: `test_build_user_prompt.spec.js` bloqueia regressão para
       `[gpt-5-mini/high]`, exige `modelo gpt-5-mini`, `raciocínio high` e `turno`.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/dialog/output.js`.
   - `npx eslint src/copilot/terminal/dialog/output.js tests/unit/copilot/terminal/test_build_user_prompt.spec.js`.
   - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js`.
-- [ ] Próxima lacuna: reabrir PTY live em cenário canônico para confirmar que o prompt vivo
-      mantém largura confortável durante `ask_user`, tools e deltas longos.
+- [ ] Próxima lacuna: reabrir PTY live em cenário canônico para confirmar que o prompt vivo mantém
+      largura confortável durante `ask_user`, tools e deltas longos.
 
 ### 12.28 Perguntas pendentes com rótulos humanos, não enums do SDK
 
 - [x] Auditoria: o terminal ainda podia mostrar `question`, `confirm` ou `shadow <kind>` em
       superfícies humanas como prompt detalhado, `/now`, `/status`, `/diagnose` e menu. Esses
       valores são úteis para contrato interno, mas ruins para operador.
-- [x] Decisão UX: o tipo técnico permanece em SSE/raw/export quando necessário, mas a UX default
-      usa vocabulário estável:
+- [x] Decisão UX: o tipo técnico permanece em SSE/raw/export quando necessário, mas a UX default usa
+      vocabulário estável:
   - `question` → `operador`;
   - `confirm` → `confirmação`;
   - `choice/select` → `escolha`;
   - `ready` → `pronto`;
   - ausente → `geral` ou `sem tipo`, dependendo da frase.
-- [x] Implementação: criado `terminal/state/pending-question-labels.js`, exportado pelos barrels
-      de `state`, `dialog`, `repl`, `ui` e `projections`.
-- [x] Implementação: `buildUserPrompt` e `buildWaitingPrompt` renderizam
-      `[PERGUNTA:OPERADOR]` ou `[PERGUNTA]`, nunca `[PERGUNTA:QUESTION]`.
+- [x] Implementação: criado `terminal/state/pending-question-labels.js`, exportado pelos barrels de
+      `state`, `dialog`, `repl`, `ui` e `projections`.
+- [x] Implementação: `buildUserPrompt` e `buildWaitingPrompt` renderizam `[PERGUNTA:OPERADOR]` ou
+      `[PERGUNTA]`, nunca `[PERGUNTA:QUESTION]`.
 - [x] Implementação: `/status`, `/now`, `/diagnose`, projeção de canal e menu contextual usam o
       helper canônico.
 - [x] Testes unitários:
@@ -5079,19 +5077,19 @@
   - `npx eslint` nos módulos e testes alterados;
   - `npx vitest run tests/unit/copilot/terminal/test_build_user_prompt.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`;
   - `npm run typecheck:strict:src.copilot`.
-- [ ] Próxima lacuna: revisar `/activity detail` e `/metrics` para mapear fases/tipos técnicos
-      em modo default, preservando o valor cru apenas no modo diagnóstico.
+- [ ] Próxima lacuna: revisar `/activity detail` e `/metrics` para mapear fases/tipos técnicos em
+      modo default, preservando o valor cru apenas no modo diagnóstico.
 
 ### 12.29 Live canônico pós-humanização e correção do detector pós-pergunta
 
 - [x] Live PTY canônico executado após humanização do prompt e dos tipos de pergunta:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-humanized-question-prompt-20260603-221211`.
-- [x] Resultado funcional: fluxo real passou pelo usuário, tools reais, deltas públicos,
-      `ask_user`, resposta `SIM`, mensagem pós-pergunta, `/usage`, `/activity`, `/tools diag`,
-      `/events`, `/health full` e `/export`.
-- [x] Falha do harness identificada: `post-ask-final-visible` falhou embora
-      `terminal.plain.log`, SSE e export contivessem `POST-ASK-CANONICAL-FINAL`. O regex antigo
-      de bloco reconhecia `Mensagem sdk/assistant.message`, mas não a narrativa atual
+- [x] Resultado funcional: fluxo real passou pelo usuário, tools reais, deltas públicos, `ask_user`,
+      resposta `SIM`, mensagem pós-pergunta, `/usage`, `/activity`, `/tools diag`, `/events`,
+      `/health full` e `/export`.
+- [x] Falha do harness identificada: `post-ask-final-visible` falhou embora `terminal.plain.log`,
+      SSE e export contivessem `POST-ASK-CANONICAL-FINAL`. O regex antigo de bloco reconhecia
+      `Mensagem sdk/assistant.message`, mas não a narrativa atual
       `Resposta pós-pergunta sdk/assistant.message`.
 - [x] Implementação: o runner live agora reconhece `Resposta pós-pergunta sdk/assistant.message`
       como bloco visível de assistant.message para o critério `post-ask-final-visible`.
@@ -5101,28 +5099,28 @@
   - simulação local sobre `terminal.plain.log` existente retornou `recognized`.
 - [x] Rerun PTY canônico passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-humanized-question-prompt-rerun-20260603-221518`.
-  - Resultado: `Status: PASS`; `post-ask-final-visible: assistant.message=yes`;
-        zero erros no tracker; export criado; SSE monotônico.
-- [x] Observação visual remanescente: a captura plain do PTY ainda pode mostrar prompt e linha
-      viva de pergunta intercalados (`você...[PERG]›` seguido de `LLM-B Pergunta ...`). O
-      detector `no-prompt-double-render` passa, mas a experiência humana ainda precisa de uma
-      política mais elegante para pergunta viva em TTY estreito.
-- [ ] Próxima lacuna: revisar a linha viva quando há `ask_user` pendente para garantir que ela
-      nunca dispute a linha de input; alternativas: compactar para uma única linha ainda mais
-      curta, pausar heartbeat enquanto readline está com prompt `[PERG]`, ou reservar área acima
-      com altura estável específica para pergunta humana.
-- [ ] Próxima lacuna: decidir se `/events --raw` deve permanecer despejo JSON bruto na tela ou se
-      o raw interativo deve sugerir `/export`/arquivo por padrão, mantendo `--json` para pipe.
+  - Resultado: `Status: PASS`; `post-ask-final-visible: assistant.message=yes`; zero erros no
+    tracker; export criado; SSE monotônico.
+- [x] Observação visual remanescente: a captura plain do PTY ainda pode mostrar prompt e linha viva
+      de pergunta intercalados (`você...[PERG]›` seguido de `LLM-B Pergunta ...`). O detector
+      `no-prompt-double-render` passa, mas a experiência humana ainda precisa de uma política mais
+      elegante para pergunta viva em TTY estreito.
+- [ ] Próxima lacuna: revisar a linha viva quando há `ask_user` pendente para garantir que ela nunca
+      dispute a linha de input; alternativas: compactar para uma única linha ainda mais curta,
+      pausar heartbeat enquanto readline está com prompt `[PERG]`, ou reservar área acima com altura
+      estável específica para pergunta humana.
+- [ ] Próxima lacuna: decidir se `/events --raw` deve permanecer despejo JSON bruto na tela ou se o
+      raw interativo deve sugerir `/export`/arquivo por padrão, mantendo `--json` para pipe.
 
 ### 12.30 Linha viva de pergunta pendente mais curta e menos invasiva
 
 - [x] Auditoria live: no rerun canônico, a pergunta em si já aparecia corretamente no card
-      `Pergunta ao operador`, mas a linha viva repetia a pergunta inteira (`LLM-B Pergunta ·
-      ASK-CANONICAL...`). Em PTY estreito isso podia quebrar em múltiplas linhas e parecer colado
-      ao prompt `[PERG]`.
+      `Pergunta ao operador`, mas a linha viva repetia a pergunta inteira
+      (`LLM-B Pergunta ·     ASK-CANONICAL...`). Em PTY estreito isso podia quebrar em múltiplas
+      linhas e parecer colado ao prompt `[PERG]`.
 - [x] Decisão UX: durante `ask_user` vivo, o card persistente é a fonte do texto da pergunta. A
-      linha viva deve apenas comunicar estado operacional: `aguardando operador · responda no
-      prompt [PERG]`, com opções resumidas quando existirem.
+      linha viva deve apenas comunicar estado operacional:
+      `aguardando operador · responda no     prompt [PERG]`, com opções resumidas quando existirem.
 - [x] Implementação: `formatTerminalLiveStatusLine` deixou de repetir a pergunta completa para
       `pendingQuestion` e `request_user_input` estruturado. O texto agora é curto, previsível e
       menos propenso a disputar o input.
@@ -5141,18 +5139,19 @@
 
 - [x] Tentativa de validação PTY da linha viva curta:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-short-ask-live-status-20260603-222007`.
-- [x] Resultado: `Status: BLOCKED`; blocker `live-timeout`; a LLM-B executou as tools reais e
-      emitiu os 8 deltas, mas não chamou `ask_user` antes do timeout. O summary registrou
+- [x] Resultado: `Status: BLOCKED`; blocker `live-timeout`; a LLM-B executou as tools reais e emitiu
+      os 8 deltas, mas não chamou `ask_user` antes do timeout. O summary registrou
       `ask=not-answered · postAsk=missing · diagnostics=not-started`.
 - [x] Diagnóstico: essa rodada não valida a linha viva de pergunta pendente, pois a pergunta não
-      ocorreu. Ela valida indiretamente que o harness separa bloqueio de cenário de regressão de
-      UX (`root-cause-not-ux-duplication`).
-- [x] Nova lacuna visual encontrada no mesmo PTY: o pulso `Aguardando resposta · 10s sem resposta
-      visível` ainda incluía modelo/esforço e quebrava em várias linhas. O prompt de espera já
-      mostra modelo e raciocínio, então a linha viva estava duplicando metadado.
+      ocorreu. Ela valida indiretamente que o harness separa bloqueio de cenário de regressão de UX
+      (`root-cause-not-ux-duplication`).
+- [x] Nova lacuna visual encontrada no mesmo PTY: o pulso
+      `Aguardando resposta · 10s sem resposta     visível` ainda incluía modelo/esforço e quebrava
+      em várias linhas. O prompt de espera já mostra modelo e raciocínio, então a linha viva estava
+      duplicando metadado.
 - [x] Implementação: o caminho `noDeltaStatus` de `formatTerminalLiveStatusLine` passou a mostrar
-      apenas `LLM-B pensando · <tempo> sem delta · conversa ativa`, sem `modelo ... · raciocínio
-      ...`.
+      apenas `LLM-B pensando · <tempo> sem delta · conversa ativa`, sem
+      `modelo ... · raciocínio     ...`.
 - [x] Testes unitários: `test_live_status_line.spec.js` exige ausência de `modelo auto` e
       `raciocínio high` nesse pulso e limite de comprimento menor que 70 caracteres.
 - [x] Validação passou:
@@ -5163,8 +5162,8 @@
 - [ ] Próxima validação live: repetir cenário canônico até uma execução com `ask_user` real para
       confirmar a linha curta `aguardando operador`.
 - [ ] Próxima lacuna do harness: adicionar heartbeat/diagnóstico textual próprio quando o cenário
-      fica mais de 60s sem eventos relevantes após deltas, para não deixar o operador sem saber se
-      o modelo, o SDK ou o runner estão travados.
+      fica mais de 60s sem eventos relevantes após deltas, para não deixar o operador sem saber se o
+      modelo, o SDK ou o runner estão travados.
 
 ### 12.32 Investigação oficial de libs auxiliares e contrato de tempo dual
 
@@ -5202,20 +5201,20 @@
 - [x] Live PTY executado após `formatTerminalTimeLabel` dual e resumo de model switch:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=300000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-dual-time-model-events-20260604-2244`.
 - [x] Resultado: `Status: BLOCKED`; blocker `live-timeout`; a sessão ficou pronta, executou
-      `report_intent`, `read_file_content` e os 8 deltas públicos, mas o modelo encerrou sem
-      chamar `ask_user`.
+      `report_intent`, `read_file_content` e os 8 deltas públicos, mas o modelo encerrou sem chamar
+      `ask_user`.
 - [x] Evidência positiva: cabeçalho de streaming apareceu como
       `[2026-06-03T22:44:13-03:00 (há 0s)]`, confirmando ISO até segundos + relativo no fluxo real.
 - [x] Bug UX encontrado: o pulso de espera `10s sem resposta visível` seguia pelo renderer genérico,
       duplicava `modelo kilo-auto/free · raciocínio high` e quebrava em várias linhas.
 - [x] Correção aplicada: `formatTerminalLiveStatusLine` agora trata espera silenciosa por
-      `sem resposta visível` como linha curta `pensando · 10s sem resposta pública · conversa ativa`,
-      sem modelo/esforço duplicado.
+      `sem resposta visível` como linha curta
+      `pensando · 10s sem resposta pública · conversa ativa`, sem modelo/esforço duplicado.
 - [x] Testes escopados: `test_live_status_line.spec.js` cobre `sem delta visível` e
       `sem resposta visível`.
-- [x] Próxima lacuna do harness/live: quando o cenário canônico volta para `Pronto` após deltas
-      sem `ask_user`, o runner deve classificar rapidamente como `missing-required-ask-user`
-      ou `assistant-ended-before-ask`, em vez de aguardar timeout total.
+- [x] Próxima lacuna do harness/live: quando o cenário canônico volta para `Pronto` após deltas sem
+      `ask_user`, o runner deve classificar rapidamente como `missing-required-ask-user` ou
+      `assistant-ended-before-ask`, em vez de aguardar timeout total.
 - [x] Próxima lacuna UX: a tela humana deve receber uma linha curta de diagnóstico do cenário live
       após deltas sem pergunta, por exemplo `Cenário live aguardava ask_user, mas o turno terminou`.
 - [x] Continuação: o runner ganhou detector `assistant-ended-before-ask` para o padrão
@@ -5225,9 +5224,8 @@
 - [x] Continuação UX: o runner imprime uma linha curta
       `[terminal-live] cenário canônico: deltas públicos concluídos, mas ask_user obrigatório não apareceu; coletando diagnósticos.`
       antes de disparar os comandos diagnósticos.
-- [x] Validação local: o artefato bloqueado
-      `live-canonical-dual-time-model-events-20260604-2244` seria classificado como
-      `assistant-ended-before-ask`.
+- [x] Validação local: o artefato bloqueado `live-canonical-dual-time-model-events-20260604-2244`
+      seria classificado como `assistant-ended-before-ask`.
 - [x] Live de verificação rápida:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-missing-ask-fast-diagnostic-20260604-2255`.
 - [x] Resultado: `Status: FAIL`; o modelo chamou `ask_user`, mas o novo detector disparou
@@ -5242,8 +5240,9 @@
 - [x] Critério UX validado: a espera `sem resposta pública` ficou compacta e sem duplicação de
       modelo/esforço; `ask_user` ficou como superfície própria e persistente.
 - [x] Nova lacuna visual encontrada nessa live: `session.info/model_retry` ainda renderizava a linha
-      viva como `LLM-B erro · Retry de modelo em andamento · Response was interrupted ... · modelo
-      kilo-auto/free · raciocínio high`, quebrando em várias linhas.
+      viva como
+      `LLM-B erro · Retry de modelo em andamento · Response was interrupted ... · modelo     kilo-auto/free · raciocínio high`,
+      quebrando em várias linhas.
 - [x] Correção aplicada: atividades de recuperação/retry de modelo agora usam caminho compacto na
       linha viva: `LLM-B recuperando · retry do modelo · <idade> · conversa ativa`, mantendo o
       detalhe técnico apenas no histórico/SSE/diagnóstico.
@@ -5254,19 +5253,19 @@
 
 ### 12.34 Prompt de espera como estado curto, não painel de telemetria
 
-- [x] Auditoria do live PASS mostrou que a tela ainda exibia `LLM-B pensando · modelo ... ·
-      raciocínio ...` no prompt temporário, competindo visualmente com a linha viva permanente.
+- [x] Auditoria do live PASS mostrou que a tela ainda exibia
+      `LLM-B pensando · modelo ... ·     raciocínio ...` no prompt temporário, competindo
+      visualmente com a linha viva permanente.
 - [x] Decisão UX: o prompt normal pode mostrar `você[modelo/esforço]›` quando o terminal está
       pronto; durante processamento, o prompt de espera deve ser curto e sem metadados duplicados.
-- [x] `buildWaitingPrompt()` agora renderiza apenas `LLM-B pensando`, tags essenciais
-      (`[PERGUNTA]`, fila, shadow) e, no modo detalhado, fase/label curtos. Modelo/esforço saem
-      dessa superfície.
+- [x] `buildWaitingPrompt()` agora renderiza apenas `LLM-B pensando`, tags essenciais (`[PERGUNTA]`,
+      fila, shadow) e, no modo detalhado, fase/label curtos. Modelo/esforço saem dessa superfície.
 - [x] `formatTerminalLiveStatusLine()` agora compacta `boot` como
       `LLM-B iniciando · <fase> · <idade> · <runtime>`, sem repetir modelo/esforço na linha viva de
       inicialização.
 - [x] Testes unitários atualizados:
   - `test_build_user_prompt.spec.js` exige ausência de `modelo gpt-5-mini`, `raciocínio high`,
-        `gpt-5-mini` e `high` no prompt de espera.
+    `gpt-5-mini` e `high` no prompt de espera.
   - `test_live_status_line.spec.js` exige boot curto sem modelo/esforço e com limite de comprimento.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/dialog/output.js`;
@@ -5282,10 +5281,10 @@
 - [x] Nova lacuna visual encontrada: mesmo com prompt curto, a linha viva em PTY estreito ainda
       quebrava em duas linhas por causa de `conversa ativa/parada` em `boot`, `turn` e retry/espera.
 - [x] Correção aplicada: pulsos transitórios de `boot`, `turn`, `retry de modelo` e espera
-      silenciosa removem o tail redundante de runtime; o runtime detalhado permanece em
-      `/activity`, `/events` e estado pronto.
-- [x] Teste unitário reforçado: `test_live_status_line.spec.js` agora exige ausência de `conversa
-      ativa/parada` nos pulsos curtos e limites de comprimento mais agressivos.
+      silenciosa removem o tail redundante de runtime; o runtime detalhado permanece em `/activity`,
+      `/events` e estado pronto.
+- [x] Teste unitário reforçado: `test_live_status_line.spec.js` agora exige ausência de
+      `conversa     ativa/parada` nos pulsos curtos e limites de comprimento mais agressivos.
 - [x] Live estética após corte do tail:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-short-transient-status-20260604-2310`.
 - [x] Evidência positiva: boot e `Contexto atualizado` passaram para uma linha reservada única em
@@ -5328,8 +5327,8 @@
   - `node --check src/copilot/terminal/events/agent-runtime-events.js`;
   - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
-- [ ] Próxima live: repetir cenário canônico para confirmar summary mais honesto, `LLM-B
-      finalizando · <idade>` e painel BYOK curto quando houver falha de provider.
+- [ ] Próxima live: repetir cenário canônico para confirmar summary mais honesto,
+      `LLM-B     finalizando · <idade>` e painel BYOK curto quando houver falha de provider.
 
 ### 12.35 Paths humanos e continuação pós-pergunta vazia
 
@@ -5352,8 +5351,8 @@
       `dialog.empty_after_user_input` no SSE.
 - [x] Guardrail: turnos vazios normais de tool-only continuam silenciosos; conteúdo já materializado
       por delta/assistant.message não dispara aviso.
-- [x] Lacuna visual encontrada: tools e `/activity` ainda vazavam paths absolutos do workspace,
-      como `/workspaces/chatgpt-docker-puppeteer/package.json`, na superfície humana padrão.
+- [x] Lacuna visual encontrada: tools e `/activity` ainda vazavam paths absolutos do workspace, como
+      `/workspaces/chatgpt-docker-puppeteer/package.json`, na superfície humana padrão.
 - [x] Decisão UX: payload bruto permanece em SSE/export/`--raw`; stdout padrão e comandos humanos
       devem mostrar paths relativos ao workspace sempre que possível.
 - [x] Correção aplicada: `tool-activity-presenter` ganhou normalização central
@@ -5362,7 +5361,8 @@
       compactação humana para paths absolutos e detalhes compostos.
 - [x] Testes unitários adicionados:
   - presenter transforma `${workspace}/package.json` em `package.json` na superfície humana;
-  - `shouldWarnEmptyDialogTurnAfterUserInput()` só sinaliza vazios pós-input humano dentro da janela.
+  - `shouldWarnEmptyDialogTurnAfterUserInput()` só sinaliza vazios pós-input humano dentro da
+    janela.
 - [ ] Próxima validação escopada: `node --check`, ESLint e unit tests dos módulos tocados.
 - [x] Live de confirmação:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-paths-empty-ask-warning-20260604-2330`.
@@ -5389,8 +5389,8 @@
 - [x] Busca no `terminal.plain.log`: ocorrências absolutas restantes aparecem apenas em log de DB,
       `/events --raw`/payload técnico ou caminho do arquivo exportado; a superfície humana padrão
       ficou relativa.
-- [ ] Próxima validação escopada adicional, se houver nova edição: repetir `node --check`, ESLint e unit tests incluindo
-      `sdk-session-events`.
+- [ ] Próxima validação escopada adicional, se houver nova edição: repetir `node --check`, ESLint e
+      unit tests incluindo `sdk-session-events`.
 - [x] Lacuna UX seguinte tratada: a linha viva de pergunta quebrava em PTY estreito como
       `LLM-B aguardando operador · responda no` / `prompt [PERG] · opções SIM · conversa ativa`.
 - [x] Decisão UX: o card da pergunta já explica a ação; a linha viva deve ser só um estado curto.
@@ -5406,9 +5406,9 @@
 - [x] Resultado: `Status: PASS`; fluxo canônico completo, 182 eventos SSE, zero erros, export ok.
 - [x] Evidência positiva: a linha viva de pergunta apareceu como uma linha única:
       `LLM-B aguardando você · [PERG] · SIM`.
-- [x] Observação de log: `terminal.plain.log` concatena `SIM` ao frame ANSI em uma linha (`... SIMSIM`),
-      mas no PTY visual a linha reservada foi limpa ao enviar a resposta; não houve nova quebra de
-      linha nem disputa durável com o prompt.
+- [x] Observação de log: `terminal.plain.log` concatena `SIM` ao frame ANSI em uma linha
+      (`... SIMSIM`), mas no PTY visual a linha reservada foi limpa ao enviar a resposta; não houve
+      nova quebra de linha nem disputa durável com o prompt.
 - [x] Lacuna UX: `/export` ainda imprimia `Exportado /workspaces/...` no modo humano.
 - [x] Decisão UX: o caminho físico continua absoluto internamente para escrita; a linha humana
       mostra path relativo ao workspace quando possível, mantendo paths brutos apenas nos artefatos
@@ -5433,8 +5433,8 @@
   - `npx eslint` nos módulos e specs tocados;
   - `npx vitest run test_tool_activity_presenter.spec.js test_commands_activity.spec.js test_commands_export.spec.js`.
 - [x] Lacuna UX: comandos de auditoria ainda exibiam labels de backend como `Archive`.
-- [x] Correção aplicada: `/events`, `/session sdk events` e `/session sdk waits` usam `Registro`
-      na superfície humana; `/session sdk waits` virou `Interações SDK da sessão` para refletir
+- [x] Correção aplicada: `/events`, `/session sdk events` e `/session sdk waits` usam `Registro` na
+      superfície humana; `/session sdk waits` virou `Interações SDK da sessão` para refletir
       perguntas, formulários e permissões, não apenas espera passiva.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/events.js src/copilot/terminal/commands/session.js`;
@@ -5448,8 +5448,8 @@
       `Resposta pós-pergunta sdk/assistant.message · Resposta pós-pergunta`, misturando source cru
       com título humano.
 - [x] Correção aplicada: `assistant-transcript-renderer` agora separa source bruto persistido de
-      source visual; `sdk/assistant.message` vira `LLM-B via SDK` e deltas viram `streaming da
-      LLM-B` na linha humana.
+      source visual; `sdk/assistant.message` vira `LLM-B via SDK` e deltas viram
+      `streaming da     LLM-B` na linha humana.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/events/assistant-transcript-renderer.js`;
   - `npx eslint src/copilot/terminal/events/assistant-transcript-renderer.js tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js`;
@@ -5465,8 +5465,8 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
 - [x] Lacuna visual encontrada na live: `/events` ainda mostrava payload enums como
       `tipo session.updated` e `classe ask user continuation`.
-- [x] Correção aplicada: `humanPayloadKind()` agora traduz lifecycle SDK, continuação pós-ask,
-      retry de modelo e falhas BYOK para labels de operador.
+- [x] Correção aplicada: `humanPayloadKind()` agora traduz lifecycle SDK, continuação pós-ask, retry
+      de modelo e falhas BYOK para labels de operador.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/events.js`;
   - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`;
@@ -5495,8 +5495,8 @@
 - [x] Diagnóstico: a tela real continha `Resposta pós-pergunta LLM-B via SDK` e o SSE/export
       continham `POST-ASK-CANONICAL-FINAL`, mas o verificador ainda procurava o formato antigo
       `Resposta pós-pergunta sdk/assistant.message`.
-- [x] Correção aplicada: o runner live aceita headings antigos e novos, incluindo
-      `LLM-B via SDK`, sem regredir compatibilidade com logs históricos.
+- [x] Correção aplicada: o runner live aceita headings antigos e novos, incluindo `LLM-B via SDK`,
+      sem regredir compatibilidade com logs históricos.
 - [x] Lacuna visual: quando título e detalhe eram iguais, o transcript renderizava
       `Resposta pós-pergunta LLM-B via SDK · Resposta pós-pergunta`.
 - [x] Correção aplicada: `renderTerminalAssistantTranscript()` suprime detalhe duplicado quando
@@ -5530,10 +5530,9 @@
   - `node --check tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
-- [x] Correção aplicada no live-runner: quando `BLOCKED` por `byok-provider-turn-failed`, o
-      summary agora também verifica `byok-provider-panel-visible` e
-      `byok-provider-error-tracked`, para transformar falhas instáveis do provider em evidência
-      objetiva de UX/diagnóstico.
+- [x] Correção aplicada no live-runner: quando `BLOCKED` por `byok-provider-turn-failed`, o summary
+      agora também verifica `byok-provider-panel-visible` e `byok-provider-error-tracked`, para
+      transformar falhas instáveis do provider em evidência objetiva de UX/diagnóstico.
 - [x] Validação escopada do runner passou:
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
@@ -5542,8 +5541,8 @@
 - [x] Resultado: `Status: PASS`; fluxo canônico completo, 178 eventos SSE, zero erros, export ok.
 - [x] Evidência positiva: `post-ask-final-visible` passou com `assistant.message=yes`; tela mostrou
       `Resposta pós-pergunta LLM-B via SDK` sem `· Resposta pós-pergunta`.
-- [x] Lacuna visual residual da live: `/usage now` ainda mostrava `Telemetria LLM modelo ... ·
-      sem Premium Request · tipo ... · custo ...` numa linha longa.
+- [x] Lacuna visual residual da live: `/usage now` ainda mostrava
+      `Telemetria LLM modelo ... ·     sem Premium Request · tipo ... · custo ...` numa linha longa.
 - [x] Correção aplicada: `/usage now` divide telemetria recente em `Telemetria LLM`, `Request`,
       `Tipo` e `Detalhe`, preservando o modo `detail` para classe/motivo técnico.
 - [x] Validação escopada passou:
@@ -5564,22 +5563,22 @@
 - [x] Observação visual: o log PTY ainda pode registrar `SIM` grudado ao frame ANSI da linha viva,
       mas o summary manteve `no-prompt-double-render` e `ux-compact-ask-live-status`; manter sob
       observação em lives futuras.
-- [x] Lacuna visual residual: eventos inline/timeline de uso repetiam `sem Premium Request` no
-      label e no detalhe (`Uso BYOK sem Premium Request — modelo ... · custo ... · sem Premium
-      Request · tokens ...`).
+- [x] Lacuna visual residual: eventos inline/timeline de uso repetiam `sem Premium Request` no label
+      e no detalhe
+      (`Uso BYOK sem Premium Request — modelo ... · custo ... · sem Premium     Request · tokens ...`).
 - [x] Correção aplicada: `formatLlmUsageOperatorDetail()` agora usa detalhe mais escaneável:
-      `modelo ... · tokens entrada→saída · custo ...`; o estado `sem Premium Request` fica no
-      label, e a classe/motivo técnica permanece no payload SSE/`detail`.
+      `modelo ... · tokens entrada→saída · custo ...`; o estado `sem Premium Request` fica no label,
+      e a classe/motivo técnica permanece no payload SSE/`detail`.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/events/agent-runtime-events.js`;
   - `node --check tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx eslint src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`;
   - `npx vitest run tests/unit/copilot/test_terminal_agent_runtime_events.spec.js`.
-- [ ] Próxima live, quando o provider falhar novamente: confirmar `byok-provider-error-tracked`
-      no summary e `/errors 10` preenchido.
+- [ ] Próxima live, quando o provider falhar novamente: confirmar `byok-provider-error-tracked` no
+      summary e `/errors 10` preenchido.
 - [x] Auditoria UX de `/events`: labels remanescentes `SDK assistant`, `pergunta humana SDK`,
-      `agente/usage`, `classe continuação...` e `export envelope` ainda pareciam backend
-      vazando na superfície humana.
+      `agente/usage`, `classe continuação...` e `export envelope` ainda pareciam backend vazando na
+      superfície humana.
 - [x] Decisão UX: sources técnicos continuam em `/events --raw`; no modo padrão:
   - `sdk/assistant.*` vira `LLM-B via SDK`;
   - `sdk/user_input.*` vira `pergunta ao operador`;
@@ -5593,8 +5592,8 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
 - [x] Live de auditoria iniciada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-human-sources-20260605-0025`.
-- [x] Resultado: `Status: BLOCKED` por `blocked-by-assistant-ended-before-ask`; a LLM-B
-      executou tools e deltas públicos, mas encerrou antes da ferramenta obrigatória `ask_user`.
+- [x] Resultado: `Status: BLOCKED` por `blocked-by-assistant-ended-before-ask`; a LLM-B executou
+      tools e deltas públicos, mas encerrou antes da ferramenta obrigatória `ask_user`.
 - [x] Evidência positiva apesar do bloqueio: a linha viva e `/activity` já exibiram o detalhe
       compacto de uso (`Uso do modelo kilo-auto/free · tokens ... · custo ...` e
       `Uso BYOK sem Premium Request — modelo ... · tokens ... · custo ...`), sem duplicar
@@ -5607,29 +5606,30 @@
 - [x] Resultado: `Status: PASS`; fluxo canônico completo com tools reais, deltas, `ask_user`,
       resposta `SIM`, final pós-pergunta, export Markdown, SSE conectado e zero erros.
 - [x] Evidência em `/events 60`: `Mensagem da LLM-B · LLM-B via SDK`,
-      `Pergunta ao operador · pergunta ao operador`, `Uso LLM · telemetria LLM · tipo
-      continuação da pergunta humana`, e `transcript ... · registro export ...`.
-- [x] Contrato adicionado ao harness: `sse-archive-human-source-labels` valida que `/events`
-      legível contém `LLM-B via SDK`, `pergunta ao operador`, `telemetria LLM` e
-      `registro export`, e que não regressa para `SDK assistant`, `pergunta humana SDK`,
-      `agente/usage` ou `export envelope` antes do `--raw`.
+      `Pergunta ao operador · pergunta ao operador`,
+      `Uso LLM · telemetria LLM · tipo     continuação da pergunta humana`, e
+      `transcript ... · registro export ...`.
+- [x] Contrato adicionado ao harness: `sse-archive-human-source-labels` valida que `/events` legível
+      contém `LLM-B via SDK`, `pergunta ao operador`, `telemetria LLM` e `registro export`, e que
+      não regressa para `SDK assistant`, `pergunta humana SDK`, `agente/usage` ou `export envelope`
+      antes do `--raw`.
 - [x] Validação escopada do harness passou:
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
 - [x] Live de contrato concluída:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-human-source-contract-20260605-0035`.
-- [x] Resultado: `Status: PASS`; critério `sse-archive-human-source-labels` passou no summary,
-      além de `sse-archive-query-visible`, `no-terminal-errors` e `clean-quit`.
-- [x] Auditoria UX de lifecycle em `/events`: `Sessão SDK · agente · tipo sessão atualizada`
-      era uma linha redundante e centrada no backend; `Hook iniciado/concluído` também soava como
-      jargão técnico no modo padrão.
+- [x] Resultado: `Status: PASS`; critério `sse-archive-human-source-labels` passou no summary, além
+      de `sse-archive-query-visible`, `no-terminal-errors` e `clean-quit`.
+- [x] Auditoria UX de lifecycle em `/events`: `Sessão SDK · agente · tipo sessão atualizada` era uma
+      linha redundante e centrada no backend; `Hook iniciado/concluído` também soava como jargão
+      técnico no modo padrão.
 - [x] Correção aplicada: `/events` padrão agora deriva `sdk.lifecycle` pelo `payload.type`
-      (`Sessão atualizada`, `Sessão criada`, `Sessão removida` etc.), mostra
-      `agent/sdk.lifecycle` como `controle da sessão`, troca hook por `Rotina iniciada/concluída`
-      e remove resumo redundante quando ele só repete o label.
-- [x] Contrato live ampliado: `sse-archive-human-source-labels` também exige
-      `Sessão atualizada`, `controle da sessão`, `Rotina iniciada` e `Rotina concluída`, e bloqueia
-      regressões para `Sessão SDK`, `Hook iniciado` e `Hook concluído` antes do `--raw`.
+      (`Sessão atualizada`, `Sessão criada`, `Sessão removida` etc.), mostra `agent/sdk.lifecycle`
+      como `controle da sessão`, troca hook por `Rotina iniciada/concluída` e remove resumo
+      redundante quando ele só repete o label.
+- [x] Contrato live ampliado: `sse-archive-human-source-labels` também exige `Sessão atualizada`,
+      `controle da sessão`, `Rotina iniciada` e `Rotina concluída`, e bloqueia regressões para
+      `Sessão SDK`, `Hook iniciado` e `Hook concluído` antes do `--raw`.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/events.js`;
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
@@ -5638,44 +5638,46 @@
 - [x] Live de confirmação concluída:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-session-lifecycle-contract-20260605-0040`.
 - [x] Resultado: `Status: PASS`; `/events 60` exibiu `Sessão atualizada · controle da sessão`,
-      `Rotina iniciada` e `Rotina concluída`; o critério `sse-archive-human-source-labels`
-      passou no summary.
+      `Rotina iniciada` e `Rotina concluída`; o critério `sse-archive-human-source-labels` passou no
+      summary.
 - [x] Decisão de escopo: `Sessão SDK` permanece aceitável em `/events --raw` e em telas
       explicitamente diagnósticas como `/health full` até nova auditoria dessas superfícies.
 - [x] Auditoria UX de `session.info`: lives antigas mostravam `Info SDK · configuration`,
       `Disabled tools: ...`, `Info SDK · model_retry` e mensagens em inglês na linha viva/activity,
       apesar de a impressão verbose já ter um renderizador mais amigável.
 - [x] Correção aplicada: `session.info` agora usa `renderSdkSessionInfoForOperator()` como fonte
-      única também para activity/linha viva; `configuration` vira `Configuração · ferramentas
-      nativas desativadas`, `model_retry` vira `Retry modelo · resposta interrompida por erro do
-      servidor; tentando novamente`, e outros tipos viram `Evento` com detalhe saneado.
-- [x] Contrato live adicionado: `ux-no-raw-sdk-info-labels` bloqueia `Info SDK`,
-      `configuration`, `Disabled tools`, `model_retry` e o texto inglês de retry antes do `--raw`.
+      única também para activity/linha viva; `configuration` vira
+      `Configuração · ferramentas     nativas desativadas`, `model_retry` vira
+      `Retry modelo · resposta interrompida por erro do     servidor; tentando novamente`, e outros
+      tipos viram `Evento` com detalhe saneado.
+- [x] Contrato live adicionado: `ux-no-raw-sdk-info-labels` bloqueia `Info SDK`, `configuration`,
+      `Disabled tools`, `model_retry` e o texto inglês de retry antes do `--raw`.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/events/sdk-session-events.js`;
   - `npx eslint src/copilot/terminal/events/sdk-session-events.js`;
   - `npx vitest run tests/unit/copilot/terminal/test_dialog_runtime.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
-- [x] Live canônica confirmou `ux-no-raw-sdk-info-labels`: `artifacts/terminal-live/live-canonical-sdk-info-short-copy-contract-20260605-0050/summary.md`
+- [x] Live canônica confirmou `ux-no-raw-sdk-info-labels`:
+      `artifacts/terminal-live/live-canonical-sdk-info-short-copy-contract-20260605-0050/summary.md`
       ficou `Status: PASS`, com `/events` limpo, `no-terminal-errors`, `clean-quit`, e primeiro
       viewport pós-boot exibindo `Configuração ferramentas nativas desativadas...` sem `Info SDK`,
       `Disabled tools`, `model_retry` ou texto inglês de retry antes do bloco `--raw`.
-- [x] Live pós-critério: repetir cenário canônico após `sse-archive-human-source-labels`
-      confirmou o contrato no summary, não só na evidência visual.
-- [x] Auditoria UX de `/tools diag`: a live canônica ainda mostrava `Técnico`,
-      `SDK report_intent` e `Refs call chatcmpl-too... · req ...` dentro da superfície
-      diagnóstica intermediária. Isso preservava auditoria, mas quebrava a leitura humana e
-      reintroduzia IDs estranhos no fluxo que o operador mais usa para entender tools.
+- [x] Live pós-critério: repetir cenário canônico após `sse-archive-human-source-labels` confirmou o
+      contrato no summary, não só na evidência visual.
+- [x] Auditoria UX de `/tools diag`: a live canônica ainda mostrava `Técnico`, `SDK report_intent` e
+      `Refs call chatcmpl-too... · req ...` dentro da superfície diagnóstica intermediária. Isso
+      preservava auditoria, mas quebrava a leitura humana e reintroduzia IDs estranhos no fluxo que
+      o operador mais usa para entender tools.
 - [x] Decisão UX: `/tools diag` agora é diagnóstico humano de triagem; `/tools all` é drill-down
       técnico; `/tools raw` e `/events --raw` continuam sendo o envelope bruto. Portanto, o modo
       `diag` pode mostrar classe, latência, categorias, contrato e lifecycle recente com nomes
       humanos, mas não deve mostrar `chatcmpl`, `requestId`, `traceId`, `report_intent_local` ou
       nomes SDK como linha primária.
 - [x] Correção aplicada: `/tools diag` oculta refs e nomes internos de lifecycle; `/tools all`
-      preserva `Nome interno` e `Rastreio`; o espaçamento global de `terminalThemeRow` ganhou
-      duas colunas entre label e valor para evitar linhas visualmente coladas como
+      preserva `Nome interno` e `Rastreio`; o espaçamento global de `terminalThemeRow` ganhou duas
+      colunas entre label e valor para evitar linhas visualmente coladas como
       `Configuração ferramentas...`.
-- [x] Contrato unitário atualizado: `diag` exige diagnóstico humano sem nomes internos/refs, e
-      `all` preserva rastreio técnico.
+- [x] Contrato unitário atualizado: `diag` exige diagnóstico humano sem nomes internos/refs, e `all`
+      preserva rastreio técnico.
 - [x] Contrato live atualizado: `diagnostic-ux-tools-diag-hierarchy` agora bloqueia `Nome interno`,
       `Técnico`, `Refs`, `Rastreio call/req/trace`, `chatcmpl-tool` e labels antigos na superfície
       `/tools diag`.
@@ -5687,9 +5689,9 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
 - [x] Live canônica/diagnóstica passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-tools-diag-human-contract-20260605-0055`.
-  - Resultado: `Status: PASS`; `/tools diag` mostrou `diagnóstico humano`, nomes humanos,
-        lifecycle recente sem `chatcmpl`, refs ou nomes internos, `/events 60` permaneceu humano,
-        `/errors 10` ficou zerado e `/health full` preservou painel temático.
+  - Resultado: `Status: PASS`; `/tools diag` mostrou `diagnóstico humano`, nomes humanos, lifecycle
+    recente sem `chatcmpl`, refs ou nomes internos, `/events 60` permaneceu humano, `/errors 10`
+    ficou zerado e `/health full` preservou painel temático.
 - [x] Achado visual da live: `Classe tool` e categoria `tool` ainda apareciam em inglês no painel
       humano. Correção aplicada: classe/categoria `tool` viram `ferramenta`/`Ferramenta`, e o
       critério live agora bloqueia `Classe tool` e linha de categoria `tool`.
@@ -5698,12 +5700,12 @@
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx eslint src/copilot/terminal/commands/tools.js tests/unit/copilot/terminal/test_commands_tools.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js`.
-- [ ] Próxima live: repetir ciclo canônico/diagnóstico para confirmar a tradução final
-      `ferramenta` em PTY real e verificar `/tools all` como rota de auditoria profunda.
+- [ ] Próxima live: repetir ciclo canônico/diagnóstico para confirmar a tradução final `ferramenta`
+      em PTY real e verificar `/tools all` como rota de auditoria profunda.
 - [x] Live de confirmação pós-tradução executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-tools-diag-ferramenta-contract-20260605-0100`.
   - Resultado: `Status: BLOCKED` por `blocked-by-assistant-empty-turn`; a LLM-B respondeu a
-        pergunta, mas encerrou a continuação sem texto público antes do marcador final canônico.
+    pergunta, mas encerrou a continuação sem texto público antes do marcador final canônico.
 - [x] Evidência positiva da live bloqueada: `/tools diag` exibiu `Classe ferramenta` e categoria
       `Ferramenta`, sem refs/IDs crus, confirmando a tradução final no PTY real.
 - [x] Bug UX descoberto pela live: após `dialog.empty_after_user_input`, o aviso
@@ -5724,13 +5726,13 @@
       linha viva presa e que o prompt permanece limpo.
 - [x] Live seguinte capturou falha BYOK real:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-empty-turn-status-clear-contract-20260605-0105`.
-  - Resultado: `Status: BLOCKED` por `blocked-by-byok-provider-turn-failed`; `/errors 10`
-        registrou `terminal.byok_provider` com ação/contexto, e o terminal retornou a `Pronto`,
-        confirmando que o empty-turn anterior não deixou a linha presa.
+  - Resultado: `Status: BLOCKED` por `blocked-by-byok-provider-turn-failed`; `/errors 10` registrou
+    `terminal.byok_provider` com ação/contexto, e o terminal retornou a `Pronto`, confirmando que o
+    empty-turn anterior não deixou a linha presa.
 - [x] Bug UX descoberto nessa live: a linha viva de erro BYOK renderizava uma frase gigante com
       `Erro do SDK sem mensagem estruturada`, `/byok model`, modelo, raciocínio e `conversa ativa`,
-      quebrando em quatro linhas físicas. O bloco durável e `/errors` já carregam ação/contexto;
-      a linha viva deve ser apenas estado curto.
+      quebrando em quatro linhas físicas. O bloco durável e `/errors` já carregam ação/contexto; a
+      linha viva deve ser apenas estado curto.
 - [x] Correção aplicada: `phase=error` em provider BYOK agora renderiza
       `LLM-B erro · provider BYOK · <idade>`, sem detalhe longo, modelo, raciocínio ou runtime.
 - [x] Contrato live adicionado: `ux-compact-byok-error-live-status` bloqueia vazamento de
@@ -5742,36 +5744,34 @@
   - `npx vitest run tests/unit/copilot/terminal/test_live_status_line.spec.js`.
 - [x] Live canônica final do pacote passou:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-byok-error-compact-status-contract-20260605-0110`.
-  - Resultado: `Status: PASS`; fluxo canônico completo com tools reais, deltas, pergunta,
-        resposta, final pós-pergunta, export, `/tools diag` com `Classe ferramenta`/`Ferramenta`,
-        `/events 60` humano, `/errors 10` zerado e critério
-        `ux-compact-byok-error-live-status` verde.
+  - Resultado: `Status: PASS`; fluxo canônico completo com tools reais, deltas, pergunta, resposta,
+    final pós-pergunta, export, `/tools diag` com `Classe ferramenta`/`Ferramenta`, `/events 60`
+    humano, `/errors 10` zerado e critério `ux-compact-byok-error-live-status` verde.
 - [ ] Próxima live de falha controlada: reproduzir ou simular erro BYOK para confirmar que
       `/errors 10` mostra `terminal.byok_provider` com ação/contexto, sem duplicar eventos
       recuperáveis internos.
 - [x] Auditoria UX de `/events` pós-erro BYOK: a live bloqueada
       `live-canonical-empty-turn-status-clear-contract-20260605-0105` mostrou que a superfície
       default ainda vazava `agent error`, `Info da sessão`, `Operation cancelled by user`,
-      `terminal turn empty output`, `model_call`, `recoverable_model_call` e
-      `non_user_initiated`. O envelope raw estava correto, mas o modo humano ainda espelhava
-      nomes internos.
+      `terminal turn empty output`, `model_call`, `recoverable_model_call` e `non_user_initiated`. O
+      envelope raw estava correto, mas o modo humano ainda espelhava nomes internos.
 - [x] Decisão UX: `/events` default é histórico operacional para operador humano; `--raw`/`--json`
-      continuam como auditoria técnica. Portanto, erro de provider, cancelamento, turno sem saída
-      e classificação de uso devem ter labels e detalhes humanos, com IDs/nomes internos apenas em
+      continuam como auditoria técnica. Portanto, erro de provider, cancelamento, turno sem saída e
+      classificação de uso devem ter labels e detalhes humanos, com IDs/nomes internos apenas em
       modos diagnósticos explícitos.
-- [x] Correção aplicada: `agent.error` vira `Erro BYOK` quando há contexto BYOK; `session.info`
-      com `infoType=cancellation` vira `Cancelamento` e traduz `Operation cancelled by user` para
+- [x] Correção aplicada: `agent.error` vira `Erro BYOK` quando há contexto BYOK; `session.info` com
+      `infoType=cancellation` vira `Cancelamento` e traduz `Operation cancelled by user` para
       `operação cancelada pelo operador`; `terminal.turn.empty_output` vira `Turno sem saída`;
       `non_user_initiated`, `model_call`, `recoverable_model_call`, `errorOccurred` e `empty` são
       normalizados antes de aparecerem no resumo.
 - [x] A origem `sdk/session.info` agora aparece como `controle da sessão`, evitando o rótulo solto
       `SDK` para cancelamentos e eventos de controle.
-- [x] Contrato unitário adicionado em `test_commands_events.spec.js`: bloqueia os rótulos crus
-      acima e exige `Erro BYOK`, `falha do provider BYOK`, `Cancelamento`, `Turno sem saída` e
+- [x] Contrato unitário adicionado em `test_commands_events.spec.js`: bloqueia os rótulos crus acima
+      e exige `Erro BYOK`, `falha do provider BYOK`, `Cancelamento`, `Turno sem saída` e
       `tipo iniciado pelo agente`.
-- [x] Contrato live adicionado: `sse-archive-human-operational-events` bloqueia esses vazamentos
-      no trecho humano antes de `/events --raw` e exige label BYOK humano quando uma falha de
-      provider aparece.
+- [x] Contrato live adicionado: `sse-archive-human-operational-events` bloqueia esses vazamentos no
+      trecho humano antes de `/events --raw` e exige label BYOK humano quando uma falha de provider
+      aparece.
 - [x] Validação escopada passou:
   - `node --check src/copilot/terminal/commands/events.js`;
   - `node --check tests/unit/copilot/terminal/test_commands_events.spec.js`;
@@ -5782,21 +5782,20 @@
       real.
 - [x] Live canônica executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-operational-human-contract-20260605-0120`.
-  - Resultado: `Status: PASS`; novo critério `sse-archive-human-operational-events` passou,
-        assim como `sse-archive-human-source-labels`, `ux-no-raw-sdk-info-labels`,
-        `ux-compact-byok-error-live-status`, `no-terminal-errors`, `clean-quit` e correlação
-        export/SSE.
-- [x] Achado visual da live: `/activity 40` ainda mostrava `Técnico  Detalhes técnicos ficam em
-      /activity detail` no modo padrão. A mensagem era funcional, mas colocava a superfície
-      operacional novamente em tom de backend.
-- [x] Correção aplicada: `/activity` padrão agora mostra `Drill-down  /activity detail mostra
-      origem, trace, engine e streaming`, mantendo a rota técnica clara sem chamar o painel
-      principal de técnico.
-- [x] Achado visual da live: labels longos em `/events 60`, como `Tarefa em segundo plano
-      concluída`, ultrapassavam a coluna fixa e empurravam timestamp/origem para a direita,
-      quebrando a grade visual.
-- [x] Correção aplicada: `terminalThemeRow()` ganhou `truncateLabel` opt-in; `/events` usa esse
-      modo para manter a coluna estável sem afetar outras superfícies que precisam preservar label
+  - Resultado: `Status: PASS`; novo critério `sse-archive-human-operational-events` passou, assim
+    como `sse-archive-human-source-labels`, `ux-no-raw-sdk-info-labels`,
+    `ux-compact-byok-error-live-status`, `no-terminal-errors`, `clean-quit` e correlação export/SSE.
+- [x] Achado visual da live: `/activity 40` ainda mostrava
+      `Técnico  Detalhes técnicos ficam em     /activity detail` no modo padrão. A mensagem era
+      funcional, mas colocava a superfície operacional novamente em tom de backend.
+- [x] Correção aplicada: `/activity` padrão agora mostra
+      `Drill-down  /activity detail mostra     origem, trace, engine e streaming`, mantendo a rota
+      técnica clara sem chamar o painel principal de técnico.
+- [x] Achado visual da live: labels longos em `/events 60`, como
+      `Tarefa em segundo plano     concluída`, ultrapassavam a coluna fixa e empurravam
+      timestamp/origem para a direita, quebrando a grade visual.
+- [x] Correção aplicada: `terminalThemeRow()` ganhou `truncateLabel` opt-in; `/events` usa esse modo
+      para manter a coluna estável sem afetar outras superfícies que precisam preservar label
       inteiro.
 - [x] Contratos adicionados:
   - unitário de tema real em `test_ui_theme.spec.js` para truncamento opt-in e preservação default;
@@ -5811,23 +5810,24 @@
   - `node --check tests/unit/copilot/terminal/test_ui_theme.spec.js`;
   - `npx eslint src/copilot/terminal/state/ui-theme.js src/copilot/terminal/commands/activity.js src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_ui_theme.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_ui_theme.spec.js`.
-- [ ] Próxima live: repetir cenário canônico após o patch de `Drill-down`/truncamento para
-      confirmar a grade visual em PTY real e fechar os novos critérios do harness.
+- [ ] Próxima live: repetir cenário canônico após o patch de `Drill-down`/truncamento para confirmar
+      a grade visual em PTY real e fechar os novos critérios do harness.
 - [x] Live de confirmação executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-events-grid-contract-20260605-0130`.
   - Resultado: `Status: PASS`; critérios `ux-activity-drilldown-label` e
-        `ux-events-stable-long-label-column` passaram no summary.
-- [x] Evidência visual: `/activity 40` exibiu `Drill-down  /activity detail mostra origem, trace,
-      engine e streaming`; `/events 60` exibiu `Tarefa em segundo pla…` com timestamp alinhado,
-      sem empurrar a coluna.
+    `ux-events-stable-long-label-column` passaram no summary.
+- [x] Evidência visual: `/activity 40` exibiu
+      `Drill-down  /activity detail mostra origem, trace,     engine e streaming`; `/events 60`
+      exibiu `Tarefa em segundo pla…` com timestamp alinhado, sem empurrar a coluna.
 - [ ] Próxima frente UX: revisar `/activity` timeline para reduzir duplicação de eventos de tarefa
-      de segundo plano e tornar `Resposta do operador · agente` mais específica quando o evento
-      vem de delivery/ack interno, mantendo autoria humana clara no transcript/export.
+      de segundo plano e tornar `Resposta do operador · agente` mais específica quando o evento vem
+      de delivery/ack interno, mantendo autoria humana clara no transcript/export.
 - [x] Auditoria de acks pós-`ask_user`: a live mostrou duas linhas de tarefa quase idênticas
-      (`Resposta humana entregue ao resolvedor da ferramenta` e `Pergunta pendente persistida
-      limpa`) no output ao vivo e na timeline de `/activity`. Essas linhas são úteis para raw/SSE,
-      mas o operador já recebeu `Resposta enviada para pergunta pendente` e não precisa ver os acks
-      internos como eventos principais.
+      (`Resposta humana entregue ao resolvedor da ferramenta` e
+      `Pergunta pendente persistida     limpa`) no output ao vivo e na timeline de `/activity`.
+      Essas linhas são úteis para raw/SSE, mas o operador já recebeu
+      `Resposta enviada para pergunta pendente` e não precisa ver os acks internos como eventos
+      principais.
 - [x] Correção aplicada na origem: `Relay question.answered answers into hook tools resolver` e
       `Clear persisted pendingQuestion` passaram a ser classificados como background interno, sem
       print, sem update do current e sem histórico padrão; o broadcast SSE permanece com
@@ -5840,7 +5840,7 @@
       canônico `user_input.completed`, que continua sendo `Resposta do operador`.
 - [x] Contratos adicionados:
   - unitário bloqueando evento interno no `/events` default e preservando-o quando há filtro
-        explícito;
+    explícito;
   - unitário de fonte garantindo que os dois acks de pergunta continuam classificados como internos;
   - live `ux-no-question-ack-task-spam`.
 - [x] Validação escopada passou:
@@ -5855,10 +5855,10 @@
 - [x] Live de confirmação executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-no-question-ack-spam-contract-20260605-0145`.
   - Resultado: `Status: PASS`; critério `ux-no-question-ack-task-spam` passou no summary.
-- [x] Evidência visual: após `SIM`, o output ao vivo mostrou apenas `Resposta enviada para
-      pergunta pendente`; `/activity 40` não exibiu os acks auxiliares; `/events 60` exibiu
-      `Resposta encaminhada · ponte da pergunta · SIM` e `Resposta do operador · pergunta ao
-      operador · SIM`, separando relay de autoria canônica.
+- [x] Evidência visual: após `SIM`, o output ao vivo mostrou apenas
+      `Resposta enviada para     pergunta pendente`; `/activity 40` não exibiu os acks auxiliares;
+      `/events 60` exibiu `Resposta encaminhada · ponte da pergunta · SIM` e
+      `Resposta do operador · pergunta ao     operador · SIM`, separando relay de autoria canônica.
 - [x] Próxima frente UX: revisar `/events`/`activity` para fontes ainda genéricas como
       `Atividade · agente`, `Atividade · SDK`, `Uso LLM · diálogo` e `Rotina iniciada · SDK`,
       avaliando se devem ser agregadas, renomeadas ou movidas para detail/raw.
@@ -5884,8 +5884,8 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-control-noise-hidden-20260605-0210`.
   - Resultado: `Status: PASS`; novo critério `sse-archive-default-control-noise-hidden` passou.
 - [x] Evidência visual: `/events 60` ficou reduzido a `Mensagem da LLM-B`, `Pergunta ao operador`,
-      `Resposta encaminhada`, `Resposta do operador`, `Uso LLM` de `telemetria LLM` e mensagem final;
-      `session.updated`, `activity.changed`, `terminal.activity`, `hook.start`, `hook.end`,
+      `Resposta encaminhada`, `Resposta do operador`, `Uso LLM` de `telemetria LLM` e mensagem
+      final; `session.updated`, `activity.changed`, `terminal.activity`, `hook.start`, `hook.end`,
       `streaming.progress` e `session.usage` seguiram presentes em `/events --raw`.
 - [x] Novo achado da live: ainda apareceram `Turno concluído ×2 · diálogo`,
       `Turno concluído ×2 · LLM-B via SDK` e `Turno iniciado · LLM-B via SDK`, que são úteis para
@@ -5894,15 +5894,16 @@
 - [x] Decisão UX: `dialog.turn_start`, `dialog.turn_end`, `assistant.turn_start` e
       `assistant.turn_end` também pertencem a filtros explícitos e `--raw` no default; eventos de
       erro/timeout/turno vazio permanecem em eventos próprios e humanos.
-- [x] Correção aplicada: `isRoutineDefaultEvent()` passou a ocultar turn lifecycle no resumo default,
-      preservando consulta explícita (`/events event=assistant.turn_end`) e o envelope bruto.
+- [x] Correção aplicada: `isRoutineDefaultEvent()` passou a ocultar turn lifecycle no resumo
+      default, preservando consulta explícita (`/events event=assistant.turn_end`) e o envelope
+      bruto.
 - [x] Próxima live: repetir cenário canônico para confirmar que `/events 60` default fica somente
       com transcript, ask/answer, relay, uso LLM canônico e mensagem final, sem lifecycle de turno.
 - [x] Live executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-events-turn-lifecycle-hidden-20260605-0225`.
   - Resultado: `Status: PASS`; `/events 60` exibiu somente seis linhas operacionais:
-    `Mensagem da LLM-B`, `Pergunta ao operador`, `Resposta encaminhada`,
-    `Resposta do operador`, `Uso LLM` e mensagem final da LLM-B.
+    `Mensagem da LLM-B`, `Pergunta ao operador`, `Resposta encaminhada`, `Resposta do operador`,
+    `Uso LLM` e mensagem final da LLM-B.
 - [x] Achado visual da live: durante a resposta `SIM`, a linha viva ainda podia repintar
       `LLM-B aguardando você · [PERG] · SIM` enquanto o operador estava digitando, criando sensação
       de disputa com o input mesmo com `no-prompt-double-render` passando.
@@ -5917,8 +5918,8 @@
       input `[PERG]› SIM` durante a resposta humana.
 - [x] Live executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-input-guard-events-clean-20260605-0240`.
-  - Resultado: `Status: PASS`; `terminal.plain.log` mostra `você[kilo-auto…/high][PERG]› SIM`
-    sem linha `LLM-B aguardando você` intercalada no momento da digitação.
+  - Resultado: `Status: PASS`; `terminal.plain.log` mostra `você[kilo-auto…/high][PERG]› SIM` sem
+    linha `LLM-B aguardando você` intercalada no momento da digitação.
 - [x] Evidência adicional: `/events 60` permaneceu com seis linhas operacionais e o novo critério
       `sse-archive-default-control-noise-hidden` continuou passando.
 - [x] Próxima frente UX: auditar `/activity 40`, porque ainda há duplicação visual de arquivo
@@ -5933,8 +5934,8 @@
 - [x] Correção aplicada: a timeline default virou `Timeline operacional`, filtra ruído de idle,
       streaming e `Uso BYOK sem Premium Request`, limita a 12 linhas e mostra hint para
       `/activity detail` quando houver histórico omitido. O modo detail mostra `Timeline completa`.
-- [x] Teste unitário: `test_commands_activity.spec.js` cobre arquivo repetido colapsado em uma linha,
-      timeline operacional/default, timeline completa/detail e filtro de uso BYOK rotineiro.
+- [x] Teste unitário: `test_commands_activity.spec.js` cobre arquivo repetido colapsado em uma
+      linha, timeline operacional/default, timeline completa/detail e filtro de uso BYOK rotineiro.
 - [x] Próxima live: repetir ciclo canônico/diagnóstico para confirmar visualmente que `/activity 40`
       não duplica `package.json`, não despeja streaming/uso rotineiro na timeline default e mantém
       detail como rota completa.
@@ -5957,9 +5958,9 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`.
 - [x] Live executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-path-live-status-20260605-0310`.
-  - Resultado: `Status: PASS`; `/activity 40` mostrou uma única linha `Arquivo leitura ·
-    package.json ×2`, sem duplicata absoluto/relativo, e `/events 60` permaneceu com eventos
-    operacionais limpos.
+  - Resultado: `Status: PASS`; `/activity 40` mostrou uma única linha
+    `Arquivo leitura · package.json ×2`, sem duplicata absoluto/relativo, e `/events 60` permaneceu
+    com eventos operacionais limpos.
 - [x] Achado crítico apesar do PASS: o log PTY ainda mostrou
       `você...[PERG]› LLM-B aguardando você · [PERG] · SIMSIM`, ou seja, a linha viva de pergunta
       pendente ainda podia repintar no mesmo trecho visual do input antes da resposta automática.
@@ -5969,8 +5970,8 @@
       `LLM-B resposta recebida · aguardando LLM-B · Ns`.
 - [x] Correção aplicada: `shouldRenderTerminalLiveStatusLine()` agora retorna falso para
       `pendingQuestion` e `request_user_input` pendentes, mantendo `formatTerminalLiveStatusLine()`
-      formatável para diagnóstico/teste direto, mas impedindo o repaint periódico que compete com
-      o cursor humano.
+      formatável para diagnóstico/teste direto, mas impedindo o repaint periódico que compete com o
+      cursor humano.
 - [x] Contrato live reforçado: o runner ganhou critério
       `ux-question-live-status-does-not-compete-with-input`, bloqueando `SIMSIM` e status de
       pergunta pendente colado ao prompt.
@@ -5979,15 +5980,16 @@
   - Resultado: `Status: PASS`; o novo critério `ux-question-live-status-does-not-compete-with-input`
     passou, o prompt mostrou `você...[PERG]› SIM` sem `SIMSIM`, e `/events 60` manteve apenas
     transcript, pergunta, resposta, uso LLM e final pós-pergunta.
-- [x] Evidência positiva adicional: `/activity 40` mostrou somente `Arquivo leitura · package.json
-      ×2` no resumo consolidado, sem duplicata absoluto/relativo.
-- [x] Achado visual remanescente: o bloco durável de resumo do turno ainda exibiu `Arquivos LER
-      package.json · LER package.json`, porque `renderTurnTraceSummary()` usava os arquivos crus do
-      trace e não a chave visual humana.
+- [x] Evidência positiva adicional: `/activity 40` mostrou somente
+      `Arquivo leitura · package.json     ×2` no resumo consolidado, sem duplicata
+      absoluto/relativo.
+- [x] Achado visual remanescente: o bloco durável de resumo do turno ainda exibiu
+      `Arquivos LER     package.json · LER package.json`, porque `renderTurnTraceSummary()` usava os
+      arquivos crus do trace e não a chave visual humana.
 - [x] Correção aplicada: `sdk-session-events.js` ganhou `selectTerminalTurnTraceSummaryFiles()`,
       deduplicando o resumo visual por operação + caminho humano sem apagar o trace bruto.
-- [x] Teste unitário: `test_sdk_session_events_turn_summary.spec.js` cobre que
-      `package.json` relativo e `/workspaces/.../package.json` viram uma única linha no resumo.
+- [x] Teste unitário: `test_sdk_session_events_turn_summary.spec.js` cobre que `package.json`
+      relativo e `/workspaces/.../package.json` viram uma única linha no resumo.
 - [x] Contrato live reforçado: o runner ganhou `ux-turn-file-summary-deduped`, reprovando a linha
       `Arquivos LER package.json · LER package.json` no default antes dos diagnósticos crus.
 - [x] Live executada:
@@ -6015,17 +6017,17 @@
 - [x] Correção aplicada: `printTurnTraceSummary()` agora calcula arquivos únicos agregados para o
       default; em `detail`, quando há diferença, mostra `1 arquivo único · 2 registros`, preservando
       a informação bruta sem poluir o resumo humano.
-- [x] Contrato live reforçado: o runner ganhou
-      `ux-activity-post-turn-timeline-operational`, validando a última seção `/activity 40` e
-      reprovando `inicialização`/`Processando mensagem` no default pós-turno.
+- [x] Contrato live reforçado: o runner ganhou `ux-activity-post-turn-timeline-operational`,
+      validando a última seção `/activity 40` e reprovando `inicialização`/`Processando mensagem` no
+      default pós-turno.
 - [x] Live executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --timeout-ms=220000 --transport=pty --out-dir=artifacts/terminal-live/live-canonical-activity-timeline-operational-20260605-0425`.
   - Resultado: `Status: PASS`; `ux-activity-post-turn-timeline-operational` passou; `/activity 40`
     pós-turno mostrou timeline com pergunta, conclusão e ferramentas, sem boot/processamento; o
     resumo mostrou `Arquivos 1` e `Arquivo leitura · package.json ×2`.
 - [x] Achado visual remanescente: em PTY estreito, a linha viva pós-`SIM` ainda quebrou em duas
-      linhas como `LLM-B resposta recebida · aguardando LLM-B ·` / `0s`, apesar de não competir
-      mais com o input.
+      linhas como `LLM-B resposta recebida · aguardando LLM-B ·` / `0s`, apesar de não competir mais
+      com o input.
 - [x] Decisão UX: após a resposta humana, o histórico/card já explica a autoria; a linha viva deve
       ser apenas o pulso de continuação. Texto canônico: `LLM-B continuando · Ns`.
 - [x] Correção aplicada: `live-status-line.js` encurtou `phase=question` pós-resposta para
@@ -6039,8 +6041,8 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-question-output-guard-20260605-0516 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T05-16-03-451Z/summary.md`.
   - Resultado: `Status: PASS`; `ux-answer-live-status-stays-single-line`,
-    `ux-activity-post-turn-timeline-operational` e `ux-no-durable-tool-output-inside-question-prompt`
-    passaram.
+    `ux-activity-post-turn-timeline-operational` e
+    `ux-no-durable-tool-output-inside-question-prompt` passaram.
 - [x] Evidência visual: `terminal.plain.log` mostrou uma única linha
       `você[kilo-auto…/high][PERG]› SIM`; grep confirmou ausência de `Ferramenta`, `Arquivo`,
       `Concluído`, `Falhou` ou `Turno` na linha do prompt `[PERG]`.
@@ -6048,8 +6050,8 @@
       no mesmo lote `preToolUse`; nessa corrida, `Arquivo leitura` e `Concluído Ler arquivo` podiam
       ser impressos enquanto a pergunta humana estava ativa, poluindo o input.
 - [x] Decisão UX: enquanto o terminal aguarda pergunta humana, o card/prompt `[PERG]` é superfície
-      exclusiva. Tools e I/O podem continuar no ledger canônico (`/activity`, `/events`, SSE,
-      turn trace), mas não devem disputar stdout durável com o input humano.
+      exclusiva. Tools e I/O podem continuar no ledger canônico (`/activity`, `/events`, SSE, turn
+      trace), mas não devem disputar stdout durável com o input humano.
 - [x] Correção estrutural: `ToolCallRegistry` ganhou `suppressLiveNarration()` e
       `shouldSuppressLiveNarration()`, preservando a decisão mesmo quando `hook.start` chega antes
       ou depois de `tool.execution_start`.
@@ -6060,9 +6062,8 @@
       gravados em activity, lifecycle SSE e turn trace.
 - [x] Teste unitário: `test_io_activity_events.spec.js` cobre I/O correlacionado a tool silenciosa e
       I/O emitido durante `waiting_for_input/question`, ambos sem `println` e com SSE preservado.
-- [x] Contrato live reforçado: o runner ganhou
-      `ux-no-durable-tool-output-inside-question-prompt`, bloqueando tool/file/turn na linha
-      `[PERG]›`.
+- [x] Contrato live reforçado: o runner ganhou `ux-no-durable-tool-output-inside-question-prompt`,
+      bloqueando tool/file/turn na linha `[PERG]›`.
 - [x] Contrato live reforçado: o runner ganhou `ux-no-durable-output-inside-default-prompt`,
       protegendo também o prompt ocioso normal `você›` contra linhas duráveis grudadas.
 - [x] Achado UX: `/activity 40` default ainda podia repetir categoria e label na timeline, como
@@ -6073,9 +6074,9 @@
       `Tarefa`, `Turno`).
 - [x] Teste unitário: `test_commands_activity.spec.js` cobre que `Tarefa em segundo plano concluída`
       aparece sem prefixo duplicado `tarefa ·`.
-- [x] Contrato live reforçado: o runner ganhou `ux-activity-no-redundant-timeline-labels`, reprovando
-      `ferramenta · Ferramenta`, `pergunta · Pergunta`, `tarefa · Tarefa` e `turno · Turno` no
-      `/activity 40` default pós-turno.
+- [x] Contrato live reforçado: o runner ganhou `ux-activity-no-redundant-timeline-labels`,
+      reprovando `ferramenta · Ferramenta`, `pergunta · Pergunta`, `tarefa · Tarefa` e
+      `turno · Turno` no `/activity 40` default pós-turno.
 - [x] Validação focada:
   - `node --check src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
@@ -6083,12 +6084,12 @@
 - [x] Live de auditoria pós-critério executada:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-activity-labels-20260605-0522 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T05-22-09-678Z/summary.md`.
-  - Resultado: `Status: FAIL`; a live revelou `você[kilo-auto…/high]›   Falhou ... tool genérica`
-    e ausência de materialização/export da pergunta quando o SDK primeiro tentou `ask_user` com
-    schema inválido.
-- [x] Decisão UX: stdout durável não pode depender apenas de carriage-return/ANSI para sair da
-      linha viva; logs plain, VS Code terminal e operador humano precisam ver uma separação física
-      clara entre prompt e eventos permanentes.
+  - Resultado: `Status: FAIL`; a live revelou `você[kilo-auto…/high]›   Falhou ... tool genérica` e
+    ausência de materialização/export da pergunta quando o SDK primeiro tentou `ask_user` com schema
+    inválido.
+- [x] Decisão UX: stdout durável não pode depender apenas de carriage-return/ANSI para sair da linha
+      viva; logs plain, VS Code terminal e operador humano precisam ver uma separação física clara
+      entre prompt e eventos permanentes.
 - [x] Correção aplicada: `printlnBlock()` agora abre uma quebra real antes de blocos duráveis quando
       há readline ativo sem input humano parcial, preservando a limpeza ANSI e impedindo
       `você› Uso do modelo`/`você› Falhou` no mesmo registro visual.
@@ -6103,8 +6104,7 @@
   - `test_tool_lifecycle_runtime.spec.js` cobre que falha de `ask_user` grava/imprime pergunta
     humana e não `tool genérica`.
 - [x] Contrato live reforçado: o runner ganhou `ux-no-generic-tool-failure-copy`, além de
-      `ux-no-durable-output-inside-default-prompt` e
-      `ux-activity-no-redundant-timeline-labels`.
+      `ux-no-durable-output-inside-default-prompt` e `ux-activity-no-redundant-timeline-labels`.
 - [x] Validação focada:
   - `node --check src/copilot/terminal/dialog/output.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/tool-lifecycle-runtime.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
   - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js`.
@@ -6122,10 +6122,12 @@
 - [x] Decisão UX: durante `phase=boot`, blocos duráveis (`printlnBlock`) não devem redesenhar prompt
       automaticamente. A linha viva pode reservar sua área e pintar o prompt uma vez; o prompt final
       pós-boot deve ser agendado explicitamente quando a atividade marca `Pronto`.
-- [x] Correção aplicada: `redrawPromptIfInteractive()` agora ignora atividade `boot`; `_tryStartDialogLoop()`
-      agenda `buildUserPrompt()` depois de `markTerminalActivityIdle('Sessão retomada...')`.
-- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que `printlnBlock('Preparando
-      agente...')` escreve a linha permanente, mas não chama `setPrompt()`/`prompt()` durante boot.
+- [x] Correção aplicada: `redrawPromptIfInteractive()` agora ignora atividade `boot`;
+      `_tryStartDialogLoop()` agenda `buildUserPrompt()` depois de
+      `markTerminalActivityIdle('Sessão retomada...')`.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que
+      `printlnBlock('Preparando     agente...')` escreve a linha permanente, mas não chama
+      `setPrompt()`/`prompt()` durante boot.
 - [x] Contrato live reforçado: o runner ganhou `ux-no-boot-prompt-double-paint`, bloqueando dois
       prompts idênticos antes de `LLM-B pronta`.
 - [x] Validação focada:
@@ -6161,8 +6163,8 @@
 - [x] Live de confirmação parcial:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-question-prompt-redraw-20260605-0243 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T05-42-49-136Z/summary.md`.
-  - Resultado geral: `Status: BLOCKED` por `assistant-empty-turn` na continuação pós-pergunta, mas
-    o `terminal.plain.log` mostrou `você[kilo-auto…/high][PERG]› SIM`, confirmando a correção do
+  - Resultado geral: `Status: BLOCKED` por `assistant-empty-turn` na continuação pós-pergunta, mas o
+    `terminal.plain.log` mostrou `você[kilo-auto…/high][PERG]› SIM`, confirmando a correção do
     prompt humano.
 - [x] Achado no harness: quando o bloqueio ocorre depois de deltas/tools/pergunta já materializados,
       o resumo antigo trocava a suíte completa por `root-cause-not-ux-duplication`, apagando sinais
@@ -6186,11 +6188,11 @@
 - [x] Correção aplicada: `sdk-session-events.js` deixou de chamar `refreshPromptIfIdle()` em
       `user_input.completed`; a conclusão da pergunta agora registra transcript/SSE/activity sem
       disputar repaint com a continuação do modelo.
-- [x] Correção estrutural: `dialog/output.js` ganhou
-      `parkTerminalPromptForContinuation()`, uma primitiva transitória de TTY para estacionar o
-      prompt normal durante a continuação pós-resposta humana. Enquanto o estacionamento está ativo,
-      pinturas de prompt usam `buildWaitingPrompt()`; quando a atividade volta a `idle` ou o prazo
-      expira, o prompt normal volta automaticamente.
+- [x] Correção estrutural: `dialog/output.js` ganhou `parkTerminalPromptForContinuation()`, uma
+      primitiva transitória de TTY para estacionar o prompt normal durante a continuação
+      pós-resposta humana. Enquanto o estacionamento está ativo, pinturas de prompt usam
+      `buildWaitingPrompt()`; quando a atividade volta a `idle` ou o prazo expira, o prompt normal
+      volta automaticamente.
 - [x] Barrel preservado: `dialog/index.js` exporta `parkTerminalPromptForContinuation()` e
       `repl-lifecycle.js` consome a função pelo barrel público.
 - [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que, com prompt estacionado,
@@ -6209,26 +6211,27 @@
 - [x] Live canônica pós-estacionamento do prompt:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-canonical-post-answer-prompt-parked-after-commit-20260605-0322 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T06-03-15-731Z/summary.md`.
-  - Resultado: `Status: PASS`; o terminal materializou `você[kilo-auto…/high][PERG]› SIM`,
-    imprimiu `Resposta enviada para pergunta pendente`, estacionou o prompt normal como
-    `LLM-B pensando` durante a continuação, materializou `POST-ASK-CANONICAL-FINAL: usuário
-    confirmou SIM` e passou `no-prompt-double-render`, `ask-user-input-prompt-visible`,
-    `post-ask-final-visible`, `no-terminal-errors`, export e correlação SSE.
+  - Resultado: `Status: PASS`; o terminal materializou `você[kilo-auto…/high][PERG]› SIM`, imprimiu
+    `Resposta enviada para pergunta pendente`, estacionou o prompt normal como `LLM-B pensando`
+    durante a continuação, materializou `POST-ASK-CANONICAL-FINAL: usuário confirmou SIM` e passou
+    `no-prompt-double-render`, `ask-user-input-prompt-visible`, `post-ask-final-visible`,
+    `no-terminal-errors`, export e correlação SSE.
 - [ ] Próxima frente UX: auditar a sincronização entre comandos injetados pelo harness e prompt
       real, porque o log plain ainda mostra comandos como `/usage now` colados ao prompt em alguns
-      trechos; confirmar se é artefato de `script`/ANSI ou desalinhamento visível no terminal humano.
+      trechos; confirmar se é artefato de `script`/ANSI ou desalinhamento visível no terminal
+      humano.
 - [x] Auditoria inicial: o primeiro `/usage now` com prompt na mesma linha é esperado em TTY, pois
       representa o comando digitado no prompt humano; porém `/activity 12` e o prompt do cenário
       eram enviados imediatamente depois, antes de o REPL voltar ao prompt.
-- [x] Decisão: lives canônicas devem dirigir o terminal como operador humano, aguardando prompt entre
-      comandos de pré-diagnóstico. Rajadas rápidas continuam úteis em testes de stress, mas não no
-      baseline estético usado para comparar UX real.
+- [x] Decisão: lives canônicas devem dirigir o terminal como operador humano, aguardando prompt
+      entre comandos de pré-diagnóstico. Rajadas rápidas continuam úteis em testes de stress, mas
+      não no baseline estético usado para comparar UX real.
 - [x] Correção aplicada: o caminho canônico do runner passou a usar
       `startPromptSynchronizedCommandSequence(['/usage now', '/activity 12'], ...)` antes de enviar
       o prompt do cenário, reaproveitando o mecanismo já usado por lives BYOK/no-PR.
 - [x] Achado crítico exposto pela live sincronizada: após `/usage now`, o REPL podia não repintar o
-      prompt quando o comando terminava dentro da janela curta de dedupe de prompt. O terminal seguia
-      aceitando input, mas a superfície humana parecia parada, sem linha pronta.
+      prompt quando o comando terminava dentro da janela curta de dedupe de prompt. O terminal
+      seguia aceitando input, mas a superfície humana parecia parada, sem linha pronta.
 - [x] Decisão UX: dedupe continua válido para eventos assíncronos, streaming, tools e pergunta
       humana; conclusão de comando explícito (`/...`) é uma fronteira de interação humana e deve
       forçar repaint do prompt mesmo que o texto seja idêntico ao anterior.
@@ -6247,15 +6250,15 @@
       imediatos via `{ force: true }`, e prompt de pergunta humana não deve ser adiado quando a
       pergunta já estiver ativa.
 - [x] Correção aplicada: `deferTerminalIdlePromptRedraw()` foi adicionada ao renderer central,
-      exportada pelo barrel `dialog/index.js` e chamada no final de turno em `dialog/engine.js` antes
-      de `markTerminalActivityIdle()`. A função adia apenas prompt idle não-forçado e reaproveita a
-      mesma fila de redraw para não criar uma segunda superfície de prompt.
+      exportada pelo barrel `dialog/index.js` e chamada no final de turno em `dialog/engine.js`
+      antes de `markTerminalActivityIdle()`. A função adia apenas prompt idle não-forçado e
+      reaproveita a mesma fila de redraw para não criar uma segunda superfície de prompt.
 - [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre que prompt idle pós-turno é
       adiado, enquanto repaint forçado de comando explícito segue imediato.
 - [x] Achado adicional: em comandos rápidos, `readline` pode manter `rl.line` preenchido por um tick
-      depois de emitir o evento `line`. O scheduler respeitava esse valor mesmo com `{ force: true }`,
-      então o prompt pós-comando podia sumir e o harness enviava o próximo comando sem superfície
-      visual pronta.
+      depois de emitir o evento `line`. O scheduler respeitava esse valor mesmo com
+      `{ force: true }`, então o prompt pós-comando podia sumir e o harness enviava o próximo
+      comando sem superfície visual pronta.
 - [x] Correção aplicada: repaint forçado ignora `rl.line` stale apenas dentro do redraw agendado com
       `{ force: true }`. Redraw normal continua protegendo input humano parcial.
 - [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre repaint forçado com
@@ -6273,8 +6276,8 @@
       de deltas, tools e pergunta.
 - [x] Tentativa rejeitada: atrasar o repaint pós-comando para o próximo macrotask em
       `repl-lifecycle.js` gerou regressão pior:
-      `artifacts/terminal-live/2026-06-04T06-24-16-588Z/summary.md` falhou
-      `no-prompt-double-render` com `você› você›` antes do export. A mudança foi revertida.
+      `artifacts/terminal-live/2026-06-04T06-24-16-588Z/summary.md` falhou `no-prompt-double-render`
+      com `você› você›` antes do export. A mudança foi revertida.
 - [ ] Próxima frente UX: tratar prelude/diagnósticos do harness como fila de comandos com critério
       próprio, sem alterar novamente o repaint canônico do REPL até haver evidência mais clara do
       comportamento humano real.
@@ -6289,8 +6292,8 @@
 - [x] Auditoria pós-compactação: `/health full`/`/diagnose full` ainda preservavam rótulos de
       implementação em uma tela humana detalhada: `MCP bridge`, `Hub storage`, `Boot report`,
       `Shutdown`, `Timers` e `preflight SDK`.
-- [x] Decisão UX: `full` é painel humano detalhado, não dump bruto. Termos de implementação ficam
-      em `detail`, `raw`, `/events --raw`, JSON/export ou em código/testes; a tela humana deve usar
+- [x] Decisão UX: `full` é painel humano detalhado, não dump bruto. Termos de implementação ficam em
+      `detail`, `raw`, `/events --raw`, JSON/export ou em código/testes; a tela humana deve usar
       nomes operacionais consistentes com a gramática do restante do terminal.
 - [x] Correção aplicada: `diagnose.js` removeu o mini-sistema ANSI local e passou a usar
       `terminalThemeText()` como fonte única de cores. A seção de infraestrutura agora fala em
@@ -6303,16 +6306,16 @@
       usa regex para validar colunas alinhadas sem depender de espaçamento fixo.
 - [x] Validação escopada: `node --check`, `vitest` de `test_commands_diagnose.spec.js` e `eslint`
       para `diagnose.js`/teste passaram.
-- [ ] Próxima frente UX: auditar `/status`, `/usage`, `/activity detail` e comandos de sessão para
-      o mesmo contrato: default/full humano, detail/raw técnico, sem misturar IDs e nomes internos
-      no fluxo principal do operador.
+- [ ] Próxima frente UX: auditar `/status`, `/usage`, `/activity detail` e comandos de sessão para o
+      mesmo contrato: default/full humano, detail/raw técnico, sem misturar IDs e nomes internos no
+      fluxo principal do operador.
 
 ### 12.44 Activity sem identificadores de tool no fluxo humano
 
 - [x] Auditoria: `/activity` ainda podia mostrar `Executando tool` e `web_fetch` no modo padrão,
       reproduzindo o aspecto cru das screenshots mesmo depois das correções de `report_intent`.
-- [x] Decisão UX: detalhes textuais compactos podem conter o nome operacional da ferramenta, mas
-      não o identificador técnico quando existir nome humano canônico no presenter central.
+- [x] Decisão UX: detalhes textuais compactos podem conter o nome operacional da ferramenta, mas não
+      o identificador técnico quando existir nome humano canônico no presenter central.
 - [x] Correção aplicada: `tool-activity-presenter.js` ganhou nomes humanos para ferramentas web
       (`web_fetch`, `web_search`, `fetch_url`), e `activity.js` passou a humanizar identificadores
       conhecidos dentro de labels e detalhes compactos.
@@ -6358,8 +6361,8 @@
       ferramenta conhecido deve ser traduzido antes de chegar nela. Diagnose full deve seguir o
       mesmo contrato.
 - [x] Correção aplicada: `live-status-line.js` humaniza identificadores conhecidos em labels e
-      detalhes compactos, troca `Executando tool`/`Tool concluída`/`Tool falhou` por
-      `ferramenta`, e mantém IDs internos compactados como `id interno`.
+      detalhes compactos, troca `Executando tool`/`Tool concluída`/`Tool falhou` por `ferramenta`, e
+      mantém IDs internos compactados como `id interno`.
 - [x] Correção aplicada: `diagnose.js` passou a humanizar labels/detalhes de atividade antes de
       renderizar `Atividade`/`Atual`.
 - [x] Teste unitário: `test_live_status_line.spec.js` bloqueia retorno de `Executando tool` e
@@ -6386,8 +6389,8 @@
       curta e sem despejar `/byok model`, modelo ou detalhe cru.
 - [x] Correção aplicada: `dialog/engine.js` removeu ANSI manual do erro BYOK de turno, trocando a
       linha crua `[byok] ... sem Premium Request` por rows temáticas `BYOK` e `Ação`.
-- [x] Correção aplicada: admission control e atividades de falha BYOK passaram a usar `provedor
-      BYOK` e `sem pedido premium`.
+- [x] Correção aplicada: admission control e atividades de falha BYOK passaram a usar
+      `provedor     BYOK` e `sem pedido premium`.
 - [x] Teste unitário: `test_commands_events.spec.js` e `test_live_status_line.spec.js` bloqueiam
       retorno de `provider BYOK`/`provider openai` no output humano.
 - [x] Validação escopada: `vitest` de eventos/linha viva/activity e `eslint` dos arquivos alterados
@@ -6442,9 +6445,9 @@
 - [x] Contrato live atualizado: `llm-usage-visible` aceita a cópia humanizada
       `Uso BYOK sem pedido premium`/`Telemetria LLM sem pedido premium`; novo critério
       `ux-live-status-not-input-prompt` bloqueia linhas standalone `LLM-B pensando`.
-- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` agora cobre os dois modos:
-      linha viva ativa preserva prompt humano; linha viva desligada preserva prompt de espera
-      estacionado como fallback.
+- [x] Teste unitário: `test_dialog_output_inline_status.spec.js` agora cobre os dois modos: linha
+      viva ativa preserva prompt humano; linha viva desligada preserva prompt de espera estacionado
+      como fallback.
 - [x] Validação escopada:
   - `node --check src/copilot/terminal/dialog/output.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
   - `npx vitest run tests/unit/copilot/terminal/test_dialog_output_inline_status.spec.js`.
@@ -6460,8 +6463,8 @@
     humano e, logo depois, a linha viva da continuação reservava status e repintava outro prompt
     humano. O problema deixou de ser `LLM-B pensando` no input e virou competição entre dois
     produtores legítimos de prompt.
-- [x] Correção aplicada: `println()`/`printlnBlock()` ganharam opção `{ redrawPrompt: false }`.
-      O ACK positivo de resposta humana usa essa opção, preservando a linha durável, mas deixando a
+- [x] Correção aplicada: `println()`/`printlnBlock()` ganharam opção `{ redrawPrompt: false }`. O
+      ACK positivo de resposta humana usa essa opção, preservando a linha durável, mas deixando a
       continuação da LLM-B repintar a superfície uma única vez pela linha viva.
 - [x] Teste unitário: `test_dialog_output_inline_status.spec.js` cobre bloco durável sem redraw de
       prompt para handoff pós-resposta humana.
@@ -6480,9 +6483,9 @@
   - Artefato: `artifacts/terminal-live/2026-06-04T07-06-25-402Z/summary.md`.
   - Resultado geral: `Status: BLOCKED` por `assistant-ended-before-ask`, mas o runner ficou
     silencioso até o timeout e não coletou export/diagnósticos completos.
-  - Achado de harness/UX: o diagnóstico de “deltas concluídos, ask obrigatório ausente” dependia
-    de detectar prompt final por regex; em alguns PTYs a linha de prompt não fica no formato exato
-    do regex, então o scheduler nunca arma.
+  - Achado de harness/UX: o diagnóstico de “deltas concluídos, ask obrigatório ausente” dependia de
+    detectar prompt final por regex; em alguns PTYs a linha de prompt não fica no formato exato do
+    regex, então o scheduler nunca arma.
 - [x] Correção aplicada no runner: `scheduleMissingRequiredAskDiagnostics()` passa a ser acionado
       pelo próprio fim semântico do turno (`DELTA-CANONICAL-8` + retorno/assistant.message), sem
       exigir `hasReturnedToReplPrompt()`. O pacote de diagnóstico ganhou `/tools diag` e
@@ -6508,10 +6511,9 @@
 - [x] Tentativa `invalid-choice` pós-runner multi-step:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=invalid-choice --label live-terminal-ux-invalid-choice-no-prompt-double-retry-20260604 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T07-16-42-720Z/summary.md`.
-  - Resultado geral: `Status: BLOCKED` por `assistant-empty-turn`; o provider BYOK cancelou o
-    turno antes de materializar `ask_user`/final. O bloqueio impediu validação do handoff
-    pós-resposta, mas o terminal exibiu erro BYOK compacto, sem janela de permissão e sem spam de
-    espera.
+  - Resultado geral: `Status: BLOCKED` por `assistant-empty-turn`; o provider BYOK cancelou o turno
+    antes de materializar `ask_user`/final. O bloqueio impediu validação do handoff pós-resposta,
+    mas o terminal exibiu erro BYOK compacto, sem janela de permissão e sem spam de espera.
 - [ ] Próxima live obrigatória: repetir cenário canônico com PTY para confirmar que
       `ux-live-status-not-input-prompt`, `llm-usage-visible`, `no-prompt-double-render`,
       `ask-user-input-prompt-visible`, export/SSE e `clean-quit` passam juntos.
@@ -6520,23 +6522,25 @@
 
 - [x] Auditoria live: `artifacts/terminal-live/2026-06-04T07-16-42-720Z/summary.md` bloqueou por
       `assistant-empty-turn`, mas revelou linhas humanas ainda com cheiro de adaptador cru:
-      `Provedor BYOK  Erro do SDK sem mensagem estruturada.`, `Evento cancellation · Operation
-      cancelled by user`, `Turno terminou sem saída pública...` com ANSI manual e símbolo de erro
-      fora do tema, além de `Fallback` com texto de contrato ainda longo.
+      `Provedor BYOK  Erro do SDK sem mensagem estruturada.`,
+      `Evento cancellation · Operation     cancelled by user`, `Turno terminou sem saída pública...`
+      com ANSI manual e símbolo de erro fora do tema, além de `Fallback` com texto de contrato ainda
+      longo.
 - [x] Decisão UX: `/events raw`, SSE e export técnico podem preservar payloads originais; a tela
       padrão do operador não pode imprimir inglês de SDK, labels genéricos como `Evento`, nem ANSI
-      manual. Todo evento visível deve passar por label humano, detalhe compacto e `terminalThemeRow`.
+      manual. Todo evento visível deve passar por label humano, detalhe compacto e
+      `terminalThemeRow`.
 - [x] Correção: `dialog/engine.js` trocou a mensagem crua de turno vazio por rows temáticas
       `Turno`/`Diagnóstico`, sem símbolo manual, mantendo SSE e `/activity` como drill-down.
 - [x] Correção: `sdk-session-events.js` renderiza `infoType=cancellation` como
       `Cancelamento · operação cancelada pelo operador`, e avisos como `Aviso da sessão`, sem
       `Warning SDK`.
-- [x] Correção: `agent-runtime-events.js` humaniza o bloco BYOK recuperável na origem:
-      label curto, `provedor` em português, ação clara, e fallback como consequência operacional,
-      sem repetir `Erro do SDK sem mensagem estruturada` como primeira coisa que o operador vê.
-- [x] Testes: casos unitários escopados cobrem cancelamento/session warning/BYOK
-      recuperável/turno vazio humano, bloqueando `Operation cancelled by user`, `Warning SDK`,
-      ANSI manual e `provider BYOK` no stdout humano.
+- [x] Correção: `agent-runtime-events.js` humaniza o bloco BYOK recuperável na origem: label curto,
+      `provedor` em português, ação clara, e fallback como consequência operacional, sem repetir
+      `Erro do SDK sem mensagem estruturada` como primeira coisa que o operador vê.
+- [x] Testes: casos unitários escopados cobrem cancelamento/session warning/BYOK recuperável/turno
+      vazio humano, bloqueando `Operation cancelled by user`, `Warning SDK`, ANSI manual e
+      `provider BYOK` no stdout humano.
 - [x] Validação escopada:
   - `node --check src/copilot/terminal/dialog/engine.js src/copilot/terminal/events/sdk-session-events.js src/copilot/terminal/events/agent-runtime-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
   - `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/test_terminal_agent_runtime_events.spec.js tests/unit/copilot/terminal/test_dialog_runtime.spec.js`.
@@ -6545,16 +6549,16 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --scenario canonical --label live-terminal-ux-runtime-human-events-20260604 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T07-27-34-180Z/summary.md`.
   - Resultado geral: `Status: PASS`. Passaram `ux-no-raw-sdk-info-labels`,
-    `ux-live-status-not-input-prompt`, `no-prompt-double-render`,
-    `ask-user-input-prompt-visible`, `llm-usage-visible`, export/SSE e `clean-quit`.
+    `ux-live-status-not-input-prompt`, `no-prompt-double-render`, `ask-user-input-prompt-visible`,
+    `llm-usage-visible`, export/SSE e `clean-quit`.
   - Confirmação visual: `Configuração ferramentas nativas desativadas`, pergunta `[PERG]`,
     `Uso BYOK sem pedido premium`, `/events` humano e `/errors` limpo apareceram corretamente.
 - [x] Achado visual extra da live: a linha viva de ferramenta ainda podia quebrar em várias linhas
       físicas no PTY estreito porque o fallback genérico anexava detalhe, modelo, raciocínio e
       estado da conversa: `LLM-B ferramenta · ... Ler` seguido por `arquivo ... modelo ...`.
-- [x] Correção aplicada: `live-status-line.js` ganhou caminho compacto específico para
-      `phase=tool`, renderizando apenas `LLM-B ferramenta · <nome humano> · <duração>`, com
-      detalhes completos preservados nas linhas duráveis e em `/activity`.
+- [x] Correção aplicada: `live-status-line.js` ganhou caminho compacto específico para `phase=tool`,
+      renderizando apenas `LLM-B ferramenta · <nome humano> · <duração>`, com detalhes completos
+      preservados nas linhas duráveis e em `/activity`.
 - [x] Contrato live reforçado: o runner ganhou `ux-tool-live-status-stays-single-line`, bloqueando
       quebra física da linha viva de ferramenta e caudas `modelo`/`raciocínio`/`conversa ativa`.
 - [x] Live canônica pós-compactação de ferramenta:
@@ -6568,14 +6572,14 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=invalid-choice --label live-terminal-ux-invalid-choice-feedback-spacing-20260604 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T07-46-09-370Z/summary.md`.
   - Resultado geral: `Status: PASS`.
-  - Confirmação: `TALVEZ` foi rejeitado localmente, o prompt `[PERG]` permaneceu pronto,
-    `SIM` foi aceito, a resposta pós-pergunta saiu por `assistant.message`, `/activity`,
-    `/events`, `/errors`, `/health`, export/SSE e `clean-quit` passaram.
+  - Confirmação: `TALVEZ` foi rejeitado localmente, o prompt `[PERG]` permaneceu pronto, `SIM` foi
+    aceito, a resposta pós-pergunta saiu por `assistant.message`, `/activity`, `/events`, `/errors`,
+    `/health`, export/SSE e `clean-quit` passaram.
 - [x] Correção de harness descoberta antes do PASS:
   - quando a LLM-B concluía os deltas mas não chamava `ask_user`, o timeout encerrava com `/quit`
     antes de coletar `/activity`, `/events`, `/errors`, `/health` e `/export`;
-  - o runner agora detecta `assistant-ended-before-ask` também com apoio dos eventos SSE vivos e,
-    no timeout, executa diagnósticos/export antes de encerrar ou matar o processo.
+  - o runner agora detecta `assistant-ended-before-ask` também com apoio dos eventos SSE vivos e, no
+    timeout, executa diagnósticos/export antes de encerrar ou matar o processo.
 - [x] Correção de harness para choice inválido:
   - o feedback real usa layout tabular (`Resposta      não corresponde...`), então o detector de
     `invalid-choice` passou a aceitar espaçamento visual da UI, não apenas logs com espaço único.
@@ -6607,11 +6611,11 @@
   - Achado UX crítico: o terminal imprimia `Concluído ... Executar comando` a partir de
     `external_completed success=true` e logo depois `Falhou ... Executar comando` a partir do
     `postToolUse` estruturado. A timeline ficava contraditória, e `/tools`/`/health` ainda diziam
-    `sem falhas` porque a telemetria agregada tratava handler retornado como sucesso mesmo quando
-    o payload era `{ success:false }`.
-- [x] Decisão arquitetural: para operações de terminal (`operation=run`), `external_completed`
-      sem resultado estruturado é sinal provisório, não conclusão visual. A verdade operacional
-      vem do `postToolUse` ou do reconciliador de fim de turno.
+    `sem falhas` porque a telemetria agregada tratava handler retornado como sucesso mesmo quando o
+    payload era `{ success:false }`.
+- [x] Decisão arquitetural: para operações de terminal (`operation=run`), `external_completed` sem
+      resultado estruturado é sinal provisório, não conclusão visual. A verdade operacional vem do
+      `postToolUse` ou do reconciliador de fim de turno.
 - [x] Correção aplicada: `handleTerminalExternalToolCompleted()` deixa de imprimir, arquivar em
       `/activity`, fechar registry ou emitir `external_completed` visual para execução local
       provisória. A entrada fica ativa para o `postToolUse` correlacionar corretamente.
@@ -6624,8 +6628,8 @@
       handler (`success:false`, `ok:false`, `resultType=error`, `exitCode!=0`) como falha real,
       mesmo sem exceção. Isso corrige `/tools`, `/health` e métricas agregadas na fonte.
 - [x] Contrato live atualizado: `scenario-render-*` aceita o novo render humano
-      `Ferramenta`/`Concluído`/`Falhou` com nome legível, além do badge legado; `health-full`
-      aceita a cópia humana `Permissões automáticas · prompts SDK ignorados`.
+      `Ferramenta`/`Concluído`/`Falhou` com nome legível, além do badge legado; `health-full` aceita
+      a cópia humana `Permissões automáticas · prompts SDK ignorados`.
 - [x] Testes unitários:
   - `test_tool_lifecycle_runtime.spec.js` cobre reconciliação tardia de `exitCode=7` e bloqueia
     sucesso provisório visual em `external_completed` de `exec_command`.
@@ -6640,26 +6644,26 @@
 - [x] Tentativa live pós-correção de sucesso provisório:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-no-provisional-success-20260604 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-03-39-347Z/summary.md`.
-  - Resultado: `Status: BLOCKED` por `assistant-empty-turn`; a LLM-B chamou apenas
-    `report_intent`, encerrou o turno sem saída pública e não chegou a `read_file_content`,
-    `exec_command`, deltas ou `ask_user`.
+  - Resultado: `Status: BLOCKED` por `assistant-empty-turn`; a LLM-B chamou apenas `report_intent`,
+    encerrou o turno sem saída pública e não chegou a `read_file_content`, `exec_command`, deltas ou
+    `ask_user`.
   - Diagnóstico: a tentativa não exercitou a correção de `exec_command`; o bloqueio é aderência do
     modelo/turno, não regressão da UX de lifecycle.
-- [x] Bug de harness descoberto nessa live: a cópia nova da tela é `Turno sem saída pública`, mas
-      o detector de diagnóstico automático ainda esperava apenas `Turno terminou sem saída
-      pública`. Por isso o runner aguardou timeout e terminou com `conversation-export.md` n/a.
-- [x] Correção aplicada no runner: detectores de turno vazio agora aceitam
-      `Turno sem saída pública` e `Turno terminou sem saída pública`; o pacote automático desse
-      bloqueio coleta `/activity 40`, `/tools diag`, `/health full`, `/events`, `/errors` e
-      `/export`.
+- [x] Bug de harness descoberto nessa live: a cópia nova da tela é `Turno sem saída pública`, mas o
+      detector de diagnóstico automático ainda esperava apenas
+      `Turno terminou sem saída     pública`. Por isso o runner aguardou timeout e terminou com
+      `conversation-export.md` n/a.
+- [x] Correção aplicada no runner: detectores de turno vazio agora aceitam `Turno sem saída pública`
+      e `Turno terminou sem saída pública`; o pacote automático desse bloqueio coleta
+      `/activity 40`, `/tools diag`, `/health full`, `/events`, `/errors` e `/export`.
 - [x] Validação focada:
   - `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
   - `npx eslint scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
 - [ ] Próxima tentativa: executar `recoverable-tool-error` com rota/modelo mais aderente ou criar
-      ciclo diagnóstico controlado de lifecycle para provar a superfície visual enquanto o live
-      real continua sujeito à aderência do provider.
-- [x] Prompt do cenário `recoverable-tool-error` foi reescrito para ordem sequencial explícita:
-      não encerrar após `report_intent`, chamar `read_file_content`, depois `exec_command`, continuar
+      ciclo diagnóstico controlado de lifecycle para provar a superfície visual enquanto o live real
+      continua sujeito à aderência do provider.
+- [x] Prompt do cenário `recoverable-tool-error` foi reescrito para ordem sequencial explícita: não
+      encerrar após `report_intent`, chamar `read_file_content`, depois `exec_command`, continuar
       mesmo com `success=false/exitCode=7`, ler o arquivo novamente, só então emitir deltas e
       perguntar ao operador.
 - [x] Live `recoverable-tool-error` com prompt sequencial:
@@ -6671,14 +6675,14 @@
     `report_intent`, `read_file_content`, `exec_command` com `exitCode=7`, `read_file_content`
     novamente, emitiu os 8 deltas, chamou `ask_user`, recebeu `SIM` e materializou
     `POST-ASK-RECOVERABLE-FINAL`.
-  - Confirmação visual: a tela exibiu somente `Falhou Executar comando · executando comando falhou
-    (81ms · saída 7)`; não houve `Concluído Executar comando`, não houve `Falhou falhou`, e o
-    prompt humano permaneceu limpo.
-  - Confirmação diagnóstica: `/tools diag` mostrou `Executar comando uso 1 · sem bloqueios · 1
-    falha(s)`, lifecycle com `falhas recentes 1`, e `/health full` mostrou `Executar comando 0%
-    média 105ms (1 uso)`.
-  - Export/SSE: export gerado com 4091 chars, ask/answer/postAsk correlacionados, `no-terminal-errors`
-    e `clean-quit` passaram.
+  - Confirmação visual: a tela exibiu somente
+    `Falhou Executar comando · executando comando falhou (81ms · saída 7)`; não houve
+    `Concluído Executar comando`, não houve `Falhou falhou`, e o prompt humano permaneceu limpo.
+  - Confirmação diagnóstica: `/tools diag` mostrou
+    `Executar comando uso 1 · sem bloqueios · 1 falha(s)`, lifecycle com `falhas recentes 1`, e
+    `/health full` mostrou `Executar comando 0% média 105ms (1 uso)`.
+  - Export/SSE: export gerado com 4091 chars, ask/answer/postAsk correlacionados,
+    `no-terminal-errors` e `clean-quit` passaram.
 - [x] Critérios live corrigidos após a live: `renderedReadFileToolOk()` e `ux-human-tool-names`
       aceitam a nova linha `Concluído Ler arquivo ...` sem exigir o marcador textual `ok` removido
       da UX.
@@ -6695,34 +6699,34 @@
   - Artefato: `artifacts/terminal-live/2026-06-04T08-13-38-809Z/summary.md`.
   - Resultado formal: `Status: FAIL` apenas por falso negativo em
     `ux-tool-live-status-stays-single-line`.
-  - Diagnóstico: a linha viva real era `LLM-B ferramenta · Ler arquivo · 0s`; o harness tratava
-    `\r` de repintura TTY como quebra visual real e confundia a próxima linha durável com wrap.
+  - Diagnóstico: a linha viva real era `LLM-B ferramenta · Ler arquivo · 0s`; o harness tratava `\r`
+    de repintura TTY como quebra visual real e confundia a próxima linha durável com wrap.
 - [x] Correção aplicada: o critério `ux-tool-live-status-stays-single-line` agora considera quebra
       visual por `\n`, preservando `\r` como repintura de TTY/ANSI. O teste continua bloqueando
       cauda de modelo/runtime (`modelo`, `raciocínio`, `conversa ativa`) na linha viva.
 - [x] Live `recoverable-tool-error` com critério corrigido:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-formal-pass-20260604 --timeout-ms 240000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-17-12-174Z/summary.md`.
-  - Resultado: `Status: BLOCKED` por `assistant-ended-before-ask`. A LLM-B executou
-    `report_intent`, `read_file_content`, `exec_command` com `exitCode=7`, novo
-    `read_file_content`, emitiu os deltas, mas encerrou sem chamar `ask_user`.
+  - Resultado: `Status: BLOCKED` por `assistant-ended-before-ask`. A LLM-B executou `report_intent`,
+    `read_file_content`, `exec_command` com `exitCode=7`, novo `read_file_content`, emitiu os
+    deltas, mas encerrou sem chamar `ask_user`.
   - Sinal positivo de UX: a falha de `exec_command` permaneceu uma única linha humana
-    `Falhou Executar comando ... saída 7`; `/tools diag` e `/health full` registraram
-    `1 falha(s)` e `0%`.
-  - Gap de diagnóstico: `/activity 40` escolheu a leitura posterior como “Último turno concluído”
-    e escondia o `exec_command` falho como contexto principal, embora a timeline ainda mostrasse a
+    `Falhou Executar comando ... saída 7`; `/tools diag` e `/health full` registraram `1 falha(s)` e
+    `0%`.
+  - Gap de diagnóstico: `/activity 40` escolheu a leitura posterior como “Último turno concluído” e
+    escondia o `exec_command` falho como contexto principal, embora a timeline ainda mostrasse a
     falha.
 - [x] Decisão de harness: “deltas canônicos produzidos, mas `ask_user` obrigatório ausente” deve
       primeiro gerar continuação controlada curta, não timeout ou pós-mortem imediato. Se a
       continuação também encerrar sem `ask_user`, o runner coleta diagnóstico e bloqueia.
-- [x] Correção aplicada: o runner cria um turno de recuperação com instrução exclusiva para chamar
-      a tool real `ask_user`, sem repetir tools/deltas. A segunda avaliação olha apenas o trecho
+- [x] Correção aplicada: o runner cria um turno de recuperação com instrução exclusiva para chamar a
+      tool real `ask_user`, sem repetir tools/deltas. A segunda avaliação olha apenas o trecho
       posterior à continuação, evitando diagnosticar cedo demais olhando para o primeiro turno.
-- [x] Correção aplicada em `/activity`: `readTerminalActivityProjection()` amplia a janela de
-      turn traces conforme o limite do operador (`8..24`), e a escolha de “último turno útil”
-      prioriza falhas operacionais recentes antes de reads triviais posteriores.
-- [x] Teste unitário adicionado: `/activity 40` passa a priorizar `Executar comando · falhou` em
-      vez de uma leitura posterior bem-sucedida quando ambos estão nos traces recentes.
+- [x] Correção aplicada em `/activity`: `readTerminalActivityProjection()` amplia a janela de turn
+      traces conforme o limite do operador (`8..24`), e a escolha de “último turno útil” prioriza
+      falhas operacionais recentes antes de reads triviais posteriores.
+- [x] Teste unitário adicionado: `/activity 40` passa a priorizar `Executar comando · falhou` em vez
+      de uma leitura posterior bem-sucedida quando ambos estão nos traces recentes.
 - [x] Validação focada:
   - `node --check src/copilot/terminal/frontend/projections/now.js src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
@@ -6731,16 +6735,16 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=recoverable-tool-error --label live-terminal-ux-recoverable-tool-controlled-recovery-20260604 --timeout-ms 260000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-23-23-791Z/summary.md`.
   - Resultado: `Status: BLOCKED`. A LLM-B executou `report_intent`, `read_file_content`,
-    `exec_command` falho e novo `read_file_content`, mas chamou `ask_user` antes dos deltas
-    públicos obrigatórios; depois do `SIM`, a continuação pós-pergunta ficou vazia.
+    `exec_command` falho e novo `read_file_content`, mas chamou `ask_user` antes dos deltas públicos
+    obrigatórios; depois do `SIM`, a continuação pós-pergunta ficou vazia.
   - Confirmação UX: a falha real de comando permaneceu coerente em tela, `/tools diag` e
     `/health full`; o problema remanescente é aderência/ordem do modelo ao contrato do cenário.
   - Achado de diagnóstico: o blocker final `assistant-empty-after-user-input` escondia a causa
     anterior mais útil para o operador, que era `ask_user` cedo demais.
 - [x] Correção aplicada no runner: se `user_input.requested` aparece antes de um
-      `assistant.message`/delta com os 8 `DELTA-CANONICAL`, o runner não responde `SIM`; ele
-      coleta `/activity 40`, `/tools diag`, `/events`, `/errors`, `/health full` e export, e
-      classifica a causa como `assistant-asked-before-required-deltas`.
+      `assistant.message`/delta com os 8 `DELTA-CANONICAL`, o runner não responde `SIM`; ele coleta
+      `/activity 40`, `/tools diag`, `/events`, `/errors`, `/health full` e export, e classifica a
+      causa como `assistant-asked-before-required-deltas`.
 - [x] Correção refinada em `/activity`: falhas vazias sem ferramentas, arquivos ou operador não
       devem ocultar uma falha operacional recente com ferramenta real; o teste unitário cobre esse
       caso com um turno vazio falho antes de um read e de um `exec_command` falho.
@@ -6748,8 +6752,8 @@
   - `node --check src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
   - `npx vitest run tests/unit/copilot/terminal/test_commands_activity.spec.js`.
   - `npx eslint src/copilot/terminal/commands/activity.js tests/unit/copilot/terminal/test_commands_activity.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
-- [ ] Próxima live obrigatória: repetir `recoverable-tool-error`; aceitar `Status: PASS` direto
-      ou `Status: PASS` via continuação controlada, desde que ask/answer/postAsk, SSE/export,
+- [ ] Próxima live obrigatória: repetir `recoverable-tool-error`; aceitar `Status: PASS` direto ou
+      `Status: PASS` via continuação controlada, desde que ask/answer/postAsk, SSE/export,
       `/activity`, `/tools diag` e `/health full` permaneçam coerentes.
 
 ### 12.53 Turno vazio e eventos precisam orientar, não repetir
@@ -6761,15 +6765,15 @@
   - `/events` resumia `terminal.turn.empty_output`, mas não mostrava `deltaSlices/deltaChars`,
     porque o renderer procurava `deltaCount`.
 - [x] Decisão UX: duas camadas podem continuar emitindo sinais distintos, mas a cópia deve ser
-      complementar. A linha específica explica “continuação pós-pergunta”; a linha genérica deve
-      ser curta, operacional e acionável.
+      complementar. A linha específica explica “continuação pós-pergunta”; a linha genérica deve ser
+      curta, operacional e acionável.
 - [x] Correção aplicada: `recordTerminalExplicitEmptyOutput()` agora imprime:
   - `Turno vazio · sem resposta pública materializada; nenhuma pergunta humana pendente`;
   - `Próximo passo · /activity 40 · /events 60 · /byok health · reenvie ou troque modelo`.
 - [x] Correção aplicada: `/events` passa a resumir `deltaSlices/deltaChars` como
       `deltas 0/0 caracteres`, preservando evidência útil para diagnosticar turno vazio.
-- [x] Correção de contrato textual: teste de engine atualizado para `Falha de provedor BYOK no
-      turno`, alinhado ao vocabulário em português já usado pela UX.
+- [x] Correção de contrato textual: teste de engine atualizado para
+      `Falha de provedor BYOK no     turno`, alinhado ao vocabulário em português já usado pela UX.
 - [x] Validação focada:
   - `node --check src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js src/copilot/terminal/dialog/engine.js`.
   - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
@@ -6778,8 +6782,8 @@
 - [x] Correção aplicada: `dialog.empty_after_user_input` recebeu resumo próprio em `/events`,
       incluindo `continuação pós-pergunta terminou sem texto público`, resposta humana quando
       disponível e ação sugerida (`/activity 40 · /events 60 · reenviar ou trocar modelo`).
-- [x] Decisão UX: `requestId` continua oculto no `/events` padrão; aparece apenas nos modos com
-      IDs diagnósticos, preservando legibilidade para o operador humano.
+- [x] Decisão UX: `requestId` continua oculto no `/events` padrão; aparece apenas nos modos com IDs
+      diagnósticos, preservando legibilidade para o operador humano.
 - [x] Teste unitário adicionado: `/events` renderiza `Continuação vazia` com resposta e ação, sem
       expor `requestId` bruto por padrão.
 - [x] Validação focada:
@@ -6787,8 +6791,8 @@
   - `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js`.
   - `npx eslint src/copilot/terminal/commands/events.js tests/unit/copilot/terminal/test_commands_events.spec.js`.
 - [ ] Próxima inspeção UX: revisar prompt longo enviado pelo harness/live, porque no PTY ele pode
-      aparecer sem o prefixo visual completo em logs plain quando `script` e repaint ANSI se
-      cruzam; separar artefato de captura de bug real no renderer.
+      aparecer sem o prefixo visual completo em logs plain quando `script` e repaint ANSI se cruzam;
+      separar artefato de captura de bug real no renderer.
 
 ### 12.54 Timestamps completos por contrato central
 
@@ -6809,21 +6813,21 @@
 - [x] Live PTY executado para inspeção visual do contrato de timestamp completo:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-complete-iso-cycle-20260604 --timeout-ms 90000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-39-49-862Z/summary.md`.
-  - Resultado observado: `/activity` e `/events` exibiram `2026-06-04T05:39:56.404-03:00 (há 1s)`
-    e `2026-06-04T05:39:54.289-03:00 (há 3s)`, confirmando ISO 8601 completo local
-    com milissegundos e idade relativa nas linhas persistentes.
+  - Resultado observado: `/activity` e `/events` exibiram `2026-06-04T05:39:56.404-03:00 (há 1s)` e
+    `2026-06-04T05:39:54.289-03:00 (há 3s)`, confirmando ISO 8601 completo local com milissegundos e
+    idade relativa nas linhas persistentes.
 - [x] Achado no harness: o critério `ux-cycle-activity-human` ainda procurava a cópia antiga
       `Detalhes técnicos ficam em /activity detail` e bloqueava a palavra `trace` mesmo quando ela
-      aparecia somente na instrução humana `Drill-down /activity detail mostra origem, trace,
-      engine e streaming`.
+      aparecia somente na instrução humana
+      `Drill-down /activity detail mostra origem, trace,     engine e streaming`.
 - [x] Correção aplicada no runner live:
   - `ux-cycle-activity-human` agora exige o texto de drill-down vigente e continua bloqueando
     identificadores crus como `traceId`, `source`, `tools`, `deltas` e eventos de limpeza SDK.
   - O ciclo `--ux-cycle` agora aguarda marcadores de superfície por comando (`Ajuda rápida`,
-    `Terminal LLM-B - Ajuda completa`, `Status do Terminal LLM-B`, `Eventos SSE`, etc.),
-    reduzindo falsos positivos/falsos negativos por repaint de prompt ou telas longas.
-  - Novo critério `ux-cycle-command-order` falha se as superfícies default aparecerem fora da
-    ordem dos comandos do operador.
+    `Terminal LLM-B - Ajuda completa`, `Status do Terminal LLM-B`, `Eventos SSE`, etc.), reduzindo
+    falsos positivos/falsos negativos por repaint de prompt ou telas longas.
+  - Novo critério `ux-cycle-command-order` falha se as superfícies default aparecerem fora da ordem
+    dos comandos do operador.
 - [x] Live PTY repetido após ajuste do harness:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-command-order-guard-20260604 --timeout-ms 120000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-44-53-143Z/summary.md`.
@@ -6846,30 +6850,30 @@
   - painéis default devem mostrar a rota/modelo vivo que o operador realmente está usando;
   - `auto` deve ser tratado como seletor e substituído pelo fallback vivo quando ele existe;
   - telemetria histórica de PR/cobrança deve continuar disponível como `observado`/`cobrado`,
-    especialmente em `/status full`, `/metrics` e `/usage`, mas não pode substituir a rota viva
-    nos painéis default.
+    especialmente em `/status full`, `/metrics` e `/usage`, mas não pode substituir a rota viva nos
+    painéis default.
 - [x] Correção aplicada:
   - `normalizeTerminalModelBillingProjection()` ganhou `observedModel` e agora calcula
-    `displayModel` como `configuredModel` apenas quando ele não é `auto`; se `configuredModel`
-    for `auto`, prefere o fallback vivo.
+    `displayModel` como `configuredModel` apenas quando ele não é `auto`; se `configuredModel` for
+    `auto`, prefere o fallback vivo.
   - `status.js`, `metrics.js` e `usage.js` passaram a passar `base.model` antes de
     `base.snap.model`, alinhando projeções com o prompt vivo.
-  - `/status` e `/now` usam helper único para renderizar `rota` ou `configurado → observado`
-    quando existe divergência real.
-  - `/status full`, `/metrics` e `/usage` preservam `observado`/`cobrado` como telemetria
-    histórica explícita.
+  - `/status` e `/now` usam helper único para renderizar `rota` ou `configurado → observado` quando
+    existe divergência real.
+  - `/status full`, `/metrics` e `/usage` preservam `observado`/`cobrado` como telemetria histórica
+    explícita.
 - [x] Testes focados:
   - `test_terminal_runtime_frontend.spec.js` cobre `configuredModel=auto` sem mismatch e o caso
-    `fallback=kilo-auto/free`, garantindo que `displayModel` vira `kilo-auto/free` em vez de
-    `auto` ou `claude-haiku-4.5`.
+    `fallback=kilo-auto/free`, garantindo que `displayModel` vira `kilo-auto/free` em vez de `auto`
+    ou `claude-haiku-4.5`.
 - [x] Validação focada:
   - `node --check src/copilot/terminal/frontend/projections/shared.js src/copilot/terminal/frontend/projections/status.js src/copilot/terminal/frontend/projections/metrics.js src/copilot/terminal/frontend/projections/usage.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js src/copilot/terminal/commands/usage.js tests/unit/copilot/test_terminal_runtime_frontend.spec.js`.
   - `npx vitest run tests/unit/copilot/test_terminal_runtime_frontend.spec.js --hookTimeout=30000`.
   - `npx eslint src/copilot/terminal/frontend/projections/shared.js src/copilot/terminal/frontend/projections/status.js src/copilot/terminal/frontend/projections/metrics.js src/copilot/terminal/frontend/projections/usage.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js src/copilot/terminal/commands/usage.js tests/unit/copilot/test_terminal_runtime_frontend.spec.js`.
 - [x] Harness live reforçado:
-  - novo critério `ux-cycle-model-labels-consistent` exige que `/status`, `/now`, `/health` e
-    `/sdk` concordem no modelo/rota vivo e não retornem a `auto` ou `claude-haiku-4.5` como
-    label default stale.
+  - novo critério `ux-cycle-model-labels-consistent` exige que `/status`, `/now`, `/health` e `/sdk`
+    concordem no modelo/rota vivo e não retornem a `auto` ou `claude-haiku-4.5` como label default
+    stale.
 - [x] Live PTY de confirmação:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-model-label-contract-20260604 --timeout-ms 120000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-52-31-421Z/summary.md`.
@@ -6879,23 +6883,27 @@
 ### 12.56 SDK capabilities e workspace sem JSON bruto no default
 
 - [x] Achado live:
-  - `/sdk capabilities` mostrava painel humano, mas terminava com `Retorno { "ui": ... }`,
-    poluindo a superfície default com contrato bruto;
-  - `/workspace list`, quando o workspace SDK virtual estava vazio, mostrava `Retorno { "files": [] }`,
-    em vez de explicar o estado vazio para o operador.
+  - `/sdk capabilities` mostrava painel humano, mas terminava com `Retorno { "ui": ... }`, poluindo
+    a superfície default com contrato bruto;
+  - `/workspace list`, quando o workspace SDK virtual estava vazio, mostrava
+    `Retorno { "files": [] }`, em vez de explicar o estado vazio para o operador.
 - [x] Decisão UX:
   - superfícies default devem ser legíveis e operacionais;
-  - contratos JSON continuam disponíveis por opção explícita (`detail`, `--raw`, `--json`), nunca como
-    fallback visual default em telas canônicas;
+  - contratos JSON continuam disponíveis por opção explícita (`detail`, `--raw`, `--json`), nunca
+    como fallback visual default em telas canônicas;
   - workspace SDK virtual deve lembrar sua fronteira com o FS local quando estiver vazio.
 - [x] Correção aplicada:
-  - `/sdk capabilities` default remove `Retorno` bruto e mostra `Detalhe /sdk capabilities detail · /sdk doctor · /sdk waits`;
+  - `/sdk capabilities` default remove `Retorno` bruto e mostra
+    `Detalhe /sdk capabilities detail · /sdk doctor · /sdk waits`;
   - `/sdk capabilities detail` preserva o JSON bruto para auditoria;
-  - `/workspace list` default mostra `Estado nenhum arquivo no workspace SDK virtual` e `Escopo SDK virtual separado do FS local`;
+  - `/workspace list` default mostra `Estado nenhum arquivo no workspace SDK virtual` e
+    `Escopo SDK virtual separado do FS local`;
   - `/workspace list --raw` preserva o retorno bruto.
 - [x] Testes focados:
-  - `test_commands_sdk.spec.js` cobre `/sdk capabilities` default sem `Retorno`/`"ui"` e detail com `Retorno`;
-  - `test_commands_sdk.spec.js` cobre `/workspace list` com arquivos, vazio sem `Retorno` e vazio com `--raw`.
+  - `test_commands_sdk.spec.js` cobre `/sdk capabilities` default sem `Retorno`/`"ui"` e detail com
+    `Retorno`;
+  - `test_commands_sdk.spec.js` cobre `/workspace list` com arquivos, vazio sem `Retorno` e vazio
+    com `--raw`.
 - [x] Validação focada:
   - `node --check src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`.
   - `npx vitest run tests/unit/copilot/terminal/test_commands_sdk.spec.js --hookTimeout=30000`.
@@ -6903,8 +6911,8 @@
 - [x] Harness live reforçado:
   - `ux-cycle-sdk-capabilities-human` falha se `/sdk capabilities` default voltar a mostrar
     `Retorno`, `{ "ui": ... }`, `[OK]`, `[ERR]` ou heading legado;
-  - `ux-cycle-workspace-human` falha se `/workspace list` default voltar a mostrar `Retorno`
-    ou `{ "files": ... }`.
+  - `ux-cycle-workspace-human` falha se `/workspace list` default voltar a mostrar `Retorno` ou
+    `{ "files": ... }`.
 - [x] Live PTY de confirmação:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-workspace-no-raw-json-pass-20260604 --timeout-ms 120000`.
   - Artefato: `artifacts/terminal-live/2026-06-04T08-57-38-850Z/summary.md`.
@@ -6914,27 +6922,38 @@
 
 - [x] Retomada após commits/push anteriores:
   - worktree revisado; apenas `.codex/config.toml` permanece modificado fora do escopo desta tarefa;
-  - `src/copilot/terminal/capabilities` já contém registry, previews, structured preview, picker plan e picker runner;
-  - `/terminal libs`, `/libs`, `/fs preview`, `/git diff`, `/gh pr diff` e `/menu picker` já exercem a arquitetura opcional.
+  - `src/copilot/terminal/capabilities` já contém registry, previews, structured preview, picker
+    plan e picker runner;
+  - `/terminal libs`, `/libs`, `/fs preview`, `/git diff`, `/gh pr diff` e `/menu picker` já exercem
+    a arquitetura opcional.
 - [x] Investigação oficial refeita em 2026-06-04 antes de novas integrações:
-  - `gum`: docs oficiais confirmam comandos interativos (`choose`, `confirm`, `file`, `filter`, `input`, `write`, `pager`) e comandos de formatação; decisão segue `accepted_guarded`;
-  - `fzf`: docs/manpage confirmam seleção por stdout e preview por comando shell; decisão segue aceitar seleção e bloquear `fzf --preview` até adapter tokenizado;
-  - `bat`: docs oficiais confirmam `--paging=never`, `batcat` como realidade de distro e uso típico de preview; decisão segue preview read-only;
-  - `glow`: docs oficiais confirmam CLI/stdin, largura e pager; decisão segue Markdown explícito sem pager automático;
-  - `delta`: docs oficiais confirmam diff por stdin/pager Git; decisão segue diff explícito sem substituir diff bruto canônico;
-  - `jq`/`yq`: docs oficiais confirmam filtros por stdin e risco de quoting/ops avançadas; decisão segue diagnóstico/preview, não fonte canônica;
-  - `atuin`: docs oficiais atuais incluem hooks para agentes e AI própria; decisão segue adiar integração ativa para evitar paralelismo de histórico/permissões;
-  - `zoxide`: docs oficiais confirmam shell hooks, ranking pessoal e `zi` com `fzf`; decisão segue adiar para preservar cwd/escopo canônico.
+  - `gum`: docs oficiais confirmam comandos interativos (`choose`, `confirm`, `file`, `filter`,
+    `input`, `write`, `pager`) e comandos de formatação; decisão segue `accepted_guarded`;
+  - `fzf`: docs/manpage confirmam seleção por stdout e preview por comando shell; decisão segue
+    aceitar seleção e bloquear `fzf --preview` até adapter tokenizado;
+  - `bat`: docs oficiais confirmam `--paging=never`, `batcat` como realidade de distro e uso típico
+    de preview; decisão segue preview read-only;
+  - `glow`: docs oficiais confirmam CLI/stdin, largura e pager; decisão segue Markdown explícito sem
+    pager automático;
+  - `delta`: docs oficiais confirmam diff por stdin/pager Git; decisão segue diff explícito sem
+    substituir diff bruto canônico;
+  - `jq`/`yq`: docs oficiais confirmam filtros por stdin e risco de quoting/ops avançadas; decisão
+    segue diagnóstico/preview, não fonte canônica;
+  - `atuin`: docs oficiais atuais incluem hooks para agentes e AI própria; decisão segue adiar
+    integração ativa para evitar paralelismo de histórico/permissões;
+  - `zoxide`: docs oficiais confirmam shell hooks, ranking pessoal e `zi` com `fzf`; decisão segue
+    adiar para preservar cwd/escopo canônico.
 - [x] Novo guia criado:
   - `src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md`.
 - [x] Decisão consolidada:
   - nenhuma lib vira dependência obrigatória;
   - nenhuma lib é instalada ou chamada automaticamente;
-  - TUI externa exige ação explícita, TTY exclusivo, ausência de pergunta humana pendente, ausência de input digitado e restauração limpa de prompt;
+  - TUI externa exige ação explícita, TTY exclusivo, ausência de pergunta humana pendente, ausência
+    de input digitado e restauração limpa de prompt;
   - `atuin` e `zoxide` seguem detectáveis, mas adiados;
   - `fzf --preview` segue bloqueado até existir preview tokenizado sem shell livre.
-- [x] Transformação aplicada: `/terminal libs detail` passou a renderizar `Política` e `Exemplo n`
-      a partir do registry central de capabilities, sem criar segunda fonte no comando.
+- [x] Transformação aplicada: `/terminal libs detail` passou a renderizar `Política` e `Exemplo n` a
+      partir do registry central de capabilities, sem criar segunda fonte no comando.
 - [x] Transformação aplicada: `/help full` ganhou seção `Previews e libs auxiliares` com comandos
       canônicos para `bat`/`batcat`, `glow`, `delta`, `jq`, `yq`, picker e a decisão adiada de
       `atuin/zoxide`.
@@ -6976,10 +6995,10 @@
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-filtered-after-smoke-20260604`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-02-16-650Z/summary.md`;
   - resultado: PASS em 5/5 critérios;
-  - escopo real da prova: `fzf --filter`, handoff exclusivo, seleção, roteamento por `/status`
-    e restauração de prompt;
-  - limite conhecido: não é prova visual completa de TUI fullscreen, porque o harness PTY não
-    emula todas as respostas de terminal necessárias para esse modo.
+  - escopo real da prova: `fzf --filter`, handoff exclusivo, seleção, roteamento por `/status` e
+    restauração de prompt;
+  - limite conhecido: não é prova visual completa de TUI fullscreen, porque o harness PTY não emula
+    todas as respostas de terminal necessárias para esse modo.
 - [x] Reconciliação documental:
   - `TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md` foi alinhado com o progresso real:
     exemplos, políticas, `/help full` rico e smoke local deixaram de aparecer como gaps pendentes.
@@ -6990,16 +7009,16 @@
   - ferramentas adiadas como `atuin` e `zoxide` ficam descritas como inventário/planejamento, sem
     chamada automática.
 - [x] Bug de poluição visual corrigido:
-  - achado: renderizar `/terminal libs detail` por import direto emitia `[db][INFO] SQLite copilot ready`
-    antes da tela humana;
+  - achado: renderizar `/terminal libs detail` por import direto emitia
+    `[db][INFO] SQLite copilot ready` antes da tela humana;
   - causa: import via barrel amplo acionava módulos laterais desnecessários para uma tela read-only;
   - correção: `/terminal libs` importa `external-tools.js` diretamente e `diff-preview.js` importa
     `ui-theme.js` diretamente;
   - regressão coberta por processo filho em
     `tests/unit/copilot/terminal/test_terminal_command_import_side_effects.spec.js`.
 - [x] Boot humano mais limpo:
-  - achado live: a sessão ainda começava com `[db][INFO] [CopilotDB] SQLite copilot ready` antes
-    do cabeçalho visual;
+  - achado live: a sessão ainda começava com `[db][INFO] [CopilotDB] SQLite copilot ready` antes do
+    cabeçalho visual;
   - decisão UX: INFO de infraestrutura fica no logger central/arquivo, não na primeira linha do
     terminal humano;
   - correção: logger default de `src/copilot/db/sqlite.js` agora só imprime WARN/ERROR/FATAL antes
@@ -7009,8 +7028,8 @@
 - [x] Live PTY final:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-no-db-criterion-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-13-42-410Z/summary.md`;
-  - resultado: PASS em 21/21 critérios, incluindo copy operacional de libs e ausência de ruído DB
-    no console humano.
+  - resultado: PASS em 21/21 critérios, incluindo copy operacional de libs e ausência de ruído DB no
+    console humano.
 - [x] Wrapping visual padronizado:
   - achado: `/workspace list`, `/activity`, `/events` e uma linha de `/help full` ainda podiam
     ultrapassar 120 colunas em PTY real;
@@ -7043,10 +7062,10 @@
 - [x] `/sdk` default com comandos nomeados:
   - achado live: o painel `/sdk` ainda renderizava `Uso` como lista multi-linha com continuações
     anônimas (`/sdk skills`, `/sdk quota`, `/sdk headers`) penduradas sem label próprio;
-  - decisão UX: painel operacional default deve ser escaneável por categoria, não por bloco de
-    ajuda colado;
-  - correção: `/sdk` default agora mostra `Modelos`, `Skills`, `Rotina`, `Headers` e `Simular`,
-    cada um com linha própria via `terminalThemeWrappedRow()`;
+  - decisão UX: painel operacional default deve ser escaneável por categoria, não por bloco de ajuda
+    colado;
+  - correção: `/sdk` default agora mostra `Modelos`, `Skills`, `Rotina`, `Headers` e `Simular`, cada
+    um com linha própria via `terminalThemeWrappedRow()`;
   - regressão coberta em `tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
   - harness live reforçado: `ux-cycle-sdk-human` exige linhas nomeadas e rejeita continuações
     anônimas;
@@ -7097,11 +7116,11 @@
   - live final:
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-silent-boot-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T16-38-33-340Z/summary.md`;
-  - medição: `awk 'length($0)>120' default-ux-cycle.plain.log` não encontrou linhas acima de
-    120 colunas.
+  - medição: `awk 'length($0)>120' default-ux-cycle.plain.log` não encontrou linhas acima de 120
+    colunas.
 - [x] Pergunta humana estruturada com card vertical e prompt restaurado:
-  - achado live: após responder `SIM` em `request_user_input`, o terminal confirmava a resposta,
-    mas não redesenhava o prompt; o próximo comando do harness ficava bloqueado até timeout;
+  - achado live: após responder `SIM` em `request_user_input`, o terminal confirmava a resposta, mas
+    não redesenhava o prompt; o próximo comando do harness ficava bloqueado até timeout;
   - causa: o caminho imediato de resposta pendente estacionava o prompt como se toda resposta fosse
     `ask_user` de turno real aguardando continuação da LLM;
   - correção: `repl-lifecycle` agora diferencia `request_user_input` estruturado resolvido de
@@ -7125,29 +7144,27 @@
   - resultado: PASS em 11/11 critérios, incluindo prompt restaurado, zero pendências após resposta,
     ausência de IDs crus e ausência de spam `request_user_input ainda executando`.
 - [x] Diagnóstico rápido quando a LLM-B produz deltas mas omite `ask_user`:
-  - achado live real:
-    `artifacts/terminal-live/2026-06-04T16-50-21-066Z/summary.md`;
+  - achado live real: `artifacts/terminal-live/2026-06-04T16-50-21-066Z/summary.md`;
   - status observado: BLOCKED por timeout, embora a LLM-B tenha executado `report_intent`,
     `read_file_content` e escrito oito deltas públicos;
   - causa funcional: o modelo escreveu `DELTA-1`..`DELTA-8` em vez de
     `DELTA-CANONICAL-1`..`DELTA-CANONICAL-8`; o detector de recuperacao aceitava apenas
     `DELTA-CANONICAL-8`, portanto nao percebeu que a proxima acao obrigatoria era `ask_user`;
-  - decisao UX/protocolo: "oito deltas publicos vistos" e "rotulo textual exatamente canonico"
-    sao evidencias diferentes; a primeira deve dirigir a maquina de estados do runner, enquanto a
+  - decisao UX/protocolo: "oito deltas publicos vistos" e "rotulo textual exatamente canonico" sao
+    evidencias diferentes; a primeira deve dirigir a maquina de estados do runner, enquanto a
     segunda fica como criterio informativo de aderencia do modelo;
   - correcao: o harness agora reconhece `DELTA-8` e `DELTA-CANONICAL-8` para acionar
     recuperacao/diagnostico de `ask_user` ausente;
   - correcao: a continuacao controlada nao mente mais dizendo que as linhas foram necessariamente
     `DELTA-CANONICAL`; ela diz apenas que os oito deltas publicos ja apareceram;
   - correcao: os criterios live agora separam `partial-deltas` de `canonical-delta-labels`; o
-    primeiro permanece requisito de fluxo, o segundo vira warning quando a LLM-B usa rotulos
-    nao canonicos;
-  - objetivo operacional: uma falha de protocolo do modelo deve virar recuperacao ou diagnostico
-    em segundos, com `/activity`, `/tools diag`, `/events`, `/errors`, `/health` e `/export`, nao
-    uma espera muda ate o timeout.
+    primeiro permanece requisito de fluxo, o segundo vira warning quando a LLM-B usa rotulos nao
+    canonicos;
+  - objetivo operacional: uma falha de protocolo do modelo deve virar recuperacao ou diagnostico em
+    segundos, com `/activity`, `/tools diag`, `/events`, `/errors`, `/health` e `/export`, nao uma
+    espera muda ate o timeout.
 - [x] `/usage now` com BYOK ativo sem falsa hierarquia de quota:
-  - achado live:
-    `artifacts/terminal-live/2026-06-04T16-59-30-059Z/terminal.plain.log`;
+  - achado live: `artifacts/terminal-live/2026-06-04T16-59-30-059Z/terminal.plain.log`;
   - problema visual: logo apos boot BYOK, `/usage now` mostrava primeiro
     `Quota Copilot rota kilo-auto/free · observado claude-haiku-4.5`, o que parecia indicar modelo
     atual divergente, apesar de ser apenas snapshot historico/lateral;
@@ -7155,8 +7172,8 @@
     deve ser rotulada como `Histórico Copilot`;
   - correcao: quando BYOK esta ativo, `/usage now` renderiza `BYOK ativo` antes do historico e usa
     `Histórico Copilot ... anterior/lateral; BYOK atual separado`;
-  - preservacao: em caso de mismatch real, a linha historica ainda mostra `configurado`,
-    `observado` quando existir e `cobrado`, para nao perder valor diagnostico;
+  - preservacao: em caso de mismatch real, a linha historica ainda mostra `configurado`, `observado`
+    quando existir e `cobrado`, para nao perder valor diagnostico;
   - teste focado:
     `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js --hookTimeout=30000`;
   - resultado: PASS em 8/8 testes;
@@ -7167,8 +7184,8 @@
   - artefato: `artifacts/terminal-live/2026-06-04T17-07-17-596Z/summary.md`;
   - resultado: PASS em 22/22 criterios, sem linhas acima de 132 colunas no plain log filtrado.
 - [x] `/sdk` default sem rótulo `Premium Requests` no painel BYOK:
-  - achado live: `/sdk` mostrava `Quota Premium Requests · 0.0% restante`, o que podia ser lido
-    como bloqueio/cobranca atual, embora seja entitlement SDK lateral ao runtime BYOK;
+  - achado live: `/sdk` mostrava `Quota Premium Requests · 0.0% restante`, o que podia ser lido como
+    bloqueio/cobranca atual, embora seja entitlement SDK lateral ao runtime BYOK;
   - decisao UX: manter a informacao, mas nomear como quota SDK, nao como produto/cobranca atual;
   - correcao: `premium_interactions` agora renderiza `Pedidos premium SDK`; o escopo tecnico bruto
     permanece escondido;
@@ -7180,12 +7197,12 @@
   - live final:
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-sdk-premium-quota-humanized-20260604 --timeout-ms 140000`;
   - artefato: `artifacts/terminal-live/2026-06-04T17-10-45-648Z/summary.md`;
-  - resultado: PASS em 22/22 criterios, com `Pedidos premium SDK` e sem linhas acima de 132
-    colunas no plain log filtrado.
+  - resultado: PASS em 22/22 criterios, com `Pedidos premium SDK` e sem linhas acima de 132 colunas
+    no plain log filtrado.
 - [x] Fronteira de modelo BYOK/SDK com vocabulario operacional:
   - achado por auditoria: `session-binding.js` era a unidade certa para impedir trocas cruzando
-    provedor/perfil, mas suas frases default ainda vazavam termos internos como `provider BYOK vivo`,
-    `binding de nascimento` e `binding da sessao viva`;
+    provedor/perfil, mas suas frases default ainda vazavam termos internos como
+    `provider BYOK vivo`, `binding de nascimento` e `binding da sessao viva`;
   - decisao UX: o operador deve ler quatro conceitos estaveis: `selecao preparada`, `sessao atual`,
     `proximo boot` e `confirmacao`; `binding`, `provider-boundary` e equivalentes ficam somente no
     codigo/diagnostico raw;
@@ -7194,21 +7211,22 @@
   - correcao: troca cruzando provedor/perfil agora aparece como
     `selecao preparada cruza provedor ou perfil da sessao atual`;
   - correcao: `/byok model <id>` quando nao pode aplicar no runtime vivo diz
-    `Sessao atual usa outro provedor/perfil; modelo preparado para o proximo boot`, sem sugerir
-    que houve tentativa perigosa de troca cruzada;
+    `Sessao atual usa outro provedor/perfil; modelo preparado para o proximo boot`, sem sugerir que
+    houve tentativa perigosa de troca cruzada;
   - achado live adicional: quando `/byok model <id>` era aplicado na sessao viva e o SDK emitia
     `session.model_changed`, `/byok` e `/session sdk` ainda comparavam apenas contra o modelo de
     nascimento persistido da sessao e continuavam dizendo que o modelo preparado precisava de
     confirmacao;
   - correcao: `classifyTerminalByokSdkBinding()` agora recebe o modelo runtime atual; se ele ja
-    coincide com a selecao BYOK preparada, o estado vira `modelo BYOK ja confirmado na sessao atual`;
+    coincide com a selecao BYOK preparada, o estado vira
+    `modelo BYOK ja confirmado na sessao atual`;
   - correcao: `/byok` e `/session sdk` passam o modelo runtime atual pela projection canonica,
     preservando o dado de nascimento em `Vinculo SDK`, mas nao confundindo isso com o modelo efetivo
     confirmado;
   - regressao coberta em `tests/unit/copilot/terminal/test_byok_session_binding.spec.js` e no
     contrato existente de `/byok model`;
-  - harness live reforcado: `--ux-cycle` agora executa `/byok`, `/byok model
-    terminal-ux-boundary-fixture`, `/byok` e `/session sdk 6`, rejeitando `binding`,
+  - harness live reforcado: `--ux-cycle` agora executa `/byok`,
+    `/byok model terminal-ux-boundary-fixture`, `/byok` e `/session sdk 6`, rejeitando `binding`,
     `provider-boundary` e vocabulário antigo;
   - validacao focada:
     `npx vitest run tests/unit/copilot/terminal/test_byok_session_binding.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js --hookTimeout=30000`;
@@ -7240,8 +7258,8 @@
     semântico, usando `preserveProtocolNames`.
 - [x] Correção aplicada:
   - criado `humanizeTerminalToolSurfaceText()`;
-  - migrados `live-status-line.js`, `dialog/output.js`, `/activity`, `/diagnose` e `/session`
-    para usar o mesmo filtro humano;
+  - migrados `live-status-line.js`, `dialog/output.js`, `/activity`, `/diagnose` e `/session` para
+    usar o mesmo filtro humano;
   - ids `chatcmpl-tool-*`, `toolu_*` e `call_*` viram `id interno` nas superfícies default;
   - `request_user_input ainda executando` vira `Pergunta ao operador aguardando resposta` sem
     engolir o restante da linha;
@@ -7258,15 +7276,15 @@
   - artefato: `artifacts/terminal-live/2026-06-04T18-00-46-885Z/summary.md`;
   - resultado: `Status: PASS` em 27/27 critérios;
   - achado visual apesar do PASS: eventos informativos `Skills SDK carregadas` e depois
-    `Configuração` podiam ser impressos entre prompt e comando injetado, poluindo a região de
-    input embora não quebrassem o ciclo formal.
+    `Configuração` podiam ser impressos entre prompt e comando injetado, poluindo a região de input
+    embora não quebrassem o ciclo formal.
 - [x] Correção de eventos SDK informativos:
   - `session.skills_loaded` e `session.tools_updated` deixam de imprimir linhas duráveis em modo
     verbose; quando o operador liga narração de sessão, eles usam linha viva curta;
   - `session.info` de tipo `configuration` deixa de pintar stdout e também não atualiza a atividade
     atual, ficando disponível em SSE/eventos e diagnósticos;
-  - eventos relevantes como `model_retry`, título de sessão, warning e permissões continuam
-    visíveis porque pedem atenção operacional real.
+  - eventos relevantes como `model_retry`, título de sessão, warning e permissões continuam visíveis
+    porque pedem atenção operacional real.
 - [x] Live PTY intermediária:
   - comando:
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-inline-informative-sdk-events-20260604 --timeout-ms 180000 --transport=pty`;
@@ -7280,8 +7298,8 @@
   - resultado: `Status: PASS` em 27/27 critérios;
   - verificação manual do `plain.log`: as únicas ocorrências finais são
     `você[terminal-…/high]› /session sdk 6` e `você[terminal-…/high]› /quit`, sem `Skills`,
-    `Configuração`, `chatcmpl-tool`, `request_user_input`, `report_intent` ou `toolu_` na
-    superfície default.
+    `Configuração`, `chatcmpl-tool`, `request_user_input`, `report_intent` ou `toolu_` na superfície
+    default.
 - [x] Guardrail automatizado no harness:
   - `--ux-cycle` ganhou o critério `ux-cycle-no-informative-event-inside-prompt`;
   - a regra falha quando `Skills`, `Configuração` ou `Ferramentas` aparecem como linha informativa
@@ -7298,8 +7316,8 @@
     - `artifacts/terminal-live/2026-06-04T18-12-49-450Z/summary.md`: `PASS`, 28/28 critérios,
       incluindo `ux-cycle-no-informative-event-inside-prompt`.
 - [ ] Próxima frente:
-  - revisar `/events` default e `/intent` para garantir que o glossário compartilhado não precise
-    de uma segunda camada paralela;
+  - revisar `/events` default e `/intent` para garantir que o glossário compartilhado não precise de
+    uma segunda camada paralela;
   - só depois retomar a avaliação visual de TUI completa (`gum`, `fzf`, `bat`, `glow`, `delta`).
 
 ## 2026-06-04 — Intent e Eventos sem Vocabulário Paralelo
@@ -7307,8 +7325,8 @@
 - [x] Auditoria inicial:
   - `/events` já usa `tool-activity-presenter.js` para nomes de ferramenta, paths e IDs compactos;
   - `/intent` e `intent-renderer.js` ainda mantêm helpers próprios para origem/risco;
-  - o teste de `/intent detail` ainda aceitava `origem bruta tool/report_intent_local`, `ferramenta
-    patch_file` e `chamada call-1`;
+  - o teste de `/intent detail` ainda aceitava `origem bruta tool/report_intent_local`,
+    `ferramenta patch_file` e `chamada call-1`;
   - isso cria uma segunda gramática visual e reabre a porta para `report_intent_local`,
     `chatcmpl-tool-*`, `toolu_*` e nomes técnicos longos em superfícies que deveriam ser humanas.
 - [x] Decisão UX:
@@ -7317,13 +7335,13 @@
   - `/intent detail` pode mostrar envelope técnico, mas com nomes humanos e IDs compactos;
   - nomes brutos de ferramenta/source/call ficam reservados para export estruturado, SSE raw ou
     testes de contrato, não para a superfície visual default;
-  - `assistant.intent`, `report_intent` e `report_intent_local` continuam sendo protocolos
-    canônicos internamente, mas a UI deve apresentá-los como `SDK` ou `ferramenta de intenção`.
+  - `assistant.intent`, `report_intent` e `report_intent_local` continuam sendo protocolos canônicos
+    internamente, mas a UI deve apresentá-los como `SDK` ou `ferramenta de intenção`.
 - [ ] Implementação planejada:
   - [x] criar presenter compartilhado para intent;
   - [x] migrar `commands/intent.js` e `events/intent-renderer.js`;
-  - [x] atualizar testes para bloquear `report_intent_local`, `toolu_*`, `chatcmpl-tool-*` e `call_*`
-    na superfície humana;
+  - [x] atualizar testes para bloquear `report_intent_local`, `toolu_*`, `chatcmpl-tool-*` e
+        `call_*` na superfície humana;
   - [x] reforçar harness live para validar `/intent` quando houver intenção real capturada.
 - [x] Live canônico de auditoria:
   - comando:
@@ -7353,8 +7371,8 @@
 - [x] Próximo achado visual:
   - o mesmo live mostrou `Título` da sessão como linha durável logo após o prompt longo do operador;
   - decisão: título gerado pelo SDK é metadado de sessão, não progresso da LLM-B;
-  - deve permanecer em SSE/diagnóstico e não roubar a região entre `prompt do usuário` e `LLM-B
-    trabalhando`.
+  - deve permanecer em SSE/diagnóstico e não roubar a região entre `prompt do usuário` e
+    `LLM-B trabalhando`.
 - [x] Correção aplicada:
   - `session.title_changed` deixa de imprimir linha durável;
   - `Título da sessão atualizado` usa `updateCurrent:false` e `recordHistory:false`;
@@ -7395,14 +7413,14 @@
     em `/events --raw`, SSE e export técnico.
 - [ ] Implementação planejada:
   - [x] criar presenter compartilhado para recuperação de `dialog.empty_after_user_input`;
-  - [x] trocar a linha genérica de warning por um cartão de recuperação com `Retomar`,
-    `Diagnóstico` e `Alternativa`;
+  - [x] trocar a linha genérica de warning por um cartão de recuperação com `Retomar`, `Diagnóstico`
+        e `Alternativa`;
   - [x] alinhar `/events` default para mostrar a mesma ação de retomada em vez de uma frase
-    genérica;
+        genérica;
   - [x] adicionar critério live opcional garantindo que uma execução bloqueada por
-    `assistant-empty-after-user-input` mostre o comando de recuperação;
+        `assistant-empty-after-user-input` mostre o comando de recuperação;
   - [x] repetir live canônico para observar o cartão em uma falha real ou confirmar PASS quando a
-    LLM-B materializar o pós-ask.
+        LLM-B materializar o pós-ask.
   - [x] live de confirmação:
     - comando:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --label terminal-ux-question-safe-diagnostics-20260604 --timeout-ms 240000 --transport=pty`;
@@ -7453,8 +7471,7 @@
 - [x] Correção aplicada:
   - `renderTimelineEntryHeading()` reconhece `Intenção da LLM-B`, `Mensagem...` e
     `Resposta concluída` como labels autossuficientes;
-  - teste focado cobre ausência de `turno · Intenção da LLM-B` e
-    `sistema · Resposta concluída`.
+  - teste focado cobre ausência de `turno · Intenção da LLM-B` e `sistema · Resposta concluída`.
 - [x] Guardrail live:
   - `ux-activity-no-redundant-timeline-labels` também falha se `/activity 40` voltar a mostrar
     `turno · Intenção...` ou `sistema · Resposta...`.
@@ -7466,10 +7483,10 @@
 
 - [x] Achado live:
   - em `artifacts/terminal-live/2026-06-04T18-45-44-582Z/terminal.plain.log`, `/usage now`
-    comunicava a semântica correta, mas labels longos como `Histórico Copilot`,
-    `Telemetria LLM`, `Pergunta humana` e `Correlacionar` quebravam o alinhamento visual;
-  - isso era especialmente perceptível em PTY estreito, onde a coluna de valor começava em
-    posições diferentes.
+    comunicava a semântica correta, mas labels longos como `Histórico Copilot`, `Telemetria LLM`,
+    `Pergunta humana` e `Correlacionar` quebravam o alinhamento visual;
+  - isso era especialmente perceptível em PTY estreito, onde a coluna de valor começava em posições
+    diferentes.
 - [x] Decisão UX:
   - labels default devem ser curtos e escaneáveis;
   - contexto semântico vai para o valor: `Histórico` pode dizer `Copilot ...`, `LLM` pode dizer
@@ -7489,8 +7506,8 @@
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-usage-compact-labels-20260604 --timeout-ms 160000 --transport=pty`;
   - artefato: `artifacts/terminal-live/2026-06-04T18-54-21-268Z/summary.md`;
   - resultado: `PASS` em 28/28 critérios;
-  - verificação visual: `/usage now` mostrou `BYOK`, `Histórico`, `LLM`, `Pergunta` e
-    `Conferir`, sem `BYOK ativo`, `Histórico Copilot`, `Telemetria LLM` ou `Correlacionar`.
+  - verificação visual: `/usage now` mostrou `BYOK`, `Histórico`, `LLM`, `Pergunta` e `Conferir`,
+    sem `BYOK ativo`, `Histórico Copilot`, `Telemetria LLM` ou `Correlacionar`.
 - [x] Próxima lacuna visual promovida:
   - `/byok` default ainda era superfície muito densa;
   - `/help full` continua denso por escolha explícita do operador e será tratado em rodada separada.
@@ -7498,9 +7515,9 @@
 ## 2026-06-04 — `/byok` Default como Cockpit Compacto
 
 - [x] Achado live:
-  - no artefato `artifacts/terminal-live/2026-06-04T18-54-21-268Z/terminal.plain.log`, `/byok`
-    e `/byok model terminal-ux-boundary-fixture` renderizavam o estado correto, mas terminavam com
-    um bloco `Comandos` de nove linhas;
+  - no artefato `artifacts/terminal-live/2026-06-04T18-54-21-268Z/terminal.plain.log`, `/byok` e
+    `/byok model terminal-ux-boundary-fixture` renderizavam o estado correto, mas terminavam com um
+    bloco `Comandos` de nove linhas;
   - esse bloco incluía catálogo de gateway, seleção, importers, probes, recomendações e automação,
     ocupando o primeiro viewport como se o operador tivesse pedido documentação completa;
   - a tela de status perdia o papel de cockpit e voltava a parecer dump de manual.
@@ -7516,21 +7533,20 @@
     deixou claro que `/restart` não troca provedor;
   - `tryApplyLiveByokModelSwitch()` trocou mensagens ANSI manuais por rows temáticas `Sessão viva`,
     `Troca modelo`, `Modelo vivo` e `Confirmar`;
-  - `/byok` default substituiu o bloco `Comandos` por quatro linhas compactas:
-    `Rotina`, `Trocar`, `Provar` e `Avançado`.
+  - `/byok` default substituiu o bloco `Comandos` por quatro linhas compactas: `Rotina`, `Trocar`,
+    `Provar` e `Avançado`.
 - [x] Guardrails:
   - `test_commands_byok.spec.js` exige `Rotina`, `Trocar`, `Provar` e `Avançado`;
-  - o teste bloqueia o retorno de `/byok gateway catalog refresh|diff|integrity|sqlite|search`
-    e do bloco `/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]` no status
-    default;
-  - o runner live `--ux-cycle` exige cockpit compacto e também bloqueia catálogo avançado dentro
-    da superfície `/byok` default.
+  - o teste bloqueia o retorno de `/byok gateway catalog refresh|diff|integrity|sqlite|search` e do
+    bloco `/byok auto [on|policy|doctor|standby|proof-plan|switch|history|off]` no status default;
+  - o runner live `--ux-cycle` exige cockpit compacto e também bloqueia catálogo avançado dentro da
+    superfície `/byok` default.
 - [x] Segunda correção derivada da live:
-  - `/session sdk` ainda mostrava `Metadados modelo ... · provedor BYOK · limite mudança de
-    provider/modelo BYOK`;
+  - `/session sdk` ainda mostrava
+    `Metadados modelo ... · provedor BYOK · limite mudança de provider/modelo BYOK`;
   - o vocabulário foi normalizado para `rota BYOK` e `mudança de rota/modelo BYOK`;
-  - `classifyTerminalByokSdkBinding()` também passou a dizer `rota BYOK da sessão atual coincide`
-    no caso de mesma rota com modelo ainda pendente;
+  - `classifyTerminalByokSdkBinding()` também passou a dizer `rota BYOK da sessão atual coincide` no
+    caso de mesma rota com modelo ainda pendente;
   - o runner live agora reprova `provedor BYOK` e `provider/modelo BYOK` dentro da superfície
     default de `/session sdk`.
 - [x] Live UX:
@@ -7544,13 +7560,13 @@
 - [x] Terceira correção derivada da live:
   - `/session sdk 6` ainda repetia seis linhas `Resumo` com 137 colunas;
   - o preview default de resumo de sessão foi reduzido de 120 para 84 caracteres úteis;
-  - `test_commands_session.spec.js` passou a bloquear linhas `Resumo` maiores que 112 caracteres
-    na superfície default;
+  - `test_commands_session.spec.js` passou a bloquear linhas `Resumo` maiores que 112 caracteres na
+    superfície default;
   - live posterior:
     `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --ux-cycle --label terminal-ux-session-summary-compact-20260604 --timeout-ms 170000 --transport=pty`;
   - artefato: `artifacts/terminal-live/2026-06-04T19-06-07-106Z/summary.md`;
-  - resultado: `PASS` em 28/28 critérios; `awk length>135` não encontrou linhas longas, e os
-    resumos de sessão ficaram em 101 colunas no plain log.
+  - resultado: `PASS` em 28/28 critérios; `awk length>135` não encontrou linhas longas, e os resumos
+    de sessão ficaram em 101 colunas no plain log.
 - [x] Quarta correção derivada da auditoria do plain log:
   - `/help full` ainda dizia `/session sdk commands  CommandDefinition[] registrados no SDK`;
   - mesmo em modo completo, tipo TypeScript cru não ajuda o operador;
@@ -7626,16 +7642,16 @@
   - imediatamente após o retorno, chama `completeTerminalTurnMaterialization()`;
   - se nenhuma fonte textual estiver presente, chama `recordTerminalExplicitEmptyOutput()`.
 - [x] O gateway `terminal/frontend/gateways/dialog.js` delega para
-  `llmBridgeClient.dialogTurnDetailed()` quando não há `requestHeaders`.
+      `llmBridgeClient.dialogTurnDetailed()` quando não há `requestHeaders`.
 - [x] O transporte `channel/client-dialog.js` observa:
   - retorno direto de `sendRuntimeDialogTurnOnActiveLoop()`;
   - espelho `dialog.reply`;
   - deltas `task.delta` e `dialog.delta`;
   - reasoning `task.reasoning`.
 - [x] O transporte usa uma única passagem por `setImmediate()` quando o retorno direto está vazio e
-  `dialog.reply` ainda não chegou.
+      `dialog.reply` ainda não chegou.
 - [x] O runtime do dialog loop em `agent/dialog/executors/turn-executor.js` usa
-  `createDialogTurnOutputCollector()` como owner semântico do reply.
+      `createDialogTurnOutputCollector()` como owner semântico do reply.
 - [x] O collector observa:
   - `assistant.message`;
   - `dialog.delta`;
@@ -7644,16 +7660,16 @@
   - sinais de início/fim de tools;
   - snapshot de protocolo pendente.
 - [x] O collector deliberadamente considera delta inelegível quando houve sinal de tool depois do
-  último delta:
+      último delta:
   - isso evita tratar texto pré-tool como resposta final;
-  - também significa que um turno tool-only sem mensagem final pode terminar legitimamente sem
-    reply textual.
+  - também significa que um turno tool-only sem mensagem final pode terminar legitimamente sem reply
+    textual.
 - [x] O terminal também observa `assistant.message` em `sdk-session-events.js`:
   - quando `getBusy()` é verdadeiro, a mensagem é anexada ao materializador do turno;
   - quando `getBusy()` já é falso, ela é tratada como mensagem fora do turno ativo ou reconciliada
     contra materialização recente.
 - [x] `dialog.turn_end` em `terminal-agent-wiring.js` é lifecycle e fallback visual, não deveria ser
-  uma segunda fonte semântica independente de transcript.
+      uma segunda fonte semântica independente de transcript.
 
 ### 12.64 Situações reais em que “sem resposta pública materializada” pode aparecer
 
@@ -7697,17 +7713,18 @@
 ### 12.65 Bugs e gaps identificados no contrato de turno
 
 - [x] Gap: `replySource` do transporte descreve apenas `runtime_return`, `transport_mirror` ou
-  `empty`; ele não carrega diagnóstico suficiente para explicar por que o runtime terminou vazio.
+      `empty`; ele não carrega diagnóstico suficiente para explicar por que o runtime terminou
+      vazio.
 - [x] Gap: o materializador do terminal conhece deltas e mensagens capturados localmente, mas não
-  conhece o snapshot semântico do collector do `agent`.
+      conhece o snapshot semântico do collector do `agent`.
 - [x] Gap: o terminal decide vazio imediatamente após o retorno do gateway, sem uma política
-  explícita de quiescência para eventos finais assíncronos.
+      explícita de quiescência para eventos finais assíncronos.
 - [x] Gap: o transporte usa um único `setImmediate()` como drenagem implícita:
   - é uma heurística de event loop;
   - não representa uma janela de quiescência;
   - não produz diagnóstico de quanto tempo ou quais sinais foram aguardados.
 - [x] Gap: `dialog.empty_after_user_input` e `terminal.turn.empty_output` podem representar a mesma
-  falha em camadas diferentes, mas não compartilham uma classificação causal canônica.
+      falha em camadas diferentes, mas não compartilham uma classificação causal canônica.
 - [x] Gap: o turno vazio é atualmente registrado como falha BYOK sempre que BYOK está pronto:
   - isso pode ser correto para vazio real do provider;
   - pode ser incorreto para falso positivo causado por mensagem tardia;
@@ -7745,8 +7762,8 @@
   - APIs públicas que ainda esperam `Promise<string>` continuam funcionando;
   - uma API detalhada expõe o resultado semântico;
   - migração deve ocorrer por barrels e sem duplicar lógica.
-- [x] `channel/client-dialog.js` transporta o resultado detalhado em vez de reconstruir
-  semântica a partir de uma string e um espelho eventual.
+- [x] `channel/client-dialog.js` transporta o resultado detalhado em vez de reconstruir semântica a
+      partir de uma string e um espelho eventual.
 - [x] `terminal/frontend/gateways/dialog.js` expõe os metadados detalhados ao engine.
 - [x] `terminal/dialog/engine.js` materializa e classifica usando o resultado semântico:
   - não acusar falha quando há pergunta humana pendente;
@@ -7781,18 +7798,18 @@
   - linha de progresso;
   - linha de conclusão.
 - [x] `tool-lifecycle-runtime.js` preserva a apresentação no `ToolCallRegistry` e a reutiliza em
-  start, progress, complete, SSE e turn trace.
+      start, progress, complete, SSE e turn trace.
 - [x] A linha viva usa `activity.toolName`, mas não recebe um campo semântico específico para o alvo
-  operacional atual.
+      operacional atual.
 - [x] `exec_command` tem argumento `command`, porém `command` não faz parte da introspecção
-  canônica:
+      canônica:
   - o `cwd` pode aparecer como arquivo/alvo;
   - o comando não aparece;
   - a UX reduz a operação a `Executar comando · executando comando`.
 - [x] `list_tools` tem filtros `category` e `search`, e resultado com `count`, mas não possui nome
-  humano nem resumo semântico dedicado.
+      humano nem resumo semântico dedicado.
 - [x] Tools de listagem de arquivo podem mostrar path ou busca quando esses campos existem, mas
-  contagem e escopo retornados não são apresentados de forma consistente.
+      contagem e escopo retornados não são apresentados de forma consistente.
 
 ### 12.68 Bugs e gaps identificados na narrativa de tools
 
@@ -7801,17 +7818,17 @@
 - [x] Gap: não há campo canônico para contagem de resultados.
 - [x] Gap: não há campo canônico para resumo seguro de resultado.
 - [x] Gap: `hasSemanticToolTarget()` considera apenas paths, ranges, URLs, buscas e patches; uma
-  apresentação enriquecida por comando ou contagem pode ser descartada na conclusão.
+      apresentação enriquecida por comando ou contagem pode ser descartada na conclusão.
 - [x] Gap: `tool.lifecycle` não transporta comando seguro, filtro ou contagem.
 - [x] Gap: `recordTerminalTurnToolActivity()` recebe apenas `target`, então a projeção de turno não
-  consegue diferenciar arquivo, comando, filtro e resultado.
+      consegue diferenciar arquivo, comando, filtro e resultado.
 - [x] Gap: a linha viva mostra o nome humano da tool, mas não prioriza `presentation.target` ou um
-  alvo operacional enriquecido.
+      alvo operacional enriquecido.
 - [x] Gap: nomes humanos não cobrem `list_tools`, apesar de a tool ser parte relevante da
-  introspecção da sessão.
+      introspecção da sessão.
 - [x] Risco: mostrar comando bruto pode vazar segredos, tokens, headers ou payloads longos.
 - [x] Risco: mostrar stdout/stderr bruto na linha viva criaria verborragia, quebras e vazamento de
-  dados.
+      dados.
 
 ### 12.69 Situação ideal para metadados e UX de tools
 
@@ -7848,8 +7865,8 @@
   - introspecção prioriza recurso e contagem;
   - pergunta prioriza texto da pergunta;
   - intent prioriza intenção.
-- [x] `ToolCallRegistry` preserva a apresentação enriquecida do start e permite upgrade no
-  complete quando o resultado adiciona contagem ou resumo.
+- [x] `ToolCallRegistry` preserva a apresentação enriquecida do start e permite upgrade no complete
+      quando o resultado adiciona contagem ou resumo.
 - [x] `tool.lifecycle` carrega metadados semânticos seguros para consumidores externos.
 - [x] Linha viva deve mostrar:
   - `LLM-B ferramenta · Executar comando · git status · 2s`;
@@ -7910,8 +7927,8 @@
   - `LLM-B trocando modelo · antigo → novo`;
   - depois retornar à atividade real;
   - histórico deve preservar a confirmação efetiva.
-- [ ] SSE e `/events` devem manter IDs e correlação; stdout default deve usar nomes humanos e
-  motivo curto.
+- [ ] SSE e `/events` devem manter IDs e correlação; stdout default deve usar nomes humanos e motivo
+      curto.
 
 ### 12.72 Sequência técnica priorizada
 
@@ -7978,8 +7995,8 @@
 - [ ] `list_tools` mostra nome humano, filtro e contagem quando disponíveis.
 - [ ] Tools de busca/listagem mostram alvo e resultado curto sem stdout bruto.
 - [x] Linha viva comunica a ação atual sem IDs internos, sem multiline e sem ocupar o input.
-- [ ] Troca efetiva de modelo é comunicada com precisão e sem confundir seleção preparada com
-  sessão viva.
+- [ ] Troca efetiva de modelo é comunicada com precisão e sem confundir seleção preparada com sessão
+      viva.
 - [ ] Testes focados e lives PTY preservam legibilidade, correlação e ausência de regressões.
 
 ### 12.74 Implementação estrutural concluída em 2026-06-04
@@ -8023,8 +8040,7 @@
   - `long-tool-heartbeat`;
   - transporte PTY real;
   - BYOK real;
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-05-46-656Z/summary.md`.
+  - artefato: `artifacts/terminal-live/2026-06-04T20-05-46-656Z/summary.md`.
 - [x] O live confirmou que `exec_command` agora preserva e apresenta o comando seguro:
   - start durável com `Executar comando`;
   - `/activity` com alvo operacional;
@@ -8060,8 +8076,7 @@
 ### 12.76 Metadado contextual de shell e segunda rodada live — 2026-06-04
 
 - [x] A primeira reexecução após o truncamento width-aware passou:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-12-10-531Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T20-12-10-531Z/summary.md`;
   - lifecycle humano de `exec_command` foi reconhecido pelo runner;
   - linha viva permaneceu em uma linha física;
   - ask_user posterior continuou dedicado e sem disputa com input.
@@ -8085,24 +8100,19 @@
   - projeção diagnóstica mantém o novo campo;
   - linha viva estreita remove o rótulo redundante de fase antes de omitir o alvo.
 - [x] Terceira execução PTY confirmou o comportamento real:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-19-17-919Z/summary.md`;
-  - linha viva:
-    `LLM-B · Executar comando · node -e "setT… · 0s`;
-  - resumo do turno:
-    `Turno 1 ação`, sem arquivo fictício;
+  - artefato: `artifacts/terminal-live/2026-06-04T20-19-17-919Z/summary.md`;
+  - linha viva: `LLM-B · Executar comando · node -e "setT… · 0s`;
+  - resumo do turno: `Turno 1 ação`, sem arquivo fictício;
   - `/activity`: `Arquivos 0`;
   - `/tools diag`: alvo é o comando;
-  - SSE: `path=null`, `fileTargets=[]`, `directoryTargets=[workspace]`,
-    `primaryTargetKind=command`.
+  - SSE: `path=null`, `fileTargets=[]`, `directoryTargets=[workspace]`, `primaryTargetKind=command`.
 - [x] O terceiro live encontrou novo falso negativo do runner:
   - regex ampla alcançava JSON técnico contendo `LLM-B` e `modelo`;
   - o critério passou a inspecionar frames físicos delimitados por `\r`;
   - um frame de tool só é válido quando contém duração no mesmo frame e não carrega tail de
     modelo/runtime.
 - [x] Reexecutar `long-tool-heartbeat` após o critério por frame e registrar PASS final:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-22-39-510Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T20-22-39-510Z/summary.md`;
   - status PASS;
   - `ux-tool-live-status-stays-single-line` passou;
   - `ux-command-cwd-not-file-target` passou.
@@ -8125,7 +8135,8 @@
   - produtores devem declarar quando uma atividade é de foco `background`;
   - background pode refinar `boot`, `turn` ou `thinking` genéricos;
   - background não pode desalojar tool, streaming, pergunta, tarefa, compaction, subagente ou erro;
-  - completions só limpam foco por identidade de tool, mesma fase, fluxo de turno compatível ou idle.
+  - completions só limpam foco por identidade de tool, mesma fase, fluxo de turno compatível ou
+    idle.
 - [x] Implementação:
   - `recordTerminalActivity()` aceita `focusMode`;
   - ticker de silêncio do diálogo usa `focusMode=background`;
@@ -8135,9 +8146,9 @@
   - coleta IDs de start e completion por tool;
   - falha se um `terminal.activity` de `thinking` surgir entre esses eventos;
   - evita depender apenas da aparência final do stdout.
-- [x] Reexecutar `long-tool-heartbeat` e confirmar que `exec_command` permanece foreground até o complete:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-28-19-696Z/summary.md`;
+- [x] Reexecutar `long-tool-heartbeat` e confirmar que `exec_command` permanece foreground até o
+      complete:
+  - artefato: `artifacts/terminal-live/2026-06-04T20-28-19-696Z/summary.md`;
   - status PASS;
   - `scenario-tool-exec_command-focus-preserved` passou;
   - a linha viva permaneceu no comando durante os quatro segundos de execução;
@@ -8146,8 +8157,7 @@
 ### 12.78 Recuperação canônica de turno vazio pré-ação — 2026-06-04
 
 - [x] Live real `recoverable-tool-error` encontrou uma falha anterior ao cenário de erro:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-30-57-924Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T20-30-57-924Z/summary.md`;
   - status `BLOCKED`;
   - blocker `assistant-empty-turn`;
   - o provider/SDK consumiu tokens e emitiu `assistant.turn_end`;
@@ -8170,8 +8180,8 @@
   - o terminal emite `terminal.turn.empty_recovery` antes da segunda tentativa;
   - somente a segunda falha vazia degrada saúde BYOK e imprime `Turno vazio`.
 - [x] Implementação:
-  - `shouldAttemptPreActionEmptyTurnRecovery()` valida ator, ausência de requestHeaders, ausência
-    de input humano, ausência de protocolo, zero tools, zero assistant messages e zero deltas;
+  - `shouldAttemptPreActionEmptyTurnRecovery()` valida ator, ausência de requestHeaders, ausência de
+    input humano, ausência de protocolo, zero tools, zero assistant messages e zero deltas;
   - `_executeTurn()` faz uma segunda chamada com `RECUPERAÇÃO AUTOMÁTICA DO TERMINAL`;
   - a materialização do terminal permanece aberta até a segunda chamada resolver;
   - `/events` ganhou label humano `Recuperação de turno` e resumo de tentativa/motivo;
@@ -8182,8 +8192,7 @@
   - `/events` renderiza a recuperação sem envelope cru.
 - [x] Reexecutar `recoverable-tool-error` e confirmar que o cenário avança para tools reais, erro
       recuperável, segunda leitura, deltas públicos, `ask_user` e final pós-resposta:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-48-30-966Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T20-48-30-966Z/summary.md`;
   - status PASS;
   - `scenario-tool-exec_command-lifecycle` passou com `expected=failure`;
   - `scenario-tool-exec_command-focus-preserved` passou;
@@ -8195,8 +8204,7 @@
 ### 12.79 Roundtrip de arquivos: prompt único e confirmação cruzada SDK/IO — 2026-06-04
 
 - [x] Live real `file-write-roundtrip` executado com criação, movimento e exclusão reais:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T20-51-40-410Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T20-51-40-410Z/summary.md`;
   - status FAIL apenas em `no-prompt-double-render`;
   - critérios positivos: `create_file`, `move_file`, `delete_file`, ausência de prompt de permissão,
     `ask_user`, resposta final, export, SSE, `/errors`, `/health full` e fechamento limpo;
@@ -8217,8 +8225,8 @@
   - isso sugeria duas ações humanas, quando na prática era confirmação cruzada de observabilidade.
 - [x] Correção aplicada:
   - `aggregateTurnTraceFiles()` mantém contagem acumulada apenas quando a origem é a mesma;
-  - quando origens diferentes confirmam a mesma operação/caminho, a linha humana permanece única e
-    o detalhe preserva a origem como `múltiplas origens`.
+  - quando origens diferentes confirmam a mesma operação/caminho, a linha humana permanece única e o
+    detalhe preserva a origem como `múltiplas origens`.
 - [x] Correção fundacional adicional:
   - `recordTerminalTurnToolActivity()` deixou de contar `started` e `completed` da mesma
     `toolCallId` como duas operações de arquivo;
@@ -8230,34 +8238,32 @@
   - `/activity` default não renderiza `×2` para confirmação cruzada SDK/IO do mesmo arquivo.
 - [x] Reexecutar live `file-write-roundtrip` e confirmar `Status: PASS`, prompt único e `/activity`
       sem duplicidade artificial de arquivo:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T21-05-26-400Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T21-05-26-400Z/summary.md`;
   - status PASS;
   - `no-prompt-double-render` passou;
-  - `create_file`, `move_file`, `delete_file`, `ask_user`, resposta humana, export, SSE,
-    `/errors`, `/health full` e fechamento limpo passaram;
+  - `create_file`, `move_file`, `delete_file`, `ask_user`, resposta humana, export, SSE, `/errors`,
+    `/health full` e fechamento limpo passaram;
   - `/activity 40` mostrou arquivos sem `×2` falso para start/complete da mesma tool.
 - [x] Achado UX pós-PASS:
   - o resumo compacto do turno selecionava os três primeiros arquivos únicos, então um roundtrip
     podia mostrar `CRIAR · MOVER · MOVER` e deixar `EXCLUIR` de fora;
   - isso é tecnicamente correto, mas comunica pior o fluxo canônico do operador.
 - [x] Correção aplicada:
-  - `selectTerminalTurnTraceSummaryFiles()` agora prioriza diversidade de operação antes de preencher
-    detalhes laterais;
+  - `selectTerminalTurnTraceSummaryFiles()` agora prioriza diversidade de operação antes de
+    preencher detalhes laterais;
   - com limite curto, o resumo prefere `CRIAR`, `MOVER` e `EXCLUIR` a repetir dois lados do move.
 - [x] Contrato live reforçado:
   - o runner ganhou `ux-turn-file-summary-operation-coverage`;
   - em cenários com `create_file`, `move_file` e `delete_file`, a linha compacta `Arquivos` deve
     cobrir `CRIAR`, `MOVER` e `EXCLUIR`.
 - [x] Live de confirmação encontrou fricção canônica de autonomia antes de medir a nova linha:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T21-10-32-808Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T21-10-32-808Z/summary.md`;
   - status BLOCKED;
   - blocker `assistant-asked-before-required-deltas`;
   - a LLM-B invocou `ask_user` para confirmar caminho relativo/workspace antes de executar
     `create_file`, `move_file` e `delete_file`;
-  - a UX da pergunta permaneceu limpa, mas o comportamento viola o contrato de autorização máxima
-    do cenário.
+  - a UX da pergunta permaneceu limpa, mas o comportamento viola o contrato de autorização máxima do
+    cenário.
 - [x] Correção aplicada no harness:
   - o prompt do cenário `file-write-roundtrip` declara que caminhos relativos `data/...` são
     deliberados, relativos ao workspace atual e já autorizados pelo operador;
@@ -8265,8 +8271,7 @@
     movimento ou exclusão.
 - [x] Live pós-endurecimento removeu a pergunta intermediária e completou o fluxo real, mas revelou
       que o novo critério estava rígido demais:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T21-16-48-282Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T21-16-48-282Z/summary.md`;
   - status FAIL apenas em `ux-turn-file-summary-operation-coverage`;
   - `create_file`, `move_file`, `delete_file`, deltas, `ask_user`, resposta humana, final pós-ask,
     `/activity`, `/events`, `/errors`, `/health full` e export passaram;
@@ -8277,8 +8282,7 @@
     distribuída em linhas `Ações`/`Arquivos` separadas;
   - o critério continua exigindo que `CRIAR`, `MOVER` e `EXCLUIR` estejam visíveis ao operador.
 - [x] Live seguinte encontrou uma segunda variação de provedor:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T21-19-34-926Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T21-19-34-926Z/summary.md`;
   - status BLOCKED;
   - blocker `assistant-empty-turn`;
   - após `create_file` e `move_file`, a LLM-B encerrou um turno com tools executadas, sem síntese
@@ -8292,17 +8296,16 @@
   - isso mantém a segurança do produto e torna o teste live mais robusto contra divisão real de
     turnos pelo provider.
 - [x] Reexecutar live dirigido para confirmar a cobertura visual do roundtrip completo:
-  - artefato:
-    `artifacts/terminal-live/2026-06-04T21-28-51-100Z/summary.md`;
+  - artefato: `artifacts/terminal-live/2026-06-04T21-28-51-100Z/summary.md`;
   - status PASS;
   - `ux-turn-file-summary-operation-coverage` passou com cobertura distribuída em linhas compactas;
   - `CRIAR`, `MOVER` e `EXCLUIR` ficaram visíveis ao operador;
   - `no-prompt-double-render`, ausência de prompt SDK de permissão, foco de tool, `ask_user`,
-    resposta humana, final pós-ask, export, SSE, `/errors`, `/health full` e fechamento limpo
-    também passaram.
+    resposta humana, final pós-ask, export, SSE, `/errors`, `/health full` e fechamento limpo também
+    passaram.
 - [x] Decisão de UX consolidada:
-  - a linha compacta ideal deve cobrir diversidade de operação quando o turno contém múltiplas
-    ações de arquivo;
+  - a linha compacta ideal deve cobrir diversidade de operação quando o turno contém múltiplas ações
+    de arquivo;
   - quando o provider reparte o roundtrip em turnos distintos, a obrigação visual migra para a
     cobertura distribuída em linhas `Ações`/`Arquivos` recentes, sem exigir uma linha artificial
     única que não corresponda ao envelope real do SDK.
@@ -8312,8 +8315,8 @@
 - [x] Auditoria do fluxo atual:
   - `/byok model <id>` alterava a projeção local com `setTerminalModelProjection()` e imprimia
     `Modelo vivo · solicitado <id>`;
-  - a confirmação real já existia em `session.model_changed`, que atualiza `lastPrInfo`, emite SSE
-    e grava confirmação no SQLite do model-gateway;
+  - a confirmação real já existia em `session.model_changed`, que atualiza `lastPrInfo`, emite SSE e
+    grava confirmação no SQLite do model-gateway;
   - o gap era a etapa intermediária: a solicitação/adiamento de troca não tinha unidade canônica,
     nem registro histórico consistente para `/activity`;
   - a automação `model-gateway auto` aplicava `set_live_model` por caminho próprio, repetindo a
@@ -8331,8 +8334,8 @@
     `Troca de modelo solicitada` com transição anterior → novo quando disponível;
   - `recordTerminalLiveByokModelSwitchDeferred()` registra `Troca de modelo adiada` quando a sessão
     viva não pode ser inspecionada ou cruza provedor/perfil;
-  - `/byok model` passou a usar essa unidade e a imprimir `Confirmação · aguarde
-    session.model_changed ou próximo uso observado`;
+  - `/byok model` passou a usar essa unidade e a imprimir
+    `Confirmação · aguarde session.model_changed ou próximo uso observado`;
   - `applyTerminalByokGatewayAutoEffects()` passou a usar a mesma unidade para efeitos
     `set_live_model`.
 - [x] Contrato de UX:
@@ -8341,10 +8344,9 @@
   - `session.model_changed` permanece como confirmação final observável em `/events`, SSE e SQLite;
   - auto-switch e comando manual compartilham o mesmo vocabulário.
 - [x] Ciclo PTY dirigido executado:
-  - artefato:
-    `artifacts/terminal-live/byok-model-switch-ux-20260604-1844/summary.md`;
-  - `/byok model terminal-ux-boundary-fixture` mostrou `Modelo vivo · solicitado kilo-auto/free →
-    terminal-ux-boundary-fixture`;
+  - artefato: `artifacts/terminal-live/byok-model-switch-ux-20260604-1844/summary.md`;
+  - `/byok model terminal-ux-boundary-fixture` mostrou
+    `Modelo vivo · solicitado kilo-auto/free → terminal-ux-boundary-fixture`;
   - o prompt exibiu `[MODEL?]` enquanto havia divergência configurado/observado;
   - após confirmação observada, `/byok` mostrou a transição do modelo e removeu o marcador de
     divergência no prompt.
@@ -8359,34 +8361,30 @@
   - a ação sugerida passa a ser `/session sdk next new` apenas quando o operador quiser materializar
     a seleção preparada no vínculo de boot.
 - [x] Ciclo PTY pós-correção:
-  - artefato:
-    `artifacts/terminal-live/byok-model-switch-ux-20260604-1846/summary.md`;
+  - artefato: `artifacts/terminal-live/byok-model-switch-ux-20260604-1846/summary.md`;
   - status PASS;
   - novo critério `ux-cycle-byok-model-switch-request-confirmation` passou;
-  - evidência visual:
-    `Modelo vivo · solicitado kilo-auto/free → terminal-ux-boundary-fixture`;
-  - evidência visual:
-    `Confirmação · aguarde session.model_changed ou próximo uso observado`;
-  - evidência visual:
-    `[MODEL?]` apareceu no prompt durante divergência transitória;
+  - evidência visual: `Modelo vivo · solicitado kilo-auto/free → terminal-ux-boundary-fixture`;
+  - evidência visual: `Confirmação · aguarde session.model_changed ou próximo uso observado`;
+  - evidência visual: `[MODEL?]` apareceu no prompt durante divergência transitória;
   - evidência visual:
     `modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão`
     apareceu em `/byok` e `/session sdk`.
 - [x] Ciclo PTY reforçado com `/activity`:
-  - artefato:
-    `artifacts/terminal-live/byok-model-switch-ux-20260604-activity/summary.md`;
+  - artefato: `artifacts/terminal-live/byok-model-switch-ux-20260604-activity/summary.md`;
   - status PASS;
-  - o comando `/activity 10` foi executado imediatamente após `/byok model
-    terminal-ux-boundary-fixture`;
-  - `ux-cycle-byok-model-switch-request-confirmation` agora valida:
-    solicitação visual, prompt `[MODEL?]`, timeline `Troca de modelo solicitada`, cópia de
-    confirmação runtime-vs-boot e ausência da frase antiga imprecisa.
+  - o comando `/activity 10` foi executado imediatamente após
+    `/byok model terminal-ux-boundary-fixture`;
+  - `ux-cycle-byok-model-switch-request-confirmation` agora valida: solicitação visual, prompt
+    `[MODEL?]`, timeline `Troca de modelo solicitada`, cópia de confirmação runtime-vs-boot e
+    ausência da frase antiga imprecisa.
 - [x] Testar o fluxo com `/byok auto apply` em ciclo dirigido do terminal.
 - [x] Adicionar critério live dedicado para troca de modelo:
   - solicitação aparece sem tomar o prompt;
   - `/activity` mostra `Troca de modelo solicitada`;
   - `session.model_changed`, quando emitido pelo SDK, aparece como confirmação;
-  - divergência modelo configurado/efetivo aparece em `/usage`/prompt sem ids técnicos desnecessários.
+  - divergência modelo configurado/efetivo aparece em `/usage`/prompt sem ids técnicos
+    desnecessários.
 
 ### 12.81 Auto-probe BYOK: `apply`, ledgers humanos e sincronização do harness — 2026-06-04
 
@@ -8399,15 +8397,15 @@
 - [x] Correção do runner:
   - `auto-probe` e `model-probe` migraram para sequência sincronizada por prompt;
   - entradas sincronizadas agora aceitam `waitBeforeMs`;
-  - o auto-probe aguarda após o catálogo canônico longo antes de abrir o cockpit
-    `operator-ready`, reduzindo eco de comandos colado na superfície anterior.
+  - o auto-probe aguarda após o catálogo canônico longo antes de abrir o cockpit `operator-ready`,
+    reduzindo eco de comandos colado na superfície anterior.
 - [x] Correção de UX de `/byok auto apply`:
   - quando não há efeitos derivados, o terminal mostra:
     `Auto apply · nenhum efeito terminal derivado para aplicar`;
   - quando há efeitos pulados, o terminal usa linhas temáticas e próxima ação humana, sem frase
     solta `Auto apply: ...`;
-  - quando há `set_live_model`, o mesmo vocabulário da troca manual é usado:
-    solicitação, transição e confirmação por `session.model_changed`/próximo uso observado.
+  - quando há `set_live_model`, o mesmo vocabulário da troca manual é usado: solicitação, transição
+    e confirmação por `session.model_changed`/próximo uso observado.
 - [x] Correção dos ledgers automáticos:
   - ações e status técnicos passaram por `renderByokTokenLabel()`;
   - `manual_intervention` virou `intervenção manual`;
@@ -8423,14 +8421,12 @@
   - `auto-recovery-fixture-visible` aceita a cópia atual em português e a linha de health;
   - `no-terminal-errors` passou a aceitar caixa baixa em `nenhum erro recente`.
 - [x] Prova PTY aprovada:
-  - artefato:
-    `artifacts/terminal-live/byok-auto-probe-ux-20260604-human-ledgers/summary.md`;
+  - artefato: `artifacts/terminal-live/byok-auto-probe-ux-20260604-human-ledgers/summary.md`;
   - status PASS;
-  - 31 critérios passaram, incluindo `auto-apply-visible`, `auto-human-default-copy`,
-    ledgers, SSE archive, ausência de erros e fechamento limpo.
+  - 31 critérios passaram, incluindo `auto-apply-visible`, `auto-human-default-copy`, ledgers, SSE
+    archive, ausência de erros e fechamento limpo.
 - [x] Prova PTY pós-ajuste de espaçamento:
-  - artefato:
-    `artifacts/terminal-live/byok-auto-probe-ux-20260604-wait-before/summary.md`;
+  - artefato: `artifacts/terminal-live/byok-auto-probe-ux-20260604-wait-before/summary.md`;
   - status PASS;
   - o cockpit `operator-ready` deixou de colar no eco do catálogo canônico longo.
 - [x] Limpeza pós-PASS:
@@ -8444,8 +8440,8 @@
     `automation_decision_blocked` passaram por tradução visual;
   - `target:` virou `alvo:`;
   - `set model vivo` virou `modelo vivo`;
-  - cooldowns, bloqueios, classes e motivos de não ação agora usam a mesma função de rótulo
-    humano dos ledgers.
+  - cooldowns, bloqueios, classes e motivos de não ação agora usam a mesma função de rótulo humano
+    dos ledgers.
 - [ ] Próxima auditoria:
   - segmentar critérios de auto-probe por superfície em vez de procurar alguns termos no log
     inteiro;
@@ -8455,8 +8451,8 @@
 ### 12.82 Lifecycle conversacional: pergunta humana e intenção fora da estética de tool crua — 2026-06-04
 
 - [x] Auditoria do ponto de entrada:
-  - as screenshots ruins mostram `request_user_input ainda executando`, `report_intent`, `chatcmpl-tool-*`
-    e blocos `[TOOL]`/`[INTENT]` competindo com a narrativa principal;
+  - as screenshots ruins mostram `request_user_input ainda executando`, `report_intent`,
+    `chatcmpl-tool-*` e blocos `[TOOL]`/`[INTENT]` competindo com a narrativa principal;
   - o código já possui `human-question-renderer`, `intent-renderer`, `tool-activity-presenter` e
     `live-status-line`, mas alguns eventos laterais ainda chegam pelo lifecycle genérico;
   - quando isso acontece, a superfície default pode chamar pergunta/intenção de “Tool” ou usar
@@ -8481,63 +8477,51 @@
     `Intenção capturada`, evitando `Tool concluída` para eventos conversacionais;
   - garantir que targets visuais default não caiam para `requestId` técnico;
   - reforçar testes unitários para lifecycle e presenter;
-  - propagar `choices` e `allowFreeform` de `request_user_input` pelo `TerminalToolActivityPresentation`,
-    para o card humano não perder opções estruturadas.
+  - propagar `choices` e `allowFreeform` de `request_user_input` pelo
+    `TerminalToolActivityPresentation`, para o card humano não perder opções estruturadas.
 - [x] Validação focada:
   - `node --check` em presenter, lifecycle e testes alterados;
-  - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js
-    tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js
-    tests/unit/copilot/terminal/test_human_question_renderer.spec.js
-    tests/unit/copilot/terminal/test_live_status_line.spec.js`;
-  - `npx eslint src/copilot/terminal/events/tool-activity-presenter.js
-    src/copilot/terminal/events/tool-lifecycle-runtime.js
-    tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js
-    tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js`;
+  - `npx vitest run tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js tests/unit/copilot/terminal/test_human_question_renderer.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`;
+  - `npx eslint src/copilot/terminal/events/tool-activity-presenter.js src/copilot/terminal/events/tool-lifecycle-runtime.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js`;
   - `git diff --check`.
 - [ ] Próxima etapa:
   - atualizar critérios live para procurar resíduos por superfície e não apenas no log inteiro;
-  - testar cenário live com `request_user_input`/`ask_user` e confirmar que o operador vê card humano,
-    opções, timestamp e input livre sem heartbeat repetitivo.
+  - testar cenário live com `request_user_input`/`ask_user` e confirmar que o operador vê card
+    humano, opções, timestamp e input livre sem heartbeat repetitivo.
 - [x] Harness live:
   - `evaluateOutput()` ganhou `questionWaitSurface`, recortando a tela da pergunta até a resposta do
     operador antes dos diagnósticos raw;
   - novo critério `ux-question-wait-surface-human` valida card/prompt humano sem
     `request_user_input ainda executando`, `ask_user SDK`, `chatcmpl-tool-*`, `toolu_*`,
-    `Tool solicitou`, `Tool concluída/falhou` ou `LLM-B ainda trabalhando` no trecho que o
-    operador usa para responder;
+    `Tool solicitou`, `Tool concluída/falhou` ou `LLM-B ainda trabalhando` no trecho que o operador
+    usa para responder;
   - isso reduz mistura entre superfície humana e `/events --raw`, mantendo raw/export intactos.
 - [x] Live estruturado:
   - comando executado:
-    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs
-    --structured-input-cycle --transport=pty --timeout-ms=180000
-    --out-dir=artifacts/terminal-live/structured-input-ux-20260604-lifecycle-question`;
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --structured-input-cycle --transport=pty --timeout-ms=180000 --out-dir=artifacts/terminal-live/structured-input-ux-20260604-lifecycle-question`;
   - status PASS;
-  - evidência: card `Pergunta humana estruturada`, `Origem`, `Hora` ISO completo,
-    `[PERGUNTA]`, opções `[1] SIM [2] NAO`, prompt `[PERG]`, resposta roteada e `/sdk waits`
-    limpo após resposta;
+  - evidência: card `Pergunta humana estruturada`, `Origem`, `Hora` ISO completo, `[PERGUNTA]`,
+    opções `[1] SIM [2] NAO`, prompt `[PERG]`, resposta roteada e `/sdk waits` limpo após resposta;
   - busca no log confirmou ausência de `chatcmpl-tool`, `Tool solicitou`, `LLM-B ainda trabalhando`
     e `ask_user SDK` na superfície limpa.
 - [x] Live canônico com LLM-B real:
   - comando executado:
-    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs
-    --live-scenario=canonical --transport=pty --timeout-ms=240000
-    --out-dir=artifacts/terminal-live/canonical-ux-20260604-question-lifecycle`;
+    `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --live-scenario=canonical --transport=pty --timeout-ms=240000 --out-dir=artifacts/terminal-live/canonical-ux-20260604-question-lifecycle`;
   - status PASS;
-  - evidência visual:
-    `Intenção capturada`, `Ler arquivo`, bloco de deltas `DELTA-CANONICAL-*`, card
+  - evidência visual: `Intenção capturada`, `Ler arquivo`, bloco de deltas `DELTA-CANONICAL-*`, card
     `Pergunta ao operador`, ISO completo, opção `[1] SIM`, prompt `[PERG]`, confirmação
     `Resposta enviada para pergunta pendente` e resposta final pós-pergunta;
-  - critérios relevantes aprovados:
-    `ux-no-durable-waiting-spam`, `ux-question-live-status-does-not-compete-with-input`,
-    `ux-question-wait-surface-human`, `ux-no-durable-tool-output-inside-question-prompt`,
-    `ux-human-tool-names`, `ux-intent-command-default-human`, `ux-intent-command-detail-human-envelope`
-    e `no-terminal-errors`.
+  - critérios relevantes aprovados: `ux-no-durable-waiting-spam`,
+    `ux-question-live-status-does-not-compete-with-input`, `ux-question-wait-surface-human`,
+    `ux-no-durable-tool-output-inside-question-prompt`, `ux-human-tool-names`,
+    `ux-intent-command-default-human`, `ux-intent-command-detail-human-envelope` e
+    `no-terminal-errors`.
 
 ### 12.83 Vocabulário humano em health/status/diagnose/metrics — 2026-06-04
 
 - [x] Auditoria pós-live:
-  - o terminal já passava os critérios canônicos, mas `/health full` ainda exibiu
-    `Runtime alvo`, `Sessão runtime`, `Mapa runtime` e `Linha viva reservada`;
+  - o terminal já passava os critérios canônicos, mas `/health full` ainda exibiu `Runtime alvo`,
+    `Sessão runtime`, `Mapa runtime` e `Linha viva reservada`;
   - esses termos eram tecnicamente corretos, mas ruins para o operador humano e desalinhados com a
     meta de UX fluida.
 - [x] Correção aplicada:
@@ -8561,43 +8545,45 @@
 
 - [x] Auditoria:
   - as screenshots mostravam o terminal iniciando em `TERMINAL_DISPLAY_PRESET=full`;
-  - `full` ligava `thinking`, `usage`, `session`, `tools`, `intent` e `streaming`, deixando o caminho feliz
-    parecido com diagnóstico permanente;
-  - o rodapé de usage pós-turno explicava modelo/custo/tokens, mas era ruído quando o operador só queria
-    uma conversa fluida;
-  - os comandos canônicos `terminal:llm-b`, `terminal:llm-b:dev`, `dev:terminal` e o runner live forçavam
-    `full`, então o default real não correspondia à UX ideal.
+  - `full` ligava `thinking`, `usage`, `session`, `tools`, `intent` e `streaming`, deixando o
+    caminho feliz parecido com diagnóstico permanente;
+  - o rodapé de usage pós-turno explicava modelo/custo/tokens, mas era ruído quando o operador só
+    queria uma conversa fluida;
+  - os comandos canônicos `terminal:llm-b`, `terminal:llm-b:dev`, `dev:terminal` e o runner live
+    forçavam `full`, então o default real não correspondia à UX ideal.
 - [x] Decisão UX:
   - `default` é o modo diário elegante: streaming público, tools e intenção continuam visíveis;
-  - `usage`, `session` e `thinking` deixam de aparecer por padrão e ficam disponíveis em `/usage now`,
-    `/metrics`, `/status full`, `/display usage on`, `/display session on`, `/display thinking on`,
-    `/display preset full` e `/display preset debug`;
+  - `usage`, `session` e `thinking` deixam de aparecer por padrão e ficam disponíveis em
+    `/usage now`, `/metrics`, `/status full`, `/display usage on`, `/display session on`,
+    `/display thinking on`, `/display preset full` e `/display preset debug`;
   - `full` continua existindo como opt-in para auditoria e troubleshooting, sem ser o boot canônico.
 - [x] Implementação:
   - `TERMINAL_DISPLAY_PRESET` agora cai para `default` quando não configurado;
   - preset inválido também cai para `default`, em vez de `full`;
   - script `terminal:llm-b`, `terminal:llm-b:dev` e `dev:terminal` iniciam em `default`;
-  - runner live usa `TERMINAL_DISPLAY_PRESET` do ambiente quando presente e `default` quando ausente;
-  - contrato unitário garante que `default` mantém `usage=false`, `session=false` e `thinking=false`.
+  - runner live usa `TERMINAL_DISPLAY_PRESET` do ambiente quando presente e `default` quando
+    ausente;
+  - contrato unitário garante que `default` mantém `usage=false`, `session=false` e
+    `thinking=false`.
 - [ ] Próxima validação live:
   - rodar cenário canônico PTY com preset default e confirmar ausência de footer pós-turno verboso;
-  - rodar cenário diagnóstico com `TERMINAL_DISPLAY_PRESET=full` explicitamente para confirmar que
-    o modo rico continua acessível.
+  - rodar cenário diagnóstico com `TERMINAL_DISPLAY_PRESET=full` explicitamente para confirmar que o
+    modo rico continua acessível.
 
 ### 12.85 Prompt obsoleto cancelado ao receber nova linha — 2026-06-04
 
 - [x] Evidência live:
-  - live PTY em `artifacts/terminal-live/default-ux-20260604-display-default/summary.md` confirmou
-    o preset `default` e ausência de footer de usage automático;
+  - live PTY em `artifacts/terminal-live/default-ux-20260604-display-default/summary.md` confirmou o
+    preset `default` e ausência de footer de usage automático;
   - a mesma live falhou em `no-prompt-double-render`;
-  - no `terminal.plain.log`, o prompt anterior aparecia vazio e, logo abaixo, outro prompt era pintado
-    junto da linha viva do turno.
+  - no `terminal.plain.log`, o prompt anterior aparecia vazio e, logo abaixo, outro prompt era
+    pintado junto da linha viva do turno.
 - [x] Diagnóstico:
   - prompts são coalescidos via `setImmediate`;
-  - se uma linha nova chega antes desse `setImmediate`, o redraw agendado pertence ao estado anterior
-    e não deve mais materializar;
-  - o novo turno já vai assumir a tela com linha viva/prompt de espera, portanto manter o prompt antigo
-    cria duplicação visual.
+  - se uma linha nova chega antes desse `setImmediate`, o redraw agendado pertence ao estado
+    anterior e não deve mais materializar;
+  - o novo turno já vai assumir a tela com linha viva/prompt de espera, portanto manter o prompt
+    antigo cria duplicação visual.
 - [x] Correção:
   - adicionada primitiva `cancelScheduledTerminalPromptRedraw(rl)` no renderer do diálogo;
   - o lifecycle do REPL cancela redraw pendente no início de cada evento `line`;
@@ -8608,20 +8594,22 @@
 ### 12.86 Recuperação automática pós-pergunta vazia — 2026-06-04
 
 - [x] Evidência live:
-  - live PTY em `artifacts/terminal-live/canonical-ux-20260604-display-default-prompt-fix/summary.md`
-    confirmou `no-prompt-double-render` e o preset `default`;
-  - o mesmo ciclo bloqueou porque, após o operador responder `SIM`, a LLM-B encerrou a continuação sem
-    mensagem pública;
-  - a UX atual mostrou uma placa `RECUPERAR` com `/turn Continue...`, ou seja, exigiu ação manual para
-    um caso em que o operador já tinha respondido corretamente.
+  - live PTY em
+    `artifacts/terminal-live/canonical-ux-20260604-display-default-prompt-fix/summary.md` confirmou
+    `no-prompt-double-render` e o preset `default`;
+  - o mesmo ciclo bloqueou porque, após o operador responder `SIM`, a LLM-B encerrou a continuação
+    sem mensagem pública;
+  - a UX atual mostrou uma placa `RECUPERAR` com `/turn Continue...`, ou seja, exigiu ação manual
+    para um caso em que o operador já tinha respondido corretamente.
 - [x] Decisão UX:
-  - resposta humana aceita é um contrato forte: o terminal deve tentar preservar o fluxo conversacional
-    sem pedir ao operador para repetir comandos;
-  - a recuperação automática só é segura como uma continuação textual única, depois da pergunta humana,
-    sem repetir o prompt original e sem reexecutar tools anteriores por conta própria;
-  - a tentativa deve ser rastreável em SSE/activity e ter chave idempotente por `requestId`/turno/janela,
-    para não criar loop infinito;
-  - se a tentativa automática também falhar, a placa manual continua existindo como fallback explícito.
+  - resposta humana aceita é um contrato forte: o terminal deve tentar preservar o fluxo
+    conversacional sem pedir ao operador para repetir comandos;
+  - a recuperação automática só é segura como uma continuação textual única, depois da pergunta
+    humana, sem repetir o prompt original e sem reexecutar tools anteriores por conta própria;
+  - a tentativa deve ser rastreável em SSE/activity e ter chave idempotente por
+    `requestId`/turno/janela, para não criar loop infinito;
+  - se a tentativa automática também falhar, a placa manual continua existindo como fallback
+    explícito.
 - [x] Implementação:
   - separar mensagem de retomada humana (`Continue...`) do comando visual (`/turn Continue...`);
   - adicionar política testável de tentativa única para `dialog.empty_after_user_input`;
@@ -8633,12 +8621,12 @@
 - [x] Validação:
   - [x] teste unitário da política de idempotência;
   - [x] live PTY canônico com preset `default`, exigindo pergunta, resposta humana e ausência de
-    duplicação visual;
+        duplicação visual;
   - [ ] live ou harness focado que force `dialog.empty_after_user_input` para exercitar a retomada
-    automática sem depender de não determinismo do modelo.
+        automática sem depender de não determinismo do modelo.
 - [x] Evidência:
-  - `artifacts/terminal-live/canonical-ux-20260604-auto-recovery-default-rerun/summary.md`
-    terminou PASS;
+  - `artifacts/terminal-live/canonical-ux-20260604-auto-recovery-default-rerun/summary.md` terminou
+    PASS;
   - critérios relevantes verdes: `no-prompt-double-render`, `ux-question-wait-surface-human`,
     `ux-question-live-status-does-not-compete-with-input`, `post-ask-final-visible`,
     `sse-canonical-transcript-events`, `export-post-ask-final` e `no-terminal-errors`;
@@ -8650,8 +8638,8 @@
 - [x] Achado live:
   - `/usage now` ainda renderizava `runtime, SDK e hub conectados`;
   - `/health full` ainda tinha cabeçalho `Agente · runtime · modelo · entrada`;
-  - esses textos contradiziam a decisão já aplicada em `/status`, `/diagnose`, `/metrics` e linha viva:
-    `runtimeId` é contrato interno; superfície humana usa `ambiente`.
+  - esses textos contradiziam a decisão já aplicada em `/status`, `/diagnose`, `/metrics` e linha
+    viva: `runtimeId` é contrato interno; superfície humana usa `ambiente`.
 - [x] Correção:
   - `/usage now` passou a dizer `ambiente, SDK e hub conectados`;
   - `/usage now detail` passou a dizer `ambiente <id> · SDK <id> · hub <id>`;
@@ -8672,8 +8660,8 @@
 - [x] Achado:
   - `node --input-type=module -e "await import('./scripts/.../model-gateway-terminal-llm-b-live-test.mjs')"`
     executava uma live real por causa de `await main()` no topo do módulo;
-  - isso torna validação ESM perigosa, lenta e surpreendente, além de poder consumir chamada real sem
-    intenção explícita do operador.
+  - isso torna validação ESM perigosa, lenta e surpreendente, além de poder consumir chamada real
+    sem intenção explícita do operador.
 - [x] Correção:
   - runner passou a comparar `import.meta.url` com `pathToFileURL(process.argv[1])`;
   - execução direta continua chamando `main()`;
@@ -8685,8 +8673,8 @@
 ### 12.89 Higiene de vocabulário humano em superfícies detalhadas — 2026-06-04
 
 - [x] Achado:
-  - depois da troca principal de `/usage now` e `/health full`, ainda havia resíduos visuais em telas
-    menos frequentes:
+  - depois da troca principal de `/usage now` e `/health full`, ainda havia resíduos visuais em
+    telas menos frequentes:
     - auto-brief detalhado exibia `Runtime`;
     - `/now full` exibia `Runtime default`;
     - `/live full` exibia `Runtime principal`;
@@ -8737,8 +8725,8 @@
 ### 12.91 Recuperação pós-tools sem síntese pública — 2026-06-04
 
 - [x] Evidência live:
-  - live PTY `artifacts/terminal-live/long-tool-ux-20260604-transient-heartbeat/summary.md`
-    terminou `BLOCKED`;
+  - live PTY `artifacts/terminal-live/long-tool-ux-20260604-transient-heartbeat/summary.md` terminou
+    `BLOCKED`;
   - a tool longa real executou e concluiu;
   - o heartbeat apareceu como linha viva transitória, sem cascata durável de `ainda trabalhando`;
   - depois das tools, a LLM-B encerrou o turno sem deltas públicos, sem mensagem final e sem
@@ -8746,9 +8734,10 @@
   - o runner classificou como `blocked-by-assistant-empty-turn`.
 - [x] Diagnóstico:
   - o engine já tinha recuperação para turno vazio antes de qualquer tool;
-  - o caso live era semanticamente diferente: `tool_only` com tools reais concluídas, mas sem síntese
-    pública;
-  - a UX apenas avisava `tools executadas; a LLM-B não emitiu síntese pública`, exigindo ação manual.
+  - o caso live era semanticamente diferente: `tool_only` com tools reais concluídas, mas sem
+    síntese pública;
+  - a UX apenas avisava `tools executadas; a LLM-B não emitiu síntese pública`, exigindo ação
+    manual.
 - [x] Decisão UX:
   - `tool_only` sem resposta pública e sem pergunta humana deve tentar continuação segura uma vez;
   - a continuação não deve repetir tools já concluídas;
@@ -8764,18 +8753,18 @@
   - [x] testes unitários focados do dialog engine;
   - [x] `node --check`/lint escopado;
   - [x] live PTY `long-tool-heartbeat` avançou para delta, `ask_user`, resposta humana e final
-    pós-pergunta.
+        pós-pergunta.
   - [x] evidência: `artifacts/terminal-live/long-tool-ux-20260604-post-tool-recovery/summary.md`
-    terminou PASS, com `ux-no-durable-waiting-spam`, `ux-human-runtime-vocabulary`,
-    `scenario-tool-exec_command-lifecycle`, `ask-user-visible`, `post-ask-final-visible`,
-    `export-post-ask-final` e `no-terminal-errors`.
+        terminou PASS, com `ux-no-durable-waiting-spam`, `ux-human-runtime-vocabulary`,
+        `scenario-tool-exec_command-lifecycle`, `ask-user-visible`, `post-ask-final-visible`,
+        `export-post-ask-final` e `no-terminal-errors`.
 
 ### 12.92 `/tools diag` menos repetitivo e mais alinhado — 2026-06-04
 
 - [x] Achado live:
   - `/tools diag` estava funcional, mas repetia `Classe ferramenta` para quase toda tool;
-  - linhas `Alvo` do lifecycle usavam largura diferente da linha principal, parecendo desalinhadas em
-    PTY;
+  - linhas `Alvo` do lifecycle usavam largura diferente da linha principal, parecendo desalinhadas
+    em PTY;
   - o diagnóstico humano ficava com ar de dump técnico apesar de já ter bons nomes de tool.
 - [x] Decisão UX:
   - tipo/classe só aparece quando acrescenta informação;
@@ -8795,12 +8784,12 @@
 ### 12.93 Transições de modelo como narrativa operacional própria — 2026-06-04
 
 - [x] Achado:
-  - `session.model_changed` aparecia como linha genérica `Modelo`, sem distinguir confirmação do SDK,
-    troca real, reconfirmação redundante ou origem;
+  - `session.model_changed` aparecia como linha genérica `Modelo`, sem distinguir confirmação do
+    SDK, troca real, reconfirmação redundante ou origem;
   - `pr.fallback_model` dizia apenas `fallback aplicado: A -> B`, sem timestamp ISO completo nem
     resumo operacional no SSE;
-  - `/byok model` e automação BYOK já falavam em solicitação/aguardo de confirmação, mas a confirmação
-    posterior do SDK usava outra linguagem.
+  - `/byok model` e automação BYOK já falavam em solicitação/aguardo de confirmação, mas a
+    confirmação posterior do SDK usava outra linguagem.
   - live control probe de `/model` mostrou outro ruído: `/model <id>` dizia `Modelo configurado`
     mesmo antes da confirmação do SDK, enquanto o prompt já mostrava `[MODEL?]`.
 - [x] Decisão UX:
@@ -8812,8 +8801,8 @@
     original foi aplicada com sucesso sem checar handoff/uso posterior.
 - [x] Implementação:
   - criado `terminal/events/model-transition-presenter.js`;
-  - `session.model_changed` passou a renderizar `Modelo SDK` com resumo canônico e
-    `operatorSummary` no SSE;
+  - `session.model_changed` passou a renderizar `Modelo SDK` com resumo canônico e `operatorSummary`
+    no SSE;
   - reconfirmação sem troca continua silenciosa por padrão e aparece apenas com sessão verbose;
   - `pr.fallback_model` passou a renderizar `Fallback modelo` com origem, razão opcional e
     `operatorSummary` no SSE;
@@ -8828,10 +8817,10 @@
   - [x] testes focados de `sdk-session-events`, `agent-runtime-events` e `/model`;
   - [x] lint escopado dos arquivos tocados e runner live;
   - [x] live PTY control probe `--model-probe` confirmou `/model` como `Modelo solicitado`,
-    `/activity` com solicitações auditáveis e SSE raw com `operatorSummary` ISO completo;
+        `/activity` com solicitações auditáveis e SSE raw com `operatorSummary` ISO completo;
   - [x] evidência:
-    `artifacts/terminal-live/model-probe-20260604-model-transition-ux-rerun/summary.md` terminou
-    PASS com `model-change-sse-operator-summary`, `model-human-default-copy` e zero erros.
+        `artifacts/terminal-live/model-probe-20260604-model-transition-ux-rerun/summary.md` terminou
+        PASS com `model-change-sse-operator-summary`, `model-human-default-copy` e zero erros.
 - [x] Lacuna seguinte:
   - resolvida na seção 12.94: `/events` passou a usar a semântica do `operatorSummary` e distinguir
     `Modelo confirmado` de `Modelo alterado`.
@@ -8842,8 +8831,8 @@
   - após `/model auto`, o SDK pode emitir `session.model_changed` com `auto -> auto`;
   - `/events` resumia esse caso como `Modelo alterado`, apesar do SSE já carregar
     `operatorSummary: confirmado sem troca`;
-  - em PTY real, uma confirmação `Modelo SDK` podia aparecer colada no prompt quando chegava no mesmo
-    instante em que o operador/runner digitava o próximo comando.
+  - em PTY real, uma confirmação `Modelo SDK` podia aparecer colada no prompt quando chegava no
+    mesmo instante em que o operador/runner digitava o próximo comando.
 - [x] Decisão UX:
   - reconfirmação sem troca deve ser `Modelo confirmado`, não `Modelo alterado`;
   - quando `operatorSummary` existir, ele é a fonte humana preferida do detalhe;
@@ -8858,10 +8847,10 @@
 - [x] Validação:
   - [x] testes unitários focados de `/events`, `/model` e listeners de eventos;
   - [x] live PTY `artifacts/terminal-live/model-probe-20260604-model-events-semantic/summary.md`
-    confirmou `Modelo SDK` em linha própria no plain log quando houve troca efetiva;
+        confirmou `Modelo SDK` em linha própria no plain log quando houve troca efetiva;
   - [x] live PTY `artifacts/terminal-live/model-probe-20260604-model-async-line/summary.md`
-    confirmou `/events` com `Modelo confirmado` para no-op e critério
-    `model-events-summary-semantic` verde.
+        confirmou `/events` com `Modelo confirmado` para no-op e critério
+        `model-events-summary-semantic` verde.
 
 ### 12.95 Fronteira humana/técnica de tools e empty-turn recuperado — 2026-06-04
 
@@ -8874,8 +8863,8 @@
     `dialog.turn_end` vazios transitórios, mas o runner ainda classificava o primeiro empty-turn do
     mesmo `traceId` como bloqueio mesmo quando havia `assistant.message` pública posterior.
 - [x] Decisão UX/contrato:
-  - `tool.lifecycle` continua sendo o contrato técnico: preserva `toolName`, `rawToolName`,
-    ids e correlação para diagnóstico;
+  - `tool.lifecycle` continua sendo o contrato técnico: preserva `toolName`, `rawToolName`, ids e
+    correlação para diagnóstico;
   - `terminal.activity` é superfície operacional humana: `toolName` deve ser o nome que o operador
     vê, como `Intenção capturada`, `Pergunta ao operador`, `Executar comando` e `Ler arquivo`;
   - empty-turn vazio só é bloqueador live se permanecer sem recuperação pública posterior no mesmo
@@ -8897,18 +8886,19 @@
   - [x] `node --check` do runtime de tools, teste e runner live;
   - [x] teste focado `tests/unit/copilot/terminal/test_tool_lifecycle_runtime.spec.js`;
   - [x] live PTY `artifacts/terminal-live/ux-tool-name-heartbeat-current-20260604/summary.md`
-    reproduziu o falso bloqueio `assistant-empty-after-user-input` apesar de a resposta final estar
-    em `assistant.message`;
+        reproduziu o falso bloqueio `assistant-empty-after-user-input` apesar de a resposta final
+        estar em `assistant.message`;
   - [x] live PTY `artifacts/terminal-live/ux-tool-name-heartbeat-recovery-fixed-20260604/summary.md`
-    terminou PASS com `ux-human-tool-names`, `ux-no-raw-tool-ids-in-default-tool-lines`,
-    `ux-no-durable-waiting-spam`, `ux-question-live-status-does-not-compete-with-input`,
-    `post-ask-final-visible`, `no-terminal-errors` e `sse-critical-events-sourced`.
+        terminou PASS com `ux-human-tool-names`, `ux-no-raw-tool-ids-in-default-tool-lines`,
+        `ux-no-durable-waiting-spam`, `ux-question-live-status-does-not-compete-with-input`,
+        `post-ask-final-visible`, `no-terminal-errors` e `sse-critical-events-sourced`.
 - [ ] Lacunas remanescentes:
   - manter payloads raw visíveis somente em `/events --raw`, `/tools raw` e modos explicitamente
     detalhados;
   - continuar procurando surfaces que ainda aceitem nome técnico como rótulo humano primário;
-  - próxima frente de alto retorno: revisar comandos de arquivo/mover/deletar e seleção automática de
-    modelo em live, garantindo que toda transição e toda permissão apareça como evento humano claro.
+  - próxima frente de alto retorno: revisar comandos de arquivo/mover/deletar e seleção automática
+    de modelo em live, garantindo que toda transição e toda permissão apareça como evento humano
+    claro.
 
 ### 12.96 Permissões autoaprovadas fora da superfície humana — 2026-06-04
 
@@ -8922,24 +8912,25 @@
   - a auditoria/SSE precisava continuar preservada, porque permissões são eventos importantes para
     diagnóstico posterior.
 - [x] Decisão UX:
-  - em `approve_all` e `audit_only`, permissões SDK aprovadas automaticamente ficam fora da superfície
-    visual default;
+  - em `approve_all` e `audit_only`, permissões SDK aprovadas automaticamente ficam fora da
+    superfície visual default;
   - nesses modos, `permission.requested` e `permission.completed` continuam no SSE e no estado de
     permissões para `/permission`, `/events --raw`, auditoria e testes;
   - em `selective`, permissões continuam visíveis como pergunta operacional, com ajuda de comandos;
-  - negações, políticas automáticas restritivas e resultados inseguros continuam podendo aparecer como
-    alerta humano, mesmo fora de `selective`;
-  - a linha viva não deve ser atualizada por permissão autoaprovada silenciosa, para não competir com
-    o input.
+  - negações, políticas automáticas restritivas e resultados inseguros continuam podendo aparecer
+    como alerta humano, mesmo fora de `selective`;
+  - a linha viva não deve ser atualizada por permissão autoaprovada silenciosa, para não competir
+    com o input.
 - [x] Implementação:
   - `sdk-session-events.js` passou a consultar `readTerminalRuntimePermissionMode()` e
     `terminalPermissionModeSkipsSdkPrompts()`;
-  - `onPermissionRequested` registra/broadcasta sempre, mas só grava atividade visual, imprime ajuda e
-    refresca prompt quando o modo exige superfície seletiva;
+  - `onPermissionRequested` registra/broadcasta sempre, mas só grava atividade visual, imprime ajuda
+    e refresca prompt quando o modo exige superfície seletiva;
   - `onPermissionCompleted` preserva SSE com `decision`, mas omite linha durável e activity de
     aprovação automática nos modos silenciosos;
-  - teste unitário cobre o contrato `approve_all`: nenhum `println` com `Permissão`, nenhuma activity
-    `Permissão SDK solicitada/aprovada`, nenhum refresh do prompt, mas SSE completo preservado;
+  - teste unitário cobre o contrato `approve_all`: nenhum `println` com `Permissão`, nenhuma
+    activity `Permissão SDK solicitada/aprovada`, nenhum refresh do prompt, mas SSE completo
+    preservado;
   - teste existente de narrativa seletiva agora fixa `selective` explicitamente, protegendo os dois
     modos.
 - [x] Validação:
@@ -8950,16 +8941,16 @@
 - [x] Live:
   - repetir `file-write-roundtrip` em PTY;
   - confirmar que permissões autoaprovadas não poluem o log visual;
-  - se ainda houver bloqueio por tool inesperada (`grep`, `search_in_files`) ou intenção stale, tratar
-    como lacuna separada de roteamento/harness, não como falha de permissão.
+  - se ainda houver bloqueio por tool inesperada (`grep`, `search_in_files`) ou intenção stale,
+    tratar como lacuna separada de roteamento/harness, não como falha de permissão.
   - evidência PASS:
     `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`.
 
 ### 12.97 `/errors` como falha ativa, não incidente BYOK recuperado — 2026-06-04
 
 - [x] Achado live:
-  - `file-write-roundtrip` concluiu create/move/delete reais, deltas públicos, `ask_user` real e final
-    pós-resposta;
+  - `file-write-roundtrip` concluiu create/move/delete reais, deltas públicos, `ask_user` real e
+    final pós-resposta;
   - o critério `no-sdk-permission-prompt-in-approve-all` passou, confirmando que permissões
     autoaprovadas saíram da superfície visual;
   - o run ainda terminou FAIL porque `/errors 10` mostrava uma falha BYOK recuperável ocorrida antes
@@ -8974,8 +8965,8 @@
     terminal;
   - falhas fatais de sessão e falhas não recuperáveis continuam indo ao error tracker.
 - [x] Implementação:
-  - `agent-runtime-events.js` deixou de chamar `trackOperatorVisibleTerminalError` para
-    `model_call` recuperável;
+  - `agent-runtime-events.js` deixou de chamar `trackOperatorVisibleTerminalError` para `model_call`
+    recuperável;
   - o comentário do helper passou a documentar a diferença entre incidente recuperável e erro final;
   - testes unitários agora exigem que falha BYOK recuperável preserve painel/SSE sem sujar
     `defaultErrorTracker`;
@@ -8987,9 +8978,10 @@
   - [x] lint escopado dos listeners e testes.
 - [x] Live:
   - repetir `file-write-roundtrip` para confirmar PASS completo;
-  - se o provider não produzir incidente recuperável nessa execução, manter a evidência anterior como
-    reprodução e validar a limpeza por teste unitário;
-  - se produzir, confirmar `/errors` com `nenhum erro recente` e `agent.error` ainda presente no SSE.
+  - se o provider não produzir incidente recuperável nessa execução, manter a evidência anterior
+    como reprodução e validar a limpeza por teste unitário;
+  - se produzir, confirmar `/errors` com `nenhum erro recente` e `agent.error` ainda presente no
+    SSE.
   - evidência PASS:
     `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`, com
     `no-terminal-errors` verde e `/errors 10` exibindo `0 total · 0 no buffer`.
@@ -9002,7 +8994,8 @@
   - o live runner só reconhecia `você[modelo/high][PERG]›`;
   - por isso, em turno de recuperação, o runner não respondeu `SIM` e o teste terminou
     `blocked-by-live-timeout`;
-  - a falha era do harness, não da UX terminal, porque `user_input.requested` também apareceu no SSE.
+  - a falha era do harness, não da UX terminal, porque `user_input.requested` também apareceu no
+    SSE.
 - [x] Decisão:
   - tags intermediárias de estado, como `[Q:1]`, são parte válida da UX;
   - todo helper de reconhecimento de prompt humano deve aceitar uma sequência de tags antes de
@@ -9016,8 +9009,8 @@
   - [x] `git diff --check`.
 - [x] Live:
   - repetir `file-write-roundtrip` e confirmar auto-answer em prompt `[Q:1][PERG]`;
-  - se a LLM-B ordenar create/move/delete incorretamente, registrar como gap de aderência do modelo ao
-    cenário, mas manter a UX mostrando falha/sucesso com clareza.
+  - se a LLM-B ordenar create/move/delete incorretamente, registrar como gap de aderência do modelo
+    ao cenário, mas manter a UX mostrando falha/sucesso com clareza.
   - evidência PASS:
     `artifacts/terminal-live/ux-file-roundtrip-question-tag-fixed-20260604/summary.md`, com
     `ask-user-answer`, `post-ask-final-visible`, `no-sdk-permission-prompt-in-approve-all` e
@@ -9037,8 +9030,8 @@
   - tipo por item fica reservado ao modo profundo `/tools all`.
 - [x] Implementação:
   - `cmdTools` passou a renderizar `Tipo` por item somente em `wantsDeepDiag`;
-  - teste de `/tools diag` agora exige ausência de `Tipo` no diagnóstico humano, preservando os nomes
-    humanos e a categoria agregada.
+  - teste de `/tools diag` agora exige ausência de `Tipo` no diagnóstico humano, preservando os
+    nomes humanos e a categoria agregada.
 - [x] Validação:
   - [x] teste focado de `/tools`;
   - [x] lint/sintaxe escopados;
@@ -9056,7 +9049,8 @@
   - o default deve usar `tratado como erro recuperável do modelo`.
 - [x] Implementação:
   - `summarizeAgentErrorPayload()` trocou `classe ...` por `tratado como ...`;
-  - teste de `/events` protege a nova frase e bloqueia regressão para `classe erro recuperável do modelo`.
+  - teste de `/events` protege a nova frase e bloqueia regressão para
+    `classe erro recuperável do modelo`.
 - [x] Validação:
   - [x] teste focado de `/events`;
   - [x] lint/sintaxe escopados.
@@ -9085,7 +9079,8 @@
   - `renderElicitationEntry()` passa a esconder schema/payload/handles por padrão;
   - estados, modos, fontes e resultados ganharam rótulos humanos em português;
   - comandos sugeridos usam `/permission respond latest ...` e `/elicitation respond latest ...`;
-  - testes de `/permission` e `/elicitation` agora fixam a separação entre card limpo e detalhe bruto.
+  - testes de `/permission` e `/elicitation` agora fixam a separação entre card limpo e detalhe
+    bruto.
 - [x] Validação:
   - [x] `node --check src/copilot/terminal/commands/sdk.js`;
   - [x] `node --check tests/unit/copilot/terminal/test_commands_sdk.spec.js`;
@@ -9099,13 +9094,14 @@
 ### 12.102 `/activity`, `/status full` e `/metrics` sem jargão inglês ou `phase:label` cru — 2026-06-04
 
 - [x] Achado:
-  - `/activity` default ainda chamava o caminho profundo de `Drill-down`, destoando do restante da UX
-    em português;
+  - `/activity` default ainda chamava o caminho profundo de `Drill-down`, destoando do restante da
+    UX em português;
   - `/status full` imprimia `Origem` como `${phase} · ${source}`, expondo `turn`, `tool`, `agent`,
     `terminal` e similares como linguagem primária;
   - `Atividade info` e `Atividade rec.` ainda deixavam detalhes livres e histórico recente com
     formato técnico (`phase:label`).
-  - `/metrics` usava o rótulo `Label`, que descreve o schema interno e não a experiência do operador.
+  - `/metrics` usava o rótulo `Label`, que descreve o schema interno e não a experiência do
+    operador.
 - [x] Decisão UX:
   - default e full continuam diferentes, mas ambos devem falar primeiro com o operador humano;
   - fases e fontes devem ser traduzidas para `pensando`, `respondendo`, `ferramenta`, `agente`,
@@ -9119,12 +9115,12 @@
     `renderLiveSourceLabel()`;
   - `Atividade info` virou `Detalhe atividade`, com compactação/humanização;
   - `Atividade rec.` passou de `phase:label` para `fase · rótulo`.
-  - `/metrics` trocou `Label` por `Evento`, traduziu fases `tool/turn/streaming/question` e humanizou
-    detalhes de atividade como `display=full`, `status=success`, `choices=`.
+  - `/metrics` trocou `Label` por `Evento`, traduziu fases `tool/turn/streaming/question` e
+    humanizou detalhes de atividade como `display=full`, `status=success`, `choices=`.
 - [x] Validação:
   - [x] `node --check` de `activity.js`, `session.js`, `metrics.js` e testes focados;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
-    com 63 testes verdes.
+        com 63 testes verdes.
 - [ ] Próximas verificações:
   - confirmar em live que `/activity 10` não exibe `Drill-down`, tool IDs ou fontes cruas;
   - revisar `/diagnose` para a mesma fronteira default/detail;
@@ -9145,7 +9141,8 @@
   - `/scope context` mostrava export bruto como `scope.js::cmdScope(function)`;
   - `/fs read/preview/search` repetia paths absolutos do workspace na tela humana.
 - [x] Decisão UX:
-  - ISO 8601 completo, com milissegundos e offset, é o formato canônico para timestamps operacionais;
+  - ISO 8601 completo, com milissegundos e offset, é o formato canônico para timestamps
+    operacionais;
   - payload bruto, IDs e nomes técnicos continuam disponíveis em raw/detail, mas default deve ser
     leitura humana;
   - nomes de ferramentas bridge devem ser traduzidos quando representarem ações conhecidas;
@@ -9160,21 +9157,21 @@
   - o runner live aceita ISO completo com milissegundos e atualizou critérios de `/tools diag`,
     `/sdk status` e `/menu picker`;
   - `/terminal libs` ganhou pluralização humana para contagens adiadas;
-  - `buildTerminalPickerPlan()` trocou a guarda para `sessão ainda não liberou controle exclusivo do
-    TTY`;
+  - `buildTerminalPickerPlan()` trocou a guarda para
+    `sessão ainda não liberou controle exclusivo do TTY`;
   - `/scope context` renderiza exports como `cmdScope · função · scope.js`;
   - `/fs` usa `formatTerminalToolPathForOperator()` em list/read/search e reescreve linhas de busca
     para paths relativos ao workspace.
 - [x] Validação:
   - [x] `node --check` dos comandos, presenters, harness e testes alterados;
   - [x] `npx vitest run` focado com 119 testes verdes nas superfícies de FS, scope, menu, terminal,
-    picker, tools/events/session;
+        picker, tools/events/session;
   - [x] live inicial PASS após correções de harness:
-    `artifacts/terminal-live/ux-diagnostic-surfaces-humanized-rerun-20260604/summary.md`;
+        `artifacts/terminal-live/ux-diagnostic-surfaces-humanized-rerun-20260604/summary.md`;
   - [x] live intermediária FAIL capturou apenas critério stale do picker:
-    `artifacts/terminal-live/ux-diagnostic-surfaces-polished-rerun-20260604/summary.md`;
+        `artifacts/terminal-live/ux-diagnostic-surfaces-polished-rerun-20260604/summary.md`;
   - [x] live final PASS:
-    `artifacts/terminal-live/ux-diagnostic-surfaces-polished-pass-20260604/summary.md`.
+        `artifacts/terminal-live/ux-diagnostic-surfaces-polished-pass-20260604/summary.md`.
 - [x] Resultado observado:
   - `/fs` não mostra mais `/workspaces/chatgpt-docker-puppeteer/...` em read/preview/search default;
   - `/terminal libs` mostra `1 disponível`;
@@ -9183,9 +9180,10 @@
   - grep do plain log final não encontra `request_user_input`, `report_intent`, `scope.js::`,
     `disponível(is)`, `runtime ainda`, `bridge.git.diff` ou paths absolutos do workspace.
 - [ ] Próximas verificações:
-  - revisar `/diagnose`, `/errors`, `/sources`, `/audit` e `/intent` com a mesma lente default/detail;
-  - criar uma live de turno real com deltas parciais para comparar fala da LLM-B, thinking e tools no
-    mesmo fluxo;
+  - revisar `/diagnose`, `/errors`, `/sources`, `/audit` e `/intent` com a mesma lente
+    default/detail;
+  - criar uma live de turno real com deltas parciais para comparar fala da LLM-B, thinking e tools
+    no mesmo fluxo;
   - medir truncamento/alinhamento em viewport menor e ajustar larguras responsivas do terminal.
 
 ### 12.104 `/audit` e `/events sources` com fronteira default/detail protegida por live — 2026-06-04
@@ -9195,10 +9193,10 @@
     `/events sources` lado a lado em PTY real;
   - primeira execução falhou porque `/events sources` default ainda imprimia comandos técnicos como
     `/events user_input.requested 50` e paths de emissor `terminal/events/...`;
-  - `/events sources` também duplicava rótulos humanos quando eventos diferentes tinham o mesmo
-    nome público (`Uso LLM + Uso LLM`, `Atividade, Atividade`);
-  - `/audit 10` renderizava `tool.execution · sem horário · tool.execution`, apesar de o arquivo
-    de auditoria carregar `ts` ISO e toolName;
+  - `/events sources` também duplicava rótulos humanos quando eventos diferentes tinham o mesmo nome
+    público (`Uso LLM + Uso LLM`, `Atividade, Atividade`);
+  - `/audit 10` renderizava `tool.execution · sem horário · tool.execution`, apesar de o arquivo de
+    auditoria carregar `ts` ISO e toolName;
   - `shell.exec_command` aparecia cru como ferramenta.
 - [x] Decisão UX:
   - `/events sources` default deve explicar famílias humanas de eventos e apontar para `/events 50`
@@ -9212,8 +9210,8 @@
   - runner live ganhou `--audit-ux-cycle`, summary e critérios para default/detail de auditoria;
   - o recorte de superfícies do novo ciclo procura prompt real do REPL, não ocorrência textual em
     links de ajuda;
-  - `/events sources` default passou a usar `ver <família>: /events 50 · detalhe técnico: /events
-    sources detail`;
+  - `/events sources` default passou a usar
+    `ver <família>: /events 50 · detalhe técnico: /events sources detail`;
   - `/events sources detail` preserva `/events <evento>`, `/events source <emissor>`, ID, classe,
     dono técnico, emissor, aceita/suprime/fallback;
   - `humanEventLabel()` trocou `Runtime pronto/falhou` por `Sessão pronta/falhou`;
@@ -9223,17 +9221,14 @@
 - [x] Validação:
   - [x] `node --check` em `events.js`, `audit.js`, `tool-activity-presenter.js`, runner e testes;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_commands_audit.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`
-    com 39 testes verdes;
-  - [x] live inicial FAIL:
-    `artifacts/terminal-live/audit-ux-surfaces-first-20260604/summary.md`;
+        com 39 testes verdes;
+  - [x] live inicial FAIL: `artifacts/terminal-live/audit-ux-surfaces-first-20260604/summary.md`;
   - [x] live intermediária mostrou `/audit` e `/events sources` humanizados mas revelou critério de
-    recorte stale:
-    `artifacts/terminal-live/audit-ux-surfaces-humanized-20260604/summary.md`;
-  - [x] live final PASS:
-    `artifacts/terminal-live/audit-ux-surfaces-pass-20260604/summary.md`.
+        recorte stale: `artifacts/terminal-live/audit-ux-surfaces-humanized-20260604/summary.md`;
+  - [x] live final PASS: `artifacts/terminal-live/audit-ux-surfaces-pass-20260604/summary.md`.
 - [x] Resultado observado:
-  - `/audit 10` mostra `Execução de ferramenta · ISO completo (há X) · Executar comando ·
-    concluída/falhou · Nms`;
+  - `/audit 10` mostra
+    `Execução de ferramenta · ISO completo (há X) · Executar comando · concluída/falhou · Nms`;
   - `/events sources` default não mostra `user_input.requested`, `terminal/events/...`, `ID`,
     `Classe`, `Dono técnico` ou `Emissor`;
   - `/events sources detail` continua com os dados técnicos para auditoria profunda.
@@ -9247,15 +9242,15 @@
 ### 12.105 Comandos operacionais sem ilhas ANSI, plurais mecânicos ou nomes crus — 2026-06-04
 
 - [x] Achado:
-  - `/index` ainda era uma superfície antiga: ANSI manual, `falhou:`, bullets cinzas,
-    `symbolKind`, `export`, uso em linha crua e status sem alinhamento temático;
+  - `/index` ainda era uma superfície antiga: ANSI manual, `falhou:`, bullets cinzas, `symbolKind`,
+    `export`, uso em linha crua e status sem alinhamento temático;
   - `/resume` imprimia banner ANSI, IDs coloridos manualmente, seta/emoji e erros com `✗`;
   - `/git status/log/branch/pull/stash/help` misturava progresso ANSI e ajuda multiline crua,
     destoando do `/git diff`, que já usa preview canônico;
   - `/compact` e `/session save` ainda usavam `✓/✗` e ANSI manual;
   - anexos, mailbox, workspace SDK, BYOK, SDK models, live flow, stats e diagnose ainda continham
-    plurais de engenharia como `item(ns)`, `modelo(s)`, `arquivo(s)`, `turno(s)`,
-    `ferramenta(s)`, `cliente(s)` e `salva(s)`;
+    plurais de engenharia como `item(ns)`, `modelo(s)`, `arquivo(s)`, `turno(s)`, `ferramenta(s)`,
+    `cliente(s)` e `salva(s)`;
   - testes antigos ainda reforçavam parte desses textos provisórios.
 - [x] Decisão UX:
   - comandos operacionais devem usar `terminalThemeHeadline`, `terminalThemeRow`,
@@ -9279,36 +9274,35 @@
   - `/context` agora explicita `real SDK` quando os tokens vêm do SDK e preserva a frase
     `live-tail visível foi preservado` em divergência;
   - `/compact` e `/session save` usam rows temáticos para erro/sucesso/path;
-  - anexos inline, `/attach`, `/mailbox clear`, `/model list`, `/byok`, `/sdk models`,
-    workspace SDK virtual, `/session live`, `/session count` e `/diagnose` ganharam plurais
-    naturais;
+  - anexos inline, `/attach`, `/mailbox clear`, `/model list`, `/byok`, `/sdk models`, workspace SDK
+    virtual, `/session live`, `/session count` e `/diagnose` ganharam plurais naturais;
   - live revelou que `/model list` despejava 342 modelos; o default passou a mostrar 40 modelos e
     uma linha `Omitidos ... · use /model list full`, preservando lista completa sob comando
     explícito;
   - runner live ganhou `--operator-ux-cycle`, cobrindo `/index`, `/git`, `/context`,
     `/session save`, `/attach`, `/mailbox`, `/model list`, `/sdk models`, `/workspace list` e
     `/live` em PTY real;
-  - testes de `/index`, `/attach`, `/model list`, `/resume`, `/context` e `/session save`
-    foram atualizados para travar a linguagem nova.
+  - testes de `/index`, `/attach`, `/model list`, `/resume`, `/context` e `/session save` foram
+    atualizados para travar a linguagem nova.
 - [x] Validação:
   - [x] `node --check` focado em comandos, diálogo e REPL alterados;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_index.spec.js tests/unit/copilot/terminal/test_commands_attach.spec.js tests/unit/copilot/terminal/test_commands_config_errors.spec.js tests/unit/copilot/terminal/test_commands_memory_resume_search.spec.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js`
-    com 33 testes verdes;
+        com 33 testes verdes;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`
-    com 102 testes verdes;
-  - [x] `rg` não encontrou mais `\x1b[`, `✗`, `✓`, `item(ns)`, `resultado(s)`,
-    `adicional(is)`, `modelo(s)`, `disponível(is)`, `embutido(s)`, `arquivo(s)`,
-    `turno(s)`, `ferramenta(s)`, `cliente(s)`, `crítico(s)` ou `salva(s)` nas superfícies
-    auditadas, exceto uma asserção negativa de teste.
+        com 102 testes verdes;
+  - [x] `rg` não encontrou mais `\x1b[`, `✗`, `✓`, `item(ns)`, `resultado(s)`, `adicional(is)`,
+        `modelo(s)`, `disponível(is)`, `embutido(s)`, `arquivo(s)`, `turno(s)`, `ferramenta(s)`,
+        `cliente(s)`, `crítico(s)` ou `salva(s)` nas superfícies auditadas, exceto uma asserção
+        negativa de teste.
   - [x] live inicial FAIL revelou critério incorreto de `/git` e verborragia real em `/model list`:
-    `artifacts/terminal-live/operator-ux-cycle-first-20260604/summary.md`;
-  - [x] live final PASS:
-    `artifacts/terminal-live/operator-ux-cycle-pass-20260604/summary.md`.
+        `artifacts/terminal-live/operator-ux-cycle-first-20260604/summary.md`;
+  - [x] live final PASS: `artifacts/terminal-live/operator-ux-cycle-pass-20260604/summary.md`.
 - [x] Resultado observado:
   - `/index status/search` aparece alinhado e sem campos crus;
   - `/git help` usa painel de comandos e `/git status` usa shell temático;
   - `/session save` mostra `Snapshot      salvo · <id>` e path separado;
-  - `/model list` mostra `342 modelos · mostrando 40 modelos` e `Omitidos      302 modelos · use /model list full`;
+  - `/model list` mostra `342 modelos · mostrando 40 modelos` e
+    `Omitidos      302 modelos · use /model list full`;
   - `/live` mantém a linha `Conexões      SSE sem clientes · timeline 12 turnos`, sem `turno(s)`;
   - o ciclo live não encontra plurais mecânicos, banners antigos ou campos crus nas superfícies
     operacionais testadas.
@@ -9320,23 +9314,23 @@
 ### 12.106 Presenter git, cache SDK fora da raiz e polimento live de anexos/workspace — 2026-06-04
 
 - [x] Achado:
-  - após a humanização da casca de `/git`, `status/log/branch` ainda dependiam dos formatadores
-    ANSI do bridge, o que deixava a fronteira default/detail incompleta;
+  - após a humanização da casca de `/git`, `status/log/branch` ainda dependiam dos formatadores ANSI
+    do bridge, o que deixava a fronteira default/detail incompleta;
   - `git status --porcelain` tinha a primeira linha alterada por `stdout.trim()`: quando o primeiro
     arquivo era `.codex/config.toml`, o espaço de status era removido e o path virava
     `codex/config.toml`;
   - a live PTY expôs que `/model list`/SDK models podiam criar `modellist-cache.json` na raiz do
     repositório, misturando cache runtime com arquivos de trabalho;
-  - o cache persistente era escrito em modo fire-and-forget sem promise observável: um `clear`
-    podia apagar e uma escrita atrasada recriar o cache depois;
+  - o cache persistente era escrito em modo fire-and-forget sem promise observável: um `clear` podia
+    apagar e uma escrita atrasada recriar o cache depois;
   - a live também mostrou dois ruídos pequenos mas visíveis: `/attach` imprimia
     `Fila: 1 item - serão embutidos...` e `/workspace list` repetia o rótulo `Promover`.
 - [x] Decisão UX/arquitetura:
   - bridge git continua fornecendo dados brutos e formatadores legados para consumidores técnicos,
     mas o terminal default deve ter presenter próprio sem ANSI local;
   - parsing de porcelain não pode perder whitespace significativo;
-  - cache persistente de modelos deve viver em `data/copilot/sdk/models/modellist-cache.json`,
-    fora da raiz e dentro do espaço runtime ignorado;
+  - cache persistente de modelos deve viver em `data/copilot/sdk/models/modellist-cache.json`, fora
+    da raiz e dentro do espaço runtime ignorado;
   - leitura deve aceitar o cache legado da raiz como fallback de migração, mas escrita nova deve ir
     apenas para `data/`;
   - limpeza deve aguardar escrita pendente antes de remover arquivos;
@@ -9350,8 +9344,8 @@
   - `git-bridge-read` trocou `trim()` por `trimEnd()`, preservando o espaço inicial do porcelain;
   - `persistent-cache.js` ganhou caminho primário sob `data/copilot/sdk/models`, override por
     `COPILOT_MODEL_PERSISTENT_CACHE_FILE`, fallback de leitura legado e criação de diretório;
-  - a escrita persistente agora mantém `_pendingPersistentModelCacheWrite` e `clearPersistentModelCache`
-    aguarda essa promise antes de apagar o cache;
+  - a escrita persistente agora mantém `_pendingPersistentModelCacheWrite` e
+    `clearPersistentModelCache` aguarda essa promise antes de apagar o cache;
   - testes SDK desabilitam cache persistente quando querem medir L1/client mockado, e testes de
     persistência usam arquivo isolado via env override;
   - o runner `--operator-ux-cycle` aceita eco de comando em linha própria quando o prompt do PTY é
@@ -9360,14 +9354,14 @@
   - `/workspace list` substituiu a duplicação `Promover` por `SDK → FS` e `FS → SDK`.
 - [x] Validação:
   - [x] `node --check` em `persistent-cache.js`, `git.js`, `git-bridge-read.js`, `attach.js`,
-    `sdk.js`, testes alterados e runner live;
+        `sdk.js`, testes alterados e runner live;
   - [x] `npx eslint` focado nos arquivos alterados;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_attach.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_git.spec.js tests/unit/copilot/bridges/test_git_bridge.spec.js tests/unit/copilot/sdk/test_persistent_model_cache.spec.js tests/unit/copilot/sdk/test_sdk_models.spec.js`
-    com 106 testes verdes;
+        com 106 testes verdes;
   - [x] live PASS antes do polimento de anexos/workspace:
-    `artifacts/terminal-live/operator-ux-cycle-git-cache-pass-20260604/summary.md`;
+        `artifacts/terminal-live/operator-ux-cycle-git-cache-pass-20260604/summary.md`;
   - [x] live PASS final:
-    `artifacts/terminal-live/operator-ux-cycle-polished-pass-20260604/summary.md`.
+        `artifacts/terminal-live/operator-ux-cycle-polished-pass-20260604/summary.md`.
 - [x] Resultado observado:
   - `/git status` mostra `.codex/config.toml` corretamente e sem `unstaged:` cru;
   - `/model list` não cria `modellist-cache.json` na raiz do repo;
@@ -9375,7 +9369,8 @@
   - `/attach` e `/workspace list` ficaram mais escaneáveis na tela real;
   - o ciclo live fecha com `operator-ux-no-stale-copy` verde.
 - [ ] Próximas verificações:
-  - auditar `/byok` e subcomandos longos de SDK para eliminar frases herdadas e separar default/detail;
+  - auditar `/byok` e subcomandos longos de SDK para eliminar frases herdadas e separar
+    default/detail;
   - criar live de turno real com deltas, tools, thinking e troca de modelo no mesmo fluxo;
   - investigar o uso de `gum`, `fzf`, `bat`, `glow`, `delta`, `atuin`, `zoxide`, `jq` e `yq` após
     estabilizar terminal/BYOK, com documento técnico próprio antes de qualquer dependência nova.
@@ -9383,13 +9378,13 @@
 ### 12.107 Menu, BYOK profundo e archive SSE com gramática visual única — 2026-06-04
 
 - [x] Achado:
-  - `/menu` ainda renderizava tabela manual com `[01]`, setas soltas e footer de ações rápidas
-    em estilo antigo;
+  - `/menu` ainda renderizava tabela manual com `[01]`, setas soltas e footer de ações rápidas em
+    estilo antigo;
   - `/menu picker` já era seguro, mas a indisponibilidade e a lista planejada não usavam o mesmo
     vocabulário visual da superfície default;
   - `/byok health`, `/byok recommend`, `/byok models`, `/byok providers`, `/byok use`,
-    `/byok model`, `/byok provider` e `/byok auto status` ainda misturavam ANSI manual,
-    plurais mecânicos e mensagens longas demais para uma tela de operador;
+    `/byok model`, `/byok provider` e `/byok auto status` ainda misturavam ANSI manual, plurais
+    mecânicos e mensagens longas demais para uma tela de operador;
   - `/byok health` em live real despejava dezenas de registros por default, reduzindo a legibilidade
     justamente na tela que deveria ser primeiro diagnóstico operacional;
   - o harness BYOK fixture estava preso à gramática antiga (`endpoint=`, `profile:`, `model:`,
@@ -9400,46 +9395,46 @@
     ação, comando explícito e descrição em row wrapped;
   - default de `/byok health` deve ser compacto e escaneável; a lista completa passa a exigir
     intenção explícita com `full`;
-  - BYOK pode manter termos técnicos necessários (`profile`, `provider`, endpoint, model id), mas
-    o rótulo da tela deve explicar a função operacional do dado;
+  - BYOK pode manter termos técnicos necessários (`profile`, `provider`, endpoint, model id), mas o
+    rótulo da tela deve explicar a função operacional do dado;
   - diagnósticos de filtro safe, prova de agente, catálogos remotos, troca viva e automação devem
     usar `terminalThemeRow`/`terminalThemeWrappedRow`, sem ANSI local;
   - harness live deve validar a UX real vista pelo operador, não strings legadas;
   - plural natural passa a ser requisito também em `/events`, porque o archive SSE é parte do fluxo
     canônico de auditoria do terminal.
 - [x] Implementação:
-  - `/menu` passou a renderizar `Painel de ações · N ações contextuais` e linhas `#01 ...`,
-    com footer `Executar /menu <n> · /menu <id> · /menu picker`;
+  - `/menu` passou a renderizar `Painel de ações · N ações contextuais` e linhas `#01 ...`, com
+    footer `Executar /menu <n> · /menu <id> · /menu picker`;
   - `/menu picker` passou a usar rows temáticos para modo, fallback, guarda e segurança;
   - `/session sdk` removeu o resíduo `sessão(ões) omitida(s)`;
-  - `/byok health` passou a headline temático, rows de persistência/filtro/registro/estado/limite
-    e limite default de 12 registros, com `Omitidos ... · use /byok health full para ampliar`;
+  - `/byok health` passou a headline temático, rows de persistência/filtro/registro/estado/limite e
+    limite default de 12 registros, com `Omitidos ... · use /byok health full para ampliar`;
   - `/byok providers` e `/byok profiles` passaram a headlines com plural natural;
-  - diagnósticos de filtro safe e prova de agente agora indicam o motivo e o próximo comando em
-    rows separadas;
-  - alertas de catálogo, bloqueio de saúde e hint de provider local foram migrados para wrapped rows;
-  - `/byok use sdk`, erros de uso, troca de modelo/provider e auto status saíram de ANSI manual
-    para labels humanos (`BYOK`, `Próximo`, `Modelo`, `Alternativa`, `Trilha auto`);
+  - diagnósticos de filtro safe e prova de agente agora indicam o motivo e o próximo comando em rows
+    separadas;
+  - alertas de catálogo, bloqueio de saúde e hint de provider local foram migrados para wrapped
+    rows;
+  - `/byok use sdk`, erros de uso, troca de modelo/provider e auto status saíram de ANSI manual para
+    labels humanos (`BYOK`, `Próximo`, `Modelo`, `Alternativa`, `Trilha auto`);
   - `/events` usa `18 eventos`/`1 evento` na linha de registro do archive SSE;
   - o runner live `--byok-fixture` foi sincronizado com a nova linguagem visual e passou a validar
     endpoint remoto como `Fonte provider · endpoint http://.../v1/models`.
 - [x] Validação:
   - [x] `node --check src/copilot/terminal/commands/byok.js`;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_byok.spec.js -t "status|perfis|profiles|health falho|safe|recomenda|health|auto|catálogo remoto|use sdk|wireApi"`
-    com 45 testes verdes;
+        com 45 testes verdes;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_menu.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js`
-    com 57 testes verdes;
+        com 57 testes verdes;
   - [x] `npx eslint` focado em `byok.js`, `menu.js`, `session.js`, testes alterados e runner live;
-  - [x] live menu PASS:
-    `artifacts/terminal-live/menu-cycle-themed-pass-20260604/summary.md`;
+  - [x] live menu PASS: `artifacts/terminal-live/menu-cycle-themed-pass-20260604/summary.md`;
   - [x] live BYOK fixture PASS:
-    `artifacts/terminal-live/byok-fixture-themed-rerun2-pass-20260604/summary.md`.
+        `artifacts/terminal-live/byok-fixture-themed-rerun2-pass-20260604/summary.md`.
 - [x] Resultado observado:
   - `/menu` ficou alinhado, curto e sem bracket table antiga;
   - `/byok health` mostra estado operacional com limite default e sem despejar todo o ledger;
   - `/byok models refresh` mostra fonte estática/remota/cache e endpoint sem vazar segredo;
-  - `/byok use codex-fixture`, `/byok model fixture/model-b`, `/byok provider ...` e
-    `/byok use sdk` comunicam a fronteira entre seleção preparada e sessão viva;
+  - `/byok use codex-fixture`, `/byok model fixture/model-b`, `/byok provider ...` e `/byok use sdk`
+    comunicam a fronteira entre seleção preparada e sessão viva;
   - `/events 30` mostra `18 eventos`, filtro, detalhe e eventos humanos sem plural mecânico;
   - o fixture live confirmou catálogo remoto, troca de modelo, troca de provider, retorno ao SDK,
     ausência de vazamento do token fixture e `/errors 10` limpo.
@@ -9457,16 +9452,16 @@
   - a auditoria pós-12.107 reduziu a dívida de copy a poucos arquivos muito expostos: `/tools`,
     `/sdk waits`, `/sdk skills`, `/sdk tools`, `/status`, `/now`, `/fs`, `/skills`, `/help`,
     `/events`, linha viva, auto-brief, watcher e eventos SDK;
-  - os resíduos eram pequenos (`tool(s)`, `pendente(s)`, `mensagem(ns)`, `arquivo(s)`,
-    `grupo(s)`, `skill(s)`, `agent(s)`, `comando(s)`, `descartada(s)`), mas passavam a sensação
-    de dump técnico, exatamente o problema visual reportado nas screenshots;
+  - os resíduos eram pequenos (`tool(s)`, `pendente(s)`, `mensagem(ns)`, `arquivo(s)`, `grupo(s)`,
+    `skill(s)`, `agent(s)`, `comando(s)`, `descartada(s)`), mas passavam a sensação de dump técnico,
+    exatamente o problema visual reportado nas screenshots;
   - a linha viva ainda dizia `provedor BYOK` em erro, embora a arquitetura consolidada fale em
     rota/modelo/profile/provider como uma unidade operacional.
 - [x] Decisão UX/arquitetura:
   - cada superfície pode ter helper local de plural enquanto não houver uma camada compartilhada
     canônica de copy; isso evita acoplamento prematuro e mantém o patch rastreável;
-  - `agent`, `skill`, `server` podem continuar como termos SDK quando forem nomes de conceitos,
-    mas contadores devem ser naturais (`1 skill`, `2 skills`, `1 ferramenta nativa`);
+  - `agent`, `skill`, `server` podem continuar como termos SDK quando forem nomes de conceitos, mas
+    contadores devem ser naturais (`1 skill`, `2 skills`, `1 ferramenta nativa`);
   - erros BYOK do terminal devem dizer `rota BYOK`, não `provedor BYOK`, porque o bloqueio pode
     envolver profile, quota, modelo, endpoint, token ou provider;
   - filas de intervenção devem usar a mesma gramática em `/steer`, `/interrupt`, `/queue`,
@@ -9478,20 +9473,20 @@
     `skill(s)`, `agent(s)` e `tool(s) nativa(s)`;
   - `/status`, `/now` e `/session sdk commands` foram alinhados para `pendência`, `formulário`,
     `permissão`, `pergunta`, `input estruturado` e `comando` naturais;
-  - eventos SDK passaram a registrar `mensagens pendentes`, `ferramentas preservadas`,
-    `comandos`, `servers`, `extensões`, `restantes na fila`, `mesclas` e `habilitadas`;
-  - REPL de intervenção ganhou helper único para fila e descartes, cobrindo `/steer`,
-    `/interrupt`, `/queue`, `/mailbox` e lifecycle de entrada livre;
+  - eventos SDK passaram a registrar `mensagens pendentes`, `ferramentas preservadas`, `comandos`,
+    `servers`, `extensões`, `restantes na fila`, `mesclas` e `habilitadas`;
+  - REPL de intervenção ganhou helper único para fila e descartes, cobrindo `/steer`, `/interrupt`,
+    `/queue`, `/mailbox` e lifecycle de entrada livre;
   - linha viva e eventos de erro BYOK migraram de `provedor BYOK` para `rota BYOK`;
   - preview de arquivo, hot reload de skills/instruções, dev-watch e auto-brief perderam seus
     plurais mecânicos.
 - [x] Validação:
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_sdk.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_commands_skills.spec.js tests/unit/copilot/terminal/test_commands_help.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js tests/unit/copilot/terminal/test_file_preview.spec.js`
-    com 163 testes verdes;
+        com 163 testes verdes;
   - [x] `npx eslint` focado em comandos, eventos, REPL, engine, preview e testes alterados;
   - [x] `git diff --check`;
   - [x] `rg` não encontrou plurais mecânicos nas superfícies alteradas, exceto asserção negativa
-    deliberada e comentário JSDoc.
+        deliberada e comentário JSDoc.
 - [x] Resultado observado:
   - o vocabulário default do terminal ficou mais coeso entre comandos, eventos e linha viva;
   - `/tools` e `/sdk` agora parecem painéis do mesmo produto, não misturas de SDK cru e PT-BR;
@@ -9521,8 +9516,8 @@
     `SIM` podia aparecer como `Complemento da LLM-B` redundante.
 - [x] Decisão UX/arquitetura:
   - o harness deve validar a cópia atual (`Detalhes`) e não perpetuar termos antigos;
-  - bloqueio por modelo que viola ordem de cenário deve permanecer explícito, porque é sinal útil
-    de seleção/runtime e não regressão estética;
+  - bloqueio por modelo que viola ordem de cenário deve permanecer explícito, porque é sinal útil de
+    seleção/runtime e não regressão estética;
   - suffix de `assistant.message` pode usar supressão por transcript recente com limite menor quando
     o chamador sabe que o conteúdo é só complemento de stream;
   - o padrão global continua conservador: cobertura curta não deve ser usada em todo renderer, só no
@@ -9539,11 +9534,11 @@
     `SIM` e não renderiza `Complemento da LLM-B`.
 - [x] Validação:
   - [x] live completo com handshake funcional, mas critério stale:
-    `artifacts/terminal-live/canonical-turn-ux-after-copy-pass-20260604/summary.md`;
+        `artifacts/terminal-live/canonical-turn-ux-after-copy-pass-20260604/summary.md`;
   - [x] live rerun BLOCKED por ordem do modelo, com artefatos preservados:
-    `artifacts/terminal-live/canonical-turn-ux-after-copy-rerun-pass-20260604/summary.md`;
+        `artifacts/terminal-live/canonical-turn-ux-after-copy-rerun-pass-20260604/summary.md`;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_assistant_transcript_renderer.spec.js tests/unit/copilot/terminal/test_turn_materialization_state.spec.js tests/unit/copilot/terminal/test_turn_reconciliation.spec.js tests/unit/copilot/terminal/test_sdk_session_events_turn_summary.spec.js tests/unit/copilot/terminal/test_live_status_line.spec.js`
-    com 50 testes verdes;
+        com 50 testes verdes;
   - [x] `npx eslint` focado em harness, renderer, eventos SDK e teste novo;
   - [x] `git diff --check`.
 - [x] Resultado observado:
@@ -9584,14 +9579,14 @@
   - `MCP remoto` virou `MCP`.
 - [x] Validação:
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_diagnose.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
-    com 13 testes verdes;
+        com 13 testes verdes;
   - [x] `npx eslint src/copilot/terminal/commands/diagnose.js tests/unit/copilot/terminal/test_commands_diagnose.spec.js`;
   - [x] `git diff --check`.
 - [x] Resultado observado:
-  - `/health full` fica consistente com a nomenclatura de ambiente/local/SDK adotada no restante
-    do terminal;
-  - os testes impedem retorno de `Plan arquivo`, `Sessão ambiente`, `MCP remoto` e `Modo SDK`
-    em posições antigas.
+  - `/health full` fica consistente com a nomenclatura de ambiente/local/SDK adotada no restante do
+    terminal;
+  - os testes impedem retorno de `Plan arquivo`, `Sessão ambiente`, `MCP remoto` e `Modo SDK` em
+    posições antigas.
 - [ ] Próximas verificações:
   - auditar `/usage now`, pois o live ainda mostra `BYOK provedor ...` e pode seguir a mesma
     transição para `rota BYOK`;
@@ -9612,8 +9607,8 @@
   - o valor da rota deve ser compacto: `<perfil/preset> · modelo <id>`;
   - o histórico Copilot deve continuar explícito como histórico/lateral, com `BYOK atual separado`,
     para evitar interpretação de cobrança BYOK a partir de snapshot GitHub PR;
-  - `provedor` continua válido em telas de catálogo e auditoria BYOK, onde o objeto exibido é de fato
-    o provedor ou sua fonte de metadados.
+  - `provedor` continua válido em telas de catálogo e auditoria BYOK, onde o objeto exibido é de
+    fato o provedor ou sua fonte de metadados.
 - [x] Implementação:
   - `/usage now` passou de `BYOK / provedor ...` para `Rota BYOK / ... · modelo ...`;
   - `/metrics` passou de `BYOK ativo provedor ...` para `rota BYOK atual ...`;
@@ -9623,14 +9618,14 @@
     `Rota BYOK`.
 - [x] Validação:
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js` com 8
-    testes verdes;
+        testes verdes;
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
-    com 54 testes verdes;
+        com 54 testes verdes;
   - [x] `npx eslint src/copilot/terminal/commands/usage.js src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
   - [x] `npx eslint src/copilot/terminal/commands/session.js src/copilot/terminal/commands/usage.js src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
   - [x] `rg` confirmou que o vazamento específico saiu de `/usage` e `/metrics`; ocorrências
-    restantes de `provedor` pertencem a catálogo, BYOK detail, health, sessão e testes dessas
-    superfícies.
+        restantes de `provedor` pertencem a catálogo, BYOK detail, health, sessão e testes dessas
+        superfícies.
 - [x] Resultado esperado no próximo live:
   - `/usage now` deve mostrar `Rota BYOK` antes do histórico Copilot;
   - nenhuma linha default deve sugerir que a telemetria PR histórica é cobrança BYOK;
@@ -9646,12 +9641,12 @@
 - [x] Achado:
   - as screenshots ruins tinham três padrões que ainda podiam reaparecer em superfícies detalhadas:
     `report_intent`, `tool/report_intent_local` e `Tarefa interna`;
-  - o presenter central já sabia que `report_intent` significa `Intenção capturada`, mas `/tools all`
-    ainda escrevia `SDK report_intent` como detalhe bruto;
+  - o presenter central já sabia que `report_intent` significa `Intenção capturada`, mas
+    `/tools all` ainda escrevia `SDK report_intent` como detalhe bruto;
   - `/activity detail` não mostrava origem na timeline, e quando uma origem `tool/...` era usada em
     outras áreas ela não passava pelo glossário humano;
-  - `task-stream-events` e background tasks ainda usavam `tarefa interna`, termo correto para código,
-    mas ruim para o operador humano.
+  - `task-stream-events` e background tasks ainda usavam `tarefa interna`, termo correto para
+    código, mas ruim para o operador humano.
 - [x] Decisão UX:
   - nomes brutos de tool podem aparecer apenas como complemento em modo profundo, nunca como texto
     primário;
@@ -9664,22 +9659,26 @@
     `SDK Intenção capturada (report_intent)`;
   - `/activity detail` passou a incluir origem humana na timeline completa;
   - `renderSourceLabel()` agora humaniza fontes `tool/...` com o glossário canônico de tools;
-  - `task-stream-events` passou a registrar `Tarefa em segundo plano`, `Raciocínio em segundo plano`,
-    `Tarefa em segundo plano concluída` e `Tarefa em segundo plano falhou`;
+  - `task-stream-events` passou a registrar `Tarefa em segundo plano`,
+    `Raciocínio em segundo plano`, `Tarefa em segundo plano concluída` e
+    `Tarefa em segundo plano falhou`;
   - background tasks internas silenciosas do runtime também usam `Tarefa em segundo plano` como
     label humano, preservando a mesma política de histórico/update.
 - [x] Validação:
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`
-    com 35 testes verdes;
+        com 35 testes verdes;
   - [x] `npx vitest run tests/unit/copilot/test_terminal_task_stream_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js tests/unit/copilot/terminal/test_commands_tools.spec.js tests/unit/copilot/terminal/test_commands_activity.spec.js tests/unit/copilot/terminal/test_tool_activity_presenter.spec.js`
-    com 59 testes verdes;
+        com 59 testes verdes;
   - [x] `npx eslint` focado em task stream, agent runtime events, `/tools`, `/activity` e testes
-    associados;
-  - [x] `rg` não encontrou `Tarefa interna`, `Executando tarefa interna`, `Raciocinando tarefa
-    interna`, `task thinking` ou `SDK report_intent` nas superfícies de terminal e testes focados.
+        associados;
+  - [x] `rg` não encontrou `Tarefa interna`, `Executando tarefa interna`,
+        `Raciocinando tarefa interna`, `task thinking` ou `SDK report_intent` nas superfícies de
+        terminal e testes focados.
 - [x] Resultado esperado:
-  - `/activity detail` passa a explicar de onde veio uma intenção sem expor `tool/report_intent_local`;
-  - `/tools all` continua útil para engenharia, mas com leitura humana à frente do identificador cru;
+  - `/activity detail` passa a explicar de onde veio uma intenção sem expor
+    `tool/report_intent_local`;
+  - `/tools all` continua útil para engenharia, mas com leitura humana à frente do identificador
+    cru;
   - a linha viva e a timeline deixam de sugerir que há uma tarefa de implementação “interna” visível
     ao operador.
 - [ ] Próximas verificações:
@@ -9708,11 +9707,11 @@
   - `exit_plan_mode.requested` usa `pluralPt(actions.length, 'ação', 'ações')`.
 - [x] Validação:
   - [x] `npx vitest run tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_sdk_session_events_turn_summary.spec.js tests/unit/copilot/terminal/test_commands_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js`
-    com 55 testes verdes;
+        com 55 testes verdes;
   - [x] `npx eslint src/copilot/terminal/events/sdk-session-events.js tests/unit/copilot/test_terminal_sdk_session_events.spec.js tests/unit/copilot/terminal/test_activity_state.spec.js`;
-  - [x] `rg` não encontrou `Task concluída`, `Background tasks SDK alteradas`, `MCP servers
-    carregados:`, `ação(ões)`, `comando(s)`, `pendente(s)` ou `habilitada(s)` nas superfícies
-    alteradas, exceto asserções negativas deliberadas.
+  - [x] `rg` não encontrou `Task concluída`, `Background tasks SDK alteradas`,
+        `MCP servers carregados:`, `ação(ões)`, `comando(s)`, `pendente(s)` ou `habilitada(s)` nas
+        superfícies alteradas, exceto asserções negativas deliberadas.
 - [x] Resultado esperado:
   - eventos de tarefa SDK ficam parecidos com o restante do terminal;
   - o operador lê estado e ação, não nome interno de evento;
@@ -9726,8 +9725,8 @@
 
 - [x] Achado:
   - o primeiro live no-PR pós-polimento falhou em dois critérios que ficaram mais antigos que a UX:
-    `ux-cycle-usage-byok-current-first` ainda esperava `BYOK provedor`, e
-    `ux-cycle-workspace-human` rejeitava a fronteira visual `SDK → FS`/`FS → SDK`;
+    `ux-cycle-usage-byok-current-first` ainda esperava `BYOK provedor`, e `ux-cycle-workspace-human`
+    rejeitava a fronteira visual `SDK → FS`/`FS → SDK`;
   - a tela real de `/usage now` já estava correta, com `Rota BYOK` antes do histórico Copilot;
   - a tela real de `/workspace list` ainda podia ser mais elegante: setas técnicas comunicavam
     direção, mas pareciam siglas de arquitetura dentro de uma superfície de operador.
@@ -9746,12 +9745,12 @@
   - [x] `npx eslint src/copilot/terminal/commands/sdk.js tests/unit/copilot/terminal/test_commands_sdk.spec.js scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - [x] `node --check scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`;
   - [x] live no-PR:
-    `npm run terminal:llm-b:live-test -- --no-pr --ux-cycle --timeout-ms=180000 --out-dir=artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604`;
+        `npm run terminal:llm-b:live-test -- --no-pr --ux-cycle --timeout-ms=180000 --out-dir=artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604`;
   - [x] resultado: PASS em 30/30 critérios, incluindo `ux-cycle-usage-byok-current-first` e
-    `ux-cycle-workspace-human`;
+        `ux-cycle-workspace-human`;
   - [x] artefatos:
-    `artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604/summary.md`,
-    `artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604/default-ux-cycle.plain.log`.
+        `artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604/summary.md`,
+        `artifacts/terminal-live/ux-cycle-after-terminal-polish-rerun-20260604/default-ux-cycle.plain.log`.
 - [x] Resultado observado:
   - `/usage now` mostrou `Rota BYOK`, `Histórico`, `Telemetria LLM`, `Request`, `Vínculo` e `Modo`
     sem sugerir cobrança BYOK por telemetria Copilot histórica;
@@ -9770,16 +9769,16 @@
 
 - [x] Achado:
   - a próxima varredura estática apontou `/context` como ilha de vocabulário antigo:
-    `context window`, `cwd`, `git`, `bridge`, `live-tail`, `pendentes=`, `gravados=` e
-    `Sync Hub`;
+    `context window`, `cwd`, `git`, `bridge`, `live-tail`, `pendentes=`, `gravados=` e `Sync Hub`;
   - esses termos aparecem em fluxo de operador, inclusive no ciclo `/context`/`/compact`, e por isso
     degradam a sensação de cockpit mesmo quando o restante da UX está polido;
-  - a projeção interna está correta e deve continuar preservando enums para testes, sync e auditoria.
+  - a projeção interna está correta e deve continuar preservando enums para testes, sync e
+    auditoria.
 - [x] Decisão UX:
-  - `/context` default deve falar em `Janela de contexto`, `Diretório`, `Git`, `Fonte`,
-    `Histórico` e `Sincronização`;
-  - fonte/autoridade/reconciliação devem ser traduzidas no presenter:
-    `bridge` -> `conversa viva`, `hub` -> `hub persistido`, `bridge_tail` -> `cauda viva`;
+  - `/context` default deve falar em `Janela de contexto`, `Diretório`, `Git`, `Fonte`, `Histórico`
+    e `Sincronização`;
+  - fonte/autoridade/reconciliação devem ser traduzidas no presenter: `bridge` -> `conversa viva`,
+    `hub` -> `hub persistido`, `bridge_tail` -> `cauda viva`;
   - contadores de sincronização devem usar plural real (`1 pendente`, `2 gravados`), nunca
     `pendentes=2`;
   - motivos técnicos como `diverged-no-overlap` ficam em enums internos, mas viram texto humano na
@@ -9792,11 +9791,12 @@
   - `Sync Hub` virou `Sincronização`, e a nota de divergência agora preserva `cauda viva` sem falar
     `bridge/live-tail`.
 - [x] Validação:
-  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_context.spec.js` com 11 testes verdes;
+  - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_context.spec.js` com 11 testes
+        verdes;
   - [x] `node --check src/copilot/terminal/commands/context.js`;
   - [x] `npx eslint src/copilot/terminal/commands/context.js tests/unit/copilot/terminal/test_commands_context.spec.js`;
   - [x] testes focados bloqueiam retorno de `cwd`, `bridge_tail`, `pendentes=`,
-    `diverged-no-overlap` e `live-tail` na saída default.
+        `diverged-no-overlap` e `live-tail` na saída default.
 - [x] Resultado esperado:
   - `/context` passa a ler como painel de operador, não como dump de reconciliação;
   - a arquitetura de timeline continua transparente, mas com nomes que explicam o que o operador
@@ -9806,7 +9806,8 @@
 - [ ] Próximas verificações:
   - incluir `/context` em uma live de operador curta depois de mais uma leva de limpeza;
   - auditar `/session` e `/metrics` porque ainda exibem `bridge` como termo técnico em alguns modos;
-  - revisar eventos `session_context_changed` do SDK, que ainda têm print ANSI manual em modo verbose.
+  - revisar eventos `session_context_changed` do SDK, que ainda têm print ANSI manual em modo
+    verbose.
 
 ### 12.116 Timeline humana em `/session` e `/metrics` — 2026-06-04
 
@@ -9838,13 +9839,14 @@
   - `Git root` virou `Raiz Git`.
 - [x] Validação:
   - [x] `npx vitest run tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`
-    com 65 testes verdes;
+        com 65 testes verdes;
   - [x] `node --check src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js src/copilot/terminal/commands/context.js`;
   - [x] `npx eslint src/copilot/terminal/commands/context.js src/copilot/terminal/commands/session.js src/copilot/terminal/commands/metrics.js tests/unit/copilot/terminal/test_commands_context.spec.js tests/unit/copilot/terminal/test_commands_session.spec.js tests/unit/copilot/terminal/test_commands_metrics_usage.spec.js`;
   - [x] varredura textual focada confirmou que ocorrências restantes de `diverged-no-overlap` e
-    `live-tail` são mapeamentos internos ou fixtures com asserções negativas.
+        `live-tail` são mapeamentos internos ou fixtures com asserções negativas.
 - [x] Resultado esperado:
-  - `/context`, `/session`, `/history` e `/metrics` agora compartilham a mesma gramática de timeline;
+  - `/context`, `/session`, `/history` e `/metrics` agora compartilham a mesma gramática de
+    timeline;
   - a UX explica reconciliação sem transformar o terminal em dump de enum;
   - o operador consegue distinguir persistência, conversa viva e cauda pendente com menos esforço.
 - [ ] Próximas verificações:

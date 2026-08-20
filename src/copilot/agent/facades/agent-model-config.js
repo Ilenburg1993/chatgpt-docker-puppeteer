@@ -10,9 +10,7 @@
  */
 
 import { resolveModelSelectionMismatch, toError } from '#copilot/core';
-import {
-    executeModelGatewayRuntimeModelSwitch,
-} from '#copilot/model-gateway';
+import { executeModelGatewayRuntimeModelSwitch } from '#copilot/model-gateway';
 import { describeAutoModelPolicy, listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
 import { setSessionModel } from '#copilot/sdk/session-runtime';
 import { log } from '../ports/logging/index.js';
@@ -93,8 +91,8 @@ export function setModel(ctx, modelId) {
 /**
  * Troca o modelo da sessão viva de forma transacional.
  *
- * O estado configurado só é alterado depois que o SDK confirma o modelo efetivo e a persistência termina.
- * Em falha, o control plane tenta restaurar o modelo anterior.
+ * O estado configurado só é alterado depois que o SDK confirma o modelo efetivo e a persistência termina. Em falha, o
+ * control plane tenta restaurar o modelo anterior.
  *
  * @param {import('../agent-context.js').AgentContext} ctx
  * @param {string} modelId
@@ -151,9 +149,9 @@ export async function switchModelTransactional(ctx, modelId, options = {}) {
 /**
  * Materializa, no estado observado do runtime, uma confirmação emitida pela sessão SDK sobre o modelo vivo.
  *
- * Diferente de `setModel()`, esta função não tenta trocar nada no SDK. Ela apenas fecha o ciclo de feedback:
- * operador configura `/model`, SDK emite `session.model_changed`, prompt/status passam a distinguir com clareza
- * modelo configurado, modelo efetivo e eventual roteamento divergente.
+ * Diferente de `setModel()`, esta função não tenta trocar nada no SDK. Ela apenas fecha o ciclo de feedback: operador
+ * configura `/model`, SDK emite `session.model_changed`, prompt/status passam a distinguir com clareza modelo
+ * configurado, modelo efetivo e eventual roteamento divergente.
  *
  * @param {import('../agent-context.js').AgentContext | { ctx?: import('../agent-context.js').AgentContext }} target
  * @param {{ previousModel?: string | null; newModel: string; reasoningEffort?: string | null; ts?: number }} event
@@ -194,12 +192,13 @@ export function observeRuntimeModelChange(target, event) {
 export function readRuntimeAutoModelPolicy(runtime) {
     const selection = readRuntimeModelSelection(runtime);
     const snap = readAgentRuntimeStatusSnapshot(runtime);
-    const runtimeWithPrInfo = /**
-     * @type {{
-     *     getLastPrInfoSnapshot?: () => Record<string, unknown> | null;
-     *     lastPrInfo?: Record<string, unknown> | null;
-     * }}
-     */ (runtime);
+    const runtimeWithPrInfo =
+        /**
+         * @type {{
+         *     getLastPrInfoSnapshot?: () => Record<string, unknown> | null;
+         *     lastPrInfo?: Record<string, unknown> | null;
+         * }}
+         */ (runtime);
     const explicitPrInfo =
         typeof runtimeWithPrInfo.getLastPrInfoSnapshot === 'function'
             ? runtimeWithPrInfo.getLastPrInfoSnapshot()
@@ -309,7 +308,12 @@ export function setRuntimeModel(runtime, modelId) {
 }
 
 /**
- * @param {{ switchModel?: (modelId: string, options?: { idempotencyKey?: string; source?: string }) => Promise<Record<string, unknown>> }} runtime
+ * @param {{
+ *     switchModel?: (
+ *         modelId: string,
+ *         options?: { idempotencyKey?: string; source?: string },
+ *     ) => Promise<Record<string, unknown>>;
+ * }} runtime
  * @param {string} modelId
  * @param {{ idempotencyKey?: string; source?: string }} [options]
  * @returns {Promise<Record<string, unknown>>}

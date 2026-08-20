@@ -92,9 +92,7 @@ describe('DevContainer endpoint registry shared contract', () => {
         await mkdir(dir, { recursive: true });
         const fixture = join(dir, 'duplicate.tsv');
         const canonical = await readFile(CANONICAL_REGISTRY, 'utf8');
-        const firstActive = canonical
-            .split(/\r?\n/u)
-            .find((line) => line.length > 0 && !line.startsWith('#'));
+        const firstActive = canonical.split(/\r?\n/u).find((line) => line.length > 0 && !line.startsWith('#'));
         assert.ok(firstActive);
         await writeFile(fixture, `${canonical.trimEnd()}\n${firstActive}\n`, 'utf8');
         try {
@@ -142,21 +140,25 @@ describe('DevContainer endpoint registry shared contract', () => {
         assert.ok(firstActive);
         await writeFile(fixture, `${canonical.trimEnd()}\n${firstActive}\n`, 'utf8');
         try {
-            const result = runDevcontainerScript('.devcontainer/scripts/network/github-copilot-network-manager.sh', ['start'], {
-                DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE: fixture,
-                DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE: fixture,
-                DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE: 'off',
-                DEVCONTAINER_COPILOT_NETWORK_REPORT_FILE: report,
-                DEVCONTAINER_COPILOT_NETWORK_METRICS_FILE: join(dir, 'manager.metrics.tsv'),
-                DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE: join(dir, 'manager.status'),
-                DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE: summary,
-                DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE: join(dir, 'manager.diagnosis.tsv'),
-                DEVCONTAINER_COPILOT_NETWORK_HISTORY_FILE: join(dir, 'manager.history.tsv'),
-                DEVCONTAINER_COPILOT_NETWORK_HISTORY_ANALYSIS_FILE: join(dir, 'manager.history-analysis.tsv'),
-                DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_FILE: join(dir, 'manager.recommendation'),
-                DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_JSON_FILE: join(dir, 'manager.recommendation.json'),
-                DEVCONTAINER_COPILOT_NETWORK_LOCK_FILE: join(dir, 'manager.lock'),
-            });
+            const result = runDevcontainerScript(
+                '.devcontainer/scripts/network/github-copilot-network-manager.sh',
+                ['start'],
+                {
+                    DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_FILE: fixture,
+                    DEVCONTAINER_COPILOT_ENDPOINT_REGISTRY_CANONICAL_FILE: fixture,
+                    DEVCONTAINER_COPILOT_NETWORK_MANAGER_MODE: 'off',
+                    DEVCONTAINER_COPILOT_NETWORK_REPORT_FILE: report,
+                    DEVCONTAINER_COPILOT_NETWORK_METRICS_FILE: join(dir, 'manager.metrics.tsv'),
+                    DEVCONTAINER_COPILOT_NETWORK_STATUS_FILE: join(dir, 'manager.status'),
+                    DEVCONTAINER_COPILOT_NETWORK_SUMMARY_FILE: summary,
+                    DEVCONTAINER_COPILOT_NETWORK_DIAGNOSIS_FILE: join(dir, 'manager.diagnosis.tsv'),
+                    DEVCONTAINER_COPILOT_NETWORK_HISTORY_FILE: join(dir, 'manager.history.tsv'),
+                    DEVCONTAINER_COPILOT_NETWORK_HISTORY_ANALYSIS_FILE: join(dir, 'manager.history-analysis.tsv'),
+                    DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_FILE: join(dir, 'manager.recommendation'),
+                    DEVCONTAINER_COPILOT_NETWORK_RECOMMENDATION_JSON_FILE: join(dir, 'manager.recommendation.json'),
+                    DEVCONTAINER_COPILOT_NETWORK_LOCK_FILE: join(dir, 'manager.lock'),
+                },
+            );
             assert.equal(result.status, 0, result.stderr);
             const [reportText, summaryText] = await Promise.all([readFile(report, 'utf8'), readFile(summary, 'utf8')]);
             assert.match(reportText, /endpoint_source=default-registry-invalid/u);

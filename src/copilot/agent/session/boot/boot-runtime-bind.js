@@ -13,8 +13,8 @@ import {
     EMITTER_SESSION_KEEPALIVE,
 } from '#copilot/events';
 import { getAgentSdkModelStatsTracker, isAgentSdkExperimentalEnabled } from '../../facades/sdk-access.js';
-import { createAgentEventObserver } from '../../ports/event-observer-port.js';
 import { defaultErrorTracker } from '../../ports/error-tracking-port.js';
+import { createAgentEventObserver } from '../../ports/event-observer-port.js';
 import { log } from '../../ports/logging/index.js';
 import { readAgentMcpCapabilitySnapshot } from '../../ports/mcp-port.js';
 import { defaultMetrics } from '../../ports/metrics-port.js';

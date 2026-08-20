@@ -1,28 +1,44 @@
 # MCP HTTP/2+ latency roadmap — Node 24 / Cloudflare / OAuth
 
 Data: 2026-05-31  
-Escopo: `src/copilot/mcp`, Cloudflare Tunnel, Cloudflare edge policy, OAuth dev server e endpoint público `https://mcp.aurelin.org/mcp`.
+Escopo: `src/copilot/mcp`, Cloudflare Tunnel, Cloudflare edge policy, OAuth dev server e endpoint
+público `https://mcp.aurelin.org/mcp`.
 
-Este documento é a trilha canônica para migrar o MCP HTTP atual de HTTP/1.1 para HTTP/2+ com redução estrutural de latência e preservação de compatibilidade com ChatGPT, Claude, MCP Inspector e OAuth.
+Este documento é a trilha canônica para migrar o MCP HTTP atual de HTTP/1.1 para HTTP/2+ com redução
+estrutural de latência e preservação de compatibilidade com ChatGPT, Claude, MCP Inspector e OAuth.
 
 ---
 
 ## 1. Conclusão executiva
 
-A situação atual não é “HTTP/2 parcial” no origin MCP. Ela é uma pilha com três camadas diferentes de protocolo:
+A situação atual não é “HTTP/2 parcial” no origin MCP. Ela é uma pilha com três camadas diferentes
+de protocolo:
 
-1. **Cliente externo → Cloudflare edge**: Cloudflare oferece HTTP/2 no edge por padrão quando SSL/TLS está ativo. Esse trecho provavelmente já negocia HTTP/2 ou HTTP/3 com clientes modernos, mas precisa ser medido com probes que registrem ALPN/protocolo.
-2. **Cloudflare edge → `cloudflared` connector**: o wrapper do projeto hoje normaliza `COPILOT_MCP_CLOUDFLARE_PROTOCOL`/`TUNNEL_TRANSPORT_PROTOCOL` para `http2` por padrão, embora Cloudflare documente `auto` como modo que tenta QUIC e faz fallback para HTTP/2. Isso é transporte do túnel, não HTTP/2 origin.
-3. **`cloudflared` connector → MCP origin local**: hoje é **HTTP/1.1 claro** contra `http://127.0.0.1:3333`, porque `src/copilot/mcp/adapters/http.js` usa `node:http.createServer()` e a configuração canônica de Cloudflare origin é `http://127.0.0.1:3333`.
+1. **Cliente externo → Cloudflare edge**: Cloudflare oferece HTTP/2 no edge por padrão quando
+   SSL/TLS está ativo. Esse trecho provavelmente já negocia HTTP/2 ou HTTP/3 com clientes modernos,
+   mas precisa ser medido com probes que registrem ALPN/protocolo.
+2. **Cloudflare edge → `cloudflared` connector**: o wrapper do projeto hoje normaliza
+   `COPILOT_MCP_CLOUDFLARE_PROTOCOL`/`TUNNEL_TRANSPORT_PROTOCOL` para `http2` por padrão, embora
+   Cloudflare documente `auto` como modo que tenta QUIC e faz fallback para HTTP/2. Isso é
+   transporte do túnel, não HTTP/2 origin.
+3. **`cloudflared` connector → MCP origin local**: hoje é **HTTP/1.1 claro** contra
+   `http://127.0.0.1:3333`, porque `src/copilot/mcp/adapters/http.js` usa `node:http.createServer()`
+   e a configuração canônica de Cloudflare origin é `http://127.0.0.1:3333`.
 
-Portanto, a migração real para HTTP/2+ precisa ser feita em fases. O primeiro alvo estrutural é **HTTP/2 to origin com TLS local e ALPN**, não apenas ligar `originRequest.http2Origin=true`. Com o origin atual em `http://`, essa flag é incompatível e pode causar fallback silencioso, 5xx, ou diagnósticos enganosos.
+Portanto, a migração real para HTTP/2+ precisa ser feita em fases. O primeiro alvo estrutural é
+**HTTP/2 to origin com TLS local e ALPN**, não apenas ligar `originRequest.http2Origin=true`. Com o
+origin atual em `http://`, essa flag é incompatível e pode causar fallback silencioso, 5xx, ou
+diagnósticos enganosos.
 
 A situação ideal é:
 
 - Edge público com HTTP/2 e HTTP/3 habilitados, sem cache/transformação em `/mcp`.
-- Túnel `cloudflared` em `auto` para produção quando UDP/QUIC funciona, com override `http2` para Dev Containers restritos.
-- Origin MCP local em HTTPS + HTTP/2 usando Node 24 `node:http2`, com `allowHTTP1: true` durante rollout.
-- Cloudflare Tunnel ingress apontando para `https://127.0.0.1:3333`, com `originRequest.http2Origin=true` somente quando o origin HTTPS estiver pronto.
+- Túnel `cloudflared` em `auto` para produção quando UDP/QUIC funciona, com override `http2` para
+  Dev Containers restritos.
+- Origin MCP local em HTTPS + HTTP/2 usando Node 24 `node:http2`, com `allowHTTP1: true` durante
+  rollout.
+- Cloudflare Tunnel ingress apontando para `https://127.0.0.1:3333`, com
+  `originRequest.http2Origin=true` somente quando o origin HTTPS estiver pronto.
 - Verificação de compatibilidade completa com MCP Streamable HTTP, OAuth, CORS, streaming e abortos.
 - Métricas de protocolo no `/health`, nos smokes e no benchmark de latência.
 
@@ -32,12 +48,17 @@ A situação ideal é:
 
 Consulta feita em 2026-05-31.
 
-- Cloudflare Learning Center — HTTP/2 vs HTTP/1.1: `https://www.cloudflare.com/learning/performance/http2-vs-http1.1/`
+- Cloudflare Learning Center — HTTP/2 vs HTTP/1.1:
+  `https://www.cloudflare.com/learning/performance/http2-vs-http1.1/`
 - Cloudflare Speed — HTTP/2: `https://developers.cloudflare.com/speed/optimization/protocol/http2/`
-- Cloudflare Speed — HTTP/2 to Origin: `https://developers.cloudflare.com/speed/optimization/protocol/http2-to-origin/`
-- Cloudflare Speed — Enhanced HTTP/2 Prioritization: `https://developers.cloudflare.com/speed/optimization/protocol/enhanced-http2-prioritization/`
-- Cloudflare Tunnel origin parameters: `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/cloudflared-parameters/origin-parameters/`
-- Cloudflare Tunnel run parameters: `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/cloudflared-parameters/run-parameters/`
+- Cloudflare Speed — HTTP/2 to Origin:
+  `https://developers.cloudflare.com/speed/optimization/protocol/http2-to-origin/`
+- Cloudflare Speed — Enhanced HTTP/2 Prioritization:
+  `https://developers.cloudflare.com/speed/optimization/protocol/enhanced-http2-prioritization/`
+- Cloudflare Tunnel origin parameters:
+  `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/cloudflared-parameters/origin-parameters/`
+- Cloudflare Tunnel run parameters:
+  `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/cloudflared-parameters/run-parameters/`
 - Node.js v24 — HTTP/2 API: `https://nodejs.org/docs/latest-v24.x/api/http2.html`
 
 ---
@@ -68,7 +89,8 @@ Em `src/copilot/mcp/cloudflare/config.js`:
 - `DEFAULT_CLOUDFLARE_ORIGIN_URL = 'http://127.0.0.1:3333'`;
 - `DEFAULT_CLOUDFLARE_PUBLIC_URL = 'https://mcp.aurelin.org/mcp'`;
 - `normalizeTransportProtocol()` aceita `auto`, `http2`, `quic`, mas usa `http2` como default;
-- `buildCloudflaredRunFlags()` não injeta `--protocol`; o protocolo é passado por env `TUNNEL_TRANSPORT_PROTOCOL` em `cli.js`;
+- `buildCloudflaredRunFlags()` não injeta `--protocol`; o protocolo é passado por env
+  `TUNNEL_TRANSPORT_PROTOCOL` em `cli.js`;
 - `normalizeOriginUrl()` aceita `http://` e `https://`, mas o default real é HTTP claro.
 
 Status: **túnel pode usar HTTP/2 no trecho edge↔connector, mas origin local segue HTTP/1.1**.
@@ -85,7 +107,8 @@ Em `src/copilot/mcp/cloudflare/origin-request-profile.js`, o perfil desejado atu
 - `tcpKeepAlive='30s'`;
 - invariantes que proíbem `http2Origin=true` enquanto o origin é `http://127.0.0.1:3333`.
 
-Isso está correto para o estado atual, mas precisa virar política condicional quando habilitarmos origin HTTPS/H2.
+Isso está correto para o estado atual, mas precisa virar política condicional quando habilitarmos
+origin HTTPS/H2.
 
 ### 3.4 Scripts e testes atuais
 
@@ -102,7 +125,8 @@ Scripts relevantes em `package.json`:
 - `npm run copilot:mcp:cloudflare:edge-policy-diff`
 - `npm run copilot:mcp:cloudflare:edge-policy-apply`
 
-Limitação: os smokes e benchmarks atuais não registram ALPN/protocolo HTTP efetivo. Isso impede provar, em números, se um request foi HTTP/1.1, HTTP/2 ou HTTP/3 em cada trecho.
+Limitação: os smokes e benchmarks atuais não registram ALPN/protocolo HTTP efetivo. Isso impede
+provar, em números, se um request foi HTTP/1.1, HTTP/2 ou HTTP/3 em cada trecho.
 
 ### 3.5 Dados de latência já documentados anteriormente
 
@@ -114,7 +138,8 @@ O documento `MCP_PAYLOAD_LATENCY_UPGRADE_2026-05-31.md` registrou padrão aproxi
 - `public.tools/list` download p50: ~169 ms;
 - payload decodificado: ~101 KB.
 
-Interpretação: HTTP/2+ é importante, mas payload/transferência continua sendo gargalo material. A migração de protocolo deve rodar junto com tool-surface/payload compaction.
+Interpretação: HTTP/2+ é importante, mas payload/transferência continua sendo gargalo material. A
+migração de protocolo deve rodar junto com tool-surface/payload compaction.
 
 ---
 
@@ -122,7 +147,9 @@ Interpretação: HTTP/2+ é importante, mas payload/transferência continua send
 
 ### 4.1 HTTP/2 no edge público
 
-Cloudflare HTTP/2 no edge é voltado ao trecho cliente→Cloudflare. Benefícios gerais: multiplexing, compressão de headers e menor overhead de conexões. Para MCP, o ganho mais provável é redução de custo de conexão e estabilidade em chamadas repetidas, não cache.
+Cloudflare HTTP/2 no edge é voltado ao trecho cliente→Cloudflare. Benefícios gerais: multiplexing,
+compressão de headers e menor overhead de conexões. Para MCP, o ganho mais provável é redução de
+custo de conexão e estabilidade em chamadas repetidas, não cache.
 
 Ações neste trecho:
 
@@ -134,17 +161,21 @@ Ações neste trecho:
 
 ### 4.2 Transporte do Cloudflare Tunnel
 
-`TUNNEL_TRANSPORT_PROTOCOL=auto|http2|quic` controla o trecho Cloudflare edge↔`cloudflared`. Esse campo não significa `originRequest.http2Origin`.
+`TUNNEL_TRANSPORT_PROTOCOL=auto|http2|quic` controla o trecho Cloudflare edge↔`cloudflared`. Esse
+campo não significa `originRequest.http2Origin`.
 
 Política proposta:
 
-- produção/named tunnel: default desejado `auto`, para usar QUIC quando UDP funciona e fallback para HTTP/2 quando necessário;
+- produção/named tunnel: default desejado `auto`, para usar QUIC quando UDP funciona e fallback para
+  HTTP/2 quando necessário;
 - Dev Container ou ambientes com UDP bloqueado: override explícito `http2`;
 - auditoria deve reportar claramente: `tunnelEdgeTransportProtocol`, não apenas `transportProtocol`.
 
 ### 4.3 HTTP/2 to origin
 
-`originRequest.http2Origin=true` controla o trecho `cloudflared`→origin. Pelos parâmetros oficiais do Cloudflare Tunnel, `http2Origin=true` faz o `cloudflared` tentar HTTP/2 contra o origin e requer certificado SSL no origin.
+`originRequest.http2Origin=true` controla o trecho `cloudflared`→origin. Pelos parâmetros oficiais
+do Cloudflare Tunnel, `http2Origin=true` faz o `cloudflared` tentar HTTP/2 contra o origin e requer
+certificado SSL no origin.
 
 Logo, a ordem segura é:
 
@@ -162,7 +193,8 @@ Logo, a ordem segura é:
 
 Causa: `node:http.createServer()` em `http.js` e origin URL default `http://127.0.0.1:3333`.
 
-Impacto: não há multiplexing HTTP/2 entre `cloudflared` e origin; cada request ainda chega ao Node pelo modelo HTTP/1.1.
+Impacto: não há multiplexing HTTP/2 entre `cloudflared` e origin; cada request ainda chega ao Node
+pelo modelo HTTP/1.1.
 
 Correção: introduzir servidor HTTPS/H2 com Node 24 e `allowHTTP1: true`.
 
@@ -172,19 +204,24 @@ Causa: Cloudflare requer origin SSL para HTTP/2 origin; nosso origin atual é HT
 
 Impacto: ligar a flag hoje é mudança perigosa e contrária à auditoria atual.
 
-Correção: tornar `originRequest.http2Origin` condicional ao scheme `https:` e à presença de política TLS válida.
+Correção: tornar `originRequest.http2Origin` condicional ao scheme `https:` e à presença de política
+TLS válida.
 
 ### B3 — Ambiguidade entre “tunnel protocol” e “origin HTTP/2”
 
 Causa: o nome `transportProtocol` no config pode ser confundido com HTTP/2 to origin.
 
-Impacto: operadores podem achar que `TUNNEL_TRANSPORT_PROTOCOL=http2` já migrou o MCP origin para HTTP/2. Não migrou.
+Impacto: operadores podem achar que `TUNNEL_TRANSPORT_PROTOCOL=http2` já migrou o MCP origin para
+HTTP/2. Não migrou.
 
-Correção: renomear relatórios/docs para `tunnelEdgeTransportProtocol` e documentar `originRequest.http2Origin` separadamente.
+Correção: renomear relatórios/docs para `tunnelEdgeTransportProtocol` e documentar
+`originRequest.http2Origin` separadamente.
 
 ### B4 — Comentário do adapter diverge do default real
 
-O cabeçalho de `http.js` recomenda “Cloudflare Tunnel on auto/QUIC”, mas `config.js` defaulta para `http2`. Pode ter sido uma decisão consciente para Dev Containers com UDP bloqueado, mas precisa ficar explícito.
+O cabeçalho de `http.js` recomenda “Cloudflare Tunnel on auto/QUIC”, mas `config.js` defaulta para
+`http2`. Pode ter sido uma decisão consciente para Dev Containers com UDP bloqueado, mas precisa
+ficar explícito.
 
 Correção: escolher política canônica:
 
@@ -208,9 +245,12 @@ Correção: adicionar `http.protocol` ao `/health` e aos relatórios de smoke/be
 
 ### B6 — Compatibilidade MCP SDK vs Node HTTP/2 precisa de spike
 
-O SDK `StreamableHTTPServerTransport` espera objetos compatíveis com HTTP server request/response. Node `http2` oferece Compatibility API, mas a documentação deixa claro que nem todo comportamento interno de HTTP/1 é suportado.
+O SDK `StreamableHTTPServerTransport` espera objetos compatíveis com HTTP server request/response.
+Node `http2` oferece Compatibility API, mas a documentação deixa claro que nem todo comportamento
+interno de HTTP/1 é suportado.
 
-Risco: `transport.handleRequest(req, res)` pode funcionar com `Http2ServerRequest`/`Http2ServerResponse`, mas precisa de teste real para:
+Risco: `transport.handleRequest(req, res)` pode funcionar com
+`Http2ServerRequest`/`Http2ServerResponse`, mas precisa de teste real para:
 
 - `initialize`;
 - `tools/list`;
@@ -227,25 +267,31 @@ Correção: criar spike isolado com `createSecureServer({ allowHTTP1: true })` e
 
 Opções:
 
-- ideal: certificado local com SAN para `127.0.0.1` e/ou hostname interno, verificado por CA local via `caPool` quando suportado pelo runtime do connector;
+- ideal: certificado local com SAN para `127.0.0.1` e/ou hostname interno, verificado por CA local
+  via `caPool` quando suportado pelo runtime do connector;
 - canary temporário: `noTLSVerify=true` apenas para provar H2 origin em ambiente controlado;
 - proibido como estado final: `noTLSVerify=true` permanente sem justificativa.
 
 ### B8 — H2 pode piorar se max streams/long requests forem mal configurados
 
-Cloudflare alerta para 5xx quando origin não suporta multiplexing suficientemente bem ou quando requests longos ocupam conexões. MCP tools podem ter chamadas longas.
+Cloudflare alerta para 5xx quando origin não suporta multiplexing suficientemente bem ou quando
+requests longos ocupam conexões. MCP tools podem ter chamadas longas.
 
-Correção: começar com max streams conservador, observar p95/p99 e erros 5xx, e aumentar gradualmente.
+Correção: começar com max streams conservador, observar p95/p99 e erros 5xx, e aumentar
+gradualmente.
 
 ### B9 — Payload continua gargalo
 
-Mesmo com HTTP/2, `tools/list` público já mostrou download dominante. A migração de protocolo não substitui compactação de tool descriptors.
+Mesmo com HTTP/2, `tools/list` público já mostrou download dominante. A migração de protocolo não
+substitui compactação de tool descriptors.
 
-Correção: seguir em paralelo com `COPILOT_MCP_TOOL_SURFACE=latency|minimal` e redução de schemas/descrições.
+Correção: seguir em paralelo com `COPILOT_MCP_TOOL_SURFACE=latency|minimal` e redução de
+schemas/descrições.
 
 ### B10 — Enhanced HTTP/2 Prioritization provavelmente é secundário
 
-Recurso útil para páginas com muitos assets e prioridades de browser. Para MCP JSON API, o ganho esperado é menor. Deve ser avaliado, não priorizado como principal.
+Recurso útil para páginas com muitos assets e prioridades de browser. Para MCP JSON API, o ganho
+esperado é menor. Deve ser avaliado, não priorizado como principal.
 
 ---
 
@@ -304,7 +350,9 @@ originRequest:
   tcpKeepAlive: 30s
 ```
 
-Campos TLS (`originServerName`, `caPool`) devem ser definidos conforme a estratégia de certificado. Se Cloudflare Tunnel remoto/connector não conseguir validar a CA local no ambiente atual, o canary pode usar `noTLSVerify=true`, mas o roadmap deve tratar isso como exceção temporária.
+Campos TLS (`originServerName`, `caPool`) devem ser definidos conforme a estratégia de certificado.
+Se Cloudflare Tunnel remoto/connector não conseguir validar a CA local no ambiente atual, o canary
+pode usar `noTLSVerify=true`, mas o roadmap deve tratar isso como exceção temporária.
 
 ### 6.4 Edge policy ideal
 
@@ -313,7 +361,8 @@ Manter:
 - cache bypass para `/mcp`, `/mcp/*`, `/oauth/token`, OAuth runtime;
 - short-cache para discovery metadata público GET-only;
 - sem challenge/Access interativo em `/mcp`;
-- sem transforms que alterem `Authorization`, `WWW-Authenticate`, `Content-Type`, `Cache-Control`, `Location`, CORS ou framing;
+- sem transforms que alterem `Authorization`, `WWW-Authenticate`, `Content-Type`, `Cache-Control`,
+  `Location`, CORS ou framing;
 - compressão de `/mcp` reavaliada após H2, pois o benchmark anterior favoreceu `identity`.
 
 ---
@@ -402,7 +451,8 @@ Extrair do `http.js` uma função interna compartilhável:
 async function handleMcpHttpLikeRequest(req, res) { ... }
 ```
 
-Meta: manter toda a lógica de rota/CORS/OAuth/MCP igual, trocando apenas o servidor que entrega `req/res`.
+Meta: manter toda a lógica de rota/CORS/OAuth/MCP igual, trocando apenas o servidor que entrega
+`req/res`.
 
 Não fazer:
 
@@ -476,7 +526,8 @@ Critério de aceite:
 Atualizar `src/copilot/mcp/cloudflare/origin-request-profile.js`:
 
 - se `originUrl` começa com `http://`: `http2Origin=false` continua recomendado e `true` é critical;
-- se `originUrl` começa com `https://` e H2 local está habilitado: `http2Origin=true` passa a ser recomendado;
+- se `originUrl` começa com `https://` e H2 local está habilitado: `http2Origin=true` passa a ser
+  recomendado;
 - se `https://` mas H2 local desconhecido: warning e não apply automático;
 - `disableChunkedEncoding=false` permanece;
 - `noTLSVerify=false` é recomendado para produção;
@@ -538,7 +589,8 @@ Abortar se:
 
 #### 3.1 Revisar default `http2` vs `auto`
 
-Hoje o config defaulta para `http2`. A documentação Cloudflare descreve `auto` como modo que tenta QUIC e faz fallback para HTTP/2 quando UDP não conecta.
+Hoje o config defaulta para `http2`. A documentação Cloudflare descreve `auto` como modo que tenta
+QUIC e faz fallback para HTTP/2 quando UDP não conecta.
 
 Política recomendada:
 
@@ -548,7 +600,8 @@ Política recomendada:
 
 #### 3.2 Atualizar testes
 
-`test_mcp_cloudflare_config.spec.js` hoje espera `http2` como default. Atualizar depois de decisão explícita.
+`test_mcp_cloudflare_config.spec.js` hoje espera `http2` como default. Atualizar depois de decisão
+explícita.
 
 #### 3.3 Medir
 
@@ -585,7 +638,8 @@ Verificar via dashboard/API:
 
 #### 4.2 Enhanced HTTP/2 Prioritization
 
-Avaliar apenas se o plano Cloudflare suportar. Baixa prioridade para MCP API, pois o endpoint principal é JSON-RPC e não uma página com múltiplos assets.
+Avaliar apenas se o plano Cloudflare suportar. Baixa prioridade para MCP API, pois o endpoint
+principal é JSON-RPC e não uma página com múltiplos assets.
 
 #### 4.3 Revalidar compressão
 
@@ -619,7 +673,8 @@ Reduzir especialmente:
 
 #### 5.3 Stateful sessions
 
-Não reativar agora. HTTP/2 melhora reutilização de conexão, mas o problema anterior era parsing/body replay no SDK. Sessões só voltam com hook seguro ou transporte SDK compatível.
+Não reativar agora. HTTP/2 melhora reutilização de conexão, mas o problema anterior era parsing/body
+replay no SDK. Sessões só voltam com hook seguro ou transporte SDK compatível.
 
 ---
 
@@ -630,7 +685,8 @@ Não reativar agora. HTTP/2 melhora reutilização de conexão, mas o problema a
 1. Baseline H1 atual.
 2. H2 local sem Cloudflare.
 3. H2 local + fallback H1.
-4. Cloudflare Tunnel para HTTPS origin com `http2Origin=false` inicialmente, só para validar TLS/connect.
+4. Cloudflare Tunnel para HTTPS origin com `http2Origin=false` inicialmente, só para validar
+   TLS/connect.
 5. Cloudflare Tunnel com `http2Origin=true` em canary.
 6. Public canary com smoke OAuth/MCP.
 7. Benchmark 30–100 samples.
@@ -748,4 +804,5 @@ Risco: alto operacionalmente; exige rollback pronto.
 
 Status: **roadmap criado, implementação ainda não aplicada**.
 
-Próxima ação recomendada: começar pelo **Patch 1 — Observabilidade sem mudança de protocolo**, porque ele reduz risco e nos dá provas antes de qualquer mudança em HTTP/2.
+Próxima ação recomendada: começar pelo **Patch 1 — Observabilidade sem mudança de protocolo**,
+porque ele reduz risco e nos dá provas antes de qualquer mudança em HTTP/2.

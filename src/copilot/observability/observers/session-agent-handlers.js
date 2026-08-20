@@ -39,8 +39,8 @@ function normalizeUnknownErrorMessage(raw) {
 }
 
 /**
- * Erros recuperáveis de `model_call` são sinais de roteamento/retry do SDK, não falhas operacionais finais.
- * Eles continuam no stream público via `agent.error`, mas não devem poluir `/errors` como erros vermelhos.
+ * Erros recuperáveis de `model_call` são sinais de roteamento/retry do SDK, não falhas operacionais finais. Eles
+ * continuam no stream público via `agent.error`, mas não devem poluir `/errors` como erros vermelhos.
  *
  * @param {unknown} raw
  * @returns {boolean}
@@ -48,11 +48,7 @@ function normalizeUnknownErrorMessage(raw) {
 function isRecoverableModelCallAgentError(raw) {
     if (!raw || typeof raw !== 'object') return false;
     const rec = /** @type {Record<string, unknown>} */ (raw);
-    return (
-        rec['hookType'] === 'errorOccurred' &&
-        rec['errorContext'] === 'model_call' &&
-        rec['recoverable'] === true
-    );
+    return rec['hookType'] === 'errorOccurred' && rec['errorContext'] === 'model_call' && rec['recoverable'] === true;
 }
 
 /** @typedef {import('./context.js').ObserverContext} ObserverContext */

@@ -1,5 +1,6 @@
 // @ts-check
 
+export { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from '../deferred-route-promotion.js';
 export {
     consumeTerminalLiveByokModelSwitchConfirmation,
     readTerminalLiveByokModelSwitchRequest,
@@ -7,4 +8,3 @@ export {
     requestTerminalLiveByokModelSwitch,
     requestTerminalLiveByokRouteSwitch,
 } from '../live-model-switch.js';
-export { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from '../deferred-route-promotion.js';

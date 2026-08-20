@@ -2,8 +2,8 @@
 /**
  * Presenters compartilhados para traces de turno/atividade do terminal.
  *
- * O estado interno usa `implicit:*` para agrupar I/O local sem turno conversacional real.
- * A superfície humana não deve chamar esses agrupamentos de "turno da LLM-B".
+ * O estado interno usa `implicit:*` para agrupar I/O local sem turno conversacional real. A superfície humana não deve
+ * chamar esses agrupamentos de "turno da LLM-B".
  */
 
 /**
@@ -49,4 +49,3 @@ export function renderTerminalTraceFlowSummary(summary, trace) {
         .replace(/\bturno\b/giu, 'atividade')
         .replace(/\bturnos\b/giu, 'atividades');
 }
-

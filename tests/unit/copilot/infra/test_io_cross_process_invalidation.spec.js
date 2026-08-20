@@ -1,5 +1,6 @@
 // @ts-check
 
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -7,7 +8,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
 import { afterEach, describe, it } from 'vitest';
 
 import {
@@ -64,7 +64,7 @@ describe('cross-process IO invalidation journal', () => {
         producer.publish(expectedPath, { recursive: true, source: 'unit-test' });
         now += 37;
 
-        /** @type {Array<{ filePath: string; recursive: boolean; source: string }>} */
+        /** @type {{ filePath: string; recursive: boolean; source: string }[]} */
         const received = [];
         const consumerPoll = consumer.poll((filePath, event) => received.push({ filePath, ...event }));
         const producerPoll = producer.poll(() => assert.fail('producer must not receive its own journal row'));
@@ -108,7 +108,10 @@ describe('cross-process IO invalidation journal', () => {
         assert.equal(replay.highWatermark, seq3);
         assert.equal(replay.gapDetected, false);
         assert.equal(replay.truncated, false);
-        assert.deepEqual(replay.rows.map((row) => row.sequence), [seq2, seq3]);
+        assert.deepEqual(
+            replay.rows.map((row) => row.sequence),
+            [seq2, seq3],
+        );
         assert.equal(journal.getStats().lastSeenSequence, 0);
 
         const truncated = readCrossProcessInvalidationReplay({ afterSequence: 0, maxRows: 1, db });
@@ -197,7 +200,9 @@ describe('cross-process IO invalidation journal', () => {
 
         if (child.exitCode === null) {
             await new Promise((resolve, reject) => {
-                child.once('exit', (code) => (code === 0 ? resolve(undefined) : reject(new Error(`child exit ${code}: ${stderr}`))));
+                child.once('exit', (code) =>
+                    code === 0 ? resolve(undefined) : reject(new Error(`child exit ${code}: ${stderr}`)),
+                );
             });
         } else {
             assert.equal(child.exitCode, 0, stderr);

@@ -3,7 +3,8 @@
  * Hugging Face Inference Providers router catalog importer.
  *
  * The router is OpenAI-compatible, but the important metadata lives one layer above the model id: provider variants,
- * pricing, context, latency and selection suffixes such as `:fastest`, `:cheapest`, `:preferred` and explicit providers.
+ * pricing, context, latency and selection suffixes such as `:fastest`, `:cheapest`, `:preferred` and explicit
+ * providers.
  *
  * @module copilot/model-gateway/catalog/importers/huggingface-inference-providers-importer
  */
@@ -78,7 +79,12 @@ function stringArray(value) {
  * @returns {Record<string, unknown>[]}
  */
 function parseHuggingFaceRows(raw) {
-    const data = isRecord(raw) && Array.isArray(raw['data']) ? raw['data'] : isRecord(raw) && Array.isArray(raw['models']) ? raw['models'] : [];
+    const data =
+        isRecord(raw) && Array.isArray(raw['data'])
+            ? raw['data']
+            : isRecord(raw) && Array.isArray(raw['models'])
+              ? raw['models']
+              : [];
     return data.filter(isRecord);
 }
 
@@ -116,9 +122,15 @@ function normalizedProviderVariant(provider) {
     return {
         provider: providerName(provider),
         routing: stringArray(provider['routing'] ?? provider['policies'] ?? provider['badges']),
-        inputUsdPerMillion: finiteNumber(provider['inputUsdPerMillion'] ?? pricing['inputUsdPerMillion'] ?? pricing['input']),
-        outputUsdPerMillion: finiteNumber(provider['outputUsdPerMillion'] ?? pricing['outputUsdPerMillion'] ?? pricing['output']),
-        contextWindowTokens: finiteNumber(provider['context'] ?? provider['context_length'] ?? provider['contextWindow']),
+        inputUsdPerMillion: finiteNumber(
+            provider['inputUsdPerMillion'] ?? pricing['inputUsdPerMillion'] ?? pricing['input'],
+        ),
+        outputUsdPerMillion: finiteNumber(
+            provider['outputUsdPerMillion'] ?? pricing['outputUsdPerMillion'] ?? pricing['output'],
+        ),
+        contextWindowTokens: finiteNumber(
+            provider['context'] ?? provider['context_length'] ?? provider['contextWindow'],
+        ),
         latencySeconds: finiteNumber(provider['latency'] ?? provider['latencySeconds']),
         throughputTokensPerSecond: finiteNumber(provider['throughput'] ?? provider['throughputTokensPerSecond']),
         tools: booleanValue(provider['tools'] ?? provider['toolUse']),
@@ -147,11 +159,13 @@ function maxContextWindow(variants) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']) ?? stringValue(row['model']);
-    const variants = providerRows(row).map(normalizedProviderVariant).filter((item) => stringValue(item['provider']));
+    const variants = providerRows(row)
+        .map(normalizedProviderVariant)
+        .filter((item) => stringValue(item['provider']));
     const aliases = normalizeModelAliases({ providerModel, huggingFaceId: providerModel });
     const identityTraits = normalizeModelIdentityTraits({
         providerModel,
@@ -172,7 +186,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.huggingface.providers', value: variants },
         { fieldPath: 'providerMetadata.huggingface.fastestProvider', value: providerForPolicy(variants, 'fastest') },
         { fieldPath: 'providerMetadata.huggingface.cheapestProvider', value: providerForPolicy(variants, 'cheapest') },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'huggingface' },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
@@ -201,7 +218,8 @@ export function createHuggingFaceInferenceProvidersImporter(options = {}) {
         refreshPolicy: 'manual',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Hugging Face catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Hugging Face catalog import');
             const headers = options.apiKey
                 ? { accept: 'application/json', authorization: `Bearer ${options.apiKey}` }
                 : { accept: 'application/json' };
@@ -239,7 +257,9 @@ export function createHuggingFaceInferenceProvidersImporter(options = {}) {
                 const record = isRecord(row) ? row : {};
                 const providerModel = stringValue(record['id']) ?? stringValue(record['model']);
                 if (!providerModel) return [];
-                const variants = providerRows(record).map(normalizedProviderVariant).filter((item) => stringValue(item['provider']));
+                const variants = providerRows(record)
+                    .map(normalizedProviderVariant)
+                    .filter((item) => stringValue(item['provider']));
                 const policyRoutes = HUGGINGFACE_ROUTE_POLICY_SUFFIXES.map((policy) =>
                     createModelRouteOption({
                         providerId: 'huggingface',
@@ -270,8 +290,14 @@ export function createHuggingFaceInferenceProvidersImporter(options = {}) {
                         providerSpecific: {
                             huggingFaceProvider: provider,
                             pricing: normalizeUsdPricing({
-                                inputPerTokenUsd: finiteNumber(variant['inputUsdPerMillion']) === null ? null : Number(variant['inputUsdPerMillion']) / 1_000_000,
-                                outputPerTokenUsd: finiteNumber(variant['outputUsdPerMillion']) === null ? null : Number(variant['outputUsdPerMillion']) / 1_000_000,
+                                inputPerTokenUsd:
+                                    finiteNumber(variant['inputUsdPerMillion']) === null
+                                        ? null
+                                        : Number(variant['inputUsdPerMillion']) / 1_000_000,
+                                outputPerTokenUsd:
+                                    finiteNumber(variant['outputUsdPerMillion']) === null
+                                        ? null
+                                        : Number(variant['outputUsdPerMillion']) / 1_000_000,
                             }),
                         },
                         normalizedPolicy: {
@@ -289,7 +315,7 @@ export function createHuggingFaceInferenceProvidersImporter(options = {}) {
             if (!options.apiKey) return [];
             const sourceId = stringValue(context.source['id']) ?? 'huggingface-inference-providers';
             const enabledModels = rows
-                .map((row) => (isRecord(row) ? stringValue(row['id']) ?? stringValue(row['model']) : null))
+                .map((row) => (isRecord(row) ? (stringValue(row['id']) ?? stringValue(row['model'])) : null))
                 .filter((model) => model !== null);
             const controls = normalizeAccountOverlayControls({
                 enabledModels,

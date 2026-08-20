@@ -16,15 +16,15 @@ Conectar `https://claude.ai/` ao mesmo MCP remoto usado pelo ChatGPT, mantendo:
 
 Use estes valores em `Claude > Customize > Connectors > Add custom connector`:
 
-| Campo | Valor |
-| --- | --- |
-| Name | `Repo DevContainer MCP` |
+| Campo                 | Valor                         |
+| --------------------- | ----------------------------- |
+| Name                  | `Repo DevContainer MCP`       |
 | Remote MCP server URL | `https://mcp.aurelin.org/mcp` |
-| OAuth Client ID | deixar vazio |
-| OAuth Client Secret | deixar vazio |
+| OAuth Client ID       | deixar vazio                  |
+| OAuth Client Secret   | deixar vazio                  |
 
-Os campos OAuth avancados ficam vazios porque o issuer dev embutido publica Dynamic Client Registration e Client ID
-Metadata Document para clientes publicos.
+Os campos OAuth avancados ficam vazios porque o issuer dev embutido publica Dynamic Client
+Registration e Client ID Metadata Document para clientes publicos.
 
 ## Preflight local
 
@@ -42,7 +42,8 @@ O resultado esperado:
 
 1. `remote-audit.ok=true`;
 2. Cloudflare remoto com `mcp.aurelin.org -> http://127.0.0.1:3333`;
-3. DNS CNAME apontando para o tunnel `workspace-mcp-dev`, quando `CLOUDFLARE_ZONE_ID` permitir auditoria DNS;
+3. DNS CNAME apontando para o tunnel `workspace-mcp-dev`, quando `CLOUDFLARE_ZONE_ID` permitir
+   auditoria DNS;
 4. OAuth smoke com DCR, CIMD, refresh token e chamada bearer passando;
 5. tools/list remoto com todas as tools locais.
 
@@ -106,5 +107,6 @@ curl -i https://mcp.aurelin.org/.well-known/oauth-protected-resource/mcp
 curl -i https://mcp.aurelin.org/.well-known/oauth-authorization-server
 ```
 
-Se a Claude pedir Client ID/Secret obrigatorios em alguma mudanca futura da UI, usar DCR primeiro. Se ela exigir um
-cliente estatico, criar um client publico dedicado e registrar o redirect URI informado pela Claude.
+Se a Claude pedir Client ID/Secret obrigatorios em alguma mudanca futura da UI, usar DCR primeiro.
+Se ela exigir um cliente estatico, criar um client publico dedicado e registrar o redirect URI
+informado pela Claude.

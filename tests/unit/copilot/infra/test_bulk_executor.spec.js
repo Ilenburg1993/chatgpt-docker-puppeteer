@@ -1,7 +1,7 @@
 // @ts-check
 
-import { describe, expect, it } from 'vitest';
 import { runBoundedOperationBatch } from '#copilot/infra';
+import { describe, expect, it } from 'vitest';
 
 const delay = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -73,10 +73,14 @@ describe('shared bulk executor', () => {
     it('aplica budgets de itens e bytes antes de executar workers', async () => {
         let calls = 0;
         await expect(
-            runBoundedOperationBatch([1, 2, 3], () => {
-                calls += 1;
-                return 1;
-            }, { maxItems: 2 }),
+            runBoundedOperationBatch(
+                [1, 2, 3],
+                () => {
+                    calls += 1;
+                    return 1;
+                },
+                { maxItems: 2 },
+            ),
         ).rejects.toMatchObject({ code: 'ERR_BULK_ITEM_LIMIT' });
         expect(calls).toBe(0);
 
@@ -89,11 +93,9 @@ describe('shared bulk executor', () => {
     });
 
     it('pode tratar retorno normal como falha lógica sem lançar exceção', async () => {
-        const result = await runBoundedOperationBatch(
-            [{ ok: true }, { ok: false }, { ok: true }],
-            (value) => value,
-            { isFailure: (value) => value.ok !== true },
-        );
+        const result = await runBoundedOperationBatch([{ ok: true }, { ok: false }, { ok: true }], (value) => value, {
+            isFailure: (value) => value.ok !== true,
+        });
 
         expect(result).toMatchObject({ succeededCount: 2, failedCount: 1, skippedCount: 0 });
         expect(result.results[1]).toMatchObject({ status: 'failed', value: { ok: false } });

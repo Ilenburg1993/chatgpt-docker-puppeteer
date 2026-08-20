@@ -244,7 +244,7 @@ export function recordTerminalFinalReconciliationDiagnostic(input) {
 }
 
 /**
- * @param {number} [limit=10]
+ * @param {number} [limit=10] Default is `10`
  * @returns {{
  *     counters: TerminalStreamDiagnosticCounters;
  *     recent: TerminalStreamDiagnosticEntry[];

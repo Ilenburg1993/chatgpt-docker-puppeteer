@@ -1,8 +1,8 @@
 # 2026-05-12 — Avaliação arquitetural Terminal 2.1+: política barrel-first e fronteiras de import/export
 
-**Data:** 2026-05-12
-**Escopo:** `src/copilot/terminal/**`
-**Motivação:** iniciar a próxima onda ampla de consolidação arquitetural, com foco em boundary enforcement e convergência para o modelo 2.0/2.1 onde `index.js` é sempre barrel puro.
+**Data:** 2026-05-12 **Escopo:** `src/copilot/terminal/**` **Motivação:** iniciar a próxima onda
+ampla de consolidação arquitetural, com foco em boundary enforcement e convergência para o modelo
+2.0/2.1 onde `index.js` é sempre barrel puro.
 
 ---
 
@@ -18,22 +18,30 @@
 > - `dialog-runtime.js` já absorveu o runtime/lazy loading do submódulo `dialog`;
 > - os sub-barrels de `events/`, `repl/`, `state/`, `stores/`, `terminal-phases/`, `wiring/`,
 >   `frontend/gateways/`, `frontend/projections/` e `frontend/operational-guidance/` já existem;
-> - os leafs legados da raiz (`auto-briefing.js`, `mailbox-drain.js`) deixaram de ser owners canônicos.
+> - os leafs legados da raiz (`auto-briefing.js`, `mailbox-drain.js`) deixaram de ser owners
+>   canônicos.
 >
-> Assim, esta nota passa a funcionar como **diagnóstico-base + target de governança**, não mais como foto exata do
-> estado corrente em todos os pontos.
+> Assim, esta nota passa a funcionar como **diagnóstico-base + target de governança**, não mais como
+> foto exata do estado corrente em todos os pontos.
 
-O estado atual do `terminal/` já evoluiu bastante em taxonomia, module map e decomposição de eventos, mas **ainda não está aderente ao regime barrel-first que queremos como target final**.
+O estado atual do `terminal/` já evoluiu bastante em taxonomia, module map e decomposição de
+eventos, mas **ainda não está aderente ao regime barrel-first que queremos como target final**.
 
 Os principais gaps objetivos remanescentes passam a ser:
 
-1. terminar a eliminação dos imports cross-folder que ainda bypassam barrels em pontos isolados do grafo vivo;
-2. consolidar a governança do `frontend/` em torno de sub-barrels puros, sem owners soltos fora dos submódulos;
-3. alinhar module-map, README e testes de governança ao novo papel de `runtime-root.js` e aos barrels recursivos;
+1. terminar a eliminação dos imports cross-folder que ainda bypassam barrels em pontos isolados do
+   grafo vivo;
+2. consolidar a governança do `frontend/` em torno de sub-barrels puros, sem owners soltos fora dos
+   submódulos;
+3. alinhar module-map, README e testes de governança ao novo papel de `runtime-root.js` e aos
+   barrels recursivos;
 4. endurecer o enforcement automatizado anti-bypass em CI/contracts;
-5. seguir a decomposição dos hotspots grandes (`commands/sdk.js`, `events/sdk-session-events.js`, `timeline.js`, etc.).
+5. seguir a decomposição dos hotspots grandes (`commands/sdk.js`, `events/sdk-session-events.js`,
+   `timeline.js`, etc.).
 
-Conclusão: a próxima fase do terminal deve ser tratada como **programa de barrelização recursiva + pureza de `index.js` + enforcement contratual**, e não apenas como refactor pontual de arquivos grandes.
+Conclusão: a próxima fase do terminal deve ser tratada como **programa de barrelização recursiva +
+pureza de `index.js` + enforcement contratual**, e não apenas como refactor pontual de arquivos
+grandes.
 
 ---
 
@@ -71,7 +79,8 @@ Hoje existem `index.js` em:
 - `terminal/terminal-phases/index.js`
 - `terminal/wiring/index.js`
 
-E, após a rodada atual, o target local passou a ser: **todo `index.js` existente no terminal deve permanecer barrel puro**.
+E, após a rodada atual, o target local passou a ser: **todo `index.js` existente no terminal deve
+permanecer barrel puro**.
 
 ### 2.3 Principais pontos de bypass físico
 
@@ -110,7 +119,8 @@ Arquivos grandes do terminal hoje:
 - `events/tool-lifecycle-runtime.js` → 553 linhas
 - `module-map.js` → 537 linhas
 
-Leitura arquitetural: a barrelização deve começar **onde há ao mesmo tempo alta densidade de imports + hotspot semântico**, e não por microarquivos estáveis.
+Leitura arquitetural: a barrelização deve começar **onde há ao mesmo tempo alta densidade de
+imports + hotspot semântico**, e não por microarquivos estáveis.
 
 ---
 
@@ -120,17 +130,21 @@ Leitura arquitetural: a barrelização deve começar **onde há ao mesmo tempo a
 
 O principal desvio não é apenas “faltam alguns barrels”. O desvio real é:
 
-> o terminal ainda mistura **barrels**, **composition roots** e **leaf modules** na mesma convenção de nomes.
+> o terminal ainda mistura **barrels**, **composition roots** e **leaf modules** na mesma convenção
+> de nomes.
 
-Enquanto isso continuar, `index.js` não poderá ser tratado como superfície pública totalmente confiável.
+Enquanto isso continuar, `index.js` não poderá ser tratado como superfície pública totalmente
+confiável.
 
 ## 3.2 Consequência direta
 
 Se `index.js` pode conter lógica operacional, o sistema perde três garantias importantes:
 
 1. **legibilidade arquitetural** — `index.js` deixa de sinalizar “ponto de acesso público”;
-2. **governança de boundaries** — consumers podem importar a raíz e acoplar a detalhes de runtime sem perceber;
-3. **migração segura** — qualquer reestruturação física passa a exigir leitura profunda de arquivos que deveriam ser barrels triviais.
+2. **governança de boundaries** — consumers podem importar a raíz e acoplar a detalhes de runtime
+   sem perceber;
+3. **migração segura** — qualquer reestruturação física passa a exigir leitura profunda de arquivos
+   que deveriam ser barrels triviais.
 
 ## 3.3 O caso do terminal hoje
 
@@ -141,7 +155,8 @@ Atualmente:
 - `terminal/frontend/index.js` = barrel puro;
 - `terminal/commands/index.js` = barrel puro.
 
-Isso mostra que o módulo já está **meio migrado**, mas ainda sem uma política única aplicada de ponta a ponta.
+Isso mostra que o módulo já está **meio migrado**, mas ainda sem uma política única aplicada de
+ponta a ponta.
 
 ---
 
@@ -163,10 +178,12 @@ Ou seja:
 
 ## 4.2 Consequência da regra-mãe
 
-Todo arquivo operacional que hoje usa o nome `index.js` deve migrar para um nome explícito, por exemplo:
+Todo arquivo operacional que hoje usa o nome `index.js` deve migrar para um nome explícito, por
+exemplo:
 
 - `terminal/index.js` → barrel puro re-exportando `./runtime-root.js` ou `./orchestrator.js`;
-- `terminal/dialog/index.js` → barrel puro re-exportando `./dialog-runtime.js`, `./output.js`, `./sse.js` etc.
+- `terminal/dialog/index.js` → barrel puro re-exportando `./dialog-runtime.js`, `./output.js`,
+  `./sse.js` etc.
 
 ## 4.3 Modelo de módulo ideal
 
@@ -207,15 +224,16 @@ Exemplos desejados:
 - `terminal/index.js` importa `./repl/index.js`, não `./repl/repl.js`;
 - `terminal/repl/*` importa `../events/index.js`, não `../events/event-adapters.js`;
 - `terminal/events/*` importa `../state/index.js`, não `../state/activity-state.js`;
-- `terminal/frontend/projections/*` importa `../gateways/index.js`, não `../gateways/agent-runtime.js`.
+- `terminal/frontend/projections/*` importa `../gateways/index.js`, não
+  `../gateways/agent-runtime.js`.
 
 > **Delta de implementação — endurecimento atual**
 >
-> A rodada corrente passou a materializar também a política de superfície pública no `package.json`: o wildcard
-> `#copilot/terminal/*` deixa de ser aceitável como target final, substituído por superfícies explícitas como
-> `#copilot/terminal`, `#copilot/terminal/frontend`, `#copilot/terminal/commands`, `#copilot/terminal/dialog`,
-> `#copilot/terminal/handlers`, `#copilot/terminal/stores` e a sub-surface estreita
-> `#copilot/terminal/state/repl-runtime`.
+> A rodada corrente passou a materializar também a política de superfície pública no `package.json`:
+> o wildcard `#copilot/terminal/*` deixa de ser aceitável como target final, substituído por
+> superfícies explícitas como `#copilot/terminal`, `#copilot/terminal/frontend`,
+> `#copilot/terminal/commands`, `#copilot/terminal/dialog`, `#copilot/terminal/handlers`,
+> `#copilot/terminal/stores` e a sub-surface estreita `#copilot/terminal/state/repl-runtime`.
 
 ## 5.2 Regra para same-folder imports
 
@@ -223,15 +241,19 @@ Avaliação arquitetural recomendada:
 
 - **same-folder imports diretos podem existir** entre leaf files privados do mesmo micro-módulo;
 - **cross-folder imports não**;
-- quando a pasta cresce e passa a representar módulo autônomo, seu consumo externo deve ser **exclusivamente via `index.js`**.
+- quando a pasta cresce e passa a representar módulo autônomo, seu consumo externo deve ser
+  **exclusivamente via `index.js`**.
 
-Isso evita cair num absolutismo que cria barrels cíclicos e “importa o próprio módulo público de dentro dele mesmo”.
+Isso evita cair num absolutismo que cria barrels cíclicos e “importa o próprio módulo público de
+dentro dele mesmo”.
 
 Portanto, o objetivo prático final deve ser lido assim:
 
-> **todos os imports entre módulos/pastas passam via barrels; imports internos locais podem permanecer diretos quando forem estritamente privados ao mesmo micro-módulo.**
+> **todos os imports entre módulos/pastas passam via barrels; imports internos locais podem
+> permanecer diretos quando forem estritamente privados ao mesmo micro-módulo.**
 
-Se quisermos endurecer ainda mais no futuro, isso deve ocorrer **depois** da barrelização recursiva estabilizada.
+Se quisermos endurecer ainda mais no futuro, isso deve ocorrer **depois** da barrelização recursiva
+estabilizada.
 
 ## 5.3 Regra para imports externos ao terminal
 
@@ -448,7 +470,8 @@ Adicionar guardrails em CI/lint/contracts para impedir regressão:
 2. Composition root nunca usa nome `index.js`.
 3. Import entre subpastas irmãs do terminal só via barrel.
 4. Import vindo de fora do terminal só usa barrel público.
-5. Barrel não importa arquivos de fora do próprio módulo, exceto outros barrels explicitamente autorizados do mesmo domínio terminal.
+5. Barrel não importa arquivos de fora do próprio módulo, exceto outros barrels explicitamente
+   autorizados do mesmo domínio terminal.
 
 ## 9.2 Exceções aceitáveis
 
@@ -464,7 +487,8 @@ Somente temporariamente:
 
 1. Converter `terminal/index.js` em barrel puro, movendo a composição para `runtime-root.js`.
 2. Converter `dialog/index.js` em barrel puro, movendo lazy/runtime para `dialog-runtime.js`.
-3. Criar barrels faltantes em `repl/state/stores/wiring/terminal-phases/frontend/gateways/frontend/projections/events`.
+3. Criar barrels faltantes em
+   `repl/state/stores/wiring/terminal-phases/frontend/gateways/frontend/projections/events`.
 4. Reescrever imports cross-folder do terminal via barrels.
 5. Atualizar testes para privilegiar sub-barrels em vez de leaf files.
 6. Adicionar contratos/lint anti-bypass.
@@ -477,6 +501,9 @@ O target arquitetural ideal para o terminal **não é apenas “mais barrels”*
 
 O target correto é:
 
-> **terminal com barrels puros em todos os níveis relevantes, composition roots nomeados explicitamente, imports cross-folder exclusivamente via barrels, e superfície pública governada por exports deliberados.**
+> **terminal com barrels puros em todos os níveis relevantes, composition roots nomeados
+> explicitamente, imports cross-folder exclusivamente via barrels, e superfície pública governada
+> por exports deliberados.**
 
-Esse é o formato mais coerente com a Arquitetura 2.0/2.1 que já estamos consolidando no restante de `src/copilot`.
+Esse é o formato mais coerente com a Arquitetura 2.0/2.1 que já estamos consolidando no restante de
+`src/copilot`.

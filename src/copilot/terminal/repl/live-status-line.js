@@ -12,13 +12,13 @@ import { TERMINAL_LIVE_STATUS_ENABLED, TERMINAL_LIVE_STATUS_INTERVAL_MS } from '
 import { cancelTimer, registerInterval } from '#copilot/core';
 import { getBusy } from '../../presentation/state/index.js';
 import { clearInlineStatus, writeInlineStatus } from '../dialog/index.js';
+import { renderTerminalQuestionActivityLiveLabel } from '../events/presenters/question/index.js';
 import { getTerminalHumanToolName, humanizeTerminalToolSurfaceText } from '../events/presenters/tools/index.js';
 import {
     listTerminalPendingStructuredUserInputs,
     readTerminalDialogStreamMeta,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
-import { renderTerminalQuestionActivityLiveLabel } from '../events/presenters/question/index.js';
 import { readTerminalActivityHistory, readTerminalActivitySnapshot, terminalThemeText } from '../state/repl/index.js';
 
 const MIN_LIVE_STATUS_INTERVAL_MS = 250;
@@ -80,7 +80,7 @@ function fitLiveStatusToSingleLine(value, columns) {
     const targetVisibleChars = Math.max(1, budget - 1);
     let visibleChars = 0;
     let result = '';
-    for (let index = 0; index < sanitized.length && visibleChars < targetVisibleChars; ) {
+    for (let index = 0; index < sanitized.length && visibleChars < targetVisibleChars;) {
         if (sanitized[index] === ANSI_ESCAPE) {
             const match = sanitized.slice(index).match(ANSI_ESCAPE_PREFIX_PATTERN);
             if (match) {

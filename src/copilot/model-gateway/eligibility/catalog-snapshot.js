@@ -8,12 +8,12 @@
  * @module copilot/model-gateway/eligibility/catalog-snapshot
  */
 
-import { createModelEligibilityRun } from './contracts.js';
-import { evaluateModelGatewayEligibility } from './evaluator.js';
 import {
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../account-access/index.js';
+import { createModelEligibilityRun } from './contracts.js';
+import { evaluateModelGatewayEligibility } from './evaluator.js';
 
 /**
  * @param {unknown} value
@@ -99,7 +99,7 @@ export function modelEligibilityDecisionKey(decision) {
  * @param {TExisting[]} records
  * @param {TAddition[]} additions
  * @param {(record: TExisting | TAddition) => string} key
- * @returns {Array<TExisting | TAddition>}
+ * @returns {(TExisting | TAddition)[]}
  */
 function upsertMany(records, additions, key) {
     /** @type {Map<string, TExisting | TAddition>} */
@@ -170,7 +170,9 @@ export function evaluateModelGatewayCatalogEligibility(input) {
     const snapshot = isRecord(input.snapshot) ? input.snapshot : {};
     const projections = Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(isRecord) : [];
     const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
-    const snapshotAccountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
+    const snapshotAccountOverlays = Array.isArray(snapshot['accountOverlays'])
+        ? snapshot['accountOverlays'].filter(isRecord)
+        : [];
     const healthRecords = Array.isArray(input.healthRecords) ? input.healthRecords.filter(isRecord) : [];
     const routesByKey = routeOptionsByProjectionKey(routeOptions);
     const policy = isRecord(input.policy) ? input.policy : {};
@@ -180,7 +182,9 @@ export function evaluateModelGatewayCatalogEligibility(input) {
             ? policy['runtimeAccountWideFailureKinds'].map(optionalString).filter((item) => item !== null)
             : [],
     });
-    const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, { now: startedAt });
+    const runtimeAccountOverlaySummary = summarizeModelGatewayRuntimeAccountOverlays(runtimeAccountOverlays, {
+        now: startedAt,
+    });
     const accountOverlays = [...snapshotAccountOverlays, ...runtimeAccountOverlays];
     const healthByKey = new Map(healthRecords.map((record) => [healthRouteKey(record), record]));
     const decisions = projections.flatMap((projection) => {
@@ -241,13 +245,11 @@ export function applyModelGatewayEligibilityToSnapshot(snapshot, decisions, run)
     return {
         ...snapshot,
         source: 'eligibility-refresh',
-        modelEligibilityDecisions: upsertMany(
-            retainedDecisions,
-            decisions,
-            modelEligibilityDecisionKey,
-        ),
+        modelEligibilityDecisions: upsertMany(retainedDecisions, decisions, modelEligibilityDecisionKey),
         modelEligibilityRuns: [
-            ...(Array.isArray(snapshot['modelEligibilityRuns']) ? snapshot['modelEligibilityRuns'].filter(isRecord) : []),
+            ...(Array.isArray(snapshot['modelEligibilityRuns'])
+                ? snapshot['modelEligibilityRuns'].filter(isRecord)
+                : []),
             run,
         ],
     };

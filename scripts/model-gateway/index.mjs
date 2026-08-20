@@ -48,7 +48,10 @@ export const MODEL_GATEWAY_SCRIPT_MANIFEST = Object.freeze(
             id,
             role: id === 'runner' ? 'runner' : 'command',
             scriptPath,
-            runnerCommand: id === 'runner' ? 'node scripts/model-gateway/run.mjs --help' : `node scripts/model-gateway/run.mjs ${id}`,
+            runnerCommand:
+                id === 'runner'
+                    ? 'node scripts/model-gateway/run.mjs --help'
+                    : `node scripts/model-gateway/run.mjs ${id}`,
         }),
     ),
 );

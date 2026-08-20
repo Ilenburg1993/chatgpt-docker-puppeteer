@@ -50,7 +50,7 @@ describe('infra/io/invalidation/external-watch', () => {
         const nested = join(root, 'nested');
         const file = join(nested, 'module.js');
         await mkdir(nested, { recursive: true });
-        /** @type {Array<{ filePath: string; source: string }>} */
+        /** @type {{ filePath: string; source: string }[]} */
         const invalidations = [];
 
         const started = startIoExternalWatch(root, {

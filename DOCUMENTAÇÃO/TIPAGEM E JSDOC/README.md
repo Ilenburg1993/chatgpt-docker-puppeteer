@@ -20,16 +20,16 @@ trabalhar com tipagem e JSDoc neste repositório:
 
 ## Documentos deste hub
 
-| Arquivo                       | Papel                                                                  |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `../PLANOS/MIGRACAO_TYPESCRIPT_7_WORKSPACE_ROADMAP_2026-08-19.md` | Roadmap ativo da migração TS7 do workspace |
-| `PADROES.md`                  | Padrões JSDoc e tipagem TS — o "como fazer" obrigatório                |
-| `ROADMAP.md`                  | Roadmap de execução ativo (fases, erros, checklist)                    |
-| `SCRIPTS-E-AUTOMACAO.md`      | Scripts de análise, comandos npm, automações disponíveis               |
-| `CONFIGURACOES-TSCONFIG.md`   | Arquivos tsconfig, 41 lanes strict, flags e suas implicações           |
-| `SISTEMA-TIPAGEM-COMPLETO.md` | 📖 Guia completo do sistema — arquitetura, fluxo, todos os componentes |
-| `AUDITORIA-2026-03-07.md`     | Auditoria completa do sistema (7 mar 2026) — Fases 0–D ✅ — **Atual**  |
-| `AUDITORIA-2026-03-06.md`     | Auditoria anterior (6 mar 2026) — histórico                            |
+| Arquivo                                                           | Papel                                                                  |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `../PLANOS/MIGRACAO_TYPESCRIPT_7_WORKSPACE_ROADMAP_2026-08-19.md` | Roadmap ativo da migração TS7 do workspace                             |
+| `PADROES.md`                                                      | Padrões JSDoc e tipagem TS — o "como fazer" obrigatório                |
+| `ROADMAP.md`                                                      | Roadmap de execução ativo (fases, erros, checklist)                    |
+| `SCRIPTS-E-AUTOMACAO.md`                                          | Scripts de análise, comandos npm, automações disponíveis               |
+| `CONFIGURACOES-TSCONFIG.md`                                       | Arquivos tsconfig, 41 lanes strict, flags e suas implicações           |
+| `SISTEMA-TIPAGEM-COMPLETO.md`                                     | 📖 Guia completo do sistema — arquitetura, fluxo, todos os componentes |
+| `AUDITORIA-2026-03-07.md`                                         | Auditoria completa do sistema (7 mar 2026) — Fases 0–D ✅ — **Atual**  |
+| `AUDITORIA-2026-03-06.md`                                         | Auditoria anterior (6 mar 2026) — histórico                            |
 
 ---
 

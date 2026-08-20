@@ -138,7 +138,13 @@ export async function cmdPlan({ println }, arg) {
             return;
         }
         const plan = await callWithRuntimeTarget(updateTerminalSdkPlanProjection, runtimeId, content);
-        println(terminalThemeRow('plan.md', `atualizado · ${plan.path ?? 'sem path'} · ${plan.exists ? 'presente' : 'ausente'}`, { role: 'success' }));
+        println(
+            terminalThemeRow(
+                'plan.md',
+                `atualizado · ${plan.path ?? 'sem path'} · ${plan.exists ? 'presente' : 'ausente'}`,
+                { role: 'success' },
+            ),
+        );
         return;
     }
 
@@ -151,13 +157,21 @@ export async function cmdPlan({ println }, arg) {
         const current = await callWithRuntimeTarget(readTerminalSdkSessionProjection, runtimeId);
         const base = current.plan.content ? `${current.plan.content.trimEnd()}\n` : '';
         const plan = await callWithRuntimeTarget(updateTerminalSdkPlanProjection, runtimeId, `${base}${addition}`);
-        println(terminalThemeRow('plan.md', `expandido · ${plan.path ?? 'sem path'} · ${plan.exists ? 'presente' : 'ausente'}`, { role: 'success' }));
+        println(
+            terminalThemeRow(
+                'plan.md',
+                `expandido · ${plan.path ?? 'sem path'} · ${plan.exists ? 'presente' : 'ausente'}`,
+                { role: 'success' },
+            ),
+        );
         return;
     }
 
     if (lower === 'clear' || lower === 'delete') {
         const plan = await callWithRuntimeTarget(deleteTerminalSdkPlanProjection, runtimeId);
-        println(terminalThemeRow('plan.md', `removido · agora ${plan.exists ? 'presente' : 'ausente'}`, { role: 'warn' }));
+        println(
+            terminalThemeRow('plan.md', `removido · agora ${plan.exists ? 'presente' : 'ausente'}`, { role: 'warn' }),
+        );
         return;
     }
 

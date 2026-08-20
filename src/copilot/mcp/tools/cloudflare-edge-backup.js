@@ -5,9 +5,9 @@
  * @module copilot/mcp/tools/cloudflare-edge-backup
  */
 
-import { z } from 'zod';
 import { createCloudflareEdgeBackup, listCloudflareEdgeBackups } from '#copilot/mcp/cloudflare';
 import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -21,7 +21,8 @@ export const mcpCloudflareEdgeBackupCreateTool = {
         label: z.string().optional()['describe']('Optional filesystem-safe label for the backup file.'),
         includeSnapshot: z
             .boolean()
-            .optional()['describe']('Whether to include the full snapshot in the tool response. Default: false.'),
+            .optional()
+            ['describe']('Whether to include the full snapshot in the tool response. Default: false.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async ({ label, includeSnapshot }) =>

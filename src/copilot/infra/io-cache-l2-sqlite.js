@@ -323,8 +323,7 @@ export function createIoL2SqliteCache(options) {
         get(key) {
             const startedAt = performance.now();
             try {
-                const row =
-                    pendingSets.get(key) ?? /** @type {IoL2CacheRow | undefined} */ (stmtGet.get(key));
+                const row = pendingSets.get(key) ?? /** @type {IoL2CacheRow | undefined} */ (stmtGet.get(key));
                 if (!row) {
                     stats.misses += 1;
                     return null;
@@ -491,7 +490,8 @@ export function createIoL2SqliteCache(options) {
                 setBatchWindowMs,
                 setBatchMaxEntries,
                 pendingSets: pendingSets.size,
-                averageBatchSize: stats.batchFlushes > 0 ? Number((stats.batchedRows / stats.batchFlushes).toFixed(3)) : 0,
+                averageBatchSize:
+                    stats.batchFlushes > 0 ? Number((stats.batchedRows / stats.batchFlushes).toFixed(3)) : 0,
                 latency: Object.fromEntries(
                     Object.entries(latency).map(([operation, metric]) => [
                         operation,

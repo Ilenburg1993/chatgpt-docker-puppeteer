@@ -43,7 +43,9 @@ function optionalString(value) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
@@ -76,7 +78,9 @@ function normalizeWireApi(runtimeKind) {
  * @returns {boolean}
  */
 function isChatLike(runtimeKind) {
-    return /(?:chat|responses|messages|generate_content|google_model|workers_ai_run|ai_gateway_universal|generate)$/u.test(runtimeKind);
+    return /(?:chat|responses|messages|generate_content|google_model|workers_ai_run|ai_gateway_universal|generate)$/u.test(
+        runtimeKind,
+    );
 }
 
 /**
@@ -88,10 +92,18 @@ function inferProbeKinds(runtimeKind, routing) {
     /** @type {string[]} */
     const kinds = [];
     if (isChatLike(runtimeKind)) kinds.push('chat', 'streaming', 'json');
-    if (/(?:chat_completions|responses|messages|generate_content|google_model|ai_gateway_universal|openai_chat_completions|openai_responses|anthropic_messages)$/u.test(runtimeKind)) {
+    if (
+        /(?:chat_completions|responses|messages|generate_content|google_model|ai_gateway_universal|openai_chat_completions|openai_responses|anthropic_messages)$/u.test(
+            runtimeKind,
+        )
+    ) {
         kinds.push('agent', 'reasoning');
     }
-    if (/(?:chat_completions|responses|openai_chat_completions|openai_responses|ai_gateway_universal)$/u.test(runtimeKind)) {
+    if (
+        /(?:chat_completions|responses|openai_chat_completions|openai_responses|ai_gateway_universal)$/u.test(
+            runtimeKind,
+        )
+    ) {
         kinds.push('forced_tool_choice', 'parallel_tool_calls');
     }
     if (/vision|image_input/u.test(runtimeKind)) kinds.push('vision');
@@ -101,7 +113,11 @@ function inferProbeKinds(runtimeKind, routing) {
     if (/rerank/u.test(runtimeKind)) kinds.push('rerank');
     if (/(?:image_generation|text_to_image)/u.test(runtimeKind)) kinds.push('image_generation');
     if (runtimeKind === 'fim_completions') kinds.push('provider_native');
-    if (/^(?:messages|anthropic_messages|generate_content|google_model|workers_ai_run|generate|chat)$/u.test(runtimeKind)) {
+    if (
+        /^(?:messages|anthropic_messages|generate_content|google_model|workers_ai_run|generate|chat)$/u.test(
+            runtimeKind,
+        )
+    ) {
         kinds.push('provider_native');
     }
     if (routing['supportsFallback'] === true || runtimeKind === 'ai_gateway_universal') kinds.push('gateway_fallback');
@@ -112,18 +128,18 @@ function inferProbeKinds(runtimeKind, routing) {
  * @param {object} [options]
  * @param {readonly Record<string, unknown>[]} [options.traits]
  * @param {string} [options.providerId]
- * @returns {Array<{
- *   providerId: string;
- *   topology: string;
- *   runtimeKind: string;
- *   wireApi: string;
- *   probeKinds: string[];
- *   implementedProbeKinds: string[];
- *   pendingProbeKinds: string[];
- *   gatewaySpecific: boolean;
- *   providerNative: boolean;
- *   notes: string[];
- * }>}
+ * @returns {{
+ *     providerId: string;
+ *     topology: string;
+ *     runtimeKind: string;
+ *     wireApi: string;
+ *     probeKinds: string[];
+ *     implementedProbeKinds: string[];
+ *     pendingProbeKinds: string[];
+ *     gatewaySpecific: boolean;
+ *     providerNative: boolean;
+ *     notes: string[];
+ * }[]}
  */
 export function listProviderWireProbeMatrix(options = {}) {
     const providerFilter = optionalString(options.providerId)?.toLowerCase() ?? null;
@@ -137,9 +153,14 @@ export function listProviderWireProbeMatrix(options = {}) {
             const routing = asRecord(item['routing']);
             return runtimeKinds.map((runtimeKind) => {
                 const probeKinds = inferProbeKinds(runtimeKind, routing);
-                const implementedProbeKinds = probeKinds.filter((kind) => MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS.includes(kind));
-                const pendingProbeKinds = probeKinds.filter((kind) => !MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS.includes(kind));
-                const gatewaySpecific = topology === 'gateway' || runtimeKind.includes('gateway') || routing['supportsFallback'] === true;
+                const implementedProbeKinds = probeKinds.filter((kind) =>
+                    MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS.includes(kind),
+                );
+                const pendingProbeKinds = probeKinds.filter(
+                    (kind) => !MODEL_GATEWAY_IMPLEMENTED_PROBE_KINDS.includes(kind),
+                );
+                const gatewaySpecific =
+                    topology === 'gateway' || runtimeKind.includes('gateway') || routing['supportsFallback'] === true;
                 const providerNative = probeKinds.includes('provider_native');
                 return {
                     providerId,
@@ -163,7 +184,13 @@ export function listProviderWireProbeMatrix(options = {}) {
 
 /**
  * @param {readonly Record<string, unknown>[]} rows
- * @returns {{ providerCount: number; rowCount: number; implementedProbeKindCounts: Record<string, number>; pendingProbeKindCounts: Record<string, number>; providersWithPendingProbeKinds: string[] }}
+ * @returns {{
+ *     providerCount: number;
+ *     rowCount: number;
+ *     implementedProbeKindCounts: Record<string, number>;
+ *     pendingProbeKindCounts: Record<string, number>;
+ *     providersWithPendingProbeKinds: string[];
+ * }}
  */
 export function summarizeProviderWireProbeMatrix(rows) {
     const providers = new Set(rows.map((row) => optionalString(row['providerId']) ?? 'unknown-provider'));

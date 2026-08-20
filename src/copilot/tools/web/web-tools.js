@@ -1,11 +1,6 @@
 // @ts-check
 import { getWebRateLimitPolicy, WEB_FETCH_DISABLED, WEB_SEARCH_DISABLED } from '#copilot/config';
-import {
-    bufferIsUtf8,
-    concatBufferViews,
-    decodeUtf8Buffer,
-    utf8ByteLength,
-} from '#copilot/infra/public/buffer';
+import { bufferIsUtf8, concatBufferViews, decodeUtf8Buffer, utf8ByteLength } from '#copilot/infra/public/buffer';
 import { publishIoOperation } from '#copilot/infra/public/events';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -199,10 +194,7 @@ async function readCompleteWebTextResponse(response, maxBytes, label) {
         }
         reader.releaseLock();
     }
-    return decodeUtf8Buffer(
-        concatBufferViews(chunks, bytesRead),
-        `${label} contém bytes inválidos para UTF-8.`,
-    );
+    return decodeUtf8Buffer(concatBufferViews(chunks, bytesRead), `${label} contém bytes inválidos para UTF-8.`);
 }
 
 // ─── Tool: web_fetch_local ───────────────────────────────────────────────────
@@ -294,22 +286,26 @@ const webFetchTool = buildTool({
             .int()
             .min(1)
             .max(MAX_WEB_FETCH_RESPONSE_BYTES)
-            .optional()['describe'](`Máximo efetivo da resposta em bytes. Default: ${DEFAULT_WEB_FETCH_RESPONSE_BYTES}.`),
+            .optional()
+            ['describe'](`Máximo efetivo da resposta em bytes. Default: ${DEFAULT_WEB_FETCH_RESPONSE_BYTES}.`),
         timeoutMs: z
             .number()
             .int()
             .min(0)
-            .optional()['describe']('Timeout efetivo em ms (aborta a operação quando excedido).'),
+            .optional()
+            ['describe']('Timeout efetivo em ms (aborta a operação quando excedido).'),
     }),
     handler: async (
-        /** @type {{
-    url: string;
-    method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
-    headers?: Record<string, string>;
-    body?: string;
-    maxBytes?: number;
-    timeoutMs?: number;
-}} */
+        /**
+         * @type {{
+         *     url: string;
+         *     method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
+         *     headers?: Record<string, string>;
+         *     body?: string;
+         *     maxBytes?: number;
+         *     timeoutMs?: number;
+         * }}
+         */
         { url, method, headers, body, maxBytes, timeoutMs },
     ) => {
         const rate = checkRateLimit();
@@ -408,10 +404,7 @@ const webFetchTool = buildTool({
                 reader.releaseLock();
             }
 
-            const decoded = decodeWebFetchBytes(
-                concatBufferViews(chunks, collectedBytes),
-                truncated,
-            );
+            const decoded = decodeWebFetchBytes(concatBufferViews(chunks, collectedBytes), truncated);
 
             const sanitized = sanitizeIoTextOutput({ text: decoded.text });
             const io = buildIoMeta({

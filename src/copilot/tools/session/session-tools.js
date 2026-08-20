@@ -1,9 +1,9 @@
 // @ts-check
 import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
+import { readConfiguredSkillCatalog } from '#copilot/infra/public/skill-io';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { execFileSync } from 'node:child_process';
-import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
@@ -175,51 +175,28 @@ const invokeSkillTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ name?: string }>} */ (
         /** @type {unknown} */ (
             z.object({
-                name: z.string().optional()['describe']('Nome da skill a carregar (slug do diretório em .github/skills/)'),
+                name: z
+                    .string()
+                    .optional()
+                    ['describe']('Nome da skill a carregar (slug do diretório em .github/skills/)'),
             })
         )
     ),
     handler: async (/** @type {{ name?: string }} */ { name }) => {
         const bootSkills = readBootSkillConfig();
-        const disabled = new Set(bootSkills.disabledSkills);
-        /** @type {Map<string, string>} */
-        const availableMap = new Map();
-        let readableSkillDirCount = 0;
-        for (const skillsDir of bootSkills.skillDirectories) {
-            try {
-                await stat(skillsDir);
-                readableSkillDirCount++;
-                const entries = await readdir(skillsDir, { withFileTypes: true });
-                for (const entry of entries) {
-                    if (entry.isDirectory() && !disabled.has(entry.name) && !availableMap.has(entry.name)) {
-                        availableMap.set(entry.name, skillsDir);
-                    }
-                }
-            } catch (e) {
-                logSwallowed(e, `invokeSkill.readDir:${skillsDir}`);
-            }
-        }
-        if (readableSkillDirCount === 0) {
+        const catalog = await readConfiguredSkillCatalog({
+            skillDirectories: bootSkills.skillDirectories,
+            disabledSkills: bootSkills.disabledSkills,
+            ...(name ? { requestedName: name } : {}),
+        });
+        if (catalog.readableDirectoryCount === 0) {
             return { error: 'Diretório .github/skills/ não encontrado.' };
         }
-        const available = [...availableMap.keys()].sort();
+        const available = catalog.names;
+        if (!name) return { available };
+        if (!catalog.selected) return { error: `Skill '${name}' não encontrada.`, available };
 
-        if (!name) {
-            return { available };
-        }
-
-        const skillsDir = availableMap.get(name);
-        if (!skillsDir) {
-            return { error: `Skill '${name}' não encontrada.`, available };
-        }
-        const skillPath = join(skillsDir, name, 'SKILL.md');
-        let content;
-        try {
-            content = (await readText(skillPath)).content;
-        } catch {
-            return { error: `Skill '${name}' não encontrada.`, available };
-        }
-
+        const content = catalog.selected.content;
         log('INFO', `[copilot/invoke_skill] skill='${name}' carregada (${content.length} bytes)`);
         return { name, content };
     },

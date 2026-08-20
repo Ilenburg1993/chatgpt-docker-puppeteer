@@ -8,23 +8,23 @@ noturna e publicação de releases.
 
 ## Entradas principais
 
-| Arquivo                    | Descrição                                             |
-| -------------------------- | ----------------------------------------------------- |
+| Arquivo                    | Descrição                                              |
+| -------------------------- | ------------------------------------------------------ |
 | `ci.yml`                   | Validação de runtime/workflows e canário Copilot IO L2 |
-| `code-quality.yml`         | Análise de qualidade de código                        |
-| `coverage.yml`             | Relatório de cobertura de testes                      |
-| `audit-nightly.yml`        | Auditoria profunda noturna                            |
-| `security.yml`             | Gate de segurança (npm audit, secrets scan)           |
-| `docker-security-scan.yml` | Scan de segurança da imagem Docker                    |
-| `dependency-review.yml`    | Revisão de dependências em PRs                        |
-| `dependency-hygiene.yml`   | Higiene de dependências (desatualizadas, vulneráveis) |
-| `dashboard-build.yml`      | Build do dashboard frontend                           |
-| `release.yml`              | Pipeline de publicação de releases                    |
-| `scorecard.yml`            | OpenSSF Scorecard                                     |
-| `semantic-analysis.yml`    | Análise semântica do código                           |
-| `jsdoc-typing.yml`         | Validação de cobertura JSDoc                          |
-| `stale.yml`                | Fechamento automático de issues/PRs stale             |
-| `copilot-setup-steps.yml`  | Setup do ambiente Copilot                             |
+| `code-quality.yml`         | Análise de qualidade de código                         |
+| `coverage.yml`             | Relatório de cobertura de testes                       |
+| `audit-nightly.yml`        | Auditoria profunda noturna                             |
+| `security.yml`             | Gate de segurança (npm audit, secrets scan)            |
+| `docker-security-scan.yml` | Scan de segurança da imagem Docker                     |
+| `dependency-review.yml`    | Revisão de dependências em PRs                         |
+| `dependency-hygiene.yml`   | Higiene de dependências (desatualizadas, vulneráveis)  |
+| `dashboard-build.yml`      | Build do dashboard frontend                            |
+| `release.yml`              | Pipeline de publicação de releases                     |
+| `scorecard.yml`            | OpenSSF Scorecard                                      |
+| `semantic-analysis.yml`    | Análise semântica do código                            |
+| `jsdoc-typing.yml`         | Validação de cobertura JSDoc                           |
+| `stale.yml`                | Fechamento automático de issues/PRs stale              |
+| `copilot-setup-steps.yml`  | Setup do ambiente Copilot                              |
 
 ## Regras de manutenção
 

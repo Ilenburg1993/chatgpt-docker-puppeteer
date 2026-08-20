@@ -80,7 +80,11 @@ vi.mock('../../../src/copilot/presentation/runtime/overview.js', () => ({
     readAgentRuntimeOverviewProjection: mocks.readAgentRuntimeOverview,
 }));
 
-import { handleGetPrBudget, handleGetQuota, handleGetUsageBudget } from '../../../src/copilot/presentation/system/index.js';
+import {
+    handleGetPrBudget,
+    handleGetQuota,
+    handleGetUsageBudget,
+} from '../../../src/copilot/presentation/system/index.js';
 
 /** @template T @param {{ body: unknown }} result @returns {T} */
 const bodyOf = (result) => /** @type {T} */ (result.body);

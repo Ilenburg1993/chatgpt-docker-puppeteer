@@ -412,7 +412,12 @@ export function enrichToolFailureResult(result, context) {
  */
 export function isToolExecutionFailureResponse(value) {
     if (!isRecord(value)) return false;
-    return value['success'] === false && value['ok'] === false && typeof value['error'] === 'string' && isRecord(value['toolFeedback']);
+    return (
+        value['success'] === false &&
+        value['ok'] === false &&
+        typeof value['error'] === 'string' &&
+        isRecord(value['toolFeedback'])
+    );
 }
 
 /**
@@ -466,15 +471,18 @@ export function createToolFailureResult(options) {
 }
 
 /**
- * Envolve handlers de tools com feedback estruturado de falha preservando o resultado do caminho normal.
- * Exceções são convertidas, por contrato, em uma resposta de falha estruturada.
+ * Envolve handlers de tools com feedback estruturado de falha preservando o resultado do caminho normal. Exceções são
+ * convertidas, por contrato, em uma resposta de falha estruturada.
  *
  * @template TArgs
  * @template TResult
  * @param {string} toolName
  * @param {(args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult> | TResult} handler
  * @param {{ parameters?: unknown }} [options]
- * @returns {(args: TArgs, invocation?: import('#copilot/sdk/types').ToolInvocation) => Promise<TResult | ReturnType<typeof createToolFailureResponse>>}
+ * @returns {(
+ *     args: TArgs,
+ *     invocation?: import('#copilot/sdk/types').ToolInvocation,
+ * ) => Promise<TResult | ReturnType<typeof createToolFailureResponse>>}
  */
 export function withToolFailureFeedback(toolName, handler, options = {}) {
     return async function toolFailureAwareHandler(args, invocation) {

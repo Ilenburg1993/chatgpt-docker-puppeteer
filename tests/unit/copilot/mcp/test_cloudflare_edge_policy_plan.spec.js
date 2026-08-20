@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { buildCloudflareEdgePolicyPlan } from '#copilot/mcp/cloudflare';
+import { describe, expect, it } from 'vitest';
 
 describe('mcp/cloudflare/edge-policy-plan', () => {
     it('builds a plan-only desired Cloudflare edge policy for the permanent hostname', async () => {
@@ -25,11 +25,11 @@ describe('mcp/cloudflare/edge-policy-plan', () => {
                 expect.objectContaining({ phase: 'http_ratelimit' }),
             ]),
         );
-        const desiredRulesets = /** @type {{ name?: string; rules?: { expression?: string; rateLimitDraft?: Record<string, unknown> }[] }[]} */ (
-            result['desiredRulesets']
-        );
-        const constrainedRule = desiredRulesets
-            .find((ruleset) => ruleset.name === 'MCP constrained rate limit policy')
+        const desiredRulesets =
+            /** @type {{ name?: string; rules?: { expression?: string; rateLimitDraft?: Record<string, unknown> }[] }[]} */ (
+                result['desiredRulesets']
+            );
+        const constrainedRule = desiredRulesets.find((ruleset) => ruleset.name === 'MCP constrained rate limit policy')
             ?.rules?.[0];
         expect(constrainedRule?.expression).toContain('/oauth/token');
         expect(constrainedRule?.expression).toContain('not any(http.request.headers.names[*] eq "authorization")');

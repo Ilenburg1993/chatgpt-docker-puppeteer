@@ -49,7 +49,7 @@ function stringOrEmpty(value) {
 
 /**
  * @param {string} value
- * @param {number} [max=PREVIEW_CHARS]
+ * @param {number} [max=PREVIEW_CHARS] Default is `PREVIEW_CHARS`
  * @returns {string}
  */
 function preview(value, max = PREVIEW_CHARS) {

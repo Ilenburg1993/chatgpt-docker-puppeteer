@@ -7,42 +7,29 @@
  * @module copilot/tools/file/read/read-file-content
  */
 
-import { stat as fsStat } from 'node:fs/promises';
-import { z } from 'zod';
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { sanitizeIoTextOutput, toError, withIoMeta } from '#copilot/core';
+import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { getIoCacheStats } from '#copilot/infra/public/cache';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { z } from 'zod';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
-import {
-    FILE_TOOLS_OUTPUT_POLICY,
-    truncateBuffer,
-    truncateUtf8Text,
-    validatePath,
-    WORKSPACE_ROOT,
-} from '../shared.js';
+import { FILE_TOOLS_OUTPUT_POLICY, truncateBuffer, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../shared.js';
 import { createReadFileFailure } from './feedback.js';
 import { buildReadFileMetadata } from './metadata.js';
 import {
-    DEFAULT_READ_THROUGH_AUTO_TIMEOUT_MS,
-    DEFAULT_READ_THROUGH_FORCE_TIMEOUT_MS,
     buildAttemptedReadThroughReport,
     buildSkippedReadThroughReport,
     buildTimedOutReadThroughReport,
+    DEFAULT_READ_THROUGH_AUTO_TIMEOUT_MS,
+    DEFAULT_READ_THROUGH_FORCE_TIMEOUT_MS,
     normalizeReadThroughMode,
     planReadThrough,
 } from './read-through-policy.js';
-import {
-    nextLineCursor,
-    normalizeNonNegativeInteger,
-    normalizePositiveInteger,
-    parseReadCursor,
-} from './window.js';
+import { nextLineCursor, normalizeNonNegativeInteger, normalizePositiveInteger, parseReadCursor } from './window.js';
 
-const { readBytes, readText, readTextChunks, warmReadThroughContext } = createWorkspaceIo({
-    workspaceRoot: WORKSPACE_ROOT,
-});
+const { readBytesValidated, readTextChunksValidated, readTextValidated, statPathValidated, warmReadThroughContext } =
+    createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
  * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.
@@ -152,61 +139,80 @@ export const readFileContentTool = buildTool({
             .number()
             .int()
             .min(1)
-            .optional()['describe']('Linha inicial (1-based). Se omitido, lê desde o início.'),
+            .optional()
+            ['describe']('Linha inicial (1-based). Se omitido, lê desde o início.'),
         endLine: z
             .number()
             .int()
             .min(1)
-            .optional()['describe']('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
+            .optional()
+            ['describe']('Linha final (1-based, inclusivo). Se omitido, lê até o fim.'),
         cursor: z
             .string()
-            .optional()['describe']('Cursor retornado por chamada anterior. Em utf8 representa a próxima linha; em base64, byte offset.'),
+            .optional()
+            ['describe'](
+                'Cursor retornado por chamada anterior. Em utf8 representa a próxima linha; em base64, byte offset.',
+            ),
         maxLines: z
             .number()
             .int()
             .min(1)
-            .optional()['describe']('Máximo de linhas a retornar em utf8 quando endLine não for definido.'),
+            .optional()
+            ['describe']('Máximo de linhas a retornar em utf8 quando endLine não for definido.'),
         maxBytes: z
             .number()
             .int()
             .min(1)
-            .optional()['describe']('Máximo de bytes de saída para esta chamada. Default segue COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES.'),
+            .optional()
+            ['describe'](
+                'Máximo de bytes de saída para esta chamada. Default segue COPILOT_FILE_TOOLS_MAX_CONTENT_BYTES.',
+            ),
         encoding: z
             .enum(['utf8', 'base64'])
             .optional()
-            .default('utf8')['describe']('Codificação de saída. Use base64 para arquivos binários.'),
+            .default('utf8')
+            ['describe']('Codificação de saída. Use base64 para arquivos binários.'),
         readStrategy: z
             .enum(['cached', 'stream'])
             .optional()
-            .default('cached')['describe']('cached forma/reusa cache full-file; stream pagina por readline sem hidratar cache full-file.'),
+            .default('cached')
+            ['describe'](
+                'cached forma/reusa cache full-file; stream pagina por readline sem hidratar cache full-file.',
+            ),
         streamHighWaterMark: z
             .number()
             .int()
             .min(1024)
             .max(16 * 1024 * 1024)
-            .optional()['describe']('Buffer interno do read stream em bytes quando readStrategy=stream. Default: Node/fs padrão.'),
+            .optional()
+            ['describe']('Buffer interno do read stream em bytes quando readStrategy=stream. Default: Node/fs padrão.'),
         includeMetadata: z
             .boolean()
             .optional()
-            .default(true)['describe']('Inclui bloco metadata com stat, cache, cursor, bytes, linhas e hashes quando solicitados.'),
+            .default(true)
+            ['describe']('Inclui bloco metadata com stat, cache, cursor, bytes, linhas e hashes quando solicitados.'),
         includeHash: z
             .boolean()
             .optional()
-            .default(false)['describe']('Inclui SHA-256 do arquivo completo e do conteúdo retornado em metadata.'),
+            .default(false)
+            ['describe']('Inclui SHA-256 do arquivo completo e do conteúdo retornado em metadata.'),
         includeReadThrough: z
             .union([z.boolean(), z.enum(['off', 'auto', 'force'])])
             .optional()
-            .default('auto')['describe'](
+            .default('auto')
+            ['describe'](
                 "Controla aquecimento de contexto relacionado: 'off' desativa, 'auto' usa heurística de tamanho, 'force' tenta sempre em utf8/cached. Boolean legado: true=auto, false=off.",
             ),
         includeCacheStats: z
             .boolean()
             .optional()
-            .default(false)['describe']('Inclui snapshot de stats L1 do cache de IO no metadata. Útil para auditoria/debug.'),
+            .default(false)
+            ['describe']('Inclui snapshot de stats L1 do cache de IO no metadata. Útil para auditoria/debug.'),
         quietLog: z
             .boolean()
             .optional()
-            .default(false)['describe']('Suprime log informativo de leitura quando a superfície chamadora já renderiza a operação.'),
+            .default(false)
+            ['describe']('Suprime log informativo de leitura quando a superfície chamadora já renderiza a operação.'),
     }),
     handler: async ({
         path: filePath,
@@ -246,8 +252,9 @@ export const readFileContentTool = buildTool({
         const outputMaxBytes =
             normalizePositiveInteger(maxBytes, FILE_TOOLS_OUTPUT_POLICY.maxContentBytes) ?? Number.POSITIVE_INFINITY;
         const resolvedMaxLines = normalizePositiveInteger(maxLines);
-        const { ok, reason, resolved } = await validatePath(filePath, { mode: 'read' });
-        if (!ok) {
+        const validated = await validatePath(filePath, { mode: 'read', issueReadCapability: true });
+        const { ok, reason, resolved, validatedReadPath } = validated;
+        if (!ok || !validatedReadPath) {
             return createReadFileFailure(
                 reason ?? 'Caminho inválido.',
                 'ERR_READ_PATH_INVALID',
@@ -256,7 +263,10 @@ export const readFileContentTool = buildTool({
                 { category: 'policy-denied' },
             );
         }
-        if (resolvedEncoding === 'base64' && (startLine !== undefined || endLine !== undefined || maxLines !== undefined)) {
+        if (
+            resolvedEncoding === 'base64' &&
+            (startLine !== undefined || endLine !== undefined || maxLines !== undefined)
+        ) {
             return createReadFileFailure(
                 'Parâmetros de linha (startLine/endLine/maxLines) são válidos apenas com encoding=utf8.',
                 'ERR_READ_BINARY_LINE_WINDOW',
@@ -313,7 +323,7 @@ export const readFileContentTool = buildTool({
         if (!quietLog) log('INFO', `[copilot/read_file_content] ${resolved}`);
 
         try {
-            const stats = await fsStat(resolved);
+            const stats = (await statPathValidated(validatedReadPath)).stats;
             if (stats.isDirectory()) {
                 return createReadFileFailure(
                     'É um diretório, use list_directory.',
@@ -325,7 +335,7 @@ export const readFileContentTool = buildTool({
             }
 
             if (resolvedEncoding === 'base64') {
-                const raw = await readBytes(resolved);
+                const raw = await readBytesValidated(validatedReadPath);
                 const offset = normalizeNonNegativeInteger(byteCursor?.ok ? byteCursor.value : 0, 0);
                 const source = offset > 0 ? raw.content.subarray(Math.min(offset, raw.content.length)) : raw.content;
                 const limitedBuffer = truncateBuffer(source, outputMaxBytes);
@@ -400,7 +410,7 @@ export const readFileContentTool = buildTool({
 
             const text =
                 resolvedReadStrategy === 'stream'
-                    ? await readTextChunks(resolved, {
+                    ? await readTextChunksValidated(validatedReadPath, {
                           startLine: effectiveStartLine,
                           endLine: effectiveEndLine,
                           chunkLines: resolvedMaxLines ?? DEFAULT_STREAM_CHUNK_LINES,
@@ -412,17 +422,17 @@ export const readFileContentTool = buildTool({
                               streamHighWaterMark: streamHighWaterMark ?? null,
                           },
                       })
-                    : await readText(resolved, {
+                    : await readTextValidated(validatedReadPath, {
                           startLine: effectiveStartLine,
                           endLine: effectiveEndLine,
+                          hashMode: includeHash ? 'full' : 'none',
                           advisoryLimits: {
                               readStrategy: 'cached',
                               maxLines: resolvedMaxLines ?? null,
                               cursor: cursor ?? null,
                           },
                       });
-            const textContent =
-                'chunks' in text ? text.chunks.map((chunk) => chunk.content).join('\n') : text.content;
+            const textContent = 'chunks' in text ? text.chunks.map((chunk) => chunk.content).join('\n') : text.content;
             const returnedLines =
                 'chunks' in text
                     ? text.chunks.length > 0
@@ -481,8 +491,12 @@ export const readFileContentTool = buildTool({
                     : {}),
                 ...(includeCacheStats ? { cacheStats: getIoCacheStats() } : {}),
                 ...(resolvedMaxLines !== undefined ? { maxLines: resolvedMaxLines } : {}),
-                ...(includeHash && 'contentHash' in text ? { contentHash: text.contentHash } : {}),
-                ...(includeHash && 'returnedContentHash' in text ? { returnedContentHash: text.returnedContentHash } : {}),
+                ...(includeHash && 'contentHash' in text && typeof text.contentHash === 'string'
+                    ? { contentHash: text.contentHash }
+                    : {}),
+                ...(includeHash && 'returnedContentHash' in text && typeof text.returnedContentHash === 'string'
+                    ? { returnedContentHash: text.returnedContentHash }
+                    : {}),
             });
             const terminalSummary = buildReadTerminalSummary({
                 path: resolved,

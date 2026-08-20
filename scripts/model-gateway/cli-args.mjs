@@ -2,9 +2,8 @@
 /**
  * Primitivas canônicas para parsing dos argumentos dos comandos Model Gateway.
  *
- * Mantém o parser intencionalmente pequeno: estes comandos aceitam `--name=value`
- * e `--name value`; opções sem valor usam o fallback. A leitura por índice é
- * protegida para permanecer correta com `noUncheckedIndexedAccess` no TS7.
+ * Mantém o parser intencionalmente pequeno: estes comandos aceitam `--name=value` e `--name value`; opções sem valor
+ * usam o fallback. A leitura por índice é protegida para permanecer correta com `noUncheckedIndexedAccess` no TS7.
  */
 
 /**

@@ -32,33 +32,23 @@ const TEST_ENV = {
 const QUIET_TEST_LOGGER = () => {};
 
 /**
- * Estado compartilhado do setup por worker/processo.
- *
- * @type {{
+ * @typedef {{
  *     setupInstalled: boolean;
  *     warningPatchInstalled: boolean;
  *     errorHandlersInstalled: boolean;
- * }}
+ * }} CopilotTestSetupState
  */
+
+/**
+ * Estado compartilhado do setup por worker/processo.
+ *
+ * @type {typeof globalThis & { __copilotTestSetupState?: CopilotTestSetupState }}
+ */
+const testGlobal = globalThis;
+
 const setupState =
-    /**
-     * @type {typeof globalThis & {
-     *     __copilotTestSetupState?: {
-     *         setupInstalled: boolean;
-     *         warningPatchInstalled: boolean;
-     *         errorHandlersInstalled: boolean;
-     *     };
-     * }}
-     */ (globalThis).__copilotTestSetupState ??
-    (/**
-     * @type {typeof globalThis & {
-     *     __copilotTestSetupState?: {
-     *         setupInstalled: boolean;
-     *         warningPatchInstalled: boolean;
-     *         errorHandlersInstalled: boolean;
-     *     };
-     * }}
-     */ (globalThis).__copilotTestSetupState = {
+    testGlobal.__copilotTestSetupState ??
+    (testGlobal.__copilotTestSetupState = {
         setupInstalled: false,
         warningPatchInstalled: false,
         errorHandlersInstalled: false,

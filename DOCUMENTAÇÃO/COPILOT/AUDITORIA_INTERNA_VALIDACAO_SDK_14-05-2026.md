@@ -12,7 +12,8 @@
 
 1. Leitura integral da auditoria externa (arquivo completo).
 2. Inspeção direta dos arquivos citados no `src/copilot/sdk`.
-3. Verificação de contrato do SDK real em `node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts` e `types.d.ts`.
+3. Verificação de contrato do SDK real em `node_modules/@github/copilot-sdk/dist/generated/rpc.d.ts`
+   e `types.d.ts`.
 4. Execução dos gates no escopo Copilot:
    - `npm run typecheck:strict:src.copilot.sdk` ✅
    - `npx eslint src/copilot/sdk --cache ...` ✅
@@ -46,6 +47,7 @@
 ## 3) Validação da auditoria externa — ponto a ponto
 
 Legenda:
+
 - **Confirmado** = procede no estado atual
 - **Parcial** = há fundamento, mas com ajuste de causa/escopo/prioridade
 - **Não procede / desatualizado** = não se sustenta no código atual ou no contrato real do SDK 0.3.0
@@ -142,22 +144,27 @@ Legenda:
 ## 4.1 Situação atual (resumo executivo)
 
 - Base `sdk` está funcional e com boa organização por superfície.
-- Parte relevante da auditoria externa procede, mas **há itens desatualizados** por drift do código e por inferências não suportadas pelo contrato real do SDK 0.3.0.
+- Parte relevante da auditoria externa procede, mas **há itens desatualizados** por drift do código
+  e por inferências não suportadas pelo contrato real do SDK 0.3.0.
 - O maior risco imediato hoje está em:
-  1. Robustez/confiabilidade de wrappers (`HookBus`, `workspace RPC guards`, `compaction method`, `model selector tiers`)
+  1. Robustez/confiabilidade de wrappers (`HookBus`, `workspace RPC guards`, `compaction method`,
+     `model selector tiers`)
   2. Consistência API pública (barrel incompleto, adapters incompletos)
   3. Débito de duplicidade tipada/documental
-- Gate de testes revela desalinhamento entre implementação e expectativa antiga em feature flags experimentais.
+- Gate de testes revela desalinhamento entre implementação e expectativa antiga em feature flags
+  experimentais.
 
 ## 4.2 Situação ideal alvo
 
 - SDK wrapper **estritamente alinhado** ao contrato efetivo de `@github/copilot-sdk@0.3.0`.
-- API pública coesa (barrels completos, sem wrappers triviais desnecessários, sem duplicidades de typedef).
+- API pública coesa (barrels completos, sem wrappers triviais desnecessários, sem duplicidades de
+  typedef).
 - Operações RPC críticas com:
   - cancelamento cooperativo (`AbortSignal`) onde aplicável,
   - retries e timeouts consistentes,
   - validação defensiva de namespaces/métodos.
-- Testes unitários copilot 100% verdes com expectativas atualizadas para a superfície experimental vigente.
+- Testes unitários copilot 100% verdes com expectativas atualizadas para a superfície experimental
+  vigente.
 
 ---
 
@@ -168,7 +175,8 @@ Legenda:
 2. **Drift entre auditoria externa e SDK real**
    - Diversos GAPs/EXPs citados não existem no contrato real de RPC do SDK 0.3.0.
 3. **Oportunidade de “contrato de compatibilidade” automatizado**
-   - Falta checagem automatizada (CI) para detectar divergência entre wrappers locais e `generated/rpc.d.ts`.
+   - Falta checagem automatizada (CI) para detectar divergência entre wrappers locais e
+     `generated/rpc.d.ts`.
 
 ---
 
@@ -177,67 +185,85 @@ Legenda:
 ## Fase 0 — Baseline e alinhamento de contrato (curta, obrigatória)
 
 ### Subfase 0.1 — Congelar baseline
+
 - Registrar versão alvo (`@github/copilot-sdk@0.3.0`) e hash de referência da auditoria.
 - Criar checklist de compatibilidade wrapper ↔ contrato RPC.
 
 ### Subfase 0.2 — Corrigir expectativa de testes
-- Atualizar `test_sdk_experimental_f22.spec.js` para 8 flags (ou ajustar implementação se decisão arquitetural for voltar para 5).
+
+- Atualizar `test_sdk_experimental_f22.spec.js` para 8 flags (ou ajustar implementação se decisão
+  arquitetural for voltar para 5).
 - Reexecutar `npm run test:copilot:unit`.
 
 ## Fase 1 — Correções de robustez prioritária (bugs confirmados)
 
 ### Subfase 1.1 — Runtime correctness
+
 - BUG-02, BUG-08, BUG-09, BUG-10, BUG-15.
 
 ### Subfase 1.2 — Segurança e UX operacional
+
 - BUG-07, BUG-12, BUG-16, BUG-17.
 
 ### Subfase 1.3 — Concorrência/cache
+
 - BUG-05 + hardening de reset em `tools/custom.js` (BUG-06 parcial).
 
 ## Fase 2 — Coesão de API pública e compatibilidade
 
 ### Subfase 2.1 — Barrels e builders
+
 - GAP-02 (`clearModelsCache` no root barrel).
 - GAP-12 (`sessionStatePath` explícito em `ClientOptionsBuilder`).
 
 ### Subfase 2.2 — Adapter completeness
+
 - Completar `createToolRegistryAdapter` com `exclude`/`merge`.
 
 ### Subfase 2.3 — Helpers de capabilities
-- Expandir `session/capabilities.js` para helpers coerentes com superfície disponível (sem inventar RPC inexistente).
+
+- Expandir `session/capabilities.js` para helpers coerentes com superfície disponível (sem inventar
+  RPC inexistente).
 
 ## Fase 3 — Redução de duplicidade estrutural
 
 ### Subfase 3.1 — Tipos centrais
+
 - Centralizar `AgentInfo`, `CompactionResult`, `ModelInfo` local.
 
 ### Subfase 3.2 — Guards e normalizadores
+
 - Consolidar asserts de sessão/client/rpc.
 - Extrair `event-normalize-utils.js`.
 
 ### Subfase 3.3 — Limpeza de API
+
 - Rever reexport ambíguo de `log` em `session/index.js`.
 - Simplificar adapters triviais (ex.: `session-resolution-adapter`).
 
 ## Fase 4 — Arquitetura e resiliência operacional
 
 ### Subfase 4.1 — Cancelamento e timeout
+
 - Introduzir padrão `AbortSignal` + timeout nas operações longas.
 
 ### Subfase 4.2 — Retry policy por operação
+
 - Estruturar política central reutilizável para wrappers RPC.
 
 ### Subfase 4.3 — Performance defensiva
+
 - Cache curto para validação de policy em `session-fs`.
 - Revisar carregamento síncrono de custom tools.
 
 ## Fase 5 — Governança contínua
 
 ### Subfase 5.1 — Auditoria automatizada de imports/políticas
+
 - Implementar verificador executável para `SDK_LAYER_ACCESS_POLICY`.
 
 ### Subfase 5.2 — Contrato wrapper ↔ SDK
+
 - Adicionar teste/auditoria que falha CI quando wrappers locais divergem do `generated/rpc.d.ts`.
 
 ---
@@ -256,8 +282,11 @@ Legenda:
 
 ## 8) Conclusão
 
-A auditoria externa foi útil e capturou diversos pontos reais; porém parte relevante está desatualizada frente ao estado atual do código e ao contrato efetivo do SDK 0.3.0. A estratégia correta agora é:
+A auditoria externa foi útil e capturou diversos pontos reais; porém parte relevante está
+desatualizada frente ao estado atual do código e ao contrato efetivo do SDK 0.3.0. A estratégia
+correta agora é:
 
 - preservar o que foi confirmado,
 - descartar o que não se sustenta no contrato real,
-- executar o roadmap faseado acima para entrar no próximo ciclo de hardening com baixo risco e alta rastreabilidade.
+- executar o roadmap faseado acima para entrar no próximo ciclo de hardening com baixo risco e alta
+  rastreabilidade.

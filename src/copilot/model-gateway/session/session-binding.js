@@ -11,21 +11,22 @@
 
 import { resolveConfiguredByokSessionOverrides as resolveLegacyByokSessionOverrides } from '#copilot/sdk/session';
 import { createModelGatewayModelIdentity } from '../contracts/model-identity.js';
-import { resolveModelGatewayProviderAdapter } from '../providers/provider-adapter-registry.js';
+import { assertModelGatewaySecretRegistryPort } from '../control-plane/ports.js';
 import { materializeModelGatewayActiveByokProfileEnv } from '../profiles/env-profile-store.js';
+import { resolveModelGatewayProviderAdapter } from '../providers/provider-adapter-registry.js';
 import { importConfiguredByokFromEnv } from '../registry/env-byok-compat-importer.js';
 import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
 import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
-import { assertModelGatewaySecretRegistryPort } from '../control-plane/ports.js';
 
 /**
  * @param {unknown} value
  * @returns {Record<string, unknown>}
  */
 function record(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
-
 
 /**
  * @param {unknown} value
@@ -117,7 +118,9 @@ export function resolveModelGatewaySessionBinding(env = process.env, requestedMo
             ? active['bindingSource']
             : 'env_compat';
     const providerProfile =
-        optionalString(active['gatewayProfile']) ?? optionalString(active['profile']) ?? optionalString(active['preset']);
+        optionalString(active['gatewayProfile']) ??
+        optionalString(active['profile']) ??
+        optionalString(active['preset']);
     const identity = createModelGatewayModelIdentity({
         providerId,
         providerModel: adapted.model,

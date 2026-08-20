@@ -91,7 +91,6 @@ export function matchesAnyPattern(absolutePath, workspaceRoot, patterns) {
     const normalizedAbsolute = resolve(absolutePath).replace(/\\/g, '/');
     const normalizedRelative = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
     return patterns.some(
-        (pattern) =>
-            matchesGlobPattern(normalizedRelative, pattern) || matchesGlobPattern(normalizedAbsolute, pattern),
+        (pattern) => matchesGlobPattern(normalizedRelative, pattern) || matchesGlobPattern(normalizedAbsolute, pattern),
     );
 }

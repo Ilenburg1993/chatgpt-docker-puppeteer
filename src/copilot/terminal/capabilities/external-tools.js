@@ -8,9 +8,9 @@
  * @module copilot/terminal/capabilities/external-tools
  */
 
+import { spawnSync } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
 import { delimiter, extname, join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 /** @typedef {'accepted' | 'accepted_guarded' | 'deferred'} TerminalExternalToolDecision */
 /** @typedef {'picker' | 'preview' | 'markdown' | 'diff' | 'structured' | 'history' | 'navigation'} TerminalExternalToolUse */
@@ -95,7 +95,10 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         risk: 'arquivos grandes/binários precisam de limite e detecção antes de renderizar',
         officialDocs: 'https://github.com/sharkdp/bat',
         executionPolicy: 'preview read-only explícito; nunca pager automático',
-        exampleCommands: Object.freeze(['/fs preview src/copilot/terminal/commands/terminal.js', '/fs read README.md --preview --plain']),
+        exampleCommands: Object.freeze([
+            '/fs preview src/copilot/terminal/commands/terminal.js',
+            '/fs read README.md --preview --plain',
+        ]),
     }),
     Object.freeze({
         id: 'glow',
@@ -109,7 +112,10 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         risk: 'modo TUI/pager deve ser opt-in para não ocupar o prompt vivo',
         officialDocs: 'https://github.com/charmbracelet/glow',
         executionPolicy: 'Markdown explícito por stdin; sem pager/TUI automática',
-        exampleCommands: Object.freeze(['/fs preview README.md --markdown', '/fs read src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md --preview --markdown --plain']),
+        exampleCommands: Object.freeze([
+            '/fs preview README.md --markdown',
+            '/fs read src/copilot/docs/terminal/TERMINAL_AUXILIARY_LIBS_DECISION_GUIDE_2026-06-04.md --preview --markdown --plain',
+        ]),
     }),
     Object.freeze({
         id: 'delta',
@@ -165,7 +171,10 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         risk: 'não deve virar fonte canônica paralela aos contratos JS',
         officialDocs: 'https://jqlang.org/',
         executionPolicy: 'diagnóstico por stdin; parser JS continua fonte canônica',
-        exampleCommands: Object.freeze(['/fs preview package.json --json', "/fs preview package.json --json --query '.scripts'"]),
+        exampleCommands: Object.freeze([
+            '/fs preview package.json --json',
+            "/fs preview package.json --json --query '.scripts'",
+        ]),
     }),
     Object.freeze({
         id: 'yq',
@@ -179,7 +188,10 @@ export const TERMINAL_EXTERNAL_TOOL_DEFINITIONS = Object.freeze([
         risk: 'edição mutável exige preview e confirmação explícitos',
         officialDocs: 'https://github.com/mikefarah/yq',
         executionPolicy: 'preview/query por stdin com env/file ops bloqueadas; sem edição in-place automática',
-        exampleCommands: Object.freeze(['/fs preview .github/workflows/ci.yml --yaml', "/fs preview .github/workflows/ci.yml --yaml --query '.jobs'"]),
+        exampleCommands: Object.freeze([
+            '/fs preview .github/workflows/ci.yml --yaml',
+            "/fs preview .github/workflows/ci.yml --yaml --query '.jobs'",
+        ]),
     }),
 ]);
 
@@ -233,7 +245,13 @@ export function sanitizeTerminalExternalToolText(value, options = {}) {
         .split('')
         .filter((char) => {
             const code = char.charCodeAt(0);
-            return !((code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127);
+            return !(
+                (code >= 0 && code <= 8) ||
+                code === 11 ||
+                code === 12 ||
+                (code >= 14 && code <= 31) ||
+                code === 127
+            );
         })
         .join('');
     return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;

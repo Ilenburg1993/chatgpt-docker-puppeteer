@@ -8,22 +8,21 @@ F121-F250 (continuação da numeração PARTE-14E)
 
 ## Sumário de Faixas
 
-| Faixa | Fases     | Título                                  | Foco Principal                          |
-| ----: | --------- | --------------------------------------- | --------------------------------------- | --- |
-|     1 | F121-F130 | Foundation Hardening                    | core/ expansion, FS async, shutdown     |
-|     2 | F131-F138 | Security Hardening                      | execSync, auth, SSRF, origin            |
-|     3 | F139-F150 | Error Handling Standardization ✅       | catch blocks, error flow, logging       |
-|     4 | F151-F158 | Timer & Lifecycle Management            | setInterval cleanup, timer registry     | ✅  |
-|     5 | F159-F170 | Conversation-Hub: Testes + Decomposição | 0→100% test coverage, god module split  |
-|     6 | F171-F180 | Bridges: Testes + Retry Migration       | 0→100% test coverage, centralizar retry |
-|     7 | F179-F192 | Terminal Hardening + Decomposição       | 5 god modules, server security, tests   |
-|     8 | F193-F206 | Tools Decomposição + Testes             | 3 god modules, security, +10 testes     |
-|     9 | F207-F216 | Observability: Testes + Cleanup         | catch blocks, metrics reset, OTEL tests |
-|    10 | F217-F228 | God Module Decomposição Tier-2          | 450-600L files decomposition            |
-|    11 | F229-F238 | God Module Decomposição Tier-3          | 400-450L files decomposition            |
-|    12 | F239-F244 | Performance Hardening                   | FS async final, memory management       |
-|    13 | F245-F248 | API Consistency + Padronização Final    | Error responses, logging, patterns      |
-|    14 | F249-F250 | Coverage Targets + CI + Relatório Final | Thresholds, CI gates, PARTE-17B report  |
+| Faixa | Fases | Título | Foco Principal | | ----: | --------- |
+--------------------------------------- | --------------------------------------- | --- | | 1 |
+F121-F130 | Foundation Hardening | core/ expansion, FS async, shutdown | | 2 | F131-F138 | Security
+Hardening | execSync, auth, SSRF, origin | | 3 | F139-F150 | Error Handling Standardization ✅ |
+catch blocks, error flow, logging | | 4 | F151-F158 | Timer & Lifecycle Management | setInterval
+cleanup, timer registry | ✅ | | 5 | F159-F170 | Conversation-Hub: Testes + Decomposição | 0→100%
+test coverage, god module split | | 6 | F171-F180 | Bridges: Testes + Retry Migration | 0→100% test
+coverage, centralizar retry | | 7 | F179-F192 | Terminal Hardening + Decomposição | 5 god modules,
+server security, tests | | 8 | F193-F206 | Tools Decomposição + Testes | 3 god modules, security,
++10 testes | | 9 | F207-F216 | Observability: Testes + Cleanup | catch blocks, metrics reset, OTEL
+tests | | 10 | F217-F228 | God Module Decomposição Tier-2 | 450-600L files decomposition | | 11 |
+F229-F238 | God Module Decomposição Tier-3 | 400-450L files decomposition | | 12 | F239-F244 |
+Performance Hardening | FS async final, memory management | | 13 | F245-F248 | API Consistency +
+Padronização Final | Error responses, logging, patterns | | 14 | F249-F250 | Coverage Targets + CI +
+Relatório Final | Thresholds, CI gates, PARTE-17B report |
 
 **Total: 14 faixas, 130 fases (F121-F250)**
 

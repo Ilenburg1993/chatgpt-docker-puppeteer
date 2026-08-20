@@ -65,17 +65,20 @@ describe('repo_apply_patch_batch V2', () => {
         assert.equal(result.structuredContent?.['success'], true);
         assert.equal(result.structuredContent?.['appliedCount'], 3);
         assert.equal(result.structuredContent?.['preflightElided'], true);
-        assert.equal(
-            result.structuredContent?.['preflightElisionReason'],
-            'per-target-fast-direct-atomic-apply',
-        );
+        assert.equal(result.structuredContent?.['preflightElisionReason'], 'per-target-fast-direct-atomic-apply');
         assert.equal(result.structuredContent?.['preflightSummary']?.['ran'], false);
         assert.equal(result.structuredContent?.['resultMode'], 'compact');
         assert.equal(result.structuredContent?.['detailsAvailable'], true);
         const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['applied']);
         assert.equal(rows.length, 3);
-        assert.equal(rows.every((row) => row['expectedHashMode'] === 'group-baseline'), true);
-        assert.equal(rows.every((row) => !('traceId' in row) && !('previousHash' in row)), true);
+        assert.equal(
+            rows.every((row) => row['expectedHashMode'] === 'group-baseline'),
+            true,
+        );
+        assert.equal(
+            rows.every((row) => !('traceId' in row) && !('previousHash' in row)),
+            true,
+        );
         const targetSummaries = /** @type {Record<string, unknown>[]} */ (
             result.structuredContent?.['targetSummaries']
         );
@@ -108,10 +111,22 @@ describe('repo_apply_patch_batch V2', () => {
         assert.equal(result.structuredContent?.['resultMode'], 'detailed');
         const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['applied']);
         assert.equal(rows.length, 2);
-        assert.equal(rows.every((row) => typeof row['traceId'] === 'string'), true);
-        assert.equal(rows.every((row) => typeof row['previousHash'] === 'string'), true);
-        assert.equal(rows.every((row) => typeof row['contentHash'] === 'string'), true);
-        assert.equal(rows.every((row) => typeof row['firstMatchLine'] === 'number'), true);
+        assert.equal(
+            rows.every((row) => typeof row['traceId'] === 'string'),
+            true,
+        );
+        assert.equal(
+            rows.every((row) => typeof row['previousHash'] === 'string'),
+            true,
+        );
+        assert.equal(
+            rows.every((row) => typeof row['contentHash'] === 'string'),
+            true,
+        );
+        assert.equal(
+            rows.every((row) => typeof row['firstMatchLine'] === 'number'),
+            true,
+        );
         assert.equal(await readFile(absolutePath, 'utf8'), 'ALPHA BETA');
     });
 

@@ -11,7 +11,8 @@ Branch/HEAD observado: `main` / `e69ec3d8`
 Este relatório registra o avanço prático das faixas P1 e P2 do diagnóstico geral:
 
 - P1: observabilidade/SLO de latência.
-- P2: postura Cloudflare/transport performance, com snapshot, diff e gates sem mutação real de Cloudflare.
+- P2: postura Cloudflare/transport performance, com snapshot, diff e gates sem mutação real de
+  Cloudflare.
 
 Também foi resolvido o bloqueador P0 de validação que impedia avançar com segurança.
 
@@ -72,14 +73,14 @@ Objetivo:
 
 Defaults implementados:
 
-| Budget | Default |
-|---|---:|
-| `minSampleCalls` | 5 |
-| `toolAverageWarnMs` | 1000 ms |
-| `authorizationAverageWarnMs` | 250 ms |
-| `handlerAverageWarnMs` | 750 ms |
-| `resultSizeAverageWarnMs` | 250 ms |
-| `errorRateWarn` | 0.001 |
+| Budget                       | Default |
+| ---------------------------- | ------: |
+| `minSampleCalls`             |       5 |
+| `toolAverageWarnMs`          | 1000 ms |
+| `authorizationAverageWarnMs` |  250 ms |
+| `handlerAverageWarnMs`       |  750 ms |
+| `resultSizeAverageWarnMs`    |  250 ms |
+| `errorRateWarn`              |   0.001 |
 
 Também foram adicionadas env vars opcionais:
 
@@ -110,7 +111,9 @@ Mudanças:
 
 ### 3.4 Observação operacional
 
-A tool foi validada por typecheck/lint/unit em processo novo de teste. Para aparecer no conector atualmente rodando, o processo MCP precisa ser reiniciado/recarregado, pois o servidor vivo iniciou antes desta alteração.
+A tool foi validada por typecheck/lint/unit em processo novo de teste. Para aparecer no conector
+atualmente rodando, o processo MCP precisa ser reiniciado/recarregado, pois o servidor vivo iniciou
+antes desta alteração.
 
 ---
 
@@ -140,7 +143,8 @@ Interpretação:
 
 - QUIC está saudável no momento.
 - A latência p95 RPC está dentro do budget atual dos post-change gates.
-- Ainda há necessidade de benchmark comparativo `quic` vs `auto` vs `http2` antes de promover qualquer troca de transporte.
+- Ainda há necessidade de benchmark comparativo `quic` vs `auto` vs `http2` antes de promover
+  qualquer troca de transporte.
 
 ### 4.2 Tunnel status
 
@@ -155,7 +159,8 @@ Estado observado:
 
 Observação:
 
-- Ainda aparecem logs recentes de reconexão/`accept stream listener encountered a failure`, mas os gates finais passaram e não há erro de request ativo.
+- Ainda aparecem logs recentes de reconexão/`accept stream listener encountered a failure`, mas os
+  gates finais passaram e não há erro de request ativo.
 
 ### 4.3 Snapshot Cloudflare edge
 
@@ -197,7 +202,8 @@ Decisão tomada:
 
 - Não aplicar regra Cloudflare automaticamente.
 - Manter fallback origin por enquanto.
-- Só promover rate-limit edge após decisão explícita, porque a regra envolve `http_ratelimit` e precisa garantir que sessões autenticadas ChatGPT/Claude não sejam limitadas.
+- Só promover rate-limit edge após decisão explícita, porque a regra envolve `http_ratelimit` e
+  precisa garantir que sessões autenticadas ChatGPT/Claude não sejam limitadas.
 
 ### 4.5 Post-change gates
 
@@ -275,14 +281,18 @@ Interpretação:
 
 - Reiniciar/recarregar MCP para expor `mcp_latency_dashboard` no conector vivo.
 - Chamar a nova tool após restart para coletar a primeira baseline in-process.
-- Criar histórico persistente de snapshots de latência, caso se queira comparar regressões entre sessões.
+- Criar histórico persistente de snapshots de latência, caso se queira comparar regressões entre
+  sessões.
 
 ### P2 pendente
 
-- Executar benchmark controlado `quic` vs `auto` vs `http2` com protocolo realmente alternado entre rodadas.
+- Executar benchmark controlado `quic` vs `auto` vs `http2` com protocolo realmente alternado entre
+  rodadas.
 - Só aplicar Cloudflare edge policy com confirmação explícita.
-- Decidir se o short-cache GET-only para `/.well-known/*` e `/chatgpt-connector.json` será promovido.
-- Decidir se o rate-limit edge para `/mcp` anônimo será promovido ou se o fallback origin continua suficiente.
+- Decidir se o short-cache GET-only para `/.well-known/*` e `/chatgpt-connector.json` será
+  promovido.
+- Decidir se o rate-limit edge para `/mcp` anônimo será promovido ou se o fallback origin continua
+  suficiente.
 
 ---
 
@@ -292,5 +302,6 @@ Interpretação:
 2. Chamar `mcp_latency_dashboard` após pelo menos 5 chamadas reais.
 3. Capturar baseline `quic` com golden prompts.
 4. Rodar uma janela `auto` e outra `http2` com os mesmos prompts.
-5. Comparar `mcp_latency_dashboard`, `mcp_cloudflare_metrics_snapshot`, `mcp_tunnel_status` e `mcp_cloudflare_post_change_gates`.
+5. Comparar `mcp_latency_dashboard`, `mcp_cloudflare_metrics_snapshot`, `mcp_tunnel_status` e
+   `mcp_cloudflare_post_change_gates`.
 6. Só então decidir promoção de transporte ou edge policy.

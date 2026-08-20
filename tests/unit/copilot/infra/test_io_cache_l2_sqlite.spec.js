@@ -119,18 +119,18 @@ describe('createIoL2SqliteCache', () => {
         cache.flushPending();
         cache.get('touch');
         expect(
-            db.prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?').get(
-                'touch',
-            ),
+            db
+                .prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?')
+                .get('touch'),
         ).toMatchObject({ lastAccessedMs: 1_000 });
 
         nowMs = 11_001;
         cache.get('touch');
 
         expect(
-            db.prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?').get(
-                'touch',
-            ),
+            db
+                .prepare('SELECT last_accessed_ms as lastAccessedMs FROM copilot_io_cache_l2 WHERE cache_key = ?')
+                .get('touch'),
         ).toMatchObject({ lastAccessedMs: 11_001 });
         expect(cache.getStats()).toMatchObject({
             hits: 2,

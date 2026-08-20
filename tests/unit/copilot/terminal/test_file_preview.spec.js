@@ -2,8 +2,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { renderTerminalFilePreview } from '../../../../src/copilot/terminal/capabilities/index.js';
 import { __test__ } from '../../../../src/copilot/terminal/capabilities/file-preview.js';
+import { renderTerminalFilePreview } from '../../../../src/copilot/terminal/capabilities/index.js';
 
 describe('terminal/capabilities/file-preview', () => {
     it('renderiza fallback JS com linhas numeradas quando preview externo é desativado', () => {

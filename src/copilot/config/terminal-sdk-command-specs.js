@@ -2,8 +2,8 @@
 /**
  * Especificacoes puras dos comandos locais expostos ao SDK como `CommandDefinition[]`.
  *
- * A lista mora em `config/` porque e contrato estatico compartilhado entre o agent, que materializa os handlers do
- * SDK, e o terminal, que apenas exibe o catalogo operacional. Nenhum dos lados precisa importar o outro.
+ * A lista mora em `config/` porque e contrato estatico compartilhado entre o agent, que materializa os handlers do SDK,
+ * e o terminal, que apenas exibe o catalogo operacional. Nenhum dos lados precisa importar o outro.
  *
  * @module copilot/config/terminal-sdk-command-specs
  */

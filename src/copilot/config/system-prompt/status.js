@@ -8,11 +8,10 @@
  * @module copilot/config/system-prompt/status
  */
 
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { readFile as readFileAsync, stat as statAsync } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/trusted-io';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { loadLiveSystemPromptSections } from './live-loader.js';
 import { readSystemPromptModeState } from './mode.js';
 import { buildSystemPromptProfile } from './profile.js';
@@ -80,6 +79,10 @@ import { readResolvedSystemPromptUserConfig, readResolvedSystemPromptUserConfigS
  * }} SystemPromptStatus
  */
 
+/** Snapshot caches hydrated only by async status reads; sync status is a pure in-memory projection. */
+const trackedFileStatusSnapshots = new Map();
+const trackedAppendTextSnapshots = new Map();
+
 /**
  * @param {string} fileName
  * @returns {string}
@@ -106,20 +109,15 @@ function resolveSectionRegistryEntry(sectionId) {
  * @returns {SystemPromptTrackedFileStatus}
  */
 function readTrackedFileStatusSync(path) {
-    if (!existsSync(path)) {
-        return { path, exists: false, bytes: null, mtimeMs: null };
-    }
-    try {
-        const info = statSync(path);
-        return {
-            path,
-            exists: true,
-            bytes: info.size,
-            mtimeMs: info.mtimeMs,
-        };
-    } catch {
-        return { path, exists: false, bytes: null, mtimeMs: null };
-    }
+    const snapshot = trackedFileStatusSnapshots.get(path);
+    if (snapshot) return { ...snapshot };
+    // Section source modules are already imported into this process; before physical status hydration they are known
+    // logical inputs, but byte/mtime metadata is intentionally unknown rather than obtained through sync filesystem IO.
+    const isLoadedSectionSource = SYSTEM_PROMPT_SECTION_ORDER.some((sectionId) => {
+        const fileName = SYSTEM_PROMPT_SECTION_FILES[sectionId];
+        return fileName ? resolveSectionFilePath(fileName) === path : false;
+    });
+    return { path, exists: isLoadedSectionSource, bytes: null, mtimeMs: null };
 }
 
 /**
@@ -127,17 +125,15 @@ function readTrackedFileStatusSync(path) {
  * @returns {Promise<SystemPromptTrackedFileStatus>}
  */
 async function readTrackedFileStatus(path) {
+    let snapshot;
     try {
-        const info = await statAsync(path);
-        return {
-            path,
-            exists: true,
-            bytes: info.size,
-            mtimeMs: info.mtimeMs,
-        };
+        const info = (await statPathTrusted(path, { caller: 'config.system-prompt.status' })).stats;
+        snapshot = { path, exists: true, bytes: info.size, mtimeMs: info.mtimeMs };
     } catch {
-        return { path, exists: false, bytes: null, mtimeMs: null };
+        snapshot = { path, exists: false, bytes: null, mtimeMs: null };
     }
+    trackedFileStatusSnapshots.set(path, snapshot);
+    return { ...snapshot };
 }
 
 /**
@@ -145,18 +141,11 @@ async function readTrackedFileStatus(path) {
  * @returns {string}
  */
 function readUserAppendContentSyncByPaths(filePaths) {
-    /** @type {string[]} */
-    const parts = [];
-    for (const filePath of filePaths) {
-        if (!existsSync(filePath)) continue;
-        try {
-            const content = readFileSync(filePath, 'utf8').trim();
-            if (content) parts.push(content);
-        } catch {
-            // silencioso por design
-        }
-    }
-    return parts.join('\n\n');
+    return filePaths
+        .map((filePath) => trackedAppendTextSnapshots.get(filePath) ?? '')
+        .map((content) => content.trim())
+        .filter(Boolean)
+        .join('\n\n');
 }
 
 /**
@@ -168,9 +157,13 @@ async function readUserAppendContentByPaths(filePaths) {
     const parts = [];
     for (const filePath of filePaths) {
         try {
-            const content = (await readFileAsync(filePath, 'utf8')).trim();
+            const content = (
+                await readTextFreshTrusted(filePath, { caller: 'config.system-prompt.status' })
+            ).content.trim();
+            trackedAppendTextSnapshots.set(filePath, content);
             if (content) parts.push(content);
         } catch {
+            trackedAppendTextSnapshots.delete(filePath);
             // silencioso por design
         }
     }

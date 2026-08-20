@@ -5,7 +5,6 @@
  * @module copilot/mcp/tools/runtime-health
  */
 
-import { z } from 'zod';
 import { buildIoCacheTierPlan } from '#copilot/infra/public/cache';
 import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/health';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
@@ -22,9 +21,9 @@ import {
     getMcpWorkspaceRoot,
     getTtlCacheStats,
     okResult,
+    readIoCacheBenchmarkState,
     readMcpAuthConfigCacheStats,
     readMcpAuthDecisionCacheStats,
-    readIoCacheBenchmarkState,
     readMcpHttpStatefulSessionPolicy,
     readMcpIndexAutoBuildState,
     readMcpMetricsSnapshot,
@@ -33,6 +32,7 @@ import {
     readMcpWorkspaceSmokeSummary,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 import { readMcpStartupMaintenanceState } from '../control-plane/startup-maintenance.js';
 import { readRepoReadFileResultCacheStats } from './repo-read-cache.js';
@@ -41,7 +41,10 @@ import { repoStatusHandler } from './repo-status.js';
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 const WORKSPACE_STATUS_CACHE_TTL_MS = 5 * 1000;
 
-/** @type {{ expiresAt: number; value: { dirty: boolean | null; branch: string | null; head: string | null; error: string | null } } | null} */
+/** @type {{
+    expiresAt: number;
+    value: { dirty: boolean | null; branch: string | null; head: string | null; error: string | null };
+} | null} */
 let cachedWorkspaceStatus = null;
 
 /**
@@ -53,6 +56,9 @@ let cachedWorkspaceStatus = null;
  *     empty: boolean;
  *     degraded: boolean;
  *     reason: string | null;
+ *     parserPolicyVersion: string | null;
+ *     parserPolicyRefreshes: number;
+ *     parsedSymbolPolicyRejects: number;
  * }}
  */
 function summarizeIndexHealth(stats) {
@@ -60,6 +66,13 @@ function summarizeIndexHealth(stats) {
     const available = record['available'] === true;
     const enabled = record['enabled'] !== false;
     const files = typeof record['files'] === 'number' ? record['files'] : null;
+    const freshnessPolicy = recordOrEmpty(record['freshnessPolicy']);
+    const parserPolicyVersion =
+        typeof freshnessPolicy['parserPolicyVersion'] === 'string' ? freshnessPolicy['parserPolicyVersion'] : null;
+    const parserPolicyRefreshes =
+        typeof record['parserPolicyRefreshes'] === 'number' ? record['parserPolicyRefreshes'] : 0;
+    const parsedSymbolPolicyRejects =
+        typeof record['parsedSymbolPolicyRejects'] === 'number' ? record['parsedSymbolPolicyRejects'] : 0;
     const empty = available && files === 0;
     return {
         available,
@@ -68,6 +81,9 @@ function summarizeIndexHealth(stats) {
         empty,
         degraded: !available || empty,
         reason: !available ? 'index-unavailable' : empty ? 'index-empty' : null,
+        parserPolicyVersion,
+        parserPolicyRefreshes,
+        parsedSymbolPolicyRejects,
     };
 }
 
@@ -112,7 +128,7 @@ async function summarizeWorkspaceStatus() {
  */
 /**
  * @param {Record<string, Record<string, unknown>>} tools
- * @returns {Array<{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }>}
+ * @returns {{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }[]}
  */
 /**
  * @param {Record<string, unknown>} indexAutoBuild
@@ -162,7 +178,7 @@ function summarizeIndexStats(stats) {
 
 /**
  * @param {Record<string, Record<string, unknown>>} tools
- * @returns {Array<{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }>}
+ * @returns {{ name: string; calls: number; errors: number; averageMs: number | null; maxMs: number | null }[]}
  */
 function summarizeSlowestTools(tools) {
     return Object.entries(tools)
@@ -180,14 +196,16 @@ function summarizeSlowestTools(tools) {
 
 /**
  * @param {Record<string, Record<string, unknown>>} tools
- * @returns {Array<{ tool: string; phase: string; calls: number; averageMs: number | null; lastMs: number | null }>}
+ * @returns {{ tool: string; phase: string; calls: number; averageMs: number | null; lastMs: number | null }[]}
  */
 function summarizeSlowestPhases(tools) {
     const rows = [];
     for (const [tool, metric] of Object.entries(tools)) {
         const phaseAverages = metric['phaseAverages'];
         if (!phaseAverages || typeof phaseAverages !== 'object' || Array.isArray(phaseAverages)) continue;
-        for (const [phase, phaseMetric] of Object.entries(/** @type {Record<string, Record<string, unknown>>} */ (phaseAverages))) {
+        for (const [phase, phaseMetric] of Object.entries(
+            /** @type {Record<string, Record<string, unknown>>} */ (phaseAverages),
+        )) {
             const calls = finiteNumber(phaseMetric['calls']);
             rows.push({
                 tool,
@@ -214,7 +232,9 @@ function summarizePhaseTotals(tools) {
     for (const metric of Object.values(tools)) {
         const phaseAverages = metric['phaseAverages'];
         if (!phaseAverages || typeof phaseAverages !== 'object' || Array.isArray(phaseAverages)) continue;
-        for (const [phase, phaseMetric] of Object.entries(/** @type {Record<string, Record<string, unknown>>} */ (phaseAverages))) {
+        for (const [phase, phaseMetric] of Object.entries(
+            /** @type {Record<string, Record<string, unknown>>} */ (phaseAverages),
+        )) {
             const calls = finiteNumber(phaseMetric['calls']);
             const totalDurationMs = finiteNumber(phaseMetric['totalDurationMs']);
             if (calls <= 0 && totalDurationMs <= 0) continue;
@@ -268,7 +288,9 @@ function readStatefulRuntimePolicySnapshot() {
     return {
         ...policy,
         postSessionContractEnforced: process.env['COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT'] === 'true',
-        sessionIdHashSecretPresent: typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' && process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
+        sessionIdHashSecretPresent:
+            typeof process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] === 'string' &&
+            process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'].trim().length >= 32,
         statelessFallbackPossible: !policy.enabled,
     };
 }
@@ -328,6 +350,11 @@ function summarizeRepoReadCache(stats) {
         hits: stats['hits'],
         misses: stats['misses'],
         stale: stats['stale'],
+        trustWindowHits: stats['trustWindowHits'],
+        hashVariantMisses: stats['hashVariantMisses'],
+        fingerprintValidations: stats['fingerprintValidations'],
+        fingerprintValidationHits: stats['fingerprintValidationHits'],
+        trustWindowMs: stats['trustWindowMs'],
         singleflightJoins: stats['singleflightJoins'],
         chunkHits: stats['chunkHits'],
         chunkMisses: stats['chunkMisses'],
@@ -340,6 +367,9 @@ function summarizeRepoReadCache(stats) {
 function summarizeIoCache(cache) {
     const l1 = recordOrEmpty(cache['l1']);
     const coherence = recordOrEmpty(cache['coherence']);
+    const readHashes = recordOrEmpty(cache['readHashes']);
+    const byteLineIndex = recordOrEmpty(cache['byteLineIndex']);
+    const pathPolicy = recordOrEmpty(cache['pathPolicy']);
     const crossProcess = recordOrEmpty(coherence['crossProcess']);
     const externalWatch = recordOrEmpty(coherence['externalWatch']);
     const aggregate = recordOrEmpty(cache['aggregate']);
@@ -350,7 +380,52 @@ function summarizeIoCache(cache) {
             size: l1['size'] ?? 0,
             bytesStored: l1['bytesStored'] ?? 0,
         },
+        readHashes: {
+            reads: readHashes['reads'] ?? 0,
+            hashComputations: readHashes['hashComputations'] ?? 0,
+            fullHashComputations: readHashes['fullHashComputations'] ?? 0,
+            returnedSliceHashComputations: readHashes['returnedSliceHashComputations'] ?? 0,
+            knownFullHashReuses: readHashes['knownFullHashReuses'] ?? 0,
+            fullWindowReturnedHashReuses: readHashes['fullWindowReturnedHashReuses'] ?? 0,
+            fullHashOutputSkips: readHashes['fullHashOutputSkips'] ?? 0,
+            returnedHashOutputSkips: readHashes['returnedHashOutputSkips'] ?? 0,
+        },
+        byteLineIndex: {
+            hits: byteLineIndex['hits'] ?? 0,
+            hitPrevalidationElisions: byteLineIndex['hitPrevalidationElisions'] ?? 0,
+            misses: byteLineIndex['misses'] ?? 0,
+            builds: byteLineIndex['builds'] ?? 0,
+            extensions: byteLineIndex['extensions'] ?? 0,
+            partialBuilds: byteLineIndex['partialBuilds'] ?? 0,
+            fullBuilds: byteLineIndex['fullBuilds'] ?? 0,
+            memoryEvictions: byteLineIndex['memoryEvictions'] ?? 0,
+            indexBytesScanned: byteLineIndex['indexBytesScanned'] ?? 0,
+            rangeBytesRead: byteLineIndex['rangeBytesRead'] ?? 0,
+            capturedRangeReuses: byteLineIndex['capturedRangeReuses'] ?? 0,
+            rangeBytesAvoided: byteLineIndex['rangeBytesAvoided'] ?? 0,
+            streamSeeds: byteLineIndex['streamSeeds'] ?? 0,
+            streamSeedBytes: byteLineIndex['streamSeedBytes'] ?? 0,
+            streamSeedPromotions: byteLineIndex['streamSeedPromotions'] ?? 0,
+            busInvalidations: byteLineIndex['busInvalidations'] ?? 0,
+            size: byteLineIndex['size'] ?? 0,
+            sizeBytes: byteLineIndex['sizeBytes'] ?? 0,
+            maxBytes: byteLineIndex['maxBytes'] ?? 0,
+        },
+        pathPolicy: {
+            hits: pathPolicy['hits'] ?? 0,
+            misses: pathPolicy['misses'] ?? 0,
+            expirations: pathPolicy['expirations'] ?? 0,
+            invalidatedEntries: pathPolicy['invalidatedEntries'] ?? 0,
+            size: pathPolicy['size'] ?? 0,
+            ttlMs: pathPolicy['ttlMs'] ?? 0,
+        },
         coherence: {
+            localDispatches: coherence['localDispatches'] ?? 0,
+            pendingReplications: coherence['pendingReplications'] ?? coherence['pending'] ?? 0,
+            replicationQueued: coherence['replicationQueued'] ?? 0,
+            replicationCoalesced: coherence['replicationCoalesced'] ?? 0,
+            replicationFlushes: coherence['replicationFlushes'] ?? 0,
+            replicationPublished: coherence['replicationPublished'] ?? 0,
             gapDetections: crossProcess['gapDetections'] ?? 0,
             writeErrors: crossProcess['writeErrors'] ?? 0,
             readErrors: crossProcess['readErrors'] ?? 0,
@@ -377,6 +452,70 @@ function summarizeIoCache(cache) {
     };
 }
 
+/**
+ * Keep the default MCP health payload intentionally small. Full cache internals remain available through
+ * includeDetails=true; the normal round-trip only carries counters that are directly actionable for readiness and
+ * capability-fast-path diagnosis.
+ *
+ * @param {ReturnType<typeof readIoRuntimeHealthSnapshot>['cache']} cache
+ */
+function summarizeIoCacheCompact(cache) {
+    const summary = summarizeIoCache(cache);
+    const validatedReadPath = recordOrEmpty(summary.validatedReadPath);
+    const validatedMutablePath = recordOrEmpty(summary.validatedMutablePath);
+    return {
+        l1: summary.l1,
+        coherence: {
+            gapDetections: summary.coherence.gapDetections,
+            writeErrors: summary.coherence.writeErrors,
+            readErrors: summary.coherence.readErrors,
+        },
+        validatedReadPath: {
+            issued: validatedReadPath['issued'] ?? 0,
+            accepted: validatedReadPath['accepted'] ?? 0,
+            rejectedUnbranded: validatedReadPath['rejectedUnbranded'] ?? 0,
+            rejectedWorkspace: validatedReadPath['rejectedWorkspace'] ?? 0,
+            rejectedMode: validatedReadPath['rejectedMode'] ?? 0,
+        },
+        validatedMutablePath: {
+            issued: validatedMutablePath['issued'] ?? 0,
+            accepted: validatedMutablePath['accepted'] ?? 0,
+            rejectedUnbranded: validatedMutablePath['rejectedUnbranded'] ?? 0,
+            rejectedWorkspace: validatedMutablePath['rejectedWorkspace'] ?? 0,
+            rejectedMode: validatedMutablePath['rejectedMode'] ?? 0,
+        },
+        aggregate: summary.aggregate,
+    };
+}
+
+/** @param {Record<string, unknown>} state */
+function summarizeSchemaConvergence(state) {
+    return {
+        status: state['status'] ?? 'uninitialized',
+        descriptorRevision: state['descriptorRevision'] ?? 0,
+        currentToolCount: state['currentToolCount'] ?? 0,
+        listChangedSentCount: state['listChangedSentCount'] ?? 0,
+        listChangedErrorCount: state['listChangedErrorCount'] ?? 0,
+        lastListChangedError: state['lastListChangedError'] ?? null,
+    };
+}
+
+/** @param {Record<string, unknown>} state */
+function summarizeRoundTripAnalyticsMonitor(state) {
+    return {
+        enabled: state['enabled'] === true,
+        running: state['running'] === true,
+        runs: state['runs'] ?? 0,
+        failures: state['failures'] ?? 0,
+        lastRunAt: state['lastRunAt'] ?? null,
+        lastSuccessAt: state['lastSuccessAt'] ?? null,
+        lastDurationMs: state['lastDurationMs'] ?? null,
+        lastLagBytes: state['lastLagBytes'] ?? null,
+        lastComplete: state['lastComplete'] ?? null,
+        lastError: state['lastError'] ?? null,
+    };
+}
+
 /** @param {Record<string, unknown>} durability */
 function summarizeIoDurability(durability) {
     const fileSync = recordOrEmpty(durability['fileSync']);
@@ -384,14 +523,11 @@ function summarizeIoDurability(durability) {
     const atomic = recordOrEmpty(durability['atomicWritePhases']);
     const observed = Number(atomic['observed'] ?? 0);
     /** @param {string} field */
-    const average = (field) =>
-        observed > 0 ? Math.round((Number(atomic[field] ?? 0) / observed) * 1000) / 1000 : 0;
+    const average = (field) => (observed > 0 ? Math.round((Number(atomic[field] ?? 0) / observed) * 1000) / 1000 : 0);
     /** @param {Record<string, unknown>} stats */
     const averageSync = (stats) => {
         const attempted = Number(stats['attempted'] ?? 0);
-        return attempted > 0
-            ? Math.round((Number(stats['totalDurationMs'] ?? 0) / attempted) * 1000) / 1000
-            : 0;
+        return attempted > 0 ? Math.round((Number(stats['totalDurationMs'] ?? 0) / attempted) * 1000) / 1000 : 0;
     };
     return {
         modes: durability['modes'] ?? null,
@@ -416,10 +552,21 @@ function summarizeIoDurability(durability) {
             averageTempPathMs: average('tempPathMs'),
             averageCapacityPreflightMs: average('capacityPreflightMs'),
             averageTempWriteMs: average('tempWriteMs'),
+            averageModeApplyMs: average('modeApplyMs'),
+            averageFileSyncMs: average('fileSyncMs'),
             averagePrePublishCheckMs: average('prePublishCheckMs'),
             averagePublishMs: average('publishMs'),
             averageDirectorySyncMs: average('directorySyncMs'),
         },
+    };
+}
+
+/** @param {Record<string, unknown>} mutationState */
+function summarizeIoMutationState(mutationState) {
+    return {
+        appliedButUnconfirmed: mutationState['appliedButUnconfirmed'] ?? 0,
+        byOperation: mutationState['byOperation'] ?? {},
+        last: mutationState['last'] ?? null,
     };
 }
 
@@ -435,6 +582,11 @@ function summarizeIoParser(parser) {
         workerFailures: parser['workerFailures'] ?? 0,
         workerTimeouts: parser['workerTimeouts'] ?? 0,
         workerFallbacks: parser['workerFallbacks'] ?? 0,
+        workerInitFailures: parser['workerInitFailures'] ?? 0,
+        workerInitRecoveries: parser['workerInitRecoveries'] ?? 0,
+        workerPoolConsecutiveInitFailures: parser['workerPoolConsecutiveInitFailures'] ?? 0,
+        workerPoolNextInitAttemptAtMs: parser['workerPoolNextInitAttemptAtMs'] ?? null,
+        parserPolicyVersion: parser['parserPolicyVersion'] ?? null,
     };
 }
 
@@ -454,7 +606,8 @@ function summarizeAiArtifacts(artifacts) {
     };
 }
 
-/** @param {ReturnType<typeof readIoRuntimeHealthSnapshot>} ioRuntime @param {Record<string, unknown> | null} benchmarkState */
+/** @param {ReturnType<typeof readIoRuntimeHealthSnapshot>} ioRuntime @param {Record<string, unknown> | null}
+  benchmarkState */
 function buildEvidenceAwareIoCachePlan(ioRuntime, benchmarkState) {
     const cache = recordOrEmpty(ioRuntime.cache);
     const aggregate = recordOrEmpty(cache['aggregate']);
@@ -478,7 +631,12 @@ export const mcpRuntimeHealthTool = {
     title: 'MCP runtime health',
     description: 'Return MCP runtime health, workspace root, uptime and per-tool metrics.',
     inputSchema: {
-        includeDetails: z.boolean().optional()['describe']('Include verbose index, temporary fallback tunnel and full per-tool metrics. Defaults to false.'),
+        includeDetails: z
+            .boolean()
+            .optional()
+            ['describe'](
+                'Include verbose index, temporary fallback tunnel and full per-tool metrics. Defaults to false.',
+            ),
     },
     annotations: readOnlyAnnotations(),
     handler: async (input = {}) => {
@@ -593,8 +751,8 @@ export const mcpRuntimeHealthTool = {
                     },
                     statefulPolicy,
                     statefulRuntime,
-                    schemaConvergence,
-                    roundTripAnalyticsMonitor,
+                    schemaConvergence: summarizeSchemaConvergence(schemaConvergence),
+                    roundTripAnalyticsMonitor: summarizeRoundTripAnalyticsMonitor(roundTripAnalyticsMonitor),
                     nodeRuntime: {
                         nodeVersion: process.version,
                         compileCache: {
@@ -628,8 +786,9 @@ export const mcpRuntimeHealthTool = {
                     authorizationConfigCache: summarizeAuthorizationCache(recordOrEmpty(authConfigCache)),
                     authorizationCache: summarizeAuthorizationCache(recordOrEmpty(authDecisionCache)),
                     repoReadFileCache: summarizeRepoReadCache(repoReadFileCache),
-                    ioCache: summarizeIoCache(ioRuntime.cache),
+                    ioCache: summarizeIoCacheCompact(ioRuntime.cache),
                     ioDurability: summarizeIoDurability(recordOrEmpty(ioRuntime.durability)),
+                    ioMutationState: summarizeIoMutationState(recordOrEmpty(ioRuntime.mutationState)),
                     ioCachePlan: {
                         l2Decision: ioCachePlanWithBenchmark.l2Decision,
                         recommendationCount: Array.isArray(ioCachePlanWithBenchmark.recommendations)

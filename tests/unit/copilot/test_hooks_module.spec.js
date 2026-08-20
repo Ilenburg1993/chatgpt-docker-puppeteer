@@ -157,8 +157,8 @@ const inv = (sessionId = 'test-session') => ({ sessionId });
 /** @typedef {Extract<import('@github/copilot-sdk').PermissionRequest, { kind: 'custom-tool' }>} CustomToolPermissionRequest */
 
 /**
- * @param {string} [toolName='custom-tool']
- * @param {string} [toolCallId='custom-tool-call']
+ * @param {string} [toolName='custom-tool'] Default is `'custom-tool'`
+ * @param {string} [toolCallId='custom-tool-call'] Default is `'custom-tool-call'`
  * @returns {CustomToolPermissionRequest}
  */
 function customToolPermissionRequest(toolName = 'custom-tool', toolCallId = 'custom-tool-call') {

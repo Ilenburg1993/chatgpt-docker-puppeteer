@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { commandExists, parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 
-/** @import {RawFinding} from "../normalize/findings.mjs" */
+/** @import {RawFinding} from '../normalize/findings.mjs' */
 
 /**
  * @param {unknown} value
@@ -170,60 +170,64 @@ function parseTypecheckOutput(output) {
  * @param {string} output
  * @returns {RawFinding[]}
  */
-function parseMadgeOutput(output) {
+function parseDependencyGraphOutput(output) {
     /** @type {RawFinding[]} */
     const findings = [];
     const parsed = parseJsonFromMixedOutput(output);
-    /** @type {string[][]} */
-    const cycles = [];
-
-    if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-            if (!Array.isArray(item) || item.length < 2) {
-                continue;
-            }
-            const cycle = item.map((token) => normalizePathLike(String(token || ''))).filter(Boolean);
-            if (cycle.length >= 2) {
-                cycles.push(cycle);
-            }
-        }
-    } else {
-        const lines = String(output || '').split(/\r?\n/);
-        for (const rawLine of lines) {
-            const line = rawLine.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').trim();
-            const cyclePrefix = line.match(/^\d+\)\s+(.+)$/);
-            if (!cyclePrefix) {
-                continue;
-            }
-            const parts = (cyclePrefix[1] ?? '')
-                .split('>')
-                .map((part) => normalizePathLike(part))
-                .filter(Boolean);
-            if (parts.length >= 2) {
-                cycles.push(parts);
-            }
-        }
-    }
-
-    /** @type {Set<string>} */
-    const dedup = new Set();
-    for (const cycle of cycles) {
-        if (cycle.every((entry) => isDistArtifactPath(entry))) {
-            continue;
-        }
-
-        const key = cycle.join(' -> ');
-        if (dedup.has(key)) {
-            continue;
-        }
-        dedup.add(key);
+    const parseErrors = Array.isArray(parsed?.parseErrors) ? parsed.parseErrors : [];
+    for (const item of parseErrors) {
+        const record = item && typeof item === 'object' ? item : {};
+        const file = normalizePathLike(String(record.file || record.path || '')) || null;
+        const message = String(record.message || record.error || 'Dependency graph parser failed.');
         findings.push({
-            source_tool: 'madge',
+            source_tool: 'dependency-graph',
+            file,
+            line: Number.isInteger(record.line) ? record.line : null,
+            evidence: message,
+            rule: 'dependency-graph-parse-error',
+            severity_hint: 'P1',
+            type: 'falha de contrato',
+            impact: 'Grafo arquitetural incompleto: um arquivo de origem não pôde ser analisado.',
+            root_cause: 'Falha de parse impede provar ciclos e dependências com cobertura total.',
+            suggested_patch: 'Corrigir o arquivo/parser antes de aceitar o resultado do grafo.',
+            test_strategy: 'Executar `npm run analyze:deps` e confirmar parseErrors=0.',
+            regression_risk: 'Alto',
+        });
+    }
+    const unresolvedLocalImports = Array.isArray(parsed?.unresolvedLocalImports) ? parsed.unresolvedLocalImports : [];
+    for (const item of unresolvedLocalImports) {
+        const record = item && typeof item === 'object' ? item : {};
+        const file = normalizePathLike(String(record.file || '')) || null;
+        const specifier = String(record.specifier || '').trim() || '(unknown local import)';
+        findings.push({
+            source_tool: 'dependency-graph',
+            file,
+            line: null,
+            evidence: `Import local não resolvido: ${specifier}`,
+            rule: 'dependency-graph-unresolved-local-import',
+            severity_hint: 'P1',
+            type: 'falha de contrato',
+            impact: 'Grafo arquitetural incompleto: uma dependência first-party não pôde ser resolvida.',
+            root_cause:
+                'Specifier relativo ou package-import local não resolve segundo a semântica de módulos do Node.',
+            suggested_patch:
+                'Corrigir o specifier, package imports ou arquivo alvo antes de aceitar o resultado do grafo.',
+            test_strategy: 'Executar `npm run analyze:deps` e confirmar unresolvedLocalImports=0.',
+            regression_risk: 'Alto',
+        });
+    }
+    const cycles = Array.isArray(parsed?.cycles) ? parsed.cycles : [];
+    for (const item of cycles) {
+        if (!Array.isArray(item) || item.length === 0) continue;
+        const cycle = item.map((token) => normalizePathLike(String(token || ''))).filter(Boolean);
+        if (cycle.length === 0 || cycle.every((entry) => isDistArtifactPath(entry))) continue;
+        findings.push({
+            source_tool: 'dependency-graph',
             file: cycle[0] || null,
             line: null,
-            evidence: `Ciclo detectado: ${cycle.join(' -> ')}`,
+            evidence: `Componente circular detectado: ${cycle.join(' <-> ')}`,
             rule: 'circular-dependency',
-            severity_hint: 'P2',
+            severity_hint: 'P1',
             type: 'gap',
             impact: 'Dependência circular pode introduzir inicialização parcial e comportamento não determinístico.',
             root_cause: 'Acoplamento cíclico entre módulos.',
@@ -232,7 +236,6 @@ function parseMadgeOutput(output) {
             regression_risk: 'Médio',
         });
     }
-
     return findings;
 }
 
@@ -484,21 +487,19 @@ export async function collectStaticFindings(options) {
             }
         }
 
-        const madge = await exec(
-            'static.madge',
-            'npx',
-            ['madge', '--circular', '--extensions', 'js,mjs,cjs', '--json', '--exclude', '^dashboard-ui/dist/', 'src/'],
+        const depgraph = await exec(
+            'static.depgraph',
+            'node',
+            ['scripts/analysis/analyze-code-graph.js', '--root', 'src', '--circular', '--json-stdout'],
             { timeoutMs: 300000, acceptExitCodes: [0, 1] },
         );
-        const madgeFindings = parseMadgeOutput(`${madge.stdout}\n${madge.stderr}`);
-        telemetry.gates.depgraph_ok = madgeFindings.length === 0 && madge.ok;
-        if (madgeFindings.length > 0) {
-            findings.push(...madgeFindings);
-        }
-        if (!madge.ok && madgeFindings.length === 0) {
+        const depgraphFindings = parseDependencyGraphOutput(`${depgraph.stdout}\n${depgraph.stderr}`);
+        telemetry.gates.depgraph_ok = depgraphFindings.length === 0 && depgraph.ok;
+        if (depgraphFindings.length > 0) findings.push(...depgraphFindings);
+        if (!depgraph.ok) {
             errors.push({
-                source: 'madge',
-                message: madge.stderr || madge.stdout || 'madge failed sem saída parseável',
+                source: 'dependency-graph',
+                message: depgraph.stderr || depgraph.stdout || 'dependency graph failed sem saída parseável',
             });
         }
 

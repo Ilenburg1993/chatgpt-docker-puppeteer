@@ -21,26 +21,28 @@ export const HARD_BULK_MAX_ITEMS = 256;
 /**
  * @template T
  * @typedef {{
- *     index: number;
- *     status: 'succeeded';
- *     success: true;
- *     durationMs: number;
- *     value: T;
- * } | {
- *     index: number;
- *     status: 'failed';
- *     success: false;
- *     durationMs: number;
- *     value?: T;
- *     error?: string;
- *     code?: string | null;
- * } | {
- *     index: number;
- *     status: 'skipped';
- *     success: false;
- *     durationMs: 0;
- *     reason: string;
- * }} BulkOperationResult
+ *           index: number;
+ *           status: 'succeeded';
+ *           success: true;
+ *           durationMs: number;
+ *           value: T;
+ *       }
+ *     | {
+ *           index: number;
+ *           status: 'failed';
+ *           success: false;
+ *           durationMs: number;
+ *           value?: T;
+ *           error?: string;
+ *           code?: string | null;
+ *       }
+ *     | {
+ *           index: number;
+ *           status: 'skipped';
+ *           success: false;
+ *           durationMs: 0;
+ *           reason: string;
+ *       }} BulkOperationResult
  */
 
 /**
@@ -77,11 +79,15 @@ export const HARD_BULK_MAX_ITEMS = 256;
  */
 export async function runBoundedOperationBatch(items, worker, options = {}) {
     if (!Array.isArray(items)) throw bulkLimitError('Bulk items must be an array.', 'ERR_BULK_ITEMS_REQUIRED');
-    if (typeof worker !== 'function') throw bulkLimitError('Bulk worker must be a function.', 'ERR_BULK_WORKER_REQUIRED');
+    if (typeof worker !== 'function')
+        throw bulkLimitError('Bulk worker must be a function.', 'ERR_BULK_WORKER_REQUIRED');
 
     const maxItems = normalizeMaxItems(options.maxItems);
     if (items.length > maxItems) {
-        throw bulkLimitError(`Bulk request contains ${items.length} items; limit is ${maxItems}.`, 'ERR_BULK_ITEM_LIMIT');
+        throw bulkLimitError(
+            `Bulk request contains ${items.length} items; limit is ${maxItems}.`,
+            'ERR_BULK_ITEM_LIMIT',
+        );
     }
 
     const inputBytes = estimateTotalInputBytes(items, options.estimateItemBytes);
@@ -206,11 +212,17 @@ function estimateTotalInputBytes(items, estimator) {
     for (const [index, item] of items.entries()) {
         const bytes = Number(estimator(item, index));
         if (!Number.isFinite(bytes) || bytes < 0) {
-            throw bulkLimitError(`Invalid input byte estimate for bulk item ${index}.`, 'ERR_BULK_INPUT_BYTES_ESTIMATE');
+            throw bulkLimitError(
+                `Invalid input byte estimate for bulk item ${index}.`,
+                'ERR_BULK_INPUT_BYTES_ESTIMATE',
+            );
         }
         total += Math.ceil(bytes);
         if (!Number.isSafeInteger(total)) {
-            throw bulkLimitError('Bulk input byte estimate overflowed the safe integer range.', 'ERR_BULK_INPUT_BYTES_ESTIMATE');
+            throw bulkLimitError(
+                'Bulk input byte estimate overflowed the safe integer range.',
+                'ERR_BULK_INPUT_BYTES_ESTIMATE',
+            );
         }
     }
     return total;

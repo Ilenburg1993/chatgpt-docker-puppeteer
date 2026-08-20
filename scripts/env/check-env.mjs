@@ -35,7 +35,9 @@ if (process.env['npm_execpath']) {
 
 const windowsMountPattern = /^\/mnt\/[a-z]\//i;
 const isWindowsMountedNode = windowsMountPattern.test(process.execPath);
-const isWindowsMountedNpm = Boolean(process.env['npm_execpath'] && windowsMountPattern.test(process.env['npm_execpath']));
+const isWindowsMountedNpm = Boolean(
+    process.env['npm_execpath'] && windowsMountPattern.test(process.env['npm_execpath']),
+);
 
 if (isWindowsMountedNode || isWindowsMountedNpm) {
     console.log('   ⚠️  Runtime misto detectado: node/npm estão vindo de um path do Windows.');

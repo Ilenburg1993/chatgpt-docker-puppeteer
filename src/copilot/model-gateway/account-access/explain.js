@@ -45,10 +45,18 @@ function nextActions(status, hardReasons, softReasons) {
     if (status === 'missing_secret' || hardReasons.some((reason) => reason.startsWith('secret_missing'))) {
         actions.push('configure_required_secret');
     }
-    if (status === 'missing_overlay' || hardReasons.includes('account_overlay_missing') || softReasons.includes('account_overlay_missing')) {
+    if (
+        status === 'missing_overlay' ||
+        hardReasons.includes('account_overlay_missing') ||
+        softReasons.includes('account_overlay_missing')
+    ) {
         actions.push('refresh_or_collect_account_overlay');
     }
-    if (status === 'expired' || hardReasons.includes('account_overlay_expired') || softReasons.includes('account_overlay_expired')) {
+    if (
+        status === 'expired' ||
+        hardReasons.includes('account_overlay_expired') ||
+        softReasons.includes('account_overlay_expired')
+    ) {
         actions.push('refresh_account_overlay');
     }
     if (status === 'not_visible' || hardReasons.includes('account_model_not_visible')) {
@@ -67,7 +75,8 @@ function nextActions(status, hardReasons, softReasons) {
     if (status === 'key_disabled' || hardReasons.includes('account_key_disabled')) {
         actions.push('enable_or_replace_provider_key');
     }
-    if (status === 'unknown' || softReasons.includes('account_visibility_unknown')) actions.push('run_low_cost_access_probe');
+    if (status === 'unknown' || softReasons.includes('account_visibility_unknown'))
+        actions.push('run_low_cost_access_probe');
     if (actions.length === 0 && status === 'visible') actions.push('account_access_can_enter_eligibility');
     return [...new Set(actions)];
 }
@@ -81,8 +90,10 @@ function nextActions(status, hardReasons, softReasons) {
 function actionableUnknownContext(status, hardReasons, softReasons) {
     const dataNeeded = [];
     if (hardReasons.some((reason) => reason.startsWith('secret_missing'))) dataNeeded.push('secret');
-    if (hardReasons.includes('account_overlay_missing') || softReasons.includes('account_overlay_missing')) dataNeeded.push('account_overlay');
-    if (hardReasons.includes('account_overlay_expired') || softReasons.includes('account_overlay_expired')) dataNeeded.push('fresh_account_overlay');
+    if (hardReasons.includes('account_overlay_missing') || softReasons.includes('account_overlay_missing'))
+        dataNeeded.push('account_overlay');
+    if (hardReasons.includes('account_overlay_expired') || softReasons.includes('account_overlay_expired'))
+        dataNeeded.push('fresh_account_overlay');
     if (
         hardReasons.includes('account_access_unknown') ||
         hardReasons.includes('account_model_not_visible') ||
@@ -92,15 +103,17 @@ function actionableUnknownContext(status, hardReasons, softReasons) {
     }
     if (hardReasons.includes('account_rate_limited')) dataNeeded.push('rate_limit_reset');
     if (hardReasons.includes('account_quota_exhausted')) dataNeeded.push('quota_reset_or_balance');
-    const category = hardReasons.length > 0
-        ? 'blocked'
-        : status === 'unknown' || softReasons.includes('account_visibility_unknown')
-          ? 'unknown_probe_allowed'
-          : status;
+    const category =
+        hardReasons.length > 0
+            ? 'blocked'
+            : status === 'unknown' || softReasons.includes('account_visibility_unknown')
+              ? 'unknown_probe_allowed'
+              : status;
     return {
         category,
         dataNeeded: [...new Set(dataNeeded)],
-        probeSafe: hardReasons.length === 0 && (status === 'unknown' || softReasons.includes('account_visibility_unknown')),
+        probeSafe:
+            hardReasons.length === 0 && (status === 'unknown' || softReasons.includes('account_visibility_unknown')),
         operatorHint:
             category === 'unknown_probe_allowed'
                 ? 'run_low_cost_access_probe_or_refresh_account_overlay'
@@ -113,19 +126,19 @@ function actionableUnknownContext(status, hardReasons, softReasons) {
 /**
  * @param {Record<string, unknown>} access
  * @returns {{
- *   key: string;
- *   status: string;
- *   canAttempt: boolean;
- *   accessConfidence: string;
- *   failureClass: string;
- *   primaryReason: string;
- *   hardReasons: string[];
- *   softReasons: string[];
- *   reasons: string[];
- *   overlayRefs: string[];
- *   actionable: { category: string; dataNeeded: string[]; probeSafe: boolean; operatorHint: string };
- *   nextActions: string[];
- *   summary: string;
+ *     key: string;
+ *     status: string;
+ *     canAttempt: boolean;
+ *     accessConfidence: string;
+ *     failureClass: string;
+ *     primaryReason: string;
+ *     hardReasons: string[];
+ *     softReasons: string[];
+ *     reasons: string[];
+ *     overlayRefs: string[];
+ *     actionable: { category: string; dataNeeded: string[]; probeSafe: boolean; operatorHint: string };
+ *     nextActions: string[];
+ *     summary: string;
  * }}
  */
 export function explainModelGatewayAccountAccess(access) {

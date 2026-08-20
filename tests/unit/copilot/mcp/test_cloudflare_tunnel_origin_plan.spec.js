@@ -1,8 +1,5 @@
+import { applyCloudflareTunnelOriginPlan, buildCloudflareTunnelOriginPlan } from '#copilot/mcp/cloudflare';
 import { describe, expect, it } from 'vitest';
-import {
-    applyCloudflareTunnelOriginPlan,
-    buildCloudflareTunnelOriginPlan,
-} from '#copilot/mcp/cloudflare';
 
 const BASE_ENV = {
     CLOUDFLARE_API_TOKEN: 'cfat_test_token',
@@ -26,14 +23,16 @@ describe('mcp/cloudflare/tunnel-origin-plan', () => {
     });
 
     it('plans HTTPS plus http2Origin for explicit H2 rollout', async () => {
-        const plan = /** @type {any} */ (await buildCloudflareTunnelOriginPlan({
-            env: {
-                ...BASE_ENV,
-                COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
-                COPILOT_MCP_CLOUDFLARE_ORIGIN_SERVER_NAME: 'mcp.aurelin.org',
-                COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
-            },
-        }));
+        const plan = /** @type {any} */ (
+            await buildCloudflareTunnelOriginPlan({
+                env: {
+                    ...BASE_ENV,
+                    COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
+                    COPILOT_MCP_CLOUDFLARE_ORIGIN_SERVER_NAME: 'mcp.aurelin.org',
+                    COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
+                },
+            })
+        );
 
         expect(plan.ok).toBe(true);
         expect(plan.rollout).toBe('https-http2-origin');
@@ -47,14 +46,16 @@ describe('mcp/cloudflare/tunnel-origin-plan', () => {
     });
 
     it('blocks real apply by default', async () => {
-        const report = /** @type {any} */ (await applyCloudflareTunnelOriginPlan({
-            env: {
-                ...BASE_ENV,
-                COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
-                COPILOT_MCP_CLOUDFLARE_ORIGIN_SERVER_NAME: 'mcp.aurelin.org',
-                COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
-            },
-        }));
+        const report = /** @type {any} */ (
+            await applyCloudflareTunnelOriginPlan({
+                env: {
+                    ...BASE_ENV,
+                    COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
+                    COPILOT_MCP_CLOUDFLARE_ORIGIN_SERVER_NAME: 'mcp.aurelin.org',
+                    COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
+                },
+            })
+        );
 
         expect(report.ok).toBe(true);
         expect(report.appliesChanges).toBe(false);
@@ -64,14 +65,16 @@ describe('mcp/cloudflare/tunnel-origin-plan', () => {
     });
 
     it('keeps human-readable durations in the dry-run plan', async () => {
-        const report = /** @type {any} */ (await applyCloudflareTunnelOriginPlan({
-            env: {
-                ...BASE_ENV,
-                COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
-                COPILOT_MCP_CLOUDFLARE_ORIGIN_SERVER_NAME: 'mcp.aurelin.org',
-                COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
-            },
-        }));
+        const report = /** @type {any} */ (
+            await applyCloudflareTunnelOriginPlan({
+                env: {
+                    ...BASE_ENV,
+                    COPILOT_MCP_CLOUDFLARE_ORIGIN_URL: 'https://127.0.0.1:3333',
+                    COPILOT_MCP_CLOUDFLARE_ORIGIN_SERVER_NAME: 'mcp.aurelin.org',
+                    COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN: 'true',
+                },
+            })
+        );
 
         expect(report.desired.originRequest.connectTimeout).toBe('5s');
         expect(report.desired.originRequest.keepAliveTimeout).toBe('1m30s');

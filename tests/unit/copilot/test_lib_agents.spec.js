@@ -65,10 +65,7 @@ describe('createAgent', () => {
     });
 
     it('deve lançar erro quando name não é string', () => {
-        assert.throws(
-            () => Reflect.apply(createAgent, undefined, [{ name: 42, prompt: 'ok' }]),
-            /createAgent.*"name"/,
-        );
+        assert.throws(() => Reflect.apply(createAgent, undefined, [{ name: 42, prompt: 'ok' }]), /createAgent.*"name"/);
     });
 
     it('deve lançar erro quando prompt está ausente', () => {

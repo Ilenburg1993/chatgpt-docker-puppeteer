@@ -4,14 +4,7 @@
  */
 
 /**
- * @typedef {'entrypoint'
- *     | 'orchestrator'
- *     | 'compat-entry'
- *     | 'process-host'
- *     | 'setup'
- *     | 'policy'
- *     | 'teardown'
- *     | 'state'} LifecycleModuleRole
+ * @typedef {'entrypoint' | 'orchestrator' | 'compat-entry' | 'process-host' | 'setup' | 'policy' | 'teardown' | 'state'} LifecycleModuleRole
  *
  *
  * @typedef {'primary' | 'secondary' | 'internal'} LifecycleModuleTier

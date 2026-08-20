@@ -159,7 +159,8 @@ export class SseClientPool {
         const replayEvent = opts.replayEvent ?? event;
         const filterEvent = opts.filterEvent ?? replayEvent;
         const explicitEventId = Number.isFinite(opts.eventId) ? Number(opts.eventId) : undefined;
-        const eventId = explicitEventId ?? (opts.skipReplay ? undefined : this.#replayBuffer.push(replayEvent, payload));
+        const eventId =
+            explicitEventId ?? (opts.skipReplay ? undefined : this.#replayBuffer.push(replayEvent, payload));
 
         this.#count('broadcast');
         if (opts.skipReplay) this.#count('broadcast_skip_replay');

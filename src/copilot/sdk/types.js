@@ -20,9 +20,8 @@
 /**
  * Classe principal do SDK. Gerencia conexão com o CLI, autenticação, criação/resumo de sessões, metadata e lifecycle
  * events. Métodos principais: `start()`, `stop()`, `forceStop()`, `createSession()`, `resumeSession()`, `ping()`,
- * `getStatus()`, `getAuthStatus()`, `listModels()`, `getLastSessionId()`, `listSessions()`,
- * `getSessionMetadata()`, `deleteSession()`, `getForegroundSessionId()`, `setForegroundSessionId()` e `onLifecycle()`
- * (lifecycle).
+ * `getStatus()`, `getAuthStatus()`, `listModels()`, `getLastSessionId()`, `listSessions()`, `getSessionMetadata()`,
+ * `deleteSession()`, `getForegroundSessionId()`, `setForegroundSessionId()` e `onLifecycle()` (lifecycle).
  *
  * @typedef {import('@github/copilot-sdk').CopilotClient} CopilotClient
  */
@@ -45,11 +44,10 @@
 /**
  * Configuração completa para criação de sessão. Campos principais: `sessionId?`, `clientName?`, `model?`,
  * `reasoningEffort?`, `reasoningSummary?`, `contextTier?`, `modelCapabilities?`, `configDirectory?`,
- * `enableConfigDiscovery?`, `tools?`, `commands?`,
- * `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`, `onPermissionRequest`, `onUserInputRequest?`,
- * `onElicitationRequest?`, `hooks?`, `workingDirectory?`, `streaming?`, `includeSubAgentStreamingEvents?`,
- * `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`, `disabledSkills?`,
- * `infiniteSessions?`, `sessionLimits?`, `gitHubToken?`, `onEvent?` e `createSessionFsProvider?`.
+ * `enableConfigDiscovery?`, `tools?`, `commands?`, `systemMessage?`, `availableTools?`, `excludedTools?`, `provider?`,
+ * `onPermissionRequest`, `onUserInputRequest?`, `onElicitationRequest?`, `hooks?`, `workingDirectory?`, `streaming?`,
+ * `includeSubAgentStreamingEvents?`, `mcpServers?`, `customAgents?`, `defaultAgent?`, `agent?`, `skillDirectories?`,
+ * `disabledSkills?`, `infiniteSessions?`, `sessionLimits?`, `gitHubToken?`, `onEvent?` e `createSessionFsProvider?`.
  *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
  */
@@ -74,8 +72,8 @@
 
 /**
  * Opções para `session.send(options)` e `session.sendAndWait(options, timeout?)`. Campos: `prompt`, `attachments?`
- * (file, directory, selection, blob), `mode?` ("enqueue" | "immediate") e `requestHeaders?` para headers por turno.
- * A borda runtime canônica valida esse objeto via `normalizeMessageOptions()` antes de chamar o SDK.
+ * (file, directory, selection, blob), `mode?` ("enqueue" | "immediate") e `requestHeaders?` para headers por turno. A
+ * borda runtime canônica valida esse objeto via `normalizeMessageOptions()` antes de chamar o SDK.
  *
  * @typedef {import('@github/copilot-sdk').MessageOptions} MessageOptions
  */
@@ -114,16 +112,16 @@
 /**
  * Tool criada pelas factories executáveis locais; `handler` é obrigatório e preserva o tipo de resultado.
  *
- * @template [TArgs=unknown]
- * @template [TResult=unknown]
+ * @template [TArgs=unknown] Default is `unknown`
+ * @template [TResult=unknown] Default is `unknown`
  * @typedef {import('./tools/core.js').ExecutableTool<TArgs, TResult>} ExecutableTool
  */
 
 /**
  * Opções da factory executável local.
  *
- * @template [TArgs=unknown]
- * @template [TResult=unknown]
+ * @template [TArgs=unknown] Default is `unknown`
+ * @template [TResult=unknown] Default is `unknown`
  * @typedef {import('./tools/core.js').CreateToolOptions<TArgs, TResult>} CreateToolOptions
  */
 
@@ -583,7 +581,7 @@
 /**
  * @typedef {(
  *     input: PreMcpToolCallHookInput,
- *     invocation: { sessionId?: string; agentName?: string }
+ *     invocation: { sessionId?: string; agentName?: string },
  * ) => Promise<PreMcpToolCallHookOutput | void> | PreMcpToolCallHookOutput | void} PreMcpToolCallHandler
  */
 
@@ -643,7 +641,7 @@
 /**
  * @typedef {(
  *     input: PostToolUseFailureHookInput,
- *     invocation: { sessionId?: string; agentName?: string }
+ *     invocation: { sessionId?: string; agentName?: string },
  * ) => Promise<PostToolUseFailureHookOutput | void> | PostToolUseFailureHookOutput | void} PostToolUseFailureHandler
  */
 

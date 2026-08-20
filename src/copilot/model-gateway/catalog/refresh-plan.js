@@ -31,8 +31,8 @@
  */
 
 /**
- * @template [TRaw=unknown]
- * @template [TRow=unknown]
+ * @template [TRaw=unknown] Default is `unknown`
+ * @template [TRow=unknown] Default is `unknown`
  * @typedef {object} CatalogRefreshPlan
  * @property {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} selectedImporters
  * @property {CatalogRefreshPlanEntry[]} selected
@@ -46,7 +46,9 @@
  * @returns {Record<string, unknown> | null}
  */
 function recordOrNull(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**

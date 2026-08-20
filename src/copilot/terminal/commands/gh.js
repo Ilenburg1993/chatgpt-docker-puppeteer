@@ -33,12 +33,7 @@ import {
     renderTerminalPreviewSummary,
     terminalPreviewSummaryRole,
 } from '../capabilities/index.js';
-import {
-    terminalThemeDivider,
-    terminalThemeHeadline,
-    terminalThemeRow,
-    terminalThemeRows,
-} from '../state/index.js';
+import { terminalThemeDivider, terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -88,7 +83,7 @@ function printGhUsage(println, usage) {
 /**
  * @param {(text: string) => void} println
  * @param {string} title
- * @param {Array<string | null | undefined | false>} [details=[]]
+ * @param {(string | null | undefined | false)[]} [details=[]] Default is `[]`
  * @returns {void}
  */
 function printGhSection(println, title, details = []) {
@@ -100,7 +95,7 @@ function printGhSection(println, title, details = []) {
  * @param {(text: string) => void} println
  * @param {string} label
  * @param {string} value
- * @param {import('../state/ui-theme.js').TerminalThemeRole} [role='muted']
+ * @param {import('../state/ui-theme.js').TerminalThemeRole} [role='muted'] Default is `'muted'`
  * @returns {void}
  */
 function printGhRow(println, label, value, role = 'muted') {
@@ -246,12 +241,7 @@ async function handlePr(println, args) {
         }
         const rendered = renderTerminalDiffPreview(diff, { forceJs: plain, lineLimit: 220 });
         printGhSection(println, `PR #${n} diff`, ['GitHub']);
-        printGhRow(
-            println,
-            'Preview',
-            renderTerminalPreviewSummary(rendered),
-            terminalPreviewSummaryRole(rendered),
-        );
+        printGhRow(println, 'Preview', renderTerminalPreviewSummary(rendered), terminalPreviewSummaryRole(rendered));
         println(rendered.output);
         return;
     }
@@ -427,7 +417,11 @@ function printHelp(println) {
     println(
         terminalThemeRows(
             'PRs',
-            ['/gh pr list [open|closed|merged] · lista PRs', '/gh pr <n> · detalhe', '/gh pr diff <n> [--plain] · diff'],
+            [
+                '/gh pr list [open|closed|merged] · lista PRs',
+                '/gh pr <n> · detalhe',
+                '/gh pr diff <n> [--plain] · diff',
+            ],
             { role: 'command' },
         ),
     );

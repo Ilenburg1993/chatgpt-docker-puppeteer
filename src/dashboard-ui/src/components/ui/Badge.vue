@@ -6,10 +6,11 @@ import { computed } from 'vue';
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 type BadgeSize = 'sm' | 'md' | 'lg';
 
-const props = withDefaults(
-    defineProps<{ variant?: BadgeVariant; size?: BadgeSize; class?: string }>(),
-    { variant: 'default', size: 'md', class: '' },
-);
+const props = withDefaults(defineProps<{ variant?: BadgeVariant; size?: BadgeSize; class?: string }>(), {
+    variant: 'default',
+    size: 'md',
+    class: '',
+});
 
 const badgeVariants = cva('inline-flex items-center justify-center rounded-md font-medium', {
     variants: {

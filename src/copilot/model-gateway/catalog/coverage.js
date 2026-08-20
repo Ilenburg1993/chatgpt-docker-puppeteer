@@ -52,7 +52,12 @@ function providerId(row) {
  * @returns {string}
  */
 function providerModel(row) {
-    return optionalString(row['providerModel']) ?? optionalString(row['model']) ?? optionalString(row['id']) ?? 'unknown-model';
+    return (
+        optionalString(row['providerModel']) ??
+        optionalString(row['model']) ??
+        optionalString(row['id']) ??
+        'unknown-model'
+    );
 }
 
 /**
@@ -165,11 +170,19 @@ function providerModelSet(rows) {
  * @param {object} [options]
  * @param {Date} [options.now]
  * @returns {{
- *   providerCount: number;
- *   sourceCount: number;
- *   expiredSourceCount: number;
- *   ttlKnownSourceCount: number;
- *   providers: Array<{ providerId: string; sourceCount: number; expiredSourceCount: number; ttlKnownSourceCount: number; newestAgeSeconds: number | null; oldestAgeSeconds: number | null; averageAgeSeconds: number | null }>;
+ *     providerCount: number;
+ *     sourceCount: number;
+ *     expiredSourceCount: number;
+ *     ttlKnownSourceCount: number;
+ *     providers: {
+ *         providerId: string;
+ *         sourceCount: number;
+ *         expiredSourceCount: number;
+ *         ttlKnownSourceCount: number;
+ *         newestAgeSeconds: number | null;
+ *         oldestAgeSeconds: number | null;
+ *         averageAgeSeconds: number | null;
+ *     }[];
  * }}
  */
 export function summarizeModelGatewayProviderFreshness(snapshot, options = {}) {
@@ -188,10 +201,12 @@ export function summarizeModelGatewayProviderFreshness(snapshot, options = {}) {
             providerId: id,
             sourceCount: providerSources.length,
             expiredSourceCount,
-            ttlKnownSourceCount: providerSources.filter((source) => positiveNumber(source['ttlSeconds']) !== null).length,
+            ttlKnownSourceCount: providerSources.filter((source) => positiveNumber(source['ttlSeconds']) !== null)
+                .length,
             newestAgeSeconds: ages.length === 0 ? null : Math.min(...ages),
             oldestAgeSeconds: ages.length === 0 ? null : Math.max(...ages),
-            averageAgeSeconds: ages.length === 0 ? null : Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length),
+            averageAgeSeconds:
+                ages.length === 0 ? null : Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length),
         };
     });
     return {
@@ -233,23 +248,40 @@ export function projectModelGatewayProviderFreshnessMetrics(summary) {
 /**
  * @param {Record<string, unknown>} snapshot
  * @returns {{
- *   providerCount: number;
- *   modelCount: number;
- *   modelEvidenceCount: number;
- *   providerEvidenceCount: number;
- *   routeOptionCount: number;
- *   accountOverlayCount: number;
- *   eligibilityDecisionCount: number;
- *   pricingKnownModelCount: number;
- *   limitsKnownModelCount: number;
- *   dataPolicyKnownModelCount: number;
- *   runtimeAgenticTaxonomyModelCount: number;
- *   pricingTaxonomyModelCount: number;
- *   rateLimitTaxonomyModelCount: number;
- *   dataPolicyTaxonomyModelCount: number;
- *   routeCoverageRatio: number;
- *   overlayCoverageRatio: number;
- *   providers: Array<{ providerId: string; modelCount: number; modelEvidenceCount: number; providerEvidenceCount: number; routeOptionCount: number; accountOverlayCount: number; eligibilityDecisionCount: number; pricingKnownModelCount: number; limitsKnownModelCount: number; dataPolicyKnownModelCount: number; runtimeAgenticTaxonomyModelCount: number; pricingTaxonomyModelCount: number; rateLimitTaxonomyModelCount: number; dataPolicyTaxonomyModelCount: number; routeCoverageRatio: number; overlayAvailable: boolean }>;
+ *     providerCount: number;
+ *     modelCount: number;
+ *     modelEvidenceCount: number;
+ *     providerEvidenceCount: number;
+ *     routeOptionCount: number;
+ *     accountOverlayCount: number;
+ *     eligibilityDecisionCount: number;
+ *     pricingKnownModelCount: number;
+ *     limitsKnownModelCount: number;
+ *     dataPolicyKnownModelCount: number;
+ *     runtimeAgenticTaxonomyModelCount: number;
+ *     pricingTaxonomyModelCount: number;
+ *     rateLimitTaxonomyModelCount: number;
+ *     dataPolicyTaxonomyModelCount: number;
+ *     routeCoverageRatio: number;
+ *     overlayCoverageRatio: number;
+ *     providers: {
+ *         providerId: string;
+ *         modelCount: number;
+ *         modelEvidenceCount: number;
+ *         providerEvidenceCount: number;
+ *         routeOptionCount: number;
+ *         accountOverlayCount: number;
+ *         eligibilityDecisionCount: number;
+ *         pricingKnownModelCount: number;
+ *         limitsKnownModelCount: number;
+ *         dataPolicyKnownModelCount: number;
+ *         runtimeAgenticTaxonomyModelCount: number;
+ *         pricingTaxonomyModelCount: number;
+ *         rateLimitTaxonomyModelCount: number;
+ *         dataPolicyTaxonomyModelCount: number;
+ *         routeCoverageRatio: number;
+ *         overlayAvailable: boolean;
+ *     }[];
  * }}
  */
 export function summarizeModelGatewayMetadataCoverage(snapshot) {
@@ -259,7 +291,9 @@ export function summarizeModelGatewayMetadataCoverage(snapshot) {
     const routeOptions = records(snapshot['routeOptions']);
     const accountOverlays = records(snapshot['accountOverlays']);
     const eligibilityDecisions = records(snapshot['modelEligibilityDecisions']);
-    const providers = [...providerSet([...projections, ...modelEvidence, ...providerEvidence, ...routeOptions, ...accountOverlays])].sort();
+    const providers = [
+        ...providerSet([...projections, ...modelEvidence, ...providerEvidence, ...routeOptions, ...accountOverlays]),
+    ].sort();
     const routedModels = providerModelSet(routeOptions);
     const overlayProviders = providerSet(accountOverlays);
     const providerSummaries = providers.map((id) => {

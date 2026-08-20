@@ -17,7 +17,13 @@
 
 import { recordToolCall } from '#copilot/observability';
 import { getShowToolActivity } from '../../presentation/state/index.js';
-import { broadcastSse, clearInlineStatus, parkTerminalPromptForContinuation, println, writeInlineStatus } from '../dialog/io/index.js';
+import {
+    broadcastSse,
+    clearInlineStatus,
+    parkTerminalPromptForContinuation,
+    println,
+    writeInlineStatus,
+} from '../dialog/io/index.js';
 import { readTerminalRuntimeState } from '../frontend/gateways/index.js';
 import {
     completeTerminalTurnToolCall,
@@ -55,16 +61,7 @@ import {
 const DURABLE_TOOL_PROGRESS_INTERVAL_MS = 4_000;
 const DURABLE_TOOL_PROGRESS_PERCENT_STEP = 25;
 const TOOL_TURN_PROMPT_PARK_MS = 12_000;
-const POST_TOOL_USE_RESULT_OPERATIONS = new Set([
-    'create',
-    'delete',
-    'edit',
-    'move',
-    'read',
-    'run',
-    'search',
-    'write',
-]);
+const POST_TOOL_USE_RESULT_OPERATIONS = new Set(['create', 'delete', 'edit', 'move', 'read', 'run', 'search', 'write']);
 
 /**
  * @param {string} toolName
@@ -161,7 +158,7 @@ function terminalToolOperationCompletionLabels(operation) {
 /**
  * @param {import('./tool-activity-presenter.js').TerminalToolActivityPresentation} presentation
  * @param {'start' | 'progress' | 'partial' | 'complete' | 'user_requested'} stage
- * @param {boolean | null} [success=null]
+ * @param {boolean | null} [success=null] Default is `null`
  * @returns {string}
  */
 function terminalActivityLabelForPresentation(presentation, stage, success = null) {
@@ -1228,7 +1225,11 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
             severity: success ? 'info' : 'error',
         },
     );
-    const canPrintExternalComplete = shouldPrintToolNarration(completedEntry ?? resolvedEntry, resolvedToolCallId, registry);
+    const canPrintExternalComplete = shouldPrintToolNarration(
+        completedEntry ?? resolvedEntry,
+        resolvedToolCallId,
+        registry,
+    );
     if (canPrintExternalComplete) {
         printToolComplete(presentation, success, durationLabel, resolvedToolCallId);
     } else if (
@@ -1272,8 +1273,8 @@ export function handleTerminalExternalToolCompleted({ registry, evt, verboseNarr
  * Reconciliacao tardia do hook `postToolUse`.
  *
  * Alguns eventos SDK marcam `external_completed` antes de o hook `postToolUse` expor o resultado real. Para tools de
- * shell/comando, isso pode significar `external_completed success=true` seguido por `textResultForLlm` com
- * `{ success:false, exitCode:7 }`. A tela humana deve refletir o resultado real da tool.
+ * shell/comando, isso pode significar `external_completed success=true` seguido por `textResultForLlm` com `{
+ * success:false, exitCode:7 }`. A tela humana deve refletir o resultado real da tool.
  *
  * @param {{
  *     registry: ReturnType<typeof import('../state/tool-call-registry.js').createToolCallRegistry>;
@@ -1299,7 +1300,8 @@ export function reconcileTerminalPostToolUseResult({ registry, evt }) {
         toolName,
     );
     const canonicalName = presentation.canonicalToolName ?? presentation.toolName;
-    const eventToolCallId = typeof evt['toolCallId'] === 'string' && evt['toolCallId'].trim() ? evt['toolCallId'] : null;
+    const eventToolCallId =
+        typeof evt['toolCallId'] === 'string' && evt['toolCallId'].trim() ? evt['toolCallId'] : null;
     const requestId = typeof evt['requestId'] === 'string' && evt['requestId'].trim() ? evt['requestId'] : null;
     const resolvedEntry =
         (eventToolCallId ? registry.getEntry(eventToolCallId) : null) ??

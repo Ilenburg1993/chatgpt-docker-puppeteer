@@ -1,13 +1,13 @@
 // @ts-check
-import assert from 'node:assert';
-import fs from 'fs/promises';
-import path from 'node:path';
-import EventEmitter from 'node:events';
-import { describe, it, beforeEach, afterEach } from 'node:test';
-import { MissionStateManager, MISSION_STATUS } from '#missions/mission_state_manager';
-import { WorkflowGenerator } from '#missions/workflow_generator';
 import { MissionManager } from '#missions/mission_manager';
+import { MISSION_STATUS, MissionStateManager } from '#missions/mission_state_manager';
+import { WorkflowGenerator } from '#missions/workflow_generator';
 import { ActionCode, MessageType } from '#shared/nerv/constants';
+import fs from 'fs/promises';
+import assert from 'node:assert';
+import EventEmitter from 'node:events';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 // Diretórios de teste
 const TEST_MISSIONS_DIR = path.join(import.meta.dirname, '../../tmp/missions');
@@ -31,7 +31,7 @@ class MockNERV extends EventEmitter {
     }
 
     receive(/** @type {any} */ envelope) {
-        this.receiveHandlers.forEach(h => h(envelope));
+        this.receiveHandlers.forEach((h) => h(envelope));
     }
 
     emitCommand(/** @type {any} */ envelope) {
@@ -56,7 +56,15 @@ class MockKernel {
 
 // Helper: envelope do driver → mission manager (formato resiliente)
 /**
- * @param {{ actionCode: any, missionId: any, taskId: any, stepId: any, result?: any, error?: any, correlationId?: any }} opts
+ * @param {{
+ *     actionCode: any;
+ *     missionId: any;
+ *     taskId: any;
+ *     stepId: any;
+ *     result?: any;
+ *     error?: any;
+ *     correlationId?: any;
+ * }} opts
  */
 function buildTaskEnvelope({
     actionCode,
@@ -95,7 +103,7 @@ async function waitForCondition(/** @type {any} */ predicate, { timeoutMs = 1500
         if (Date.now() - start >= timeoutMs) {
             throw new Error('Timed out waiting for condition');
         }
-        await new Promise(resolve => setTimeout(resolve, intervalMs));
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
 }
 
@@ -217,7 +225,7 @@ describe('MissionStateManager (filesystem persistence)', () => {
             assert.ok(updated.updated_at !== updated.created_at);
 
             const hasStatusChange = updated.history.some(
-                (/** @type {any} */ h) => h.event === 'STATUS_CHANGED' && h.msg.includes('pending → running')
+                (/** @type {any} */ h) => h.event === 'STATUS_CHANGED' && h.msg.includes('pending → running'),
             );
             assert.ok(hasStatusChange, 'Histórico contém mudança de status');
         });
@@ -371,7 +379,7 @@ describe('WorkflowGenerator (template → workflow)', () => {
         it('should validate required params', async () => {
             await assert.rejects(
                 generator.generateWorkflow('book_writing', {}),
-                /Parâmetro obrigatório ausente: topic/
+                /Parâmetro obrigatório ausente: topic/,
             );
         });
 
@@ -381,7 +389,7 @@ describe('WorkflowGenerator (template → workflow)', () => {
                     topic: 'Rust',
                     num_chapters: 100,
                 }),
-                /deve ser <= 50/
+                /deve ser <= 50/,
             );
         });
     });
@@ -400,8 +408,8 @@ describe('MissionManager (end-to-end)', () => {
     /** @type {any} */ let missionManager;
     /** @type {any} */ let kernel;
     /** @type {any} */ let nerv;
-    /** @type {string|undefined} */ let prevMissionDispatchMode;
-    /** @type {string|undefined} */ let prevMissionLegacyDispatchEnabled;
+    /** @type {string | undefined} */ let prevMissionDispatchMode;
+    /** @type {string | undefined} */ let prevMissionLegacyDispatchEnabled;
 
     beforeEach(async () => {
         // Este suite valida integração histórica com mock de kernel (dispatch direto).
@@ -599,10 +607,10 @@ describe('MissionManager (end-to-end)', () => {
                     taskId: firstTask.meta.id,
                     stepId: firstTask.meta.step_id,
                     result: { output: 'should be ignored' },
-                })
+                }),
             );
 
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise((resolve) => setTimeout(resolve, 50));
 
             const state = await missionManager.getMission(created.id);
             assert.strictEqual(state.progress.current_step, 0, 'Progresso não deve avançar com missão pausada');

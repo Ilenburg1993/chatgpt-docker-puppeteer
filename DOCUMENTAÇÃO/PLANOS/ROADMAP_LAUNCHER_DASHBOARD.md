@@ -723,20 +723,19 @@ io.on('connection', (socket) => {
 | M7        | Dashboard completo                | Semana 10         |
 | M8        | Integra (Atualizado - 21/01/2026) |
 
-| Milestone                                 | Entregável                    | Status                       | Data                                           |
-| ----------------------------------------- | ----------------------------- | ---------------------------- | ---------------------------------------------- | ----- | ------------------------------------ |
-| M1                                        | Auditorias completas          | ✅ CONCLUÍDO                 | 20/01/2026                                     |
-| M2                                        | Documentação canônica         | ✅ CONCLUÍDO                 | 20/01/2026                                     |
-| ~~M3~~                                    | ~~Launcher Tauri MVP~~        | ❌ CANCELADO                 | -                                              |
-| **M3**                                    | **Super Launcher PM2-First**  | ✅ **CONCLUÍDO**             | **21/01/2026**                                 |
-| M4                                        | Launcher em produção          | ⏳ TESTES                    | Semana 4                                       |
-| M5                                        | Dashboard MVP (Tasks + Queue) | ⏳ PLANEJADO                 | Semana 6                                       |
-| M6                                        | Dashboard Analytics           | ⏳ PLANEJADO                 | Semana 8                                       |
-| M7                                        | Dashboard completo            | ⏳ PLANEJADO                 | Semana 10                                      |
-| M8                                        | Integração final              | ⏳ PLANEJADOfalse positives) | Média                                          | Médio | Retry com backoff + múltiplos checks |
-| Dashboard muito complexo (scope creep)    | Alta                          | Alto                         | Implementar MVP primeiro, features em releases |
-| IPC instável (JSON stdin/out)             | Baixa                         | Médio                        | Fallback para TCP sockets se necessário        |
-| Real-time (Socket.io) degrada performance | Média                         | Baixo                        | Rate limiting + batching de eventos            |
+| Milestone | Entregável | Status | Data | | ----------------------------------------- |
+----------------------------- | ---------------------------- |
+---------------------------------------------- | ----- | ------------------------------------ | | M1
+| Auditorias completas | ✅ CONCLUÍDO | 20/01/2026 | | M2 | Documentação canônica | ✅ CONCLUÍDO |
+20/01/2026 | | ~~M3~~ | ~~Launcher Tauri MVP~~ | ❌ CANCELADO | - | | **M3** | **Super Launcher
+PM2-First** | ✅ **CONCLUÍDO** | **21/01/2026** | | M4 | Launcher em produção | ⏳ TESTES | Semana 4
+| | M5 | Dashboard MVP (Tasks + Queue) | ⏳ PLANEJADO | Semana 6 | | M6 | Dashboard Analytics | ⏳
+PLANEJADO | Semana 8 | | M7 | Dashboard completo | ⏳ PLANEJADO | Semana 10 | | M8 | Integração
+final | ⏳ PLANEJADOfalse positives) | Média | Médio | Retry com backoff + múltiplos checks | |
+Dashboard muito complexo (scope creep) | Alta | Alto | Implementar MVP primeiro, features em
+releases | | IPC instável (JSON stdin/out) | Baixa | Médio | Fallback para TCP sockets se necessário
+| | Real-time (Socket.io) degrada performance | Média | Baixo | Rate limiting + batching de eventos
+|
 
 ### Contingências
 

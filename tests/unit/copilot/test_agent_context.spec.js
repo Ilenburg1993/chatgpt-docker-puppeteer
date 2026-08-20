@@ -182,7 +182,10 @@ describe('AgentContext', () => {
         assert.equal(metadata['dialog.loop']?.['provider'], 'agent/dialog/loop-manager');
 
         metadata['dialog.loop'] = { provider: 'mutated' };
-        assert.equal(ctx.getContextFactoryCapabilitiesSnapshot()['dialog.loop']?.['provider'], 'agent/dialog/loop-manager');
+        assert.equal(
+            ctx.getContextFactoryCapabilitiesSnapshot()['dialog.loop']?.['provider'],
+            'agent/dialog/loop-manager',
+        );
     });
 
     it('backgroundTasks emite completed e idle via emitter', async () => {
@@ -520,14 +523,15 @@ describe('AgentContext', () => {
         if (!captured) {
             throw new Error('callbacks do keepalive não foram capturados');
         }
-        const keepaliveCallbacks = /**
-         * @type {{
-         *     performKeepalive: () => Promise<'client.ping' | 'session.send' | null>;
-         *     isIdle: () => boolean;
-         *     isDialogLoopActive: () => boolean;
-         *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
-         * }}
-         */ (captured);
+        const keepaliveCallbacks =
+            /**
+             * @type {{
+             *     performKeepalive: () => Promise<'client.ping' | 'session.send' | null>;
+             *     isIdle: () => boolean;
+             *     isDialogLoopActive: () => boolean;
+             *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
+             * }}
+             */ (captured);
         assert.equal(typeof keepaliveCallbacks.performKeepalive, 'function');
         assert.equal(keepaliveCallbacks.isIdle(), true);
         assert.equal(keepaliveCallbacks.isDialogLoopActive(), false);

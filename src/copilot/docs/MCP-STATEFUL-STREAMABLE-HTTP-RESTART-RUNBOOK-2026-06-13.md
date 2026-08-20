@@ -1,20 +1,25 @@
 # MCP Stateful Streamable HTTP — runbook de reinicio
 
-Data: 2026-06-13
-Estado: pronto para reinicio com runtime stateful obrigatório no caminho OAuth; GET/SSE autenticado ainda em diagnóstico por timeout remoto.
+Data: 2026-06-13 Estado: pronto para reinicio com runtime stateful obrigatório no caminho OAuth;
+GET/SSE autenticado ainda em diagnóstico por timeout remoto.
 
 ## Objetivo
 
-Subir o MCP remoto usando o novo caminho stateful Streamable HTTP, mantendo fallback controlado apenas por flag explicita.
+Subir o MCP remoto usando o novo caminho stateful Streamable HTTP, mantendo fallback controlado
+apenas por flag explicita.
 
 ## Codigo incluido neste corte
 
-- `src/copilot/mcp/adapters/http-body.js`: leitura segura de body JSON e classificacao initialize/session.
-- `src/copilot/mcp/adapters/http-stateful-router.js`: initialize stateful, reuso por `Mcp-Session-Id`, GET/SSE em transporte vivo, DELETE com `204`, event store e auth binding.
-- `src/copilot/mcp/control-plane/session-runtime.js`: runtime process-local com TTL, limites, tombstones e metricas.
+- `src/copilot/mcp/adapters/http-body.js`: leitura segura de body JSON e classificacao
+  initialize/session.
+- `src/copilot/mcp/adapters/http-stateful-router.js`: initialize stateful, reuso por
+  `Mcp-Session-Id`, GET/SSE em transporte vivo, DELETE com `204`, event store e auth binding.
+- `src/copilot/mcp/control-plane/session-runtime.js`: runtime process-local com TTL, limites,
+  tombstones e metricas.
 - `src/copilot/mcp/control-plane/session-store.js`: store SQLite de metadados redigidos.
 - `src/copilot/mcp/control-plane/event-store.js`: event store compativel com SDK para resumability.
-- `src/copilot/mcp/control-plane/stream-registry.js`: registry process-local de streams SSE redigido.
+- `src/copilot/mcp/control-plane/stream-registry.js`: registry process-local de streams SSE
+  redigido.
 
 ## Comandos canonicos sincronizados
 
@@ -63,7 +68,8 @@ npm run copilot:mcp:stateful:restart-ready
 
 ## Segredo canonico de sessao
 
-O segredo de hash de sessao agora e criado/carregado automaticamente pelos comandos stateful canonicos. O arquivo local e ignorado pelo Git:
+O segredo de hash de sessao agora e criado/carregado automaticamente pelos comandos stateful
+canonicos. O arquivo local e ignorado pelo Git:
 
 ```text
 src/copilot/.ai/mcp/stateful-session.env
@@ -76,7 +82,8 @@ make mcp-stateful-secret-ensure
 make mcp-stateful-secret-status
 ```
 
-Os comandos `make copilot-mcp-up`, `make copilot-mcp-restart`, `make copilot-mcp-h2-up` e `make copilot-mcp-h2-restart` carregam esse env automaticamente com:
+Os comandos `make copilot-mcp-up`, `make copilot-mcp-restart`, `make copilot-mcp-h2-up` e
+`make copilot-mcp-h2-restart` carregam esse env automaticamente com:
 
 ```text
 COPILOT_MCP_HTTP_STATEFUL_SESSIONS=true
@@ -92,8 +99,10 @@ Notas:
 - O segredo e persistente entre reinicios.
 - O arquivo recebe permissao `0600`.
 - O valor bruto nao e impresso por `status`; apenas um preview redigido.
-- Arquivos antigos com `COPILOT_MCP_HTTP_MAX_SESSIONS=32` sao auto-atualizados para `256` sem rotacionar o segredo.
-- O limite existe para conter consumo de memoria, streams vivos, event/resume state e abusos/retries; saturacao agora retorna 503 claro antes do SDK.
+- Arquivos antigos com `COPILOT_MCP_HTTP_MAX_SESSIONS=32` sao auto-atualizados para `256` sem
+  rotacionar o segredo.
+- O limite existe para conter consumo de memoria, streams vivos, event/resume state e
+  abusos/retries; saturacao agora retorna 503 claro antes do SDK.
 
 ## Rollback imediato
 
@@ -107,12 +116,22 @@ Depois reinicie o processo MCP.
 
 ## Estado auditado em 2026-06-14 UTC
 
-> Atualização desta rodada: documentação revisada contra o código atual; transformação de código ficou limitada por bloqueio de escrita em arquivos-fonte do workspace nesta sessão, então os itens novos abaixo ficam como próximos patches aplicáveis. Probes confirmaram que algumas ações mutáveis são barradas antes de alcançar o MCP; a mitigação é planejar com ferramenta read-only, reduzir payload, suprimir diff e aplicar em chamada única quando a camada host permitir.
+> Atualização desta rodada: documentação revisada contra o código atual; transformação de código
+> ficou limitada por bloqueio de escrita em arquivos-fonte do workspace nesta sessão, então os itens
+> novos abaixo ficam como próximos patches aplicáveis. Probes confirmaram que algumas ações mutáveis
+> são barradas antes de alcançar o MCP; a mitigação é planejar com ferramenta read-only, reduzir
+> payload, suprimir diff e aplicar em chamada única quando a camada host permitir.
 
-- [x] `mcp_runtime_health` indica stateful policy carregada: `enabled=true`, `statelessCompat=false`, contrato pós-initialize ativo e fallback stateless indisponível no processo atual.
-- [x] Smoke OAuth autenticado executa `mcp_runtime_health` e `tools/list` via sessão; `tools/list` retornou 102/102 tools após normalização de resposta POST em SSE.
-- [ ] GET/SSE autenticado ainda aborta por timeout; manter este ponto como gate de promoção antes de declarar P0 remoto encerrado.
-- [ ] O gate vivo de Cloudflare ainda pode reprovar por contador agregado `requestErrorRate` até o processo MCP carregar a heurística nova; o teste unitário da heurística já passou no `mcp-full` job `36828763-587d-4f35-9127-c11fd87cfe30`.
+- [x] `mcp_runtime_health` indica stateful policy carregada: `enabled=true`,
+      `statelessCompat=false`, contrato pós-initialize ativo e fallback stateless indisponível no
+      processo atual.
+- [x] Smoke OAuth autenticado executa `mcp_runtime_health` e `tools/list` via sessão; `tools/list`
+      retornou 102/102 tools após normalização de resposta POST em SSE.
+- [ ] GET/SSE autenticado ainda aborta por timeout; manter este ponto como gate de promoção antes de
+      declarar P0 remoto encerrado.
+- [ ] O gate vivo de Cloudflare ainda pode reprovar por contador agregado `requestErrorRate` até o
+      processo MCP carregar a heurística nova; o teste unitário da heurística já passou no
+      `mcp-full` job `36828763-587d-4f35-9127-c11fd87cfe30`.
 
 ## Checklist antes do reinicio
 
@@ -127,7 +146,8 @@ Depois reinicie o processo MCP.
 
 ## Sequencia operacional
 
-1. Rodar `make mcp-stateful-secret-status` para validar/atualizar o env local sem imprimir segredo bruto.
+1. Rodar `make mcp-stateful-secret-status` para validar/atualizar o env local sem imprimir segredo
+   bruto.
 2. Rodar `make mcp-stateful-restart-ready`.
 3. Reiniciar com `make copilot-mcp-restart`.
 4. Manter o Cloudflare Tunnel apontando para o mesmo origin HTTP/2+.
@@ -143,6 +163,9 @@ Depois reinicie o processo MCP.
 
 ## Limitacoes conhecidas para proxima faixa
 
-- Heartbeat/retry customizado para SSE ainda nao foi aprofundado alem do comportamento do transporte SDK.
-- Smoke SSE remoto autenticado e reconnect remoto com `Last-Event-ID` ainda ficam para a proxima faixa.
-- Multi-runtime/HA real ainda exige sticky routing ou roteamento por session owner; o rollout atual permanece single-origin stateful.
+- Heartbeat/retry customizado para SSE ainda nao foi aprofundado alem do comportamento do transporte
+  SDK.
+- Smoke SSE remoto autenticado e reconnect remoto com `Last-Event-ID` ainda ficam para a proxima
+  faixa.
+- Multi-runtime/HA real ainda exige sticky routing ou roteamento por session owner; o rollout atual
+  permanece single-origin stateful.

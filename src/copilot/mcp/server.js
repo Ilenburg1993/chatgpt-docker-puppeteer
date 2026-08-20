@@ -11,20 +11,16 @@
  * @module copilot/mcp/server
  */
 
-import {
-    logMcp,
-    readMcpSchemaConvergenceState,
-    recordMcpDescriptorObservation,
-} from '#copilot/mcp/control-plane';
+import { logMcp, readMcpSchemaConvergenceState, recordMcpDescriptorObservation } from '#copilot/mcp/control-plane';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createHash } from 'node:crypto';
-import { registerCopilotAppsSdkResources } from './tools/apps-sdk-resources.js';
 import {
     getCanonicalMcpRegistryState,
     getCanonicalMcpTools,
     getCanonicalMcpToolSurfaceState,
     registerCanonicalMcpTools,
 } from './registry.js';
+import { registerCopilotAppsSdkResources } from './tools/apps-sdk-resources.js';
 
 export const COPILOT_MCP_SERVER_FACTORY_NAME = 'copilot-mcp-server-factory';
 export const COPILOT_MCP_SERVER_FACTORY_VERSION = '1.2.0';

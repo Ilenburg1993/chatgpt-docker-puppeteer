@@ -2,7 +2,8 @@
 
 The repository does not use raw `tsserver` JSON over stdio as the user-facing contract.
 
-Instead, it preserves an opt-in wrapper over the native TypeScript 7 LSP with a smaller operation set defined by:
+Instead, it preserves an opt-in wrapper over the native TypeScript 7 LSP with a smaller operation
+set defined by:
 
 - [`schemas/typing/tsserver-tool-contract.schema.json`](../../../../schemas/typing/tsserver-tool-contract.schema.json)
 - [`src/integration/lsp/tsgo-lsp-daemon.mjs`](../../../../src/integration/lsp/tsgo-lsp-daemon.mjs)

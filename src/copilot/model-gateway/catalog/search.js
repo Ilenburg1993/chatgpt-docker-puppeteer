@@ -82,7 +82,8 @@ function countSameModelRows(projection, rows) {
         (row) =>
             optionalString(row['providerId']) === optionalString(projection['providerId']) &&
             optionalString(row['providerModel']) === optionalString(projection['providerModel']) &&
-            (optionalString(row['routeProfile']) ?? 'default') === (optionalString(projection['routeProfile']) ?? 'default'),
+            (optionalString(row['routeProfile']) ?? 'default') ===
+                (optionalString(projection['routeProfile']) ?? 'default'),
     ).length;
 }
 
@@ -134,25 +135,22 @@ function scoreProjectionText(projection, terms) {
  * @param {boolean} [options.requireStreaming]
  * @param {boolean} [options.requireReasoning]
  * @param {number} [options.limit]
- * @returns {Array<{
- *   key: string;
- *   providerId: string;
- *   providerModel: string;
- *   displayName: string;
- *   score: number;
- *   matchedFields: string[];
- *   routeOptionCount: number;
- *   accountOverlayCount: number;
- *   eligibilityStatus: string;
- *   projection: Record<string, unknown>;
- * }>}
+ * @returns {{
+ *     key: string;
+ *     providerId: string;
+ *     providerModel: string;
+ *     displayName: string;
+ *     score: number;
+ *     matchedFields: string[];
+ *     routeOptionCount: number;
+ *     accountOverlayCount: number;
+ *     eligibilityStatus: string;
+ *     projection: Record<string, unknown>;
+ * }[]}
  */
 export function searchModelGatewayCatalogEntries(snapshot, options = {}) {
     const catalog = normalizeStoredCatalogSnapshot(snapshot);
-    const terms = (optionalString(options.query) ?? '')
-        .toLowerCase()
-        .split(/\s+/u)
-        .filter(Boolean);
+    const terms = (optionalString(options.query) ?? '').toLowerCase().split(/\s+/u).filter(Boolean);
     const providerFilter = optionalString(options.providerId)?.toLowerCase() ?? null;
     const limit = Math.min(Math.max(Math.floor(options.limit ?? 20), 1), 200);
     const decisions = catalog.modelEligibilityDecisions.filter(isRecord);
@@ -173,7 +171,7 @@ export function searchModelGatewayCatalogEntries(snapshot, options = {}) {
                 eligibility?.['include'] === true
                     ? 'eligible'
                     : eligibility
-                      ? optionalString(eligibility['disposition']) ?? 'excluded'
+                      ? (optionalString(eligibility['disposition']) ?? 'excluded')
                       : 'unknown';
             const routeOptionCount = countSameModelRows(projection, routeOptions);
             const accountOverlayCount = accountOverlays.filter(
@@ -188,7 +186,10 @@ export function searchModelGatewayCatalogEntries(snapshot, options = {}) {
                 key: projectionKey(projection),
                 providerId: optionalString(projection['providerId']) ?? 'unknown-provider',
                 providerModel: optionalString(projection['providerModel']) ?? 'unknown-model',
-                displayName: optionalString(projection['displayName']) ?? optionalString(projection['providerModel']) ?? 'unknown',
+                displayName:
+                    optionalString(projection['displayName']) ??
+                    optionalString(projection['providerModel']) ??
+                    'unknown',
                 score,
                 matched: textScore.matched,
                 matchedFields: textScore.matchedFields,

@@ -45,15 +45,18 @@ function createMockResponseV2(/** @type {string} */ text) {
 function createMinimalTask(/** @type {string} */ taskId) {
     return {
         meta: { id: taskId },
-        result: /** @type {{
-         *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
-         *     generation?: unknown;
-         *     preview?: unknown;
-         *     validation?: unknown;
-         *     file_path?: string;
-         *     raw_output_preview?: string;
-         *     finish_reason?: string;
-         * }} */ ({}),
+        result:
+            /**
+             * @type {{
+             *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
+             *     generation?: unknown;
+             *     preview?: unknown;
+             *     validation?: unknown;
+             *     file_path?: string;
+             *     raw_output_preview?: string;
+             *     finish_reason?: string;
+             * }}
+             */ ({}),
     };
 }
 
@@ -161,7 +164,11 @@ async function runAllTests() {
             await saveResponse(taskId, response, task);
 
             const mdContent = await loadResponse(taskId, 'markdown');
-            if (typeof mdContent !== 'string' || !mdContent.includes('Load test') || !mdContent.startsWith('# Response')) {
+            if (
+                typeof mdContent !== 'string' ||
+                !mdContent.includes('Load test') ||
+                !mdContent.startsWith('# Response')
+            ) {
                 throw new Error('Markdown loading failed');
             }
 

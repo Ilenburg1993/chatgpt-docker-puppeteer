@@ -5,13 +5,7 @@ import { AUDIT_PHASES } from './event_types.mjs';
  * @typedef {object} BuildPhasePlanOptions
  * @property {'quick' | 'deep' | 'nightly'} profile
  * @property {'smart' | 'force' | 'skip'} refreshContextMode
- * @property {'observability'
- *     | 'reactive_bug'
- *     | 'exploratory_bug'
- *     | 'contracts'
- *     | 'security'
- *     | 'performance'
- *     | 'architecture'} auditMode
+ * @property {'observability' | 'reactive_bug' | 'exploratory_bug' | 'contracts' | 'security' | 'performance' | 'architecture'} auditMode
  */
 /**
  * @param {BuildPhasePlanOptions} options
@@ -105,7 +99,7 @@ export function buildPhasePlan(options) {
                       'static.forbidden',
                       'static.lint',
                       'static.typecheck',
-                      'static.madge',
+                      'static.depgraph',
                       'static.depcruise',
                       'static.jscpd',
                       'static.semgrep',

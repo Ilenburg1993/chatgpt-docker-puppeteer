@@ -1,7 +1,14 @@
 // @ts-check
 import { formatHttpError, http } from '@/lib/http';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
-/** @import { DashboardEvent, DashboardGraph, DashboardMission, DashboardProposal, DashboardTask, MissionProgressSelection } from '@/types/dashboard' */
+/** @import {
+  DashboardEvent,
+  DashboardGraph,
+  DashboardMission,
+  DashboardProposal,
+  DashboardTask,
+  MissionProgressSelection
+} from '@/types/dashboard' */
 import { defineStore } from 'pinia';
 
 function _normalizeUpper(/** @type {any} */ value) {

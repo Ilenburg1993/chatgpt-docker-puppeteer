@@ -2,7 +2,8 @@
 
 Data: 2026-06-04
 
-Escopo: `src/copilot/terminal`, UX do Terminal LLM-B, comandos canônicos, lives PTY, integração com BYOK/model-gateway e superfícies humanas de operação.
+Escopo: `src/copilot/terminal`, UX do Terminal LLM-B, comandos canônicos, lives PTY, integração com
+BYOK/model-gateway e superfícies humanas de operação.
 
 Documento relacionado:
 
@@ -11,7 +12,8 @@ Documento relacionado:
 
 ## 1. Papel deste documento
 
-Este documento substitui o uso informal da lista de ferramentas auxiliares como "coisas legais de terminal" por um contrato de arquitetura.
+Este documento substitui o uso informal da lista de ferramentas auxiliares como "coisas legais de
+terminal" por um contrato de arquitetura.
 
 O terminal da LLM-B deve continuar sendo:
 
@@ -42,7 +44,8 @@ As libs abaixo são enriquecimentos opcionais. Nenhuma é fundação obrigatóri
 - [x] O registry trata `batcat` como alternativa a `bat`.
 - [x] `atuin` e `zoxide` são detectáveis, mas ficam `deferred` e `defaultEnabled=false`.
 - [x] Todos os itens atuais estão `defaultEnabled=false`.
-- [x] Existe `/terminal libs`, `/terminal libs detail`, `/terminal libs json`, `/terminal libs refresh` e `/libs`.
+- [x] Existe `/terminal libs`, `/terminal libs detail`, `/terminal libs json`,
+      `/terminal libs refresh` e `/libs`.
 - [x] Existe preview read-only de arquivos com `bat`/`batcat` e fallback JS.
 - [x] Existe preview Markdown explícito com `glow` e fallback JS.
 - [x] Existe preview de diff explícito com `delta` e fallback JS.
@@ -52,7 +55,8 @@ As libs abaixo são enriquecimentos opcionais. Nenhuma é fundação obrigatóri
 - [x] Existe gateway de TTY exclusivo em `dialog/output.js`.
 - [x] O picker default continua textual e seguro.
 - [x] A live filtrada já exercitou `fzf --filter`, seleção e restauração de prompt.
-- [x] A live visual TUI completa ainda não foi validada de modo literal no mesmo terminal do operador humano.
+- [x] A live visual TUI completa ainda não foi validada de modo literal no mesmo terminal do
+      operador humano.
 
 ## 3. Fontes oficiais reconsultadas em 2026-06-04
 
@@ -65,7 +69,8 @@ Fonte oficial:
 Achados:
 
 - [x] `gum` é descrito como ferramenta para scripts shell com utilitários prontos.
-- [x] A documentação lista comandos interativos como `choose`, `confirm`, `file`, `filter`, `input`, `write` e `pager`.
+- [x] A documentação lista comandos interativos como `choose`, `confirm`, `file`, `filter`, `input`,
+      `write` e `pager`.
 - [x] A documentação lista comandos de formatação como `format`, `join`, `style`, `table` e `log`.
 - [x] `gum confirm` usa código de saída para afirmar ou negar.
 - [x] `gum input`, `gum write`, `gum choose`, `gum filter`, `gum file` e `gum pager` tomam o TTY.
@@ -91,14 +96,18 @@ Achados:
 - [x] A seleção via stdout se encaixa bem em adapters sem shell livre.
 - [x] O preview do `fzf` usa comando shell configurável.
 - [x] A documentação/manpage descreve placeholders no preview e variáveis como `FZF_PREVIEW_LINES`.
-- [x] O preview embutido é poderoso, mas é exatamente a parte mais perigosa se receber path ou conteúdo sem tokenização.
+- [x] O preview embutido é poderoso, mas é exatamente a parte mais perigosa se receber path ou
+      conteúdo sem tokenização.
 
 Decisão:
 
-- [x] Aceitar `fzf` para seleção explícita de menus, arquivos, sessões, resultados, comandos e modelos.
+- [x] Aceitar `fzf` para seleção explícita de menus, arquivos, sessões, resultados, comandos e
+      modelos.
 - [x] Continuar evitando `fzf --preview` até existir adapter próprio sem shell livre.
-- [x] Usar `fzf --filter` em automação PTY quando a intenção é provar handoff/seleção sem emular TUI visual completa.
-- [x] Validar visualmente a TUI completa em terminal real antes de promovê-la como recomendação default.
+- [x] Usar `fzf --filter` em automação PTY quando a intenção é provar handoff/seleção sem emular TUI
+      visual completa.
+- [x] Validar visualmente a TUI completa em terminal real antes de promovê-la como recomendação
+      default.
 
 ## 3.3 bat / batcat
 
@@ -109,8 +118,10 @@ Fonte oficial:
 Achados:
 
 - [x] `bat` fornece syntax highlighting, line numbers e integração Git.
-- [x] A própria documentação recomenda `--paging=never` quando se quer comportamento semelhante a `cat`.
-- [x] A documentação mostra uso típico com `fzf --preview`, incluindo `--color=always`, `--style=numbers` e `--line-range`.
+- [x] A própria documentação recomenda `--paging=never` quando se quer comportamento semelhante a
+      `cat`.
+- [x] A documentação mostra uso típico com `fzf --preview`, incluindo `--color=always`,
+      `--style=numbers` e `--line-range`.
 - [x] Em alguns ambientes Debian/Ubuntu o binário pode se chamar `batcat`.
 
 Decisão:
@@ -153,7 +164,8 @@ Achados:
 
 - [x] `delta` é pager/syntax highlighter para Git, diff e grep.
 - [x] Pode ser usado com unified diff via stdin.
-- [x] Como é pager por vocação, precisa ser forçado para superfície não paginada quando a UX default é persistente.
+- [x] Como é pager por vocação, precisa ser forçado para superfície não paginada quando a UX default
+      é persistente.
 
 Decisão:
 
@@ -216,17 +228,21 @@ Achados:
 
 - [x] Atuin substitui histórico shell por SQLite e registra contexto adicional de comandos.
 - [x] Sync é opcional e criptografado, mas ainda envolve estado pessoal sensível.
-- [x] A documentação lista hooks para agentes, inclusive Codex, gravando comandos de ferramenta Bash.
+- [x] A documentação lista hooks para agentes, inclusive Codex, gravando comandos de ferramenta
+      Bash.
 - [x] Atuin AI tem sua própria UX de LLM, permissões e detecção de comandos perigosos.
-- [x] Integrar isso diretamente ao Terminal LLM-B criaria paralelismo de histórico, permissões e assistência.
+- [x] Integrar isso diretamente ao Terminal LLM-B criaria paralelismo de histórico, permissões e
+      assistência.
 
 Decisão:
 
 - [x] Adiar integração ativa.
 - [x] Não ler histórico externo por padrão.
 - [x] Não instalar hooks Atuin automaticamente.
-- [x] Não chamar `atuin search`, `atuin history`, `atuin sync` ou `atuin hook install` automaticamente.
-- [x] Futuro possível: comando de diagnóstico opt-in que apenas explique status local, sem capturar histórico.
+- [x] Não chamar `atuin search`, `atuin history`, `atuin sync` ou `atuin hook install`
+      automaticamente.
+- [x] Futuro possível: comando de diagnóstico opt-in que apenas explique status local, sem capturar
+      histórico.
 
 ## 3.9 zoxide
 
@@ -247,7 +263,8 @@ Decisão:
 
 - [x] Adiar integração ativa.
 - [x] Não mudar cwd canônico com base em ranking pessoal.
-- [x] Futuro possível: `/cd --interactive --zoxide` somente se houver comando de navegação explícito, escopo permitido e rollback claro.
+- [x] Futuro possível: `/cd --interactive --zoxide` somente se houver comando de navegação
+      explícito, escopo permitido e rollback claro.
 
 ## 4. Arquitetura ideal
 
@@ -280,8 +297,10 @@ Decisão:
 - [x] Default humano deve ser curto.
 - [x] Detail deve explicar path, versão, risco e fallback.
 - [x] JSON deve existir para scripts/LLMs, mas não aparecer por fallback default.
-- [x] JSON e logs de diagnóstico devem remover ANSI, CR solto e controles vindos de binários externos.
-- [x] JSON de `/terminal libs json` deve ter `schema`, `generatedAt` ISO e política operacional explícita.
+- [x] JSON e logs de diagnóstico devem remover ANSI, CR solto e controles vindos de binários
+      externos.
+- [x] JSON de `/terminal libs json` deve ter `schema`, `generatedAt` ISO e política operacional
+      explícita.
 - [x] Cada ferramenta aceita deve ter exemplo humano claro de uso.
 - [x] Cada ferramenta adiada deve explicar o motivo em termos operacionais, não apenas "adiada".
 - [x] O terminal deve sugerir comandos canônicos, não flags obscuras.
@@ -289,15 +308,21 @@ Decisão:
 ## 5. Gaps atuais
 
 - [x] `/terminal libs detail` mostra exemplos por ferramenta.
-- [x] `/terminal libs detail` diferencia `aceita`, `aceita com guardas` e `adiada` em termos de política de execução.
-- [x] `/terminal libs` aceita filtros por disponibilidade, decisão e ferramenta para reduzir rolagem humana.
+- [x] `/terminal libs detail` diferencia `aceita`, `aceita com guardas` e `adiada` em termos de
+      política de execução.
+- [x] `/terminal libs` aceita filtros por disponibilidade, decisão e ferramenta para reduzir rolagem
+      humana.
 - [x] `/help libs` oferece descoberta temática sem abrir o catálogo completo.
 - [x] `/help full` tem uma seção rica de libs auxiliares com exemplos e fallbacks.
-- [ ] O picker externo ainda não tem preview seguro integrado; decisão atual é manter sem preview embutido.
-- [x] Há comando de auditoria único que roda bateria local não interativa de previews para demonstrar renderer/fallback.
+- [ ] O picker externo ainda não tem preview seguro integrado; decisão atual é manter sem preview
+      embutido.
+- [x] Há comando de auditoria único que roda bateria local não interativa de previews para
+      demonstrar renderer/fallback.
 - [x] Versões e diagnósticos de ferramentas externas passam por sanitização antes de JSON/log.
-- [x] Previews estruturados sem cor preservam JSON/YAML, mas removem ANSI e controles de renderers externos.
-- [ ] A TUI visual completa de `fzf`/`gum` ainda depende de validação manual/assistida em terminal real.
+- [x] Previews estruturados sem cor preservam JSON/YAML, mas removem ANSI e controles de renderers
+      externos.
+- [ ] A TUI visual completa de `fzf`/`gum` ainda depende de validação manual/assistida em terminal
+      real.
 - [x] `atuin` e `zoxide` estão corretamente adiados e o terminal explica que aparecem apenas como
       inventário/planejamento, sem chamada automática.
 
@@ -320,13 +345,16 @@ Decisão:
 - [x] Fase B.4: adicionar exemplos por ferramenta em detail.
 - [x] Fase B.5: adicionar política curta por ferramenta em detail.
 - [x] Fase B.6: adicionar nota explícita de que `defaultEnabled=false` preserva portabilidade.
-- [x] Fase B.7: transformar `/terminal libs json` em envelope versionável com `schema`, timestamp e policy.
-- [x] Fase B.8: adicionar filtros `available`, `missing`, `accepted`, `guarded`, `deferred` e `<tool>`.
+- [x] Fase B.7: transformar `/terminal libs json` em envelope versionável com `schema`, timestamp e
+      policy.
+- [x] Fase B.8: adicionar filtros `available`, `missing`, `accepted`, `guarded`, `deferred` e
+      `<tool>`.
 
 ### Faixa C: Help e descoberta
 
 - [x] Fase C.1: `/menu` contém `Libs auxiliares`.
-- [x] Fase C.2: `/help full` deve listar comandos de preview com `--plain`, `--markdown`, `--json`, `--yaml`, `/git diff`, `/gh pr diff`.
+- [x] Fase C.2: `/help full` deve listar comandos de preview com `--plain`, `--markdown`, `--json`,
+      `--yaml`, `/git diff`, `/gh pr diff`.
 - [x] Fase C.3: `/help full` deve listar que `atuin` e `zoxide` são detectados, mas não usados.
 - [x] Fase C.4: `/help full` deve apontar `/terminal libs detail` como diagnóstico.
 - [x] Fase C.5: `/help libs` deve oferecer ajuda temática curta para filtros, previews, TUI e smoke.
@@ -336,7 +364,8 @@ Decisão:
 - [x] Fase D.1: `bat`/`batcat` sem pager.
 - [x] Fase D.2: fallback JS.
 - [x] Fase D.3: detecção de binário/controle.
-- [x] Fase D.4: comando de smoke local para provar fallback em `PATH` vazio e renderer real quando disponível.
+- [x] Fase D.4: comando de smoke local para provar fallback em `PATH` vazio e renderer real quando
+      disponível.
 
 ### Faixa E: Markdown
 
@@ -366,8 +395,10 @@ Decisão:
 - [x] Fase G2.1: centralizar sanitização de versões e mensagens de ferramentas externas.
 - [x] Fase G2.2: remover ANSI/OSC, CR solto e controles não textuais antes de contratos JSON/log.
 - [x] Fase G2.3: truncar diagnóstico externo para não poluir `/terminal libs json` nem smoke.
-- [x] Fase G2.4: manter sanitização de preview separada da sanitização diagnóstica para não colapsar JSON/YAML.
-- [x] Fase G2.5: ampliar o smoke para verificar explicitamente que o JSON emitido não contém escapes ANSI.
+- [x] Fase G2.4: manter sanitização de preview separada da sanitização diagnóstica para não colapsar
+      JSON/YAML.
+- [x] Fase G2.5: ampliar o smoke para verificar explicitamente que o JSON emitido não contém escapes
+      ANSI.
 
 ### Faixa H: Picker e TTY
 
@@ -377,7 +408,8 @@ Decisão:
 - [x] Fase H.4: live filtrada com `fzf --filter`.
 - [ ] Fase H.5: live visual/manual de `fzf` TUI completa.
 - [ ] Fase H.6: live visual/manual de `gum` quando instalado.
-- [ ] Fase H.7: decidir se preview embutido será rejeitado permanentemente ou implementado via adapter seguro.
+- [ ] Fase H.7: decidir se preview embutido será rejeitado permanentemente ou implementado via
+      adapter seguro.
 
 ### Faixa I: Atuin e zoxide
 
@@ -434,8 +466,8 @@ Decisão:
   - resultado: PASS em 5/5 critérios;
   - escopo real da prova: `fzf --filter`, handoff exclusivo, seleção, roteamento por `/status` e
     restauração de prompt;
-  - limite conhecido: não é prova visual completa de TUI fullscreen, porque o harness PTY não
-    emula todas as respostas de terminal necessárias para esse modo.
+  - limite conhecido: não é prova visual completa de TUI fullscreen, porque o harness PTY não emula
+    todas as respostas de terminal necessárias para esse modo.
 - [x] Reconciliação documental pós-commit:
   - checklist de gaps ajustada para refletir que exemplos por ferramenta, política por ferramenta,
     seção rica de `/help full` e smoke local já foram implementados e validados;
@@ -448,9 +480,11 @@ Decisão:
   - libs adiadas ficam como inventário/planejamento, sem chamada automática.
 - [x] Bug de poluição visual corrigido:
   - importar e executar `/terminal libs detail` isoladamente não inicializa mais log lateral de DB;
-  - `terminal/commands/terminal.js` usa o registry específico de external tools em vez do barrel amplo;
+  - `terminal/commands/terminal.js` usa o registry específico de external tools em vez do barrel
+    amplo;
   - `diff-preview.js` usa o módulo específico de tema visual em vez do barrel amplo de state;
-  - teste de processo filho garante ausência de `[db]` e `SQLite copilot ready` no output do comando.
+  - teste de processo filho garante ausência de `[db]` e `SQLite copilot ready` no output do
+    comando.
 - [x] Boot humano protegido contra INFO precoce do DB:
   - o logger default do SQLite só imprime WARN/ERROR/FATAL antes da observabilidade central;
   - INFO de prontidão do DB deixa de ocupar a primeira linha do terminal;
@@ -466,11 +500,13 @@ Decisão:
   - medição final não encontrou linhas internas acima de 120 colunas no `plain.log`.
 - [x] Higiene de saída externa consolidada:
   - `external-tools.js` agora expõe sanitização diagnóstica e sanitização preservadora de texto;
-  - versões de ferramentas externas não carregam ANSI/OSC, CR solto ou controles para `/terminal libs json`;
+  - versões de ferramentas externas não carregam ANSI/OSC, CR solto ou controles para
+    `/terminal libs json`;
   - `structured-preview.js` usa sanitização preservadora quando a superfície exige saída sem cor;
   - `terminal:aux-libs:smoke` passa a falhar com `json-envelope-clean` se o envelope JSON carregar
     ANSI/OSC/CR solto/controles;
-  - testes unitários cobrem ANSI, retorno de carro e controle em versão/diagnóstico e em texto estruturado.
+  - testes unitários cobrem ANSI, retorno de carro e controle em versão/diagnóstico e em texto
+    estruturado.
 - [x] Contrato JSON de libs versionado:
   - `/terminal libs json` agora emite `schema=terminal-external-tools-capability-summary`;
   - `generatedAt` usa ISO 8601 completo com milissegundos e timezone UTC;
@@ -478,8 +514,8 @@ Decisão:
 - [x] Filtros de UX para reduzir rolagem:
   - `/terminal libs deferred` mostra apenas ferramentas adiadas;
   - `/terminal libs detail fzf` mostra uma ferramenta específica;
-  - `/terminal libs json deferred` preserva contadores globais e emite `filter` com `query`, `label`,
-    `matched` e `count`;
+  - `/terminal libs json deferred` preserva contadores globais e emite `filter` com `query`,
+    `label`, `matched` e `count`;
   - filtros sem resultado geram aviso humano e não despejam JSON bruto.
 - [x] Ajuda temática de libs:
   - `/help libs` renderiza uma superfície específica para inspeção, previews, TUI e smoke;
@@ -494,12 +530,13 @@ Decisão:
     abrir enquanto `ask_user`, pergunta estruturada ou qualquer input humano pendente estiver ativo;
   - `cmdMenu()` agora lê `readTerminalRuntimeState()` também no caminho interativo e passa a
     pendência real para `buildTerminalPickerPlan()`;
-  - teste unitário cobre pergunta humana pendente com TTY pronto e garante que
-    `withExclusiveTty()` não é chamado.
+  - teste unitário cobre pergunta humana pendente com TTY pronto e garante que `withExclusiveTty()`
+    não é chamado.
 - [x] Live de regressão do picker interativo após o guardrail:
   - `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms 90000 --label terminal-picker-pending-guard-after-menu-fix-20260604`;
   - artefato: `artifacts/terminal-live/2026-06-04T19-13-40-513Z/summary.md`;
-  - resultado: PASS em 5/5 critérios, com `fzf --filter`, roteamento para `/status` e fechamento limpo.
+  - resultado: PASS em 5/5 critérios, com `fzf --filter`, roteamento para `/status` e fechamento
+    limpo.
 - [x] Guardrail de option-injection em preview com `bat`:
   - reauditoria de `file-preview.js` confirmou que o caminho era tokenizado, mas ainda entrava sem
     separador de opções;

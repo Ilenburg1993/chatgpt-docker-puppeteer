@@ -14,12 +14,14 @@ describe('MCP dependency maintenance', () => {
         assert.equal(readDeclaredNpmVersionFromPackageText('{"packageManager":"npm@latest"}'), null);
     });
 
-
     it('classifies install-script policy without trusting newly introduced package names', () => {
         const policy = summarizeInstallScriptPolicy({
             allowScripts: [
                 { name: 'node-pty', changes: [{ key: 'node-pty@1.1.0', change: 'pending' }] },
-                { name: 'unexpected-native-package', changes: [{ key: 'unexpected-native-package@1.0.0', change: 'pending' }] },
+                {
+                    name: 'unexpected-native-package',
+                    changes: [{ key: 'unexpected-native-package@1.0.0', change: 'pending' }],
+                },
                 { name: 'esbuild', changes: [{ key: 'esbuild@0.28.2', change: 'allowed' }] },
             ],
         });

@@ -2,7 +2,8 @@
 
 Data: 2026-05-24  
 Escopo: `src/copilot`  
-Objetivo: transformar a base atual, construída sobre `@github/copilot-sdk` 0.3.x e BYOK, em um runtime próprio multi-provider, onde OpenRouter é apenas um provider entre muitos.
+Objetivo: transformar a base atual, construída sobre `@github/copilot-sdk` 0.3.x e BYOK, em um
+runtime próprio multi-provider, onde OpenRouter é apenas um provider entre muitos.
 
 ---
 
@@ -40,7 +41,8 @@ A base atual já contém vários elementos valiosos para um router universal BYO
 - admissão por orçamento de tokens para evitar chamadas BYOK inviáveis;
 - taxonomia de falhas externas BYOK.
 
-A principal conclusão é que o projeto **não precisa começar do zero**. Ele já possui cerca de 60% das peças conceituais. O problema é que elas estão no lugar errado para o objetivo novo.
+A principal conclusão é que o projeto **não precisa começar do zero**. Ele já possui cerca de 60%
+das peças conceituais. O problema é que elas estão no lugar errado para o objetivo novo.
 
 Hoje, BYOK está distribuído assim:
 
@@ -68,7 +70,8 @@ src/copilot/model-gateway/telemetry       -> health, custo, latência, falhas e 
 A tese central é:
 
 > `@github/copilot-sdk` deve continuar sendo o runtime agentic e a fronteira vanilla.  
-> O novo domínio `model-gateway` deve ser o cérebro de catálogo, BYOK, roteamento, probes e governança.  
+> O novo domínio `model-gateway` deve ser o cérebro de catálogo, BYOK, roteamento, probes e
+> governança.  
 > OpenRouter deve ser somente um `ProviderAdapter`, não a fundação da arquitetura.
 
 ---
@@ -79,22 +82,22 @@ A tese central é:
 
 Arquivos e módulos prioritários lidos durante a investigação:
 
-| Área | Arquivos principais | Leitura arquitetural |
-|---|---|---|
-| Mapa canônico | `src/copilot/README.md` | Define `sdk/` como wrapper canônico do SDK vanilla e `agent/` como runtime contínuo. |
-| SDK wrapper | `src/copilot/sdk/README.md` | Define surfaces estáveis como `#copilot/sdk/session`, `#copilot/sdk/models`, `#copilot/sdk/tools`, etc. |
-| BYOK atual | `src/copilot/sdk/session/provider.js` | Concentra presets, env vars, descoberta de modelos, ProviderConfig, redaction e resolução de sessão. |
-| Client options | `src/copilot/sdk/session/client-options.js` | Injeta `onListModels` quando BYOK está configurado. |
-| Lifecycle SDK | `src/copilot/sdk/session/lifecycle.js` | Cria/retoma sessão e passa `provider` para o SDK. |
-| Registry atual | `src/copilot/sdk/models/registry.js` | Catálogo estático simples: id, custo, velocidade, contexto, reasoning e vision. |
-| Model seeds | `src/copilot/sdk/models/known-models.js` | Lista modelos conhecidos, mas sem provider, endpoint, supported parameters ou proveniência. |
-| Selector atual | `src/copilot/sdk/models/selector.js` | Score por custo/velocidade/contexto/stats. Útil, mas ainda insuficiente para roteamento universal. |
-| Stats atual | `src/copilot/sdk/models/stats-tracker.js` | Latência, sucesso e tokens por modelo; sem provider dimensionado. |
-| Config BYOK | `src/copilot/config/byok.js`, `src/copilot/config/sdk-config-port.js` | Reexports seguros para consumidores fora do SDK, mas ainda acoplam BYOK ao SDK. |
-| Saúde BYOK | `src/copilot/terminal/state/byok-provider-health.js` | Health operacional provider/modelo com persistência e redaction. |
-| Probes BYOK | `src/copilot/terminal/frontend/gateways/sdk-session.js` | Probes descartáveis de chat e agent, incluindo tools e ask_user. |
-| Admissão BYOK | `src/copilot/terminal/byok/admission.js` | Budget guard para contexto/token antes de probe ou turno vivo. |
-| Falhas BYOK | `src/copilot/terminal/byok/provider-failure.js` | Taxonomia de erros externos: auth, créditos, rate limit, upstream etc. |
+| Área           | Arquivos principais                                                   | Leitura arquitetural                                                                                    |
+| -------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Mapa canônico  | `src/copilot/README.md`                                               | Define `sdk/` como wrapper canônico do SDK vanilla e `agent/` como runtime contínuo.                    |
+| SDK wrapper    | `src/copilot/sdk/README.md`                                           | Define surfaces estáveis como `#copilot/sdk/session`, `#copilot/sdk/models`, `#copilot/sdk/tools`, etc. |
+| BYOK atual     | `src/copilot/sdk/session/provider.js`                                 | Concentra presets, env vars, descoberta de modelos, ProviderConfig, redaction e resolução de sessão.    |
+| Client options | `src/copilot/sdk/session/client-options.js`                           | Injeta `onListModels` quando BYOK está configurado.                                                     |
+| Lifecycle SDK  | `src/copilot/sdk/session/lifecycle.js`                                | Cria/retoma sessão e passa `provider` para o SDK.                                                       |
+| Registry atual | `src/copilot/sdk/models/registry.js`                                  | Catálogo estático simples: id, custo, velocidade, contexto, reasoning e vision.                         |
+| Model seeds    | `src/copilot/sdk/models/known-models.js`                              | Lista modelos conhecidos, mas sem provider, endpoint, supported parameters ou proveniência.             |
+| Selector atual | `src/copilot/sdk/models/selector.js`                                  | Score por custo/velocidade/contexto/stats. Útil, mas ainda insuficiente para roteamento universal.      |
+| Stats atual    | `src/copilot/sdk/models/stats-tracker.js`                             | Latência, sucesso e tokens por modelo; sem provider dimensionado.                                       |
+| Config BYOK    | `src/copilot/config/byok.js`, `src/copilot/config/sdk-config-port.js` | Reexports seguros para consumidores fora do SDK, mas ainda acoplam BYOK ao SDK.                         |
+| Saúde BYOK     | `src/copilot/terminal/state/byok-provider-health.js`                  | Health operacional provider/modelo com persistência e redaction.                                        |
+| Probes BYOK    | `src/copilot/terminal/frontend/gateways/sdk-session.js`               | Probes descartáveis de chat e agent, incluindo tools e ask_user.                                        |
+| Admissão BYOK  | `src/copilot/terminal/byok/admission.js`                              | Budget guard para contexto/token antes de probe ou turno vivo.                                          |
+| Falhas BYOK    | `src/copilot/terminal/byok/provider-failure.js`                       | Taxonomia de erros externos: auth, créditos, rate limit, upstream etc.                                  |
 
 ### 2.2 Documentação oficial consultada
 
@@ -111,7 +114,9 @@ As referências estão no final do documento.
 
 ### 3.1 GitHub Copilot SDK BYOK é preview
 
-A documentação oficial informa que o Copilot SDK está em public preview e que funcionalidade/disponibilidade podem mudar. Isso implica que nossa arquitetura deve conter uma camada de isolamento explícita entre domínio próprio e SDK.
+A documentação oficial informa que o Copilot SDK está em public preview e que
+funcionalidade/disponibilidade podem mudar. Isso implica que nossa arquitetura deve conter uma
+camada de isolamento explícita entre domínio próprio e SDK.
 
 Decisão arquitetural derivada:
 
@@ -156,7 +161,8 @@ O registry próprio precisa conhecer:
 
 ### 3.3 `openai` no SDK significa protocolo OpenAI-compatible
 
-A documentação oficial do GitHub diz que provider type `openai` funciona com OpenAI e endpoints compatíveis, incluindo Ollama, vLLM, Foundry Local, LiteLLM e similares.
+A documentação oficial do GitHub diz que provider type `openai` funciona com OpenAI e endpoints
+compatíveis, incluindo Ollama, vLLM, Foundry Local, LiteLLM e similares.
 
 Isso favorece um adapter genérico:
 
@@ -179,13 +185,15 @@ Mas isso não elimina adapters específicos. Ele só define a ponte final para o
 
 ### 3.4 `wireApi` é uma escolha de protocolo, não de capacidade
 
-`wireApi: 'completions'` usa Chat Completions; `wireApi: 'responses'` usa Responses API para modelos compatíveis.
+`wireApi: 'completions'` usa Chat Completions; `wireApi: 'responses'` usa Responses API para modelos
+compatíveis.
 
 No registry próprio, isso deve estar em `transport` ou `copilotBinding`, não em `capabilities`.
 
 ### 3.5 BYOK exige modelo explícito
 
-O código local já respeita essa restrição: `COPILOT_BYOK_MODEL` não pode ser `auto` quando BYOK está habilitado.
+O código local já respeita essa restrição: `COPILOT_BYOK_MODEL` não pode ser `auto` quando BYOK está
+habilitado.
 
 Isso é correto. Em um router próprio, `auto` deve existir apenas no domínio do roteador:
 
@@ -197,13 +205,17 @@ Copilot SDK recebe: model concreto + provider config
 
 ### 3.6 CLI agentic exige tool calling e streaming
 
-A documentação do Copilot CLI exige que modelos BYOK suportem tool/function calling e streaming; recomenda janela de contexto de pelo menos 128k tokens para melhores resultados.
+A documentação do Copilot CLI exige que modelos BYOK suportem tool/function calling e streaming;
+recomenda janela de contexto de pelo menos 128k tokens para melhores resultados.
 
 Isso justifica probes obrigatórios para qualquer modelo usado em perfis agentic.
 
 ### 3.7 OpenRouter normaliza, mas não deve ser o router interno
 
-OpenRouter declara que sua API normaliza schemas entre modelos/providers em formato similar à OpenAI Chat API. Ele também oferece streaming, roteamento próprio e structured outputs. Entretanto, a própria documentação informa que parâmetros não suportados pelo modelo escolhido podem ser ignorados.
+OpenRouter declara que sua API normaliza schemas entre modelos/providers em formato similar à OpenAI
+Chat API. Ele também oferece streaming, roteamento próprio e structured outputs. Entretanto, a
+própria documentação informa que parâmetros não suportados pelo modelo escolhido podem ser
+ignorados.
 
 Conclusão:
 
@@ -214,7 +226,8 @@ OpenRouter não deve ser a fonte de verdade de capacidades reais do nosso sistem
 
 ### 3.8 MCP é para tools/contexto, não inferência LLM
 
-MCP padroniza descoberta e chamada de tools, incluindo `tools/list`, `tools/call` e `inputSchema`. Ele não é um schema universal de chamada de modelos.
+MCP padroniza descoberta e chamada de tools, incluindo `tools/list`, `tools/call` e `inputSchema`.
+Ele não é um schema universal de chamada de modelos.
 
 Uso recomendado:
 
@@ -256,17 +269,20 @@ SDK/agent events
 
 A regra do projeto é correta:
 
-> quando existir conceito análogo no `@github/copilot-sdk`, o código local deve partir do SDK vanilla e só depois ampliar ergonomia, UX ou governança.
+> quando existir conceito análogo no `@github/copilot-sdk`, o código local deve partir do SDK
+> vanilla e só depois ampliar ergonomia, UX ou governança.
 
 Essa regra deve continuar valendo.
 
-O novo router universal não deve violá-la. Ele deve nascer como domínio próprio acima do SDK, não como mutação da camada SDK.
+O novo router universal não deve violá-la. Ele deve nascer como domínio próprio acima do SDK, não
+como mutação da camada SDK.
 
 ---
 
 ## 4.2 `src/copilot/sdk` está bem definido
 
-`src/copilot/sdk/README.md` define o SDK como fronteira canônica para o `@github/copilot-sdk`, com surfaces explícitas:
+`src/copilot/sdk/README.md` define o SDK como fronteira canônica para o `@github/copilot-sdk`, com
+surfaces explícitas:
 
 ```txt
 #copilot/sdk/session
@@ -334,15 +350,18 @@ chutes
 zai
 ```
 
-Isso prova que o sistema já saiu do estágio “um provider BYOK”. Ele já é, na prática, um mini gateway. A questão é formalizar essa realidade em uma arquitetura própria.
+Isso prova que o sistema já saiu do estágio “um provider BYOK”. Ele já é, na prática, um mini
+gateway. A questão é formalizar essa realidade em uma arquitetura própria.
 
 ---
 
 ## 4.4 `onListModels()` já está sendo usado corretamente
 
-`src/copilot/sdk/session/client-options.js` chama `buildConfiguredByokModelListHandler(process.env)` e injeta o resultado em `ClientOptionsBuilder.onListModels()`.
+`src/copilot/sdk/session/client-options.js` chama `buildConfiguredByokModelListHandler(process.env)`
+e injeta o resultado em `ClientOptionsBuilder.onListModels()`.
 
-Isso está alinhado à documentação oficial do SDK: quando a CLI não sabe quais modelos o provider suporta, o cliente pode fornecer uma lista customizada em formato `ModelInfo`.
+Isso está alinhado à documentação oficial do SDK: quando a CLI não sabe quais modelos o provider
+suporta, o cliente pode fornecer uma lista customizada em formato `ModelInfo`.
 
 Limitação atual:
 
@@ -409,9 +428,12 @@ Faltam campos fundamentais:
 
 ## 4.6 `known-models.js` deve virar seed, não fonte de verdade
 
-`known-models.js` contém IDs de modelos e aliases. Isso serve como fallback, mas não pode ser o catálogo autoritativo.
+`known-models.js` contém IDs de modelos e aliases. Isso serve como fallback, mas não pode ser o
+catálogo autoritativo.
 
-Problema: modelos mudam rapidamente, provedores alteram nomes, limites e capabilities, e alguns IDs no arquivo parecem antecipatórios ou específicos do projeto. Para uma base própria, todo model record precisa de proveniência:
+Problema: modelos mudam rapidamente, provedores alteram nomes, limites e capabilities, e alguns IDs
+no arquivo parecem antecipatórios ou específicos do projeto. Para uma base própria, todo model
+record precisa de proveniência:
 
 ```txt
 manual
@@ -421,7 +443,8 @@ probe_verified
 runtime_observed
 ```
 
-Sem proveniência, o roteador não consegue decidir se um campo é confiável ou apenas uma suposição local.
+Sem proveniência, o roteador não consegue decidir se um campo é confiável ou apenas uma suposição
+local.
 
 ---
 
@@ -454,11 +477,13 @@ Essa peça é valiosa e deve ser promovida para domínio compartilhado.
 - `probeTerminalConfiguredByokChat()`;
 - `probeTerminalConfiguredByokAgent()`.
 
-A probe agent exige capacidades operacionais reais, incluindo tool calls e `ask_user`. Isso é excelente, porque não testa apenas HTTP 200.
+A probe agent exige capacidades operacionais reais, incluindo tool calls e `ask_user`. Isso é
+excelente, porque não testa apenas HTTP 200.
 
 ### Admissão por budget
 
-`src/copilot/terminal/byok/admission.js` evita probes/turnos inviáveis quando o provider tem limite baixo.
+`src/copilot/terminal/byok/admission.js` evita probes/turnos inviáveis quando o provider tem limite
+baixo.
 
 ### Taxonomia de falhas
 
@@ -504,7 +529,8 @@ Isso reduz o custo de introduzir `model-gateway/` como novo domínio.
 
 ### B. O SDK wrapper já é governado
 
-O `sdk/README.md` mostra que o projeto já passou por uma limpeza de aliases e surfaces. Isso é importante: o novo router não deve desfazer esse avanço.
+O `sdk/README.md` mostra que o projeto já passou por uma limpeza de aliases e surfaces. Isso é
+importante: o novo router não deve desfazer esse avanço.
 
 ### C. BYOK já suporta múltiplos providers
 
@@ -512,11 +538,13 @@ Apesar de monolítico, `provider.js` já conhece diversos providers e endpoints 
 
 ### D. Existe noção de health/probe
 
-Muitos routers falham porque tratam catálogo como verdade. Este projeto já entendeu que runtime health e probes são necessários.
+Muitos routers falham porque tratam catálogo como verdade. Este projeto já entendeu que runtime
+health e probes são necessários.
 
 ### E. O terminal já possui affordances operacionais
 
-Comandos como `/byok`, health, probe, diagnóstico e session status já têm base para evoluir para um cockpit multi-provider.
+Comandos como `/byok`, health, probe, diagnóstico e session status já têm base para evoluir para um
+cockpit multi-provider.
 
 ---
 
@@ -604,7 +632,8 @@ O terminal deveria apenas renderizar.
 
 ### F. OpenRouter está hard-coded como preset
 
-Para o objetivo declarado, OpenRouter precisa ser um adapter normal. Ele pode ter importer próprio, headers próprios e capabilities próprias, mas não deve ocupar lugar especial.
+Para o objetivo declarado, OpenRouter precisa ser um adapter normal. Ele pode ter importer próprio,
+headers próprios e capabilities próprias, mas não deve ocupar lugar especial.
 
 ---
 
@@ -612,7 +641,8 @@ Para o objetivo declarado, OpenRouter precisa ser um adapter normal. Ele pode te
 
 ## 6.1 Risco de acoplamento ao preview do SDK
 
-Como o SDK está em public preview, mudanças em `ProviderConfig`, `onListModels`, eventos ou session semantics podem quebrar o domínio BYOK se ele continuar dentro de `sdk/session/provider.js`.
+Como o SDK está em public preview, mudanças em `ProviderConfig`, `onListModels`, eventos ou session
+semantics podem quebrar o domínio BYOK se ele continuar dentro de `sdk/session/provider.js`.
 
 Mitigação:
 
@@ -623,7 +653,8 @@ Manter apenas bridge fina para Copilot SDK.
 
 ## 6.2 Risco de catálogo incorreto
 
-Catálogo estático envelhece rápido. `known-models.js` não deve decidir sozinho qual modelo suporta tools, JSON schema ou reasoning.
+Catálogo estático envelhece rápido. `known-models.js` não deve decidir sozinho qual modelo suporta
+tools, JSON schema ou reasoning.
 
 Mitigação:
 
@@ -633,7 +664,8 @@ ModelRecord com provenance + confidence + lastVerifiedAt + probe results.
 
 ## 6.3 Risco de parâmetro ignorado silenciosamente
 
-OpenRouter documenta que parâmetros não suportados podem ser ignorados. Outros providers também podem aceitar campos e degradar sem erro.
+OpenRouter documenta que parâmetros não suportados podem ser ignorados. Outros providers também
+podem aceitar campos e degradar sem erro.
 
 Mitigação:
 
@@ -713,7 +745,8 @@ App / Terminal / Agent
 5. `SecretRegistry` é o único mecanismo para resolver segredo.
 6. `ModelRegistry` não armazena API key, bearer token ou header sensível.
 7. `onListModels()` é uma projeção do registry, não uma descoberta ad hoc por env ativo.
-8. Probes atualizam capabilities com confidence; catálogo nunca sobrescreve probe mais recente sem downgrade explícito.
+8. Probes atualizam capabilities com confidence; catálogo nunca sobrescreve probe mais recente sem
+   downgrade explícito.
 9. Terminal renderiza estado; não é dono de health, probes ou falhas.
 10. Todo model record deve ter `source`, `confidence` e `updatedAt`.
 
@@ -835,17 +868,17 @@ src/copilot/model-gateway/
 
 ## 8.3 Papel de cada camada
 
-| Camada | Papel | Não deve fazer |
-|---|---|---|
-| `sdk/` | Bridge vanilla para Copilot SDK | Decidir provider ideal, ler todos os envs, guardar catálogo universal |
-| `model-gateway/registry` | Fonte de verdade de modelos/providers/capabilities | Resolver segredo |
-| `model-gateway/providers` | Converter provider/model para transport SDK | Renderizar UX terminal |
-| `model-gateway/secrets` | Resolver `secretRef` em runtime | Salvar segredo em ModelRecord |
-| `model-gateway/probes` | Verificar capacidades reais | Depender de comandos terminal |
-| `model-gateway/routing` | Selecionar modelo/fallback | Criar sessão diretamente |
-| `model-gateway/session` | Ponte final para Copilot SDK | Manter catálogo |
-| `terminal/` | UX e comandos | Ser fonte de health/capability |
-| `observability/` | Métricas, tracing, auditoria | Decidir roteamento |
+| Camada                    | Papel                                              | Não deve fazer                                                        |
+| ------------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| `sdk/`                    | Bridge vanilla para Copilot SDK                    | Decidir provider ideal, ler todos os envs, guardar catálogo universal |
+| `model-gateway/registry`  | Fonte de verdade de modelos/providers/capabilities | Resolver segredo                                                      |
+| `model-gateway/providers` | Converter provider/model para transport SDK        | Renderizar UX terminal                                                |
+| `model-gateway/secrets`   | Resolver `secretRef` em runtime                    | Salvar segredo em ModelRecord                                         |
+| `model-gateway/probes`    | Verificar capacidades reais                        | Depender de comandos terminal                                         |
+| `model-gateway/routing`   | Selecionar modelo/fallback                         | Criar sessão diretamente                                              |
+| `model-gateway/session`   | Ponte final para Copilot SDK                       | Manter catálogo                                                       |
+| `terminal/`               | UX e comandos                                      | Ser fonte de health/capability                                        |
+| `observability/`          | Métricas, tracing, auditoria                       | Decidir roteamento                                                    |
 
 ---
 
@@ -1013,15 +1046,15 @@ export type TaskProfile =
 
 Perfis recomendados:
 
-| Perfil | Requisitos mínimos |
-|---|---|
-| `repo_agent` | `streaming`, `tools`, contexto >= 128k, agent probe ok |
-| `tool_agent` | `tools`, `forcedToolChoice` preferencial, streaming |
-| `json_extraction` | `jsonSchema` ou `jsonMode`; fallback com validator/healing |
-| `vision` | input `image`, contexto suficiente |
-| `deep_reasoning` | `reasoningEffort` ou modelo frontier marcado manualmente/probeado |
-| `local_private` | provider local, sem egress externo, auth opcional |
-| `cheap_chat` | custo baixo, streaming opcional, sem tools obrigatórias |
+| Perfil            | Requisitos mínimos                                                |
+| ----------------- | ----------------------------------------------------------------- |
+| `repo_agent`      | `streaming`, `tools`, contexto >= 128k, agent probe ok            |
+| `tool_agent`      | `tools`, `forcedToolChoice` preferencial, streaming               |
+| `json_extraction` | `jsonSchema` ou `jsonMode`; fallback com validator/healing        |
+| `vision`          | input `image`, contexto suficiente                                |
+| `deep_reasoning`  | `reasoningEffort` ou modelo frontier marcado manualmente/probeado |
+| `local_private`   | provider local, sem egress externo, auth opcional                 |
+| `cheap_chat`      | custo baixo, streaming opcional, sem tools obrigatórias           |
 
 ---
 
@@ -1067,7 +1100,8 @@ probe_verified > manual_override > provider_catalog > openrouter_catalog > stati
 
 ## 10.3 OpenRouter não deve decidir fallback interno
 
-OpenRouter tem fallback próprio de GPUs/providers. Isso é útil quando a chamada já foi roteada para OpenRouter.
+OpenRouter tem fallback próprio de GPUs/providers. Isso é útil quando a chamada já foi roteada para
+OpenRouter.
 
 Mas o nosso router deve decidir primeiro:
 
@@ -1082,7 +1116,8 @@ usar fallback interno?
 
 ## 11. Estratégia para compatibilidade com o código atual
 
-Não recomendo remover o BYOK atual em um grande patch. O risco é alto. A migração deve ser incremental.
+Não recomendo remover o BYOK atual em um grande patch. O risco é alto. A migração deve ser
+incremental.
 
 ## 11.1 Compat layer
 
@@ -1154,7 +1189,8 @@ Objetivo: congelar o entendimento atual e evitar regressão enquanto a extraçã
 
 - Listar todos os consumidores de `resolveConfiguredByokSessionOverrides`.
 - Listar todos os consumidores de `readConfiguredByokSummary`.
-- Listar todos os consumidores de `probeTerminalConfiguredByokChat` e `probeTerminalConfiguredByokAgent`.
+- Listar todos os consumidores de `probeTerminalConfiguredByokChat` e
+  `probeTerminalConfiguredByokAgent`.
 - Listar todos os imports de `#copilot/sdk/session` fora das camadas permitidas.
 
 Entregáveis:
@@ -1472,16 +1508,16 @@ O terminal passa a renderizar o resultado.
 
 Criar probes reutilizáveis:
 
-| Probe | Verifica |
-|---|---|
-| `basic_text` | sessão mínima responde |
-| `streaming` | eventos de delta chegam |
-| `tools` | modelo chama tool simples |
+| Probe                | Verifica                               |
+| -------------------- | -------------------------------------- |
+| `basic_text`         | sessão mínima responde                 |
+| `streaming`          | eventos de delta chegam                |
+| `tools`              | modelo chama tool simples              |
 | `forced_tool_choice` | provider respeita tool_choice required |
-| `json_mode` | retorna JSON válido |
-| `json_schema` | obedece schema estrito |
-| `vision` | aceita imagem mínima |
-| `agent_runtime` | tools + ask_user + ciclo agentic |
+| `json_mode`          | retorna JSON válido                    |
+| `json_schema`        | obedece schema estrito                 |
+| `vision`             | aceita imagem mínima                   |
+| `agent_runtime`      | tools + ask_user + ciclo agentic       |
 
 ### 6.4 Atualização de capabilities
 
@@ -1727,7 +1763,8 @@ Critério de saída:
 
 ## 14.1 Validação imediata após documentação
 
-Como esta etapa só adiciona documentação, não exige typecheck obrigatório. Mesmo assim, antes de refactors de código, registrar baseline:
+Como esta etapa só adiciona documentação, não exige typecheck obrigatório. Mesmo assim, antes de
+refactors de código, registrar baseline:
 
 ```bash
 npm run typecheck:strict:src.copilot
@@ -1737,35 +1774,35 @@ npm run test:copilot:unit
 
 ## 14.2 Validação por fase
 
-| Fase | Validações mínimas |
-|---|---|
-| Faixa 1 | unit tests dos contracts e projections |
-| Faixa 2 | registry load/save/import; snapshot do compat importer |
-| Faixa 3 | adapters geram ProviderConfig válido e redigido |
-| Faixa 4 | secrets nunca aparecem em registry/logs |
-| Faixa 5 | sessão BYOK atual ainda cria com provider/model legado |
-| Faixa 6 | probes chat/agent equivalentes aos atuais continuam passando |
-| Faixa 7 | policy seleciona/rejeita modelos por capability real |
-| Faixa 8 | comandos terminal mostram mesma informação + provenance |
-| Faixa 9 | usage/cost/latency gravados sem segredo |
+| Fase     | Validações mínimas                                            |
+| -------- | ------------------------------------------------------------- |
+| Faixa 1  | unit tests dos contracts e projections                        |
+| Faixa 2  | registry load/save/import; snapshot do compat importer        |
+| Faixa 3  | adapters geram ProviderConfig válido e redigido               |
+| Faixa 4  | secrets nunca aparecem em registry/logs                       |
+| Faixa 5  | sessão BYOK atual ainda cria com provider/model legado        |
+| Faixa 6  | probes chat/agent equivalentes aos atuais continuam passando  |
+| Faixa 7  | policy seleciona/rejeita modelos por capability real          |
+| Faixa 8  | comandos terminal mostram mesma informação + provenance       |
+| Faixa 9  | usage/cost/latency gravados sem segredo                       |
 | Faixa 10 | `sdk/session/provider.js` reduzido sem quebrar compat exports |
 
 ---
 
 ## 15. Glossário operacional
 
-| Termo | Definição |
-|---|---|
-| Provider | Serviço ou endpoint que executa modelos: OpenAI, Anthropic, OpenRouter, Ollama, vLLM etc. |
-| ProviderAdapter | Código que converte ProviderRecord/ModelRecord para ProviderConfig do Copilot SDK. |
-| ModelRecord | Registro canônico de um modelo específico em um provider específico. |
-| Capability | Capacidade declarada ou verificada: tools, streaming, vision, json_schema etc. |
-| Probe | Teste real, geralmente descartável, para verificar comportamento. |
-| Confidence | Grau de confiança da capability: catalog, manual, probe_verified etc. |
-| RouteProfile | Intenção operacional: repo_agent, cheap_chat, json_extraction etc. |
-| Source of truth | Registro próprio do sistema, não a lista estática de modelos nem OpenRouter isoladamente. |
-| OpenAI-compatible | Endpoint que aceita formato de Chat Completions/Responses compatível com OpenAI. |
-| BYOK | Bring Your Own Key: uso de credenciais próprias de providers externos. |
+| Termo             | Definição                                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| Provider          | Serviço ou endpoint que executa modelos: OpenAI, Anthropic, OpenRouter, Ollama, vLLM etc. |
+| ProviderAdapter   | Código que converte ProviderRecord/ModelRecord para ProviderConfig do Copilot SDK.        |
+| ModelRecord       | Registro canônico de um modelo específico em um provider específico.                      |
+| Capability        | Capacidade declarada ou verificada: tools, streaming, vision, json_schema etc.            |
+| Probe             | Teste real, geralmente descartável, para verificar comportamento.                         |
+| Confidence        | Grau de confiança da capability: catalog, manual, probe_verified etc.                     |
+| RouteProfile      | Intenção operacional: repo_agent, cheap_chat, json_extraction etc.                        |
+| Source of truth   | Registro próprio do sistema, não a lista estática de modelos nem OpenRouter isoladamente. |
+| OpenAI-compatible | Endpoint que aceita formato de Chat Completions/Responses compatível com OpenAI.          |
+| BYOK              | Bring Your Own Key: uso de credenciais próprias de providers externos.                    |
 
 ---
 
@@ -1799,4 +1836,7 @@ para:
 ModelGateway próprio, com registry/adapters/probes/routing/health, usando o Copilot SDK como runtime agentic.
 ```
 
-A base atual já tem os blocos corretos, mas ainda não a separação correta. O próximo passo mais importante é criar `src/copilot/model-gateway` como domínio explícito e mover gradualmente para lá as responsabilidades que hoje estão espalhadas entre `sdk/session/provider.js`, `sdk/models/*` e `terminal/byok/*`.
+A base atual já tem os blocos corretos, mas ainda não a separação correta. O próximo passo mais
+importante é criar `src/copilot/model-gateway` como domínio explícito e mover gradualmente para lá
+as responsabilidades que hoje estão espalhadas entre `sdk/session/provider.js`, `sdk/models/*` e
+`terminal/byok/*`.

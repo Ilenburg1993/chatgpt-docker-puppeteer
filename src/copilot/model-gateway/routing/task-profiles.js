@@ -90,7 +90,7 @@ export const MODEL_GATEWAY_TASK_PROFILES = Object.freeze({
 });
 
 /**
- * @returns {Array<(typeof MODEL_GATEWAY_TASK_PROFILES)[keyof typeof MODEL_GATEWAY_TASK_PROFILES]>}
+ * @returns {(typeof MODEL_GATEWAY_TASK_PROFILES)[keyof typeof MODEL_GATEWAY_TASK_PROFILES][]}
  */
 export function listModelGatewayTaskProfiles() {
     return Object.values(MODEL_GATEWAY_TASK_PROFILES);
@@ -102,6 +102,9 @@ export function listModelGatewayTaskProfiles() {
  */
 export function resolveModelGatewayTaskProfile(id) {
     if (typeof id !== 'string') return null;
-    const normalized = id.trim().toLowerCase().replace(/[-\s]+/gu, '_');
+    const normalized = id
+        .trim()
+        .toLowerCase()
+        .replace(/[-\s]+/gu, '_');
     return MODEL_GATEWAY_TASK_PROFILES[/** @type {keyof typeof MODEL_GATEWAY_TASK_PROFILES} */ (normalized)] ?? null;
 }

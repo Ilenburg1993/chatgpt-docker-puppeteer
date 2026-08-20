@@ -130,7 +130,16 @@ export const TERMINAL_AGENT_SSE_PASSTHROUGH_EVENTS = new Set([
  *
  * @type {ReadonlyArray<{
  *     id: string;
- *     class: 'content' | 'interaction' | 'tool' | 'state' | 'telemetry' | 'diagnostic' | 'lifecycle' | 'provider' | 'extension';
+ *     class:
+ *         | 'content'
+ *         | 'interaction'
+ *         | 'tool'
+ *         | 'state'
+ *         | 'telemetry'
+ *         | 'diagnostic'
+ *         | 'lifecycle'
+ *         | 'provider'
+ *         | 'extension';
  *     canonicalEmitter: string;
  *     publicEvents: string[];
  *     accepts: string[];
@@ -217,7 +226,8 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
         publicEvents: ['llm.usage', 'session.usage'],
         accepts: ['assistant.usage', 'session.usage_info', 'llm.usage', 'session.usage'],
         suppresses: ['wording that infers request-based billing from assistant.usage'],
-        fallback: 'usage is attributed by origin/tokens/AI usage; request-based fields are legacy-only when explicitly received',
+        fallback:
+            'usage is attributed by origin/tokens/AI usage; request-based fields are legacy-only when explicitly received',
         owner: 'event-handlers/usage-classifier.js + terminal/events/agent-runtime-events.js',
     },
     {
@@ -303,7 +313,12 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
             'activity.changed',
             'skills.reloaded',
         ],
-        accepts: ['boot phase lifecycle', 'runtime wiring lifecycle', 'pinned context reload', 'activity state changes'],
+        accepts: [
+            'boot phase lifecycle',
+            'runtime wiring lifecycle',
+            'pinned context reload',
+            'activity state changes',
+        ],
         suppresses: ['transient boot degraded states presented as final diagnosis'],
         fallback: 'ready auto-brief supersedes boot partial brief when registry/dialog become canonical',
         owner: 'terminal/runtime-root.js + terminal/terminal-phases/boot-listeners.js + terminal/terminal-phases/boot-pinned.js',
@@ -311,7 +326,7 @@ export const TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES = Object.freeze([
 ]);
 
 /**
- * @returns {Array<(typeof TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES)[number]>}
+ * @returns {(typeof TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES)[number][]}
  */
 export function listTerminalPublicStreamSourcePolicies() {
     return TERMINAL_PUBLIC_STREAM_SOURCE_POLICIES.map((policy) => ({

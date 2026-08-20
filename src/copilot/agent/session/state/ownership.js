@@ -52,9 +52,7 @@ export function syncActiveSessionOwnership(sdkSessionId, deps) {
  *     conversationStore?: { updateSdkSession?: (hubSessionId: string, sdkSessionId: string) => void } | null;
  * }} deps
  * @param {{ label?: string }} [opts]
- * @returns {Promise<
- *     import('../../error/index.js').AgentPolicyResult<ReturnType<typeof syncActiveSessionOwnership>>
- * >}
+ * @returns {Promise<import('../../error/index.js').AgentPolicyResult<ReturnType<typeof syncActiveSessionOwnership>>>}
  */
 export async function syncActiveSessionOwnershipWithPolicy(sdkSessionId, deps, opts = {}) {
     const label = opts.label ?? 'session.ownership.sync';

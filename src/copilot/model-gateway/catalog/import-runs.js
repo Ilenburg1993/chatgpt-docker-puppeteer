@@ -38,7 +38,9 @@ function sanitizePayload(value) {
         return Object.fromEntries(
             Object.entries(value).map(([key, item]) => [
                 key,
-                /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(key)
+                /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(
+                    key,
+                )
                     ? '[redacted]'
                     : sanitizePayload(item),
             ]),
@@ -76,7 +78,18 @@ function sha256(value) {
  * @param {unknown} input.payload
  * @param {string} [input.mediaType]
  * @param {{ mode?: string; maxInlineBytes?: number } | undefined} [input.storagePolicy]
- * @returns {{ schemaVersion: number; rawPayloadRef: string; providerId: string; sourceId: string; mediaType: string; byteLength: number; payloadSha256: string; storagePolicy: string; sanitizedPayload: unknown; redactionStatus: string }}
+ * @returns {{
+ *     schemaVersion: number;
+ *     rawPayloadRef: string;
+ *     providerId: string;
+ *     sourceId: string;
+ *     mediaType: string;
+ *     byteLength: number;
+ *     payloadSha256: string;
+ *     storagePolicy: string;
+ *     sanitizedPayload: unknown;
+ *     redactionStatus: string;
+ * }}
  */
 export function createSanitizedRawPayloadRef(input) {
     const providerId = optionalString(input.providerId);
@@ -87,9 +100,12 @@ export function createSanitizedRawPayloadRef(input) {
     const serialized = stableJson(sanitizedPayload);
     const digest = sha256(serialized);
     const byteLength = Buffer.byteLength(serialized, 'utf8');
-    const policyMode = optionalString(input.storagePolicy?.mode) ?? MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED;
+    const policyMode =
+        optionalString(input.storagePolicy?.mode) ?? MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED;
     const maxInlineBytes = optionalPositiveInteger(input.storagePolicy?.maxInlineBytes);
-    const inlineAllowed = policyMode !== MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY && (maxInlineBytes === null || byteLength <= maxInlineBytes);
+    const inlineAllowed =
+        policyMode !== MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY &&
+        (maxInlineBytes === null || byteLength <= maxInlineBytes);
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         rawPayloadRef: `sha256:${digest}`,
@@ -98,7 +114,9 @@ export function createSanitizedRawPayloadRef(input) {
         mediaType: optionalString(input.mediaType) ?? 'application/json',
         byteLength,
         payloadSha256: digest,
-        storagePolicy: inlineAllowed ? MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED : MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY,
+        storagePolicy: inlineAllowed
+            ? MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.INLINE_SANITIZED
+            : MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY.HASH_ONLY,
         sanitizedPayload: inlineAllowed ? sanitizedPayload : null,
         redactionStatus: 'sanitized',
     };
@@ -139,9 +157,13 @@ export function createCatalogImportRun(input) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} previous
- * @param {Array<Record<string, unknown>>} next
- * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedFields: string[]; changedKinds: string[] }> }}
+ * @param {Record<string, unknown>[]} previous
+ * @param {Record<string, unknown>[]} next
+ * @returns {{
+ *     added: string[];
+ *     removed: string[];
+ *     changed: { key: string; changedFields: string[]; changedKinds: string[] }[];
+ * }}
  */
 export function diffCanonicalModelProjections(previous, next) {
     const previousByKey = new Map(previous.map((item) => [projectionKey(item), item]));
@@ -156,7 +178,8 @@ export function diffCanonicalModelProjections(previous, next) {
             .filter((field) => !['provenanceByField', 'confidenceByField'].includes(field))
             .filter((field) => stableJson(previousItem[field]) !== stableJson(nextItem[field]))
             .sort();
-        if (changedFields.length > 0) changed.push({ key, changedFields, changedKinds: classifyChangedFields(changedFields) });
+        if (changedFields.length > 0)
+            changed.push({ key, changedFields, changedKinds: classifyChangedFields(changedFields) });
     }
     return { added, removed, changed: changed.sort((a, b) => a.key.localeCompare(b.key)) };
 }
@@ -164,14 +187,27 @@ export function diffCanonicalModelProjections(previous, next) {
 /**
  * @param {object} input
  * @param {{ removed?: string[] }} input.diff
- * @param {Array<Record<string, unknown>>} input.previousProjections
+ * @param {Record<string, unknown>[]} input.previousProjections
  * @param {string | number | Date} [input.observedAt]
  * @param {string} [input.reason]
- * @returns {Array<{ schemaVersion: number; tombstoneId: string; projectionKey: string; providerId: string | null; providerModel: string | null; routeProfile: string; displayName: string | null; reason: string; observedAt: string; lastProjection: Record<string, unknown> | null }>}
+ * @returns {{
+ *     schemaVersion: number;
+ *     tombstoneId: string;
+ *     projectionKey: string;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     routeProfile: string;
+ *     displayName: string | null;
+ *     reason: string;
+ *     observedAt: string;
+ *     lastProjection: Record<string, unknown> | null;
+ * }[]}
  */
 export function createCatalogModelTombstones(input) {
     const observedAt = normalizeIsoDate(input.observedAt) ?? new Date().toISOString();
-    const previousByKey = new Map(input.previousProjections.map((projection) => [projectionKey(projection), projection]));
+    const previousByKey = new Map(
+        input.previousProjections.map((projection) => [projectionKey(projection), projection]),
+    );
     return (Array.isArray(input.diff.removed) ? input.diff.removed : []).map((key) => {
         const projection = previousByKey.get(key) ?? null;
         const parsed = parseProjectionKey(key);
@@ -181,7 +217,7 @@ export function createCatalogModelTombstones(input) {
             projectionKey: key,
             providerId: projection ? optionalString(projection['providerId']) : parsed.providerId,
             providerModel: projection ? optionalString(projection['providerModel']) : parsed.providerModel,
-            routeProfile: projection ? optionalString(projection['routeProfile']) ?? 'default' : parsed.routeProfile,
+            routeProfile: projection ? (optionalString(projection['routeProfile']) ?? 'default') : parsed.routeProfile,
             displayName: projection ? optionalString(projection['displayName']) : null,
             reason: optionalString(input.reason) ?? 'catalog_removed',
             observedAt,
@@ -203,8 +239,14 @@ function parseProjectionKey(key) {
 }
 
 /**
- * @param {{ added?: unknown[]; removed?: unknown[]; changed?: Array<{ changedKinds?: unknown[] }> }} diff
- * @returns {{ addedCount: number; removedCount: number; changedCount: number; changedKinds: string[]; changedKindCounts: Record<string, number> }}
+ * @param {{ added?: unknown[]; removed?: unknown[]; changed?: { changedKinds?: unknown[] }[] }} diff
+ * @returns {{
+ *     addedCount: number;
+ *     removedCount: number;
+ *     changedCount: number;
+ *     changedKinds: string[];
+ *     changedKindCounts: Record<string, number>;
+ * }}
  */
 export function summarizeCanonicalModelProjectionDiff(diff) {
     /** @type {Record<string, number>} */

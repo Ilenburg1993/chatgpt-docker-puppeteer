@@ -504,7 +504,6 @@ class HandleManager extends EventEmitter {
             config: { ...HANDLE_CONFIG },
         };
     }
-
 }
 
 /**

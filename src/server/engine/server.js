@@ -1,6 +1,6 @@
 // @ts-check
-/** @import {Server} from "http" */
-/** @import {ServerOptions} from "https" */
+/** @import {Server} from 'http' */
+/** @import {ServerOptions} from 'https' */
 import { log } from '#core/logger';
 import { SSL_OP_NO_TLSv1, SSL_OP_NO_TLSv1_1 } from 'node:constants';
 import fs from 'node:fs';
@@ -175,7 +175,6 @@ async function stop(gracefulTimeout = 30000) {
             notifyShutdown(gracefulTimeout);
         }
     } catch (/** @type {any} */ err) {
-
         // Socket.IO pode não estar inicializado
         log('DEBUG', '[ENGINE] Socket.IO shutdown notification skipped (not initialized)');
     }

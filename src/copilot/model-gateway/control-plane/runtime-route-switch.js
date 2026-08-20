@@ -1,15 +1,12 @@
 // @ts-check
 
 import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.js';
+import { assertModelGatewayOperationStorePort, assertModelGatewaySessionRoutePort } from './ports.js';
 import {
     createModelGatewaySameSessionRouteSwitchOperationId,
     executeModelGatewaySameSessionRouteSwitch,
 } from './same-session-route-switch.js';
 import { createSqliteSameSessionRouteSwitchRecorder } from './sqlite-same-session-route-switch-recorder.js';
-import {
-    assertModelGatewayOperationStorePort,
-    assertModelGatewaySessionRoutePort,
-} from './ports.js';
 
 /**
  * @param {unknown} value

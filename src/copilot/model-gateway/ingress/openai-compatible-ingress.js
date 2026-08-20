@@ -24,12 +24,7 @@ const HOP_BY_HOP_HEADERS = new Set([
     'transfer-encoding',
     'upgrade',
 ]);
-const SENSITIVE_FORWARD_HEADERS = new Set([
-    'authorization',
-    'proxy-authorization',
-    'x-api-key',
-    'api-key',
-]);
+const SENSITIVE_FORWARD_HEADERS = new Set(['authorization', 'proxy-authorization', 'x-api-key', 'api-key']);
 
 /**
  * @param {unknown} value
@@ -50,8 +45,8 @@ function optionalString(value) {
 /**
  * Creates a process-local credential for one SDK-facing ingress binding.
  *
- * The value is intentionally never persisted or returned by redacted registry views. Callers should pass the same
- * value to both the SDK ProviderConfig and the in-memory route registry.
+ * The value is intentionally never persisted or returned by redacted registry views. Callers should pass the same value
+ * to both the SDK ProviderConfig and the in-memory route registry.
  *
  * @param {{ randomBytesImpl?: typeof randomBytes }} [options]
  * @returns {string}
@@ -71,9 +66,8 @@ export function createModelGatewayIngressLocalApiKey(options = {}) {
 export function buildModelGatewayIngressPublicBaseUrl(input) {
     const rawHost = optionalString(input.host) ?? '127.0.0.1';
     const normalizedHost = ['0.0.0.0', '::', '[::]'].includes(rawHost) ? '127.0.0.1' : rawHost;
-    const hostForUrl = normalizedHost.includes(':') && !normalizedHost.startsWith('[')
-        ? `[${normalizedHost}]`
-        : normalizedHost;
+    const hostForUrl =
+        normalizedHost.includes(':') && !normalizedHost.startsWith('[') ? `[${normalizedHost}]` : normalizedHost;
     const port = Number.isInteger(input.port) && input.port > 0 && input.port <= 65_535 ? input.port : null;
     if (port === null) throw new Error('MODEL_GATEWAY_INGRESS_PUBLIC_PORT_INVALID');
     const protocol = input.protocol === 'https' ? 'https' : 'http';
@@ -185,19 +179,19 @@ function joinUrlPath(baseUrl, path) {
  * @param {number} [input.now]
  * @param {number} [input.ttlMs]
  * @returns {{
- *   schemaVersion: 'model-gateway.ingress-route.v1';
- *   routeId: string;
- *   sessionId: string;
- *   providerId: string;
- *   providerModel: string;
- *   sdkRouteKey: string | null;
- *   sdkVisibleModel: string;
- *   upstreamBaseUrl: string;
- *   upstreamChatCompletionsUrl: string;
- *   sdkBaseUrl: string;
- *   targetRoute: Record<string, unknown>;
- *   createdAt: string;
- *   expiresAt: string | null;
+ *     schemaVersion: 'model-gateway.ingress-route.v1';
+ *     routeId: string;
+ *     sessionId: string;
+ *     providerId: string;
+ *     providerModel: string;
+ *     sdkRouteKey: string | null;
+ *     sdkVisibleModel: string;
+ *     upstreamBaseUrl: string;
+ *     upstreamChatCompletionsUrl: string;
+ *     sdkBaseUrl: string;
+ *     targetRoute: Record<string, unknown>;
+ *     createdAt: string;
+ *     expiresAt: string | null;
  * }}
  */
 export function createModelGatewayIngressRoute(input) {
@@ -262,7 +256,11 @@ export function createModelGatewayIngressRoute(input) {
 /**
  * @param {ReturnType<typeof createModelGatewayIngressRoute>} ingressRoute
  * @param {{ localApiKey: string }} options
- * @returns {{ model: string; provider: { type: 'openai'; baseUrl: string; apiKey: string }; modelCapabilities?: Record<string, unknown> }}
+ * @returns {{
+ *     model: string;
+ *     provider: { type: 'openai'; baseUrl: string; apiKey: string };
+ *     modelCapabilities?: Record<string, unknown>;
+ * }}
  */
 export function buildModelGatewayIngressSessionOverrides(ingressRoute, options) {
     const localApiKey = optionalString(options?.localApiKey);
@@ -286,11 +284,11 @@ export function buildModelGatewayIngressSessionOverrides(ingressRoute, options) 
 /**
  * @param {ReturnType<typeof createModelGatewayIngressRoute>} ingressRoute
  * @param {{
- *   method?: string;
- *   path?: string;
- *   headers?: Record<string, unknown>;
- *   body?: unknown;
- *   upstreamAuthHeaders?: Record<string, string>;
+ *     method?: string;
+ *     path?: string;
+ *     headers?: Record<string, unknown>;
+ *     body?: unknown;
+ *     upstreamAuthHeaders?: Record<string, string>;
  * }} input
  * @returns {{ url: string; init: { method: string; headers: Record<string, string>; body: string } }}
  */
@@ -325,14 +323,25 @@ export function buildModelGatewayIngressUpstreamRequest(ingressRoute, input = {}
 /**
  * @param {ReturnType<typeof createModelGatewayIngressRoute>} ingressRoute
  * @param {{
- *   method?: string;
- *   path?: string;
- *   headers?: Record<string, unknown>;
- *   body?: unknown;
- *   fetchImpl: (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<unknown>;
- *   resolveUpstreamAuthHeaders?: (route: ReturnType<typeof createModelGatewayIngressRoute>) => Promise<Record<string, string>> | Record<string, string>;
+ *     method?: string;
+ *     path?: string;
+ *     headers?: Record<string, unknown>;
+ *     body?: unknown;
+ *     fetchImpl: (
+ *         url: string,
+ *         init: { method: string; headers: Record<string, string>; body: string },
+ *     ) => Promise<unknown>;
+ *     resolveUpstreamAuthHeaders?: (
+ *         route: ReturnType<typeof createModelGatewayIngressRoute>,
+ *     ) => Promise<Record<string, string>> | Record<string, string>;
  * }} input
- * @returns {Promise<{ routeId: string; providerId: string; providerModel: string; upstream: ReturnType<typeof buildModelGatewayIngressUpstreamRequest>; response: unknown }>}
+ * @returns {Promise<{
+ *     routeId: string;
+ *     providerId: string;
+ *     providerModel: string;
+ *     upstream: ReturnType<typeof buildModelGatewayIngressUpstreamRequest>;
+ *     response: unknown;
+ * }>}
  */
 export async function proxyModelGatewayIngressOpenAIChatCompletions(ingressRoute, input) {
     const upstreamAuthHeaders = input.resolveUpstreamAuthHeaders

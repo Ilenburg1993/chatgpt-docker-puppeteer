@@ -92,9 +92,9 @@ export function toError(value) {
                   ? objectValue['errorMessage']
                   : typeof objectValue['detail'] === 'string' && objectValue['detail'].trim().length > 0
                     ? objectValue['detail']
-                : serialized && serialized !== '{}'
-                  ? serialized
-                  : 'Erro recebido como objeto sem mensagem estruturada.';
+                    : serialized && serialized !== '{}'
+                      ? serialized
+                      : 'Erro recebido como objeto sem mensagem estruturada.';
         const err = /** @type {NormalizedError} */ (new Error(message));
         if (typeof objectValue['stack'] === 'string') err.stack = objectValue['stack'];
         if (typeof objectValue['code'] === 'string' || typeof objectValue['code'] === 'number') {

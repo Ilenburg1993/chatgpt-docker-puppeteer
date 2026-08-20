@@ -1,31 +1,46 @@
 # Provedores de LLMs com acesso gratuito, API key e uso análogo ao Kilo Code
 
-**Versão canônica:** 2026-05-21
-**Autor:** ChatGPT para Yuri Ilenburg
-**Escopo:** provedores, roteadores e plataformas que oferecem acesso a LLMs por API key com algum modo gratuito, cota gratuita, trial sem cartão, créditos iniciais ou integração compatível com ferramentas de desenvolvimento.
-**Foco:** uso com Kilo Code, Roo Code, Cline, Continue, OpenCode, VS Code, GitHub Actions, scripts Node.js 24+ ESM e automações agentic.
+**Versão canônica:** 2026-05-21 **Autor:** ChatGPT para Yuri Ilenburg **Escopo:** provedores,
+roteadores e plataformas que oferecem acesso a LLMs por API key com algum modo gratuito, cota
+gratuita, trial sem cartão, créditos iniciais ou integração compatível com ferramentas de
+desenvolvimento. **Foco:** uso com Kilo Code, Roo Code, Cline, Continue, OpenCode, VS Code, GitHub
+Actions, scripts Node.js 24+ ESM e automações agentic.
 
-> **Aviso crítico:** limites, modelos disponíveis, planos gratuitos e políticas de retenção mudam com frequência. Antes de usar em fluxo real, confirme nos links oficiais de cada provedor. Para código proprietário, segredos, dados pessoais, credenciais, repositórios privados ou material regulado, não presuma que um free tier seja seguro.
+> **Aviso crítico:** limites, modelos disponíveis, planos gratuitos e políticas de retenção mudam
+> com frequência. Antes de usar em fluxo real, confirme nos links oficiais de cada provedor. Para
+> código proprietário, segredos, dados pessoais, credenciais, repositórios privados ou material
+> regulado, não presuma que um free tier seja seguro.
 
 ---
 
 ## 1. Definição operacional de “análogo ao Kilo Code”
 
-Neste documento, “análogo ao Kilo Code free” não significa apenas “ter um chat gratuito”. O critério é mais técnico:
+Neste documento, “análogo ao Kilo Code free” não significa apenas “ter um chat gratuito”. O critério
+é mais técnico:
 
 1. **API key ou token de autenticação** disponível ao usuário.
-2. **Endpoint HTTP utilizável por ferramentas externas**, preferencialmente compatível com OpenAI Chat Completions/Responses.
-3. **Acesso gratuito real**, seja por cota recorrente, plano experimental gratuito, roteador de modelos grátis, free credits ou camada trial.
+2. **Endpoint HTTP utilizável por ferramentas externas**, preferencialmente compatível com OpenAI
+   Chat Completions/Responses.
+3. **Acesso gratuito real**, seja por cota recorrente, plano experimental gratuito, roteador de
+   modelos grátis, free credits ou camada trial.
 4. **Modelos úteis para código**, raciocínio, automação ou agentes.
 5. **Documentação oficial pública**.
 6. **Limites claros ou pelo menos verificáveis**.
-7. **Viabilidade em ferramentas de coding agent** como Kilo, Roo, Cline, Continue, Cursor-like clients ou scripts próprios.
+7. **Viabilidade em ferramentas de coding agent** como Kilo, Roo, Cline, Continue, Cursor-like
+   clients ou scripts próprios.
 
 ### Importante: Kilo Code como baseline
 
-Kilo Code não é apenas um “provedor de modelos”. Ele é uma ferramenta/agente que pode usar modelos por diferentes caminhos: o Kilo Gateway, provedores configurados pelo usuário e modelos gratuitos como `kilo-auto/free`. A própria documentação do Kilo afirma que existem modelos gratuitos para interações agentic, autocomplete e tarefas de background, mas também alerta que modelos gratuitos podem ser limitados por rate limits upstream e que o Auto Free pode rotear para provedores que logam prompts e respostas. Portanto, o Kilo é usado aqui como **referência funcional**, não como definição estrita de provedor.
+Kilo Code não é apenas um “provedor de modelos”. Ele é uma ferramenta/agente que pode usar modelos
+por diferentes caminhos: o Kilo Gateway, provedores configurados pelo usuário e modelos gratuitos
+como `kilo-auto/free`. A própria documentação do Kilo afirma que existem modelos gratuitos para
+interações agentic, autocomplete e tarefas de background, mas também alerta que modelos gratuitos
+podem ser limitados por rate limits upstream e que o Auto Free pode rotear para provedores que logam
+prompts e respostas. Portanto, o Kilo é usado aqui como **referência funcional**, não como definição
+estrita de provedor.
 
 **Documentação oficial:**
+
 - Kilo — Using Kilo for Free: https://kilo.ai/docs/getting-started/using-kilo-for-free
 - Kilo — Privacy: https://kilo.ai/docs/reference/privacy
 
@@ -115,15 +130,15 @@ Nem todo “free” é equivalente. Para evitar confusão, esta investigação u
 
 ## 5.1 OpenRouter
 
-**Classificação:** Tier S
-**Tipo:** roteador multiprovedor com modelos gratuitos.
-**Endpoint:** `https://openrouter.ai/api/v1`
-**Autenticação:** Bearer token / OpenRouter API key.
+**Classificação:** Tier S **Tipo:** roteador multiprovedor com modelos gratuitos. **Endpoint:**
+`https://openrouter.ai/api/v1` **Autenticação:** Bearer token / OpenRouter API key.
 **Compatibilidade:** OpenAI-compatible.
 
 ### Por que é análogo ao Kilo free
 
-OpenRouter é provavelmente o análogo mais próximo do espírito “gateway de modelos”. Ele permite usar muitos modelos por uma API unificada e oferece modelos gratuitos, incluindo modelos com sufixo `:free` e o roteador `openrouter/free`.
+OpenRouter é provavelmente o análogo mais próximo do espírito “gateway de modelos”. Ele permite usar
+muitos modelos por uma API unificada e oferece modelos gratuitos, incluindo modelos com sufixo
+`:free` e o roteador `openrouter/free`.
 
 ### Pontos fortes
 
@@ -137,7 +152,8 @@ OpenRouter é provavelmente o análogo mais próximo do espírito “gateway de 
 
 - Modelos gratuitos têm limites.
 - Free variants podem ter limite baixo de requests por minuto/dia.
-- A política de retenção depende do provedor efetivamente usado, salvo quando você configura filtros adequados.
+- A política de retenção depende do provedor efetivamente usado, salvo quando você configura filtros
+  adequados.
 - Para dados sensíveis, use provedores com ZDR ou plano pago/privado.
 
 ### Exemplo `.env`
@@ -162,15 +178,14 @@ LLM_MODEL="openrouter/free"
 
 ## 5.2 Groq
 
-**Classificação:** Tier S
-**Tipo:** free tier rate-limited para inferência rápida.
-**Endpoint:** `https://api.groq.com/openai/v1`
-**Autenticação:** Groq API key.
-**Compatibilidade:** OpenAI-compatible.
+**Classificação:** Tier S **Tipo:** free tier rate-limited para inferência rápida. **Endpoint:**
+`https://api.groq.com/openai/v1` **Autenticação:** Groq API key. **Compatibilidade:**
+OpenAI-compatible.
 
 ### Por que é análogo ao Kilo free
 
-Groq fornece API key, endpoint compatível com OpenAI e limites gratuitos por modelo. É uma das opções mais úteis para coding agents quando a prioridade é velocidade.
+Groq fornece API key, endpoint compatível com OpenAI e limites gratuitos por modelo. É uma das
+opções mais úteis para coding agents quando a prioridade é velocidade.
 
 ### Pontos fortes
 
@@ -183,7 +198,8 @@ Groq fornece API key, endpoint compatível com OpenAI e limites gratuitos por mo
 
 - Rate limits são por modelo e podem ser apertados para fluxos agentic longos.
 - Free tier não deve ser tratado como produção ilimitada.
-- Verifique política de retenção e disponibilidade de Zero Data Retention antes de enviar dados sensíveis.
+- Verifique política de retenção e disponibilidade de Zero Data Retention antes de enviar dados
+  sensíveis.
 
 ### Exemplo `.env`
 
@@ -205,15 +221,14 @@ LLM_MODEL="qwen/qwen3-32b"
 
 ## 5.3 Google Gemini API / Google AI Studio
 
-**Classificação:** Tier S
-**Tipo:** free tier oficial por projeto/modelo.
-**Endpoint OpenAI-compatible:** `https://generativelanguage.googleapis.com/v1beta/openai/`
-**Autenticação:** Gemini API key.
-**Compatibilidade:** OpenAI-compatible e SDKs próprios.
+**Classificação:** Tier S **Tipo:** free tier oficial por projeto/modelo. **Endpoint
+OpenAI-compatible:** `https://generativelanguage.googleapis.com/v1beta/openai/` **Autenticação:**
+Gemini API key. **Compatibilidade:** OpenAI-compatible e SDKs próprios.
 
 ### Por que é análogo ao Kilo free
 
-Gemini API fornece API key, modelos com free tier e endpoint compatível com OpenAI. É uma das melhores opções para contexto grande, multimodalidade e agentes com análise de arquivos.
+Gemini API fornece API key, modelos com free tier e endpoint compatível com OpenAI. É uma das
+melhores opções para contexto grande, multimodalidade e agentes com análise de arquivos.
 
 ### Pontos fortes
 
@@ -225,7 +240,8 @@ Gemini API fornece API key, modelos com free tier e endpoint compatível com Ope
 
 ### Limitações e riscos
 
-- No free tier, o conteúdo pode ser usado para melhorar produtos do Google, conforme documentação de pricing.
+- No free tier, o conteúdo pode ser usado para melhorar produtos do Google, conforme documentação de
+  pricing.
 - Rate limits são por projeto e modelo.
 - Para código proprietário, use plano pago ou configurações adequadas.
 
@@ -249,14 +265,15 @@ LLM_MODEL="gemini-3.5-flash"
 
 ## 5.4 GitHub Models
 
-**Classificação:** Tier S
-**Tipo:** free tier para contas GitHub, com limites.
-**Autenticação:** GitHub PAT ou `GITHUB_TOKEN`, dependendo do contexto.
-**Compatibilidade:** API de inferência OpenAI-compatible.
+**Classificação:** Tier S **Tipo:** free tier para contas GitHub, com limites. **Autenticação:**
+GitHub PAT ou `GITHUB_TOKEN`, dependendo do contexto. **Compatibilidade:** API de inferência
+OpenAI-compatible.
 
 ### Por que é análogo ao Kilo free
 
-GitHub Models dá a usuários GitHub acesso rate-limited a modelos para prototipagem. É especialmente interessante para workflows dev, GitHub Actions, bots de repositório e automações ligadas a PRs/issues.
+GitHub Models dá a usuários GitHub acesso rate-limited a modelos para prototipagem. É especialmente
+interessante para workflows dev, GitHub Actions, bots de repositório e automações ligadas a
+PRs/issues.
 
 ### Pontos fortes
 
@@ -274,24 +291,25 @@ GitHub Models dá a usuários GitHub acesso rate-limited a modelos para prototip
 
 ### Documentação oficial
 
-- About billing for GitHub Models: https://docs.github.com/billing/managing-billing-for-your-products/about-billing-for-github-models
+- About billing for GitHub Models:
+  https://docs.github.com/billing/managing-billing-for-your-products/about-billing-for-github-models
 - Prototyping with AI models: https://docs.github.com/github-models/prototyping-with-ai-models
 - GitHub Models docs: https://docs.github.com/github-models
-- GitHub blog — inference for open source projects: https://github.blog/ai-and-ml/llms/solving-the-inference-problem-for-open-source-ai-projects-with-github-models/
+- GitHub blog — inference for open source projects:
+  https://github.blog/ai-and-ml/llms/solving-the-inference-problem-for-open-source-ai-projects-with-github-models/
 
 ---
 
 ## 5.5 Mistral / Codestral
 
-**Classificação:** Tier S
-**Tipo:** plano Experiment gratuito.
-**Endpoint:** `https://api.mistral.ai/v1`
-**Autenticação:** Mistral API key.
-**Compatibilidade:** SDK próprio e integrações compatíveis em vários clientes.
+**Classificação:** Tier S **Tipo:** plano Experiment gratuito. **Endpoint:**
+`https://api.mistral.ai/v1` **Autenticação:** Mistral API key. **Compatibilidade:** SDK próprio e
+integrações compatíveis em vários clientes.
 
 ### Por que é análogo ao Kilo free
 
-Mistral oferece plano Experiment gratuito para avaliação e prototipagem. O Kilo também menciona Codestral como opção para autocomplete gratuito via BYOK.
+Mistral oferece plano Experiment gratuito para avaliação e prototipagem. O Kilo também menciona
+Codestral como opção para autocomplete gratuito via BYOK.
 
 ### Pontos fortes
 
@@ -303,7 +321,9 @@ Mistral oferece plano Experiment gratuito para avaliação e prototipagem. O Kil
 ### Limitações e riscos
 
 - Plano Experiment é voltado a avaliação/prototipagem.
-- A documentação de setup do plano experimental pode conter avisos sobre uso de requisições para melhoria de modelos; já a documentação geral de privacidade da API pode trazer nuances diferentes. Revise os termos atuais antes de enviar dados sensíveis.
+- A documentação de setup do plano experimental pode conter avisos sobre uso de requisições para
+  melhoria de modelos; já a documentação geral de privacidade da API pode trazer nuances diferentes.
+  Revise os termos atuais antes de enviar dados sensíveis.
 - Limites são por workspace/organização e incluem RPS, TPM e tokens mensais.
 
 ### Exemplo `.env`
@@ -326,15 +346,14 @@ LLM_MODEL="codestral-latest"
 
 ## 5.6 Cerebras Inference
 
-**Classificação:** Tier S
-**Tipo:** free API access para modelos Cerebras-powered.
-**Endpoint:** `https://api.cerebras.ai/v1`
-**Autenticação:** Cerebras API key.
-**Compatibilidade:** OpenAI-compatible.
+**Classificação:** Tier S **Tipo:** free API access para modelos Cerebras-powered. **Endpoint:**
+`https://api.cerebras.ai/v1` **Autenticação:** Cerebras API key. **Compatibilidade:**
+OpenAI-compatible.
 
 ### Por que é análogo ao Kilo free
 
-Cerebras oferece uma API de inferência com acesso gratuito e compatibilidade com SDK OpenAI. É especialmente interessante para baixa latência e modelos abertos.
+Cerebras oferece uma API de inferência com acesso gratuito e compatibilidade com SDK OpenAI. É
+especialmente interessante para baixa latência e modelos abertos.
 
 ### Pontos fortes
 
@@ -370,15 +389,15 @@ LLM_MODEL="gpt-oss-120b"
 
 ## 5.7 Chutes AI
 
-**Classificação:** Tier S/A
-**Tipo:** free API access, OpenAI-compatible.
-**Endpoint compartilhado:** `https://llm.chutes.ai/v1`
-**Autenticação:** Chutes API key.
-**Compatibilidade:** OpenAI-compatible.
+**Classificação:** Tier S/A **Tipo:** free API access, OpenAI-compatible. **Endpoint
+compartilhado:** `https://llm.chutes.ai/v1` **Autenticação:** Chutes API key. **Compatibilidade:**
+OpenAI-compatible.
 
 ### Por que é análogo ao Kilo free
 
-A própria documentação do Kilo lista Chutes AI como opção que fornece acesso gratuito via API, com variedade de modelos e rate limits. A documentação da Chutes mostra endpoint OpenAI-compatible para chat completions.
+A própria documentação do Kilo lista Chutes AI como opção que fornece acesso gratuito via API, com
+variedade de modelos e rate limits. A documentação da Chutes mostra endpoint OpenAI-compatible para
+chat completions.
 
 ### Pontos fortes
 
@@ -412,14 +431,14 @@ LLM_MODEL="..."
 
 ## 5.8 Hugging Face Inference Providers
 
-**Classificação:** Tier A
-**Tipo:** roteamento para múltiplos inference providers com créditos gratuitos.
-**Autenticação:** Hugging Face token ou provider key customizada.
-**Compatibilidade:** SDKs Hugging Face; compatibilidade varia por provider/modelo.
+**Classificação:** Tier A **Tipo:** roteamento para múltiplos inference providers com créditos
+gratuitos. **Autenticação:** Hugging Face token ou provider key customizada. **Compatibilidade:**
+SDKs Hugging Face; compatibilidade varia por provider/modelo.
 
 ### Por que é útil
 
-Hugging Face oferece acesso a centenas de modelos por Inference Providers. É excelente para testar modelos open-source, embeddings, rerankers e modelos especializados.
+Hugging Face oferece acesso a centenas de modelos por Inference Providers. É excelente para testar
+modelos open-source, embeddings, rerankers e modelos especializados.
 
 ### Pontos fortes
 
@@ -445,14 +464,14 @@ Hugging Face oferece acesso a centenas de modelos por Inference Providers. É ex
 
 ## 5.9 Cloudflare Workers AI
 
-**Classificação:** Tier A
-**Tipo:** free allocation diária no ecossistema Cloudflare.
-**Autenticação:** Cloudflare API token + Account ID.
-**Compatibilidade:** API própria/REST; pode ser integrado por wrappers.
+**Classificação:** Tier A **Tipo:** free allocation diária no ecossistema Cloudflare.
+**Autenticação:** Cloudflare API token + Account ID. **Compatibilidade:** API própria/REST; pode ser
+integrado por wrappers.
 
 ### Por que é útil
 
-Workers AI é forte para aplicações edge, bots serverless e automações próximas do usuário. O plano Free inclui alocação diária de Neurons.
+Workers AI é forte para aplicações edge, bots serverless e automações próximas do usuário. O plano
+Free inclui alocação diária de Neurons.
 
 ### Pontos fortes
 
@@ -470,7 +489,8 @@ Workers AI é forte para aplicações edge, bots serverless e automações próx
 ### Documentação oficial
 
 - Workers AI pricing: https://developers.cloudflare.com/workers-ai/platform/pricing/
-- Workers AI REST API: https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/
+- Workers AI REST API:
+  https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/
 - Get started: https://developers.cloudflare.com/workers-ai/get-started/
 - Models: https://developers.cloudflare.com/workers-ai/models/
 
@@ -478,14 +498,14 @@ Workers AI é forte para aplicações edge, bots serverless e automações próx
 
 ## 5.10 Cohere
 
-**Classificação:** Tier A
-**Tipo:** trial key gratuita limitada.
-**Autenticação:** Cohere API key.
+**Classificação:** Tier A **Tipo:** trial key gratuita limitada. **Autenticação:** Cohere API key.
 **Compatibilidade:** API própria; alguns clientes possuem adaptadores.
 
 ### Por que é útil
 
-Cohere é especialmente forte para RAG: embeddings, reranking, classificação e search semântico. Para coding agents puros, é menos central que OpenRouter/Groq/Gemini, mas pode complementar muito bem pipelines com retrieval.
+Cohere é especialmente forte para RAG: embeddings, reranking, classificação e search semântico. Para
+coding agents puros, é menos central que OpenRouter/Groq/Gemini, mas pode complementar muito bem
+pipelines com retrieval.
 
 ### Pontos fortes
 
@@ -512,14 +532,15 @@ Cohere é especialmente forte para RAG: embeddings, reranking, classificação e
 
 ## 5.11 NVIDIA NIM
 
-**Classificação:** Tier A
-**Tipo:** free prototyping / NIM API endpoints.
-**Autenticação:** NVIDIA API key.
-**Compatibilidade:** muitos endpoints seguem padrões compatíveis com clientes conhecidos; verificar por modelo.
+**Classificação:** Tier A **Tipo:** free prototyping / NIM API endpoints. **Autenticação:** NVIDIA
+API key. **Compatibilidade:** muitos endpoints seguem padrões compatíveis com clientes conhecidos;
+verificar por modelo.
 
 ### Por que é útil
 
-NVIDIA NIM permite testar modelos serverless pelo catálogo NVIDIA, com foco em prototipagem e desenvolvimento. É relevante para quem quer experimentar modelos Nemotron, Llama e outros em infraestrutura NVIDIA.
+NVIDIA NIM permite testar modelos serverless pelo catálogo NVIDIA, com foco em prototipagem e
+desenvolvimento. É relevante para quem quer experimentar modelos Nemotron, Llama e outros em
+infraestrutura NVIDIA.
 
 ### Pontos fortes
 
@@ -545,15 +566,14 @@ NVIDIA NIM permite testar modelos serverless pelo catálogo NVIDIA, com foco em 
 
 ## 5.12 Scaleway Generative APIs
 
-**Classificação:** Tier A/B
-**Tipo:** serverless AI APIs, OpenAI-compatible.
-**Endpoint:** `https://api.scaleway.ai/v1`
-**Autenticação:** Scaleway API key.
-**Compatibilidade:** OpenAI-compatible.
+**Classificação:** Tier A/B **Tipo:** serverless AI APIs, OpenAI-compatible. **Endpoint:**
+`https://api.scaleway.ai/v1` **Autenticação:** Scaleway API key. **Compatibilidade:**
+OpenAI-compatible.
 
 ### Por que é útil
 
-Scaleway é uma alternativa europeia com endpoints serverless para modelos de texto/código. Pode ser atrativa quando região, soberania de dados e infraestrutura EU importam.
+Scaleway é uma alternativa europeia com endpoints serverless para modelos de texto/código. Pode ser
+atrativa quando região, soberania de dados e infraestrutura EU importam.
 
 ### Pontos fortes
 
@@ -588,14 +608,13 @@ LLM_MODEL="..."
 
 ## 5.13 SambaNova Cloud
 
-**Classificação:** Tier A/B
-**Tipo:** free credits + free tier limitado.
-**Autenticação:** SambaNova API key.
-**Compatibilidade:** OpenAI-compatible.
+**Classificação:** Tier A/B **Tipo:** free credits + free tier limitado. **Autenticação:** SambaNova
+API key. **Compatibilidade:** OpenAI-compatible.
 
 ### Por que é útil
 
-SambaNova Cloud oferece créditos iniciais e API compatível com OpenAI. Pode ser útil para benchmarks, protótipos e comparação de modelos.
+SambaNova Cloud oferece créditos iniciais e API compatível com OpenAI. Pode ser útil para
+benchmarks, protótipos e comparação de modelos.
 
 ### Pontos fortes
 
@@ -623,49 +642,61 @@ SambaNova Cloud oferece créditos iniciais e API compatível com OpenAI. Pode se
 
 ## 6.1 Together AI
 
-Together é forte para modelos open-source em produção, mas a documentação de billing atual indica que não há free trial no momento e que é necessário comprar créditos.
+Together é forte para modelos open-source em produção, mas a documentação de billing atual indica
+que não há free trial no momento e que é necessário comprar créditos.
 
 **Documentação oficial:**
+
 - Billing / credits: https://docs.together.ai/docs/billing-credits
 - API docs: https://docs.together.ai/docs/introduction
 
 ## 6.2 Fireworks AI
 
-Fireworks costuma oferecer créditos iniciais pequenos. Isso é útil para teste, mas não equivale a um free tier robusto e recorrente.
+Fireworks costuma oferecer créditos iniciais pequenos. Isso é útil para teste, mas não equivale a um
+free tier robusto e recorrente.
 
 **Documentação oficial:**
+
 - Pricing: https://fireworks.ai/pricing
 - Docs: https://docs.fireworks.ai/
 
 ## 6.3 Poe API
 
-Poe API é compatível com ferramentas como Cline/Roo/Continue, mas normalmente funciona via assinatura/pontos. Portanto, não é equivalente a um provedor free robusto.
+Poe API é compatível com ferramentas como Cline/Roo/Continue, mas normalmente funciona via
+assinatura/pontos. Portanto, não é equivalente a um provedor free robusto.
 
 **Documentação oficial:**
+
 - Poe API: https://creator.poe.com/docs/api
 - OpenAI compatibility: https://creator.poe.com/docs/openai
 
 ## 6.4 Venice API
 
-Venice API é OpenAI-compatible e interessante para privacidade, mas seu modelo tende a envolver créditos, DIEM ou pagamento. Não entra como free robusto principal.
+Venice API é OpenAI-compatible e interessante para privacidade, mas seu modelo tende a envolver
+créditos, DIEM ou pagamento. Não entra como free robusto principal.
 
 **Documentação oficial:**
+
 - API docs: https://docs.venice.ai/
 - OpenAI compatibility: https://docs.venice.ai/compatibility/openai
 
 ## 6.5 DeepSeek API
 
-DeepSeek API é relevante por custo baixo e compatibilidade OpenAI/Anthropic-like, mas não deve ser classificada como free tier robusto recorrente sem confirmação oficial atual.
+DeepSeek API é relevante por custo baixo e compatibilidade OpenAI/Anthropic-like, mas não deve ser
+classificada como free tier robusto recorrente sem confirmação oficial atual.
 
 **Documentação oficial:**
+
 - API docs: https://api-docs.deepseek.com/
 - Pricing: https://api-docs.deepseek.com/quick_start/pricing
 
 ## 6.6 Ollama local e Ollama cloud
 
-Ollama local é gratuito e excelente para privacidade, inclusive com endpoint OpenAI-compatible local. Porém, não é um provedor cloud free com API key no mesmo sentido dos demais.
+Ollama local é gratuito e excelente para privacidade, inclusive com endpoint OpenAI-compatible
+local. Porém, não é um provedor cloud free com API key no mesmo sentido dos demais.
 
 **Documentação oficial:**
+
 - Ollama: https://ollama.com/
 - OpenAI compatibility: https://github.com/ollama/ollama/blob/main/docs/openai.md
 - Ollama API: https://github.com/ollama/ollama/blob/main/docs/api.md
@@ -760,7 +791,8 @@ RAG:
 
 ## Não abuse de free tiers
 
-Não use múltiplas contas/chaves para burlar limites. Isso pode violar termos de uso e degradar a disponibilidade para todos. A estratégia correta é fallback funcional, não evasão de rate limits.
+Não use múltiplas contas/chaves para burlar limites. Isso pode violar termos de uso e degradar a
+disponibilidade para todos. A estratégia correta é fallback funcional, não evasão de rate limits.
 
 ---
 
@@ -1114,4 +1146,5 @@ Para dados sensíveis, a recomendação muda:
 Local/self-hosted ou plano pago com Zero Data Retention explícito.
 ```
 
-Free tiers são excelentes para pesquisa, aprendizado, prototipagem e automação leve. Eles não devem ser confundidos com infraestrutura privada, estável e ilimitada de produção.
+Free tiers são excelentes para pesquisa, aprendizado, prototipagem e automação leve. Eles não devem
+ser confundidos com infraestrutura privada, estável e ilimitada de produção.

@@ -85,7 +85,8 @@ function isRecord(value) {
  * @returns {string}
  */
 function normalizePresetId(value) {
-    const raw = optionalString(value)?.toLowerCase().replaceAll('-', '_') ?? MODEL_GATEWAY_ELIGIBILITY_POLICY_PRESET.DEFAULT;
+    const raw =
+        optionalString(value)?.toLowerCase().replaceAll('-', '_') ?? MODEL_GATEWAY_ELIGIBILITY_POLICY_PRESET.DEFAULT;
     return POLICY_PRESETS[raw] ? raw : MODEL_GATEWAY_ELIGIBILITY_POLICY_PRESET.DEFAULT;
 }
 
@@ -112,11 +113,13 @@ export function resolveModelGatewayEligibilityPolicy(policy = {}) {
 }
 
 /**
- * @returns {Array<{ id: string; policy: Record<string, unknown> }>}
+ * @returns {{ id: string; policy: Record<string, unknown> }[]}
  */
 export function listModelGatewayEligibilityPolicyPresets() {
-    return Object.keys(POLICY_PRESETS).sort().map((id) => ({
-        id,
-        policy: getModelGatewayEligibilityPolicyPreset(id),
-    }));
+    return Object.keys(POLICY_PRESETS)
+        .sort()
+        .map((id) => ({
+            id,
+            policy: getModelGatewayEligibilityPolicyPreset(id),
+        }));
 }

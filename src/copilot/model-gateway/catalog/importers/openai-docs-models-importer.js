@@ -6,6 +6,7 @@
  * such as docs URLs, pricing hints and lifecycle words. This importer keeps that evidence separate from access.
  *
  * Sources checked 2026-05-26:
+ *
  * - https://developers.openai.com/docs/models
  * - https://developers.openai.com/docs/pricing
  * - https://developers.openai.com/docs/models/compare
@@ -95,9 +96,15 @@ function priceFromText(text) {
  * @returns {Record<string, number>}
  */
 function pricingFromWindow(window) {
-    const input = window.match(/\$+\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*)?(?:1M|million)?\s*(?:input|in\b|prompt)/iu)?.[0];
-    const output = window.match(/\$+\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*)?(?:1M|million)?\s*(?:output|out\b|completion)/iu)?.[0];
-    const cacheRead = window.match(/\$+\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*)?(?:1M|million)?\s*(?:cached|cache read)/iu)?.[0];
+    const input = window.match(
+        /\$+\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*)?(?:1M|million)?\s*(?:input|in\b|prompt)/iu,
+    )?.[0];
+    const output = window.match(
+        /\$+\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*)?(?:1M|million)?\s*(?:output|out\b|completion)/iu,
+    )?.[0];
+    const cacheRead = window.match(
+        /\$+\s*([0-9]+(?:\.[0-9]+)?)\s*(?:\/\s*)?(?:1M|million)?\s*(?:cached|cache read)/iu,
+    )?.[0];
     /** @type {Record<string, number>} */
     const pricing = {};
     const inputPrice = input ? priceFromText(input) : null;
@@ -140,7 +147,7 @@ function capabilitiesForModel(id, docsWindow) {
 
 /**
  * @param {OpenAiDocsModelRow} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function evidenceValues(row) {
     const docsWindow = textWindow(row.docsText, row.id);
@@ -166,7 +173,10 @@ function evidenceValues(row) {
         { fieldPath: 'modalities.output', value: modalities.output },
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         ...Object.entries(pricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;
@@ -185,7 +195,9 @@ export function parseOpenAiDocsRows(raw) {
     const docsText = normalizeDocsText(String(record['models'] ?? ''));
     const pricingText = normalizeDocsText(String(record['pricing'] ?? ''));
     const compareText = normalizeDocsText(String(record['compare'] ?? ''));
-    const ids = [...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(pricingText), ...modelIdsFromText(compareText)])].sort();
+    const ids = [
+        ...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(pricingText), ...modelIdsFromText(compareText)]),
+    ].sort();
     return ids.map((id) => ({ id, docsText, pricingText, compareText }));
 }
 
@@ -223,7 +235,11 @@ export function createOpenAiDocsModelsImporter(options = {}) {
                 if (!response.ok) throw new Error(`OpenAI docs fetch failed for ${url} with HTTP ${response.status}`);
                 return readCatalogResponseText(response, { label: `OpenAI docs ${url}` });
             };
-            const [models, pricing, compare] = await Promise.all([fetchText(modelsUrl), fetchText(pricingUrl), fetchText(compareUrl)]);
+            const [models, pricing, compare] = await Promise.all([
+                fetchText(modelsUrl),
+                fetchText(pricingUrl),
+                fetchText(compareUrl),
+            ]);
             return { models, pricing, compare };
         },
         parseRows: parseOpenAiDocsRows,

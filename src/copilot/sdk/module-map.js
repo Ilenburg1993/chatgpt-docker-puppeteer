@@ -294,7 +294,8 @@ export const SDK_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'watch',
         public: true,
-        summary: 'Surface experimental limitada e gated: fleet, skills, mcp/oauth, plugins, extensions, history e usage.',
+        summary:
+            'Surface experimental limitada e gated: fleet, skills, mcp/oauth, plugins, extensions, history e usage.',
     },
     {
         path: 'session/',
@@ -728,7 +729,13 @@ export const SDK_LAYER_ACCESS_POLICY = Object.freeze([
     },
     {
         layer: 'server',
-        preferred: ['#copilot/sdk/session', '#copilot/sdk/rpc', '#copilot/sdk/tools', '#copilot/sdk/telemetry', '#copilot/sdk/utils'],
+        preferred: [
+            '#copilot/sdk/session',
+            '#copilot/sdk/rpc',
+            '#copilot/sdk/tools',
+            '#copilot/sdk/telemetry',
+            '#copilot/sdk/utils',
+        ],
         allowed: [],
         discouraged: ['#copilot/sdk/rpc/experimental'],
         notes: 'Rotas SDK devem evitar root amplo quando subpaths existem.',

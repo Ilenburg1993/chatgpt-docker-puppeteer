@@ -5,14 +5,14 @@
  * @module copilot/mcp/tools/cloudflare-transport-benchmark
  */
 
-import { z } from 'zod';
 import {
-    TRANSPORT_BENCHMARK_STATE_PATH,
     readCloudflaredMetricsSnapshot,
     readCloudflareTunnelConfig,
     readTransportBenchmarkState,
+    TRANSPORT_BENCHMARK_STATE_PATH,
 } from '#copilot/mcp/cloudflare';
 import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 const CANDIDATES = ['http2', 'auto', 'quic'];
 const DEFAULT_MIN_SAMPLES = 5;
@@ -26,7 +26,13 @@ export const mcpCloudflareTransportBenchmarkPlanTool = {
         'Build a read-only plan for a controlled Cloudflare Tunnel transport benchmark across quic, auto and http2 profiles.',
     inputSchema: {
         includeMetricsBaseline: z.boolean().optional()['describe']('Include a current cloudflared metrics baseline.'),
-        timeoutMs: z.number().int().min(500).max(10000).optional()['describe']('Metrics fetch timeout in milliseconds.'),
+        timeoutMs: z
+            .number()
+            .int()
+            .min(500)
+            .max(10000)
+            .optional()
+            ['describe']('Metrics fetch timeout in milliseconds.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async ({ includeMetricsBaseline, timeoutMs }) =>
@@ -244,7 +250,8 @@ function nextActionsForProtocol(currentProtocol) {
  */
 function recommendationForProtocol(candidate, currentProtocol) {
     if (candidate === currentProtocol) return 'Use as control baseline.';
-    if (candidate === 'http2') return 'Use as the explicit TCP rollback/baseline candidate when comparing QUIC and auto.';
+    if (candidate === 'http2')
+        return 'Use as the explicit TCP rollback/baseline candidate when comparing QUIC and auto.';
     if (candidate === 'auto') return 'Best first fallback-capable candidate; can try QUIC and fall back to HTTP/2.';
     if (candidate === 'quic') return 'Test strict QUIC against the comparable HTTP/2/auto baselines.';
     return 'Unsupported candidate.';
@@ -255,7 +262,8 @@ function recommendationForProtocol(candidate, currentProtocol) {
  * @returns {string}
  */
 function riskForProtocol(candidate) {
-    if (candidate === 'http2') return 'lowest transport risk for DevContainer/TCP egress; canonical TCP rollback baseline';
+    if (candidate === 'http2')
+        return 'lowest transport risk for DevContainer/TCP egress; canonical TCP rollback baseline';
     if (candidate === 'auto') return 'medium; should fall back when UDP is unavailable';
     if (candidate === 'quic') return 'highest; depends on stable UDP egress';
     return 'unknown';

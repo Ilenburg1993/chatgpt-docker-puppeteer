@@ -38,7 +38,12 @@ import { buildModelGatewayRouteCandidates } from '../routing/index.js';
  * @property {string[]} outputModalities
  * @property {Record<string, unknown>} capabilities
  * @property {Record<string, unknown>} limits
- * @property {{ maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null }} rateLimits
+ * @property {{
+ *     maxRequestTokens: number | null;
+ *     tokensPerMinute: number | null;
+ *     requestsPerMinute: number | null;
+ *     dailyRequests: number | null;
+ * }} rateLimits
  * @property {{ prompt: number | null; completion: number | null; request: number | null }} pricing
  */
 
@@ -60,7 +65,6 @@ function optionalString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-
 /**
  * @param {unknown} value
  * @returns {number | null}
@@ -74,9 +78,7 @@ function optionalNumber(value) {
  * @returns {string[]}
  */
 function stringList(value) {
-    return Array.isArray(value)
-        ? value.map(optionalString).filter((item) => item !== null)
-        : [];
+    return Array.isArray(value) ? value.map(optionalString).filter((item) => item !== null) : [];
 }
 
 /**
@@ -84,7 +86,12 @@ function stringList(value) {
  * @returns {string}
  */
 function sdkModelId(model) {
-    return optionalString(model['selectorSyntax']) ?? optionalString(model['providerModel']) ?? optionalString(model['id']) ?? 'unknown-model';
+    return (
+        optionalString(model['selectorSyntax']) ??
+        optionalString(model['providerModel']) ??
+        optionalString(model['id']) ??
+        'unknown-model'
+    );
 }
 
 /**
@@ -159,10 +166,7 @@ export function toCopilotModelInfo(model) {
             wireApi: optionalString(routing['wireApi']),
             autoSelection: routing['autoSelection'] === true,
             supportsFallback: routing['supportsFallback'] === true,
-            source:
-                optionalString(provenance['source']) ??
-                stringList(verification['sources'])[0] ??
-                'model-gateway',
+            source: optionalString(provenance['source']) ?? stringList(verification['sources'])[0] ?? 'model-gateway',
             confidence: optionalString(verification['confidence']) ?? 'unknown',
             supportsReasoning: capabilities['reasoningEffort'] === true,
             inputModalities: stringList(modalities['input']).length > 0 ? stringList(modalities['input']) : ['text'],
@@ -208,7 +212,9 @@ export function toCopilotRouteModelInfoList(input = {}) {
         buildModelGatewayRouteCandidates({
             projections: Array.isArray(input.projections) ? input.projections : [],
             routeOptions: Array.isArray(input.routeOptions) ? input.routeOptions : [],
-            ...(input.includeProjectionOnly !== undefined ? { includeProjectionOnly: input.includeProjectionOnly } : {}),
+            ...(input.includeProjectionOnly !== undefined
+                ? { includeProjectionOnly: input.includeProjectionOnly }
+                : {}),
         }),
     );
 }

@@ -38,38 +38,18 @@ O baseline real medido após a restauração está a seguir.
 
 ### Baseline por lane strict
 
-| Lane                    | Erros | Fase     |
-| ----------------------- | ----: | -------- | -------- |
-| `src.types`             |     0 | ✅ verde |
-| `agents`                |     0 | ✅ verde |
-| `scripts.ci`            |     0 | ✅ verde |
-| `scripts.setup`         |     0 | ✅ verde |
-| `tests.helpers`         |     0 | ✅ verde |
-| `scripts.build`         |     0 | ✅ verde |
-| `scripts.env`           |     0 | ✅ verde |
-| `src.validation`        |     0 | ✅ verde |
-| `tests.mocks`           |     0 | ✅ verde |
-| `src.logic`             |     2 | Fase A   |
-| `scripts.analysis`      |   181 | Fase A   |
-| `src.inference_gateway` |   191 | Fase A   |
-| `src.dashboard-ui`      |   285 | Fase A   |
-| `tests.manual`          |   300 | Fase A   |
-| `src.audit_agent`       |   358 | Fase A   |
-| `src.nerv`              |   439 | Fase B   | ✅ verde |
-| `scripts.health`        |   441 | Fase B   | ✅ verde |
-| `src.missions`          |   608 | Fase B   | ✅ verde |
-| `src.shared`            |   746 | Fase B   |
-| `src.orchestrator`      |   773 | Fase B   | ✅ verde |
-| `src.integration`       |   924 | Fase B   |
-| `scripts.audit`         |   928 | Fase B   |
-| `scripts.root`          |   935 | Fase B   |
-| `tools.workspace`       | 1.013 | Fase B   |
-| `src.core`              | 1.053 | Fase B   |
-| `src.agent`             | 1.190 | Fase B   |
-| `tests.legacy`          | 1.403 | Fase C   |
-| `src.kernel`            |     0 | ✅ Done  |
-| `src.driver`            | 1.558 | Fase C   |
-| `src.infra`             | 2.232 | Fase C   |
+| Lane | Erros | Fase | | ----------------------- | ----: | -------- | -------- | | `src.types` | 0
+| ✅ verde | | `agents` | 0 | ✅ verde | | `scripts.ci` | 0 | ✅ verde | | `scripts.setup` | 0 | ✅
+verde | | `tests.helpers` | 0 | ✅ verde | | `scripts.build` | 0 | ✅ verde | | `scripts.env` | 0 |
+✅ verde | | `src.validation` | 0 | ✅ verde | | `tests.mocks` | 0 | ✅ verde | | `src.logic` | 2 |
+Fase A | | `scripts.analysis` | 181 | Fase A | | `src.inference_gateway` | 191 | Fase A | |
+`src.dashboard-ui` | 285 | Fase A | | `tests.manual` | 300 | Fase A | | `src.audit_agent` | 358 |
+Fase A | | `src.nerv` | 439 | Fase B | ✅ verde | | `scripts.health` | 441 | Fase B | ✅ verde | |
+`src.missions` | 608 | Fase B | ✅ verde | | `src.shared` | 746 | Fase B | | `src.orchestrator` |
+773 | Fase B | ✅ verde | | `src.integration` | 924 | Fase B | | `scripts.audit` | 928 | Fase B | |
+`scripts.root` | 935 | Fase B | | `tools.workspace` | 1.013 | Fase B | | `src.core` | 1.053 | Fase B
+| | `src.agent` | 1.190 | Fase B | | `tests.legacy` | 1.403 | Fase C | | `src.kernel` | 0 | ✅ Done
+| | `src.driver` | 1.558 | Fase C | | `src.infra` | 2.232 | Fase C |
 
 ---
 

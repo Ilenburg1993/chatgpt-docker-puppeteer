@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
-import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 import { listModelGatewayRuntimeAutomationPolicyPresets } from '../../../src/copilot/model-gateway/index.js';
+import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
 
 import { createArgReader, readPositiveIntArg } from '../cli-args.mjs';
 
@@ -11,14 +11,14 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-operator-ready.mjs [--json] [--fail] [--profile ID] [--limit N]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-operator-ready.mjs [--json] [--fail] [--profile ID] [--limit N]
 
 Read-only operator/LLM readiness cockpit. It aggregates SQLite diagnostics, auto-ready, runtime selector, standby,
 live runs and runtime-health diff without calling providers, running models or mutating terminal state.
 `);
     process.exit(0);
 }
-
 
 /**
  * @param {string} name
@@ -69,7 +69,12 @@ function runJson(scriptId, scriptArgs = []) {
     try {
         return { ok: true, status: result.status, error: null, json: JSON.parse(result.stdout) };
     } catch (error) {
-        return { ok: false, status: result.status, error: error instanceof Error ? error.message : String(error), json: null };
+        return {
+            ok: false,
+            status: result.status,
+            error: error instanceof Error ? error.message : String(error),
+            json: null,
+        };
     }
 }
 
@@ -129,7 +134,9 @@ const healthSummary = optionalRecord(optionalRecord(healthDiffJson?.['diff'])?.[
 const liveRunsJson = optionalRecord(liveRuns.json);
 const liveRunRows = Array.isArray(liveRunsJson?.['rows']) ? liveRunsJson['rows'].filter(optionalRecord) : [];
 const liveScenarioRunRowCount = Math.max(optionalNumber(opsDatabase?.['liveScenarioRunRows']) ?? 0, liveRunRows.length);
-const latestLiveScenarioRunEffective = optionalString(latestLiveScenarioRun?.['summaryPath']) ? latestLiveScenarioRun : (liveRunRows[0] ?? {});
+const latestLiveScenarioRunEffective = optionalString(latestLiveScenarioRun?.['summaryPath'])
+    ? latestLiveScenarioRun
+    : (liveRunRows[0] ?? {});
 const runtimeRoutes = Array.isArray(runtimePlan?.['routes']) ? runtimePlan['routes'].filter(optionalRecord) : [];
 const selectedRuntimeRoute = runtimeRoutes.find((route) => route['profileId'] === profile) ?? null;
 const standbyRoutes = Array.isArray(standbyJson?.['routes']) ? standbyJson['routes'].filter(optionalRecord) : [];
@@ -229,7 +236,9 @@ const commandGroups = {
         '/byok auto policy',
         ...uniqueNextSafeCommands,
     ]),
-    probeBeforePromotion: uniqueCommands(candidateActions.flatMap((action) => [action.commands.probeAgent, action.commands.probeChat])),
+    probeBeforePromotion: uniqueCommands(
+        candidateActions.flatMap((action) => [action.commands.probeAgent, action.commands.probeChat]),
+    ),
     recommended: uniqueCommands(candidateActions.map((action) => action.recommendedCommand)),
     sameBoundarySwitch: uniqueCommands(candidateActions.map((action) => action.commands.liveModel)),
     newSessionHandoff: uniqueCommands(candidateActions.map((action) => action.commands.newSessionProvider)),
@@ -237,7 +246,9 @@ const commandGroups = {
         `npm run model-gateway:auto:standby -- --profile=${profile} --limit=${limit} --write-sqlite`,
         ...candidateActions.map((action) => action.commands.persistProvider),
     ]),
-    healthClear: uniqueCommands(candidateActions.flatMap((action) => [action.commands.clearHealthTerminal, action.commands.clearHealthApply])),
+    healthClear: uniqueCommands(
+        candidateActions.flatMap((action) => [action.commands.clearHealthTerminal, action.commands.clearHealthApply]),
+    ),
     liveTests: liveCommands,
 };
 
@@ -250,7 +261,8 @@ const checks = [
     check(
         'auto_ready_ok',
         autoReady.ok && autoReadyJson?.['ok'] === true,
-        autoReady.error ?? `failed=${Array.isArray(autoReadyJson?.['blockers']) ? autoReadyJson['blockers'].length : 0}`,
+        autoReady.error ??
+            `failed=${Array.isArray(autoReadyJson?.['blockers']) ? autoReadyJson['blockers'].length : 0}`,
     ),
     check(
         'live_readiness_ok',
@@ -265,7 +277,8 @@ const checks = [
     check(
         'standby_available',
         standby.ok && (optionalNumber(standbySummary?.['routeCount']) ?? 0) > 0,
-        standby.error ?? `routes=${standbySummary?.['routeCount'] ?? 0} providers=${standbySummary?.['providerCount'] ?? 0}`,
+        standby.error ??
+            `routes=${standbySummary?.['routeCount'] ?? 0} providers=${standbySummary?.['providerCount'] ?? 0}`,
     ),
     check(
         'standby_persistence_visible',
@@ -275,8 +288,11 @@ const checks = [
     ),
     check(
         'runtime_health_no_regression',
-        healthDiff.ok && (optionalNumber(healthSummary?.['regressions']) ?? 0) === 0 && (optionalNumber(healthSummary?.['newFailures']) ?? 0) === 0,
-        healthDiff.error ?? `regressions=${healthSummary?.['regressions'] ?? '-'} newFailures=${healthSummary?.['newFailures'] ?? '-'}`,
+        healthDiff.ok &&
+            (optionalNumber(healthSummary?.['regressions']) ?? 0) === 0 &&
+            (optionalNumber(healthSummary?.['newFailures']) ?? 0) === 0,
+        healthDiff.error ??
+            `regressions=${healthSummary?.['regressions'] ?? '-'} newFailures=${healthSummary?.['newFailures'] ?? '-'}`,
     ),
     check(
         'next_safe_commands_available',
@@ -287,7 +303,9 @@ const checks = [
     check(
         'live_runs_visible',
         liveRuns.ok,
-        liveRuns.ok ? `runs=${liveRunRows.length} latest=${latestLiveScenarioRunEffective?.['summaryPath'] ?? '-'}` : (liveRuns.error ?? 'live runs unavailable'),
+        liveRuns.ok
+            ? `runs=${liveRunRows.length} latest=${latestLiveScenarioRunEffective?.['summaryPath'] ?? '-'}`
+            : (liveRuns.error ?? 'live runs unavailable'),
         'warn',
     ),
 ];
@@ -314,7 +332,9 @@ const output = {
         liveCommands: liveCommands.length,
         candidateActions: candidateActions.length,
         policyPresets: policyPresets.length,
-        commandGroups: Object.fromEntries(Object.entries(commandGroups).map(([group, commands]) => [group, commands.length])),
+        commandGroups: Object.fromEntries(
+            Object.entries(commandGroups).map(([group, commands]) => [group, commands.length]),
+        ),
     },
     operatorDecision: {
         requiresHumanDecision: true,
@@ -327,7 +347,8 @@ const output = {
         defaultAutoOnCommand: `/byok auto on profile:${profile}`,
         guardedLlmCommand: `/byok auto on profile:${profile} preset:llm_operator_guarded`,
         prepareNewSessionCommand: `/byok auto on profile:${profile} preset:auto_prepare_new_session`,
-        liveWarning: 'liveCommands may consume provider quota or start terminal live tests; do not run them implicitly.',
+        liveWarning:
+            'liveCommands may consume provider quota or start terminal live tests; do not run them implicitly.',
     },
     policyPresets,
     commandGroups,
@@ -359,9 +380,16 @@ const output = {
         rows: liveScenarioRunRowCount,
         latest: {
             runId: optionalString(latestLiveScenarioRunEffective?.['runId']),
-            scenarioKind: optionalString(latestLiveScenarioRunEffective?.['scenarioKind']) ?? optionalString(latestLiveScenarioRunEffective?.['kind']),
+            scenarioKind:
+                optionalString(latestLiveScenarioRunEffective?.['scenarioKind']) ??
+                optionalString(latestLiveScenarioRunEffective?.['kind']),
             status: optionalString(latestLiveScenarioRunEffective?.['status']),
-            ok: latestLiveScenarioRunEffective?.['ok'] === true ? true : latestLiveScenarioRunEffective?.['ok'] === false ? false : null,
+            ok:
+                latestLiveScenarioRunEffective?.['ok'] === true
+                    ? true
+                    : latestLiveScenarioRunEffective?.['ok'] === false
+                      ? false
+                      : null,
             completedAtMs: optionalNumber(latestLiveScenarioRunEffective?.['completedAtMs']),
             completedAt: optionalString(latestLiveScenarioRunEffective?.['completedAt']),
             summaryPath: optionalString(latestLiveScenarioRunEffective?.['summaryPath']),
@@ -384,7 +412,9 @@ const output = {
               status: optionalString(selectedRuntimeRoute['status']),
               providerId: optionalString(optionalRecord(selectedRuntimeRoute['selected'])?.['providerId']),
               providerModel: optionalString(optionalRecord(selectedRuntimeRoute['selected'])?.['providerModel']),
-              reasons: Array.isArray(selectedRuntimeRoute['reasons']) ? selectedRuntimeRoute['reasons'].map(optionalString).filter(Boolean) : [],
+              reasons: Array.isArray(selectedRuntimeRoute['reasons'])
+                  ? selectedRuntimeRoute['reasons'].map(optionalString).filter(Boolean)
+                  : [],
           }
         : null,
     standby: standbyRoutes.slice(0, limit).map((route) => ({

@@ -7,8 +7,8 @@ Roadmap ativo:
 
 ## Objetivo
 
-O modo auto do model-gateway decide a próxima ação de modelo para o terminal BYOK sem misturar metadados canônicos com
-estado volátil de runtime.
+O modo auto do model-gateway decide a próxima ação de modelo para o terminal BYOK sem misturar
+metadados canônicos com estado volátil de runtime.
 
 Ele usa:
 
@@ -40,8 +40,9 @@ No terminal:
 /byok auto off
 ```
 
-`/byok auto on` grava policy sem segredos em `data/copilot/model-gateway/runtime-automation-policy.json`. Variaveis de
-ambiente `COPILOT_BYOK_GATEWAY_AUTO*` continuam tendo precedencia quando definidas.
+`/byok auto on` grava policy sem segredos em
+`data/copilot/model-gateway/runtime-automation-policy.json`. Variaveis de ambiente
+`COPILOT_BYOK_GATEWAY_AUTO*` continuam tendo precedencia quando definidas.
 
 ## Estados
 
@@ -88,13 +89,14 @@ Defaults são conservadores:
 2. Se `ops.ok=true`, rode `/byok auto status profile:repo_agent`.
 3. Se quiser trilha operacional sem aplicar efeito, rode `/byok auto record profile:repo_agent`.
 4. Se a ação for `apply_live_model`, use `/byok auto apply profile:repo_agent allow-live-set-model`.
-5. Se a ação for `prepare_new_session`, confirme `/session sdk next new` e reinicie a task do terminal.
+5. Se a ação for `prepare_new_session`, confirme `/session sdk next new` e reinicie a task do
+   terminal.
 6. Se a ação for `wait_for_reset`, aguarde o reset/cooldown ou selecione outro perfil/rota.
 
 ## Pós-Falha BYOK
 
-Quando uma falha BYOK ocorre no turno vivo, o terminal registra runtime health. Se `COPILOT_BYOK_GATEWAY_AUTO=true`, o
-terminal sugere imediatamente:
+Quando uma falha BYOK ocorre no turno vivo, o terminal registra runtime health. Se
+`COPILOT_BYOK_GATEWAY_AUTO=true`, o terminal sugere imediatamente:
 
 ```text
 /byok auto record profile:<perfil>
@@ -107,5 +109,6 @@ Isso evita repetir manualmente o mesmo modelo esgotado.
 
 - O controller pré-turno ainda não roda automaticamente antes de toda mensagem.
 - Novo boot SDK ainda é comando orientado ao operador.
-- Confirmação por `usage/session.model_changed` ainda precisa ser fechada como verificação de aplicação live.
+- Confirmação por `usage/session.model_changed` ainda precisa ser fechada como verificação de
+  aplicação live.
 - Testes live LLM-B devem ocorrer apenas após `ops`, readiness e plano estarem limpos.

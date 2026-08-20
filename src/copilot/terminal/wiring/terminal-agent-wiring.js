@@ -37,8 +37,8 @@ import {
 } from '../dialog/index.js';
 import {
     buildEmptyAfterUserInputAutoRecoveryRows,
-    buildEmptyAfterUserInputResumeMessage,
     buildEmptyAfterUserInputRecoveryRows,
+    buildEmptyAfterUserInputResumeMessage,
     createTerminalHandledAgentEventsSet,
     createTerminalPassthroughAgentEventsSet,
     isTerminalAssistantTranscriptCovered,
@@ -55,9 +55,19 @@ import {
     stopTerminalDialogMode,
     writeTerminalHubSystemTurn,
 } from '../frontend/gateways/index.js';
-import { markTerminalActivityIdle, readTerminalActivitySnapshot, recordTerminalActivity, terminalThemeText } from '../state/dialog/index.js';
-import { terminalThemeBadge, terminalThemeHeadline, terminalThemeRow } from '../state/events/index.js';
-import { shouldSuppressTerminalAssistantMessageAsMaterializedTurn, withTerminalTurnCorrelation } from '../state/events/index.js';
+import {
+    markTerminalActivityIdle,
+    readTerminalActivitySnapshot,
+    recordTerminalActivity,
+    terminalThemeText,
+} from '../state/dialog/index.js';
+import {
+    shouldSuppressTerminalAssistantMessageAsMaterializedTurn,
+    terminalThemeBadge,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    withTerminalTurnCorrelation,
+} from '../state/events/index.js';
 import { readTerminalUserInputSummary } from '../state/index.js';
 import { drainMailboxToTurnIfIdle } from './mailbox-drain.js';
 
@@ -82,7 +92,9 @@ function scheduleMaterializedTurnEndPromptRedraw() {
     const timer = setTimeout(() => {
         const activity = readTerminalActivitySnapshot();
         const phase =
-            activity && typeof activity === 'object' && typeof /** @type {{ phase?: unknown }} */ (activity).phase === 'string'
+            activity &&
+            typeof activity === 'object' &&
+            typeof (/** @type {{ phase?: unknown }} */ (activity).phase) === 'string'
                 ? /** @type {{ phase: string }} */ (activity).phase
                 : '';
         if (phase !== 'idle') return;
@@ -117,8 +129,8 @@ function withTerminalAgentSseEnvelope(payload, source) {
 
 /**
  * `dialog.turn_end` e um evento de ciclo de vida, nao uma segunda fonte canonica de transcript. Quando o texto ja foi
- * materializado por `dialog.delta` ou `assistant.message`, mantemos o evento publico, mas removemos o `reply` do payload
- * para que SSE/JSONL/export nao preservem um prefixo truncado como se fosse uma nova mensagem.
+ * materializado por `dialog.delta` ou `assistant.message`, mantemos o evento publico, mas removemos o `reply` do
+ * payload para que SSE/JSONL/export nao preservem um prefixo truncado como se fosse uma nova mensagem.
  *
  * @param {{
  *     reply?: string;
@@ -197,12 +209,14 @@ export function shouldWarnEmptyDialogTurnAfterUserInput(input) {
  * @returns {string}
  */
 export function createEmptyAfterUserInputAutoRecoveryKey(input) {
-    const requestId = typeof input.requestId === 'string' && input.requestId.trim().length > 0 ? input.requestId.trim() : null;
+    const requestId =
+        typeof input.requestId === 'string' && input.requestId.trim().length > 0 ? input.requestId.trim() : null;
     if (requestId) return `request:${requestId}`;
     const turnId =
         typeof input.turnId === 'string' || typeof input.turnId === 'number' ? String(input.turnId).trim() : '';
     if (turnId) return `turn:${turnId}`;
-    const answeredAt = typeof input.answeredAt === 'number' && Number.isFinite(input.answeredAt) ? input.answeredAt : Date.now();
+    const answeredAt =
+        typeof input.answeredAt === 'number' && Number.isFinite(input.answeredAt) ? input.answeredAt : Date.now();
     return `answer-window:${Math.floor(answeredAt / EMPTY_DIALOG_AFTER_USER_INPUT_WINDOW_MS)}`;
 }
 
@@ -294,9 +308,9 @@ export function describeDialogStoppedRestartPolicy(reason) {
 export function shouldSuppressDialogLoopChangedSse(last, next) {
     return Boolean(
         last &&
-            last.active === next.active &&
-            next.at - last.at >= 0 &&
-            next.at - last.at <= DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS,
+        last.active === next.active &&
+        next.at - last.at >= 0 &&
+        next.at - last.at <= DIALOG_LOOP_CHANGED_DEDUP_WINDOW_MS,
     );
 }
 
@@ -314,7 +328,8 @@ export function registerAgentEventListeners(printBanner) {
     agentEvents.on(
         EMITTER_DIALOG_RECOVERY,
         (
-            /** @type {{
+            /**
+             * @type {{
              *     reason?: string;
              *     recovered?: boolean;
              *     strategy?: string;
@@ -323,7 +338,8 @@ export function registerAgentEventListeners(printBanner) {
              *     durationMs?: number;
              *     success?: boolean;
              *     traceId?: string;
-             * }} */ evt,
+             * }}
+             */ evt,
         ) => {
             const recovered = evt.recovered === true;
             const additionalModelCall = evt.additionalModelCall === true || evt.prConsumed === true;
@@ -427,7 +443,9 @@ export function registerAgentEventListeners(printBanner) {
 
         if (recovered) {
             // F52.3: ask_user reapareceu — a conversa continua sem custo de PR
-            println(`\n  ${terminalThemeBadge('success', 'WATCHDOG')} ${terminalThemeText('success', 'Conversa recuperada sem consumir PR; pergunta humana preservada.')}`);
+            println(
+                `\n  ${terminalThemeBadge('success', 'WATCHDOG')} ${terminalThemeText('success', 'Conversa recuperada sem consumir PR; pergunta humana preservada.')}`,
+            );
             log('INFO', '[TerminalServer] F52: Watchdog recovery zero-PR — ask_user reapareceu após abort.');
             pingTerminalDialogWatchdog();
             broadcastSse(
@@ -441,7 +459,9 @@ export function registerAgentEventListeners(printBanner) {
         }
 
         // F52.4: ask_user NÃO reapareceu — fallback para restart completo (1 PR)
-        println(`\n  ${terminalThemeBadge('warn', 'WATCHDOG')} ${terminalThemeText('warn', `Conversa inativa há ${secs}s; reiniciando (1 PR).`)}`);
+        println(
+            `\n  ${terminalThemeBadge('warn', 'WATCHDOG')} ${terminalThemeText('warn', `Conversa inativa há ${secs}s; reiniciando (1 PR).`)}`,
+        );
         log('WARN', `[TerminalServer] F52: Watchdog recovery falhou — restart com boot prompt (1 PR).`);
 
         const _hubSessionId = getHubSessionId();
@@ -528,7 +548,13 @@ export function registerAgentEventListeners(printBanner) {
     let lastStreamingReportAt = 0;
     /** @type {{ active: boolean; reason: string; at: number } | null} */
     let lastDialogLoopChangedSse = null;
-    /** @type {{ at: number; answerPreview: string | null; answer: string | null; question: string | null; requestId: string | null } | null} */
+    /** @type {{
+    at: number;
+    answerPreview: string | null;
+    answer: string | null;
+    question: string | null;
+    requestId: string | null;
+} | null} */
     let lastUserInputCompleted = null;
     /** @type {Set<string>} */
     const emptyAfterUserInputAutoRecoveryKeys = new Set();
@@ -536,11 +562,13 @@ export function registerAgentEventListeners(printBanner) {
     agentEvents.on(
         EMITTER_USER_INPUT_COMPLETED,
         (
-            /** @type {{
+            /**
+             * @type {{
              *     timestamp?: number;
              *     answer?: unknown;
              *     requestId?: string | null;
-             * }} */ evt,
+             * }}
+             */ evt,
         ) => {
             const at = typeof evt.timestamp === 'number' && Number.isFinite(evt.timestamp) ? evt.timestamp : Date.now();
             const answer = typeof evt.answer === 'string' && evt.answer.trim().length > 0 ? evt.answer.trim() : null;
@@ -560,7 +588,8 @@ export function registerAgentEventListeners(printBanner) {
                     typeof latestUserInput?.question === 'string' && latestUserInput.question.trim().length > 0
                         ? latestUserInput.question.trim()
                         : null,
-                requestId: typeof evt.requestId === 'string' && evt.requestId.trim().length > 0 ? evt.requestId.trim() : null,
+                requestId:
+                    typeof evt.requestId === 'string' && evt.requestId.trim().length > 0 ? evt.requestId.trim() : null,
             };
         },
     );
@@ -581,12 +610,14 @@ export function registerAgentEventListeners(printBanner) {
     agentEvents.on(
         EMITTER_DIALOG_TURN_END,
         (
-            /** @type {{
+            /**
+             * @type {{
              *     reply?: string;
              *     turnId?: string | number | null;
              *     durationMs?: number;
              *     timestamp?: number;
-             * }} */ evt,
+             * }}
+             */ evt,
         ) => {
             const { envelope, reply, turnId, replyAlreadyMaterialized } = createDialogTurnEndSseEnvelope(evt);
             broadcastSse('dialog.turn_end', envelope);
@@ -611,13 +642,18 @@ export function registerAgentEventListeners(printBanner) {
                     const detail = [
                         'continuação após resposta humana sem texto público',
                         turnId ? `turno ${turnId}` : null,
-                        lastUserInputCompleted?.answerPreview ? `resposta ${lastUserInputCompleted.answerPreview}` : null,
+                        lastUserInputCompleted?.answerPreview
+                            ? `resposta ${lastUserInputCompleted.answerPreview}`
+                            : null,
                     ]
                         .filter(Boolean)
                         .join(' · ');
                     if (autoRecovery.attempt) {
                         emptyAfterUserInputAutoRecoveryKeys.add(autoRecovery.key);
-                        if (emptyAfterUserInputAutoRecoveryKeys.size > EMPTY_DIALOG_AFTER_USER_INPUT_AUTO_RECOVERY_MAX_KEYS) {
+                        if (
+                            emptyAfterUserInputAutoRecoveryKeys.size >
+                            EMPTY_DIALOG_AFTER_USER_INPUT_AUTO_RECOVERY_MAX_KEYS
+                        ) {
                             const oldestKey = emptyAfterUserInputAutoRecoveryKeys.values().next().value;
                             if (typeof oldestKey === 'string') emptyAfterUserInputAutoRecoveryKeys.delete(oldestKey);
                         }
@@ -762,27 +798,30 @@ export function registerAgentEventListeners(printBanner) {
         },
     );
     // F4.6 (UPG-11): emite dialog.loop.changed para dashboard responsivo
-    agentEvents.on(EMITTER_DIALOG_LOOP_CHANGED, (/** @type {{ active: boolean; ts: number; reason?: string }} */ evt) => {
-        const at = typeof evt.ts === 'number' ? evt.ts : Date.now();
-        const reason = typeof evt.reason === 'string' && evt.reason.trim().length > 0 ? evt.reason : '';
-        if (shouldSuppressDialogLoopChangedSse(lastDialogLoopChangedSse, { active: evt.active, at })) {
-            recordTerminalActivity('system', 'dialog.loop.changed duplicado suprimido', {
-                detail: `active=${evt.active}${reason ? ` · ${reason}` : ''}`,
-                source: 'terminal-agent-wiring/dialog.loop.changed',
-                recordHistory: false,
-                updateCurrent: false,
-            });
-            return;
-        }
-        lastDialogLoopChangedSse = { active: evt.active, reason, at };
-        broadcastSse(
-            'dialog.loop.changed',
-            withTerminalAgentSseEnvelope(
-                { active: evt.active, timestamp: at, ...(reason ? { reason } : {}) },
-                'terminal-agent-wiring/dialog.loop.changed',
-            ),
-        );
-    });
+    agentEvents.on(
+        EMITTER_DIALOG_LOOP_CHANGED,
+        (/** @type {{ active: boolean; ts: number; reason?: string }} */ evt) => {
+            const at = typeof evt.ts === 'number' ? evt.ts : Date.now();
+            const reason = typeof evt.reason === 'string' && evt.reason.trim().length > 0 ? evt.reason : '';
+            if (shouldSuppressDialogLoopChangedSse(lastDialogLoopChangedSse, { active: evt.active, at })) {
+                recordTerminalActivity('system', 'dialog.loop.changed duplicado suprimido', {
+                    detail: `active=${evt.active}${reason ? ` · ${reason}` : ''}`,
+                    source: 'terminal-agent-wiring/dialog.loop.changed',
+                    recordHistory: false,
+                    updateCurrent: false,
+                });
+                return;
+            }
+            lastDialogLoopChangedSse = { active: evt.active, reason, at };
+            broadcastSse(
+                'dialog.loop.changed',
+                withTerminalAgentSseEnvelope(
+                    { active: evt.active, timestamp: at, ...(reason ? { reason } : {}) },
+                    'terminal-agent-wiring/dialog.loop.changed',
+                ),
+            );
+        },
+    );
     agentEvents.on(EMITTER_DIALOG_READY, () => {
         const { model, reasoningEffort } = readTerminalDialogStreamMeta();
         lastStreamingKbReported = -1;
@@ -869,7 +908,11 @@ export function registerAgentEventListeners(printBanner) {
                 source: 'dialog',
             });
             println('');
-            println(terminalThemeRow('Conversa', 'encerrada enquanto pausada pelo operador; não reiniciando', { role: 'warn' }));
+            println(
+                terminalThemeRow('Conversa', 'encerrada enquanto pausada pelo operador; não reiniciando', {
+                    role: 'warn',
+                }),
+            );
             log('INFO', '[TerminalServer] Conversa encerrada com dialogPaused=true. Não reiniciando.');
             broadcastSse(
                 'dialog.stopped',
@@ -942,10 +985,7 @@ export function registerAgentEventListeners(printBanner) {
             if (cachedInput > 0) {
                 broadcastSse(
                     'session.compaction_complete',
-                    withTerminalAgentSseEnvelope(
-                        { cachedInput },
-                        'terminal-agent-wiring/session.compaction_complete',
-                    ),
+                    withTerminalAgentSseEnvelope({ cachedInput }, 'terminal-agent-wiring/session.compaction_complete'),
                 );
             }
         },

@@ -48,9 +48,13 @@ function decisionKey(decision) {
 function nextActions(hardExclusions, softPenalties, runtimeProbes) {
     const actions = [];
     if (hardExclusions.some((reason) => reason.startsWith('secret_missing'))) actions.push('configure_required_secret');
-    if (hardExclusions.includes('account_model_not_visible')) actions.push('refresh_account_overlay_or_choose_visible_model');
+    if (hardExclusions.includes('account_model_not_visible'))
+        actions.push('refresh_account_overlay_or_choose_visible_model');
     if (hardExclusions.includes('account_access_unknown')) actions.push('collect_account_overlay_before_runtime');
-    if (hardExclusions.includes('upstream_provider_not_allowed') || hardExclusions.includes('upstream_provider_blocked')) {
+    if (
+        hardExclusions.includes('upstream_provider_not_allowed') ||
+        hardExclusions.includes('upstream_provider_blocked')
+    ) {
         actions.push('choose_allowed_upstream_provider_or_relax_policy');
     }
     if (hardExclusions.includes('route_layer_not_allowed') || hardExclusions.includes('route_layer_blocked')) {
@@ -59,18 +63,25 @@ function nextActions(hardExclusions, softPenalties, runtimeProbes) {
     if (hardExclusions.includes('wire_api_not_allowed') || hardExclusions.includes('wire_api_blocked')) {
         actions.push('choose_allowed_wire_api_or_relax_policy');
     }
-    if (hardExclusions.includes('account_overlay_expired') || softPenalties.includes('account_overlay_expired')) actions.push('refresh_account_overlay');
+    if (hardExclusions.includes('account_overlay_expired') || softPenalties.includes('account_overlay_expired'))
+        actions.push('refresh_account_overlay');
     if (hardExclusions.includes('account_quota_exhausted')) actions.push('wait_for_quota_or_choose_another_account');
-    if (hardExclusions.includes('account_spending_exhausted')) actions.push('raise_spending_limit_or_choose_free_model');
+    if (hardExclusions.includes('account_spending_exhausted'))
+        actions.push('raise_spending_limit_or_choose_free_model');
     if (hardExclusions.includes('cloudflare_account_id_missing')) actions.push('configure_cloudflare_account_id');
     if (hardExclusions.includes('cloudflare_gateway_id_missing')) actions.push('configure_cloudflare_ai_gateway_id');
-    if (hardExclusions.includes('ollama_local_model_not_installed')) actions.push('pull_or_select_installed_ollama_model');
+    if (hardExclusions.includes('ollama_local_model_not_installed'))
+        actions.push('pull_or_select_installed_ollama_model');
     if (hardExclusions.includes('health_fatal')) actions.push('wait_or_clear_fatal_provider_health_after_fix');
     if (hardExclusions.includes('price_unknown')) actions.push('refresh_pricing_or_relax_known_price_policy');
-    if (hardExclusions.some((reason) => reason.startsWith('budget_exceeded'))) actions.push('choose_lower_cost_model_or_raise_budget');
-    if (softPenalties.some((reason) => reason.startsWith('price_above_preference'))) actions.push('prefer_lower_cost_model_when_possible');
-    if (hardExclusions.length === 0 && softPenalties.includes('account_visibility_unknown')) actions.push('run_low_cost_access_probe');
-    if (hardExclusions.length === 0 && runtimeProbes.length > 0) actions.push(`run_runtime_probes:${runtimeProbes.join(',')}`);
+    if (hardExclusions.some((reason) => reason.startsWith('budget_exceeded')))
+        actions.push('choose_lower_cost_model_or_raise_budget');
+    if (softPenalties.some((reason) => reason.startsWith('price_above_preference')))
+        actions.push('prefer_lower_cost_model_when_possible');
+    if (hardExclusions.length === 0 && softPenalties.includes('account_visibility_unknown'))
+        actions.push('run_low_cost_access_probe');
+    if (hardExclusions.length === 0 && runtimeProbes.length > 0)
+        actions.push(`run_runtime_probes:${runtimeProbes.join(',')}`);
     if (actions.length === 0 && hardExclusions.length === 0) actions.push('candidate_can_be_ranked');
     return [...new Set(actions)];
 }
@@ -87,7 +98,10 @@ function actionableContext(hardExclusions, softPenalties) {
     if (hardExclusions.includes('account_access_unknown') || softPenalties.includes('account_visibility_unknown')) {
         dataNeeded.push('account_visibility');
     }
-    if (hardExclusions.includes('upstream_provider_not_allowed') || hardExclusions.includes('upstream_provider_blocked')) {
+    if (
+        hardExclusions.includes('upstream_provider_not_allowed') ||
+        hardExclusions.includes('upstream_provider_blocked')
+    ) {
         dataNeeded.push('allowed_upstream_policy');
     }
     if (hardExclusions.includes('route_layer_not_allowed') || hardExclusions.includes('route_layer_blocked')) {
@@ -112,18 +126,18 @@ function actionableContext(hardExclusions, softPenalties) {
 /**
  * @param {Record<string, unknown>} decision
  * @returns {{
- *   key: string;
- *   include: boolean;
- *   disposition: string;
- *   status: 'eligible' | 'excluded' | 'unknown';
- *   primaryReason: string;
- *   hardExclusions: string[];
- *   softPenalties: string[];
- *   reasons: string[];
- *   requiredRuntimeProbes: string[];
- *   actionable: { category: string; dataNeeded: string[]; probeSafe: boolean; operatorHint: string };
- *   nextActions: string[];
- *   summary: string;
+ *     key: string;
+ *     include: boolean;
+ *     disposition: string;
+ *     status: 'eligible' | 'excluded' | 'unknown';
+ *     primaryReason: string;
+ *     hardExclusions: string[];
+ *     softPenalties: string[];
+ *     reasons: string[];
+ *     requiredRuntimeProbes: string[];
+ *     actionable: { category: string; dataNeeded: string[]; probeSafe: boolean; operatorHint: string };
+ *     nextActions: string[];
+ *     summary: string;
  * }}
  */
 export function explainModelGatewayEligibilityDecision(decision) {

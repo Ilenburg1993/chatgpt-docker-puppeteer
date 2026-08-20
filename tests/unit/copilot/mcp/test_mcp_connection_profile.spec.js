@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
+import { getCanonicalMcpTools } from '#copilot/mcp';
 import { startHttpMcpServer } from '#copilot/mcp/adapters';
 import {
     buildChatGptConnectorProfile,
@@ -34,7 +35,6 @@ import {
     scopesForMcpTool,
     securitySchemesForMcpTool,
 } from '#copilot/mcp/control-plane';
-import { getCanonicalMcpTools } from '#copilot/mcp';
 
 describe('copilot MCP ChatGPT connection profile', () => {
     it('normalizes connector URLs to /mcp', () => {

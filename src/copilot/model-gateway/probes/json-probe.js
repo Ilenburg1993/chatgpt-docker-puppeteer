@@ -10,8 +10,7 @@
 
 import { runConfiguredByokChatProbe } from './chat-probe.js';
 
-const DEFAULT_JSON_PROBE_PROMPT =
-    'Responda somente com JSON valido, sem markdown: {"byok_probe":"ok","mode":"json"}.';
+const DEFAULT_JSON_PROBE_PROMPT = 'Responda somente com JSON valido, sem markdown: {"byok_probe":"ok","mode":"json"}.';
 
 /**
  * @param {string} text
@@ -60,7 +59,9 @@ export async function runConfiguredByokJsonProbe(options = {}) {
 
     const parsed = parseJsonObject(chatResult.finalContent);
     if (!parsed.ok || !hasExpectedProbePayload(parsed.value)) {
-        const reason = parsed.ok ? 'JSON valido, mas payload do probe nao confere.' : `JSON invalido: ${parsed.message}`;
+        const reason = parsed.ok
+            ? 'JSON valido, mas payload do probe nao confere.'
+            : `JSON invalido: ${parsed.message}`;
         return {
             ...chatResult,
             ok: false,

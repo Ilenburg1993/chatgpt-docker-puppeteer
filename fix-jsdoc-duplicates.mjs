@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-/** @typedef {{ code: number, message: string, file?: string, line: number }} DiagnosticEntry */
+/** @typedef {{ code: number; message: string; file?: string; line: number }} DiagnosticEntry */
 /** @type {{ errors: DiagnosticEntry[] }} */
 const report = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 

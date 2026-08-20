@@ -1,23 +1,25 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'vitest';
 import {
     readMcpRoundTripAnalyticsMonitorState,
     resetMcpRoundTripAnalyticsMonitorForTests,
     scheduleMcpRoundTripAnalyticsMonitor,
 } from '#copilot/mcp/control-plane';
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'vitest';
 
 afterEach(() => resetMcpRoundTripAnalyticsMonitorForTests());
 
 describe('MCP round-trip analytics monitor', () => {
     it('runs one non-overlapping incremental sync and reschedules after success', async () => {
-        /** @type {Array<() => void>} */
+        /** @type {(() => void)[]} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
-            callbacks.push(fn);
-            return /** @type {NodeJS.Timeout} */ ({ unref() {} });
-        });
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
         let calls = 0;
         assert.equal(
             scheduleMcpRoundTripAnalyticsMonitor({
@@ -61,12 +63,14 @@ describe('MCP round-trip analytics monitor', () => {
     });
 
     it('records a failed sync without throwing and still schedules the next cycle', async () => {
-        /** @type {Array<() => void>} */
+        /** @type {(() => void)[]} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
-            callbacks.push(fn);
-            return /** @type {NodeJS.Timeout} */ ({ unref() {} });
-        });
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
         scheduleMcpRoundTripAnalyticsMonitor({
             enabled: true,
             initialDelayMs: 0,

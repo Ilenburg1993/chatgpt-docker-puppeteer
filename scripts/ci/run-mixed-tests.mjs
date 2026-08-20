@@ -133,19 +133,24 @@ for (const chunk of chunkFiles(nodeTestFiles, nodeTestShardSize)) {
 
 for (const chunk of chunkFiles(genericVitestFiles, vitestShardSize)) {
     if (chunk.length === 0) continue;
-    const status = runCommand(
-        'npx',
-        ['vitest', 'run', '--config', 'vitest.config.js', `--maxWorkers=${vitestMaxWorkers}`, ...chunk],
-    );
+    const status = runCommand('npx', [
+        'vitest',
+        'run',
+        '--config',
+        'vitest.config.js',
+        `--maxWorkers=${vitestMaxWorkers}`,
+        ...chunk,
+    ]);
     if (status !== 0) exitCode = status;
 }
 
 for (const chunk of chunkFiles(copilotVitestFiles, vitestShardSize)) {
     if (chunk.length === 0) continue;
-    const status = runCommand(
-        'node',
-        ['scripts/ci/run-vitest-copilot.mjs', `--maxWorkers=${vitestMaxWorkers}`, ...chunk],
-    );
+    const status = runCommand('node', [
+        'scripts/ci/run-vitest-copilot.mjs',
+        `--maxWorkers=${vitestMaxWorkers}`,
+        ...chunk,
+    ]);
     if (status !== 0) exitCode = status;
 }
 

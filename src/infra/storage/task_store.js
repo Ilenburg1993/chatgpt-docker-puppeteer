@@ -100,7 +100,6 @@ function listTaskFiles() {
     try {
         return fs.readdirSync(PATHS.QUEUE).filter((f) => f.endsWith('.json'));
     } catch (/** @type {any} */ _) {
-
         return [];
     }
 }
@@ -130,7 +129,6 @@ async function clearQueue() {
             await fsp.unlink(filepath);
             deleted++;
         } catch (/** @type {any} */ _) {
-
             // Em caso de erro de leitura ou exclusão de um arquivo específico, incrementa preservados
             preserved++;
         }

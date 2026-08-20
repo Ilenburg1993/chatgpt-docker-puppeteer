@@ -252,8 +252,7 @@ function validateFieldAgainstSchema(key, value, fieldObj) {
 /**
  * @param {Record<string, RuntimeElicitationFieldValue> | undefined} content
  * @param {unknown} schema
- * @returns {{ ok: true; content: Record<string, RuntimeElicitationFieldValue> | undefined }
- *     | { ok: false; error: string }}
+ * @returns {{ ok: true; content: Record<string, RuntimeElicitationFieldValue> | undefined } | { ok: false; error: string }}
  */
 export function normalizeElicitationContentWithSchema(content, schema) {
     if (!content) {

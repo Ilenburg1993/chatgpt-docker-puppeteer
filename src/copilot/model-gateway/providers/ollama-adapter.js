@@ -2,8 +2,8 @@
 /**
  * Ollama provider adapter.
  *
- * Ollama local/cloud speaks an OpenAI-compatible chat surface in this project, but routing needs to know whether a model
- * is local/private or cloud-backed. This adapter preserves that identity while reusing the generic wire mapping.
+ * Ollama local/cloud speaks an OpenAI-compatible chat surface in this project, but routing needs to know whether a
+ * model is local/private or cloud-backed. This adapter preserves that identity while reusing the generic wire mapping.
  *
  * @module copilot/model-gateway/providers/ollama-adapter
  */

@@ -11,23 +11,17 @@ import {
 
 describe('bounded HTTP response bodies', () => {
     it('reads byte, text and JSON bodies within their budget', async () => {
-        assert.deepEqual(
-            await readBoundedResponseBytes(new Response('abc'), { maxBytes: 3 }),
-            Buffer.from('abc'),
-        );
+        assert.deepEqual(await readBoundedResponseBytes(new Response('abc'), { maxBytes: 3 }), Buffer.from('abc'));
         assert.equal(await readBoundedResponseText(new Response('ação'), { maxBytes: 16 }), 'ação');
-        assert.deepEqual(
-            await readBoundedResponseJson(new Response('{"ok":true}'), { maxBytes: 32 }),
-            { ok: true },
-        );
+        assert.deepEqual(await readBoundedResponseJson(new Response('{"ok":true}'), { maxBytes: 32 }), { ok: true });
     });
 
     it('rejects Content-Length and streamed bodies above the budget', async () => {
         await assert.rejects(
-            readBoundedResponseText(
-                new Response('ok', { headers: { 'content-length': '100' } }),
-                { maxBytes: 4, label: 'probe' },
-            ),
+            readBoundedResponseText(new Response('ok', { headers: { 'content-length': '100' } }), {
+                maxBytes: 4,
+                label: 'probe',
+            }),
             /probe exceeds 4 bytes/u,
         );
         await assert.rejects(

@@ -17,8 +17,8 @@ import {
     parseCgroupMemoryLimit,
     pruneCompletedJobRecords,
     readCopilotValidatorCapacityState,
-    readValidatorResourceSnapshot,
     readJobOutput,
+    readValidatorResourceSnapshot,
     resolveFocusedUnitTestCommand,
     resolveJobTimeoutMs,
     resolveValidatorCommand,
@@ -176,14 +176,17 @@ describe('copilot MCP jobs', () => {
     });
 
     it('parses cgroup memory evidence without widening the persisted key surface', () => {
-        assert.deepEqual(parseCgroupMemoryEvents('low 1\nhigh 2\nmax 3\noom 4\noom_kill 5\noom_group_kill 6\nunknown 99\n'), {
-            low: 1,
-            high: 2,
-            max: 3,
-            oom: 4,
-            oom_kill: 5,
-            oom_group_kill: 6,
-        });
+        assert.deepEqual(
+            parseCgroupMemoryEvents('low 1\nhigh 2\nmax 3\noom 4\noom_kill 5\noom_group_kill 6\nunknown 99\n'),
+            {
+                low: 1,
+                high: 2,
+                max: 3,
+                oom: 4,
+                oom_kill: 5,
+                oom_group_kill: 6,
+            },
+        );
         assert.equal(parseCgroupMemoryLimit('max\n'), null);
         assert.equal(parseCgroupMemoryLimit('1073741824\n'), 1_073_741_824);
         assert.equal(parseCgroupMemoryLimit('not-a-number'), null);

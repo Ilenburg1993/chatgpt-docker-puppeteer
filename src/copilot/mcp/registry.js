@@ -29,6 +29,7 @@ import {
     recordMcpToolInteractionEnd,
     recordMcpToolInteractionStart,
     recordMcpToolMetric,
+    toWorkspaceRelativePath,
 } from '#copilot/mcp/control-plane';
 import {
     bindMcpOAuthFrictionAuditProvider,
@@ -43,7 +44,6 @@ import {
     jobTools,
     llmBLiveTools,
     maintenanceTools,
-    terminalTools,
     mcpAppsSdkReadinessTool,
     mcpAutonomyPowerScoreTool,
     mcpClientLatencyEvidenceTool,
@@ -72,15 +72,15 @@ import {
     mcpLatencyAttributionTool,
     mcpLatencyDashboardTool,
     mcpLatencyPulseTool,
-    mcpOpenAiEndpointLatencyTool,
-    mcpRoundTripAnalyticsTool,
-    mcpToolPayloadAuditTool,
     mcpOAuthFrictionAuditTool,
+    mcpOpenAiEndpointLatencyTool,
     mcpPostRestartReadinessTool,
     mcpReloadTools,
+    mcpRoundTripAnalyticsTool,
     mcpRuntimeHealthTool,
     mcpSessionProfileTool,
     mcpSmokeWorkspaceTool,
+    mcpToolPayloadAuditTool,
     mcpToolsStatusTool,
     mcpTunnelStatusTool,
     metaTools,
@@ -90,9 +90,12 @@ import {
     repoReadTools,
     repoWorkingSetTool,
     repoWriteTools,
+    terminalTools,
 } from '#copilot/mcp/tools';
 import { createHash, randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { z } from 'zod';
+import { readMutationAppliedState } from '../infra/io/fs/mutation-state.js';
 import { bindConnectorSmokeLocalToolNamesProvider } from './cloudflare/connector-smoke.js';
 import {
     applyMcpToolSurfacePolicy,
@@ -104,7 +107,10 @@ import {
 export const COPILOT_MCP_REGISTRY_IMPLEMENTATION_NAME = 'copilot-mcp-registry';
 export const COPILOT_MCP_REGISTRY_IMPLEMENTATION_VERSION = '1.1.0';
 
-const devcontainerNetworkTools = [mcpDevcontainerNetworkPostureAuditTool, mcpDevcontainerNetworkControlPlaneRefreshTool];
+const devcontainerNetworkTools = [
+    mcpDevcontainerNetworkPostureAuditTool,
+    mcpDevcontainerNetworkControlPlaneRefreshTool,
+];
 
 /** @type {WeakMap<McpToolDefinition, { risk: ReturnType<typeof classifyMcpToolRisk>; requiredScopes: string[] }>} */
 const TOOL_RUNTIME_CONTEXT_CACHE = new WeakMap();
@@ -483,11 +489,12 @@ function buildMcpRegisterToolOptions(tool) {
     return /** @type {Parameters<import('@modelcontextprotocol/sdk/server/mcp.js').McpServer['registerTool']>[1]} */ ({
         title: tool.title,
         description: tool.description,
-        inputSchema: /**
-         * @type {Parameters<
-         *     import('@modelcontextprotocol/sdk/server/mcp.js').McpServer['registerTool']
-         * >[1]['inputSchema']}
-         */ (/** @type {unknown} */ (tool.inputSchema)),
+        inputSchema:
+            /**
+             * @type {Parameters<
+             *     import('@modelcontextprotocol/sdk/server/mcp.js').McpServer['registerTool']
+             * >[1]['inputSchema']}
+             */ (/** @type {unknown} */ (tool.inputSchema)),
         annotations: tool.annotations,
         ...(tool.outputSchema !== undefined ? { outputSchema: tool.outputSchema } : {}),
         ...(tool.securitySchemes !== undefined ? { securitySchemes: tool.securitySchemes } : {}),
@@ -673,6 +680,10 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
     } catch (error) {
         const durationMs = elapsedMs(startedAt);
         const errorMessage = error instanceof Error ? error.message : String(error);
+        const mutationState = readMutationAppliedState(error);
+        const mutationPaths = mutationState.paths
+            .slice(0, 16)
+            .map((entry) => (path.isAbsolute(entry) ? toWorkspaceRelativePath(entry) : entry));
         if (activePhase !== 'idle' && phases[activePhase] === undefined) {
             phases[activePhase] = elapsedMs(activePhaseStartedAt);
         }
@@ -683,6 +694,16 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
             durationMs,
             error: errorMessage,
             risk,
+            ...(mutationState.applied
+                ? {
+                      mutationApplied: true,
+                      mutationPhase: mutationState.phase,
+                      mutationPaths,
+                      failureClass: 'applied-but-unconfirmed',
+                      retryability: 'inspect-before-retry',
+                      recoveryRequired: true,
+                  }
+                : {}),
         });
         safeRecordMcpToolMetric(tool.name, { durationMs, isError: true, phases });
         if (registryPolicy.handlerExceptionMode === 'tool-result') {
@@ -690,6 +711,16 @@ async function guardedToolHandler(tool, args, options, registryPolicy) {
                 code: 'MCP_TOOL_EXECUTION_FAILED',
                 hint: errorMessage,
                 callId,
+                ...(mutationState.applied
+                    ? {
+                          mutationApplied: true,
+                          mutationPhase: mutationState.phase,
+                          mutationPaths,
+                          failureClass: 'applied-but-unconfirmed',
+                          retryability: 'inspect-before-retry',
+                          recoveryRequired: true,
+                      }
+                    : {}),
             });
         }
         throw error;
@@ -792,9 +823,10 @@ async function runToolHandlerWithTimeout(tool, args, policy) {
  */
 function validateToolResultSize(result, policy, tool) {
     const requestedLimit = Number(tool.maxResultBytes);
-    const limitBytes = Number.isInteger(requestedLimit) && requestedLimit > 0
-        ? Math.max(16 * 1024, Math.min(64 * 1024 * 1024, requestedLimit))
-        : policy.maxToolResultBytes;
+    const limitBytes =
+        Number.isInteger(requestedLimit) && requestedLimit > 0
+            ? Math.max(16 * 1024, Math.min(64 * 1024 * 1024, requestedLimit))
+            : policy.maxToolResultBytes;
     const hint = getResultSizeHint(result);
     if (hint) {
         return {
@@ -810,10 +842,7 @@ function validateToolResultSize(result, policy, tool) {
     try {
         const bytes = Buffer.byteLength(stableJsonStringify(result));
         return {
-            error:
-                bytes > limitBytes
-                    ? `Tool result is ${bytes} bytes; limit is ${limitBytes} bytes.`
-                    : null,
+            error: bytes > limitBytes ? `Tool result is ${bytes} bytes; limit is ${limitBytes} bytes.` : null,
             strategy: 'stringify',
             bytes,
             limitBytes,
@@ -894,7 +923,9 @@ export function validateMcpToolDefinitions(tools, policy = readMcpRegistryPolicy
         }
         if (
             tool.maxResultBytes !== undefined &&
-            (!Number.isInteger(tool.maxResultBytes) || tool.maxResultBytes < 16 * 1024 || tool.maxResultBytes > 64 * 1024 * 1024)
+            (!Number.isInteger(tool.maxResultBytes) ||
+                tool.maxResultBytes < 16 * 1024 ||
+                tool.maxResultBytes > 64 * 1024 * 1024)
         ) {
             errors.push(`${label}: maxResultBytes must be an integer between 16 KiB and 64 MiB.`);
         }
@@ -1269,7 +1300,8 @@ function normalizeSecuritySchemeArray(value) {
 function validateToolStructuredOutput(tool, result) {
     if (tool.outputSchema === undefined || !result || typeof result !== 'object') return [];
     if (result.isError === true) return [];
-    if (!('structuredContent' in result)) return ['successful tool result is missing structuredContent for outputSchema.'];
+    if (!('structuredContent' in result))
+        return ['successful tool result is missing structuredContent for outputSchema.'];
     const schema = normalizeToolOutputSchema(tool.outputSchema);
     if (!schema) return ['outputSchema cannot be normalized for local structuredContent validation.'];
     const parsed = schema.safeParse(result.structuredContent);
@@ -1309,8 +1341,8 @@ function normalizePlainObject(value) {
 }
 
 /**
- * Persist only explicitly bounded experiment labels for the no-I/O latency pulse.
- * Raw IPs, URLs and arbitrary input fields are intentionally excluded.
+ * Persist only explicitly bounded experiment labels for the no-I/O latency pulse. Raw IPs, URLs and arbitrary input
+ * fields are intentionally excluded.
  *
  * @param {string} toolName
  * @param {Record<string, unknown>} args

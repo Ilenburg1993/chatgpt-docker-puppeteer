@@ -72,12 +72,12 @@ logging, e status snapshots.
 
 ### Por Severidade
 
-| Severidade | Count | Finding IDs                                          |
-| ---------- | ----- | ---------------------------------------------------- |
-| **P2**     | 2     | LEAK-AGENT-001, LEAK-AGENT-002                       |
-| **P3**     | 13    | ARCH-001~003, RACE-001~003, BUG-006~008, SEC-003~005 |
-| **P4**     | 16    | PERF-001~004, GAP-005~015, ARCH-005~009, BUG-009~010 |
-| **P5**     | 6     | GAP-AGENT-007/008/012, ARCH-AGENT-006/008            |
+| Severidade | Count | Finding IDs                                              |
+| ---------- | ----- | -------------------------------------------------------- |
+| **P2**     | 2     | LEAK-AGENT-001, LEAK-AGENT-002                           |
+| **P3**     | 13    | ARCH-001~~003, RACE-001~~003, BUG-006~~008, SEC-003~~005 |
+| **P4**     | 16    | PERF-001~~004, GAP-005~~015, ARCH-005~~009, BUG-009~~010 |
+| **P5**     | 6     | GAP-AGENT-007/008/012, ARCH-AGENT-006/008                |
 
 ### Por Categoria
 

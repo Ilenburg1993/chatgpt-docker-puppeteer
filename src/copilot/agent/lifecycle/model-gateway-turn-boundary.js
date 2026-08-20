@@ -9,37 +9,35 @@
  * @module copilot/agent/lifecycle/model-gateway-turn-boundary
  */
 
-import { promoteModelGatewayDeferredRouteSwitchAtTurnBoundary } from '#copilot/model-gateway';
 import {
     EMITTER_QUESTION_ANSWERED,
     EMITTER_QUESTION_PENDING,
     EMITTER_USER_INPUT_COMPLETED,
     EMITTER_USER_INPUT_REQUESTED,
 } from '#copilot/events';
+import { promoteModelGatewayDeferredRouteSwitchAtTurnBoundary } from '#copilot/model-gateway';
 import { log } from '../ports/logging/index.js';
 
 /**
  * @typedef {{
- *   getSessionSnapshot: () => { sessionId: string } | null;
- *   trackBackgroundTask: (
- *     task: Promise<unknown>,
- *     meta?: { label?: string; description?: string },
- *   ) => Promise<void>;
- *   hasPendingQuestion?: () => boolean;
- *   getDialogTurnQueueDepth?: () => number;
- *   isProcessing?: () => boolean;
+ *     getSessionSnapshot: () => { sessionId: string } | null;
+ *     trackBackgroundTask: (task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>;
+ *     hasPendingQuestion?: () => boolean;
+ *     getDialogTurnQueueDepth?: () => number;
+ *     isProcessing?: () => boolean;
  * }} ModelGatewayTurnBoundaryContext
  *
+ *
  * @typedef {import('node:events').EventEmitter & {
- *   switchRoute: (
- *     route: Record<string, unknown>,
- *     options?: {
- *       idempotencyKey?: string;
- *       source?: string;
- *       allowActiveDialogLoopReattach?: boolean;
- *       forceApplyDeferred?: boolean;
- *     },
- *   ) => Promise<Record<string, unknown>>;
+ *     switchRoute: (
+ *         route: Record<string, unknown>,
+ *         options?: {
+ *             idempotencyKey?: string;
+ *             source?: string;
+ *             allowActiveDialogLoopReattach?: boolean;
+ *             forceApplyDeferred?: boolean;
+ *         },
+ *     ) => Promise<Record<string, unknown>>;
  * }} ModelGatewayTurnBoundaryHost
  */
 
@@ -47,9 +45,9 @@ import { log } from '../ports/logging/index.js';
  * @param {ModelGatewayTurnBoundaryContext} ctx
  * @param {ModelGatewayTurnBoundaryHost} host
  * @param {{
- *   promote?: typeof promoteModelGatewayDeferredRouteSwitchAtTurnBoundary;
- *   source?: string;
- *   turnBoundarySettleMs?: number;
+ *     promote?: typeof promoteModelGatewayDeferredRouteSwitchAtTurnBoundary;
+ *     source?: string;
+ *     turnBoundarySettleMs?: number;
  * }} [options]
  * @returns {() => void}
  */
@@ -109,9 +107,7 @@ export function wireAgentModelGatewayTurnBoundaryPromotion(ctx, host, options = 
                         `[ModelGateway] Promoção pós-turno não foi concluída ` +
                             `(session=${session.sessionId}): ${detail || 'unknown'}`,
                     );
-                    throw new Error(
-                        `MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_FAILED: ${detail || 'unknown'}`,
-                    );
+                    throw new Error(`MODEL_GATEWAY_DEFERRED_ROUTE_PROMOTION_FAILED: ${detail || 'unknown'}`);
                 }
                 return result;
             })

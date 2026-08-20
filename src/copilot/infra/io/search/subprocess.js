@@ -128,14 +128,17 @@ function normalizeTimeout(timeout) {
 function makeSearchExitError(file, args, status, signal, stdout, stderr) {
     const descriptor = [file, ...args].join(' ');
     const reason = signal ? `signal ${signal}` : `exit code ${String(status)}`;
-    const error = /** @type {Error & {
-    code?: number | string;
-    status?: number;
-    signal?: NodeJS.Signals;
-    stdout?: string;
-    stderr?: string;
-    killed?: boolean;
-}} */ (new Error(`Comando de busca falhou (${reason}): ${descriptor}`));
+    const error =
+        /**
+         * @type {Error & {
+         *     code?: number | string;
+         *     status?: number;
+         *     signal?: NodeJS.Signals;
+         *     stdout?: string;
+         *     stderr?: string;
+         *     killed?: boolean;
+         * }}
+         */ (new Error(`Comando de busca falhou (${reason}): ${descriptor}`));
     if (status !== null) {
         error.code = status;
         error.status = status;
@@ -314,8 +317,8 @@ export async function execSearchFile(file, args, options = {}) {
 /**
  * Executa um binário de busca processando stdout por linha.
  *
- * Quando `onStdoutLine` retorna `false`, o subprocesso é encerrado com sucesso via `SIGTERM`. Isso permite que
- * callers façam early stop depois de sanitizar/paginar sem materializar todo o stdout.
+ * Quando `onStdoutLine` retorna `false`, o subprocesso é encerrado com sucesso via `SIGTERM`. Isso permite que callers
+ * façam early stop depois de sanitizar/paginar sem materializar todo o stdout.
  *
  * @param {string} file
  * @param {readonly string[]} args

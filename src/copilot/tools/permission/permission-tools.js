@@ -129,22 +129,26 @@ const permissionModeSetTool = buildTool({
         'ATENÇÃO: o dialog loop (DL-PERM) não é uma tool — não é afetado por este modo.',
     parameters: z.object({
         mode: z
-            .enum(['approve_all', 'audit_only', 'selective'])['describe']('Modo de aprovação: "approve_all" | "audit_only" | "selective"'),
+            .enum(['approve_all', 'audit_only', 'selective'])
+            ['describe']('Modo de aprovação: "approve_all" | "audit_only" | "selective"'),
         allowTools: z
             .array(z.string())
-            .optional()['describe'](
+            .optional()
+            ['describe'](
                 'Whitelist de tools permitidas (somente para modo "selective"). ' +
                     'Se definida, somente estas tools são aprovadas.',
             ),
         denyTools: z
             .array(z.string())
-            .optional()['describe'](
+            .optional()
+            ['describe'](
                 'Blacklist de tools negadas (somente para modo "selective"). ' + 'Ignorada se allowTools for definida.',
             ),
         denyShell: z
             .boolean()
             .optional()
-            .default(false)['describe'](
+            .default(false)
+            ['describe'](
                 'Se true (modo "selective"), bloqueia as shell tools: ' +
                     'run_shell_command, run_npm_script, run_node_script.',
             ),

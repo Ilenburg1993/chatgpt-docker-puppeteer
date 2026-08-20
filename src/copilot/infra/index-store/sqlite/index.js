@@ -6,14 +6,14 @@
  */
 
 export {
-    classifyContentKind,
-    countLines,
     DEFAULT_CHUNK_LINES,
     DEFAULT_INDEX_EXTENSIONS,
+    SYMBOL_EXTENSIONS,
+    classifyContentKind,
+    countLines,
     iterateLineChunks,
     makeLineChunks,
     sha256,
-    SYMBOL_EXTENSIONS,
 } from './content.js';
 export {
     buildIndexPathTreeRange,
@@ -24,4 +24,4 @@ export {
     shouldIndexFile,
 } from './paths.js';
 export { normalizeIndexMaxResults, sanitizeFtsQuery } from './query.js';
-export { ensureIoIndexSchema, IO_INDEX_SCHEMA_VERSION } from './schema.js';
+export { IO_INDEX_SCHEMA_VERSION, ensureIoIndexSchema } from './schema.js';

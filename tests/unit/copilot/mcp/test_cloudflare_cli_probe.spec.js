@@ -5,16 +5,16 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { afterEach, describe, it } from 'vitest';
 
-import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
 import { probeJsonWithRetry, readSmokeBearerToken } from '#copilot/mcp/cloudflare/cli-probe.js';
 import { runCloudflareSmoke } from '#copilot/mcp/cloudflare/cli-smoke.js';
+import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
 
 /** @type {http.Server[]} */
 const servers = [];
 
 /**
  * @param {string} publicMcpUrl
- * @param {string} [smokeStateFile='/tmp/cloudflare-smoke-test.json']
+ * @param {string} [smokeStateFile='/tmp/cloudflare-smoke-test.json'] Default is `'/tmp/cloudflare-smoke-test.json'`
  * @returns {ReturnType<typeof readCloudflareTunnelConfig>}
  */
 function smokeConfig(publicMcpUrl, smokeStateFile = '/tmp/cloudflare-smoke-test.json') {

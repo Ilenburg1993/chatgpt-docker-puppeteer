@@ -51,6 +51,7 @@ export function classifySdkRateLimitScope(error) {
  *     reason: string;
  * }} ModelCallFallbackDecision
  *
+ *
  * @typedef {{
  *     errorHandling: 'retry' | 'abort';
  *     reason: string;

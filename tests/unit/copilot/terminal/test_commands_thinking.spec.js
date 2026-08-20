@@ -35,8 +35,11 @@ vi.mock('../../../../src/copilot/presentation/state/index.js', () => ({
 vi.mock('../../../../src/copilot/terminal/state/events/index.js', () => ({
     formatTerminalThinkingRef: (/** @type {string | null | undefined} */ id) => String(id ?? '').slice(0, 12),
     terminalThemeDivider: (width = 70) => `  ${'-'.repeat(width)}`,
-    terminalThemeHeadline: (/** @type {string} */ _role, /** @type {string} */ title, /** @type {Array<string | null | undefined | false>} */ details = []) =>
-        `  ${title}${details.length > 0 ? ` · ${details.filter(Boolean).join(' · ')}` : ''}`,
+    terminalThemeHeadline: (
+        /** @type {string} */ _role,
+        /** @type {string} */ title,
+        /** @type {(string | null | undefined | false)[]} */ details = [],
+    ) => `  ${title}${details.length > 0 ? ` · ${details.filter(Boolean).join(' · ')}` : ''}`,
     terminalThemeRow: (/** @type {string} */ label, /** @type {string} */ value) => `  ${label} ${value}`,
     terminalThemeText: (/** @type {string} */ _role, /** @type {string} */ text) => text,
 }));

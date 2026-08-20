@@ -18,12 +18,12 @@ function text(value) {
 
 /**
  * @param {{
- *   currentProviderId?: string | null;
- *   targetProviderId?: string | null;
- *   sessionAvailable?: boolean;
- *   modelSwitchAvailable?: boolean;
- *   providerRebindAvailable?: boolean;
- *   sameSessionReattachAvailable?: boolean;
+ *     currentProviderId?: string | null;
+ *     targetProviderId?: string | null;
+ *     sessionAvailable?: boolean;
+ *     modelSwitchAvailable?: boolean;
+ *     providerRebindAvailable?: boolean;
+ *     sameSessionReattachAvailable?: boolean;
  * }} input
  */
 export function evaluateLiveRouteSwitchCapability(input) {
@@ -86,9 +86,6 @@ export function evaluateLiveRouteSwitchCapability(input) {
         requiresNewSession: false,
         providerRebindRequired: false,
         providerBoundaryKnown,
-        reason:
-            input.modelSwitchAvailable === true
-                ? 'live_model_switch_supported'
-                : 'same_session_reattach_supported',
+        reason: input.modelSwitchAvailable === true ? 'live_model_switch_supported' : 'same_session_reattach_supported',
     };
 }

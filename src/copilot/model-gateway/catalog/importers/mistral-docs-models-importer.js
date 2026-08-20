@@ -6,6 +6,7 @@
  * limitations, pricing snippets and endpoint hints before any key-scoped collection or runtime proof.
  *
  * Sources checked 2026-05-26:
+ *
  * - https://docs.mistral.ai/models/overview
  * - https://docs.mistral.ai/resources/known-limitations
  * - https://docs.mistral.ai/api/endpoint/models
@@ -98,7 +99,9 @@ function compactTokenLimit(value) {
  * @returns {number[]}
  */
 function pricesFromText(value) {
-    return [...value.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)].map((match) => Number(match[1])).filter(Number.isFinite);
+    return [...value.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)]
+        .map((match) => Number(match[1]))
+        .filter(Number.isFinite);
 }
 
 /**
@@ -108,8 +111,17 @@ function pricesFromText(value) {
 function mistralModelTraits(providerModel) {
     const family = providerModel.split('-')[0] ?? 'mistral';
     const lower = providerModel.toLowerCase();
-    const tier = lower.includes('large') ? 'large' : lower.includes('medium') ? 'medium' : lower.includes('small') ? 'small' : lower.includes('embed') ? 'embed' : null;
-    const generation = lower.match(/-(\d{2,4}(?:\d{2})?)$/u)?.[1] ?? lower.match(/-(\d+(?:-\d+)?)$/u)?.[1]?.replace('-', '.') ?? null;
+    const tier = lower.includes('large')
+        ? 'large'
+        : lower.includes('medium')
+          ? 'medium'
+          : lower.includes('small')
+            ? 'small'
+            : lower.includes('embed')
+              ? 'embed'
+              : null;
+    const generation =
+        lower.match(/-(\d{2,4}(?:\d{2})?)$/u)?.[1] ?? lower.match(/-(\d+(?:-\d+)?)$/u)?.[1]?.replace('-', '.') ?? null;
     const displayName = providerModel
         .split('-')
         .map((part) => (part.length <= 3 ? part.toUpperCase() : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
@@ -126,7 +138,12 @@ function modalitiesForModel(providerModel) {
     if (lower.includes('embed')) return normalizeModelModalities({ input: ['text'], output: ['embedding'] });
     if (lower.includes('ocr')) return normalizeModelModalities({ input: ['document', 'image'], output: ['text'] });
     if (lower.includes('voxtral')) return normalizeModelModalities({ input: ['audio', 'text'], output: ['text'] });
-    if (lower.includes('pixtral') || lower.includes('ministral') || lower.includes('large') || lower.includes('medium')) {
+    if (
+        lower.includes('pixtral') ||
+        lower.includes('ministral') ||
+        lower.includes('large') ||
+        lower.includes('medium')
+    ) {
         return normalizeModelModalities({ input: ['text', 'image'], output: ['text'] });
     }
     return normalizeModelModalities({ input: ['text'], output: ['text'] });
@@ -139,7 +156,9 @@ function modalitiesForModel(providerModel) {
  */
 function capabilitiesForModel(providerModel, combinedWindow) {
     const lower = providerModel.toLowerCase();
-    const explicitToolCalling = /\b(?:function[- ]calling|tool[- ]calling|tool use|function calls?)\b/iu.test(combinedWindow);
+    const explicitToolCalling = /\b(?:function[- ]calling|tool[- ]calling|tool use|function calls?)\b/iu.test(
+        combinedWindow,
+    );
     /** @type {Record<string, boolean>} */
     const capabilities = {};
     if (lower.includes('embed')) capabilities['embeddings'] = true;
@@ -172,7 +191,12 @@ function tokenLimitsForModel(providerModel, combinedWindow) {
         combinedWindow.match(/context\s+(?:length|window)?\s*([0-9.,]+\s*[kmb]?)/iu)?.[1] ??
         combinedWindow.match(/([0-9.,]+\s*[kmb]?)\s+context/iu)?.[1];
     const lower = providerModel.toLowerCase();
-    const inferred = lower.includes('large') || lower.includes('pixtral') || lower.includes('ministral') ? 131_072 : lower.includes('small') || lower.includes('codestral') ? 32_768 : null;
+    const inferred =
+        lower.includes('large') || lower.includes('pixtral') || lower.includes('ministral')
+            ? 131_072
+            : lower.includes('small') || lower.includes('codestral')
+              ? 32_768
+              : null;
     return normalizeModelTokenLimits({ contextWindowTokens: compactTokenLimit(limitFromWindow ?? '') ?? inferred });
 }
 
@@ -191,7 +215,7 @@ function pricingFromWindow(combinedWindow) {
 
 /**
  * @param {MistralDocsModelRow} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function evidenceValues(row) {
     const traits = mistralModelTraits(row.id);
@@ -229,7 +253,10 @@ function evidenceValues(row) {
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         ...Object.entries(tokenLimits).map(([key, value]) => ({ fieldPath: `limits.${key}`, value })),
         ...Object.entries(pricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'mistral' },
     ];
     return values.filter((item) => {
@@ -249,7 +276,9 @@ export function parseMistralDocsRows(raw) {
     const docsText = normalizeDocsText(String(record['models'] ?? ''));
     const limitsText = normalizeDocsText(String(record['limits'] ?? ''));
     const apiText = normalizeDocsText(String(record['api'] ?? ''));
-    const ids = [...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(limitsText), ...modelIdsFromText(apiText)])].sort();
+    const ids = [
+        ...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(limitsText), ...modelIdsFromText(apiText)]),
+    ].sort();
     return ids.map((id) => ({ id, docsText, limitsText, apiText }));
 }
 
@@ -275,14 +304,21 @@ export function createMistralDocsModelsImporter(options = {}) {
         refreshPolicy: 'scheduled',
         ttlSeconds: 86_400,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Mistral docs catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Mistral docs catalog import');
             /** @param {string} url */
             const fetchText = async (url) => {
-                const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
+                const response = await fetchImpl(url, {
+                    headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' },
+                });
                 if (!response.ok) throw new Error(`Mistral docs fetch failed for ${url} with HTTP ${response.status}`);
                 return readCatalogResponseText(response, { label: `Mistral docs ${url}` });
             };
-            const [models, limits, api] = await Promise.all([fetchText(modelsUrl), fetchText(limitsUrl), fetchText(apiDocsUrl)]);
+            const [models, limits, api] = await Promise.all([
+                fetchText(modelsUrl),
+                fetchText(limitsUrl),
+                fetchText(apiDocsUrl),
+            ]);
             return { models, limits, api };
         },
         parseRows: parseMistralDocsRows,

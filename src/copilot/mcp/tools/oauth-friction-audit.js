@@ -58,15 +58,20 @@ export const mcpOAuthFrictionAuditTool = {
         const resourceMatchesAudience = config.acceptedAudiences.includes(config.resource);
         const issuerMatchesResource = config.expectedIssuer === config.resource;
         if (config.mode === 'oauth' && config.enforcement === 'off') {
-            warnings.push('OAuth mode is configured but enforcement is off; this is only appropriate for fallback testing.');
+            warnings.push(
+                'OAuth mode is configured but enforcement is off; this is only appropriate for fallback testing.',
+            );
         }
-        if (!resourceMatchesAudience) critical.push('Configured OAuth accepted audiences do not include protected resource.');
+        if (!resourceMatchesAudience)
+            critical.push('Configured OAuth accepted audiences do not include protected resource.');
         if (config.mode === 'oauth' && !config.jwksUri) critical.push('OAuth mode is enabled but JWKS URI is missing.');
         if (config.mode === 'oauth' && config.authorizationServers.length === 0) {
             critical.push('Protected resource metadata has no authorization server.');
         }
         if (issuerMetadata && protectedMethods.join('|') !== issuerMethods.join('|')) {
-            warnings.push('Protected resource metadata and issuer metadata advertise different token endpoint auth methods.');
+            warnings.push(
+                'Protected resource metadata and issuer metadata advertise different token endpoint auth methods.',
+            );
         }
         if (issuerMetadata && !issuerGrants.includes('authorization_code')) {
             critical.push('Issuer metadata does not advertise authorization_code.');
@@ -74,7 +79,10 @@ export const mcpOAuthFrictionAuditTool = {
         if (issuerMetadata && !issuerGrants.includes('refresh_token')) {
             critical.push('Issuer metadata does not advertise refresh_token.');
         }
-        if (issuerMetadata && !asSortedStringArray(issuerMetadata['code_challenge_methods_supported']).includes('S256')) {
+        if (
+            issuerMetadata &&
+            !asSortedStringArray(issuerMetadata['code_challenge_methods_supported']).includes('S256')
+        ) {
             critical.push('Issuer metadata does not advertise PKCE S256.');
         }
         for (const scope of config.initialScopes) {
@@ -83,7 +91,9 @@ export const mcpOAuthFrictionAuditTool = {
             }
         }
         if (!issuerMatchesResource) {
-            warnings.push('Issuer differs from resource; this is valid for external IdPs but increases configuration risk.');
+            warnings.push(
+                'Issuer differs from resource; this is valid for external IdPs but increases configuration risk.',
+            );
         }
         if (lifetime.accessTokenTtlSeconds < lifetime.defaults.accessTokenTtlSeconds) {
             warnings.push('Access-token TTL is below the max-autonomy default of 24 hours.');
@@ -123,9 +133,7 @@ export const mcpOAuthFrictionAuditTool = {
                 pkceS256Advertised: asSortedStringArray(issuerMetadata?.['code_challenge_methods_supported']).includes(
                     'S256',
                 ),
-                protectedResourceAuthorizationServers: asSortedStringArray(
-                    protectedResource['authorization_servers'],
-                ),
+                protectedResourceAuthorizationServers: asSortedStringArray(protectedResource['authorization_servers']),
             },
             tokenLifetimePolicy: {
                 accessTokenTtlSeconds: lifetime.accessTokenTtlSeconds,
@@ -194,21 +202,24 @@ function summarizeToolScopes(tools) {
         readOnlyCount: rows.filter((row) => row.readOnly).length,
         boundedWriteCount: rows.filter((row) => !row.readOnly && !row.destructive).length,
         destructiveCount: rows.filter((row) => row.destructive).length,
-        adminScopeTools: rows.filter((row) => row.scopes.includes('repo:admin')).map((row) => row.name).sort(),
-        validateScopeTools: rows.filter((row) => row.scopes.includes('repo:validate')).map((row) => row.name).sort(),
+        adminScopeTools: rows
+            .filter((row) => row.scopes.includes('repo:admin'))
+            .map((row) => row.name)
+            .sort(),
+        validateScopeTools: rows
+            .filter((row) => row.scopes.includes('repo:validate'))
+            .map((row) => row.name)
+            .sort(),
         publicDiagnosticTools: ['mcp_oauth_friction_audit', 'mcp_oauth_issuer_diagnostics'],
-        maxPowerScopesAdvertisedByDefault: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'].every(
-            (scope) =>
-                rows.some(
-                    (row) =>
-                        row.scopes.map(String).includes(scope) ||
-                        row.securitySchemes.some(
-                            (scheme) =>
-                                scheme.type === 'oauth2' &&
-                                Array.isArray(scheme.scopes) &&
-                                scheme.scopes.includes(scope),
-                        ),
-                ),
+        maxPowerScopesAdvertisedByDefault: ['repo:read', 'repo:write', 'repo:validate', 'repo:admin'].every((scope) =>
+            rows.some(
+                (row) =>
+                    row.scopes.map(String).includes(scope) ||
+                    row.securitySchemes.some(
+                        (scheme) =>
+                            scheme.type === 'oauth2' && Array.isArray(scheme.scopes) && scheme.scopes.includes(scope),
+                    ),
+            ),
         ),
     };
 }
@@ -218,7 +229,12 @@ function summarizeToolScopes(tools) {
  * @returns {string[]}
  */
 function asSortedStringArray(value) {
-    return Array.isArray(value) ? value.filter((item) => typeof item === 'string').map(String).sort() : [];
+    return Array.isArray(value)
+        ? value
+              .filter((item) => typeof item === 'string')
+              .map(String)
+              .sort()
+        : [];
 }
 
 /**

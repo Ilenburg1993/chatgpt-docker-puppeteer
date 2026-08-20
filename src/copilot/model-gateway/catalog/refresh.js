@@ -8,15 +8,6 @@
  * @module copilot/model-gateway/catalog/refresh
  */
 
-import { createCatalogImportRun, createCatalogModelTombstones, diffCanonicalModelProjections } from './import-runs.js';
-import { createProviderAccountOverlay } from './contracts.js';
-import { runCatalogImporters } from './importer-runner.js';
-import { createModelGatewayCatalogSnapshotId, normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
-import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
-import { toOpenAIModelCatalogList } from './openai-schema.js';
-import { resolveModelGatewayCatalogRefreshLockKey, withModelGatewayCatalogRefreshLock } from './refresh-lock.js';
-import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
-import { applyModelGatewayCatalogRetention } from './retention.js';
 import {
     applyModelGatewayEligibilityToSnapshot,
     createModelEligibilityRun,
@@ -24,6 +15,15 @@ import {
     evaluateModelGatewayCatalogEligibility,
     summarizeModelGatewayEligibilityDiff,
 } from '../eligibility/index.js';
+import { createProviderAccountOverlay } from './contracts.js';
+import { createCatalogImportRun, createCatalogModelTombstones, diffCanonicalModelProjections } from './import-runs.js';
+import { runCatalogImporters } from './importer-runner.js';
+import { createModelGatewayCatalogSnapshotId, normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
+import { mergeModelMetadataEvidence, mergeProviderMetadataEvidence } from './merge.js';
+import { toOpenAIModelCatalogList } from './openai-schema.js';
+import { resolveModelGatewayCatalogRefreshLockKey, withModelGatewayCatalogRefreshLock } from './refresh-lock.js';
+import { planModelGatewayCatalogRefresh } from './refresh-plan.js';
+import { applyModelGatewayCatalogRetention } from './retention.js';
 
 /**
  * @typedef {object} ModelGatewayCatalogRefreshProgressEvent
@@ -119,14 +119,11 @@ function providerProjectionGroupKey(evidence) {
 function accountOverlayKey(overlay) {
     const explicit = overlay['accountOverlayId'];
     if (typeof explicit === 'string' && explicit) return explicit;
-    return [
-        overlay['providerId'],
-        overlay['accountScope'],
-        overlay['secretRef'],
-        overlay['sourceId'],
-    ]
-        .filter((part) => typeof part === 'string' && part)
-        .join(':') || JSON.stringify(overlay);
+    return (
+        [overlay['providerId'], overlay['accountScope'], overlay['secretRef'], overlay['sourceId']]
+            .filter((part) => typeof part === 'string' && part)
+            .join(':') || JSON.stringify(overlay)
+    );
 }
 
 /**
@@ -189,7 +186,9 @@ function buildProviderProjectionsFromEvidence(evidences) {
     }
     return {
         providerProjections: providerProjections.sort((left, right) =>
-            `${left['providerId']}:${left['subjectProviderId']}`.localeCompare(`${right['providerId']}:${right['subjectProviderId']}`),
+            `${left['providerId']}:${left['subjectProviderId']}`.localeCompare(
+                `${right['providerId']}:${right['subjectProviderId']}`,
+            ),
         ),
         providerConflicts,
     };
@@ -201,24 +200,33 @@ function buildProviderProjectionsFromEvidence(evidences) {
  * @param {object} [input]
  * @param {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} [input.importers]
  * @param {unknown} [input.snapshot]
- * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>; writeSnapshot(snapshot: object): Promise<void> }} [input.store]
+ * @param {{
+ *     readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>;
+ *     writeSnapshot(snapshot: object): Promise<void>;
+ * }} [input.store]
  * @param {() => Date} [input.now]
  * @param {boolean} [input.incremental]
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
- * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, unknown>; healthRecords?: Record<string, unknown>[] }} [input.eligibility]
+ * @param {{
+ *     enabled?: boolean;
+ *     secretRegistry?: { has(ref: string): boolean };
+ *     policy?: Record<string, unknown>;
+ *     healthRecords?: Record<string, unknown>[];
+ * }} [input.eligibility]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
  * @param {string | false} [input.lockKey]
  * @param {(event: ModelGatewayCatalogRefreshProgressEvent) => void} [input.onProgress]
-
  */
 export async function refreshModelGatewayCatalog(input = {}) {
-    const resolvedLockKey = input.lockKey === false
-        ? null
-        : (typeof input.lockKey === 'string' && input.lockKey.trim()) || resolveModelGatewayCatalogRefreshLockKey(input.store);
+    const resolvedLockKey =
+        input.lockKey === false
+            ? null
+            : (typeof input.lockKey === 'string' && input.lockKey.trim()) ||
+              resolveModelGatewayCatalogRefreshLockKey(input.store);
     if (resolvedLockKey) {
         return withModelGatewayCatalogRefreshLock(resolvedLockKey, async () => ({
             ...(await refreshModelGatewayCatalogUnlocked(input)),
@@ -237,13 +245,21 @@ export async function refreshModelGatewayCatalog(input = {}) {
  * @param {object} [input]
  * @param {import('./importer-runner.js').CatalogImporter<TRaw, TRow>[]} [input.importers]
  * @param {unknown} [input.snapshot]
- * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>; writeSnapshot(snapshot: object): Promise<void> }} [input.store]
+ * @param {{
+ *     readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>;
+ *     writeSnapshot(snapshot: object): Promise<void>;
+ * }} [input.store]
  * @param {() => Date} [input.now]
  * @param {boolean} [input.incremental]
  * @param {boolean} [input.force]
  * @param {string[]} [input.sourceIds]
  * @param {boolean} [input.refreshAccountOverlays]
- * @param {{ enabled?: boolean; secretRegistry?: { has(ref: string): boolean }; policy?: Record<string, unknown>; healthRecords?: Record<string, unknown>[] }} [input.eligibility]
+ * @param {{
+ *     enabled?: boolean;
+ *     secretRegistry?: { has(ref: string): boolean };
+ *     policy?: Record<string, unknown>;
+ *     healthRecords?: Record<string, unknown>[];
+ * }} [input.eligibility]
  * @param {{ mode?: string; maxInlineBytes?: number }} [input.rawPayloadStoragePolicy]
  * @param {import('./retention.js').ModelGatewayCatalogRetentionPolicy} [input.retentionPolicy]
  * @param {string} [input.writePolicy]
@@ -272,15 +288,16 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         projectionCount: previous.projections.length,
         accountOverlayCount: previous.accountOverlays.length,
     });
-    const refreshPlan = input.incremental === true
-        ? planModelGatewayCatalogRefresh({
-            importers: input.importers ?? [],
-            sources: previous.sources,
-            now: () => startedAt,
-            ...(input.force === undefined ? {} : { force: input.force }),
-            ...(input.sourceIds === undefined ? {} : { sourceIds: input.sourceIds }),
-        })
-        : null;
+    const refreshPlan =
+        input.incremental === true
+            ? planModelGatewayCatalogRefresh({
+                  importers: input.importers ?? [],
+                  sources: previous.sources,
+                  now: () => startedAt,
+                  ...(input.force === undefined ? {} : { force: input.force }),
+                  ...(input.sourceIds === undefined ? {} : { sourceIds: input.sourceIds }),
+              })
+            : null;
     emitRefreshProgress(input.onProgress, {
         phase: 'refresh_plan_ready',
         elapsedMs: refreshElapsedMs(startedAt, now()),
@@ -293,14 +310,17 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
     const imported = await runCatalogImporters({
         importers: refreshPlan?.selectedImporters ?? input.importers ?? [],
         now,
-        ...(input.rawPayloadStoragePolicy === undefined ? {} : { rawPayloadStoragePolicy: input.rawPayloadStoragePolicy }),
-        onProgress: (event) => emitRefreshProgress(input.onProgress, {
-            ...event,
-            phase: `importer:${event.phase}`,
-            elapsedMs: refreshElapsedMs(startedAt, now()),
-            importer: event,
-            progressPct: 10 + Math.round((event.progressPct / 100) * 45),
-        }),
+        ...(input.rawPayloadStoragePolicy === undefined
+            ? {}
+            : { rawPayloadStoragePolicy: input.rawPayloadStoragePolicy }),
+        onProgress: (event) =>
+            emitRefreshProgress(input.onProgress, {
+                ...event,
+                phase: `importer:${event.phase}`,
+                elapsedMs: refreshElapsedMs(startedAt, now()),
+                importer: event,
+                progressPct: 10 + Math.round((event.progressPct / 100) * 45),
+            }),
     });
     emitRefreshProgress(input.onProgress, {
         phase: 'importers_completed',
@@ -313,20 +333,29 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
         accountOverlayCount: imported.accountOverlays.length,
     });
     const refreshedSourceIds = new Set(imported.sources.map((source) => String(source['id'])));
-    const retainedEvidences = previous.evidences.filter((evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])));
+    const retainedEvidences = previous.evidences.filter(
+        (evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])),
+    );
     const retainedProviderEvidences = previous.providerEvidences.filter(
         (evidence) => !refreshedSourceIds.has(String(evidence['sourceId'])),
     );
-    const retainedRouteOptions = previous.routeOptions.filter((option) => !refreshedSourceIds.has(String(option['sourceId'])));
-    const retainedRawPayloadRefs = previous.rawPayloadRefs.filter((rawRef) => !refreshedSourceIds.has(String(rawRef['sourceId'])));
+    const retainedRouteOptions = previous.routeOptions.filter(
+        (option) => !refreshedSourceIds.has(String(option['sourceId'])),
+    );
+    const retainedRawPayloadRefs = previous.rawPayloadRefs.filter(
+        (rawRef) => !refreshedSourceIds.has(String(rawRef['sourceId'])),
+    );
     const retainedAccountOverlays = (
         input.refreshAccountOverlays === true
             ? previous.accountOverlays.filter((overlay) => !refreshedSourceIds.has(String(overlay['sourceId'])))
             : previous.accountOverlays
-    ).map((overlay) => createProviderAccountOverlay(/** @type {Parameters<typeof createProviderAccountOverlay>[0]} */ (overlay)));
-    const accountOverlays = input.refreshAccountOverlays === true
-        ? upsertMany(retainedAccountOverlays, imported.accountOverlays, accountOverlayKey)
-        : retainedAccountOverlays;
+    ).map((overlay) =>
+        createProviderAccountOverlay(/** @type {Parameters<typeof createProviderAccountOverlay>[0]} */ (overlay)),
+    );
+    const accountOverlays =
+        input.refreshAccountOverlays === true
+            ? upsertMany(retainedAccountOverlays, imported.accountOverlays, accountOverlayKey)
+            : retainedAccountOverlays;
     const combinedEvidences = [...retainedEvidences, ...imported.evidences];
     const combinedProviderEvidences = [...retainedProviderEvidences, ...imported.providerEvidences];
     const { projections, conflicts } = buildProjectionsFromEvidence(combinedEvidences);
@@ -404,9 +433,10 @@ async function refreshModelGatewayCatalogUnlocked(input = {}) {
               diffSummary: eligibilityDiffSummary,
           })
         : null;
-    const snapshotWithEligibility = evaluatedEligibility && eligibilityRun
-        ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, eligibilityRun)
-        : nextSnapshot;
+    const snapshotWithEligibility =
+        evaluatedEligibility && eligibilityRun
+            ? applyModelGatewayEligibilityToSnapshot(nextSnapshot, evaluatedEligibility.decisions, eligibilityRun)
+            : nextSnapshot;
     if (evaluatedEligibility) {
         emitRefreshProgress(input.onProgress, {
             phase: 'eligibility_evaluated',

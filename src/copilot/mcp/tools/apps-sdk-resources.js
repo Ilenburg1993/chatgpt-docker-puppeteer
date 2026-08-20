@@ -64,9 +64,11 @@ function normalizeDedicatedHttpsOrigin(value, strictOrigin) {
     if (!value) return '';
     try {
         const parsed = new URL(value);
-        const exactOrigin = parsed.pathname === '/' && !parsed.search && !parsed.hash && !parsed.username && !parsed.password;
+        const exactOrigin =
+            parsed.pathname === '/' && !parsed.search && !parsed.hash && !parsed.username && !parsed.password;
         if (parsed.protocol !== 'https:' || (strictOrigin && !exactOrigin)) {
-            if (strictOrigin) throw new Error('expected a dedicated HTTPS origin without path, query, hash, or userinfo');
+            if (strictOrigin)
+                throw new Error('expected a dedicated HTTPS origin without path, query, hash, or userinfo');
             return '';
         }
         return parsed.origin;

@@ -155,7 +155,9 @@ export function setupTerminalTaskStreamListeners({ agent }) {
                         { role: status === 'error' ? 'error' : 'muted' },
                     ),
                 );
-                println(terminalThemeRow('Ação', `/thinking show ${thinkingRef} · /thinking latest`, { role: 'command' }));
+                println(
+                    terminalThemeRow('Ação', `/thinking show ${thinkingRef} · /thinking latest`, { role: 'command' }),
+                );
             }
             taskThinkingStarts.delete(thinkingId);
             openThinkingIds.delete(thinkingId);
@@ -178,7 +180,8 @@ export function setupTerminalTaskStreamListeners({ agent }) {
     const getTaskKey = (evt) => {
         const taskId = stringOrEmpty(evt.taskId);
         if (taskId) return getTaskTranscriptKey(taskId);
-        const streamId = stringOrEmpty(evt['streamId']) || stringOrEmpty(evt['messageId']) || stringOrEmpty(evt['responseId']);
+        const streamId =
+            stringOrEmpty(evt['streamId']) || stringOrEmpty(evt['messageId']) || stringOrEmpty(evt['responseId']);
         if (streamId) return getTaskTranscriptKey(`stream:${streamId}`);
         return getTaskTranscriptKey(null);
     };
@@ -264,13 +267,13 @@ export function setupTerminalTaskStreamListeners({ agent }) {
             if (getShowThinking()) {
                 const thinkingRef = formatTerminalThinkingRef(thinkingId);
                 println(
-                    terminalThemeRow(
-                        'Raciocínio',
-                        `capturado · ${taskId ?? 'tarefa em segundo plano'}`,
-                        { role: 'warn' },
-                    ),
+                    terminalThemeRow('Raciocínio', `capturado · ${taskId ?? 'tarefa em segundo plano'}`, {
+                        role: 'warn',
+                    }),
                 );
-                println(terminalThemeRow('Ação', `/thinking show ${thinkingRef} · /thinking latest`, { role: 'command' }));
+                println(
+                    terminalThemeRow('Ação', `/thinking show ${thinkingRef} · /thinking latest`, { role: 'command' }),
+                );
             }
         }
     };

@@ -11,7 +11,7 @@
 
 import { WORKSPACE_ROOT as BOOT_WORKSPACE_ROOT } from '#copilot/boot';
 import { COPILOT_ALLOWED_EXECUTABLES, COPILOT_NPM_SCRIPT_ALLOWLIST } from '#copilot/config';
-import * as fs from 'node:fs/promises';
+import { evaluateIoPathPolicyAsync } from '#copilot/core';
 import * as path from 'node:path';
 
 /** Raiz canonica do workspace definida pelo boot. */
@@ -152,19 +152,6 @@ export const ALLOWED_EXECUTABLES = (() => {
     return list.length > 0 ? new Set(list) : null;
 })();
 
-/** @type {Promise<string> | null} */
-let _rootRealPromise = null;
-
-/**
- * @returns {Promise<string>}
- */
-async function getWorkspaceRootRealPath() {
-    if (!_rootRealPromise) {
-        _rootRealPromise = fs.realpath(WORKSPACE_ROOT).catch(() => WORKSPACE_ROOT);
-    }
-    return _rootRealPromise;
-}
-
 /**
  * Verifica se um cwd é seguro (dentro do workspace). SEC-TOOLS-001: resolve symlinks antes de comparar para evitar path
  * traversal via symlink.
@@ -174,27 +161,12 @@ async function getWorkspaceRootRealPath() {
  */
 export async function validateCwd(cwd) {
     const resolved = cwd ? (path.isAbsolute(cwd) ? cwd : path.resolve(WORKSPACE_ROOT, cwd)) : WORKSPACE_ROOT;
-    const rootReal = await getWorkspaceRootRealPath();
-
-    // Resolve symlinks para bloquear travessia via link simbólico.
-    // Se o target não existir, valida o diretório pai real para impedir bypass por parent symlink.
-    let real;
-    try {
-        real = await fs.realpath(resolved);
-    } catch {
-        const parent = path.dirname(resolved);
-        try {
-            const parentReal = await fs.realpath(parent);
-            real = path.join(parentReal, path.basename(resolved));
-        } catch {
-            return { ok: false, reason: `Cwd não resolvível com segurança: ${resolved}`, resolved };
-        }
-    }
-
-    if (!real.startsWith(rootReal + path.sep) && real !== rootReal) {
-        return { ok: false, reason: `Cwd fora do workspace: ${resolved}`, resolved };
-    }
-    return { ok: true, resolved };
+    const policy = await evaluateIoPathPolicyAsync(resolved, {
+        workspaceRoot: WORKSPACE_ROOT,
+        mode: 'read',
+    });
+    if (!policy.ok) return { ok: false, reason: `Cwd fora do workspace ou bloqueado: ${policy.reason}`, resolved };
+    return { ok: true, resolved: policy.realPath };
 }
 
 /**

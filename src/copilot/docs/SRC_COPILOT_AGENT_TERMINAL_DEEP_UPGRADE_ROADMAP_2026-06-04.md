@@ -3,11 +3,14 @@
 ## 00. Status do Documento
 
 - [x] Documento criado como guia novo para a fase ampla de `src/copilot`.
-- [x] Escopo primário: `src/copilot`, com prioridade operacional em `terminal`, `agent`, `presentation`, `sdk` e suas fronteiras.
-- [x] Escopo secundário: `model-gateway`, `mcp`, `server`, `channel`, `tools`, `infra` quando impactarem runtime, BYOK, terminal ou agent.
+- [x] Escopo primário: `src/copilot`, com prioridade operacional em `terminal`, `agent`,
+      `presentation`, `sdk` e suas fronteiras.
+- [x] Escopo secundário: `model-gateway`, `mcp`, `server`, `channel`, `tools`, `infra` quando
+      impactarem runtime, BYOK, terminal ou agent.
 - [x] Roadmap usa somente checkboxes booleanos.
 - [x] O documento anterior de UX terminal continua como histórico detalhado da revolução visual.
-- [x] Este documento passa a guiar a próxima etapa: bugs, gaps e upgrades estruturais além da superfície visual.
+- [x] Este documento passa a guiar a próxima etapa: bugs, gaps e upgrades estruturais além da
+      superfície visual.
 
 ## 01. Evidências Coletadas
 
@@ -18,14 +21,18 @@
 - [x] Leitura do fluxo de turno em `src/copilot/terminal/dialog/engine.js`.
 - [x] Leitura do collector semântico em `src/copilot/agent/dialog/seams/turn-output-collector.js`.
 - [x] Leitura do executor de turno em `src/copilot/agent/dialog/executors/turn-executor.js`.
-- [x] Leitura do estado de materialização em `src/copilot/terminal/state/turn-materialization-state.js`.
+- [x] Leitura do estado de materialização em
+      `src/copilot/terminal/state/turn-materialization-state.js`.
 - [x] Leitura de `src/copilot/presentation/runtime/dialog.js`.
 - [x] Leitura de `src/copilot/presentation/runtime/status.js`.
 - [x] Leitura de `src/copilot/presentation/agent/runtime/runtime-selection.js`.
-- [x] Varredura de fronteiras proibidas: `agent`, `presentation`, `sdk`, `core`, `config` não importam `terminal`.
+- [x] Varredura de fronteiras proibidas: `agent`, `presentation`, `sdk`, `core`, `config` não
+      importam `terminal`.
 - [x] Varredura de hotspots por tamanho em `agent`, `presentation` e `terminal`.
-- [x] Varredura do texto crítico `sem resposta pública materializada; nenhuma pergunta humana pendente`.
-- [x] Varredura de `ask_user`, `request_user_input`, `assistant.message`, `assistant.turn_end`, `session.model_changed`, `setModel`.
+- [x] Varredura do texto crítico
+      `sem resposta pública materializada; nenhuma pergunta humana pendente`.
+- [x] Varredura de `ask_user`, `request_user_input`, `assistant.message`, `assistant.turn_end`,
+      `session.model_changed`, `setModel`.
 - [x] Varredura de `TODO`, `FIXME`, `fallback`, `degraded`, `legacy` nas camadas centrais.
 - [x] Validações recentes da leva de UX: contexto, sessão e métricas com 65 testes verdes.
 
@@ -35,45 +42,66 @@
 - [x] A linha viva já existe e fica fora do input, com pulso de atividade.
 - [x] O terminal já tem presenters dedicados para tools, intents, ask_user, deltas, SSE e tarefas.
 - [x] O agent já possui um collector semântico de output de turno.
-- [x] O terminal ainda mantém uma materialização própria de turno para reconciliação visual e fallback local.
+- [x] O terminal ainda mantém uma materialização própria de turno para reconciliação visual e
+      fallback local.
 - [x] `presentation/` já centraliza seleção de runtime e projeções compartilhadas.
 - [x] A fronteira `agent -> presentation -> terminal` está conceitualmente definida.
-- [x] Não foi encontrado import proibido de `terminal` dentro de `agent`, `presentation`, `sdk`, `core` ou `config`.
+- [x] Não foi encontrado import proibido de `terminal` dentro de `agent`, `presentation`, `sdk`,
+      `core` ou `config`.
 - [x] Os hotspots principais continuam muito grandes e exigem decomposição planejada.
-- [x] A mensagem de turno vazio já tem classificação semântica, mas ainda precisa de diagnóstico mais acionável.
-- [x] A seleção/troca de modelo já emite estado e eventos, mas a UX e a camada agent/presentation ainda precisam de trilha única mais forte.
+- [x] A mensagem de turno vazio já tem classificação semântica, mas ainda precisa de diagnóstico
+      mais acionável.
+- [x] A seleção/troca de modelo já emite estado e eventos, mas a UX e a camada agent/presentation
+      ainda precisam de trilha única mais forte.
 
 ## 03. Situação Ideal
 
 - [ ] O agent é o owner único da semântica de turno.
-- [ ] O terminal é o owner único da apresentação humana, sem reinterpretar semântica já resolvida pelo agent.
+- [ ] O terminal é o owner único da apresentação humana, sem reinterpretar semântica já resolvida
+      pelo agent.
 - [ ] `presentation/` é o owner das projeções compartilhadas entre terminal, server e channel.
 - [ ] `sdk/` é o owner das capacidades vanilla do SDK.
-- [ ] Todo turno explícito produz um resultado semântico auditável: reply público, input humano pendente, tool-only, transição de protocolo ou empty.
-- [ ] Todo empty output vem com causa provável, evidências, impacto, próximo passo e relação com provider/modelo.
-- [ ] Tool lifecycle sempre mostra nome humano, comando/argumentos seguros, alvo, duração, status, origem e IDs apenas em detail/raw.
-- [ ] `exec_command` e equivalentes sempre comunicam o comando seguro ou sua versão redigida quando isso ajuda o operador.
-- [ ] Tools de lista, leitura, escrita, move/delete e shell têm presenters consistentes e sem nomes internos na superfície default.
+- [ ] Todo turno explícito produz um resultado semântico auditável: reply público, input humano
+      pendente, tool-only, transição de protocolo ou empty.
+- [ ] Todo empty output vem com causa provável, evidências, impacto, próximo passo e relação com
+      provider/modelo.
+- [ ] Tool lifecycle sempre mostra nome humano, comando/argumentos seguros, alvo, duração, status,
+      origem e IDs apenas em detail/raw.
+- [ ] `exec_command` e equivalentes sempre comunicam o comando seguro ou sua versão redigida quando
+      isso ajuda o operador.
+- [ ] Tools de lista, leitura, escrita, move/delete e shell têm presenters consistentes e sem nomes
+      internos na superfície default.
 - [ ] A linha viva reflete progressos reais do agent, não apenas timers.
-- [ ] A troca de modelo tem trilha única: solicitado, aplicado no SDK, confirmado por evento, observado no próximo uso, persistido no vínculo de sessão.
-- [ ] O terminal explica claramente diferença entre modelo preparado, modelo vivo, vínculo de boot e telemetria histórica.
+- [ ] A troca de modelo tem trilha única: solicitado, aplicado no SDK, confirmado por evento,
+      observado no próximo uso, persistido no vínculo de sessão.
+- [ ] O terminal explica claramente diferença entre modelo preparado, modelo vivo, vínculo de boot e
+      telemetria histórica.
 - [ ] BYOK, SDK Copilot e rotas auto não ficam misturados em linguagem visual.
 - [ ] O usuário nunca vê enum interno por acidente em comandos default.
 - [ ] Raw/detail preservam toda a informação técnica necessária para engenharia.
-- [ ] Os testes live provam fluxo canônico completo: prompt, thinking, tools, deltas, ask_user, resposta, final, usage, export e SSE.
+- [ ] Os testes live provam fluxo canônico completo: prompt, thinking, tools, deltas, ask_user,
+      resposta, final, usage, export e SSE.
 
 ## 04. Achados Principais
 
 - [x] Achado A: há dois níveis de materialização de turno, um no agent e outro no terminal.
-- [x] Achado B: o agent já classifica `public_reply`, `pending_human_input`, `tool_only`, `protocol_transition` e `empty`.
-- [x] Achado C: o terminal usa essa semântica, mas ainda complementa com materialização local pesada.
-- [x] Achado D: `sem resposta pública materializada` aparece no terminal quando materialization source é `empty` e não há input humano pendente.
+- [x] Achado B: o agent já classifica `public_reply`, `pending_human_input`, `tool_only`,
+      `protocol_transition` e `empty`.
+- [x] Achado C: o terminal usa essa semântica, mas ainda complementa com materialização local
+      pesada.
+- [x] Achado D: `sem resposta pública materializada` aparece no terminal quando materialization
+      source é `empty` e não há input humano pendente.
 - [x] Achado E: há recuperação segura para empty antes de tools e para tool-only sem síntese.
-- [x] Achado F: após tool ou protocolo, retry automático é deliberadamente limitado para evitar duplicar ação.
-- [x] Achado G: o diagnóstico de empty já registra SSE e BYOK failure, mas pode ser mais explicativo.
-- [x] Achado H: `exec_command` tem presenters, mas ainda deve ser auditado para comando/args em linha viva e `/tools`.
-- [x] Achado I: `sdk-session-events.js`, `byok.js`, `sdk.js`, `session.js` e `engine.js` são hotspots grandes.
-- [x] Achado J: `presentation/agent/control/handlers.js` é hotspot de controle humano/HTTP e merece auditoria própria.
+- [x] Achado F: após tool ou protocolo, retry automático é deliberadamente limitado para evitar
+      duplicar ação.
+- [x] Achado G: o diagnóstico de empty já registra SSE e BYOK failure, mas pode ser mais
+      explicativo.
+- [x] Achado H: `exec_command` tem presenters, mas ainda deve ser auditado para comando/args em
+      linha viva e `/tools`.
+- [x] Achado I: `sdk-session-events.js`, `byok.js`, `sdk.js`, `session.js` e `engine.js` são
+      hotspots grandes.
+- [x] Achado J: `presentation/agent/control/handlers.js` é hotspot de controle humano/HTTP e merece
+      auditoria própria.
 - [x] Achado K: não há violação grosseira de import `terminal` para dentro das camadas inferiores.
 - [x] Achado L: há duplicação de helpers de glossário entre comandos, sinal de extração futura.
 
@@ -103,12 +131,14 @@
 ## Faixa B — Resultado Semântico de Turno como Contrato Único
 
 - [x] B.1 Confirmar existência de `DialogTurnSemanticResult` no agent.
-- [x] B.2 Confirmar que `presentation/runtime/dialog.js` propaga resultado detalhado em caminho ativo.
+- [x] B.2 Confirmar que `presentation/runtime/dialog.js` propaga resultado detalhado em caminho
+      ativo.
 - [ ] B.3 Auditar todos os consumidores de `sendDialogTurn` que perdem o resultado detalhado.
 - [ ] B.4 Introduzir projection comum de resultado de turno em `presentation/runtime`.
 - [ ] B.5 Reduzir interpretação paralela no terminal onde o agent já informou outcome.
 - [ ] B.6 Manter materialização terminal apenas para reconciliação visual de deltas finais.
-- [ ] B.7 Testar que `tool_only`, `pending_human_input`, `protocol_transition` e `empty` aparecem corretamente.
+- [ ] B.7 Testar que `tool_only`, `pending_human_input`, `protocol_transition` e `empty` aparecem
+      corretamente.
 - [ ] B.8 Garantir que channel/server não reinterpretem `assistant.message` por conta própria.
 
 ## Faixa C — Empty Output e Diagnóstico Acionável
@@ -116,7 +146,8 @@
 - [x] C.1 Localizar mensagem `sem resposta pública materializada; nenhuma pergunta humana pendente`.
 - [x] C.2 Confirmar condições: source empty, sem pergunta humana, sem formulário pendente.
 - [x] C.3 Confirmar recovery pre-action e post-tool-only.
-- [x] C.4 Separar causas prováveis: sem delta, sem assistant.message, tool-only, protocolo, provider vazio, timeout tardio.
+- [x] C.4 Separar causas prováveis: sem delta, sem assistant.message, tool-only, protocolo, provider
+      vazio, timeout tardio.
 - [x] C.5 Melhorar painel do terminal para empty output com evidências e próximo passo por causa.
 - [x] C.6 Registrar evento SSE com `operatorSummary`.
 - [ ] C.7 Marcar saúde runtime/BYOK com cooldown adequado quando empty for provider/model failure.
@@ -126,11 +157,11 @@
 ### Atualização C — 2026-06-04
 
 - [x] `terminal/dialog/engine.js` agora gera diagnóstico de empty output com `cause`, `evidence`,
-  `operatorSummary` e `operatorAction`.
+      `operatorSummary` e `operatorAction`.
 - [x] A superfície humana trocou a linha opaca por três linhas: `Turno vazio`, `Causa` e
-  `Evidências`, mantendo `Próximo passo` acionável.
+      `Evidências`, mantendo `Próximo passo` acionável.
 - [x] O SSE `terminal.turn.empty_output` passou a carregar os mesmos campos de diagnóstico para
-  `/events`, artefatos live e automações.
+      `/events`, artefatos live e automações.
 - [x] O teste `test_terminal_dialog_engine.spec.js` bloqueia regressão desses campos.
 
 ## Faixa D — Linha Viva Realmente Informativa
@@ -158,44 +189,44 @@
 
 ### Atualização E — 2026-06-04
 
-- [x] `tool-activity-presenter.js` passou a extrair argumentos de `args`, `arguments`,
-  `toolArgs`, `input`, `data` e `payload`, incluindo JSON serializado.
-- [x] `tool-activity-presenter.js` passou a entender `toolResult` e envelopes
-  `textResultForLlm`, preservando resumo de resultado, contagem e ranges retornados.
+- [x] `tool-activity-presenter.js` passou a extrair argumentos de `args`, `arguments`, `toolArgs`,
+      `input`, `data` e `payload`, incluindo JSON serializado.
+- [x] `tool-activity-presenter.js` passou a entender `toolResult` e envelopes `textResultForLlm`,
+      preservando resumo de resultado, contagem e ranges retornados.
 - [x] `tool-lifecycle-runtime.js` passou a registrar no `ToolCallRegistry` os argumentos
-  normalizados, reduzindo completions genéricas quando o SDK omite payload no fim da tool.
-- [x] `exec_command` serializado em `arguments` agora aparece como `Executar comando` com
-  comando seguro em `terminal.activity`, linha viva e `tool.lifecycle`.
+      normalizados, reduzindo completions genéricas quando o SDK omite payload no fim da tool.
+- [x] `exec_command` serializado em `arguments` agora aparece como `Executar comando` com comando
+      seguro em `terminal.activity`, linha viva e `tool.lifecycle`.
 - [x] Testes escopados cobrem argumentos JSON, resultado estruturado e ausência de vazamento de
-  `toolCallId` na superfície default.
+      `toolCallId` na superfície default.
 - [x] A base de extração de metadados está mais forte para `exec_command`, leitura e resultados
-  estruturados.
+      estruturados.
 - [x] `/tools diag` agora renderiza `Comando`, `Filtros`, `Diretório` e `Resultado` quando o
-  lifecycle possui esses metadados.
+      lifecycle possui esses metadados.
 - [x] `/tools diag` mantém IDs internos fora da superfície humana; `/tools all` preserva rastreio
-  técnico.
-- [ ] Ainda falta auditar profundamente `/tools diag`, shell legacy e operações write/move/delete
-  em execução live.
+      técnico.
+- [ ] Ainda falta auditar profundamente `/tools diag`, shell legacy e operações write/move/delete em
+      execução live.
 - [ ] Ainda falta live real com lista/leitura/escrita/move/delete/exec para comparar `/activity`,
-  linha viva, `/tools diag` e artefatos SSE.
+      linha viva, `/tools diag` e artefatos SSE.
 
 ### Atualização E2 — 2026-06-05
 
 - [x] `file-write-roundtrip` executou `report_intent`, `read_file_content`, `create_file`,
-  `move_file`, `delete_file` e `ask_user` reais via SDK, sem prompt de permissão do SDK.
+      `move_file`, `delete_file` e `ask_user` reais via SDK, sem prompt de permissão do SDK.
 - [x] `/health full` no live confirmou `Permissões automáticas · prompts SDK ignorados`.
 - [x] `/tools diag` mostrou `Criar arquivo`, `Mover arquivo`, `Excluir arquivo` e I/O local com
-  nomes humanos, alvos claros e IDs internos fora da superfície default.
+      nomes humanos, alvos claros e IDs internos fora da superfície default.
 - [x] `io-activity-events.js` passou a concordar corretamente operações masculinas como
-  `Arquivo: movimento concluído`, preservando `leitura/escrita/remoção concluída`.
+      `Arquivo: movimento concluído`, preservando `leitura/escrita/remoção concluída`.
 - [x] O runner live deixou de classificar recuperação vazia pré-ação como
-  `assistant-empty-after-user-input` quando o `user_input.completed` ocorreu apenas depois; a
-  classificação agora respeita ordem temporal dos eventos.
+      `assistant-empty-after-user-input` quando o `user_input.completed` ocorreu apenas depois; a
+      classificação agora respeita ordem temporal dos eventos.
 - [x] O runner live reconhece `terminal.turn.empty_recovery` como recuperado quando há
-  materialização pública, delta, reply suprimido já materializado ou nova pergunta depois da
-  recuperação.
+      materialização pública, delta, reply suprimido já materializado ou nova pergunta depois da
+      recuperação.
 - [ ] Ainda falta live específico para `exec_command`, `LIST` e patch/edit em um único ciclo
-  comparando linha viva, `/activity`, `/tools diag`, `/events` e export.
+      comparando linha viva, `/activity`, `/tools diag`, `/events` e export.
 
 ## Faixa F — Model Switching e BYOK Runtime Boundary
 
@@ -205,7 +236,8 @@
 - [ ] F.4 Auditar caminho completo: comando -> SDK setModel -> evento -> status -> usage -> prompt.
 - [ ] F.5 Criar projection compartilhada de model transition em `presentation`.
 - [ ] F.6 Garantir que agent registre modelo observado por turno.
-- [ ] F.7 Garantir que mismatch preparado/vivo tenha estado claro e não pareça erro se aguardando confirmação.
+- [ ] F.7 Garantir que mismatch preparado/vivo tenha estado claro e não pareça erro se aguardando
+      confirmação.
 - [ ] F.8 Criar live de troca automática/real com confirmação.
 - [ ] F.9 Testar fallback proibido BYOK -> Copilot auto quando contrato exigir bloqueio.
 
@@ -262,9 +294,9 @@
 - [ ] K.7 Criar live completo terminal + agent + presentation + SSE.
 - [ ] K.8 Comparar plain log com critérios de estética: largura, ids, enums, ANSI solto.
 - [x] K.9 Live `file-write-roundtrip` passou em 2026-06-05: create/move/delete/ask_user reais,
-  permissões automáticas, SSE sem erros, export correlacionado e pós-pergunta materializado.
-- [ ] K.10 Criar live de patch/edit real e leitura profunda, pois read/patch são tools de maior
-  uso operacional.
+      permissões automáticas, SSE sem erros, export correlacionado e pós-pergunta materializado.
+- [ ] K.10 Criar live de patch/edit real e leitura profunda, pois read/patch são tools de maior uso
+      operacional.
 - [ ] K.11 Criar live de exec/list/search com foco em targets, cwd e comando seguro.
 
 ## Faixa L — Documentação e Governança Contínua
@@ -278,13 +310,15 @@
 
 ## 06. Próxima Sequência Técnica Recomendada
 
-- [ ] Primeiro: auditar e melhorar empty output em `terminal/dialog/engine.js` usando outcome semântico do agent.
+- [ ] Primeiro: auditar e melhorar empty output em `terminal/dialog/engine.js` usando outcome
+      semântico do agent.
 - [ ] Segundo: auditar tool lifecycle para `exec_command`, LIST, READ e patch/edit reais.
 - [ ] Terceiro: criar documento de auditoria ampla de `src/copilot` com Agent, terminal, tools,
-  MCP/OpenAI e fronteiras de arquitetura.
+      MCP/OpenAI e fronteiras de arquitetura.
 - [ ] Quarto: criar projection compartilhada de turn diagnostics em `presentation/runtime`.
 - [ ] Quinto: executar live canônico com read/patch/exec/list/search após as correções.
-- [ ] Sexto: iniciar decomposição de hotspots, começando por presenters e subcomandos sem mudar comportamento.
+- [ ] Sexto: iniciar decomposição de hotspots, começando por presenters e subcomandos sem mudar
+      comportamento.
 
 ## 07. Comandos de Evidência Usados
 
@@ -302,7 +336,8 @@
 ## 08. Notas de Risco
 
 - [ ] Não remover a materialização terminal até provar que o agent cobre todos os casos visuais.
-- [ ] Não transformar retry de empty output em retry automático depois de tools sem prova de idempotência.
+- [ ] Não transformar retry de empty output em retry automático depois de tools sem prova de
+      idempotência.
 - [ ] Não tornar fallback de modelo implícito em BYOK quando o contrato diz para bloquear.
 - [ ] Não esconder raw payloads em detail/raw, porque eles são necessários para depuração.
 - [ ] Não criar novos imports diretos de `terminal` em camadas inferiores.

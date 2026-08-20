@@ -23,8 +23,14 @@ describe('Cloudflare transport benchmark plan', () => {
         restoreEnv('TUNNEL_TRANSPORT_PROTOCOL', undefined);
 
         const plan = await buildCloudflareTransportBenchmarkPlan();
-        const candidates = /** @type {{ protocol: string; role: string; recommendation: string; risk: string }[]} */ (plan['candidates']);
-        const benchmarkDesign = /** @type {{ sampleMetric: string; delegatedExecution: { mission: string; stateFile: string; autoPromotion: boolean }; manualFallback: { env: string } }} */ (plan['benchmarkDesign']);
+        const candidates = /** @type {{ protocol: string; role: string; recommendation: string; risk: string }[]} */ (
+            plan['candidates']
+        );
+        const benchmarkDesign = /** @type {{
+    sampleMetric: string;
+    delegatedExecution: { mission: string; stateFile: string; autoPromotion: boolean };
+    manualFallback: { env: string };
+}} */ (plan['benchmarkDesign']);
         const decisionPolicy = /** @type {{ keepQuicWhen: string[] }} */ (plan['decisionPolicy']);
         const nextActions = /** @type {string[]} */ (plan['nextActions']);
 
@@ -40,8 +46,14 @@ describe('Cloudflare transport benchmark plan', () => {
         assert.match(benchmarkDesign.sampleMetric, /wall-clock duration/u);
         assert.equal(benchmarkDesign.delegatedExecution.mission, 'benchmark-transport');
         assert.equal(benchmarkDesign.delegatedExecution.autoPromotion, false);
-        assert.equal(benchmarkDesign.delegatedExecution.stateFile, 'src/copilot/.ai/mcp/transport-benchmark-state.json');
-        assert.equal(benchmarkDesign.manualFallback.env, 'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL');
+        assert.equal(
+            benchmarkDesign.delegatedExecution.stateFile,
+            'src/copilot/.ai/mcp/transport-benchmark-state.json',
+        );
+        assert.equal(
+            benchmarkDesign.manualFallback.env,
+            'COPILOT_MCP_CLOUDFLARE_PROTOCOL or TUNNEL_TRANSPORT_PROTOCOL',
+        );
         assert.ok(decisionPolicy.keepQuicWhen.includes('Cloudflare QUIC metrics remain present after restart'));
         assert.ok(nextActions.some((action) => action.includes('mission=benchmark-transport')));
         assert.ok(nextActions.some((action) => action.includes('Keep QUIC as the current control')));

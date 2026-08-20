@@ -20,9 +20,25 @@ const EVENT_ID_PATTERN = /^([^\s.]+)\.(\d+)\.([0-9a-f-]{36})$/u;
 
 /**
  * @typedef {{ send: (message: import('@modelcontextprotocol/sdk/types.js').JSONRPCMessage) => Promise<void> | void }} McpEventReplaySink
- * @typedef {{ eventId: string; streamId: string; sequence: number; message: import('@modelcontextprotocol/sdk/types.js').JSONRPCMessage; createdAtMs: number; expiresAtMs: number }} McpStoredEvent
+ *
+ * @typedef {{
+ *     eventId: string;
+ *     streamId: string;
+ *     sequence: number;
+ *     message: import('@modelcontextprotocol/sdk/types.js').JSONRPCMessage;
+ *     createdAtMs: number;
+ *     expiresAtMs: number;
+ * }} McpStoredEvent
+ *
  * @typedef {{ maxEventsPerStream?: number; eventTtlMs?: number; now?: () => number }} McpEventStoreOptions
- * @typedef {{ storeEvent(streamId: string, message: import('@modelcontextprotocol/sdk/types.js').JSONRPCMessage): Promise<string>; replayEventsAfter(lastEventId: string, sink: McpEventReplaySink): Promise<string> }} McpSdkCompatibleEventStore
+ *
+ * @typedef {{
+ *     storeEvent(
+ *         streamId: string,
+ *         message: import('@modelcontextprotocol/sdk/types.js').JSONRPCMessage,
+ *     ): Promise<string>;
+ *     replayEventsAfter(lastEventId: string, sink: McpEventReplaySink): Promise<string>;
+ * }} McpSdkCompatibleEventStore
  */
 
 /**
@@ -102,7 +118,9 @@ export function createSqliteMcpEventStore(options = {}) {
         async storeEvent(streamId, message) {
             const normalizedStreamId = normalizeStreamId(streamId);
             const last = db
-                .prepare('SELECT sequence FROM copilot_mcp_http_events WHERE stream_id = ? ORDER BY sequence DESC LIMIT 1')
+                .prepare(
+                    'SELECT sequence FROM copilot_mcp_http_events WHERE stream_id = ? ORDER BY sequence DESC LIMIT 1',
+                )
                 .get(normalizedStreamId);
             const sequence = Number(/** @type {{ sequence?: number } | undefined} */ (last)?.sequence ?? 0) + 1;
             const eventId = buildMcpEventId(normalizedStreamId, sequence);
@@ -131,7 +149,9 @@ export function createSqliteMcpEventStore(options = {}) {
         },
         snapshot() {
             const aggregate = db
-                .prepare('SELECT COUNT(DISTINCT stream_id) AS streamCount, COUNT(*) AS eventCount FROM copilot_mcp_http_events')
+                .prepare(
+                    'SELECT COUNT(DISTINCT stream_id) AS streamCount, COUNT(*) AS eventCount FROM copilot_mcp_http_events',
+                )
                 .get();
             return {
                 version: MCP_EVENT_STORE_VERSION,

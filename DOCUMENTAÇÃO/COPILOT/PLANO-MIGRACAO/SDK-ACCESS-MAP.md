@@ -1,20 +1,20 @@
 # Mapa canônico de acesso ao `src/copilot/sdk`
 
-**Status**: consolidado para surfaces SDK canônicas
-**Última revisão**: 2026-05-14
-**Escopo**: pontos de entrada/saída entre `src/copilot/**` e `src/copilot/sdk/**`
+**Status**: consolidado para surfaces SDK canônicas **Última revisão**: 2026-05-14 **Escopo**:
+pontos de entrada/saída entre `src/copilot/**` e `src/copilot/sdk/**`
 
 ## Objetivo
 
-Este mapa consolida os pontos de acesso canônicos ao SDK dentro de `src/copilot`, reduzindo rotas paralelas,
-nomes genéricos e superfícies sobrepostas.
+Este mapa consolida os pontos de acesso canônicos ao SDK dentro de `src/copilot`, reduzindo rotas
+paralelas, nomes genéricos e superfícies sobrepostas.
 
 A regra-alvo é:
 
 - **entrada canônica**: consumir o SDK por superfícies explícitas e estáveis;
-- **saída canônica**: o SDK importar domínios externos apenas pelas superfícies autorizadas (`boot`, `core`, `infra`,
-  `events`, `config`, `presentation` quando aplicável);
-- **sem caminhos paralelos**: evitar reexportação duplicada em múltiplos níveis quando a superfície canônica já existe.
+- **saída canônica**: o SDK importar domínios externos apenas pelas superfícies autorizadas (`boot`,
+  `core`, `infra`, `events`, `config`, `presentation` quando aplicável);
+- **sem caminhos paralelos**: evitar reexportação duplicada em múltiplos níveis quando a superfície
+  canônica já existe.
 
 ## Superfícies canônicas de entrada para consumidores de `src/copilot`
 
@@ -27,8 +27,8 @@ Superfície pública estável do SDK. Deve concentrar:
 - acessos de composição/boot que realmente sejam parte da API canônica;
 - runtime comum quando a granularidade não exigir subpath específico.
 
-**Observação**: esta superfície continua ampla por compatibilidade arquitetural, mas não deve ser tratada como rota
-padrão quando existir subpath canônico mais específico.
+**Observação**: esta superfície continua ampla por compatibilidade arquitetural, mas não deve ser
+tratada como rota padrão quando existir subpath canônico mais específico.
 
 ### 2. `#copilot/sdk/session`
 
@@ -41,7 +41,8 @@ Canônica para:
 
 ### 3. `#copilot/sdk/session-runtime`
 
-Canônica para operações de runtime da sessão quando o consumidor precisa da semântica operacional explícita:
+Canônica para operações de runtime da sessão quando o consumidor precisa da semântica operacional
+explícita:
 
 - `sendSession`, `sendSessionAndWait`
 - `setSessionModel`
@@ -111,8 +112,8 @@ Canônica apenas para os subsistemas experimentais ainda isolados:
 - `history`
 - `usage`
 
-**Regra importante**: `agent.*` não pertence mais a esta surface. Agent virou domínio estável e deve ser consumido
-pela surface canônica de RPC estável.
+**Regra importante**: `agent.*` não pertence mais a esta surface. Agent virou domínio estável e deve
+ser consumido pela surface canônica de RPC estável.
 
 ### 11. Micro-surfaces raiz explícitas
 
@@ -125,8 +126,9 @@ Substituem o antigo uso residual do root e o wildcard físico:
 - `#copilot/sdk/feature-flags`
 - `#copilot/sdk/utils`
 
-Essas surfaces existem para que `agent`, `boot`, `config`, `audit`, `server` e `observability` não precisem importar o
-barrel raiz apenas para constantes, tokens, classificação de erro ou helpers pequenos.
+Essas surfaces existem para que `agent`, `boot`, `config`, `audit`, `server` e `observability` não
+precisem importar o barrel raiz apenas para constantes, tokens, classificação de erro ou helpers
+pequenos.
 
 ## Entradas canônicas por camada de `src/copilot`
 
@@ -138,7 +140,8 @@ barrel raiz apenas para constantes, tokens, classificação de erro ou helpers p
 
 ### Config
 
-- `src/copilot/config/sdk-config-port.js` → `#copilot/sdk/constants`, `#copilot/sdk/session`, `#copilot/sdk/tools`
+- `src/copilot/config/sdk-config-port.js` → `#copilot/sdk/constants`, `#copilot/sdk/session`,
+  `#copilot/sdk/tools`
 - `src/copilot/config/system-prompt/*` → `#copilot/sdk/session` + `#copilot/sdk/rpc`
 
 ### Event handlers
@@ -147,27 +150,29 @@ barrel raiz apenas para constantes, tokens, classificação de erro ou helpers p
 
 ### Agent runtime e facades
 
-- `src/copilot/agent/*` → `#copilot/sdk/session`, `#copilot/sdk/session-runtime`, `#copilot/sdk/rpc`,
-  `#copilot/sdk/tools`, `#copilot/sdk/telemetry`, `#copilot/sdk/errors`, `#copilot/sdk/event-helpers`,
-  `#copilot/sdk/feature-flags` e `#copilot/sdk/utils` quando a semântica exigir o subdomínio específico
+- `src/copilot/agent/*` → `#copilot/sdk/session`, `#copilot/sdk/session-runtime`,
+  `#copilot/sdk/rpc`, `#copilot/sdk/tools`, `#copilot/sdk/telemetry`, `#copilot/sdk/errors`,
+  `#copilot/sdk/event-helpers`, `#copilot/sdk/feature-flags` e `#copilot/sdk/utils` quando a
+  semântica exigir o subdomínio específico
 - `src/copilot/agent/*` → `#copilot/sdk/models` para registry, seleção, stats e listagem de modelos
 
 ### Hooks / observability / terminal / server
 
 - `src/copilot/hooks/*` → `#copilot/sdk/session`, `#copilot/sdk/models`, `#copilot/sdk/errors`
-- `src/copilot/observability/*` → `#copilot/sdk/di`, `#copilot/sdk/session`, `#copilot/sdk/telemetry`
-- `src/copilot/terminal/frontend/gateways/sdk-session.js` → `#copilot/sdk/session`; o restante do terminal consome
-  a surface terminal-owned via `terminal/frontend/gateways`
-- `src/copilot/server/routes/sdk/*` → `#copilot/sdk/session`, `#copilot/sdk/rpc`, `#copilot/sdk/tools`,
-  `#copilot/sdk/telemetry`, `#copilot/sdk/utils`
+- `src/copilot/observability/*` → `#copilot/sdk/di`, `#copilot/sdk/session`,
+  `#copilot/sdk/telemetry`
+- `src/copilot/terminal/frontend/gateways/sdk-session.js` → `#copilot/sdk/session`; o restante do
+  terminal consome a surface terminal-owned via `terminal/frontend/gateways`
+- `src/copilot/server/routes/sdk/*` → `#copilot/sdk/session`, `#copilot/sdk/rpc`,
+  `#copilot/sdk/tools`, `#copilot/sdk/telemetry`, `#copilot/sdk/utils`
 
 ### Tools / bridges / runtime
 
 - `src/copilot/tools/*` → `#copilot/sdk/rpc`, `#copilot/sdk/session`
 - `src/copilot/tools/*` → `#copilot/sdk/tools` para factories, registry e custom tools
 - `src/copilot/runtime-wiring.js` → `#copilot/sdk/session` quando houver seam operacional específico
-- `src/copilot/config/session-config.js` é a fronteira canônica para `SessionConfigBuilder`; o SDK não expõe mais
-  `sdk/config.js` nem helpers duplicados de config.
+- `src/copilot/config/session-config.js` é a fronteira canônica para `SessionConfigBuilder`; o SDK
+  não expõe mais `sdk/config.js` nem helpers duplicados de config.
 
 ## Saídas canônicas do SDK para domínios externos
 
@@ -184,55 +189,66 @@ Quando o SDK precisa importar outros domínios do projeto, os pontos autorizados
 
 ### Paralelo 1 — `agent.*` dentro de experimental RPC
 
-Já removido da surface experimental. O domínio agent deve ficar na surface estável de RPC e nas façades
-canônicas do agent.
+Já removido da surface experimental. O domínio agent deve ficar na surface estável de RPC e nas
+façades canônicas do agent.
 
 ### Paralelo 2 — barrels genéricos demais para wrappers específicos
 
-Ex.: nomes como `agent-sdk-access` ou wrappers intermediários que apenas reexportam outro barrel sem adicionar policy.
+Ex.: nomes como `agent-sdk-access` ou wrappers intermediários que apenas reexportam outro barrel sem
+adicionar policy.
 
 ### Paralelo 3 — root SDK usado quando o subpath existe
 
-Quando houver subpath canônico (`session`, `rpc`, `telemetry`, `tools`, `agents`), ele deve ser preferido ao root.
+Quando houver subpath canônico (`session`, `rpc`, `telemetry`, `tools`, `agents`), ele deve ser
+preferido ao root.
 
 ### Paralelo 4 — aliases de compatibilidade em `package.json`
 
-Resolvido nesta onda. Aliases folha e wildcard físico foram removidos; `package.json#imports` só expõe surfaces SDK
-semânticas e explícitas.
+Resolvido nesta onda. Aliases folha e wildcard físico foram removidos; `package.json#imports` só
+expõe surfaces SDK semânticas e explícitas.
 
 ## Consolidações aplicadas nesta onda
 
-- `src/copilot/agent/facades/agent-sdk-access.js` foi renomeado para `sdk-access.js`, reduzindo um nome genérico e
-  tornando a surface do agent mais legível.
+- `src/copilot/agent/facades/agent-sdk-access.js` foi renomeado para `sdk-access.js`, reduzindo um
+  nome genérico e tornando a surface do agent mais legível.
 - `src/copilot/sdk/config.js` foi removido. Configuração de sessão pertence a `#copilot/config` via
   `SessionConfigBuilder`, evitando duplicação L1↔L2.
-- `src/copilot/agent/ports/tool-port.js` agora consome `#copilot/sdk/rpc` para `createSessionRpcFacade`.
-- `src/copilot/agent/ports/permission-port.js` agora consome `#copilot/sdk/session` para `PermissionController`.
-- `src/copilot/agent/ports/hook-port.js` agora consome `attachBus`, `createQueuedElicitationHandler` e `defaultBus` via
-  `#copilot/sdk/session`, reservando `#copilot/sdk` raiz apenas para as helpers que ainda não têm subpath explícito.
-- `#copilot/sdk/models` e `#copilot/sdk/types` foram promovidos a aliases explícitos em `package.json`, removendo a
-  dependência de wildcard implícito.
+- `src/copilot/agent/ports/tool-port.js` agora consome `#copilot/sdk/rpc` para
+  `createSessionRpcFacade`.
+- `src/copilot/agent/ports/permission-port.js` agora consome `#copilot/sdk/session` para
+  `PermissionController`.
+- `src/copilot/agent/ports/hook-port.js` agora consome `attachBus`, `createQueuedElicitationHandler`
+  e `defaultBus` via `#copilot/sdk/session`, reservando `#copilot/sdk` raiz apenas para as helpers
+  que ainda não têm subpath explícito.
+- `#copilot/sdk/models` e `#copilot/sdk/types` foram promovidos a aliases explícitos em
+  `package.json`, removendo a dependência de wildcard implícito.
 - `#copilot/sdk/constants`, `#copilot/sdk/di`, `#copilot/sdk/errors`, `#copilot/sdk/event-helpers`,
   `#copilot/sdk/feature-flags` e `#copilot/sdk/utils` foram criados como micro-surfaces estáveis.
-- O wildcard `#copilot/sdk/*` e todos os aliases folha de compatibilidade foram removidos de `package.json`.
-- `package.json#exports` agora publica as surfaces SDK estáveis sem expor caminhos físicos internos como API pública.
-- `src/copilot/sdk/session` deixou de abrir `copilot.sqlite` no import: `hook-bus` e `permission-controller` passaram a
-  usar módulos folha de `events` e `config`.
-- Consumers operacionais em `terminal`, `event-handlers`, `hooks`, `tools`, `agent/facades` e `server/routes/sdk/deps`
-  foram deslocados do root para subpaths canônicos.
-- O terminal deixou de importar `#copilot/sdk/session` diretamente em comandos, status, state e adapters de eventos; a
-  única ponte runtime para helpers vanilla da sessão SDK é `terminal/frontend/gateways/sdk-session.js`.
-- O preflight SDK/CLI do boot agora vive em `#copilot/sdk/telemetry`, removendo a dependência `boot -> agent/lifecycle`
-  para uma checagem que é de SDK vanilla.
-- A surface RPC local foi completada com capacidades do `@github/copilot-sdk@0.3.0`: `session.name`, aprovações nativas,
-  `mcp.config`, `skills.discover/config`, `sessions.fork`, `mcp.oauth.login`, `history.truncate` e `usage.getMetrics`.
+- O wildcard `#copilot/sdk/*` e todos os aliases folha de compatibilidade foram removidos de
+  `package.json`.
+- `package.json#exports` agora publica as surfaces SDK estáveis sem expor caminhos físicos internos
+  como API pública.
+- `src/copilot/sdk/session` deixou de abrir `copilot.sqlite` no import: `hook-bus` e
+  `permission-controller` passaram a usar módulos folha de `events` e `config`.
+- Consumers operacionais em `terminal`, `event-handlers`, `hooks`, `tools`, `agent/facades` e
+  `server/routes/sdk/deps` foram deslocados do root para subpaths canônicos.
+- O terminal deixou de importar `#copilot/sdk/session` diretamente em comandos, status, state e
+  adapters de eventos; a única ponte runtime para helpers vanilla da sessão SDK é
+  `terminal/frontend/gateways/sdk-session.js`.
+- O preflight SDK/CLI do boot agora vive em `#copilot/sdk/telemetry`, removendo a dependência
+  `boot -> agent/lifecycle` para uma checagem que é de SDK vanilla.
+- A surface RPC local foi completada com capacidades do `@github/copilot-sdk@0.3.0`: `session.name`,
+  aprovações nativas, `mcp.config`, `skills.discover/config`, `sessions.fork`, `mcp.oauth.login`,
+  `history.truncate` e `usage.getMetrics`.
 - `#copilot/config/tools-state`, `#copilot/config/custom-tools-registry`, `#copilot/config/tools` e
-  `#copilot/config/tools/*` foram removidos de `package.json` porque apontavam para arquivos inexistentes.
-- Outros aliases históricos quebrados de `package.json` também foram removidos e agora há teste de regressão para
-  validar que aliases internos apontam para destinos existentes.
-- `config/typing/strict/tsconfig.strict.src.copilot.sdk.json` foi criado para aplicar TypeScript 6/NodeNext estrito ao
-  SDK local. `skipLibCheck: false` foi avaliado, mas está bloqueado por declarações externas de `vscode-jsonrpc`; o
-  SDK local passa com `skipLibCheck: true` e todas as demais flags rigorosas relevantes.
+  `#copilot/config/tools/*` foram removidos de `package.json` porque apontavam para arquivos
+  inexistentes.
+- Outros aliases históricos quebrados de `package.json` também foram removidos e agora há teste de
+  regressão para validar que aliases internos apontam para destinos existentes.
+- `config/typing/strict/tsconfig.strict.src.copilot.sdk.json` foi criado para aplicar TypeScript
+  6/NodeNext estrito ao SDK local. `skipLibCheck: false` foi avaliado, mas está bloqueado por
+  declarações externas de `vscode-jsonrpc`; o SDK local passa com `skipLibCheck: true` e todas as
+  demais flags rigorosas relevantes.
 
 ## Mapa resumido atual por frequência observada
 
@@ -245,7 +261,8 @@ Leitura baseada no inventário de `src/copilot` em 2026-05-14:
 - `#copilot/sdk/tools` → 11 referências
 - `#copilot/sdk/telemetry` → 10 referências
 - `#copilot/sdk` → 8 referências
-- micro-surfaces (`constants`, `di`, `errors`, `event-helpers`, `feature-flags`, `utils`) → 33 referências somadas
+- micro-surfaces (`constants`, `di`, `errors`, `event-helpers`, `feature-flags`, `utils`) → 33
+  referências somadas
 
 ## Baseline por camada (inventário real)
 
@@ -292,8 +309,9 @@ Snapshot em `src/copilot/**` (fora de `sdk/`) por camada consumidora:
 | `tools`             | `#copilot/sdk/session`          |    1 |
 | `types`             | `#copilot/sdk/di`               |    1 |
 
-Leitura: `session` é a superfície dominante; o root agora resta para contrato público/barrel e validação explícita.
-Os usos residuais de constantes, erros, helpers e DI foram deslocados para micro-surfaces.
+Leitura: `session` é a superfície dominante; o root agora resta para contrato público/barrel e
+validação explícita. Os usos residuais de constantes, erros, helpers e DI foram deslocados para
+micro-surfaces.
 
 ## Próximo passo sugerido
 

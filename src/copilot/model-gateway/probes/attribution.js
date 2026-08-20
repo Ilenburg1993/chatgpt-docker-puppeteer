@@ -12,7 +12,9 @@
 export function didConfiguredByokProbeAttemptProvider(probe) {
     if (!probe || typeof probe !== 'object') return false;
     if (typeof probe['providerAttempted'] === 'boolean') return probe['providerAttempted'];
-    const status = String(probe['status'] ?? '').trim().toLowerCase();
+    const status = String(probe['status'] ?? '')
+        .trim()
+        .toLowerCase();
     return status !== '' && status !== 'unavailable' && status !== 'admission-blocked';
 }
 
@@ -25,7 +27,9 @@ export function didConfiguredByokProbeAttemptProvider(probe) {
 export function classifyConfiguredByokProbeFailureScope(probe) {
     if (!probe || typeof probe !== 'object' || probe['ok'] === true) return null;
     if (didConfiguredByokProbeAttemptProvider(probe)) return 'provider';
-    const status = String(probe['status'] ?? '').trim().toLowerCase();
+    const status = String(probe['status'] ?? '')
+        .trim()
+        .toLowerCase();
     if (status === 'failed') return 'controller_substrate';
     return 'preflight';
 }

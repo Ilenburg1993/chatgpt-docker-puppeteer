@@ -168,8 +168,8 @@ forçar cor (por exemplo PM2, testes e helpers específicos).
 
 ### BYOK do Terminal LLM-B
 
-O BYOK do `src/copilot` usa o campo `provider` nativo do `@github/copilot-sdk`; portanto, não há
-um segundo loop paralelo de chamadas a LLM. O caminho operacional é:
+O BYOK do `src/copilot` usa o campo `provider` nativo do `@github/copilot-sdk`; portanto, não há um
+segundo loop paralelo de chamadas a LLM. O caminho operacional é:
 
 - knobs não sensíveis em [`.env.example`](../../.env.example) e
   [`.env.expert.example`](../../.env.expert.example);
@@ -199,14 +199,15 @@ Descoberta automática de modelos:
 - por padrão, providers OpenAI-compatible tentam `GET <baseUrl>/models`;
 - `COPILOT_BYOK_MODELS_ENDPOINT` permite sobrescrever o endpoint, absoluto ou relativo ao `baseUrl`;
 - `COPILOT_BYOK_MODEL_DISCOVERY_ENABLED=false` desliga a descoberta e usa somente catálogo estático;
-- `COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS` e `COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS` controlam timeout e cache;
-- se a chamada remota falhar, o sistema cai para `COPILOT_BYOK_MODELS`, `COPILOT_BYOK_MODELS_JSON` ou
-  `COPILOT_BYOK_MODEL`, sempre com aviso redigido.
+- `COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS` e `COPILOT_BYOK_MODEL_DISCOVERY_TTL_MS` controlam
+  timeout e cache;
+- se a chamada remota falhar, o sistema cai para `COPILOT_BYOK_MODELS`, `COPILOT_BYOK_MODELS_JSON`
+  ou `COPILOT_BYOK_MODEL`, sempre com aviso redigido.
 
 Presets canônicos: `openai`, `openai-compatible`, `azure`, `anthropic`, `ollama-local`,
-`ollama-cloud`, `kilo-code`, `kilo-gateway`, `kilo` e `custom`. Providers não suportados
-diretamente pelo SDK devem entrar via endpoint OpenAI-compatible (por exemplo Kilo Gateway, LiteLLM,
-vLLM, Ollama local/cloud ou proxy interno).
+`ollama-cloud`, `kilo-code`, `kilo-gateway`, `kilo` e `custom`. Providers não suportados diretamente
+pelo SDK devem entrar via endpoint OpenAI-compatible (por exemplo Kilo Gateway, LiteLLM, vLLM,
+Ollama local/cloud ou proxy interno).
 
 Comandos principais:
 
@@ -253,14 +254,15 @@ valores inválidos falham fechados e aparecem como `IO_L2_PROFILE_INVALID` no he
 - `on`: ativa L2 com TTL/pruning de 5 minutos e limite de 100.000 entradas.
 
 Os knobs `IO_L2_CACHE_TTL_MS`, `IO_L2_CACHE_MAX_ENTRIES`, `IO_L2_CACHE_PRUNE_MS` e
-`IO_L2_CACHE_MIN_BYTES` substituem os defaults do perfil. Zero em `IO_L2_CACHE_MIN_BYTES` admite todos os payloads.
-`IO_L2_CACHE_ENABLED` continua aceito apenas para compatibilidade quando
+`IO_L2_CACHE_MIN_BYTES` substituem os defaults do perfil. Zero em `IO_L2_CACHE_MIN_BYTES` admite
+todos os payloads. `IO_L2_CACHE_ENABLED` continua aceito apenas para compatibilidade quando
 `IO_L2_CACHE_PROFILE` está ausente. O health expõe perfil, origem da configuração, hit/miss,
 ocupação e latência bounded de get/set/invalidate/prune/clear.
 
 Comece por `experimental`, compare cold/warm e só promova para `on` quando hit ratio e custo SQLite
-justificarem o footprint persistente. A matriz local com admissão em 4/16/64 KiB piorou o break-even porque misses
-ainda consultam SQLite antes do fallback; por isso todos os perfis mantêm limiar zero por default.
+justificarem o footprint persistente. A matriz local com admissão em 4/16/64 KiB piorou o break-even
+porque misses ainda consultam SQLite antes do fallback; por isso todos os perfis mantêm limiar zero
+por default.
 
 ### Preflight de capacidade IO Copilot
 
@@ -268,13 +270,13 @@ ainda consultam SQLite antes do fallback; por isso todos os perfis mantêm limia
 `EXDEV` consultam `statfs` no diretório de destino. O default é 64 MiB; use `0` para desabilitar.
 `IO_CAPACITY_PREFLIGHT_RESERVE_BYTES` exige headroom adicional, também 64 MiB por default.
 
-Quando o filesystem já reporta espaço insuficiente, a operação falha cedo com `ENOSPC`, antes de criar o
-temporário ou substituir o destino. Se `statfs` estiver indisponível, a checagem falha aberta e a mutação segue para
-preservar portabilidade. O relatório aparece em metadata de IO.
+Quando o filesystem já reporta espaço insuficiente, a operação falha cedo com `ENOSPC`, antes de
+criar o temporário ou substituir o destino. Se `statfs` estiver indisponível, a checagem falha
+aberta e a mutação segue para preservar portabilidade. O relatório aparece em metadata de IO.
 
-O preflight é advisory: ele não reserva blocos e outra operação ainda pode consumir espaço entre a checagem e a
-escrita. Move same-device não materializa o payload e portanto não executa essa checagem; apenas o fallback
-cross-device precisa dela.
+O preflight é advisory: ele não reserva blocos e outra operação ainda pode consumir espaço entre a
+checagem e a escrita. Move same-device não materializa o payload e portanto não executa essa
+checagem; apenas o fallback cross-device precisa dela.
 
 ### Parser Workers Copilot
 

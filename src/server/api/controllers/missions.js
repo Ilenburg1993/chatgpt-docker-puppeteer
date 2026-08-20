@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {Router} from "express" */
+/** @import {Router} from 'express' */
 import { log } from '#core/logger';
 import * as schemas from '#core/schemas';
 import { recordEvent } from '#infra/db/events_repo';
@@ -49,7 +49,8 @@ const patchMissionSchema = z
         description: z.string().max(5000).optional(),
         autonomy_mode: AUTONOMY_SCHEMA.optional(),
         autonomyMode: AUTONOMY_SCHEMA.optional(),
-    })['refine']((/** @type {Record<string, unknown>} */ value) => Object.keys(value).length > 0, {
+    })
+    ['refine']((/** @type {Record<string, unknown>} */ value) => Object.keys(value).length > 0, {
         message: 'Body vazio',
     });
 
@@ -89,8 +90,9 @@ const proposalsRejectSchema = z
     .object({
         all: z.boolean().optional(),
         task_ids: z.array(z.string()).max(2000).optional(),
-    })['refine'](
-        (/** @type {{all?: boolean; task_ids?: unknown[]}} */ value) =>
+    })
+    ['refine'](
+        (/** @type {{ all?: boolean; task_ids?: unknown[] }} */ value) =>
             value.all === true || (Array.isArray(value.task_ids) && value.task_ids.length > 0),
         {
             message: 'Body inválido: forneça {all:true} ou {task_ids:[...]}',

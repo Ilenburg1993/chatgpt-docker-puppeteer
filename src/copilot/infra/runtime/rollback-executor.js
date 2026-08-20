@@ -7,19 +7,21 @@
 
 import path from 'node:path';
 import { acquireIoResourceLocks } from '../io-locks.js';
-import { invalidateIoCacheTiers } from '../io/invalidation/cache-tiers.js';
 import { mkdirPathUnlocked } from '../io/fs/mkdir.js';
 import { moveFileUnlocked } from '../io/fs/move.js';
+import { readMutationAppliedState } from '../io/fs/mutation-state.js';
 import { deleteFileUnlocked } from '../io/fs/remove.js';
 import { readVerifiedRollbackSidecar } from '../io/fs/rollback-sidecar.js';
 import { readBinaryMutationSnapshot } from '../io/fs/snapshot.js';
 import { writeAtomicFileUnlocked } from '../io/fs/write-atomic.js';
+import { invalidateIoCacheTiers } from '../io/invalidation/cache-tiers.js';
 import { decodeBase64ToOwnedBuffer } from '../shared/buffer.js';
 import { sha256 } from '../shared/hash.js';
 import { parseIoRollbackToken, verifyIoRollbackToken } from './rollback.js';
 
 /**
  * @typedef {{ exists: boolean; contentHash: string | null; bytes: number | null }} RollbackPathState
+ *
  * @typedef {import('./rollback.js').IoRollbackStep} IoRollbackStep
  */
 
@@ -106,6 +108,44 @@ function stepPaths(step) {
     return [step.target];
 }
 
+/** @typedef {'ready' | 'pending' | 'applied' | 'failed' | 'applied-but-unconfirmed'} RollbackExecutionStepStatus */
+/**
+ * @typedef {{
+ *     order: number;
+ *     action: import('./transaction.js').IoChangeAction;
+ *     target: string;
+ *     status: RollbackExecutionStepStatus;
+ * }} RollbackExecutionStep
+ */
+/**
+ * @typedef {{
+ *     success: true;
+ *     dryRun: boolean;
+ *     status: 'ready' | 'applied';
+ *     tokenId: string;
+ *     changeSetId: string;
+ *     appliedCount: number;
+ *     steps: RollbackExecutionStep[];
+ * }} RollbackExecutionSuccess
+ */
+/**
+ * @typedef {{
+ *     success: false;
+ *     dryRun: boolean;
+ *     status: 'blocked' | 'failed' | 'partially-applied';
+ *     tokenId: string;
+ *     changeSetId: string;
+ *     appliedCount: number;
+ *     steps: RollbackExecutionStep[];
+ *     error: string;
+ *     code: string;
+ *     mutationApplied?: true;
+ *     mutationPhase?: string | null;
+ *     mutationPaths?: string[];
+ * }} RollbackExecutionFailure
+ */
+/** @typedef {RollbackExecutionSuccess | RollbackExecutionFailure} RollbackExecutionResult */
+
 /**
  * @param {string | import('./rollback.js').IoRollbackToken} tokenOrSerialized
  * @param {{
@@ -113,11 +153,12 @@ function stepPaths(step) {
  *     allowedPaths?: ReadonlySet<string>;
  *     sidecarDirectory?: string;
  *     nowMs?: number;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
  * }} [options]
+ * @returns {Promise<RollbackExecutionResult>}
  */
 export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
-    const token =
-        typeof tokenOrSerialized === 'string' ? parseIoRollbackToken(tokenOrSerialized) : tokenOrSerialized;
+    const token = typeof tokenOrSerialized === 'string' ? parseIoRollbackToken(tokenOrSerialized) : tokenOrSerialized;
     if (!verifyIoRollbackToken(token)) {
         throw new Error('Rollback token inválido.');
     }
@@ -153,6 +194,7 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                 virtualState.set(filePath, await readPathState(filePath));
             }
 
+            /** @type {RollbackExecutionStep[]} */
             const steps = [];
             try {
                 for (const step of token.steps) {
@@ -238,15 +280,16 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                         const payload = /** @type {Buffer} */ (payloads.get(step.order));
                         await mkdirPathUnlocked(path.dirname(step.target), { recursive: true });
                         await writeAtomicFileUnlocked(step.target, payload, {
-                            ...(step.contentHash
-                                ? { expectedHash: step.contentHash }
-                                : { exclusive: true }),
+                            ...(step.contentHash ? { expectedHash: step.contentHash } : { exclusive: true }),
+                            ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                         });
                         invalidateIoCacheTiers(step.target);
                     } else if (step.action === 'delete') {
                         const current = await readPathState(step.target);
                         assertExpectedState(current, step.contentHash ?? null, step.target);
-                        await deleteFileUnlocked(step.target);
+                        await deleteFileUnlocked(step.target, {
+                            ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                        });
                         invalidateIoCacheTiers(step.target);
                     } else if (step.action === 'move') {
                         const source = String(step.source);
@@ -260,6 +303,7 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                             overwrite: false,
                             ...(current.contentHash ? { expectedSourceHash: current.contentHash } : {}),
                             ...(current.bytes === null ? {} : { expectedSourceBytes: current.bytes }),
+                            ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                         });
                         if (moveResult.duplicatedAfterCrossDeviceMove) {
                             await deleteFileUnlocked(destination).catch(() => undefined);
@@ -274,8 +318,16 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                     const reportStep = steps[index];
                     if (reportStep) reportStep.status = 'applied';
                 } catch (error) {
+                    const mutationState = readMutationAppliedState(error);
                     const reportStep = steps[index];
-                    if (reportStep) reportStep.status = 'failed';
+                    if (mutationState.applied) {
+                        const affectedPaths = mutationState.paths.length > 0 ? mutationState.paths : stepPaths(step);
+                        for (const affectedPath of affectedPaths) invalidateIoCacheTiers(path.resolve(affectedPath));
+                        appliedCount += 1;
+                        if (reportStep) reportStep.status = 'applied-but-unconfirmed';
+                    } else if (reportStep) {
+                        reportStep.status = 'failed';
+                    }
                     return {
                         success: false,
                         dryRun: false,
@@ -286,6 +338,13 @@ export async function executeIoRollbackToken(tokenOrSerialized, options = {}) {
                         steps,
                         error: error instanceof Error ? error.message : String(error),
                         code: String(/** @type {{ code?: unknown }} */ (error)?.code ?? 'EROLLBACKAPPLY'),
+                        ...(mutationState.applied
+                            ? {
+                                  mutationApplied: true,
+                                  mutationPhase: mutationState.phase,
+                                  mutationPaths: mutationState.paths,
+                              }
+                            : {}),
                     };
                 }
             }

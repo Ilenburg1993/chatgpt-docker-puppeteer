@@ -1,9 +1,9 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
-import Database from 'better-sqlite3';
-import { afterEach, describe, it } from 'vitest';
 import { createOAuthReplayStore, OAUTH_REPLAY_NAMESPACES } from '#copilot/mcp/control-plane';
+import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'vitest';
 
 /** @type {import('better-sqlite3').Database[]} */
 const databases = [];

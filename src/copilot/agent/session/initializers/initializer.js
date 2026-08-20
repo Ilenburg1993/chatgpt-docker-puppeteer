@@ -31,13 +31,19 @@ import {
     readSystemPromptStatus,
 } from '../../../config/system-prompt/index.js';
 import {
-    canReadAgentSdkSessionMessages,
-    readAgentSdkSessionMessages,
-} from '../../facades/agent-sdk-runtime.js';
+    applyModelGatewayBindingStrategy,
+    buildModelGatewayIngressPublicBaseUrl,
+    buildModelGatewayIngressSessionOverrides,
+    createModelGatewayIngressLocalApiKey,
+    createModelGatewayIngressRoute,
+    defaultModelGatewayIngressRouteRegistry,
+} from '../../../model-gateway/ingress/index.js';
+import { buildModelGatewayRuntimeSelectorProbeEnv } from '../../../model-gateway/routing/runtime-selector.js';
 import {
     persistAgentRuntimeStatePartial,
     readAgentRuntimePersistedStateAsync,
 } from '../../facades/agent-runtime-state.js';
+import { canReadAgentSdkSessionMessages, readAgentSdkSessionMessages } from '../../facades/agent-sdk-runtime.js';
 import {
     AGENT_SDK_DEFAULT_MODEL,
     createAgentSdkSessionByClient,
@@ -48,17 +54,8 @@ import {
     resumeOrCreateAgentSdkSession,
     validateAgentContracts,
 } from '../../facades/sdk-access.js';
-import { defaultMetrics } from '../../ports/metrics-port.js';
 import { log } from '../../ports/logging/index.js';
-import {
-    applyModelGatewayBindingStrategy,
-    buildModelGatewayIngressPublicBaseUrl,
-    buildModelGatewayIngressSessionOverrides,
-    createModelGatewayIngressLocalApiKey,
-    createModelGatewayIngressRoute,
-    defaultModelGatewayIngressRouteRegistry,
-} from '../../../model-gateway/ingress/index.js';
-import { buildModelGatewayRuntimeSelectorProbeEnv } from '../../../model-gateway/routing/runtime-selector.js';
+import { defaultMetrics } from '../../ports/metrics-port.js';
 import { buildHookSystemContextSafe } from '../context/index.js';
 
 // Re-exports para backward compatibility
@@ -394,12 +391,12 @@ function deriveModelGatewayIngressUpstreamAuthHeaders(provider) {
  * @param {ReturnType<typeof readCopilotBootConfig>} input.bootConfig
  * @param {string | null} input.sessionId
  * @returns {{
- *   byok: ReturnType<typeof resolveConfiguredByokSessionOverrides>;
- *   ingressPreparation: {
- *     routeId: string;
- *     registeredRevision: number;
- *     previousSnapshot: ReturnType<typeof defaultModelGatewayIngressRouteRegistry.snapshot>;
- *   } | null;
+ *     byok: ReturnType<typeof resolveConfiguredByokSessionOverrides>;
+ *     ingressPreparation: {
+ *         routeId: string;
+ *         registeredRevision: number;
+ *         previousSnapshot: ReturnType<typeof defaultModelGatewayIngressRouteRegistry.snapshot>;
+ *     } | null;
  * }}
  */
 function applyModelGatewayIngressSessionBinding(input) {
@@ -409,7 +406,8 @@ function applyModelGatewayIngressSessionBinding(input) {
     }
     const provider = record(input.byok.provider);
     const providerBaseUrl = optionalText(provider['baseUrl']);
-    const routeBaseUrl = optionalText(route?.['openAICompatibleBaseUrl']) ?? optionalText(route?.['baseUrl']) ?? providerBaseUrl;
+    const routeBaseUrl =
+        optionalText(route?.['openAICompatibleBaseUrl']) ?? optionalText(route?.['baseUrl']) ?? providerBaseUrl;
     if (!routeBaseUrl) return { byok: input.byok, ingressPreparation: null };
 
     const providerModel =
@@ -527,16 +525,17 @@ function buildPersistedModelGatewayActiveRoute(route) {
         directRebindReliability: optionalText(route['directRebindReliability']),
         directRebindSupported:
             typeof route['directRebindSupported'] === 'boolean' ? route['directRebindSupported'] : null,
-        directRebindReliable:
-            typeof route['directRebindReliable'] === 'boolean' ? route['directRebindReliable'] : null,
+        directRebindReliable: typeof route['directRebindReliable'] === 'boolean' ? route['directRebindReliable'] : null,
         directConfigRepresentability: optionalText(route['directConfigRepresentability']),
         requiredDirectHeaders: Array.isArray(route['requiredDirectHeaders'])
             ? route['requiredDirectHeaders'].map(String)
             : [],
         bindingCapabilities:
             Object.keys(record(route['bindingCapabilities'])).length > 0 ? record(route['bindingCapabilities']) : null,
-        bindingDecision: Object.keys(record(route['bindingDecision'])).length > 0 ? record(route['bindingDecision']) : null,
-        runtimeEvidence: Object.keys(record(route['runtimeEvidence'])).length > 0 ? record(route['runtimeEvidence']) : null,
+        bindingDecision:
+            Object.keys(record(route['bindingDecision'])).length > 0 ? record(route['bindingDecision']) : null,
+        runtimeEvidence:
+            Object.keys(record(route['runtimeEvidence'])).length > 0 ? record(route['runtimeEvidence']) : null,
         requiresIngress: route['requiresIngress'] === true,
         useIngress: route['useIngress'] === true,
         modelGatewayIngress: route['modelGatewayIngress'] === true,
@@ -579,12 +578,15 @@ function readPersistedByokSessionBinding(value) {
 function compareByokSessionBindings(current, persisted) {
     if (!current) return persisted ? 'sessao persistida nasceu em BYOK e o boot atual voltou ao SDK Copilot' : null;
     if (!persisted) return 'sessao persistida nao traz binding BYOK seguro para o provider atual';
-    if (current.profile !== persisted.profile) return buildByokBindingMismatch('profile', current.profile, persisted.profile);
-    if (current.preset !== persisted.preset) return buildByokBindingMismatch('preset', current.preset, persisted.preset);
+    if (current.profile !== persisted.profile)
+        return buildByokBindingMismatch('profile', current.profile, persisted.profile);
+    if (current.preset !== persisted.preset)
+        return buildByokBindingMismatch('preset', current.preset, persisted.preset);
     if (current.providerType !== persisted.providerType) {
         return buildByokBindingMismatch('providerType', current.providerType, persisted.providerType);
     }
-    if (current.baseUrl !== persisted.baseUrl) return buildByokBindingMismatch('baseUrl', current.baseUrl, persisted.baseUrl);
+    if (current.baseUrl !== persisted.baseUrl)
+        return buildByokBindingMismatch('baseUrl', current.baseUrl, persisted.baseUrl);
     if (current.model !== persisted.model) return buildByokBindingMismatch('model', current.model, persisted.model);
     return null;
 }
@@ -885,7 +887,9 @@ export async function initOrResumeSession(client, sessionOptions) {
     let savedSessionId = persistedResumeSessionId;
     /** @type {'auto' | 'new' | 'resume'} */
     let requestedSdkSessionBootMode = 'auto';
-    let sdkSessionBootReason = savedSessionId ? 'auto-resume-persisted-session' : 'auto-create-without-resume-candidate';
+    let sdkSessionBootReason = savedSessionId
+        ? 'auto-resume-persisted-session'
+        : 'auto-create-without-resume-candidate';
     const nextSdkSessionBoot = readNextSdkSessionBootSelection(state);
     if (nextSdkSessionBoot?.mode === 'new') {
         log('INFO', '[PersistentSession] Diretiva do operador: criar nova sessão SDK neste boot.');
@@ -900,7 +904,10 @@ export async function initOrResumeSession(client, sessionOptions) {
             sdkSessionBootReason = 'operator-next-boot-resume-session';
             savedSessionId = explicitSessionId;
         } else {
-            log('WARN', '[PersistentSession] Diretiva de retomada traz sessionId inválido; mantendo seleção persistida.');
+            log(
+                'WARN',
+                '[PersistentSession] Diretiva de retomada traz sessionId inválido; mantendo seleção persistida.',
+            );
             sdkSessionBootReason = 'operator-next-boot-resume-invalid-session-id';
         }
     }
@@ -982,7 +989,8 @@ export async function initOrResumeSession(client, sessionOptions) {
         Reflect.set(result.session, '__copilotByokProvider', byok.provider);
         if (byok.summary.profile) Reflect.set(result.session, '__copilotByokProfile', byok.summary.profile);
         if (byok.summary.preset) Reflect.set(result.session, '__copilotByokPreset', byok.summary.preset);
-        if (byok.summary.providerType) Reflect.set(result.session, '__copilotByokProviderType', byok.summary.providerType);
+        if (byok.summary.providerType)
+            Reflect.set(result.session, '__copilotByokProviderType', byok.summary.providerType);
     } else {
         Reflect.set(result.session, '__copilotByokEnabled', false);
     }

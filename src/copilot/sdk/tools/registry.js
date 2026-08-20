@@ -48,9 +48,8 @@ function formatInstructionTags(tags) {
 }
 
 /**
- * Cria uma orientação operacional mínima e consistente para tools que ainda
- * declaram apenas description/schema. Instructions explícitas da tool sempre
- * vencem esta síntese.
+ * Cria uma orientação operacional mínima e consistente para tools que ainda declaram apenas description/schema.
+ * Instructions explícitas da tool sempre vencem esta síntese.
  *
  * @param {Tool} tool
  * @param {{ category: string; tags: string[]; readOnly: boolean }} meta

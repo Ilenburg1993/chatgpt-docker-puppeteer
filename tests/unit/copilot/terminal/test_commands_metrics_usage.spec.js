@@ -237,9 +237,8 @@ vi.mock('../../../../src/copilot/terminal/state/activity-state.js', () => ({
 
 const { cmdMetrics } = await import('../../../../src/copilot/terminal/commands/metrics.js');
 const { cmdUsage } = await import('../../../../src/copilot/terminal/commands/usage.js');
-const { recordTerminalSseEventArchive, resetTerminalSseEventArchiveForTests } = await import(
-    '../../../../src/copilot/terminal/state/sse-event-archive.js'
-);
+const { recordTerminalSseEventArchive, resetTerminalSseEventArchiveForTests } =
+    await import('../../../../src/copilot/terminal/state/sse-event-archive.js');
 
 function mockCtx() {
     /** @type {string[]} */

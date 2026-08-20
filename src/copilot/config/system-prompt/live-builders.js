@@ -9,7 +9,7 @@
  */
 
 import { customizeSystemMessage, sectionOverride } from '../sdk-config-port.js';
-import { applyDeclaredSystemPromptSection, buildSystemMessage } from './builders.js';
+import { applyDeclaredSystemPromptSection, buildSystemMessageFromResolvedConfig } from './builders.js';
 import { loadLiveSystemPromptSections } from './live-loader.js';
 import { getMode } from './mode.js';
 import { buildSystemPromptProfile, renderSystemPromptProfileBlock } from './profile.js';
@@ -101,7 +101,8 @@ export async function buildLiveSystemMessage(opts = {}) {
         userConfig.reloadStrategy !== 'sdk-transform' ||
         !sdkCompatibility.supportsCustomizeMode
     ) {
-        return buildSystemMessage({
+        const userAppendContent = await readUserAppendContent(userConfig);
+        return buildSystemMessageFromResolvedConfig(userConfig, userAppendContent, {
             ...(mode ? { mode } : {}),
             ...(opts.getExtraContext ? { extraContext: await readExtraContext(opts.getExtraContext) } : {}),
         });

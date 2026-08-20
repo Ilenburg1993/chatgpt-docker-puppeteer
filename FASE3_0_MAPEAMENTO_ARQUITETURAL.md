@@ -1,7 +1,7 @@
 # Fase 3.0 — Mapeamento Arquitetural Completo
 
-**Data**: 2026-05-14 06:00 UTC
-**Objetivo**: Análise estrutural, padrões, dependências e caminhos críticos
+**Data**: 2026-05-14 06:00 UTC **Objetivo**: Análise estrutural, padrões, dependências e caminhos
+críticos
 
 ---
 
@@ -75,11 +75,11 @@ sdk/
 
 ### B. Caching Strategies
 
-| Subsystem    | Strategy                 | TTL   | Dedup            | Invalidation          |
-| ------------ | ------------------------ | ----- | ---------------- | --------------------- |
+| Subsystem    | Strategy                 | TTL   | Dedup             | Invalidation          |
+| ------------ | ------------------------ | ----- | ----------------- | --------------------- |
 | Models       | Single cache entry       | 5 min | ✅ (BUG-05 fixed) | forceRefresh OR error |
-| Compaction   | Per-session (RPC native) | N/A   | RPC layer        | Per compaction        |
-| Custom tools | Disk-based               | N/A   | _loadPromise     | Manual reset          |
+| Compaction   | Per-session (RPC native) | N/A   | RPC layer         | Per compaction        |
+| Custom tools | Disk-based               | N/A   | _loadPromise      | Manual reset          |
 
 **Pattern**: Cache-aside with TTL, error purges stale cache.
 
@@ -124,7 +124,8 @@ SDK native handler (final decision)
 - **HookBus**: Main event bus (EventEmitter)
 - **HookRegistry**: Hook metadata
 - **attachBus()**: Wraps SessionHooks automatically
-- **Hooks emitted**: pre_tool_use, post_tool_use, prompt_submitted, session_start, session_end, error_occurred
+- **Hooks emitted**: pre_tool_use, post_tool_use, prompt_submitted, session_start, session_end,
+  error_occurred
 
 **Thread safety**: Independent try/catch blocks (BUG-09 fixed).
 
@@ -143,8 +144,7 @@ createSession()
   └─ Hook bus broadcast
 ```
 
-**Impacto**: High-frequency (per conversation start)
-**Latency**: ~200-500ms (network + client init)
+**Impacto**: High-frequency (per conversation start) **Latency**: ~200-500ms (network + client init)
 **Gates**: Connection circuit breaker, client validation
 
 ### Path 2: Tool Execution (request_user_input → resolve)
@@ -159,8 +159,7 @@ request_user_input hook
   └─ RPC send() with answer
 ```
 
-**Impacto**: Per-tool invocation (high frequency)
-**Latency**: ~10-50ms (memory operations)
+**Impacto**: Per-tool invocation (high frequency) **Latency**: ~10-50ms (memory operations)
 **Gates**: Input validation, pending count checks
 
 ### Path 3: Model List & Selection
@@ -174,8 +173,7 @@ listModels(forceRefresh)
   └─ Return selected model
 ```
 
-**Impacto**: Per-session init, user model selection
-**Latency**: ~100-300ms network, ~5ms cache hit
+**Impacto**: Per-session init, user model selection **Latency**: ~100-300ms network, ~5ms cache hit
 **Gates**: Cache TTL, dedup, unknown enum defaults
 
 ### Path 4: Permission Validation
@@ -188,9 +186,8 @@ createAllowlistPermissionHandler()
   └─ Return decision
 ```
 
-**Impacto**: Per permission request (medium frequency)
-**Latency**: ~1-5ms (set lookup)
-**Gates**: Constant references, policy enforcement
+**Impacto**: Per permission request (medium frequency) **Latency**: ~1-5ms (set lookup) **Gates**:
+Constant references, policy enforcement
 
 ### Path 5: Tool Registry Composition
 
@@ -202,9 +199,8 @@ createToolRegistryAdapter()
   └─ stats() [aggregation]
 ```
 
-**Impacto**: Tool filtering during request handling
-**Latency**: ~5-20ms (map iteration)
-**Gates**: Registry state isolation
+**Impacto**: Tool filtering during request handling **Latency**: ~5-20ms (map iteration) **Gates**:
+Registry state isolation
 
 ### Path 6: Model Switch Verification
 
@@ -218,9 +214,8 @@ verifySessionModelSwitch()
   └─ Return result { verifiedSwitch, effectiveModel, ... }
 ```
 
-**Impacto**: Per setModel() call
-**Latency**: ~100-500ms (network + retries)
-**Gates**: Async race detection, timeout handling
+**Impacto**: Per setModel() call **Latency**: ~100-500ms (network + retries) **Gates**: Async race
+detection, timeout handling
 
 ---
 
@@ -257,8 +252,7 @@ Consumers (external)
     └─ utils.js (Helpers)
 ```
 
-**Cycles**: None detected (clean DAG)
-**Coupling**: Loose via index.js facade + DI tokens
+**Cycles**: None detected (clean DAG) **Coupling**: Loose via index.js facade + DI tokens
 **Fragility**: Medium (RPC layer depends on SDK contract, could break on SDK update)
 
 ---
@@ -404,6 +398,7 @@ Consumers (external)
 ## Next: Fase 3.1 — Profiling & Coverage Analysis
 
 Continuing with:
+
 - Test coverage gaps
 - Performance profiling (latency P50/P95)
 - Potential memory leaks

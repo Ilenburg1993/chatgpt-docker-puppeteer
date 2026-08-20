@@ -29,11 +29,13 @@ function optionalString(value) {
  * @returns {string}
  */
 function idPart(value) {
-    return value
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9_.:@/-]+/gu, '-')
-        .replace(/^-+|-+$/gu, '') || 'unknown';
+    return (
+        value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9_.:@/-]+/gu, '-')
+            .replace(/^-+|-+$/gu, '') || 'unknown'
+    );
 }
 
 /**
@@ -49,7 +51,18 @@ export const MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES = Object.freeze({
     identity: Object.freeze(['identity', 'owner', 'provider', 'upstream', 'catalog', 'docs', 'openapi']),
     pricing: Object.freeze(['pricing', 'price', 'prices', 'tiers', 'cost', 'cache', 'caching', 'web', 'search']),
     limits: Object.freeze(['limits', 'rate', 'context', 'tokens', 'parameters', 'quota']),
-    capabilities: Object.freeze(['features', 'feature', 'capabilities', 'capability', 'modalities', 'multimodal', 'tool', 'tools', 'vision', 'audio']),
+    capabilities: Object.freeze([
+        'features',
+        'feature',
+        'capabilities',
+        'capability',
+        'modalities',
+        'multimodal',
+        'tool',
+        'tools',
+        'vision',
+        'audio',
+    ]),
     routing: Object.freeze(['route', 'routing', 'provider', 'upstream', 'fallback', 'gateway', 'selectors']),
     lifecycle: Object.freeze(['lifecycle', 'deprecation', 'deprecated', 'retirement', 'status']),
     dataPolicy: Object.freeze(['privacy', 'policy', 'confidential', 'compute', 'retention', 'byok']),
@@ -62,7 +75,13 @@ export const MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES = Object.freeze({
  * @returns {string[]}
  */
 function placeholders(locator) {
-    return [...new Set([...locator.matchAll(/\{([a-z0-9_.-]+)\}/giu)].map((match) => match[1]).filter((item) => item !== undefined))].sort();
+    return [
+        ...new Set(
+            [...locator.matchAll(/\{([a-z0-9_.-]+)\}/giu)]
+                .map((match) => match[1])
+                .filter((item) => item !== undefined),
+        ),
+    ].sort();
 }
 
 /**
@@ -71,7 +90,14 @@ function placeholders(locator) {
  */
 function richnessTags(richness) {
     if (!richness) return [];
-    return [...new Set(richness.split(/[_\s,|/+-]+/u).map((item) => item.trim()).filter(Boolean))].sort();
+    return [
+        ...new Set(
+            richness
+                .split(/[_\s,|/+-]+/u)
+                .map((item) => item.trim())
+                .filter(Boolean),
+        ),
+    ].sort();
 }
 
 /**
@@ -175,11 +201,12 @@ function endpointSourceRecord(inventory, target, source) {
  */
 export function listProviderEndpointSourceRecords(inventories) {
     return inventories.flatMap((inventory) => [
-        ...(Array.isArray(inventory['modelCatalogSources']) ? inventory['modelCatalogSources'].filter(isRecord) : []).map((source) =>
-            endpointSourceRecord(inventory, 'catalog', source),
-        ),
-        ...(Array.isArray(inventory['runtimeEndpoints']) ? inventory['runtimeEndpoints'].filter(isRecord) : []).map((source) =>
-            endpointSourceRecord(inventory, 'runtime', source),
+        ...(Array.isArray(inventory['modelCatalogSources'])
+            ? inventory['modelCatalogSources'].filter(isRecord)
+            : []
+        ).map((source) => endpointSourceRecord(inventory, 'catalog', source)),
+        ...(Array.isArray(inventory['runtimeEndpoints']) ? inventory['runtimeEndpoints'].filter(isRecord) : []).map(
+            (source) => endpointSourceRecord(inventory, 'runtime', source),
         ),
     ]);
 }
@@ -188,15 +215,25 @@ export function listProviderEndpointSourceRecords(inventories) {
  * @param {object} input
  * @param {readonly Record<string, unknown>[]} input.inventories
  * @param {readonly Record<string, unknown>[]} input.importers
- * @returns {Array<{ providerId: string; catalogSourceCount: number; importerCount: number; coveredCatalogSourceCount: number; uncoveredCatalogSourceIds: string[] }>}
+ * @returns {{
+ *     providerId: string;
+ *     catalogSourceCount: number;
+ *     importerCount: number;
+ *     coveredCatalogSourceCount: number;
+ *     uncoveredCatalogSourceIds: string[];
+ * }[]}
  */
 export function auditProviderEndpointImporterCoverage(input) {
     const importers = Array.isArray(input.importers) ? input.importers.filter(isRecord) : [];
-    const catalogSources = listProviderEndpointSourceRecords(input.inventories).filter((source) => source['target'] === 'catalog');
+    const catalogSources = listProviderEndpointSourceRecords(input.inventories).filter(
+        (source) => source['target'] === 'catalog',
+    );
     const providers = [...new Set(catalogSources.map((source) => String(source['providerId'])))].sort();
     return providers.map((providerId) => {
         const providerSources = catalogSources.filter((source) => source['providerId'] === providerId);
-        const providerImporters = importers.filter((importer) => importer['providerId'] === providerId || importer['providerId'] === `${providerId}-local`);
+        const providerImporters = importers.filter(
+            (importer) => importer['providerId'] === providerId || importer['providerId'] === `${providerId}-local`,
+        );
         const covered = providerSources.filter((source) =>
             providerImporters.some(
                 (importer) =>
@@ -209,7 +246,9 @@ export function auditProviderEndpointImporterCoverage(input) {
             catalogSourceCount: providerSources.length,
             importerCount: providerImporters.length,
             coveredCatalogSourceCount: covered.length,
-            uncoveredCatalogSourceIds: providerSources.filter((source) => !covered.includes(source)).map((source) => String(source['id'])),
+            uncoveredCatalogSourceIds: providerSources
+                .filter((source) => !covered.includes(source))
+                .map((source) => String(source['id'])),
         };
     });
 }

@@ -10,8 +10,8 @@
 import { bootCopilot } from '../boot/runtime-bootstrap.js';
 import { log } from '../observability/logger.js';
 import { handleTerminalBootFailure, registerTerminalShutdownSignals } from './bootstrap-lifecycle.js';
-import { broadcastSse } from './dialog/index.js';
 import { startDevWatch } from './dev-watch.js';
+import { broadcastSse } from './dialog/index.js';
 import * as terminal from './index.js';
 
 /**

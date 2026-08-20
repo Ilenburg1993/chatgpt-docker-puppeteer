@@ -103,14 +103,13 @@ describe('callViaDialogLoop', () => {
 describe('callViaStructured', () => {
     it('retorna llmBResponse e llmBStructured', async () => {
         const bridge = {
-            chatStructured: vi.fn(async (
-                /** @type {unknown} */ _message,
-                /** @type {{ captureChunks?: boolean }} */ _options,
-            ) => ({
-                raw: 'resposta raw',
-                structured: { action: 'test' },
-                parseError: null,
-            })),
+            chatStructured: vi.fn(
+                async (/** @type {unknown} */ _message, /** @type {{ captureChunks?: boolean }} */ _options) => ({
+                    raw: 'resposta raw',
+                    structured: { action: 'test' },
+                    parseError: null,
+                }),
+            ),
         };
         const ctx = makeCtx();
         const result = await callViaStructured(/** @type {any} */ (bridge), { text: 'hello' }, ctx);
@@ -142,10 +141,11 @@ describe('callViaStructured', () => {
 describe('callViaSimpleChat', () => {
     it('retorna response do bridge.chat', async () => {
         const bridge = {
-            chat: vi.fn(async (
-                /** @type {string} */ _message,
-                /** @type {{ captureChunks?: boolean }} */ _options,
-            ) => ({ response: 'simple response' })),
+            chat: vi.fn(
+                async (/** @type {string} */ _message, /** @type {{ captureChunks?: boolean }} */ _options) => ({
+                    response: 'simple response',
+                }),
+            ),
         };
         const ctx = makeCtx();
         const result = await callViaSimpleChat(/** @type {any} */ (bridge), 'hello', ctx);

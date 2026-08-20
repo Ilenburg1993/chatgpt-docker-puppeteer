@@ -30,7 +30,7 @@ import {
 /**
  * @typedef {object} ThinkingContext
  * @property {(text: string) => void} println - Função de output do terminal
- * @property {((lines: string[]) => void)=} printlnBlock - Escrita em bloco, quando disponível
+ * @property {(lines: string[]) => void} [printlnBlock] - Escrita em bloco, quando disponível
  */
 
 /**
@@ -48,7 +48,9 @@ function printBlock(ctx, lines) {
  * @returns {string}
  */
 function humanThinkingStatus(value) {
-    const status = String(value ?? '').trim().toLowerCase();
+    const status = String(value ?? '')
+        .trim()
+        .toLowerCase();
     if (status === 'completed' || status === 'done' || status === 'success') return 'concluído';
     if (status === 'active' || status === 'running' || status === 'started') return 'em andamento';
     if (status === 'failed' || status === 'error') return 'falhou';
@@ -91,7 +93,10 @@ export function cmdThinking(ctx, arg) {
             lines.push(
                 `  ${terminalThemeText('command', shortId)}  ${terminalThemeText('muted', entry.source)}  ${terminalThemeText('muted', '·')}  ${entry.title}  ${terminalThemeText('muted', '·')}  ${entry.chars} caracteres`,
             );
-            if (preview) lines.push(`    ${terminalThemeText('muted', `${preview}${entry.content.length > preview.length ? '…' : ''}`)}`);
+            if (preview)
+                lines.push(
+                    `    ${terminalThemeText('muted', `${preview}${entry.content.length > preview.length ? '…' : ''}`)}`,
+                );
         }
         lines.push('', terminalThemeRow('Uso', '/thinking show <id> ou /thinking latest', { role: 'command' }), '');
         printBlock(ctx, lines);
@@ -118,7 +123,10 @@ export function cmdThinking(ctx, arg) {
         /** @type {string[]} */
         const lines = ['', terminalThemeHeadline('thinking', `Raciocínio ${shortId}`, [entry.title])];
         lines.push(
-            terminalThemeRow('Metadados', `fonte ${entry.source} · estado ${humanThinkingStatus(entry.status)} · ${entry.chars} caracteres · duração ${(Number(entry.durationMs ?? 0) / 1000).toFixed(1)}s`),
+            terminalThemeRow(
+                'Metadados',
+                `fonte ${entry.source} · estado ${humanThinkingStatus(entry.status)} · ${entry.chars} caracteres · duração ${(Number(entry.durationMs ?? 0) / 1000).toFixed(1)}s`,
+            ),
         );
         lines.push(terminalThemeDivider(60));
         for (const line of entry.content.split('\n')) {

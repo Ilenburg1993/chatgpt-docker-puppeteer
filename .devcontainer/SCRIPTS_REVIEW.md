@@ -71,7 +71,7 @@ hooks. Esta seção consolida os contratos que devem estar sincronizados em todo
 ### Observações atuais
 
 - Bastante simples e não bloqueante. Executa `make info` para coletar informações e grava status em
-      `/tmp/devcontainer-health.status` (consumido pelo `healthcheck.sh` e pelo `post-attach.sh`).
+  `/tmp/devcontainer-health.status` (consumido pelo `healthcheck.sh` e pelo `post-attach.sh`).
 - Usa logs informativos/avisos mas sempre sai com `0`.
 
 ### Sugestões
@@ -79,8 +79,8 @@ hooks. Esta seção consolida os contratos que devem estar sincronizados em todo
 - [ ] **Possibilidade de `exit` com erro opcional**: em alguns workflows o devcontainer pode querer
       sinalizar falha (ex: se `make info` retorna código específico). Poderia haver uma variável
       `DEVCONTAINER_START_STRICT` que, quando definida, faz o script repassar o código de `make`.
-- [x] **Link com healthcheck**: o `healthcheck.sh` já consome `/tmp/devcontainer-health.status`
-      para respeitar o estado observacional emitido pelo `post-start.sh`.
+- [x] **Link com healthcheck**: o `healthcheck.sh` já consome `/tmp/devcontainer-health.status` para
+      respeitar o estado observacional emitido pelo `post-start.sh`.
 - [ ] **Incrementar verificações**: além de `make info`, poderia checar a presença de artefatos
       criados pela `post-create` (ex.: `/tmp/devcontainer-nss/passwd`) para detectar inicialização
       parcial.

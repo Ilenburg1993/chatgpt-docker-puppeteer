@@ -5,10 +5,11 @@ import { useNotifications } from '../../composables/useNotifications.js';
 import Button from '../ui/Button.vue';
 import Modal from '../ui/Modal.vue';
 
-const props = withDefaults(
-    defineProps<{ open?: boolean; task?: DashboardTask | null; mode?: 'create' | 'edit' }>(),
-    { open: false, task: null, mode: 'create' },
-);
+const props = withDefaults(defineProps<{ open?: boolean; task?: DashboardTask | null; mode?: 'create' | 'edit' }>(), {
+    open: false,
+    task: null,
+    mode: 'create',
+});
 
 type TaskFormPayload = Omit<DashboardTask, 'id'>;
 const emit = defineEmits<{ 'update:open': [open: boolean]; submit: [task: TaskFormPayload] }>();
@@ -57,7 +58,9 @@ watch(
             form.agent = props.task['meta']?.agent || 'chatgpt';
             form.model = props.task['spec']?.payload?.model || 'gpt-4';
             form.priority = props.task['meta']?.priority || 5;
-            form.context = props.task['spec']?.payload?.context ? JSON.stringify(props.task['spec'].payload.context) : '';
+            form.context = props.task['spec']?.payload?.context
+                ? JSON.stringify(props.task['spec'].payload.context)
+                : '';
         } else if (newVal && props.mode === 'create') {
             resetForm();
         }
@@ -198,7 +201,11 @@ const handleClose = () => {
                         class="w-full px-3 py-2 bg-background-tertiary border rounded-lg text-foreground focus:border-primary focus:outline-none"
                         :class="errors.model ? 'border-error' : 'border-border'"
                     >
-                        <option v-for="option in modelOptions[form.agent] || []" :key="option.value" :value="option.value">
+                        <option
+                            v-for="option in modelOptions[form.agent] || []"
+                            :key="option.value"
+                            :value="option.value"
+                        >
                             {{ option.label }}
                         </option>
                     </select>

@@ -5,9 +5,9 @@
  * @module copilot/mcp/tools/cloudflare-edge-apply
  */
 
-import { z } from 'zod';
 import { applyCloudflareEdgePolicy } from '#copilot/mcp/cloudflare';
 import { boundedWriteAnnotations, okResult } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -21,13 +21,16 @@ export const mcpCloudflareEdgePolicyApplyTool = {
         dryRun: z.boolean().optional()['describe']('Plan only. Default: true.'),
         confirmApply: z
             .boolean()
-            .optional()['describe']('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
+            .optional()
+            ['describe']('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
         phases: z
             .array(z.enum(['http_request_cache_settings', 'http_ratelimit']))
-            .optional()['describe']('Optional phases to include. Default: cache settings and rate limiting.'),
+            .optional()
+            ['describe']('Optional phases to include. Default: cache settings and rate limiting.'),
         ruleRefs: z
             .array(z.string().min(1))
-            .optional()['describe']('Optional rule refs to include. Required for targeted rate-limit apply.'),
+            .optional()
+            ['describe']('Optional rule refs to include. Required for targeted rate-limit apply.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async ({ dryRun, confirmApply, phases, ruleRefs }) =>

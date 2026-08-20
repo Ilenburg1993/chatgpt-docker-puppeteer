@@ -5,9 +5,7 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
-import { readFile } from 'node:fs/promises';
-import https from 'node:https';
-import { z } from 'zod';
+import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
@@ -18,7 +16,6 @@ import {
     summarizeQuickTunnelState,
     validateConfiguredPublicUrl,
 } from '#copilot/mcp/cloudflare';
-import { runCanonicalConnectorSmoke } from '../cloudflare/connector-smoke.js';
 import { formatChatGptConnectorAuthentication } from '#copilot/mcp/connection';
 import {
     boundedWriteAnnotations,
@@ -30,6 +27,9 @@ import {
     readOnlyAnnotations,
     summarizeMcpReloadState,
 } from '#copilot/mcp/control-plane';
+import https from 'node:https';
+import { z } from 'zod';
+import { runCanonicalConnectorSmoke } from '../cloudflare/connector-smoke.js';
 
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 const CLOUDFLARED_LOG_FILE = 'src/copilot/.ai/cloudflare/cloudflared.log';
@@ -40,7 +40,7 @@ const CLOUDFLARED_LOG_FILE = 'src/copilot/.ai/cloudflare/cloudflared.log';
  */
 async function readPidFileStatus(pidFile) {
     try {
-        const raw = (await readFile(pidFile, 'utf8')).trim();
+        const raw = (await readTextFreshTrusted(pidFile, { caller: 'mcp.tools.tunnel-status' })).content.trim();
         const pid = Number(raw);
         if (!Number.isInteger(pid) || pid <= 0) {
             return { pidFile, pid: null, alive: false, error: 'PID file does not contain a positive integer.' };
@@ -89,7 +89,9 @@ function probeLocalInsecureHttpsHealth(url) {
             });
         });
         request.setTimeout(3000, () => request.destroy(new Error('health probe timed out')));
-        request.on('error', (error) => resolve({ ok: false, error: error.message, tlsVerification: 'disabled-local-origin-diagnostic' }));
+        request.on('error', (error) =>
+            resolve({ ok: false, error: error.message, tlsVerification: 'disabled-local-origin-diagnostic' }),
+        );
         request.end();
     });
 }
@@ -98,7 +100,9 @@ function probeLocalInsecureHttpsHealth(url) {
 async function readCloudflaredOriginDiagnostics() {
     let text;
     try {
-        text = (await readFile(CLOUDFLARED_LOG_FILE, 'utf8')).slice(-64_000);
+        text = (await readTextFreshTrusted(CLOUDFLARED_LOG_FILE, { caller: 'mcp.tools.tunnel-status' })).content.slice(
+            -64_000,
+        );
     } catch {
         return {
             logFile: CLOUDFLARED_LOG_FILE,
@@ -138,8 +142,12 @@ async function readCloudflaredOriginDiagnostics() {
  * @returns {boolean}
  */
 export function isCloudflaredOriginErrorLine(line) {
-    return /\bERR\b|\bWRN\b|error=/iu.test(line) &&
-        /origin service|originService=|first record does not look like a TLS handshake|connection refused|502|1033/iu.test(line);
+    return (
+        /\bERR\b|\bWRN\b|error=/iu.test(line) &&
+        /origin service|originService=|first record does not look like a TLS handshake|connection refused|502|1033/iu.test(
+            line,
+        )
+    );
 }
 
 /**
@@ -147,8 +155,12 @@ export function isCloudflaredOriginErrorLine(line) {
  * @returns {boolean}
  */
 export function isCloudflaredTunnelTransportErrorLine(line) {
-    return /\bERR\b|\bWRN\b|error=/iu.test(line) &&
-        /failed to accept QUIC stream|failed to run the datagram handler|no recent network activity|accept stream listener|Serve tunnel error|Connection terminated|Failed to dial a quic connection/iu.test(line);
+    return (
+        /\bERR\b|\bWRN\b|error=/iu.test(line) &&
+        /failed to accept QUIC stream|failed to run the datagram handler|no recent network activity|accept stream listener|Serve tunnel error|Connection terminated|Failed to dial a quic connection/iu.test(
+            line,
+        )
+    );
 }
 
 /**
@@ -221,7 +233,11 @@ function compactSmokeReport(value, includeRemoteToolNames) {
                 delete authenticatedToolsList['remoteToolNames'];
                 authenticatedToolsList['remoteToolNamesSuppressed'] = true;
             }
-            if (authenticatedOAuthSmoke && typeof authenticatedOAuthSmoke === 'object' && !Array.isArray(authenticatedOAuthSmoke)) {
+            if (
+                authenticatedOAuthSmoke &&
+                typeof authenticatedOAuthSmoke === 'object' &&
+                !Array.isArray(authenticatedOAuthSmoke)
+            ) {
                 authenticatedOAuthSmoke['authenticatedToolsList'] = authenticatedToolsList;
             }
         }
@@ -256,7 +272,9 @@ export function summarizeConnectorSmokeReport(value) {
     const sse = smokeRecord(authenticated['authenticatedSse']);
     const failedChecks = Array.isArray(authenticated['failedChecks']) ? authenticated['failedChecks'] : [];
     const missingLocalTools = Array.isArray(toolsList['missingLocalTools']) ? toolsList['missingLocalTools'] : [];
-    const unexpectedRemoteTools = Array.isArray(toolsList['unexpectedRemoteTools']) ? toolsList['unexpectedRemoteTools'] : [];
+    const unexpectedRemoteTools = Array.isArray(toolsList['unexpectedRemoteTools'])
+        ? toolsList['unexpectedRemoteTools']
+        : [];
     return {
         ok: report['ok'] === true,
         protocolVersion: report['protocolVersion'] ?? null,
@@ -359,7 +377,9 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
         readPidFileStatus(config.mcpHttpPidFile),
         readPidFileStatus(config.managedTunnelPidFile),
         probeHealth(config.healthUrl),
-        publicHealthUrl ? probeHealth(publicHealthUrl) : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
+        publicHealthUrl
+            ? probeHealth(publicHealthUrl)
+            : Promise.resolve({ ok: false, error: 'public MCP URL not configured' }),
     ]);
     const originDiagnostics = options.includeDiagnostics === false ? null : await readCloudflaredOriginDiagnostics();
     const statefulPolicy = {
@@ -373,14 +393,9 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
         config.mode === 'named-permanent' && Boolean(config.publicMcpUrl) && publicUrlValidation?.ok === true;
     const healthReady = localHealth.ok || publicHealth.ok;
     const ready =
-        permanentUrlReady &&
-        mcpHttpProcess.alive &&
-        cloudflaredProcess.alive &&
-        healthReady &&
-        connectorSmokeFresh;
+        permanentUrlReady && mcpHttpProcess.alive && cloudflaredProcess.alive && healthReady && connectorSmokeFresh;
     const nextActions = [];
-    if (!permanentUrlReady)
-        nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
+    if (!permanentUrlReady) nextActions.push('Fix COPILOT_MCP_CLOUDFLARE_PUBLIC_URL or public hostname configuration.');
     if (!mcpHttpProcess.alive || !cloudflaredProcess.alive || !healthReady) {
         nextActions.push('Run make copilot-mcp-restart.');
     } else if (!localHealth.ok && publicHealth.ok) {
@@ -389,7 +404,9 @@ async function buildPostRestartReadinessSnapshot(options = {}) {
         );
     }
     if (reload.inFlight) {
-        nextActions.push('Wait for mcp_reload_status to leave the in-flight state before trusting post-restart readiness.');
+        nextActions.push(
+            'Wait for mcp_reload_status to leave the in-flight state before trusting post-restart readiness.',
+        );
     } else if (reload.failed) {
         nextActions.push('Inspect mcp_reload_status: the latest controlled MCP reload did not complete successfully.');
     }
@@ -485,14 +502,15 @@ async function runConnectorSmokeRefresh(input) {
         report: includeDetails ? detailedReport : reportSummary,
         postRestartReadiness: readinessSummary,
         detailsAvailable: !includeDetails,
-        next: readinessSummary['ready'] === true
-            ? [
-                  'Post-restart readiness is reconciled in this response; no separate reload_status/readiness call is needed.',
-                  'Use the ChatGPT connector URL https://mcp.aurelin.org/mcp.',
-              ]
-            : Array.isArray(readinessSummary['nextActions'])
-              ? readinessSummary['nextActions']
-              : [],
+        next:
+            readinessSummary['ready'] === true
+                ? [
+                      'Post-restart readiness is reconciled in this response; no separate reload_status/readiness call is needed.',
+                      'Use the ChatGPT connector URL https://mcp.aurelin.org/mcp.',
+                  ]
+                : Array.isArray(readinessSummary['nextActions'])
+                  ? readinessSummary['nextActions']
+                  : [],
     });
 }
 
@@ -587,12 +605,14 @@ export const mcpConnectorSmokeRefreshTool = {
     inputSchema: {
         includeRemoteToolNames: z
             .boolean()
-            .optional()['describe'](
-                'Include the full remote tool-name list in the response. This implies detailed output.',
-            ),
+            .optional()
+            ['describe']('Include the full remote tool-name list in the response. This implies detailed output.'),
         includeDetails: z
             .boolean()
-            .optional()['describe']('Include the full smoke report. Default: false; compact decision summary plus post-restart readiness is returned.'),
+            .optional()
+            ['describe'](
+                'Include the full smoke report. Default: false; compact decision summary plus post-restart readiness is returned.',
+            ),
     },
     annotations: boundedWriteAnnotations(),
     handler: runConnectorSmokeRefresh,

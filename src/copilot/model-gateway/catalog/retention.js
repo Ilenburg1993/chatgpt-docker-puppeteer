@@ -87,26 +87,26 @@ function stats(before, after) {
  * @template {object} TEligibilityRun
  * @template {object} TRest
  * @param {TRest & {
- *   importRuns?: TImportRun[];
- *   rawPayloadRefs?: TRawPayloadRef[];
- *   conflicts?: TConflict[];
- *   modelEligibilityRuns?: TEligibilityRun[];
+ *     importRuns?: TImportRun[];
+ *     rawPayloadRefs?: TRawPayloadRef[];
+ *     conflicts?: TConflict[];
+ *     modelEligibilityRuns?: TEligibilityRun[];
  * }} snapshot
  * @param {ModelGatewayCatalogRetentionPolicy} [policy]
  * @returns {{
- *   snapshot: TRest & {
- *     importRuns: TImportRun[];
- *     rawPayloadRefs: TRawPayloadRef[];
- *     conflicts: TConflict[];
- *     modelEligibilityRuns: TEligibilityRun[];
- *   };
- *   summary: {
- *     enabled: boolean;
- *     importRuns: { before: number; after: number; pruned: number };
- *     rawPayloadRefs: { before: number; after: number; pruned: number };
- *     conflicts: { before: number; after: number; pruned: number };
- *     modelEligibilityRuns: { before: number; after: number; pruned: number };
- *   };
+ *     snapshot: TRest & {
+ *         importRuns: TImportRun[];
+ *         rawPayloadRefs: TRawPayloadRef[];
+ *         conflicts: TConflict[];
+ *         modelEligibilityRuns: TEligibilityRun[];
+ *     };
+ *     summary: {
+ *         enabled: boolean;
+ *         importRuns: { before: number; after: number; pruned: number };
+ *         rawPayloadRefs: { before: number; after: number; pruned: number };
+ *         conflicts: { before: number; after: number; pruned: number };
+ *         modelEligibilityRuns: { before: number; after: number; pruned: number };
+ *     };
  * }}
  */
 export function applyModelGatewayCatalogRetention(snapshot, policy = {}) {
@@ -118,7 +118,10 @@ export function applyModelGatewayCatalogRetention(snapshot, policy = {}) {
     const retainedImportRuns = keepNewest(importRuns, optionalPositiveInteger(policy.maxImportRuns));
     const retainedRawPayloadRefs = keepNewest(rawPayloadRefs, optionalPositiveInteger(policy.maxRawPayloadRefs));
     const retainedConflicts = keepNewest(conflicts, optionalPositiveInteger(policy.maxConflicts));
-    const retainedModelEligibilityRuns = keepNewest(modelEligibilityRuns, optionalPositiveInteger(policy.maxModelEligibilityRuns));
+    const retainedModelEligibilityRuns = keepNewest(
+        modelEligibilityRuns,
+        optionalPositiveInteger(policy.maxModelEligibilityRuns),
+    );
 
     const summary = {
         enabled:

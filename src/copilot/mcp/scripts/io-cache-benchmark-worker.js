@@ -5,12 +5,13 @@
  * @module copilot/mcp/scripts/io-cache-benchmark-worker
  */
 
-import { lstat } from 'node:fs/promises';
-import { performance } from 'node:perf_hooks';
+import { getIoPathPolicyCacheStats } from '#copilot/core';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { getIoReadHashStats } from '../../infra/io/fs/read-services.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '../../../..');
@@ -30,7 +31,7 @@ function parseArgs(argv) {
     /** @param {string} name */
     const read = (name) => {
         const index = argv.indexOf(name);
-        return index >= 0 ? argv[index + 1] ?? '' : '';
+        return index >= 0 ? (argv[index + 1] ?? '') : '';
     };
     const requestId = read('--request-id');
     const mode = read('--mode');
@@ -39,14 +40,44 @@ function parseArgs(argv) {
     return { requestId, mode };
 }
 
+const PATH_POLICY_COUNTERS = Object.freeze([
+    'hits',
+    'misses',
+    'sets',
+    'expirations',
+    'evictions',
+    'bypasses',
+    'invalidationEvents',
+    'invalidatedEntries',
+]);
+const READ_HASH_COUNTERS = Object.freeze([
+    'reads',
+    'hashComputations',
+    'fullHashComputations',
+    'returnedSliceHashComputations',
+    'knownFullHashReuses',
+    'fullWindowReturnedHashReuses',
+    'fullHashOutputSkips',
+    'returnedHashOutputSkips',
+]);
+
+/** @param {Record<string, unknown>} after @param {Record<string, unknown>} before @param {readonly string[]} keys */
+function counterDelta(after, before, keys) {
+    return Object.fromEntries(
+        keys.map((key) => [key, Math.max(0, Number(after[key] ?? 0) - Number(before[key] ?? 0))]),
+    );
+}
+
 /** @param {{ readText: (filePath: string) => Promise<any> }} io */
 async function runPass(io) {
     const files = [];
     let totalBytes = 0;
+    const pathPolicyBefore = getIoPathPolicyCacheStats();
+    const readHashesBefore = getIoReadHashStats();
     const startedAt = performance.now();
     for (const relativePath of WORKLOAD) {
-        const absolutePath = path.join(repoRoot, relativePath);
-        const result = await io.readText(absolutePath);
+        // Deliberately exercise the public workspace facade: benchmark includes canonical path policy/realpath overhead.
+        const result = await io.readText(relativePath);
         const cache = String(result?.io?.cache ?? 'none');
         const bytesRead = Number(result?.bytesRead ?? 0);
         totalBytes += Number.isFinite(bytesRead) ? bytesRead : 0;
@@ -60,6 +91,8 @@ async function runPass(io) {
             counts[file.cache] = Number(counts[file.cache] ?? 0) + 1;
             return counts;
         }, /** @type {Record<string, number>} */ ({})),
+        pathPolicy: counterDelta(getIoPathPolicyCacheStats(), pathPolicyBefore, PATH_POLICY_COUNTERS),
+        readHashes: counterDelta(getIoReadHashStats(), readHashesBefore, READ_HASH_COUNTERS),
     };
 }
 
@@ -67,13 +100,13 @@ async function main() {
     const { requestId, mode } = parseArgs(process.argv.slice(2));
     const benchmarkRoot = path.join(repoRoot, 'src/copilot/.ai/mcp/io-cache-benchmark');
     await workspaceIo.mkdirPathLocked(benchmarkRoot, { recursive: true });
-    const rootStats = await lstat(benchmarkRoot);
+    const rootStats = (await workspaceIo.lstatPath(benchmarkRoot)).stats;
     if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
         throw new Error('IO cache benchmark root must be a regular directory.');
     }
     const benchmarkDir = path.join(benchmarkRoot, requestId);
     await workspaceIo.mkdirPathLocked(benchmarkDir, { recursive: true });
-    const benchmarkStats = await lstat(benchmarkDir);
+    const benchmarkStats = (await workspaceIo.lstatPath(benchmarkDir)).stats;
     if (benchmarkStats.isSymbolicLink() || !benchmarkStats.isDirectory()) {
         throw new Error('IO cache benchmark request directory must be a regular directory.');
     }
@@ -81,15 +114,14 @@ async function main() {
     process.env['IO_L2_CACHE_PROFILE'] = mode === 'l2' || mode === 'l2-prime' ? 'experimental' : 'off';
     delete process.env['IO_L2_CACHE_ENABLED'];
 
-    const [{ readText }, { getIoL2Cache }, { closeCopilotDb }] = await Promise.all([
-        import('../../infra/io/fs/read-services.js'),
+    const [{ getIoL2Cache }, { closeCopilotDb }] = await Promise.all([
         import('../../infra/io-cache-l2-registry.js'),
         import('../../db/index.js'),
     ]);
 
     try {
-        if (mode === 'l1') await runPass({ readText });
-        const result = await runPass({ readText });
+        if (mode === 'l1') await runPass(workspaceIo);
+        const result = await runPass(workspaceIo);
         const l2 = getIoL2Cache();
         if (l2) l2.flushPending?.();
         process.stdout.write(`${JSON.stringify({ success: true, requestId, mode, workload: WORKLOAD, ...result })}\n`);

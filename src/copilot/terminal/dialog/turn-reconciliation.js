@@ -13,7 +13,9 @@ import { measureVisibleTerminalChars, normalizeTerminalTranscriptText } from './
 
 /**
  * @typedef {'none' | 'full' | 'suffix'} TerminalFinalTranscriptRenderMode
+ *
  * @typedef {'already_streamed' | 'no_visible_stream' | 'stream_suffix' | 'stream_mismatch' | 'empty_reply'} TerminalFinalTranscriptRenderReason
+ *
  *
  * @typedef {{
  *     mode: TerminalFinalTranscriptRenderMode;

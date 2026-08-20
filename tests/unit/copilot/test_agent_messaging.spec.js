@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * tests/unit/copilot/test_agent_messaging.spec.js
  *

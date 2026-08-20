@@ -17,7 +17,7 @@ const MAX_ACTIVE = readEnvPositiveInt('IO_ADVISORY_BUDGET_MAX_ACTIVE', 12);
 const EVENT_COOLDOWN_MS = readEnvPositiveInt('IO_ADVISORY_BUDGET_EVENT_COOLDOWN_MS', 5_000);
 const MAX_SAMPLES = 10_000;
 
-/** @type {Array<{ id: number; at: number; operation: string; estimatedBytes: number }>} */
+/** @type {{ id: number; at: number; operation: string; estimatedBytes: number }[]} */
 let _samples = [];
 let _active = 0;
 let _nextId = 1;

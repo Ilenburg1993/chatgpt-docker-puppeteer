@@ -1,8 +1,6 @@
 # Plano de Migração — `src/copilot/sdk/` → Barris Canônicos
 
-**Status**: Em execução
-**Branch**: `codex/agent-architecture-21-deep-refactor`
-**Data**: 2026-05
+**Status**: Em execução **Branch**: `codex/agent-architecture-21-deep-refactor` **Data**: 2026-05
 **Autor**: Copilot Agent (sessão de refactoring arquitetural)
 
 ---
@@ -23,13 +21,13 @@ nunca caminhos relativos como `../../sdk/session/events.js`.
 
 | Subpasta     | Arquivos | Barrel `index.js` | Status    |
 | ------------ | -------- | ----------------- | --------- |
-| `session/`   | 26       | ❌ Não existe      | **Criar** |
-| `tools/`     | 5        | ❌ Não existe      | **Criar** |
-| `rpc/`       | 5        | ❌ Não existe      | **Criar** |
-| `telemetry/` | 4        | ❌ Não existe      | **Criar** |
-| `models/`    | 9        | ✅ Existe          | OK        |
-| `agent/`     | 1        | ❌ Não existe      | **Criar** |
-| (raiz)       | 13       | ✅ Existe          | OK        |
+| `session/`   | 26       | ❌ Não existe     | **Criar** |
+| `tools/`     | 5        | ❌ Não existe     | **Criar** |
+| `rpc/`       | 5        | ❌ Não existe     | **Criar** |
+| `telemetry/` | 4        | ❌ Não existe     | **Criar** |
+| `models/`    | 9        | ✅ Existe         | OK        |
+| `agent/`     | 1        | ❌ Não existe     | **Criar** |
+| (raiz)       | 13       | ✅ Existe         | OK        |
 
 ### 2.2 Aliases Existentes (antes desta migração)
 
@@ -86,11 +84,12 @@ nunca caminhos relativos como `../../sdk/session/events.js`.
 
 ### Fase 1 — Criar sub-barris `index.js`
 
-**1.1** `sdk/session/index.js` — `export *` de todos os 26 arquivos de `session/`
-**1.2** `sdk/tools/index.js` — `export *` de `core.js`, `registry.js`, `custom.js`, `state.js`, `agent-policy.js`
-**1.3** `sdk/rpc/index.js` — `export *` de `server.js`, `session.js`, `ops.js`, `experimental.js`, `guards.js`
-**1.4** `sdk/telemetry/index.js` — `export *` de `health.js`, `operation-metrics.js`, `quota-monitor.js`, `tracing.js`
-**1.5** `sdk/agent/index.js` — `export *` de `agents.js`
+**1.1** `sdk/session/index.js` — `export *` de todos os 26 arquivos de `session/` **1.2**
+`sdk/tools/index.js` — `export *` de `core.js`, `registry.js`, `custom.js`, `state.js`,
+`agent-policy.js` **1.3** `sdk/rpc/index.js` — `export *` de `server.js`, `session.js`, `ops.js`,
+`experimental.js`, `guards.js` **1.4** `sdk/telemetry/index.js` — `export *` de `health.js`,
+`operation-metrics.js`, `quota-monitor.js`, `tracing.js` **1.5** `sdk/agent/index.js` — `export *`
+de `agents.js`
 
 ### Fase 2 — Atualizar/Adicionar aliases em `package.json`
 
@@ -107,6 +106,7 @@ nunca caminhos relativos como `../../sdk/session/events.js`.
 | `#copilot/infra/*`               | `src/copilot/infra/*.js`     | **ADD** (wildcard)                           |
 
 Aliases a manter sem alteração (14 consumidores ativos):
+
 - `#copilot/sdk/tools-registry` → `tools/registry.js` (**MANTER**)
 - `#copilot/sdk/quota-monitor` → `telemetry/quota-monitor.js` (**MANTER**)
 - Todos os outros aliases específicos de session/*.js (**MANTER**)
@@ -132,7 +132,8 @@ Substituir paths relativos por aliases canônicos em 7 arquivos externos:
 
 Substituir paths relativos que saem de `sdk/` por aliases canônicos:
 
-- `core/*` → usar `#copilot/core` (barrel existente) quando exportado, ou `#copilot/core/<file>` (wildcard)
+- `core/*` → usar `#copilot/core` (barrel existente) quando exportado, ou `#copilot/core/<file>`
+  (wildcard)
 - `infra/*` → usar `#copilot/infra/<file>` (novo wildcard a criar)
 - `boot/*` → usar `#copilot/boot` (barrel existente)
 
@@ -158,7 +159,8 @@ npm run typecheck:strict:src.copilot
 
 - [ ] Zero deep imports relativos de fora de `sdk/` para dentro de `sdk/`
 - [ ] Sub-barris `index.js` criados para: `session/`, `tools/`, `rpc/`, `telemetry/`, `agent/`
-- [ ] Aliases canônicos adicionados: `#copilot/sdk/session`, `#copilot/sdk/tools`, `#copilot/sdk/rpc`, `#copilot/sdk/telemetry`, `#copilot/infra`, `#copilot/infra/*`
+- [ ] Aliases canônicos adicionados: `#copilot/sdk/session`, `#copilot/sdk/tools`,
+      `#copilot/sdk/rpc`, `#copilot/sdk/telemetry`, `#copilot/infra`, `#copilot/infra/*`
 - [ ] Zero escapes de `sdk/` para `core/`, `infra/`, `boot/` via caminho relativo
 - [ ] `typecheck:strict:src.copilot` GREEN após migração
 
@@ -168,4 +170,5 @@ npm run typecheck:strict:src.copilot
 
 - `agent/` migration: completa — zero deep imports externos (documentado neste mesmo branch)
 - Onda 1: 24 barris criados em `agent/` subdirs
-- Onda 2: 51 imports internos pendentes (`agent/` → `sdk/`, `core/`) — pode ser cobertos por esta migração
+- Onda 2: 51 imports internos pendentes (`agent/` → `sdk/`, `core/`) — pode ser cobertos por esta
+  migração

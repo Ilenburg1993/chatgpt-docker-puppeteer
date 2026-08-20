@@ -22,9 +22,8 @@ export function readOnlyAnnotations() {
 }
 
 /**
- * Read-only tools that contact a fixed external service boundary. The tool
- * must still keep its inputs closed/allowlisted; openWorldHint describes the
- * observation boundary, not permission for arbitrary URLs or commands.
+ * Read-only tools that contact a fixed external service boundary. The tool must still keep its inputs
+ * closed/allowlisted; openWorldHint describes the observation boundary, not permission for arbitrary URLs or commands.
  *
  * @returns {ToolAnnotations}
  */
@@ -50,9 +49,8 @@ export function boundedWriteAnnotations() {
 }
 
 /**
- * Bounded-write tools that contact fixed external service boundaries while
- * persisting only local, sanitized diagnostic state. Inputs must remain closed
- * and must never accept arbitrary URLs, commands, credentials or destinations.
+ * Bounded-write tools that contact fixed external service boundaries while persisting only local, sanitized diagnostic
+ * state. Inputs must remain closed and must never accept arbitrary URLs, commands, credentials or destinations.
  *
  * @returns {ToolAnnotations}
  */
@@ -78,8 +76,8 @@ export function destructiveAnnotations() {
 }
 
 /**
- * Arbitrary terminal/process and equivalent actions that can both mutate local state and contact external systems.
- * This annotation does not weaken OAuth/host approval; it accurately advertises the broad execution boundary.
+ * Arbitrary terminal/process and equivalent actions that can both mutate local state and contact external systems. This
+ * annotation does not weaken OAuth/host approval; it accurately advertises the broad execution boundary.
  *
  * @returns {ToolAnnotations}
  */

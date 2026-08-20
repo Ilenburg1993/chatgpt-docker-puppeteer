@@ -7,26 +7,26 @@
  *
  * ### Categorias de API pública
  *
- * | Categoria        | Exports principais                                           |
+ * | Categoria | Exports principais |
  * | ---------------- | ------------------------------------------------------------ | ----------------------------------- |
- * | **Factory**      | createHooks, createMinimalHooks, createSafeHooks, etc.       |
- * | **Permission**   | createPermissionHandler, createApproveAllPermission, etc.    |
- * | **Lifecycle**    | createSessionHooks                                           |
- * | **Prompt**       | createPromptTransformer, createContextInjector, etc.         |
+ * | **Factory** | createHooks, createMinimalHooks, createSafeHooks, etc. |
+ * | **Permission** | createPermissionHandler, createApproveAllPermission, etc. |
+ * | **Lifecycle** | createSessionHooks |
+ * | **Prompt** | createPromptTransformer, createContextInjector, etc. |
  * | **Interceptors** | createAllowlistHook, createBlocklistHook, createArgSanitizer |
- * | **User Input**   | createReadlineInputHandler, createQueuedInputHandler         |
- * | **Bus**          | HookBus, defaultBus, attachBus                               |
- * | **Registry**     | HookRegistry, SDK_HOOKS                                      |
- * | **Composer**     | composeHandlers, pipeline, conditional, fallback, memoize    |
- * | **Presets**      | createAuditPreset, createProductionHooks, etc.               | r, createApproveAllPermission, etc. |
- * | **Lifecycle**    | createSessionHooks                                           |
- * | **Prompt**       | createPromptTransformer, createContextInjector, etc.         |
+ * | **User Input** | createReadlineInputHandler, createQueuedInputHandler |
+ * | **Bus** | HookBus, defaultBus, attachBus |
+ * | **Registry** | HookRegistry, SDK_HOOKS |
+ * | **Composer** | composeHandlers, pipeline, conditional, fallback, memoize |
+ * | **Presets** | createAuditPreset, createProductionHooks, etc. | r, createApproveAllPermission, etc. |
+ * | **Lifecycle** | createSessionHooks |
+ * | **Prompt** | createPromptTransformer, createContextInjector, etc. |
  * | **Interceptors** | createAllowlistHook, createBlocklistHook, createArgSanitizer |
- * | **User Input**   | createReadlineInputHandler, createQueuedInputHandler         |
- * | **Bus**          | HookBus, defaultBus, attachBus                               |
- * | **Registry**     | HookRegistry, SDK_HOOKS                                      |
- * | **Composer**     | composeHandlers, pipeline, conditional, fallback, memoize    |
- * | **Presets**      | createAuditPreset, createProductionHooks, etc.               |
+ * | **User Input** | createReadlineInputHandler, createQueuedInputHandler |
+ * | **Bus** | HookBus, defaultBus, attachBus |
+ * | **Registry** | HookRegistry, SDK_HOOKS |
+ * | **Composer** | composeHandlers, pipeline, conditional, fallback, memoize |
+ * | **Presets** | createAuditPreset, createProductionHooks, etc. |
  *
  * @module copilot/hooks
  * @see EventBus
@@ -70,7 +70,9 @@ export function createAuditOnlyPermission() {
  * @returns {import('./types.js').PermissionHandler}
  */
 export function createRestrictedPermission(allowedTools) {
-    return /** @type {import('./types.js').PermissionHandler} */ (createSdkPermissionHandler({ allowTools: allowedTools }));
+    return /** @type {import('./types.js').PermissionHandler} */ (
+        createSdkPermissionHandler({ allowTools: allowedTools })
+    );
 }
 
 /**
@@ -112,7 +114,7 @@ export { createQueuedElicitationHandler } from './elicitation.js';
 export { createQueuedInputHandler, createReadlineInputHandler, createStaticInputHandler } from './user-input.js';
 
 // ─── HookBus (Gap 6) ──────────────────────────────────────────────────────────
-export { HookBus, attachBus, defaultBus, normalizeHookInputForSdk10 } from './bus.js';
+export { attachBus, defaultBus, HookBus, normalizeHookInputForSdk10 } from './bus.js';
 
 // ─── HookRegistry ─────────────────────────────────────────────────────────────
 export { HookRegistry, SDK_HOOKS } from './registry.js';

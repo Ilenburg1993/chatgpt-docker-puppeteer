@@ -1,4 +1,4 @@
-/** @import {VerifyOptions} from "jsonwebtoken" */
+/** @import {VerifyOptions} from 'jsonwebtoken' */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 
 /**

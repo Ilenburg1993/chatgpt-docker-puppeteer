@@ -6,7 +6,8 @@ Data: 2026-05-14
 
 ### Boundary de tools
 
-- `workspace_index_build` agora valida `directory` via policy de workspace antes de chamar o indexador.
+- `workspace_index_build` agora valida `directory` via policy de workspace antes de chamar o
+  indexador.
 - `workspace_scope_declare` valida `directory`.
 - `workspace_scope_refresh` valida cada item de `modifiedPaths`.
 - Foram adicionadas regressões para rejeitar paths fora do workspace.
@@ -41,13 +42,14 @@ As file/web tools passaram a consumir essas facades em vez de módulos internos 
 
 - `searchText` e `searchWorkspaceSymbols` agora têm timeout default e `maxBuffer` menor.
 - `maxResults` passou a ser aplicado como janela inicial de saída.
-- `io-index-sqlite` deixou de reler o arquivo via parser/cache durante `indexTextFile`; agora parseia o snapshot
-  recebido.
+- `io-index-sqlite` deixou de reler o arquivo via parser/cache durante `indexTextFile`; agora
+  parseia o snapshot recebido.
 - `parseError` retornado pelo parser passa a marcar o arquivo como `failed`.
 
 ### Cache, parser e invalidação
 
-- L2 normaliza timestamps para milissegundos inteiros e mantém compatibilidade com entradas fracionárias existentes.
+- L2 normaliza timestamps para milissegundos inteiros e mantém compatibilidade com entradas
+  fracionárias existentes.
 - Parser cache usa path normalizado.
 - JSON array multi-linha é suportado em `extractJsonSchema`.
 - Markdown preserva linha real dos headings ao virar símbolo.
@@ -59,7 +61,8 @@ As file/web tools passaram a consumir essas facades em vez de módulos internos 
 - `lockfile` usa criação atômica com `open('wx')`.
 - `releaseLock` não remove lock de outro processo.
 - `withIoResourceLock(s)` normaliza resource keys para reduzir bypass por path relativo/absoluto.
-- `policy/path-resource.js` passou a centralizar normalização de resource keys e helpers puros de workspace path.
+- `policy/path-resource.js` passou a centralizar normalização de resource keys e helpers puros de
+  workspace path.
 - `AsyncQueue` tem regressões de concorrência inválida e `clear()`.
 
 ## Validadores executados
@@ -84,7 +87,8 @@ Também foram executadas rodadas Vitest focadas em:
 
 ## Ponto ainda pendente
 
-Resolvido na onda seguinte: a análise de ciclos que antes mostrava o ciclo estrutural abaixo agora retorna `cycles 0`.
+Resolvido na onda seguinte: a análise de ciclos que antes mostrava o ciclo estrutural abaixo agora
+retorna `cycles 0`.
 
 O ciclo removido era:
 
@@ -94,34 +98,47 @@ io-index-registry.js -> io-index-sqlite.js -> io-engine.js -> io-index-registry.
 
 Transformações aplicadas:
 
-- `src/copilot/infra/io/fs/read-text.js`, `read-lines.js` e `read-chunks.js` foram criados como portas baixas para leitura
-  textual, snapshots por linhas e paginação de chunks.
+- `src/copilot/infra/io/fs/read-text.js`, `read-lines.js` e `read-chunks.js` foram criados como
+  portas baixas para leitura textual, snapshots por linhas e paginação de chunks.
 - `io-parser.js` deixou de importar `io-engine.js` para leitura de símbolos.
-- `io-index-sqlite.js` deixou de importar `io-engine.js` durante indexação e passou a usar snapshot textual baixo.
+- `io-index-sqlite.js` deixou de importar `io-engine.js` durante indexação e passou a usar snapshot
+  textual baixo.
 - `io-index-sqlite.search()` aplica `pathPrefix` no SQL/FTS em vez de filtrar em memória depois.
 - `io-scanner.js` ganhou `IO_SCAN_BATCH_SIZE`/`batchSize` para evitar fan-out massivo de promessas.
-- `shared/env.js`, `policy/output-window.js` e `scan/*` foram extraídos como subdomínios internos baixos.
-- `policy/budgets.js` foi criado para unificar budgets de timeout e `maxBuffer` de search/subprocessos.
-- `policy/path-resource.js` foi criado para unificar path/resource policy usada por locks e file tools.
-- `policy/capabilities.js` e `policy/risk.js` foram criados para padronizar envelopes agentic de mutação.
+- `shared/env.js`, `policy/output-window.js` e `scan/*` foram extraídos como subdomínios internos
+  baixos.
+- `policy/budgets.js` foi criado para unificar budgets de timeout e `maxBuffer` de
+  search/subprocessos.
+- `policy/path-resource.js` foi criado para unificar path/resource policy usada por locks e file
+  tools.
+- `policy/capabilities.js` e `policy/risk.js` foram criados para padronizar envelopes agentic de
+  mutação.
 - `parse/*` passou a concentrar parsers puros de JSON, Markdown, comentários e outline.
-- `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de `io-engine.js`.
+- `storage/*` passou a concentrar JSON store baixo; `storage.js` virou facade sem depender de
+  `io-engine.js`.
 - `queue/*`, `locks/*` e `runtime/*` foram iniciados como domínios internos barrel-first.
-- `io/fs/*` foi expandido com portas baixas para bytes, texto, linhas, chunks, stat, mkdir, append, remove, copy e move.
+- `io/fs/*` foi expandido com portas baixas para bytes, texto, linhas, chunks, stat, mkdir, append,
+  remove, copy e move.
 - `io/patch/*` foi criado com patch e diff textual puros.
 - `io/search/*` foi criado com helpers puros para índice FTS, grep fallback e busca simbólica.
-- `io/search/result-paginator.js` passou a centralizar cursor, limite e paginação textual/de itens de busca.
-- `io/invalidation/*` foi criado com bus best-effort, eventos normalizados e helper de invalidação de L1/L2.
+- `io/search/result-paginator.js` passou a centralizar cursor, limite e paginação textual/de itens
+  de busca.
+- `io/invalidation/*` foi criado com bus best-effort, eventos normalizados e helper de invalidação
+  de L1/L2.
 - `cache/l1/*` foi iniciado com chaves canônicas de L1, mantendo reexports legados em `io-cache.js`.
-- `index-store/sqlite/*` foi criado com schema, normalização de paths, query FTS e chunks persistentes do índice L2.
-- `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado no SQLite.
+- `index-store/sqlite/*` foi criado com schema, normalização de paths, query FTS e chunks
+  persistentes do índice L2.
+- `workspace_index_search` e `workspace_index_find_symbol` passaram a aceitar `maxResults`, aplicado
+  no SQLite.
 - `list_directory` passou a aceitar `maxEntries` e `cursor`, retornando `nextCursor`.
-- `search_in_files` e `workspace_symbol_search` passaram a aceitar `cursor`, retornando `nextCursor`, `cursorOffset` e
-  `totalMatches`.
-- Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability, risco, status, duração e
-  evidence.
-- `write_file_content` e `patch_file` passaram a aceitar `expectedHash` SHA-256 e retornam hashes de evidência.
-- `patch_file` passou a aceitar `dryRun`, retornando status `dry-run` e bytes/hash projetados sem escrita em disco.
+- `search_in_files` e `workspace_symbol_search` passaram a aceitar `cursor`, retornando
+  `nextCursor`, `cursorOffset` e `totalMatches`.
+- Mutações de file tools passaram a retornar envelope `operation` com `operationId`, capability,
+  risco, status, duração e evidence.
+- `write_file_content` e `patch_file` passaram a aceitar `expectedHash` SHA-256 e retornam hashes de
+  evidência.
+- `patch_file` passou a aceitar `dryRun`, retornando status `dry-run` e bytes/hash projetados sem
+  escrita em disco.
 - `delete_file`, `copy_file` e `move_file` passaram a retornar hashes/bytes de snapshot pré-mutação.
 - `runtime/audit-log.js` passou a registrar JSONL append-only de mutações quando
   `COPILOT_IO_MUTATION_AUDIT_LOG_PATH` está configurado.

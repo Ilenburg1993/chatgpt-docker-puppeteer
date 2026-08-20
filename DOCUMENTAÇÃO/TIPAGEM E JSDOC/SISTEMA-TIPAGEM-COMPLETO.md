@@ -608,19 +608,19 @@ Os dois devem estar sincronizados.
 
 ### 9.1 Typecheck
 
-| Script                    | Comando                              | Escopo              |
-| ------------------------- | ------------------------------------ | ------------------- |
-| `typecheck:node`          | runner TS7 + `tsconfig.node.json`          | src/ + scripts/     |
-| `typecheck:tools`         | runner TS7 + `tsconfig.tools.json`         | tools/              |
-| `typecheck:browser`       | runner TS7 + `tsconfig.browser.json`       | src/dashboard-ui/   |
-| `typecheck:tests`         | runner TS7 + `tsconfig.tests.json`         | tests/              |
-| `typecheck:declarations`  | runner TS7 + `tsconfig.declarations.json`  | src/types/ (emite)  |
-| `typecheck:isolated`      | runner TS7 + isolated declarations         | isolated decl check |
-| `typecheck:dashboard`     | `vue-tsc --noEmit`                   | SFCs Vue (vue-tsc)  |
-| `typecheck:full`          | node + tools + browser               | base sem tests      |
-| `typecheck:repo`          | full + tests + dashboard + isolated  | **completo**        |
-| `typecheck:strict:all`    | todas as 41 lanes                    | strict mode total   |
-| `typecheck:strict:<nome>` | lane individual                      | domínio específico  |
+| Script                    | Comando                                   | Escopo              |
+| ------------------------- | ----------------------------------------- | ------------------- |
+| `typecheck:node`          | runner TS7 + `tsconfig.node.json`         | src/ + scripts/     |
+| `typecheck:tools`         | runner TS7 + `tsconfig.tools.json`        | tools/              |
+| `typecheck:browser`       | runner TS7 + `tsconfig.browser.json`      | src/dashboard-ui/   |
+| `typecheck:tests`         | runner TS7 + `tsconfig.tests.json`        | tests/              |
+| `typecheck:declarations`  | runner TS7 + `tsconfig.declarations.json` | src/types/ (emite)  |
+| `typecheck:isolated`      | runner TS7 + isolated declarations        | isolated decl check |
+| `typecheck:dashboard`     | `vue-tsc --noEmit`                        | SFCs Vue (vue-tsc)  |
+| `typecheck:full`          | node + tools + browser                    | base sem tests      |
+| `typecheck:repo`          | full + tests + dashboard + isolated       | **completo**        |
+| `typecheck:strict:all`    | todas as 41 lanes                         | strict mode total   |
+| `typecheck:strict:<nome>` | lane individual                           | domínio específico  |
 
 ### 9.2 JSDoc e análise
 

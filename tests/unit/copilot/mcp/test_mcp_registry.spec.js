@@ -257,7 +257,10 @@ describe('copilot MCP registry', () => {
 
     it('keeps security metadata and a baseline output schema registry-wide while preserving specific schemas', () => {
         const tools = getCanonicalMcpTools();
-        const outputSchemaTools = tools.filter((tool) => tool.outputSchema !== undefined).map((tool) => tool.name).sort();
+        const outputSchemaTools = tools
+            .filter((tool) => tool.outputSchema !== undefined)
+            .map((tool) => tool.name)
+            .sort();
         assert.equal(outputSchemaTools.length, tools.length);
         assert.equal(outputSchemaTools.includes('fetch'), true);
         assert.equal(outputSchemaTools.includes('search'), true);

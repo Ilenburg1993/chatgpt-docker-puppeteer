@@ -8,12 +8,9 @@
  */
 
 import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.js';
-import {
-    createModelGatewayModelSwitchOperationId,
-    executeModelGatewayModelSwitch,
-} from './model-switch.js';
-import { createSqliteModelGatewayModelSwitchRecorder } from './sqlite-model-switch-recorder.js';
+import { createModelGatewayModelSwitchOperationId, executeModelGatewayModelSwitch } from './model-switch.js';
 import { assertModelGatewayOperationStorePort } from './ports.js';
+import { createSqliteModelGatewayModelSwitchRecorder } from './sqlite-model-switch-recorder.js';
 
 /**
  * @param {unknown} value
@@ -25,15 +22,22 @@ function isRecord(value) {
 
 /**
  * @param {{
- *   targetModel: string;
- *   previousModel: string;
- *   sessionId?: string | null;
- *   idempotencyKey?: string;
- *   source?: string;
- *   timeoutMs?: number;
- *   switchSessionModel?: (model: string) => Promise<{ requestedModel: string; effectiveModel: string | null; verifiedSwitch: boolean; usedRpcFallback: boolean }>;
- *   commit?: () => Promise<void>;
- *   store?: SqliteModelGatewayCatalogStore;
+ *     targetModel: string;
+ *     previousModel: string;
+ *     sessionId?: string | null;
+ *     idempotencyKey?: string;
+ *     source?: string;
+ *     timeoutMs?: number;
+ *     switchSessionModel?: (
+ *         model: string,
+ *     ) => Promise<{
+ *         requestedModel: string;
+ *         effectiveModel: string | null;
+ *         verifiedSwitch: boolean;
+ *         usedRpcFallback: boolean;
+ *     }>;
+ *     commit?: () => Promise<void>;
+ *     store?: SqliteModelGatewayCatalogStore;
  * }} input
  */
 export async function executeModelGatewayRuntimeModelSwitch(input) {

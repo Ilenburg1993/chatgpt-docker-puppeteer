@@ -3,6 +3,7 @@
  * Local Cloudflare Tunnel CLI for the Copilot MCP endpoint.
  *
  * Version 1.0 refactor:
+ *
  * - keeps this file as a small executable entrypoint;
  * - moves command dispatch, process supervision and smoke probes into focused modules;
  * - preserves every command name used by package.json and existing MCP tools.

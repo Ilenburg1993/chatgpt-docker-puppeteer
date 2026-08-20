@@ -2,9 +2,9 @@
 /**
  * Line-offset cache for UTF-8 text snapshots.
  *
- * This cache sits below MCP and above full-text window shaping. It does not cache file contents; it caches newline-derived
- * character offsets for already validated text snapshots so repeated `readText(..., { startLine, endLine })` calls avoid
- * `text.split('\n')` over the whole file.
+ * This cache sits below MCP and above full-text window shaping. It does not cache file contents; it caches
+ * newline-derived character offsets for already validated text snapshots so repeated `readText(..., { startLine,
+ * endLine })` calls avoid `text.split('\n')` over the whole file.
  *
  * @module copilot/infra/io/fs/line-offset-cache
  */
@@ -53,7 +53,14 @@ let lineOffsetInvalidationUnregister = null;
 ensureLineOffsetCacheInvalidationHook();
 
 /**
- * @returns {Record<string, number | boolean> & { enabled: boolean; size: number; sizeBytes: number; maxEntries: number; maxTextChars: number; maxBytes: number }}
+ * @returns {Record<string, number | boolean> & {
+ *     enabled: boolean;
+ *     size: number;
+ *     sizeBytes: number;
+ *     maxEntries: number;
+ *     maxTextChars: number;
+ *     maxBytes: number;
+ * }}
  */
 export function getLineOffsetCacheStats() {
     return {
@@ -89,7 +96,9 @@ export function resetLineOffsetCacheForTest() {
 export function ensureLineOffsetCacheInvalidationHook() {
     if (lineOffsetInvalidationUnregister) return;
     lineOffsetInvalidationUnregister = registerIoInvalidationHook((filePath, event) => {
-        const removed = event.recursive ? invalidateLineOffsetCacheSubtree(filePath) : invalidateLineOffsetCachePath(filePath);
+        const removed = event.recursive
+            ? invalidateLineOffsetCacheSubtree(filePath)
+            : invalidateLineOffsetCachePath(filePath);
         lineOffsetCacheStats.busInvalidations += 1;
         if (event.recursive) lineOffsetCacheStats.recursiveInvalidations += 1;
         void removed;
@@ -113,10 +122,7 @@ export function invalidateLineOffsetCachePath(filePath) {
  */
 export function invalidateLineOffsetCacheSubtree(filePath) {
     const normalizedPath = normalizePathResourceKey(filePath);
-    const removed = clearLineOffsetCacheByPrefixes([
-        `${normalizedPath}\u0000`,
-        `${normalizedPath}${path.sep}`,
-    ]);
+    const removed = clearLineOffsetCacheByPrefixes([`${normalizedPath}\u0000`, `${normalizedPath}${path.sep}`]);
     lineOffsetCacheStats.clears += removed;
     return removed;
 }
@@ -142,7 +148,12 @@ function clearLineOffsetCacheByPrefixes(prefixes) {
  * @param {string} text
  * @param {{ sizeBytes: number; mtimeMs: number | null | undefined }} fingerprint
  * @param {{ startLine?: number | undefined; endLine?: number | undefined }} [window]
- * @returns {{ content: string; totalLines: number; returnedLines: { start: number; end: number }; cache: 'line-offset-hit' | 'line-offset-miss' | 'line-offset-bypass' }}
+ * @returns {{
+ *     content: string;
+ *     totalLines: number;
+ *     returnedLines: { start: number; end: number };
+ *     cache: 'line-offset-hit' | 'line-offset-miss' | 'line-offset-bypass';
+ * }}
  */
 export function sliceTextByCachedLineOffsets(filePath, text, fingerprint, window = {}) {
     const sizeBytes = typeof fingerprint.sizeBytes === 'number' ? fingerprint.sizeBytes : Number.NaN;
@@ -249,7 +260,9 @@ function buildLineOffsetCacheKey(filePath, sizeBytes, mtimeMs, textLength) {
  * @returns {boolean}
  */
 function isLineOffsetCacheEnabled() {
-    const value = String(process.env['IO_LINE_OFFSET_CACHE_ENABLED'] ?? '1').trim().toLowerCase();
+    const value = String(process.env['IO_LINE_OFFSET_CACHE_ENABLED'] ?? '1')
+        .trim()
+        .toLowerCase();
     return !LINE_OFFSET_CACHE_DISABLED_VALUES.has(value);
 }
 

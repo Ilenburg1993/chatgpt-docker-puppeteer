@@ -8,7 +8,7 @@
  * @module copilot/config/system-prompt/live-loader
  */
 
-import { stat } from 'node:fs/promises';
+import { statPathTrusted } from '#copilot/infra/public/trusted-io';
 import { fileURLToPath } from 'node:url';
 import { SECTIONS, SYSTEM_PROMPT_SECTION_FILES, SYSTEM_PROMPT_SECTION_ORDER } from './sections-registry.js';
 
@@ -37,7 +37,7 @@ export async function loadLiveSystemPromptSection(sectionId) {
     const filePath = fileURLToPath(baseUrl);
 
     try {
-        const info = await stat(filePath);
+        const info = (await statPathTrusted(filePath, { caller: 'config.system-prompt.live-loader' })).stats;
         const stamp = `${info.mtimeMs}:${info.size}`;
         const cached = _cache.get(sectionId);
         if (cached?.stamp === stamp) {

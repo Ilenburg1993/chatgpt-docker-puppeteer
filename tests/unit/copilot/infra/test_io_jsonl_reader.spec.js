@@ -57,6 +57,27 @@ describe('infra/io/jsonl-reader', () => {
         expect(await readFile(filePath, 'utf8')).toBe('{"id":1}\n');
     });
 
+    it('marca repair como aplicado quando hook falha depois do truncate', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
+        tempDirs.push(dir);
+        const filePath = join(dir, 'applied-truncate.jsonl');
+        await writeFile(filePath, '{"id":1}\n{"broken":');
+
+        await expect(
+            repairJsonlTrailingPartial(filePath, {
+                onPhase: (phase) => {
+                    if (phase === 'after-truncate') throw new Error('fault:after-truncate');
+                },
+            }),
+        ).rejects.toMatchObject({
+            message: 'fault:after-truncate',
+            mutationApplied: true,
+            mutationPhase: 'jsonl-truncate-confirmation',
+            mutationPath: filePath,
+        });
+        expect(await readFile(filePath, 'utf8')).toBe('{"id":1}\n');
+    });
+
     it('preserva último registro JSON válido sem newline', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
         tempDirs.push(dir);
@@ -152,10 +173,7 @@ describe('infra/io/jsonl-reader', () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
         tempDirs.push(dir);
         const filePath = join(dir, 'events.jsonl');
-        await writeFile(
-            filePath,
-            Buffer.concat([Buffer.alloc(4_096, 0xff), Buffer.from('\n{"id":2}\n', 'utf8')]),
-        );
+        await writeFile(filePath, Buffer.concat([Buffer.alloc(4_096, 0xff), Buffer.from('\n{"id":2}\n', 'utf8')]));
 
         const result = await readJsonlTail(filePath, { maxLines: 2, blockSize: 1_024, maxBytes: 1_024 });
 

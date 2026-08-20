@@ -56,7 +56,8 @@ function resolveDeltaCausalKey(evt) {
     const eventId = stringOrEmpty(evt['eventId']) || stringOrEmpty(evt['causationId']) || stringOrEmpty(evt['id']);
     if (eventId) return `event:${eventId}`;
 
-    const streamId = stringOrEmpty(evt['streamId']) || stringOrEmpty(evt['messageId']) || stringOrEmpty(evt['responseId']);
+    const streamId =
+        stringOrEmpty(evt['streamId']) || stringOrEmpty(evt['messageId']) || stringOrEmpty(evt['responseId']);
     const chunkSeq = scalarOrEmpty(evt['chunkSeq']) || scalarOrEmpty(evt['sequence']) || scalarOrEmpty(evt['seq']);
     if (streamId && chunkSeq) return `stream:${streamId}:${chunkSeq}`;
 
@@ -217,99 +218,133 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
     };
     agent.on(EMITTER_DIALOG_REPLY, onReplyTemp);
 
-    const createDeltaListener = onDelta || onDeltaDiagnostic
-        ? (() => {
-              /** @type {{ chunk: string; source: 'task.delta' | 'dialog.delta'; at: number; causalKey: string | null } | null} */
-              let lastDelta = null;
-              /** @type {Set<string>} */
-              const seenCausalKeys = new Set();
-              let emittedText = '';
-              let sawCumulativeSnapshot = false;
-              /** @type {'task.delta' | 'dialog.delta' | null} */
-              let lastEmittedSource = null;
-              /** @type {'dialog.delta' | null} */
-              let canonicalDialogDeltaSource = null;
-              /** @type {string | null} */
-              let lastEmittedCausalKey = null;
+    const createDeltaListener =
+        onDelta || onDeltaDiagnostic
+            ? (() => {
+                  /** @type {{
+    chunk: string;
+    source: 'task.delta' | 'dialog.delta';
+    at: number;
+    causalKey: string | null;
+} | null} */
+                  let lastDelta = null;
+                  /** @type {Set<string>} */
+                  const seenCausalKeys = new Set();
+                  let emittedText = '';
+                  let sawCumulativeSnapshot = false;
+                  /** @type {'task.delta' | 'dialog.delta' | null} */
+                  let lastEmittedSource = null;
+                  /** @type {'dialog.delta' | null} */
+                  let canonicalDialogDeltaSource = null;
+                  /** @type {string | null} */
+                  let lastEmittedCausalKey = null;
 
-              /**
-               * @param {DialogDeltaDiagnosticEvent} event
-               * @returns {void}
-               */
-              const emitDeltaDiagnostic = (event) => {
-                  if (!onDeltaDiagnostic) return;
-                  try {
-                      onDeltaDiagnostic(event);
-                  } catch (err) {
-                      const message = err instanceof Error ? err.message : String(err);
-                      log('WARN', `[LlmBridgeClient] onDeltaDiagnostic falhou: ${message}`);
-                  }
-              };
+                  /**
+                   * @param {DialogDeltaDiagnosticEvent} event
+                   * @returns {void}
+                   */
+                  const emitDeltaDiagnostic = (event) => {
+                      if (!onDeltaDiagnostic) return;
+                      try {
+                          onDeltaDiagnostic(event);
+                      } catch (err) {
+                          const message = err instanceof Error ? err.message : String(err);
+                          log('WARN', `[LlmBridgeClient] onDeltaDiagnostic falhou: ${message}`);
+                      }
+                  };
 
-              /**
-               * Alguns bridges entregam `deltaContent` incremental, outros ecoam snapshots cumulativos ou sufixos ja
-               * cobertos por um snapshot anterior. Normalizar aqui evita que o renderer tenha de adivinhar.
-               *
-               * @param {string} rawChunk
-               * @param {'task.delta' | 'dialog.delta'} source
-               * @param {string | null} causalKey
-               * @returns {{ chunk: string; reason: DialogDeltaDiagnosticReason }}
-               */
-              const normalizeAppendableChunk = (rawChunk, source, causalKey) => {
-                  if (!emittedText) return { chunk: rawChunk, reason: 'raw' };
+                  /**
+                   * Alguns bridges entregam `deltaContent` incremental, outros ecoam snapshots cumulativos ou sufixos ja
+                   * cobertos por um snapshot anterior. Normalizar aqui evita que o renderer tenha de adivinhar.
+                   *
+                   * @param {string} rawChunk
+                   * @param {'task.delta' | 'dialog.delta'} source
+                   * @param {string | null} causalKey
+                   * @returns {{ chunk: string; reason: DialogDeltaDiagnosticReason }}
+                   */
+                  const normalizeAppendableChunk = (rawChunk, source, causalKey) => {
+                      if (!emittedText) return { chunk: rawChunk, reason: 'raw' };
 
-                  const hasDistinctCausalProgress =
-                      Boolean(causalKey) && Boolean(lastEmittedCausalKey) && causalKey !== lastEmittedCausalKey;
-                  const shouldTrustAsDuplicate =
-                      sawCumulativeSnapshot || (source !== lastEmittedSource && !hasDistinctCausalProgress);
+                      const hasDistinctCausalProgress =
+                          Boolean(causalKey) && Boolean(lastEmittedCausalKey) && causalKey !== lastEmittedCausalKey;
+                      const shouldTrustAsDuplicate =
+                          sawCumulativeSnapshot || (source !== lastEmittedSource && !hasDistinctCausalProgress);
 
-                  if (rawChunk === emittedText && shouldTrustAsDuplicate) {
-                      sawCumulativeSnapshot = true;
-                      return { chunk: '', reason: 'cumulative_snapshot' };
-                  }
+                      if (rawChunk === emittedText && shouldTrustAsDuplicate) {
+                          sawCumulativeSnapshot = true;
+                          return { chunk: '', reason: 'cumulative_snapshot' };
+                      }
 
-                  if (rawChunk !== emittedText && rawChunk.startsWith(emittedText)) {
-                      sawCumulativeSnapshot = true;
-                      return { chunk: rawChunk.slice(emittedText.length), reason: 'cumulative_snapshot' };
-                  }
+                      if (rawChunk !== emittedText && rawChunk.startsWith(emittedText)) {
+                          sawCumulativeSnapshot = true;
+                          return { chunk: rawChunk.slice(emittedText.length), reason: 'cumulative_snapshot' };
+                      }
 
-                  if (rawChunk !== emittedText && emittedText.startsWith(rawChunk) && shouldTrustAsDuplicate) {
-                      sawCumulativeSnapshot = true;
-                      return { chunk: '', reason: 'cumulative_prefix' };
-                  }
+                      if (rawChunk !== emittedText && emittedText.startsWith(rawChunk) && shouldTrustAsDuplicate) {
+                          sawCumulativeSnapshot = true;
+                          return { chunk: '', reason: 'cumulative_prefix' };
+                      }
 
-                  if (emittedText.endsWith(rawChunk) && shouldTrustAsDuplicate) {
-                      return { chunk: '', reason: 'duplicate_suffix' };
-                  }
+                      if (emittedText.endsWith(rawChunk) && shouldTrustAsDuplicate) {
+                          return { chunk: '', reason: 'duplicate_suffix' };
+                      }
 
-                  if (shouldTrustAsDuplicate) {
-                      for (let overlap = Math.min(emittedText.length, rawChunk.length); overlap > 0; overlap -= 1) {
-                          if (emittedText.endsWith(rawChunk.slice(0, overlap))) {
-                              return { chunk: rawChunk.slice(overlap), reason: 'overlap_normalized' };
+                      if (shouldTrustAsDuplicate) {
+                          for (let overlap = Math.min(emittedText.length, rawChunk.length); overlap > 0; overlap -= 1) {
+                              if (emittedText.endsWith(rawChunk.slice(0, overlap))) {
+                                  return { chunk: rawChunk.slice(overlap), reason: 'overlap_normalized' };
+                              }
                           }
                       }
-                  }
 
-                  return { chunk: rawChunk, reason: 'raw' };
-              };
+                      return { chunk: rawChunk, reason: 'raw' };
+                  };
 
-              return (/** @type {'task.delta' | 'dialog.delta'} */ source) => (/** @type {unknown} */ rawEvt) => {
-                  const evt = /** @type {{ chunk?: string } & Record<string, unknown>} */ (rawEvt);
-                  if (!evt.chunk) return;
-                  if (canonicalDialogDeltaSource === 'dialog.delta' && source === 'task.delta') {
-                      return;
-                  }
-                  if (source === 'dialog.delta') {
-                      canonicalDialogDeltaSource = 'dialog.delta';
-                  }
-                  const now = Date.now();
-                  const causalKey = resolveDeltaCausalKey(evt);
-                  if (causalKey) {
-                      if (seenCausalKeys.has(causalKey)) {
+                  return (/** @type {'task.delta' | 'dialog.delta'} */ source) => (/** @type {unknown} */ rawEvt) => {
+                      const evt = /** @type {{ chunk?: string } & Record<string, unknown>} */ (rawEvt);
+                      if (!evt.chunk) return;
+                      if (canonicalDialogDeltaSource === 'dialog.delta' && source === 'task.delta') {
+                          return;
+                      }
+                      if (source === 'dialog.delta') {
+                          canonicalDialogDeltaSource = 'dialog.delta';
+                      }
+                      const now = Date.now();
+                      const causalKey = resolveDeltaCausalKey(evt);
+                      if (causalKey) {
+                          if (seenCausalKeys.has(causalKey)) {
+                              lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
+                              emitDeltaDiagnostic({
+                                  action: 'suppressed',
+                                  reason: 'causal_duplicate',
+                                  source,
+                                  causalKey,
+                                  rawChunk: evt.chunk,
+                                  normalizedChunk: '',
+                                  rawChars: evt.chunk.length,
+                                  normalizedChars: 0,
+                                  at: now,
+                                  streamId: evt['streamId'],
+                                  chunkSeq: evt['chunkSeq'],
+                                  eventId: evt['eventId'],
+                                  causationId: evt['causationId'],
+                              });
+                              return;
+                          }
+                          seenCausalKeys.add(causalKey);
+                      }
+                      if (
+                          !causalKey &&
+                          !lastDelta?.causalKey &&
+                          lastDelta &&
+                          lastDelta.chunk === evt.chunk &&
+                          lastDelta.source !== source &&
+                          now - lastDelta.at <= CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS
+                      ) {
                           lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
                           emitDeltaDiagnostic({
                               action: 'suppressed',
-                              reason: 'causal_duplicate',
+                              reason: 'temporal_cross_channel',
                               source,
                               causalKey,
                               rawChunk: evt.chunk,
@@ -324,87 +359,59 @@ export async function dialogTurnDetailed(agent, message, opts = {}) {
                           });
                           return;
                       }
-                      seenCausalKeys.add(causalKey);
-                  }
-                  if (
-                      !causalKey &&
-                      !lastDelta?.causalKey &&
-                      lastDelta &&
-                      lastDelta.chunk === evt.chunk &&
-                      lastDelta.source !== source &&
-                      now - lastDelta.at <= CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS
-                  ) {
                       lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
+                      const normalized = normalizeAppendableChunk(evt.chunk, source, causalKey);
+                      const appendableChunk = normalized.chunk;
+                      if (!appendableChunk) {
+                          emitDeltaDiagnostic({
+                              action: 'suppressed',
+                              reason: normalized.reason,
+                              source,
+                              causalKey,
+                              rawChunk: evt.chunk,
+                              normalizedChunk: '',
+                              rawChars: evt.chunk.length,
+                              normalizedChars: 0,
+                              at: now,
+                              streamId: evt['streamId'],
+                              chunkSeq: evt['chunkSeq'],
+                              eventId: evt['eventId'],
+                              causationId: evt['causationId'],
+                          });
+                          return;
+                      }
+                      emittedText += appendableChunk;
+                      lastEmittedSource = source;
+                      lastEmittedCausalKey = causalKey;
                       emitDeltaDiagnostic({
-                          action: 'suppressed',
-                          reason: 'temporal_cross_channel',
-                          source,
-                          causalKey,
-                          rawChunk: evt.chunk,
-                          normalizedChunk: '',
-                          rawChars: evt.chunk.length,
-                          normalizedChars: 0,
-                          at: now,
-                          streamId: evt['streamId'],
-                          chunkSeq: evt['chunkSeq'],
-                          eventId: evt['eventId'],
-                          causationId: evt['causationId'],
-                      });
-                      return;
-                  }
-                  lastDelta = { chunk: evt.chunk, source, at: now, causalKey };
-                  const normalized = normalizeAppendableChunk(evt.chunk, source, causalKey);
-                  const appendableChunk = normalized.chunk;
-                  if (!appendableChunk) {
-                      emitDeltaDiagnostic({
-                          action: 'suppressed',
+                          action: normalized.reason === 'raw' ? 'accepted' : 'normalized',
                           reason: normalized.reason,
                           source,
                           causalKey,
                           rawChunk: evt.chunk,
-                          normalizedChunk: '',
+                          normalizedChunk: appendableChunk,
                           rawChars: evt.chunk.length,
-                          normalizedChars: 0,
+                          normalizedChars: appendableChunk.length,
                           at: now,
                           streamId: evt['streamId'],
                           chunkSeq: evt['chunkSeq'],
                           eventId: evt['eventId'],
                           causationId: evt['causationId'],
                       });
-                      return;
-                  }
-                  emittedText += appendableChunk;
-                  lastEmittedSource = source;
-                  lastEmittedCausalKey = causalKey;
-                  emitDeltaDiagnostic({
-                      action: normalized.reason === 'raw' ? 'accepted' : 'normalized',
-                      reason: normalized.reason,
-                      source,
-                      causalKey,
-                      rawChunk: evt.chunk,
-                      normalizedChunk: appendableChunk,
-                      rawChars: evt.chunk.length,
-                      normalizedChars: appendableChunk.length,
-                      at: now,
-                      streamId: evt['streamId'],
-                      chunkSeq: evt['chunkSeq'],
-                      eventId: evt['eventId'],
-                      causationId: evt['causationId'],
-                  });
-                  if (!onDelta) return;
-                  if (onDelta.length >= 2) {
-                      onDelta(appendableChunk, {
-                          ...evt,
-                          source,
-                          rawChunk: evt.chunk,
-                          normalizedChunk: appendableChunk,
-                      });
-                  } else {
-                      onDelta(appendableChunk);
-                  }
-              };
-          })()
-        : null;
+                      if (!onDelta) return;
+                      if (onDelta.length >= 2) {
+                          onDelta(appendableChunk, {
+                              ...evt,
+                              source,
+                              rawChunk: evt.chunk,
+                              normalizedChunk: appendableChunk,
+                          });
+                      } else {
+                          onDelta(appendableChunk);
+                      }
+                  };
+              })()
+            : null;
     const onTaskDeltaTemp = createDeltaListener ? createDeltaListener('task.delta') : null;
     const onDialogDeltaTemp = createDeltaListener ? createDeltaListener('dialog.delta') : null;
     if (onTaskDeltaTemp && onDialogDeltaTemp) {

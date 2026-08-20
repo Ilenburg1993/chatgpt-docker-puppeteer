@@ -1,62 +1,201 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, buildCatalogRefreshStartedEvent, buildEligibilityEvaluatedEvent, buildModelGatewayPreBuildReadinessReport, buildModelGatewayPreKCompatibilityReport, buildModelGatewayRouteCandidates, buildModelGatewayRuntimeProofCommands, buildModelGatewayRuntimeStandbyPlan, buildModelGatewayRuntimeStandbyRoutes, buildModelGatewayRuntimeSelectorPlan, buildModelGatewayRuntimeAutomationDecision, buildModelGatewayRuntimeAutomationControllerStep, DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH, explainModelGatewayRuntimeAutomationPolicySources, listModelGatewayRuntimeAutomationPolicyPresets, resolveModelGatewayRuntimeAutomationPolicyPreset, validateModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationEffectivePolicy, readModelGatewayRuntimeAutomationPolicy, readModelGatewayRuntimeAutomationPolicyFile, writeModelGatewayRuntimeAutomationPolicyFile, buildModelGatewaySelectionDecisionTrace, buildProbeCompletedEvent, buildRouteDecisionEvent, auditCatalogImporterSet, auditModelGatewayCatalogSnapshotIntegrity, auditModelGatewayPostRuntimeSelection, auditModelGatewayPreRuntimeSelection, applyModelGatewayEligibilityToSnapshot, chmod, classifyByokProviderFailure, clearByokProviderModelHealth, compareModelGatewaySelectionAudits, createDefaultModelGatewayCatalogImporters, createEnvSecretRegistry, DEFAULT_MODEL_GATEWAY_CATALOG_PATH, DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR, deriveModelGatewayRuntimeAccountOverlaysFromHealth, discoverConfiguredByokModelsFromEnv, evaluateModelGatewayCatalogEligibility, evaluateModelGatewayProviderEnvRequirements, explainModelGatewayAccountLimitOverlays, explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry, explainModelGatewayEligibilityDecision, explainModelGatewaySelectionComparison, flushAndMirrorByokProviderHealthToSqlite, flushByokProviderHealth, JsonModelGatewayCatalogStore, listByokProviderModelHealth, listModelGatewayCanonicalCommands, listProviderEndpointInventory, listProviderGatewayTraits, listProviderWireProbeMatrix, listTerminalSdkSessionInventory, loadDotenv, materializeModelGatewayActiveByokProfileEnv, mirrorByokProviderHealthToSqlite, mirrorModelGatewayCatalogSnapshotToSqlite, MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON, persistModelGatewaySelectionDecisionTrace, planModelGatewayProbeBackoff, planModelGatewayCatalogRefresh, readModelGatewayByokProfileCostHint, refreshModelGatewayCatalog, recommendCatalogDiffProbes, renderModelGatewayCanonicalCommandLines, renderModelGatewayLocalProviderOptInGuidance, resolveModelGatewaySelectionPolicy, resolveProviderEndpointInventory, resolveProviderGatewayTraits, routeGatewayModels, runConfiguredByokAgentProbe, runConfiguredByokChatProbe, runConfiguredByokJsonProbe, runConfiguredByokStreamingProbe, runConfiguredByokVisionProbe, searchModelGatewayCatalogEntries, readByokProviderHealthState, readByokProviderModelHealth, readConfiguredByokModelDiscoveryCacheFromEnv, readConfiguredByokProfilesFromEnv, readFile, readdir, mkdir, rm, readTerminalByokGatewayProjectionFromEnv, readTerminalByokProjection, readTerminalByokRuntimeConfigProjection, readTerminalConfiguredSessionFsState, readTerminalRuntimeContextWindow, recordByokProviderModelAgentProbeFailure, recordByokProviderModelAgentProbeSuccess, recordByokProviderModelCallFailure, recordByokProviderModelCallSuccess, recordByokProviderModelProbeResult, recordModelGatewayRouteDecision, rename, scheduleTerminalSdkSessionBootSelection, setTerminalModelProjection, switchTerminalRouteProjection, SqliteModelGatewayCatalogStore, stat, summarizeCanonicalModelProjectionDiff, summarizeGatewayRuntimeProofFreshness, summarizeModelGatewayEligibilityDiff, summarizeModelGatewayAccountOverlays, summarizeModelGatewayLocalProviderOptInBlocks, summarizeModelGatewayProviderQuotaCapabilities, summarizeModelGatewayRuntimeAccountOverlays, summarizeModelGatewayProviderEnvRequirements, summarizeModelGatewayRefreshLogText, summarizeProviderWireProbeMatrix, toOpenAIModelCatalogList, writeFile } =
-    vi.hoisted(() => ({
-        buildCatalogRefreshEventBatch: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/observability/events.js').buildCatalogRefreshEventBatch>[0]} */ input) => {
-            const changedKinds = [
-                ...new Set((input.diff?.changed ?? []).flatMap((item) => item.changedKinds ?? [])),
-            ];
+const {
+    activateModelGatewayByokProfileEnv,
+    buildCatalogRefreshEventBatch,
+    buildCatalogRefreshStartedEvent,
+    buildEligibilityEvaluatedEvent,
+    buildModelGatewayPreBuildReadinessReport,
+    buildModelGatewayPreKCompatibilityReport,
+    buildModelGatewayRouteCandidates,
+    buildModelGatewayRuntimeProofCommands,
+    buildModelGatewayRuntimeStandbyPlan,
+    buildModelGatewayRuntimeStandbyRoutes,
+    buildModelGatewayRuntimeSelectorPlan,
+    buildModelGatewayRuntimeAutomationDecision,
+    buildModelGatewayRuntimeAutomationControllerStep,
+    DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH,
+    explainModelGatewayRuntimeAutomationPolicySources,
+    listModelGatewayRuntimeAutomationPolicyPresets,
+    resolveModelGatewayRuntimeAutomationPolicyPreset,
+    validateModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
+    readModelGatewayRuntimeAutomationPolicy,
+    readModelGatewayRuntimeAutomationPolicyFile,
+    writeModelGatewayRuntimeAutomationPolicyFile,
+    buildModelGatewaySelectionDecisionTrace,
+    buildProbeCompletedEvent,
+    buildRouteDecisionEvent,
+    auditCatalogImporterSet,
+    auditModelGatewayCatalogSnapshotIntegrity,
+    auditModelGatewayPostRuntimeSelection,
+    auditModelGatewayPreRuntimeSelection,
+    applyModelGatewayEligibilityToSnapshot,
+    chmod,
+    classifyByokProviderFailure,
+    clearByokProviderModelHealth,
+    compareModelGatewaySelectionAudits,
+    createDefaultModelGatewayCatalogImporters,
+    createEnvSecretRegistry,
+    DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
+    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth,
+    discoverConfiguredByokModelsFromEnv,
+    evaluateModelGatewayCatalogEligibility,
+    evaluateModelGatewayProviderEnvRequirements,
+    explainModelGatewayAccountLimitOverlays,
+    explainModelGatewayCatalogEntry,
+    explainModelGatewayProviderEntry,
+    explainModelGatewayEligibilityDecision,
+    explainModelGatewaySelectionComparison,
+    flushAndMirrorByokProviderHealthToSqlite,
+    flushByokProviderHealth,
+    JsonModelGatewayCatalogStore,
+    listByokProviderModelHealth,
+    listModelGatewayCanonicalCommands,
+    listProviderEndpointInventory,
+    listProviderGatewayTraits,
+    listProviderWireProbeMatrix,
+    listTerminalSdkSessionInventory,
+    loadDotenv,
+    materializeModelGatewayActiveByokProfileEnv,
+    mirrorByokProviderHealthToSqlite,
+    mirrorModelGatewayCatalogSnapshotToSqlite,
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
+    persistModelGatewaySelectionDecisionTrace,
+    planModelGatewayProbeBackoff,
+    planModelGatewayCatalogRefresh,
+    readModelGatewayByokProfileCostHint,
+    refreshModelGatewayCatalog,
+    recommendCatalogDiffProbes,
+    renderModelGatewayCanonicalCommandLines,
+    renderModelGatewayLocalProviderOptInGuidance,
+    resolveModelGatewaySelectionPolicy,
+    resolveProviderEndpointInventory,
+    resolveProviderGatewayTraits,
+    routeGatewayModels,
+    runConfiguredByokAgentProbe,
+    runConfiguredByokChatProbe,
+    runConfiguredByokJsonProbe,
+    runConfiguredByokStreamingProbe,
+    runConfiguredByokVisionProbe,
+    searchModelGatewayCatalogEntries,
+    readByokProviderHealthState,
+    readByokProviderModelHealth,
+    readConfiguredByokModelDiscoveryCacheFromEnv,
+    readConfiguredByokProfilesFromEnv,
+    readFile,
+    readTextFreshTrusted,
+    readdir,
+    mkdir,
+    rm,
+    writeFileAtomicTrusted,
+    workspaceIoListDirectoryNamesFresh,
+    workspaceIoReadTextFresh,
+    workspaceIoStatPath,
+    readTerminalByokGatewayProjectionFromEnv,
+    readTerminalByokProjection,
+    readTerminalByokRuntimeConfigProjection,
+    readTerminalConfiguredSessionFsState,
+    readTerminalRuntimeContextWindow,
+    recordByokProviderModelAgentProbeFailure,
+    recordByokProviderModelAgentProbeSuccess,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+    recordByokProviderModelProbeResult,
+    recordModelGatewayRouteDecision,
+    rename,
+    scheduleTerminalSdkSessionBootSelection,
+    setTerminalModelProjection,
+    switchTerminalRouteProjection,
+    SqliteModelGatewayCatalogStore,
+    stat,
+    summarizeCanonicalModelProjectionDiff,
+    summarizeGatewayRuntimeProofFreshness,
+    summarizeModelGatewayEligibilityDiff,
+    summarizeModelGatewayAccountOverlays,
+    summarizeModelGatewayLocalProviderOptInBlocks,
+    summarizeModelGatewayProviderQuotaCapabilities,
+    summarizeModelGatewayRuntimeAccountOverlays,
+    summarizeModelGatewayProviderEnvRequirements,
+    summarizeModelGatewayRefreshLogText,
+    summarizeProviderWireProbeMatrix,
+    toOpenAIModelCatalogList,
+    writeFile,
+} = vi.hoisted(() => ({
+    buildCatalogRefreshEventBatch: vi.fn(
+        (
+            /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/observability/events.js').buildCatalogRefreshEventBatch
+>[0]} */ input,
+        ) => {
+            const changedKinds = [...new Set((input.diff?.changed ?? []).flatMap((item) => item.changedKinds ?? []))];
             return {
                 completedEvent: { type: 'model_gateway:catalog:import_completed', changedKinds },
                 events: [
-                    { type: 'model_gateway:catalog:model_changed', key: 'openrouter:changed-model:default', changedKinds },
+                    {
+                        type: 'model_gateway:catalog:model_changed',
+                        key: 'openrouter:changed-model:default',
+                        changedKinds,
+                    },
                     { type: 'model_gateway:catalog:import_completed', changedKinds },
                 ],
             };
-        }),
-        buildCatalogRefreshStartedEvent: vi.fn((input) => ({
-            type: 'model_gateway:catalog:import_started',
-            importerIds: input.importerIds ?? [],
-        })),
-        buildEligibilityEvaluatedEvent: vi.fn((input) => ({
-            type: 'model_gateway:eligibility_evaluated',
-            modelCount: input?.summary?.modelCount ?? input?.run?.modelCount ?? 0,
-            eligibleCount: input?.summary?.eligibleCount ?? input?.run?.eligibleCount ?? 0,
-        })),
-        recommendCatalogDiffProbes: vi.fn(() => [
-            {
-                key: 'openrouter:changed-model:default',
-                priority: 'high',
-                probeKinds: ['chat', 'agent'],
-                reasons: ['capabilities_changed', 'agentic_capability'],
-                commands: ['/byok probe agent model:changed-model'],
-            },
-        ]),
-        summarizeCanonicalModelProjectionDiff: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/catalog/import-runs.js').summarizeCanonicalModelProjectionDiff>[0]} */ diff) => ({
+        },
+    ),
+    buildCatalogRefreshStartedEvent: vi.fn((input) => ({
+        type: 'model_gateway:catalog:import_started',
+        importerIds: input.importerIds ?? [],
+    })),
+    buildEligibilityEvaluatedEvent: vi.fn((input) => ({
+        type: 'model_gateway:eligibility_evaluated',
+        modelCount: input?.summary?.modelCount ?? input?.run?.modelCount ?? 0,
+        eligibleCount: input?.summary?.eligibleCount ?? input?.run?.eligibleCount ?? 0,
+    })),
+    recommendCatalogDiffProbes: vi.fn(() => [
+        {
+            key: 'openrouter:changed-model:default',
+            priority: 'high',
+            probeKinds: ['chat', 'agent'],
+            reasons: ['capabilities_changed', 'agentic_capability'],
+            commands: ['/byok probe agent model:changed-model'],
+        },
+    ]),
+    summarizeCanonicalModelProjectionDiff: vi.fn(
+        (
+            /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/catalog/import-runs.js').summarizeCanonicalModelProjectionDiff
+>[0]} */ diff,
+        ) => ({
             addedCount: diff.added?.length ?? 0,
             removedCount: diff.removed?.length ?? 0,
             changedCount: diff.changed?.length ?? 0,
             changedKinds: [...new Set((diff.changed ?? []).flatMap((item) => item.changedKinds ?? []))],
             changedKindCounts: {},
-        })),
-        summarizeGatewayRuntimeProofFreshness: vi.fn((health) => ({
-            hasHistoricalProof: health?.lastStatus === 'ok' || health?.agentProbeStatus === 'ok',
-            hasFreshProof: health?.lastStatus === 'ok' || health?.agentProbeStatus === 'ok',
-            stale: false,
-            maxAgeMs: 24 * 60 * 60 * 1000,
-            latestProofAt: health?.lastAgentProbeSuccessAt ?? health?.lastSuccessAt ?? null,
-            ageMs: 0,
-            chatFresh: health?.lastStatus === 'ok',
-            agentFresh: health?.agentProbeStatus === 'ok',
-            freshProbeKinds: Object.entries(health?.probes ?? {})
-                .filter(([, probe]) => probe?.status === 'ok')
-                .map(([kind]) => kind),
-            staleProbeKinds: [],
-        })),
-        summarizeModelGatewayEligibilityDiff: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/eligibility/diff.js').summarizeModelGatewayEligibilityDiff>[0]} */ diff) => ({
+        }),
+    ),
+    summarizeGatewayRuntimeProofFreshness: vi.fn((health) => ({
+        hasHistoricalProof: health?.lastStatus === 'ok' || health?.agentProbeStatus === 'ok',
+        hasFreshProof: health?.lastStatus === 'ok' || health?.agentProbeStatus === 'ok',
+        stale: false,
+        maxAgeMs: 24 * 60 * 60 * 1000,
+        latestProofAt: health?.lastAgentProbeSuccessAt ?? health?.lastSuccessAt ?? null,
+        ageMs: 0,
+        chatFresh: health?.lastStatus === 'ok',
+        agentFresh: health?.agentProbeStatus === 'ok',
+        freshProbeKinds: Object.entries(health?.probes ?? {})
+            .filter(([, probe]) => probe?.status === 'ok')
+            .map(([kind]) => kind),
+        staleProbeKinds: [],
+    })),
+    summarizeModelGatewayEligibilityDiff: vi.fn(
+        (
+            /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/eligibility/diff.js').summarizeModelGatewayEligibilityDiff
+>[0]} */ diff,
+        ) => ({
             addedCount: diff.added?.length ?? 0,
             removedCount: diff.removed?.length ?? 0,
             changedCount: diff.changed?.length ?? 0,
@@ -64,173 +203,179 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             changedKindCounts: {},
             becameEligibleCount: 0,
             becameExcludedCount: 0,
-        })),
-        summarizeProviderWireProbeMatrix: vi.fn(() => ({
-            providerCount: 1,
-            rowCount: 1,
-            implementedProbeKindCounts: { chat: 1, streaming: 1, json: 1, agent: 1 },
-            pendingProbeKindCounts: { reasoning: 1, forced_tool_choice: 1, parallel_tool_calls: 1 },
-            providersWithPendingProbeKinds: ['kilo'],
-        })),
-        summarizeModelGatewayProviderEnvRequirements: vi.fn(() => ({
-            providerCount: 1,
-            readyCount: 0,
-            partialCount: 0,
-            missingCount: 1,
-            missingRequiredKeyCounts: { KILO_API_KEY: 1, KILO_CODE_API_KEY: 1 },
-            missingRecommendedKeyCounts: {},
-        })),
-        summarizeModelGatewayAccountOverlays: vi.fn(() => ({
-            rows: [
-                {
-                    accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
-                    providerId: 'openrouter',
-                    accountScope: 'default',
-                    secretRef: 'OPENROUTER_API_KEY',
-                    sourceId: 'openrouter-key-account',
-                    sourceKind: 'authenticated_account_api',
-                    confidence: 'authenticated_catalog',
-                    enabledModelCount: 2,
-                    blockedModelCount: 0,
-                    observedAt: '2026-05-25T00:00:00.000Z',
-                    expiresAt: null,
-                    limitStatus: 'rate_limited',
-                    retryAfterSeconds: 60,
-                    resetAt: '2026-05-25T00:01:00.000Z',
-                    freshnessStatus: 'fresh',
-                    freshnessAgeSeconds: 60,
-                    freshnessTtlSeconds: 900,
-                    effectiveExpiresAt: '2026-05-25T00:15:00.000Z',
-                    resetWindowClass: 'temporary',
-                    resetWindowSource: 'explicit_reset_at',
-                    nextRefreshAfter: '2026-05-25T00:01:00.000Z',
-                    retentionExpiresAt: '2026-05-25T01:00:00.000Z',
-                    autoUnblocksAt: '2026-05-25T00:01:00.000Z',
-                    blocksUntilRefresh: false,
-                    remainingUsd: 12,
-                    remainingCreditsUsd: 12,
-                },
-            ],
-            summary: {
-                total: 1,
-                visible: 1,
-                matched: 1,
-                providers: 1,
-                statusCounts: { rate_limited: 1 },
+        }),
+    ),
+    summarizeProviderWireProbeMatrix: vi.fn(() => ({
+        providerCount: 1,
+        rowCount: 1,
+        implementedProbeKindCounts: { chat: 1, streaming: 1, json: 1, agent: 1 },
+        pendingProbeKindCounts: { reasoning: 1, forced_tool_choice: 1, parallel_tool_calls: 1 },
+        providersWithPendingProbeKinds: ['kilo'],
+    })),
+    summarizeModelGatewayProviderEnvRequirements: vi.fn(() => ({
+        providerCount: 1,
+        readyCount: 0,
+        partialCount: 0,
+        missingCount: 1,
+        missingRequiredKeyCounts: { KILO_API_KEY: 1, KILO_CODE_API_KEY: 1 },
+        missingRecommendedKeyCounts: {},
+    })),
+    summarizeModelGatewayAccountOverlays: vi.fn(() => ({
+        rows: [
+            {
+                accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
+                providerId: 'openrouter',
+                accountScope: 'default',
+                secretRef: 'OPENROUTER_API_KEY',
+                sourceId: 'openrouter-key-account',
+                sourceKind: 'authenticated_account_api',
+                confidence: 'authenticated_catalog',
+                enabledModelCount: 2,
+                blockedModelCount: 0,
+                observedAt: '2026-05-25T00:00:00.000Z',
+                expiresAt: null,
+                limitStatus: 'rate_limited',
+                retryAfterSeconds: 60,
+                resetAt: '2026-05-25T00:01:00.000Z',
+                freshnessStatus: 'fresh',
+                freshnessAgeSeconds: 60,
+                freshnessTtlSeconds: 900,
+                effectiveExpiresAt: '2026-05-25T00:15:00.000Z',
+                resetWindowClass: 'temporary',
+                resetWindowSource: 'explicit_reset_at',
+                nextRefreshAfter: '2026-05-25T00:01:00.000Z',
+                retentionExpiresAt: '2026-05-25T01:00:00.000Z',
+                autoUnblocksAt: '2026-05-25T00:01:00.000Z',
+                blocksUntilRefresh: false,
+                remainingUsd: 12,
+                remainingCreditsUsd: 12,
             },
-        })),
-        explainModelGatewayAccountLimitOverlays: vi.fn(() => ({
-            rows: [
-                {
-                    accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
-                    providerId: 'openrouter',
-                    accountScope: 'default',
-                    secretRef: 'OPENROUTER_API_KEY',
-                    sourceId: 'openrouter-key-account',
-                    sourceKind: 'authenticated_account_api',
-                    sourceLayer: 'account',
-                    confidence: 'authenticated_catalog',
-                    limitStatus: 'rate_limited',
-                    activeBlocker: true,
-                    expiredSignal: false,
-                    temporaryBlocker: true,
-                    retryAfterSeconds: 60,
-                    resetAt: '2026-05-25T00:01:00.000Z',
-                    expiresAt: null,
-                    freshnessStatus: 'fresh',
-                    freshnessAgeSeconds: 60,
-                    freshnessTtlSeconds: 900,
-                    effectiveExpiresAt: '2026-05-25T00:15:00.000Z',
-                    resetWindowClass: 'temporary',
-                    resetWindowSource: 'explicit_reset_at',
-                    nextRefreshAfter: '2026-05-25T00:01:00.000Z',
-                    retentionExpiresAt: '2026-05-25T01:00:00.000Z',
-                    autoUnblocksAt: '2026-05-25T00:01:00.000Z',
-                    blocksUntilRefresh: false,
-                    remainingUsd: 12,
-                    remainingCreditsUsd: 12,
-                    failureKind: null,
-                    nextAction: 'wait_for_rate_limit_reset_or_choose_another_route',
-                },
-                {
-                    accountOverlayId: 'runtime-health:groq:default:limited-model:rate-limit',
-                    providerId: 'groq',
-                    accountScope: 'default',
-                    secretRef: 'GROQ_API_KEY',
-                    sourceId: 'runtime-health-rate-limit',
-                    sourceKind: 'runtime_health',
-                    sourceLayer: 'runtime',
-                    confidence: 'probe_failed',
-                    limitStatus: 'ok',
-                    activeBlocker: false,
-                    expiredSignal: true,
-                    temporaryBlocker: false,
-                    retryAfterSeconds: null,
-                    resetAt: '2026-05-25T00:01:00.000Z',
-                    expiresAt: '2026-05-25T00:02:00.000Z',
-                    freshnessStatus: 'expired',
-                    freshnessAgeSeconds: 3600,
-                    freshnessTtlSeconds: 3600,
-                    effectiveExpiresAt: '2026-05-25T00:02:00.000Z',
-                    resetWindowClass: 'not_blocking',
-                    resetWindowSource: 'none',
-                    nextRefreshAfter: '2026-05-25T00:02:00.000Z',
-                    retentionExpiresAt: '2026-05-25T00:02:00.000Z',
-                    autoUnblocksAt: null,
-                    blocksUntilRefresh: false,
-                    remainingUsd: null,
-                    remainingCreditsUsd: null,
-                    failureKind: 'rate-limit',
-                    nextAction: 'refresh_overlay_or_retry_pre_runtime_selection',
-                },
-            ],
-            summary: {
-                total: 2,
-                matched: 2,
-                providers: 2,
-                activeBlockers: 1,
-                expiredSignals: 1,
-                temporaryBlockers: 1,
-                byStatus: { rate_limited: 1, ok: 1 },
-                bySourceKind: { authenticated_account_api: 1, runtime_health: 1 },
-                bySourceLayer: { account: 1, runtime: 1 },
-            },
-        })),
-        summarizeModelGatewayRuntimeAccountOverlays: vi.fn(() => ({
+        ],
+        summary: {
             total: 1,
-            activeCount: 1,
-            expiredCount: 0,
-            byProvider: { groq: 1 },
-            byFailureKind: { 'rate-limit': 1 },
-            items: [],
-        })),
-        summarizeModelGatewayProviderQuotaCapabilities: vi.fn(() => ({
-            rows: [
-                {
-                    providerId: 'openrouter',
-                    accountVisibility: 'key_account_and_public_models',
-                    quotaSnapshot: 'key_credit_balance',
-                    spendingLimit: 'key_credit_balance',
-                    rateLimit: 'headers_or_runtime_failure',
-                    runtimeFailureOverlay: true,
-                    sdkQuotaAppliesToByok: false,
-                    requiredEnv: ['OPENROUTER_API_KEY'],
-                    endpoints: ['/api/v1/models', '/api/v1/key'],
-                },
-            ],
-            summary: {
-                total: 15,
-                matched: 1,
-                providerCount: 1,
-                accountVisibilityCount: 1,
-                quotaSnapshotCount: 1,
-                runtimeFailureOverlayCount: 1,
-                sdkQuotaByokTruthCount: 0,
-                byQuotaSnapshot: { key_credit_balance: 1 },
+            visible: 1,
+            matched: 1,
+            providers: 1,
+            statusCounts: { rate_limited: 1 },
+        },
+    })),
+    explainModelGatewayAccountLimitOverlays: vi.fn(() => ({
+        rows: [
+            {
+                accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
+                providerId: 'openrouter',
+                accountScope: 'default',
+                secretRef: 'OPENROUTER_API_KEY',
+                sourceId: 'openrouter-key-account',
+                sourceKind: 'authenticated_account_api',
+                sourceLayer: 'account',
+                confidence: 'authenticated_catalog',
+                limitStatus: 'rate_limited',
+                activeBlocker: true,
+                expiredSignal: false,
+                temporaryBlocker: true,
+                retryAfterSeconds: 60,
+                resetAt: '2026-05-25T00:01:00.000Z',
+                expiresAt: null,
+                freshnessStatus: 'fresh',
+                freshnessAgeSeconds: 60,
+                freshnessTtlSeconds: 900,
+                effectiveExpiresAt: '2026-05-25T00:15:00.000Z',
+                resetWindowClass: 'temporary',
+                resetWindowSource: 'explicit_reset_at',
+                nextRefreshAfter: '2026-05-25T00:01:00.000Z',
+                retentionExpiresAt: '2026-05-25T01:00:00.000Z',
+                autoUnblocksAt: '2026-05-25T00:01:00.000Z',
+                blocksUntilRefresh: false,
+                remainingUsd: 12,
+                remainingCreditsUsd: 12,
+                failureKind: null,
+                nextAction: 'wait_for_rate_limit_reset_or_choose_another_route',
             },
-        })),
-        MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON: 'local_provider_requires_explicit_request',
-        summarizeModelGatewayLocalProviderOptInBlocks: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/local-provider-opt-in.js').summarizeModelGatewayLocalProviderOptInBlocks>[0]} */ selection) => {
+            {
+                accountOverlayId: 'runtime-health:groq:default:limited-model:rate-limit',
+                providerId: 'groq',
+                accountScope: 'default',
+                secretRef: 'GROQ_API_KEY',
+                sourceId: 'runtime-health-rate-limit',
+                sourceKind: 'runtime_health',
+                sourceLayer: 'runtime',
+                confidence: 'probe_failed',
+                limitStatus: 'ok',
+                activeBlocker: false,
+                expiredSignal: true,
+                temporaryBlocker: false,
+                retryAfterSeconds: null,
+                resetAt: '2026-05-25T00:01:00.000Z',
+                expiresAt: '2026-05-25T00:02:00.000Z',
+                freshnessStatus: 'expired',
+                freshnessAgeSeconds: 3600,
+                freshnessTtlSeconds: 3600,
+                effectiveExpiresAt: '2026-05-25T00:02:00.000Z',
+                resetWindowClass: 'not_blocking',
+                resetWindowSource: 'none',
+                nextRefreshAfter: '2026-05-25T00:02:00.000Z',
+                retentionExpiresAt: '2026-05-25T00:02:00.000Z',
+                autoUnblocksAt: null,
+                blocksUntilRefresh: false,
+                remainingUsd: null,
+                remainingCreditsUsd: null,
+                failureKind: 'rate-limit',
+                nextAction: 'refresh_overlay_or_retry_pre_runtime_selection',
+            },
+        ],
+        summary: {
+            total: 2,
+            matched: 2,
+            providers: 2,
+            activeBlockers: 1,
+            expiredSignals: 1,
+            temporaryBlockers: 1,
+            byStatus: { rate_limited: 1, ok: 1 },
+            bySourceKind: { authenticated_account_api: 1, runtime_health: 1 },
+            bySourceLayer: { account: 1, runtime: 1 },
+        },
+    })),
+    summarizeModelGatewayRuntimeAccountOverlays: vi.fn(() => ({
+        total: 1,
+        activeCount: 1,
+        expiredCount: 0,
+        byProvider: { groq: 1 },
+        byFailureKind: { 'rate-limit': 1 },
+        items: [],
+    })),
+    summarizeModelGatewayProviderQuotaCapabilities: vi.fn(() => ({
+        rows: [
+            {
+                providerId: 'openrouter',
+                accountVisibility: 'key_account_and_public_models',
+                quotaSnapshot: 'key_credit_balance',
+                spendingLimit: 'key_credit_balance',
+                rateLimit: 'headers_or_runtime_failure',
+                runtimeFailureOverlay: true,
+                sdkQuotaAppliesToByok: false,
+                requiredEnv: ['OPENROUTER_API_KEY'],
+                endpoints: ['/api/v1/models', '/api/v1/key'],
+            },
+        ],
+        summary: {
+            total: 15,
+            matched: 1,
+            providerCount: 1,
+            accountVisibilityCount: 1,
+            quotaSnapshotCount: 1,
+            runtimeFailureOverlayCount: 1,
+            sdkQuotaByokTruthCount: 0,
+            byQuotaSnapshot: { key_credit_balance: 1 },
+        },
+    })),
+    MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON: 'local_provider_requires_explicit_request',
+    summarizeModelGatewayLocalProviderOptInBlocks: vi.fn(
+        (
+            /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/routing/local-provider-opt-in.js').summarizeModelGatewayLocalProviderOptInBlocks
+>[0]} */ selection,
+        ) => {
             const blockedProfileIds = (selection.profiles ?? [])
                 .filter(
                     (profile) =>
@@ -239,7 +384,8 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 )
                 .map((profile) => profile['profileId'])
                 .filter((profileId) => typeof profileId === 'string');
-            const rejectedCount = selection.summary?.rejectedReasonCounts?.['local_provider_requires_explicit_request'] ?? 0;
+            const rejectedCount =
+                selection.summary?.rejectedReasonCounts?.['local_provider_requires_explicit_request'] ?? 0;
             return {
                 reason: 'local_provider_requires_explicit_request',
                 blockedProfileIds,
@@ -247,162 +393,199 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 rejectedCount,
                 hasBlocks: blockedProfileIds.length > 0 || rejectedCount > 0,
             };
-        }),
-        renderModelGatewayLocalProviderOptInGuidance: vi.fn((options = {}) => {
-            const profileId = options.profileId ?? options.profileIds?.[0] ?? 'repo_agent';
-            const profileSuffix = Array.isArray(options.profileIds) && options.profileIds.length > 0 ? ` nos perfis ${options.profileIds.join(',')}` : '';
-            return `Ollama/local foi bloqueado por padrão${profileSuffix}. Para usar modelos locais, peça explicitamente: /byok models route ${profileId} provider:ollama, /byok models route local_private ou /byok models route local_private_strict.`;
-        }),
-        buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
-            stage: 'pre-k',
-            ready: true,
-            total: 2,
-            passed: 2,
-            failed: 0,
-            checks: [
-                {
-                    id: 'sdk_provider_config_boundary',
-                    track: 'J',
-                    passed: true,
-                    summary: 'SDK ProviderConfig boundary ok',
-                },
-                {
-                    id: 'route_trace_attributes_are_stable',
-                    track: 'I',
-                    passed: true,
-                    summary: 'route trace attrs ok',
-                },
-            ],
-        })),
-        buildModelGatewayPreBuildReadinessReport: vi.fn(() => ({
-            stage: 'prebuild',
-            ready: true,
-            total: 3,
-            passed: 3,
-            failed: 0,
-            checks: [
-                {
-                    id: 'universal_catalog_contracts_are_exported',
-                    track: 'K',
-                    passed: true,
-                    summary: 'catalog ok',
-                },
-                {
-                    id: 'provider_gateway_traits_are_metadata',
-                    track: 'M',
-                    passed: true,
-                    summary: 'traits ok',
-                },
-                {
-                    id: 'canonical_commands_are_published',
-                    track: 'Y',
-                    passed: true,
-                    summary: 'commands ok',
-                },
-            ],
-        })),
-        buildModelGatewayRouteCandidates: vi.fn(() => []),
-        buildProbeCompletedEvent: vi.fn((input) => ({
-            type: 'model_gateway:probe:completed',
-            probeKind: input.probeKind,
-            ok: input.result?.ok === true,
-            status: input.result?.status ?? 'unknown',
-            providerAttempted: input.providerAttempted !== false,
-        })),
-        buildRouteDecisionEvent: vi.fn((input) => ({
-            type: 'model_gateway:route:decision',
-            decisionId: 'route-test',
-            taskProfile: input.taskProfile,
-            routeProfile: input.routeProfile ?? null,
-            mode: input.mode ?? 'unknown',
-            source: input.source ?? 'test',
-            selected: Boolean(input.route?.selected),
-            candidateCount: input.route?.candidates?.length ?? 0,
-            rejectedCount: input.route?.rejected?.length ?? 0,
-            fallbackChain: input.route?.fallbackChain ?? [],
-            providerId: input.route?.selected?.model?.providerId ?? null,
-            modelId: input.route?.selected?.model?.providerModel ?? null,
-            gatewayModelId: input.route?.selected?.model?.id ?? null,
-            estimatedInputTokens: input.estimatedInputTokens ?? null,
-            estimatedOutputTokens: input.estimatedOutputTokens ?? null,
-            estimatedCostUsd: input.estimatedCostUsd ?? null,
-            failure: input.failure ?? null,
-        })),
-        auditCatalogImporterSet: vi.fn((importers) => ({
-            importerCount: importers.length,
-            providerCount: 1,
-            publicImporterCount: 1,
-            authenticatedImporterCount: 1,
-            routeOptionImporterCount: 1,
-            accountOverlayImporterCount: 1,
-            providerEvidenceImporterCount: 1,
-            descriptors: [
-                {
-                    id: 'kilo-gateway-models',
-                    providerId: 'kilo',
-                    sourceKind: 'public_gateway_api',
-                    requiresAuth: false,
-                    url: 'https://api.kilo.ai/api/gateway/models',
-                    command: null,
-                    envRequirements: [],
-                    refreshPolicy: 'ttl',
-                    ttlSeconds: 21600,
-                    hooks: {
-                        fetchRaw: true,
-                        parseRows: true,
-                        toEvidenceFacts: true,
-                        toProviderEvidenceFacts: false,
-                        toRouteOptions: true,
-                        toAccountOverlays: false,
-                    },
-                },
-                {
-                    id: 'kilo-gateway-providers',
-                    providerId: 'kilo',
-                    sourceKind: 'public_gateway_api',
-                    requiresAuth: true,
-                    url: 'https://api.kilo.ai/api/gateway/providers',
-                    command: null,
-                    envRequirements: ['KILO_API_KEY'],
-                    refreshPolicy: 'ttl',
-                    ttlSeconds: 21600,
-                    hooks: {
-                        fetchRaw: true,
-                        parseRows: true,
-                        toEvidenceFacts: true,
-                        toProviderEvidenceFacts: true,
-                        toRouteOptions: false,
-                        toAccountOverlays: true,
-                    },
-                },
-            ],
-            endpointCoverage: [
-                {
-                    providerId: 'kilo',
-                    catalogSourceCount: 2,
-                    importerCount: 2,
-                    coveredCatalogSourceCount: 1,
-                    uncoveredCatalogSourceIds: ['kilo:catalog:public_docs:get:https-api-kilo-ai-docs'],
-                },
-            ],
-            providersWithoutImporters: [],
-            uncoveredCatalogSourceIds: ['kilo:catalog:public_docs:get:https-api-kilo-ai-docs'],
-            missingRequiredHooks: [],
-        })),
-        auditModelGatewayCatalogSnapshotIntegrity: vi.fn(() => ({
-            ok: true,
-            redactedIdentityCount: 0,
-            redactedIdentitySamples: [],
-            duplicateChecks: {
-                evidences: { rowCount: 0, uniqueKeyCount: 0, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
-                providerEvidences: { rowCount: 0, uniqueKeyCount: 0, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
-                routeOptions: { rowCount: 1, uniqueKeyCount: 1, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
-                projections: { rowCount: 1, uniqueKeyCount: 1, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
-                providerProjections: { rowCount: 0, uniqueKeyCount: 0, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
-                accountOverlays: { rowCount: 1, uniqueKeyCount: 1, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
+        },
+    ),
+    renderModelGatewayLocalProviderOptInGuidance: vi.fn((options = {}) => {
+        const profileId = options.profileId ?? options.profileIds?.[0] ?? 'repo_agent';
+        const profileSuffix =
+            Array.isArray(options.profileIds) && options.profileIds.length > 0
+                ? ` nos perfis ${options.profileIds.join(',')}`
+                : '';
+        return `Ollama/local foi bloqueado por padrão${profileSuffix}. Para usar modelos locais, peça explicitamente: /byok models route ${profileId} provider:ollama, /byok models route local_private ou /byok models route local_private_strict.`;
+    }),
+    buildModelGatewayPreKCompatibilityReport: vi.fn(() => ({
+        stage: 'pre-k',
+        ready: true,
+        total: 2,
+        passed: 2,
+        failed: 0,
+        checks: [
+            {
+                id: 'sdk_provider_config_boundary',
+                track: 'J',
+                passed: true,
+                summary: 'SDK ProviderConfig boundary ok',
             },
-        })),
-        auditModelGatewayPreRuntimeSelection: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/routing/selection-audit.js').auditModelGatewayPreRuntimeSelection>} */ (vi.fn(() => ({
+            {
+                id: 'route_trace_attributes_are_stable',
+                track: 'I',
+                passed: true,
+                summary: 'route trace attrs ok',
+            },
+        ],
+    })),
+    buildModelGatewayPreBuildReadinessReport: vi.fn(() => ({
+        stage: 'prebuild',
+        ready: true,
+        total: 3,
+        passed: 3,
+        failed: 0,
+        checks: [
+            {
+                id: 'universal_catalog_contracts_are_exported',
+                track: 'K',
+                passed: true,
+                summary: 'catalog ok',
+            },
+            {
+                id: 'provider_gateway_traits_are_metadata',
+                track: 'M',
+                passed: true,
+                summary: 'traits ok',
+            },
+            {
+                id: 'canonical_commands_are_published',
+                track: 'Y',
+                passed: true,
+                summary: 'commands ok',
+            },
+        ],
+    })),
+    buildModelGatewayRouteCandidates: vi.fn(() => []),
+    buildProbeCompletedEvent: vi.fn((input) => ({
+        type: 'model_gateway:probe:completed',
+        probeKind: input.probeKind,
+        ok: input.result?.ok === true,
+        status: input.result?.status ?? 'unknown',
+        providerAttempted: input.providerAttempted !== false,
+    })),
+    buildRouteDecisionEvent: vi.fn((input) => ({
+        type: 'model_gateway:route:decision',
+        decisionId: 'route-test',
+        taskProfile: input.taskProfile,
+        routeProfile: input.routeProfile ?? null,
+        mode: input.mode ?? 'unknown',
+        source: input.source ?? 'test',
+        selected: Boolean(input.route?.selected),
+        candidateCount: input.route?.candidates?.length ?? 0,
+        rejectedCount: input.route?.rejected?.length ?? 0,
+        fallbackChain: input.route?.fallbackChain ?? [],
+        providerId: input.route?.selected?.model?.providerId ?? null,
+        modelId: input.route?.selected?.model?.providerModel ?? null,
+        gatewayModelId: input.route?.selected?.model?.id ?? null,
+        estimatedInputTokens: input.estimatedInputTokens ?? null,
+        estimatedOutputTokens: input.estimatedOutputTokens ?? null,
+        estimatedCostUsd: input.estimatedCostUsd ?? null,
+        failure: input.failure ?? null,
+    })),
+    auditCatalogImporterSet: vi.fn((importers) => ({
+        importerCount: importers.length,
+        providerCount: 1,
+        publicImporterCount: 1,
+        authenticatedImporterCount: 1,
+        routeOptionImporterCount: 1,
+        accountOverlayImporterCount: 1,
+        providerEvidenceImporterCount: 1,
+        descriptors: [
+            {
+                id: 'kilo-gateway-models',
+                providerId: 'kilo',
+                sourceKind: 'public_gateway_api',
+                requiresAuth: false,
+                url: 'https://api.kilo.ai/api/gateway/models',
+                command: null,
+                envRequirements: [],
+                refreshPolicy: 'ttl',
+                ttlSeconds: 21600,
+                hooks: {
+                    fetchRaw: true,
+                    parseRows: true,
+                    toEvidenceFacts: true,
+                    toProviderEvidenceFacts: false,
+                    toRouteOptions: true,
+                    toAccountOverlays: false,
+                },
+            },
+            {
+                id: 'kilo-gateway-providers',
+                providerId: 'kilo',
+                sourceKind: 'public_gateway_api',
+                requiresAuth: true,
+                url: 'https://api.kilo.ai/api/gateway/providers',
+                command: null,
+                envRequirements: ['KILO_API_KEY'],
+                refreshPolicy: 'ttl',
+                ttlSeconds: 21600,
+                hooks: {
+                    fetchRaw: true,
+                    parseRows: true,
+                    toEvidenceFacts: true,
+                    toProviderEvidenceFacts: true,
+                    toRouteOptions: false,
+                    toAccountOverlays: true,
+                },
+            },
+        ],
+        endpointCoverage: [
+            {
+                providerId: 'kilo',
+                catalogSourceCount: 2,
+                importerCount: 2,
+                coveredCatalogSourceCount: 1,
+                uncoveredCatalogSourceIds: ['kilo:catalog:public_docs:get:https-api-kilo-ai-docs'],
+            },
+        ],
+        providersWithoutImporters: [],
+        uncoveredCatalogSourceIds: ['kilo:catalog:public_docs:get:https-api-kilo-ai-docs'],
+        missingRequiredHooks: [],
+    })),
+    auditModelGatewayCatalogSnapshotIntegrity: vi.fn(() => ({
+        ok: true,
+        redactedIdentityCount: 0,
+        redactedIdentitySamples: [],
+        duplicateChecks: {
+            evidences: { rowCount: 0, uniqueKeyCount: 0, duplicateKeyCount: 0, duplicateExtraRowCount: 0, samples: [] },
+            providerEvidences: {
+                rowCount: 0,
+                uniqueKeyCount: 0,
+                duplicateKeyCount: 0,
+                duplicateExtraRowCount: 0,
+                samples: [],
+            },
+            routeOptions: {
+                rowCount: 1,
+                uniqueKeyCount: 1,
+                duplicateKeyCount: 0,
+                duplicateExtraRowCount: 0,
+                samples: [],
+            },
+            projections: {
+                rowCount: 1,
+                uniqueKeyCount: 1,
+                duplicateKeyCount: 0,
+                duplicateExtraRowCount: 0,
+                samples: [],
+            },
+            providerProjections: {
+                rowCount: 0,
+                uniqueKeyCount: 0,
+                duplicateKeyCount: 0,
+                duplicateExtraRowCount: 0,
+                samples: [],
+            },
+            accountOverlays: {
+                rowCount: 1,
+                uniqueKeyCount: 1,
+                duplicateKeyCount: 0,
+                duplicateExtraRowCount: 0,
+                samples: [],
+            },
+        },
+    })),
+    auditModelGatewayPreRuntimeSelection: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/routing/selection-audit.js').auditModelGatewayPreRuntimeSelection
+>} */ (
+        vi.fn(() => ({
             schema: 'model-gateway-pre-runtime-selection-audit',
             ok: true,
             mode: 'allow_probe_unknown',
@@ -490,187 +673,201 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 decisionLayers: { runtimeProbeProofCount: 0 },
                 snapshotContext: {},
             })),
-        }))),
-        auditModelGatewayPostRuntimeSelection: vi.fn(() => ({
-            schema: 'model-gateway-post-runtime-selection-audit',
-            ok: true,
-            mode: 'strict_access_only',
-            runtimeMode: 'observed_runtime_health',
-            snapshotContext: {
-                projectionCount: 1,
-                routeOptionCount: 1,
-                accountOverlayCount: 1,
-                eligibilityDecisionCount: 1,
-                candidateCount: 1,
-            },
-            summary: {
-                profileCount: 1,
-                selectedProfileCount: 1,
-                unselectedProfileCount: 0,
-                candidateCount: 1,
-                rejectedCount: 0,
-                healthRecordCount: 1,
-                runtimeChatOkCount: 1,
-                runtimeAgentProbeProofCount: 1,
-                runtimeProbeProofCount: 1,
-                runtimeHealthProofCount: 1,
-                selectedProviders: { openrouter: 1 },
-                selectedSelectorKinds: { provider_explicit: 1 },
-                rejectedReasonCounts: {},
-            },
-            profiles: [],
-        })),
-        compareModelGatewaySelectionAudits: vi.fn(() => ({
-            schema: 'model-gateway-selection-comparison',
-            ok: true,
-            summary: {
-                profileCount: 1,
-                changedCount: 1,
-                unchangedCount: 0,
-                preSelectedCount: 1,
-                postSelectedCount: 1,
-                postRuntimeProofSelectedCount: 1,
-                postRuntimeHealthProofCount: 1,
-                postRuntimeProbeProofCount: 1,
-            },
-            rows: [
-                {
-                    profileId: 'repo_agent',
-                    changed: true,
-                    preSelected: {
-                        providerId: 'openrouter',
-                        providerModel: 'openai/gpt-oss-120b',
-                        selectorKind: 'provider_explicit',
-                        score: 250,
-                    },
-                    postSelected: {
-                        providerId: 'groq',
-                        providerModel: 'openai/gpt-oss-120b',
-                        selectorKind: 'exact_model',
-                        score: 310,
-                    },
-                    postSelectedHasRuntimeProof: true,
-                    postDecisionLayers: {},
+        }))
+    ),
+    auditModelGatewayPostRuntimeSelection: vi.fn(() => ({
+        schema: 'model-gateway-post-runtime-selection-audit',
+        ok: true,
+        mode: 'strict_access_only',
+        runtimeMode: 'observed_runtime_health',
+        snapshotContext: {
+            projectionCount: 1,
+            routeOptionCount: 1,
+            accountOverlayCount: 1,
+            eligibilityDecisionCount: 1,
+            candidateCount: 1,
+        },
+        summary: {
+            profileCount: 1,
+            selectedProfileCount: 1,
+            unselectedProfileCount: 0,
+            candidateCount: 1,
+            rejectedCount: 0,
+            healthRecordCount: 1,
+            runtimeChatOkCount: 1,
+            runtimeAgentProbeProofCount: 1,
+            runtimeProbeProofCount: 1,
+            runtimeHealthProofCount: 1,
+            selectedProviders: { openrouter: 1 },
+            selectedSelectorKinds: { provider_explicit: 1 },
+            rejectedReasonCounts: {},
+        },
+        profiles: [],
+    })),
+    compareModelGatewaySelectionAudits: vi.fn(() => ({
+        schema: 'model-gateway-selection-comparison',
+        ok: true,
+        summary: {
+            profileCount: 1,
+            changedCount: 1,
+            unchangedCount: 0,
+            preSelectedCount: 1,
+            postSelectedCount: 1,
+            postRuntimeProofSelectedCount: 1,
+            postRuntimeHealthProofCount: 1,
+            postRuntimeProbeProofCount: 1,
+        },
+        rows: [
+            {
+                profileId: 'repo_agent',
+                changed: true,
+                preSelected: {
+                    providerId: 'openrouter',
+                    providerModel: 'openai/gpt-oss-120b',
+                    selectorKind: 'provider_explicit',
+                    score: 250,
                 },
-            ],
-        })),
-        explainModelGatewaySelectionComparison: vi.fn(() => ({
-            schema: 'model-gateway-selection-comparison-explain',
-            ok: true,
-            summary: {
-                profileCount: 1,
-                changedCount: 1,
-                unchangedCount: 0,
-                runtimeProofCount: 1,
-                reasonCounts: { post_runtime_proved_better_route: 1 },
+                postSelected: {
+                    providerId: 'groq',
+                    providerModel: 'openai/gpt-oss-120b',
+                    selectorKind: 'exact_model',
+                    score: 310,
+                },
+                postSelectedHasRuntimeProof: true,
+                postDecisionLayers: {},
+            },
+        ],
+    })),
+    explainModelGatewaySelectionComparison: vi.fn(() => ({
+        schema: 'model-gateway-selection-comparison-explain',
+        ok: true,
+        summary: {
+            profileCount: 1,
+            changedCount: 1,
+            unchangedCount: 0,
+            runtimeProofCount: 1,
+            reasonCounts: { post_runtime_proved_better_route: 1 },
+            nextActions: ['consider_prefer_runtime_proved_policy'],
+        },
+        rows: [
+            {
+                profileId: 'repo_agent',
+                changed: true,
+                reason: 'post_runtime_proved_better_route',
                 nextActions: ['consider_prefer_runtime_proved_policy'],
+                preRouteKey: 'openrouter:openai/gpt-oss-120b:provider_explicit',
+                postRouteKey: 'groq:openai/gpt-oss-120b:exact_model',
+                postSelectedHasRuntimeProof: true,
             },
-            rows: [
-                {
-                    profileId: 'repo_agent',
-                    changed: true,
-                    reason: 'post_runtime_proved_better_route',
-                    nextActions: ['consider_prefer_runtime_proved_policy'],
-                    preRouteKey: 'openrouter:openai/gpt-oss-120b:provider_explicit',
-                    postRouteKey: 'groq:openai/gpt-oss-120b:exact_model',
-                    postSelectedHasRuntimeProof: true,
-                },
-            ],
-        })),
-        resolveModelGatewaySelectionPolicy: vi.fn((_comparison, options = {}) => ({
-            schema: 'model-gateway-selection-policy-resolution',
-            ok: true,
-            mode: options.mode ?? 'metadata_first',
-            summary: {
-                profileCount: 1,
-                selectedCount: 1,
-                unselectedCount: 0,
-                metadataWinnerCount: options.mode === 'metadata_first' ? 1 : 0,
-                postRuntimeWinnerCount: options.mode === 'metadata_first' ? 0 : 1,
-                runtimeProofSelectedCount: 1,
-                changedFromPreRuntimeCount: options.mode === 'metadata_first' ? 0 : 1,
-            },
-            rows: [],
-        })),
-        buildModelGatewaySelectionDecisionTrace: vi.fn((input) => ({
-            schema: 'model-gateway-selection-decision-trace',
-            traceId: input.traceId ?? 'terminal-selection-trace',
-            source: input.source ?? 'terminal-byok-selection-audit',
-        })),
-        DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH:
-            'data/copilot/model-gateway/runtime-automation-policy.json',
-        listModelGatewayRuntimeAutomationPolicyPresets: vi.fn(() => [
-            {
-                preset: 'operator_manual',
-                policy: 'prefer_runtime_proved',
-                allowLiveSetModel: false,
-                allowNewSession: false,
-                allowLocalPrivate: false,
-            },
-            {
-                preset: 'auto_same_boundary',
-                policy: 'prefer_runtime_proved',
-                allowLiveSetModel: true,
-                allowNewSession: false,
-                allowLocalPrivate: false,
-            },
-            {
-                preset: 'auto_prepare_new_session',
-                policy: 'prefer_runtime_proved',
-                allowLiveSetModel: true,
-                allowNewSession: true,
-                allowLocalPrivate: false,
-            },
-        ]),
-        resolveModelGatewayRuntimeAutomationPolicyPreset: vi.fn((preset, overrides = {}) => {
-            const presetId = String(preset ?? 'operator_manual').replace(/-/g, '_');
-            return {
-                enabled: true,
-                policy: presetId === 'llm_operator_guarded' ? 'require_runtime_proof' : 'prefer_runtime_proved',
-                profiles: [],
-                allowLiveSetModel: presetId === 'auto_same_boundary' || presetId === 'auto_prepare_new_session',
-                allowNewSession: presetId === 'auto_prepare_new_session',
-                allowProviderProbes: false,
-                allowLocalPrivate: false,
-                accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
-                ...overrides,
-                preset: presetId,
-            };
-        }),
-        readModelGatewayRuntimeAutomationPolicy: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy>} */ (vi.fn(() =>
-            /** @satisfies {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy>} */ ({
-                enabled: false,
-                preset: 'operator_manual',
-                policy: 'prefer_runtime_proved',
-                profiles: [],
-                allowLiveSetModel: false,
-                allowNewSession: false,
-                allowProviderProbes: false,
-                allowLocalPrivate: false,
-                accountWideFailureKinds: [],
-            })
-        )),
-        readModelGatewayRuntimeAutomationPolicyFile: vi.fn(() => Promise.resolve({})),
-        explainModelGatewayRuntimeAutomationPolicySources: vi.fn(() => ({
-            enabled: { source: 'default' },
-            preset: { source: 'default' },
-            policy: { source: 'default' },
-            profiles: { source: 'default' },
-            allowLiveSetModel: { source: 'default' },
-            allowNewSession: { source: 'default' },
-            allowProviderProbes: { source: 'default' },
-            allowLocalPrivate: { source: 'default' },
-            accountWideFailureKinds: { source: 'default' },
-        })),
-        validateModelGatewayRuntimeAutomationPolicy: vi.fn(() => ({
-            ok: true,
-            issues: [],
-            allowedModes: ['prefer_runtime_proved'],
-            allowedPresets: ['operator_manual', 'llm_operator_guarded', 'auto_same_boundary', 'auto_prepare_new_session'],
-        })),
-        readModelGatewayRuntimeAutomationEffectivePolicy: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationEffectivePolicy>} */ (vi.fn(() =>
+        ],
+    })),
+    resolveModelGatewaySelectionPolicy: vi.fn((_comparison, options = {}) => ({
+        schema: 'model-gateway-selection-policy-resolution',
+        ok: true,
+        mode: options.mode ?? 'metadata_first',
+        summary: {
+            profileCount: 1,
+            selectedCount: 1,
+            unselectedCount: 0,
+            metadataWinnerCount: options.mode === 'metadata_first' ? 1 : 0,
+            postRuntimeWinnerCount: options.mode === 'metadata_first' ? 0 : 1,
+            runtimeProofSelectedCount: 1,
+            changedFromPreRuntimeCount: options.mode === 'metadata_first' ? 0 : 1,
+        },
+        rows: [],
+    })),
+    buildModelGatewaySelectionDecisionTrace: vi.fn((input) => ({
+        schema: 'model-gateway-selection-decision-trace',
+        traceId: input.traceId ?? 'terminal-selection-trace',
+        source: input.source ?? 'terminal-byok-selection-audit',
+    })),
+    DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH: 'data/copilot/model-gateway/runtime-automation-policy.json',
+    listModelGatewayRuntimeAutomationPolicyPresets: vi.fn(() => [
+        {
+            preset: 'operator_manual',
+            policy: 'prefer_runtime_proved',
+            allowLiveSetModel: false,
+            allowNewSession: false,
+            allowLocalPrivate: false,
+        },
+        {
+            preset: 'auto_same_boundary',
+            policy: 'prefer_runtime_proved',
+            allowLiveSetModel: true,
+            allowNewSession: false,
+            allowLocalPrivate: false,
+        },
+        {
+            preset: 'auto_prepare_new_session',
+            policy: 'prefer_runtime_proved',
+            allowLiveSetModel: true,
+            allowNewSession: true,
+            allowLocalPrivate: false,
+        },
+    ]),
+    resolveModelGatewayRuntimeAutomationPolicyPreset: vi.fn((preset, overrides = {}) => {
+        const presetId = String(preset ?? 'operator_manual').replace(/-/g, '_');
+        return {
+            enabled: true,
+            policy: presetId === 'llm_operator_guarded' ? 'require_runtime_proof' : 'prefer_runtime_proved',
+            profiles: [],
+            allowLiveSetModel: presetId === 'auto_same_boundary' || presetId === 'auto_prepare_new_session',
+            allowNewSession: presetId === 'auto_prepare_new_session',
+            allowProviderProbes: false,
+            allowLocalPrivate: false,
+            accountWideFailureKinds: ['rate-limit', 'quota', 'credits'],
+            ...overrides,
+            preset: presetId,
+        };
+    }),
+    readModelGatewayRuntimeAutomationPolicy: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy
+>} */ (
+        vi.fn(
+            () =>
+                /** @satisfies {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy
+>} */ ({
+                    enabled: false,
+                    preset: 'operator_manual',
+                    policy: 'prefer_runtime_proved',
+                    profiles: [],
+                    allowLiveSetModel: false,
+                    allowNewSession: false,
+                    allowProviderProbes: false,
+                    allowLocalPrivate: false,
+                    accountWideFailureKinds: [],
+                }),
+        )
+    ),
+    readModelGatewayRuntimeAutomationPolicyFile: vi.fn(() => Promise.resolve({})),
+    explainModelGatewayRuntimeAutomationPolicySources: vi.fn(() => ({
+        enabled: { source: 'default' },
+        preset: { source: 'default' },
+        policy: { source: 'default' },
+        profiles: { source: 'default' },
+        allowLiveSetModel: { source: 'default' },
+        allowNewSession: { source: 'default' },
+        allowProviderProbes: { source: 'default' },
+        allowLocalPrivate: { source: 'default' },
+        accountWideFailureKinds: { source: 'default' },
+    })),
+    validateModelGatewayRuntimeAutomationPolicy: vi.fn(() => ({
+        ok: true,
+        issues: [],
+        allowedModes: ['prefer_runtime_proved'],
+        allowedPresets: ['operator_manual', 'llm_operator_guarded', 'auto_same_boundary', 'auto_prepare_new_session'],
+    })),
+    readModelGatewayRuntimeAutomationEffectivePolicy: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationEffectivePolicy
+>} */ (
+        vi.fn(() =>
             Promise.resolve(
-                /** @satisfies {Awaited<ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationEffectivePolicy>>} */ ({
+                /** @satisfies {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationEffectivePolicy
+    >
+>} */ ({
                     enabled: false,
                     preset: 'operator_manual',
                     policy: 'prefer_runtime_proved',
@@ -682,42 +879,82 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                     accountWideFailureKinds: [],
                 }),
             ),
-        )),
-        writeModelGatewayRuntimeAutomationPolicyFile: vi.fn((policy) =>
-            Promise.resolve({
-                filePath: '/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/runtime-automation-policy.json',
-                policy,
-            }),
-        ),
-        buildModelGatewayRuntimeAutomationDecision: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision>} */ (vi.fn((input) =>
-            /** @satisfies {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision>} */ ({
-                schema: 'model-gateway-runtime-automation-decision',
-                ok: false,
-                status: 'blocked',
-                action: 'manual_intervention',
-                selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
-                selectedRouteReasons: ['mock_selection'],
-                selectedRouteConfidence: 'catalog',
-                routeProfile: input.profileId ?? 'repo_agent',
-                fallbackFromSelectedRouteKey: null,
-                fallbackReason: null,
-                canApplyLiveModel: false,
-                canApplyLiveRoute: false,
-                requiresProviderRebind: true,
-                requiresNewSession: false,
-                blockers: ['live_set_model_policy_disabled'],
-                currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
-                targetBoundary: { profile: input.profileId ?? 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'openai/gpt-oss-120b' },
-                targetRoute: { providerId: 'openrouter', providerModel: 'openai/gpt-oss-120b', selectorSyntax: 'openai/gpt-oss-120b', baseUrl: null, openAICompatibleBaseUrl: null, wireApi: null, routeProfile: input.profileId ?? 'repo_agent', selectedRouteKey: 'openrouter:openai/gpt-oss-120b' },
-                cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
-                blockerClass: 'route_blocked',
-                nonActionReason: 'live_set_model_policy_disabled',
-                nextCommands: ['/byok auto status'],
-                operatorSummary: 'mock automation decision',
-            })
-        )),
-        buildModelGatewayRuntimeAutomationControllerStep: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/automation/controller.js').buildModelGatewayRuntimeAutomationControllerStep>} */ (vi.fn()),
-        buildModelGatewayRuntimeProofCommands: vi.fn((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeProofCommands>[0]} */ alternativeSummary, /** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeProofCommands>[1]} */ options = {}) => {
+        )
+    ),
+    writeModelGatewayRuntimeAutomationPolicyFile: vi.fn((policy) =>
+        Promise.resolve({
+            filePath: '/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/runtime-automation-policy.json',
+            policy,
+        }),
+    ),
+    buildModelGatewayRuntimeAutomationDecision: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision
+>} */ (
+        vi.fn(
+            (input) =>
+                /** @satisfies {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision
+>} */ ({
+                    schema: 'model-gateway-runtime-automation-decision',
+                    ok: false,
+                    status: 'blocked',
+                    action: 'manual_intervention',
+                    selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
+                    selectedRouteReasons: ['mock_selection'],
+                    selectedRouteConfidence: 'catalog',
+                    routeProfile: input.profileId ?? 'repo_agent',
+                    fallbackFromSelectedRouteKey: null,
+                    fallbackReason: null,
+                    canApplyLiveModel: false,
+                    canApplyLiveRoute: false,
+                    requiresProviderRebind: true,
+                    requiresNewSession: false,
+                    blockers: ['live_set_model_policy_disabled'],
+                    currentBoundary: {
+                        enabled: false,
+                        profile: null,
+                        preset: null,
+                        providerType: null,
+                        baseUrl: null,
+                        model: null,
+                    },
+                    targetBoundary: {
+                        profile: input.profileId ?? 'repo_agent',
+                        preset: 'openrouter',
+                        providerType: 'openai_compatible',
+                        baseUrl: null,
+                        model: 'openai/gpt-oss-120b',
+                    },
+                    targetRoute: {
+                        providerId: 'openrouter',
+                        providerModel: 'openai/gpt-oss-120b',
+                        selectorSyntax: 'openai/gpt-oss-120b',
+                        baseUrl: null,
+                        openAICompatibleBaseUrl: null,
+                        wireApi: null,
+                        routeProfile: input.profileId ?? 'repo_agent',
+                        selectedRouteKey: 'openrouter:openai/gpt-oss-120b',
+                    },
+                    cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
+                    blockerClass: 'route_blocked',
+                    nonActionReason: 'live_set_model_policy_disabled',
+                    nextCommands: ['/byok auto status'],
+                    operatorSummary: 'mock automation decision',
+                }),
+        )
+    ),
+    buildModelGatewayRuntimeAutomationControllerStep: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/automation/controller.js').buildModelGatewayRuntimeAutomationControllerStep
+>} */ (vi.fn()),
+    buildModelGatewayRuntimeProofCommands: vi.fn(
+        (
+            /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeProofCommands
+>[0]} */ alternativeSummary,
+            /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeProofCommands
+>[1]} */ options = {},
+        ) => {
             const limit = typeof options.limit === 'number' ? options.limit : 3;
             const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20_000;
             const summary =
@@ -729,9 +966,7 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 .filter((route) => route && typeof route === 'object' && !Array.isArray(route))
                 .map((route) => /** @type {Record<string, unknown>} */ (route))
                 .filter(
-                    (route) =>
-                        typeof route['providerId'] === 'string' &&
-                        typeof route['providerModel'] === 'string',
+                    (route) => typeof route['providerId'] === 'string' && typeof route['providerModel'] === 'string',
                 )
                 .map((route) => {
                     const reasons = Array.isArray(route['reasons'])
@@ -747,187 +982,200 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                     };
                 })
                 .slice(0, limit);
-        }),
-        buildModelGatewayRuntimeStandbyRoutes: vi.fn((_runtimeSelectorPlan, options = {}) => {
-            const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20_000;
-            return [
-                {
-                    profileId: 'repo_agent',
-                    rank: 1,
-                    source: 'candidate_alternative',
-                    selectedRouteKey: 'kilo-code:kilo-auto/free',
-                    providerId: 'kilo-code',
-                    providerModel: 'kilo-auto/free',
-                    selectorSyntax: 'kilo-auto/free',
-                    routeLayer: 'openai_compatible_direct',
-                    wireApi: 'openai_chat_completions',
-                    upstreamProvider: null,
-                    score: 91,
-                    hasRuntimeProof: true,
-                    needsProbe: false,
-                    standbyClass: 'new_provider',
-                    runtimeEnvStatus: 'ready',
-                    reasons: ['runtime_selector_alternativa:alternate1'],
-                    commands: {
-                        probeAgent: `/byok probe agent provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
-                        probeChat: `/byok probe chat provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
-                        liveModel: '/byok model kilo-auto/free',
-                        provider: '/byok provider kilo-code kilo-auto/free',
-                        persistProvider: '/byok persist provider kilo-code kilo-auto/free',
-                        newSession: '/session sdk next new',
-                    },
-                },
-            ];
-        }),
-        buildModelGatewayRuntimeStandbyPlan: vi.fn((_runtimeSelectorPlan, options = {}) => {
-            const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20_000;
-            const routes = [
-                {
-                    profileId: 'repo_agent',
-                    rank: 1,
-                    source: 'candidate_alternative',
-                    selectedRouteKey: 'kilo-code:kilo-auto/free',
-                    providerId: 'kilo-code',
-                    providerModel: 'kilo-auto/free',
-                    selectorSyntax: 'kilo-auto/free',
-                    routeLayer: 'openai_compatible_direct',
-                    wireApi: 'openai_chat_completions',
-                    upstreamProvider: null,
-                    score: 91,
-                    hasRuntimeProof: true,
-                    needsProbe: false,
-                    standbyClass: 'new_provider',
-                    runtimeEnvStatus: 'ready',
-                    reasons: ['runtime_selector_alternativa:alternate1'],
-                    commands: {
-                        probeAgent: `/byok probe agent provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
-                        probeChat: `/byok probe chat provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
-                        liveModel: '/byok model kilo-auto/free',
-                        provider: '/byok provider kilo-code kilo-auto/free',
-                        persistProvider: '/byok persist provider kilo-code kilo-auto/free',
-                        newSession: '/session sdk next new',
-                    },
-                },
-            ];
-            return {
-                schema: 'model-gateway-runtime-standby-plan',
-                ok: true,
-                generatedAt: '2026-06-02T00:00:00.000Z',
-                profileId: options.profileId ?? 'repo_agent',
-                selectorOk: true,
-                runtimeSelectorReady: true,
-                summary: {
-                    routeCount: routes.length,
-                    selectedCount: 0,
-                    alternateCount: routes.length,
-                    runtimeProofCount: 1,
-                    providerCount: 1,
-                    sameBoundaryCommandCount: 1,
-                    newProviderCommandCount: 1,
-                    probeCommandCount: 1,
-                },
-                routes,
-                nextCommands: [
-                    `/byok probe agent provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
-                    '/byok model kilo-auto/free',
-                    '/byok provider kilo-code kilo-auto/free',
-                ],
-            };
-        }),
-        buildModelGatewayRuntimeSelectorPlan: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan>} */ (vi.fn((_policy, options = {}) =>
-            /** @satisfies {ReturnType<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan>} */ ({
-                schema: 'model-gateway-runtime-selector-plan',
-                ok: true,
-                ready: true,
-                mode: options.requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first',
-                sourceSchema: null,
-                traceId: null,
-                summary: {
-                    profileCount: 1,
-                    selectedProfileCount: 1,
-                    blockedProfileCount: 0,
-                    accountAccessBlockedCount: 0,
-                    runtimeProofSelectedCount: options.requireRuntimeProof ? 1 : 0,
-                    runtimeEnvReadyCount: 1,
-                    runtimeEnvBlockedCount: 0,
-                    runtimeHealthBlockedCount: 0,
-                    runtimeProbeBlockedCount: 0,
-                    providerCooldownBlockedCount: 0,
-                    alternativeEvaluatedCount: 0,
-                    alternativeUsableCount: 0,
-                },
-                routes: [],
-            })
-        )),
-        persistModelGatewaySelectionDecisionTrace: vi.fn((trace) =>
-            Promise.resolve({
-                schema: 'model-gateway-selection-decision-trace-persistence',
-                ok: true,
-                written: true,
-                traceId: trace.traceId ?? 'terminal-selection-trace',
-                filePath: '/tmp/model-gateway-selection-trace.json',
-                latestPath: '/tmp/latest-model-gateway-selection-trace.json',
-                error: null,
-            }),
-        ),
-        DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR: 'data/copilot/model-gateway/selection-traces',
-        planModelGatewayProbeBackoff: vi.fn(() => ({
-            ready: [
-                {
-                    key: 'openrouter:changed-model:default',
-                    providerId: 'openrouter',
-                    providerModel: 'changed-model',
-                    routeProfile: 'default',
-                    probeKinds: ['chat'],
-                    reasons: ['capabilities_changed'],
-                },
-            ],
-            deferred: [
-                {
-                    key: 'groq:limited-model:default',
-                    providerId: 'groq',
-                    providerModel: 'limited-model',
-                    routeProfile: 'default',
-                    reason: 'runtime_rate_limited',
-                    retryAfterSeconds: 60,
-                    resetAt: '2026-05-25T00:01:00.000Z',
-                },
-            ],
-            summary: {
-                total: 2,
-                ready: 1,
-                deferred: 1,
-                reasonCounts: { runtime_rate_limited: 1 },
-            },
-        })),
-        chmod: vi.fn(),
-        classifyByokProviderFailure: vi.fn((error) => ({
-            kind: 'unknown',
-            message: error instanceof Error ? error.message : String(error),
-            statusCode: null,
-            errorContext: 'provider.unknown',
-            operatorLabel: 'falha BYOK ainda sem classe operacional',
-            operatorAction: 'inspecione /byok health',
-            external: true,
-        })),
-        clearByokProviderModelHealth: vi.fn(),
-        createDefaultModelGatewayCatalogImporters: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/default-importers.js').createDefaultModelGatewayCatalogImporters>} */ (vi.fn(() => [])),
-        createEnvSecretRegistry: vi.fn(() => ({ has: () => false, get: () => null, list: () => [] })),
-        DEFAULT_MODEL_GATEWAY_CATALOG_PATH: 'data/copilot/model-gateway/catalog.json',
-        deriveModelGatewayRuntimeAccountOverlaysFromHealth: vi.fn(() => [
+        },
+    ),
+    buildModelGatewayRuntimeStandbyRoutes: vi.fn((_runtimeSelectorPlan, options = {}) => {
+        const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20_000;
+        return [
             {
-                accountOverlayId: 'runtime-health:groq:default:limited-model:rate-limit',
-                providerId: 'groq',
-                sourceKind: 'runtime_health',
+                profileId: 'repo_agent',
+                rank: 1,
+                source: 'candidate_alternative',
+                selectedRouteKey: 'kilo-code:kilo-auto/free',
+                providerId: 'kilo-code',
+                providerModel: 'kilo-auto/free',
+                selectorSyntax: 'kilo-auto/free',
+                routeLayer: 'openai_compatible_direct',
+                wireApi: 'openai_chat_completions',
+                upstreamProvider: null,
+                score: 91,
+                hasRuntimeProof: true,
+                needsProbe: false,
+                standbyClass: 'new_provider',
+                runtimeEnvStatus: 'ready',
+                reasons: ['runtime_selector_alternativa:alternate1'],
+                commands: {
+                    probeAgent: `/byok probe agent provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
+                    probeChat: `/byok probe chat provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
+                    liveModel: '/byok model kilo-auto/free',
+                    provider: '/byok provider kilo-code kilo-auto/free',
+                    persistProvider: '/byok persist provider kilo-code kilo-auto/free',
+                    newSession: '/session sdk next new',
+                },
             },
-        ]),
-        discoverConfiguredByokModelsFromEnv: vi.fn(),
-        applyModelGatewayEligibilityToSnapshot: vi.fn((snapshot, decisions, run) => ({
-            ...snapshot,
-            modelEligibilityDecisions: decisions,
-            modelEligibilityRuns: [run],
-        })),
-        evaluateModelGatewayCatalogEligibility: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/eligibility/catalog-snapshot.js').evaluateModelGatewayCatalogEligibility>} */ (vi.fn(() => ({
+        ];
+    }),
+    buildModelGatewayRuntimeStandbyPlan: vi.fn((_runtimeSelectorPlan, options = {}) => {
+        const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 20_000;
+        const routes = [
+            {
+                profileId: 'repo_agent',
+                rank: 1,
+                source: 'candidate_alternative',
+                selectedRouteKey: 'kilo-code:kilo-auto/free',
+                providerId: 'kilo-code',
+                providerModel: 'kilo-auto/free',
+                selectorSyntax: 'kilo-auto/free',
+                routeLayer: 'openai_compatible_direct',
+                wireApi: 'openai_chat_completions',
+                upstreamProvider: null,
+                score: 91,
+                hasRuntimeProof: true,
+                needsProbe: false,
+                standbyClass: 'new_provider',
+                runtimeEnvStatus: 'ready',
+                reasons: ['runtime_selector_alternativa:alternate1'],
+                commands: {
+                    probeAgent: `/byok probe agent provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
+                    probeChat: `/byok probe chat provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
+                    liveModel: '/byok model kilo-auto/free',
+                    provider: '/byok provider kilo-code kilo-auto/free',
+                    persistProvider: '/byok persist provider kilo-code kilo-auto/free',
+                    newSession: '/session sdk next new',
+                },
+            },
+        ];
+        return {
+            schema: 'model-gateway-runtime-standby-plan',
+            ok: true,
+            generatedAt: '2026-06-02T00:00:00.000Z',
+            profileId: options.profileId ?? 'repo_agent',
+            selectorOk: true,
+            runtimeSelectorReady: true,
+            summary: {
+                routeCount: routes.length,
+                selectedCount: 0,
+                alternateCount: routes.length,
+                runtimeProofCount: 1,
+                providerCount: 1,
+                sameBoundaryCommandCount: 1,
+                newProviderCommandCount: 1,
+                probeCommandCount: 1,
+            },
+            routes,
+            nextCommands: [
+                `/byok probe agent provider:kilo-code model:kilo-auto/free timeout:${timeoutMs}`,
+                '/byok model kilo-auto/free',
+                '/byok provider kilo-code kilo-auto/free',
+            ],
+        };
+    }),
+    buildModelGatewayRuntimeSelectorPlan: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan
+>} */ (
+        vi.fn(
+            (_policy, options = {}) =>
+                /** @satisfies {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan
+>} */ ({
+                    schema: 'model-gateway-runtime-selector-plan',
+                    ok: true,
+                    ready: true,
+                    mode: options.requireRuntimeProof ? 'require_runtime_proof' : 'metadata_first',
+                    sourceSchema: null,
+                    traceId: null,
+                    summary: {
+                        profileCount: 1,
+                        selectedProfileCount: 1,
+                        blockedProfileCount: 0,
+                        accountAccessBlockedCount: 0,
+                        runtimeProofSelectedCount: options.requireRuntimeProof ? 1 : 0,
+                        runtimeEnvReadyCount: 1,
+                        runtimeEnvBlockedCount: 0,
+                        runtimeHealthBlockedCount: 0,
+                        runtimeProbeBlockedCount: 0,
+                        providerCooldownBlockedCount: 0,
+                        alternativeEvaluatedCount: 0,
+                        alternativeUsableCount: 0,
+                    },
+                    routes: [],
+                }),
+        )
+    ),
+    persistModelGatewaySelectionDecisionTrace: vi.fn((trace) =>
+        Promise.resolve({
+            schema: 'model-gateway-selection-decision-trace-persistence',
+            ok: true,
+            written: true,
+            traceId: trace.traceId ?? 'terminal-selection-trace',
+            filePath: '/tmp/model-gateway-selection-trace.json',
+            latestPath: '/tmp/latest-model-gateway-selection-trace.json',
+            error: null,
+        }),
+    ),
+    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR: 'data/copilot/model-gateway/selection-traces',
+    planModelGatewayProbeBackoff: vi.fn(() => ({
+        ready: [
+            {
+                key: 'openrouter:changed-model:default',
+                providerId: 'openrouter',
+                providerModel: 'changed-model',
+                routeProfile: 'default',
+                probeKinds: ['chat'],
+                reasons: ['capabilities_changed'],
+            },
+        ],
+        deferred: [
+            {
+                key: 'groq:limited-model:default',
+                providerId: 'groq',
+                providerModel: 'limited-model',
+                routeProfile: 'default',
+                reason: 'runtime_rate_limited',
+                retryAfterSeconds: 60,
+                resetAt: '2026-05-25T00:01:00.000Z',
+            },
+        ],
+        summary: {
+            total: 2,
+            ready: 1,
+            deferred: 1,
+            reasonCounts: { runtime_rate_limited: 1 },
+        },
+    })),
+    chmod: vi.fn(),
+    classifyByokProviderFailure: vi.fn((error) => ({
+        kind: 'unknown',
+        message: error instanceof Error ? error.message : String(error),
+        statusCode: null,
+        errorContext: 'provider.unknown',
+        operatorLabel: 'falha BYOK ainda sem classe operacional',
+        operatorAction: 'inspecione /byok health',
+        external: true,
+    })),
+    clearByokProviderModelHealth: vi.fn(),
+    createDefaultModelGatewayCatalogImporters: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/catalog/default-importers.js').createDefaultModelGatewayCatalogImporters
+>} */ (vi.fn(() => [])),
+    createEnvSecretRegistry: vi.fn(() => ({ has: () => false, get: () => null, list: () => [] })),
+    DEFAULT_MODEL_GATEWAY_CATALOG_PATH: 'data/copilot/model-gateway/catalog.json',
+    deriveModelGatewayRuntimeAccountOverlaysFromHealth: vi.fn(() => [
+        {
+            accountOverlayId: 'runtime-health:groq:default:limited-model:rate-limit',
+            providerId: 'groq',
+            sourceKind: 'runtime_health',
+        },
+    ]),
+    discoverConfiguredByokModelsFromEnv: vi.fn(),
+    applyModelGatewayEligibilityToSnapshot: vi.fn((snapshot, decisions, run) => ({
+        ...snapshot,
+        modelEligibilityDecisions: decisions,
+        modelEligibilityRuns: [run],
+    })),
+    evaluateModelGatewayCatalogEligibility: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/eligibility/catalog-snapshot.js').evaluateModelGatewayCatalogEligibility
+>} */ (
+        vi.fn(() => ({
             run: {
                 schemaVersion: 1,
                 runId: 'eligibility-run',
@@ -949,23 +1197,27 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             },
             decisions: [],
             summary: { modelCount: 0, eligibleCount: 0, unknownCount: 0, excludedCount: 0 },
-        }))),
-        evaluateModelGatewayProviderEnvRequirements: vi.fn(() => [
-            {
-                providerId: 'kilo',
-                status: 'missing',
-                requiredGroupCount: 1,
-                satisfiedRequiredGroupCount: 0,
-                recommendedGroupCount: 0,
-                satisfiedRecommendedGroupCount: 0,
-                configuredKeys: [],
-                missingRequiredKeys: ['KILO_API_KEY', 'KILO_CODE_API_KEY'],
-                missingRecommendedKeys: [],
-                groups: [],
-            },
-        ]),
-        flushByokProviderHealth: vi.fn(() => Promise.resolve()),
-        explainModelGatewayCatalogEntry: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/explain.js').explainModelGatewayCatalogEntry>} */ (vi.fn(() => ({
+        }))
+    ),
+    evaluateModelGatewayProviderEnvRequirements: vi.fn(() => [
+        {
+            providerId: 'kilo',
+            status: 'missing',
+            requiredGroupCount: 1,
+            satisfiedRequiredGroupCount: 0,
+            recommendedGroupCount: 0,
+            satisfiedRecommendedGroupCount: 0,
+            configuredKeys: [],
+            missingRequiredKeys: ['KILO_API_KEY', 'KILO_CODE_API_KEY'],
+            missingRecommendedKeys: [],
+            groups: [],
+        },
+    ]),
+    flushByokProviderHealth: vi.fn(() => Promise.resolve()),
+    explainModelGatewayCatalogEntry: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/catalog/explain.js').explainModelGatewayCatalogEntry
+>} */ (
+        vi.fn(() => ({
             found: false,
             operationalFound: false,
             selector: '',
@@ -978,10 +1230,19 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             providerProjection: null,
             runtimeHealth: null,
             runtimeProbes: [],
-            metadataCoverage: { confidenceFields: 0, provenanceFields: 0, supportedParameters: 0, unsupportedParameters: 0 },
+            metadataCoverage: {
+                confidenceFields: 0,
+                provenanceFields: 0,
+                supportedParameters: 0,
+                unsupportedParameters: 0,
+            },
             nextActions: ['refresh_catalog_or_use_more_specific_selector'],
-        }))),
-        explainModelGatewayProviderEntry: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/explain.js').explainModelGatewayProviderEntry>} */ (vi.fn(() => ({
+        }))
+    ),
+    explainModelGatewayProviderEntry: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/catalog/explain.js').explainModelGatewayProviderEntry
+>} */ (
+        vi.fn(() => ({
             found: false,
             selector: '',
             providerId: null,
@@ -994,8 +1255,12 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             conflicts: [],
             freshness: { newestSourceAt: null, oldestSourceAt: null, sourceCount: 0 },
             nextActions: ['refresh_catalog_or_use_provider_id'],
-        }))),
-        explainModelGatewayEligibilityDecision: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/eligibility/explain.js').explainModelGatewayEligibilityDecision>} */ (vi.fn(() => ({
+        }))
+    ),
+    explainModelGatewayEligibilityDecision: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/eligibility/explain.js').explainModelGatewayEligibilityDecision
+>} */ (
+        vi.fn(() => ({
             status: 'eligible',
             key: 'openrouter:model:default:exact_model:model',
             include: true,
@@ -1013,150 +1278,172 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 operatorHint: 'no_extra_action',
             },
             nextActions: ['candidate_can_be_ranked'],
-        }))),
-        JsonModelGatewayCatalogStore: vi.fn(function JsonModelGatewayCatalogStore() {
-            return {
-                filePath: 'data/copilot/model-gateway/catalog.json',
-                readSnapshot: vi.fn(() =>
-                    Promise.resolve({
-                        generatedAt: '2026-05-26T20:00:00.000Z',
-                        sources: [
-                            { id: 'openrouter-models', providerId: 'openrouter', refreshPolicy: 'ttl', ttlSeconds: 3600 },
-                            { id: 'openai-models', providerId: 'openai', refreshPolicy: 'ttl', ttlSeconds: 3600 },
-                        ],
-                        projections: [{ providerId: 'openrouter', providerModel: 'new-model' }],
-                        routeOptions: [
-                            {
-                                providerId: 'openrouter',
-                                providerModel: 'openai/gpt-oss-120b',
-                                selectorKind: 'provider_explicit',
-                                selectorSyntax: 'openai/gpt-oss-120b:groq',
+        }))
+    ),
+    JsonModelGatewayCatalogStore: vi.fn(function JsonModelGatewayCatalogStore() {
+        return {
+            filePath: 'data/copilot/model-gateway/catalog.json',
+            readSnapshot: vi.fn(() =>
+                Promise.resolve({
+                    generatedAt: '2026-05-26T20:00:00.000Z',
+                    sources: [
+                        { id: 'openrouter-models', providerId: 'openrouter', refreshPolicy: 'ttl', ttlSeconds: 3600 },
+                        { id: 'openai-models', providerId: 'openai', refreshPolicy: 'ttl', ttlSeconds: 3600 },
+                    ],
+                    projections: [{ providerId: 'openrouter', providerModel: 'new-model' }],
+                    routeOptions: [
+                        {
+                            providerId: 'openrouter',
+                            providerModel: 'openai/gpt-oss-120b',
+                            selectorKind: 'provider_explicit',
+                            selectorSyntax: 'openai/gpt-oss-120b:groq',
+                        },
+                    ],
+                    accountOverlays: [
+                        {
+                            accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
+                            providerId: 'openrouter',
+                            secretRef: 'OPENROUTER_API_KEY',
+                        },
+                    ],
+                    modelEligibilityDecisions: [],
+                    modelEligibilityRuns: [
+                        {
+                            runId: 'eligibility-run-1',
+                            status: 'completed',
+                            policyProfile: 'terminal-refresh',
+                            taskProfile: 'default',
+                            accountScope: 'default',
+                            completedAt: '2026-05-25T18:00:00.000Z',
+                            modelCount: 2,
+                            eligibleCount: 1,
+                            unknownCount: 0,
+                            excludedCount: 1,
+                            diff: {
+                                added: [
+                                    'openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default',
+                                ],
+                                removed: [],
+                                changed: [
+                                    {
+                                        key: 'openrouter:changed-model:default:exact_model:changed-model:default:terminal-refresh:default',
+                                        changedFields: ['include', 'hardExclusions'],
+                                        changedKinds: ['disposition_changed', 'access_gate_changed'],
+                                        previousInclude: false,
+                                        nextInclude: true,
+                                    },
+                                ],
                             },
-                        ],
-                        accountOverlays: [
-                            {
-                                accountOverlayId: 'openrouter:default:OPENROUTER_API_KEY',
-                                providerId: 'openrouter',
-                                secretRef: 'OPENROUTER_API_KEY',
+                            diffSummary: { addedCount: 1, removedCount: 0, changedCount: 1 },
+                        },
+                    ],
+                    conflicts: [
+                        {
+                            projectionKey: 'openrouter:changed-model:default',
+                            fieldPath: 'capabilities.tools',
+                            selectedEvidenceId: 'catalog-tools',
+                            conflictingEvidenceIds: ['heuristic-tools'],
+                        },
+                    ],
+                    importRuns: [
+                        {
+                            runId: 'model-gateway:catalog-refresh:2026-05-25T17:00:00.000Z',
+                            providerId: 'model-gateway',
+                            sourceId: 'catalog-refresh',
+                            diff: {
+                                added: ['openrouter:new-model:default'],
+                                removed: [],
+                                changed: [
+                                    {
+                                        key: 'openrouter:changed-model:default',
+                                        changedFields: ['capabilities'],
+                                        changedKinds: ['capabilities_changed'],
+                                    },
+                                ],
                             },
-                        ],
-                        modelEligibilityDecisions: [],
-                        modelEligibilityRuns: [
-                            {
-                                runId: 'eligibility-run-1',
-                                status: 'completed',
-                                policyProfile: 'terminal-refresh',
-                                taskProfile: 'default',
-                                accountScope: 'default',
-                                completedAt: '2026-05-25T18:00:00.000Z',
-                                modelCount: 2,
-                                eligibleCount: 1,
-                                unknownCount: 0,
-                                excludedCount: 1,
-                                diff: {
-                                    added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'],
-                                    removed: [],
-                                    changed: [
-                                        {
-                                            key: 'openrouter:changed-model:default:exact_model:changed-model:default:terminal-refresh:default',
-                                            changedFields: ['include', 'hardExclusions'],
-                                            changedKinds: ['disposition_changed', 'access_gate_changed'],
-                                            previousInclude: false,
-                                            nextInclude: true,
-                                        },
-                                    ],
-                                },
-                                diffSummary: { addedCount: 1, removedCount: 0, changedCount: 1 },
-                            },
-                        ],
-                        conflicts: [
-                            {
-                                projectionKey: 'openrouter:changed-model:default',
-                                fieldPath: 'capabilities.tools',
-                                selectedEvidenceId: 'catalog-tools',
-                                conflictingEvidenceIds: ['heuristic-tools'],
-                            },
-                        ],
-                        importRuns: [
-                            {
-                                runId: 'model-gateway:catalog-refresh:2026-05-25T17:00:00.000Z',
-                                providerId: 'model-gateway',
-                                sourceId: 'catalog-refresh',
-                                diff: {
-                                    added: ['openrouter:new-model:default'],
-                                    removed: [],
-                                    changed: [
-                                        {
-                                            key: 'openrouter:changed-model:default',
-                                            changedFields: ['capabilities'],
-                                            changedKinds: ['capabilities_changed'],
-                                        },
-                                    ],
-                                },
-                            },
-                        ],
-                    }),
-                ),
-            };
-        }),
-        listByokProviderModelHealth: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').listByokProviderModelHealth>} */ (vi.fn(() => [])),
-        listModelGatewayCanonicalCommands: vi.fn(() => [
-            { id: 'prebuild.all', surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
-            { id: 'prebuild.first-build', surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
-            { id: 'commands.text', surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
-            { id: 'operator.ready', surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
-        ]),
-        listProviderEndpointInventory: vi.fn(() => [
-            {
-                providerId: 'kilo',
-                adapterId: 'kilo',
-                providerKind: 'gateway',
-                baseUrls: ['https://api.kilo.ai/api/gateway'],
-                modelCatalogSources: [
-                    {
-                        kind: 'public_gateway_api',
-                        method: 'GET',
-                        url: 'https://api.kilo.ai/api/gateway/models',
-                        richness: 'pricing_context_features',
-                    },
-                ],
-                runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
-                routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                        },
+                    ],
+                }),
+            ),
+        };
+    }),
+    listByokProviderModelHealth: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').listByokProviderModelHealth
+>} */ (vi.fn(() => [])),
+    listModelGatewayCanonicalCommands: vi.fn(() => [
+        { id: 'prebuild.all', surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
+        { id: 'prebuild.first-build', surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
+        { id: 'commands.text', surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
+        {
+            id: 'operator.ready',
+            surface: 'terminal',
+            phase: 'orientation',
+            command: '/byok gateway operator-ready profile:repo_agent',
+        },
+    ]),
+    listProviderEndpointInventory: vi.fn(() => [
+        {
+            providerId: 'kilo',
+            adapterId: 'kilo',
+            providerKind: 'gateway',
+            baseUrls: ['https://api.kilo.ai/api/gateway'],
+            modelCatalogSources: [
+                {
+                    kind: 'public_gateway_api',
+                    method: 'GET',
+                    url: 'https://api.kilo.ai/api/gateway/models',
+                    richness: 'pricing_context_features',
+                },
+            ],
+            runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
+            routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+        },
+    ]),
+    listProviderGatewayTraits: vi.fn(() => [
+        {
+            providerId: 'kilo',
+            providerKind: 'gateway',
+            topology: 'gateway',
+            openAICompatible: true,
+            catalogSourceCount: 1,
+            runtimeEndpointCount: 1,
+            publicCatalogSourceCount: 1,
+            authenticatedCatalogSourceCount: 0,
+            parameterizedCatalogSourceCount: 0,
+            runtimeKinds: ['chat_completions'],
+            routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+            richnessTags: ['context', 'features', 'pricing'],
+            capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
+            routing: {
+                supportsAutoSelection: true,
+                supportsFallback: false,
+                supportsProviderOrder: false,
+                supportsGatewayByok: false,
             },
-        ]),
-        listProviderGatewayTraits: vi.fn(() => [
-            {
-                providerId: 'kilo',
-                providerKind: 'gateway',
-                topology: 'gateway',
-                openAICompatible: true,
-                catalogSourceCount: 1,
-                runtimeEndpointCount: 1,
-                publicCatalogSourceCount: 1,
-                authenticatedCatalogSourceCount: 0,
-                parameterizedCatalogSourceCount: 0,
-                runtimeKinds: ['chat_completions'],
-                routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
-                richnessTags: ['context', 'features', 'pricing'],
-                capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
-                routing: { supportsAutoSelection: true, supportsFallback: false, supportsProviderOrder: false, supportsGatewayByok: false },
-                metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
-            },
-        ]),
-        listProviderWireProbeMatrix: vi.fn(() => [
-            {
-                providerId: 'kilo',
-                topology: 'gateway',
-                runtimeKind: 'chat_completions',
-                wireApi: 'openai_chat_completions',
-                implementedProbeKinds: ['chat', 'streaming', 'json', 'agent'],
-                pendingProbeKinds: ['reasoning', 'forced_tool_choice', 'parallel_tool_calls'],
-                notes: ['runtime_probe_gap'],
-            },
-        ]),
-        listTerminalSdkSessionInventory: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory>} */ (vi.fn(() =>
+            metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
+        },
+    ]),
+    listProviderWireProbeMatrix: vi.fn(() => [
+        {
+            providerId: 'kilo',
+            topology: 'gateway',
+            runtimeKind: 'chat_completions',
+            wireApi: 'openai_chat_completions',
+            implementedProbeKinds: ['chat', 'streaming', 'json', 'agent'],
+            pendingProbeKinds: ['reasoning', 'forced_tool_choice', 'parallel_tool_calls'],
+            notes: ['runtime_probe_gap'],
+        },
+    ]),
+    listTerminalSdkSessionInventory: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory
+>} */ (
+        vi.fn(() =>
             Promise.resolve(
-                /** @satisfies {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory>>} */ ({
+                /** @satisfies {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory
+    >
+>} */ ({
                     currentSessionId: null,
                     lastSessionId: null,
                     foregroundSessionId: null,
@@ -1173,222 +1460,235 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                     sessions: [],
                 }),
             ),
-        )),
-        scheduleTerminalSdkSessionBootSelection: vi.fn(() => Promise.resolve({ ok: true })),
-        loadDotenv: vi.fn(),
-        flushAndMirrorByokProviderHealthToSqlite: vi.fn(() =>
-            Promise.resolve({ flushed: true, records: 0, healthObservations: 0, probeResults: 0, runId: 'health-run' }),
-        ),
-        mirrorByokProviderHealthToSqlite: vi.fn(() =>
-            Promise.resolve({ records: 0, healthObservations: 0, probeResults: 0, runId: 'health-run' }),
-        ),
-        mirrorModelGatewayCatalogSnapshotToSqlite: vi.fn(() =>
-            Promise.resolve({
-                sqliteSnapshot: { source: 'test' },
-                sqliteCounts: {
-                    projections: 1,
-                    evidences: 0,
-                    routeOptions: 1,
-                    accountOverlays: 1,
-                    modelEligibilityDecisions: 0,
-                    providerProjections: 0,
-                    providerEvidences: 0,
-                    rawPayloadRefs: 0,
-                    conflicts: 0,
-                    importRuns: 0,
-                },
-            }),
-        ),
-        planModelGatewayCatalogRefresh: vi.fn(() => ({
-            selectedImporters: [],
-            selected: [
-                {
-                    importerId: 'openrouter-models',
-                    providerId: 'openrouter',
-                    sourceId: 'openrouter-models',
-                    sourceKind: 'public_api',
-                    refreshPolicy: 'ttl',
-                    ttlSeconds: 3600,
-                    ageSeconds: 7200,
-                    reason: 'source_ttl_expired',
-                },
-            ],
-            skipped: [
-                {
-                    importerId: 'openai-models',
-                    providerId: 'openai',
-                    sourceId: 'openai-models',
-                    sourceKind: 'authenticated_api',
-                    refreshPolicy: 'ttl',
-                    ttlSeconds: 3600,
-                    ageSeconds: 60,
-                    reason: 'source_ttl_fresh',
-                },
-            ],
-            importerCount: 2,
-            sourceCount: 2,
-        })),
-        refreshModelGatewayCatalog: vi.fn(() =>
-            Promise.resolve({
-                snapshot: { projections: [{ providerModel: 'new-model' }], importRuns: [{ status: 'completed' }] },
+        )
+    ),
+    scheduleTerminalSdkSessionBootSelection: vi.fn(() => Promise.resolve({ ok: true })),
+    loadDotenv: vi.fn(),
+    flushAndMirrorByokProviderHealthToSqlite: vi.fn(() =>
+        Promise.resolve({ flushed: true, records: 0, healthObservations: 0, probeResults: 0, runId: 'health-run' }),
+    ),
+    mirrorByokProviderHealthToSqlite: vi.fn(() =>
+        Promise.resolve({ records: 0, healthObservations: 0, probeResults: 0, runId: 'health-run' }),
+    ),
+    mirrorModelGatewayCatalogSnapshotToSqlite: vi.fn(() =>
+        Promise.resolve({
+            sqliteSnapshot: { source: 'test' },
+            sqliteCounts: {
+                projections: 1,
+                evidences: 0,
+                routeOptions: 1,
+                accountOverlays: 1,
+                modelEligibilityDecisions: 0,
+                providerProjections: 0,
+                providerEvidences: 0,
+                rawPayloadRefs: 0,
+                conflicts: 0,
+                importRuns: 0,
+            },
+        }),
+    ),
+    planModelGatewayCatalogRefresh: vi.fn(() => ({
+        selectedImporters: [],
+        selected: [
+            {
+                importerId: 'openrouter-models',
+                providerId: 'openrouter',
+                sourceId: 'openrouter-models',
+                sourceKind: 'public_api',
+                refreshPolicy: 'ttl',
+                ttlSeconds: 3600,
+                ageSeconds: 7200,
+                reason: 'source_ttl_expired',
+            },
+        ],
+        skipped: [
+            {
+                importerId: 'openai-models',
+                providerId: 'openai',
+                sourceId: 'openai-models',
+                sourceKind: 'authenticated_api',
+                refreshPolicy: 'ttl',
+                ttlSeconds: 3600,
+                ageSeconds: 60,
+                reason: 'source_ttl_fresh',
+            },
+        ],
+        importerCount: 2,
+        sourceCount: 2,
+    })),
+    refreshModelGatewayCatalog: vi.fn(() =>
+        Promise.resolve({
+            snapshot: { projections: [{ providerModel: 'new-model' }], importRuns: [{ status: 'completed' }] },
+            diff: {
+                added: ['openrouter:new-model:default'],
+                removed: [],
+                changed: [
+                    {
+                        key: 'openrouter:changed-model:default',
+                        changedFields: ['pricing'],
+                        changedKinds: ['pricing_changed'],
+                    },
+                ],
+            },
+            openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
+            overlayRefresh: { enabled: true, imported: 0, retained: 0, total: 0 },
+            eligibilityRefresh: {
+                enabled: true,
+                run: { runId: 'eligibility-run' },
+                decisionCount: 2,
                 diff: {
-                    added: ['openrouter:new-model:default'],
+                    added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'],
                     removed: [],
-                    changed: [
-                        {
-                            key: 'openrouter:changed-model:default',
-                            changedFields: ['pricing'],
-                            changedKinds: ['pricing_changed'],
-                        },
-                    ],
+                    changed: [],
                 },
-                openai: { object: 'list', data: [{ id: 'new-model', object: 'model' }] },
-                overlayRefresh: { enabled: true, imported: 0, retained: 0, total: 0 },
-                eligibilityRefresh: {
-                    enabled: true,
-                    run: { runId: 'eligibility-run' },
-                    decisionCount: 2,
-                    diff: { added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'], removed: [], changed: [] },
-                    diffSummary: { addedCount: 1, removedCount: 0, changedCount: 0, changedKinds: [], becameEligibleCount: 0, becameExcludedCount: 0 },
+                diffSummary: {
+                    addedCount: 1,
+                    removedCount: 0,
+                    changedCount: 0,
+                    changedKinds: [],
+                    becameEligibleCount: 0,
+                    becameExcludedCount: 0,
                 },
-                retention: {
-                    importRuns: { before: 1, after: 1, pruned: 0 },
-                    rawPayloadRefs: { before: 0, after: 0, pruned: 0 },
-                    conflicts: { before: 0, after: 0, pruned: 0 },
-                    modelEligibilityRuns: { before: 0, after: 0, pruned: 0 },
-                },
-                writePolicy: { mode: 'commit', storeAvailable: true, committed: true },
-            }),
-        ),
-        renderModelGatewayCanonicalCommandLines: vi.fn(() => [
-            'package  prebuild    npm run model-gateway:prebuild :: Run pre-build validators.',
-            'make     prebuild    make model-gateway-prebuild :: Run pre-build validators.',
-            'terminal orientation /byok gateway commands :: Show commands.',
-            'terminal orientation /byok gateway operator-ready profile:repo_agent :: Show operator readiness.',
-        ]),
-        routeGatewayModels: vi.fn(),
-        searchModelGatewayCatalogEntries: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/search.js').searchModelGatewayCatalogEntries>} */ (vi.fn(() => [])),
-        SqliteModelGatewayCatalogStore: vi.fn(function SqliteModelGatewayCatalogStore() {
-            return {
-                readStorageDiagnostics: vi.fn(() =>
-                    Promise.resolve({
-                        schemaVersion: 3,
-                        userVersion: 3,
-                        catalogRows: 1,
-                        accountHistoryRows: 0,
-                        runtimeRows: 0,
-                        routeDecisionRows: 0,
-                        recoveryAttemptRows: 0,
-                        liveScenarioRunRows: 1,
-                        latestLiveScenarioRun: {
-                            runId: 'live-scenario-1',
-                            scenarioKind: 'byok_real_no_pr',
-                            status: 'passed',
-                            ok: true,
-                            summaryPath: 'artifacts/terminal-live/unit/summary.md',
-                        },
-                        activeSnapshot: { exists: true, source: 'test' },
-                        tableCounts: {},
-                    }),
-                ),
-                writeRouteDecisionEvents: vi.fn(() => Promise.resolve()),
-                writeAutomationDecisionRecords: vi.fn(() => Promise.resolve({ automationDecisions: 1 })),
-                writeAutomationPolicySnapshotRecords: vi.fn(() =>
-                    Promise.resolve({ automationPolicySnapshots: 1 }),
-                ),
-                writeAutomationEffectApplicationRecords: vi.fn(() =>
-                    Promise.resolve({ automationEffectApplications: 1 }),
-                ),
-                writeRecoveryAttemptRecords: vi.fn(() => Promise.resolve({ recoveryAttempts: 1 })),
-                writeSdkSessionHandoffRecords: vi.fn(() => Promise.resolve({ sdkSessionHandoffs: 1 })),
-                readAutomationDecisionRecords: vi.fn(() =>
-                    Promise.resolve([
-                        {
-                            timestamp: '2026-06-01T00:00:00.000Z',
-                            action: 'prepare_new_session',
-                            selectedRouteKey: 'zai:glm-4.5-flash',
-                            routeProfile: 'repo_agent',
-                            ok: true,
-                        },
-                    ]),
-                ),
-                readSdkSessionHandoffRecords: vi.fn(() =>
-                    Promise.resolve([
-                        {
-                            requestedAt: '2026-06-01T00:00:01.000Z',
-                            status: 'deferred_until_turn_boundary',
-                            sessionId: 'sdk-session-1',
-                            targetModel: 'glm-4.5-flash',
-                            selectedRouteKey: 'zai:glm-4.5-flash',
-                            operation: {
-                                targetRoute: {
-                                    providerId: 'zai',
-                                    providerModel: 'glm-4.5-flash',
-                                },
-                                promotionAuthorization: {
-                                    authorized: true,
-                                    expiresAt: '2026-06-01T00:05:01.000Z',
-                                },
+            },
+            retention: {
+                importRuns: { before: 1, after: 1, pruned: 0 },
+                rawPayloadRefs: { before: 0, after: 0, pruned: 0 },
+                conflicts: { before: 0, after: 0, pruned: 0 },
+                modelEligibilityRuns: { before: 0, after: 0, pruned: 0 },
+            },
+            writePolicy: { mode: 'commit', storeAvailable: true, committed: true },
+        }),
+    ),
+    renderModelGatewayCanonicalCommandLines: vi.fn(() => [
+        'package  prebuild    npm run model-gateway:prebuild :: Run pre-build validators.',
+        'make     prebuild    make model-gateway-prebuild :: Run pre-build validators.',
+        'terminal orientation /byok gateway commands :: Show commands.',
+        'terminal orientation /byok gateway operator-ready profile:repo_agent :: Show operator readiness.',
+    ]),
+    routeGatewayModels: vi.fn(),
+    searchModelGatewayCatalogEntries: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/catalog/search.js').searchModelGatewayCatalogEntries
+>} */ (vi.fn(() => [])),
+    SqliteModelGatewayCatalogStore: vi.fn(function SqliteModelGatewayCatalogStore() {
+        return {
+            readStorageDiagnostics: vi.fn(() =>
+                Promise.resolve({
+                    schemaVersion: 3,
+                    userVersion: 3,
+                    catalogRows: 1,
+                    accountHistoryRows: 0,
+                    runtimeRows: 0,
+                    routeDecisionRows: 0,
+                    recoveryAttemptRows: 0,
+                    liveScenarioRunRows: 1,
+                    latestLiveScenarioRun: {
+                        runId: 'live-scenario-1',
+                        scenarioKind: 'byok_real_no_pr',
+                        status: 'passed',
+                        ok: true,
+                        summaryPath: 'artifacts/terminal-live/unit/summary.md',
+                    },
+                    activeSnapshot: { exists: true, source: 'test' },
+                    tableCounts: {},
+                }),
+            ),
+            writeRouteDecisionEvents: vi.fn(() => Promise.resolve()),
+            writeAutomationDecisionRecords: vi.fn(() => Promise.resolve({ automationDecisions: 1 })),
+            writeAutomationPolicySnapshotRecords: vi.fn(() => Promise.resolve({ automationPolicySnapshots: 1 })),
+            writeAutomationEffectApplicationRecords: vi.fn(() => Promise.resolve({ automationEffectApplications: 1 })),
+            writeRecoveryAttemptRecords: vi.fn(() => Promise.resolve({ recoveryAttempts: 1 })),
+            writeSdkSessionHandoffRecords: vi.fn(() => Promise.resolve({ sdkSessionHandoffs: 1 })),
+            readAutomationDecisionRecords: vi.fn(() =>
+                Promise.resolve([
+                    {
+                        timestamp: '2026-06-01T00:00:00.000Z',
+                        action: 'prepare_new_session',
+                        selectedRouteKey: 'zai:glm-4.5-flash',
+                        routeProfile: 'repo_agent',
+                        ok: true,
+                    },
+                ]),
+            ),
+            readSdkSessionHandoffRecords: vi.fn(() =>
+                Promise.resolve([
+                    {
+                        requestedAt: '2026-06-01T00:00:01.000Z',
+                        status: 'deferred_until_turn_boundary',
+                        sessionId: 'sdk-session-1',
+                        targetModel: 'glm-4.5-flash',
+                        selectedRouteKey: 'zai:glm-4.5-flash',
+                        operation: {
+                            targetRoute: {
+                                providerId: 'zai',
+                                providerModel: 'glm-4.5-flash',
+                            },
+                            promotionAuthorization: {
+                                authorized: true,
+                                expiresAt: '2026-06-01T00:05:01.000Z',
                             },
                         },
-                    ]),
-                ),
-                readSdkSessionConfirmationRecords: vi.fn(() =>
-                    Promise.resolve([
-                        {
-                            observedAt: '2026-06-01T00:00:02.000Z',
-                            status: 'matched_handoff',
-                            previousModel: 'auto',
-                            confirmedModel: 'glm-4.5-flash',
-                        },
-                    ]),
-                ),
-                readRecoveryAttemptRecords: vi.fn(() =>
-                    Promise.resolve([
-                        {
-                            observedAt: '2026-06-01T00:00:03.000Z',
-                            status: 'effect_not_authorized',
-                            recoveryScope: 'account',
-                            failureKind: 'rate-limit',
-                            selectedRouteKey: 'zai:glm-4.5-flash',
-                        },
-                    ]),
-                ),
-                readStandbyPlanRecords: vi.fn(() =>
-                    Promise.resolve([
-                        {
-                            standbyPlanId: 'standby-1',
-                            status: 'ready',
-                            generatedAt: '2026-06-01T00:00:04.000Z',
-                            summary: { routeCount: 2, providerCount: 2, runtimeProofCount: 1 },
-                            routes: [
-                                { providerId: 'groq', providerModel: 'llama', routeKey: 'groq:llama' },
-                                { providerId: 'zai', providerModel: 'glm', routeKey: 'zai:glm' },
-                            ],
-                        },
-                    ]),
-                ),
-                readLiveScenarioRunRecords: vi.fn(() =>
-                    Promise.resolve([
-                        {
-                            runId: 'live-scenario-1',
-                            scenarioKind: 'byok_real_no_pr',
-                            status: 'passed',
-                            ok: true,
-                            summaryPath: 'artifacts/terminal-live/unit/summary.md',
-                        },
-                    ]),
-                ),
-                readOpenAIModelCatalogList: vi.fn(() => Promise.resolve({ object: 'list', data: [] })),
-                readRuntimeHealthForModel: vi.fn(() => Promise.resolve({ health: null, probes: [] })),
-            };
-        }),
-        runConfiguredByokAgentProbe: vi.fn(),
-        runConfiguredByokChatProbe: vi.fn(),
-        runConfiguredByokJsonProbe: vi.fn(),
-        runConfiguredByokStreamingProbe: vi.fn(),
-        runConfiguredByokVisionProbe: vi.fn(),
-        readByokProviderHealthState: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderHealthState>} */ (vi.fn(() => ({
+                    },
+                ]),
+            ),
+            readSdkSessionConfirmationRecords: vi.fn(() =>
+                Promise.resolve([
+                    {
+                        observedAt: '2026-06-01T00:00:02.000Z',
+                        status: 'matched_handoff',
+                        previousModel: 'auto',
+                        confirmedModel: 'glm-4.5-flash',
+                    },
+                ]),
+            ),
+            readRecoveryAttemptRecords: vi.fn(() =>
+                Promise.resolve([
+                    {
+                        observedAt: '2026-06-01T00:00:03.000Z',
+                        status: 'effect_not_authorized',
+                        recoveryScope: 'account',
+                        failureKind: 'rate-limit',
+                        selectedRouteKey: 'zai:glm-4.5-flash',
+                    },
+                ]),
+            ),
+            readStandbyPlanRecords: vi.fn(() =>
+                Promise.resolve([
+                    {
+                        standbyPlanId: 'standby-1',
+                        status: 'ready',
+                        generatedAt: '2026-06-01T00:00:04.000Z',
+                        summary: { routeCount: 2, providerCount: 2, runtimeProofCount: 1 },
+                        routes: [
+                            { providerId: 'groq', providerModel: 'llama', routeKey: 'groq:llama' },
+                            { providerId: 'zai', providerModel: 'glm', routeKey: 'zai:glm' },
+                        ],
+                    },
+                ]),
+            ),
+            readLiveScenarioRunRecords: vi.fn(() =>
+                Promise.resolve([
+                    {
+                        runId: 'live-scenario-1',
+                        scenarioKind: 'byok_real_no_pr',
+                        status: 'passed',
+                        ok: true,
+                        summaryPath: 'artifacts/terminal-live/unit/summary.md',
+                    },
+                ]),
+            ),
+            readOpenAIModelCatalogList: vi.fn(() => Promise.resolve({ object: 'list', data: [] })),
+            readRuntimeHealthForModel: vi.fn(() => Promise.resolve({ health: null, probes: [] })),
+        };
+    }),
+    runConfiguredByokAgentProbe: vi.fn(),
+    runConfiguredByokChatProbe: vi.fn(),
+    runConfiguredByokJsonProbe: vi.fn(),
+    runConfiguredByokStreamingProbe: vi.fn(),
+    runConfiguredByokVisionProbe: vi.fn(),
+    readByokProviderHealthState: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderHealthState
+>} */ (
+        vi.fn(() => ({
             enabled: false,
             path: null,
             loaded: true,
@@ -1399,19 +1699,53 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
             dirty: false,
             error: null,
             changeListenerCount: 0,
-        }))),
-        readByokProviderModelHealth: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderModelHealth>} */ (vi.fn(() => null)),
-        readConfiguredByokModelDiscoveryCacheFromEnv: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/sdk/session/provider.js').readConfiguredByokModelDiscoveryCacheFromEnv>} */ (vi.fn(() => null)),
-        readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
-        readFile: vi.fn(),
-        readdir: vi.fn(),
-        readTerminalByokGatewayProjectionFromEnv: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokGatewayProjectionFromEnv>} */ (vi.fn(() => ({
+        }))
+    ),
+    readByokProviderModelHealth: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderModelHealth
+>} */ (vi.fn(() => null)),
+    readConfiguredByokModelDiscoveryCacheFromEnv: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/sdk/session/provider.js').readConfiguredByokModelDiscoveryCacheFromEnv
+>} */ (vi.fn(() => null)),
+    readConfiguredByokProfilesFromEnv: vi.fn(() => ({})),
+    readFile: vi.fn(),
+    readTextFreshTrusted: vi.fn((/** @type {string} */ path) =>
+        Promise.resolve(readFile(path, 'utf8')).then((content) => ({ content: String(content) })),
+    ),
+    readdir: vi.fn(),
+    writeFileAtomicTrusted: vi.fn(
+        (
+            /** @type {string} */ path,
+            /** @type {string | Uint8Array} */ content,
+            /** @type {Record<string, unknown>} */ options,
+        ) => writeFile(path, content, options),
+    ),
+    workspaceIoListDirectoryNamesFresh: vi.fn((/** @type {string} */ path) =>
+        Promise.resolve(readdir(path)).then((entries) => ({ entries })),
+    ),
+    workspaceIoReadTextFresh: vi.fn((/** @type {string} */ path) =>
+        Promise.resolve(readFile(path, 'utf8')).then((content) => ({ content: String(content) })),
+    ),
+    workspaceIoStatPath: vi.fn((/** @type {string} */ path) =>
+        Promise.resolve(stat(path)).then((stats) => ({ stats })),
+    ),
+    readTerminalByokGatewayProjectionFromEnv: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokGatewayProjectionFromEnv
+>} */ (
+        vi.fn(() => ({
             gatewayModels: [],
             modelGateway: {
                 schemaVersion: 1,
                 generatedAt: '2026-06-01T00:00:00.000Z',
                 source: 'env_compat',
-                active: { enabled: false, ready: false, providerId: null, modelId: null, providerModel: null, bindingSource: 'env_compat' },
+                active: {
+                    enabled: false,
+                    ready: false,
+                    providerId: null,
+                    modelId: null,
+                    providerModel: null,
+                    bindingSource: 'env_compat',
+                },
                 providers: [],
                 models: [],
                 diagnostics: { providerCount: 0, modelCount: 0, enabledModelCount: 0, warnings: [], errors: [] },
@@ -1423,13 +1757,29 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 providerCount: 0,
                 modelCount: 0,
                 enabledModelCount: 0,
-                effectiveRoute: { enabled: false, ready: false, providerId: null, providerModel: null, modelId: null, profile: null, gatewayProfile: null, preset: null, bindingSource: null, source: 'env_compat', label: '-' },
+                effectiveRoute: {
+                    enabled: false,
+                    ready: false,
+                    providerId: null,
+                    providerModel: null,
+                    modelId: null,
+                    profile: null,
+                    gatewayProfile: null,
+                    preset: null,
+                    bindingSource: null,
+                    source: 'env_compat',
+                    label: '-',
+                },
                 providers: [],
                 models: [],
             },
-        }))),
-        readTerminalByokProjection: vi.fn(),
-        readTerminalByokRuntimeConfigProjection: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokRuntimeConfigProjection>} */ (vi.fn(() => ({
+        }))
+    ),
+    readTerminalByokProjection: vi.fn(),
+    readTerminalByokRuntimeConfigProjection: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokRuntimeConfigProjection
+>} */ (
+        vi.fn(() => ({
             currentModel: 'kilo-auto/free',
             modelGatewayProjection: {
                 source: 'env_compat',
@@ -1438,130 +1788,161 @@ const { activateModelGatewayByokProfileEnv, buildCatalogRefreshEventBatch, build
                 providerCount: 0,
                 modelCount: 0,
                 enabledModelCount: 0,
-                effectiveRoute: { enabled: false, ready: false, providerId: null, providerModel: null, modelId: null, profile: null, gatewayProfile: null, preset: null, bindingSource: null, source: 'env_compat', label: '-' },
+                effectiveRoute: {
+                    enabled: false,
+                    ready: false,
+                    providerId: null,
+                    providerModel: null,
+                    modelId: null,
+                    profile: null,
+                    gatewayProfile: null,
+                    preset: null,
+                    bindingSource: null,
+                    source: 'env_compat',
+                    label: '-',
+                },
                 providers: [],
                 models: [],
             },
-        }))),
-        readTerminalConfiguredSessionFsState: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>} */ (vi.fn(() => Promise.resolve(
-            /** @satisfies {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>>} */ ({
-                enabled: false,
-                initialCwd: '/workspaces/chatgpt-docker-puppeteer',
-                sessionStatePath: 'data/copilot/session-state.json',
-                conventions: 'posix',
-                storageRoot: { display: 'data/copilot/sessions', withinWorkspace: true, exists: null },
-                session: null,
-            }),
-        ))),
-        readTerminalRuntimeContextWindow: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeContextWindow>} */ (vi.fn(() => null)),
-        recordByokProviderModelCallFailure: vi.fn(),
-        recordByokProviderModelCallSuccess: vi.fn(),
-        recordByokProviderModelProbeResult: vi.fn(),
-        recordByokProviderModelAgentProbeFailure: vi.fn(),
-        recordByokProviderModelAgentProbeSuccess: vi.fn(),
-        recordModelGatewayRouteDecision: vi.fn((event) => event),
-        resolveProviderEndpointInventory: vi.fn((providerId) =>
-            providerId === 'kilo'
-                ? {
-                      providerId: 'kilo',
-                      adapterId: 'kilo',
-                      providerKind: 'gateway',
-                      baseUrls: ['https://api.kilo.ai/api/gateway'],
-                      modelCatalogSources: [
-                          {
-                              kind: 'public_gateway_api',
-                              method: 'GET',
-                              url: 'https://api.kilo.ai/api/gateway/models',
-                              richness: 'pricing_context_features',
-                          },
-                      ],
-                      runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
-                      routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
-                  }
-                : null,
-        ),
-        resolveProviderGatewayTraits: vi.fn((providerId) =>
-            providerId === 'kilo'
-                ? {
-                      providerId: 'kilo',
-                      providerKind: 'gateway',
-                      topology: 'gateway',
-                      openAICompatible: true,
-                      catalogSourceCount: 1,
-                      runtimeEndpointCount: 1,
-                      publicCatalogSourceCount: 1,
-                      authenticatedCatalogSourceCount: 0,
-                      parameterizedCatalogSourceCount: 0,
-                      runtimeKinds: ['chat_completions'],
-                      routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
-                      richnessTags: ['context', 'features', 'pricing'],
-                      capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
-                      routing: {
-                          supportsAutoSelection: true,
-                          supportsFallback: false,
-                          supportsProviderOrder: false,
-                          supportsGatewayByok: false,
+        }))
+    ),
+    readTerminalConfiguredSessionFsState: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState
+>} */ (
+        vi.fn(() =>
+            Promise.resolve(
+                /** @satisfies {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState
+    >
+>} */ ({
+                    enabled: false,
+                    initialCwd: '/workspaces/chatgpt-docker-puppeteer',
+                    sessionStatePath: 'data/copilot/session-state.json',
+                    conventions: 'posix',
+                    storageRoot: { display: 'data/copilot/sessions', withinWorkspace: true, exists: null },
+                    session: null,
+                }),
+            ),
+        )
+    ),
+    readTerminalRuntimeContextWindow: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeContextWindow
+>} */ (vi.fn(() => null)),
+    recordByokProviderModelCallFailure: vi.fn(),
+    recordByokProviderModelCallSuccess: vi.fn(),
+    recordByokProviderModelProbeResult: vi.fn(),
+    recordByokProviderModelAgentProbeFailure: vi.fn(),
+    recordByokProviderModelAgentProbeSuccess: vi.fn(),
+    recordModelGatewayRouteDecision: vi.fn((event) => event),
+    resolveProviderEndpointInventory: vi.fn((providerId) =>
+        providerId === 'kilo'
+            ? {
+                  providerId: 'kilo',
+                  adapterId: 'kilo',
+                  providerKind: 'gateway',
+                  baseUrls: ['https://api.kilo.ai/api/gateway'],
+                  modelCatalogSources: [
+                      {
+                          kind: 'public_gateway_api',
+                          method: 'GET',
+                          url: 'https://api.kilo.ai/api/gateway/models',
+                          richness: 'pricing_context_features',
                       },
-                      metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
-                  }
-                : null,
-        ),
-        mkdir: vi.fn(() => Promise.resolve()),
-        rename: vi.fn(),
-        rm: vi.fn(() => Promise.resolve()),
-        setTerminalModelProjection: vi.fn(),
-        switchTerminalRouteProjection: vi.fn(() => ({
-            ok: true,
-            previousRoute: null,
-            nextRoute: { providerId: 'kilo-code', providerModel: 'kilo-auto/free' },
-        })),
-        stat: vi.fn(),
-        summarizeModelGatewayRefreshLogText: vi.fn(() => ({
-            eventCount: 6,
-            invalidLineCount: 0,
-            completed: true,
-            committed: true,
-            elapsedMs: 1200,
-            totals: { projections: 42, openai: 42, overlays: 3, added: 2, removed: 0, changed: 1 },
-            importers: {
-                'openrouter-models': { started: 1, completed: 1, failed: 0, rowCount: 2, evidenceCount: 8 },
+                  ],
+                  runtimeEndpoints: [{ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }],
+                  routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+              }
+            : null,
+    ),
+    resolveProviderGatewayTraits: vi.fn((providerId) =>
+        providerId === 'kilo'
+            ? {
+                  providerId: 'kilo',
+                  providerKind: 'gateway',
+                  topology: 'gateway',
+                  openAICompatible: true,
+                  catalogSourceCount: 1,
+                  runtimeEndpointCount: 1,
+                  publicCatalogSourceCount: 1,
+                  authenticatedCatalogSourceCount: 0,
+                  parameterizedCatalogSourceCount: 0,
+                  runtimeKinds: ['chat_completions'],
+                  routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
+                  richnessTags: ['context', 'features', 'pricing'],
+                  capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
+                  routing: {
+                      supportsAutoSelection: true,
+                      supportsFallback: false,
+                      supportsProviderOrder: false,
+                      supportsGatewayByok: false,
+                  },
+                  metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
+              }
+            : null,
+    ),
+    mkdir: vi.fn(() => Promise.resolve()),
+    rename: vi.fn(),
+    rm: vi.fn(() => Promise.resolve()),
+    setTerminalModelProjection: vi.fn(),
+    switchTerminalRouteProjection: vi.fn(() => ({
+        ok: true,
+        previousRoute: null,
+        nextRoute: { providerId: 'kilo-code', providerModel: 'kilo-auto/free' },
+    })),
+    stat: vi.fn(),
+    summarizeModelGatewayRefreshLogText: vi.fn(() => ({
+        eventCount: 6,
+        invalidLineCount: 0,
+        completed: true,
+        committed: true,
+        elapsedMs: 1200,
+        totals: { projections: 42, openai: 42, overlays: 3, added: 2, removed: 0, changed: 1 },
+        importers: {
+            'openrouter-models': { started: 1, completed: 1, failed: 0, rowCount: 2, evidenceCount: 8 },
+        },
+        failures: [],
+    })),
+    toOpenAIModelCatalogList: /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/model-gateway/catalog/openai-schema.js').toOpenAIModelCatalogList
+>} */ (vi.fn(() => ({ object: 'list', data: [] }))),
+    activateModelGatewayByokProfileEnv: vi.fn((name, env = process.env) => {
+        env.COPILOT_BYOK_ENABLED = 'true';
+        env.COPILOT_BYOK_PROFILE = String(name);
+        return { ok: true, profileName: String(name) };
+    }),
+    materializeModelGatewayActiveByokProfileEnv: vi.fn((env = process.env) => {
+        const profile = String(env.COPILOT_BYOK_PROFILE ?? '');
+        const preset = profile.startsWith('groq')
+            ? 'groq'
+            : profile.startsWith('openrouter')
+              ? 'openrouter'
+              : 'kilo-code';
+        return {
+            env: {
+                ...env,
+                COPILOT_BYOK_ENABLED: 'true',
+                COPILOT_BYOK_PROVIDER_PRESET: preset,
             },
-            failures: [],
-        })),
-        toOpenAIModelCatalogList: /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/model-gateway/catalog/openai-schema.js').toOpenAIModelCatalogList>} */ (vi.fn(() => ({ object: 'list', data: [] }))),
-        activateModelGatewayByokProfileEnv: vi.fn((name, env = process.env) => {
-            env.COPILOT_BYOK_ENABLED = 'true';
-            env.COPILOT_BYOK_PROFILE = String(name);
-            return { ok: true, profileName: String(name) };
-        }),
-        materializeModelGatewayActiveByokProfileEnv: vi.fn((env = process.env) => {
-            const profile = String(env.COPILOT_BYOK_PROFILE ?? '');
-            const preset = profile.startsWith('groq') ? 'groq' : profile.startsWith('openrouter') ? 'openrouter' : 'kilo-code';
-            return {
-                env: {
-                    ...env,
-                    COPILOT_BYOK_ENABLED: 'true',
-                    COPILOT_BYOK_PROVIDER_PRESET: preset,
-                },
-                profile,
-            };
-        }),
-        readModelGatewayByokProfileCostHint: vi.fn((profileName) => {
-            const profile = String(profileName ?? '');
-            return profile.includes('free')
-                ? {
-                      profileFreeTier: true,
-                      profileCostSource: 'profile',
-                      profileCostDetail: '6k TPM observed on current plan',
-                  }
-                : {
-                      profileFreeTier: null,
-                      profileCostSource: null,
-                      profileCostDetail: null,
-                  };
-        }),
-        writeFile: vi.fn(),
-    }));
+            profile,
+        };
+    }),
+    readModelGatewayByokProfileCostHint: vi.fn((profileName) => {
+        const profile = String(profileName ?? '');
+        return profile.includes('free')
+            ? {
+                  profileFreeTier: true,
+                  profileCostSource: 'profile',
+                  profileCostDetail: '6k TPM observed on current plan',
+              }
+            : {
+                  profileFreeTier: null,
+                  profileCostSource: null,
+                  profileCostDetail: null,
+              };
+    }),
+    writeFile: vi.fn(),
+}));
 
 vi.mock('node:fs/promises', () => ({
     default: { readFile, mkdir, rm, writeFile, rename, chmod, readdir, stat },
@@ -1575,9 +1956,36 @@ vi.mock('node:fs/promises', () => ({
     stat,
 }));
 
-vi.mock('#copilot/infra/public/trusted-io', () => ({
-    writeFileAtomicTrusted: vi.fn((path, content, options) => writeFile(path, content, options)),
-}));
+vi.mock('#copilot/infra/public/workspace-io', async (importOriginal) => {
+    const actual = /** @type {typeof import('../../../../src/copilot/infra/public/workspace-io.js')} */ (
+        await importOriginal()
+    );
+    return {
+        ...actual,
+        createWorkspaceIo: vi.fn(
+            (
+                /** @type {Parameters<typeof import('../../../../src/copilot/infra/public/workspace-io.js').createWorkspaceIo>[0]} */ options,
+            ) => ({
+                ...actual.createWorkspaceIo(options),
+                listDirectoryNamesFresh: workspaceIoListDirectoryNamesFresh,
+                readTextFresh: workspaceIoReadTextFresh,
+                statPath: workspaceIoStatPath,
+            }),
+        ),
+    };
+});
+
+vi.mock('#copilot/infra/public/trusted-io', async (importOriginal) => {
+    const actual = /** @type {typeof import('../../../../src/copilot/infra/public/trusted-io.js')} */ (
+        await importOriginal()
+    );
+    return {
+        ...actual,
+        listDirectoryNamesFreshTrusted: vi.fn(() => Promise.resolve({ entries: [] })),
+        readTextFreshTrusted,
+        writeFileAtomicTrusted,
+    };
+});
 
 vi.mock('dotenv', () => ({
     config: loadDotenv,
@@ -1731,9 +2139,8 @@ const {
 } = await import('../../../../src/copilot/model-gateway/eligibility/contracts.js');
 const { buildModelGatewayRuntimeAutomationControllerStep: buildModelGatewayRuntimeAutomationControllerStepActual } =
     await import('../../../../src/copilot/model-gateway/automation/controller.js');
-const { explainModelGatewayEligibilityDecision: explainModelGatewayEligibilityDecisionActual } = await import(
-    '../../../../src/copilot/model-gateway/eligibility/explain.js'
-);
+const { explainModelGatewayEligibilityDecision: explainModelGatewayEligibilityDecisionActual } =
+    await import('../../../../src/copilot/model-gateway/eligibility/explain.js');
 const {
     toOpenAIModelCatalogEntry: toOpenAIModelCatalogEntryActual,
     toOpenAIModelCatalogList: toOpenAIModelCatalogListActual,
@@ -1748,9 +2155,8 @@ const {
     runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } = await import('../../../../src/copilot/terminal/byok/gateway-auto.js');
-const { clearTerminalActivityHistory, readTerminalActivityHistory } = await import(
-    '../../../../src/copilot/terminal/state/activity-state.js'
-);
+const { clearTerminalActivityHistory, readTerminalActivityHistory } =
+    await import('../../../../src/copilot/terminal/state/activity-state.js');
 
 buildModelGatewayRuntimeAutomationControllerStep.mockImplementation(
     buildModelGatewayRuntimeAutomationControllerStepActual,
@@ -1793,27 +2199,79 @@ const BASE_PROJECTION = Object.freeze({
     }),
 });
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokProjection>} TerminalByokProjection */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokProjection
+>} TerminalByokProjection */
 /** @typedef {TerminalByokProjection['models'][number]} ByokModelInfo */
 /** @typedef {TerminalByokProjection['gatewayModels'][number]} GatewayModelInfo */
 /** @typedef {TerminalByokProjection['modelGateway']} EnvByokModelGatewaySnapshot */
-/** @typedef {Omit<Partial<ByokModelInfo>, 'capabilities' | 'byok'> & { capabilities?: { supports?: Partial<NonNullable<ByokModelInfo['capabilities']>['supports']>; limits?: Partial<NonNullable<ByokModelInfo['capabilities']>['limits']> }; byok?: Omit<Partial<ByokModelInfo['byok']>, 'pricing' | 'rateLimits'> & { pricing?: Partial<ByokModelInfo['byok']['pricing']>; rateLimits?: Partial<ByokModelInfo['byok']['rateLimits']> } }} ByokModelInfoOverrides */
-/** @typedef {Omit<Partial<GatewayModelInfo>, 'capabilities' | 'byok'> & { capabilities?: { supports?: Partial<NonNullable<GatewayModelInfo['capabilities']>['supports']>; limits?: Partial<NonNullable<GatewayModelInfo['capabilities']>['limits']> }; byok?: Omit<Partial<GatewayModelInfo['byok']>, 'pricing' | 'rateLimits' | 'capabilities' | 'limits'> & { pricing?: Partial<GatewayModelInfo['byok']['pricing']>; rateLimits?: Partial<GatewayModelInfo['byok']['rateLimits']>; capabilities?: Record<string, unknown>; limits?: Record<string, unknown> } }} GatewayModelInfoOverrides */
-/** @typedef {Omit<Partial<TerminalByokProjection>, 'summary' | 'modelGateway' | 'modelGatewayProjection'> & { summary?: Partial<TerminalByokProjection['summary']>; modelGateway?: EnvByokModelGatewaySnapshot; modelGatewayProjection?: ModelGatewayOperatorProjection }} TerminalByokProjectionOverrides */
+/** @typedef {Omit<Partial<ByokModelInfo>, 'capabilities' | 'byok'> & {
+    capabilities?: {
+        supports?: Partial<NonNullable<ByokModelInfo['capabilities']>['supports']>;
+        limits?: Partial<NonNullable<ByokModelInfo['capabilities']>['limits']>;
+    };
+    byok?: Omit<Partial<ByokModelInfo['byok']>, 'pricing' | 'rateLimits'> & {
+        pricing?: Partial<ByokModelInfo['byok']['pricing']>;
+        rateLimits?: Partial<ByokModelInfo['byok']['rateLimits']>;
+    };
+}} ByokModelInfoOverrides */
+/** @typedef {Omit<Partial<GatewayModelInfo>, 'capabilities' | 'byok'> & {
+    capabilities?: {
+        supports?: Partial<NonNullable<GatewayModelInfo['capabilities']>['supports']>;
+        limits?: Partial<NonNullable<GatewayModelInfo['capabilities']>['limits']>;
+    };
+    byok?: Omit<Partial<GatewayModelInfo['byok']>, 'pricing' | 'rateLimits' | 'capabilities' | 'limits'> & {
+        pricing?: Partial<GatewayModelInfo['byok']['pricing']>;
+        rateLimits?: Partial<GatewayModelInfo['byok']['rateLimits']>;
+        capabilities?: Record<string, unknown>;
+        limits?: Record<string, unknown>;
+    };
+}} GatewayModelInfoOverrides */
+/** @typedef {Omit<Partial<TerminalByokProjection>, 'summary' | 'modelGateway' | 'modelGatewayProjection'> & {
+    summary?: Partial<TerminalByokProjection['summary']>;
+    modelGateway?: EnvByokModelGatewaySnapshot;
+    modelGatewayProjection?: ModelGatewayOperatorProjection;
+}} TerminalByokProjectionOverrides */
 /** @typedef {TerminalByokProjection['profiles'][number]} TerminalByokProfileSummary */
-/** @typedef {NonNullable<ReturnType<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderModelHealth>>} ByokProviderHealthFixtureRecord */
+/** @typedef {NonNullable<
+    ReturnType<
+        typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderModelHealth
+    >
+>} ByokProviderHealthFixtureRecord */
 /** @typedef {ByokProviderHealthFixtureRecord['probes'][string]} ByokProviderProbeHealthFixtureRecord */
-/** @typedef {Omit<Partial<ByokProviderHealthFixtureRecord>, 'probes'> & { probes?: Record<string, Partial<ByokProviderProbeHealthFixtureRecord>> }} ByokProviderHealthFixtureOverrides */
+/** @typedef {Omit<Partial<ByokProviderHealthFixtureRecord>, 'probes'> & {
+    probes?: Record<string, Partial<ByokProviderProbeHealthFixtureRecord>>;
+}} ByokProviderHealthFixtureOverrides */
 
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>>} TerminalSessionFsState */
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory>>} TerminalSdkSessionInventory */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy>} RuntimeAutomationPolicy */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision>} RuntimeAutomationDecision */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan>} RuntimeSelectorPlan */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState
+    >
+>} TerminalSessionFsState */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalSdkSessionInventory
+    >
+>} TerminalSdkSessionInventory */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/automation/policy.js').readModelGatewayRuntimeAutomationPolicy
+>} RuntimeAutomationPolicy */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/automation/decision.js').buildModelGatewayRuntimeAutomationDecision
+>} RuntimeAutomationDecision */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/routing/runtime-selector.js').buildModelGatewayRuntimeSelectorPlan
+>} RuntimeSelectorPlan */
 /** @typedef {Omit<Partial<RuntimeSelectorPlan>, 'summary'> & { summary?: Partial<RuntimeSelectorPlan['summary']> }} RuntimeSelectorPlanOverrides */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/registry/projection.js').buildModelGatewayOperatorProjection>} ModelGatewayOperatorProjection */
-/** @typedef {Omit<Partial<ModelGatewayOperatorProjection>, 'effectiveRoute'> & { effectiveRoute?: Partial<ModelGatewayOperatorProjection['effectiveRoute']> }} ModelGatewayOperatorProjectionOverrides */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderHealthState>} ByokProviderHealthState */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/registry/projection.js').buildModelGatewayOperatorProjection
+>} ModelGatewayOperatorProjection */
+/** @typedef {Omit<Partial<ModelGatewayOperatorProjection>, 'effectiveRoute'> & {
+    effectiveRoute?: Partial<ModelGatewayOperatorProjection['effectiveRoute']>;
+}} ModelGatewayOperatorProjectionOverrides */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/health/provider-health.js').readByokProviderHealthState
+>} ByokProviderHealthState */
 
 /**
  * @template T
@@ -1828,8 +2286,12 @@ function requireFixtureIndex(values, index, label) {
     return value;
 }
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/catalog/default-importers.js').createDefaultModelGatewayCatalogImporters>[number]} CatalogImporterFixture */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/routing/selection-audit.js').auditModelGatewayPreRuntimeSelection>} PreRuntimeSelectionAudit */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/catalog/default-importers.js').createDefaultModelGatewayCatalogImporters
+>[number]} CatalogImporterFixture */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/routing/selection-audit.js').auditModelGatewayPreRuntimeSelection
+>} PreRuntimeSelectionAudit */
 
 /**
  * @param {string} id
@@ -2027,7 +2489,9 @@ function gatewayModelInfoFixture(overrides = {}) {
     };
 }
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokGatewayProjectionFromEnv>} TerminalByokGatewayProjection */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/config.js').readTerminalByokGatewayProjectionFromEnv
+>} TerminalByokGatewayProjection */
 
 /** @returns {EnvByokModelGatewaySnapshot} */
 function envByokModelGatewaySnapshotFixture() {
@@ -2183,7 +2647,14 @@ function runtimeAutomationDecisionFixture(overrides = {}) {
         requiresProviderRebind: false,
         requiresNewSession: false,
         blockers: ['fixture_manual_intervention'],
-        currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
+        currentBoundary: {
+            enabled: false,
+            profile: null,
+            preset: null,
+            providerType: null,
+            baseUrl: null,
+            model: null,
+        },
         targetBoundary: { profile: null, preset: null, providerType: null, baseUrl: null, model: null },
         targetRoute: null,
         cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
@@ -2228,9 +2699,19 @@ function operatorProjectionFixture(overrides = {}) {
     };
 }
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/model-gateway/observability/events.js').buildRouteDecisionEvent>} RouteDecisionEvent */
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/byok/gateway-auto.js').buildTerminalByokGatewayAutoStatus>>} TerminalGatewayAutoStatus */
-/** @typedef {Omit<Partial<TerminalGatewayAutoStatus>, 'args' | 'decision' | 'automationDecisionRecord'> & { args?: Partial<TerminalGatewayAutoStatus['args']>; decision?: Partial<RuntimeAutomationDecision>; automationDecisionRecord?: Record<string, unknown> }} TerminalGatewayAutoStatusOverrides */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/model-gateway/observability/events.js').buildRouteDecisionEvent
+>} RouteDecisionEvent */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/byok/gateway-auto.js').buildTerminalByokGatewayAutoStatus
+    >
+>} TerminalGatewayAutoStatus */
+/** @typedef {Omit<Partial<TerminalGatewayAutoStatus>, 'args' | 'decision' | 'automationDecisionRecord'> & {
+    args?: Partial<TerminalGatewayAutoStatus['args']>;
+    decision?: Partial<RuntimeAutomationDecision>;
+    automationDecisionRecord?: Record<string, unknown>;
+}} TerminalGatewayAutoStatusOverrides */
 
 /**
  * @param {Partial<RouteDecisionEvent>} [overrides]
@@ -2301,9 +2782,7 @@ function blockedRuntimeSelectorPlanFixture(providerId, providerModel, rejectionR
                     blockedCount: 1,
                     providerCount: 1,
                     rejectionReasonCounts: { [rejectionReason]: 1 },
-                    topBlockedRoutes: [
-                        { label: 'alternate1', providerId, providerModel, reasons: [rejectionReason] },
-                    ],
+                    topBlockedRoutes: [{ label: 'alternate1', providerId, providerModel, reasons: [rejectionReason] }],
                 },
                 candidateAlternatives: [],
                 reasons: ['blocked:no_selected_route'],
@@ -2335,18 +2814,17 @@ function terminalGatewayAutoStatusFixture(overrides = {}) {
         runtimeSelectorPlan: overrides.runtimeSelectorPlan ?? runtimeSelectorPlanFixture(),
         inventory: overrides.inventory ?? sessionInventoryFixture(),
         decision,
-        controllerStep:
-            overrides.controllerStep ?? {
-                schema: 'model-gateway-runtime-automation-controller-step',
-                ok: decision.ok,
-                phase: 'manual',
-                action: decision.action,
-                effectMode: 'dry_run',
-                effects: [],
-                blockers: [...decision.blockers],
-                selectedRouteKey: decision.selectedRouteKey,
-                operatorSummary: decision.operatorSummary,
-            },
+        controllerStep: overrides.controllerStep ?? {
+            schema: 'model-gateway-runtime-automation-controller-step',
+            ok: decision.ok,
+            phase: 'manual',
+            action: decision.action,
+            effectMode: 'dry_run',
+            effects: [],
+            blockers: [...decision.blockers],
+            selectedRouteKey: decision.selectedRouteKey,
+            operatorSummary: decision.operatorSummary,
+        },
         automationDecisionRecord: {
             ...decision,
             decisionId: 'fixture-automation-decision',
@@ -2526,7 +3004,12 @@ describe('terminal /byok command', () => {
             { id: 'prebuild.all', surface: 'package', phase: 'prebuild', command: 'npm run model-gateway:prebuild' },
             { id: 'prebuild.first-build', surface: 'make', phase: 'prebuild', command: 'make model-gateway-prebuild' },
             { id: 'commands.text', surface: 'terminal', phase: 'orientation', command: '/byok gateway commands' },
-            { id: 'operator.ready', surface: 'terminal', phase: 'orientation', command: '/byok gateway operator-ready profile:repo_agent' },
+            {
+                id: 'operator.ready',
+                surface: 'terminal',
+                phase: 'orientation',
+                command: '/byok gateway operator-ready profile:repo_agent',
+            },
         ]);
         listProviderEndpointInventory.mockReset();
         listProviderEndpointInventory.mockReturnValue([
@@ -2563,7 +3046,12 @@ describe('terminal /byok command', () => {
                 routeSelectors: ['exact_model', 'gateway_auto', 'provider_model'],
                 richnessTags: ['context', 'features', 'pricing'],
                 capabilities: { chatCompletions: true, responses: false, fim: false, embeddings: false },
-                routing: { supportsAutoSelection: true, supportsFallback: false, supportsProviderOrder: false, supportsGatewayByok: false },
+                routing: {
+                    supportsAutoSelection: true,
+                    supportsFallback: false,
+                    supportsProviderOrder: false,
+                    supportsGatewayByok: false,
+                },
                 metadata: { hasPricingMetadata: true, hasContextMetadata: true, hasProviderMetadata: false },
             },
         ]);
@@ -2652,8 +3140,19 @@ describe('terminal /byok command', () => {
                 enabled: true,
                 run: { runId: 'eligibility-run' },
                 decisionCount: 2,
-                diff: { added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'], removed: [], changed: [] },
-                diffSummary: { addedCount: 1, removedCount: 0, changedCount: 0, changedKinds: [], becameEligibleCount: 0, becameExcludedCount: 0 },
+                diff: {
+                    added: ['openrouter:new-model:default:exact_model:new-model:default:terminal-refresh:default'],
+                    removed: [],
+                    changed: [],
+                },
+                diffSummary: {
+                    addedCount: 1,
+                    removedCount: 0,
+                    changedCount: 0,
+                    changedKinds: [],
+                    becameEligibleCount: 0,
+                    becameExcludedCount: 0,
+                },
             },
             retention: {
                 importRuns: { before: 1, after: 1, pruned: 0 },
@@ -2702,8 +3201,13 @@ describe('terminal /byok command', () => {
         readConfiguredByokProfilesFromEnv.mockReset();
         readConfiguredByokProfilesFromEnv.mockReturnValue({});
         readFile.mockReset();
+        readTextFreshTrusted.mockClear();
         readdir.mockReset();
         stat.mockReset();
+        writeFileAtomicTrusted.mockClear();
+        workspaceIoListDirectoryNamesFresh.mockClear();
+        workspaceIoReadTextFresh.mockClear();
+        workspaceIoStatPath.mockClear();
         summarizeModelGatewayRefreshLogText.mockReset();
         summarizeModelGatewayRefreshLogText.mockReturnValue({
             eventCount: 6,
@@ -2721,7 +3225,10 @@ describe('terminal /byok command', () => {
         readTerminalByokGatewayProjectionFromEnv.mockReturnValue(terminalByokGatewayProjectionFixture());
         readTerminalByokProjection.mockReset();
         readTerminalByokRuntimeConfigProjection.mockReset();
-        readTerminalByokRuntimeConfigProjection.mockReturnValue({ currentModel: 'kilo-auto/free', modelGatewayProjection: operatorProjectionFixture() });
+        readTerminalByokRuntimeConfigProjection.mockReturnValue({
+            currentModel: 'kilo-auto/free',
+            modelGatewayProjection: operatorProjectionFixture(),
+        });
         readTerminalRuntimeContextWindow.mockReset();
         readTerminalRuntimeContextWindow.mockReturnValue(null);
         recordByokProviderModelCallFailure.mockReset();
@@ -2928,7 +3435,10 @@ describe('terminal /byok command', () => {
             models: [
                 byokModelInfoFixture({
                     id: 'kilo-auto/free',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 256000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 256000 },
+                    },
                     byok: {
                         source: 'remote',
                         supportsReasoning: true,
@@ -2958,7 +3468,12 @@ describe('terminal /byok command', () => {
                 model: 'kilo-auto/free',
                 auth: { apiKeyConfigured: false, bearerTokenConfigured: true, headersConfigured: false },
                 modelList: { configured: true, count: 3 },
-                capabilities: { reasoningEffort: true, sdkReasoningEffort: true, vision: true, contextWindowTokens: 200000 },
+                capabilities: {
+                    reasoningEffort: true,
+                    sdkReasoningEffort: true,
+                    vision: true,
+                    contextWindowTokens: 200000,
+                },
             },
         });
         const ctx = mockCtx();
@@ -2982,21 +3497,23 @@ describe('terminal /byok command', () => {
                 model: 'qwen3-coder-next',
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sessionInventoryFixture({
-            currentSessionId: 'sdk-kilo-live',
-            lastSessionId: 'sdk-kilo-live',
-            foregroundSessionId: 'sdk-kilo-live',
-            persistedByokBinding: {
-                enabled: true,
-                profile: 'kilo',
-                preset: 'kilo-code',
-                providerType: 'openai',
-                baseUrl: 'https://api.kilo.ai/api/gateway',
-                model: 'kilo-auto/free',
-            },
-            lastBootDecision: null,
-            sessions: [],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sessionInventoryFixture({
+                currentSessionId: 'sdk-kilo-live',
+                lastSessionId: 'sdk-kilo-live',
+                foregroundSessionId: 'sdk-kilo-live',
+                persistedByokBinding: {
+                    enabled: true,
+                    profile: 'kilo',
+                    preset: 'kilo-code',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.kilo.ai/api/gateway',
+                    model: 'kilo-auto/free',
+                },
+                lastBootDecision: null,
+                sessions: [],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'status');
@@ -3041,12 +3558,18 @@ describe('terminal /byok command', () => {
             models: [
                 byokModelInfoFixture({
                     id: 'deepseek/deepseek-v4-flash:free',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { provider: 'openrouter', freeTier: true, supportsReasoning: true, supportsVision: false },
                 }),
                 byokModelInfoFixture({
                     id: 'openrouter/free',
-                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: true },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { provider: 'openrouter', freeTier: true, supportsReasoning: true, supportsVision: true },
                 }),
             ],
@@ -3433,7 +3956,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'kilo/model-a',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         profile: 'kilo',
@@ -3443,7 +3969,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'openrouter/model-b',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 180000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 180000 },
+                    },
                     byok: {
                         freeTier: true,
                         profile: 'openrouter-free',
@@ -3538,7 +4067,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'kilo-auto/free',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 256000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 256000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'kilo-code',
@@ -3584,7 +4116,10 @@ describe('terminal /byok command', () => {
         });
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'probe shortlist free reasoning safe 1 timeout:15000 provider:kilo-code');
+        await cmdByok(
+            { println: ctx.println },
+            'probe shortlist free reasoning safe 1 timeout:15000 provider:kilo-code',
+        );
 
         const env = runConfiguredByokAgentProbe.mock.calls[0]?.[0]?.env;
         expect(env).toEqual(expect.objectContaining({ COPILOT_BYOK_PROVIDER_PRESET: 'kilo-code' }));
@@ -4102,7 +4637,10 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway secrets kilo');
 
-        expect(evaluateModelGatewayProviderEnvRequirements).toHaveBeenCalledWith({ env: process.env, providerId: 'kilo' });
+        expect(evaluateModelGatewayProviderEnvRequirements).toHaveBeenCalledWith({
+            env: process.env,
+            providerId: 'kilo',
+        });
         expect(summarizeModelGatewayProviderEnvRequirements).toHaveBeenCalled();
         expect(ctx.output()).toContain('BYOK requisitos de ambiente');
         expect(ctx.output()).toContain('estado ausente');
@@ -4126,8 +4664,16 @@ describe('terminal /byok command', () => {
         expect(resolveProviderEndpointInventory).toHaveBeenCalledWith('kilo');
         expect(auditCatalogImporterSet).toHaveBeenCalledWith(
             [
-                expect.objectContaining({ id: 'kilo-gateway-models', providerId: 'kilo', sourceKind: 'public_gateway_api' }),
-                expect.objectContaining({ id: 'kilo-gateway-providers', providerId: 'kilo', sourceKind: 'public_gateway_api' }),
+                expect.objectContaining({
+                    id: 'kilo-gateway-models',
+                    providerId: 'kilo',
+                    sourceKind: 'public_gateway_api',
+                }),
+                expect.objectContaining({
+                    id: 'kilo-gateway-providers',
+                    providerId: 'kilo',
+                    sourceKind: 'public_gateway_api',
+                }),
             ],
             { inventories: [expect.objectContaining({ providerId: 'kilo' })] },
         );
@@ -4191,7 +4737,9 @@ describe('terminal /byok command', () => {
         expect(ctx.output()).toContain('não executa modelo nem revela valores de segredo');
         expect(ctx.output()).not.toContain('\x1b[');
         expect(ctx.output()).not.toContain('BYOK model-gateway account overlays');
-        expect(ctx.output()).not.toContain('/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/catalog.json');
+        expect(ctx.output()).not.toContain(
+            '/workspaces/chatgpt-docker-puppeteer/data/copilot/model-gateway/catalog.json',
+        );
     });
 
     it('lista rotas do model-gateway com rótulos humanos e sem ANSI', async () => {
@@ -4319,7 +4867,10 @@ describe('terminal /byok command', () => {
         await cmdByok({ println: ctx.println }, 'gateway commands live-readiness');
 
         expect(listModelGatewayCanonicalCommands).toHaveBeenCalledWith({ surface: undefined, phase: 'live-readiness' });
-        expect(renderModelGatewayCanonicalCommandLines).toHaveBeenCalledWith({ surface: undefined, phase: 'live-readiness' });
+        expect(renderModelGatewayCanonicalCommandLines).toHaveBeenCalledWith({
+            surface: undefined,
+            phase: 'live-readiness',
+        });
     });
 
     it('renderiza cockpit operator-ready no terminal sem chamar provider', async () => {
@@ -4437,9 +4988,31 @@ describe('terminal /byok command', () => {
                 requiresProviderRebind: true,
                 requiresNewSession: false,
                 blockers: [],
-                currentBoundary: { enabled: true, profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'primary-model' },
-                targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'fallback-model' },
-                targetRoute: { providerId: 'groq', providerModel: 'fallback-model', selectorSyntax: 'fallback-model', baseUrl: null, openAICompatibleBaseUrl: null, wireApi: null, routeProfile: 'repo_agent', selectedRouteKey: 'groq:fallback-model' },
+                currentBoundary: {
+                    enabled: true,
+                    profile: 'repo_agent',
+                    preset: 'openrouter',
+                    providerType: 'openai_compatible',
+                    baseUrl: null,
+                    model: 'primary-model',
+                },
+                targetBoundary: {
+                    profile: 'repo_agent',
+                    preset: 'groq',
+                    providerType: 'openai_compatible',
+                    baseUrl: null,
+                    model: 'fallback-model',
+                },
+                targetRoute: {
+                    providerId: 'groq',
+                    providerModel: 'fallback-model',
+                    selectorSyntax: 'fallback-model',
+                    baseUrl: null,
+                    openAICompatibleBaseUrl: null,
+                    wireApi: null,
+                    routeProfile: 'repo_agent',
+                    selectedRouteKey: 'groq:fallback-model',
+                },
                 cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
                 blockerClass: 'none',
                 nonActionReason: null,
@@ -4551,8 +5124,21 @@ describe('terminal /byok command', () => {
                 requiresProviderRebind: false,
                 requiresNewSession: false,
                 blockers: [],
-                currentBoundary: { enabled: true, profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'old-model' },
-                targetBoundary: { profile: 'repo_agent', preset: 'openrouter', providerType: 'openai_compatible', baseUrl: null, model: 'openai/gpt-oss-120b' },
+                currentBoundary: {
+                    enabled: true,
+                    profile: 'repo_agent',
+                    preset: 'openrouter',
+                    providerType: 'openai_compatible',
+                    baseUrl: null,
+                    model: 'old-model',
+                },
+                targetBoundary: {
+                    profile: 'repo_agent',
+                    preset: 'openrouter',
+                    providerType: 'openai_compatible',
+                    baseUrl: null,
+                    model: 'openai/gpt-oss-120b',
+                },
                 targetRoute: null,
                 cooldown: { active: false, reason: null, resetAt: null, retryAfterSeconds: null },
                 blockerClass: 'none',
@@ -4739,10 +5325,28 @@ describe('terminal /byok command', () => {
                 requiresProviderRebind: false,
                 requiresNewSession: false,
                 blockers: ['blocked:provider_health_cooldown:rate-limit'],
-                currentBoundary: { enabled: false, profile: null, preset: null, providerType: null, baseUrl: null, model: null },
-                targetBoundary: { profile: 'repo_agent', preset: 'groq', providerType: 'openai_compatible', baseUrl: null, model: 'reset-model' },
+                currentBoundary: {
+                    enabled: false,
+                    profile: null,
+                    preset: null,
+                    providerType: null,
+                    baseUrl: null,
+                    model: null,
+                },
+                targetBoundary: {
+                    profile: 'repo_agent',
+                    preset: 'groq',
+                    providerType: 'openai_compatible',
+                    baseUrl: null,
+                    model: 'reset-model',
+                },
                 targetRoute: null,
-                cooldown: { active: true, reason: 'provider_health_cooldown', resetAt: '2026-06-01T10:00:00.000Z', retryAfterSeconds: 120 },
+                cooldown: {
+                    active: true,
+                    reason: 'provider_health_cooldown',
+                    resetAt: '2026-06-01T10:00:00.000Z',
+                    retryAfterSeconds: 120,
+                },
                 blockerClass: 'rate_limit_resettable',
                 nonActionReason: 'route_wait_for_reset',
                 nextCommands: ['npm run model-gateway:runtime-health:diff'],
@@ -4799,7 +5403,12 @@ describe('terminal /byok command', () => {
                 },
                 { kind: 'prepare_new_sdk_session', model: 'anthropic/claude-sonnet-4.5', execute: true },
                 { kind: 'set_live_model', model: 'dry-model', execute: false },
-                { kind: 'set_live_model', model: 'blocked-model', execute: false, blockedReason: 'live_set_model_not_allowed' },
+                {
+                    kind: 'set_live_model',
+                    model: 'blocked-model',
+                    execute: false,
+                    blockedReason: 'live_set_model_not_allowed',
+                },
             ],
         });
 
@@ -4807,9 +5416,7 @@ describe('terminal /byok command', () => {
         expect(scheduleTerminalSdkSessionBootSelection).not.toHaveBeenCalled();
         expect(result.applied).toHaveLength(1);
         expect(result.applied.map(describeTerminalByokGatewayAutoEffect)).toEqual(
-            expect.arrayContaining([
-                'modelo vivo solicitado anthropic/claude-sonnet-4.5 · confiança catálogo',
-            ]),
+            expect.arrayContaining(['modelo vivo solicitado anthropic/claude-sonnet-4.5 · confiança catálogo']),
         );
         expect(result.skipped).toEqual(
             expect.arrayContaining([
@@ -4834,11 +5441,9 @@ describe('terminal /byok command', () => {
             decision: { routeProfile: 'repo_agent', selectedRouteKey: 'openrouter:model-a' },
             automationDecisionRecord: { decisionId: 'automation-1' },
         });
-        const records = createTerminalByokGatewayAutoEffectApplicationRecords(
-            autoStatus,
-            result,
-            { timestamp: '2026-06-01T00:00:00.000Z' },
-        );
+        const records = createTerminalByokGatewayAutoEffectApplicationRecords(autoStatus, result, {
+            timestamp: '2026-06-01T00:00:00.000Z',
+        });
         expect(records).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
@@ -4857,11 +5462,9 @@ describe('terminal /byok command', () => {
                 }),
             ]),
         );
-        const handoffs = createTerminalByokGatewaySdkSessionHandoffRecords(
-            autoStatus,
-            result,
-            { timestamp: '2026-06-01T00:00:00.000Z' },
-        );
+        const handoffs = createTerminalByokGatewaySdkSessionHandoffRecords(autoStatus, result, {
+            timestamp: '2026-06-01T00:00:00.000Z',
+        });
         expect(handoffs).toEqual([
             expect.objectContaining({
                 decisionId: 'automation-1',
@@ -5149,9 +5752,15 @@ describe('terminal /byok command', () => {
                 limit: 5,
             }),
         );
-        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_started' }));
-        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:model_changed' }));
-        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:catalog:import_completed' }));
+        expect(eventBus.emit).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'model_gateway:catalog:import_started' }),
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'model_gateway:catalog:model_changed' }),
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'model_gateway:catalog:import_completed' }),
+        );
         expect(ctx.output()).toContain('BYOK refresh do catálogo');
         expect(ctx.output()).toContain('schema OpenAI + x_model_gateway');
         expect(ctx.output()).toContain('projeções 1');
@@ -5186,7 +5795,13 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'gateway catalog refresh-log');
 
-        expect(readFile).toHaveBeenCalledWith(expect.stringContaining('latest.jsonl'), 'utf8');
+        expect(workspaceIoListDirectoryNamesFresh).toHaveBeenCalledWith(
+            expect.stringContaining('logs/model-gateway-refresh'),
+        );
+        expect(workspaceIoStatPath).toHaveBeenCalledTimes(2);
+        expect(workspaceIoReadTextFresh).toHaveBeenCalledWith(expect.stringContaining('latest.jsonl'), {
+            includeHash: false,
+        });
         expect(summarizeModelGatewayRefreshLogText).toHaveBeenCalledWith('{"phase":"refresh_completed"}\n', {
             logPath: expect.stringContaining('latest.jsonl'),
         });
@@ -5571,7 +6186,10 @@ describe('terminal /byok command', () => {
         ]);
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'gateway catalog search new-model provider:openrouter eligible tools 5');
+        await cmdByok(
+            { println: ctx.println },
+            'gateway catalog search new-model provider:openrouter eligible tools 5',
+        );
 
         expect(searchModelGatewayCatalogEntries).toHaveBeenCalledWith(
             expect.any(Object),
@@ -5647,7 +6265,13 @@ describe('terminal /byok command', () => {
                     streaming: { kind: 'streaming', status: 'ok', ok: true, providerAttempted: true, count: 2 },
                     vision: { kind: 'vision', status: 'failed', ok: false, providerAttempted: true, count: 1 },
                     live_ask_user: { kind: 'live_ask_user', status: 'ok', ok: true, providerAttempted: true, count: 1 },
-                    live_tool_protocol: { kind: 'live_tool_protocol', status: 'ok', ok: true, providerAttempted: true, count: 1 },
+                    live_tool_protocol: {
+                        kind: 'live_tool_protocol',
+                        status: 'ok',
+                        ok: true,
+                        providerAttempted: true,
+                        count: 1,
+                    },
                 },
             }),
         ]);
@@ -5710,7 +6334,10 @@ describe('terminal /byok command', () => {
         mockProjection();
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'health provider:openrouter model:openai/gpt-oss-120b profile:repo_agent');
+        await cmdByok(
+            { println: ctx.println },
+            'health provider:openrouter model:openai/gpt-oss-120b profile:repo_agent',
+        );
 
         expect(ctx.output()).toContain('Filtro');
         expect(ctx.output()).toContain('provedor openrouter');
@@ -5738,7 +6365,10 @@ describe('terminal /byok command', () => {
         mockProjection();
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'health clear provider:openrouter model:openai/gpt-oss-120b profile:repo_agent');
+        await cmdByok(
+            { println: ctx.println },
+            'health clear provider:openrouter model:openai/gpt-oss-120b profile:repo_agent',
+        );
 
         expect(clearByokProviderModelHealth).toHaveBeenCalledWith({
             providerId: 'openrouter',
@@ -5825,21 +6455,23 @@ describe('terminal /byok command', () => {
                 model: 'kilo-auto/free',
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValue(sessionInventoryFixture({
-            currentSessionId: 'sdk-kilo',
-            lastSessionId: 'sdk-kilo',
-            foregroundSessionId: 'sdk-kilo',
-            persistedByokBinding: {
-                enabled: true,
-                profile: 'kilo',
-                preset: 'kilo-code',
-                providerType: 'openai',
-                baseUrl: 'https://api.kilo.ai/api/gateway',
-                model: 'kilo-auto/free',
-            },
-            lastBootDecision: null,
-            sessions: [],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValue(
+            sessionInventoryFixture({
+                currentSessionId: 'sdk-kilo',
+                lastSessionId: 'sdk-kilo',
+                foregroundSessionId: 'sdk-kilo',
+                persistedByokBinding: {
+                    enabled: true,
+                    profile: 'kilo',
+                    preset: 'kilo-code',
+                    providerType: 'openai',
+                    baseUrl: 'https://api.kilo.ai/api/gateway',
+                    model: 'kilo-auto/free',
+                },
+                lastBootDecision: null,
+                sessions: [],
+            }),
+        );
         setTerminalModelProjection.mockReturnValueOnce({
             previousModel: 'kilo-auto/free',
             previousReasoningEffort: 'high',
@@ -5887,21 +6519,23 @@ describe('terminal /byok command', () => {
                 model: 'kilo-auto/free',
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValue(sessionInventoryFixture({
-            currentSessionId: 'sdk-openrouter',
-            lastSessionId: 'sdk-openrouter',
-            foregroundSessionId: 'sdk-openrouter',
-            persistedByokBinding: {
-                enabled: true,
-                profile: 'openrouter-free',
-                preset: 'openrouter',
-                providerType: 'openai',
-                baseUrl: 'https://openrouter.ai/api/v1',
-                model: 'openrouter/free',
-            },
-            lastBootDecision: null,
-            sessions: [],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValue(
+            sessionInventoryFixture({
+                currentSessionId: 'sdk-openrouter',
+                lastSessionId: 'sdk-openrouter',
+                foregroundSessionId: 'sdk-openrouter',
+                persistedByokBinding: {
+                    enabled: true,
+                    profile: 'openrouter-free',
+                    preset: 'openrouter',
+                    providerType: 'openai',
+                    baseUrl: 'https://openrouter.ai/api/v1',
+                    model: 'openrouter/free',
+                },
+                lastBootDecision: null,
+                sessions: [],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdByok({ println: ctx.println }, 'model anthropic/claude-sonnet-4.5');
@@ -6131,8 +6765,12 @@ describe('terminal /byok command', () => {
                 failure: null,
             }),
         );
-        expect(recordModelGatewayRouteDecision).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:route:decision' }));
-        expect(eventBus.emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'model_gateway:route:decision', decisionId: 'route-test' }));
+        expect(recordModelGatewayRouteDecision).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'model_gateway:route:decision' }),
+        );
+        expect(eventBus.emit).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'model_gateway:route:decision', decisionId: 'route-test' }),
+        );
     });
 
     it('trata provider:ollama como opt-in explícito e explica bloqueio local padrão', async () => {
@@ -6302,20 +6940,17 @@ describe('terminal /byok command', () => {
             fromCache: true,
             error: null,
         });
-        routeGatewayModels.mockImplementation((/** @type {Parameters<typeof import('../../../../src/copilot/model-gateway/routing/policy-engine.js').routeGatewayModels>[0]} */ candidates) => {
-            const selectedModel = candidates.find((candidate) => candidate['providerModel'] === 'glm-4.5-flash') ?? candidates[0];
-            return {
-                profile: { id: 'code' },
-                selected: {
-                    model: selectedModel,
-                    include: true,
-                    score: 260,
-                    reasons: ['active_runtime_model'],
-                    rejectedReasons: [],
-                    health: null,
-                },
-                candidates: [
-                    {
+        routeGatewayModels.mockImplementation(
+            (
+                /** @type {Parameters<
+    typeof import('../../../../src/copilot/model-gateway/routing/policy-engine.js').routeGatewayModels
+>[0]} */ candidates,
+            ) => {
+                const selectedModel =
+                    candidates.find((candidate) => candidate['providerModel'] === 'glm-4.5-flash') ?? candidates[0];
+                return {
+                    profile: { id: 'code' },
+                    selected: {
                         model: selectedModel,
                         include: true,
                         score: 260,
@@ -6323,11 +6958,21 @@ describe('terminal /byok command', () => {
                         rejectedReasons: [],
                         health: null,
                     },
-                ],
-                rejected: [],
-                fallbackChain: ['zai:glm-4.5-flash', 'zai:glm-4.5'],
-            };
-        });
+                    candidates: [
+                        {
+                            model: selectedModel,
+                            include: true,
+                            score: 260,
+                            reasons: ['active_runtime_model'],
+                            rejectedReasons: [],
+                            health: null,
+                        },
+                    ],
+                    rejected: [],
+                    fallbackChain: ['zai:glm-4.5-flash', 'zai:glm-4.5'],
+                };
+            },
+        );
         mockProjection({
             summary: {
                 enabled: true,
@@ -6407,7 +7052,13 @@ describe('terminal /byok command', () => {
                         providerModel: 'gemma3:4b',
                         profile: 'ollama',
                         routeProfile: 'ollama',
-                        capabilities: { local: true, privacy: true, no_remote_secrets: true, tools: true, streaming: true },
+                        capabilities: {
+                            local: true,
+                            privacy: true,
+                            no_remote_secrets: true,
+                            tools: true,
+                            streaming: true,
+                        },
                         source: 'model-gateway',
                     },
                 }),
@@ -6446,7 +7097,13 @@ describe('terminal /byok command', () => {
                     byok: {
                         provider: 'ollama-local',
                         providerModel: 'gemma3:4b',
-                        capabilities: { local: true, privacy: true, no_remote_secrets: true, tools: true, streaming: true },
+                        capabilities: {
+                            local: true,
+                            privacy: true,
+                            no_remote_secrets: true,
+                            tools: true,
+                            streaming: true,
+                        },
                         source: 'remote',
                     },
                 },
@@ -6508,7 +7165,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'legacy-static',
-                    capabilities: { supports: { reasoningEffort: false, vision: false }, limits: { max_context_window_tokens: 8000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 8000 },
+                    },
                     byok: { provider: 'legacy' },
                 },
             ],
@@ -6521,7 +7181,10 @@ describe('terminal /byok command', () => {
             gatewayModels: [
                 gatewayModelInfoFixture({
                     id: 'gateway-model',
-                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: true },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         gatewayId: 'openrouter:gateway-model',
                         routeCandidateId: 'openrouter:gateway-model',
@@ -6551,12 +7214,18 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'paid-small',
-                    capabilities: { supports: { reasoningEffort: false, vision: false }, limits: { max_context_window_tokens: 8000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: false, vision: false },
+                        limits: { max_context_window_tokens: 8000 },
+                    },
                     byok: { freeTier: false, pricing: { prompt: 0.1, completion: 0.2, request: null } },
                 },
                 {
                     id: 'free-reasoning',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { freeTier: true, pricing: { prompt: 0, completion: 0, request: null } },
                 },
             ],
@@ -6615,7 +7284,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'openrouter/free-reasoning',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'openrouter',
@@ -6624,7 +7296,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'openrouter/free-low',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'openrouter',
@@ -6633,7 +7308,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'groq/free-reasoning',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'groq',
@@ -6642,7 +7320,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'openrouter/paid-vision',
-                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: true },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { freeTier: false, provider: 'openrouter' },
                 },
             ],
@@ -6793,7 +7474,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'groq/free-reasoning',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: { freeTier: true, provider: 'groq', rateLimits: { maxRequestTokens: 64000 } },
                 },
             ],
@@ -6854,7 +7538,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'qwen/qwen3-32b',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: null,
                         provider: 'groq',
@@ -6927,7 +7614,9 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'models refresh');
 
-        expect(ctx.output()).toMatch(/modelo configurado 'provider\/stale-model' não apareceu no catálogo remoto\s+atual/u);
+        expect(ctx.output()).toMatch(
+            /modelo configurado 'provider\/stale-model' não apareceu no catálogo remoto\s+atual/u,
+        );
         expect(ctx.output()).toContain('/byok probe agent profile:chutes-ai model:<id>');
         expect(ctx.output()).toContain('provider/current-model');
     });
@@ -6942,7 +7631,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'qwen/qwen3-32b',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: null,
                         provider: 'groq',
@@ -7012,7 +7704,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'free-low-limit',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: true,
                         rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
@@ -7021,7 +7716,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'free-comfortable',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         rateLimits: { maxRequestTokens: 64000, tokensPerMinute: 64000 },
@@ -7030,7 +7728,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'paid-vision',
-                    capabilities: { supports: { reasoningEffort: true, vision: true }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: true },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { freeTier: false, provider: 'paid' },
                 },
             ],
@@ -7059,7 +7760,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'openrouter/unverified',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         rateLimits: { maxRequestTokens: 128000 },
@@ -7111,13 +7815,13 @@ describe('terminal /byok command', () => {
                       lastAgentProbeErrorContext: null,
                   })
                 : model === 'turn-ok'
-	                  ? byokHealthFixture({
-	                        key: 'kilo|kilo-code|turn-ok',
-                            routeProfile: 'kilo',
-                            providerId: 'kilo-code',
-                            providerModel: model,
-	                        profile: 'kilo',
-	                        provider: 'kilo-code',
+                  ? byokHealthFixture({
+                        key: 'kilo|kilo-code|turn-ok',
+                        routeProfile: 'kilo',
+                        providerId: 'kilo-code',
+                        providerModel: model,
+                        profile: 'kilo',
+                        provider: 'kilo-code',
                         model,
                         lastStatus: 'ok',
                         failureCount: 0,
@@ -7135,7 +7839,7 @@ describe('terminal /byok command', () => {
                         lastAgentProbeMessage: null,
                         lastAgentProbeErrorContext: null,
                     })
-	                  : null;
+                  : null;
         });
         discoverConfiguredByokModelsFromEnv.mockResolvedValue({
             models: [
@@ -7215,7 +7919,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'gpt-oss-120b',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'cerebras',
@@ -7225,7 +7932,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'kilo/healthy',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'kilo-code',
@@ -7272,7 +7982,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'gpt-oss-120b',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'cerebras',
@@ -7300,17 +8013,26 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'openrouter/free',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { freeTier: true, provider: 'openrouter' },
                 },
                 {
                     id: 'openrouter/paid',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { freeTier: false, provider: 'openrouter' },
                 },
                 {
                     id: 'groq/paid',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 128000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
                     byok: { freeTier: false, provider: 'groq' },
                 },
             ],
@@ -7336,7 +8058,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'groq-small-budget',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 131072 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 131072 },
+                    },
                     byok: {
                         freeTier: true,
                         rateLimits: { maxRequestTokens: 6000, tokensPerMinute: 6000 },
@@ -7392,7 +8117,10 @@ describe('terminal /byok command', () => {
             models: [
                 {
                     id: 'openrouter/almost-enough',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'openrouter',
@@ -7401,7 +8129,10 @@ describe('terminal /byok command', () => {
                 },
                 {
                     id: 'openrouter-roomy',
-                    capabilities: { supports: { reasoningEffort: true, vision: false }, limits: { max_context_window_tokens: 200000 } },
+                    capabilities: {
+                        supports: { reasoningEffort: true, vision: false },
+                        limits: { max_context_window_tokens: 200000 },
+                    },
                     byok: {
                         freeTier: true,
                         provider: 'openrouter',
@@ -7526,7 +8257,10 @@ describe('terminal /byok command', () => {
         mockProjection();
         const ctx = mockCtx();
 
-        await cmdByok({ println: ctx.println }, 'provider openrouter openai/gpt-oss-120b https://openrouter.ai/api/v1 wire:bad');
+        await cmdByok(
+            { println: ctx.println },
+            'provider openrouter openai/gpt-oss-120b https://openrouter.ai/api/v1 wire:bad',
+        );
 
         expect(process.env['COPILOT_BYOK_PROVIDER_PRESET']).toBe('stale-provider');
         expect(process.env['COPILOT_BYOK_WIRE_API']).toBeUndefined();
@@ -7564,12 +8298,17 @@ describe('terminal /byok command', () => {
 
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('true');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBe('kilo');
-        expect(writeFile).toHaveBeenCalledWith(
+        expect(readTextFreshTrusted).toHaveBeenCalledWith('.env.local', { caller: 'terminal.commands.byok' });
+        expect(writeFileAtomicTrusted).toHaveBeenCalledWith(
             '.env.local',
             expect.stringContaining('COPILOT_BYOK_PROFILE=kilo'),
-            expect.objectContaining({ mode: 0o600 }),
+            expect.objectContaining({ caller: 'terminal.commands.byok', mode: 0o600 }),
         );
-        const writeCall = requireFixtureIndex(writeFile.mock.calls, 0, 'persist profile writeFile call');
+        const writeCall = requireFixtureIndex(
+            writeFileAtomicTrusted.mock.calls,
+            0,
+            'persist profile writeFileAtomicTrusted call',
+        );
         const written = String(requireFixtureIndex(writeCall, 1, 'persist profile writeFile payload'));
         expect(written).toContain('COPILOT_BYOK_ENABLED=true');
         expect(written).not.toContain('COPILOT_BYOK_MODEL=old-model');
@@ -7595,7 +8334,12 @@ describe('terminal /byok command', () => {
 
         await cmdByok({ println: ctx.println }, 'persist sdk');
 
-        const writeCall = requireFixtureIndex(writeFile.mock.calls, 0, 'persist sdk writeFile call');
+        expect(readTextFreshTrusted).toHaveBeenCalledWith('.env.local', { caller: 'terminal.commands.byok' });
+        const writeCall = requireFixtureIndex(
+            writeFileAtomicTrusted.mock.calls,
+            0,
+            'persist sdk writeFileAtomicTrusted call',
+        );
         const written = String(requireFixtureIndex(writeCall, 1, 'persist sdk writeFile payload'));
         expect(process.env['COPILOT_BYOK_ENABLED']).toBe('false');
         expect(process.env['COPILOT_BYOK_PROFILE']).toBeUndefined();

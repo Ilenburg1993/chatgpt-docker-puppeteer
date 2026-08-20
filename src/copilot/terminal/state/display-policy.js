@@ -37,6 +37,7 @@ import {
  *     source: 'env' | 'default';
  * }} TerminalInlineStatusPolicy
  *
+ *
  * @typedef {'default' | 'minimal' | 'verbose' | 'debug' | 'focus' | 'full'} TerminalDisplayPresetName
  *
  * @typedef {{

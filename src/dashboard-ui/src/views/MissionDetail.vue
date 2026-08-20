@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { BadgeVariant } from '@/types/dashboard';
 import Badge from '@/components/ui/Badge.vue';
 import Button from '@/components/ui/Button.vue';
 import Card from '@/components/ui/Card.vue';
@@ -8,6 +7,7 @@ import Modal from '@/components/ui/Modal.vue';
 import { confirmTwoStepAction, requireReason } from '@/lib/command_guard';
 import { useMissionsVNextStore } from '@/stores/missions_vnext';
 import { useTasksVNextStore } from '@/stores/tasks_vnext';
+import type { BadgeVariant } from '@/types/dashboard';
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -780,13 +780,14 @@ watch(missionId, () => void loadAll());
                             <div class="text-xs text-slate-400 font-mono truncate">
                                 #{{ e.id }} · {{ e.entity_type }} · {{ e.entity_id }}
                             </div>
-                            <div class="text-xs text-slate-500">{{ new Date(Number(e.ts_ms || 0)).toLocaleString() }}</div>
+                            <div class="text-xs text-slate-500">
+                                {{ new Date(Number(e.ts_ms || 0)).toLocaleString() }}
+                            </div>
                         </div>
                         <div class="text-sm text-slate-200 font-semibold">{{ e.event_type }}</div>
                         <pre
                             class="text-xs text-slate-300 bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2 overflow-auto max-h-56"
-                            >{{ JSON.stringify(e.payload, null, 2) }}</pre
-                        >
+                            >{{ JSON.stringify(e.payload, null, 2) }}</pre>
                     </div>
                 </div>
             </div>
@@ -862,7 +863,9 @@ watch(missionId, () => void loadAll());
                             :key="i"
                             class="p-3 rounded-lg bg-slate-900/40 border border-slate-800"
                         >
-                            <div class="text-xs text-slate-500 mb-1">{{ new Date(Number(fb.ts_ms || 0)).toLocaleString() }}</div>
+                            <div class="text-xs text-slate-500 mb-1">
+                                {{ new Date(Number(fb.ts_ms || 0)).toLocaleString() }}
+                            </div>
                             <div class="text-sm text-slate-200 whitespace-pre-wrap">{{ fb.text }}</div>
                         </div>
                     </div>

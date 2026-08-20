@@ -38,9 +38,11 @@ describe('io capacity preflight', () => {
     it('skips statfs below the configured threshold', async () => {
         const report = await preflightIoCapacity('/tmp/target', 9, {
             minBytes: 10,
-            statfs: /** @type {any} */ (async () => {
-                throw new Error('must not run');
-            }),
+            statfs: /** @type {any} */ (
+                async () => {
+                    throw new Error('must not run');
+                }
+            ),
         });
 
         expect(report).toMatchObject({ enabled: true, checked: false, reason: 'below-threshold' });
@@ -67,10 +69,12 @@ describe('io capacity preflight', () => {
 
     it('reusa statfs por diretório durante a janela curta e expira depois dela', async () => {
         let calls = 0;
-        const statfs = /** @type {any} */ (async () => {
-            calls += 1;
-            return { bavail: 1_000n, bsize: 1n };
-        });
+        const statfs = /** @type {any} */ (
+            async () => {
+                calls += 1;
+                return { bavail: 1_000n, bsize: 1n };
+            }
+        );
 
         await preflightIoCapacity('/tmp/a/first', 10, {
             minBytes: 1,
@@ -118,11 +122,13 @@ describe('io capacity preflight', () => {
     it('fails open when statfs is unavailable', async () => {
         const report = await preflightIoCapacity('/tmp/target', 100, {
             minBytes: 1,
-            statfs: /** @type {any} */ (async () => {
-                const error = new Error('unsupported');
-                /** @type {any} */ (error).code = 'ENOSYS';
-                throw error;
-            }),
+            statfs: /** @type {any} */ (
+                async () => {
+                    const error = new Error('unsupported');
+                    /** @type {any} */ (error).code = 'ENOSYS';
+                    throw error;
+                }
+            ),
         });
 
         expect(report).toMatchObject({

@@ -34,7 +34,8 @@ Esta auditoria verifica três superfícies intimamente relacionadas do SDK insta
 Nota semântica importante desta auditoria:
 
 - `custom agent` = definição declarativa anexada à sessão em `SessionConfig.customAgents`;
-- `sub-agent` = manifestação runtime de um custom agent quando o SDK o seleciona/invoca e emite eventos `subagent.*`.
+- `sub-agent` = manifestação runtime de um custom agent quando o SDK o seleciona/invoca e emite
+  eventos `subagent.*`.
 
 O critério aqui não é “há algo vagamente parecido no runtime”.
 
@@ -56,7 +57,8 @@ A fonte de verdade para esta rodada foi, em ordem:
 2. documentação oficial do SDK 0.3.0
 3. código local do repositório
 
-Isso foi especialmente importante porque a documentação narrativa e a implementação local nem sempre estavam perfeitamente sincronizadas em temas como:
+Isso foi especialmente importante porque a documentação narrativa e a implementação local nem sempre
+estavam perfeitamente sincronizadas em temas como:
 
 - optionalidade de `CustomAgentConfig.description`
 - semântica de `tools: []`
@@ -71,9 +73,11 @@ Isso foi especialmente importante porque a documentação narrativa e a implemen
 
 A situação era:
 
-- `SessionConfig`: **majoritariamente full**, mas com gaps de superfície serializável no adapter HTTP
+- `SessionConfig`: **majoritariamente full**, mas com gaps de superfície serializável no adapter
+  HTTP
 - `ResumeSessionConfig`: **parcial**, sem módulo dedicado e com builder local estruturalmente frouxo
-- subagentes: **parciais**, com drift real em schema/validação/factory sobre `description?`, `skills` e `mcpServers`
+- subagentes: **parciais**, com drift real em schema/validação/factory sobre `description?`,
+  `skills` e `mcpServers`
 
 ### Após esta rodada
 
@@ -81,7 +85,9 @@ A situação ficou:
 
 - `SessionConfig`: **full na camada programática** e **full na superfície HTTP serializável**
 - `ResumeSessionConfig`: **full**, agora com módulo dedicado e sanitização explícita
-- `CustomAgentConfig` / subagentes: **full na camada de contrato/config/factory** e **endurecido na governança de skills**, mantendo backlog apenas para UX/produto mais rico, não para ausência de contrato
+- `CustomAgentConfig` / subagentes: **full na camada de contrato/config/factory** e **endurecido na
+  governança de skills**, mantendo backlog apenas para UX/produto mais rico, não para ausência de
+  contrato
 
 ---
 
@@ -124,7 +130,8 @@ A situação ficou:
 
 ### 4.2. Surface HTTP serializável (`server/routes/sdk`)
 
-Nem todos os campos de `SessionConfig` podem cruzar HTTP em JSON: callbacks e handlers são process-local por natureza.
+Nem todos os campos de `SessionConfig` podem cruzar HTTP em JSON: callbacks e handlers são
+process-local por natureza.
 
 #### Não-aplicáveis via HTTP JSON por desenho
 
@@ -141,7 +148,8 @@ Esses permanecem **full no runtime programático** e **not-applicable no adapter
 
 #### Campos seriais auditados na rota
 
-Antes desta rodada, a rota de sessão não repassava todos os campos seriais que o SDK permite. Faltavam:
+Antes desta rodada, a rota de sessão não repassava todos os campos seriais que o SDK permite.
+Faltavam:
 
 - `modelCapabilities`
 - `enableConfigDiscovery`
@@ -191,13 +199,15 @@ Como `buildForResume()` convertia o objeto completo via cast, um call site podia
 - `.sessionId(...)`
 - `.buildForResume()`
 
-E o payload resultante ainda carregava `sessionId`, embora esse campo não faça parte de `ResumeSessionConfig`.
+E o payload resultante ainda carregava `sessionId`, embora esse campo não faça parte de
+`ResumeSessionConfig`.
 
 **Veredito:** confirmado.
 
 #### RSCFG-003 — `disableResume` vazava no `build()` normal
 
-Como o builder compartilhava um único objeto interno, `disableResume` podia acabar presente até em `build()` de `SessionConfig`.
+Como o builder compartilhava um único objeto interno, `disableResume` podia acabar presente até em
+`build()` de `SessionConfig`.
 
 **Veredito:** confirmado.
 
@@ -294,13 +304,15 @@ A factory já aceitava parcialmente, mas os contratos/documentação locais não
 
 O SDK aceita `tools?: string[] | null`.
 
-O validador local tratava `tools=[]` como erro fatal, assumindo que ao menos uma tool seria obrigatória.
+O validador local tratava `tools=[]` como erro fatal, assumindo que ao menos uma tool seria
+obrigatória.
 
 Isso era mais restritivo que o contrato do SDK.
 
 **Veredito:** confirmado.
 
-**Correção aplicada:** `tools=[]` agora é aceito e tratado como warning operacional, não erro estrutural.
+**Correção aplicada:** `tools=[]` agora é aceito e tratado como warning operacional, não erro
+estrutural.
 
 #### SUBAGENT-005 — faltava governança para `skills` por subagente
 
@@ -311,7 +323,8 @@ Mesmo após aceitar `skills`, ainda faltava uma validação útil contra o conte
 
 **Veredito:** confirmado.
 
-**Correção aplicada:** `validateAgentContracts(...)` agora aceita contexto opcional da sessão (`skillDirectories`, `disabledSkills`) e produz warnings canônicos.
+**Correção aplicada:** `validateAgentContracts(...)` agora aceita contexto opcional da sessão
+(`skillDirectories`, `disabledSkills`) e produz warnings canônicos.
 
 ### 6.2. Melhoria arquitetônica adicional
 
@@ -320,7 +333,8 @@ O validador local agora também emite warning quando:
 - o agente é inferível (`infer !== false`)
 - e não declara `description`
 
-Isso **não bloqueia** a sessão, porque o SDK aceita o contrato, mas torna explícito que a inferência de subagentes tende a perder qualidade sem descrição específica.
+Isso **não bloqueia** a sessão, porque o SDK aceita o contrato, mas torna explícito que a inferência
+de subagentes tende a perder qualidade sem descrição específica.
 
 ### 6.3. Veredito final
 
@@ -330,13 +344,15 @@ Na camada de contrato/configuração/factory:
 - `skills` está **full**
 - `mcpServers` por agente está **full**
 - governança mínima de skills por subagente está **entregue**
-- a superfície terminal agora expõe projeção rica e mutação básica via `/sdk skills config`, `/sdk skills agents`, `/sdk skills disable ...` e `/sdk skills enable ...`
+- a superfície terminal agora expõe projeção rica e mutação básica via `/sdk skills config`,
+  `/sdk skills agents`, `/sdk skills disable ...` e `/sdk skills enable ...`
 
 O backlog residual aqui já não é de contrato, e sim de produto/UX mais rica:
 
 - projeções ainda mais visíveis/correlacionadas de skills por subagente em streaming
 - diffs de config mais ricos em eventos
-- mutações/config administrativas adicionais (ex.: alinhamento entre estado server-scoped e persistência declarativa do processo)
+- mutações/config administrativas adicionais (ex.: alinhamento entre estado server-scoped e
+  persistência declarativa do processo)
 
 ---
 
@@ -377,7 +393,8 @@ Validação concluída nesta rodada:
 - `npm run typecheck:strict:tests.unit` ✅
 - `npm run lint:copilot` ✅
 
-A baseline completa do lote Copilot continua sendo o próximo checkpoint natural após a sincronização documental desta frente.
+A baseline completa do lote Copilot continua sendo o próximo checkpoint natural após a sincronização
+documental desta frente.
 
 ---
 
@@ -397,4 +414,5 @@ O que restou é:
 2. avançar em `instructions.getSources()` / `convertMcpCallToolResult()`
 3. seguir com persistência longa e hardening residual
 
-Ou seja: esta frente deixa de ser gap estrutural e passa a ser base estabilizada para a próxima onda do roadmap principal.
+Ou seja: esta frente deixa de ser gap estrutural e passa a ser base estabilizada para a próxima onda
+do roadmap principal.

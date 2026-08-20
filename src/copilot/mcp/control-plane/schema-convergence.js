@@ -13,7 +13,11 @@ import { randomUUID } from 'node:crypto';
 
 export const MCP_SCHEMA_CONVERGENCE_VERSION = 1;
 
-/** @typedef {'uninitialized' | 'server-descriptor-unlisted' | 'converged-observed' | 'server-changed-client-unverified' | 'notification-sent-awaiting-refresh'} McpSchemaConvergenceStatus */
+/** @typedef {'uninitialized'
+    | 'server-descriptor-unlisted'
+    | 'converged-observed'
+    | 'server-changed-client-unverified'
+    | 'notification-sent-awaiting-refresh'} McpSchemaConvergenceStatus */
 
 const runtimeEpoch = randomUUID();
 
@@ -91,19 +95,17 @@ export function recordMcpToolsListChangedNotification(input) {
 
 /** Return true only once per descriptor revision while the current list remains unverified by an observed tools/list. */
 export function shouldSendMcpToolsListChangedNotification() {
-    if (!state.listChangedAdvertised || state.descriptorRevision <= 0 || state.descriptorSinceAtMs === null) return false;
-    if (
-        state.lastToolsListObservedAtMs !== null &&
-        state.lastToolsListObservedAtMs >= state.descriptorSinceAtMs
-    ) {
+    if (!state.listChangedAdvertised || state.descriptorRevision <= 0 || state.descriptorSinceAtMs === null)
+        return false;
+    if (state.lastToolsListObservedAtMs !== null && state.lastToolsListObservedAtMs >= state.descriptorSinceAtMs) {
         return false;
     }
     return state.lastNotificationAttemptRevision !== state.descriptorRevision;
 }
 
 /**
- * Send a single non-blocking schema-refresh nudge for the current descriptor revision.
- * The caller should invoke this only after MCP initialize completed; all errors are captured as evidence.
+ * Send a single non-blocking schema-refresh nudge for the current descriptor revision. The caller should invoke this
+ * only after MCP initialize completed; all errors are captured as evidence.
  *
  * @param {unknown} server
  * @returns {Promise<{ attempted: boolean; sent: boolean; reason: string; error?: string }>}
@@ -143,26 +145,26 @@ export async function maybeSendMcpToolsListChangedNotification(server) {
 
 /**
  * @returns {{
- *   schemaVersion: number;
- *   runtimeEpoch: string;
- *   status: McpSchemaConvergenceStatus;
- *   descriptorRevision: number;
- *   descriptorObservations: number;
- *   currentDescriptorFingerprint: string | null;
- *   previousDescriptorFingerprint: string | null;
- *   descriptorSinceAt: string | null;
- *   lastDescriptorObservedAt: string | null;
- *   currentToolCount: number;
- *   listChangedAdvertised: boolean;
- *   toolsListObservedCount: number;
- *   lastToolsListObservedAt: string | null;
- *   lastToolsListProtocolVersion: string | null;
- *   listChangedAttemptCount: number;
- *   lastNotificationAttemptRevision: number;
- *   listChangedSentCount: number;
- *   lastListChangedSentAt: string | null;
- *   listChangedErrorCount: number;
- *   lastListChangedError: string | null;
+ *     schemaVersion: number;
+ *     runtimeEpoch: string;
+ *     status: McpSchemaConvergenceStatus;
+ *     descriptorRevision: number;
+ *     descriptorObservations: number;
+ *     currentDescriptorFingerprint: string | null;
+ *     previousDescriptorFingerprint: string | null;
+ *     descriptorSinceAt: string | null;
+ *     lastDescriptorObservedAt: string | null;
+ *     currentToolCount: number;
+ *     listChangedAdvertised: boolean;
+ *     toolsListObservedCount: number;
+ *     lastToolsListObservedAt: string | null;
+ *     lastToolsListProtocolVersion: string | null;
+ *     listChangedAttemptCount: number;
+ *     lastNotificationAttemptRevision: number;
+ *     listChangedSentCount: number;
+ *     lastListChangedSentAt: string | null;
+ *     listChangedErrorCount: number;
+ *     lastListChangedError: string | null;
  * }}
  */
 export function readMcpSchemaConvergenceState() {
@@ -214,16 +216,10 @@ export function resetMcpSchemaConvergenceStateForTests() {
 /** @returns {McpSchemaConvergenceStatus} */
 function classifyMcpSchemaConvergenceStatus() {
     if (!state.currentDescriptorFingerprint || state.descriptorSinceAtMs === null) return 'uninitialized';
-    if (
-        state.lastToolsListObservedAtMs !== null &&
-        state.lastToolsListObservedAtMs >= state.descriptorSinceAtMs
-    ) {
+    if (state.lastToolsListObservedAtMs !== null && state.lastToolsListObservedAtMs >= state.descriptorSinceAtMs) {
         return 'converged-observed';
     }
-    if (
-        state.lastListChangedSentAtMs !== null &&
-        state.lastListChangedSentAtMs >= state.descriptorSinceAtMs
-    ) {
+    if (state.lastListChangedSentAtMs !== null && state.lastListChangedSentAtMs >= state.descriptorSinceAtMs) {
         return 'notification-sent-awaiting-refresh';
     }
     return state.descriptorRevision > 1 ? 'server-changed-client-unverified' : 'server-descriptor-unlisted';

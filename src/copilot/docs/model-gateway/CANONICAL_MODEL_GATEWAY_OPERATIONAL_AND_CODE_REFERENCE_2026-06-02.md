@@ -1,15 +1,17 @@
 # Canonical Model Gateway Operational And Code Reference - 2026-06-02
 
-Este documento e a referencia canonica atual para operar, entender, testar e evoluir o `src/copilot/model-gateway`.
-Ele consolida o que antes estava espalhado em roadmaps, playbooks e notas de migracao. Os documentos anteriores continuam
-como historico, mas este arquivo deve ser o primeiro ponto de leitura para operador humano, LLM operadora e engenheiro que
-precise alterar codigo.
+Este documento e a referencia canonica atual para operar, entender, testar e evoluir o
+`src/copilot/model-gateway`. Ele consolida o que antes estava espalhado em roadmaps, playbooks e
+notas de migracao. Os documentos anteriores continuam como historico, mas este arquivo deve ser o
+primeiro ponto de leitura para operador humano, LLM operadora e engenheiro que precise alterar
+codigo.
 
 ## 1. Objetivo
 
-O model-gateway existe para dar ao terminal BYOK uma camada universal de metadados, selecao e operacao de modelos. Ele
-normaliza providers diferentes para uma superficie compativel com OpenAI, preserva metadados canonicos, separa fatos de
-runtime, prepara rotas substitutas, e oferece comandos intuitivos para trocar, provar e recuperar modelos.
+O model-gateway existe para dar ao terminal BYOK uma camada universal de metadados, selecao e
+operacao de modelos. Ele normaliza providers diferentes para uma superficie compativel com OpenAI,
+preserva metadados canonicos, separa fatos de runtime, prepara rotas substitutas, e oferece comandos
+intuitivos para trocar, provar e recuperar modelos.
 
 O resultado esperado e:
 
@@ -36,9 +38,10 @@ O escopo de integracao direta inclui:
 - `tests/unit/copilot/terminal/test_commands_byok.spec.js`
 - `src/copilot/docs/model-gateway/`
 
-Mudancas fora desses caminhos devem ser tratadas como suspeitas ate haver motivo claro. O model-gateway nao deve
-reescrever o SDK, nem criar um runtime paralelo. Ele decide, explica e projeta provider/model; a sessao SDK continua
-sendo a fronteira de criacao, retomada e execucao do dialogo.
+Mudancas fora desses caminhos devem ser tratadas como suspeitas ate haver motivo claro. O
+model-gateway nao deve reescrever o SDK, nem criar um runtime paralelo. Ele decide, explica e
+projeta provider/model; a sessao SDK continua sendo a fronteira de criacao, retomada e execucao do
+dialogo.
 
 ## 3. Principios
 
@@ -78,9 +81,9 @@ provider importers
 
 ### 4.1 Catalogo Canonico
 
-O catalogo canonico e o estado normalizado de providers/modelos. Ele vive em JSON e pode ser espelhado para SQLite.
-Ele contem evidencias, projections, route options, account overlays e decisoes de eligibility. Ele nao deve conter
-falhas temporarias de runtime.
+O catalogo canonico e o estado normalizado de providers/modelos. Ele vive em JSON e pode ser
+espelhado para SQLite. Ele contem evidencias, projections, route options, account overlays e
+decisoes de eligibility. Ele nao deve conter falhas temporarias de runtime.
 
 Arquivos principais:
 
@@ -94,18 +97,19 @@ Arquivos principais:
 
 ### 4.2 Importers
 
-Cada provider deve ter importer proprio quando houver endpoint, documento ou fonte distinta. O objetivo e coletar o maximo
-de metadados possivel antes de runtime. Providers com OpenAI-compatible endpoint tambem precisam registrar wire API,
-base URL, selector syntax, route layer, pricing, limits, modalities, tools, reasoning e status de acesso quando disponivel.
+Cada provider deve ter importer proprio quando houver endpoint, documento ou fonte distinta. O
+objetivo e coletar o maximo de metadados possivel antes de runtime. Providers com OpenAI-compatible
+endpoint tambem precisam registrar wire API, base URL, selector syntax, route layer, pricing,
+limits, modalities, tools, reasoning e status de acesso quando disponivel.
 
-Importers nao devem executar probes. Eles coletam metadados e, quando autenticados, podem coletar account/key facts que
-continuam separados do runtime.
+Importers nao devem executar probes. Eles coletam metadados e, quando autenticados, podem coletar
+account/key facts que continuam separados do runtime.
 
 ### 4.3 Account, Key, Quota E Rate Limit
 
-Account/key e um plano volatil. O operador pode ter chave valida hoje e sem credito amanha. O catalogo pode listar um
-modelo excelente, mas a selecao deve exclui-lo antes do runtime se a key atual nao tiver acesso, estiver sem credito ou
-estiver em cooldown.
+Account/key e um plano volatil. O operador pode ter chave valida hoje e sem credito amanha. O
+catalogo pode listar um modelo excelente, mas a selecao deve exclui-lo antes do runtime se a key
+atual nao tiver acesso, estiver sem credito ou estiver em cooldown.
 
 Arquivos principais:
 
@@ -118,8 +122,8 @@ Arquivos principais:
 
 ### 4.4 Pre-Runtime Selection
 
-Pre-runtime selection usa catalogo, eligibility, account overlays e policy. Ela nao roda modelos. Ela responde: "o que
-vale tentar?". O runtime vem depois.
+Pre-runtime selection usa catalogo, eligibility, account overlays e policy. Ela nao roda modelos.
+Ela responde: "o que vale tentar?". O runtime vem depois.
 
 Arquivos principais:
 
@@ -130,8 +134,8 @@ Arquivos principais:
 
 ### 4.5 Runtime Selector
 
-Runtime selector usa a selecao efetiva e runtime health ja observado para escolher rota operacional. Ele tambem produz
-alternativas e standby.
+Runtime selector usa a selecao efetiva e runtime health ja observado para escolher rota operacional.
+Ele tambem produz alternativas e standby.
 
 Arquivos principais:
 
@@ -149,8 +153,9 @@ Contratos importantes:
 
 ### 4.6 Standby Plan
 
-Standby plan e a fila operacional de substitutos. Ele contem rota selecionada e alternativas, com comandos explicitos
-para provar, trocar modelo no mesmo provider, persistir provider/model e preparar novo boot SDK.
+Standby plan e a fila operacional de substitutos. Ele contem rota selecionada e alternativas, com
+comandos explicitos para provar, trocar modelo no mesmo provider, persistir provider/model e
+preparar novo boot SDK.
 
 O standby pode ser:
 
@@ -181,8 +186,9 @@ copilot_model_gateway_standby_plans
 
 ### 4.7 Automation Decision
 
-A decisao automatica e pura. Ela nao muta env, nao chama provider e nao toca a sessao SDK. Ela decide se o proximo passo
-e manter, trocar modelo live, preparar nova sessao, esperar reset ou pedir intervencao manual.
+A decisao automatica e pura. Ela nao muta env, nao chama provider e nao toca a sessao SDK. Ela
+decide se o proximo passo e manter, trocar modelo live, preparar nova sessao, esperar reset ou pedir
+intervencao manual.
 
 Arquivos principais:
 
@@ -212,7 +218,8 @@ Terminal:
 SQLite tem duas funcoes:
 
 1. Projecao normalizada do catalogo.
-2. Historico operacional para runtime, automacao, recoveries, handoffs, confirmations, standby e live runs.
+2. Historico operacional para runtime, automacao, recoveries, handoffs, confirmations, standby e
+   live runs.
 
 Schema atual: `MODEL_GATEWAY_SQLITE_SCHEMA_VERSION = 11`.
 
@@ -283,10 +290,11 @@ npm run model-gateway:operator-ready
 /byok gateway operator-ready profile:repo_agent
 ```
 
-Agrega SQLite diagnostics, auto-ready, runtime selector, standby, standby persistido, runtime health diff e live scenario
-runs recentes. Deve ser o primeiro comando para operador humano ou LLM. O JSON separa `nextSafeCommands` de
-`liveCommands`, porque alguns comandos live podem consumir provider/quota. O caminho package evita chamar `ops` por
-dentro para nao duplicar readiness e automacao.
+Agrega SQLite diagnostics, auto-ready, runtime selector, standby, standby persistido, runtime health
+diff e live scenario runs recentes. Deve ser o primeiro comando para operador humano ou LLM. O JSON
+separa `nextSafeCommands` de `liveCommands`, porque alguns comandos live podem consumir
+provider/quota. O caminho package evita chamar `ops` por dentro para nao duplicar readiness e
+automacao.
 
 Campos criticos para LLM operadora:
 
@@ -312,8 +320,8 @@ Explica policy efetiva, decision, ledgers e proximos passos.
 
 ### 8.1 Env Principal
 
-O arquivo operacional esperado e `.env.local`. Scripts usam `scripts/model-gateway/lib/env.mjs` quando precisam carregar
-env local.
+O arquivo operacional esperado e `.env.local`. Scripts usam `scripts/model-gateway/lib/env.mjs`
+quando precisam carregar env local.
 
 ### 8.2 Profiles
 
@@ -329,8 +337,8 @@ Provider/preset nao deve virar profile implicito.
 
 ### 8.3 Ollama/Local
 
-Ollama/local privado e suportado. Ele nao deve ser selecionado por default. Entra apenas por pedido explicito do operador,
-como profile local, filtro local ou opt-in equivalente.
+Ollama/local privado e suportado. Ele nao deve ser selecionado por default. Entra apenas por pedido
+explicito do operador, como profile local, filtro local ou opt-in equivalente.
 
 ### 8.4 Policy De Automacao
 
@@ -357,7 +365,9 @@ Terminal:
 /byok auto off
 ```
 
-`/byok auto on` sem preset explicito usa `auto_same_boundary`: troca modelo vivo apenas quando a boundary SDK/provider continua compativel. Novo boot SDK exige `preset:auto_prepare_new_session` ou `allow-new-session`.
+`/byok auto on` sem preset explicito usa `auto_same_boundary`: troca modelo vivo apenas quando a
+boundary SDK/provider continua compativel. Novo boot SDK exige `preset:auto_prepare_new_session` ou
+`allow-new-session`.
 
 ## 9. Fluxo Operacional Recomendado
 
@@ -433,8 +443,9 @@ npm run model-gateway:live:plan
 npm run model-gateway:auto:scenarios -- --profile=repo_agent --json
 ```
 
-`model-gateway:auto:scenarios` executa gates read-only independentes em paralelo e deve permanecer abaixo de 60s no
-ambiente de operador para continuar utilizavel por LLMs. Em 2026-06-02, apos a paralelizacao, rodou em cerca de 34s.
+`model-gateway:auto:scenarios` executa gates read-only independentes em paralelo e deve permanecer
+abaixo de 60s no ambiente de operador para continuar utilizavel por LLMs. Em 2026-06-02, apos a
+paralelizacao, rodou em cerca de 34s.
 
 Cenarios:
 
@@ -460,8 +471,8 @@ npm run model-gateway:test:contracts
 npm run model-gateway:test:terminal
 ```
 
-Typecheck strict global ainda inclui areas MCP/Cloudflare fora do model-gateway. Quando rodado, diferencie erros nos
-arquivos tocados de erros legados fora do escopo.
+Typecheck strict global ainda inclui areas MCP/Cloudflare fora do model-gateway. Quando rodado,
+diferencie erros nos arquivos tocados de erros legados fora do escopo.
 
 ## 12. Testes Unitarios Importantes
 
@@ -504,33 +515,39 @@ O cockpit deve, progressivamente, apontar artifact paths relevantes para operado
 
 Evidencias recentes desta sessao:
 
-- [x] 2026-06-02T02:44:38.197Z - `npm run model-gateway:live:auto-probe` passou, exibiu cockpit, standby,
-  recovery fixture, ledger, SSE e error tracker limpo.
+- [x] 2026-06-02T02:44:38.197Z - `npm run model-gateway:live:auto-probe` passou, exibiu cockpit,
+      standby, recovery fixture, ledger, SSE e error tracker limpo.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-44-38-191Z/summary.md`.
 - [x] 2026-06-02T02:45:10.607Z - `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000`
-  passou como controle terminal sem turno.
+      passou como controle terminal sem turno.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-10-607Z/summary.md`.
-- [x] 2026-06-02T02:45:29.927Z - `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
-  passou com fixture OpenAI-compatible, troca de perfil/modelo e redacao de secrets.
+- [x] 2026-06-02T02:45:29.927Z -
+      `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+      passou com fixture OpenAI-compatible, troca de perfil/modelo e redacao de secrets.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-29-920Z/summary.md`.
 - [x] 2026-06-02T02:45:55.246Z - `npm run model-gateway:live:llm-b -- --byok-real ... --no-pr`
-  passou com rota `repo_agent -> kilo-code:kilo-auto/free`, chat, streaming, JSON, agent e shortlist agent OK.
+      passou com rota `repo_agent -> kilo-code:kilo-auto/free`, chat, streaming, JSON, agent e
+      shortlist agent OK.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-55-239Z/summary.md`.
-- [x] O probe vision real registrou falha HTTP 400 como capacidade especifica nao provada, sem degradar chat/agent.
-- [x] O evento `quota.warning` do side-channel GitHub Copilot apareceu em SSE e metrics, mas foi classificado como
-  historico/nao-BYOK quando BYOK estava ativo.
+- [x] O probe vision real registrou falha HTTP 400 como capacidade especifica nao provada, sem
+      degradar chat/agent.
+- [x] O evento `quota.warning` do side-channel GitHub Copilot apareceu em SSE e metrics, mas foi
+      classificado como historico/nao-BYOK quando BYOK estava ativo.
 
 ## 14. Bugs E Lacunas Atuais
 
-- Presets `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e `auto_prepare_new_session` ainda precisam ser
-  consolidados como policy clara.
+- Presets `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e
+  `auto_prepare_new_session` ainda precisam ser consolidados como policy clara.
 - Standby ainda precisa de fluxo manual por rank/item para aplicar ou preparar troca.
 - Fallback selected after failure ainda precisa ser registrado de forma mais rica nos ledgers.
 - Confirmacao de novo boot SDK ainda precisa ser melhor correlacionada com handoff.
 - Cockpit ainda deve mostrar resetAt/nextRetry por rota bloqueada.
-- Live real com turno completo ainda precisa ser executado depois que o fluxo de fallback em falha real estiver fechado.
-- Capabilities como vision devem continuar como dimensoes de health/capability, sem virar criterio excludente universal.
-- `auto:scenarios` agrega muitos gates e passou de 60s no ambiente atual; vale reduzir latencia sem perder cobertura.
+- Live real com turno completo ainda precisa ser executado depois que o fluxo de fallback em falha
+  real estiver fechado.
+- Capabilities como vision devem continuar como dimensoes de health/capability, sem virar criterio
+  excludente universal.
+- `auto:scenarios` agrega muitos gates e passou de 60s no ambiente atual; vale reduzir latencia sem
+  perder cobertura.
 
 ## 15. Checklist Para Alteracoes Futuras
 

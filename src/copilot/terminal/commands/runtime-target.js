@@ -60,8 +60,8 @@ export function hasRuntimeTarget(runtimeId) {
 }
 
 /**
- * Rótulo humano para superfícies de operador. O contrato interno continua usando
- * `default`; a tela humana chama esse runtime de `principal`.
+ * Rótulo humano para superfícies de operador. O contrato interno continua usando `default`; a tela humana chama esse
+ * runtime de `principal`.
  *
  * @param {unknown} value
  * @returns {string}

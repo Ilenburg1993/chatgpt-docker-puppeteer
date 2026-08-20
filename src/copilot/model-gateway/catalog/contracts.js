@@ -236,8 +236,12 @@ export function createCanonicalProviderProjection(input) {
         displayName: optionalString(input.displayName) ?? subjectProviderId,
         dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonRecord(input.dataPolicy, sanitizeCatalogString) : {},
         providerMetadata: sanitizeOptionalCatalogRecord(input.providerMetadata),
-        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonRecord(input.provenanceByField, sanitizeCatalogString) : {},
-        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonRecord(input.confidenceByField, sanitizeCatalogString) : {},
+        provenanceByField: isRecord(input.provenanceByField)
+            ? sanitizeJsonRecord(input.provenanceByField, sanitizeCatalogString)
+            : {},
+        confidenceByField: isRecord(input.confidenceByField)
+            ? sanitizeJsonRecord(input.confidenceByField, sanitizeCatalogString)
+            : {},
     };
 }
 
@@ -290,7 +294,6 @@ export function createModelRouteOption(input) {
  * @template {Record<string, unknown>} TRateLimits
  * @template {Record<string, unknown>} TSpendingLimits
  * @template {Record<string, unknown>} TProviderMetadata
-
  * @param {object} input
  * @param {string} input.providerId
  * @param {string | undefined} [input.accountOverlayId]
@@ -318,7 +321,12 @@ export function createProviderAccountOverlay(input) {
     const sourceId = optionalString(input.sourceId);
     const sourceKind = optionalString(input.sourceKind) ?? 'unknown';
     const safeSourceId = sanitizeCatalogIdentity(sourceId, null);
-    const fallbackOverlayId = [providerId, accountScope, secretRef ?? 'no-secret', sourceKind === 'unknown' ? 'account-overlay' : sourceKind].join(':');
+    const fallbackOverlayId = [
+        providerId,
+        accountScope,
+        secretRef ?? 'no-secret',
+        sourceKind === 'unknown' ? 'account-overlay' : sourceKind,
+    ].join(':');
     return {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         accountOverlayId: fallbackOverlayId,
@@ -336,7 +344,9 @@ export function createProviderAccountOverlay(input) {
         rateLimits: sanitizeOptionalCatalogRecord(input.rateLimits),
         spendingLimits: sanitizeOptionalCatalogRecord(input.spendingLimits),
         policyHeaders: isRecord(input.policyHeaders) ? redactSecretRecord(input.policyHeaders) : {},
-        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonRecord(input.providerMetadata, sanitizeCatalogString) : {},
+        providerMetadata: isRecord(input.providerMetadata)
+            ? sanitizeJsonRecord(input.providerMetadata, sanitizeCatalogString)
+            : {},
         observedAt: normalizeIsoDate(input.observedAt) ?? new Date().toISOString(),
         expiresAt: normalizeIsoDate(input.expiresAt),
         redactionStatus: 'sanitized',
@@ -380,7 +390,9 @@ export function createCanonicalModelProjection(input) {
         routeProfile: optionalString(input.routeProfile),
         displayName: optionalString(input.displayName) ?? providerModel,
         description: optionalString(input.description),
-        lifecycle: lifecycleText ?? (isRecord(input.lifecycle) ? sanitizeJsonRecord(input.lifecycle, sanitizeCatalogString) : 'unknown'),
+        lifecycle:
+            lifecycleText ??
+            (isRecord(input.lifecycle) ? sanitizeJsonRecord(input.lifecycle, sanitizeCatalogString) : 'unknown'),
         aliases: Array.isArray(input.aliases)
             ? stringList(input.aliases)
             : isRecord(input.aliases)
@@ -399,10 +411,16 @@ export function createCanonicalModelProjection(input) {
         rateLimits: isRecord(input.rateLimits) ? sanitizeJsonRecord(input.rateLimits, sanitizeCatalogString) : {},
         dataPolicy: isRecord(input.dataPolicy) ? sanitizeJsonRecord(input.dataPolicy, sanitizeCatalogString) : {},
         license: optionalString(input.license),
-        providerMetadata: isRecord(input.providerMetadata) ? sanitizeJsonRecord(input.providerMetadata, sanitizeCatalogString) : {},
+        providerMetadata: isRecord(input.providerMetadata)
+            ? sanitizeJsonRecord(input.providerMetadata, sanitizeCatalogString)
+            : {},
         openai: isRecord(input.openai) ? sanitizeJsonRecord(input.openai, sanitizeCatalogString) : {},
-        provenanceByField: isRecord(input.provenanceByField) ? sanitizeJsonRecord(input.provenanceByField, sanitizeCatalogString) : {},
-        confidenceByField: isRecord(input.confidenceByField) ? sanitizeJsonRecord(input.confidenceByField, sanitizeCatalogString) : {},
+        provenanceByField: isRecord(input.provenanceByField)
+            ? sanitizeJsonRecord(input.provenanceByField, sanitizeCatalogString)
+            : {},
+        confidenceByField: isRecord(input.confidenceByField)
+            ? sanitizeJsonRecord(input.confidenceByField, sanitizeCatalogString)
+            : {},
         routingHints: isRecord(input.routingHints) ? sanitizeJsonRecord(input.routingHints, sanitizeCatalogString) : {},
         accountOverlayRefs: stringList(input.accountOverlayRefs),
     };

@@ -3,8 +3,8 @@
  * Auto-brief progressivo do terminal LLM-B.
  *
  * O briefing inicial roda antes do registry de tools estar pronto; por isso ele precisa ser útil mesmo em boot parcial
- * e deve poder rodar de novo após o dialog loop ficar pronto. Este módulo mantém a renderização em uma borda única,
- * sem espalhar heurísticas de UX pelo lifecycle.
+ * e deve poder rodar de novo após o dialog loop ficar pronto. Este módulo mantém a renderização em uma borda única, sem
+ * espalhar heurísticas de UX pelo lifecycle.
  *
  * @module copilot/terminal/repl/auto-brief
  */
@@ -232,7 +232,10 @@ export function buildTerminalAutoBrief(input = {}) {
             return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
         }
         lines.push(
-            briefLine('Sessão', `${model}/${reasoning} · ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'ferramentas subindo'}`),
+            briefLine(
+                'Sessão',
+                `${model}/${reasoning} · ${sessionTag} · ${displayPreset} · ${toolBits.join(' · ') || 'ferramentas subindo'}`,
+            ),
         );
         if (byok.enabled) {
             lines.push(
@@ -242,7 +245,12 @@ export function buildTerminalAutoBrief(input = {}) {
                 ),
             );
         }
-        lines.push(briefLine('Fluxo', `${renderAutoBriefRoutingMode(guidance.mode)} · próximo ${guidance.nextCommand ?? '/status'}`));
+        lines.push(
+            briefLine(
+                'Fluxo',
+                `${renderAutoBriefRoutingMode(guidance.mode)} · próximo ${guidance.nextCommand ?? '/status'}`,
+            ),
+        );
         if (!ready) lines.push(briefLine('Boot', 'parcial · preparando ferramentas/conversa'));
         if (visibleWarnings.length > 0) lines.push(briefLine('Atenção', visibleWarnings.join(' | ')));
         return { phase, ready, fingerprint: buildAutoBriefFingerprint(projection), lines };
@@ -275,7 +283,10 @@ export function buildTerminalAutoBrief(input = {}) {
         ),
     );
     lines.push(
-        briefLine('Rota', `${renderAutoBriefRoutingMode(guidance.mode)} · ${guidance.summary} · próximo ${guidance.nextCommand ?? '-'}`),
+        briefLine(
+            'Rota',
+            `${renderAutoBriefRoutingMode(guidance.mode)} · ${guidance.summary} · próximo ${guidance.nextCommand ?? '-'}`,
+        ),
     );
     lines.push(
         briefLine(
@@ -283,9 +294,7 @@ export function buildTerminalAutoBrief(input = {}) {
             `${projection.timelineSource}/${projection.timelineReconciliationStatus} · sync ${projection.timelineSyncStatus}${projection.timelineSyncReason ? `:${projection.timelineSyncReason}` : ''} · turnos ${projection.timelineTurnCount}/${projection.persistedTimelineTurnCount}`,
         ),
     );
-    lines.push(
-        briefLine('I/O', `${io.io} · cache ${io.cache} · índice ${io.index} · contexto ${pct(utilization)}`),
-    );
+    lines.push(briefLine('I/O', `${io.io} · cache ${io.cache} · índice ${io.index} · contexto ${pct(utilization)}`));
     if (!ready) {
         lines.push(briefLine('Estado', 'parcial · registry/dialog ainda subindo; novo brief virá com dados reais.'));
     }

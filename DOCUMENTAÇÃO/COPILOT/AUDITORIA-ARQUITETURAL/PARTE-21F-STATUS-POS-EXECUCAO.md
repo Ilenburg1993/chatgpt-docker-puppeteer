@@ -30,21 +30,23 @@ Health Score **A (95/100)**.
 
 ### 1.2 Métricas atuais vs baseline vs target
 
-| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | **Wave 4 (atual)**   | Target (21B)             |
-| --------------------- | -------------- | ------------------- | -------------------- | ------------------------ | ------------ |
-| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | Wave 4 (1.1)         | **Wave 5 (atual)**       | Target (21B) |
-| --------------------- | -------------- | -------------       | -------------------- | ----------------------   | ------------ |
-| **Health Score**      | D (35/100)     | D (65/100)          | B (84/100)           | **A (95/100)** ✅        | A (85+)      |
-| Layer violations (CI) | 0              | 0 ✅                | 0 ✅                 | **0** ✅                 | 0            |
-| Barrel coverage       | 23%            | 100% ✅             | 100% ✅              | **100%** ✅              | ≥90%         |
-| Deep imports (total)  | 233            | 165                 | 40 ✅                | **40** ✅                | ≤50          |
-| Deep imports (real)   | —              | 40 (refined)        | 4 (refined) ✅       | **4** (refined) ✅       | ≤10          |
-| Files >400 LoC        | 25             | 18                  | 18 ⚠️                | **18** ⚠️                | ≤5           |
-| Singletons (refined)  | ~30            | 73                  | 66 (refined)         | **53 (refined)** ✅      | ≤10          |
-| DI tokens             | 0              | 13 ✅               | 13 ✅                | **13** ✅                | —            |
-| Fan-out max (real)    | 11 (api)       | 19 (medição errada) | 19 (errado)          | **10** (inter-módulo) ✅ | ≤8           |
-| Contract tests        | 6              | 108                 | 136 ✅               | **136** ✅               | 20+          |
-| Módulos totais        | 14             | 17 ✅               | 17 ✅                | **17** ✅                | 17           |
+| Métrica | Baseline (21A) | Pós-H~N (1.0) | **Wave 4 (atual)** | Target (21B) | |
+--------------------- | -------------- | ------------------- | -------------------- |
+------------------------ | ------------ |
+
+| Métrica               | Baseline (21A) | Pós-H~N (1.0)       | Wave 4 (1.1)   | **Wave 5 (atual)**       | Target (21B) |
+| --------------------- | -------------- | ------------------- | -------------- | ------------------------ | ------------ |
+| **Health Score**      | D (35/100)     | D (65/100)          | B (84/100)     | **A (95/100)** ✅        | A (85+)      |
+| Layer violations (CI) | 0              | 0 ✅                | 0 ✅           | **0** ✅                 | 0            |
+| Barrel coverage       | 23%            | 100% ✅             | 100% ✅        | **100%** ✅              | ≥90%         |
+| Deep imports (total)  | 233            | 165                 | 40 ✅          | **40** ✅                | ≤50          |
+| Deep imports (real)   | —              | 40 (refined)        | 4 (refined) ✅ | **4** (refined) ✅       | ≤10          |
+| Files >400 LoC        | 25             | 18                  | 18 ⚠️          | **18** ⚠️                | ≤5           |
+| Singletons (refined)  | ~30            | 73                  | 66 (refined)   | **53 (refined)** ✅      | ≤10          |
+| DI tokens             | 0              | 13 ✅               | 13 ✅          | **13** ✅                | —            |
+| Fan-out max (real)    | 11 (api)       | 19 (medição errada) | 19 (errado)    | **10** (inter-módulo) ✅ | ≤8           |
+| Contract tests        | 6              | 108                 | 136 ✅         | **136** ✅               | 20+          |
+| Módulos totais        | 14             | 17 ✅               | 17 ✅          | **17** ✅                | 17           |
 
 ### 1.3 Análise do Health Score Wave 5
 

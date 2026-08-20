@@ -10,49 +10,49 @@
 
 /**
  * @typedef {{
- *   readSnapshot?: () => Promise<Record<string, unknown>>;
- *   readRoutingSnapshot?: (options?: { includeImportRuns?: boolean }) => Promise<Record<string, unknown>>;
+ *     readSnapshot?: () => Promise<Record<string, unknown>>;
+ *     readRoutingSnapshot?: (options?: { includeImportRuns?: boolean }) => Promise<Record<string, unknown>>;
  * }} ModelGatewayCatalogReadPort
  */
 
 /**
  * @typedef {{
- *   filePath: string;
- *   readSnapshot: () => Promise<Record<string, unknown>>;
- *   writeSnapshot: (snapshot: Record<string, unknown>) => Promise<unknown>;
+ *     filePath: string;
+ *     readSnapshot: () => Promise<Record<string, unknown>>;
+ *     writeSnapshot: (snapshot: Record<string, unknown>) => Promise<unknown>;
  * }} ModelGatewayCatalogWritePort
  */
 
 /**
  * @typedef {{
- *   readSdkSessionHandoffRecord: (operationId: string) => Promise<Record<string, unknown> | null>;
- *   writeSdkSessionHandoffRecords: (records: Record<string, unknown>[]) => Promise<unknown>;
- *   writeSdkSessionConfirmationRecords: (records: Record<string, unknown>[]) => Promise<unknown>;
+ *     readSdkSessionHandoffRecord: (operationId: string) => Promise<Record<string, unknown> | null>;
+ *     writeSdkSessionHandoffRecords: (records: Record<string, unknown>[]) => Promise<unknown>;
+ *     writeSdkSessionConfirmationRecords: (records: Record<string, unknown>[]) => Promise<unknown>;
  * }} ModelGatewayOperationStorePort
  */
 
 /**
  * @typedef {{
- *   get: (ref: string) => string | undefined;
- *   has: (ref: string) => boolean;
- *   describe: (ref: string) => Record<string, unknown>;
+ *     get: (ref: string) => string | undefined;
+ *     has: (ref: string) => boolean;
+ *     describe: (ref: string) => Record<string, unknown>;
  * }} ModelGatewaySecretRegistryPort
  */
 
 /**
  * @template {{ sessionId: string }} TSession
  * @typedef {{
- *   reattach: (route: Record<string, unknown>) => Promise<TSession>;
- *   verify: (session: TSession, route: Record<string, unknown>) => Promise<boolean>;
- *   commit: (session: TSession, route: Record<string, unknown>) => Promise<void>;
+ *     reattach: (route: Record<string, unknown>) => Promise<TSession>;
+ *     verify: (session: TSession, route: Record<string, unknown>) => Promise<boolean>;
+ *     commit: (session: TSession, route: Record<string, unknown>) => Promise<void>;
  * }} ModelGatewaySessionRoutePort
  */
 
 /**
  * @typedef {{
- *   list: () => Record<string, unknown>[];
- *   get: (name: string) => Record<string, unknown> | null;
- *   getActive: () => Record<string, unknown> | null;
+ *     list: () => Record<string, unknown>[];
+ *     get: (name: string) => Record<string, unknown> | null;
+ *     getActive: () => Record<string, unknown> | null;
  * }} ModelGatewayProviderProfileStorePort
  */
 
@@ -87,9 +87,7 @@ function requireMethods(port, portName, methods) {
 export function assertModelGatewayCatalogReadPort(value) {
     const port = portRecord(value, 'catalog.read');
     if (typeof port['readSnapshot'] !== 'function' && typeof port['readRoutingSnapshot'] !== 'function') {
-        throw new TypeError(
-            'MODEL_GATEWAY_PORT_INVALID: port=catalog.read missing=readSnapshot|readRoutingSnapshot',
-        );
+        throw new TypeError('MODEL_GATEWAY_PORT_INVALID: port=catalog.read missing=readSnapshot|readRoutingSnapshot');
     }
     return /** @type {ModelGatewayCatalogReadPort} */ (value);
 }

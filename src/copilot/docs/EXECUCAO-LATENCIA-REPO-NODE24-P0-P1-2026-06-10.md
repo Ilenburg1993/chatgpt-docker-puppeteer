@@ -6,7 +6,8 @@ Branch/HEAD observado: `main` / `e69ec3d8`
 
 ## 1. Objetivo
 
-Atualizar o roadmap assumindo Node 24 e iniciar transformações estruturais para reduzir a latência média das repo tools sem perda funcional.
+Atualizar o roadmap assumindo Node 24 e iniciar transformações estruturais para reduzir a latência
+média das repo tools sem perda funcional.
 
 ## 2. Roadmap atualizado
 

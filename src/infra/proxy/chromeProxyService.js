@@ -383,11 +383,13 @@ class ChromeProxyService {
             });
             this.wsProxy.on(
                 'error',
-                /** @type {(
-    err: Error,
-    req: import('node:http').IncomingMessage,
-    res: import('node:http').ServerResponse | import('node:net').Socket,
-) => void} */ (
+                /**
+                 * @type {(
+                 *     err: Error,
+                 *     req: import('node:http').IncomingMessage,
+                 *     res: import('node:http').ServerResponse | import('node:net').Socket,
+                 * ) => void}
+                 */ (
                     (err, _req, res) => {
                         this.stats.errors++;
                         this._incrementMetric(this.metrics.proxyErrors, { type: 'http_proxy' });

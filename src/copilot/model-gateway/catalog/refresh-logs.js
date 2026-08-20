@@ -88,17 +88,30 @@ function errorsForEvent(event) {
  *     completed: boolean;
  *     committed: boolean;
  *     phases: Record<string, number>;
- *     importers: Record<string, { started: number; completed: number; failed: number; rowCount: number; evidenceCount: number }>;
- *     totals: { projections: number | null; openai: number | null; overlays: number | null; added: number | null; removed: number | null; changed: number | null };
- *     failures: Array<{ phase: string; importerId: string | null; errors: string[] }>;
+ *     importers: Record<
+ *         string,
+ *         { started: number; completed: number; failed: number; rowCount: number; evidenceCount: number }
+ *     >;
+ *     totals: {
+ *         projections: number | null;
+ *         openai: number | null;
+ *         overlays: number | null;
+ *         added: number | null;
+ *         removed: number | null;
+ *         changed: number | null;
+ *     };
+ *     failures: { phase: string; importerId: string | null; errors: string[] }[];
  * }}
  */
 export function summarizeModelGatewayRefreshLogEvents(events, input = {}) {
     /** @type {Record<string, number>} */
     const phases = {};
-    /** @type {Record<string, { started: number; completed: number; failed: number; rowCount: number; evidenceCount: number }>} */
+    /** @type {Record<
+    string,
+    { started: number; completed: number; failed: number; rowCount: number; evidenceCount: number }
+>} */
     const importers = {};
-    /** @type {Array<{ phase: string; importerId: string | null; errors: string[] }>} */
+    /** @type {{ phase: string; importerId: string | null; errors: string[] }[]} */
     const failures = [];
     let firstTs = null;
     let lastTs = null;
@@ -123,19 +136,28 @@ export function summarizeModelGatewayRefreshLogEvents(events, input = {}) {
         const importerId = importerIdForEvent(event);
         if (importerId) {
             const importer = isRecord(event['importer']) ? event['importer'] : {};
-            const current = importers[importerId] ?? { started: 0, completed: 0, failed: 0, rowCount: 0, evidenceCount: 0 };
+            const current = importers[importerId] ?? {
+                started: 0,
+                completed: 0,
+                failed: 0,
+                rowCount: 0,
+                evidenceCount: 0,
+            };
             if (phase.endsWith('importer_started')) current.started += 1;
             if (phase.endsWith('importer_completed')) current.completed += 1;
             if (phase.endsWith('importer_failed')) current.failed += 1;
             current.rowCount += optionalNumber(event['rowCount']) ?? optionalNumber(importer['rowCount']) ?? 0;
-            current.evidenceCount += optionalNumber(event['evidenceCount']) ?? optionalNumber(importer['evidenceCount']) ?? 0;
+            current.evidenceCount +=
+                optionalNumber(event['evidenceCount']) ?? optionalNumber(importer['evidenceCount']) ?? 0;
             importers[importerId] = current;
         }
         if (phase === 'refresh_completed') completed = true;
         if (event['committed'] === true) committed = true;
-        totals.projections = optionalNumber(event['projectionCount']) ?? optionalNumber(event['projections']) ?? totals.projections;
+        totals.projections =
+            optionalNumber(event['projectionCount']) ?? optionalNumber(event['projections']) ?? totals.projections;
         totals.openai = optionalNumber(event['openai']) ?? totals.openai;
-        totals.overlays = optionalNumber(event['overlays']) ?? optionalNumber(event['accountOverlayCount']) ?? totals.overlays;
+        totals.overlays =
+            optionalNumber(event['overlays']) ?? optionalNumber(event['accountOverlayCount']) ?? totals.overlays;
         const diff = isRecord(event['diff']) ? event['diff'] : {};
         totals.added = optionalNumber(event['addedCount']) ?? optionalNumber(diff['added']) ?? totals.added;
         totals.removed = optionalNumber(event['removedCount']) ?? optionalNumber(diff['removed']) ?? totals.removed;

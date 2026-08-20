@@ -186,9 +186,6 @@ export async function runDialogLoopBoot(input) {
 
     input.bootCircuit.recordSuccess();
     input.costLedger.recordBoot();
-    void input.persistUsageMetrics(
-        'dialog.usageMetrics.boot',
-        'Persist dialog usage metrics after boot model call',
-    );
+    void input.persistUsageMetrics('dialog.usageMetrics.boot', 'Persist dialog usage metrics after boot model call');
     log('INFO', '[DialogLoopManager] Dialog loop iniciado.');
 }

@@ -21,8 +21,8 @@ export {
     MODEL_GATEWAY_REGISTRY_SNAPSHOT,
     MODEL_GATEWAY_ROUTE_DECISION,
     buildCatalogConflictDetectedEvents,
-    buildCatalogRefreshEventBatch,
     buildCatalogRefreshCompletedEvent,
+    buildCatalogRefreshEventBatch,
     buildCatalogRefreshModelEvents,
     buildCatalogRefreshStartedEvent,
     buildEligibilityEvaluatedEvent,
@@ -32,9 +32,9 @@ export {
     buildRouteDecisionTraceAttributes,
     projectCatalogRefreshCompletedMetrics,
     projectEligibilityEvaluatedMetrics,
+    projectModelGatewayMetrics,
     projectProbeCompletedMetrics,
     projectRouteDecisionMetrics,
-    projectModelGatewayMetrics,
 } from './events.js';
 export {
     createModelGatewayRouteDecisionCapture,

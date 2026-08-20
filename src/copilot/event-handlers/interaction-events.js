@@ -6,7 +6,6 @@
  */
 
 import { SESSION_EVENTS } from '#copilot/events';
-import { log } from '#copilot/observability';
 import {
     getSessionCapabilities,
     normalizePermissionCompletedEvent,
@@ -15,6 +14,7 @@ import {
     normalizeUserInputRequestedEvent,
     onSessionEvent,
 } from '#copilot/events/sdk-events';
+import { log } from '#copilot/observability';
 import { DialogProtocol } from '../dialog/protocol.js';
 
 /**

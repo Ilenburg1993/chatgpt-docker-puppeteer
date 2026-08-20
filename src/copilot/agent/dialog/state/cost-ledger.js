@@ -3,9 +3,9 @@
  * @module copilot/agent/dialog/cost-ledger
  * @file Ledger de chamadas adicionais de modelo do dialog loop.
  *
- * O ledger não estima billing. Ele registra apenas se boot/resume exigiram uma nova chamada de modelo. As chaves PR
- * antigas continuam aceitas/emitidas como aliases de compatibilidade para snapshots persistidos antes do billing
- * usage-based de 2026.
+ *   O ledger não estima billing. Ele registra apenas se boot/resume exigiram uma nova chamada de modelo. As chaves PR
+ *   antigas continuam aceitas/emitidas como aliases de compatibilidade para snapshots persistidos antes do billing
+ *   usage-based de 2026.
  */
 
 /**
@@ -16,6 +16,7 @@
  *     resumesWithPR?: number;
  *     resumesZeroPR?: number;
  * }} DialogCostLedgerInput
+ *
  *
  * @typedef {{
  *     boots: number;

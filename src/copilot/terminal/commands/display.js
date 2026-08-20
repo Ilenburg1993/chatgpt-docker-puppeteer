@@ -97,7 +97,13 @@ export function cmdDisplay({ println }, arg, rest) {
         const themeName = getTerminalThemeName();
         const detailLevel = getTerminalDetailLevel();
         println('');
-        println(terminalThemeHeadline('assistant', 'Exibição do terminal', [`preset ${promptPolicy.density}`, `tema ${themeName}`, `detalhe ${detailLevel}`]));
+        println(
+            terminalThemeHeadline('assistant', 'Exibição do terminal', [
+                `preset ${promptPolicy.density}`,
+                `tema ${themeName}`,
+                `detalhe ${detailLevel}`,
+            ]),
+        );
         println(terminalThemeDivider(52));
         for (const toggleDef of listTerminalDisplayToggles()) {
             println(
@@ -125,7 +131,11 @@ export function cmdDisplay({ println }, arg, rest) {
         }
         setTerminalDetailLevel(value);
         println(
-            terminalThemeRow('Mais detalhes', `${value} · ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`, { role: 'success' }),
+            terminalThemeRow(
+                'Mais detalhes',
+                `${value} · ${value === 'compact' ? 'menos ruído, mais síntese' : 'máximo contexto operacional'}`,
+                { role: 'success' },
+            ),
         );
         return;
     }
@@ -142,7 +152,11 @@ export function cmdDisplay({ println }, arg, rest) {
         }
         setTerminalThemeName(value);
         const selected = listTerminalThemeProfiles().find((theme) => theme.name === value);
-        println(terminalThemeRow('Tema', `${value} · ${selected?.description ?? 'paleta visual atualizada'}`, { role: 'success' }));
+        println(
+            terminalThemeRow('Tema', `${value} · ${selected?.description ?? 'paleta visual atualizada'}`, {
+                role: 'success',
+            }),
+        );
         return;
     }
 

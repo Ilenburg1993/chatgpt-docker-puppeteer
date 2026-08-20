@@ -11,8 +11,7 @@
  */
 
 import { redactSecretText } from '#copilot/core';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { existsSync, readFileSync } from 'node:fs';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { join } from 'node:path';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;
@@ -72,12 +71,7 @@ const DEFAULT_BYOK_PROVIDER_HEALTH_PATH = join(process.cwd(), 'data', 'copilot-t
 
 /**
  * @typedef {object} ByokProviderHealthChangeEvent
- * @property {'call_failure'
- *     | 'call_success'
- *     | 'agent_probe_failure'
- *     | 'agent_probe_success'
- *     | 'probe_result'
- *     | 'clear'} reason
+ * @property {'call_failure' | 'call_success' | 'agent_probe_failure' | 'agent_probe_success' | 'probe_result' | 'clear'} reason
  * @property {number} observedAt
  * @property {string | null} key
  * @property {ByokProviderHealthRecord | null} record
@@ -88,6 +82,8 @@ const _byokProviderHealthByKey = new Map();
 /** @type {Set<(event: ByokProviderHealthChangeEvent) => void | Promise<void>>} */
 const _byokProviderHealthChangeListeners = new Set();
 let _byokProviderHealthHydrated = false;
+/** @type {Promise<void> | null} */
+let _byokProviderHealthHydrationPromise = null;
 let _byokProviderHealthFlushScheduled = false;
 let _byokProviderHealthFlushInFlight = false;
 let _byokProviderHealthDirty = false;
@@ -501,36 +497,53 @@ function notifyByokProviderHealthChange(reason, record) {
     }
 }
 
-function hydrateByokProviderHealthFromDisk() {
-    if (_byokProviderHealthHydrated) return;
-    _byokProviderHealthHydrated = true;
-    if (!isByokProviderHealthPersistenceEnabled()) return;
-    const filePath = resolveByokProviderHealthPath();
-    if (!existsSync(filePath)) return;
-    try {
-        const raw = readFileSync(filePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (
-            !isRecord(parsed) ||
-            ![
-                BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
-                PREVIOUS_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
-                LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
-            ].includes(/** @type {number} */ (parsed['schemaVersion']))
-        ) {
+export function hydrateByokProviderHealthFromDisk() {
+    if (_byokProviderHealthHydrated) return Promise.resolve();
+    if (_byokProviderHealthHydrationPromise) return _byokProviderHealthHydrationPromise;
+    _byokProviderHealthHydrationPromise = (async () => {
+        if (!isByokProviderHealthPersistenceEnabled()) {
+            _byokProviderHealthHydrated = true;
             return;
         }
-        const records = Array.isArray(parsed['records']) ? parsed['records'] : [];
-        for (const item of records) {
-            const record = normalizeRecord(item);
-            if (record) _byokProviderHealthByKey.set(record.key, record);
+        const filePath = resolveByokProviderHealthPath();
+        try {
+            const raw = (await readTextFreshTrusted(filePath, { caller: 'model-gateway.health.provider-health' }))
+                .content;
+            const parsed = JSON.parse(raw);
+            if (
+                !isRecord(parsed) ||
+                ![
+                    BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
+                    PREVIOUS_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
+                    LEGACY_BYOK_PROVIDER_HEALTH_SCHEMA_VERSION,
+                ].includes(/** @type {number} */ (parsed['schemaVersion']))
+            ) {
+                return;
+            }
+            const records = Array.isArray(parsed['records']) ? parsed['records'] : [];
+            for (const item of records) {
+                const persisted = normalizeRecord(item);
+                if (!persisted) continue;
+                const live = _byokProviderHealthByKey.get(persisted.key);
+                if (
+                    !live ||
+                    byokProviderHealthRecordLastObservedAt(persisted) > byokProviderHealthRecordLastObservedAt(live)
+                ) {
+                    _byokProviderHealthByKey.set(persisted.key, persisted);
+                }
+            }
+            pruneByokProviderHealth();
+            _byokProviderHealthPersistedRecords = records.length;
+            _byokProviderHealthLastError = null;
+        } catch (error) {
+            const code = /** @type {{ code?: unknown }} */ (error)?.code;
+            if (code !== 'ENOENT')
+                _byokProviderHealthLastError = error instanceof Error ? error.message : String(error);
+        } finally {
+            _byokProviderHealthHydrated = true;
         }
-        pruneByokProviderHealth();
-        _byokProviderHealthPersistedRecords = _byokProviderHealthByKey.size;
-        _byokProviderHealthLastError = null;
-    } catch (error) {
-        _byokProviderHealthLastError = error instanceof Error ? error.message : String(error);
-    }
+    })();
+    return _byokProviderHealthHydrationPromise;
 }
 
 function scheduleByokProviderHealthFlush() {
@@ -549,7 +562,7 @@ function scheduleByokProviderHealthFlush() {
  */
 export async function flushByokProviderHealth() {
     if (!isByokProviderHealthPersistenceEnabled()) return;
-    hydrateByokProviderHealthFromDisk();
+    await hydrateByokProviderHealthFromDisk();
     if (_byokProviderHealthFlushInFlight) {
         await _byokProviderHealthFlushPromise;
         return;
@@ -623,7 +636,6 @@ export function subscribeByokProviderHealthChanges(listener) {
  * @returns {void}
  */
 export function recordByokProviderModelCallFailure(input) {
-    hydrateByokProviderHealthFromDisk();
     const identity = normalizeHealthIdentity(input);
     if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
     const key = healthKey(identity);
@@ -674,7 +686,6 @@ export function recordByokProviderModelCallFailure(input) {
  * @returns {void}
  */
 export function recordByokProviderModelCallSuccess(input) {
-    hydrateByokProviderHealthFromDisk();
     const identity = normalizeHealthIdentity(input);
     if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
     const key = healthKey(identity);
@@ -724,7 +735,6 @@ export function recordByokProviderModelCallSuccess(input) {
  * @returns {void}
  */
 export function recordByokProviderModelAgentProbeFailure(input) {
-    hydrateByokProviderHealthFromDisk();
     const identity = normalizeHealthIdentity(input);
     if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
     const key = healthKey(identity);
@@ -789,7 +799,6 @@ export function recordByokProviderModelAgentProbeFailure(input) {
  * @returns {void}
  */
 export function recordByokProviderModelAgentProbeSuccess(input) {
-    hydrateByokProviderHealthFromDisk();
     const identity = normalizeHealthIdentity(input);
     if (!identity.routeProfile && !identity.providerId && !identity.providerModel) return;
     const key = healthKey(identity);
@@ -860,7 +869,6 @@ export function recordByokProviderModelAgentProbeSuccess(input) {
  * @returns {void}
  */
 export function recordByokProviderModelProbeResult(input) {
-    hydrateByokProviderHealthFromDisk();
     const identity = normalizeHealthIdentity(input);
     const probeKind = normalizePart(input.probeKind);
     const status = normalizePart(input.status);
@@ -929,7 +937,6 @@ export function recordByokProviderModelProbeResult(input) {
  * @returns {ByokProviderHealthRecord | null}
  */
 export function readByokProviderModelHealth(input) {
-    hydrateByokProviderHealthFromDisk();
     return _byokProviderHealthByKey.get(healthKey(input)) ?? null;
 }
 
@@ -937,7 +944,6 @@ export function readByokProviderModelHealth(input) {
  * @returns {ByokProviderHealthRecord[]}
  */
 export function listByokProviderModelHealth() {
-    hydrateByokProviderHealthFromDisk();
     return [..._byokProviderHealthByKey.values()].sort((a, b) => {
         const aTime = Math.max(
             a.lastFailureAt ?? 0,
@@ -967,7 +973,6 @@ export function listByokProviderModelHealth() {
  * @returns {void}
  */
 export function clearByokProviderModelHealth(input = {}) {
-    hydrateByokProviderHealthFromDisk();
     const identity = normalizeHealthIdentity(input);
     if (!identity.routeProfile && !identity.providerId && !identity.providerModel) {
         _byokProviderHealthByKey.clear();
@@ -998,7 +1003,6 @@ export function clearByokProviderModelHealth(input = {}) {
  * }}
  */
 export function readByokProviderHealthState() {
-    hydrateByokProviderHealthFromDisk();
     return {
         enabled: isByokProviderHealthPersistenceEnabled(),
         path: isByokProviderHealthPersistenceEnabled() ? resolveByokProviderHealthPath() : null,
@@ -1020,6 +1024,7 @@ export function resetByokProviderHealthForTests() {
     _byokProviderHealthByKey.clear();
     _byokProviderHealthChangeListeners.clear();
     _byokProviderHealthHydrated = false;
+    _byokProviderHealthHydrationPromise = null;
     _byokProviderHealthFlushScheduled = false;
     _byokProviderHealthFlushInFlight = false;
     _byokProviderHealthDirty = false;
@@ -1027,3 +1032,6 @@ export function resetByokProviderHealthForTests() {
     _byokProviderHealthLastError = null;
     _byokProviderHealthPersistedRecords = 0;
 }
+
+// Start durable hydration without blocking ESM evaluation; synchronous readers expose loaded=false until it completes.
+void hydrateByokProviderHealthFromDisk();

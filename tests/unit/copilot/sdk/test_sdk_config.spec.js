@@ -1,13 +1,13 @@
 // @ts-check
 /**
- * Verifica a nova fronteira canônica de configuração: o SDK root não carrega mais
- * `sdk/config.js`; configuração de sessão pertence a `#copilot/config`.
+ * Verifica a nova fronteira canônica de configuração: o SDK root não carrega mais `sdk/config.js`; configuração de
+ * sessão pertence a `#copilot/config`.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS } from '#copilot/sdk/constants';
 import { SessionConfigBuilder } from '#copilot/config/session-config';
+import { DEFAULT_DIAGNOSTIC_MODEL, DEFAULT_MODEL, INFINITE_SESSION_DEFAULTS } from '#copilot/sdk/constants';
 
 describe('Config constants', () => {
     it('DEFAULT_MODEL é auto', () => {

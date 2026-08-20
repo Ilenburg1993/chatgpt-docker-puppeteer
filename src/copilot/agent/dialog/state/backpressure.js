@@ -15,8 +15,7 @@
  * @see EventBus
  */
 
-import { SessionError } from '#copilot/core';
-import { logSwallowed } from '#copilot/core';
+import { logSwallowed, SessionError } from '#copilot/core';
 
 /**
  * Serializa execução de turnos com backpressure baseada em profundidade da fila.

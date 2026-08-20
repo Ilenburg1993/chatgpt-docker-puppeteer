@@ -23,10 +23,12 @@ import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
 import { getSseClients, getSseCriticalClients } from '../../infra/sse/state.js';
-import { setDefaultAgentBackgroundCompactionThreshold } from '../runtime/index.js';
-import { readRuntimeLifecycleSnapshot } from '../runtime/index.js';
-import { readAgentRuntimeOverviewProjection } from '../runtime/index.js';
 import { readRuntimeIdFromParams } from '../routing/index.js';
+import {
+    readAgentRuntimeOverviewProjection,
+    readRuntimeLifecycleSnapshot,
+    setDefaultAgentBackgroundCompactionThreshold,
+} from '../runtime/index.js';
 import {
     readRuntimeBusyState,
     readRuntimeFileCacheStats,

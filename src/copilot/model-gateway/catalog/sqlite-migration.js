@@ -103,7 +103,9 @@ function snapshotParityKeys(snapshot) {
     return {
         sources: snapshot.sources.map((row) => optionalString(row['id']) ?? 'unknown-source'),
         providerEvidences: snapshot.providerEvidences.map(
-            (row) => optionalString(row['evidenceId']) ?? [providerId(row), optionalString(row['fieldPath']) ?? 'field'].join(':'),
+            (row) =>
+                optionalString(row['evidenceId']) ??
+                [providerId(row), optionalString(row['fieldPath']) ?? 'field'].join(':'),
         ),
         evidences: snapshot.evidences.map(
             (row) =>
@@ -111,7 +113,9 @@ function snapshotParityKeys(snapshot) {
                 [modelRouteKey(row), optionalString(row['fieldPath']) ?? 'field'].join(':'),
         ),
         routeOptions: snapshot.routeOptions.map(routeOptionKey),
-        accountOverlays: snapshot.accountOverlays.map((row) => optionalString(row['accountOverlayId']) ?? providerId(row)),
+        accountOverlays: snapshot.accountOverlays.map(
+            (row) => optionalString(row['accountOverlayId']) ?? providerId(row),
+        ),
         providerProjections: snapshot.providerProjections.map((row) =>
             [providerId(row), optionalString(row['subjectProviderId']) ?? 'unknown-subject'].join(':'),
         ),
@@ -141,7 +145,7 @@ function sortedDifference(left, right) {
 /**
  * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
  * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sqliteSnapshot
- * @returns {Array<{ field: string; missingFromSqlite: string[]; missingFromSource: string[] }>}
+ * @returns {{ field: string; missingFromSqlite: string[]; missingFromSource: string[] }[]}
  */
 function compareSnapshotKeyParity(sourceSnapshot, sqliteSnapshot) {
     const sourceKeys = snapshotParityKeys(sourceSnapshot);
@@ -162,18 +166,18 @@ function compareSnapshotKeyParity(sourceSnapshot, sqliteSnapshot) {
 /**
  * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} snapshot
  * @returns {{
- *   sources: number;
- *   providerEvidences: number;
- *   evidences: number;
- *   routeOptions: number;
- *   accountOverlays: number;
- *   providerProjections: number;
- *   projections: number;
- *   importRuns: number;
- *   rawPayloadRefs: number;
- *   conflicts: number;
- *   modelEligibilityRuns: number;
- *   modelEligibilityDecisions: number;
+ *     sources: number;
+ *     providerEvidences: number;
+ *     evidences: number;
+ *     routeOptions: number;
+ *     accountOverlays: number;
+ *     providerProjections: number;
+ *     projections: number;
+ *     importRuns: number;
+ *     rawPayloadRefs: number;
+ *     conflicts: number;
+ *     modelEligibilityRuns: number;
+ *     modelEligibilityDecisions: number;
  * }}
  */
 export function summarizeModelGatewayCatalogSnapshot(snapshot) {
@@ -197,19 +201,23 @@ export function summarizeModelGatewayCatalogSnapshot(snapshot) {
  * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sourceSnapshot
  * @param {ReturnType<typeof normalizeStoredCatalogSnapshot>} sqliteSnapshot
  * @returns {{
- *   ok: boolean;
- *   snapshotIdMatches: boolean;
- *   sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
- *   sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
- *   countMismatches: Array<{ field: string; source: number; sqlite: number }>;
- *   keyMismatches: Array<{ field: string; missingFromSqlite: string[]; missingFromSource: string[] }>;
+ *     ok: boolean;
+ *     snapshotIdMatches: boolean;
+ *     sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *     sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *     countMismatches: { field: string; source: number; sqlite: number }[];
+ *     keyMismatches: { field: string; missingFromSqlite: string[]; missingFromSource: string[] }[];
  * }}
  */
 export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteSnapshot) {
     const sourceCounts = summarizeModelGatewayCatalogSnapshot(sourceSnapshot);
     const sqliteCounts = summarizeModelGatewayCatalogSnapshot(sqliteSnapshot);
     const countMismatches = Object.keys(sourceCounts)
-        .filter((field) => sourceCounts[/** @type {keyof typeof sourceCounts} */ (field)] !== sqliteCounts[/** @type {keyof typeof sqliteCounts} */ (field)])
+        .filter(
+            (field) =>
+                sourceCounts[/** @type {keyof typeof sourceCounts} */ (field)] !==
+                sqliteCounts[/** @type {keyof typeof sqliteCounts} */ (field)],
+        )
         .map((field) => ({
             field,
             source: sourceCounts[/** @type {keyof typeof sourceCounts} */ (field)],
@@ -230,13 +238,16 @@ export function compareModelGatewayCatalogSnapshotParity(sourceSnapshot, sqliteS
 /**
  * @param {object} input
  * @param {{ readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>> }} input.sourceStore
- * @param {{ writeSnapshot(snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>): Promise<void>; readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>> }} input.sqliteStore
+ * @param {{
+ *     writeSnapshot(snapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>): Promise<void>;
+ *     readSnapshot(): Promise<ReturnType<typeof normalizeStoredCatalogSnapshot>>;
+ * }} input.sqliteStore
  * @returns {Promise<{
- *   sourceSnapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
- *   sqliteSnapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
- *   sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
- *   sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
- *   parity: ReturnType<typeof compareModelGatewayCatalogSnapshotParity>;
+ *     sourceSnapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
+ *     sqliteSnapshot: ReturnType<typeof normalizeStoredCatalogSnapshot>;
+ *     sourceCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *     sqliteCounts: ReturnType<typeof summarizeModelGatewayCatalogSnapshot>;
+ *     parity: ReturnType<typeof compareModelGatewayCatalogSnapshotParity>;
  * }>}
  */
 export async function mirrorModelGatewayCatalogSnapshotToSqlite(input) {

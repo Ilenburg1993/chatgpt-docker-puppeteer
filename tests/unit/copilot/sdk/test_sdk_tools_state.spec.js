@@ -3,19 +3,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
+    readTextFreshTrusted: vi.fn(),
     writeFileAtomicTrusted: vi.fn(),
     log: vi.fn(),
     logSwallowed: vi.fn(),
 }));
 
-vi.mock('node:fs/promises', () => ({
-    readFile: mocks.readFile,
-    writeFile: mocks.writeFile,
-}));
-
 vi.mock('#copilot/infra/public/trusted-io', () => ({
+    readTextFreshTrusted: mocks.readTextFreshTrusted,
     writeFileAtomicTrusted: mocks.writeFileAtomicTrusted,
 }));
 
@@ -46,6 +41,9 @@ vi.mock('../../../../src/copilot/sdk/logger.js', () => ({
 
 describe('sdk/tools/state', () => {
     beforeEach(() => {
+        mocks.readTextFreshTrusted.mockReset();
+        mocks.readTextFreshTrusted.mockResolvedValue({ content: '{}' });
+        mocks.writeFileAtomicTrusted.mockReset();
         mocks.writeFileAtomicTrusted.mockResolvedValue(undefined);
     });
 
@@ -54,7 +52,7 @@ describe('sdk/tools/state', () => {
     });
 
     it('loadToolsConfigAsync trata ENOENT como opcional', async () => {
-        mocks.readFile.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        mocks.readTextFreshTrusted.mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
         const mod = await import('../../../../src/copilot/sdk/tools/state.js');
 
         await mod.loadToolsConfigAsync();

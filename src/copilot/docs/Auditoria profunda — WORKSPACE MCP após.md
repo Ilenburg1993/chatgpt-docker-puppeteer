@@ -1,11 +1,10 @@
 # Auditoria profunda — WORKSPACE MCP após transformações amplas
 
-**Data:** 2026-05-23
-**Endpoint MCP testado:** `/WORKSPACE/link_6a11f5d55abc8191afb3817eb0edfe51`
-**Domínio público esperado:** `https://mcp.aurelin.org/mcp`
-**Branch:** `main`
-**HEAD observado:** `415337b6`
-**Objetivo:** avaliar profundamente o estado atual do MCP `WORKSPACE`, com foco em bugs, gaps, oportunidades de upgrade, permissões, liberdade operacional do ChatGPT, OAuth, outputSchema, securitySchemes, túnel permanente, index, validação e ferramentas de autonomia.
+**Data:** 2026-05-23 **Endpoint MCP testado:** `/WORKSPACE/link_6a11f5d55abc8191afb3817eb0edfe51`
+**Domínio público esperado:** `https://mcp.aurelin.org/mcp` **Branch:** `main` **HEAD observado:**
+`415337b6` **Objetivo:** avaliar profundamente o estado atual do MCP `WORKSPACE`, com foco em bugs,
+gaps, oportunidades de upgrade, permissões, liberdade operacional do ChatGPT, OAuth, outputSchema,
+securitySchemes, túnel permanente, index, validação e ferramentas de autonomia.
 
 ---
 
@@ -36,33 +35,50 @@
 
 ## 1. Resumo executivo
 
-O MCP `WORKSPACE` passou por uma evolução muito grande desde a última auditoria. A arquitetura atual está substancialmente mais madura, mais alinhada ao Apps SDK e muito mais poderosa para o ChatGPT operar o repositório.
+O MCP `WORKSPACE` passou por uma evolução muito grande desde a última auditoria. A arquitetura atual
+está substancialmente mais madura, mais alinhada ao Apps SDK e muito mais poderosa para o ChatGPT
+operar o repositório.
 
 Principais avanços confirmados live:
 
 - O MCP agora expõe **67 tools anunciadas/visíveis**.
-- `mcp_tools_status` informa **50 read-only idempotentes**, **16 bounded-write**, **1 destrutiva** e **0 open-world**.
+- `mcp_tools_status` informa **50 read-only idempotentes**, **16 bounded-write**, **1 destrutiva** e
+  **0 open-world**.
 - **100% das tools listadas em `mcp_tools_status` têm `hasOutputSchema=true`**.
-- **100% das tools listadas têm `securitySchemes` explícito**, com scopes OAuth (`repo:read`, `repo:write`, `repo:validate`, `repo:admin`).
+- **100% das tools listadas têm `securitySchemes` explícito**, com scopes OAuth (`repo:read`,
+  `repo:write`, `repo:validate`, `repo:admin`).
 - `mcp_autonomy_power_score` retornou **95/100, grade A**.
 - OAuth agora está ativo: `mcp_auth_profile.mode = oauth`, `enforcement = all`.
-- O issuer OAuth em `https://mcp.aurelin.org` passou em diagnóstico: metadata OAuth pronta, escopos presentes, PKCE `S256` suportado e client metadata document funcional.
+- O issuer OAuth em `https://mcp.aurelin.org` passou em diagnóstico: metadata OAuth pronta, escopos
+  presentes, PKCE `S256` suportado e client metadata document funcional.
 - O endpoint permanente `https://mcp.aurelin.org/mcp` está configurado como URL principal.
-- Plan-only tools foram implementadas: `repo_patch_plan`, `repo_create_file_plan`, `repo_quarantine_file_plan`, `repo_move_file_plan`, `repo_index_refresh_plan`, `mcp_validation_plan`.
-- O index build agora funcionou diretamente via ChatGPT/MCP: 45 arquivos indexados, 343 símbolos, 205 imports.
-- Escrita real funcionou: criei arquivo temporário, coloquei em quarantine, restaurei e removi com `repo_remove_file(confirm=true)`.
-- A validação real funcionou: `mcp_run_safe_validation_suite(mcp-fast)` passou com typecheck e unit-mcp.
+- Plan-only tools foram implementadas: `repo_patch_plan`, `repo_create_file_plan`,
+  `repo_quarantine_file_plan`, `repo_move_file_plan`, `repo_index_refresh_plan`,
+  `mcp_validation_plan`.
+- O index build agora funcionou diretamente via ChatGPT/MCP: 45 arquivos indexados, 343 símbolos,
+  205 imports.
+- Escrita real funcionou: criei arquivo temporário, coloquei em quarantine, restaurei e removi com
+  `repo_remove_file(confirm=true)`.
+- A validação real funcionou: `mcp_run_safe_validation_suite(mcp-fast)` passou com typecheck e
+  unit-mcp.
 - O `unit-mcp` atual passou com **12 arquivos e 85 testes**, indicando expansão importante da suíte.
 
 Principais problemas restantes:
 
 - O repo segue dirty: `.codex/config.toml` modificado e arquivos/docs não rastreados.
-- `mcp_runtime_health` ainda mostra ruído do antigo quick tunnel temporário stale, mesmo com permanent tunnel funcionando.
-- Há inconsistência de auth entre ferramentas: `mcp_auth_profile` e `chatgpt_connector_current_url_status` indicam OAuth, mas `mcp_tunnel_status.chatgpt.authentication` ainda mostra `none-dev`.
-- O index está disponível após build manual, mas `indexAutoBuild.status = disabled`; sem auto-build, o index pode voltar a ficar vazio após restart.
-- `mcp_smoke_workspace` não considera index indisponível como warning próprio; esse alerta aparece em `mcp_runtime_health`.
-- O workspace tem artefatos de relatórios na raiz e docs não rastreados, mantendo smoke/runtime em `degraded`.
-- O OAuth parece pronto tecnicamente, mas ainda precisa ser validado ponta a ponta na UI do ChatGPT com login/linking real e tokens emitidos pelo fluxo OAuth.
+- `mcp_runtime_health` ainda mostra ruído do antigo quick tunnel temporário stale, mesmo com
+  permanent tunnel funcionando.
+- Há inconsistência de auth entre ferramentas: `mcp_auth_profile` e
+  `chatgpt_connector_current_url_status` indicam OAuth, mas
+  `mcp_tunnel_status.chatgpt.authentication` ainda mostra `none-dev`.
+- O index está disponível após build manual, mas `indexAutoBuild.status = disabled`; sem auto-build,
+  o index pode voltar a ficar vazio após restart.
+- `mcp_smoke_workspace` não considera index indisponível como warning próprio; esse alerta aparece
+  em `mcp_runtime_health`.
+- O workspace tem artefatos de relatórios na raiz e docs não rastreados, mantendo smoke/runtime em
+  `degraded`.
+- O OAuth parece pronto tecnicamente, mas ainda precisa ser validado ponta a ponta na UI do ChatGPT
+  com login/linking real e tokens emitidos pelo fluxo OAuth.
 
 ---
 
@@ -70,17 +86,21 @@ Principais problemas restantes:
 
 Esta auditoria cruzou os resultados live do MCP com documentação oficial relevante:
 
-- OpenAI Apps SDK Reference: https://developers.openai.com/apps-sdk/reference
-  Usada para avaliar `outputSchema`, `securitySchemes`, `readOnlyHint`, `destructiveHint`, `openWorldHint`, `idempotentHint` e metadados de tools.
-- ChatGPT Developer Mode: https://developers.openai.com/api/docs/guides/developer-mode
-  Usada para avaliar conexão de apps/MCP no ChatGPT, Developer Mode, OAuth/No Authentication/Mixed Authentication e confirmações de write actions.
-- Apps SDK Authentication: https://developers.openai.com/apps-sdk/build/auth
-  Usada para avaliar OAuth metadata, protected resource metadata, `securitySchemes`, `_meta["mcp/www_authenticate"]` e scopes por tool.
-- Apps SDK MCP Server: https://developers.openai.com/apps-sdk/build/mcp-server
-  Usada para avaliar server MCP, tools e structured outputs.
+- OpenAI Apps SDK Reference: https://developers.openai.com/apps-sdk/reference Usada para avaliar
+  `outputSchema`, `securitySchemes`, `readOnlyHint`, `destructiveHint`, `openWorldHint`,
+  `idempotentHint` e metadados de tools.
+- ChatGPT Developer Mode: https://developers.openai.com/api/docs/guides/developer-mode Usada para
+  avaliar conexão de apps/MCP no ChatGPT, Developer Mode, OAuth/No Authentication/Mixed
+  Authentication e confirmações de write actions.
+- Apps SDK Authentication: https://developers.openai.com/apps-sdk/build/auth Usada para avaliar
+  OAuth metadata, protected resource metadata, `securitySchemes`, `_meta["mcp/www_authenticate"]` e
+  scopes por tool.
+- Apps SDK MCP Server: https://developers.openai.com/apps-sdk/build/mcp-server Usada para avaliar
+  server MCP, tools e structured outputs.
 - MCP Tools Specification: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
   Usada para avaliar o modelo de tools MCP, humano no loop e contratos de tool.
-- Cloudflare Tunnel DNS routing: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/
+- Cloudflare Tunnel DNS routing:
+  https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/
   Usada para avaliar hostname público `mcp.aurelin.org`, Cloudflare Tunnel permanente e DNS route.
 
 ---
@@ -128,7 +148,8 @@ be13e1fe feat(mcp): add autonomy power score
 3a3e786f feat(mcp): expose auth environment templates
 ```
 
-A sequência confirma foco recente em OAuth, autenticação/scopes, domínio permanente, tunnel permanente, autonomy score e diagnostics.
+A sequência confirma foco recente em OAuth, autenticação/scopes, domínio permanente, tunnel
+permanente, autonomy score e diagnostics.
 
 ---
 
@@ -217,7 +238,8 @@ Isso confirma correção dos maiores gaps de metadados.
 
 ### 5.4. Registro MCP
 
-`repo_read_file(src/copilot/mcp/registry.js)` confirmou que o registry passa para `server.registerTool`:
+`repo_read_file(src/copilot/mcp/registry.js)` confirmou que o registry passa para
+`server.registerTool`:
 
 - `inputSchema`;
 - `annotations`;
@@ -378,7 +400,9 @@ Esse desalinhamento deve ser corrigido.
 
 ### 8.1. Estado atual
 
-`mcp_tools_status` indica `hasOutputSchema: true` para todas as 67 tools. Isso corrige uma recomendação forte da documentação oficial do Apps SDK: tools que retornam `structuredContent` devem declarar `outputSchema`, permitindo validação e raciocínio melhor pelo modelo.
+`mcp_tools_status` indica `hasOutputSchema: true` para todas as 67 tools. Isso corrige uma
+recomendação forte da documentação oficial do Apps SDK: tools que retornam `structuredContent` devem
+declarar `outputSchema`, permitindo validação e raciocínio melhor pelo modelo.
 
 ### 8.2. Qualidade atual
 
@@ -455,11 +479,13 @@ temporaryTunnel.stale=true
 temporaryTunnel.recommendedAction=restart
 ```
 
-Isso aparece tanto em `mcp_tunnel_status` quanto em `mcp_runtime_health`, mesmo que o caminho correto agora seja o permanent tunnel.
+Isso aparece tanto em `mcp_tunnel_status` quanto em `mcp_runtime_health`, mesmo que o caminho
+correto agora seja o permanent tunnel.
 
 ### 9.4. Correção proposta
 
-Quando `mode = named-permanent` e `configuredPublicUrlValidation.ok = true`, o temporary tunnel stale deve ser:
+Quando `mode = named-permanent` e `configuredPublicUrlValidation.ok = true`, o temporary tunnel
+stale deve ser:
 
 - movido para seção `fallback`;
 - não gerar recovery principal;
@@ -528,7 +554,9 @@ WORKSPACE_DIRTY
 
 ### 10.4. Gap
 
-Agora que index é um componente central, `mcp_smoke_workspace` deveria emitir warning próprio se `repo_index_status.available=false`. No teste inicial, quando index estava indisponível, o smoke detalhou `available=false`, mas não adicionou warning. O runtime health já faz isso melhor.
+Agora que index é um componente central, `mcp_smoke_workspace` deveria emitir warning próprio se
+`repo_index_status.available=false`. No teste inicial, quando index estava indisponível, o smoke
+detalhou `available=false`, mas não adicionou warning. O runtime health já faz isso melhor.
 
 ---
 
@@ -592,7 +620,8 @@ Auto-build está desabilitado:
 }
 ```
 
-Recomendação: habilitar auto-build para `src/copilot` ou pelo menos `src/copilot/mcp` quando iniciar o MCP server.
+Recomendação: habilitar auto-build para `src/copilot` ou pelo menos `src/copilot/mcp` quando iniciar
+o MCP server.
 
 ---
 
@@ -600,7 +629,8 @@ Recomendação: habilitar auto-build para `src/copilot` ou pelo menos `src/copil
 
 ### 12.1. Leitura
 
-Diferente de auditorias anteriores, `repo_read_file(src/copilot/mcp/registry.js)` funcionou em janelas:
+Diferente de auditorias anteriores, `repo_read_file(src/copilot/mcp/registry.js)` funcionou em
+janelas:
 
 - linhas 1–80;
 - linhas 81–168.
@@ -685,7 +715,8 @@ src/copilot/.ai/tmp/audit-plan-only-test.txt
 
 ### 13.6. Delete
 
-`repo_remove_file(confirm=true)` funcionou para remover o arquivo temporário, com snapshot de rollback.
+`repo_remove_file(confirm=true)` funcionou para remover o arquivo temporário, com snapshot de
+rollback.
 
 ### 13.7. Gap
 
@@ -695,7 +726,8 @@ A operação de quarantine deixa metadados em:
 src/copilot/.ai/quarantine/
 ```
 
-O diretório ficou não rastreado. Isso é esperado, mas precisa ser tratado por `.gitignore` ou hygiene policy.
+O diretório ficou não rastreado. Isso é esperado, mas precisa ser tratado por `.gitignore` ou
+hygiene policy.
 
 ---
 
@@ -743,7 +775,9 @@ Duration: 4.38s
 
 ### 14.5. Gap
 
-`mcp_last_validation_summary` por validator ainda pode induzir erro porque `typecheck` isolado mais recente é antigo/falho, enquanto `suite-mcp-fast` acabou de passar typecheck. Seria útil agregar “latest effective typecheck result” considerando suites.
+`mcp_last_validation_summary` por validator ainda pode induzir erro porque `typecheck` isolado mais
+recente é antigo/falho, enquanto `suite-mcp-fast` acabou de passar typecheck. Seria útil agregar
+“latest effective typecheck result” considerando suites.
 
 ---
 
@@ -751,67 +785,76 @@ Duration: 4.38s
 
 ### BUG-001 — Inconsistência de auth entre status tools
 
-**Severidade:** P1
-**Evidência:** `mcp_auth_profile` e `chatgpt_connector_current_url_status` indicam OAuth/enforcement all, mas `mcp_tunnel_status.chatgpt.authentication` ainda mostra `none-dev`.
+**Severidade:** P1 **Evidência:** `mcp_auth_profile` e `chatgpt_connector_current_url_status`
+indicam OAuth/enforcement all, mas `mcp_tunnel_status.chatgpt.authentication` ainda mostra
+`none-dev`.
 
 **Impacto:** pode orientar incorretamente o usuário na configuração do ChatGPT.
 
-**Correção proposta:** centralizar a fonte de auth display em `mcp_auth_profile` ou config efetiva; `mcp_tunnel_status` não deve manter valor legado.
+**Correção proposta:** centralizar a fonte de auth display em `mcp_auth_profile` ou config efetiva;
+`mcp_tunnel_status` não deve manter valor legado.
 
 ---
 
 ### BUG-002 — Runtime health ainda carrega ruído do quick tunnel temporário
 
-**Severidade:** P2
-**Evidência:** `mcp_runtime_health.tunnel` ainda aponta para `temporary-trycloudflare` stale, apesar de `operationalSignals.tunnel.mode = named-permanent`.
+**Severidade:** P2 **Evidência:** `mcp_runtime_health.tunnel` ainda aponta para
+`temporary-trycloudflare` stale, apesar de `operationalSignals.tunnel.mode = named-permanent`.
 
-**Impacto:** o usuário pode pensar que precisa reiniciar o quick tunnel, mesmo usando `mcp.aurelin.org`.
+**Impacto:** o usuário pode pensar que precisa reiniciar o quick tunnel, mesmo usando
+`mcp.aurelin.org`.
 
-**Correção proposta:** quando permanent tunnel está validado, mover quick tunnel para `fallbackTemporaryTunnel` e não gerar recovery principal.
+**Correção proposta:** quando permanent tunnel está validado, mover quick tunnel para
+`fallbackTemporaryTunnel` e não gerar recovery principal.
 
 ---
 
 ### BUG-003 — `mcp_last_validation_summary` não agrega resultados equivalentes de suites
 
-**Severidade:** P2
-**Evidência:** `typecheck` isolado mais recente é um job antigo falho, mas `suite-mcp-fast` acabou de passar typecheck.
+**Severidade:** P2 **Evidência:** `typecheck` isolado mais recente é um job antigo falho, mas
+`suite-mcp-fast` acabou de passar typecheck.
 
-**Impacto:** resumo pode sugerir que typecheck está falho quando o estado efetivo recente está OK dentro da suite.
+**Impacto:** resumo pode sugerir que typecheck está falho quando o estado efetivo recente está OK
+dentro da suite.
 
-**Correção proposta:** adicionar campo `effectiveChecks`, extraindo steps internos de `suite-mcp-fast`/`suite-mcp-full`.
+**Correção proposta:** adicionar campo `effectiveChecks`, extraindo steps internos de
+`suite-mcp-fast`/`suite-mcp-full`.
 
 ---
 
 ### BUG-004 — `mcp_smoke_workspace` não eleva warning de index indisponível
 
-**Severidade:** P2
-**Evidência:** quando index estava indisponível, smoke detalhou `available=false`, mas warnings só mencionaram workspace dirty.
+**Severidade:** P2 **Evidência:** quando index estava indisponível, smoke detalhou
+`available=false`, mas warnings só mencionaram workspace dirty.
 
 **Impacto:** smoke pode parecer saudável demais para navegação LLM.
 
-**Correção proposta:** se `repo_index_status.enabled=true && available=false`, adicionar warning `INDEX_UNAVAILABLE`.
+**Correção proposta:** se `repo_index_status.enabled=true && available=false`, adicionar warning
+`INDEX_UNAVAILABLE`.
 
 ---
 
 ### BUG-005 — Quarantine/restored metadata suja o workspace
 
-**Severidade:** P2/P3
-**Evidência:** após testes, `src/copilot/.ai/quarantine/` aparece como untracked.
+**Severidade:** P2/P3 **Evidência:** após testes, `src/copilot/.ai/quarantine/` aparece como
+untracked.
 
 **Impacto:** workspace dirty persistente e ruído em auditorias.
 
-**Correção proposta:** adicionar `.gitignore` para `.ai/quarantine/*.data`, `.ai/quarantine/*.json` ou mover quarantine para diretório já ignorado.
+**Correção proposta:** adicionar `.gitignore` para `.ai/quarantine/*.data`, `.ai/quarantine/*.json`
+ou mover quarantine para diretório já ignorado.
 
 ---
 
 ### BUG-006 — Root tree showHidden expõe muitos nomes não protegidos
 
-**Severidade:** P3
-**Evidência:** `repo_root_tree(showHidden=true)` lista dotfiles e artefatos não protegidos.
+**Severidade:** P3 **Evidência:** `repo_root_tree(showHidden=true)` lista dotfiles e artefatos não
+protegidos.
 
 **Impacto:** não é vazamento de segredo, mas aumenta payload e exposição de metadados.
 
-**Correção proposta:** usar `repo_root_redaction_status` como default em prompts ChatGPT; talvez adicionar `redactHiddenNames=true`.
+**Correção proposta:** usar `repo_root_redaction_status` como default em prompts ChatGPT; talvez
+adicionar `redactHiddenNames=true`.
 
 ---
 
@@ -843,7 +886,8 @@ O estado dirty precisa ser resolvido com:
 
 ### GAP-004 — Tool-specific outputSchema ainda é hardening futuro
 
-Há cobertura de outputSchema, mas o próprio metadataProfile indica que schemas específicos por tool são o próximo nível.
+Há cobertura de outputSchema, mas o próprio metadataProfile indica que schemas específicos por tool
+são o próximo nível.
 
 ### GAP-005 — Sem Cloudflare smoke result para o current permanent tunnel
 
@@ -1045,7 +1089,8 @@ Registrar:
 
 ## 20. Veredito
 
-O MCP `WORKSPACE` está agora em seu melhor estado até aqui. A arquitetura saltou de um conector experimental com várias lacunas para uma plataforma MCP com alto grau de maturidade:
+O MCP `WORKSPACE` está agora em seu melhor estado até aqui. A arquitetura saltou de um conector
+experimental com várias lacunas para uma plataforma MCP com alto grau de maturidade:
 
 ```text
 Autonomia: A / 95
@@ -1062,7 +1107,9 @@ Smoke: functional
 Runtime: degraded only by operational hygiene
 ```
 
-A principal conclusão é que os maiores gaps anteriores foram resolvidos: outputSchema, securitySchemes, OAuth, plan-only tools, current URL status, redaction status, safe validation e writes reais agora funcionam.
+A principal conclusão é que os maiores gaps anteriores foram resolvidos: outputSchema,
+securitySchemes, OAuth, plan-only tools, current URL status, redaction status, safe validation e
+writes reais agora funcionam.
 
 O que resta não é reconstruir a arquitetura, mas endurecer e limpar:
 
@@ -1074,4 +1121,5 @@ O que resta não é reconstruir a arquitetura, mas endurecer e limpar:
 - avançar de schemas genéricos para schemas tool-specific;
 - criar smoke permanente Cloudflare.
 
-Em termos de liberdade e poder do ChatGPT sobre o repo, o sistema saiu de “parcialmente bloqueado e instável” para “amplo, autenticado, auditável e operacional”, com poucas lacunas remanescentes.
+Em termos de liberdade e poder do ChatGPT sobre o repo, o sistema saiu de “parcialmente bloqueado e
+instável” para “amplo, autenticado, auditável e operacional”, com poucas lacunas remanescentes.

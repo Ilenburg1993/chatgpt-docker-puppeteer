@@ -16,16 +16,14 @@
  * @see module:copilot/sdk/tools-registry
  */
 
-import { buildCustomTools, getAllTools as getRegistryTools, registerTools } from '#copilot/sdk/tools';
+import { buildCustomTools, getAllTools as getRegistryTools, initCustomTools, registerTools } from '#copilot/sdk/tools';
 import { log } from '../observability/logger.js';
 import { wrapWithStats } from '../observability/tool-stats.js';
 import { codeReadTools, codeTools, codeWriteTools } from './code/index.js';
 import { fileReadTools, fileWriteTools, indexTools, scopeTools } from './file/index.js';
-import { searchTools } from './search/index.js';
 import { gitTools } from './git/index.js';
 import { configureHookTools, hookTools } from './hook/index.js';
 import { hubTools, setHub } from './hub/index.js';
-import { modelGatewayReadTools, modelGatewayWriteTools } from './model-gateway/index.js';
 import {
     introspectionTools,
     registerForIntrospection,
@@ -33,7 +31,9 @@ import {
     setToolContractReport,
     verifyToolRegistryContracts,
 } from './introspection/index.js';
+import { modelGatewayReadTools, modelGatewayWriteTools } from './model-gateway/index.js';
 import { permissionTools, setPermissionAgent } from './permission/index.js';
+import { searchTools } from './search/index.js';
 import {
     experimentalRpcTools,
     reloadAgentProcessTool,
@@ -58,6 +58,11 @@ import { webTools } from './web/index.js';
 // R13: configureHookTools, setHub, setPermissionAgent, setSessionRpc, setExperimentalSession exportados diretamente de tools/index.js
 // O infra barrel (infra/index.js) re-exporta de tools-bootstrap.js; consumidores devem usar o barrel agent/.
 export { configureHookTools, setExperimentalSession, setHub, setPermissionAgent, setSessionRpc };
+
+/** Hydrate declarative custom tools before synchronous registry composition. */
+export async function hydrateCustomTools() {
+    await initCustomTools();
+}
 
 // ─── getAllTools flat — array de todas as tools para consumers externos (ex.: server/routes/sdk/deps.js) ─────
 
@@ -176,7 +181,11 @@ export function assertPrimaryToolCategoriesHealthy(failedToolCategories, options
 /**
  * @param {ToolRegistry} registry
  * @param {ToolGroupConfig[]} toolGroups
- * @param {(registry: ToolRegistry, tools: Tool[], options: { category: string; tags: string[]; readOnly?: boolean }) => void} [registerFn]
+ * @param {(
+ *     registry: ToolRegistry,
+ *     tools: Tool[],
+ *     options: { category: string; tags: string[]; readOnly?: boolean },
+ * ) => void} [registerFn]
  * @returns {{ category: string; error: string; toolCount: number }[]}
  */
 export function registerToolGroupsCollectFailures(registry, toolGroups, registerFn = registerTools) {
@@ -352,9 +361,9 @@ function readBootstrapPermissionMode() {
 }
 
 /**
- * Em modo operacional approve_all/audit_only, o handler de permissão continua existindo para auditoria, mas a sessão SDK
- * não deve abrir prompts/janelas para cada tool. Em selective, preservamos o contrato original para que a policy granular
- * continue tendo oportunidade de intervir.
+ * Em modo operacional approve_all/audit_only, o handler de permissão continua existindo para auditoria, mas a sessão
+ * SDK não deve abrir prompts/janelas para cada tool. Em selective, preservamos o contrato original para que a policy
+ * granular continue tendo oportunidade de intervir.
  *
  * @param {Tool[]} tools
  * @param {'approve_all' | 'audit_only' | 'selective'} permissionMode

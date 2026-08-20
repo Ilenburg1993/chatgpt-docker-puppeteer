@@ -11,8 +11,8 @@
  * @see EventBus
  */
 
-import { AGENT_EVENTS } from '#copilot/events';
 import { STATUS_SNAPSHOT_TTL_MS } from '#copilot/config/agent';
+import { AGENT_EVENTS } from '#copilot/events';
 import { evaluateSystemPromptFreshness, readSystemPromptStatusSync } from '../../config/system-prompt/index.js';
 import { readAgentRuntimePersistedStateSync } from '../facades/agent-runtime-state.js';
 import { buildStatusSnapshot } from '../ports/snapshot-port.js';

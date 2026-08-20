@@ -32,7 +32,8 @@ export const todoGetTool = withSkipPermission(
             include_subtasks: z
                 .boolean()
                 .optional()
-                .default(true)['describe']('Se true, inclui objetos completos das subtarefas diretas'),
+                .default(true)
+                ['describe']('Se true, inclui objetos completos das subtarefas diretas'),
         }),
         handler: async (/** @type {{ id: string; include_subtasks?: boolean }} */ args) => {
             const store = await readStore();
@@ -83,7 +84,8 @@ export const todoUpdateTool = buildTool({
                 add_tags: z.array(z.string()).optional()['describe']('Adicionar tags (merge com existentes)'),
                 remove_tags: z.array(z.string()).optional()['describe']('Remover tags específicas'),
                 due_date: z
-                    .string()['datetime']({ offset: true })
+                    .string()
+                    ['datetime']({ offset: true })
                     .nullable()
                     .optional()
                     .describe('Nova data vencimento ISO 8601 (null para remover)'),
@@ -91,7 +93,8 @@ export const todoUpdateTool = buildTool({
                 append_notes: z.string().optional()['describe']('Adicionar ao final das notas existentes'),
                 metadata: z
                     .record(z.string(), z.unknown())
-                    .optional()['describe']('Merge de metadata (deep merge de keys)'),
+                    .optional()
+                    ['describe']('Merge de metadata (deep merge de keys)'),
             })
         )
     ),

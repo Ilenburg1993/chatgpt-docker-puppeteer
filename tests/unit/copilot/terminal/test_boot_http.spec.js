@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, vi } from 'vitest';

@@ -108,7 +108,7 @@ function capabilitiesFromModelId(providerModel) {
 
 /**
  * @param {Record<string, unknown>} record
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(record) {
     const providerModel = stringValue(record['id']);
@@ -133,7 +133,10 @@ function modelEvidenceValues(record) {
         { fieldPath: 'providerMetadata.openai.family', value: family.family },
         { fieldPath: 'providerMetadata.openai.wireApi', value: family.wireApi },
         { fieldPath: 'providerMetadata.openai.tier', value: family.tier },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.created', value: finiteNumber(record['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(record['owned_by']) ?? 'openai' },
     ].filter((item) => item.value !== null && item.value !== undefined);

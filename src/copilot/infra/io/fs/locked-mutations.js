@@ -179,7 +179,12 @@ async function discardRollbackSidecar(sidecar) {
  * Remove arquivo com lock por path.
  *
  * @param {string} filePath
- * @param {{ expectedHash?: string; captureRollback?: boolean }} [options]
+ * @param {{
+ *     expectedHash?: string;
+ *     captureRollback?: boolean;
+ *     durability?: import('./durability.js').IoDurabilityMode;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
@@ -191,6 +196,7 @@ async function discardRollbackSidecar(sidecar) {
  *     previousSnapshotTruncated: boolean;
  *     previousRollbackSidecar: import('./rollback-sidecar.js').IoRollbackSidecar | null;
  *     rollbackCaptureEnabled: boolean;
+ *     durability: Awaited<ReturnType<typeof deleteFileUnlocked>>;
  * }>}
  */
 export async function deleteFileLocked(filePath, options = {}) {
@@ -209,8 +215,11 @@ export async function deleteFileLocked(filePath, options = {}) {
                 return await lease.run(async () => {
                     const snapshot = await readMutationSnapshot(filePath, captureRollback);
                     assertExpectedSha256Digest(snapshot.contentHash, options.expectedHash);
-                    await deleteFileUnlocked(filePath);
-                    return snapshot;
+                    const durability = await deleteFileUnlocked(filePath, {
+                        ...(options.durability === undefined ? {} : { durability: options.durability }),
+                        ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
+                    });
+                    return { ...snapshot, durability };
                 });
             } finally {
                 await lease.releaseAsync();
@@ -232,6 +241,7 @@ export async function deleteFileLocked(filePath, options = {}) {
                     lockWaitMs: waitMs,
                     previousHash: value.contentHash,
                     rollbackCaptureEnabled: captureRollback,
+                    durability: value.durability,
                     rollbackSidecar: value.rollbackSidecar
                         ? {
                               available: true,
@@ -254,6 +264,7 @@ export async function deleteFileLocked(filePath, options = {}) {
                 previousSnapshotTruncated: value.snapshotTruncated,
                 previousRollbackSidecar: value.rollbackSidecar,
                 rollbackCaptureEnabled: captureRollback,
+                durability: value.durability,
             },
             io,
         );
@@ -279,12 +290,20 @@ export async function deleteFileLocked(filePath, options = {}) {
  * Remove arquivo ou diretório com lock por path.
  *
  * @param {string} filePath
- * @param {{ recursive?: boolean; force?: boolean; recursiveConfirmation?: string; traceId?: string }} [options]
+ * @param {{
+ *     recursive?: boolean;
+ *     force?: boolean;
+ *     recursiveConfirmation?: string;
+ *     traceId?: string;
+ *     durability?: import('./durability.js').IoDurabilityMode;
+ *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
+ * }} [options]
  * @returns {Promise<{
  *     path: string;
  *     deleted: true;
  *     io: import('#copilot/core/io-contracts').IoMeta;
  *     lockWaitMs: number;
+ *     durability: Awaited<ReturnType<typeof removePathUnlocked>>;
  * }>}
  */
 export async function removePathLocked(filePath, options = {}) {
@@ -297,14 +316,17 @@ export async function removePathLocked(filePath, options = {}) {
             target: filePath,
             riskClass: 'high',
         });
+        let durability;
         try {
-            await lease.run(async () =>
+            durability = await lease.run(async () =>
                 removePathUnlocked(filePath, {
                     recursive: Boolean(options.recursive),
                     force: Boolean(options.force),
                     ...(options.recursiveConfirmation === undefined
                         ? {}
                         : { recursiveConfirmation: options.recursiveConfirmation }),
+                    ...(options.durability === undefined ? {} : { durability: options.durability }),
+                    ...(options.onPhase === undefined ? {} : { onPhase: options.onPhase }),
                 }),
             );
         } finally {
@@ -326,11 +348,12 @@ export async function removePathLocked(filePath, options = {}) {
                     recursive: Boolean(options.recursive),
                     recursiveConfirmed: Boolean(options.recursive) && options.recursiveConfirmation === filePath,
                     force: Boolean(options.force),
+                    durability,
                 },
             }),
             true,
         );
-        return withIoMeta({ path: filePath, deleted: /** @type {const} */ (true), lockWaitMs: waitMs }, io);
+        return withIoMeta({ path: filePath, deleted: /** @type {const} */ (true), lockWaitMs: waitMs, durability }, io);
     } catch (error) {
         publishAndReturn(
             buildIoMeta({
@@ -647,7 +670,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  * @param {string} filePath
  * @param {{
  *     baselineExpectedHash?: string;
- *     operations: Array<{
+ *     operations: {
  *         oldString: string;
  *         newString: string;
  *         replaceAll?: boolean;
@@ -659,7 +682,7 @@ export async function moveFileLocked(source, destination, options = {}) {
  *         maxDiffLines?: number;
  *         maxDiffBytes?: number;
  *         computeDiff?: boolean;
- *     }>;
+ *     }[];
  *     dryRun?: boolean;
  *     captureRollback?: boolean;
  *     onPhase?: (phase: string, details: Record<string, unknown>) => void | Promise<void>;
@@ -886,7 +909,9 @@ function annotatePatchRecoveryState(error, currentHash, currentBytes) {
 function annotatePatchBatchOperationError(error, operationIndex, completedOperationCount, failurePhase) {
     const target =
         error instanceof Error
-            ? /** @type {Error & { operationIndex?: number; completedOperationCount?: number; failurePhase?: string }} */ (error)
+            ? /** @type {Error & { operationIndex?: number; completedOperationCount?: number; failurePhase?: string }} */ (
+                  error
+              )
             : /** @type {Error & { operationIndex?: number; completedOperationCount?: number; failurePhase?: string }} */ (
                   new Error(String(error), { cause: error })
               );
@@ -963,7 +988,13 @@ export async function patchTextLocked(filePath, options) {
                     const { firstMatchLine, lastMatchLine, lineDelta } = patch;
                     const shouldComputeDiff = options.computeDiff !== false;
                     const diff = shouldComputeDiff
-                        ? buildSimpleTextDiffAroundLineRange(content, updated, { firstMatchLine, lastMatchLine, lineDelta, contextLines: diffContextLines, replacedOccurrences: replacedOccurrences })
+                        ? buildSimpleTextDiffAroundLineRange(content, updated, {
+                              firstMatchLine,
+                              lastMatchLine,
+                              lineDelta,
+                              contextLines: diffContextLines,
+                              replacedOccurrences: replacedOccurrences,
+                          })
                         : { diff: '', contextLines: diffContextLines, rangeOptimized: false };
                     const diffPreview = shouldComputeDiff
                         ? windowTextPreview(diff.diff, {

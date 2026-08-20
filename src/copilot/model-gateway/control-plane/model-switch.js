@@ -7,8 +7,7 @@
  * @module copilot/model-gateway/control-plane/model-switch
  */
 
-import { randomUUID } from 'node:crypto';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export const MODEL_GATEWAY_MODEL_SWITCH_STATES = Object.freeze([
     'planned',
@@ -60,7 +59,14 @@ function withTimeout(task, timeoutMs, phase) {
  * @param {string} input.previousModel
  * @param {string} [input.operationId]
  * @param {string} [input.idempotencyKey]
- * @param {(model: string) => Promise<{ requestedModel: string; effectiveModel: string | null; verifiedSwitch: boolean; usedRpcFallback: boolean }>} input.switchSessionModel
+ * @param {(
+ *     model: string,
+ * ) => Promise<{
+ *     requestedModel: string;
+ *     effectiveModel: string | null;
+ *     verifiedSwitch: boolean;
+ *     usedRpcFallback: boolean;
+ * }>} input.switchSessionModel
  * @param {() => Promise<void>} input.commit
  * @param {(operation: Record<string, unknown>) => Promise<void>} input.record
  * @param {() => number} [input.now]
@@ -79,7 +85,7 @@ export async function executeModelGatewayModelSwitch(input) {
             ? createModelGatewayModelSwitchOperationId(input.idempotencyKey)
             : `model-switch:${randomUUID()}`);
     const idempotencyKey = input.idempotencyKey ?? operationId;
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const transitions = [];
     /** @type {Record<string, unknown>} */
     const operation = {
@@ -116,11 +122,7 @@ export async function executeModelGatewayModelSwitch(input) {
     try {
         await transition('planned');
         await transition('requested');
-        const verification = await withTimeout(
-            input.switchSessionModel(input.targetModel),
-            timeoutMs,
-            'switch_target',
-        );
+        const verification = await withTimeout(input.switchSessionModel(input.targetModel), timeoutMs, 'switch_target');
         await transition('sdk_acknowledged', {
             effectiveModel: verification.effectiveModel,
             usedRpcFallback: verification.usedRpcFallback,

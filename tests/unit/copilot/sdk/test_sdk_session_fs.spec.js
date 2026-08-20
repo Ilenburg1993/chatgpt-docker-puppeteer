@@ -90,7 +90,9 @@ describe('sdk/session-fs', () => {
         const provider = createLocalSessionFsProvider(rootDir);
         const adapter = createSessionFsAdapter(provider);
 
-        await expect(adapter.mkdir({ sessionId: 'test-session', path: 'nested/deep', recursive: true })).resolves.toBeUndefined();
+        await expect(
+            adapter.mkdir({ sessionId: 'test-session', path: 'nested/deep', recursive: true }),
+        ).resolves.toBeUndefined();
         await expect(provider.writeFile('nested/deep/file.txt', 'ok')).resolves.toBeUndefined();
 
         await expect(provider.stat('nested/deep')).resolves.toMatchObject({
@@ -141,7 +143,9 @@ describe('sdk/session-fs', () => {
         const adapter = createSessionFsAdapter(provider);
 
         await expect(provider.exists('link.txt')).rejects.toThrow(/symlink/i);
-        await expect(adapter.exists({ sessionId: 'test-session', path: 'link.txt' })).resolves.toEqual({ exists: false });
+        await expect(adapter.exists({ sessionId: 'test-session', path: 'link.txt' })).resolves.toEqual({
+            exists: false,
+        });
         expect(metrics.map((metric) => `${metric.operation}:${metric.status}`)).toEqual(
             expect.arrayContaining([
                 'session.fs.exists:started',

@@ -5,7 +5,7 @@
  * @module copilot/mcp/control-plane/audit
  */
 
-import { lstat, open } from 'node:fs/promises';
+import { readBytesRangeFreshTrusted } from '#copilot/infra/public/trusted-io';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
@@ -75,19 +75,19 @@ export async function appendMcpAuditEvent(event) {
 }
 
 /**
- * Read a bounded tail of persisted MCP audit events for longitudinal diagnostics.
- * This never exposes credentials and never accepts a caller-controlled path.
+ * Read a bounded tail of persisted MCP audit events for longitudinal diagnostics. This never exposes credentials and
+ * never accepts a caller-controlled path.
  *
  * @param {{ tailBytes?: number; maxEvents?: number }} [options]
  * @returns {Promise<{
- *   ok: boolean;
- *   fileBytes: number;
- *   tailBytesRead: number;
- *   truncatedByBytes: boolean;
- *   parsedEvents: number;
- *   invalidLines: number;
- *   events: Record<string, unknown>[];
- *   error: string | null;
+ *     ok: boolean;
+ *     fileBytes: number;
+ *     tailBytesRead: number;
+ *     truncatedByBytes: boolean;
+ *     parsedEvents: number;
+ *     invalidLines: number;
+ *     events: Record<string, unknown>[];
+ *     error: string | null;
  * }>}
  */
 export async function readMcpAuditEventTail(options = {}) {
@@ -101,21 +101,14 @@ export async function readMcpAuditEventTail(options = {}) {
     const auditFile = getMcpAuditFile();
     try {
         await mcpAuditWriter.flush();
-        const stats = await lstat(auditFile);
-        if (stats.isSymbolicLink() || !stats.isFile()) {
-            return {
-                ok: false,
-                fileBytes: Number(stats.size ?? 0),
-                tailBytesRead: 0,
-                truncatedByBytes: false,
-                parsedEvents: 0,
-                invalidLines: 0,
-                events: [],
-                error: 'MCP audit path is not a regular file.',
-            };
-        }
-        const fileBytes = Number(stats.size ?? 0);
-        const bytesToRead = Math.min(fileBytes, tailBytes);
+        const snapshot = await readBytesRangeFreshTrusted(auditFile, {
+            caller: 'mcp.control-plane.audit',
+            maxBytes: tailBytes,
+            fromEnd: true,
+            rejectSymlink: true,
+        });
+        const fileBytes = snapshot.sizeBytes;
+        const bytesToRead = snapshot.bytesRead;
         if (bytesToRead <= 0) {
             return {
                 ok: true,
@@ -128,16 +121,8 @@ export async function readMcpAuditEventTail(options = {}) {
                 error: null,
             };
         }
-        const buffer = Buffer.allocUnsafe(bytesToRead);
-        const offset = Math.max(0, fileBytes - bytesToRead);
-        const handle = await open(auditFile, 'r');
-        try {
-            await handle.read(buffer, 0, bytesToRead, offset);
-        } finally {
-            await handle.close();
-        }
-        let text = buffer.toString('utf8');
-        const truncatedByBytes = offset > 0;
+        let text = snapshot.content.toString('utf8');
+        const truncatedByBytes = snapshot.truncatedBefore;
         if (truncatedByBytes) {
             const firstNewline = text.indexOf('\n');
             text = firstNewline >= 0 ? text.slice(firstNewline + 1) : '';
@@ -195,9 +180,9 @@ export async function readMcpAuditEventTail(options = {}) {
 }
 
 /**
- * Read a bounded, newline-aligned audit slice beginning at an exact byte offset.
- * The returned nextOffset always points immediately after the last complete newline, so callers can checkpoint it
- * without reparsing or skipping a partial JSON line. The file identity lets derived indexes detect rotation/replacement.
+ * Read a bounded, newline-aligned audit slice beginning at an exact byte offset. The returned nextOffset always points
+ * immediately after the last complete newline, so callers can checkpoint it without reparsing or skipping a partial
+ * JSON line. The file identity lets derived indexes detect rotation/replacement.
  *
  * @param {{ offset?: number; maxBytes?: number; maxEvents?: number }} [options]
  */
@@ -208,29 +193,25 @@ export async function readMcpAuditEventSlice(options = {}) {
     const auditFile = getMcpAuditFile();
     try {
         await mcpAuditWriter.flush();
-        const stats = await lstat(auditFile);
-        if (stats.isSymbolicLink() || !stats.isFile()) {
-            return {
-                ok: false,
-                fileIdentity: null,
-                fileBytes: Number(stats.size ?? 0),
-                requestedOffset,
-                startOffset: 0,
-                nextOffset: 0,
-                bytesRead: 0,
-                complete: true,
-                resetRequired: true,
-                parsedEvents: 0,
-                invalidLines: 0,
-                events: [],
-                error: 'MCP audit path is not a regular file.',
-            };
+        let snapshot = await readBytesRangeFreshTrusted(auditFile, {
+            caller: 'mcp.control-plane.audit',
+            start: requestedOffset,
+            maxBytes,
+            rejectSymlink: true,
+        });
+        const resetRequired = requestedOffset > snapshot.sizeBytes;
+        if (resetRequired) {
+            snapshot = await readBytesRangeFreshTrusted(auditFile, {
+                caller: 'mcp.control-plane.audit',
+                start: 0,
+                maxBytes,
+                rejectSymlink: true,
+            });
         }
-        const fileBytes = Number(stats.size ?? 0);
-        const fileIdentity = `${String(stats.dev ?? 0)}:${String(stats.ino ?? 0)}`;
-        const resetRequired = requestedOffset > fileBytes;
+        const fileBytes = snapshot.sizeBytes;
+        const fileIdentity = `${String(snapshot.dev)}:${String(snapshot.ino)}`;
         const startOffset = resetRequired ? 0 : requestedOffset;
-        const bytesToRead = Math.min(maxBytes, Math.max(0, fileBytes - startOffset));
+        const bytesToRead = snapshot.bytesRead;
         if (bytesToRead <= 0) {
             return {
                 ok: true,
@@ -249,16 +230,9 @@ export async function readMcpAuditEventSlice(options = {}) {
             };
         }
 
-        const buffer = Buffer.allocUnsafe(bytesToRead);
-        const handle = await open(auditFile, 'r');
-        try {
-            await handle.read(buffer, 0, bytesToRead, startOffset);
-        } finally {
-            await handle.close();
-        }
-
+        const buffer = snapshot.content;
         let completeBytes = bytesToRead;
-        const reachedEof = startOffset + bytesToRead >= fileBytes;
+        const reachedEof = !snapshot.truncatedAfter;
         if (!reachedEof) {
             const lastNewline = buffer.lastIndexOf(0x0a);
             completeBytes = lastNewline >= 0 ? lastNewline + 1 : 0;
@@ -266,7 +240,7 @@ export async function readMcpAuditEventSlice(options = {}) {
         const text = completeBytes > 0 ? buffer.subarray(0, completeBytes).toString('utf8') : '';
         /** @type {Record<string, unknown>[]} */
         const events = [];
-        /** @type {Array<{ sourceOffset: number; event: Record<string, unknown> }>} */
+        /** @type {{ sourceOffset: number; event: Record<string, unknown> }[]} */
         const entries = [];
         let invalidLines = 0;
         let lineOffset = startOffset;

@@ -1,9 +1,11 @@
 # Documento canônico — Máxima autonomia, liberdade e poder do `https://chatgpt.com/` sobre o nosso repo via MCP
 
-**Data:** 2026-05-23
-**Status do acesso atual:** o tunnel e o MCP server estão fechados no momento deste documento; portanto, este relatório não é uma auditoria viva do repo. Ele é uma reconstrução canônica, feita do zero, com foco exclusivo na autonomia do `chatgpt.com` sobre o nosso repositório por meio de um conector MCP.
-**Foco absoluto:** tudo que aumenta a capacidade do ChatGPT de ler, compreender, modificar, validar, operar e manter o repo.
-**Fora de escopo:** qualquer melhoria do workspace que não aumente direta ou indiretamente o poder do ChatGPT sobre o repo.
+**Data:** 2026-05-23 **Status do acesso atual:** o tunnel e o MCP server estão fechados no momento
+deste documento; portanto, este relatório não é uma auditoria viva do repo. Ele é uma reconstrução
+canônica, feita do zero, com foco exclusivo na autonomia do `chatgpt.com` sobre o nosso repositório
+por meio de um conector MCP. **Foco absoluto:** tudo que aumenta a capacidade do ChatGPT de ler,
+compreender, modificar, validar, operar e manter o repo. **Fora de escopo:** qualquer melhoria do
+workspace que não aumente direta ou indiretamente o poder do ChatGPT sobre o repo.
 
 ---
 
@@ -44,16 +46,25 @@
 
 A autonomia máxima do `chatgpt.com` sobre o nosso repo depende de duas coisas:
 
-1. **O ChatGPT precisa ver o repo como um sistema operacional remoto, não como um conjunto solto de arquivos.**
-2. **O MCP precisa expor tools que sejam poderosas, previsíveis, bem anotadas, reversíveis quando possível e fáceis de aprovar.**
+1. **O ChatGPT precisa ver o repo como um sistema operacional remoto, não como um conjunto solto de
+   arquivos.**
+2. **O MCP precisa expor tools que sejam poderosas, previsíveis, bem anotadas, reversíveis quando
+   possível e fáceis de aprovar.**
 
 O servidor MCP é o contrato. O ChatGPT é o operador. O repo é o ambiente de execução.
 
-A documentação oficial da Apps SDK afirma que apps usam MCP para se conectar ao ChatGPT e que o MCP server define capabilities/tools e as expõe ao ChatGPT.[^quickstart] A documentação de Developer Mode afirma que esse modo fornece suporte MCP completo para tools de leitura e escrita, mas que write actions exigem confirmação por padrão e que `readOnlyHint` é usado para distinguir leitura de escrita.[^developer-mode]
+A documentação oficial da Apps SDK afirma que apps usam MCP para se conectar ao ChatGPT e que o MCP
+server define capabilities/tools e as expõe ao ChatGPT.[^quickstart] A documentação de Developer
+Mode afirma que esse modo fornece suporte MCP completo para tools de leitura e escrita, mas que
+write actions exigem confirmação por padrão e que `readOnlyHint` é usado para distinguir leitura de
+escrita.[^developer-mode]
 
 Assim, a tese operacional é:
 
-> Para dar poder máximo ao ChatGPT, devemos fazer o MCP expor uma superfície de desenvolvimento completa, com leitura total, escrita segura, validação allowlisted, manutenção em lote e delegação para um runner nosso — reduzindo o número de ações que parecem destrutivas ou ambíguas ao host ChatGPT.
+> Para dar poder máximo ao ChatGPT, devemos fazer o MCP expor uma superfície de desenvolvimento
+> completa, com leitura total, escrita segura, validação allowlisted, manutenção em lote e delegação
+> para um runner nosso — reduzindo o número de ações que parecem destrutivas ou ambíguas ao host
+> ChatGPT.
 
 ---
 
@@ -78,7 +89,9 @@ Neste documento, “máxima autonomia” significa que o `chatgpt.com` consegue:
 - manter continuidade durante uma conversa longa;
 - delegar tarefas multi-step para um executor nosso.
 
-Essa autonomia não significa ausência de qualquer controle do host ChatGPT. A documentação oficial deixa claro que write actions exigem confirmação por padrão e que aprovações lembradas valem só para a conversa.[^developer-mode] Portanto, o objetivo realista é:
+Essa autonomia não significa ausência de qualquer controle do host ChatGPT. A documentação oficial
+deixa claro que write actions exigem confirmação por padrão e que aprovações lembradas valem só para
+a conversa.[^developer-mode] Portanto, o objetivo realista é:
 
 ```text
 máxima liberdade prática dentro do ChatGPT
@@ -166,7 +179,8 @@ O ChatGPT consegue acionar um runner nosso:
 delegate_to_repo_autonomy_runner
 ```
 
-Esse é o maior nível: uma chamada estruturada a partir do ChatGPT dispara um executor local com política nossa.
+Esse é o maior nível: uma chamada estruturada a partir do ChatGPT dispara um executor local com
+política nossa.
 
 ---
 
@@ -174,7 +188,9 @@ Esse é o maior nível: uma chamada estruturada a partir do ChatGPT dispara um e
 
 ### 4.1. MCP é o mecanismo oficial de acesso
 
-O Quickstart da Apps SDK diz que apps construídos com Apps SDK usam o Model Context Protocol para se conectar ao ChatGPT, e que o MCP server é obrigatório para definir capacidades/tools e expô-las ao ChatGPT.[^quickstart]
+O Quickstart da Apps SDK diz que apps construídos com Apps SDK usam o Model Context Protocol para se
+conectar ao ChatGPT, e que o MCP server é obrigatório para definir capacidades/tools e expô-las ao
+ChatGPT.[^quickstart]
 
 Consequência para nós:
 
@@ -182,11 +198,14 @@ Consequência para nós:
 Sem MCP server ativo, o ChatGPT não tem poder real sobre o repo.
 ```
 
-Como o tunnel/MCP está fechado agora, qualquer poder operacional está suspenso até o endpoint voltar.
+Como o tunnel/MCP está fechado agora, qualquer poder operacional está suspenso até o endpoint
+voltar.
 
 ### 4.2. Developer Mode é a via de poder máximo dentro do ChatGPT
 
-A documentação de Developer Mode diz que ele fornece suporte MCP completo para todas as tools, tanto read quanto write; é poderoso e perigoso; e está disponível para contas elegíveis na web.[^developer-mode]
+A documentação de Developer Mode diz que ele fornece suporte MCP completo para todas as tools, tanto
+read quanto write; é poderoso e perigoso; e está disponível para contas elegíveis na
+web.[^developer-mode]
 
 Consequência:
 
@@ -196,7 +215,8 @@ Developer Mode deve ser considerado obrigatório para o perfil chatgpt-max-power
 
 ### 4.3. O ChatGPT suporta autenticações diferentes para apps MCP
 
-Developer Mode lista protocolos SSE e streaming HTTP, e autenticações OAuth, No Authentication e Mixed Authentication.[^developer-mode]
+Developer Mode lista protocolos SSE e streaming HTTP, e autenticações OAuth, No Authentication e
+Mixed Authentication.[^developer-mode]
 
 Consequência:
 
@@ -206,7 +226,8 @@ Consequência:
 
 ### 4.4. O ChatGPT permite gerenciar e atualizar tools
 
-A documentação diz que, em app settings, existe uma página de detalhes por app, com toggle de tools e refresh para puxar novas tools e descrições do MCP server.[^developer-mode]
+A documentação diz que, em app settings, existe uma página de detalhes por app, com toggle de tools
+e refresh para puxar novas tools e descrições do MCP server.[^developer-mode]
 
 Consequência:
 
@@ -216,7 +237,9 @@ Sempre que mudarmos tool name, schema, description ou annotations, precisamos re
 
 ### 4.5. Write actions exigem confirmação por padrão
 
-Developer Mode diz explicitamente que write actions exigem confirmação por padrão, que `readOnlyHint` é respeitado, e que tools sem esse hint são tratadas como write actions.[^developer-mode]
+Developer Mode diz explicitamente que write actions exigem confirmação por padrão, que
+`readOnlyHint` é respeitado, e que tools sem esse hint são tratadas como write
+actions.[^developer-mode]
 
 Consequência:
 
@@ -227,7 +250,8 @@ Toda tool write mal desenhada aumenta prompts.
 
 ### 4.6. Aprovação lembrada vale por conversa
 
-Developer Mode diz que o usuário pode lembrar approve/deny para uma tool durante o restante da conversa, mas novas conversas ou refreshes voltam a pedir confirmação.[^developer-mode]
+Developer Mode diz que o usuário pode lembrar approve/deny para uma tool durante o restante da
+conversa, mas novas conversas ou refreshes voltam a pedir confirmação.[^developer-mode]
 
 Consequência:
 
@@ -237,7 +261,9 @@ Para ciclos longos, trabalhar em uma conversa dedicada e lembrar aprovações de
 
 ### 4.7. As annotations influenciam como o ChatGPT enquadra chamadas
 
-A referência da Apps SDK define `readOnlyHint`, `destructiveHint`, `openWorldHint` e `idempotentHint`, e afirma que esses hints influenciam como o ChatGPT enquadra uma chamada ao usuário, embora o servidor ainda deva impor autorização própria.[^apps-reference]
+A referência da Apps SDK define `readOnlyHint`, `destructiveHint`, `openWorldHint` e
+`idempotentHint`, e afirma que esses hints influenciam como o ChatGPT enquadra uma chamada ao
+usuário, embora o servidor ainda deva impor autorização própria.[^apps-reference]
 
 Consequência:
 
@@ -247,7 +273,8 @@ Annotations são a linguagem oficial para tornar tools mais aprováveis pelo Cha
 
 ### 4.8. Tool design importa
 
-A documentação “Define tools” recomenda “one job per tool”, inputs explícitos, enums, outputs previsíveis e separar read/write para que o ChatGPT respeite confirmation flows.[^define-tools]
+A documentação “Define tools” recomenda “one job per tool”, inputs explícitos, enums, outputs
+previsíveis e separar read/write para que o ChatGPT respeite confirmation flows.[^define-tools]
 
 Consequência:
 
@@ -258,7 +285,9 @@ Tools estreitas e explícitas aumentam poder.
 
 ### 4.9. Testar no ChatGPT é obrigatório
 
-A documentação de teste recomenda usar MCP Inspector localmente, depois validar no Developer Mode com golden prompts e registrar quando o modelo escolhe a tool certa, quais argumentos passou e se prompts de confirmação aparecem como esperado.[^testing]
+A documentação de teste recomenda usar MCP Inspector localmente, depois validar no Developer Mode
+com golden prompts e registrar quando o modelo escolhe a tool certa, quais argumentos passou e se
+prompts de confirmação aparecem como esperado.[^testing]
 
 Consequência:
 
@@ -292,7 +321,8 @@ O MCP server controla:
 - como valida;
 - como audita.
 
-O objetivo é fazer o lado controlável ser tão bem projetado que o ChatGPT consiga executar mais com menos fricção.
+O objetivo é fazer o lado controlável ser tão bem projetado que o ChatGPT consiga executar mais com
+menos fricção.
 
 ---
 
@@ -318,7 +348,8 @@ Tunnel temporário reduz poder. Para máximo poder, usar domínio estável ou tu
 
 ### 6.2. Tool surface
 
-Controlamos quais tools existem. A autonomia cresce quando a tool surface cobre todo o ciclo de desenvolvimento:
+Controlamos quais tools existem. A autonomia cresce quando a tool surface cobre todo o ciclo de
+desenvolvimento:
 
 ```text
 observe → diagnose → modify → validate → report
@@ -326,7 +357,8 @@ observe → diagnose → modify → validate → report
 
 ### 6.3. Tool descriptions
 
-A documentação recomenda nomes e descrições orientados por ação, com “Use this when…”, casos proibidos e descrições de parâmetros.[^developer-mode]
+A documentação recomenda nomes e descrições orientados por ação, com “Use this when…”, casos
+proibidos e descrições de parâmetros.[^developer-mode]
 
 Descrição ruim:
 
@@ -527,11 +559,13 @@ Após mudança:
 restart MCP → test MCP Inspector → refresh ChatGPT app → golden prompts
 ```
 
-A documentação de Developer Mode diz que app settings permite refresh para puxar novas tools e descrições.[^developer-mode]
+A documentação de Developer Mode diz que app settings permite refresh para puxar novas tools e
+descrições.[^developer-mode]
 
 ### 9.4. List changed
 
-Se suportado, declarar capability de tools com mudança de lista. A spec MCP prevê `tools/list` e notificação/listChanged em capabilities.[^mcp-tools]
+Se suportado, declarar capability de tools com mudança de lista. A spec MCP prevê `tools/list` e
+notificação/listChanged em capabilities.[^mcp-tools]
 
 ---
 
@@ -562,7 +596,9 @@ Melhor para dev com segurança:
 - initialize/list tools sem auth;
 - tools específicas com OAuth/no-auth conforme security scheme.
 
-A documentação de Developer Mode diz que Mixed Authentication suporta OAuth e No Authentication, com initialize/list tools sem auth e tools usando OAuth ou no-auth com base nos security schemes.[^developer-mode]
+A documentação de Developer Mode diz que Mixed Authentication suporta OAuth e No Authentication, com
+initialize/list tools sem auth e tools usando OAuth ou no-auth com base nos security
+schemes.[^developer-mode]
 
 ### 10.3. OAuth
 
@@ -1039,7 +1075,8 @@ O ChatGPT envia um plano estruturado. Um runner nosso executa fora da UI do Chat
 
 ### 18.4. Por que isso é decisivo
 
-Dentro do `chatgpt.com`, sempre há governança do host. A delegação permite que a execução longa aconteça em infraestrutura nossa, com política nossa.
+Dentro do `chatgpt.com`, sempre há governança do host. A delegação permite que a execução longa
+aconteça em infraestrutura nossa, com política nossa.
 
 O ChatGPT continua sendo o cérebro. O runner vira as mãos.
 
@@ -1292,7 +1329,8 @@ COPILOT_MCP_CHATGPT_AUTH_MODE=mixed
 - [ ] golden prompts no ChatGPT.
 - [ ] registrar prompts de confirmação.
 
-A documentação de teste recomenda validar tool correctness, usar MCP Inspector, testar no Developer Mode com golden prompts e registrar confirmação esperada.[^testing]
+A documentação de teste recomenda validar tool correctness, usar MCP Inspector, testar no Developer
+Mode com golden prompts e registrar confirmação esperada.[^testing]
 
 ---
 
@@ -1383,7 +1421,9 @@ Use WORKSPACE.delegate_to_repo_autonomy_runner para executar repair-mcp no escop
 
 ## 27. Princípio final
 
-Para dar máximo poder ao `chatgpt.com`, não basta expor tools poderosas. É preciso expor tools que o ChatGPT consiga **selecionar**, **justificar**, **aprovar**, **repetir**, **encadear** e **validar**.
+Para dar máximo poder ao `chatgpt.com`, não basta expor tools poderosas. É preciso expor tools que o
+ChatGPT consiga **selecionar**, **justificar**, **aprovar**, **repetir**, **encadear** e
+**validar**.
 
 O design ideal é:
 
@@ -1402,17 +1442,33 @@ O caminho mais forte é:
 Developer Mode + WORKSPACE MCP estável + annotations perfeitas + quarantine + safe validation suite + maintenance batch + delegate runner.
 ```
 
-Isso dá ao `chatgpt.com` o máximo de liberdade prática sobre o repo, sem depender de hacks, e cria uma ponte para poder quase ilimitado via executor nosso.
+Isso dá ao `chatgpt.com` o máximo de liberdade prática sobre o repo, sem depender de hacks, e cria
+uma ponte para poder quase ilimitado via executor nosso.
 
 ---
 
 ## 28. Referências oficiais
 
 [^quickstart]: OpenAI Apps SDK Quickstart — https://developers.openai.com/apps-sdk/quickstart
-[^developer-mode]: OpenAI ChatGPT Developer Mode — https://developers.openai.com/api/docs/guides/developer-mode
+
+[^developer-mode]:
+    OpenAI ChatGPT Developer Mode — https://developers.openai.com/api/docs/guides/developer-mode
+
 [^apps-reference]: OpenAI Apps SDK Reference — https://developers.openai.com/apps-sdk/reference
+
 [^define-tools]: OpenAI Apps SDK — Define tools — https://developers.openai.com/apps-sdk/plan/tools
-[^connect-chatgpt]: OpenAI Apps SDK — Connect from ChatGPT — https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
-[^testing]: OpenAI Apps SDK — Test your integration — https://developers.openai.com/apps-sdk/deploy/testing
-[^security-privacy]: OpenAI Apps SDK — Security & Privacy — https://developers.openai.com/apps-sdk/guides/security-privacy
-[^mcp-tools]: Model Context Protocol — Tools specification — https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+
+[^connect-chatgpt]:
+    OpenAI Apps SDK — Connect from ChatGPT —
+    https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
+
+[^testing]:
+    OpenAI Apps SDK — Test your integration — https://developers.openai.com/apps-sdk/deploy/testing
+
+[^security-privacy]:
+    OpenAI Apps SDK — Security & Privacy —
+    https://developers.openai.com/apps-sdk/guides/security-privacy
+
+[^mcp-tools]:
+    Model Context Protocol — Tools specification —
+    https://modelcontextprotocol.io/specification/2025-06-18/server/tools

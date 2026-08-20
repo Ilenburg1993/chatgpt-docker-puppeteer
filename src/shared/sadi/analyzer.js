@@ -65,7 +65,6 @@ const detectionCache = new Map();
  * SADI_LOGIC: Motor de percepção injetado no contexto do Browser. Este código roda via page.evaluate(), então tem
  * acesso a APIs do browser.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sadiLogic = (/** @type {Record<string, string[]>} */ _terms, /** @type {string[]} */ _svgSigs) => {
     const SADI = {
         /**

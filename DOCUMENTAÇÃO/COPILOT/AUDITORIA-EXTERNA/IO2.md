@@ -1,14 +1,16 @@
 # Auditoria complementar e proposta estrutural — `src/copilot/infra`
 
-**Data:** 2026-05-14
-**Complementa:** `AUDITORIA-COPILOT-INFRA-NODE24-LLM-TOOLS.md`
-**Escopo:** arquivos fornecidos como representação de `src/copilot/infra`, com foco em Node 24+ ESM, ferramentas para LLMs, liberdade operacional controlada, reorganização física e endurecimento arquitetural.
+**Data:** 2026-05-14 **Complementa:** `AUDITORIA-COPILOT-INFRA-NODE24-LLM-TOOLS.md` **Escopo:**
+arquivos fornecidos como representação de `src/copilot/infra`, com foco em Node 24+ ESM, ferramentas
+para LLMs, liberdade operacional controlada, reorganização física e endurecimento arquitetural.
 
 ---
 
 ## 0. Tese complementar
 
-A auditoria anterior identificou bugs críticos e riscos operacionais. Esta continuação aprofunda o diagnóstico em um nível estrutural: o problema não é apenas a presença de bugs isolados, mas a mistura de **camadas com responsabilidades incompatíveis** no mesmo plano de arquivos.
+A auditoria anterior identificou bugs críticos e riscos operacionais. Esta continuação aprofunda o
+diagnóstico em um nível estrutural: o problema não é apenas a presença de bugs isolados, mas a
+mistura de **camadas com responsabilidades incompatíveis** no mesmo plano de arquivos.
 
 Hoje `src/copilot/infra` concentra, no mesmo nível:
 
@@ -20,11 +22,17 @@ Hoje `src/copilot/infra` concentra, no mesmo nível:
 
 Essa mistura cria três efeitos:
 
-- **Ciclos de importação:** especialmente `io-engine -> io-index-registry -> io-index-sqlite -> io-engine` e `io-engine -> io-index-registry -> io-index-sqlite -> io-parser -> io-engine`.
-- **Política fraca de retorno para LLM:** limites aparecem como metadados, mas não governam saída, tempo, bytes ou paginação.
-- **Dificuldade de evolução:** qualquer upgrade profundo em busca, índice, parser ou locks tende a tocar `io-engine.js`, que já tem cerca de 1.854 linhas.
+- **Ciclos de importação:** especialmente
+  `io-engine -> io-index-registry -> io-index-sqlite -> io-engine` e
+  `io-engine -> io-index-registry -> io-index-sqlite -> io-parser -> io-engine`.
+- **Política fraca de retorno para LLM:** limites aparecem como metadados, mas não governam saída,
+  tempo, bytes ou paginação.
+- **Dificuldade de evolução:** qualquer upgrade profundo em busca, índice, parser ou locks tende a
+  tocar `io-engine.js`, que já tem cerca de 1.854 linhas.
 
-A situação ideal é transformar `infra/` em um **substrato agentic de capacidades**, com camadas separadas, acíclicas e testáveis: `kernel -> io/fs -> cache/index/parse/scan -> services/runtime -> events/adapters -> public barrels`.
+A situação ideal é transformar `infra/` em um **substrato agentic de capacidades**, com camadas
+separadas, acíclicas e testáveis:
+`kernel -> io/fs -> cache/index/parse/scan -> services/runtime -> events/adapters -> public barrels`.
 
 ---
 
@@ -45,7 +53,9 @@ A pasta enviada contém:
 | Ciclos locais detectados |              2 ciclos principais |
 | `catch` detectados       |            64 blocos aproximados |
 
-O `node --check` em todos os `.js` enviados não acusou erro de sintaxe no ambiente disponível. Isso apenas valida sintaxe; não valida aliases, dependências, comportamento de SQLite, compatibilidade de pacote, testes nem runtime completo.
+O `node --check` em todos os `.js` enviados não acusou erro de sintaxe no ambiente disponível. Isso
+apenas valida sintaxe; não valida aliases, dependências, comportamento de SQLite, compatibilidade de
+pacote, testes nem runtime completo.
 
 ### 1.2. Grafo local de importações relevantes
 
@@ -68,7 +78,9 @@ io-engine.js -> io-index-registry.js -> io-index-sqlite.js -> io-engine.js
 io-engine.js -> io-index-registry.js -> io-index-sqlite.js -> io-parser.js -> io-engine.js
 ```
 
-Esses ciclos não necessariamente quebram o ESM hoje porque os bindings são usados tardiamente, mas são arquiteturalmente frágeis: uma simples chamada top-level futura pode introduzir TDZ, inicialização parcial ou comportamento diferente em testes.
+Esses ciclos não necessariamente quebram o ESM hoje porque os bindings são usados tardiamente, mas
+são arquiteturalmente frágeis: uma simples chamada top-level futura pode introduzir TDZ,
+inicialização parcial ou comportamento diferente em testes.
 
 ---
 
@@ -76,10 +88,12 @@ Esses ciclos não necessariamente quebram o ESM hoje porque os bindings são usa
 
 ### A-01 — `io-engine.js` é engine, facade, busca, diff, patch e adapter de índice ao mesmo tempo
 
-**Severidade:** alta
-**Evidência:** `io-engine.js` contém leitura, escrita, chunks, stat, mkdir, delete, rm, copy, move, patch, diff, busca textual e busca simbólica.
+**Severidade:** alta **Evidência:** `io-engine.js` contém leitura, escrita, chunks, stat, mkdir,
+delete, rm, copy, move, patch, diff, busca textual e busca simbólica.
 
-O nome “engine” sugere uma porta canônica, mas o arquivo virou um **módulo-orquestrador monolítico**. Ele importa índice para otimizar busca, ao mesmo tempo em que o índice importa a engine para ler arquivos. Esse é o núcleo do ciclo.
+O nome “engine” sugere uma porta canônica, mas o arquivo virou um **módulo-orquestrador
+monolítico**. Ele importa índice para otimizar busca, ao mesmo tempo em que o índice importa a
+engine para ler arquivos. Esse é o núcleo do ciclo.
 
 **Correção estrutural:** decompor em módulos inferiores e serviços superiores:
 
@@ -87,16 +101,18 @@ O nome “engine” sugere uma porta canônica, mas o arquivo virou um **módulo
 - Alto nível: `io/search/text-search.js`, `io/search/symbol-search.js`.
 - Facade pública: `public/io.js` ou `io/index.js`.
 
-O índice nunca deve importar a facade que também importa o índice. Ele deve receber um `readText` de baixo nível ou uma porta injetada.
+O índice nunca deve importar a facade que também importa o índice. Ele deve receber um `readText` de
+baixo nível ou uma porta injetada.
 
 ---
 
 ### A-02 — O parser não é puro; ele lê disco e depende do engine
 
-**Severidade:** alta
-**Evidência:** `parseAndCacheSymbols(filePath)` chama `readText(filePath)` e importa `io-engine.js`.
+**Severidade:** alta **Evidência:** `parseAndCacheSymbols(filePath)` chama `readText(filePath)` e
+importa `io-engine.js`.
 
-Isso impede que `parse/` seja usado como biblioteca pura por indexador, session scope e testes. Também participa do ciclo com `io-engine`.
+Isso impede que `parse/` seja usado como biblioteca pura por indexador, session scope e testes.
+Também participa do ciclo com `io-engine`.
 
 **Correção ideal:** separar:
 
@@ -110,10 +126,11 @@ Regra: `parse/` não importa `io/`, `cache/`, `index/` nem `session/`.
 
 ### A-03 — O índice usa busca FTS global e filtra `pathPrefix` depois
 
-**Severidade:** média/alta
-**Evidência:** `search(query, options)` executa `stmtSearch.all(safe)` e só depois filtra `row.filePath` por `pathPrefix`.
+**Severidade:** média/alta **Evidência:** `search(query, options)` executa `stmtSearch.all(safe)` e
+só depois filtra `row.filePath` por `pathPrefix`.
 
-Em workspaces grandes, isso transforma uma busca escopada em uma busca global com filtro em memória. O problema se agrava porque não há `LIMIT`, cursor ou paginação.
+Em workspaces grandes, isso transforma uma busca escopada em uma busca global com filtro em memória.
+O problema se agrava porque não há `LIMIT`, cursor ou paginação.
 
 **Correção ideal:** usar SQL parametrizado com escopo:
 
@@ -141,12 +158,14 @@ E retornar:
 
 ### A-04 — `readTextChunks()` não sabe o total real de linhas quando `endLine` é usado
 
-**Severidade:** média
-**Evidência:** o loop interrompe quando `totalLines > endLine`; portanto `totalLines` representa as linhas percorridas até a interrupção, não o total real do arquivo.
+**Severidade:** média **Evidência:** o loop interrompe quando `totalLines > endLine`; portanto
+`totalLines` representa as linhas percorridas até a interrupção, não o total real do arquivo.
 
-Para tools LLM, `totalLines` é metadado de navegação. Se ele não é real, paginação, continuação e range planning podem ficar incorretos.
+Para tools LLM, `totalLines` é metadado de navegação. Se ele não é real, paginação, continuação e
+range planning podem ficar incorretos.
 
-**Correção ideal:** renomear para `scannedLines` ou continuar a contagem sem acumular conteúdo. Alternativamente retornar:
+**Correção ideal:** renomear para `scannedLines` ou continuar a contagem sem acumular conteúdo.
+Alternativamente retornar:
 
 ```js
 {
@@ -161,8 +180,8 @@ Para tools LLM, `totalLines` é metadado de navegação. Se ele não é real, pa
 
 ### A-05 — Parser JSON quebra arrays JSON formatados em múltiplas linhas
 
-**Severidade:** média
-**Evidência:** `extractJsonSchema` faz `content.trimStart().startsWith('[') ? JSON.parse(content.split('\n')[0]) : JSON.parse(content)`.
+**Severidade:** média **Evidência:** `extractJsonSchema` faz
+`content.trimStart().startsWith('[') ? JSON.parse(content.split('\n')[0]) : JSON.parse(content)`.
 
 Um JSON comum como:
 
@@ -172,7 +191,8 @@ Um JSON comum como:
 ]
 ```
 
-terá primeira linha `[` e falhará. O comentário fala em JSON/JSONL, mas a heurística confunde array JSON com “primeira linha”.
+terá primeira linha `[` e falhará. O comentário fala em JSON/JSONL, mas a heurística confunde array
+JSON com “primeira linha”.
 
 **Correção ideal:**
 
@@ -184,21 +204,25 @@ terá primeira linha `[` e falhará. O comentário fala em JSON/JSONL, mas a heu
 
 ### A-06 — `.jsonc` é indexado como JSON, mas parser classifica como `unknown`
 
-**Severidade:** média
-**Evidência:** `io-index-sqlite.js` inclui `.jsonc` em `DEFAULT_INDEX_EXTENSIONS`, mas `io-parser.js` só trata `.json` e `.jsonl` como JSON.
+**Severidade:** média **Evidência:** `io-index-sqlite.js` inclui `.jsonc` em
+`DEFAULT_INDEX_EXTENSIONS`, mas `io-parser.js` só trata `.json` e `.jsonl` como JSON.
 
 **Impacto:** health/índice podem sugerir suporte mais amplo do que o parser realmente entrega.
 
-**Correção ideal:** ou remover `.jsonc` da lista semântica, ou suportar JSONC com parser tolerante a comentários/trailing commas.
+**Correção ideal:** ou remover `.jsonc` da lista semântica, ou suportar JSONC com parser tolerante a
+comentários/trailing commas.
 
 ---
 
 ### A-07 — Extração simbólica promete CommonJS/dynamic imports, mas implementa majoritariamente ESM top-level
 
-**Severidade:** média/alta
-**Evidência:** typedef inclui `ImportEntry.isDynamic`; documentação menciona ESM e CommonJS; implementação extrai `ImportDeclaration`, `ExportNamedDeclaration`, `ExportDefaultDeclaration` e `ExportAllDeclaration`, mas não percorre AST para `import()`, `require()`, `module.exports` ou `exports.foo`.
+**Severidade:** média/alta **Evidência:** typedef inclui `ImportEntry.isDynamic`; documentação
+menciona ESM e CommonJS; implementação extrai `ImportDeclaration`, `ExportNamedDeclaration`,
+`ExportDefaultDeclaration` e `ExportAllDeclaration`, mas não percorre AST para `import()`,
+`require()`, `module.exports` ou `exports.foo`.
 
-**Impacto:** em Node ESM moderno o prejuízo é menor, mas projetos reais ainda usam `.cjs`, `require`, exports condicionais, dynamic import, barrel re-exports e side-effect imports.
+**Impacto:** em Node ESM moderno o prejuízo é menor, mas projetos reais ainda usam `.cjs`,
+`require`, exports condicionais, dynamic import, barrel re-exports e side-effect imports.
 
 **Correção ideal:** adicionar traversal AST simples para:
 
@@ -211,8 +235,8 @@ terá primeira linha `[` e falhará. O comentário fala em JSON/JSONL, mas a heu
 
 ### A-08 — Markdown outline perde linha real do heading
 
-**Severidade:** baixa/média
-**Evidência:** `extractMarkdownOutline` retorna apenas strings, e `parseFileSymbols` usa o índice do array como linha (`i + 1`).
+**Severidade:** baixa/média **Evidência:** `extractMarkdownOutline` retorna apenas strings, e
+`parseFileSymbols` usa o índice do array como linha (`i + 1`).
 
 **Impacto:** contexto para LLM aponta linhas erradas em Markdown com texto antes dos headings.
 
@@ -222,19 +246,20 @@ terá primeira linha `[` e falhará. O comentário fala em JSON/JSONL, mas a heu
 
 ### A-09 — Cache de parser usa path cru como chave
 
-**Severidade:** média/alta
-**Evidência:** `_symbolCache.get(filePath)`, `_symbolCache.set(filePath, symbols)` e `_symbolCache.delete(filePath)` usam o argumento recebido.
+**Severidade:** média/alta **Evidência:** `_symbolCache.get(filePath)`,
+`_symbolCache.set(filePath, symbols)` e `_symbolCache.delete(filePath)` usam o argumento recebido.
 
-**Impacto:** `./src/a.js`, `/abs/src/a.js`, path com symlink e path normalizado viram entradas diferentes. A invalidação pode falhar pelo mesmo motivo.
+**Impacto:** `./src/a.js`, `/abs/src/a.js`, path com symlink e path normalizado viram entradas
+diferentes. A invalidação pode falhar pelo mesmo motivo.
 
-**Correção ideal:** centralizar `normalizeResourcePath()` e usar sempre em cache, locks, índice e invalidation bus.
+**Correção ideal:** centralizar `normalizeResourcePath()` e usar sempre em cache, locks, índice e
+invalidation bus.
 
 ---
 
 ### A-10 — `index.js` público não exporta parte relevante da própria engine
 
-**Severidade:** média
-**Evidência:** exports de `io-engine.js` ausentes no barrel atual:
+**Severidade:** média **Evidência:** exports de `io-engine.js` ausentes no barrel atual:
 
 - `statPath`
 - `mkdirPathLocked`
@@ -242,9 +267,11 @@ terá primeira linha `[` e falhará. O comentário fala em JSON/JSONL, mas a heu
 - `searchText`
 - `searchWorkspaceSymbols`
 
-Também não exporta `warmReadThroughContext` de `io-prefetch.js` nem `registerInvalidationHook` de `io-cache.js`.
+Também não exporta `warmReadThroughContext` de `io-prefetch.js` nem `registerInvalidationHook` de
+`io-cache.js`.
 
-**Impacto:** consumidores podem importar arquivos internos diretamente, criando acoplamento e furando a arquitetura.
+**Impacto:** consumidores podem importar arquivos internos diretamente, criando acoplamento e
+furando a arquitetura.
 
 **Correção ideal:** criar barrels explícitos por domínio:
 
@@ -260,10 +287,12 @@ E manter `infra/index.js` apenas como compatibilidade.
 
 ### A-11 — `scanDirectory()` pode criar fan-out grande por diretório
 
-**Severidade:** média
-**Evidência:** a função usa `Promise.all(names.map(...))` por diretório. O `p-limit` limita `lstat`, mas a quantidade de promises criadas ainda acompanha o tamanho bruto do diretório.
+**Severidade:** média **Evidência:** a função usa `Promise.all(names.map(...))` por diretório. O
+`p-limit` limita `lstat`, mas a quantidade de promises criadas ainda acompanha o tamanho bruto do
+diretório.
 
-**Impacto:** diretórios com dezenas/centenas de milhares de entradas podem gerar pressão de memória antes que o limite de I/O ajude.
+**Impacto:** diretórios com dezenas/centenas de milhares de entradas podem gerar pressão de memória
+antes que o limite de I/O ajude.
 
 **Correção ideal:** usar worker pool ou iteração assíncrona com batches:
 
@@ -279,10 +308,12 @@ Ou usar `opendir()` com streaming.
 
 ### A-12 — Webhook sanitizer é raso e entrega não é autenticada
 
-**Severidade:** alta para produção
-**Evidência:** `#sanitizePayload` varre apenas `Object.entries(payload)` de primeiro nível; a entrega usa JSON simples sem assinatura HMAC ou idempotency key.
+**Severidade:** alta para produção **Evidência:** `#sanitizePayload` varre apenas
+`Object.entries(payload)` de primeiro nível; a entrega usa JSON simples sem assinatura HMAC ou
+idempotency key.
 
-**Impacto:** payloads aninhados podem conter segredo; receptores não conseguem verificar origem/integridade; replays são difíceis de detectar.
+**Impacto:** payloads aninhados podem conter segredo; receptores não conseguem verificar
+origem/integridade; replays são difíceis de detectar.
 
 **Correção ideal:**
 
@@ -295,16 +326,21 @@ Ou usar `opendir()` com streaming.
 
 ## 3. Diagnóstico arquitetural: o que a pasta deveria ser
 
-Para um runtime de tools LLM com “máxima liberdade e poder”, a infra não deve ser apenas uma coleção de helpers. Ela deve ser uma **máquina de capacidades**:
+Para um runtime de tools LLM com “máxima liberdade e poder”, a infra não deve ser apenas uma coleção
+de helpers. Ela deve ser uma **máquina de capacidades**:
 
-1. **Toda ação tem capacidade declarada:** leitura, escrita, delete, network, webhook, git, github, shell.
-2. **Toda ação tem orçamento:** tempo, bytes lidos, bytes retornados, número de arquivos, número de mutações, risco.
+1. **Toda ação tem capacidade declarada:** leitura, escrita, delete, network, webhook, git, github,
+   shell.
+2. **Toda ação tem orçamento:** tempo, bytes lidos, bytes retornados, número de arquivos, número de
+   mutações, risco.
 3. **Toda mutação é observável:** trace, diff, snapshot anterior, rollback quando possível.
 4. **Toda saída para LLM é paginável:** cursor, range, truncation metadata.
-5. **Toda memória semântica é derivada:** cache/índice/parser nunca são fonte de verdade; a verdade é filesystem + VCS + policies.
+5. **Toda memória semântica é derivada:** cache/índice/parser nunca são fonte de verdade; a verdade
+   é filesystem + VCS + policies.
 6. **Toda camada é acíclica:** módulos baixos não importam serviços altos.
 
-A estrutura física deve codificar essas regras. Se a árvore de pastas não expressa a arquitetura, a arquitetura se dissolve rapidamente.
+A estrutura física deve codificar essas regras. Se a árvore de pastas não expressa a arquitetura, a
+arquitetura se dissolve rapidamente.
 
 ---
 
@@ -502,7 +538,9 @@ src/copilot/infra/
 
 ### 4.2. Por que `index-store/` e não `index/`?
 
-`index.js` é tradicionalmente usado como barrel. Uma pasta chamada `index/` dentro de uma base ESM pode gerar ambiguidades cognitivas com `index.js`. `index-store/` deixa claro que se trata de um índice persistente/semântico, não do barrel do pacote.
+`index.js` é tradicionalmente usado como barrel. Uma pasta chamada `index/` dentro de uma base ESM
+pode gerar ambiguidades cognitivas com `index.js`. `index-store/` deixa claro que se trata de um
+índice persistente/semântico, não do barrel do pacote.
 
 Se a preferência do projeto for manter o nome curto, usar `semantic-index/` também é aceitável.
 
@@ -565,7 +603,8 @@ Nenhuma seta inversa deve existir.
 
 1. `parse/` não importa `io/`, `cache/`, `index-store/`, `session/` ou `runtime/`.
 2. `io/fs/` não importa `index-store/`, `prefetch/`, `session/`, `runtime/` ou `events/`.
-3. `index-store/` não importa `public/` nem `io/search/`; só pode importar `io/fs/read-text.js` ou uma porta injetada.
+3. `index-store/` não importa `public/` nem `io/search/`; só pode importar `io/fs/read-text.js` ou
+   uma porta injetada.
 4. `events/` não importa `io/fs/` para buscar payloads; recebe payload pronto.
 5. `public/` não contém lógica; apenas exports e compatibilidade.
 6. Módulos de baixo nível não leem `process.env` diretamente; usam `shared/env.js`.
@@ -587,7 +626,8 @@ Substituir hooks `hook(filePath)` por eventos tipados:
  */
 ```
 
-Isso corrige a invalidação recursiva de scopes e permite que L1, L2, parser e índice reajam de modo coerente.
+Isso corrige a invalidação recursiva de scopes e permite que L1, L2, parser e índice reajam de modo
+coerente.
 
 ### 6.4. Interface de orçamento de saída para LLM
 
@@ -621,13 +661,15 @@ E retornar:
 }
 ```
 
-“Limites informativos” podem continuar existindo para telemetria interna, mas a borda de tool precisa de limite real.
+“Limites informativos” podem continuar existindo para telemetria interna, mas a borda de tool
+precisa de limite real.
 
 ---
 
 ## 7. Situação ideal para tools LLM com máxima liberdade
 
-A liberdade da LLM deve ser ampliada por **composição segura**, não por acesso cru. A situação ideal inclui:
+A liberdade da LLM deve ser ampliada por **composição segura**, não por acesso cru. A situação ideal
+inclui:
 
 ### 7.1. Operações como unidades agentic
 
@@ -689,7 +731,8 @@ No contexto de GitHub/Copilot SDK, a infra deve estar pronta para capabilities c
 - `github.issue.read`, `github.pr.read`, `github.pr.review`, `github.checks.read`.
 - `repo.planChange`, `repo.applyChange`, `repo.explainImpact`.
 
-Mas essas capabilities não devem ficar misturadas no kernel de I/O. Elas pertencem a `runtime/` ou a uma camada acima de `infra/`, consumindo `public/io.js`, `public/indexing.js` e `public/session.js`.
+Mas essas capabilities não devem ficar misturadas no kernel de I/O. Elas pertencem a `runtime/` ou a
+uma camada acima de `infra/`, consumindo `public/io.js`, `public/indexing.js` e `public/session.js`.
 
 ---
 
@@ -726,7 +769,8 @@ Objetivo: eliminar ciclos.
 
 1. Mover parsing puro para `parse/`.
 2. Criar `session/symbol-cache.js` para leitura + parse + cache.
-3. Refatorar `index-store/indexer.js` para depender de `io/fs/read-text.js` e `parse/`, não de `io-engine.js`.
+3. Refatorar `index-store/indexer.js` para depender de `io/fs/read-text.js` e `parse/`, não de
+   `io-engine.js`.
 4. Refatorar busca para `io/search`, que pode consultar `index-store/search.js`.
 5. Rodar verificador de ciclos no CI.
 
@@ -781,7 +825,8 @@ Objetivo: limpar dívida.
 
 ### 9.2. Queue
 
-- `concurrency=0`, negativo, `NaN` e `Infinity` devem lançar `RangeError` ou normalizar explicitamente.
+- `concurrency=0`, negativo, `NaN` e `Infinity` devem lançar `RangeError` ou normalizar
+  explicitamente.
 - `clear()` deve rejeitar pendentes.
 - `onIdle()` deve resolver quando fila e execução zerarem.
 
@@ -816,7 +861,8 @@ Objetivo: limpar dívida.
 
 ### 9.7. Webhooks
 
-- Sanitização profunda remove `token`, `authorization`, `password`, `secret`, `key` em objetos aninhados.
+- Sanitização profunda remove `token`, `authorization`, `password`, `secret`, `key` em objetos
+  aninhados.
 - Assinatura HMAC é gerada e verificável.
 - 4xx não faz retry; 5xx faz retry; timeout limpa timers.
 
@@ -894,6 +940,13 @@ A migração só deve ser considerada concluída quando:
 
 ## 12. Conclusão
 
-A arquitetura atual é promissora, mas está no ponto exato em que precisa deixar de crescer horizontalmente em arquivos monolíticos e passar a crescer verticalmente por camadas. O objetivo não é reduzir poder da LLM; é criar um substrato em que a LLM possa agir com mais profundidade, sabendo que cada ação terá lock correto, budget, trace, invalidação, rollback e saída paginada.
+A arquitetura atual é promissora, mas está no ponto exato em que precisa deixar de crescer
+horizontalmente em arquivos monolíticos e passar a crescer verticalmente por camadas. O objetivo não
+é reduzir poder da LLM; é criar um substrato em que a LLM possa agir com mais profundidade, sabendo
+que cada ação terá lock correto, budget, trace, invalidação, rollback e saída paginada.
 
-A reorganização proposta não é meramente estética. Ela corrige a causa de vários bugs já observados: ciclos, parser impuro, engine inchada, busca sem orçamento, invalidação sem semântica recursiva e bordas de evento pouco endurecidas. O melhor caminho é migrar por compatibilidade: primeiro estabilizar, depois quebrar o monólito, depois impor regras de importação e finalmente introduzir runtime agentic.
+A reorganização proposta não é meramente estética. Ela corrige a causa de vários bugs já observados:
+ciclos, parser impuro, engine inchada, busca sem orçamento, invalidação sem semântica recursiva e
+bordas de evento pouco endurecidas. O melhor caminho é migrar por compatibilidade: primeiro
+estabilizar, depois quebrar o monólito, depois impor regras de importação e finalmente introduzir
+runtime agentic.

@@ -146,16 +146,8 @@ describe('event-handlers/streaming', () => {
         session._emit('assistant.message_delta', { deltaContent: 'PAR' });
 
         expect(emit).toHaveBeenCalledTimes(2);
-        expect(emit).toHaveBeenNthCalledWith(
-            1,
-            'dialog.delta',
-            expect.objectContaining({ chunk: 'PAR', chunkSeq: 1 }),
-        );
-        expect(emit).toHaveBeenNthCalledWith(
-            2,
-            'dialog.delta',
-            expect.objectContaining({ chunk: 'PAR', chunkSeq: 2 }),
-        );
+        expect(emit).toHaveBeenNthCalledWith(1, 'dialog.delta', expect.objectContaining({ chunk: 'PAR', chunkSeq: 1 }));
+        expect(emit).toHaveBeenNthCalledWith(2, 'dialog.delta', expect.objectContaining({ chunk: 'PAR', chunkSeq: 2 }));
     });
 
     it('deduplica por identidade de evento sem deduplicar pelo texto do chunk', async () => {

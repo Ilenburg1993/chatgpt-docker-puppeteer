@@ -297,7 +297,10 @@ export async function mcpOauthLogin(session, serverName) {
     if (typeof login !== 'function') {
         throw new TypeError('[sdk/experimental-rpc] método RPC indisponível: mcp.oauth.login()');
     }
-    appLog('INFO', `[sdk/experimental-rpc] mcp.oauth.login: serverName='${serverName}', sessionId='${session.sessionId}'`);
+    appLog(
+        'INFO',
+        `[sdk/experimental-rpc] mcp.oauth.login: serverName='${serverName}', sessionId='${session.sessionId}'`,
+    );
     try {
         return await login({ serverName });
     } catch (error) {

@@ -8,8 +8,8 @@
  * @see EventBus
  */
 
-import { formatAliases, removeAlias, setAlias } from '../stores/index.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
+import { formatAliases, removeAlias, setAlias } from '../stores/index.js';
 
 /**
  * @typedef {object} SessionContext
@@ -38,7 +38,11 @@ export function cmdAlias({ println }, args) {
         const name = args[1];
         const expansion = args.slice(2).join(' ');
         if (!name || !expansion) {
-            println(terminalThemeRow('Uso', '/alias set <nome> <comando> · ex: /alias set /myissues /gh issue list', { role: 'warn' }));
+            println(
+                terminalThemeRow('Uso', '/alias set <nome> <comando> · ex: /alias set /myissues /gh issue list', {
+                    role: 'warn',
+                }),
+            );
             return;
         }
         const result = setAlias(name.startsWith('/') ? name : `/${name}`, expansion);
@@ -57,7 +61,11 @@ export function cmdAlias({ println }, args) {
             return;
         }
         const ok = removeAlias(name.startsWith('/') ? name : `/${name}`);
-        println(ok ? terminalThemeRow('Alias', `removido · ${name}`, { role: 'success' }) : terminalThemeRow('Alias', `não encontrado · ${name}`, { role: 'warn' }));
+        println(
+            ok
+                ? terminalThemeRow('Alias', `removido · ${name}`, { role: 'success' })
+                : terminalThemeRow('Alias', `não encontrado · ${name}`, { role: 'warn' }),
+        );
         return;
     }
 

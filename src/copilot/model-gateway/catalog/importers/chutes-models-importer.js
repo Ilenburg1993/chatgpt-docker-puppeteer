@@ -104,7 +104,7 @@ function readPricing(row) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -178,7 +178,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.chutes.supportedFeatures', value: supportedFeatures },
         { fieldPath: 'providerMetadata.chutes.supportedSamplingParameters', value: supportedParameters },
         { fieldPath: 'providerMetadata.chutes.permission', value: row['permission'] },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'chutes' },
     ];

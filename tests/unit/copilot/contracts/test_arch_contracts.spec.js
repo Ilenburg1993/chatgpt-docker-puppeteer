@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'vitest';
+import { checkCopilotTrustedIoBoundaries } from '../../../../scripts/ci/check-copilot-trusted-io-boundaries.mjs';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 
@@ -809,54 +810,32 @@ describe('IO-038 — writers síncronos diretos possuem allowlist formal', () =>
 });
 
 describe('IO-014 — IO portable/trusted possui capability pública explícita', () => {
-    it('callers trusted correspondem exatamente à allowlist declarada e portable fica interno a infra', () => {
-        const expectedTrustedCallers = [
-            'agent/lifecycle/state/state-file-io.js: agent.lifecycle.state-file-io',
-            'agent/session/state/snapshot-store.js: agent.session.state.snapshot-store',
-            'config/declarative-runtime-config.js: config.declarative-runtime-config',
-            'mcp/cloudflare/cli-process.js: mcp.cloudflare.cli-process',
-            'mcp/cloudflare/edge-backup.js: mcp.cloudflare.edge-backup',
-            'mcp/cloudflare/state.js: mcp.cloudflare.state',
-            'mcp/control-plane/dev-oauth.js: mcp.control-plane.dev-oauth',
-            'mcp/scripts/scheduled-restart-runner.js: mcp.scripts.scheduled-restart-runner',
-            'mcp/scripts/stateful-env.js: mcp.scripts.stateful-env',
-            'model-gateway/automation/policy.js: model-gateway.automation.policy',
-            'model-gateway/health/provider-health.js: model-gateway.health.provider-health',
-            'model-gateway/routing/selection-trace.js: model-gateway.routing.selection-trace',
-            'sdk/models/persistent-cache.js: sdk.models.persistent-cache',
-            'sdk/session/session-fs.js: sdk.session.session-fs.state',
-            'sdk/tools/custom.js: sdk.tools.custom',
-            'sdk/tools/state.js: sdk.tools.state',
-            'terminal/commands/byok.js: terminal.commands.byok',
-            'terminal/commands/export.js: terminal.commands.export',
-            'terminal/stores/alias-store.js: terminal.stores.alias-store',
-        ];
-        /** @type {string[]} */
-        const actualTrustedCallers = [];
+    it('trusted-io coincide exatamente com a política declarativa fail-closed', async () => {
+        const report = await checkCopilotTrustedIoBoundaries();
+        assert.deepEqual(report.issues, [], `Drift de trusted-io:\n${report.issues.join('\n')}`);
+        assert.equal(report.ok, true);
+        assert.equal(report.importerCount, report.policyEntries);
+        assert.ok(report.importerCount > 0, 'A política trusted-io deve cobrir ao menos um boundary explícito.');
+    });
+
+    it('capability portable permanece interna a infra e fora da facade workspace-facing', () => {
         /** @type {string[]} */
         const portableLeaks = [];
-
         for (const abs of listJsFilesRecursive(COPILOT_ROOT)) {
             const rel = abs.replace(COPILOT_ROOT, '').replace(/\\/g, '/');
             const src = readFileSync(abs, 'utf-8');
-            if (!rel.startsWith('infra/') && src.includes('writeFileAtomicPortable')) {
-                portableLeaks.push(rel);
-            }
-            if (!src.includes("from '#copilot/infra/public/trusted-io'")) continue;
-            const callers = new Set(
-                [...src.matchAll(/\bcaller:\s*['"]([^'"]+)['"]/gu)]
-                    .map((match) => match[1])
-                    .filter((caller) => caller !== undefined),
-            );
-            for (const caller of callers) actualTrustedCallers.push(`${rel}: ${caller}`);
+            if (!rel.startsWith('infra/') && src.includes('writeFileAtomicPortable')) portableLeaks.push(rel);
         }
 
-        assert.deepEqual(portableLeaks, [], `Primitiva portable vazou para fora de infra:\n${portableLeaks.join('\n')}`);
+        assert.deepEqual(
+            portableLeaks,
+            [],
+            `Primitiva portable vazou para fora de infra:\n${portableLeaks.join('\n')}`,
+        );
         assert.ok(
             !readSrc('infra/public/io.js').includes('writeFileAtomicPortable'),
             'facade workspace-facing não deve exportar a capability portable',
         );
-        assert.deepEqual(actualTrustedCallers.sort(), expectedTrustedCallers.sort());
     });
 });
 
@@ -908,23 +887,8 @@ describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () =
 
 describe('IO-006 — cleanup e mkdir diretos possuem matriz formal', () => {
     it('calls diretos de mkdir/rm/unlink fora de infra correspondem exatamente às exceções classificadas', () => {
-        const allowed = [
-            'agent/lifecycle/state/state-file-io.js:mkdir',
-            'agent/lifecycle/state/state-file-io.js:rm',
-            'agent/session/state/snapshot-store.js:rm',
-            'db/sqlite.js:mkdir',
-            'mcp/cloudflare/cli-process.js:mkdir',
-            'mcp/cloudflare/cli-process.js:rm',
-            'mcp/cloudflare/state.js:rm',
-            'mcp/control-plane/ai-artifacts.js:unlink',
-            'mcp/control-plane/client-latency-evidence.js:mkdir',
-            'mcp/control-plane/jobs.js:mkdir',
-            'mcp/control-plane/latency-history.js:mkdir',
-            'mcp/control-plane/openai-endpoint-latency.js:mkdir',
-            'mcp/tools/repo-write.js:mkdir',
-            'model-gateway/routing/selection-trace.js:rm',
-            'sdk/models/persistent-cache.js:unlink',
-        ];
+        /** @type {string[]} */
+        const allowed = [];
         const mutators = ['mkdir', 'rm', 'unlink'];
         /** @type {string[]} */
         const actual = [];
@@ -946,7 +910,8 @@ describe('IO-006 — cleanup e mkdir diretos possuem matriz formal', () => {
                 const binding = match[1];
                 if (!binding) continue;
                 for (const mutator of mutators) {
-                    if (new RegExp(`\\b${binding}\\.${mutator}\\s*\\(`, 'u').test(src)) actual.push(`${rel}:${mutator}`);
+                    if (new RegExp(`\\b${binding}\\.${mutator}\\s*\\(`, 'u').test(src))
+                        actual.push(`${rel}:${mutator}`);
                 }
             }
             const fsPromisesBinding = src.match(
@@ -964,7 +929,7 @@ describe('IO-006 — cleanup e mkdir diretos possuem matriz formal', () => {
         assert.deepEqual(
             [...new Set(actual)].sort(),
             allowed.sort(),
-            'A matriz deve classificar exatamente bootstrap mkdir, retenção bounded e cleanup intencional.',
+            'mkdir/rm/unlink diretos fora de infra devem permanecer eliminados.',
         );
     });
 });

@@ -2,8 +2,8 @@
 /**
  * Lockfile multiprocess opcional para recursos de I/O.
  *
- * L0 continua sendo o lock assíncrono em memória. Este módulo fornece L1 opt-in por env/option para mutações
- * sensíveis, usando criação exclusiva de arquivo (`open(lock, 'wx')`) e metadata JSON para diagnóstico/recovery.
+ * L0 continua sendo o lock assíncrono em memória. Este módulo fornece L1 opt-in por env/option para mutações sensíveis,
+ * usando criação exclusiva de arquivo (`open(lock, 'wx')`) e metadata JSON para diagnóstico/recovery.
  *
  * @module copilot/infra/locks/file-resource-lock
  */
@@ -51,13 +51,16 @@ const LOCK_SCHEMA_VERSION = 1;
  */
 
 /**
- * @type {Map<string, {
- *     resourceHash: string;
- *     operation: string;
- *     acquiredAtMs: number;
- *     waitMs: number;
- *     staleRecovered: boolean;
- * }>}
+ * @type {Map<
+ *     string,
+ *     {
+ *         resourceHash: string;
+ *         operation: string;
+ *         acquiredAtMs: number;
+ *         waitMs: number;
+ *         staleRecovered: boolean;
+ *     }
+ * >}
  */
 const activeFileLocks = new Map();
 const fileLockWaitMetrics = createBoundedLockWaitMetrics();
@@ -87,9 +90,7 @@ function normalizeFileResourceLockProfile(value) {
     if (/^(1|true|yes|on)$/.test(normalized)) return 'all';
     if (normalized === 'high-risk' || normalized === 'mutations' || normalized === 'all') return normalized;
     const error = /** @type {Error & { code?: string }} */ (
-        new Error(
-            `COPILOT_IO_FILE_LOCKS_ENABLED inválido "${normalized}". Valores: off, high-risk, mutations, all.`,
-        )
+        new Error(`COPILOT_IO_FILE_LOCKS_ENABLED inválido "${normalized}". Valores: off, high-risk, mutations, all.`)
     );
     error.code = 'ERR_IO_FILE_LOCK_PROFILE';
     throw error;
@@ -184,13 +185,13 @@ export function getFileResourceLockPath(resourceKey, lockDir = getFileResourceLo
  *     staleRecoveries: number;
  *     heartbeatFailures: number;
  *     wait: ReturnType<ReturnType<typeof createBoundedLockWaitMetrics>['snapshot']>;
- *     activeLeaseSample: Array<{
+ *     activeLeaseSample: {
  *         resourceHash: string;
  *         operation: string;
  *         ageMs: number;
  *         waitMs: number;
  *         staleRecovered: boolean;
- *     }>;
+ *     }[];
  * }}
  */
 export function getFileResourceLockStats() {
@@ -240,10 +241,13 @@ export function getFileResourceLockStats() {
 function sleep(ms, signal) {
     if (signal?.aborted) return Promise.reject(createAbortError());
     return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-            cleanup();
-            resolve(undefined);
-        }, Math.max(0, ms));
+        const timeout = setTimeout(
+            () => {
+                cleanup();
+                resolve(undefined);
+            },
+            Math.max(0, ms),
+        );
         const cleanup = () => {
             clearTimeout(timeout);
             signal?.removeEventListener('abort', onAbort);
@@ -460,7 +464,17 @@ async function writeLockMetadata(handle, metadata, durability) {
 
 /**
  * @param {string} resourceKey
- * @param {{ operation?: string; target?: string; lockDir?: string; lockPath?: string; staleMs?: number; timeoutMs?: number; pollMs?: number; signal?: AbortSignal; durability?: IoDurabilityMode }} [options]
+ * @param {{
+ *     operation?: string;
+ *     target?: string;
+ *     lockDir?: string;
+ *     lockPath?: string;
+ *     staleMs?: number;
+ *     timeoutMs?: number;
+ *     pollMs?: number;
+ *     signal?: AbortSignal;
+ *     durability?: IoDurabilityMode;
+ * }} [options]
  * @returns {Promise<FileResourceLockLease>}
  */
 export async function acquireFileResourceLock(resourceKey, options = {}) {

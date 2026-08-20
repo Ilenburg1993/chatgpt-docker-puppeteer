@@ -10,14 +10,100 @@ import { getIoL2Cache } from '../../io-cache-l2-registry.js';
 import { getIoL1Cache, getVerifiedIoL1Entry, makeBytesKey, makeTextKey, normalizeIoCacheKey } from '../../io-cache.js';
 import { nowIoMs, publishIoOperation } from '../../io-observability.js';
 import { assertValidIoFilePath } from '../../policy/path-resource.js';
-import { bufferIsUtf8, isBufferValue, toOwnedBuffer } from '../../shared/buffer.js';
+import { bufferIsUtf8, decodeUtf8Buffer, isBufferValue, toOwnedBuffer } from '../../shared/buffer.js';
 import { fingerprintMatches, richFingerprintMatches } from '../../shared/fingerprint-match.js';
 import { sha256 } from '../../shared/hash.js';
 import { splitPhysicalTextLines } from '../../shared/text-lines.js';
-import { readBytesFileSnapshot } from './read-bytes.js';
 import { sliceTextByCachedLineOffsets } from './line-offset-cache.js';
+import { readBytesFileRangeSnapshot, readBytesFileSnapshot } from './read-bytes.js';
 import { readTextLineChunks, readTextLineChunksStream } from './read-chunks.js';
-import { statPathSnapshot } from './stat.js';
+import { readDirectoryNamesSnapshot } from './read-directory.js';
+import { lstatPathSnapshot, statPathSnapshot } from './stat.js';
+
+/** @typedef {'full' | 'returned' | 'none'} TextHashMode */
+
+const textHashStats = {
+    reads: 0,
+    hashComputations: 0,
+    fullHashComputations: 0,
+    returnedSliceHashComputations: 0,
+    knownFullHashReuses: 0,
+    fullWindowReturnedHashReuses: 0,
+    fullHashOutputSkips: 0,
+    returnedHashOutputSkips: 0,
+};
+
+/** Métricas de hashing textual, separadas de cache/I/O para tornar custo criptográfico observável. */
+export function getIoReadHashStats() {
+    return { ...textHashStats };
+}
+
+/** Test-only reset. */
+export function resetIoReadHashStatsForTest() {
+    for (const key of Object.keys(textHashStats)) {
+        textHashStats[/** @type {keyof typeof textHashStats} */ (key)] = 0;
+    }
+}
+
+/** @param {unknown} value @returns {TextHashMode} */
+function normalizeTextHashMode(value) {
+    return value === 'returned' || value === 'none' ? value : 'full';
+}
+
+/**
+ * Calcula somente digests exigidos pelo caller. Em janela integral, o SHA-256 retornado e o integral são o mesmo
+ * digest; portanto um único cálculo alimenta ambos e também pode enriquecer o cache para chamadas futuras.
+ *
+ * @param {string} fullText
+ * @param {string} returnedText
+ * @param {boolean} fullWindow
+ * @param {TextHashMode} hashMode
+ * @param {string | undefined} knownFullHash
+ */
+function resolveTextHashes(fullText, returnedText, fullWindow, hashMode, knownFullHash) {
+    textHashStats.reads += 1;
+    let reusableFullHash = knownFullHash;
+    let contentHash = /** @type {string | undefined} */ (undefined);
+    let returnedContentHash = /** @type {string | undefined} */ (undefined);
+
+    const ensureFullHash = () => {
+        if (reusableFullHash) {
+            textHashStats.knownFullHashReuses += 1;
+            return reusableFullHash;
+        }
+        reusableFullHash = sha256(fullText);
+        textHashStats.hashComputations += 1;
+        textHashStats.fullHashComputations += 1;
+        return reusableFullHash;
+    };
+
+    if (hashMode === 'full') {
+        contentHash = ensureFullHash();
+        if (fullWindow) {
+            returnedContentHash = contentHash;
+            textHashStats.fullWindowReturnedHashReuses += 1;
+        } else {
+            returnedContentHash = sha256(returnedText);
+            textHashStats.hashComputations += 1;
+            textHashStats.returnedSliceHashComputations += 1;
+        }
+    } else if (hashMode === 'returned') {
+        textHashStats.fullHashOutputSkips += 1;
+        if (fullWindow) {
+            returnedContentHash = ensureFullHash();
+            textHashStats.fullWindowReturnedHashReuses += 1;
+        } else {
+            returnedContentHash = sha256(returnedText);
+            textHashStats.hashComputations += 1;
+            textHashStats.returnedSliceHashComputations += 1;
+        }
+    } else {
+        textHashStats.fullHashOutputSkips += 1;
+        textHashStats.returnedHashOutputSkips += 1;
+    }
+
+    return { contentHash, returnedContentHash, reusableFullHash };
+}
 
 /**
  * @param {number} startedAt
@@ -64,15 +150,19 @@ function readCacheContentHash(meta) {
  * @returns {boolean}
  */
 function hasRichCacheFingerprint(meta) {
-    return ['ctimeMs', 'dev', 'ino'].every(
-        (key) => typeof meta[key] === 'number' && Number.isFinite(meta[key]),
-    );
+    return ['ctimeMs', 'dev', 'ino'].every((key) => typeof meta[key] === 'number' && Number.isFinite(meta[key]));
 }
 
 /**
  * @param {{ mtimeMs?: number | null; sizeBytes: number }} l2Entry
  * @param {Record<string, unknown>} l2Meta
- * @param {{ mtimeMs?: number; ctimeMs?: number; size?: number; dev?: number | bigint; ino?: number | bigint } | null} metadata
+ * @param {{
+ *     mtimeMs?: number;
+ *     ctimeMs?: number;
+ *     size?: number;
+ *     dev?: number | bigint;
+ *     ino?: number | bigint;
+ * } | null} metadata
  * @returns {boolean}
  */
 function l2EntryMatchesStat(l2Entry, l2Meta, metadata) {
@@ -117,6 +207,160 @@ function l2EntryMatchesStat(l2Entry, l2Meta, metadata) {
 function publishAndReturn(io, success, error) {
     publishIoOperation(io, { success, ...(error !== undefined ? { error } : {}) });
     return io;
+}
+
+/**
+ * Lê bytes diretamente de um snapshot consistente, sem consultar nem preencher L1/L2. Use para state/secrets/PID/TLS e
+ * outros arquivos cujo contrato exige refletir o disco no instante da chamada.
+ *
+ * @param {string} filePath
+ * @param {{
+ *     traceId?: string;
+ *     advisoryLimits?: Record<string, unknown>;
+ *     signal?: AbortSignal;
+ *     includeHash?: boolean;
+ * }} [options]
+ */
+export async function readBytesFresh(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const snapshot = await readBytesFileSnapshot(filePath, options.signal ? { signal: options.signal } : {});
+        const contentHash = options.includeHash === true ? sha256(snapshot.content) : undefined;
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'read',
+                target: filePath,
+                targetKind: 'file',
+                bytesRead: snapshot.bytesRead,
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.readFile.bytes-fresh',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+                advisoryLimits: { ...(options.advisoryLimits ?? {}), freshness: 'physical-snapshot' },
+            }),
+            true,
+        );
+        return {
+            path: filePath,
+            content: snapshot.content,
+            bytesRead: snapshot.bytesRead,
+            sizeBytes: snapshot.sizeBytes,
+            mtimeMs: snapshot.mtimeMs,
+            ctimeMs: snapshot.ctimeMs,
+            dev: snapshot.dev,
+            ino: snapshot.ino,
+            mode: snapshot.mode,
+            isFile: snapshot.isFile,
+            attempts: snapshot.attempts,
+            ...(contentHash === undefined ? {} : { contentHash }),
+            cacheFingerprintStrategy: 'fresh-snapshot',
+            io,
+        };
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'read',
+                target: filePath,
+                targetKind: 'file',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.readFile.bytes-fresh',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
+ * Bounded fresh byte-range/tail read with the same physical-snapshot consistency guarantees used by full fresh reads.
+ *
+ * @param {string} filePath
+ * @param {{
+ *     start?: number;
+ *     maxBytes: number;
+ *     fromEnd?: boolean;
+ *     rejectSymlink?: boolean;
+ *     traceId?: string;
+ *     advisoryLimits?: Record<string, unknown>;
+ *     signal?: AbortSignal;
+ * }} options
+ */
+export async function readBytesRangeFresh(filePath, options) {
+    assertValidIoFilePath(filePath);
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const snapshot = await readBytesFileRangeSnapshot(filePath, options);
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'read',
+                target: filePath,
+                targetKind: 'file',
+                bytesRead: snapshot.bytesRead,
+                durationMs: elapsedMs(startedAt),
+                engine:
+                    options.fromEnd === true ? 'io-engine.fs.read.range-tail-fresh' : 'io-engine.fs.read.range-fresh',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+                advisoryLimits: {
+                    ...(options.advisoryLimits ?? {}),
+                    freshness: 'physical-range-snapshot',
+                    startByte: snapshot.startByte,
+                    maxBytes: options.maxBytes,
+                    fromEnd: options.fromEnd === true,
+                    rejectSymlink: options.rejectSymlink === true,
+                },
+            }),
+            true,
+        );
+        return { ...snapshot, io };
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'read',
+                target: filePath,
+                targetKind: 'file',
+                durationMs: elapsedMs(startedAt),
+                engine:
+                    options.fromEnd === true ? 'io-engine.fs.read.range-tail-fresh' : 'io-engine.fs.read.range-fresh',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
+ * Lê UTF-8 diretamente do disco por snapshot consistente, sem cache. Hash é opt-in porque state/config normalmente
+ * precisa de freshness física, não de identidade criptográfica.
+ *
+ * @param {string} filePath
+ * @param {{
+ *     traceId?: string;
+ *     advisoryLimits?: Record<string, unknown>;
+ *     signal?: AbortSignal;
+ *     includeHash?: boolean;
+ * }} [options]
+ */
+export async function readTextFresh(filePath, options = {}) {
+    const result = await readBytesFresh(filePath, options);
+    const content = decodeUtf8Buffer(result.content, `Arquivo contém bytes inválidos para UTF-8: ${filePath}`);
+    return {
+        ...result,
+        content,
+    };
 }
 
 /**
@@ -311,11 +555,13 @@ export async function readBytes(filePath, options = {}) {
  *     traceId?: string;
  *     advisoryLimits?: Record<string, unknown>;
  *     signal?: AbortSignal;
+ *     hashMode?: TextHashMode;
  * }} [options]
  */
 export async function readText(filePath, options = {}) {
     assertValidIoFilePath(filePath);
     const traceId = options.traceId ?? createIoTraceId();
+    const hashMode = normalizeTextHashMode(options.hashMode);
     const startedAt = nowIoMs();
     let failurePublished = false;
     try {
@@ -340,7 +586,6 @@ export async function readText(filePath, options = {}) {
         if (_cachedText !== null && typeof _cachedText.content === 'string') {
             _cacheState = 'l1-hit';
             const cachedContent = _cachedText.content;
-            const contentHash = _cachedText.contentHash ?? sha256(cachedContent);
             const sliced = sliceTextByCachedLineOffsets(
                 filePath,
                 cachedContent,
@@ -354,6 +599,14 @@ export async function readText(filePath, options = {}) {
             sliceStart = sliced.returnedLines.start;
             sliceEnd = sliced.returnedLines.end;
             content = sliced.content;
+            const hashes = resolveTextHashes(
+                cachedContent,
+                content,
+                sliceStart === 1 && sliceEnd === totalLines,
+                hashMode,
+                _cachedText.contentHash,
+            );
+            if (!_cachedText.contentHash && hashes.reusableFullHash) _cachedText.contentHash = hashes.reusableFullHash;
             const io = publishAndReturn(
                 buildIoMeta({
                     operation: 'read',
@@ -382,8 +635,8 @@ export async function readText(filePath, options = {}) {
                 ctimeMs: Number.isFinite(_cachedText.ctime) ? Number(_cachedText.ctime) : null,
                 dev: Number.isFinite(_cachedText.dev) ? Number(_cachedText.dev) : null,
                 ino: Number.isFinite(_cachedText.ino) ? Number(_cachedText.ino) : null,
-                contentHash,
-                returnedContentHash: sha256(content),
+                contentHash: hashes.contentHash,
+                returnedContentHash: hashes.returnedContentHash,
                 cacheFingerprintStrategy: _cachedText.fingerprintStrategy ?? null,
                 totalLines,
                 returnedLines: { start: sliceStart, end: sliceEnd },
@@ -403,7 +656,6 @@ export async function readText(filePath, options = {}) {
                         ? 'l2-mtime-size-ctime-dev-ino'
                         : 'l2-mtime-size';
                     const text = l2Entry.payload.toString('utf8');
-                    const contentHash = l2ContentHash ?? sha256(text);
                     const sliced = sliceTextByCachedLineOffsets(
                         filePath,
                         text,
@@ -417,6 +669,13 @@ export async function readText(filePath, options = {}) {
                     const sliceStart = sliced.returnedLines.start;
                     const sliceEnd = sliced.returnedLines.end;
                     const content = sliced.content;
+                    const hashes = resolveTextHashes(
+                        text,
+                        content,
+                        sliceStart === 1 && sliceEnd === totalLines,
+                        hashMode,
+                        l2ContentHash,
+                    );
 
                     const _now = Date.now();
                     _l1.set(_textKey, {
@@ -430,7 +689,7 @@ export async function readText(filePath, options = {}) {
                         ctime: Number(metadata?.ctimeMs),
                         dev: Number(metadata?.dev),
                         ino: Number(metadata?.ino),
-                        contentHash,
+                        ...(hashes.reusableFullHash ? { contentHash: hashes.reusableFullHash } : {}),
                         fingerprintStrategy,
                     });
 
@@ -462,8 +721,8 @@ export async function readText(filePath, options = {}) {
                         ctimeMs: Number.isFinite(Number(metadata?.ctimeMs)) ? Number(metadata?.ctimeMs) : null,
                         dev: Number.isFinite(Number(metadata?.dev)) ? Number(metadata?.dev) : null,
                         ino: Number.isFinite(Number(metadata?.ino)) ? Number(metadata?.ino) : null,
-                        contentHash,
-                        returnedContentHash: sha256(content),
+                        contentHash: hashes.contentHash,
+                        returnedContentHash: hashes.returnedContentHash,
                         cacheFingerprintStrategy: fingerprintStrategy,
                         totalLines,
                         returnedLines: { start: sliceStart, end: sliceEnd },
@@ -500,7 +759,6 @@ export async function readText(filePath, options = {}) {
             throw error;
         }
         const text = raw.toString('utf8');
-        const contentHash = sha256(text);
         const sliced = sliceTextByCachedLineOffsets(
             filePath,
             text,
@@ -511,6 +769,13 @@ export async function readText(filePath, options = {}) {
         sliceStart = sliced.returnedLines.start;
         sliceEnd = sliced.returnedLines.end;
         content = sliced.content;
+        const hashes = resolveTextHashes(
+            text,
+            content,
+            sliceStart === 1 && sliceEnd === totalLines,
+            hashMode,
+            undefined,
+        );
         const _textNow = Date.now();
         /** @type {import('../../io-cache.js').IoCacheEntry} */
         const _textEntry = {
@@ -524,7 +789,7 @@ export async function readText(filePath, options = {}) {
             ctime: textSnapshot.ctimeMs,
             dev: textSnapshot.dev,
             ino: textSnapshot.ino,
-            contentHash,
+            ...(hashes.reusableFullHash ? { contentHash: hashes.reusableFullHash } : {}),
             fingerprintStrategy: 'fs-read',
         };
         _l1.set(_textKey, _textEntry);
@@ -537,7 +802,7 @@ export async function readText(filePath, options = {}) {
                 sizeBytes: raw.byteLength,
                 mtimeMs: Number.isFinite(_textEntry.mtime) ? Number(_textEntry.mtime) : null,
                 metaJson: stringifyCacheMeta({
-                    contentHash,
+                    ...(hashes.reusableFullHash ? { contentHash: hashes.reusableFullHash } : {}),
                     lineCount: totalLines,
                     encoding: 'utf8',
                     ctimeMs: textSnapshot.ctimeMs,
@@ -556,8 +821,8 @@ export async function readText(filePath, options = {}) {
             ctimeMs: textSnapshot.ctimeMs,
             dev: textSnapshot.dev,
             ino: textSnapshot.ino,
-            contentHash,
-            returnedContentHash: sha256(content),
+            contentHash: hashes.contentHash,
+            returnedContentHash: hashes.returnedContentHash,
             cacheFingerprintStrategy: 'fs-read',
             totalLines,
             returnedLines: { start: sliceStart, end: sliceEnd },
@@ -645,9 +910,14 @@ export async function readTextChunks(filePath, options = {}) {
             returnedLineCount: snapshot.returnedLineCount,
             returnedChunkCount: snapshot.chunks.length,
             lastScannedLine: snapshot.lastScannedLine,
-            fileTotalLines: snapshot.totalLinesKnown ?? snapshot.endLine === null ? snapshot.totalLines : null,
+            stoppedAtRequestedWindow: snapshot.stoppedAtRequestedWindow,
+            fileTotalLines: (snapshot.totalLinesKnown ?? snapshot.endLine === null) ? snapshot.totalLines : null,
             fileTotalLinesKnown: snapshot.totalLinesKnown ?? snapshot.endLine === null,
             bytesRead: snapshot.bytesRead,
+            ...('indexBytesRead' in snapshot ? { indexBytesRead: snapshot.indexBytesRead } : {}),
+            ...('rangeBytesRead' in snapshot ? { rangeBytesRead: snapshot.rangeBytesRead } : {}),
+            ...('indexCacheState' in snapshot ? { indexCacheState: snapshot.indexCacheState } : {}),
+            ...('rangeSource' in snapshot ? { rangeSource: snapshot.rangeSource } : {}),
             sizeBytes: snapshot.sizeBytes,
             mtimeMs: snapshot.mtimeMs,
             ctimeMs: snapshot.ctimeMs,
@@ -695,6 +965,104 @@ export async function readTextChunks(filePath, options = {}) {
  */
 export function readTextChunksStream(filePath, options = {}) {
     return readTextLineChunksStream(filePath, options);
+}
+
+/**
+ * Listagem física de diretório, sem L1/L2 e sem pre-access. Ausência permanece ENOENT para o caller decidir se é estado
+ * opcional ou erro operacional.
+ *
+ * @param {string} dirPath
+ * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
+ */
+export async function listDirectoryNamesFresh(dirPath, options = {}) {
+    assertValidIoFilePath(dirPath);
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const entries = await readDirectoryNamesSnapshot(dirPath);
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'scan',
+                target: dirPath,
+                targetKind: 'directory',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.readdir.names-fresh',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+                advisoryLimits: {
+                    ...(options.advisoryLimits ?? {}),
+                    freshness: 'physical-directory-listing',
+                    entryCount: entries.length,
+                },
+            }),
+            true,
+        );
+        return { path: dirPath, entries, io };
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'scan',
+                target: dirPath,
+                targetKind: 'directory',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.readdir.names-fresh',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
+}
+
+/**
+ * lstat canônico com observabilidade. Não segue symlinks e, por isso, é a primitive apropriada para state/config que
+ * precisa rejeitar links antes de qualquer leitura de conteúdo.
+ *
+ * @param {string} filePath
+ * @param {{ traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
+ */
+export async function lstatPath(filePath, options = {}) {
+    assertValidIoFilePath(filePath);
+    const traceId = options.traceId ?? createIoTraceId();
+    const startedAt = nowIoMs();
+    try {
+        const stats = await lstatPathSnapshot(filePath);
+        const io = publishAndReturn(
+            buildIoMeta({
+                operation: 'stat',
+                target: filePath,
+                targetKind: stats.isDirectory() ? 'directory' : 'file',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.lstat',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+                advisoryLimits: { ...(options.advisoryLimits ?? {}), followSymlinks: false },
+            }),
+            true,
+        );
+        return { path: filePath, stats, io };
+    } catch (error) {
+        publishAndReturn(
+            buildIoMeta({
+                operation: 'stat',
+                target: filePath,
+                targetKind: 'unknown',
+                durationMs: elapsedMs(startedAt),
+                engine: 'io-engine.fs.lstat',
+                riskClass: 'low',
+                traceId,
+                cache: 'none',
+            }),
+            false,
+            error,
+        );
+        throw error;
+    }
 }
 
 /**

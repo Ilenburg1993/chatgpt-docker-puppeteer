@@ -79,8 +79,8 @@ function pack(payload) {
  * forma incremental, emitindo frames completos via callback. **Unidades:** Tamanho em bytes como inteiro de 32 bits
  * big-endian.
  *
- * @property {(chunk: Buffer | Uint8Array, onFrame: (frame: Buffer) => void) => void} push - Processa chunk e invoca callback para
- *   frames completos
+ * @property {(chunk: Buffer | Uint8Array, onFrame: (frame: Buffer) => void) => void} push - Processa chunk e invoca
+ *   callback para frames completos
  * @returns {any} Unpacker com método push
  */
 function createUnpacker() {

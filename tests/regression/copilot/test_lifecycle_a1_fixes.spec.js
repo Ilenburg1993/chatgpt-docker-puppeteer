@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * Testes de regressão — Fase A1 (BUG-03, BUG-06, BUG-10)
  *
@@ -15,8 +14,8 @@ const { mockLog, mockCreateSession, mockResumeSession, mockApproveAll } = vi.hoi
     mockLog: vi.fn(),
     mockCreateSession: vi.fn(),
     mockResumeSession: vi.fn(),
-    mockApproveAll: vi.fn(async () =>
-        /** @type {import('@github/copilot-sdk').PermissionRequestResult} */ ({ kind: 'approve-once' }),
+    mockApproveAll: vi.fn(
+        async () => /** @type {import('@github/copilot-sdk').PermissionRequestResult} */ ({ kind: 'approve-once' }),
     ),
 }));
 
@@ -164,7 +163,11 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
     describe('BUG-06: reasoningEffort validado', () => {
         it('valor válido não emite WARN de reasoningEffort', async () => {
             const client = fakeClient();
-            await createSession(client, { model: 'gpt-5-mini', reasoningEffort: 'high', onPermissionRequest: mockApproveAll });
+            await createSession(client, {
+                model: 'gpt-5-mini',
+                reasoningEffort: 'high',
+                onPermissionRequest: mockApproveAll,
+            });
 
             const warnCalls = mockLog.mock.calls.filter(
                 ([level, msg]) => level === 'WARN' && String(msg).includes('reasoningEffort'),
@@ -177,7 +180,11 @@ describe('Fase A1 — Regressão lifecycle.js', () => {
 
         it('xhigh (válido no SDK) não emite WARN de reasoningEffort', async () => {
             const client = fakeClient();
-            await createSession(client, { model: 'gpt-5-mini', reasoningEffort: 'xhigh', onPermissionRequest: mockApproveAll });
+            await createSession(client, {
+                model: 'gpt-5-mini',
+                reasoningEffort: 'xhigh',
+                onPermissionRequest: mockApproveAll,
+            });
 
             const warnCalls = mockLog.mock.calls.filter(
                 ([level, msg]) => level === 'WARN' && String(msg).includes('reasoningEffort'),
@@ -368,7 +375,7 @@ describe('Fase A3 — boot-wiring lifecycle + SessionConfig fields', () => {
     // ─── A3 — Novos campos SessionConfig passados ao SDK ────────────────
 
     describe('A3: novos campos SessionConfig passados ao SDK', () => {
-        /** @type {Array<[string, string]>} */
+        /** @type {[string, string][]} */
         const newFields = [
             ['availableTools', 'availableTools'],
             ['excludedTools', 'excludedTools'],

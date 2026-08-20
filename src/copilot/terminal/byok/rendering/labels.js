@@ -2,8 +2,8 @@
 /**
  * Helpers puros de apresentação textual do cockpit BYOK.
  *
- * Mantê-los fora de `terminal/commands/byok.js` reduz o command router monolítico e dá uma superfície pequena,
- * testável e reutilizável para taxonomias/labels sem acoplamento a estado, SDK ou model-gateway.
+ * Mantê-los fora de `terminal/commands/byok.js` reduz o command router monolítico e dá uma superfície pequena, testável
+ * e reutilizável para taxonomias/labels sem acoplamento a estado, SDK ou model-gateway.
  *
  * @module copilot/terminal/byok/rendering/labels
  */

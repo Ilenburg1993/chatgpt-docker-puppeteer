@@ -16,19 +16,13 @@ export {
     createProviderCatalogSource,
     createProviderMetadataEvidence,
 } from './contracts.js';
-export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
-export { auditCatalogImporterSet, describeCatalogImporter } from './importer-audit.js';
-export {
-    MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION,
-    classifyModelGatewayCatalogImporterFailure,
-} from './importer-failures.js';
-export { auditModelGatewayCatalogSnapshotIntegrity } from './integrity.js';
 export {
     projectModelGatewayMetadataCoverageMetrics,
     projectModelGatewayProviderFreshnessMetrics,
     summarizeModelGatewayMetadataCoverage,
     summarizeModelGatewayProviderFreshness,
 } from './coverage.js';
+export { createDefaultModelGatewayCatalogImporters } from './default-importers.js';
 export { explainModelGatewayCatalogEntry, explainModelGatewayProviderEntry } from './explain.js';
 export {
     MODEL_GATEWAY_RAW_PAYLOAD_STORAGE_POLICY,
@@ -38,15 +32,21 @@ export {
     diffCanonicalModelProjections,
     summarizeCanonicalModelProjectionDiff,
 } from './import-runs.js';
+export { auditCatalogImporterSet, describeCatalogImporter } from './importer-audit.js';
+export {
+    MODEL_GATEWAY_CATALOG_IMPORTER_FAILURE_DISPOSITION,
+    classifyModelGatewayCatalogImporterFailure,
+} from './importer-failures.js';
+export { defineCatalogImporter, runCatalogImporters } from './importer-runner.js';
 export {
     ANTHROPIC_MODELS_API_DOCS_URL,
     ANTHROPIC_MODELS_API_VERSION,
     ANTHROPIC_MODELS_CATALOG_URL,
     ANTHROPIC_MODELS_DOCS_URL,
     ANTHROPIC_PRICING_DOCS_URL,
-    CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     CEREBRAS_MODELS_CATALOG_URL,
     CEREBRAS_OPENAI_BASE_URL,
+    CEREBRAS_PUBLIC_MODELS_CATALOG_URL,
     CHUTES_MODELS_CATALOG_URL,
     CHUTES_OPENAI_BASE_URL,
     CLOUDFLARE_AI_GATEWAY_CREDIT_BALANCE_PATH,
@@ -63,17 +63,17 @@ export {
     GEMINI_MODELS_API_VERSION,
     GEMINI_MODELS_CATALOG_URL,
     GEMINI_MODELS_DOCS_URL,
-    GEMINI_OPENAI_COMPATIBLE_BASE_URL,
     GEMINI_OPENAI_COMPATIBILITY_DOCS_URL,
+    GEMINI_OPENAI_COMPATIBLE_BASE_URL,
     GEMINI_PRICING_DOCS_URL,
     GEMINI_VERTEX_MODELS_DOCS_URL,
     GROQ_DOCS_MODELS_URL,
     GROQ_MODELS_CATALOG_URL,
     GROQ_OPENAI_BASE_URL,
     GROQ_PRICING_URL,
-    HUGGINGFACE_ROUTE_POLICY_SUFFIXES,
     HUGGINGFACE_ROUTER_BASE_URL,
     HUGGINGFACE_ROUTER_MODELS_URL,
+    HUGGINGFACE_ROUTE_POLICY_SUFFIXES,
     KILO_GATEWAY_MODELS_CATALOG_URL,
     KILO_GATEWAY_PROVIDERS_CATALOG_URL,
     MISTRAL_KNOWN_LIMITATIONS_DOCS_URL,
@@ -87,16 +87,16 @@ export {
     OLLAMA_LOCAL_OPENAI_BASE_URL,
     OLLAMA_LOCAL_SHOW_URL,
     OLLAMA_LOCAL_TAGS_URL,
+    OPENAI_DOCS_PRICING_URL,
+    OPENAI_MODELS_CATALOG_URL,
+    OPENAI_MODELS_DOCS_URL,
+    OPENAI_MODEL_COMPARE_URL,
     OPENCODE_ZEN_BASE_URL,
     OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
     OPENCODE_ZEN_DOCS_URL,
     OPENCODE_ZEN_MESSAGES_URL,
     OPENCODE_ZEN_MODELS_URL,
     OPENCODE_ZEN_RESPONSES_URL,
-    OPENAI_DOCS_PRICING_URL,
-    OPENAI_MODEL_COMPARE_URL,
-    OPENAI_MODELS_DOCS_URL,
-    OPENAI_MODELS_CATALOG_URL,
     OPENROUTER_KEY_URL,
     OPENROUTER_MODELS_CATALOG_URL,
     ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE,
@@ -123,11 +123,11 @@ export {
     createMistralModelsImporter,
     createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
-    createOpenCodeZenDocsImporter,
-    createOpenCodeZenModelsImporter,
-    createOpenAiDocsModelsImporter,
     createOpenAICompatibleModelsImporter,
     createOpenAIModelsImporter,
+    createOpenAiDocsModelsImporter,
+    createOpenCodeZenDocsImporter,
+    createOpenCodeZenModelsImporter,
     createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
@@ -142,24 +142,18 @@ export {
     parseOpenRouterKeyRows,
     parseZaiOpenApiRows,
 } from './importers/index.js';
-export { defineCatalogImporter, runCatalogImporters } from './importer-runner.js';
+export { auditModelGatewayCatalogSnapshotIntegrity } from './integrity.js';
 export {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
     createModelGatewayCatalogSnapshotId,
     normalizeStoredCatalogSnapshot,
 } from './json-catalog-store.js';
-export { DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION, SqliteModelGatewayCatalogStore } from './sqlite-catalog-store.js';
 export { mergeModelMetadataEvidence, mergeProviderMetadataEvidence, rankCatalogEvidenceConfidence } from './merge.js';
-export {
-    OPENAI_MODEL_LIST_OBJECT,
-    OPENAI_MODEL_OBJECT,
-    toOpenAIModelCatalogEntry,
-    toOpenAIModelCatalogList,
-} from './openai-schema.js';
 export {
     normalizeAccountOverlayControls,
     normalizeCatalogModalities,
+    normalizeDataPolicyTaxonomy,
     normalizeModelAliases,
     normalizeModelIdentityTraits,
     normalizeModelLifecycle,
@@ -170,33 +164,42 @@ export {
     normalizeOpenAICompatibleModelCapabilities,
     normalizeRateLimitTaxonomy,
     normalizeRuntimeAgenticCapabilityTaxonomy,
-    normalizeDataPolicyTaxonomy,
     normalizeUsdPricing,
     parseModelModalityExpression,
     resolveModelDeprecationAlias,
 } from './normalizers.js';
+export {
+    OPENAI_MODEL_LIST_OBJECT,
+    OPENAI_MODEL_OBJECT,
+    toOpenAIModelCatalogEntry,
+    toOpenAIModelCatalogList,
+} from './openai-schema.js';
 export {
     ModelGatewayCatalogRefreshLockError,
     isModelGatewayCatalogRefreshLocked,
     resolveModelGatewayCatalogRefreshLockKey,
     withModelGatewayCatalogRefreshLock,
 } from './refresh-lock.js';
-export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
-export { refreshModelGatewayCatalog } from './refresh.js';
 export {
     parseModelGatewayRefreshLogText,
     summarizeModelGatewayRefreshLogEvents,
     summarizeModelGatewayRefreshLogText,
 } from './refresh-logs.js';
+export { planModelGatewayCatalogRefresh } from './refresh-plan.js';
+export { refreshModelGatewayCatalog } from './refresh.js';
 export { applyModelGatewayCatalogRetention } from './retention.js';
+export { searchModelGatewayCatalogEntries } from './search.js';
 export {
-    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
-    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
-    MODEL_GATEWAY_SQLITE_TABLES,
-} from './sqlite-schema.js';
+    DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION,
+    SqliteModelGatewayCatalogStore,
+} from './sqlite-catalog-store.js';
 export {
     compareModelGatewayCatalogSnapshotParity,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     summarizeModelGatewayCatalogSnapshot,
 } from './sqlite-migration.js';
-export { searchModelGatewayCatalogEntries } from './search.js';
+export {
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_TABLES,
+} from './sqlite-schema.js';

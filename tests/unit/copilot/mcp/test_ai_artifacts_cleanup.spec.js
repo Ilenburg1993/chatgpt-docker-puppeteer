@@ -83,7 +83,12 @@ describe('MCP AI artifact cleanup', () => {
         expect(rollback['purgeCandidateCount']).toBe(3);
         expect(rollback['maintenanceMutation']).toBe('explicit-only');
 
-        const applied = await cleanupAiArtifacts({ workspaceRoot, dryRun: false, retainNewest: 20, maxDeleteCount: 10 });
+        const applied = await cleanupAiArtifacts({
+            workspaceRoot,
+            dryRun: false,
+            retainNewest: 20,
+            maxDeleteCount: 10,
+        });
         expect(applied['deletedCount']).toBe(0);
         expect((await readdir(rollbackDir)).sort()).toEqual([expired, active, pending, unknown].sort());
     });

@@ -65,7 +65,7 @@ function requireProfile(snapshot, target) {
 /* --------------------------------------------------------------------------
    TESTES
 -------------------------------------------------------------------------- */
-/** @type {Array<{ name: string; run: () => Promise<void> }>} */
+/** @type {{ name: string; run: () => Promise<void> }[]} */
 const tests = [];
 
 // Test 1: Variância Converge Corretamente (Welford's Algorithm)

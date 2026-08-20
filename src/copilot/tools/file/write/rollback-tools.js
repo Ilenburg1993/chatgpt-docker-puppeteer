@@ -5,7 +5,12 @@
  * @module copilot/tools/file/write/rollback-tools
  */
 
-import { createIoOperationEnvelope, executeIoRollbackToken, listRollbackSidecars, parseIoRollbackToken } from '#copilot/infra/public/runtime';
+import {
+    createIoOperationEnvelope,
+    executeIoRollbackToken,
+    listRollbackSidecars,
+    parseIoRollbackToken,
+} from '#copilot/infra/public/runtime';
 import path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
@@ -38,7 +43,11 @@ export const rollbackFileChangesTool = buildTool({
         'Use primeiro com dryRun=true. Aplique somente o token exato retornado pela mutação correspondente e somente ' +
         'quando todas as precondições estiverem ready. Não edite nem reconstrua tokens manualmente.',
     parameters: z.object({
-        token: z.string().min(1).max(MAX_ROLLBACK_TOKEN_CHARS)['describe']('Token base64url retornado em changeSet.rollback.token.'),
+        token: z
+            .string()
+            .min(1)
+            .max(MAX_ROLLBACK_TOKEN_CHARS)
+            ['describe']('Token base64url retornado em changeSet.rollback.token.'),
         dryRun: z.boolean().optional().default(true)['describe']('Valida todos os passos sem alterar arquivos.'),
         confirm: z.boolean().optional().default(false)['describe']('Obrigatório quando dryRun=false.'),
     }),

@@ -87,7 +87,7 @@ async function main() {
         let heapPeak = heapStart;
         let maxObservedEntries = 0;
         let immediatePendingHits = 0;
-        /** @type {Array<{ cycle: number; size: number; batchFlushes: number; averageBatchSize: number }>} */
+        /** @type {{ cycle: number; size: number; batchFlushes: number; averageBatchSize: number }[]} */
         const cycleSamples = [];
 
         for (let cycle = 0; cycle < CYCLES; cycle += 1) {
@@ -110,7 +110,15 @@ async function main() {
             }
 
             await sleep(30);
-            /** @type {{ batchFailures: number; pendingSets: number; size: number; batchFlushes: number; averageBatchSize: number }} */
+            /**
+             * @type {{
+             *     batchFailures: number;
+             *     pendingSets: number;
+             *     size: number;
+             *     batchFlushes: number;
+             *     averageBatchSize: number;
+             * }}
+             */
             const stats = cache.getStats();
             assert.equal(stats.batchFailures, 0);
             assert.equal(stats.pendingSets, 0);
@@ -234,9 +242,7 @@ async function main() {
                 peakGrowthBytes: Math.max(0, heapPeak - heapStart),
             },
             shutdown: {
-                ok:
-                    shutdownReport?.failedCount === 0 &&
-                    shutdownReport?.timeoutCount === 0,
+                ok: shutdownReport?.failedCount === 0 && shutdownReport?.timeoutCount === 0,
                 handlers: shutdownReport?.handlers.map((handler) => handler.name) ?? [],
             },
             integrity,

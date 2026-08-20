@@ -183,7 +183,10 @@ export class ToolSessionContext {
                         ? request.createdAt
                         : Date.now(),
                 sessionId: this.#sessionId,
-                toolCallId: typeof request.toolCallId === 'string' && request.toolCallId.trim().length > 0 ? request.toolCallId : null,
+                toolCallId:
+                    typeof request.toolCallId === 'string' && request.toolCallId.trim().length > 0
+                        ? request.toolCallId
+                        : null,
                 data: request.data && typeof request.data === 'object' ? { ...request.data } : {},
             },
         });

@@ -113,11 +113,13 @@ export function createSseWriter(req, res, opts = {}) {
     }
     res.flushHeaders();
 
-    /** @type {{
-    write: (chunk: string) => boolean;
-    writableEnded: boolean;
-    once?: (event: string, listener: () => void) => unknown;
-}} */
+    /**
+     * @type {{
+     *     write: (chunk: string) => boolean;
+     *     writableEnded: boolean;
+     *     once?: (event: string, listener: () => void) => unknown;
+     * }}
+     */
     const out = gzStream
         ? {
               get writableEnded() {

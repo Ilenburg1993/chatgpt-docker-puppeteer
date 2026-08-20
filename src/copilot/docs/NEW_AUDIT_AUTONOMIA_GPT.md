@@ -1,12 +1,10 @@
 # Auditoria live ampliada — MCP `WORKSPACE`, poder do ChatGPT, OAuth, outputSchema e autorizações
 
-**Data:** 2026-05-23
-**Relatório substitui:** `workspace_mcp_live_power_audit.md`
-**Endpoint testado:** `/WORKSPACE/link_6a11939cefd08191906489d7b45c6a3d`
-**Branch:** `main`
-**HEAD observado:** `044b2060`
-**Status do MCP/tunnel no teste:** online
-**Foco:** poder efetivo do `chatgpt.com` sobre o repo via MCP, com ênfase em permissões, autorizações, bloqueios, OAuth, outputSchema, annotations, segurança e oportunidades para reduzir fricção.
+**Data:** 2026-05-23 **Relatório substitui:** `workspace_mcp_live_power_audit.md` **Endpoint
+testado:** `/WORKSPACE/link_6a11939cefd08191906489d7b45c6a3d` **Branch:** `main` **HEAD observado:**
+`044b2060` **Status do MCP/tunnel no teste:** online **Foco:** poder efetivo do `chatgpt.com` sobre
+o repo via MCP, com ênfase em permissões, autorizações, bloqueios, OAuth, outputSchema, annotations,
+segurança e oportunidades para reduzir fricção.
 
 ---
 
@@ -39,7 +37,9 @@
 
 ## 1. Resumo executivo
 
-A nova superfície MCP `WORKSPACE` está muito mais madura que nas auditorias anteriores. Ela agora expõe 54 tools, com classificação explícita de risco, annotations consistentes e ferramentas novas voltadas à autonomia do ChatGPT.
+A nova superfície MCP `WORKSPACE` está muito mais madura que nas auditorias anteriores. Ela agora
+expõe 54 tools, com classificação explícita de risco, annotations consistentes e ferramentas novas
+voltadas à autonomia do ChatGPT.
 
 Resumo observado:
 
@@ -51,23 +51,42 @@ Resumo observado:
 - `mcp_tools_status` informa risk classes e candidatos a “remember approval”.
 - `mcp_session_profile` recomenda workflows de baixa fricção.
 - `mcp_golden_prompts` define prompts e campos de medição de autorização/bloqueio.
-- `mcp_maintenance_apply_safe_fixes` funciona em dry-run e em execução real quando os fixes são read-only/status/smoke.
+- `mcp_maintenance_apply_safe_fixes` funciona em dry-run e em execução real quando os fixes são
+  read-only/status/smoke.
 - `delegate_to_repo_autonomy_runner` funciona em dry-run.
 - `mcp_smoke_workspace` roda e está funcional, mas retorna `degraded` porque o workspace está dirty.
 
-O problema dominante não é o registry MCP nem o tunnel: é a camada externa do `chatgpt.com`/OpenAI, que bloqueou várias chamadas antes de chegarem ao MCP, inclusive algumas chamadas read-only e quase todas as chamadas de escrita/validação reais.
+O problema dominante não é o registry MCP nem o tunnel: é a camada externa do `chatgpt.com`/OpenAI,
+que bloqueou várias chamadas antes de chegarem ao MCP, inclusive algumas chamadas read-only e quase
+todas as chamadas de escrita/validação reais.
 
 Pontos centrais deste relatório ampliado:
 
-1. **“Autorização compatível: Nenhuma” e “Autorização usada: Nenhuma” não impedem o conector de funcionar.** No Authentication é modo oficialmente suportado no Developer Mode. Porém, sem OAuth/securitySchemes, o ChatGPT não tem escopos por tool, não tem linking de conta, não mostra consentimento granular e não consegue diferenciar read/write por autorização; ele depende mais das annotations, descrições, heurísticas e confirmações do host.
+1. **“Autorização compatível: Nenhuma” e “Autorização usada: Nenhuma” não impedem o conector de
+   funcionar.** No Authentication é modo oficialmente suportado no Developer Mode. Porém, sem
+   OAuth/securitySchemes, o ChatGPT não tem escopos por tool, não tem linking de conta, não mostra
+   consentimento granular e não consegue diferenciar read/write por autorização; ele depende mais
+   das annotations, descrições, heurísticas e confirmações do host.
 
-2. **A ausência de OAuth provavelmente não é a causa direta dos bloqueios observados.** Os bloqueios ocorreram até em chamadas no-auth e em dry-run. A documentação oficial diz que write actions exigem confirmação por padrão e que tools sem `readOnlyHint` são tratadas como write actions; isso é independente de OAuth.
+2. **A ausência de OAuth provavelmente não é a causa direta dos bloqueios observados.** Os bloqueios
+   ocorreram até em chamadas no-auth e em dry-run. A documentação oficial diz que write actions
+   exigem confirmação por padrão e que tools sem `readOnlyHint` são tratadas como write actions;
+   isso é independente de OAuth.
 
-3. **OAuth/Mixed Authentication pode melhorar governança, confiança e granularidade, mas não vai eliminar confirmações de write actions.** OAuth ajuda a declarar scopes, acionar UI de login/linking e validar identidade/scopes no servidor. Não é um botão para “sem prompts”.
+3. **OAuth/Mixed Authentication pode melhorar governança, confiança e granularidade, mas não vai
+   eliminar confirmações de write actions.** OAuth ajuda a declarar scopes, acionar UI de
+   login/linking e validar identidade/scopes no servidor. Não é um botão para “sem prompts”.
 
-4. **A recomendação de `outputSchema` é importante e deve ser tratada como P0/P1.** A documentação oficial diz para declarar `outputSchema` para tools que retornam `structuredContent`, para que clientes validem resultados e o modelo raciocine melhor sobre chamadas seguintes. A ausência de outputSchema provavelmente não é a causa direta dos bloqueios, mas reduz confiabilidade, validação, previsibilidade e qualidade de uso.
+4. **A recomendação de `outputSchema` é importante e deve ser tratada como P0/P1.** A documentação
+   oficial diz para declarar `outputSchema` para tools que retornam `structuredContent`, para que
+   clientes validem resultados e o modelo raciocine melhor sobre chamadas seguintes. A ausência de
+   outputSchema provavelmente não é a causa direta dos bloqueios, mas reduz confiabilidade,
+   validação, previsibilidade e qualidade de uso.
 
-5. **Precisamos adicionar `securitySchemes` por tool, mesmo que inicialmente `noauth`.** A documentação de autenticação recomenda declarar `securitySchemes` por tool, não depender só de default global. Isso permite evoluir para Mixed Authentication: read-only noauth, bounded-write OAuth opcional/obrigatório, destrutivas OAuth obrigatório.
+5. **Precisamos adicionar `securitySchemes` por tool, mesmo que inicialmente `noauth`.** A
+   documentação de autenticação recomenda declarar `securitySchemes` por tool, não depender só de
+   default global. Isso permite evoluir para Mixed Authentication: read-only noauth, bounded-write
+   OAuth opcional/obrigatório, destrutivas OAuth obrigatório.
 
 ---
 
@@ -97,14 +116,16 @@ Aviso: Servidores MCP personalizados podem trazer riscos.
 Checkbox: Entendi e quero continuar
 ```
 
-Essas telas confirmam que o conector está em Developer Mode, sem autenticação, usando URL de tunnel Cloudflare temporário. Isso é compatível com desenvolvimento, mas tem consequências:
+Essas telas confirmam que o conector está em Developer Mode, sem autenticação, usando URL de tunnel
+Cloudflare temporário. Isso é compatível com desenvolvimento, mas tem consequências:
 
 - ChatGPT não possui OAuth token para anexar às chamadas.
 - Não há scopes como `repo.read`, `repo.write`, `repo.validate`.
 - Não há consent screen por escopo.
 - Não há distinção de autorização por tool.
 - A UI mostra avisos porque custom MCPs são potencialmente perigosos.
-- A UI recomenda outputSchema porque as tools provavelmente retornam `structuredContent` sem schema declarado completo.
+- A UI recomenda outputSchema porque as tools provavelmente retornam `structuredContent` sem schema
+  declarado completo.
 
 ---
 
@@ -114,7 +135,10 @@ Essas telas confirmam que o conector está em Developer Mode, sem autenticação
 
 **Sim, mas não da forma mais direta.**
 
-“Autorização compatível: Nenhuma” e “Autorização usada: Nenhuma” indicam que o app/conector está em modo sem autenticação. A documentação oficial de Developer Mode diz que os modos suportados incluem OAuth, No Authentication e Mixed Authentication. Portanto, “Nenhuma” é um modo suportado e não impede o funcionamento do conector.
+“Autorização compatível: Nenhuma” e “Autorização usada: Nenhuma” indicam que o app/conector está em
+modo sem autenticação. A documentação oficial de Developer Mode diz que os modos suportados incluem
+OAuth, No Authentication e Mixed Authentication. Portanto, “Nenhuma” é um modo suportado e não
+impede o funcionamento do conector.
 
 Mas isso afeta o poder do ChatGPT de forma indireta:
 
@@ -133,7 +157,8 @@ Mas isso afeta o poder do ChatGPT de forma indireta:
 
 ### 3.2. Relação com bloqueios observados
 
-Os bloqueios observados nesta auditoria provavelmente **não foram causados apenas pela ausência de OAuth**, porque:
+Os bloqueios observados nesta auditoria provavelmente **não foram causados apenas pela ausência de
+OAuth**, porque:
 
 - `repo_create_file(dryRun=true)` foi bloqueado antes do MCP, mesmo sem mutação.
 - `repo_quarantine_file(dryRun=true)` foi bloqueado.
@@ -142,11 +167,13 @@ Os bloqueios observados nesta auditoria provavelmente **não foram causados apen
 - `repo_file_outline(registry.js)` funcionou no mesmo arquivo.
 - `repo_remove_file(confirm=false,dryRun=true)` chegou ao MCP e retornou erro controlado.
 
-Isso indica uma heurística do host por tipo de tool, payload, path, URL, contexto, descrição ou sequência de chamadas, não somente por auth.
+Isso indica uma heurística do host por tipo de tool, payload, path, URL, contexto, descrição ou
+sequência de chamadas, não somente por auth.
 
 ### 3.3. Recomendação
 
-Manter `No Authentication` é aceitável apenas em dev controlado. Para aumentar poder de forma robusta e reduzir ambiguidades, implementar **Mixed Authentication**:
+Manter `No Authentication` é aceitável apenas em dev controlado. Para aumentar poder de forma
+robusta e reduzir ambiguidades, implementar **Mixed Authentication**:
 
 - read-only: `noauth`;
 - plan-only: `noauth`;
@@ -155,7 +182,8 @@ Manter `No Authentication` é aceitável apenas em dev controlado. Para aumentar
 - destrutivas: `oauth2` com escopo `repo.destructive`;
 - status/tunnel/session profile: `noauth`.
 
-Isso não vai abolir confirmações, mas vai dar ao ChatGPT uma política de autorização explícita por tool.
+Isso não vai abolir confirmações, mas vai dar ao ChatGPT uma política de autorização explícita por
+tool.
 
 ---
 
@@ -163,16 +191,22 @@ Isso não vai abolir confirmações, mas vai dar ao ChatGPT uma política de aut
 
 ### 4.1. OAuth é necessário para máxima liberdade?
 
-**Para desenvolvimento solo, não necessariamente.**
-**Para máxima robustez, governança e confiança, sim.**
+**Para desenvolvimento solo, não necessariamente.** **Para máxima robustez, governança e confiança,
+sim.**
 
-No Authentication dá menos atrito inicial: sem login, sem token, sem scopes. Porém, para um app que dá ao ChatGPT poder sobre um repo, OAuth/Mixed Auth é melhor a médio prazo.
+No Authentication dá menos atrito inicial: sem login, sem token, sem scopes. Porém, para um app que
+dá ao ChatGPT poder sobre um repo, OAuth/Mixed Auth é melhor a médio prazo.
 
-A documentação de autenticação da Apps SDK diz que o ChatGPT só mostra UI de OAuth quando o MCP sinaliza que OAuth está disponível ou necessário; isso exige metadata (`securitySchemes` e resource metadata) e erros em runtime com `_meta["mcp/www_authenticate"]`. Também recomenda declarar `securitySchemes` por tool para dizer ao ChatGPT quais tools exigem OAuth e quais podem rodar anonimamente.
+A documentação de autenticação da Apps SDK diz que o ChatGPT só mostra UI de OAuth quando o MCP
+sinaliza que OAuth está disponível ou necessário; isso exige metadata (`securitySchemes` e resource
+metadata) e erros em runtime com `_meta["mcp/www_authenticate"]`. Também recomenda declarar
+`securitySchemes` por tool para dizer ao ChatGPT quais tools exigem OAuth e quais podem rodar
+anonimamente.
 
 ### 4.2. OAuth não elimina confirmação
 
-Mesmo com OAuth, a documentação de Developer Mode diz que write actions exigem confirmação por padrão. OAuth autentica e autoriza; ele não transforma uma escrita em read-only.
+Mesmo com OAuth, a documentação de Developer Mode diz que write actions exigem confirmação por
+padrão. OAuth autentica e autoriza; ele não transforma uma escrita em read-only.
 
 OAuth resolve:
 
@@ -212,15 +246,19 @@ Isso preserva descoberta e leitura com baixa fricção, mas dá identidade/scope
 
 ## 5. Conclusão sobre `outputSchema` recomendado
 
-A UI mostra “ESQUEMA DE SAÍDA RECOMENDADO” nas tools. Isso provavelmente indica que muitas tools retornam `structuredContent` sem `outputSchema`.
+A UI mostra “ESQUEMA DE SAÍDA RECOMENDADO” nas tools. Isso provavelmente indica que muitas tools
+retornam `structuredContent` sem `outputSchema`.
 
 A documentação oficial da Apps SDK diz explicitamente:
 
-> Declare `outputSchema` for any tool that returns `structuredContent`. The schema should describe the exact object your tool returns so clients can validate results and the model can reason about follow-up tool calls.
+> Declare `outputSchema` for any tool that returns `structuredContent`. The schema should describe
+> the exact object your tool returns so clients can validate results and the model can reason about
+> follow-up tool calls.
 
 ### 5.1. Isso interfere nos bloqueios?
 
-**Provavelmente não é a causa direta dos bloqueios externos**, mas interfere na qualidade e no poder do ChatGPT:
+**Provavelmente não é a causa direta dos bloqueios externos**, mas interfere na qualidade e no poder
+do ChatGPT:
 
 - reduz validação de cliente;
 - reduz previsibilidade de resposta;
@@ -278,45 +316,49 @@ Com `outputSchema`, o ChatGPT consegue:
 
 ### 6.1. Developer Mode
 
-A documentação oficial diz que Developer Mode fornece suporte MCP completo para todas as tools, read e write; que write actions exigem confirmação por padrão; que `readOnlyHint` é respeitado; que tools sem esse hint são tratadas como write actions; e que aprovações podem ser lembradas por tool apenas durante a conversa.
+A documentação oficial diz que Developer Mode fornece suporte MCP completo para todas as tools, read
+e write; que write actions exigem confirmação por padrão; que `readOnlyHint` é respeitado; que tools
+sem esse hint são tratadas como write actions; e que aprovações podem ser lembradas por tool apenas
+durante a conversa.
 
-Fonte:
-https://developers.openai.com/api/docs/guides/developer-mode
+Fonte: https://developers.openai.com/api/docs/guides/developer-mode
 
 ### 6.2. Apps SDK Reference
 
-A referência oficial define `outputSchema`, `securitySchemes`, `readOnlyHint`, `destructiveHint`, `openWorldHint` e `idempotentHint`.
+A referência oficial define `outputSchema`, `securitySchemes`, `readOnlyHint`, `destructiveHint`,
+`openWorldHint` e `idempotentHint`.
 
-Fonte:
-https://developers.openai.com/apps-sdk/reference
+Fonte: https://developers.openai.com/apps-sdk/reference
 
 ### 6.3. Apps SDK Authentication
 
-A documentação de autenticação explica que ChatGPT só mostra UI OAuth quando o MCP sinaliza OAuth via metadata e runtime errors; também recomenda declarar `securitySchemes` por tool, com `noauth` e `oauth2`.
+A documentação de autenticação explica que ChatGPT só mostra UI OAuth quando o MCP sinaliza OAuth
+via metadata e runtime errors; também recomenda declarar `securitySchemes` por tool, com `noauth` e
+`oauth2`.
 
-Fonte:
-https://developers.openai.com/apps-sdk/build/auth
+Fonte: https://developers.openai.com/apps-sdk/build/auth
 
 ### 6.4. Build your MCP server
 
-A documentação de server explica que o MCP server define tools, aplica auth, retorna dados, e que o modelo decide quando chamar tools com base na metadata. Também reforça `structuredContent` e `outputSchema`.
+A documentação de server explica que o MCP server define tools, aplica auth, retorna dados, e que o
+modelo decide quando chamar tools com base na metadata. Também reforça `structuredContent` e
+`outputSchema`.
 
-Fonte:
-https://developers.openai.com/apps-sdk/build/mcp-server
+Fonte: https://developers.openai.com/apps-sdk/build/mcp-server
 
 ### 6.5. Define tools
 
-A documentação recomenda uma tarefa por tool, inputs explícitos, outputs previsíveis, `outputSchema`, e separação entre read/write para respeitar confirmation flows.
+A documentação recomenda uma tarefa por tool, inputs explícitos, outputs previsíveis,
+`outputSchema`, e separação entre read/write para respeitar confirmation flows.
 
-Fonte:
-https://developers.openai.com/apps-sdk/plan/tools
+Fonte: https://developers.openai.com/apps-sdk/plan/tools
 
 ### 6.6. MCP Tools Specification
 
-A especificação MCP diz que tools são model-controlled, mas recomenda humano no loop e prompts de confirmação para operações sensíveis.
+A especificação MCP diz que tools são model-controlled, mas recomenda humano no loop e prompts de
+confirmação para operações sensíveis.
 
-Fonte:
-https://modelcontextprotocol.io/specification/2025-06-18/server/tools
+Fonte: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
 
 ---
 
@@ -374,7 +416,8 @@ warnings: []
 critical: []
 ```
 
-Observação importante: `mcp_runtime_health` ficou `ok`, mas `mcp_smoke_workspace` ficou `degraded` por workspace dirty. Isso é uma inconsistência leve de severidade agregada.
+Observação importante: `mcp_runtime_health` ficou `ok`, mas `mcp_smoke_workspace` ficou `degraded`
+por workspace dirty. Isso é uma inconsistência leve de severidade agregada.
 
 ---
 
@@ -535,7 +578,10 @@ repo_inspect_quarantined_file
 | `repo_remove_file(confirm=false,dryRun=true)`                  | Chegou ao MCP; erro controlado `ERR_REMOVE_CONFIRM_REQUIRED`       |
 | `repo_remove_file(confirm=true,dryRun=true)`                   | Chegou ao MCP; erro controlado `ENOENT` porque arquivo não existia |
 
-Achado relevante: a tool destrutiva `repo_remove_file` chegou ao MCP em dry-run, enquanto bounded-write reversível foi bloqueada antes do MCP. Isso sugere que o bloqueio externo não segue apenas `destructiveHint`; depende também de nome, payload, timing, tool class ou heurística interna do host.
+Achado relevante: a tool destrutiva `repo_remove_file` chegou ao MCP em dry-run, enquanto
+bounded-write reversível foi bloqueada antes do MCP. Isso sugere que o bloqueio externo não segue
+apenas `destructiveHint`; depende também de nome, payload, timing, tool class ou heurística interna
+do host.
 
 ---
 
@@ -602,7 +648,8 @@ Foram bloqueadas:
 
 ### 11.3. Interpretação
 
-O MCP não falhou nesses casos; a chamada não chegou ao handler. O smoke interno e outras tools provaram que o servidor consegue executar leitura, stats e busca internamente.
+O MCP não falhou nesses casos; a chamada não chegou ao handler. O smoke interno e outras tools
+provaram que o servidor consegue executar leitura, stats e busca internamente.
 
 A camada externa parece sensível a:
 
@@ -620,7 +667,8 @@ A camada externa parece sensível a:
 
 ### 12.1. Não é apenas OAuth
 
-Se fosse apenas ausência de OAuth, esperaríamos que todas as chamadas sensíveis falhassem de forma previsível por auth. Mas ocorreu:
+Se fosse apenas ausência de OAuth, esperaríamos que todas as chamadas sensíveis falhassem de forma
+previsível por auth. Mas ocorreu:
 
 - `repo_remove_file` chegou ao MCP;
 - `repo_file_outline` funcionou no mesmo arquivo em que `repo_read_file` falhou;
@@ -631,7 +679,8 @@ Isso mostra que a camada externa avalia mais fatores do que auth.
 
 ### 12.2. Não é apenas `destructiveHint`
 
-`repo_remove_file` é destrutiva e chegou ao MCP em dry-run. `repo_quarantine_file` é bounded-write e foi bloqueada. Isso sugere que a heurística não é simples.
+`repo_remove_file` é destrutiva e chegou ao MCP em dry-run. `repo_quarantine_file` é bounded-write e
+foi bloqueada. Isso sugere que a heurística não é simples.
 
 ### 12.3. Pode envolver tool name + payload + contexto + ação percebida
 
@@ -667,8 +716,8 @@ chatgpt_connector_current_url_status
 
 ### BUG-001 — `mcp_runtime_health` não reflete estado degraded do smoke
 
-**Severidade:** P2
-**Evidência:** `mcp_smoke_workspace` retornou `status=degraded` por `WORKSPACE_DIRTY`, mas `mcp_runtime_health` retornou `status=ok`, `warnings=[]`.
+**Severidade:** P2 **Evidência:** `mcp_smoke_workspace` retornou `status=degraded` por
+`WORKSPACE_DIRTY`, mas `mcp_runtime_health` retornou `status=ok`, `warnings=[]`.
 
 **Impacto:** a visão de saúde geral pode parecer mais verde do que o estado operacional real.
 
@@ -682,8 +731,8 @@ chatgpt_connector_current_url_status
 
 ### BUG-002 — Index vazio/indisponível após transformações
 
-**Severidade:** P1
-**Evidência:** `repo_index_status` retornou `enabled=true`, `available=false`, `files=0`, `freshness=empty`.
+**Severidade:** P1 **Evidência:** `repo_index_status` retornou `enabled=true`, `available=false`,
+`files=0`, `freshness=empty`.
 
 **Impacto:** tools de index não oferecem poder real ao ChatGPT até reconstruir o índice.
 
@@ -691,16 +740,18 @@ chatgpt_connector_current_url_status
 
 - `mcp_smoke_workspace` deve elevar warning quando index está vazio;
 - `mcp_maintenance_plan` já sugere `refresh-index`, mas o host bloqueou `repo_index_build`;
-- criar fluxo de refresh-index interno em maintenance com menor fricção ou executável fora do host ChatGPT.
+- criar fluxo de refresh-index interno em maintenance com menor fricção ou executável fora do host
+  ChatGPT.
 
 ---
 
 ### BUG-003 — Bounded-write dry-run bloqueado pelo host
 
-**Severidade:** P1
-**Evidência:** `repo_create_file(dryRun=true)` e `repo_quarantine_file(dryRun=true)` foram bloqueadas antes do MCP.
+**Severidade:** P1 **Evidência:** `repo_create_file(dryRun=true)` e
+`repo_quarantine_file(dryRun=true)` foram bloqueadas antes do MCP.
 
-**Impacto:** reduz muito o poder prático do ChatGPT; nem planos de escrita reversível passam consistentemente.
+**Impacto:** reduz muito o poder prático do ChatGPT; nem planos de escrita reversível passam
+consistentemente.
 
 **Correção proposta:**
 
@@ -716,10 +767,11 @@ chatgpt_connector_current_url_status
 
 ### BUG-004 — `repo_remove_file` dry-run chega ao MCP, mas quarantine dry-run não
 
-**Severidade:** P2
-**Evidência:** `repo_remove_file(confirm=false,dryRun=true)` chegou ao MCP e retornou erro controlado; `repo_quarantine_file(dryRun=true)` foi bloqueado externamente.
+**Severidade:** P2 **Evidência:** `repo_remove_file(confirm=false,dryRun=true)` chegou ao MCP e
+retornou erro controlado; `repo_quarantine_file(dryRun=true)` foi bloqueado externamente.
 
-**Impacto:** a heurística externa está favorecendo comportamento inesperado. O fluxo reversível deveria ser mais fácil que o destrutivo.
+**Impacto:** a heurística externa está favorecendo comportamento inesperado. O fluxo reversível
+deveria ser mais fácil que o destrutivo.
 
 **Correção proposta:**
 
@@ -732,8 +784,8 @@ chatgpt_connector_current_url_status
 
 ### BUG-005 — `chatgpt_connector_url_check` bloqueado com URL real
 
-**Severidade:** P2
-**Evidência:** chamada com `https://gage-bon-beast-contribute.trycloudflare.com/mcp` foi bloqueada.
+**Severidade:** P2 **Evidência:** chamada com
+`https://gage-bon-beast-contribute.trycloudflare.com/mcp` foi bloqueada.
 
 **Impacto:** reduz a capacidade do ChatGPT de validar public URL automaticamente.
 
@@ -747,10 +799,10 @@ chatgpt_connector_current_url_status
 
 ### BUG-006 — `repo_root_tree(showHidden=true)` bloqueado externamente
 
-**Severidade:** P2
-**Evidência:** `showHidden=true` bloqueado; `showHidden=false` OK.
+**Severidade:** P2 **Evidência:** `showHidden=true` bloqueado; `showHidden=false` OK.
 
-**Impacto:** ChatGPT não consegue auditar redaction de hidden paths diretamente, embora smoke consiga.
+**Impacto:** ChatGPT não consegue auditar redaction de hidden paths diretamente, embora smoke
+consiga.
 
 **Correção proposta:**
 
@@ -764,8 +816,7 @@ chatgpt_connector_current_url_status
 
 ### BUG-007 — Ausência de outputSchema explícito prejudica maturidade do conector
 
-**Severidade:** P1/P2
-**Evidência:** UI mostra “ESQUEMA DE SAÍDA RECOMENDADO” nas tools.
+**Severidade:** P1/P2 **Evidência:** UI mostra “ESQUEMA DE SAÍDA RECOMENDADO” nas tools.
 
 **Impacto:** menor previsibilidade para ChatGPT, validação de cliente e encadeamento de tool calls.
 
@@ -780,8 +831,8 @@ chatgpt_connector_current_url_status
 
 ### BUG-008 — Ausência de securitySchemes por tool
 
-**Severidade:** P1/P2
-**Evidência:** UI mostra `Autorização compatível: Nenhuma` e `Autorização usada: Nenhuma`.
+**Severidade:** P1/P2 **Evidência:** UI mostra `Autorização compatível: Nenhuma` e
+`Autorização usada: Nenhuma`.
 
 **Impacto:** sem scopes por tool; sem OAuth linking; sem política granular de autorização.
 
@@ -819,9 +870,11 @@ Essas tools podem ser `readOnlyHint=true` se não mutarem nada.
 
 ### GAP-002 — Falta runner externo efetivo para escapar da autorização do host
 
-`delegate_to_repo_autonomy_runner(dryRun=true)` funcionou, mas `dryRun=false` foi bloqueado pelo ChatGPT.
+`delegate_to_repo_autonomy_runner(dryRun=true)` funcionou, mas `dryRun=false` foi bloqueado pelo
+ChatGPT.
 
-Para autonomia real, é necessário que o runner seja acionado por um canal onde a política seja nossa, não do ChatGPT, ou que o ChatGPT só gere/assine um plano e o runner local execute fora da UI.
+Para autonomia real, é necessário que o runner seja acionado por um canal onde a política seja
+nossa, não do ChatGPT, ou que o ChatGPT só gere/assine um plano e o runner local execute fora da UI.
 
 ---
 
@@ -869,7 +922,8 @@ Isso mantém smoke `degraded`.
 
 ### GAP-006 — `repo_root_tree(showHidden=false)` ainda revela arquivos raiz estranhos
 
-A raiz contém muitos artefatos/relatórios. Isso não é bug MCP, mas reduz clareza operacional e pode aumentar payload/ruído.
+A raiz contém muitos artefatos/relatórios. Isso não é bug MCP, mas reduz clareza operacional e pode
+aumentar payload/ruído.
 
 ---
 
@@ -996,7 +1050,8 @@ Retorna resumo dos últimos jobs por tipo e identifica se estão obsoletos.
 
 ### UPG-008 — Golden prompt automation
 
-`mcp_golden_prompts` já existe, mas pode gerar um arquivo JSON/Markdown de resultados de medição para o usuário preencher durante sessão real do ChatGPT.
+`mcp_golden_prompts` já existe, mas pode gerar um arquivo JSON/Markdown de resultados de medição
+para o usuário preencher durante sessão real do ChatGPT.
 
 ---
 
@@ -1456,18 +1511,24 @@ notes
 
 ## 22. Veredito
 
-O MCP `WORKSPACE` agora tem uma arquitetura forte e quase toda a superfície necessária para dar poder real ao ChatGPT sobre o repo. Ele já implementa grande parte do plano de autonomia: annotations, risk classes, session profile, golden prompts, maintenance batch, safe suite, autonomy runner e quarantine.
+O MCP `WORKSPACE` agora tem uma arquitetura forte e quase toda a superfície necessária para dar
+poder real ao ChatGPT sobre o repo. Ele já implementa grande parte do plano de autonomia:
+annotations, risk classes, session profile, golden prompts, maintenance batch, safe suite, autonomy
+runner e quarantine.
 
 Mas três pontos precisam ser tratados para aumentar o poder efetivo no `chatgpt.com`:
 
-1. **Adicionar `outputSchema` em todas as tools.**
-   Isso é explicitamente recomendado pela documentação oficial e deve melhorar validação, previsibilidade e encadeamento de tool calls.
+1. **Adicionar `outputSchema` em todas as tools.** Isso é explicitamente recomendado pela
+   documentação oficial e deve melhorar validação, previsibilidade e encadeamento de tool calls.
 
-2. **Adicionar `securitySchemes` e evoluir para Mixed Authentication.**
-   “Autorização compatível/usada: Nenhuma” não impede funcionamento em dev, mas é fraco para scopes, consentimento granular e produção. Mixed Auth é o melhor meio-termo: read/plan noauth, write/validate/destructive OAuth.
+2. **Adicionar `securitySchemes` e evoluir para Mixed Authentication.** “Autorização
+   compatível/usada: Nenhuma” não impede funcionamento em dev, mas é fraco para scopes,
+   consentimento granular e produção. Mixed Auth é o melhor meio-termo: read/plan noauth,
+   write/validate/destructive OAuth.
 
-3. **Separar plan-only read-only de apply/write.**
-   Como o host bloqueou bounded-write mesmo em dry-run, `dryRun` dentro da tool de escrita não basta. Precisamos de tools de planejamento puramente read-only.
+3. **Separar plan-only read-only de apply/write.** Como o host bloqueou bounded-write mesmo em
+   dry-run, `dryRun` dentro da tool de escrita não basta. Precisamos de tools de planejamento
+   puramente read-only.
 
 Resumo final:
 

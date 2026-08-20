@@ -1,7 +1,8 @@
 # 2026-05-11 — Validação incremental das claims externas (`src/copilot`)
 
 > **Contexto**: revalidação após estabilização do escopo `src/copilot` + testes Vitest relacionados.
-> **Baseline validada (atualizada ao fim da rodada)**: `typecheck strict` green, `eslint` green, `npm run test:copilot` green.
+> **Baseline validada (atualizada ao fim da rodada)**: `typecheck strict` green, `eslint` green,
+> `npm run test:copilot` green.
 
 ---
 
@@ -13,7 +14,8 @@
 - `git status -sb` → `## main...origin/main` ✅
 - divergência `HEAD...@{u}` = `0 0` ✅
 
-Essas validações removem ruído de regressão local e permitem avaliar as claims externas sobre a base já corrigida e publicada.
+Essas validações removem ruído de regressão local e permitem avaliar as claims externas sobre a base
+já corrigida e publicada.
 
 ---
 
@@ -39,11 +41,17 @@ Essas validações removem ruído de regressão local e permitem avaliar as clai
 
 A claim `OBS-BUG-03` / `SYS-GAP-04` foi revalidada com leitura cruzada de runtime:
 
-- `src/copilot/hooks/presets/production.js` registra decisões `deny` em `audit(...)`, que por sua vez escreve em `auditSink`/`defaultAuditLog`.
-- `src/copilot/hooks/tool-interceptor.js` também retorna `permissionDecision: 'deny'` após `log('WARN', ...)`, mas não registra métrica operacional local.
-- `src/copilot/observability/tool-stats.js` contabiliza chamadas apenas via `recordToolCall()`/`wrapWithStats()`, isto é, **após execução do handler** ou em bridges que registram explicitamente a chamada.
+- `src/copilot/hooks/presets/production.js` registra decisões `deny` em `audit(...)`, que por sua
+  vez escreve em `auditSink`/`defaultAuditLog`.
+- `src/copilot/hooks/tool-interceptor.js` também retorna `permissionDecision: 'deny'` após
+  `log('WARN', ...)`, mas não registra métrica operacional local.
+- `src/copilot/observability/tool-stats.js` contabiliza chamadas apenas via
+  `recordToolCall()`/`wrapWithStats()`, isto é, **após execução do handler** ou em bridges que
+  registram explicitamente a chamada.
 
-Conclusão após a transformação desta rodada: o sistema continua **auditando** bloqueios e agora também os promove ao plano principal de **métricas agregadas de tools** no runtime canônico do agent. O bug original deixa de ser ativo nesse fluxo.
+Conclusão após a transformação desta rodada: o sistema continua **auditando** bloqueios e agora
+também os promove ao plano principal de **métricas agregadas de tools** no runtime canônico do
+agent. O bug original deixa de ser ativo nesse fluxo.
 
 ### 3.2 O que mudou de categoria
 
@@ -65,7 +73,8 @@ As claims externas mais úteis, após a estabilização do código, se repartem 
 
 ### 3.3 O que isso significa para o rebuild canônico
 
-O centro de gravidade da auditoria saiu de “quebras imediatas da factory/bootstrap” e foi para **governança de observabilidade, limites operacionais e convergência de contratos**.
+O centro de gravidade da auditoria saiu de “quebras imediatas da factory/bootstrap” e foi para
+**governança de observabilidade, limites operacionais e convergência de contratos**.
 
 Em outras palavras:
 
@@ -88,7 +97,8 @@ Em outras palavras:
 
 ### Prioridade B — consolidar arquitetura target
 
-1. Formalizar contratos canônicos de tool (`ToolDefinition`, `Telemetry`, `PermissionDecision`, `UserInputBridge`).
+1. Formalizar contratos canônicos de tool (`ToolDefinition`, `Telemetry`, `PermissionDecision`,
+   `UserInputBridge`).
 2. Fechar o gap entre `ToolSessionContext` e o path legado de user-input.
 3. Revalidar restrições de boundary além de `tools/`, especialmente no `terminal/`.
 
@@ -102,4 +112,5 @@ O prompt original desta frente foi cumprido antes desta etapa de auditoria:
 - o pacote de testes/lint/typecheck ficou verde;
 - os commits foram organizados e enviados para `main`.
 
-Com isso, a auditoria passa a operar sobre uma base confiável. A partir daqui, o trabalho de maior valor é **separar risco arquitetural real de documentação externa já obsoleta**.
+Com isso, a auditoria passa a operar sobre uma base confiável. A partir daqui, o trabalho de maior
+valor é **separar risco arquitetural real de documentação externa já obsoleta**.

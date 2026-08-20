@@ -9,19 +9,6 @@ export {
     evaluateTerminalByokTurnBudget,
     readTerminalByokAdmissionMode,
 } from './admission.js';
-export {
-    classifyTerminalByokSdkBinding,
-    isSameTerminalByokProviderBoundary,
-    renderTerminalPreparedByokSelection,
-    renderTerminalSdkProviderBinding,
-} from './session-binding.js';
-export {
-    consumeTerminalLiveByokModelSwitchConfirmation,
-    readTerminalLiveByokModelSwitchRequest,
-    recordTerminalLiveByokModelSwitchDeferred,
-    requestTerminalLiveByokModelSwitch,
-    requestTerminalLiveByokRouteSwitch,
-} from './live-model-switch.js';
 export { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from './deferred-route-promotion.js';
 export {
     applyTerminalByokGatewayAutoEffects,
@@ -34,3 +21,16 @@ export {
     runTerminalByokGatewayPostTurnAutomation,
     runTerminalByokGatewayPreTurnAutomation,
 } from './gateway-auto.js';
+export {
+    consumeTerminalLiveByokModelSwitchConfirmation,
+    readTerminalLiveByokModelSwitchRequest,
+    recordTerminalLiveByokModelSwitchDeferred,
+    requestTerminalLiveByokModelSwitch,
+    requestTerminalLiveByokRouteSwitch,
+} from './live-model-switch.js';
+export {
+    classifyTerminalByokSdkBinding,
+    isSameTerminalByokProviderBoundary,
+    renderTerminalPreparedByokSelection,
+    renderTerminalSdkProviderBinding,
+} from './session-binding.js';

@@ -80,7 +80,14 @@ function modelKey(row) {
  * @returns {boolean}
  */
 function hasRedactedIdentity(row) {
-    return [row['id'], row['evidenceId'], row['providerId'], row['providerModel'], row['selectorSyntax'], row['accountOverlayId']]
+    return [
+        row['id'],
+        row['evidenceId'],
+        row['providerId'],
+        row['providerModel'],
+        row['selectorSyntax'],
+        row['accountOverlayId'],
+    ]
         .map(optionalString)
         .some((value) => value !== null && /\[redacted\]/iu.test(value));
 }
@@ -88,7 +95,13 @@ function hasRedactedIdentity(row) {
 /**
  * @param {Record<string, unknown>[]} rows
  * @param {(row: Record<string, unknown>) => string} keyFn
- * @returns {{ rowCount: number; uniqueKeyCount: number; duplicateKeyCount: number; duplicateExtraRowCount: number; duplicateSamples: Array<{ key: string; count: number }> }}
+ * @returns {{
+ *     rowCount: number;
+ *     uniqueKeyCount: number;
+ *     duplicateKeyCount: number;
+ *     duplicateExtraRowCount: number;
+ *     duplicateSamples: { key: string; count: number }[];
+ * }}
  */
 function duplicateKeySummary(rows, keyFn) {
     /** @type {Map<string, number>} */
@@ -109,33 +122,53 @@ function duplicateKeySummary(rows, keyFn) {
 /**
  * @param {unknown} snapshot
  * @returns {{
- *   schema: string;
- *   ok: boolean;
- *   duplicateChecks: Record<string, ReturnType<typeof duplicateKeySummary>>;
- *   redactedIdentityCount: number;
- *   redactedIdentitySamples: Array<{ field: string; id: string | null; providerId: string | null; providerModel: string | null }>;
+ *     schema: string;
+ *     ok: boolean;
+ *     duplicateChecks: Record<string, ReturnType<typeof duplicateKeySummary>>;
+ *     redactedIdentityCount: number;
+ *     redactedIdentitySamples: {
+ *         field: string;
+ *         id: string | null;
+ *         providerId: string | null;
+ *         providerModel: string | null;
+ *     }[];
  * }}
  */
 export function auditModelGatewayCatalogSnapshotIntegrity(snapshot) {
     const normalized = normalizeStoredCatalogSnapshot(snapshot);
     const duplicateChecks = {
-        evidences: duplicateKeySummary(normalized.evidences, (row) => optionalString(row['evidenceId']) ?? `${modelKey(row)}:${optionalString(row['fieldPath']) ?? 'field'}`),
+        evidences: duplicateKeySummary(
+            normalized.evidences,
+            (row) =>
+                optionalString(row['evidenceId']) ?? `${modelKey(row)}:${optionalString(row['fieldPath']) ?? 'field'}`,
+        ),
         providerEvidences: duplicateKeySummary(
             normalized.providerEvidences,
-            (row) => optionalString(row['evidenceId']) ?? [providerId(row), optionalString(row['subjectProviderId']) ?? 'unknown-subject', optionalString(row['fieldPath']) ?? 'field'].join(':'),
+            (row) =>
+                optionalString(row['evidenceId']) ??
+                [
+                    providerId(row),
+                    optionalString(row['subjectProviderId']) ?? 'unknown-subject',
+                    optionalString(row['fieldPath']) ?? 'field',
+                ].join(':'),
         ),
-        routeOptions: duplicateKeySummary(
-            normalized.routeOptions,
-            (row) => [modelKey(row), selectorKind(row), selectorSyntax(row)].join(':'),
+        routeOptions: duplicateKeySummary(normalized.routeOptions, (row) =>
+            [modelKey(row), selectorKind(row), selectorSyntax(row)].join(':'),
         ),
         projections: duplicateKeySummary(normalized.projections, modelKey),
-        providerProjections: duplicateKeySummary(
-            normalized.providerProjections,
-            (row) => [providerId(row), optionalString(row['subjectProviderId']) ?? 'unknown-subject'].join(':'),
+        providerProjections: duplicateKeySummary(normalized.providerProjections, (row) =>
+            [providerId(row), optionalString(row['subjectProviderId']) ?? 'unknown-subject'].join(':'),
         ),
         accountOverlays: duplicateKeySummary(
             normalized.accountOverlays,
-            (row) => optionalString(row['accountOverlayId']) ?? [providerId(row), optionalString(row['accountScope']) ?? 'default', optionalString(row['secretRef']) ?? 'no-secret', optionalString(row['sourceId']) ?? 'unknown-source'].join(':'),
+            (row) =>
+                optionalString(row['accountOverlayId']) ??
+                [
+                    providerId(row),
+                    optionalString(row['accountScope']) ?? 'default',
+                    optionalString(row['secretRef']) ?? 'no-secret',
+                    optionalString(row['sourceId']) ?? 'unknown-source',
+                ].join(':'),
         ),
     };
     const identityRows = [
@@ -144,7 +177,10 @@ export function auditModelGatewayCatalogSnapshotIntegrity(snapshot) {
         ...normalized.projections.map((row) => ({ field: 'projections', row })),
         ...normalized.accountOverlays.map((row) => ({ field: 'accountOverlays', row })),
     ].filter((item) => isRecord(item.row) && hasRedactedIdentity(item.row));
-    const duplicateExtraRowCount = Object.values(duplicateChecks).reduce((total, item) => total + item.duplicateExtraRowCount, 0);
+    const duplicateExtraRowCount = Object.values(duplicateChecks).reduce(
+        (total, item) => total + item.duplicateExtraRowCount,
+        0,
+    );
     return {
         schema: 'model-gateway-catalog-integrity',
         ok: duplicateExtraRowCount === 0 && identityRows.length === 0,
@@ -152,10 +188,12 @@ export function auditModelGatewayCatalogSnapshotIntegrity(snapshot) {
         redactedIdentityCount: identityRows.length,
         redactedIdentitySamples: identityRows.slice(0, 20).map((item) => ({
             field: item.field,
-            id: optionalString(item.row['id']) ?? optionalString(item.row['evidenceId']) ?? optionalString(item.row['accountOverlayId']),
+            id:
+                optionalString(item.row['id']) ??
+                optionalString(item.row['evidenceId']) ??
+                optionalString(item.row['accountOverlayId']),
             providerId: optionalString(item.row['providerId']),
             providerModel: optionalString(item.row['providerModel']),
         })),
     };
 }
-

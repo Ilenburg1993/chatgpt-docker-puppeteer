@@ -3,7 +3,8 @@
  * NVIDIA NIM hosted/self-hosted models importer.
  *
  * NVIDIA hosted NIM uses an OpenAI-compatible `/v1/models` endpoint, while self-hosted NIMs also expose management
- * endpoints such as `/v1/metadata`, `/v1/version`, `/v1/health/ready`, `/v1/metrics`, `/v1/license` and `/v1/manifest`.
+ * endpoints such as `/v1/metadata`, `/v1/version`, `/v1/health/ready`, `/v1/metrics`, `/v1/license` and
+ * `/v1/manifest`.
  *
  * @module copilot/model-gateway/catalog/importers/nvidia-nim-models-importer
  */
@@ -102,13 +103,19 @@ function capabilitiesFromModelId(providerModel) {
             : {
                   chat: false,
                   streaming: false,
-                  [runtimeFamily === 'embedding' ? 'embeddings' : runtimeFamily === 'image-generation' ? 'imageGeneration' : runtimeFamily]:
-                      true,
+                  [runtimeFamily === 'embedding'
+                      ? 'embeddings'
+                      : runtimeFamily === 'image-generation'
+                        ? 'imageGeneration'
+                        : runtimeFamily]: true,
               };
     if (lower.includes('vl') || lower.includes('vision') || lower.includes('llava')) capabilities['vision'] = true;
     if (
         runtimeFamily === 'chat' &&
-        (lower.includes('gpt-oss') || lower.includes('nemotron') || lower.includes('deepseek') || lower.includes('qwen'))
+        (lower.includes('gpt-oss') ||
+            lower.includes('nemotron') ||
+            lower.includes('deepseek') ||
+            lower.includes('qwen'))
     ) {
         capabilities['reasoning'] = true;
     }
@@ -143,7 +150,7 @@ function wireApiFromModelId(providerModel) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -163,7 +170,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.nvidia.object', value: stringValue(row['object']) },
         { fieldPath: 'providerMetadata.nvidia.managementEndpoints', value: [...NVIDIA_NIM_MANAGEMENT_ENDPOINTS] },
         { fieldPath: 'providerMetadata.nvidia.hostedBaseUrl', value: NVIDIA_NIM_BASE_URL },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.created', value: finiteNumber(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) ?? 'nvidia' },
     ];
@@ -252,7 +262,9 @@ export function createNvidiaNimModelsImporter(options = {}) {
         },
         toAccountOverlays(rows, context) {
             const sourceId = stringValue(context.source['id']) ?? 'nvidia-nim-models';
-            const enabledModels = rows.map((row) => stringValue(isRecord(row) ? row['id'] : null)).filter((id) => id !== null);
+            const enabledModels = rows
+                .map((row) => stringValue(isRecord(row) ? row['id'] : null))
+                .filter((id) => id !== null);
             const controls = normalizeAccountOverlayControls({
                 enabledModels,
                 providerMetadata: {

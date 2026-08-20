@@ -24,8 +24,9 @@ Esta auditoria verifica se o processo de boot e lifecycle da LLM-B está:
 3. expondo por default a maior superfície funcional segura possível;
 4. deixando explícitas as guardas que ainda existem por razões de robustez.
 
-O objetivo não é apenas listar bugs; é separar claramente **config**, **client**, **session**, **dialog**,
-**runtime**, **agent**, **terminal** e **server**, e então propor a situação ideal e o roadmap de execução.
+O objetivo não é apenas listar bugs; é separar claramente **config**, **client**, **session**,
+**dialog**, **runtime**, **agent**, **terminal** e **server**, e então propor a situação ideal e o
+roadmap de execução.
 
 ---
 
@@ -33,7 +34,8 @@ O objetivo não é apenas listar bugs; é separar claramente **config**, **clien
 
 ### 2.1 `config`
 
-`config/` declara defaults e knobs. Ele não deveria decidir topologia de processo nem wiring operacional.
+`config/` declara defaults e knobs. Ele não deveria decidir topologia de processo nem wiring
+operacional.
 
 ### 2.2 `boot`
 
@@ -47,34 +49,38 @@ O objetivo não é apenas listar bugs; é separar claramente **config**, **clien
 
 ### 2.3 `client`
 
-`client` é o `CopilotClient`: transporte, conexão com CLI/server, lifecycle de sessões, RPC server-scoped.
+`client` é o `CopilotClient`: transporte, conexão com CLI/server, lifecycle de sessões, RPC
+server-scoped.
 
 ### 2.4 `session`
 
-`session` é a conversa SDK viva: tools, hooks, MCP, custom agents, skills, system message, permissions e streaming.
+`session` é a conversa SDK viva: tools, hooks, MCP, custom agents, skills, system message,
+permissions e streaming.
 
 ### 2.5 `dialog`
 
-`dialog` governa o loop de input: start/stop/resume/recovery, canal READY/REPLY, `ask_user`, bounce controlado e
-watchdog.
+`dialog` governa o loop de input: start/stop/resume/recovery, canal READY/REPLY, `ask_user`, bounce
+controlado e watchdog.
 
 ### 2.6 `runtime`
 
-`runtime` é a composição operacional contínua em torno da sessão: ownership, fila, bridges, observers, keepalive,
-handoff, quota, health e surfaces de controle.
+`runtime` é a composição operacional contínua em torno da sessão: ownership, fila, bridges,
+observers, keepalive, handoff, quota, health e surfaces de controle.
 
 ### 2.7 `agent`
 
-`agent` é o governador da sessão/runtime. Ele não é o `client`, não é a `session`, e não é a borda terminal.
+`agent` é o governador da sessão/runtime. Ele não é o `client`, não é a `session`, e não é a borda
+terminal.
 
 ### 2.8 `terminal`
 
-`terminal` é host de UX local e REPL. Ele não deve decidir configuração profunda do SDK fora dos gateways próprios.
+`terminal` é host de UX local e REPL. Ele não deve decidir configuração profunda do SDK fora dos
+gateways próprios.
 
 ### 2.9 `server`
 
-`server` é host HTTP/Socket.IO. Ele deve refletir o runtime e expor superfícies, não decidir boot de SDK por conta
-própria.
+`server` é host HTTP/Socket.IO. Ele deve refletir o runtime e expor superfícies, não decidir boot de
+SDK por conta própria.
 
 ---
 
@@ -92,10 +98,13 @@ própria.
 
 Os principais desalinhamentos encontrados foram estes:
 
-1. **defaults conservadores demais** em flags que, na prática, reduziam superfície funcional por default;
+1. **defaults conservadores demais** em flags que, na prática, reduziam superfície funcional por
+   default;
 2. **hardcode local** de `includeSubAgentStreamingEvents: false` no inicializador da sessão;
-3. **ambiguidade semântica** entre `sdk.enabled` como “SDK ativo” versus “rotas HTTP /sdk habilitadas”;
-4. **pouca visibilidade operacional** sobre quais capacidades realmente estão ligadas no boot efetivo.
+3. **ambiguidade semântica** entre `sdk.enabled` como “SDK ativo” versus “rotas HTTP /sdk
+   habilitadas”;
+4. **pouca visibilidade operacional** sobre quais capacidades realmente estão ligadas no boot
+   efetivo.
 
 ### 3.3 O que continua guardado de forma deliberada
 
@@ -103,8 +112,8 @@ O principal guardrail mantido conscientemente é:
 
 - `includeSubAgentStreamingEvents` continua **guardado por default**;
 
-isso não é descuido: é uma proteção explícita até que a narrativa terminal para deltas de subagente esteja totalmente
-rica e livre de ruído operacional.
+isso não é descuido: é uma proteção explícita até que a narrativa terminal para deltas de subagente
+esteja totalmente rica e livre de ruído operacional.
 
 ---
 
@@ -118,8 +127,8 @@ rica e livre de ruído operacional.
 - `COPILOT_ENABLE_CONFIG_DISCOVERY=false`
 - `COPILOT_TERMINAL_ENABLED=false`
 
-Mesmo no perfil canônico terminal-first, isso comunicava — e em um caso efetivamente produzia — um runtime menos capaz
-por default.
+Mesmo no perfil canônico terminal-first, isso comunicava — e em um caso efetivamente produzia — um
+runtime menos capaz por default.
 
 ### Situação ideal
 
@@ -149,7 +158,8 @@ Ter uma flag explícita, observável e documentável.
 
 ### Status
 
-**Corrigido nesta rodada** com `COPILOT_INCLUDE_SUBAGENT_STREAMING_EVENTS` e projeção em `boot/sessionDefaults`.
+**Corrigido nesta rodada** com `COPILOT_INCLUDE_SUBAGENT_STREAMING_EVENTS` e projeção em
+`boot/sessionDefaults`.
 
 ---
 
@@ -254,7 +264,8 @@ Ao final da trilha de boot/lifecycle, o estado ideal é:
 
 ### Fase BL-3.2 — Projeção de knobs avançados
 
-- avaliar exposição explícita de `defaultAgent`, `customAgents`, MCP e discovery na baseline resumida;
+- avaliar exposição explícita de `defaultAgent`, `customAgents`, MCP e discovery na baseline
+  resumida;
 - distinguir contrato disponível de contrato efetivamente aplicado.
 
 **Status:** pendente.
@@ -287,8 +298,9 @@ Esta rodada já executou a Faixa BL-1 e parte da BL-2:
 
 ## 8. Veredito final
 
-O boot/lifecycle atual já era estruturalmente bom, mas ainda carregava uma herança de defaults conservadores e
-algumas ambiguidades semânticas que faziam a LLM-B parecer menos capaz do que realmente poderia ser.
+O boot/lifecycle atual já era estruturalmente bom, mas ainda carregava uma herança de defaults
+conservadores e algumas ambiguidades semânticas que faziam a LLM-B parecer menos capaz do que
+realmente poderia ser.
 
 Depois desta rodada, a situação ficou significativamente melhor:
 
@@ -296,5 +308,6 @@ Depois desta rodada, a situação ficou significativamente melhor:
 - **mais clareza de owners**;
 - **mais visibilidade do que está ativo versus guardado**.
 
-O principal item deliberadamente não destravado por default continua sendo o streaming de subagentes, e isso agora está
-documentado como decisão arquitetônica explícita, não como efeito colateral escondido.
+O principal item deliberadamente não destravado por default continua sendo o streaming de
+subagentes, e isso agora está documentado como decisão arquitetônica explícita, não como efeito
+colateral escondido.

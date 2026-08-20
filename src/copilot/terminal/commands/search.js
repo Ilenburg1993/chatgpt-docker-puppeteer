@@ -56,14 +56,20 @@ export function cmdSearch({ println, hubSessionId }, arg) {
         }
 
         println('');
-        println(terminalThemeHeadline('assistant', 'Resultados da busca', [`${results.length}`, `"${projection.query}"`]));
+        println(
+            terminalThemeHeadline('assistant', 'Resultados da busca', [`${results.length}`, `"${projection.query}"`]),
+        );
         println('');
         for (const r of results) {
             const role = r['role'] ?? '?';
             const content = typeof r['content'] === 'string' ? r['content'] : String(r['content'] ?? '');
             const preview = content.length > 120 ? content.slice(0, 120) + '…' : content;
-            const ts = r['created_at'] ? formatTerminalTimeLabel(String(r['created_at']), { mode: 'dual' }) : 'sem horário';
-            println(`  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText('command', String(role))}: ${preview}`);
+            const ts = r['created_at']
+                ? formatTerminalTimeLabel(String(r['created_at']), { mode: 'dual' })
+                : 'sem horário';
+            println(
+                `  ${terminalThemeText('muted', `[${ts}]`)} ${terminalThemeText('command', String(role))}: ${preview}`,
+            );
         }
         println('');
     } catch (e) {

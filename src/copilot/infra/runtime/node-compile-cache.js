@@ -7,12 +7,7 @@
  * @module copilot/infra/runtime/node-compile-cache
  */
 
-import {
-    constants as moduleConstants,
-    enableCompileCache,
-    flushCompileCache,
-    getCompileCacheDir,
-} from 'node:module';
+import { enableCompileCache, flushCompileCache, getCompileCacheDir, constants as moduleConstants } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -30,6 +25,7 @@ const COMPILE_CACHE_STATUS = moduleConstants.compileCacheStatus ?? {};
  *     nodeVersion: string;
  *     error: string | null;
  * }} NodeCompileCacheSummary
+ *
  *
  * @typedef {{
  *     attempted: boolean;
@@ -50,7 +46,9 @@ let lastFlushSummary = null;
  * @param {boolean} [fallback]
  */
 function readBooleanEnv(env = process.env, name = '', fallback = false) {
-    const raw = String(env[name] ?? '').trim().toLowerCase();
+    const raw = String(env[name] ?? '')
+        .trim()
+        .toLowerCase();
     if (!raw) return fallback;
     if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') return true;
     if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'off') return false;
@@ -59,7 +57,9 @@ function readBooleanEnv(env = process.env, name = '', fallback = false) {
 
 /** @param {NodeJS.ProcessEnv} [env] */
 function readCompileCacheDirectory(env = process.env) {
-    return String(env['NODE_COMPILE_CACHE'] ?? env['COPILOT_NODE_COMPILE_CACHE_DIR'] ?? DEFAULT_NODE_COMPILE_CACHE_DIR).trim();
+    return String(
+        env['NODE_COMPILE_CACHE'] ?? env['COPILOT_NODE_COMPILE_CACHE_DIR'] ?? DEFAULT_NODE_COMPILE_CACHE_DIR,
+    ).trim();
 }
 
 /** @param {NodeJS.ProcessEnv} [env] */
@@ -94,7 +94,8 @@ function summarizeCompileCacheResult(result, directory, portable, env) {
         [COMPILE_CACHE_STATUS.ENABLED, COMPILE_CACHE_STATUS.ALREADY_ENABLED].filter((value) => value !== undefined),
     );
     return {
-        enabled: enabledStatuses.has(/** @type {number} */ (result.status)) || statusName.toLowerCase().includes('enabled'),
+        enabled:
+            enabledStatuses.has(/** @type {number} */ (result.status)) || statusName.toLowerCase().includes('enabled'),
         attempted: true,
         status: String(result.status),
         statusName,
@@ -159,8 +160,8 @@ export function enableCopilotNodeCompileCache(env = process.env) {
 }
 
 /**
- * Flush accumulated compile cache to disk so children spawned before parent exit can reuse it.
- * Failures are intentionally non-fatal, matching Node's compile-cache semantics.
+ * Flush accumulated compile cache to disk so children spawned before parent exit can reuse it. Failures are
+ * intentionally non-fatal, matching Node's compile-cache semantics.
  *
  * @returns {NodeCompileCacheFlushSummary}
  */

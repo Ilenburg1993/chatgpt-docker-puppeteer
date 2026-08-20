@@ -250,7 +250,14 @@ function parseCloudflareDurationNanos(value, key) {
     for (const match of matches) {
         const amount = Number(match[1]);
         const unit = match[2];
-        const factor = unit === 'ms' ? 1_000_000 : unit === 's' ? 1_000_000_000 : unit === 'm' ? 60_000_000_000 : 3_600_000_000_000;
+        const factor =
+            unit === 'ms'
+                ? 1_000_000
+                : unit === 's'
+                  ? 1_000_000_000
+                  : unit === 'm'
+                    ? 60_000_000_000
+                    : 3_600_000_000_000;
         total += amount * factor;
     }
     return total;

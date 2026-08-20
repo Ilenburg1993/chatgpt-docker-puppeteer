@@ -142,14 +142,15 @@ export const BLOCKED_PATTERNS_SECRETS = [
  * Verifica se um caminho está dentro do workspace autorizado e não é um arquivo bloqueado.
  *
  * @param {string} filePath - Caminho absoluto ou relativo
- * @param {{ mode?: 'read' | 'write'; issueReadCapability?: boolean; issueMutableCapability?: boolean }} [opts] - Modo de operação; capabilities exigem opt-in explícito.
+ * @param {{ mode?: 'read' | 'write'; issueReadCapability?: boolean; issueMutableCapability?: boolean }} [opts] - Modo
+ *   de operação; capabilities exigem opt-in explícito.
  * @returns {Promise<{
- *   ok: boolean;
- *   reason?: string;
- *   resolved: string;
- *   validatedReadPath?: ReturnType<typeof createValidatedReadWorkspacePath>;
- *   validatedWritePath?: ReturnType<typeof createValidatedMutableWorkspacePath>;
- * }>} 
+ *     ok: boolean;
+ *     reason?: string;
+ *     resolved: string;
+ *     validatedReadPath?: ReturnType<typeof createValidatedReadWorkspacePath>;
+ *     validatedWritePath?: ReturnType<typeof createValidatedMutableWorkspacePath>;
+ * }>}
  */
 export async function validatePath(filePath, opts) {
     if (typeof filePath !== 'string' || filePath.trim().length === 0) {

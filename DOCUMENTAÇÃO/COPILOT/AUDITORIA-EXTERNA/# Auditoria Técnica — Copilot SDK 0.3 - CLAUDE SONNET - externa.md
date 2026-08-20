@@ -1,7 +1,7 @@
 # Auditoria Técnica — Copilot SDK 0.3.0 + Node.js 24 ESM
-**Data**: 16 de maio de 2026
-**Escopo**: `src/copilot/infra/` · `src/copilot/tools/`
-**Base**: SDK `@github/copilot-sdk@0.3.0` · Node.js 24 LTS · ESM puro
+
+**Data**: 16 de maio de 2026 **Escopo**: `src/copilot/infra/` · `src/copilot/tools/` **Base**: SDK
+`@github/copilot-sdk@0.3.0` · Node.js 24 LTS · ESM puro
 
 ---
 
@@ -32,9 +32,13 @@ for (const k of _lru.keys()) {
 }
 ```
 
-Iterar e deletar concorrentemente do mesmo iterador é comportamento não especificado pela implementação interna do `lru-cache`. Dependendo da versão e do modo de iteração, entradas podem ser puladas ou visitadas duas vezes. O risco é real pois `invalidate` é chamado diretamente pelo `io-engine` após cada escrita.
+Iterar e deletar concorrentemente do mesmo iterador é comportamento não especificado pela
+implementação interna do `lru-cache`. Dependendo da versão e do modo de iteração, entradas podem ser
+puladas ou visitadas duas vezes. O risco é real pois `invalidate` é chamado diretamente pelo
+`io-engine` após cada escrita.
 
 **Correção**:
+
 ```js
 const keysToDelete = [];
 for (const k of _lru.keys()) {
@@ -65,14 +69,19 @@ const buffer =
 stdoutChunks.push(buffer);        // ← view armazenada; pode ser reciclada pelo stream
 ```
 
-`toBufferView` cria um `Buffer` que aponta para a mesma memória do chunk original. O runtime do Node.js (via libuv) pode reutilizar o backing buffer do chunk assim que o evento `data` terminar, corrompendo silenciosamente `stdoutChunks`. Isso afeta qualquer busca que use `rg` ou `grep` através de `execSearchFile`.
+`toBufferView` cria um `Buffer` que aponta para a mesma memória do chunk original. O runtime do
+Node.js (via libuv) pode reutilizar o backing buffer do chunk assim que o evento `data` terminar,
+corrompendo silenciosamente `stdoutChunks`. Isso afeta qualquer busca que use `rg` ou `grep` através
+de `execSearchFile`.
 
 **Correção**:
+
 ```js
 const buffer = toOwnedBuffer(
     typeof chunk === 'string' ? chunk : chunk,
 );
 ```
+
 Ou de forma mais explícita: substituir `toBufferView` por `toOwnedBuffer` na função `collect`.
 
 ---
@@ -95,9 +104,13 @@ if (indexStore && stats) {
 }
 ```
 
-Se o arquivo for modificado entre T1 e T2, o índice persiste `content` desatualizado com `mtimeMs`/`sizeBytes` do estado novo. O comparador de fingerprint vai considerar o arquivo fresco quando, na verdade, o conteúdo do índice é stale. Isso afeta `workspace_index_build` e todas as buscas FTS5 subsequentes.
+Se o arquivo for modificado entre T1 e T2, o índice persiste `content` desatualizado com
+`mtimeMs`/`sizeBytes` do estado novo. O comparador de fingerprint vai considerar o arquivo fresco
+quando, na verdade, o conteúdo do índice é stale. Isso afeta `workspace_index_build` e todas as
+buscas FTS5 subsequentes.
 
-**Correção**: usar `text.mtimeMs` e `text.sizeBytes` retornados pelo próprio `readTextFileSnapshot`, eliminando o segundo `fsStat`.
+**Correção**: usar `text.mtimeMs` e `text.sizeBytes` retornados pelo próprio `readTextFileSnapshot`,
+eliminando o segundo `fsStat`.
 
 ---
 
@@ -105,9 +118,14 @@ Se o arquivo for modificado entre T1 e T2, o índice persiste `content` desatual
 
 **Arquivo**: `src/copilot/tools/todo/store.js`
 
-A função `readStore` chama `_readStoreRaw()` diretamente, **sem** entrar no mutex serial. Se uma operação de escrita via `withStore` estiver a meio caminho de `_writeStoreRaw`, uma leitura concorrente via `readStore` pode enxergar um estado parcial — especialmente quando a transação SQLite ainda não foi comitada (a camada `db.transaction()` é síncrona, mas o JavaScript pode interleaved por microtasks se houver `await` antes do commit).
+A função `readStore` chama `_readStoreRaw()` diretamente, **sem** entrar no mutex serial. Se uma
+operação de escrita via `withStore` estiver a meio caminho de `_writeStoreRaw`, uma leitura
+concorrente via `readStore` pode enxergar um estado parcial — especialmente quando a transação
+SQLite ainda não foi comitada (a camada `db.transaction()` é síncrona, mas o JavaScript pode
+interleaved por microtasks se houver `await` antes do commit).
 
-**Correção**: `readStore` deve adquirir o mutex em modo read-only, ou a implementação deve confiar exclusivamente no isolamento transacional do SQLite com `PRAGMA read_uncommitted = false` (padrão).
+**Correção**: `readStore` deve adquirir o mutex em modo read-only, ou a implementação deve confiar
+exclusivamente no isolamento transacional do SQLite com `PRAGMA read_uncommitted = false` (padrão).
 
 ---
 
@@ -124,9 +142,13 @@ set(input) {
 }
 ```
 
-`capSizeIfNeeded` executa sempre um `SELECT COUNT(*)` e potencialmente um `DELETE` com subquery. Em cenários de warm-up de diretório com milhares de arquivos, isso multiplica a carga sobre SQLite de forma quadrática. O L2 foi projetado para cenários de miss de L1, mas essa implementação degradaria qualquer build de índice que popule o L2.
+`capSizeIfNeeded` executa sempre um `SELECT COUNT(*)` e potencialmente um `DELETE` com subquery. Em
+cenários de warm-up de diretório com milhares de arquivos, isso multiplica a carga sobre SQLite de
+forma quadrática. O L2 foi projetado para cenários de miss de L1, mas essa implementação degradaria
+qualquer build de índice que popule o L2.
 
-**Correção**: aplicar o check de capacidade apenas a cada N operações (e.g., `stats.sets % 100 === 0`) ou mediante um TTL em tempo absoluto.
+**Correção**: aplicar o check de capacidade apenas a cada N operações (e.g.,
+`stats.sets % 100 === 0`) ou mediante um TTL em tempo absoluto.
 
 ---
 
@@ -146,9 +168,13 @@ setInterval(() => {
 }, 60_000).unref?.();
 ```
 
-Para cada entrada no mapa `tails`, a cada 60 segundos é adicionado um novo callback `.finally()` à mesma Promise. Se uma Promise de lock ficar pendente por 10 minutos, ela acumulará 10 callbacks `.finally()` que nunca removem a entrada — apenas criam closures extras que impedem GC. Em sessões longas com alto volume de operações bloqueadas, isso constitui um memory leak.
+Para cada entrada no mapa `tails`, a cada 60 segundos é adicionado um novo callback `.finally()` à
+mesma Promise. Se uma Promise de lock ficar pendente por 10 minutos, ela acumulará 10 callbacks
+`.finally()` que nunca removem a entrada — apenas criam closures extras que impedem GC. Em sessões
+longas com alto volume de operações bloqueadas, isso constitui um memory leak.
 
-**Correção**: substituir o `setInterval` por limpeza on-demand (após `release()`), que já está corretamente implementada em `scheduleTailCleanup`. O `setInterval` é redundante e prejudicial.
+**Correção**: substituir o `setInterval` por limpeza on-demand (após `release()`), que já está
+corretamente implementada em `scheduleTailCleanup`. O `setInterval` é redundante e prejudicial.
 
 ---
 
@@ -163,9 +189,14 @@ const warmPromise = (async () => { ... })();
 _warmPromises.set(sessionId, warmPromise); // substitui a promise anterior
 ```
 
-Se `declareScope` for chamada duas vezes com o mesmo `sessionId` (re-declaração de escopo após edição de arquivos), a primeira `warmPromise` continua executando em background, mas sua referência é perdida. Quando ela escreve em `scope.preloaded`, `scope.failed` etc., ela está mutando o objeto **antigo** de escopo (já descartado do registry). Resultado: o novo escopo aparece com contadores zerados enquanto o aquecimento real continua em segundo plano sem ser observável.
+Se `declareScope` for chamada duas vezes com o mesmo `sessionId` (re-declaração de escopo após
+edição de arquivos), a primeira `warmPromise` continua executando em background, mas sua referência
+é perdida. Quando ela escreve em `scope.preloaded`, `scope.failed` etc., ela está mutando o objeto
+**antigo** de escopo (já descartado do registry). Resultado: o novo escopo aparece com contadores
+zerados enquanto o aquecimento real continua em segundo plano sem ser observável.
 
-**Correção**: cancelar (ou aguardar) a warmPromise existente antes de registrar um novo scope com o mesmo ID.
+**Correção**: cancelar (ou aguardar) a warmPromise existente antes de registrar um novo scope com o
+mesmo ID.
 
 ---
 
@@ -179,9 +210,13 @@ if (!l2Enabled && readHotsetRatio < 0.1) {
 }
 ```
 
-Um `readHotsetRatio` baixo (< 10%) significa que poucas leituras estão sendo satisfeitas pelo cache — exatamente quando o L2 **mais ajudaria** a preencher lacunas de L1. A recomendação deveria ser o oposto: investigar por que o hit-ratio está baixo ou considerar habilitar L2 para aumentar cobertura.
+Um `readHotsetRatio` baixo (< 10%) significa que poucas leituras estão sendo satisfeitas pelo cache
+— exatamente quando o L2 **mais ajudaria** a preencher lacunas de L1. A recomendação deveria ser o
+oposto: investigar por que o hit-ratio está baixo ou considerar habilitar L2 para aumentar
+cobertura.
 
-**Correção**: inverter a condição ou separar a semântica (hit-ratio baixo pode indicar tanto cache subdimensionado quanto workload frio).
+**Correção**: inverter a condição ou separar a semântica (hit-ratio baixo pode indicar tanto cache
+subdimensionado quanto workload frio).
 
 ---
 
@@ -196,9 +231,13 @@ const maySafelyPrune =
     options.pruneMissing !== false;
 ```
 
-A lógica é correta, mas a tool `workspace_index_build` em `index-tools.js` não expõe `pruneMissing` ao usuário quando `include`/`exclude` estão presentes. Isso significa que o usuário **não pode forçar poda** mesmo em builds onde sabe que a fatia é completa. O parâmetro `pruneMissing` está no schema Zod mas a condição interna ignora-o quando `include.length > 0`.
+A lógica é correta, mas a tool `workspace_index_build` em `index-tools.js` não expõe `pruneMissing`
+ao usuário quando `include`/`exclude` estão presentes. Isso significa que o usuário **não pode
+forçar poda** mesmo em builds onde sabe que a fatia é completa. O parâmetro `pruneMissing` está no
+schema Zod mas a condição interna ignora-o quando `include.length > 0`.
 
-**Correção**: desacoplar as duas condições — `include`/`exclude` devem avisar (não bloquear) e `pruneMissing` deve ser o controle autoritativo.
+**Correção**: desacoplar as duas condições — `include`/`exclude` devem avisar (não bloquear) e
+`pruneMissing` deve ser o controle autoritativo.
 
 ---
 
@@ -210,9 +249,12 @@ A lógica é correta, mas a tool `workspace_index_build` em `index-tools.js` nã
 .filter((token) => token.length >= 2)
 ```
 
-Buscas por termos como `"fs"`, `"db"`, `"io"`, `"id"` retornam `""` (query vazia), que produz resultados incoerentes (FTS5 retorna todas as linhas ou nenhuma dependendo da versão do SQLite). Esses são exatamente os termos mais comuns em um codebase Node.js.
+Buscas por termos como `"fs"`, `"db"`, `"io"`, `"id"` retornam `""` (query vazia), que produz
+resultados incoerentes (FTS5 retorna todas as linhas ou nenhuma dependendo da versão do SQLite).
+Esses são exatamente os termos mais comuns em um codebase Node.js.
 
-**Correção**: reduzir o mínimo para 1 caractere, ou preservar tokens curtos que sejam alphanumericamente válidos e com length ≥ 1.
+**Correção**: reduzir o mínimo para 1 caractere, ou preservar tokens curtos que sejam
+alphanumericamente válidos e com length ≥ 1.
 
 ---
 
@@ -224,9 +266,15 @@ Buscas por termos como `"fs"`, `"db"`, `"io"`, `"id"` retornam `""` (query vazia
 ensureInvalidationHook();  // chamado no topo do módulo
 ```
 
-`ensureInvalidationHook` registra um hook no bus de invalidação global. Em ambientes de teste onde o módulo é importado múltiplas vezes (via `vi.resetModules()`), o hook pode ser registrado múltiplas vezes se o `_parserInvalidationUnregister` for zerado entre testes mas o módulo não for completamente descartado. `resetParserCacheForTest` deregistra o hook, mas se não for chamado, os hooks se acumulam.
+`ensureInvalidationHook` registra um hook no bus de invalidação global. Em ambientes de teste onde o
+módulo é importado múltiplas vezes (via `vi.resetModules()`), o hook pode ser registrado múltiplas
+vezes se o `_parserInvalidationUnregister` for zerado entre testes mas o módulo não for
+completamente descartado. `resetParserCacheForTest` deregistra o hook, mas se não for chamado, os
+hooks se acumulam.
 
-**Correção**: o hook deve ser registrado lazily na primeira chamada de `parseFileSymbols` ou `parseAndCacheSymbols`, e `resetParserCacheForTest` deve ser chamado explicitamente nos setups de teste.
+**Correção**: o hook deve ser registrado lazily na primeira chamada de `parseFileSymbols` ou
+`parseAndCacheSymbols`, e `resetParserCacheForTest` deve ser chamado explicitamente nos setups de
+teste.
 
 ---
 
@@ -234,9 +282,13 @@ ensureInvalidationHook();  // chamado no topo do módulo
 
 **Arquivos**: `module-map.js` (infra e tools)
 
-Os inventários `INFRA_MODULE_LAYOUT` e `TOOLS_MODULE_LAYOUT` são arrays estáticos. Qualquer novo arquivo ou diretório adicionado ao subsistema deve ser manualmente inserido neles. O gate arquitetural `test_infra_barrel_governance.spec.js` verifica cobertura, mas apenas em CI. Em desenvolvimento ativo, há uma janela de discrepância entre o filesystem e o mapa.
+Os inventários `INFRA_MODULE_LAYOUT` e `TOOLS_MODULE_LAYOUT` são arrays estáticos. Qualquer novo
+arquivo ou diretório adicionado ao subsistema deve ser manualmente inserido neles. O gate
+arquitetural `test_infra_barrel_governance.spec.js` verifica cobertura, mas apenas em CI. Em
+desenvolvimento ativo, há uma janela de discrepância entre o filesystem e o mapa.
 
-**Recomendação**: o script de scorecard deve ler o filesystem e comparar com o inventário em runtime, emitindo warnings observáveis quando a cobertura cair.
+**Recomendação**: o script de scorecard deve ler o filesystem e comparar com o inventário em
+runtime, emitindo warnings observáveis quando a cobertura cair.
 
 ---
 
@@ -248,9 +300,13 @@ Os inventários `INFRA_MODULE_LAYOUT` e `TOOLS_MODULE_LAYOUT` são arrays estát
 const RATE_WINDOW = new Map();  // estado de módulo compartilhado por instância ESM
 ```
 
-Se o runtime executar múltiplos worker threads que importem o mesmo módulo, cada worker terá seu próprio `RATE_WINDOW` (ESM modules são por-worker). O rate limit efetivo seria `perMinute * numWorkers`, não `perMinute` global. Isso não é um bug no modelo single-process atual, mas é uma armadilha documentada para quem escalar via `node:cluster` ou `node:worker_threads`.
+Se o runtime executar múltiplos worker threads que importem o mesmo módulo, cada worker terá seu
+próprio `RATE_WINDOW` (ESM modules são por-worker). O rate limit efetivo seria
+`perMinute * numWorkers`, não `perMinute` global. Isso não é um bug no modelo single-process atual,
+mas é uma armadilha documentada para quem escalar via `node:cluster` ou `node:worker_threads`.
 
-**Recomendação**: documentar explicitamente o comportamento por-processo ou implementar rate limit via `SharedArrayBuffer`.
+**Recomendação**: documentar explicitamente o comportamento por-processo ou implementar rate limit
+via `SharedArrayBuffer`.
 
 ---
 
@@ -269,9 +325,11 @@ for (const candidate of candidates) {
     const stat = await fsStat(candidate).catch(() => null);
 ```
 
-Para um arquivo com 20 imports relativos, isso gera até 400 chamadas `fsStat` sequenciais. Não há cache de resultados de resolução nem `Promise.all` para paralelização.
+Para um arquivo com 20 imports relativos, isso gera até 400 chamadas `fsStat` sequenciais. Não há
+cache de resultados de resolução nem `Promise.all` para paralelização.
 
-**Correção**: paralelizar os candidates por import (não os imports entre si) e adicionar um cache de resolução por sessão.
+**Correção**: paralelizar os candidates por import (não os imports entre si) e adicionar um cache de
+resolução por sessão.
 
 ---
 
@@ -283,7 +341,11 @@ Para um arquivo com 20 imports relativos, isso gera até 400 chamadas `fsStat` s
 if (c === '$' && command[i + 1] === '(') return true; // subshell $()
 ```
 
-Esta verificação já está em `hasShellMetaOutsideQuotes` em `sandbox.js`, **mas não** em `tokenizeShell`. O tokenizador divide `echo $(id)` como `['echo', '$(id)']` e passa pelo blocklist sem triggerar a proteção. O argumento `$(id)` é então passado diretamente ao `execFile` — que não executa shell expansion — então o risco de RCE é mitigado pelo uso de `execFile`, mas o comportamento confuso pode levar a falsos negativos nos logs de segurança.
+Esta verificação já está em `hasShellMetaOutsideQuotes` em `sandbox.js`, **mas não** em
+`tokenizeShell`. O tokenizador divide `echo $(id)` como `['echo', '$(id)']` e passa pelo blocklist
+sem triggerar a proteção. O argumento `$(id)` é então passado diretamente ao `execFile` — que não
+executa shell expansion — então o risco de RCE é mitigado pelo uso de `execFile`, mas o
+comportamento confuso pode levar a falsos negativos nos logs de segurança.
 
 ---
 
@@ -295,7 +357,9 @@ Esta verificação já está em `hasShellMetaOutsideQuotes` em `sandbox.js`, **m
 const queue = this.#queues.get(normalizedPriority) ?? this.#queues.get(5);
 ```
 
-Qualquer prioridade que não seja `0`, `5` ou `10` cai silenciosamente para `5` (normal). Um caller passando `priority = 3` esperaria alta prioridade mas receberia normal. O comportamento deveria ser documentado ou o mapa deveria ser dinâmico.
+Qualquer prioridade que não seja `0`, `5` ou `10` cai silenciosamente para `5` (normal). Um caller
+passando `priority = 3` esperaria alta prioridade mas receberia normal. O comportamento deveria ser
+documentado ou o mapa deveria ser dinâmico.
 
 ---
 
@@ -311,7 +375,9 @@ export function releaseLock(lockPath) {
         const pid = readLockOwnerPid(readFileSync(lockPath, 'utf-8'));
 ```
 
-Três operações síncronas de filesystem em sequência. Como `releaseLock` é chamada em `finally` blocks e shutdown handlers, isso bloqueia o event loop durante cleanup. Num processo com muitos lockfiles, pode causar timeout de shutdown.
+Três operações síncronas de filesystem em sequência. Como `releaseLock` é chamada em `finally`
+blocks e shutdown handlers, isso bloqueia o event loop durante cleanup. Num processo com muitos
+lockfiles, pode causar timeout de shutdown.
 
 ---
 
@@ -323,7 +389,10 @@ Três operações síncronas de filesystem em sequência. Como `releaseLock` é 
 ...(opts.includePattern ? [`--include=${opts.includePattern}`] : []),
 ```
 
-Se `includePattern` contiver espaços ou caracteres como `;`, e o grep for invocado via `spawn` (que é o caso), o argumento é passado diretamente sem shell expansion — tornando a injeção inofensiva para RCE. Contudo, um `includePattern` como `*.js --include=*.json` criaria argumentos extras não intencionais. A validação `hasNullByte` no adapter de busca não detecta este caso.
+Se `includePattern` contiver espaços ou caracteres como `;`, e o grep for invocado via `spawn` (que
+é o caso), o argumento é passado diretamente sem shell expansion — tornando a injeção inofensiva
+para RCE. Contudo, um `includePattern` como `*.js --include=*.json` criaria argumentos extras não
+intencionais. A validação `hasNullByte` no adapter de busca não detecta este caso.
 
 ---
 
@@ -338,7 +407,8 @@ export function countLines(content) {
 }
 ```
 
-Um arquivo vazio tem 0 linhas — correto. Mas um arquivo de uma linha sem `\n` final retorna `1` (correto) enquanto a função em `io/patch/text-patch.js` usa `countLines` de forma diferente:
+Um arquivo vazio tem 0 linhas — correto. Mas um arquivo de uma linha sem `\n` final retorna `1`
+(correto) enquanto a função em `io/patch/text-patch.js` usa `countLines` de forma diferente:
 
 ```js
 function countLines(content) {
@@ -346,7 +416,10 @@ function countLines(content) {
 }
 ```
 
-Dois `countLines` com comportamento diferente para string vazia (`0` vs `1`) coexistem no mesmo codebase. O da `text-patch.js` usa `? 1` para que o delta de linhas nunca seja negativo em patches, enquanto o do `index-store` usa `? 0`. Isso causa inconsistência no campo `line_count` do índice vs. os deltas reportados pelo `patchTextLocked`.
+Dois `countLines` com comportamento diferente para string vazia (`0` vs `1`) coexistem no mesmo
+codebase. O da `text-patch.js` usa `? 1` para que o delta de linhas nunca seja negativo em patches,
+enquanto o do `index-store` usa `? 0`. Isso causa inconsistência no campo `line_count` do índice vs.
+os deltas reportados pelo `patchTextLocked`.
 
 ---
 
@@ -356,9 +429,14 @@ Dois `countLines` com comportamento diferente para string vazia (`0` vs `1`) coe
 
 **Arquivo**: `src/copilot/infra/io-index-sqlite.js`
 
-A função `indexDirectory` pode ser chamada concorrentemente por múltiplas ferramentas (e.g., `workspace_index_build` chamada duas vezes em paralelo ou pelo `declareScope` + chamada direta). Internamente, cada arquivo usa `db.transaction(commit)()` individualmente, mas não há lock externo impedindo que dois processos de indexação deletem e re-insiram a mesma entrada simultaneamente (`clearFileRows` + `stmtUpsertFile` não é atômico com outra thread do mesmo processo).
+A função `indexDirectory` pode ser chamada concorrentemente por múltiplas ferramentas (e.g.,
+`workspace_index_build` chamada duas vezes em paralelo ou pelo `declareScope` + chamada direta).
+Internamente, cada arquivo usa `db.transaction(commit)()` individualmente, mas não há lock externo
+impedindo que dois processos de indexação deletem e re-insiram a mesma entrada simultaneamente
+(`clearFileRows` + `stmtUpsertFile` não é atômico com outra thread do mesmo processo).
 
-**Recomendação**: adicionar um lock de processo via `withIoResourceLock` com chave derivada do `rootPath` antes de iniciar o loop de indexação.
+**Recomendação**: adicionar um lock de processo via `withIoResourceLock` com chave derivada do
+`rootPath` antes de iniciar o loop de indexação.
 
 ---
 
@@ -371,9 +449,13 @@ if (directory && indexMode !== 'off') {
     const indexResult = await buildIoIndexForDirectory(directory, indexOptions);
 ```
 
-Não há proteção contra a indexação acidental de `/` ou de um workspace com centenas de milhares de arquivos. A ferramenta `workspace_scope_declare` aceita qualquer `directory` válido. O parâmetro `maxFiles` é descrito como "advisory" e não limita a operação — o scanner vai até `depth: 20` por padrão.
+Não há proteção contra a indexação acidental de `/` ou de um workspace com centenas de milhares de
+arquivos. A ferramenta `workspace_scope_declare` aceita qualquer `directory` válido. O parâmetro
+`maxFiles` é descrito como "advisory" e não limita a operação — o scanner vai até `depth: 20` por
+padrão.
 
-**Recomendação**: implementar um limite hard de arquivos no scan de escopo (configurável via env) e retornar um advisory warning quando o limite for atingido.
+**Recomendação**: implementar um limite hard de arquivos no scan de escopo (configurável via env) e
+retornar um advisory warning quando o limite for atingido.
 
 ---
 
@@ -385,9 +467,13 @@ Não há proteção contra a indexação acidental de `/` ou de um workspace com
 const rows = db.prepare('SELECT id, data FROM copilot_todo_tasks').all();
 ```
 
-O store carrega **todos** os TODOs em memória a cada leitura. Com centenas ou milhares de tarefas (especialmente após `todo_import` em massa), isso cria pressão de memória e latência de desserialização proporcional. A paginação está implementada nas tools de query (`todo_list`, `todo_search`) mas acontece **depois** do carregamento total.
+O store carrega **todos** os TODOs em memória a cada leitura. Com centenas ou milhares de tarefas
+(especialmente após `todo_import` em massa), isso cria pressão de memória e latência de
+desserialização proporcional. A paginação está implementada nas tools de query (`todo_list`,
+`todo_search`) mas acontece **depois** do carregamento total.
 
-**Recomendação**: implementar paginação na camada SQL com `LIMIT`/`OFFSET` ou cursor por `id`, especialmente para `todoListTool` e `todoSearchTool`.
+**Recomendação**: implementar paginação na camada SQL com `LIMIT`/`OFFSET` ou cursor por `id`,
+especialmente para `todoListTool` e `todoSearchTool`.
 
 ---
 
@@ -395,14 +481,19 @@ O store carrega **todos** os TODOs em memória a cada leitura. Com centenas ou m
 
 **Arquivo**: `src/copilot/infra/io-cache-l2-sqlite.js`, `io-index-sqlite.js`, `todo/store.js`
 
-Todos os módulos usam o mesmo banco (`getCopilotDb()`). O SQLite no modo padrão (journal_mode=DELETE) serializa leitores e escritores, o que cria contenção severa quando o L2 cache, o índice FTS e o todo store operam simultaneamente. WAL mode permite leitores concorrentes com um único escritor e elimina a maioria das contenções.
+Todos os módulos usam o mesmo banco (`getCopilotDb()`). O SQLite no modo padrão
+(journal_mode=DELETE) serializa leitores e escritores, o que cria contenção severa quando o L2
+cache, o índice FTS e o todo store operam simultaneamente. WAL mode permite leitores concorrentes
+com um único escritor e elimina a maioria das contenções.
 
 **Recomendação**:
+
 ```js
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 db.pragma('wal_autocheckpoint = 1000');
 ```
+
 Estes pragmas devem ser aplicados uma vez no setup do banco, em `getCopilotDb()`.
 
 ---
@@ -411,9 +502,12 @@ Estes pragmas devem ser aplicados uma vez no setup do banco, em `getCopilotDb()`
 
 **Arquivo**: `src/copilot/tools/web/web-tools.js`
 
-A ferramenta está hardcoded para `method: 'GET'`. Quando o agente precisa interagir com APIs REST (webhooks, form posts, GraphQL), é forçado a usar `exec_command` com `curl`, contornando toda a proteção SSRF e o rate limiting da tool dedicada.
+A ferramenta está hardcoded para `method: 'GET'`. Quando o agente precisa interagir com APIs REST
+(webhooks, form posts, GraphQL), é forçado a usar `exec_command` com `curl`, contornando toda a
+proteção SSRF e o rate limiting da tool dedicada.
 
-**Recomendação**: adicionar parâmetro `method` com enum `['GET', 'POST', 'PUT', 'PATCH']` e parâmetro `body` opcional, mantendo a validação SSRF existente.
+**Recomendação**: adicionar parâmetro `method` com enum `['GET', 'POST', 'PUT', 'PATCH']` e
+parâmetro `body` opcional, mantendo a validação SSRF existente.
 
 ---
 
@@ -421,9 +515,15 @@ A ferramenta está hardcoded para `method: 'GET'`. Quando o agente precisa inter
 
 **Arquivo**: `src/copilot/infra/io-cache-l2-registry.js`
 
-O circuit breaker existente (`_circuitOpenUntilMs`) abre apenas após `MAX_INIT_FAILURES = 3` falhas consecutivas. O backoff usa `[1000, 5000, 30000]` ms. Em ambientes com SQLite corrompido ou permissões incorretas, o processo vai tentar inicializar o L2 três vezes com falha, depois entrar em circuit-open, e silenciosamente operar em modo L1-only sem alertar de forma persistente nos logs de saúde (`io-health.js`).
+O circuit breaker existente (`_circuitOpenUntilMs`) abre apenas após `MAX_INIT_FAILURES = 3` falhas
+consecutivas. O backoff usa `[1000, 5000, 30000]` ms. Em ambientes com SQLite corrompido ou
+permissões incorretas, o processo vai tentar inicializar o L2 três vezes com falha, depois entrar em
+circuit-open, e silenciosamente operar em modo L1-only sem alertar de forma persistente nos logs de
+saúde (`io-health.js`).
 
-**Recomendação**: emitir um evento de lifecycle `'cache:l2:circuit-open'` via `publishIoLifecycleEvent` quando o circuit abrir, e expor o estado de circuit-open de forma mais proeminente no snapshot de health.
+**Recomendação**: emitir um evento de lifecycle `'cache:l2:circuit-open'` via
+`publishIoLifecycleEvent` quando o circuit abrir, e expor o estado de circuit-open de forma mais
+proeminente no snapshot de health.
 
 ---
 
@@ -439,9 +539,13 @@ function tryBabelParse(code, lang) {
 }
 ```
 
-`@babel/parser` é CPU-bound e síncrono. Para arquivos gerados (e.g., `bundle.js`, `.d.ts` com milhares de linhas), pode bloquear o event loop por centenas de milissegundos. O limite `MAX_PARSE_BYTES` (2MB) mitiga o caso extremo, mas dentro desse limite ainda é possível ter arquivos com parsing lento.
+`@babel/parser` é CPU-bound e síncrono. Para arquivos gerados (e.g., `bundle.js`, `.d.ts` com
+milhares de linhas), pode bloquear o event loop por centenas de milissegundos. O limite
+`MAX_PARSE_BYTES` (2MB) mitiga o caso extremo, mas dentro desse limite ainda é possível ter arquivos
+com parsing lento.
 
-**Recomendação**: mover `tryBabelParse` para um `worker_threads` pool dedicado, ou ao menos adicionar um timeout baseado em `performance.now()` para abortar parses excessivamente longos.
+**Recomendação**: mover `tryBabelParse` para um `worker_threads` pool dedicado, ou ao menos
+adicionar um timeout baseado em `performance.now()` para abortar parses excessivamente longos.
 
 ---
 
@@ -449,9 +553,13 @@ function tryBabelParse(code, lang) {
 
 **Arquivo**: `src/copilot/infra/io/invalidation/bus.js`
 
-Quando um arquivo é escrito via `patchTextLocked`, a cadeia `invalidateIoCacheTiers` → `invalidateIoCachePath` → `publishIoInvalidation` pode disparar hooks para L1, L2 e o índice em sequência rápida. Se vários patches forem aplicados em série (e.g., multi-hunk patch), o mesmo path pode invalidar o índice 5+ vezes sem necessidade.
+Quando um arquivo é escrito via `patchTextLocked`, a cadeia `invalidateIoCacheTiers` →
+`invalidateIoCachePath` → `publishIoInvalidation` pode disparar hooks para L1, L2 e o índice em
+sequência rápida. Se vários patches forem aplicados em série (e.g., multi-hunk patch), o mesmo path
+pode invalidar o índice 5+ vezes sem necessidade.
 
-**Recomendação**: implementar debounce por `filePath` no bus (e.g., 50ms) ou batch de invalidações dentro de uma janela de operação.
+**Recomendação**: implementar debounce por `filePath` no bus (e.g., 50ms) ou batch de invalidações
+dentro de uma janela de operação.
 
 ---
 
@@ -459,9 +567,14 @@ Quando um arquivo é escrito via `patchTextLocked`, a cadeia `invalidateIoCacheT
 
 **Arquivo**: `src/copilot/tools/search/text-search-tools.js`
 
-O retorno inclui `engine: 'fts5-index' | 'rg' | 'grep'`, mas quando o fallback de `fts5-index` para `rg` ocorre (índice vazio ou query complexa), o modelo não recebe nenhuma explicação. Em casos onde o índice está desatualizado e `rg` produz mais resultados, o agente pode ter percepção incorreta de completude.
+O retorno inclui `engine: 'fts5-index' | 'rg' | 'grep'`, mas quando o fallback de `fts5-index` para
+`rg` ocorre (índice vazio ou query complexa), o modelo não recebe nenhuma explicação. Em casos onde
+o índice está desatualizado e `rg` produz mais resultados, o agente pode ter percepção incorreta de
+completude.
 
-**Recomendação**: incluir campo `indexFallback: boolean` e `indexFallbackReason?: string` no retorno, para que o agente possa decidir se deve executar `workspace_index_build` antes de repetir a busca.
+**Recomendação**: incluir campo `indexFallback: boolean` e `indexFallbackReason?: string` no
+retorno, para que o agente possa decidir se deve executar `workspace_index_build` antes de repetir a
+busca.
 
 ---
 
@@ -473,9 +586,13 @@ O retorno inclui `engine: 'fts5-index' | 'rg' | 'grep'`, mas quando o fallback d
 const _registry = new Map();  // sem limite
 ```
 
-O agente pode declarar escopos sem limite. Cada escopo mantém em memória: paths, symbolIndex (Map de `FileSymbols`), prefetch cache. Em sessões de longa duração com muitas tarefas concorrentes, o registro pode crescer indefinidamente. `listScopes()` é exposto mas nenhum GC automático existe além do `closeScope` explícito.
+O agente pode declarar escopos sem limite. Cada escopo mantém em memória: paths, symbolIndex (Map de
+`FileSymbols`), prefetch cache. Em sessões de longa duração com muitas tarefas concorrentes, o
+registro pode crescer indefinidamente. `listScopes()` é exposto mas nenhum GC automático existe além
+do `closeScope` explícito.
 
-**Recomendação**: implementar limite configurável (e.g., `IO_MAX_ACTIVE_SCOPES=10`) com eviction LRU por último acesso.
+**Recomendação**: implementar limite configurável (e.g., `IO_MAX_ACTIVE_SCOPES=10`) com eviction LRU
+por último acesso.
 
 ---
 
@@ -483,9 +600,13 @@ O agente pode declarar escopos sem limite. Cada escopo mantém em memória: path
 
 **Arquivo**: `src/copilot/infra/io-session-scope.js`
 
-O `warmPromise` armazenado em `_warmPromises` não possui `AbortController` associado. Quando `closeScope` é chamado, o warm continua em background mesmo após o escopo ser deletado do registry. Isso desperdiça recursos de I/O e pode preencher o L1 cache com dados de um escopo que foi explicitamente fechado.
+O `warmPromise` armazenado em `_warmPromises` não possui `AbortController` associado. Quando
+`closeScope` é chamado, o warm continua em background mesmo após o escopo ser deletado do registry.
+Isso desperdiça recursos de I/O e pode preencher o L1 cache com dados de um escopo que foi
+explicitamente fechado.
 
-**Recomendação**: associar um `AbortController` a cada `warmPromise` e fazer `controller.abort()` em `closeScope`.
+**Recomendação**: associar um `AbortController` a cada `warmPromise` e fazer `controller.abort()` em
+`closeScope`.
 
 ---
 
@@ -493,9 +614,12 @@ O `warmPromise` armazenado em `_warmPromises` não possui `AbortController` asso
 
 **Arquivo**: `src/copilot/infra/io-health.js`
 
-O snapshot retorna `latency: safeCall(getIoLatencyStats, {})` que contém p50/p95/p99 por operação, mas a ferramenta `get_agent_info` em `introspection-tools.js` não expõe esses dados. O agente não tem visibilidade de latência de I/O sem chamar diretamente a API de health.
+O snapshot retorna `latency: safeCall(getIoLatencyStats, {})` que contém p50/p95/p99 por operação,
+mas a ferramenta `get_agent_info` em `introspection-tools.js` não expõe esses dados. O agente não
+tem visibilidade de latência de I/O sem chamar diretamente a API de health.
 
-**Recomendação**: criar uma tool `get_io_health` que expõe o snapshot completo de `readIoRuntimeHealthSnapshot`.
+**Recomendação**: criar uma tool `get_io_health` que expõe o snapshot completo de
+`readIoRuntimeHealthSnapshot`.
 
 ---
 
@@ -503,7 +627,9 @@ O snapshot retorna `latency: safeCall(getIoLatencyStats, {})` que contém p50/p9
 
 **Arquivo**: `src/copilot/tools/shell/sandbox.js`
 
-Comandos como `history`, `declare -p` (bash), e `typeset` podem expor variáveis de ambiente e histórico de comandos. `safeEnv()` já remove variáveis sensíveis, mas o histórico do shell pode conter tokens passados como argumentos de comandos anteriores.
+Comandos como `history`, `declare -p` (bash), e `typeset` podem expor variáveis de ambiente e
+histórico de comandos. `safeEnv()` já remove variáveis sensíveis, mas o histórico do shell pode
+conter tokens passados como argumentos de comandos anteriores.
 
 ---
 
@@ -511,7 +637,9 @@ Comandos como `history`, `declare -p` (bash), e `typeset` podem expor variáveis
 
 **Arquivo**: `src/copilot/infra/io-scanner.js`
 
-Um scan recursivo a `depth: 20` num workspace grande sem `maxFiles` pode retornar dezenas de milhares de entradas, all carregadas em memória como array. O `advisoryLimits` no retorno menciona `limitMode: 'informative'`, mas não há proteção hard.
+Um scan recursivo a `depth: 20` num workspace grande sem `maxFiles` pode retornar dezenas de
+milhares de entradas, all carregadas em memória como array. O `advisoryLimits` no retorno menciona
+`limitMode: 'informative'`, mas não há proteção hard.
 
 ---
 
@@ -519,7 +647,9 @@ Um scan recursivo a `depth: 20` num workspace grande sem `maxFiles` pode retorna
 
 **Arquivo**: `src/copilot/infra/io/search/text-search.js`
 
-O código assume que `grep` está disponível quando `rg` não está. Em containers mínimos (scratch images, distroless), `grep` pode não existir. O erro `ENOENT` é corretamente propagado, mas a mensagem de erro é genérica e não orienta sobre qual ferramenta instalar.
+O código assume que `grep` está disponível quando `rg` não está. Em containers mínimos (scratch
+images, distroless), `grep` pode não existir. O erro `ENOENT` é corretamente propagado, mas a
+mensagem de erro é genérica e não orienta sobre qual ferramenta instalar.
 
 ---
 
@@ -540,12 +670,14 @@ const current = new Promise((resolve) => {
 ```
 
 **Upgrade**:
+
 ```js
 // Node 24 — idiomático
 const { promise: current, resolve: release } = Promise.withResolvers();
 ```
 
-Isso elimina a mutação de variável externa, melhora legibilidade e evita o risco de `release` ser chamado antes de ser atribuído em edge cases de microtask scheduling.
+Isso elimina a mutação de variável externa, melhora legibilidade e evita o risco de `release` ser
+chamado antes de ser atribuído em edge cases de microtask scheduling.
 
 ---
 
@@ -553,7 +685,8 @@ Isso elimina a mutação de variável externa, melhora legibilidade e evita o ri
 
 **Disponível desde**: Node.js 24 (V8 13.6 — TC39 Stage 4)
 
-Os padrões `try/finally` com `release()` em `io-locks.js` e `closeScope` em `io-session-scope.js` são candidatos ideais para `await using`:
+Os padrões `try/finally` com `release()` em `io-locks.js` e `closeScope` em `io-session-scope.js`
+são candidatos ideais para `await using`:
 
 ```js
 // Adicionar ao objeto retornado por withIoResourceLock:
@@ -565,7 +698,8 @@ await using _lock = await acquireIoResourceLock(filePath);
 // _lock é liberado automaticamente ao sair do bloco
 ```
 
-Isso elimina toda uma classe de bugs de "lock esquecido" em casos de exceção e torna o controle de ciclo de vida explícito e composível.
+Isso elimina toda uma classe de bugs de "lock esquecido" em casos de exceção e torna o controle de
+ciclo de vida explícito e composível.
 
 ---
 
@@ -588,11 +722,13 @@ try {
 ```
 
 **Upgrade**:
+
 ```js
 const result = await fetch(url, { signal: AbortSignal.timeout(ms) });
 ```
 
-**Atenção**: conforme issue `nodejs/node#57736`, `AbortSignal.any()` tem bugs de confiabilidade em Node 24.x. Usar `AbortSignal.timeout()` diretamente (sem `any()`) é seguro.
+**Atenção**: conforme issue `nodejs/node#57736`, `AbortSignal.any()` tem bugs de confiabilidade em
+Node 24.x. Usar `AbortSignal.timeout()` diretamente (sem `any()`) é seguro.
 
 ---
 
@@ -608,7 +744,8 @@ if (error instanceof Error) { ... }
 if (Error.isError(error)) { ... }
 ```
 
-Especialmente relevante em `toError`, `toExecError`, `classifyToolFailure` e todos os `catch (err)` que verificam `instanceof Error`.
+Especialmente relevante em `toError`, `toExecError`, `classifyToolFailure` e todos os `catch (err)`
+que verificam `instanceof Error`.
 
 ---
 
@@ -621,7 +758,8 @@ The githubToken/GithubToken property on CopilotClientOptions has been corrected
 to gitHubToken/GitHubToken (capital H) for consistency with GitHub's branding.
 ```
 
-Qualquer código que passe `githubToken` no cliente ou sessão silenciosamente ignorará o token. **Verificar todos os pontos de criação de `CopilotClient` e `createSession`** no projeto.
+Qualquer código que passe `githubToken` no cliente ou sessão silenciosamente ignorará o token.
+**Verificar todos os pontos de criação de `CopilotClient` e `createSession`** no projeto.
 
 ---
 
@@ -635,7 +773,8 @@ take plain arguments and signal errors by throwing, instead of the previous
 RPC-shaped interface with parameter objects and error-result returns.
 ```
 
-O `io-engine.js` exporta `mkdirPathLocked` e outros providers que devem ser mapeados para o novo formato:
+O `io-engine.js` exporta `mkdirPathLocked` e outros providers que devem ser mapeados para o novo
+formato:
 
 ```js
 // Antes (SDK < 0.3.0)
@@ -647,7 +786,8 @@ createSessionFsHandler: (session) => ({
 })
 ```
 
-Verificar se o wiring atual em `bootstrap.js` usa o formato antigo. Checar o projeto inteiro src/copilot para corrigir formatos antigos.
+Verificar se o wiring atual em `bootstrap.js` usa o formato antigo. Checar o projeto inteiro
+src/copilot para corrigir formatos antigos.
 
 ---
 
@@ -660,7 +800,9 @@ A new defaultAgent.excludedTools option lets you hide tools from the default age
 while keeping them available to custom sub-agents, enabling the orchestrator pattern.
 ```
 
-O padrão atual usa `toggle_tool` (runtime disable) e `isToolDisabled()` para filtrar tools do agente maestro. Com `excludedTools`, isso pode ser feito declarativamente na configuração da sessão, eliminando o estado mutável em `_disabledTools` em `introspection-tools.js`.
+O padrão atual usa `toggle_tool` (runtime disable) e `isToolDisabled()` para filtrar tools do agente
+maestro. Com `excludedTools`, isso pode ser feito declarativamente na configuração da sessão,
+eliminando o estado mutável em `_disabledTools` em `introspection-tools.js`.
 
 ---
 
@@ -674,9 +816,12 @@ events from sub-agents as well as the root agent. To handle this, either filter 
 event.agentId (absent for the root agent) or set includeSubAgentStreamingEvents: false.
 ```
 
-O SSE fanout em `sse/fanout.js` repassa todos os eventos sem filtro de `agentId`. Clientes do terminal que renderizam streaming podem exibir output de sub-agentes intercalado com o agente principal, causando confusão de UX.
+O SSE fanout em `sse/fanout.js` repassa todos os eventos sem filtro de `agentId`. Clientes do
+terminal que renderizam streaming podem exibir output de sub-agentes intercalado com o agente
+principal, causando confusão de UX.
 
-**Recomendação**: adicionar `includeSubAgentStreamingEvents: false` na configuração da sessão ou implementar filtro por `agentId` no fanout.
+**Recomendação**: adicionar `includeSubAgentStreamingEvents: false` na configuração da sessão ou
+implementar filtro por `agentId` no fanout.
 
 ---
 
@@ -690,7 +835,9 @@ automatically discover MCP server configurations (.mcp.json, .vscode/mcp.json)
 and skill directories from the working directory.
 ```
 
-O projeto atualmente configura MCP servers manualmente via `COPILOT_MCP_SERVERS`. Com `enableConfigDiscovery: true`, a descoberta automática de `.mcp.json` e skill directories pode simplificar o bootstrap e suportar configurações por-projeto.
+O projeto atualmente configura MCP servers manualmente via `COPILOT_MCP_SERVERS`. Com
+`enableConfigDiscovery: true`, a descoberta automática de `.mcp.json` e skill directories pode
+simplificar o bootstrap e suportar configurações por-projeto.
 
 ---
 
@@ -701,7 +848,8 @@ O projeto atualmente configura MCP servers manualmente via `COPILOT_MCP_SERVERS`
 Diversas instâncias de deep clone implícito via serialização JSON:
 
 - `io-session-scope.js`: `scope.paths = [...paths]` (OK, mas outros campos usam spread shallow)
-- `runtime/transaction.js`: `{ ...changeSet, entries: [...changeSet.entries, nextEntry] }` acumula cópias shallow
+- `runtime/transaction.js`: `{ ...changeSet, entries: [...changeSet.entries, nextEntry] }` acumula
+  cópias shallow
 
 ```js
 // Antes
@@ -730,7 +878,8 @@ for (const entry of INFRA_MODULE_LAYOUT) {
 const byRole = Object.groupBy(INFRA_MODULE_LAYOUT, (e) => e.role);
 ```
 
-Aplicável em `buildInfraModuleScorecard`, `buildToolsModuleScorecard`, `bootstrapTools` (agrupamento de categorias), e nos relatórios de telemetria.
+Aplicável em `buildInfraModuleScorecard`, `buildToolsModuleScorecard`, `bootstrapTools` (agrupamento
+de categorias), e nos relatórios de telemetria.
 
 ---
 
@@ -738,7 +887,10 @@ Aplicável em `buildInfraModuleScorecard`, `buildToolsModuleScorecard`, `bootstr
 
 **Contexto**: arquitetura atual vs. Node 24 `diagnostics_channel`
 
-O canal `ioIndexChannel` em `io-observability.js` já publica eventos `'index:build.complete'` e `'index:file.indexed'`. Porém, os consumidores (health, prefetch) fazem polling periódico em vez de reagir a esses eventos. Com Node 24 e `diagnostics_channel` como subscriber registrado, seria possível invalidar proativamente outros caches quando o índice atualizar.
+O canal `ioIndexChannel` em `io-observability.js` já publica eventos `'index:build.complete'` e
+`'index:file.indexed'`. Porém, os consumidores (health, prefetch) fazem polling periódico em vez de
+reagir a esses eventos. Com Node 24 e `diagnostics_channel` como subscriber registrado, seria
+possível invalidar proativamente outros caches quando o índice atualizar.
 
 ---
 
@@ -765,7 +917,9 @@ Aplicável em `io-scanner.js` e qualquer lugar que colete streams assíncronos.
 
 **Disponível desde**: Node.js 22+
 
-O `read-chunks.js` usa `createReadStream` + `addAbortSignal` + `StringDecoder` manual para chunked reading. Com `ReadableStream.from()` e a Web Streams API agora estável em Node 24, o mesmo resultado pode ser alcançado de forma mais declarativa e com melhor integração com `AbortSignal.timeout()`.
+O `read-chunks.js` usa `createReadStream` + `addAbortSignal` + `StringDecoder` manual para chunked
+reading. Com `ReadableStream.from()` e a Web Streams API agora estável em Node 24, o mesmo resultado
+pode ser alcançado de forma mais declarativa e com melhor integração com `AbortSignal.timeout()`.
 
 ---
 
@@ -773,15 +927,19 @@ O `read-chunks.js` usa `createReadStream` + `addAbortSignal` + `StringDecoder` m
 
 **Fonte**: Node.js 24 release notes + msw/msw#2530
 
-Node 24 atualizou para undici v7 com conformidade mais estrita à spec do `fetch`. Qualquer `AbortSignal` criado via Proxy ou passado de outro realm pode lançar:
+Node 24 atualizou para undici v7 com conformidade mais estrita à spec do `fetch`. Qualquer
+`AbortSignal` criado via Proxy ou passado de outro realm pode lançar:
 
 ```
 TypeError: RequestInit: Expected signal ("AbortSignal {}") to be an instance of AbortSignal.
 ```
 
-O `web-tools.js` cria `AbortController` nativo — sem risco direto. Mas se o projeto usa interceptores de rede em testes (e.g., `msw`, `nock`), **testes de web tools podem quebrar** no Node 24 após upgrade de dependências.
+O `web-tools.js` cria `AbortController` nativo — sem risco direto. Mas se o projeto usa
+interceptores de rede em testes (e.g., `msw`, `nock`), **testes de web tools podem quebrar** no Node
+24 após upgrade de dependências.
 
-**Recomendação**: auditar o setup de testes de web tools e garantir que não proxiem o objeto `AbortSignal`.
+**Recomendação**: auditar o setup de testes de web tools e garantir que não proxiem o objeto
+`AbortSignal`.
 
 ---
 
@@ -795,7 +953,9 @@ MCP server configuration types have been renamed to match MCP protocol terminolo
 "remote" → "http"
 ```
 
-Qualquer código que construa configs MCP com `type: 'local'` ou `type: 'remote'` quebrará silenciosamente (campo ignorado) ou lançará erro de validação dependendo do SDK. Verificar `COPILOT_MCP_SERVERS` parsing e qualquer config estática no projeto.
+Qualquer código que construa configs MCP com `type: 'local'` ou `type: 'remote'` quebrará
+silenciosamente (campo ignorado) ou lançará erro de validação dependendo do SDK. Verificar
+`COPILOT_MCP_SERVERS` parsing e qualquer config estática no projeto.
 
 ---
 
@@ -869,4 +1029,5 @@ Qualquer código que construa configs MCP com `type: 'local'` ou `type: 'remote'
 
 ---
 
-*Documento gerado por análise estática manual + pesquisa de changelogs oficiais. Última revisão: 16 de maio de 2026.*
+_Documento gerado por análise estática manual + pesquisa de changelogs oficiais. Última revisão: 16
+de maio de 2026._

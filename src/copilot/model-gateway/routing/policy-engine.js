@@ -8,21 +8,21 @@
  * @module copilot/model-gateway/routing/policy-engine
  */
 
-import {
-    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
-    createGatewayRuntimeHealthIndex,
-    evaluateGatewayProviderHealthCooldown,
-    evaluateGatewayModelHealthRoute,
-    isGatewayModelProbeActivelyFailed,
-    isGatewayModelProbeFreshlyVerified,
-} from './health-routing.js';
-import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
-import { MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON } from './local-provider-opt-in.js';
-import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 import { evaluateModelGatewayEligibility } from '../eligibility/index.js';
 import { isModelGatewayRuntimeEligibilityOverlayDecision } from '../eligibility/runtime-overlay-decisions.js';
 import { resolveProviderEndpointInventory } from '../providers/endpoints/index.js';
 import { MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS } from '../secrets/requirements.js';
+import { buildModelGatewayRouteCandidates } from './candidate-builder.js';
+import {
+    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
+    createGatewayRuntimeHealthIndex,
+    evaluateGatewayModelHealthRoute,
+    evaluateGatewayProviderHealthCooldown,
+    isGatewayModelProbeActivelyFailed,
+    isGatewayModelProbeFreshlyVerified,
+} from './health-routing.js';
+import { MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON } from './local-provider-opt-in.js';
+import { resolveModelGatewayTaskProfile } from './task-profiles.js';
 
 const CONFIDENCE_SCORE = Object.freeze({
     unknown: 0,
@@ -44,15 +44,15 @@ const CONFIDENCE_RANK = Object.freeze({
 
 /**
  * @typedef {Readonly<{
- *   chatHealthOk: number;
- *   agentProbeVerified: number;
- *   genericProbeVerified: number;
- *   preferredProbeVerified: number;
- *   preferredLiveProtocolProbeVerified: number;
- *   preferredProbeFailedPenalty: number;
- *   preferredLiveProtocolProbeFailedPenalty: number;
- *   exactRouteProfileProof: number;
- *   runtimeProvedPreference: number;
+ *     chatHealthOk: number;
+ *     agentProbeVerified: number;
+ *     genericProbeVerified: number;
+ *     preferredProbeVerified: number;
+ *     preferredLiveProtocolProbeVerified: number;
+ *     preferredProbeFailedPenalty: number;
+ *     preferredLiveProtocolProbeFailedPenalty: number;
+ *     exactRouteProfileProof: number;
+ *     runtimeProvedPreference: number;
  * }>} ModelGatewayRuntimeProofWeights
  */
 
@@ -225,7 +225,9 @@ function routeMetadataText(model, field) {
     const policy = isRecord(model['normalizedPolicy']) ? model['normalizedPolicy'] : {};
     const routeProviderSpecific = isRecord(model['routeProviderSpecific']) ? model['routeProviderSpecific'] : {};
     const providerSpecific = isRecord(model['providerSpecific']) ? model['providerSpecific'] : {};
-    return String(routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field] ?? '').trim();
+    return String(
+        routing[field] ?? policy[field] ?? routeProviderSpecific[field] ?? providerSpecific[field] ?? '',
+    ).trim();
 }
 
 /**
@@ -274,11 +276,21 @@ function collectModelGatewayFamilyHints(model) {
     for (const [capability, kind] of Object.entries(NON_CONVERSATIONAL_CAPABILITY_KINDS)) {
         if (capabilities[capability] === true || routeTraits[capability] === true) hints.push(kind);
     }
-    const wireApi = routeMetadataText(model, 'wireApi').toLowerCase().replace(/[-\s]+/gu, '_');
+    const wireApi = routeMetadataText(model, 'wireApi')
+        .toLowerCase()
+        .replace(/[-\s]+/gu, '_');
     if (wireApi && NON_CONVERSATIONAL_WIRE_APIS[/** @type {keyof typeof NON_CONVERSATIONAL_WIRE_APIS} */ (wireApi)]) {
         hints.push(NON_CONVERSATIONAL_WIRE_APIS[/** @type {keyof typeof NON_CONVERSATIONAL_WIRE_APIS} */ (wireApi)]);
     }
-    return [...new Set(hints.map((hint) => String(hint).toLowerCase().replace(/[_\s]+/gu, '-')))];
+    return [
+        ...new Set(
+            hints.map((hint) =>
+                String(hint)
+                    .toLowerCase()
+                    .replace(/[_\s]+/gu, '-'),
+            ),
+        ),
+    ];
 }
 
 /**
@@ -291,7 +303,8 @@ function inferNonConversationalModelFamily(model) {
     const explicitHint = NON_CONVERSATIONAL_MODALITIES.find((kind) => hints.includes(kind));
     if (explicitHint) return explicitHint;
     const outputModalities = isRecord(model['modalities']) ? stringArray(model['modalities']['output']) : [];
-    if (outputModalities.length > 0 && !outputModalities.includes('text')) return outputModalities[0] ?? 'non-text-output';
+    if (outputModalities.length > 0 && !outputModalities.includes('text'))
+        return outputModalities[0] ?? 'non-text-output';
     const text = [
         model['providerModel'],
         model['id'],
@@ -302,7 +315,11 @@ function inferNonConversationalModelFamily(model) {
         .map((value) => String(value ?? '').toLowerCase())
         .join(' ')
         .replace(/[^a-z0-9]+/gu, '-');
-    if (/(?:^|-)(?:embed|embedding|embeddings|bge|e5|gte|nv-embedqa|nvolveqa|snowflake-arctic-embed|jina-embeddings?)(?:-|$)/u.test(text)) {
+    if (
+        /(?:^|-)(?:embed|embedding|embeddings|bge|e5|gte|nv-embedqa|nvolveqa|snowflake-arctic-embed|jina-embeddings?)(?:-|$)/u.test(
+            text,
+        )
+    ) {
         return 'embedding';
     }
     if (/(?:^|-)(?:rerank|reranker)(?:-|$)/u.test(text)) return 'rerank';
@@ -356,7 +373,10 @@ function providerAllowedByAllowList(providerId, allowProviders) {
  * @returns {boolean}
  */
 function isAutoSelector(selectorKind, selectorSyntax) {
-    return /(?:auto|fastest|cheapest|best|router|policy)/iu.test(selectorKind) || /:(?:auto|fastest|cheapest|best)$/iu.test(selectorSyntax);
+    return (
+        /(?:auto|fastest|cheapest|best|router|policy)/iu.test(selectorKind) ||
+        /:(?:auto|fastest|cheapest|best)$/iu.test(selectorSyntax)
+    );
 }
 
 /**
@@ -410,7 +430,12 @@ function privacyStrictSatisfied(model) {
  */
 function policyValueMatches(actual, expected) {
     if (typeof expected === 'boolean') return actual === expected;
-    if (typeof expected === 'string') return String(actual ?? '').trim().toLowerCase() === expected.trim().toLowerCase();
+    if (typeof expected === 'string')
+        return (
+            String(actual ?? '')
+                .trim()
+                .toLowerCase() === expected.trim().toLowerCase()
+        );
     if (typeof expected === 'number') return actual === expected;
     return actual === expected;
 }
@@ -426,7 +451,9 @@ function policyValueMatches(actual, expected) {
 function applyDataPolicyScoring(model, options, baseScore, reasons, rejectedReasons) {
     let score = baseScore;
     const policy = dataPolicy(model);
-    for (const [key, expected] of Object.entries(isRecord(options?.requiredDataPolicy) ? options.requiredDataPolicy : {})) {
+    for (const [key, expected] of Object.entries(
+        isRecord(options?.requiredDataPolicy) ? options.requiredDataPolicy : {},
+    )) {
         if (!(key in policy)) rejectedReasons.push(`data_policy_unknown:${key}`);
         else if (!policyValueMatches(policy[key], expected)) rejectedReasons.push(`data_policy_mismatch:${key}`);
         else {
@@ -434,7 +461,9 @@ function applyDataPolicyScoring(model, options, baseScore, reasons, rejectedReas
             reasons.push(`data_policy_match:${key}`);
         }
     }
-    for (const [key, expected] of Object.entries(isRecord(options?.preferredDataPolicy) ? options.preferredDataPolicy : {})) {
+    for (const [key, expected] of Object.entries(
+        isRecord(options?.preferredDataPolicy) ? options.preferredDataPolicy : {},
+    )) {
         if (key in policy && policyValueMatches(policy[key], expected)) {
             score += 8;
             reasons.push(`preferred_data_policy:${key}`);
@@ -459,7 +488,12 @@ function optionNumber(value) {
  */
 function stringSet(value) {
     if (!Array.isArray(value)) return new Set();
-    return new Set(value.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean));
+    return new Set(
+        value
+            .filter((item) => typeof item === 'string')
+            .map((item) => item.trim())
+            .filter(Boolean),
+    );
 }
 
 /**
@@ -478,7 +512,13 @@ function reasonGroup(reason) {
     if (prefix.includes('confidence')) return 'confidence';
     if (prefix.includes('eligibility')) return 'eligibility';
     if (prefix.includes('data_policy')) return 'data_policy';
-    if (prefix.includes('route') || prefix.includes('wire') || prefix.includes('upstream') || prefix.includes('selector')) return 'route_policy';
+    if (
+        prefix.includes('route') ||
+        prefix.includes('wire') ||
+        prefix.includes('upstream') ||
+        prefix.includes('selector')
+    )
+        return 'route_policy';
     return prefix;
 }
 
@@ -487,7 +527,16 @@ function reasonGroup(reason) {
  * @param {string[]} rejectedReasons
  * @param {number} baseScore
  * @param {number} finalScore
- * @returns {{ baseScore: number; finalScore: number; delta: number; hardGateCount: number; positiveSignals: string[]; negativeSignals: string[]; groups: Record<string, number>; rejectedGroups: Record<string, number> }}
+ * @returns {{
+ *     baseScore: number;
+ *     finalScore: number;
+ *     delta: number;
+ *     hardGateCount: number;
+ *     positiveSignals: string[];
+ *     negativeSignals: string[];
+ *     groups: Record<string, number>;
+ *     rejectedGroups: Record<string, number>;
+ * }}
  */
 function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
     /** @type {Record<string, number>} */
@@ -495,7 +544,8 @@ function buildScoreBreakdown(reasons, rejectedReasons, baseScore, finalScore) {
     /** @type {Record<string, number>} */
     const rejectedGroups = {};
     for (const reason of reasons) groups[reasonGroup(reason)] = (groups[reasonGroup(reason)] ?? 0) + 1;
-    for (const reason of rejectedReasons) rejectedGroups[reasonGroup(reason)] = (rejectedGroups[reasonGroup(reason)] ?? 0) + 1;
+    for (const reason of rejectedReasons)
+        rejectedGroups[reasonGroup(reason)] = (rejectedGroups[reasonGroup(reason)] ?? 0) + 1;
     const negativeSignals = reasons.filter((reason) =>
         /(?:missing|failed|unknown_for_limit|price_per_million|latency_ms|penalty|below|too_small)/iu.test(reason),
     );
@@ -639,13 +689,16 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     }
 
     if (model['enabled'] === false) rejectedReasons.push('model_disabled');
-    if (allowProviders.size > 0 && !providerAllowedByAllowList(providerId, allowProviders)) rejectedReasons.push('provider_not_allowed');
+    if (allowProviders.size > 0 && !providerAllowedByAllowList(providerId, allowProviders))
+        rejectedReasons.push('provider_not_allowed');
     if (blockProviders.has(providerId)) rejectedReasons.push('provider_blocked');
     const routeLayer = routePolicyText(model, 'routeLayer');
     const wireApi = routePolicyText(model, 'wireApi');
     const upstreamProvider = routeMetadataText(model, 'upstreamProvider');
     const selectorKind = String(model['selectorKind'] ?? routePolicyText(model, 'selectorKind')).trim();
-    const selectorSyntax = String(model['selectorSyntax'] ?? routePolicyText(model, 'selectorSyntax') ?? model['providerModel'] ?? '').trim();
+    const selectorSyntax = String(
+        model['selectorSyntax'] ?? routePolicyText(model, 'selectorSyntax') ?? model['providerModel'] ?? '',
+    ).trim();
     const excludeLocalProvidersByDefault = options.excludeLocalProvidersByDefault !== false;
     if (
         isLocalPrivateCandidate(model) &&
@@ -667,7 +720,8 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (selectorKind && allowSelectorKinds.size > 0 && !allowSelectorKinds.has(selectorKind)) {
         rejectedReasons.push(`selector_kind_not_allowed:${selectorKind}`);
     }
-    if (selectorKind && blockSelectorKinds.has(selectorKind)) rejectedReasons.push(`selector_kind_blocked:${selectorKind}`);
+    if (selectorKind && blockSelectorKinds.has(selectorKind))
+        rejectedReasons.push(`selector_kind_blocked:${selectorKind}`);
     if (options.allowAutoSelectors === false && isAutoSelector(selectorKind, selectorSyntax)) {
         rejectedReasons.push(`auto_selector_blocked:${selectorKind || selectorSyntax}`);
     }
@@ -703,7 +757,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
         }
     }
 
-    const nonConversationalFamily = profileRequiresConversationalRoute(profile) ? inferNonConversationalModelFamily(model) : null;
+    const nonConversationalFamily = profileRequiresConversationalRoute(profile)
+        ? inferNonConversationalModelFamily(model)
+        : null;
     if (nonConversationalFamily) rejectedReasons.push(`non_chat_model_family:${nonConversationalFamily}`);
 
     for (const capability of stringArray(profile['requires'])) {
@@ -724,7 +780,8 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     const minContext = finiteNumber(profile['minContextWindowTokens']);
     const context = contextWindow(model);
     if (minContext !== null) {
-        if (context !== null && context < minContext) rejectedReasons.push(`context_too_small:${context}<${minContext}`);
+        if (context !== null && context < minContext)
+            rejectedReasons.push(`context_too_small:${context}<${minContext}`);
         else if (context !== null) {
             const contextBonus = Math.min(40, Math.floor((context - minContext) / 16_000));
             if (contextBonus > 0) {
@@ -740,7 +797,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             : evaluateGatewayModelHealthRoute(model, {
                   routeProfile: options.routeProfile ?? null,
                   ...(options.excludeFailed !== undefined ? { excludeFailed: options.excludeFailed } : {}),
-                  ...(Array.isArray(options.runtimeHealthRecords) ? { runtimeHealthRecords: options.runtimeHealthRecords } : {}),
+                  ...(Array.isArray(options.runtimeHealthRecords)
+                      ? { runtimeHealthRecords: options.runtimeHealthRecords }
+                      : {}),
                   ...(options.runtimeHealthIndex ? { runtimeHealthIndex: options.runtimeHealthIndex } : {}),
                   ...(options.now !== undefined ? { now: options.now } : {}),
                   ...(typeof options.maxRuntimeProofAgeMs === 'number'
@@ -752,12 +811,15 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
                   requireAgentProbeOk: options.requireAgentProbeOk ?? profile['requireAgentProbeOk'] === true,
               });
     const runtimeHealthSource =
-        options.runtimeHealthIndex ?? (Array.isArray(options.runtimeHealthRecords) ? options.runtimeHealthRecords : null);
+        options.runtimeHealthIndex ??
+        (Array.isArray(options.runtimeHealthRecords) ? options.runtimeHealthRecords : null);
     const providerCooldownDecision =
         options.ignoreRuntimeHealth === true || !runtimeHealthSource
             ? null
             : evaluateGatewayProviderHealthCooldown(model, runtimeHealthSource, {
-                  ...(typeof options.providerCooldownWindowMs === 'number' ? { windowMs: options.providerCooldownWindowMs } : {}),
+                  ...(typeof options.providerCooldownWindowMs === 'number'
+                      ? { windowMs: options.providerCooldownWindowMs }
+                      : {}),
                   ...(typeof options.providerCooldownMinFailedModels === 'number'
                       ? { minFailedModels: options.providerCooldownMinFailedModels }
                       : {}),
@@ -767,7 +829,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
               });
     if (!healthDecision.include) rejectedReasons.push(healthDecision.reason);
     if (providerCooldownDecision?.include === false) {
-        rejectedReasons.push(`provider_health_cooldown:${providerCooldownDecision.failureKinds.join('+') || 'temporary'}`);
+        rejectedReasons.push(
+            `provider_health_cooldown:${providerCooldownDecision.failureKinds.join('+') || 'temporary'}`,
+        );
     }
     const runtimeProof = healthDecision.runtimeProof;
     if (healthDecision.health) {
@@ -797,7 +861,9 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
             if (
                 isGatewayModelProbeFreshlyVerified(healthDecision.health, kind, {
                     ...(options.now !== undefined ? { now: options.now } : {}),
-                    ...(typeof options.maxRuntimeProofAgeMs === 'number' ? { maxAgeMs: options.maxRuntimeProofAgeMs } : {}),
+                    ...(typeof options.maxRuntimeProofAgeMs === 'number'
+                        ? { maxAgeMs: options.maxRuntimeProofAgeMs }
+                        : {}),
                 })
             ) {
                 const weight = MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS.includes(kind)
@@ -875,7 +941,8 @@ export function scoreGatewayModelCandidate(model, profile, options = {}) {
     if (minimumConfidence) {
         const currentRank = CONFIDENCE_RANK[/** @type {keyof typeof CONFIDENCE_RANK} */ (confidence)] ?? 0;
         const requiredRank = CONFIDENCE_RANK[/** @type {keyof typeof CONFIDENCE_RANK} */ (minimumConfidence)] ?? 0;
-        if (currentRank < requiredRank) rejectedReasons.push(`confidence_below_minimum:${confidence}<${minimumConfidence}`);
+        if (currentRank < requiredRank)
+            rejectedReasons.push(`confidence_below_minimum:${confidence}<${minimumConfidence}`);
     }
 
     const price = pricePerMillion(model);
@@ -943,7 +1010,8 @@ function profileProbeKinds(profile) {
     if (requires.includes('tools') || prefers.includes('forcedToolChoice') || prefers.includes('parallelToolCalls')) {
         kinds.push('agent', ...MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS);
     }
-    if (prefers.includes('structuredOutputs') || prefers.includes('jsonMode') || prefers.includes('jsonSchema')) kinds.push('json');
+    if (prefers.includes('structuredOutputs') || prefers.includes('jsonMode') || prefers.includes('jsonSchema'))
+        kinds.push('json');
     if (softRequires.includes('vision') || prefers.includes('vision')) kinds.push('vision');
     return [...new Set(kinds)];
 }
@@ -1015,7 +1083,10 @@ function runtimeHealthObservedAt(health) {
         if (!isRecord(probe)) continue;
         probeAt = Math.max(
             probeAt,
-            finiteNumber(probe['lastAt']) ?? finiteNumber(probe['observedAt']) ?? finiteNumber(probe['runtimeObservedAtMs']) ?? 0,
+            finiteNumber(probe['lastAt']) ??
+                finiteNumber(probe['observedAt']) ??
+                finiteNumber(probe['runtimeObservedAtMs']) ??
+                0,
         );
     }
     return Math.max(
@@ -1040,7 +1111,8 @@ function runtimeHealthRouteProfile(health) {
  * @returns {Record<string, boolean>}
  */
 function runtimeOnlyCapabilities(health) {
-    const chatOk = runtimeProbeOk(health, 'chat') || health['lastStatus'] === 'ok' || health['runtimeHealthStatus'] === 'ok';
+    const chatOk =
+        runtimeProbeOk(health, 'chat') || health['lastStatus'] === 'ok' || health['runtimeHealthStatus'] === 'ok';
     const streaming =
         runtimeProbeOk(health, 'streaming') ||
         runtimeProbeOk(health, 'live_tool_protocol') ||
@@ -1052,7 +1124,10 @@ function runtimeOnlyCapabilities(health) {
                 Number(probe['deltaCount']) > 0,
         ) ||
         chatOk;
-    const tools = runtimeProbeOk(health, 'agent') || runtimeProbeOk(health, 'live_tool_protocol') || health['agentProbeStatus'] === 'ok';
+    const tools =
+        runtimeProbeOk(health, 'agent') ||
+        runtimeProbeOk(health, 'live_tool_protocol') ||
+        health['agentProbeStatus'] === 'ok';
     const json = runtimeProbeOk(health, 'json');
     const vision = runtimeProbeOk(health, 'vision');
     return {
@@ -1082,17 +1157,27 @@ function runtimeOnlySupportedParameters(capabilities) {
 
 /**
  * @param {string} providerId
- * @returns {{ knownProvider: boolean; routeLayer: string; wireApi: string | null; openAICompatibleBaseUrl: string | null; endpoint: string | null; localPrivate: boolean }}
+ * @returns {{
+ *     knownProvider: boolean;
+ *     routeLayer: string;
+ *     wireApi: string | null;
+ *     openAICompatibleBaseUrl: string | null;
+ *     endpoint: string | null;
+ *     localPrivate: boolean;
+ * }}
  */
 function runtimeOnlyRouteDefaults(providerId) {
     const inventory = resolveProviderEndpointInventory(providerId);
     const endpoint =
-        inventory?.runtimeEndpoints.find((item) => item.kind === 'openai_chat_completions' || item.kind === 'chat_completions') ??
+        inventory?.runtimeEndpoints.find(
+            (item) => item.kind === 'openai_chat_completions' || item.kind === 'chat_completions',
+        ) ??
         inventory?.runtimeEndpoints.find((item) => item.kind === 'responses') ??
         inventory?.runtimeEndpoints.find((item) => item.kind.includes('chat')) ??
         inventory?.runtimeEndpoints[0] ??
         null;
-    const localPrivate = providerId === 'ollama-local' || providerId === 'ollama' || inventory?.providerKind === 'local_or_cloud_daemon';
+    const localPrivate =
+        providerId === 'ollama-local' || providerId === 'ollama' || inventory?.providerKind === 'local_or_cloud_daemon';
     const endpointKind = endpoint?.kind ?? null;
     const wireApi =
         endpointKind === 'openai_chat_completions' || endpointKind === 'chat_completions' || endpointKind === 'chat'
@@ -1156,7 +1241,10 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
     if (records.length === 0) return [];
     const existingProviderModels = new Set(
         baseCandidates
-            .map((candidate) => `${optionalString(candidate['providerId']) ?? ''}\u001f${optionalString(candidate['providerModel']) ?? ''}`)
+            .map(
+                (candidate) =>
+                    `${optionalString(candidate['providerId']) ?? ''}\u001f${optionalString(candidate['providerModel']) ?? ''}`,
+            )
             .filter((key) => key !== '\u001f'),
     );
     /** @type {Map<string, Record<string, unknown>>} */
@@ -1174,8 +1262,10 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
     /** @type {Record<string, unknown>[]} */
     const runtimeCandidates = [];
     for (const health of newest.values()) {
-        const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']) ?? 'unknown-provider';
-        const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']) ?? 'unknown-model';
+        const providerId =
+            optionalString(health['providerId']) ?? optionalString(health['provider']) ?? 'unknown-provider';
+        const providerModel =
+            optionalString(health['providerModel']) ?? optionalString(health['model']) ?? 'unknown-model';
         const routeDefaults = runtimeOnlyRouteDefaults(providerId);
         if (!routeDefaults.knownProvider) continue;
         const routeProfile = runtimeHealthRouteProfile(health) ?? 'default';
@@ -1256,7 +1346,9 @@ function buildRuntimeOnlyRouteCandidates(baseCandidates, options = {}) {
                 lastStatus: optionalString(health['lastStatus']),
                 agentProbeStatus: optionalString(health['agentProbeStatus']),
                 verifiedProbes: Object.entries(runtimeHealthProbes(health))
-                    .filter(([, probe]) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false)
+                    .filter(
+                        ([, probe]) => isRecord(probe) && probe['ok'] === true && probe['providerAttempted'] !== false,
+                    )
                     .map(([kind]) => kind)
                     .sort(),
             },
@@ -1336,9 +1428,15 @@ function findRouteOptionForModel(model, routes) {
  */
 function findEligibilityDecisionForModel(model, profile, decisions, options = {}) {
     const key = modelEligibilityKey(model);
-    const scopedDecisions = decisions.filter((decision) => eligibilityDecisionMatchesSelectionScope(decision, profile, options));
+    const scopedDecisions = decisions.filter((decision) =>
+        eligibilityDecisionMatchesSelectionScope(decision, profile, options),
+    );
     return (
-        scopedDecisions.find((decision) => eligibilityDecisionMatchesRoute(decision, key) && isModelGatewayRuntimeEligibilityOverlayDecision(decision)) ??
+        scopedDecisions.find(
+            (decision) =>
+                eligibilityDecisionMatchesRoute(decision, key) &&
+                isModelGatewayRuntimeEligibilityOverlayDecision(decision),
+        ) ??
         scopedDecisions.find(
             (decision) =>
                 eligibilityDecisionMatchesProviderModel(model, decision) &&
@@ -1376,7 +1474,10 @@ function eligibilityDecisionMatchesRoute(decision, key) {
  * @returns {boolean}
  */
 function eligibilityDecisionMatchesProviderModel(model, decision) {
-    return providerModelEligibilityKey(model) !== null && providerModelEligibilityKey(model) === providerModelEligibilityKey(decision);
+    return (
+        providerModelEligibilityKey(model) !== null &&
+        providerModelEligibilityKey(model) === providerModelEligibilityKey(decision)
+    );
 }
 
 /**
@@ -1391,10 +1492,16 @@ function eligibilityDecisionMatchesSelectionScope(decision, profile, options = {
     const decisionAccountScope = String(decision['accountScope'] ?? 'default');
     if (decisionAccountScope !== desiredAccountScope) return false;
 
-    const desiredPolicyProfile = typeof policy['policyProfile'] === 'string' && policy['policyProfile'] ? policy['policyProfile'] : null;
+    const desiredPolicyProfile =
+        typeof policy['policyProfile'] === 'string' && policy['policyProfile'] ? policy['policyProfile'] : null;
     const decisionPolicyProfile =
         typeof decision['policyProfile'] === 'string' && decision['policyProfile'] ? decision['policyProfile'] : null;
-    if (desiredPolicyProfile && decisionPolicyProfile && decisionPolicyProfile !== 'default' && decisionPolicyProfile !== desiredPolicyProfile) {
+    if (
+        desiredPolicyProfile &&
+        decisionPolicyProfile &&
+        decisionPolicyProfile !== 'default' &&
+        decisionPolicyProfile !== desiredPolicyProfile
+    ) {
         return false;
     }
 
@@ -1402,8 +1509,14 @@ function eligibilityDecisionMatchesSelectionScope(decision, profile, options = {
         (typeof policy['taskProfile'] === 'string' && policy['taskProfile']) ||
         (typeof profile['id'] === 'string' && profile['id']) ||
         null;
-    const decisionTaskProfile = typeof decision['taskProfile'] === 'string' && decision['taskProfile'] ? decision['taskProfile'] : null;
-    if (desiredTaskProfile && decisionTaskProfile && decisionTaskProfile !== 'default' && decisionTaskProfile !== desiredTaskProfile) {
+    const decisionTaskProfile =
+        typeof decision['taskProfile'] === 'string' && decision['taskProfile'] ? decision['taskProfile'] : null;
+    if (
+        desiredTaskProfile &&
+        decisionTaskProfile &&
+        decisionTaskProfile !== 'default' &&
+        decisionTaskProfile !== desiredTaskProfile
+    ) {
         return false;
     }
 
@@ -1493,7 +1606,8 @@ function resolveCandidateEligibility(model, profile, options = {}) {
     if (options.evaluateEligibility !== true) return null;
     return evaluateModelGatewayEligibility({
         projection: model,
-        routeOption: findRouteOptionForModel(model, Array.isArray(options.routeOptions) ? options.routeOptions : []) ?? model,
+        routeOption:
+            findRouteOptionForModel(model, Array.isArray(options.routeOptions) ? options.routeOptions : []) ?? model,
         accountOverlays: Array.isArray(options.accountOverlays) ? options.accountOverlays : [],
         secretRegistry: options.secretRegistry,
         policy: {
@@ -1527,19 +1641,31 @@ export function routeGatewayModels(models, profileInput, options = {}) {
 
     let scoringOptions = options;
     if (
-        (options.ignoreRuntimeHealth !== true && Array.isArray(options.runtimeHealthRecords) && !options.runtimeHealthIndex) ||
+        (options.ignoreRuntimeHealth !== true &&
+            Array.isArray(options.runtimeHealthRecords) &&
+            !options.runtimeHealthIndex) ||
         (Array.isArray(options.eligibilityDecisions) && !options.eligibilityDecisionIndex)
     ) {
         scoringOptions = { ...options };
-        if (options.ignoreRuntimeHealth !== true && Array.isArray(options.runtimeHealthRecords) && !options.runtimeHealthIndex) {
+        if (
+            options.ignoreRuntimeHealth !== true &&
+            Array.isArray(options.runtimeHealthRecords) &&
+            !options.runtimeHealthIndex
+        ) {
             scoringOptions.runtimeHealthIndex = createGatewayRuntimeHealthIndex(options.runtimeHealthRecords);
         }
         if (Array.isArray(options.eligibilityDecisions) && !options.eligibilityDecisionIndex) {
-            scoringOptions.eligibilityDecisionIndex = createEligibilityDecisionIndex(options.eligibilityDecisions, profile, options);
+            scoringOptions.eligibilityDecisionIndex = createEligibilityDecisionIndex(
+                options.eligibilityDecisions,
+                profile,
+                options,
+            );
         }
     }
     const runtimeOnlyCandidates = buildRuntimeOnlyRouteCandidates(models, scoringOptions);
-    const scored = [...models, ...runtimeOnlyCandidates].map((model) => scoreGatewayModelCandidate(model, profile, scoringOptions));
+    const scored = [...models, ...runtimeOnlyCandidates].map((model) =>
+        scoreGatewayModelCandidate(model, profile, scoringOptions),
+    );
     const candidates = scored
         .filter((candidate) => candidate.include)
         .sort((a, b) => b.score - a.score || String(a.model['id']).localeCompare(String(b.model['id'])));
@@ -1549,7 +1675,9 @@ export function routeGatewayModels(models, profileInput, options = {}) {
         selected: candidates[0] ?? null,
         candidates,
         rejected,
-        fallbackChain: candidates.map((candidate) => String(candidate.model['id'] ?? candidate.model['providerModel'] ?? 'unknown')),
+        fallbackChain: candidates.map((candidate) =>
+            String(candidate.model['id'] ?? candidate.model['providerModel'] ?? 'unknown'),
+        ),
         runtimeOnlyCandidateCount: runtimeOnlyCandidates.length,
     };
 }
@@ -1560,23 +1688,25 @@ export function routeGatewayModels(models, profileInput, options = {}) {
  * @param {Record<string, unknown>} snapshot
  * @param {{ includeProjectionOnly?: boolean }} [options]
  * @returns {{
- *   candidates: Record<string, unknown>[];
- *   routeOptions: Record<string, unknown>[];
- *   accountOverlays: Record<string, unknown>[];
- *   eligibilityDecisions: Record<string, unknown>[];
- *   baseSnapshotContext: {
- *     projectionCount: number;
- *     routeOptionCount: number;
- *     accountOverlayCount: number;
- *     eligibilityDecisionCount: number;
- *     candidateCount: number;
- *   };
+ *     candidates: Record<string, unknown>[];
+ *     routeOptions: Record<string, unknown>[];
+ *     accountOverlays: Record<string, unknown>[];
+ *     eligibilityDecisions: Record<string, unknown>[];
+ *     baseSnapshotContext: {
+ *         projectionCount: number;
+ *         routeOptionCount: number;
+ *         accountOverlayCount: number;
+ *         eligibilityDecisionCount: number;
+ *         candidateCount: number;
+ *     };
  * }}
  */
 export function prepareModelGatewayCatalogRoutingSnapshot(snapshot, options = {}) {
     const projections = Array.isArray(snapshot['projections']) ? snapshot['projections'].filter(isRecord) : [];
     const routeOptions = Array.isArray(snapshot['routeOptions']) ? snapshot['routeOptions'].filter(isRecord) : [];
-    const accountOverlays = Array.isArray(snapshot['accountOverlays']) ? snapshot['accountOverlays'].filter(isRecord) : [];
+    const accountOverlays = Array.isArray(snapshot['accountOverlays'])
+        ? snapshot['accountOverlays'].filter(isRecord)
+        : [];
     const eligibilityDecisions = Array.isArray(snapshot['modelEligibilityDecisions'])
         ? snapshot['modelEligibilityDecisions'].filter(isRecord)
         : [];
@@ -1631,7 +1761,9 @@ export function routePreparedModelGatewayCatalogSnapshot(prepared, profileInput,
  */
 export function routeModelGatewayCatalogSnapshot(snapshot, profileInput, options = {}) {
     const prepared = prepareModelGatewayCatalogRoutingSnapshot(snapshot, {
-        ...(options['includeProjectionOnly'] === undefined ? {} : { includeProjectionOnly: options['includeProjectionOnly'] }),
+        ...(options['includeProjectionOnly'] === undefined
+            ? {}
+            : { includeProjectionOnly: options['includeProjectionOnly'] }),
     });
     return routePreparedModelGatewayCatalogSnapshot(prepared, profileInput, options);
 }

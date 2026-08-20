@@ -2,20 +2,15 @@
 /**
  * Allowlisted MCP adapters for the canonical terminal LLM-B live harness.
  *
- * These tools never accept arbitrary commands or script paths. Readiness/runs are read-only. The live runner defaults to
- * a control-only terminal boot; any mode capable of opening a real model/provider turn requires explicit confirmation.
+ * These tools never accept arbitrary commands or script paths. Readiness/runs are read-only. The live runner defaults
+ * to a control-only terminal boot; any mode capable of opening a real model/provider turn requires explicit
+ * confirmation.
  *
  * @module copilot/mcp/tools/llm-b-live
  */
 
-import { execFile, spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { open, readFile, readdir, stat } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
-import { performance } from 'node:perf_hooks';
-import { promisify } from 'node:util';
-import { z } from 'zod';
 import { getCopilotDb } from '#copilot/db';
+import { openDetachedAppendSinkTrusted, readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/trusted-io';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
@@ -26,11 +21,20 @@ import {
     okResult,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { execFile, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { isAbsolute, join, resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
+import { promisify } from 'node:util';
+import { z } from 'zod';
 
 const execFileAsync = promisify(execFile);
 const LIVE_RUNNER = 'scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs';
 const LIVE_READINESS = 'scripts/model-gateway/commands/model-gateway-live-readiness.mjs';
-const LIVE_READINESS_MODULE_URL = new URL('../../../../scripts/model-gateway/commands/model-gateway-live-readiness.mjs', import.meta.url).href;
+const LIVE_READINESS_MODULE_URL = new URL(
+    '../../../../scripts/model-gateway/commands/model-gateway-live-readiness.mjs',
+    import.meta.url,
+).href;
 const LIVE_RUNS = 'scripts/model-gateway/commands/model-gateway-live-runs.mjs';
 const MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const DETACHED_LIVE_RUNS_DIR = 'src/copilot/.ai/mcp/llmb-live-runs';
@@ -53,7 +57,16 @@ const MODEL_GATEWAY_FINGERPRINT_TABLES = Object.freeze([
     'copilot_model_gateway_eligibility_runs',
     'copilot_model_gateway_eligibility_decisions',
 ]);
-/** @typedef {{ success: boolean; parsed: Record<string, any> | null; stderr: string; stdout: string; error: string | null; execution: string; cacheAgeMs: number; durationMs: number }} LiveReadinessExecution */
+/** @typedef {{
+    success: boolean;
+    parsed: Record<string, any> | null;
+    stderr: string;
+    stdout: string;
+    error: string | null;
+    execution: string;
+    cacheAgeMs: number;
+    durationMs: number;
+}} LiveReadinessExecution */
 /** @type {Map<string, { parsed: Record<string, unknown>; completedAtMs: number; durationMs: number }>} */
 const liveReadinessCache = new Map();
 /** @type {Map<string, Promise<LiveReadinessExecution>>} */
@@ -151,8 +164,8 @@ function isProcessAlive(pid) {
 
 /**
  * Verify that a manifest pid still belongs to the exact allowlisted live harness before any signal is sent. This closes
- * the PID-reuse gap inherent in `kill(pid, 0)`: a recycled pid must never make an old manifest capable of terminating an
- * unrelated process.
+ * the PID-reuse gap inherent in `kill(pid, 0)`: a recycled pid must never make an old manifest capable of terminating
+ * an unrelated process.
  *
  * @param {DetachedLiveRunManifest} manifest
  */
@@ -164,12 +177,12 @@ async function inspectDetachedLiveRunProcessIdentity(manifest) {
         return { alive: true, verified: false, reason: 'process-identity-unavailable-on-win32', argv: [] };
     }
     try {
-        const cmdline = await readFile(`/proc/${manifest.pid}/cmdline`, 'utf8');
+        const cmdline = (
+            await readTextFreshTrusted(`/proc/${manifest.pid}/cmdline`, { caller: 'mcp.tools.llm-b-live.proc' })
+        ).content;
         const argv = cmdline.split('\0').filter(Boolean);
         const expectedOutDirArg = `--out-dir=${manifest.outDir}`;
-        const runnerMatch = argv.some(
-            (arg) => arg === LIVE_RUNNER || arg.endsWith(`/${LIVE_RUNNER}`),
-        );
+        const runnerMatch = argv.some((arg) => arg === LIVE_RUNNER || arg.endsWith(`/${LIVE_RUNNER}`));
         const outDirMatch = argv.includes(expectedOutDirArg);
         return {
             alive: true,
@@ -192,9 +205,12 @@ async function cancelDetachedLiveRun(manifest) {
     const identity = await inspectDetachedLiveRunProcessIdentity(manifest);
     if (!identity.alive) return { cancelled: false, alreadyStopped: true, identity };
     if (!identity.verified) {
-        throw Object.assign(new Error(`Detached LLM-B live run process identity could not be verified (${identity.reason}).`), {
-            code: 'ERR_LLMB_LIVE_CANCEL_IDENTITY_MISMATCH',
-        });
+        throw Object.assign(
+            new Error(`Detached LLM-B live run process identity could not be verified (${identity.reason}).`),
+            {
+                code: 'ERR_LLMB_LIVE_CANCEL_IDENTITY_MISMATCH',
+            },
+        );
     }
     try {
         // The detached runner is its own process-group leader on POSIX. Terminating the group also contains any PTY/
@@ -209,8 +225,8 @@ async function cancelDetachedLiveRun(manifest) {
 }
 
 /**
- * Launch the fixed canonical harness independently of the initiating MCP request. The harness writes its own artifacts and
- * SQLite ledger; this manifest only makes the in-flight state observable and survives MCP reloads.
+ * Launch the fixed canonical harness independently of the initiating MCP request. The harness writes its own artifacts
+ * and SQLite ledger; this manifest only makes the in-flight state observable and survives MCP reloads.
  *
  * @param {{ args: string[]; plan: Record<string, unknown>; timeoutMs: number }} input
  */
@@ -225,7 +241,10 @@ async function spawnDetachedLiveRun(input) {
     const workspaceIo = llmbLiveWorkspaceIo();
     await workspaceIo.mkdirPathLocked(stateDir, { recursive: true });
     await workspaceIo.mkdirPathLocked(absoluteOutDir, { recursive: true });
-    const logHandle = await open(absoluteLogPath, 'a', 0o600);
+    const logSink = await openDetachedAppendSinkTrusted(absoluteLogPath, {
+        caller: 'mcp.tools.llm-b-live',
+        mode: 0o600,
+    });
     /** @type {import('node:child_process').ChildProcess | undefined} */
     let child;
     try {
@@ -233,10 +252,10 @@ async function spawnDetachedLiveRun(input) {
             cwd: getMcpWorkspaceRoot(),
             env: process.env,
             detached: true,
-            stdio: ['ignore', logHandle.fd, logHandle.fd],
+            stdio: ['ignore', logSink.handle.fd, logSink.handle.fd],
         });
     } finally {
-        await logHandle.close();
+        await logSink.handle.close();
     }
     if (!child?.pid) throw new Error('Detached LLM-B live harness did not expose a child pid.');
     child.unref();
@@ -250,13 +269,17 @@ async function spawnDetachedLiveRun(input) {
         logPath,
         plan: input.plan,
     };
-    await llmbLiveWorkspaceIo().writeFileAtomic(detachedLiveRunManifestPath(runId), `${JSON.stringify(manifest, null, 2)}\n`, {
-        encoding: 'utf8',
-        mode: 0o600,
-        riskClass: 'medium',
-        failIfExists: true,
-        advisoryLimits: { domain: 'llmb-live-detached-manifest' },
-    });
+    await llmbLiveWorkspaceIo().writeFileAtomic(
+        detachedLiveRunManifestPath(runId),
+        `${JSON.stringify(manifest, null, 2)}\n`,
+        {
+            encoding: 'utf8',
+            mode: 0o600,
+            riskClass: 'medium',
+            failIfExists: true,
+            advisoryLimits: { domain: 'llmb-live-detached-manifest' },
+        },
+    );
     return manifest;
 }
 
@@ -266,9 +289,10 @@ async function spawnDetachedLiveRun(input) {
  */
 async function readDetachedLiveRunManifest(manifestPath, expectedRunId = null) {
     try {
-        const stats = await stat(manifestPath);
+        const workspaceIo = llmbLiveWorkspaceIo();
+        const stats = (await workspaceIo.statPath(manifestPath)).stats;
         if (!stats.isFile() || stats.size > DETACHED_LIVE_RUN_MANIFEST_MAX_BYTES) return null;
-        const parsed = JSON.parse(await readFile(manifestPath, 'utf8'));
+        const parsed = JSON.parse((await workspaceIo.readTextFresh(manifestPath, { includeHash: false })).content);
         if (
             parsed?.schema !== 'llmb-live-detached-run' ||
             typeof parsed.runId !== 'string' ||
@@ -298,7 +322,11 @@ async function listDetachedLiveRuns(options = {}) {
     const limit = Math.max(1, Math.min(500, Math.trunc(options.limit ?? 20)));
     const nowMs = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
     await llmbLiveWorkspaceIo().mkdirPathLocked(directory, { recursive: true });
-    const entries = await readdir(directory).catch(() => []);
+    const workspaceIo = llmbLiveWorkspaceIo();
+    const entries = await workspaceIo
+        .listDirectoryNamesFresh(directory)
+        .then((result) => result.entries)
+        .catch(() => []);
     const rows = [];
     for (const entry of entries) {
         if (!entry.endsWith('.json')) continue;
@@ -307,7 +335,10 @@ async function listDetachedLiveRuns(options = {}) {
         const manifest = await readDetachedLiveRunManifest(join(directory, entry), expectedRunId);
         if (!manifest) continue;
         const summaryPath = join(getMcpWorkspaceRoot(), manifest.outDir, 'summary.md');
-        const summaryStats = await stat(summaryPath).catch(() => null);
+        const summaryStats = await workspaceIo
+            .statPath(summaryPath)
+            .then((result) => result.stats)
+            .catch(() => null);
         const summaryReady = summaryStats?.isFile() === true;
         const processIdentity = await inspectDetachedLiveRunProcessIdentity(manifest);
         // `kill(pid, 0)` also reports zombies/recycled PIDs as present. On POSIX, only an exact harness command-line
@@ -346,17 +377,20 @@ const DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS = 30_000;
  * manifest and re-verifies identity immediately before signaling, so a PID recycled between scan and reap is harmless.
  *
  * @param {{
- *   nowMs?: number;
- *   graceMs?: number;
- *   deps?: {
- *     listRuns?: () => Promise<Record<string, any>[]>;
- *     cancelRun?: (runId: string) => Promise<{ cancelled: boolean; alreadyStopped?: boolean }>;
- *   };
+ *     nowMs?: number;
+ *     graceMs?: number;
+ *     deps?: {
+ *         listRuns?: () => Promise<Record<string, any>[]>;
+ *         cancelRun?: (runId: string) => Promise<{ cancelled: boolean; alreadyStopped?: boolean }>;
+ *     };
  * }} [options]
  */
 export async function reapCompletedDetachedLiveRuns(options = {}) {
     const nowMs = Number.isFinite(options.nowMs) ? Number(options.nowMs) : Date.now();
-    const graceMs = Math.max(5_000, Math.min(10 * 60_000, Math.trunc(options.graceMs ?? DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS)));
+    const graceMs = Math.max(
+        5_000,
+        Math.min(10 * 60_000, Math.trunc(options.graceMs ?? DEFAULT_COMPLETED_LIVE_RUN_REAP_GRACE_MS)),
+    );
     const listRuns = options.deps?.listRuns ?? (() => listDetachedLiveRuns({ limit: 500, nowMs }));
     const cancelRun =
         options.deps?.cancelRun ??
@@ -429,7 +463,7 @@ function parseJsonOutput(text) {
 /** @param {string} filePath */
 async function readinessFileFingerprint(filePath) {
     try {
-        const info = await stat(filePath);
+        const info = (await statPathTrusted(filePath, { caller: 'mcp.tools.llm-b-live' })).stats;
         return `${info.size}:${Math.trunc(info.mtimeMs)}`;
     } catch (error) {
         const code = /** @type {NodeJS.ErrnoException} */ (error)?.code;
@@ -459,7 +493,15 @@ function modelGatewaySqliteFingerprint() {
                 )
                 .get()
         );
-        const runtime = /** @type {{ probe_runs?: number | null; probe_run_max?: number | null; probe_results?: number | null; probe_result_max?: number | null; health_rows?: number | null; health_max?: number | null } | undefined} */ (
+        const runtime = /** @type {{
+          probe_runs?: number | null;
+          probe_run_max?: number | null;
+          probe_results?: number | null;
+          probe_result_max?: number | null;
+          health_rows?: number | null;
+          health_max?: number | null;
+      }
+    | undefined} */ (
             db
                 .prepare(
                     `SELECT
@@ -508,14 +550,22 @@ async function buildLiveReadinessFingerprint(includeSqliteRuntimeHealth) {
     return `${includeSqliteRuntimeHealth ? 'sqlite-health' : 'file-health'}:${catalogFile}:${sqliteLogical}:${byokHealthFile}`;
 }
 
-/** @type {Promise<((options?: { includeSqliteRuntimeHealth?: boolean; reuseRedactionWorkers?: boolean }) => Promise<Record<string, any>>) | null> | null} */
+/** @type {Promise<
+    | ((options?: {
+          includeSqliteRuntimeHealth?: boolean;
+          reuseRedactionWorkers?: boolean;
+      }) => Promise<Record<string, any>>)
+    | null
+> | null} */
 let liveReadinessBuilderPromise = null;
 
 async function loadLiveReadinessBuilder() {
     if (!liveReadinessBuilderPromise) {
         liveReadinessBuilderPromise = import(LIVE_READINESS_MODULE_URL)
             .then((module) =>
-                typeof module.buildModelGatewayLiveReadiness === 'function' ? module.buildModelGatewayLiveReadiness : null,
+                typeof module.buildModelGatewayLiveReadiness === 'function'
+                    ? module.buildModelGatewayLiveReadiness
+                    : null,
             )
             .catch(() => null);
     }
@@ -621,13 +671,19 @@ function validateProfile(value, field) {
 
 /**
  * @param {{
- *   mode: 'control-only'|'dry-run'|'canonical-turn'|'byok-fixture-control'|'byok-real-control'|'byok-real-turn';
- *   scenario: string;
- *   transport: 'pty'|'stdio';
- *   timeoutMs: number;
- *   byokProfile?: string;
- *   routeProfile?: string;
- *   selectionPolicy?: 'metadata_first'|'prefer_runtime_proved'|'require_runtime_proof';
+ *     mode:
+ *         | 'control-only'
+ *         | 'dry-run'
+ *         | 'canonical-turn'
+ *         | 'byok-fixture-control'
+ *         | 'byok-real-control'
+ *         | 'byok-real-turn';
+ *     scenario: string;
+ *     transport: 'pty' | 'stdio';
+ *     timeoutMs: number;
+ *     byokProfile?: string;
+ *     routeProfile?: string;
+ *     selectionPolicy?: 'metadata_first' | 'prefer_runtime_proved' | 'require_runtime_proof';
  * }} input
  */
 function buildLiveRunPlan(input) {
@@ -722,7 +778,8 @@ export const llmBLiveTools = [
     {
         name: 'llmb_live_readiness',
         title: 'LLM-B live readiness',
-        description: 'Run the canonical read-only Model Gateway/terminal LLM-B readiness audit. Does not start the terminal or call providers.',
+        description:
+            'Run the canonical read-only Model Gateway/terminal LLM-B readiness audit. Does not start the terminal or call providers.',
         inputSchema: {
             includeSqliteRuntimeHealth: z.boolean().optional(),
         },
@@ -753,7 +810,8 @@ export const llmBLiveTools = [
     {
         name: 'llmb_live_runs',
         title: 'LLM-B persisted live runs',
-        description: 'Read persisted Model Gateway terminal live scenario summaries from SQLite. This never calls a provider.',
+        description:
+            'Read persisted Model Gateway terminal live scenario summaries from SQLite. This never calls a provider.',
         inputSchema: {
             limit: z.number().int().min(1).max(100).optional(),
         },
@@ -775,7 +833,8 @@ export const llmBLiveTools = [
     {
         name: 'llmb_live_test_cancel',
         title: 'Cancel detached LLM-B live test',
-        description: 'Cancel one allowlisted detached LLM-B live harness by its strict run id after verifying the manifest pid still belongs to that exact harness.',
+        description:
+            'Cancel one allowlisted detached LLM-B live harness by its strict run id after verifying the manifest pid still belongs to that exact harness.',
         inputSchema: {
             runId: z.string()['regex'](DETACHED_LIVE_RUN_ID_RE),
         },
@@ -790,7 +849,10 @@ export const llmBLiveTools = [
                     });
                 }
                 const summaryPath = join(getMcpWorkspaceRoot(), manifest.outDir, 'summary.md');
-                const summaryReady = await stat(summaryPath).then((value) => value.isFile()).catch(() => false);
+                const summaryReady = await llmbLiveWorkspaceIo()
+                    .statPath(summaryPath)
+                    .then((result) => result.stats.isFile())
+                    .catch(() => false);
                 if (summaryReady) {
                     const processIdentity = await inspectDetachedLiveRunProcessIdentity(manifest);
                     if (!processIdentity.verified) {
@@ -832,7 +894,9 @@ export const llmBLiveTools = [
                 }
                 const cancellation = await cancelDetachedLiveRun(manifest);
                 await appendMcpAuditEvent({
-                    event: cancellation.cancelled ? 'llmb_live_test_detached_cancelled' : 'llmb_live_test_detached_already_stopped',
+                    event: cancellation.cancelled
+                        ? 'llmb_live_test_detached_cancelled'
+                        : 'llmb_live_test_detached_already_stopped',
                     tool: 'llmb_live_test_cancel',
                     runId,
                     pid: manifest.pid,
@@ -850,7 +914,7 @@ export const llmBLiveTools = [
                 return okResult(structured, JSON.stringify(structured, null, 2));
             } catch (error) {
                 const code =
-                    typeof error === 'object' && error !== null && typeof /** @type {any} */ (error).code === 'string'
+                    typeof error === 'object' && error !== null && typeof (/** @type {any} */ (error).code) === 'string'
                         ? /** @type {any} */ (error).code
                         : 'ERR_LLMB_LIVE_CANCEL';
                 return errorResult(error instanceof Error ? error.message : String(error), { code, runId });
@@ -860,7 +924,8 @@ export const llmBLiveTools = [
     {
         name: 'llmb_live_test_plan',
         title: 'Plan canonical LLM-B live test',
-        description: 'Build an allowlisted live harness invocation and state whether it can consume GitHub Copilot AI Credits or BYOK/provider quota.',
+        description:
+            'Build an allowlisted live harness invocation and state whether it can consume GitHub Copilot AI Credits or BYOK/provider quota.',
         inputSchema: commonPlanInput,
         annotations: readOnlyAnnotations(),
         handler: async ({ mode, scenario, transport, timeoutMs, byokProfile, routeProfile, selectionPolicy }) => {
@@ -876,20 +941,35 @@ export const llmBLiveTools = [
                 });
                 return okResult({ success: true, ...plan }, JSON.stringify(plan, null, 2));
             } catch (error) {
-                return errorResult(error instanceof Error ? error.message : String(error), { code: 'ERR_LLMB_LIVE_PLAN' });
+                return errorResult(error instanceof Error ? error.message : String(error), {
+                    code: 'ERR_LLMB_LIVE_PLAN',
+                });
             }
         },
     },
     {
         name: 'llmb_live_test_run',
         title: 'Run canonical LLM-B live test',
-        description: 'Run the fixed canonical LLM-B live harness. Defaults to control-only; real model/provider usage requires confirmModelUsage=true.',
+        description:
+            'Run the fixed canonical LLM-B live harness. Defaults to control-only; real model/provider usage requires confirmModelUsage=true.',
         inputSchema: {
             ...commonPlanInput,
-            confirmModelUsage: z.boolean().optional()['describe']('Required when the plan can invoke a model or real BYOK/provider.'),
+            confirmModelUsage: z
+                .boolean()
+                .optional()
+                ['describe']('Required when the plan can invoke a model or real BYOK/provider.'),
         },
         annotations: { ...boundedWriteAnnotations(), openWorldHint: true },
-        handler: async ({ mode, scenario, transport, timeoutMs, byokProfile, routeProfile, selectionPolicy, confirmModelUsage }) => {
+        handler: async ({
+            mode,
+            scenario,
+            transport,
+            timeoutMs,
+            byokProfile,
+            routeProfile,
+            selectionPolicy,
+            confirmModelUsage,
+        }) => {
             try {
                 const effectiveMode = mode ?? 'control-only';
                 const effectiveTimeoutMs = timeoutMs ?? (effectiveMode.includes('turn') ? 600_000 : 180_000);
@@ -903,10 +983,13 @@ export const llmBLiveTools = [
                     ...(selectionPolicy ? { selectionPolicy } : {}),
                 });
                 if (plan.requiresUsageConfirmation && confirmModelUsage !== true) {
-                    return errorResult('This LLM-B live plan may consume AI Credits/provider quota; rerun with confirmModelUsage=true after reviewing llmb_live_test_plan.', {
-                        code: 'ERR_LLMB_MODEL_USAGE_CONFIRMATION_REQUIRED',
-                        plan,
-                    });
+                    return errorResult(
+                        'This LLM-B live plan may consume AI Credits/provider quota; rerun with confirmModelUsage=true after reviewing llmb_live_test_plan.',
+                        {
+                            code: 'ERR_LLMB_MODEL_USAGE_CONFIRMATION_REQUIRED',
+                            plan,
+                        },
+                    );
                 }
                 if (plan.executionMode === 'detached') {
                     const manifest = await spawnDetachedLiveRun({
@@ -939,14 +1022,44 @@ export const llmBLiveTools = [
                 const runId = `mcp-${Date.now().toString(36)}`;
                 const outDir = `artifacts/terminal-live/${runId}`;
                 const args = [...plan.args, `--out-dir=${outDir}`];
-                await appendMcpAuditEvent({ event: 'llmb_live_test_started', tool: 'llmb_live_test_run', runId, mode: plan.mode, scenario: plan.scenario, invokesModel: plan.invokesModel, invokesRealProvider: plan.invokesRealProvider });
+                await appendMcpAuditEvent({
+                    event: 'llmb_live_test_started',
+                    tool: 'llmb_live_test_run',
+                    runId,
+                    mode: plan.mode,
+                    scenario: plan.scenario,
+                    invokesModel: plan.invokesModel,
+                    invokesRealProvider: plan.invokesRealProvider,
+                });
                 const result = await execFixedNodeScript(LIVE_RUNNER, args, effectiveTimeoutMs + 30_000);
-                await appendMcpAuditEvent({ event: result.success ? 'llmb_live_test_completed' : 'llmb_live_test_failed', tool: 'llmb_live_test_run', runId, mode: plan.mode, scenario: plan.scenario, exitCode: result.exitCode });
-                const structured = { success: result.success, runId, outDir, plan, exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr, error: result.error ?? null };
-                if (!result.success) return errorResult(result.error ?? 'LLM-B live harness failed.', { code: 'ERR_LLMB_LIVE_RUN_FAILED', ...structured });
+                await appendMcpAuditEvent({
+                    event: result.success ? 'llmb_live_test_completed' : 'llmb_live_test_failed',
+                    tool: 'llmb_live_test_run',
+                    runId,
+                    mode: plan.mode,
+                    scenario: plan.scenario,
+                    exitCode: result.exitCode,
+                });
+                const structured = {
+                    success: result.success,
+                    runId,
+                    outDir,
+                    plan,
+                    exitCode: result.exitCode,
+                    stdout: result.stdout,
+                    stderr: result.stderr,
+                    error: result.error ?? null,
+                };
+                if (!result.success)
+                    return errorResult(result.error ?? 'LLM-B live harness failed.', {
+                        code: 'ERR_LLMB_LIVE_RUN_FAILED',
+                        ...structured,
+                    });
                 return okResult(structured, result.stdout.slice(-16000) || `LLM-B live run ${runId} completed.`);
             } catch (error) {
-                return errorResult(error instanceof Error ? error.message : String(error), { code: 'ERR_LLMB_LIVE_RUN' });
+                return errorResult(error instanceof Error ? error.message : String(error), {
+                    code: 'ERR_LLMB_LIVE_RUN',
+                });
             }
         },
     },

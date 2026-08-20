@@ -2,7 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** @import {RawFinding} from "../normalize/findings.mjs" */
+import { buildDependencyGraph } from '../../analysis/dependency-graph.mjs';
+
+/** @import {RawFinding} from '../normalize/findings.mjs' */
 
 /**
  * @param {string} rootDir
@@ -36,7 +38,7 @@ export async function collectArchitectureFindings(rootDir) {
     }
 
     try {
-        // Análise de dependências circulares (usando madge se disponível)
+        // Análise de dependências circulares pelo grafo canônico Babel/Node.
         const circularResult = await analyzeCircularDependencies(rootDir);
         findings.push(...circularResult.findings);
         errors.push(...circularResult.errors);
@@ -145,37 +147,34 @@ async function analyzeCircularDependencies(rootDir) {
     const warnings = [];
 
     try {
-        // Tentar usar madge se disponível
-        const { execSync } = await import('node:child_process');
-
-        const madgeOutput = execSync('npx madge --circular --format json src/ --exclude "^dashboard-ui/dist/"', {
-            cwd: rootDir,
-            encoding: 'utf8',
-            stdio: ['pipe', 'pipe', 'pipe'],
-        });
-
-        const circularDeps = JSON.parse(madgeOutput);
-
-        for (const [file, deps] of Object.entries(circularDeps)) {
-            if (deps.length > 0) {
-                findings.push({
-                    source_tool: 'architecture-circular',
-                    contract_id: 'CONTRACT-ARCH-CIRCULAR-DEPENDENCY',
-                    domain: 'architecture',
-                    file: file,
-                    evidence: `Dependências circulares: ${deps.join(' -> ')}`,
-                    severity_hint: 'P1',
-                    type: 'bug',
-                    impact: 'Dependências circulares dificultam manutenção e testing.',
-                    root_cause: 'Imports mútuos entre módulos.',
-                    suggested_patch: 'Reestruturar módulos para eliminar dependências circulares.',
-                    test_strategy: 'Executar madge --circular.',
-                    regression_risk: 'Alto',
-                });
-            }
+        const dependencyReport = buildDependencyGraph('src', { workspaceRoot: rootDir });
+        if (dependencyReport.parseErrors.length > 0) {
+            errors.push({
+                source: 'dependency-graph',
+                message: `Grafo incompleto: ${dependencyReport.parseErrors.length} erro(s) de parse.`,
+            });
         }
-    } catch (_error) {
-        // madge não disponível, skip silencioso (dependência opcional)
+        for (const component of dependencyReport.cycles) {
+            findings.push({
+                source_tool: 'architecture-circular',
+                contract_id: 'CONTRACT-ARCH-CIRCULAR-DEPENDENCY',
+                domain: 'architecture',
+                file: component[0] ?? null,
+                evidence: `Componente circular: ${component.join(' <-> ')}`,
+                severity_hint: 'P1',
+                type: 'bug',
+                impact: 'Dependências circulares dificultam manutenção e testing.',
+                root_cause: 'Imports mutuamente alcançáveis entre módulos.',
+                suggested_patch: 'Reestruturar módulos para eliminar dependências circulares.',
+                test_strategy: 'Executar `npm run analyze:deps`.',
+                regression_risk: 'Alto',
+            });
+        }
+    } catch (error) {
+        errors.push({
+            source: 'dependency-graph',
+            message: error instanceof Error ? error.message : String(error),
+        });
     }
 
     return { findings, errors, warnings };

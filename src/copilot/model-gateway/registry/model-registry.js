@@ -9,11 +9,7 @@
  * @module copilot/model-gateway/registry/model-registry
  */
 
-import {
-    createModelRecord,
-    createProviderRecord,
-    optionalString,
-} from '../contracts/records.js';
+import { createModelRecord, createProviderRecord, optionalString } from '../contracts/records.js';
 import { evaluateGatewayModelHealthRoute } from '../routing/index.js';
 
 /** @typedef {ReturnType<typeof createProviderRecord>} ModelGatewayProviderRecord */
@@ -32,9 +28,7 @@ function isRecord(value) {
  * @returns {string[]}
  */
 function stringArray(value) {
-    return Array.isArray(value)
-        ? value.map(optionalString).filter((item) => item !== null)
-        : [];
+    return Array.isArray(value) ? value.map(optionalString).filter((item) => item !== null) : [];
 }
 
 /**
@@ -89,8 +83,12 @@ function providerRecordInput(value) {
     if (!id) throw new TypeError('[model-gateway] provider record id is required');
     return {
         id,
-        ...(optionalString(value['displayName']) ? { displayName: optionalString(value['displayName']) ?? undefined } : {}),
-        ...(optionalString(value['providerType']) ? { providerType: optionalString(value['providerType']) ?? undefined } : {}),
+        ...(optionalString(value['displayName'])
+            ? { displayName: optionalString(value['displayName']) ?? undefined }
+            : {}),
+        ...(optionalString(value['providerType'])
+            ? { providerType: optionalString(value['providerType']) ?? undefined }
+            : {}),
         ...(optionalString(value['baseUrl']) ? { baseUrl: optionalString(value['baseUrl']) ?? undefined } : {}),
         ...(optionalString(value['wireApi']) ? { wireApi: optionalString(value['wireApi']) ?? undefined } : {}),
         ...(typeof value['enabled'] === 'boolean' ? { enabled: value['enabled'] } : {}),
@@ -183,7 +181,12 @@ export class ModelGatewayRegistry {
     }
 
     /**
-     * @param {{ providerId?: string; requires?: string[]; minContextWindowTokens?: number; health?: { routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean } }} [requirements]
+     * @param {{
+     *     providerId?: string;
+     *     requires?: string[];
+     *     minContextWindowTokens?: number;
+     *     health?: { routeProfile?: string | null; excludeFailed?: boolean; requireAgentProbeOk?: boolean };
+     * }} [requirements]
      * @returns {ModelGatewayModelRecord[]}
      */
     findCandidates(requirements = {}) {
@@ -191,7 +194,8 @@ export class ModelGatewayRegistry {
         return this.listEnabledModels().filter((model) => {
             if (requirements.providerId && model.providerId !== requirements.providerId) return false;
             if (typeof requirements.minContextWindowTokens === 'number') {
-                const context = typeof model.limits['contextWindowTokens'] === 'number' ? model.limits['contextWindowTokens'] : 0;
+                const context =
+                    typeof model.limits['contextWindowTokens'] === 'number' ? model.limits['contextWindowTokens'] : 0;
                 if (context < requirements.minContextWindowTokens) return false;
             }
             if (requirements.health) {

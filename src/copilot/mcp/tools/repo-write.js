@@ -5,18 +5,25 @@
  * @module copilot/mcp/tools/repo-write
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra';
+import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
+import {
+    listDirectoryNamesFreshTrusted,
+    lstatPathTrusted,
+    readBytesFreshTrusted,
+    readBytesRangeFreshTrusted,
+    statPathTrusted,
+} from '#copilot/infra/public/trusted-io';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
+    canRunCopilotValidatorInline,
     destructiveAnnotations,
     errorResult,
     estimateStructuredTextResultBytes,
     getMcpWorkspaceRoot,
     MCP_TOOL_EXECUTION_LIMITS,
     normalizeFocusedUnitTestFiles,
-    canRunCopilotValidatorInline,
     okResult,
     readOnlyAnnotations,
     resolveWritePath,
@@ -26,12 +33,13 @@ import {
     withResultSizeHint,
 } from '#copilot/mcp/control-plane';
 import { createHash, randomUUID } from 'node:crypto';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { clearRepoReadFileResultCacheForResolvedPath } from './repo-read-cache.js';
 
 const {
+    chmodFileLocked,
+    chmodFileLockedValidated,
     createOrReplaceFileAtomic,
     createOrReplaceFileAtomicValidated,
     deleteFileLocked,
@@ -136,10 +144,12 @@ const MAX_QUARANTINE_ID_LENGTH = 192;
 const quarantineIdSchema = z
     .string()
     .min(1)
-    .max(MAX_QUARANTINE_ID_LENGTH)['regex'](/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, 'quarantineId must be a safe basename');
+    .max(MAX_QUARANTINE_ID_LENGTH)
+    ['regex'](/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, 'quarantineId must be a safe basename');
 const durabilitySchema = z
     .enum(['file-and-directory', 'file', 'none'])
-    .optional()['describe'](
+    .optional()
+    ['describe'](
         'Crash-durability profile. Default file-and-directory. file skips parent-directory fsync; none also skips file flush. Atomic publish, locks, path policy and hash preconditions remain enforced.',
     );
 
@@ -165,7 +175,8 @@ const quarantineMetadataSchema = z.object({
     restoredPath: z.string().min(1).max(4096).nullable(),
     sourceBytes: z.number().int().nonnegative(),
     sourceHash: z
-        .string()['regex'](/^[a-f0-9]{64}$/)
+        .string()
+        ['regex'](/^[a-f0-9]{64}$/)
         .nullable(),
     transaction: quarantineTransactionSchema.nullable().optional(),
 });
@@ -195,27 +206,39 @@ const patchBatchOperationSchema = z.object({
         .number()
         .int()
         .min(1)
-        .optional()['describe']('Require an exact occurrence count before applying.'),
+        .optional()
+        ['describe']('Require an exact occurrence count before applying.'),
     occurrence_index: z
         .number()
         .int()
         .min(1)
-        .optional()['describe']('1-based occurrence index to replace when old_string appears more than once.'),
+        .optional()
+        ['describe']('1-based occurrence index to replace when old_string appears more than once.'),
     expectedHash: z
         .string()
-        .optional()['describe']('Expected SHA-256. For repeated same-file operations, repeat the initial file hash to use one group-baseline precondition; distinct hashes keep per-operation virtual-state checks.'),
+        .optional()
+        ['describe'](
+            'Expected SHA-256. For repeated same-file operations, repeat the initial file hash to use one group-baseline precondition; distinct hashes keep per-operation virtual-state checks.',
+        ),
     allowNoop: z.boolean().optional()['describe']('Allow old_string and new_string to be identical. Default: false.'),
     diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
     maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
     includeDiffPreview: z
         .boolean()
-        .optional()['describe']('Include textual diffPreview in each operation result. Default: false.'),
+        .optional()
+        ['describe']('Include textual diffPreview in each operation result. Default: false.'),
 });
 
 /**
  * Validate post-patch validator configuration before any file is modified.
  *
- * @param {Array<{ validator: string; testFile?: string; timeoutMs?: number; waitMs?: number; failureTailBytes?: number }>} requests
+ * @param {{
+ *     validator: string;
+ *     testFile?: string;
+ *     timeoutMs?: number;
+ *     waitMs?: number;
+ *     failureTailBytes?: number;
+ * }[]} requests
  */
 function normalizePostPatchValidationRequests(requests) {
     return requests.map((request) => {
@@ -315,13 +338,16 @@ const batchOperationSchema = z['discriminatedUnion']('type', [
     z.object({
         type: z.literal('set_executable'),
         path: z.string().min(1)['describe']('Workspace-relative regular file whose executable bits should be toggled.'),
-        executable: z.boolean()['describe']('When true, add POSIX executable bits; when false, remove only executable bits.'),
+        executable: z
+            .boolean()
+            ['describe']('When true, add POSIX executable bits; when false, remove only executable bits.'),
     }),
     z.object({
         type: z.literal('remove_file'),
         path: z
             .string()
-            .min(1)['describe']('Workspace-relative file path to delete. Prefer quarantine_file when possible.'),
+            .min(1)
+            ['describe']('Workspace-relative file path to delete. Prefer quarantine_file when possible.'),
         confirm: z.boolean().optional()['describe']('Must be true for remove_file when dryRun=false.'),
     }),
 ]);
@@ -458,13 +484,31 @@ function optionalInteger(value) {
     return Number.isInteger(value) ? /** @type {number} */ (value) : undefined;
 }
 
+const REPO_WRITE_IO_CALLER = 'mcp.tools.repo-write';
+const MAX_QUARANTINE_METADATA_BYTES = 128 * 1024;
+
+/** @param {string} filePath */
+async function repoWriteStat(filePath) {
+    return (await statPathTrusted(filePath, { caller: REPO_WRITE_IO_CALLER })).stats;
+}
+
+/** @param {string} filePath */
+async function repoWriteLstat(filePath) {
+    return (await lstatPathTrusted(filePath, { caller: REPO_WRITE_IO_CALLER })).stats;
+}
+
+/** @param {string} dirPath */
+async function repoWriteListDirectoryNames(dirPath) {
+    return (await listDirectoryNamesFreshTrusted(dirPath, { caller: REPO_WRITE_IO_CALLER })).entries;
+}
+
 /**
  * @param {string} filePath
  * @returns {Promise<boolean>}
  */
 async function pathExists(filePath) {
     try {
-        await fs.access(filePath);
+        await repoWriteStat(filePath);
         return true;
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -479,7 +523,7 @@ async function pathExists(filePath) {
  */
 async function regularFileExists(filePath) {
     try {
-        const stats = await fs.lstat(filePath);
+        const stats = await repoWriteLstat(filePath);
         return stats.isFile() && !stats.isSymbolicLink();
     } catch (error) {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
@@ -542,8 +586,8 @@ function resolveQuarantinePaths(quarantineId) {
  * @returns {Promise<void>}
  */
 async function writeQuarantineMetadataDefault(metadata, metadataPath) {
-    await fs.mkdir(path.dirname(metadataPath), { recursive: true });
-    await writeFileAtomic(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, {
+    await createOrReplaceFileAtomic(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`, {
+        createParentDirs: true,
         mode: 0o600,
         riskClass: 'high',
         advisoryLimits: {
@@ -633,9 +677,13 @@ function createQuarantineRollbackError(primaryError, rollbackError, operation) {
  */
 async function readQuarantineMetadataFile(metadataPath) {
     try {
-        const metadataStats = await fs.lstat(metadataPath);
-        if (!metadataStats.isFile() || metadataStats.isSymbolicLink()) return null;
-        const parsed = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
+        const snapshot = await readBytesRangeFreshTrusted(metadataPath, {
+            caller: REPO_WRITE_IO_CALLER,
+            maxBytes: MAX_QUARANTINE_METADATA_BYTES,
+            rejectSymlink: true,
+        });
+        if (!snapshot.isFile || snapshot.truncatedAfter) return null;
+        const parsed = JSON.parse(snapshot.content.toString('utf8'));
         const validation = quarantineMetadataSchema.safeParse(parsed);
         if (!validation.success) return null;
         const metadata = /** @type {QuarantineMetadata} */ ({
@@ -687,15 +735,19 @@ async function readQuarantineMetadata(quarantineId) {
     const parsedId = quarantineIdSchema.safeParse(quarantineId);
     if (!parsedId.success) return null;
     const paths = resolveQuarantinePaths(parsedId.data);
-    const { value } = await withIoResourceLock(paths.metadataPath, async () => {
-        const metadata = await readQuarantineMetadataFile(paths.metadataPath);
-        if (!metadata || metadata.quarantineId !== parsedId.data) return null;
-        return reconcileQuarantineMetadata(metadata, paths);
-    }, {
-        operation: 'quarantine-reconcile',
-        target: paths.metadataPath,
-        riskClass: 'high',
-    });
+    const { value } = await withIoResourceLock(
+        paths.metadataPath,
+        async () => {
+            const metadata = await readQuarantineMetadataFile(paths.metadataPath);
+            if (!metadata || metadata.quarantineId !== parsedId.data) return null;
+            return reconcileQuarantineMetadata(metadata, paths);
+        },
+        {
+            operation: 'quarantine-reconcile',
+            target: paths.metadataPath,
+            riskClass: 'high',
+        },
+    );
     return value;
 }
 
@@ -703,7 +755,7 @@ async function readQuarantineMetadata(quarantineId) {
  * @returns {Promise<QuarantineMetadata[]>}
  */
 async function listQuarantineMetadata() {
-    const entries = await fs.readdir(QUARANTINE_DIR).catch((error) => {
+    const entries = await repoWriteListDirectoryNames(QUARANTINE_DIR).catch((error) => {
         const code = /** @type {{ code?: unknown }} */ (error)?.code;
         if (code === 'ENOENT' || code === 'ENOTDIR') return [];
         throw error;
@@ -729,8 +781,8 @@ async function listQuarantineMetadata() {
  * @returns {Promise<string>}
  */
 async function sha256File(filePath) {
-    const bytes = await fs.readFile(filePath);
-    return createHash('sha256').update(bytes).digest('hex');
+    const snapshot = await readBytesFreshTrusted(filePath, { caller: REPO_WRITE_IO_CALLER, includeHash: true });
+    return snapshot.contentHash ?? createHash('sha256').update(snapshot.content).digest('hex');
 }
 
 /**
@@ -740,7 +792,7 @@ async function sha256File(filePath) {
  */
 async function fileMatchesQuarantineMetadata(filePath, metadata) {
     if (!(await regularFileExists(filePath))) return false;
-    const stats = await fs.stat(filePath);
+    const stats = await repoWriteStat(filePath);
     if (metadata.sourceBytes > 0 && stats.size !== metadata.sourceBytes) return false;
     if (metadata.sourceHash !== null && (await sha256File(filePath)) !== metadata.sourceHash) return false;
     return true;
@@ -762,7 +814,7 @@ async function reconcileQuarantineMetadata(metadata, quarantinePaths) {
             pathExists(original.resolved),
         ]);
         if (dataExists && !originalExists) {
-            const dataStats = await fs.stat(quarantinePaths.dataPath);
+            const dataStats = await repoWriteStat(quarantinePaths.dataPath);
             const reconciled = /** @type {QuarantineMetadata} */ ({
                 ...metadata,
                 status: 'quarantined',
@@ -876,40 +928,44 @@ async function quarantineResolvedFile(source) {
         },
     };
 
-    const { value } = await withIoResourceLock(quarantinePaths.metadataPath, async () => {
-        await writeQuarantineMetadata(journal, quarantinePaths.metadataPath);
-        let moved;
-        try {
-            moved = await moveFileLocked(source.resolved, quarantinePaths.dataPath, { overwrite: false });
-        } catch (error) {
-            await removeFileIfPresent(quarantinePaths.metadataPath).catch(() => undefined);
-            throw error;
-        }
-
-        const metadata = /** @type {QuarantineMetadata} */ ({
-            ...journal,
-            status: 'quarantined',
-            sourceBytes: moved.sourceBytes,
-            sourceHash: moved.sourceHash,
-            transaction: null,
-        });
-        try {
-            await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
-        } catch (error) {
+    const { value } = await withIoResourceLock(
+        quarantinePaths.metadataPath,
+        async () => {
+            await writeQuarantineMetadata(journal, quarantinePaths.metadataPath);
+            let moved;
             try {
-                await moveFileLocked(quarantinePaths.dataPath, source.resolved, { overwrite: false });
-                await removeFileIfPresent(quarantinePaths.metadataPath);
-            } catch (rollbackError) {
-                throw createQuarantineRollbackError(error, rollbackError, 'Quarantine metadata commit');
+                moved = await moveFileLocked(source.resolved, quarantinePaths.dataPath, { overwrite: false });
+            } catch (error) {
+                await removeFileIfPresent(quarantinePaths.metadataPath).catch(() => undefined);
+                throw error;
             }
-            throw error;
-        }
-        return { metadata, moved };
-    }, {
-        operation: 'quarantine-commit',
-        target: quarantinePaths.metadataPath,
-        riskClass: 'high',
-    });
+
+            const metadata = /** @type {QuarantineMetadata} */ ({
+                ...journal,
+                status: 'quarantined',
+                sourceBytes: moved.sourceBytes,
+                sourceHash: moved.sourceHash,
+                transaction: null,
+            });
+            try {
+                await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
+            } catch (error) {
+                try {
+                    await moveFileLocked(quarantinePaths.dataPath, source.resolved, { overwrite: false });
+                    await removeFileIfPresent(quarantinePaths.metadataPath);
+                } catch (rollbackError) {
+                    throw createQuarantineRollbackError(error, rollbackError, 'Quarantine metadata commit');
+                }
+                throw error;
+            }
+            return { metadata, moved };
+        },
+        {
+            operation: 'quarantine-commit',
+            target: quarantinePaths.metadataPath,
+            riskClass: 'high',
+        },
+    );
     return value;
 }
 
@@ -927,108 +983,114 @@ async function quarantineResolvedFile(source) {
  */
 async function restoreQuarantinedFile(quarantineId, destination, overwrite) {
     const quarantinePaths = resolveQuarantinePaths(quarantineId);
-    const { value } = await withIoResourceLock(quarantinePaths.metadataPath, async () => {
-        const stored = await readQuarantineMetadataFile(quarantinePaths.metadataPath);
-        const metadata = stored ? await reconcileQuarantineMetadata(stored, quarantinePaths) : null;
-        if (!metadata) {
-            const error = /** @type {Error & { code?: string }} */ (new Error('Quarantine metadata not found.'));
-            error.code = 'ERR_QUARANTINE_NOT_FOUND';
-            throw error;
-        }
-        if (metadata.status !== 'quarantined') {
-            const error = /** @type {Error & { code?: string }} */ (new Error('Quarantine item is not restorable.'));
-            error.code = 'ERR_QUARANTINE_NOT_RESTORABLE';
-            throw error;
-        }
-        if (!(await fileMatchesQuarantineMetadata(quarantinePaths.dataPath, metadata))) {
-            const error = /** @type {Error & { code?: string }} */ (
-                new Error('Quarantine data is missing, unsafe or does not match its manifest.')
-            );
-            error.code = 'ERR_QUARANTINE_DATA_INVALID';
-            throw error;
-        }
-
-        const destinationExists = await pathExists(destination.resolved);
-        if (destinationExists && !overwrite) {
-            const error = /** @type {Error & { code?: string }} */ (
-                new Error(`Destino ja existe: ${destination.relative}`)
-            );
-            error.code = 'EEXIST';
-            throw error;
-        }
-        const backupPath = destinationExists
-            ? path.join(QUARANTINE_DIR, `${quarantineId}.restore-backup-${randomUUID()}.data`)
-            : null;
-        /** @type {QuarantineMetadata} */
-        const journal = {
-            ...metadata,
-            status: 'restoring',
-            restoredAt: new Date().toISOString(),
-            restoredPath: destination.relative,
-            transaction: {
-                kind: 'restore',
-                destinationPath: destination.relative,
-                backupPath: backupPath ? toWorkspaceRelativePath(backupPath) : null,
-                destinationExisted: destinationExists,
-            },
-        };
-        await writeQuarantineMetadata(journal, quarantinePaths.metadataPath);
-
-        let backupMoved = false;
-        let dataMoved = false;
-        /** @type {Awaited<ReturnType<typeof moveFileLocked>> | null} */
-        let backupMove = null;
-        try {
-            if (backupPath) {
-                backupMove = await moveFileLocked(destination.resolved, backupPath, { overwrite: false });
-                backupMoved = true;
+    const { value } = await withIoResourceLock(
+        quarantinePaths.metadataPath,
+        async () => {
+            const stored = await readQuarantineMetadataFile(quarantinePaths.metadataPath);
+            const metadata = stored ? await reconcileQuarantineMetadata(stored, quarantinePaths) : null;
+            if (!metadata) {
+                const error = /** @type {Error & { code?: string }} */ (new Error('Quarantine metadata not found.'));
+                error.code = 'ERR_QUARANTINE_NOT_FOUND';
+                throw error;
             }
-            const restored = await moveFileLocked(quarantinePaths.dataPath, destination.resolved, {
-                overwrite: false,
-            });
-            dataMoved = true;
-            const committed = /** @type {QuarantineMetadata} */ ({ ...journal, status: 'restored' });
-            await writeQuarantineMetadata(committed, quarantinePaths.metadataPath);
-
-            let cleanupPending = false;
-            try {
-                if (backupPath) await removeRegularFileIfPresent(backupPath);
-                await writeQuarantineMetadata(
-                    /** @type {QuarantineMetadata} */ ({ ...committed, transaction: null }),
-                    quarantinePaths.metadataPath,
+            if (metadata.status !== 'quarantined') {
+                const error = /** @type {Error & { code?: string }} */ (
+                    new Error('Quarantine item is not restorable.')
                 );
-            } catch {
-                cleanupPending = true;
+                error.code = 'ERR_QUARANTINE_NOT_RESTORABLE';
+                throw error;
             }
-            return {
-                metadata: /** @type {QuarantineMetadata} */ ({
-                    ...committed,
-                    transaction: cleanupPending ? committed.transaction : null,
-                }),
-                restored,
-                destinationPreviousHash: backupMove?.sourceHash ?? null,
-                destinationPreviousBytes: backupMove?.sourceBytes ?? null,
-                cleanupPending,
+            if (!(await fileMatchesQuarantineMetadata(quarantinePaths.dataPath, metadata))) {
+                const error = /** @type {Error & { code?: string }} */ (
+                    new Error('Quarantine data is missing, unsafe or does not match its manifest.')
+                );
+                error.code = 'ERR_QUARANTINE_DATA_INVALID';
+                throw error;
+            }
+
+            const destinationExists = await pathExists(destination.resolved);
+            if (destinationExists && !overwrite) {
+                const error = /** @type {Error & { code?: string }} */ (
+                    new Error(`Destino ja existe: ${destination.relative}`)
+                );
+                error.code = 'EEXIST';
+                throw error;
+            }
+            const backupPath = destinationExists
+                ? path.join(QUARANTINE_DIR, `${quarantineId}.restore-backup-${randomUUID()}.data`)
+                : null;
+            /** @type {QuarantineMetadata} */
+            const journal = {
+                ...metadata,
+                status: 'restoring',
+                restoredAt: new Date().toISOString(),
+                restoredPath: destination.relative,
+                transaction: {
+                    kind: 'restore',
+                    destinationPath: destination.relative,
+                    backupPath: backupPath ? toWorkspaceRelativePath(backupPath) : null,
+                    destinationExisted: destinationExists,
+                },
             };
-        } catch (error) {
+            await writeQuarantineMetadata(journal, quarantinePaths.metadataPath);
+
+            let backupMoved = false;
+            let dataMoved = false;
+            /** @type {Awaited<ReturnType<typeof moveFileLocked>> | null} */
+            let backupMove = null;
             try {
-                if (dataMoved) {
-                    await moveFileLocked(destination.resolved, quarantinePaths.dataPath, { overwrite: false });
+                if (backupPath) {
+                    backupMove = await moveFileLocked(destination.resolved, backupPath, { overwrite: false });
+                    backupMoved = true;
                 }
-                if (backupMoved && backupPath) {
-                    await moveFileLocked(backupPath, destination.resolved, { overwrite: false });
+                const restored = await moveFileLocked(quarantinePaths.dataPath, destination.resolved, {
+                    overwrite: false,
+                });
+                dataMoved = true;
+                const committed = /** @type {QuarantineMetadata} */ ({ ...journal, status: 'restored' });
+                await writeQuarantineMetadata(committed, quarantinePaths.metadataPath);
+
+                let cleanupPending = false;
+                try {
+                    if (backupPath) await removeRegularFileIfPresent(backupPath);
+                    await writeQuarantineMetadata(
+                        /** @type {QuarantineMetadata} */ ({ ...committed, transaction: null }),
+                        quarantinePaths.metadataPath,
+                    );
+                } catch {
+                    cleanupPending = true;
                 }
-                await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
-            } catch (rollbackError) {
-                throw createQuarantineRollbackError(error, rollbackError, 'Quarantine restore');
+                return {
+                    metadata: /** @type {QuarantineMetadata} */ ({
+                        ...committed,
+                        transaction: cleanupPending ? committed.transaction : null,
+                    }),
+                    restored,
+                    destinationPreviousHash: backupMove?.sourceHash ?? null,
+                    destinationPreviousBytes: backupMove?.sourceBytes ?? null,
+                    cleanupPending,
+                };
+            } catch (error) {
+                try {
+                    if (dataMoved) {
+                        await moveFileLocked(destination.resolved, quarantinePaths.dataPath, { overwrite: false });
+                    }
+                    if (backupMoved && backupPath) {
+                        await moveFileLocked(backupPath, destination.resolved, { overwrite: false });
+                    }
+                    await writeQuarantineMetadata(metadata, quarantinePaths.metadataPath);
+                } catch (rollbackError) {
+                    throw createQuarantineRollbackError(error, rollbackError, 'Quarantine restore');
+                }
+                throw error;
             }
-            throw error;
-        }
-    }, {
-        operation: 'quarantine-restore',
-        target: quarantinePaths.metadataPath,
-        riskClass: 'high',
-    });
+        },
+        {
+            operation: 'quarantine-restore',
+            target: quarantinePaths.metadataPath,
+            riskClass: 'high',
+        },
+    );
     return value;
 }
 
@@ -1251,8 +1313,7 @@ function buildLockedPatchBatchGroup(group) {
     const providedHashes = group
         .map(({ operation }) => readPatchExpectedHash(operation))
         .filter((value) => value !== null);
-    const baselineExpectedHash =
-        firstHash && providedHashes.every((value) => value === firstHash) ? firstHash : null;
+    const baselineExpectedHash = firstHash && providedHashes.every((value) => value === firstHash) ? firstHash : null;
     return {
         expectedHashMode: baselineExpectedHash ? 'group-baseline' : 'per-operation',
         ...(baselineExpectedHash ? { baselineExpectedHash } : {}),
@@ -1284,9 +1345,7 @@ function compactPatchBatchSuccessRow(row) {
         path: row['path'],
         noop: row['noop'] === true,
         replacedOccurrences: row['replacedOccurrences'],
-        ...(typeof row['expectedHashMode'] === 'string'
-            ? { expectedHashMode: row['expectedHashMode'] }
-            : {}),
+        ...(typeof row['expectedHashMode'] === 'string' ? { expectedHashMode: row['expectedHashMode'] } : {}),
     };
 }
 
@@ -1316,8 +1375,16 @@ function patchFailureSemantics(code, details = {}, failureScope = 'target') {
     let recoveryRequired = true;
 
     if (normalizedCode === 'ERR_PATCH_NOT_FOUND') {
-        failureClass = 'stale-context';
-        retryability = convergenceCandidate ? 'manual-decision' : 'caller-refresh';
+        const exactContextMismatch =
+            Number(details['quoteEscapeNormalizedOccurrenceCount'] ?? 0) > 0 ||
+            Number(details['lineEndingNormalizedOccurrenceCount'] ?? 0) > 0 ||
+            Number(details['whitespaceNormalizedOccurrenceCount'] ?? 0) > 0;
+        failureClass = convergenceCandidate
+            ? 'already-converged-candidate'
+            : exactContextMismatch
+              ? 'exact-context-mismatch'
+              : 'stale-context';
+        retryability = convergenceCandidate || exactContextMismatch ? 'manual-decision' : 'caller-refresh';
         mutationState = convergenceCandidate ? 'already-converged-candidate' : 'none';
         recoveryRequired = !convergenceCandidate;
     } else if (
@@ -1370,17 +1437,25 @@ function patchBatchNextAction(code, details = {}) {
     if (code === 'ERR_PATCH_EXPECTED_OCCURRENCES') {
         return 'Adjust expected_occurrences from the returned occurrence evidence, or refine old_string.';
     }
-    if (code === 'EEXPECTEDHASH') return 'Refresh only this target hash and retry; other independent targets need not be repeated.';
-    if (code === 'ERR_PATH_DENIED') return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
+    if (code === 'ERR_PATCH_NOOP') {
+        return 'This operation is already a no-op. Remove it from the batch, change new_string, or use allowNoop=true when an intentional idempotent no-op is part of the plan.';
+    }
+    if (code === 'EEXPECTEDHASH')
+        return 'Refresh only this target hash and retry; other independent targets need not be repeated.';
+    if (code === 'ERR_PATH_DENIED')
+        return 'The target is outside the permitted repository write policy or is sensitive/binary; inspect the path-policy reason.';
     if (code === 'ERR_PATCH_NOT_FOUND') {
         if (details['convergenceCandidate'] === true) {
             return 'Do not repeat the unchanged patch: new_string is already present exactly once. Treat this as a convergence candidate, or review intent using currentHash without rereading solely for diagnosis.';
         }
+        if (Number(details['quoteEscapeNormalizedOccurrenceCount'] ?? 0) > 0) {
+            return 'old_string matches after removing literal quote escapes (for example \\" -> "). This is an exact-anchor encoding mismatch, not evidence of concurrent file modification. Retry with the exact source quotes using currentHash.';
+        }
         if (Number(details['lineEndingNormalizedOccurrenceCount'] ?? 0) > 0) {
-            return `old_string matches after line-ending normalization; retry with newlineStyle=${String(details['newlineStyle'] ?? 'current')} using the returned currentHash. No full reread is required solely to diagnose this mismatch.`;
+            return `old_string matches after line-ending normalization; retry with newlineStyle=${String(details['newlineStyle'] ?? 'current')} using the returned currentHash. This is an exact-context mismatch, not by itself evidence of concurrent modification.`;
         }
         if (Number(details['whitespaceNormalizedOccurrenceCount'] ?? 0) > 0) {
-            return 'old_string matches after bounded whitespace normalization. Use candidateLines/currentHash to refine an exact anchor; avoid a full reread solely for diagnosis.';
+            return 'old_string matches after bounded whitespace normalization. This is an exact-context mismatch; use candidateLines/currentHash to refine the anchor without assuming concurrent modification.';
         }
         const candidateLines = Array.isArray(details['candidateLines']) ? details['candidateLines'] : [];
         if (candidateLines.length > 0) {
@@ -1406,7 +1481,8 @@ function compactPatchBatchFailureRows(rows) {
         const causal =
             ordered.find((row) => row['causalFailure'] === true) ??
             ordered.find((row) => row['code'] !== 'ERR_PATCH_BATCH_GROUP_ABORTED') ??
-            ordered[0] ?? {};
+            ordered[0] ??
+            {};
         const details =
             causal['details'] && typeof causal['details'] === 'object' && !Array.isArray(causal['details'])
                 ? /** @type {Record<string, unknown>} */ (causal['details'])
@@ -1487,19 +1563,14 @@ function summarizePatchBatchTargets(rows, dryRun) {
         const first = /** @type {Record<string, unknown>} */ (ordered[0] ?? {});
         const last = /** @type {Record<string, unknown>} */ (ordered.at(-1) ?? {});
         const traceId = ordered.find((row) => typeof row['traceId'] === 'string')?.['traceId'];
-        const replacedOccurrences = ordered.reduce(
-            (sum, row) => sum + Number(row['replacedOccurrences'] ?? 0),
-            0,
-        );
+        const replacedOccurrences = ordered.reduce((sum, row) => sum + Number(row['replacedOccurrences'] ?? 0), 0);
         return {
             path,
             operationIndices: ordered.map((row) => Number(row['index'] ?? 0)),
             operationCount: ordered.length,
             noopCount: ordered.filter((row) => row['noop'] === true).length,
             replacedOccurrences,
-            ...(typeof first['expectedHashMode'] === 'string'
-                ? { expectedHashMode: first['expectedHashMode'] }
-                : {}),
+            ...(typeof first['expectedHashMode'] === 'string' ? { expectedHashMode: first['expectedHashMode'] } : {}),
             ...(typeof first['previousHash'] === 'string' ? { initialHash: first['previousHash'] } : {}),
             ...(typeof (dryRun ? last['projectedHash'] : last['contentHash']) === 'string'
                 ? { finalHash: dryRun ? last['projectedHash'] : last['contentHash'] }
@@ -1507,8 +1578,7 @@ function summarizePatchBatchTargets(rows, dryRun) {
             ...(Number.isFinite(Number(last['projectedBytes']))
                 ? { projectedBytes: Number(last['projectedBytes']) }
                 : {}),
-            ...(!dryRun &&
-            Number.isFinite(Number(first['batchBytesWritten'] ?? last['bytesWritten']))
+            ...(!dryRun && Number.isFinite(Number(first['batchBytesWritten'] ?? last['bytesWritten']))
                 ? { bytesWritten: Number(first['batchBytesWritten'] ?? last['bytesWritten']) }
                 : {}),
             ...(typeof traceId === 'string' ? { traceId } : {}),
@@ -1549,7 +1619,9 @@ async function runPatchBatchOperations(operations, dryRun) {
         }
 
         const first = /** @type {{ operation: Record<string, unknown>; index: number }} */ (group[0]);
-        const resolved = await resolveWritePath(String(first.operation['path'] ?? ''), { issueMutableCapability: true });
+        const resolved = await resolveWritePath(String(first.operation['path'] ?? ''), {
+            issueMutableCapability: true,
+        });
         if (!resolved.ok) {
             for (const entry of group) {
                 results.push({
@@ -1588,9 +1660,7 @@ async function runPatchBatchOperations(operations, dryRun) {
         try {
             const patch = await patchResolvedTargetBatch(resolved, {
                 operations: lockedGroup.operations,
-                ...(lockedGroup.baselineExpectedHash
-                    ? { baselineExpectedHash: lockedGroup.baselineExpectedHash }
-                    : {}),
+                ...(lockedGroup.baselineExpectedHash ? { baselineExpectedHash: lockedGroup.baselineExpectedHash } : {}),
                 dryRun,
                 captureRollback: false,
                 ...durabilityOption(first.operation['durability']),
@@ -1656,8 +1726,7 @@ async function runPatchBatchOperations(operations, dryRun) {
             const completedOperationCount = Number.isInteger(errorRecord['completedOperationCount'])
                 ? Number(errorRecord['completedOperationCount'])
                 : null;
-            const failurePhase =
-                typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
+            const failurePhase = typeof errorRecord['failurePhase'] === 'string' ? errorRecord['failurePhase'] : null;
             const details = patchBatchErrorDetails(error);
             for (const [groupIndex, entry] of group.entries()) {
                 const causal = failedGroupOperationIndex === null || groupIndex === failedGroupOperationIndex;
@@ -1726,7 +1795,7 @@ function inspectPatchBatchEnvelope(operations) {
 async function runPatchBatchTargetGroups(operations, dryRun, options = {}) {
     /** @type {{ path: string; entries: { operation: Record<string, unknown>; index: number }[] }[]} */
     const groups = [];
-    /** @type {Map<string, typeof groups[number]>} */
+    /** @type {Map<string, (typeof groups)[number]>} */
     const byPath = new Map();
     for (const [index, operation] of operations.entries()) {
         const pathKey = String(operation['path'] ?? '');
@@ -1835,7 +1904,7 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
         const destination = await resolveWritePath(String(item['destination'] ?? ''));
         if (!destination.ok) throw new Error(`operation ${index}: ${destination.reason}`);
         const virtualSource = context.virtualFiles.get(source.resolved);
-        const stats = virtualSource ? null : await fs.stat(source.resolved);
+        const stats = virtualSource ? null : await repoWriteStat(source.resolved);
         const destinationExists = await pathExists(destination.resolved);
         const virtualDestinationExists = context.virtualFiles.has(destination.resolved);
         if ((destinationExists || virtualDestinationExists) && item['overwrite'] !== true) {
@@ -1865,7 +1934,7 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
     if (type === 'set_executable') {
         const resolved = await resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await fs.stat(resolved.resolved);
+        const stats = await repoWriteStat(resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         const currentMode = stats.mode & 0o777;
         const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
@@ -1883,7 +1952,7 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
     if (type === 'quarantine_file' || type === 'remove_file') {
         const resolved = await resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await fs.stat(resolved.resolved);
+        const stats = await repoWriteStat(resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         return {
             index,
@@ -1902,11 +1971,11 @@ async function previewBatchFileOperation(operation, index, context = { virtualFi
  *
  * @param {unknown[]} operations
  * @returns {Promise<{
- *   success: boolean;
- *   previews: Record<string, unknown>[];
- *   failureIndex: number;
- *   error: string | null;
- *   durationMs: number;
+ *     success: boolean;
+ *     previews: Record<string, unknown>[];
+ *     failureIndex: number;
+ *     error: string | null;
+ *     durationMs: number;
  * }>}
  */
 async function runFileBatchPreflight(operations) {
@@ -1988,32 +2057,38 @@ async function applyBatchFileOperation(operation, index) {
         };
     }
     if (type === 'set_executable') {
-        const resolved = await resolveWritePath(String(item['path'] ?? ''));
+        const resolved = await resolveWritePath(String(item['path'] ?? ''), { issueMutableCapability: true });
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const { value, waitMs } = await withIoResourceLock(resolved.resolved, async () => {
-            const stats = await fs.stat(resolved.resolved);
-            if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
-            const currentMode = stats.mode & 0o777;
-            const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
-            if (targetMode !== currentMode) await fs.chmod(resolved.resolved, targetMode);
-            return { currentMode, targetMode };
-        });
+        const stats = await repoWriteStat(resolved.resolved);
+        if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
+        const currentMode = stats.mode & 0o777;
+        const targetMode = item['executable'] === true ? currentMode | 0o111 : currentMode & ~0o111;
+        const changed = resolved.validatedWritePath
+            ? await chmodFileLockedValidated(resolved.validatedWritePath, targetMode, {
+                  riskClass: 'medium',
+                  advisoryLimits: { tool: 'repo_apply_file_batch', operation: type },
+              })
+            : await chmodFileLocked(resolved.resolved, targetMode, {
+                  riskClass: 'medium',
+                  advisoryLimits: { tool: 'repo_apply_file_batch', operation: type },
+              });
         return {
             index,
             type,
             path: resolved.relative,
             executable: item['executable'] === true,
-            previousMode: `0${value.currentMode.toString(8).padStart(3, '0')}`,
-            mode: `0${value.targetMode.toString(8).padStart(3, '0')}`,
-            changed: value.targetMode !== value.currentMode,
+            previousMode: `0${changed.previousMode.toString(8).padStart(3, '0')}`,
+            mode: `0${changed.mode.toString(8).padStart(3, '0')}`,
+            changed: changed.changed,
             metadataOnly: true,
-            lockWaitMs: waitMs,
+            lockWaitMs: changed.lockWaitMs,
+            traceId: changed.io.traceId ?? null,
         };
     }
     if (type === 'quarantine_file') {
         const resolved = await resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await fs.stat(resolved.resolved);
+        const stats = await repoWriteStat(resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         const { metadata, moved } = await quarantineResolvedFile(resolved);
         return { index, type, path: resolved.relative, ...metadata, traceId: moved.io.traceId ?? null };
@@ -2022,7 +2097,7 @@ async function applyBatchFileOperation(operation, index) {
         if (item['confirm'] !== true) throw new Error(`operation ${index}: confirm must be true for remove_file`);
         const resolved = await resolveWritePath(String(item['path'] ?? ''));
         if (!resolved.ok) throw new Error(`operation ${index}: ${resolved.reason}`);
-        const stats = await fs.stat(resolved.resolved);
+        const stats = await repoWriteStat(resolved.resolved);
         if (!stats.isFile()) throw new Error(`operation ${index}: only regular files are supported`);
         const removed = await deleteFileLocked(resolved.resolved);
         return {
@@ -2056,13 +2131,19 @@ export const repoWriteTools = [
             operations: z
                 .array(patchBatchOperationSchema)
                 .min(1)
-                .max(MAX_PATCH_BATCH_OPERATIONS)['describe']('Patch operations to validate in order. This tool never writes; max 128 operations / 64 targets.'),
+                .max(MAX_PATCH_BATCH_OPERATIONS)
+                ['describe'](
+                    'Patch operations to validate in order. This tool never writes; max 128 operations / 64 targets.',
+                ),
             targetConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_PATCH_TARGET_CONCURRENCY)
-                .optional()['describe']('Parallel target groups during planning. Default: 4; same-file operations remain sequential.'),
+                .optional()
+                ['describe'](
+                    'Parallel target groups during planning. Default: 4; same-file operations remain sequential.',
+                ),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations, targetConcurrency }) => {
@@ -2147,37 +2228,60 @@ export const repoWriteTools = [
             operations: z
                 .array(patchBatchOperationSchema)
                 .min(1)
-                .max(MAX_PATCH_BATCH_OPERATIONS)['describe']('Patch operations to validate or apply; max 128 operations / 64 targets / 3 MiB input.'),
+                .max(MAX_PATCH_BATCH_OPERATIONS)
+                ['describe']('Patch operations to validate or apply; max 128 operations / 64 targets / 3 MiB input.'),
             dryRun: z.boolean().optional()['describe']('Validate all operations without writing. Default: true.'),
             confirmBatch: z
                 .boolean()
-                .optional()['describe']('Must be true when dryRun=false because this applies multiple patches.'),
+                .optional()
+                ['describe']('Must be true when dryRun=false because this applies multiple patches.'),
             applyMode: z
                 .enum(['global-preflight', 'per-target-fast'])
-                .optional()['describe']('Apply policy. Default per-target-fast applies independent target groups directly with atomic compute-before-write per file. global-preflight is opt-in and blocks all writes when any preview target already fails.'),
+                .optional()
+                ['describe'](
+                    'Apply policy. Default per-target-fast applies independent target groups directly with atomic compute-before-write per file. global-preflight is opt-in and blocks all writes when any preview target already fails.',
+                ),
             failureMode: z
                 .enum(['best-effort', 'fail-fast'])
-                .optional()['describe']('Target failure policy during apply. Defaults best-effort for the default per-target-fast mode; global-preflight defaults fail-fast after its preview gate.'),
+                .optional()
+                ['describe'](
+                    'Target failure policy during apply. Defaults best-effort for the default per-target-fast mode; global-preflight defaults fail-fast after its preview gate.',
+                ),
             targetConcurrency: z
                 .number()
                 .int()
                 .min(1)
                 .max(MAX_PATCH_TARGET_CONCURRENCY)
-                .optional()['describe']('Parallel independent targets. Defaults 4 in per-target-fast; global-preflight apply uses 1 unless explicitly raised.'),
+                .optional()
+                ['describe'](
+                    'Parallel independent targets. Defaults 4 in per-target-fast; global-preflight apply uses 1 unless explicitly raised.',
+                ),
             resultMode: z
                 .enum(['compact', 'detailed'])
-                .optional()['describe']('Successful operation result detail. Default compact; detailed preserves full per-operation hashes/line/byte metadata. includeDiffPreview forces detailed.'),
+                .optional()
+                ['describe'](
+                    'Successful operation result detail. Default compact; detailed preserves full per-operation hashes/line/byte metadata. includeDiffPreview forces detailed.',
+                ),
             includePreflightDetails: z
                 .boolean()
-                .optional()['describe']('Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.'),
+                .optional()
+                ['describe'](
+                    'Echo full successful preflight rows in real apply output. Default false to avoid payload duplication.',
+                ),
             postValidate: z
                 .array(postPatchValidationRequestSchema)
                 .min(1)
                 .max(MAX_POST_PATCH_VALIDATORS)
-                .optional()['describe']('Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan and never starts jobs.'),
+                .optional()
+                ['describe'](
+                    'Optional allowlisted post-write validators executed in this same tool call; max 4. Dry-run only validates this plan and never starts jobs.',
+                ),
             postValidateOnPartial: z
                 .boolean()
-                .optional()['describe']('Run postValidate even after partial patch application. Default false; otherwise validation is skipped on partial apply.'),
+                .optional()
+                ['describe'](
+                    'Run postValidate even after partial patch application. Default false; otherwise validation is skipped on partial apply.',
+                ),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -2232,7 +2336,8 @@ export const repoWriteTools = [
                 });
             }
             const effectiveApplyMode = applyMode ?? 'per-target-fast';
-            const effectiveFailureMode = failureMode ?? (effectiveApplyMode === 'per-target-fast' ? 'best-effort' : 'fail-fast');
+            const effectiveFailureMode =
+                failureMode ?? (effectiveApplyMode === 'per-target-fast' ? 'best-effort' : 'fail-fast');
             const effectiveConcurrency =
                 targetConcurrency ?? (effectiveApplyMode === 'per-target-fast' ? DEFAULT_PATCH_FAST_CONCURRENCY : 1);
 
@@ -2275,7 +2380,8 @@ export const repoWriteTools = [
                         requestedCount: postValidationRequests.length,
                         ran: false,
                         skipped: postValidationRequests.length > 0,
-                        skippedReason: postValidationRequests.length > 0 ? 'dry-run-does-not-start-validator-jobs' : null,
+                        skippedReason:
+                            postValidationRequests.length > 0 ? 'dry-run-does-not-start-validator-jobs' : null,
                         validators: postValidationRequests.map((request) => request.validator),
                     },
                     operations: outputOperations,
@@ -2499,16 +2605,15 @@ export const repoWriteTools = [
                           durationMs: preflight.execution.durationMs,
                       }
                     : { ran: false, success: null, executionId: null, failedCount: 0, durationMs: 0 },
-                preflight: includePreflightDetails === true ? preflight?.operations ?? [] : [],
+                preflight: includePreflightDetails === true ? (preflight?.operations ?? []) : [],
                 postValidation,
                 applied: outputApplied,
                 failures: outputFailures,
                 skipped,
             };
-            const patchText =
-                structured.success
-                    ? `Applied ${succeeded.length} patch operation(s) across ${envelope.targetCount} target(s).`
-                    : `Patch batch completed partially: ${succeeded.length} applied, ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s), ${skipped.length} skipped.`;
+            const patchText = structured.success
+                ? `Applied ${succeeded.length} patch operation(s) across ${envelope.targetCount} target(s).`
+                : `Patch batch completed partially: ${succeeded.length} applied, ${failureSummary.causalFailureCount} causal target failure(s) affecting ${failureSummary.failedOperationCount} operation(s), ${skipped.length} skipped.`;
             const validationText =
                 postValidation.requestedCount === 0
                     ? ''
@@ -2524,7 +2629,8 @@ export const repoWriteTools = [
                 source: 'repo_apply_patch_batch',
             });
             return withResultExecutionHint(result, {
-                logicalOperations: normalizedOperations.length + (postValidation.ran ? postValidation.requestedCount : 0),
+                logicalOperations:
+                    normalizedOperations.length + (postValidation.ran ? postValidation.requestedCount : 0),
                 failedOperations: failedApply.length + (postValidation.ran ? postValidation.failedCount : 0),
                 skippedOperations: skipped.length + (postValidation.skipped ? postValidation.requestedCount : 0),
                 mode: `patch-apply:${effectiveApplyMode}:${effectiveFailureMode}${postValidation.ran ? ':post-validated' : ''}`,
@@ -2540,7 +2646,8 @@ export const repoWriteTools = [
             operations: z
                 .array(batchOperationSchema)
                 .min(1)
-                .max(MAX_BATCH_FILE_OPERATIONS)['describe']('Ordered file operations to validate and preview.'),
+                .max(MAX_BATCH_FILE_OPERATIONS)
+                ['describe']('Ordered file operations to validate and preview.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ operations }) => {
@@ -2589,19 +2696,28 @@ export const repoWriteTools = [
             operations: z
                 .array(batchOperationSchema)
                 .min(1)
-                .max(MAX_BATCH_FILE_OPERATIONS)['describe']('Ordered file operations. Later operations can depend on earlier ones.'),
+                .max(MAX_BATCH_FILE_OPERATIONS)
+                ['describe']('Ordered file operations. Later operations can depend on earlier ones.'),
             dryRun: z
                 .boolean()
-                .optional()['describe']('Validate and preview all operations without writing. Default: true.'),
+                .optional()
+                ['describe']('Validate and preview all operations without writing. Default: true.'),
             confirmBatch: z
                 .boolean()
-                .optional()['describe']('Must be true when applying file operations; confirmBatch=true also survives adapters that omit dryRun=false.'),
+                .optional()
+                ['describe'](
+                    'Must be true when applying file operations; confirmBatch=true also survives adapters that omit dryRun=false.',
+                ),
             applyMode: z
                 .enum(['global-preflight', 'sequential-fast'])
-                .optional()['describe']('Adaptive default: sequential-fast for create/move-without-overwrite/quarantine sequences; global-preflight when remove_file or overwrite move is present. Explicit value overrides the adaptive choice.'),
+                .optional()
+                ['describe'](
+                    'Adaptive default: sequential-fast for create/move-without-overwrite/quarantine sequences; global-preflight when remove_file or overwrite move is present. Explicit value overrides the adaptive choice.',
+                ),
             includePreflightDetails: z
                 .boolean()
-                .optional()['describe']('Include full successful preflight rows in a real apply response. Default: false.'),
+                .optional()
+                ['describe']('Include full successful preflight rows in a real apply response. Default: false.'),
         },
         annotations: destructiveAnnotations(),
         handler: async ({ operations, dryRun, confirmBatch, applyMode, includePreflightDetails }) => {
@@ -2710,7 +2826,7 @@ export const repoWriteTools = [
                     conservativeOperationIndices: applyModeDecision.conservativeOperationIndices,
                     operationCount: operations.length,
                     preflightSummary,
-                    planned: includePreflightDetails === true ? preflight?.previews ?? [] : [],
+                    planned: includePreflightDetails === true ? (preflight?.previews ?? []) : [],
                     applied,
                     appliedCount: applied.length,
                     failedCount: 1,
@@ -2749,7 +2865,7 @@ export const repoWriteTools = [
                 conservativeOperationIndices: applyModeDecision.conservativeOperationIndices,
                 operationCount: applied.length,
                 preflightSummary,
-                planned: includePreflightDetails === true ? preflight?.previews ?? [] : [],
+                planned: includePreflightDetails === true ? (preflight?.previews ?? []) : [],
                 applied,
                 appliedCount: applied.length,
                 failedCount: 0,
@@ -2780,7 +2896,8 @@ export const repoWriteTools = [
             maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
             includeDiffPreview: z
                 .boolean()
-                .optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
+                .optional()
+                ['describe']('Include textual diffPreview in the tool result. Default: false.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -2886,7 +3003,8 @@ export const repoWriteTools = [
             maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
             includeDiffPreview: z
                 .boolean()
-                .optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
+                .optional()
+                ['describe']('Include textual diffPreview in the tool result. Default: false.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -2982,22 +3100,26 @@ export const repoWriteTools = [
                 .number()
                 .int()
                 .min(1)
-                .optional()['describe']('Require an exact occurrence count before applying.'),
+                .optional()
+                ['describe']('Require an exact occurrence count before applying.'),
             occurrence_index: z
                 .number()
                 .int()
                 .min(1)
-                .optional()['describe']('1-based occurrence index to replace when old_string appears more than once.'),
+                .optional()
+                ['describe']('1-based occurrence index to replace when old_string appears more than once.'),
             expectedHash: z.string().optional()['describe']('Expected SHA-256 of current file content.'),
             dryRun: z.boolean().optional()['describe']('Validate and return diff without writing. Default: false.'),
             allowNoop: z
                 .boolean()
-                .optional()['describe']('Allow old_string and new_string to be identical. Default: false.'),
+                .optional()
+                ['describe']('Allow old_string and new_string to be identical. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
             includeDiffPreview: z
                 .boolean()
-                .optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
+                .optional()
+                ['describe']('Include textual diffPreview in the tool result. Default: false.'),
             durability: durabilitySchema,
         },
         annotations: boundedWriteAnnotations(),
@@ -3144,7 +3266,8 @@ export const repoWriteTools = [
             overwrite: z.boolean().optional()['describe']('Overwrite destination if it exists. Default: false.'),
             confirmOverwrite: z
                 .boolean()
-                .optional()['describe']('Must be true when overwrite is true because destination replacement is destructive.'),
+                .optional()
+                ['describe']('Must be true when overwrite is true because destination replacement is destructive.'),
             dryRun: z.boolean().optional()['describe']('Validate without moving. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
@@ -3161,7 +3284,7 @@ export const repoWriteTools = [
             }
 
             try {
-                const sourceStats = await fs.stat(src.resolved);
+                const sourceStats = await repoWriteStat(src.resolved);
                 const destinationExists = await pathExists(dst.resolved);
                 if (destinationExists && overwrite !== true) {
                     return errorResult(`Destino ja existe: ${dst.relative}`, { code: 'EEXIST' });
@@ -3230,7 +3353,10 @@ export const repoWriteTools = [
         title: 'List quarantined repository files',
         description: 'List files currently known to the MCP quarantine area, including restored and restorable items.',
         inputSchema: {
-            status: z.enum(['quarantined', 'restored', 'all']).optional()['describe']('Filter by status. Default: all.'),
+            status: z
+                .enum(['quarantined', 'restored', 'all'])
+                .optional()
+                ['describe']('Filter by status. Default: all.'),
             limit: z.number().int().min(1).max(200).optional()['describe']('Maximum items returned. Default: 50.'),
         },
         annotations: readOnlyAnnotations(),
@@ -3254,7 +3380,10 @@ export const repoWriteTools = [
         description: 'Inspect metadata and current stored-object state for one item created by repo_quarantine_file.',
         inputSchema: {
             quarantineId: quarantineIdSchema.describe('quarantineId returned by repo_quarantine_file.'),
-            includeHash: z.boolean().optional()['describe']('Compute SHA-256 for stored data if present. Default: true.'),
+            includeHash: z
+                .boolean()
+                .optional()
+                ['describe']('Compute SHA-256 for stored data if present. Default: true.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ quarantineId, includeHash }) => {
@@ -3268,7 +3397,7 @@ export const repoWriteTools = [
             }
             const quarantinePaths = resolveQuarantinePaths(metadata.quarantineId);
             const dataExists = await regularFileExists(quarantinePaths.dataPath);
-            const dataStats = dataExists ? await fs.stat(quarantinePaths.dataPath) : null;
+            const dataStats = dataExists ? await repoWriteStat(quarantinePaths.dataPath) : null;
             const dataHash = dataExists && includeHash !== false ? await sha256File(quarantinePaths.dataPath) : null;
             return okResult({
                 success: true,
@@ -3296,7 +3425,7 @@ export const repoWriteTools = [
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
 
             try {
-                const stats = await fs.stat(resolved.resolved);
+                const stats = await repoWriteStat(resolved.resolved);
                 if (!stats.isFile()) {
                     return errorResult('repo_quarantine_file move somente arquivos regulares.', {
                         path: resolved.relative,
@@ -3366,7 +3495,8 @@ export const repoWriteTools = [
             overwrite: z.boolean().optional()['describe']('Overwrite destination if it exists. Default: false.'),
             confirmOverwrite: z
                 .boolean()
-                .optional()['describe']('Must be true when overwrite is true because destination replacement is destructive.'),
+                .optional()
+                ['describe']('Must be true when overwrite is true because destination replacement is destructive.'),
             dryRun: z.boolean().optional()['describe']('Validate without restoring. Default: false.'),
         },
         annotations: boundedWriteAnnotations(),
@@ -3400,7 +3530,7 @@ export const repoWriteTools = [
             try {
                 if (dryRun === true) {
                     const quarantinePaths = resolveQuarantinePaths(metadata.quarantineId);
-                    const quarantineStats = await fs.stat(quarantinePaths.dataPath);
+                    const quarantineStats = await repoWriteStat(quarantinePaths.dataPath);
                     const destinationExists = await pathExists(destination.resolved);
                     if (destinationExists && overwrite !== true) {
                         return errorResult(`Destino ja existe: ${destination.relative}`, { code: 'EEXIST' });
@@ -3491,7 +3621,7 @@ export const repoWriteTools = [
             }
 
             try {
-                const stats = await fs.stat(resolved.resolved);
+                const stats = await repoWriteStat(resolved.resolved);
                 if (!stats.isFile()) {
                     return errorResult('repo_remove_file remove somente arquivos regulares.', {
                         path: resolved.relative,

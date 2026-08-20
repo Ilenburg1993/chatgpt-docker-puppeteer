@@ -59,7 +59,8 @@ describe('observability/logger.js — console resilience', () => {
             process.env['COPILOT_LOG_DIR'] = logDir;
             process.env['COPILOT_LOG_LEVEL'] = 'DEBUG';
 
-            const { audit, getRecentLogs, log, metric } = await import('../../../../src/copilot/observability/logger.js');
+            const { audit, flushObservabilityLogs, getRecentLogs, log, metric } =
+                await import('../../../../src/copilot/observability/logger.js');
 
             log.setConsoleLevel('FATAL');
             log('INFO', `direct gitHubToken=${githubToken} Authorization: Bearer ${byokToken}`, {
@@ -67,8 +68,12 @@ describe('observability/logger.js — console resilience', () => {
                 extra: { gitHubToken: githubToken },
             });
             log('INFO', { gitHubToken: githubToken, provider: { apiKey: byokToken } });
-            audit('sdk.session.create', { gitHubToken: githubToken, headers: { Authorization: `Bearer ${byokToken}` } });
+            audit('sdk.session.create', {
+                gitHubToken: githubToken,
+                headers: { Authorization: `Bearer ${byokToken}` },
+            });
             metric('sdk.session.create', { gitHubToken: githubToken, providerToken: byokToken, tokens: 42 });
+            await flushObservabilityLogs();
 
             const agentLog = readFileSync(join(logDir, 'agent.log'), 'utf8');
             const auditLog = readFileSync(join(logDir, 'audit.log'), 'utf8');

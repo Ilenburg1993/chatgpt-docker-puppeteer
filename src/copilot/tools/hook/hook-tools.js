@@ -3,7 +3,6 @@ import { getAuditTail } from '#copilot/audit';
 import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { execFile } from 'node:child_process';
-import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -66,7 +65,7 @@ const execFileAsync = promisify(execFile);
  * @type {string}
  */
 const ROOT = resolve(fileURLToPath(import.meta.url), '../../../../../');
-const { readText } = createWorkspaceIo({ workspaceRoot: ROOT });
+const { readText, statPath } = createWorkspaceIo({ workspaceRoot: ROOT });
 
 /**
  * Diretório de estado do hook system.
@@ -129,7 +128,9 @@ function _getPendingInputIds() {
 
 /** @returns {StructuredInputRequestSnapshot[]} */
 function _getPendingInputRequests() {
-    return _toolSessionContext ? _toolSessionContext.getPendingInputRequests() : getPendingStructuredUserInputRequests();
+    return _toolSessionContext
+        ? _toolSessionContext.getPendingInputRequests()
+        : getPendingStructuredUserInputRequests();
 }
 
 /** @returns {string} */
@@ -256,11 +257,13 @@ const hookGetAuditTailTool = buildTool({
             .int()
             .min(1)
             .optional()
-            .default(20)['describe']('Número sugerido de linhas a retornar (padrão histórico: 20)'),
+            .default(20)
+            ['describe']('Número sugerido de linhas a retornar (padrão histórico: 20)'),
         source: z
             .enum(['sdk', 'compliance', 'auto'])
             .optional()
-            .default('auto')['describe'](
+            .default('auto')
+            ['describe'](
                 'Fonte: "sdk" = ring buffer interno (tool calls SDK), "compliance" = audit.jsonl operacional (.github/hooks/), "auto" = sdk primeiro, compliance como fallback',
             ),
     }),
@@ -281,7 +284,7 @@ const hookGetAuditTailTool = buildTool({
         const auditPath = join(HOOK_STATE_DIR, 'audit.jsonl');
         let auditExists = false;
         try {
-            await access(auditPath);
+            await statPath(auditPath);
             auditExists = true;
         } catch {
             // file does not exist
@@ -340,14 +343,23 @@ const requestUserInputTool = buildTool({
         'É compatível com o padrão vscode_askQuestions do protocolo de hooks quando esse fluxo estiver ativo.',
     parameters: z.object({
         question: z.string()['describe']('Pergunta principal ao usuário (clara e objetiva)'),
-        context: z.string().optional()['describe']('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
+        context: z
+            .string()
+            .optional()
+            ['describe']('Contexto adicional — resumo do que foi feito para o usuário avaliar'),
         choices: z
             .array(z.string())
-            .optional()['describe']('Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre'),
+            .optional()
+            ['describe'](
+                'Opções predefinidas. Se fornecido, o usuário escolhe entre estas opções ou escreve texto livre',
+            ),
         requires_selection: z
             .boolean()
             .optional()
-            .default(false)['describe']('Compatibilidade legada: no Terminal LLM-B, choices são sugestões e texto livre continua permitido'),
+            .default(false)
+            ['describe'](
+                'Compatibilidade legada: no Terminal LLM-B, choices são sugestões e texto livre continua permitido',
+            ),
     }),
     handler: async (
         /** @type {{ question: string; context?: string; choices?: string[]; requires_selection?: boolean }} */ {
@@ -379,28 +391,32 @@ const requestUserInputTool = buildTool({
             }
 
             const requestId = _nextInputId();
-            _registerPendingInput(requestId, (answer) => {
-                clearTimeout(autoCleanupTimer);
-                resolve({
-                    requestId,
+            _registerPendingInput(
+                requestId,
+                (answer) => {
+                    clearTimeout(autoCleanupTimer);
+                    resolve({
+                        requestId,
+                        question: fullQuestion,
+                        choices: choices ?? [],
+                        allowFreeform,
+                        status: 'resolved',
+                        answer,
+                        instruction: 'Resposta recebida. Processar e continuar o fluxo.',
+                    });
+                },
+                {
                     question: fullQuestion,
                     choices: choices ?? [],
                     allowFreeform,
-                    status: 'resolved',
-                    answer,
-                    instruction: 'Resposta recebida. Processar e continuar o fluxo.',
-                });
-            }, {
-                question: fullQuestion,
-                choices: choices ?? [],
-                allowFreeform,
-                createdAt: Date.now(),
-                data: {
-                    source: 'request_user_input',
-                    requires_selection_requested: requires_selection === true,
-                    effective_policy: 'freeform_always',
+                    createdAt: Date.now(),
+                    data: {
+                        source: 'request_user_input',
+                        requires_selection_requested: requires_selection === true,
+                        effective_policy: 'freeform_always',
+                    },
                 },
-            });
+            );
             // BUG-P2-06: auto-cleanup após 10min para evitar memory leak se resolver nunca é chamado
             const autoCleanupTimer = setTimeout(() => {
                 if (_deletePendingInput(requestId)) {
@@ -445,7 +461,7 @@ const hookGetPendingTasksTool = buildTool({
         const pendingPath = join(HOOK_STATE_DIR, 'pending-tasks.md');
         let pendingExists = false;
         try {
-            await access(pendingPath);
+            await statPath(pendingPath);
             pendingExists = true;
         } catch {
             // file does not exist

@@ -73,7 +73,9 @@ import {
  *     resumesWithPR?: number;
  *     resumesZeroPR?: number;
  *     totalPR?: number;
- * }} [usageMetrics] - Métricas canônicas de chamadas de modelo do lifecycle, com aliases legacy no próprio snapshot.
+ * }} [usageMetrics]
+ *   - Métricas canônicas de chamadas de modelo do lifecycle, com aliases legacy no próprio snapshot.
+ *
  * @property {Record<string, unknown>} [prMetrics] - Alias persistido legacy de `usageMetrics` para leitores antigos.
  * @property {boolean} [gracefulShutdown] - F56.1: true se o último shutdown foi graceful (via stop()); false se
  *   crash/reboot
@@ -131,9 +133,7 @@ import {
  *   credenciais/provider headers.
  * @property {Record<string, Record<string, unknown>>} [sdkSessionLocalMetadata] Metadata local, redigida e por
  *   sessionId, para enriquecer o cockpit sem depender de APIs inexistentes como `session.updateMetadata`.
- * @property {{ mode: 'new'; requestedAt?: number }
- *     | { mode: 'resume'; sessionId: string; requestedAt?: number }
- *     | null} [nextSdkSessionBoot]
+ * @property {{ mode: 'new'; requestedAt?: number } | { mode: 'resume'; sessionId: string; requestedAt?: number } | null} [nextSdkSessionBoot]
  *   Diretiva efêmera do operador para o próximo boot da sessão SDK; consumida pelo initializer.
  */
 

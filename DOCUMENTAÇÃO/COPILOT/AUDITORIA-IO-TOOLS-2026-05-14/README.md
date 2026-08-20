@@ -1,6 +1,7 @@
 # Auditoria IO e Tools — 2026-05-14
 
-Pacote canônico desta rodada de investigação e roadmap para `src/copilot/infra` e `src/copilot/tools`.
+Pacote canônico desta rodada de investigação e roadmap para `src/copilot/infra` e
+`src/copilot/tools`.
 
 ## Ordem de leitura
 
@@ -34,14 +35,15 @@ Pacote canônico desta rodada de investigação e roadmap para `src/copilot/infr
 
 ## Status executivo
 
-As auditorias externas acertam o diagnóstico macro: `infra/` tem uma fundação útil, mas ainda não está no padrão
-arquitetural 2.0/2.1, sofre com monólito de I/O, ciclo ESM, budgets fracos, locks parcialmente frágeis e indexação
-semanticamente imprecisa.
+As auditorias externas acertam o diagnóstico macro: `infra/` tem uma fundação útil, mas ainda não
+está no padrão arquitetural 2.0/2.1, sofre com monólito de I/O, ciclo ESM, budgets fracos, locks
+parcialmente frágeis e indexação semanticamente imprecisa.
 
-A auditoria própria adiciona uma correção importante: `tools/` está realmente mais avançada em barrelização e contratos,
-mas ainda tem bypasses diretos de `infra`, ferramentas de index/scope sem validação de path no boundary e validadores
-de code-tools apontando para scripts legados. Portanto, a prioridade não é apenas "melhorar infra"; é alinhar
-`infra` e `tools` como uma superfície única de capacidades para a LLM-B.
+A auditoria própria adiciona uma correção importante: `tools/` está realmente mais avançada em
+barrelização e contratos, mas ainda tem bypasses diretos de `infra`, ferramentas de index/scope sem
+validação de path no boundary e validadores de code-tools apontando para scripts legados. Portanto,
+a prioridade não é apenas "melhorar infra"; é alinhar `infra` e `tools` como uma superfície única de
+capacidades para a LLM-B.
 
 ## Status da execução inicial
 

@@ -9,8 +9,8 @@
  * @module copilot/mcp/tools/repo-read-cache
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { registerIoInvalidationHook } from '#copilot/infra/io/invalidation/bus';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { getMcpWorkspaceRoot } from '#copilot/mcp/control-plane';
 import path from 'node:path';
 
@@ -21,9 +21,20 @@ const { readTextValidated, readTextChunksValidated, statPathValidated } = create
 const REPO_READ_FILE_CACHE_MAX_ENTRIES = 128;
 const DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 const HARD_REPO_READ_FILE_CACHE_MAX_BYTES = 64 * 1024 * 1024;
+const DEFAULT_REPO_READ_TRUST_WINDOW_MS = 250;
 
 /**
- * @typedef {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number; ino: number; validatedAtMs: number; structured: Record<string, unknown>; text: string; weightBytes: number }} RepoReadCacheEntry
+ * @typedef {{
+ *     sizeBytes: number;
+ *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     dev: number;
+ *     ino: number;
+ *     validatedAtMs: number;
+ *     structured: Record<string, unknown>;
+ *     text: string;
+ *     weightBytes: number;
+ * }} RepoReadCacheEntry
  */
 
 /** @type {Map<string, RepoReadCacheEntry>} */
@@ -36,6 +47,9 @@ const repoReadCacheStats = {
     misses: 0,
     stale: 0,
     trustWindowHits: 0,
+    hashVariantMisses: 0,
+    fingerprintValidations: 0,
+    fingerprintValidationHits: 0,
     sets: 0,
     evictions: 0,
     clears: 0,
@@ -73,7 +87,14 @@ ensureRepoReadCacheInvalidationHook();
 /**
  * Return MCP repo read response-cache stats. Kept under the historical function name for runtime-health compatibility.
  *
- * @returns {Record<string, number> & { size: number; chunkSize: number; bytes: number; chunkBytes: number; maxBytes: number; trustWindowMs: number }}
+ * @returns {Record<string, number> & {
+ *     size: number;
+ *     chunkSize: number;
+ *     bytes: number;
+ *     chunkBytes: number;
+ *     maxBytes: number;
+ *     trustWindowMs: number;
+ * }}
  */
 export function readRepoReadFileResultCacheStats() {
     return {
@@ -122,62 +143,68 @@ export function clearRepoReadFileResultCacheForResolvedSubtree(resolvedPath) {
  * @param {{ resolved: string; relative: string; validatedReadPath?: unknown }} resolved
  * @param {number | undefined} startLine
  * @param {number | undefined} endLine
+ * @param {'full' | 'returned' | 'none'} [hashMode]
  * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
  */
-export async function readRepoFileWithValidatedResultCache(resolved, startLine, endLine) {
+export async function readRepoFileWithValidatedResultCache(resolved, startLine, endLine, hashMode = 'full') {
     const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine);
-    const cached = await getValidatedRepoReadCacheEntry(
-        repoReadFileResultCache,
-        key,
-        resolved.validatedReadPath,
-        {
-            hitStat: 'hits',
-            trustWindowHitStat: 'trustWindowHits',
-            staleStat: 'stale',
-        },
-    );
+    const cached = await getValidatedRepoReadCacheEntry(repoReadFileResultCache, key, resolved.validatedReadPath, {
+        hitStat: 'hits',
+        trustWindowHitStat: 'trustWindowHits',
+        staleStat: 'stale',
+        hashMode,
+    });
     if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
 
-    return runRepoReadSingleflight(repoReadFileInflight, key, {
-        leaderStat: 'singleflightLeaders',
-        joinStat: 'singleflightJoins',
-        errorStat: 'singleflightErrors',
-    }, async () => {
-        repoReadCacheStats.misses += 1;
-        const snapshot = await readTextValidated(resolved.validatedReadPath, {
-            ...(startLine !== undefined ? { startLine } : {}),
-            ...(endLine !== undefined ? { endLine } : {}),
-        });
-        const structured = {
-            success: true,
-            path: resolved.relative,
-            content: snapshot.content,
-            sha256: snapshot.contentHash,
-            returnedSha256: snapshot.returnedContentHash,
-            bytes: snapshot.bytesRead,
-            totalLines: snapshot.totalLines,
-            returnedLines: snapshot.returnedLines,
-        };
-        const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
-        const mtimeMs = Number(snapshot.mtimeMs);
-        const ctimeMs = Number(snapshot.ctimeMs);
-        const dev = Number(snapshot.dev);
-        const ino = Number(snapshot.ino);
-        if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
-            rememberRepoReadFileCacheEntry(key, {
-                sizeBytes,
-                mtimeMs,
-                ctimeMs,
-                dev,
-                ino,
-                validatedAtMs: Date.now(),
-                structured,
-                text: snapshot.content,
-                weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, snapshot.content),
+    const inflightKey = `${key}\u0000hash:${hashMode}`;
+    return runRepoReadSingleflight(
+        repoReadFileInflight,
+        inflightKey,
+        {
+            leaderStat: 'singleflightLeaders',
+            joinStat: 'singleflightJoins',
+            errorStat: 'singleflightErrors',
+        },
+        async () => {
+            repoReadCacheStats.misses += 1;
+            const snapshot = await readTextValidated(resolved.validatedReadPath, {
+                ...(startLine !== undefined ? { startLine } : {}),
+                ...(endLine !== undefined ? { endLine } : {}),
+                hashMode,
             });
-        }
-        return { structured, text: snapshot.content };
-    });
+            const structured = {
+                success: true,
+                path: resolved.relative,
+                content: snapshot.content,
+                ...(typeof snapshot.contentHash === 'string' ? { sha256: snapshot.contentHash } : {}),
+                ...(typeof snapshot.returnedContentHash === 'string'
+                    ? { returnedSha256: snapshot.returnedContentHash }
+                    : {}),
+                bytes: snapshot.bytesRead,
+                totalLines: snapshot.totalLines,
+                returnedLines: snapshot.returnedLines,
+            };
+            const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
+            const mtimeMs = Number(snapshot.mtimeMs);
+            const ctimeMs = Number(snapshot.ctimeMs);
+            const dev = Number(snapshot.dev);
+            const ino = Number(snapshot.ino);
+            if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
+                rememberRepoReadFileCacheEntry(key, {
+                    sizeBytes,
+                    mtimeMs,
+                    ctimeMs,
+                    dev,
+                    ino,
+                    validatedAtMs: Date.now(),
+                    structured,
+                    text: snapshot.content,
+                    weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, snapshot.content),
+                });
+            }
+            return { structured, text: snapshot.content };
+        },
+    );
 }
 
 /**
@@ -199,76 +226,103 @@ export async function readRepoFileChunksWithValidatedResultCache(
     highWaterMark,
     cursor,
 ) {
-    const key = buildRepoReadFileChunkCacheKey(resolved.resolved, effectiveStartLine, endLine, chunkLines, highWaterMark);
-    const cached = await getValidatedRepoReadCacheEntry(
-        repoReadFileChunkCache,
+    const key = buildRepoReadFileChunkCacheKey(
+        resolved.resolved,
+        effectiveStartLine,
+        endLine,
+        chunkLines,
+        highWaterMark,
+    );
+    const cached = await getValidatedRepoReadCacheEntry(repoReadFileChunkCache, key, resolved.validatedReadPath, {
+        hitStat: 'chunkHits',
+        trustWindowHitStat: 'chunkTrustWindowHits',
+        staleStat: 'chunkStale',
+    });
+    if (cached) return shapeChunkResultForCaller(cached, cursor);
+
+    const canonical = await runRepoReadSingleflight(
+        repoReadFileChunkInflight,
         key,
-        resolved.validatedReadPath,
         {
-            hitStat: 'chunkHits',
-            trustWindowHitStat: 'chunkTrustWindowHits',
-            staleStat: 'chunkStale',
+            leaderStat: 'chunkSingleflightLeaders',
+            joinStat: 'chunkSingleflightJoins',
+            errorStat: 'chunkSingleflightErrors',
+        },
+        async () => {
+            repoReadCacheStats.chunkMisses += 1;
+            const snapshot = await readTextChunksValidated(resolved.validatedReadPath, {
+                startLine: effectiveStartLine,
+                ...(endLine !== undefined ? { endLine } : {}),
+                chunkLines,
+                ...(highWaterMark !== undefined ? { highWaterMark } : {}),
+            });
+            const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
+            const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
+            const hasMoreLines =
+                snapshot.stoppedAtRequestedWindow === true ||
+                (snapshot.totalLinesKnown === true && lastReturnedLine < snapshot.totalLines);
+            const nextCursor = hasMoreLines ? String(lastReturnedLine + 1) : null;
+            const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
+            const structured = {
+                success: true,
+                path: resolved.relative,
+                chunks: snapshot.chunks,
+                chunkCount: snapshot.chunks.length,
+                returnedChunkCount: snapshot.returnedChunkCount ?? snapshot.chunks.length,
+                returnedLineCount: snapshot.returnedLineCount ?? 0,
+                chunkLines,
+                startLine: effectiveStartLine,
+                endLine: endLine ?? null,
+                totalLines: snapshot.totalLines,
+                totalLinesKnown: snapshot.totalLinesKnown,
+                lastScannedLine: snapshot.lastScannedLine ?? snapshot.totalLines,
+                fileTotalLines: snapshot.fileTotalLines ?? (snapshot.totalLinesKnown ? snapshot.totalLines : null),
+                fileTotalLinesKnown: snapshot.fileTotalLinesKnown ?? snapshot.totalLinesKnown,
+                bytes: snapshot.bytesRead,
+                sizeBytes: snapshot.sizeBytes,
+                ...('indexBytesRead' in snapshot ? { indexBytesRead: snapshot.indexBytesRead } : {}),
+                ...('rangeBytesRead' in snapshot ? { rangeBytesRead: snapshot.rangeBytesRead } : {}),
+                ...('indexCacheState' in snapshot ? { indexCacheState: snapshot.indexCacheState } : {}),
+                ...('rangeSource' in snapshot ? { rangeSource: snapshot.rangeSource } : {}),
+                nextCursor,
+                engine: snapshot.io.engine,
+            };
+            const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
+            const mtimeMs = Number(snapshot.mtimeMs);
+            const ctimeMs = Number(snapshot.ctimeMs);
+            const dev = Number(snapshot.dev);
+            const ino = Number(snapshot.ino);
+            if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
+                rememberRepoReadFileChunkCacheEntry(key, {
+                    sizeBytes,
+                    mtimeMs,
+                    ctimeMs,
+                    dev,
+                    ino,
+                    validatedAtMs: Date.now(),
+                    structured,
+                    text,
+                    weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, text),
+                });
+            }
+            return { structured, text };
         },
     );
-    if (cached) return { structured: cloneStructuredReadFileResult(cached.structured), text: cached.text };
+    return shapeChunkResultForCaller(canonical, cursor);
+}
 
-    return runRepoReadSingleflight(repoReadFileChunkInflight, key, {
-        leaderStat: 'chunkSingleflightLeaders',
-        joinStat: 'chunkSingleflightJoins',
-        errorStat: 'chunkSingleflightErrors',
-    }, async () => {
-        repoReadCacheStats.chunkMisses += 1;
-        const snapshot = await readTextChunksValidated(resolved.validatedReadPath, {
-            startLine: effectiveStartLine,
-            ...(endLine !== undefined ? { endLine } : {}),
-            chunkLines,
-            ...(highWaterMark !== undefined ? { highWaterMark } : {}),
-        });
-        const lastChunk = snapshot.chunks[snapshot.chunks.length - 1];
-        const lastReturnedLine = lastChunk?.endLine ?? effectiveStartLine - 1;
-        const nextCursor = snapshot.totalLinesKnown && lastReturnedLine < snapshot.totalLines ? String(lastReturnedLine + 1) : null;
-        const text = snapshot.chunks.map((chunk) => chunk.content).join('\n');
-        const structured = {
-            success: true,
-            path: resolved.relative,
-            chunks: snapshot.chunks,
-            chunkCount: snapshot.chunks.length,
-            returnedChunkCount: snapshot.returnedChunkCount ?? snapshot.chunks.length,
-            returnedLineCount: snapshot.returnedLineCount ?? 0,
-            chunkLines,
-            startLine: effectiveStartLine,
-            endLine: endLine ?? null,
-            totalLines: snapshot.totalLines,
-            totalLinesKnown: snapshot.totalLinesKnown,
-            lastScannedLine: snapshot.lastScannedLine ?? snapshot.totalLines,
-            fileTotalLines: snapshot.fileTotalLines ?? (snapshot.totalLinesKnown ? snapshot.totalLines : null),
-            fileTotalLinesKnown: snapshot.fileTotalLinesKnown ?? snapshot.totalLinesKnown,
-            bytes: snapshot.bytesRead,
-            sizeBytes: snapshot.sizeBytes,
-            nextCursor,
-            cursor: cursor ?? null,
-            engine: snapshot.io.engine,
-        };
-        const sizeBytes = Number(snapshot.sizeBytes ?? snapshot.bytesRead);
-        const mtimeMs = Number(snapshot.mtimeMs);
-        const ctimeMs = Number(snapshot.ctimeMs);
-        const dev = Number(snapshot.dev);
-        const ino = Number(snapshot.ino);
-        if ([sizeBytes, mtimeMs, ctimeMs, dev, ino].every(Number.isFinite)) {
-            rememberRepoReadFileChunkCacheEntry(key, {
-                sizeBytes,
-                mtimeMs,
-                ctimeMs,
-                dev,
-                ino,
-                validatedAtMs: Date.now(),
-                structured,
-                text,
-                weightBytes: estimateRepoReadCacheEntryWeightBytes(structured, text),
-            });
-        }
-        return { structured, text };
-    });
+/**
+ * Apply caller-specific presentation metadata after cache/singleflight resolution. The canonical cached payload is
+ * intentionally cursor-neutral because startLine and cursor can resolve to the same effective page key.
+ *
+ * @param {RepoReadCacheResult} result
+ * @param {string | undefined} cursor
+ * @returns {RepoReadCacheResult}
+ */
+function shapeChunkResultForCaller(result, cursor) {
+    const structured = cloneStructuredReadFileResult(result.structured);
+    structured['cursor'] = cursor ?? null;
+    return { structured, text: result.text };
 }
 
 /**
@@ -330,20 +384,31 @@ function clearRepoReadCacheEntriesByPrefix(prefix) {
  * @param {Map<string, RepoReadCacheEntry>} cache
  * @param {string} key
  * @param {unknown} validatedReadPath
- * @param {{ hitStat: 'hits' | 'chunkHits'; trustWindowHitStat: 'trustWindowHits' | 'chunkTrustWindowHits'; staleStat: 'stale' | 'chunkStale' }} stats
+ * @param {{
+ *     hitStat: 'hits' | 'chunkHits';
+ *     trustWindowHitStat: 'trustWindowHits' | 'chunkTrustWindowHits';
+ *     staleStat: 'stale' | 'chunkStale';
+ *     hashMode?: 'full' | 'returned' | 'none';
+ * }} stats
  * @returns {Promise<RepoReadCacheEntry | null>}
  */
 async function getValidatedRepoReadCacheEntry(cache, key, validatedReadPath, stats) {
     const cached = cache.get(key);
     if (!cached) return null;
+    if (stats.hashMode && !repoReadCacheEntrySupportsHashMode(cached, stats.hashMode)) {
+        repoReadCacheStats.hashVariantMisses += 1;
+        return null;
+    }
     const trustWindowMs = readRepoReadTrustWindowMs();
     if (trustWindowMs > 0 && Date.now() - cached.validatedAtMs <= trustWindowMs) {
         repoReadCacheStats[stats.hitStat] += 1;
         repoReadCacheStats[stats.trustWindowHitStat] += 1;
         cache.delete(key);
-        cache.set(key, { ...cached, validatedAtMs: Date.now() });
+        // LRU touch sem renovar validatedAtMs: a trust window é fixa e não pode ser estendida por tráfego contínuo.
+        cache.set(key, cached);
         return cached;
     }
+    repoReadCacheStats.fingerprintValidations += 1;
     const current = await statPathValidated(validatedReadPath).catch(() => null);
     const fileStats = current?.stats;
     if (
@@ -355,6 +420,7 @@ async function getValidatedRepoReadCacheEntry(cache, key, validatedReadPath, sta
         Number(fileStats.ino) === cached.ino
     ) {
         repoReadCacheStats[stats.hitStat] += 1;
+        repoReadCacheStats.fingerprintValidationHits += 1;
         cache.delete(key);
         cache.set(key, { ...cached, validatedAtMs: Date.now() });
         return cached;
@@ -374,6 +440,14 @@ function buildRepoReadFileCacheKey(absolutePath, startLine, endLine) {
     return `${absolutePath}\u0000${startLine ?? ''}\u0000${endLine ?? ''}`;
 }
 
+/** @param {RepoReadCacheEntry} cached @param {'full' | 'returned' | 'none'} hashMode */
+function repoReadCacheEntrySupportsHashMode(cached, hashMode) {
+    if (hashMode === 'none') return true;
+    const hasReturnedHash = typeof cached.structured['returnedSha256'] === 'string';
+    if (hashMode === 'returned') return hasReturnedHash;
+    return hasReturnedHash && typeof cached.structured['sha256'] === 'string';
+}
+
 /**
  * @param {string} absolutePath
  * @param {number} startLine
@@ -390,7 +464,7 @@ function buildRepoReadFileChunkCacheKey(absolutePath, startLine, endLine, chunkL
  * @returns {number}
  */
 function readRepoReadTrustWindowMs() {
-    const value = Number(process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] ?? 0);
+    const value = Number(process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] ?? DEFAULT_REPO_READ_TRUST_WINDOW_MS);
     return Number.isFinite(value) && value > 0 ? Math.min(5000, Math.floor(value)) : 0;
 }
 
@@ -398,7 +472,9 @@ function readRepoReadTrustWindowMs() {
  * @returns {number}
  */
 function readRepoReadCacheMaxBytes() {
-    const value = Number(process.env['COPILOT_MCP_REPO_READ_CACHE_MAX_BYTES'] ?? DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES);
+    const value = Number(
+        process.env['COPILOT_MCP_REPO_READ_CACHE_MAX_BYTES'] ?? DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES,
+    );
     if (!Number.isFinite(value) || value <= 0) return DEFAULT_REPO_READ_FILE_CACHE_MAX_BYTES;
     return Math.min(HARD_REPO_READ_FILE_CACHE_MAX_BYTES, Math.floor(value));
 }
@@ -419,7 +495,15 @@ function cloneRepoReadSingleflightResult(result) {
 /**
  * @param {Map<string, Promise<RepoReadCacheResult>>} activeReads
  * @param {string} key
- * @param {Record<string, 'singleflightLeaders' | 'singleflightJoins' | 'singleflightErrors' | 'chunkSingleflightLeaders' | 'chunkSingleflightJoins' | 'chunkSingleflightErrors'>} stats
+ * @param {Record<
+ *     string,
+ *     | 'singleflightLeaders'
+ *     | 'singleflightJoins'
+ *     | 'singleflightErrors'
+ *     | 'chunkSingleflightLeaders'
+ *     | 'chunkSingleflightJoins'
+ *     | 'chunkSingleflightErrors'
+ * >} stats
  * @param {() => Promise<RepoReadCacheResult>} loader
  * @returns {Promise<RepoReadCacheResult>}
  */

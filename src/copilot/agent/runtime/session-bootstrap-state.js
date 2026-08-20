@@ -35,15 +35,13 @@ import { persistStateWithPolicy, readState, readStateAsync } from '../lifecycle/
  *           ) => void)
  *         | undefined;
  *     getPendingQuestionSnapshot?:
- *         | (() => import('../facades/agent-runtime-state.js').AgentRuntimePendingQuestionSnapshot | null)
- *         | undefined;
+ *         (() => import('../facades/agent-runtime-state.js').AgentRuntimePendingQuestionSnapshot | null) | undefined;
  *     getModelSnapshot?: (() => string) | undefined;
  *     getRuntimeStatus?: (() => string) | undefined;
  *     getSendCountSnapshot?: (() => number) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
  *     trackBackgroundTask?:
- *         | ((task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>)
- *         | undefined;
+ *         ((task: Promise<unknown>, meta?: { label?: string; description?: string }) => Promise<void>) | undefined;
  * }} AgentRuntimeStateContext
  *
  *

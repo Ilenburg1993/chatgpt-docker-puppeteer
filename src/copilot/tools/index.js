@@ -15,12 +15,13 @@
 
 // ─── API de bootstrap/composição ──────────────────────────────────────────────
 export {
-    applySessionToolPermissionPolicy,
     allTools,
+    applySessionToolPermissionPolicy,
     bootstrapTools,
     configureHookTools,
     getAllStaticTools,
     getAllTools,
+    hydrateCustomTools,
     setExperimentalSession,
     setHub,
     setPermissionAgent,
@@ -42,9 +43,9 @@ export {
     classifyToolFailure,
     createToolFailureFeedback,
     createToolFailureResponse,
-    isToolExecutionFailureResponse,
     createToolFailureResult,
     enrichToolFailureResult,
+    isToolExecutionFailureResponse,
     isToolFailureResult,
     previewToolFeedbackValue,
     summarizeToolParameterSchema,
@@ -53,7 +54,7 @@ export {
 
 // ─── Categorias de tools ──────────────────────────────────────────────────────
 export { codeReadTools, codeTools, codeWriteTools } from './code/index.js';
-export { fileReadTools, fileTools, fileWriteTools, validatePath, WORKSPACE_ROOT } from './file/index.js';
+export { WORKSPACE_ROOT, fileReadTools, fileTools, fileWriteTools, validatePath } from './file/index.js';
 export { gitTools } from './git/index.js';
 export {
     cancelAllUserInputRequests,
@@ -64,27 +65,6 @@ export {
     resolveUserInput,
 } from './hook/index.js';
 export { hubTools, resetHubForTests } from './hub/index.js';
-export {
-    modelGatewayCatalogRefreshTool,
-    modelGatewayCatalogSearchTool,
-    modelGatewayControlPlaneGuideTool,
-    modelGatewayModelEvaluateTool,
-    modelGatewayMaintenanceTool,
-    modelGatewayOperationStatusTool,
-    modelGatewayOverviewTool,
-    modelGatewayPolicyProposeTool,
-    modelGatewayProbeExecuteTool,
-    modelGatewayProbePlanTool,
-    modelGatewayReadTools,
-    modelGatewayRoutePlanTool,
-    modelGatewayRouteSwitchTool,
-    modelGatewayRuntimeReconcileTool,
-    modelGatewayModelSwitchTool,
-    modelGatewayTools,
-    modelGatewayWorkflowPlanTool,
-    modelGatewayWriteTools,
-    setModelGatewayRuntimeControl,
-} from './model-gateway/index.js';
 export {
     createEmptyToolContractReport,
     getDisabledToolRecords,
@@ -99,6 +79,27 @@ export {
     setSessionExcludedTools,
     verifyToolRegistryContracts,
 } from './introspection/index.js';
+export {
+    modelGatewayCatalogRefreshTool,
+    modelGatewayCatalogSearchTool,
+    modelGatewayControlPlaneGuideTool,
+    modelGatewayMaintenanceTool,
+    modelGatewayModelEvaluateTool,
+    modelGatewayModelSwitchTool,
+    modelGatewayOperationStatusTool,
+    modelGatewayOverviewTool,
+    modelGatewayPolicyProposeTool,
+    modelGatewayProbeExecuteTool,
+    modelGatewayProbePlanTool,
+    modelGatewayReadTools,
+    modelGatewayRoutePlanTool,
+    modelGatewayRouteSwitchTool,
+    modelGatewayRuntimeReconcileTool,
+    modelGatewayTools,
+    modelGatewayWorkflowPlanTool,
+    modelGatewayWriteTools,
+    setModelGatewayRuntimeControl,
+} from './model-gateway/index.js';
 export { permissionTools } from './permission/index.js';
 export {
     findSymbolUsagesTool,

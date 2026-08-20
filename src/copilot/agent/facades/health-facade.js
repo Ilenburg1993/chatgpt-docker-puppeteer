@@ -7,11 +7,8 @@
  */
 
 import { getAgentHealthSnapshot as healthSnapshot } from '../health-check.js';
+import { listenerDiagnostics as stateDiagnostics, getStatusSnapshot as stateSnapshot } from '../state/agent-state.js';
 import { getSdkHandles, getSdkResourceSnapshot } from './sdk-access.js';
-import {
-    getStatusSnapshot as stateSnapshot,
-    listenerDiagnostics as stateDiagnostics,
-} from '../state/agent-state.js';
 
 /**
  * Façade para Health & Diagnostics.

@@ -1,28 +1,38 @@
 # Validação Forense — `Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
 
-> Documento-alvo validado: `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
+> Documento-alvo validado:
+> `DOCUMENTAÇÃO/COPILOT/AUDITORIA-EXTERNA/Terminal LLM-B - Análise: Bugs, Gaps e Oportunidades de Upgrade - AUDIT_EXTERNA.md`
 >
 > Data desta validação: `2026-05-18`
 >
-> Escopo real validado: `src/copilot/terminal/**` e integrações imediatas em `src/copilot/agent/**`, `src/copilot/channel/**`, `src/copilot/presentation/runtime/**`, `src/copilot/sdk/**`, `src/copilot/event-handlers/**`
+> Escopo real validado: `src/copilot/terminal/**` e integrações imediatas em `src/copilot/agent/**`,
+> `src/copilot/channel/**`, `src/copilot/presentation/runtime/**`, `src/copilot/sdk/**`,
+> `src/copilot/event-handlers/**`
 
 ---
 
 ## 1. Conclusão executiva
 
-A auditoria externa estava **substancialmente correta no diagnóstico macro**, mas **não pode ser aceita literalmente item a item** porque parte do material já ficou obsoleto com a evolução do código.
+A auditoria externa estava **substancialmente correta no diagnóstico macro**, mas **não pode ser
+aceita literalmente item a item** porque parte do material já ficou obsoleto com a evolução do
+código.
 
 ### Síntese do veredito
 
-- **Bugs**: maioria válida; alguns já mudaram de forma; um foi efetivamente superado pelo código atual.
-- **Gaps do SDK 0.3.0**: vários já foram incorporados fora do terminal; outros continuam reais na superfície do terminal.
-- **Upgrades**: há boas oportunidades, mas nem toda sugestão é canônica ou prioritária para este repositório.
+- **Bugs**: maioria válida; alguns já mudaram de forma; um foi efetivamente superado pelo código
+  atual.
+- **Gaps do SDK 0.3.0**: vários já foram incorporados fora do terminal; outros continuam reais na
+  superfície do terminal.
+- **Upgrades**: há boas oportunidades, mas nem toda sugestão é canônica ou prioritária para este
+  repositório.
 
 ### Resultado consolidado
 
 - **Confirmado**: há bugs reais no terminal e gaps reais na integração terminal ↔ SDK.
-- **Refutado/obsoleto**: uma parcela relevante dos gaps já está coberta pela camada `agent/session/sdk`.
-- **Latente/parcial**: alguns itens não quebram o fluxo atual porque outra camada já mitiga o risco, mas ainda merecem hardening.
+- **Refutado/obsoleto**: uma parcela relevante dos gaps já está coberta pela camada
+  `agent/session/sdk`.
+- **Latente/parcial**: alguns itens não quebram o fluxo atual porque outra camada já mitiga o risco,
+  mas ainda merecem hardening.
 
 ### Batch de execução já iniciado nesta sessão
 
@@ -35,7 +45,8 @@ Já foram iniciadas correções concretas em código para:
 - renderização prematura de `report_intent` em `tool-lifecycle-runtime.js`
 - acumulação visual em `printlnBlock`
 - exposição de `/permission reset-approvals`
-- preservação de `agentId` na ponte de eventos e supressão de `assistant.message` de subagentes no terminal
+- preservação de `agentId` na ponte de eventos e supressão de `assistant.message` de subagentes no
+  terminal
 - inspeção do estado `terminalShutdownSignalsRegistered` para testes
 
 ---
@@ -77,7 +88,8 @@ Foram confrontadas as conclusões com documentação oficial e/ou primária:
 
 - release notes do `@github/copilot-sdk` `v0.3.0`
 - documentação/API do Node.js 24
-- documentação MDN para `Promise.withResolvers`, `AbortSignal.timeout`, `structuredClone`, `EventTarget`
+- documentação MDN para `Promise.withResolvers`, `AbortSignal.timeout`, `structuredClone`,
+  `EventTarget`
 - proposta TC39 de Explicit Resource Management
 
 ### Critério de decisão
@@ -88,7 +100,8 @@ Cada item foi classificado como:
 - **Parcial / latente** — problema existe, mas está mitigado por outra camada ou mudou de forma
 - **Refutado / obsoleto** — auditoria descreve um estado que já não corresponde mais ao código atual
 - **Upgrade válido** — melhoria coerente com a arquitetura atual
-- **Upgrade não recomendado agora** — melhoria possível, mas de baixo ROI, risco alto ou desalinhamento com o repositório
+- **Upgrade não recomendado agora** — melhoria possível, mas de baixo ROI, risco alto ou
+  desalinhamento com o repositório
 
 ---
 
@@ -111,7 +124,9 @@ Cada item foi classificado como:
 
 ### Observação importante sobre BUG-010
 
-A auditoria descrevia um `setInterval` clássico. O código atual usa `registerInterval()` + `cancelTimer()`. Portanto, o **texto da auditoria ficou desatualizado**, embora a família de risco (“duplicação em re-registro”) continue relevante.
+A auditoria descrevia um `setInterval` clássico. O código atual usa `registerInterval()` +
+`cancelTimer()`. Portanto, o **texto da auditoria ficou desatualizado**, embora a família de risco
+(“duplicação em re-registro”) continue relevante.
 
 ---
 
@@ -143,7 +158,8 @@ Minha palavra final aqui é:
 
 - **não é um bug crítico ativo no fluxo padrão atual**;
 - **é um gap de hardening legítimo**;
-- a mitigação real hoje vem de `includeSubAgentStreamingEvents: false`, não da camada terminal em si.
+- a mitigação real hoje vem de `includeSubAgentStreamingEvents: false`, não da camada terminal em
+  si.
 
 Ou seja: a auditoria exagerou no impacto imediato, mas acertou no risco estrutural.
 
@@ -179,7 +195,8 @@ Ou seja: a auditoria exagerou no impacto imediato, mas acertou no risco estrutur
 
 ### ACHADO-A — `sdk-responses.js` descartava `agentId`
 
-Mesmo com a mitigação de sessão (`includeSubAgentStreamingEvents: false`), a ponte de eventos estava **jogando fora** `agentId` em `assistant.message`/`assistant.reasoning`.
+Mesmo com a mitigação de sessão (`includeSubAgentStreamingEvents: false`), a ponte de eventos estava
+**jogando fora** `agentId` em `assistant.message`/`assistant.reasoning`.
 
 **Decisão:** tratar como hardening necessário entre terminal e resto de `src/copilot`.
 
@@ -194,52 +211,72 @@ A trilha atual é:
 
 O achado real desta retomada foi mais sutil do que “falta passar um parâmetro”.
 
-O caminho canônico zero-PR do dialog loop responde `ask_user` pendente; ele **não** carrega `requestHeaders` por turno de forma honesta. Portanto, para suportar BYOK/headers dinâmicos sem mentir sobre o contrato, foi necessário introduzir uma estratégia explícita:
+O caminho canônico zero-PR do dialog loop responde `ask_user` pendente; ele **não** carrega
+`requestHeaders` por turno de forma honesta. Portanto, para suportar BYOK/headers dinâmicos sem
+mentir sobre o contrato, foi necessário introduzir uma estratégia explícita:
 
 1. armazenar headers one-shot no estado de apresentação;
 2. consumi-los apenas no próximo turno do usuário;
 3. no gateway de diálogo, fazer bounce controlado do dialog loop;
-4. despachar o turno por `llmBridgeClient.chat(...)`, que já cai no caminho `sendMessage()`/SDK direto com `requestHeaders`;
+4. despachar o turno por `llmBridgeClient.chat(...)`, que já cai no caminho `sendMessage()`/SDK
+   direto com `requestHeaders`;
 5. reanexar o dialog loop com `resumeSessionAttach: true` ao final.
 
-**Decisão:** gap confirmado e corrigido nesta rodada sem abrir arquitetura paralela nem fingir suporte dentro do caminho `ask_user`.
+**Decisão:** gap confirmado e corrigido nesta rodada sem abrir arquitetura paralela nem fingir
+suporte dentro do caminho `ask_user`.
 
 ### ACHADO-C — divergência de runner e warnings de teardown do Vitest
 
 O problema foi confirmado em duas camadas diferentes:
 
-1. havia uma **divergência estrutural de runner** entre o que `test:unit` executava e o que `test:copilot:unit` executava;
-2. havia também **warnings reais de workers do Vitest**, agravados pelo uso de `pool: 'forks'` e por concorrência alta demais para a carga do lote Copilot.
+1. havia uma **divergência estrutural de runner** entre o que `test:unit` executava e o que
+   `test:copilot:unit` executava;
+2. havia também **warnings reais de workers do Vitest**, agravados pelo uso de `pool: 'forks'` e por
+   concorrência alta demais para a carga do lote Copilot.
 
-**Decisão:** tratar como trilha operacional obrigatória desta mesma rodada, não como dívida paralela.
+**Decisão:** tratar como trilha operacional obrigatória desta mesma rodada, não como dívida
+paralela.
 
 ### ACHADO-E — `SessionConfig`, `ResumeSessionConfig` e subagentes não estavam totalmente full
 
-Uma auditoria dedicada a `node_modules/@github/copilot-sdk/dist/types.d.ts` confirmou quatro desvios estruturais relevantes:
+Uma auditoria dedicada a `node_modules/@github/copilot-sdk/dist/types.d.ts` confirmou quatro desvios
+estruturais relevantes:
 
 1. `ResumeSessionConfig` ainda não tinha módulo dedicado no lugar correto;
 2. `SessionConfigBuilder.buildForResume()` podia vazar `sessionId` para payloads de resume;
 3. `SessionConfigBuilder.build()` podia vazar `disableResume` para payloads de create;
-4. a camada local de subagentes ainda tinha drift em relação ao SDK oficial (`description?`, `skills?`, `mcpServers?`, `tools=[]`).
+4. a camada local de subagentes ainda tinha drift em relação ao SDK oficial (`description?`,
+   `skills?`, `mcpServers?`, `tools=[]`).
 
-Além disso, a superfície HTTP de sessões ainda não expunha toda a parte serializável restante de `SessionConfig`/`ResumeSessionConfig` (`modelCapabilities`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`, `defaultAgent`, `gitHubToken`).
+Além disso, a superfície HTTP de sessões ainda não expunha toda a parte serializável restante de
+`SessionConfig`/`ResumeSessionConfig` (`modelCapabilities`, `enableConfigDiscovery`,
+`includeSubAgentStreamingEvents`, `defaultAgent`, `gitHubToken`).
 
-**Decisão:** tratar como trilha estrutural obrigatória e corrigir na mesma onda. O detalhamento completo está em `SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`.
+**Decisão:** tratar como trilha estrutural obrigatória e corrigir na mesma onda. O detalhamento
+completo está em `SESSIONCONFIG-SUBAGENTES-AUDITORIA-AMPLA-2026-05-18.md`.
 
 ### ACHADO-F — boot/lifecycle estavam corretos na macro, mas com defaults conservadores e baixa visibilidade do perfil efetivo
 
 Uma auditoria dedicada do processo de boot/lifecycle confirmou que:
 
-1. o boot canônico já estava corretamente centrado em `terminal/bootstrap.js` + `boot/runtime-bootstrap.js`;
-2. o pipeline de lifecycle do agent já estava bem decomposto entre `session-setup`, `initializer`, `performBootWiring` e `dialog controller`;
-3. porém os defaults de `COPILOT_SDK_ENABLED`, `COPILOT_ENABLE_CONFIG_DISCOVERY` e `COPILOT_TERMINAL_ENABLED` ainda eram conservadores demais para o perfil canônico da LLM-B;
-4. além disso, `includeSubAgentStreamingEvents` seguia como hardcode local, e o projection layer não deixava claro o que estava ativo versus deliberadamente guardado.
+1. o boot canônico já estava corretamente centrado em `terminal/bootstrap.js` +
+   `boot/runtime-bootstrap.js`;
+2. o pipeline de lifecycle do agent já estava bem decomposto entre `session-setup`, `initializer`,
+   `performBootWiring` e `dialog controller`;
+3. porém os defaults de `COPILOT_SDK_ENABLED`, `COPILOT_ENABLE_CONFIG_DISCOVERY` e
+   `COPILOT_TERMINAL_ENABLED` ainda eram conservadores demais para o perfil canônico da LLM-B;
+4. além disso, `includeSubAgentStreamingEvents` seguia como hardcode local, e o projection layer não
+   deixava claro o que estava ativo versus deliberadamente guardado.
 
-**Decisão:** corrigir imediatamente os defaults pró-capacidade seguros, explicitar o knob de streaming de subagentes e enriquecer a projeção de lifecycle com um resumo verificável de capacidades efetivas.
+**Decisão:** corrigir imediatamente os defaults pró-capacidade seguros, explicitar o knob de
+streaming de subagentes e enriquecer a projeção de lifecycle com um resumo verificável de
+capacidades efetivas.
 
 ### ACHADO-G — o circuito de reply do turno explícito tinha owner difuso entre runtime, bridge e terminal
 
-Uma auditoria dedicada do circuito `SDK event → event-handlers → agent/dialog → channel → terminal` confirmou que o problema central da resposta invisível no terminal não era apenas de renderização, mas de governança difusa do reply:
+Uma auditoria dedicada do circuito `SDK event → event-handlers → agent/dialog → channel → terminal`
+confirmou que o problema central da resposta invisível no terminal não era apenas de renderização,
+mas de governança difusa do reply:
 
 1. o runtime do dialog loop resolvia o reply por caminhos múltiplos e incompletos;
 2. o bridge ainda mantinha fallback semântico paralelo;
@@ -247,12 +284,15 @@ Uma auditoria dedicada do circuito `SDK event → event-handlers → agent/dialo
 
 Nesta rodada, a trilha estrutural passou a ser:
 
-- `agent/dialog/seams/turn-output-collector.js` como owner canônico de coleta semântica do turno explícito;
+- `agent/dialog/seams/turn-output-collector.js` como owner canônico de coleta semântica do turno
+  explícito;
 - `turn-executor.js` usando o collector como autoridade única de resolução do reply;
 - `channel/client-dialog.js` reduzido a transporte + fallback de `dialog.reply`;
-- `terminal/frontend/gateways/dialog.js` e `terminal/dialog/engine.js` consumindo um resultado detalhado (`reply`, `replySource`, `channel`) em vez de uma string opaca.
+- `terminal/frontend/gateways/dialog.js` e `terminal/dialog/engine.js` consumindo um resultado
+  detalhado (`reply`, `replySource`, `channel`) em vez de uma string opaca.
 
-**Decisão:** tratar essa trilha como correção estrutural obrigatória antes de nova sessão viva com a LLM-B.
+**Decisão:** tratar essa trilha como correção estrutural obrigatória antes de nova sessão viva com a
+LLM-B.
 
 ---
 
@@ -319,7 +359,8 @@ O terminal ideal deve:
 
 ## 9. Veredito final
 
-**Minha conclusão final é favorável à auditoria externa como instrumento de triagem, mas não como verdade literal.**
+**Minha conclusão final é favorável à auditoria externa como instrumento de triagem, mas não como
+verdade literal.**
 
 Ela identificou corretamente a direção dos principais problemas, porém:
 
@@ -353,26 +394,35 @@ E a auditoria complementar dedicada a `SessionConfig`, `ResumeSessionConfig` e s
 
 ### 10.1. Veredito geral desta rodada adicional
 
-O recorte `946–1828` de `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts` confirma um ponto arquitetural importante:
+O recorte `946–1828` de `node_modules/@github/copilot-sdk/dist/generated/session-events.d.ts`
+confirma um ponto arquitetural importante:
 
-- o SDK 0.3.0 diferencia claramente eventos finais/persistíveis, eventos efêmeros de streaming/progresso e eventos de coordenação/UI;
+- o SDK 0.3.0 diferencia claramente eventos finais/persistíveis, eventos efêmeros de
+  streaming/progresso e eventos de coordenação/UI;
 - a cadeia local já absorve boa parte disso corretamente;
-- mas o terminal ainda não tratava todos esses sinais com a mesma qualidade de UX e de rastreabilidade.
+- mas o terminal ainda não tratava todos esses sinais com a mesma qualidade de UX e de
+  rastreabilidade.
 
 Minha conclusão adicional é:
 
 1. a cadeia `session → event-handlers → agent → terminal` está conceitualmente correta;
 2. o principal gap remanescente não era mais de wiring bruto, e sim de **surface/UX canônica**;
-3. o problema dos “flashs” reportado pelo operador era real e coerente com o desenho atual do terminal em modo `compact`.
+3. o problema dos “flashs” reportado pelo operador era real e coerente com o desenho atual do
+   terminal em modo `compact`.
 
 ### 10.2. Diagnóstico técnico do problema de UX reportado pelo operador
 
-O comportamento descrito pelo usuário — mensagens operacionais aparecerem por segundos e sumirem quando o terminal atualiza o próximo status — foi confirmado como consequência de duas escolhas atuais:
+O comportamento descrito pelo usuário — mensagens operacionais aparecerem por segundos e sumirem
+quando o terminal atualiza o próximo status — foi confirmado como consequência de duas escolhas
+atuais:
 
 1. `tool.execution_progress` em `compact` usava `writeInlineStatus(...)` como canal principal;
-2. heartbeats de tools longas em `compact` também usavam apenas linha inline, sem snapshot textual durável.
+2. heartbeats de tools longas em `compact` também usavam apenas linha inline, sem snapshot textual
+   durável.
 
-Isso não era uma quebra de lógica do agent, mas um **bug de UX operacional**: a informação existia, porém o operador não conseguia reconstruir com clareza a narrativa do que a LLM-B fez ao longo do tempo.
+Isso não era uma quebra de lógica do agent, mas um **bug de UX operacional**: a informação existia,
+porém o operador não conseguia reconstruir com clareza a narrativa do que a LLM-B fez ao longo do
+tempo.
 
 ### 10.3. Achados adicionais desta rodada
 
@@ -385,13 +435,15 @@ Os eventos `system.notification` já eram convertidos em:
 - `agent.shell.completed`
 - `agent.shell.detached_completed`
 
-Porém o terminal não os promovia a UX explícita. Isso criava uma discrepância entre a cadeia canônica de eventos e a visibilidade operacional real.
+Porém o terminal não os promovia a UX explícita. Isso criava uma discrepância entre a cadeia
+canônica de eventos e a visibilidade operacional real.
 
 **Decisão:** tratar como gap de surface do terminal, não do SDK.
 
 #### ACHADO-E — há mais famílias ainda não promovidas à UX terminal explícita
 
-Continuam merecendo tratamento dedicado ou aprofundamento, mas já houve endurecimento material nesta retomada para:
+Continuam merecendo tratamento dedicado ou aprofundamento, mas já houve endurecimento material nesta
+retomada para:
 
 - `hook.start` / `hook.end`
 - `sampling.requested` / `sampling.completed`
@@ -407,7 +459,8 @@ Continuam merecendo tratamento dedicado ou aprofundamento, mas já houve endurec
 #### Subir para P1
 
 - durabilidade de UX para progresso e heartbeat de tools em `compact`
-- surface terminal para `system.notification` já normalizada em `agent.background.*` e `agent.shell.*`
+- surface terminal para `system.notification` já normalizada em `agent.background.*` e
+  `agent.shell.*`
 
 #### Permanecem P2/P3
 
@@ -417,19 +470,29 @@ Continuam merecendo tratamento dedicado ou aprofundamento, mas já houve endurec
 
 ### 10.6. Addendum desta retomada contínua
 
-Após a estabilização da baseline de testes, esta retomada executou uma nova onda arquitetural que mudou o estado real do roadmap:
+Após a estabilização da baseline de testes, esta retomada executou uma nova onda arquitetural que
+mudou o estado real do roadmap:
 
-- `assistant.usage` deixou de ser apenas coleta/estado implícito e ganhou owner terminal explícito via `pr.consumed` e `pr.fallback_model` em `agent-runtime-events.js`;
-- `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e `exit_plan_mode.requested` passaram a ter wiring canônico até a UX terminal;
-- `skills.discover` agora está exposto no terminal por `/sdk skills`, atravessando a cadeia canônica `agent → presentation → gateway → command`;
-- a distinção canônica entre `custom agent` (definição em `SessionConfig.customAgents`) e `sub-agent` (manifestação runtime via `subagent.*`) foi formalizada em código e documentação;
-- o terminal agora expõe governança mais rica de skills por `/sdk skills config`, `/sdk skills agents`, `/sdk skills disable <skill...>` e `/sdk skills enable <skill...>`, usando mutação server-scoped honesta para `disabledSkills`;
-- o terminal passou a aceitar `blob` inline por `/attach blob <mime> <base64> [--name ...]`, com fila estruturada e embedding zero-PR via helper unificado de runtime.
-- `requestHeaders` por turno agora estão expostos por `/sdk headers`, com store one-shot e dispatch SDK direto com reanexo do dialog loop no gateway quando necessário.
+- `assistant.usage` deixou de ser apenas coleta/estado implícito e ganhou owner terminal explícito
+  via `pr.consumed` e `pr.fallback_model` em `agent-runtime-events.js`;
+- `hook.*`, `sampling.*`, `commands.changed`, `capabilities.changed`, `auto_mode_switch.*` e
+  `exit_plan_mode.requested` passaram a ter wiring canônico até a UX terminal;
+- `skills.discover` agora está exposto no terminal por `/sdk skills`, atravessando a cadeia canônica
+  `agent → presentation → gateway → command`;
+- a distinção canônica entre `custom agent` (definição em `SessionConfig.customAgents`) e
+  `sub-agent` (manifestação runtime via `subagent.*`) foi formalizada em código e documentação;
+- o terminal agora expõe governança mais rica de skills por `/sdk skills config`,
+  `/sdk skills agents`, `/sdk skills disable <skill...>` e `/sdk skills enable <skill...>`, usando
+  mutação server-scoped honesta para `disabledSkills`;
+- o terminal passou a aceitar `blob` inline por `/attach blob <mime> <base64> [--name ...]`, com
+  fila estruturada e embedding zero-PR via helper unificado de runtime.
+- `requestHeaders` por turno agora estão expostos por `/sdk headers`, com store one-shot e dispatch
+  SDK direto com reanexo do dialog loop no gateway quando necessário.
 
 Com isso, o backlog remanescente ficou mais estreito e mais claramente concentrado em:
 
-- governança/mutação avançada de skills (incluindo alinhamento entre estado server-scoped e persistência declarativa);
+- governança/mutação avançada de skills (incluindo alinhamento entre estado server-scoped e
+  persistência declarativa);
 - aprofundamento de superfícies ricas para `command.*` e capacidades dinâmicas;
 - eventual caminho binário nativo futuro além do embed textual do terminal.
 
@@ -440,8 +503,10 @@ O tema desta rodada não é “embelezar” o terminal.
 É consolidar a ideia de que:
 
 - informação operacional relevante não pode existir apenas como inline transient UI;
-- eventos efêmeros do SDK podem continuar efêmeros no wire, mas a superfície terminal precisa promover snapshots duráveis quando isso for importante para a operação humana;
-- o terminal da LLM-B é uma console operacional, então clareza narrativa e persistência visual fazem parte do contrato funcional.
+- eventos efêmeros do SDK podem continuar efêmeros no wire, mas a superfície terminal precisa
+  promover snapshots duráveis quando isso for importante para a operação humana;
+- o terminal da LLM-B é uma console operacional, então clareza narrativa e persistência visual fazem
+  parte do contrato funcional.
 
 ## 11. Addendum — runner, Vitest, testes e typecheck estrito
 
@@ -449,39 +514,51 @@ O tema desta rodada não é “embelezar” o terminal.
 
 O comportamento anterior não era mero ruído. Havia uma combinação de fatores:
 
-1. `npm test -- --run ...` **não era equivalente** a “rodar só alguns testes Copilot”; ele continuava expandindo para o pipeline padrão e alcançando mais escopo do que parecia na linha de comando;
-2. `test:unit` usava `scripts/ci/run-mixed-tests.mjs`, que até então executava o lote Vitest híbrido inteiro sob uma única configuração base;
-3. quando o lote misturava specs Copilot e specs genéricas, testes Copilot podiam acabar rodando sob `vitest.config.js`, sem a baseline própria do domínio Copilot;
-4. além disso, havia **falhas reais** em testes stale fora da faixa terminal estrita, inclusive em mocks de SDK, contratos de barrel e parte da trilha `devcontainer`.
+1. `npm test -- --run ...` **não era equivalente** a “rodar só alguns testes Copilot”; ele
+   continuava expandindo para o pipeline padrão e alcançando mais escopo do que parecia na linha de
+   comando;
+2. `test:unit` usava `scripts/ci/run-mixed-tests.mjs`, que até então executava o lote Vitest híbrido
+   inteiro sob uma única configuração base;
+3. quando o lote misturava specs Copilot e specs genéricas, testes Copilot podiam acabar rodando sob
+   `vitest.config.js`, sem a baseline própria do domínio Copilot;
+4. além disso, havia **falhas reais** em testes stale fora da faixa terminal estrita, inclusive em
+   mocks de SDK, contratos de barrel e parte da trilha `devcontainer`.
 
-Portanto, o problema não era “cache ruim” ou “test:copilot:unit omitindo testes” em sentido simples. O que existia era:
+Portanto, o problema não era “cache ruim” ou “test:copilot:unit omitindo testes” em sentido simples.
+O que existia era:
 
 - uma mistura inadequada de configurações no runner híbrido;
 - warnings de workers mascarando a análise;
-- e um conjunto real de testes e contratos envelhecidos que só apareceu quando a baseline correta foi rodada de ponta a ponta.
+- e um conjunto real de testes e contratos envelhecidos que só apareceu quando a baseline correta
+  foi rodada de ponta a ponta.
 
 ### 11.2. Correções definitivas aplicadas nesta rodada
 
 #### Runner / Vitest
 
 - `scripts/ci/run-mixed-tests.mjs` passou a separar explicitamente:
-	- specs Copilot → `vitest.copilot.config.js`
-	- specs genéricas → `vitest.config.js`
+  - specs Copilot → `vitest.copilot.config.js`
+  - specs genéricas → `vitest.config.js`
 - `vitest.copilot.config.js` foi endurecido para usar:
-	- `pool: 'threads'` por default
-	- `maxWorkers: '50%'` por default
+  - `pool: 'threads'` por default
+  - `maxWorkers: '50%'` por default
 
-Isso eliminou a discrepância artificial entre `test:unit` e `test:copilot:unit` e zerou os warnings de worker teardown na baseline final.
+Isso eliminou a discrepância artificial entre `test:unit` e `test:copilot:unit` e zerou os warnings
+de worker teardown na baseline final.
 
 #### Testes / contratos / mocks
 
 Foram corrigidos, entre outros:
 
 - mocks stale em rotas e barrels do SDK/runtime;
-- contratos desatualizados em `always-alive`, `loop-manager`, `snapshot`, `agent-integration` e testes de presentation/runtime;
-- seams de infraestrutura como `url-validator` com `dnsResolver.lookup` explícito para teste robusto;
-- filtros canônicos de glob em `index-search` para tratar corretamente segmentos como `node_modules`;
-- expectativas stale da trilha `devcontainer`, que já não correspondiam ao comportamento real dos scripts atuais.
+- contratos desatualizados em `always-alive`, `loop-manager`, `snapshot`, `agent-integration` e
+  testes de presentation/runtime;
+- seams de infraestrutura como `url-validator` com `dnsResolver.lookup` explícito para teste
+  robusto;
+- filtros canônicos de glob em `index-search` para tratar corretamente segmentos como
+  `node_modules`;
+- expectativas stale da trilha `devcontainer`, que já não correspondiam ao comportamento real dos
+  scripts atuais.
 
 #### Typecheck estrito
 
@@ -500,13 +577,13 @@ Ao final desta rodada, a baseline exigida ficou **integralmente verde**:
 - `npm run typecheck:strict:src.copilot` ✅
 - `npm run typecheck:strict:tests.unit` ✅
 - `npm run test:copilot:unit` ✅
-	- `2791/2791 testes`
-	- `951/951 suites`
-	- `warnings/errors unique=0 total=0`
+  - `2791/2791 testes`
+  - `951/951 suites`
+  - `warnings/errors unique=0 total=0`
 - `npm run test:unit` ✅
-	- `5069/5069 testes executados com sucesso` no lote ativo
-	- `424 arquivos` com `406 passed | 18 skipped`
-	- encerramento com `[test-runner] Mixed test run finished successfully.`
+  - `5069/5069 testes executados com sucesso` no lote ativo
+  - `424 arquivos` com `406 passed | 18 skipped`
+  - encerramento com `[test-runner] Mixed test run finished successfully.`
 
 ### 11.4. Palavra final desta trilha paralela
 
@@ -515,17 +592,20 @@ A resposta final para a dúvida do usuário é:
 - **não**, `test:copilot:unit` não estava simplesmente “escondendo” um problema por cache;
 - **sim**, havia um problema real de orquestração/configuração do runner híbrido;
 - **sim**, havia também falhas reais em testes stale fora do recorte inicial;
-- **agora**, a trilha de validação está convergente, warning-zero e pronta para a retomada contínua e profunda do roadmap funcional.
+- **agora**, a trilha de validação está convergente, warning-zero e pronta para a retomada contínua
+  e profunda do roadmap funcional.
 
 ## 12. Addendum — auditoria ampla de `CopilotClient`
 
 ### 12.1. Escopo e fonte de verdade
 
-Nesta rodada foi feita leitura integral de `node_modules/@github/copilot-sdk/dist/client.d.ts` e confronto com:
+Nesta rodada foi feita leitura integral de `node_modules/@github/copilot-sdk/dist/client.d.ts` e
+confronto com:
 
 - `node_modules/@github/copilot-sdk/dist/types.d.ts`
 - README oficial do SDK
-- implementação local em `src/copilot/sdk/session/**`, `src/copilot/server/routes/sdk/**` e `src/copilot/boot/**`
+- implementação local em `src/copilot/sdk/session/**`, `src/copilot/server/routes/sdk/**` e
+  `src/copilot/boot/**`
 
 A regra adotada foi: **o pacote tipado instalado vale mais do que o README quando houver drift**.
 
@@ -539,19 +619,19 @@ A regra adotada foi: **o pacote tipado instalado vale mais do que o README quand
 ### 12.3. Correções aplicadas nesta rodada
 
 - `src/copilot/sdk/session/client.js`
-	- `startClient()` explícito como alias semântico de start/getClient
-	- `getClientSessionMetadata()` com fallback compatível
+  - `startClient()` explícito como alias semântico de start/getClient
+  - `getClientSessionMetadata()` com fallback compatível
 - `src/copilot/server/routes/sdk/session-crud.js`
-	- `GET /sessions/:id` passou a usar metadata dedicada do SDK
+  - `GET /sessions/:id` passou a usar metadata dedicada do SDK
 - `src/copilot/sdk/session/client-options.js`
-	- builder fluente para `cwd`, `isChildProcess`, `autoRestart`
-	- parsing de env correspondente
+  - builder fluente para `cwd`, `isChildProcess`, `autoRestart`
+  - parsing de env correspondente
 - `src/copilot/sdk/types.js`
-	- SSOT documental atualizado
+  - SSOT documental atualizado
 - `src/copilot/sdk/session/provider.js`
-	- correção do comentário sobre `provider`
+  - correção do comentário sobre `provider`
 - `src/copilot/boot/contract.js` e `src/copilot/boot/surface-validation.js`
-	- baseline declarativo ampliado para a paridade do client
+  - baseline declarativo ampliado para a paridade do client
 
 ### 12.4. Veredito final desta frente
 

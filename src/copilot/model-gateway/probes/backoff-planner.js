@@ -55,7 +55,11 @@ function recommendationIdentity(row) {
     const key = optionalString(row['key']);
     const keyParts = key ? key.split(':') : [];
     const providerId = optionalString(row['providerId']) ?? keyParts[0] ?? 'unknown-provider';
-    const providerModel = optionalString(row['providerModel']) ?? optionalString(row['id']) ?? keyParts.slice(1, -1).join(':') ?? 'unknown-model';
+    const providerModel =
+        optionalString(row['providerModel']) ??
+        optionalString(row['id']) ??
+        keyParts.slice(1, -1).join(':') ??
+        'unknown-model';
     const routeProfile = optionalString(row['routeProfile']) ?? keyParts.at(-1) ?? 'default';
     return {
         providerId,
@@ -83,7 +87,11 @@ function healthMatchesRecommendation(health, identity) {
     const providerId = optionalString(health['providerId']) ?? optionalString(health['provider']);
     const providerModel = optionalString(health['providerModel']) ?? optionalString(health['model']);
     const routeProfile = optionalString(health['routeProfile']) ?? optionalString(health['profile']) ?? 'default';
-    return providerId === identity.providerId && providerModel === identity.providerModel && routeProfile === identity.routeProfile;
+    return (
+        providerId === identity.providerId &&
+        providerModel === identity.providerModel &&
+        routeProfile === identity.routeProfile
+    );
 }
 
 /**
@@ -151,9 +159,25 @@ function runtimeProbeFailureState(health, kind, nowMs, cooldownSeconds) {
  * @param {string | number | Date} [input.now]
  * @param {number} [input.probeFailureCooldownSeconds]
  * @returns {{
- *   ready: Array<{ key: string; providerId: string; providerModel: string; routeProfile: string; probeKinds: string[]; reasons: string[] }>;
- *   deferred: Array<{ key: string; providerId: string; providerModel: string; routeProfile: string; reason: string; probeKind?: string; retryAfterSeconds: number | null; resetAt: string | null }>;
- *   summary: { total: number; ready: number; deferred: number; reasonCounts: Record<string, number> };
+ *     ready: {
+ *         key: string;
+ *         providerId: string;
+ *         providerModel: string;
+ *         routeProfile: string;
+ *         probeKinds: string[];
+ *         reasons: string[];
+ *     }[];
+ *     deferred: {
+ *         key: string;
+ *         providerId: string;
+ *         providerModel: string;
+ *         routeProfile: string;
+ *         reason: string;
+ *         probeKind?: string;
+ *         retryAfterSeconds: number | null;
+ *         resetAt: string | null;
+ *     }[];
+ *     summary: { total: number; ready: number; deferred: number; reasonCounts: Record<string, number> };
  * }}
  */
 export function planModelGatewayProbeBackoff(input = {}) {
@@ -198,7 +222,9 @@ export function planModelGatewayProbeBackoff(input = {}) {
         }
         const runtimeProbeCooldown = healthRecords
             .filter((health) => healthMatchesRecommendation(health, identity))
-            .flatMap((health) => probeKinds.map((kind) => runtimeProbeFailureState(health, kind, nowMs, probeFailureCooldownSeconds)))
+            .flatMap((health) =>
+                probeKinds.map((kind) => runtimeProbeFailureState(health, kind, nowMs, probeFailureCooldownSeconds)),
+            )
             .find((state) => state.active);
         if (runtimeProbeCooldown) {
             deferred.push({

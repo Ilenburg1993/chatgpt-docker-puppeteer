@@ -213,10 +213,7 @@ export class AdaptiveThrottler {
      * Get current stats for reporting.
      */
     getStats() {
-        const avgCPU =
-            this.samples.length > 0
-                ? this.samples.reduce((a, b) => a + b, 0) / this.samples.length
-                : 0;
+        const avgCPU = this.samples.length > 0 ? this.samples.reduce((a, b) => a + b, 0) / this.samples.length : 0;
 
         return {
             enabled: this.enabled,

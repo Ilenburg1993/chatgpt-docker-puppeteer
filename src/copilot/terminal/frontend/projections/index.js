@@ -1,17 +1,17 @@
 // @ts-check
 
 export {
-    readTerminalByokProjection,
-    readTerminalByokRuntimeConfigProjection,
     listTerminalAvailableModelsProjection,
     observeTerminalModelChangeProjection,
     readTerminalByokGatewayProjectionFromEnv,
+    readTerminalByokProjection,
+    readTerminalByokRuntimeConfigProjection,
     readTerminalConfigProjection,
     readTerminalModelStatsProjection,
     setTerminalModelProjection,
+    setTerminalReasoningProjection,
     switchTerminalModelProjection,
     switchTerminalRouteProjection,
-    setTerminalReasoningProjection,
 } from './config.js';
 export { readTerminalLiveFlowProjection } from './live.js';
 export {

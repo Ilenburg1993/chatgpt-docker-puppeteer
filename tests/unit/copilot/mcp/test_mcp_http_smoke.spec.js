@@ -13,10 +13,7 @@ import {
     readMcpHttpServerTimingPolicy,
     recordMcpHttpProtocolRequest,
 } from '#copilot/mcp/adapters';
-import {
-    compareToolNames,
-    extractMcpToolNames,
-} from '#copilot/mcp/scripts';
+import { compareToolNames, extractMcpToolNames } from '#copilot/mcp/scripts';
 
 describe('copilot MCP local HTTP smoke helpers', () => {
     it('extracts tool names from a JSON-RPC tools/list body', () => {
@@ -78,7 +75,7 @@ describe('copilot MCP local HTTP smoke helpers', () => {
         const report = buildMcpHttpProtocolReport(state);
         assert.equal(report['protocolMode'], 'http1');
         assert.equal(report['observedRequests'], 1);
-        assert.deepEqual(report['httpVersionCounts'], { '1.1': 1 });
+        assert.deepEqual(report['httpVersionCounts'], { 1.1: 1 });
         assert.deepEqual(report['alpnCounts'], { none: 1 });
         const lastRequest = /** @type {Record<string, unknown>} */ (report['lastRequest']);
         assert.equal(lastRequest['httpVersion'], '1.1');

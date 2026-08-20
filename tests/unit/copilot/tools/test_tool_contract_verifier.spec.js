@@ -4,13 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import { createRegistry, registerTool, registerTools } from '#copilot/sdk/tools';
 import {
-    modelGatewayReadTools,
-    modelGatewayWriteTools,
-} from '../../../../src/copilot/tools/model-gateway/index.js';
-import {
     verifyToolOperationResultFieldsForCategory,
     verifyToolRegistryContracts,
 } from '../../../../src/copilot/tools/introspection/tool-contract-verifier.js';
+import { modelGatewayReadTools, modelGatewayWriteTools } from '../../../../src/copilot/tools/model-gateway/index.js';
 
 /**
  * @param {string} name
@@ -61,8 +58,9 @@ describe('tool-contract-verifier', () => {
 
         expect(report.ok).toBe(true);
         expect(report.riskySkipPermissionCount).toBe(2);
-        expect(report.issues.filter((issue) => issue.code === 'RISKY_SKIP_PERMISSION').map((issue) => issue.toolName))
-            .toEqual(['run_tests', 'permission_mode_set']);
+        expect(
+            report.issues.filter((issue) => issue.code === 'RISKY_SKIP_PERMISSION').map((issue) => issue.toolName),
+        ).toEqual(['run_tests', 'permission_mode_set']);
     });
 
     it('classifica skipPermission efetivo por approve_all como decisão operacional, não warning', () => {

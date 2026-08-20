@@ -106,14 +106,16 @@ function buildCandidate(projection, route) {
     const provider = route ? providerId(route) : providerId(projection);
     const model = route ? providerModel(route) : providerModel(projection);
     const profile = route ? routeProfile(route) : routeProfile(projection);
-    const selectorKind = route ? optionalString(route['selectorKind']) ?? 'exact_model' : 'exact_model';
-    const selectorSyntax = route ? optionalString(route['selectorSyntax']) ?? model : model;
+    const selectorKind = route ? (optionalString(route['selectorKind']) ?? 'exact_model') : 'exact_model';
+    const selectorSyntax = route ? (optionalString(route['selectorSyntax']) ?? model) : model;
     const policy = route ? routePolicy(route) : {};
     const traits = route ? routeTraits(route) : {};
     const providerSpecific = route ? routeProviderSpecific(route) : {};
     const routeRef = route ? routeOptionRef(route) : [provider, model, profile, selectorKind, selectorSyntax].join(':');
     const canonicalModelId = optionalString(projection['id']) ?? [provider, model].join(':');
-    const routeCandidateId = route ? [provider, model, profile, selectorKind, selectorSyntax].join(':') : canonicalModelId;
+    const routeCandidateId = route
+        ? [provider, model, profile, selectorKind, selectorSyntax].join(':')
+        : canonicalModelId;
     const projectionRouting = isRecord(projection['routing']) ? projection['routing'] : {};
     return {
         ...projection,
@@ -127,7 +129,12 @@ function buildCandidate(projection, route) {
         selectorSyntax,
         routeProviderSpecific: providerSpecific,
         routeOptionRef: routeRef,
-        routeOptionRefs: [...new Set([...(Array.isArray(projection['routeOptionRefs']) ? projection['routeOptionRefs'] : []), routeRef])],
+        routeOptionRefs: [
+            ...new Set([
+                ...(Array.isArray(projection['routeOptionRefs']) ? projection['routeOptionRefs'] : []),
+                routeRef,
+            ]),
+        ],
         normalizedPolicy: policy,
         routeTraits: traits,
         routing: {

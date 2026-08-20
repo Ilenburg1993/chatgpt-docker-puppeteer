@@ -12,9 +12,9 @@ import { appendThinkingHistoryChunk, finalizeThinkingHistoryEntry } from '../../
 import {
     formatTerminalThinkingRef,
     formatTerminalTimeLabel,
+    readTerminalTurnCorrelation,
     recordTerminalActivity,
     recordTerminalStreamDeltaDiagnostic,
-    readTerminalTurnCorrelation,
     terminalThemeDuration,
     terminalThemeHeadline,
     terminalThemeText,
@@ -76,15 +76,17 @@ const PUBLIC_REASONING_OPEN_RE = /^\s*(?:<|&lt;)(?:thinking|analysis|reasoning)(
  * @returns {string}
  */
 export function stripTerminalInvisibleText(text) {
-    return String(text ?? '').replace(TERMINAL_ESCAPE_SEQUENCE_RE, '').replace(TERMINAL_UNSAFE_CONTROL_RE, '');
+    return String(text ?? '')
+        .replace(TERMINAL_ESCAPE_SEQUENCE_RE, '')
+        .replace(TERMINAL_UNSAFE_CONTROL_RE, '');
 }
 
 /**
  * Remove blocos de raciocínio que vazaram como texto público no começo da resposta.
  *
  * O SDK já fornece canais separados para reasoning; quando o provider devolve tags como `<thinking>` dentro do canal
- * público, o operador não deve receber esse conteúdo como fala da LLM-B. A regra é deliberadamente conservadora:
- * só remove blocos no início da mensagem, preservando exemplos literais que apareçam depois de texto público.
+ * público, o operador não deve receber esse conteúdo como fala da LLM-B. A regra é deliberadamente conservadora: só
+ * remove blocos no início da mensagem, preservando exemplos literais que apareçam depois de texto público.
  *
  * @param {string} text
  * @returns {string}
@@ -256,12 +258,16 @@ export function createReasoningCallback(state) {
                 source: 'dialog',
             });
             if (state.showThinking) {
-        const tsNow = formatTerminalTimeLabel(Date.now(), { mode: 'dual' });
-        println(SEPARATOR);
-        println(
-            terminalThemeHeadline('thinking', 'Raciocínio capturado', [`[${tsNow}]`, state.model, state.effort]),
-        );
-        println('');
+                const tsNow = formatTerminalTimeLabel(Date.now(), { mode: 'dual' });
+                println(SEPARATOR);
+                println(
+                    terminalThemeHeadline('thinking', 'Raciocínio capturado', [
+                        `[${tsNow}]`,
+                        state.model,
+                        state.effort,
+                    ]),
+                );
+                println('');
             }
         }
         state.reasoningChars += chunk.length;
@@ -397,7 +403,10 @@ export function createDeltaCallback(state) {
 
         state.streamingBuffer += chunk;
 
-        if (!state.streamingStarted && measureVisibleTerminalChars(sanitizeTerminalRenderText(state.streamingBuffer)) > 0) {
+        if (
+            !state.streamingStarted &&
+            measureVisibleTerminalChars(sanitizeTerminalRenderText(state.streamingBuffer)) > 0
+        ) {
             state.streamingStarted = true;
             state.firstChunkTime = state.firstChunkTime || Date.now();
             ensureRenderLock(state);
@@ -413,9 +422,7 @@ export function createDeltaCallback(state) {
             writeTerminalRaw('', { clearPromptLine: true });
             const tsNow = formatTerminalTimeLabel(now, { mode: 'dual' });
             println(SEPARATOR);
-            println(
-                terminalThemeHeadline('assistant', 'LLM-B', [`[${tsNow}]`, state.model, state.effort]),
-            );
+            println(terminalThemeHeadline('assistant', 'LLM-B', [`[${tsNow}]`, state.model, state.effort]));
             println('');
         }
 

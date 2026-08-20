@@ -59,20 +59,21 @@ function asRecord(value) {
  * }}
  */
 export function readUsageSessionProjection(session) {
-    const sessionRecord = /**
-     * @type {{
-     *     model?: unknown;
-     *     config?: { model?: unknown };
-     *     sessionId?: unknown;
-     *     __copilotConfiguredModel?: unknown;
-     *     __copilotEffectiveModel?: unknown;
-     *     __copilotByokEnabled?: unknown;
-     *     __copilotByokProfile?: unknown;
-     *     __copilotByokPreset?: unknown;
-     *     __copilotByokProviderType?: unknown;
-     *     __copilotByokProvider?: unknown;
-     * }}
-     */ (session);
+    const sessionRecord =
+        /**
+         * @type {{
+         *     model?: unknown;
+         *     config?: { model?: unknown };
+         *     sessionId?: unknown;
+         *     __copilotConfiguredModel?: unknown;
+         *     __copilotEffectiveModel?: unknown;
+         *     __copilotByokEnabled?: unknown;
+         *     __copilotByokProfile?: unknown;
+         *     __copilotByokPreset?: unknown;
+         *     __copilotByokProviderType?: unknown;
+         *     __copilotByokProvider?: unknown;
+         * }}
+         */ (session);
     const configuredModel =
         asString(sessionRecord.model) ??
         asString(sessionRecord.config?.model) ??
@@ -81,8 +82,8 @@ export function readUsageSessionProjection(session) {
     const configRecord = asRecord(sessionRecord.config);
     const byokProvider = Boolean(
         sessionRecord.__copilotByokEnabled === true ||
-            asRecord(sessionRecord.__copilotByokProvider) ||
-            asRecord(configRecord?.['provider']),
+        asRecord(sessionRecord.__copilotByokProvider) ||
+        asRecord(configRecord?.['provider']),
     );
     const byokProfile = asString(sessionRecord.__copilotByokProfile);
     const byokPreset = asString(sessionRecord.__copilotByokPreset);
@@ -127,8 +128,12 @@ export function normalizeAssistantUsageEvent(evt, session) {
         ...(asRecord(data['quotaSnapshots']) ? { quotaSnapshots: asRecord(data['quotaSnapshots']) } : {}),
         ...(asNumber(data['inputTokens']) !== undefined ? { inputTokens: asNumber(data['inputTokens']) } : {}),
         ...(asNumber(data['outputTokens']) !== undefined ? { outputTokens: asNumber(data['outputTokens']) } : {}),
-        ...(asNumber(data['reasoningTokens']) !== undefined ? { reasoningTokens: asNumber(data['reasoningTokens']) } : {}),
-        ...(asNumber(data['cacheReadTokens']) !== undefined ? { cacheReadTokens: asNumber(data['cacheReadTokens']) } : {}),
+        ...(asNumber(data['reasoningTokens']) !== undefined
+            ? { reasoningTokens: asNumber(data['reasoningTokens']) }
+            : {}),
+        ...(asNumber(data['cacheReadTokens']) !== undefined
+            ? { cacheReadTokens: asNumber(data['cacheReadTokens']) }
+            : {}),
         ...(asNumber(data['cacheWriteTokens']) !== undefined
             ? { cacheWriteTokens: asNumber(data['cacheWriteTokens']) }
             : {}),
@@ -180,7 +185,9 @@ export function createAssistantUsageClassifier() {
     const result = (classification, attributionReason, usage, extra = {}) => ({
         classification,
         attributionReason,
-        billingSource: /** @type {'github_copilot' | 'byok'} */ (usage['byokProvider'] === true ? 'byok' : 'github_copilot'),
+        billingSource: /** @type {'github_copilot' | 'byok'} */ (
+            usage['byokProvider'] === true ? 'byok' : 'github_copilot'
+        ),
         pendingUserMessages,
         pendingAskUserContinuations,
         pendingUserInputRequests: pendingUserInputRequests.size,

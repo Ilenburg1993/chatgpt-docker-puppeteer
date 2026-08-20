@@ -8,6 +8,13 @@
  */
 
 import {
+    compactTerminalIntentText,
+    formatTerminalIntentTechnicalEnvelope,
+    humanTerminalIntentRiskLabel,
+    humanTerminalIntentSource,
+    terminalIntentRiskTheme,
+} from '../events/presenters/intent/index.js';
+import {
     clearTerminalIntentHistory,
     formatTerminalTimeLabel,
     readTerminalIntentHistory,
@@ -16,13 +23,6 @@ import {
     terminalThemeHeadline,
     terminalThemeRow,
 } from '../state/index.js';
-import {
-    compactTerminalIntentText,
-    formatTerminalIntentTechnicalEnvelope,
-    humanTerminalIntentRiskLabel,
-    humanTerminalIntentSource,
-    terminalIntentRiskTheme,
-} from '../events/presenters/intent/index.js';
 
 /**
  * @typedef {object} IntentCommandContext

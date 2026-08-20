@@ -90,7 +90,6 @@ function extractLineWindow(text, startLine, endLine) {
     return lines;
 }
 
-
 /**
  * Build a compact diff around a known single-line replacement range.
  *
@@ -98,7 +97,13 @@ function extractLineWindow(text, startLine, endLine) {
  *
  * @param {string} contentA
  * @param {string} contentB
- * @param {{ firstMatchLine?: number | null; lastMatchLine?: number | null; lineDelta?: number | null; replacedOccurrences?: number | null; contextLines?: number }} [options]
+ * @param {{
+ *     firstMatchLine?: number | null;
+ *     lastMatchLine?: number | null;
+ *     lineDelta?: number | null;
+ *     replacedOccurrences?: number | null;
+ *     contextLines?: number;
+ * }} [options]
  * @returns {{ diff: string; contextLines: number; rangeOptimized: boolean }}
  */
 export function buildSimpleTextDiffAroundLineRange(contentA, contentB, options = {}) {
@@ -108,12 +113,12 @@ export function buildSimpleTextDiffAroundLineRange(contentA, contentB, options =
     const lineDelta = Number(options.lineDelta ?? 0);
     const replacedOccurrences = Number(options.replacedOccurrences ?? 0);
     if (
-        replacedOccurrences !== 1
-        || lineDelta !== 0
-        || !Number.isInteger(firstMatchLine)
-        || !Number.isInteger(lastMatchLine)
-        || firstMatchLine < 1
-        || lastMatchLine < firstMatchLine
+        replacedOccurrences !== 1 ||
+        lineDelta !== 0 ||
+        !Number.isInteger(firstMatchLine) ||
+        !Number.isInteger(lastMatchLine) ||
+        firstMatchLine < 1 ||
+        lastMatchLine < firstMatchLine
     ) {
         return { ...buildSimpleTextDiff(contentA, contentB, { contextLines }), rangeOptimized: false };
     }

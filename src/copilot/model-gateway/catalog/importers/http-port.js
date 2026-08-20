@@ -2,16 +2,16 @@
 /**
  * Minimal HTTP port used by catalog importers.
  *
- * Native `fetch` is a valid adapter. Tests can provide a structural response containing only the bounded-readable
- * body capabilities they exercise, without pretending to implement the full Web `Response` surface.
+ * Native `fetch` is a valid adapter. Tests can provide a structural response containing only the bounded-readable body
+ * capabilities they exercise, without pretending to implement the full Web `Response` surface.
  *
  * @module copilot/model-gateway/catalog/importers/http-port
  */
 
 /**
  * @typedef {Parameters<typeof import('#copilot/infra/public/http-response').readBoundedResponseText>[0] & {
- *   ok: boolean;
- *   status: number;
+ *     ok: boolean;
+ *     status: number;
  * }} CatalogHttpResponse
  */
 

@@ -14,7 +14,18 @@ const MAX_DEDUPE_KEY_LENGTH = 1024;
 
 /** @typedef {'assistant' | 'implicit'} TerminalTurnTraceSource */
 /** @typedef {'active' | 'completed' | 'failed' | 'interrupted'} TerminalTurnTraceStatus */
-/** @typedef {'read' | 'write' | 'edit' | 'copy' | 'move' | 'delete' | 'list' | 'run' | 'inspect' | 'ask' | 'intent' | 'unknown'} TerminalTurnTraceOperation */
+/** @typedef {'read'
+    | 'write'
+    | 'edit'
+    | 'copy'
+    | 'move'
+    | 'delete'
+    | 'list'
+    | 'run'
+    | 'inspect'
+    | 'ask'
+    | 'intent'
+    | 'unknown'} TerminalTurnTraceOperation */
 /** @typedef {'question' | 'ready' | 'reply' | 'stopped' | 'structured'} TerminalTurnTraceUserInputKind */
 /** @typedef {'requested' | 'answered' | 'cancelled'} TerminalTurnTraceUserInputStatus */
 
@@ -288,11 +299,16 @@ export function completeTerminalTurnTrace({ turnId = null, timestamp = Date.now(
 /**
  * Reconciles late lifecycle failures emitted after `assistant.turn_end`.
  *
- * Some providers surface a transport/query failure only after the SDK already emitted the assistant turn end event.
- * In that case the trace was closed as completed a few milliseconds earlier. This function revises the most recent
+ * Some providers surface a transport/query failure only after the SDK already emitted the assistant turn end event. In
+ * that case the trace was closed as completed a few milliseconds earlier. This function revises the most recent
  * matching trace instead of creating a parallel error trace.
  *
- * @param {{ turnId?: string | null; timestamp?: number; status?: Exclude<TerminalTurnTraceStatus, 'active'>; maxAgeMs?: number }} [input]
+ * @param {{
+ *     turnId?: string | null;
+ *     timestamp?: number;
+ *     status?: Exclude<TerminalTurnTraceStatus, 'active'>;
+ *     maxAgeMs?: number;
+ * }} [input]
  * @returns {TerminalTurnTraceSnapshot | null}
  */
 export function reviseRecentTerminalTurnTraceStatus({
@@ -409,9 +425,7 @@ export function recordTerminalTurnToolActivity({
             path: normalizedPath,
             operation,
             source: normalizedSource,
-            dedupeKey: normalizedToolCallId
-                ? `${normalizedToolCallId}\u241fprimary\u241f${normalizedPath}`
-                : null,
+            dedupeKey: normalizedToolCallId ? `${normalizedToolCallId}\u241fprimary\u241f${normalizedPath}` : null,
             turnId: trace.turnId,
             timestamp,
         });
@@ -450,9 +464,7 @@ export function completeTerminalTurnToolCall({ toolCallId, success, timestamp = 
  * @returns {TerminalTurnTraceUserInputKind}
  */
 function normalizeUserInputKind(value) {
-    return value === 'ready' || value === 'reply' || value === 'stopped' || value === 'structured'
-        ? value
-        : 'question';
+    return value === 'ready' || value === 'reply' || value === 'stopped' || value === 'structured' ? value : 'question';
 }
 
 /**

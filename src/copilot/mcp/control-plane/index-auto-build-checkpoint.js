@@ -3,8 +3,8 @@
  * Persistent checkpoint + cheap Git evidence for MCP index startup.
  *
  * A clean tracked file is immutable while HEAD is unchanged. Dirty/untracked paths are always refreshed explicitly, and
- * commit-to-commit changes are derived from `git diff --name-status`. This lets startup avoid scanning the whole tree on
- * every restart while preserving a periodic full reconciliation safety net.
+ * commit-to-commit changes are derived from `git diff --name-status`. This lets startup avoid scanning the whole tree
+ * on every restart while preserving a periodic full reconciliation safety net.
  *
  * @module copilot/mcp/control-plane/index-auto-build-checkpoint
  */
@@ -21,6 +21,7 @@ const GIT_MAX_BUFFER = 16 * 1024 * 1024;
 
 /**
  * @typedef {{ status: string; path: string; deleted: boolean }} IndexGitPathChange
+ *
  * @typedef {{
  *     available: boolean;
  *     head: string | null;
@@ -29,6 +30,7 @@ const GIT_MAX_BUFFER = 16 * 1024 * 1024;
  *     error: string | null;
  *     durationMs: number;
  * }} IndexGitSnapshot
+ *
  * @typedef {{
  *     scopePath: string;
  *     head: string;
@@ -37,6 +39,7 @@ const GIT_MAX_BUFFER = 16 * 1024 * 1024;
  *     lastFullReconcileAtMs: number;
  *     journalSequence: number;
  * }} IndexStartupCheckpoint
+ *
  * @typedef {{
  *     available: boolean;
  *     gapDetected: boolean;
@@ -61,7 +64,7 @@ function ensureCheckpointSchema(db = getCopilotDb()) {
             journal_sequence INTEGER NOT NULL DEFAULT 0
         ) STRICT;
     `);
-    const columns = /** @type {Array<{ name?: string }>} */ (db.prepare(`PRAGMA table_info(${TABLE})`).all());
+    const columns = /** @type {{ name?: string }[]} */ (db.prepare(`PRAGMA table_info(${TABLE})`).all());
     if (!columns.some((column) => column.name === 'journal_sequence')) {
         db.exec(`ALTER TABLE ${TABLE} ADD COLUMN journal_sequence INTEGER NOT NULL DEFAULT 0`);
     }
@@ -85,15 +88,21 @@ export function readIndexStartupCheckpoint(scopePath, db = getCopilotDb()) {
 }
 
 /**
- * @param {{ scopePath: string; head: string; schemaVersion: number; mode: 'full-reconcile' | 'incremental' | 'skip'; nowMs?: number; journalSequence?: number }} input
+ * @param {{
+ *     scopePath: string;
+ *     head: string;
+ *     schemaVersion: number;
+ *     mode: 'full-reconcile' | 'incremental' | 'skip';
+ *     nowMs?: number;
+ *     journalSequence?: number;
+ * }} input
  * @param {import('better-sqlite3').Database} [db]
  */
 export function writeIndexStartupCheckpoint(input, db = getCopilotDb()) {
     ensureCheckpointSchema(db);
     const previous = readIndexStartupCheckpoint(input.scopePath, db);
     const nowMs = input.nowMs ?? Date.now();
-    const lastFullReconcileAtMs =
-        input.mode === 'full-reconcile' ? nowMs : (previous?.lastFullReconcileAtMs ?? nowMs);
+    const lastFullReconcileAtMs = input.mode === 'full-reconcile' ? nowMs : (previous?.lastFullReconcileAtMs ?? nowMs);
     const journalSequence = normalizeJournalSequence(input.journalSequence, previous?.journalSequence ?? 0);
     db.prepare(
         `INSERT INTO ${TABLE}(scope_path, head, schema_version, completed_at_ms, last_full_reconcile_at_ms, journal_sequence)
@@ -266,7 +275,7 @@ export function planIndexStartup(input) {
  * Journal paths are hints, not path authority: malformed/non-absolute rows are unsafe, outside-scope rows are ignored,
  * and recursive/root invalidations require a full reconcile.
  *
- * @param {Array<{ filePath?: unknown; recursive?: unknown }>} rows
+ * @param {{ filePath?: unknown; recursive?: unknown }[]} rows
  * @param {string} scopeRoot
  */
 export function classifyIndexJournalReplayRows(rows, scopeRoot) {

@@ -78,7 +78,8 @@ function recommendationKey(row) {
  */
 export function estimateProbeCostUsd(projection, kind) {
     const pricing = isRecord(projection['pricing']) ? projection['pricing'] : {};
-    const estimate = PROBE_TOKEN_ESTIMATES[/** @type {keyof typeof PROBE_TOKEN_ESTIMATES} */ (kind)] ?? PROBE_TOKEN_ESTIMATES.chat;
+    const estimate =
+        PROBE_TOKEN_ESTIMATES[/** @type {keyof typeof PROBE_TOKEN_ESTIMATES} */ (kind)] ?? PROBE_TOKEN_ESTIMATES.chat;
     const input = finiteNumber(pricing['inputUsdPerMillion']);
     const output = finiteNumber(pricing['outputUsdPerMillion']);
     const request = finiteNumber(pricing['requestUsd']) ?? 0;
@@ -88,18 +89,24 @@ export function estimateProbeCostUsd(projection, kind) {
 
 /**
  * @param {object} input
- * @param {Array<Record<string, unknown>>} input.recommendations
- * @param {Array<Record<string, unknown>>} input.projections
+ * @param {Record<string, unknown>[]} input.recommendations
+ * @param {Record<string, unknown>[]} input.projections
  * @param {number} [input.maxProbeCount]
  * @param {number} [input.maxEstimatedCostUsd]
  * @param {string[]} [input.allowedProbeKinds]
  * @param {string[]} [input.blockedProbeKinds]
  * @param {'allow' | 'skip'} [input.unknownCostPolicy]
  * @returns {{
- *   selected: Array<{ key: string; kind: string; command: string | null; estimatedCostUsd: number | null; reasons: string[] }>;
- *   skipped: Array<{ key: string; kind: string; reason: string }>;
- *   totalEstimatedCostUsd: number;
- *   totalProbeCount: number;
+ *     selected: {
+ *         key: string;
+ *         kind: string;
+ *         command: string | null;
+ *         estimatedCostUsd: number | null;
+ *         reasons: string[];
+ *     }[];
+ *     skipped: { key: string; kind: string; reason: string }[];
+ *     totalEstimatedCostUsd: number;
+ *     totalProbeCount: number;
  * }}
  */
 export function planCostBoundedCatalogProbes(input) {
@@ -108,7 +115,12 @@ export function planCostBoundedCatalogProbes(input) {
     const unknownCostPolicy = input.unknownCostPolicy ?? (maxEstimatedCostUsd === null ? 'allow' : 'skip');
     const allowedKinds = stringSet(input.allowedProbeKinds);
     const blockedKinds = stringSet(input.blockedProbeKinds);
-    const projectionsByKey = new Map((Array.isArray(input.projections) ? input.projections : []).map((projection) => [recommendationKey(projection), projection]));
+    const projectionsByKey = new Map(
+        (Array.isArray(input.projections) ? input.projections : []).map((projection) => [
+            recommendationKey(projection),
+            projection,
+        ]),
+    );
     const selected = [];
     const skipped = [];
     let totalEstimatedCostUsd = 0;
@@ -138,7 +150,11 @@ export function planCostBoundedCatalogProbes(input) {
                 skipped.push({ key, kind, reason: 'probe_cost_unknown' });
                 continue;
             }
-            if (maxEstimatedCostUsd !== null && estimatedCostUsd !== null && totalEstimatedCostUsd + estimatedCostUsd > maxEstimatedCostUsd) {
+            if (
+                maxEstimatedCostUsd !== null &&
+                estimatedCostUsd !== null &&
+                totalEstimatedCostUsd + estimatedCostUsd > maxEstimatedCostUsd
+            ) {
                 skipped.push({ key, kind, reason: 'probe_cost_limit_reached' });
                 continue;
             }

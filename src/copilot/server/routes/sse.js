@@ -21,8 +21,8 @@
 import { MAX_SSE_CLIENTS, MAX_SSE_CONTENT_CHARS, MAX_SSE_LIFETIME_MS } from '#copilot/config';
 import { defaultMetrics } from '#copilot/observability';
 import { Router } from 'express';
-import { eventFanout } from '../../infra/sse/fanout.js';
 import { detachSseReplayEventId } from '../../infra/sse/envelope.js';
+import { eventFanout } from '../../infra/sse/fanout.js';
 import { SseReplayBuffer } from '../../infra/sse/replay-buffer.js';
 import { getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { SseClientPool } from '../../infra/sse/stream-hub.js';

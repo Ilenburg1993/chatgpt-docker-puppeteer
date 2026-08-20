@@ -63,7 +63,8 @@ The canonical contract lives in:
 - Do not add an operation here unless it exists in the daemon dispatch table.
 - Do not rename operations without updating schema and audit tooling.
 - Do not bypass workspace path guards or mutation guards.
-- Do not start, probe, or require the wrapper unless `LSP_ENABLED=true` was explicit for that process.
+- Do not start, probe, or require the wrapper unless `LSP_ENABLED=true` was explicit for that
+  process.
 
 ## Validation / Done Criteria
 

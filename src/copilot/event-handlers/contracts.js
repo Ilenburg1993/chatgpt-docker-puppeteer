@@ -3,8 +3,8 @@
  * @module copilot/event-handlers/contracts
  * @file Contratos tipados compartilhados pelos event handlers do SDK.
  *
- *   Centraliza os typedefs usados por `event-handlers/` e pelo wirer em `agent/session/wiring`, evitando dependência
- *   do módulo concreto `event-wirer.js` apenas para tipos.
+ *   Centraliza os typedefs usados por `event-handlers/` e pelo wirer em `agent/session/wiring`, evitando dependência do
+ *   módulo concreto `event-wirer.js` apenas para tipos.
  */
 
 /**

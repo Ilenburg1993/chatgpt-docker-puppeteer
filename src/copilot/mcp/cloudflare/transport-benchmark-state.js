@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/transport-benchmark-state
  */
 
-import { lstat, readFile } from 'node:fs/promises';
+import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import { fileURLToPath } from 'node:url';
 
 export const TRANSPORT_BENCHMARK_STATE_PATH = 'src/copilot/.ai/mcp/transport-benchmark-state.json';
@@ -24,7 +24,11 @@ export function getTransportBenchmarkStateFile() {
  */
 export async function readTransportBenchmarkState() {
     try {
-        const stats = await lstat(TRANSPORT_BENCHMARK_STATE_FILE);
+        const stats = (
+            await lstatPathTrusted(TRANSPORT_BENCHMARK_STATE_FILE, {
+                caller: 'mcp.cloudflare.transport-benchmark-state',
+            })
+        ).stats;
         if (stats.isSymbolicLink() || !stats.isFile()) {
             return { schemaVersion: 1, status: 'unreadable', error: 'Benchmark state is not a regular file.' };
         }
@@ -35,7 +39,13 @@ export async function readTransportBenchmarkState() {
                 error: `Benchmark state exceeds ${String(MAX_STATE_BYTES)} bytes.`,
             };
         }
-        const parsed = JSON.parse(await readFile(TRANSPORT_BENCHMARK_STATE_FILE, 'utf8'));
+        const parsed = JSON.parse(
+            (
+                await readTextFreshTrusted(TRANSPORT_BENCHMARK_STATE_FILE, {
+                    caller: 'mcp.cloudflare.transport-benchmark-state',
+                })
+            ).content,
+        );
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             return { schemaVersion: 1, status: 'unreadable', error: 'Benchmark state JSON is not an object.' };
         }

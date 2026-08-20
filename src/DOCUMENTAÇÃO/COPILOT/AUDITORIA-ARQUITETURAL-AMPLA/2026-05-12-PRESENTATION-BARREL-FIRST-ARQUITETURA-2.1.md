@@ -1,8 +1,8 @@
 # 2026-05-12 — Avaliação arquitetural Presentation 2.1+: shared edge layer barrel-first
 
-**Data:** 2026-05-12
-**Escopo:** `src/copilot/presentation/**`
-**Motivação:** iniciar a próxima onda ampla de reorganização arquitetural após a consolidação barrel-first do `terminal/`, agora adaptando a estratégia para a natureza própria de `presentation/` como **shared edge layer**.
+**Data:** 2026-05-12 **Escopo:** `src/copilot/presentation/**` **Motivação:** iniciar a próxima onda
+ampla de reorganização arquitetural após a consolidação barrel-first do `terminal/`, agora adaptando
+a estratégia para a natureza própria de `presentation/` como **shared edge layer**.
 
 ---
 
@@ -12,25 +12,32 @@
 >
 > A implementação já avançou bastante além do diagnóstico-base desta nota:
 >
-> - `agent/`, `routing/`, `state/`, `system/`, `conversation/`, `contracts/`, `runtime/`, `files/` e `sdk/` já são
->   subdomínios físicos reais;
-> - `server/` e `terminal/` já foram religados para consumir `presentation/` via sub-barrels nesses subdomínios;
-> - `package.json` já expõe superfícies públicas explícitas para `presentation` (`#copilot/presentation/*` sem
->   curingas);
-> - um submódulo `agent/runtime/index.js` já foi introduzido para estreitar a surface de seleção/lookup de runtime e
->   evitar ciclos com `agent/control.js`.
+> - `agent/`, `routing/`, `state/`, `system/`, `conversation/`, `contracts/`, `runtime/`, `files/` e
+>   `sdk/` já são subdomínios físicos reais;
+> - `server/` e `terminal/` já foram religados para consumir `presentation/` via sub-barrels nesses
+>   subdomínios;
+> - `package.json` já expõe superfícies públicas explícitas para `presentation`
+>   (`#copilot/presentation/*` sem curingas);
+> - um submódulo `agent/runtime/index.js` já foi introduzido para estreitar a surface de
+>   seleção/lookup de runtime e evitar ciclos com `agent/control.js`.
 >
-> Assim, esta nota passa a servir como **diagnóstico-base + target de governança**, e o próximo foco principal sai da
-> taxonomia física inicial para **surface minimization + decomposição de hotspots + enforcement automatizado**.
+> Assim, esta nota passa a servir como **diagnóstico-base + target de governança**, e o próximo foco
+> principal sai da taxonomia física inicial para **surface minimization + decomposição de hotspots +
+> enforcement automatizado**.
 
-`presentation/` **não é uma borda final** como `terminal/`. Ele é uma **camada transversal de projeções, payloads, accessors e handlers compartilhados** entre `server/`, `terminal/` e outras bordas/consumidores de runtime.
+`presentation/` **não é uma borda final** como `terminal/`. Ele é uma **camada transversal de
+projeções, payloads, accessors e handlers compartilhados** entre `server/`, `terminal/` e outras
+bordas/consumidores de runtime.
 
 Isso muda a estratégia arquitetural:
 
-- em `terminal/`, a meta foi isolar a borda humana e impedir que o resto de `src/copilot` dependesse dela;
-- em `presentation/`, a meta correta é **permitir dependência controlada**, mas **somente via superfícies públicas deliberadas**.
+- em `terminal/`, a meta foi isolar a borda humana e impedir que o resto de `src/copilot` dependesse
+  dela;
+- em `presentation/`, a meta correta é **permitir dependência controlada**, mas **somente via
+  superfícies públicas deliberadas**.
 
-O diagnóstico atual mostra que `presentation/` já cumpre corretamente o papel de shared edge layer, porém ainda está fisicamente organizado como **pasta plana de leaf files**, com:
+O diagnóstico atual mostra que `presentation/` já cumpre corretamente o papel de shared edge layer,
+porém ainda está fisicamente organizado como **pasta plana de leaf files**, com:
 
 1. **nenhuma subpasta estrutural**;
 2. **barrel raiz largo demais** (`index.js` com muitos `export *`);
@@ -45,7 +52,9 @@ O diagnóstico atual mostra que `presentation/` já cumpre corretamente o papel 
    - state store/UI,
    - contracts/types.
 
-Conclusão: a próxima onda em `presentation/` deve ser tratada como **programa de taxonomia física + barrels recursivos + superfícies públicas explícitas + decomposição dos hotspots**, e não como simples rename de arquivos.
+Conclusão: a próxima onda em `presentation/` deve ser tratada como **programa de taxonomia física +
+barrels recursivos + superfícies públicas explícitas + decomposição dos hotspots**, e não como
+simples rename de arquivos.
 
 ---
 
@@ -90,7 +99,9 @@ Maiores arquivos hoje:
 - `runtime-controls.js` → **299** linhas
 - `runtime-dialog.js` → **279** linhas
 
-Leitura arquitetural: o risco maior está em **`agent-control.js`** e **`runtime-ui-state-store.js`**, não apenas por tamanho bruto, mas porque concentram múltiplas responsabilidades de alto tráfego.
+Leitura arquitetural: o risco maior está em **`agent-control.js`** e
+**`runtime-ui-state-store.js`**, não apenas por tamanho bruto, mas porque concentram múltiplas
+responsabilidades de alto tráfego.
 
 ### 2.3 Dependência interna dentro de `presentation/`
 
@@ -140,11 +151,13 @@ Leitura arquitetural:
 
 - `server/` usa `presentation/` como **routing/meta/health gateway**;
 - `terminal/` usa `presentation/` como **shared state / projections / shared runtime façade**;
-- portanto a topologia ideal precisa refletir **dois perfis públicos distintos**, e não um único `index.js` inchado.
+- portanto a topologia ideal precisa refletir **dois perfis públicos distintos**, e não um único
+  `index.js` inchado.
 
 ### 2.5 Superfície pública atual
 
-O barrel raiz `src/copilot/presentation/index.js` segue puro, e `package.json` já declara superfícies explícitas para:
+O barrel raiz `src/copilot/presentation/index.js` segue puro, e `package.json` já declara
+superfícies explícitas para:
 
 - `#copilot/presentation`
 - `#copilot/presentation/agent`
@@ -157,8 +170,8 @@ O barrel raiz `src/copilot/presentation/index.js` segue puro, e `package.json` j
 - `#copilot/presentation/state`
 - `#copilot/presentation/system`
 
-O gap remanescente deixou de ser “falta surface pública” e passou a ser **minimizar melhor a surface do root barrel e
-dos sub-barrels grandes**.
+O gap remanescente deixou de ser “falta surface pública” e passou a ser **minimizar melhor a surface
+do root barrel e dos sub-barrels grandes**.
 
 ---
 
@@ -170,26 +183,27 @@ O principal desvio de `presentation/` não é “falta um barrel”.
 
 O desvio real é:
 
-> uma **camada shared-edge madura** continua fisicamente modelada como **namespace plano de arquivos**.
+> uma **camada shared-edge madura** continua fisicamente modelada como **namespace plano de
+> arquivos**.
 
 Isso já não escala para a densidade atual do módulo.
 
 ## 3.2 Problemas arquiteturais resultantes
 
-1. **superfície pública implícita**
-   consumidores dependem de leaf files porque não existem sub-superfícies canônicas;
+1. **superfície pública implícita** consumidores dependem de leaf files porque não existem
+   sub-superfícies canônicas;
 
-2. **mistura de domínios no mesmo nível**
-   `agent-control.js`, `runtime-request.js`, `runtime-ui-state-store.js` e `system-metrics.js` coexistem lado a lado embora pertençam a grupos semânticos distintos;
+2. **mistura de domínios no mesmo nível** `agent-control.js`, `runtime-request.js`,
+   `runtime-ui-state-store.js` e `system-metrics.js` coexistem lado a lado embora pertençam a grupos
+   semânticos distintos;
 
-3. **dificuldade de enforcement**
-   sem sub-barrels, não dá para distinguir facilmente o que é API pública do que é detalhe interno;
+3. **dificuldade de enforcement** sem sub-barrels, não dá para distinguir facilmente o que é API
+   pública do que é detalhe interno;
 
-4. **barrel raiz largo demais**
-   `index.js` vira hub por conveniência, não por governança deliberada;
+4. **barrel raiz largo demais** `index.js` vira hub por conveniência, não por governança deliberada;
 
-5. **risco de `presentation/` virar “segundo runtime”**
-   conforme cresce, sem taxonomia clara, fica mais fácil deixar lógica de domínio/runtime vazar para a camada de projeção.
+5. **risco de `presentation/` virar “segundo runtime”** conforme cresce, sem taxonomia clara, fica
+   mais fácil deixar lógica de domínio/runtime vazar para a camada de projeção.
 
 ## 3.3 Risco específico desta pasta
 
@@ -197,7 +211,8 @@ Diferente de `terminal/`, o problema aqui **não** é “frontend máximo”.
 
 O risco específico de `presentation/` é:
 
-> virar uma camada transversal tão larga e plana que deixa de ser uma *shared edge layer governada* e passa a ser um *dumping ground de accessors e handlers*.
+> virar uma camada transversal tão larga e plana que deixa de ser uma _shared edge layer governada_
+> e passa a ser um _dumping ground de accessors e handlers_.
 
 ---
 
@@ -211,7 +226,8 @@ Ou seja:
 
 - `index.js` continua barrel puro;
 - novos `index.js` de subpastas também devem ser barrels puros;
-- consumidores externos deixam de apontar para leaf files sempre que atravessam fronteiras semânticas relevantes.
+- consumidores externos deixam de apontar para leaf files sempre que atravessam fronteiras
+  semânticas relevantes.
 
 ## 4.2 Diferença essencial para `terminal/`
 
@@ -221,7 +237,8 @@ Em `terminal/`, a regra era:
 
 Em `presentation/`, a regra correta passa a ser:
 
-> módulos de fora **podem** depender de `presentation/`, mas **somente via superfícies públicas explícitas**.
+> módulos de fora **podem** depender de `presentation/`, mas **somente via superfícies públicas
+> explícitas**.
 
 ## 4.3 Modelo de módulo ideal
 
@@ -297,7 +314,8 @@ presentation/
 
 ## 5.1 Imports externos a `presentation/`
 
-`server/`, `terminal/`, testes e demais consumidores devem migrar progressivamente de leaf files para **sub-barrels explícitos**.
+`server/`, `terminal/`, testes e demais consumidores devem migrar progressivamente de leaf files
+para **sub-barrels explícitos**.
 
 Target desejado:
 
@@ -326,7 +344,8 @@ Regra proposta:
 
 - same-folder imports diretos continuam aceitáveis para leaf-private internals;
 - cross-folder imports devem passar por sub-barrels;
-- o barrel raiz não deve ser consumido de dentro do próprio módulo para evitar acoplamento circular/artificial.
+- o barrel raiz não deve ser consumido de dentro do próprio módulo para evitar acoplamento
+  circular/artificial.
 
 ## 5.3 Regra anti-regressão essencial
 
@@ -340,7 +359,8 @@ Ele é a shared edge layer; as bordas consomem `presentation/`, não o inverso.
 
 ## 6.1 Root barrel
 
-O root `presentation/index.js` deve exportar **apenas sub-superfícies deliberadas** e, excepcionalmente, alguns símbolos globais muito estáveis.
+O root `presentation/index.js` deve exportar **apenas sub-superfícies deliberadas** e,
+excepcionalmente, alguns símbolos globais muito estáveis.
 
 O target ideal é reduzir bastante os `export *` atuais.
 
@@ -376,8 +396,10 @@ Prioridade recomendada:
 
 ## Onda PBF-2 — Rewiring de consumers
 
-- migrar `server/` para `presentation/routing`, `presentation/agent`, `presentation/system`, `presentation/runtime`;
-- migrar `terminal/` para `presentation/state`, `presentation/files`, `presentation/system`, `presentation/runtime`;
+- migrar `server/` para `presentation/routing`, `presentation/agent`, `presentation/system`,
+  `presentation/runtime`;
+- migrar `terminal/` para `presentation/state`, `presentation/files`, `presentation/system`,
+  `presentation/runtime`;
 - começar a reduzir deep imports em testes.
 
 ## Onda PBF-3 — Surface minimization
@@ -393,7 +415,8 @@ Foco maior em:
 >
 > - `agent/runtime/index.js` já estreitou a fronteira entre `agent/` e `runtime/`;
 > - `server/` e `terminal/` já deixaram de fazer deep imports nos novos subdomínios barrelizados;
-> - ainda falta reduzir o peso deliberado do root `presentation/index.js` e tornar `runtime/index.js` mais explícito.
+> - ainda falta reduzir o peso deliberado do root `presentation/index.js` e tornar
+>   `runtime/index.js` mais explícito.
 
 ## Onda PBF-4 — Decomposição dos hotspots
 
@@ -414,7 +437,8 @@ Adicionar guardrails para:
 3. `presentation/` não importa `terminal/` nem `server/`;
 4. arquivos acima de thresholds exigem decomposição planejada / ADR local.
 
-> **Status atual:** iniciado nesta rodada com contrato dedicado de governança barrel-first para `presentation/`.
+> **Status atual:** iniciado nesta rodada com contrato dedicado de governança barrel-first para
+> `presentation/`.
 
 ---
 
@@ -449,7 +473,8 @@ presentation/state/ui-store/
   session.js
 ```
 
-Esses dois eixos não devem ser tratados como simples arquivos grandes; eles já são **mini-domínios operacionais**.
+Esses dois eixos não devem ser tratados como simples arquivos grandes; eles já são **mini-domínios
+operacionais**.
 
 ---
 
@@ -458,7 +483,8 @@ Esses dois eixos não devem ser tratados como simples arquivos grandes; eles já
 1. `index.js` nunca contém lógica operacional.
 2. `presentation/` não importa `terminal/` nem `server/`.
 3. Imports cross-folder em `presentation/` passam por sub-barrels.
-4. `server/` e `terminal/` deixam de importar leaf files de `presentation/` quando a superfície pública correspondente existir.
+4. `server/` e `terminal/` deixam de importar leaf files de `presentation/` quando a superfície
+   pública correspondente existir.
 5. O root `presentation/index.js` não deve voltar a crescer como barrel “catch-all”.
 
 ---
@@ -469,6 +495,8 @@ O target certo para `presentation/` **não é copiar mecanicamente o terminal**.
 
 O target correto é:
 
-> **transformar `presentation/` numa shared edge layer barrel-first, com subdomínios explícitos, superfícies públicas estáveis, imports externos via barrels, e sem permitir que a camada se deforme em um segundo runtime plano e sem fronteiras.**
+> **transformar `presentation/` numa shared edge layer barrel-first, com subdomínios explícitos,
+> superfícies públicas estáveis, imports externos via barrels, e sem permitir que a camada se
+> deforme em um segundo runtime plano e sem fronteiras.**
 
 Esse é o análogo correto — e adaptado — da estratégia aplicada com sucesso em `terminal/`.

@@ -8,16 +8,23 @@
  * @module copilot/mcp/scripts/dependency-native-smoke
  */
 
-import fs from 'node:fs/promises';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const requireFromHere = createRequire(import.meta.url);
+const dependencySmokeWorkspaceIo = createWorkspaceIo({ workspaceRoot: process.cwd() });
 const DEFAULT_PTY_TIMEOUT_MS = 5_000;
 
 /** @returns {Promise<Set<string>>} */
 async function readDeclaredPackages() {
-    const parsed = JSON.parse(await fs.readFile(path.resolve(process.cwd(), 'package.json'), 'utf8'));
+    const parsed = JSON.parse(
+        (
+            await dependencySmokeWorkspaceIo.readTextFresh(path.resolve(process.cwd(), 'package.json'), {
+                includeHash: false,
+            })
+        ).content,
+    );
     return new Set([
         ...Object.keys(parsed.dependencies ?? {}),
         ...Object.keys(parsed.devDependencies ?? {}),
@@ -63,10 +70,15 @@ async function smokeNodePty() {
     if (typeof pty.spawn !== 'function') throw new Error('node-pty does not export spawn().');
     return await new Promise((resolve, reject) => {
         const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/sh';
-        const args = process.platform === 'win32' ? ['-NoProfile', '-Command', "Write-Output -NoNewline 'node-pty-ok'"] : ['-lc', "printf 'node-pty-ok'"];
+        const args =
+            process.platform === 'win32'
+                ? ['-NoProfile', '-Command', "Write-Output -NoNewline 'node-pty-ok'"]
+                : ['-lc', "printf 'node-pty-ok'"];
         const terminal = pty.spawn(shell, args, {
             cwd: process.cwd(),
-            env: /** @type {Record<string, string>} */ (Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined))),
+            env: /** @type {Record<string, string>} */ (
+                Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== undefined))
+            ),
             cols: 80,
             rows: 24,
             name: 'xterm-256color',
@@ -113,10 +125,10 @@ async function smokeLanceDb() {
 
 /**
  * @returns {Promise<{
- *   success: boolean;
- *   checkedCount: number;
- *   skipped: string[];
- *   checks: Record<string, unknown>[];
+ *     success: boolean;
+ *     checkedCount: number;
+ *     skipped: string[];
+ *     checks: Record<string, unknown>[];
  * }>}
  */
 export async function runDependencyNativeSmoke() {

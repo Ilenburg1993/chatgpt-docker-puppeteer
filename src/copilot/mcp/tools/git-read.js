@@ -5,9 +5,9 @@
  * @module copilot/mcp/tools/git-read
  */
 
-import { z } from 'zod';
 import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { execGit } from '#copilot/mcp/tools/shared';
+import { z } from 'zod';
 
 /**
  * @type {import('../registry.js').McpToolDefinition[]}
@@ -51,7 +51,10 @@ export const gitReadTools = [
                     path: path ?? null,
                 });
             }
-            return okResult({ success: true, diff: diff.stdout, staged: staged === true, path: path ?? null }, diff.stdout);
+            return okResult(
+                { success: true, diff: diff.stdout, staged: staged === true, path: path ?? null },
+                diff.stdout,
+            );
         },
     },
     {

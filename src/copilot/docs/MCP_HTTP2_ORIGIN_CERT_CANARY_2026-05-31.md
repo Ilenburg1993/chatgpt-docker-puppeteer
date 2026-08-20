@@ -2,7 +2,8 @@
 
 ## Objetivo
 
-Habilitar um canary local HTTPS/HTTP2 para o origin MCP atrás do Cloudflare Tunnel sem commitar material secreto no repositório.
+Habilitar um canary local HTTPS/HTTP2 para o origin MCP atrás do Cloudflare Tunnel sem commitar
+material secreto no repositório.
 
 ## Arquivos locais esperados
 
@@ -20,7 +21,8 @@ O certificado emitido para este workspace cobre:
 - `*.aurelin.org`
 - `aurelin.org`
 
-Por isso o origin local pode escutar em `https://127.0.0.1:3333`, mas o SNI/certificate server name usado pelo `cloudflared` deve ser um hostname coberto pelo certificado, por padrão:
+Por isso o origin local pode escutar em `https://127.0.0.1:3333`, mas o SNI/certificate server name
+usado pelo `cloudflared` deve ser um hostname coberto pelo certificado, por padrão:
 
 - `mcp.aurelin.org`
 
@@ -42,13 +44,16 @@ export COPILOT_MCP_ORIGIN_TRANSPORT=http2
 npm run copilot:mcp:http2
 ```
 
-3. Em outro terminal, consultar `/health` usando o SNI correto. Para teste local direto com IP loopback e certificado Cloudflare Origin CA, use uma ferramenta que permita resolver o hostname para localhost:
+3. Em outro terminal, consultar `/health` usando o SNI correto. Para teste local direto com IP
+   loopback e certificado Cloudflare Origin CA, use uma ferramenta que permita resolver o hostname
+   para localhost:
 
 ```bash
 curl --resolve mcp.aurelin.org:3333:127.0.0.1 https://mcp.aurelin.org:3333/health
 ```
 
-O retorno esperado deve incluir `http.protocol` e headers de telemetria de origin quando acessado pelos smokes HTTP do projeto.
+O retorno esperado deve incluir `http.protocol` e headers de telemetria de origin quando acessado
+pelos smokes HTTP do projeto.
 
 ## Cloudflare Tunnel canary
 
@@ -63,7 +68,8 @@ npm run copilot:mcp:cloudflare:smoke
 Critérios para manter o rollout:
 
 - remote audit sem criticals;
-- `originRequest.http2Origin=true` apenas quando `COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN=true` e origin HTTPS;
+- `originRequest.http2Origin=true` apenas quando `COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN=true` e origin
+  HTTPS;
 - smoke público do ChatGPT connector OK;
 - latência p50/p95 não piora contra baseline HTTP/1;
 - nenhum erro novo de OAuth, CORS ou MCP initialize.

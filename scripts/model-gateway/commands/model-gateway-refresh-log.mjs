@@ -2,7 +2,10 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
-import { SqliteModelGatewayCatalogStore, summarizeModelGatewayRefreshLogText } from '../../../src/copilot/model-gateway/index.js';
+import {
+    SqliteModelGatewayCatalogStore,
+    summarizeModelGatewayRefreshLogText,
+} from '../../../src/copilot/model-gateway/index.js';
 
 const args = process.argv.slice(2);
 /** @param {string} name */
@@ -111,7 +114,9 @@ if (hasFlag('--json')) {
         );
     }
     for (const failure of summary.failures.slice(0, 10)) {
-        process.stdout.write(`  failure ${failure.phase} importer=${failure.importerId ?? '-'} error=${failure.errors.join('; ')}\n`);
+        process.stdout.write(
+            `  failure ${failure.phase} importer=${failure.importerId ?? '-'} error=${failure.errors.join('; ')}\n`,
+        );
     }
     if (sqlite) {
         process.stdout.write(`sqlite: mirrored=${sqlite.refreshLogEvents} runId=${sqlite.runId}\n`);

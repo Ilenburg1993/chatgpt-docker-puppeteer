@@ -49,12 +49,7 @@ import { resolveFreeTextDelivery } from './free-text-delivery.js';
 import { setupTerminalLiveStatusLine } from './live-status-line.js';
 import { buildTerminalReplBanner } from './repl-banner.js';
 import { parseTerminalReplCommand } from './repl-command-parser.js';
-import {
-    CMD_ROUTES,
-    dispatchCmd,
-    isReadlineOpen,
-    setTerminalCommandRouterInjectPort,
-} from './repl-command-router.js';
+import { CMD_ROUTES, dispatchCmd, isReadlineOpen, setTerminalCommandRouterInjectPort } from './repl-command-router.js';
 import {
     formatTerminalQueuedTurnNotice,
     isTerminalEscapeCommand,

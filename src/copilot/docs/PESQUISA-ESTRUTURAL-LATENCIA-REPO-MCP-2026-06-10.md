@@ -2,13 +2,15 @@
 
 Data: 2026-06-10  
 Workspace: `/workspaces/chatgpt-docker-puppeteer`  
-Foco: `repo_read_file`, `repo_search_text`, `repo_tree`, `repo_file_stats`, `repo_apply_patch`, `repo_apply_file_batch`, validação/patch workflows, MCP/OAuth/HTTP2-QUIC/Cloudflare/Node.
+Foco: `repo_read_file`, `repo_search_text`, `repo_tree`, `repo_file_stats`, `repo_apply_patch`,
+`repo_apply_file_batch`, validação/patch workflows, MCP/OAuth/HTTP2-QUIC/Cloudflare/Node.
 
 ---
 
 ## 1. Premissa forte
 
-A latência **não** deve ser reduzida por perda funcional. Portanto, ficam proibidas como estratégia primária:
+A latência **não** deve ser reduzida por perda funcional. Portanto, ficam proibidas como estratégia
+primária:
 
 - desativar OAuth/JWT/scope validation;
 - deixar de validar `aud`, `iss`, `resource`, `exp`, `scope`;
@@ -18,7 +20,9 @@ A latência **não** deve ser reduzida por perda funcional. Portanto, ficam proi
 - trocar `repo_read_file` por versões incompletas sem oferecer caminho funcional equivalente;
 - desligar diff/preview quando o usuário explicitamente pede diff textual.
 
-A estratégia correta é: **mesma segurança e funcionalidade, menos trabalho repetido, menos serialização, menos round-trips, melhor roteamento de IO, melhor batching, caches verificados e observabilidade mais fina.**
+A estratégia correta é: **mesma segurança e funcionalidade, menos trabalho repetido, menos
+serialização, menos round-trips, melhor roteamento de IO, melhor batching, caches verificados e
+observabilidade mais fina.**
 
 ---
 
@@ -48,7 +52,9 @@ handler: 13 ms
 resultSize: 1 ms
 ```
 
-Isso sugere que, pelo menos no início da sessão, **o gargalo mais promissor não é o handler da tool**, mas o caminho de autorização/registry. É necessário coletar mais amostras, mas a alavanca provável é clara: reduzir custo repetido por chamada sem enfraquecer OAuth.
+Isso sugere que, pelo menos no início da sessão, **o gargalo mais promissor não é o handler da
+tool**, mas o caminho de autorização/registry. É necessário coletar mais amostras, mas a alavanca
+provável é clara: reduzir custo repetido por chamada sem enfraquecer OAuth.
 
 ### 2.3 Cloudflare/QUIC atual
 
@@ -67,7 +73,8 @@ rpcClientLatency p95: 1170 ms
 rpcClientLatency p99: 1314 ms
 ```
 
-Conclusão: há espaço de benchmark `quic` vs `auto` vs `http2`, mas a prioridade estrutural para repo tools está dentro do servidor MCP e do caminho de autorização/IO.
+Conclusão: há espaço de benchmark `quic` vs `auto` vs `http2`, mas a prioridade estrutural para repo
+tools está dentro do servidor MCP e do caminho de autorização/IO.
 
 ### 2.4 Edge policy diff
 
@@ -127,7 +134,10 @@ Repo tools quentes normalmente gastam em:
 
 ### 4.1 MCP Streamable HTTP
 
-O MCP Streamable HTTP usa JSON-RPC UTF-8 e define stdio + Streamable HTTP como transportes padrão. Streamable HTTP deve usar endpoint único, como `/mcp`, aceitando POST e GET. A especificação também prevê múltiplas conexões, resumability via SSE event IDs/`Last-Event-ID`, session management via `Mcp-Session-Id`, e header `MCP-Protocol-Version`.
+O MCP Streamable HTTP usa JSON-RPC UTF-8 e define stdio + Streamable HTTP como transportes padrão.
+Streamable HTTP deve usar endpoint único, como `/mcp`, aceitando POST e GET. A especificação também
+prevê múltiplas conexões, resumability via SSE event IDs/`Last-Event-ID`, session management via
+`Mcp-Session-Id`, e header `MCP-Protocol-Version`.
 
 Implicação:
 
@@ -139,27 +149,32 @@ Implicação:
 
 ### 4.2 MCP Authorization / OAuth
 
-A especificação MCP Authorization usa OAuth 2.1, RFC 8414, RFC 7591 e RFC 9728. MCP servers com HTTP devem publicar Protected Resource Metadata e usar `WWW-Authenticate` com metadata URL em 401.
+A especificação MCP Authorization usa OAuth 2.1, RFC 8414, RFC 7591 e RFC 9728. MCP servers com HTTP
+devem publicar Protected Resource Metadata e usar `WWW-Authenticate` com metadata URL em 401.
 
 Implicação:
 
 - não reduzir latência desativando OAuth;
 - a otimização correta é cachear decisões positivas de autorização de forma segura;
-- metadata e discovery podem ser cacheados, mas autorização de tool precisa preservar scopes/audience/resource/expiração.
+- metadata e discovery podem ser cacheados, mas autorização de tool precisa preservar
+  scopes/audience/resource/expiração.
 
 ### 4.3 RFC 9728
 
-Protected Resource Metadata é um documento JSON em well-known. HTTP caching normal se aplica à metadata e `Cache-Control: max-age` pode ser usado.
+Protected Resource Metadata é um documento JSON em well-known. HTTP caching normal se aplica à
+metadata e `Cache-Control: max-age` pode ser usado.
 
 Implicação:
 
-- cachear `/.well-known/oauth-protected-resource`, metadata OAuth e `chatgpt-connector.json` é seguro se GET-only e curto TTL;
+- cachear `/.well-known/oauth-protected-resource`, metadata OAuth e `chatgpt-connector.json` é
+  seguro se GET-only e curto TTL;
 - não cachear `/oauth/token` nem `/mcp`;
 - reduzir discovery latency sem afetar chamadas dinâmicas.
 
 ### 4.4 Cloudflare Tunnel
 
-Cloudflare Tunnel permite protocolo `auto`, `http2` e `quic`. `auto` configura QUIC e faz fallback para HTTP/2 se UDP falhar. `cloudflared` também expõe endpoint Prometheus de métricas.
+Cloudflare Tunnel permite protocolo `auto`, `http2` e `quic`. `auto` configura QUIC e faz fallback
+para HTTP/2 se UDP falhar. `cloudflared` também expõe endpoint Prometheus de métricas.
 
 Implicação:
 
@@ -170,7 +185,8 @@ Implicação:
 
 ### 4.5 Cloudflare originRequest
 
-`originServerName`, `noTLSVerify`, `http2Origin`, `disableChunkedEncoding`, `connectTimeout`, `keepAliveTimeout`, `keepAliveConnections` e `tcpKeepAlive` são os campos centrais.
+`originServerName`, `noTLSVerify`, `http2Origin`, `disableChunkedEncoding`, `connectTimeout`,
+`keepAliveTimeout`, `keepAliveConnections` e `tcpKeepAlive` são os campos centrais.
 
 Implicação:
 
@@ -181,27 +197,35 @@ Implicação:
 
 ### 4.6 Node.js filesystem
 
-`fs.readFile()` lê o arquivo inteiro e bufferiza conteúdo. A própria documentação recomenda streaming para reduzir memória quando possível e `fs.read()` direto quando a meta é leitura mais rápida gerenciada pela aplicação.
+`fs.readFile()` lê o arquivo inteiro e bufferiza conteúdo. A própria documentação recomenda
+streaming para reduzir memória quando possível e `fs.read()` direto quando a meta é leitura mais
+rápida gerenciada pela aplicação.
 
 Implicação:
 
-- `repo_read_file` com janela de linhas não deveria necessariamente ler/splitar arquivo inteiro sempre;
-- usar line-offset cache, streaming com early stop ou `fs.read()` por offsets para ranges frequentes;
+- `repo_read_file` com janela de linhas não deveria necessariamente ler/splitar arquivo inteiro
+  sempre;
+- usar line-offset cache, streaming com early stop ou `fs.read()` por offsets para ranges
+  frequentes;
 - manter full read/hashes quando necessário.
 
 ### 4.7 Node module compile cache
 
-Node 22+ oferece module compile cache por `module.enableCompileCache()` ou `NODE_COMPILE_CACHE`, com possível slowdown no primeiro load, mas ganho em loads subsequentes do mesmo graph. Afeta instância atual; workers/child processes precisam herdar env ou ativar também.
+Node 22+ oferece module compile cache por `module.enableCompileCache()` ou `NODE_COMPILE_CACHE`, com
+possível slowdown no primeiro load, mas ganho em loads subsequentes do mesmo graph. Afeta instância
+atual; workers/child processes precisam herdar env ou ativar também.
 
 Implicação:
 
 - bom para restart do MCP, validators e jobs Node recorrentes;
 - não melhora muito uma tool quente dentro do processo já carregado;
-- deve ser habilitado como otimização de startup/validators, não como principal melhoria de `repo_read_file`.
+- deve ser habilitado como otimização de startup/validators, não como principal melhoria de
+  `repo_read_file`.
 
 ### 4.8 Node worker_threads
 
-Workers ajudam CPU-bound JS; a documentação diz que não ajudam muito em I/O-bound, pois async IO nativo é mais eficiente.
+Workers ajudam CPU-bound JS; a documentação diz que não ajudam muito em I/O-bound, pois async IO
+nativo é mais eficiente.
 
 Implicação:
 
@@ -211,7 +235,8 @@ Implicação:
 
 ### 4.9 Node HTTP/2 metrics
 
-Node permite coletar métricas de `Http2Session` e `Http2Stream` via `PerformanceObserver`, incluindo bytes e time-to-first-byte/header. Também expõe settings como `maxConcurrentStreams` e PING RTT.
+Node permite coletar métricas de `Http2Session` e `Http2Stream` via `PerformanceObserver`, incluindo
+bytes e time-to-first-byte/header. Também expõe settings como `maxConcurrentStreams` e PING RTT.
 
 Implicação:
 
@@ -248,7 +273,8 @@ Regras de segurança:
 - nunca cachear falhas de JWT/scope;
 - invalidar por mudança de JWKS/config/resource/issuer/audience;
 - respeitar `exp`, `nbf`, `iat`, `maxTokenAge`;
-- DPoP-bound tokens só podem ser cacheados se o proof atual for validado ou se DPoP for excluído do cache;
+- DPoP-bound tokens só podem ser cacheados se o proof atual for validado ou se DPoP for excluído do
+  cache;
 - incluir requiredScopes na chave;
 - instrumentar `authorization.cache=hit|miss|bypass`.
 
@@ -259,7 +285,8 @@ Impacto esperado:
 
 Risco:
 
-- DPoP/replay. Solução: no primeiro passo, bypass cache para tokens com `cnf.jkt` ou com header `DPoP`.
+- DPoP/replay. Solução: no primeiro passo, bypass cache para tokens com `cnf.jkt` ou com header
+  `DPoP`.
 
 ### A2. Memoizar `readMcpAuthConfig()`
 
@@ -285,7 +312,8 @@ Problema:
 
 Proposta:
 
-- no registry build, anexar `_runtime.requiredScopes`, `_runtime.risk`, `_runtime.scopeClass` em mapa interno não anunciado;
+- no registry build, anexar `_runtime.requiredScopes`, `_runtime.risk`, `_runtime.scopeClass` em
+  mapa interno não anunciado;
 - guarded handler lê do mapa.
 
 Impacto:
@@ -469,7 +497,8 @@ Proposta:
 
 Problema:
 
-- multi-file refactors exigem múltiplas chamadas, múltiplas autorizações, múltiplas auditorias e múltiplas aprovações host.
+- multi-file refactors exigem múltiplas chamadas, múltiplas autorizações, múltiplas auditorias e
+  múltiplas aprovações host.
 
 Proposta:
 
@@ -499,7 +528,8 @@ Impacto:
 
 Problema:
 
-- mesmo com `includeDiffPreview=false`, garantir que o engine não gere diff textual completo desnecessário.
+- mesmo com `includeDiffPreview=false`, garantir que o engine não gere diff textual completo
+  desnecessário.
 
 Proposta:
 
@@ -515,7 +545,8 @@ Funcionalidade preservada:
 
 Proposta:
 
-- quando `expectedHash` bate com cache L1/L2, patch engine pode usar buffer/text cache em vez de reler do disco;
+- quando `expectedHash` bate com cache L1/L2, patch engine pode usar buffer/text cache em vez de
+  reler do disco;
 - após atomic write, invalida/atualiza cache.
 
 ---
@@ -553,7 +584,8 @@ Proposta:
 
 Proposta:
 
-- mapa por tool name contendo risk, requiredScopes, annotations, output validation strategy, max result budget;
+- mapa por tool name contendo risk, requiredScopes, annotations, output validation strategy, max
+  result budget;
 - evita recomputar classification/scopes/security a cada chamada.
 
 ---
@@ -590,7 +622,8 @@ Risco:
 
 Proposta:
 
-- usar SSE event IDs/Last-Event-ID somente para streams longos, validators ou future long-running jobs;
+- usar SSE event IDs/Last-Event-ID somente para streams longos, validators ou future long-running
+  jobs;
 - não usar para cachear tool results comuns.
 
 ### G3. HTTP/2 observability
@@ -650,7 +683,8 @@ Nunca cachear:
 
 ### H4. Compression policy experimental
 
-Já há desired policy para desativar compressão em `/mcp` JSON-RPC. Deve ser tratado como experimento:
+Já há desired policy para desativar compressão em `/mcp` JSON-RPC. Deve ser tratado como
+experimento:
 
 - A/B com e sem compressão;
 - medir payload pequeno vs grande;
@@ -799,20 +833,20 @@ Expor:
 
 ## 7. Priorização por impacto provável
 
-| Prioridade | Transformação | Impacto provável | Risco | Observação |
-|---|---|---:|---:|---|
-| 1 | Auth decision positive cache | Muito alto | Médio | Maior gargalo observado: auth 259ms |
-| 2 | Result-size byte accounting | Alto | Baixo | Evita stringify de respostas grandes |
-| 3 | Patch batch | Alto | Médio | Reduz chamadas/aprovações e latência percebida |
-| 4 | Line offset cache | Alto | Baixo/Médio | Grande ganho em leituras repetidas |
-| 5 | Search smart index-first | Alto | Baixo | Mantém rg fallback |
-| 6 | Tree index-backed/cache | Médio/Alto | Baixo | Melhora navegação inicial |
-| 7 | No-preview patch fast path | Médio/Alto | Baixo | Especialmente em patches grandes |
-| 8 | HTTP/2 origin metrics | Médio | Baixo | Medição antes de tuning |
-| 9 | Cloudflare discovery cache | Médio | Baixo | Só metadata GET-only |
-| 10 | NODE_COMPILE_CACHE | Médio | Baixo | Startup/jobs, não hot calls |
-| 11 | Workers CPU-bound | Situacional | Médio | Só diffs/parse/hash grandes |
-| 12 | MCP sessions optional | Médio | Médio/Alto | Depende de compatibilidade host |
+| Prioridade | Transformação                | Impacto provável |       Risco | Observação                                     |
+| ---------- | ---------------------------- | ---------------: | ----------: | ---------------------------------------------- |
+| 1          | Auth decision positive cache |       Muito alto |       Médio | Maior gargalo observado: auth 259ms            |
+| 2          | Result-size byte accounting  |             Alto |       Baixo | Evita stringify de respostas grandes           |
+| 3          | Patch batch                  |             Alto |       Médio | Reduz chamadas/aprovações e latência percebida |
+| 4          | Line offset cache            |             Alto | Baixo/Médio | Grande ganho em leituras repetidas             |
+| 5          | Search smart index-first     |             Alto |       Baixo | Mantém rg fallback                             |
+| 6          | Tree index-backed/cache      |       Médio/Alto |       Baixo | Melhora navegação inicial                      |
+| 7          | No-preview patch fast path   |       Médio/Alto |       Baixo | Especialmente em patches grandes               |
+| 8          | HTTP/2 origin metrics        |            Médio |       Baixo | Medição antes de tuning                        |
+| 9          | Cloudflare discovery cache   |            Médio |       Baixo | Só metadata GET-only                           |
+| 10         | NODE_COMPILE_CACHE           |            Médio |       Baixo | Startup/jobs, não hot calls                    |
+| 11         | Workers CPU-bound            |      Situacional |       Médio | Só diffs/parse/hash grandes                    |
+| 12         | MCP sessions optional        |            Médio |  Médio/Alto | Depende de compatibilidade host                |
 
 ---
 
@@ -823,15 +857,19 @@ Expor:
 3. **Reduzir escopos JWT sem redesenho de OAuth**: pode causar reauth/fricção.
 4. **Forçar HTTP/2 tunnel no lugar de QUIC sem benchmark**: QUIC atual está saudável.
 5. **Workers para IO simples**: Node diz que workers não ajudam muito em I/O-bound.
-6. **Retirar full hashes do default de `repo_read_file`**: quebraria workflows de patch seguro. Use `hashMode` opcional.
-7. **Desativar audit globalmente**: trocar por audit assíncrona seletiva, não apagar rastreabilidade.
-8. **Compressão off para tudo**: testar só `/mcp`; metadata/discovery pode se beneficiar de compressão/cache.
+6. **Retirar full hashes do default de `repo_read_file`**: quebraria workflows de patch seguro. Use
+   `hashMode` opcional.
+7. **Desativar audit globalmente**: trocar por audit assíncrona seletiva, não apagar
+   rastreabilidade.
+8. **Compressão off para tudo**: testar só `/mcp`; metadata/discovery pode se beneficiar de
+   compressão/cache.
 
 ---
 
 ## 9. Conclusão
 
-O caminho mais promissor para reduzir latência média das repo tools não é “mexer mais no túnel” primeiro. O túnel está saudável. O ganho estrutural maior está em:
+O caminho mais promissor para reduzir latência média das repo tools não é “mexer mais no túnel”
+primeiro. O túnel está saudável. O ganho estrutural maior está em:
 
 1. cache seguro de decisões OAuth positivas;
 2. redução de stringify/serialização de resposta;
@@ -842,4 +880,5 @@ O caminho mais promissor para reduzir latência média das repo tools não é �
 7. HTTP/2 origin observability antes de tuning Cloudflare;
 8. compile cache para startup/jobs.
 
-Essas mudanças preservam funcionalidade e, se implementadas com gates, tendem a reduzir tanto latência real quanto latência percebida em fluxos profundos de repo.
+Essas mudanças preservam funcionalidade e, se implementadas com gates, tendem a reduzir tanto
+latência real quanto latência percebida em fluxos profundos de repo.

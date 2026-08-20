@@ -1,4 +1,4 @@
-/** @import {IDriver} from "#types/driver/contracts" */
+/** @import {IDriver} from '#types/driver/contracts' */
 // @ts-check - Type checking rigoroso habilitado
 
 import * as driverFactory from './factory.js';

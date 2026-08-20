@@ -29,9 +29,13 @@ import { createConfiguredPermissionHandler } from './permission-controller.js';
 export { setSessionAutoModelResolver };
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
+ *
  * @typedef {import('@github/copilot-sdk').SessionConfig} SessionConfig
+ *
  * @typedef {import('@github/copilot-sdk').PermissionHandler} PermissionHandler
+ *
  * @typedef {import('@github/copilot-sdk').Tool[]} ToolList
+ *
  * @typedef {'low' | 'medium' | 'high' | 'xhigh'} ReasoningEffortLevel
  */
 
@@ -42,8 +46,13 @@ export { setSessionAutoModelResolver };
  * @typedef {{
  *     start?: (() => Promise<void>) | undefined;
  *     createSession: (config: SessionConfig) => Promise<TSession>;
- *     resumeSession: (sessionId: string, config: import('@github/copilot-sdk').ResumeSessionConfig) => Promise<TSession>;
- *     listSessions: (filter?: import('@github/copilot-sdk').SessionListFilter) => Promise<import('@github/copilot-sdk').SessionMetadata[]>;
+ *     resumeSession: (
+ *         sessionId: string,
+ *         config: import('@github/copilot-sdk').ResumeSessionConfig,
+ *     ) => Promise<TSession>;
+ *     listSessions: (
+ *         filter?: import('@github/copilot-sdk').SessionListFilter,
+ *     ) => Promise<import('@github/copilot-sdk').SessionMetadata[]>;
  *     deleteSession: (sessionId: string) => Promise<void>;
  * }} SessionLifecycleClientPort
  */
@@ -85,7 +94,8 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  * @property {string} [model] - Modelo LLM (ex: 'gpt-4.1', 'claude-sonnet-4-5')
  * @property {string} [clientName] - Identificador do client no User-Agent do SDK
  * @property {ReasoningEffortLevel} [reasoningEffort] - Esforco de reasoning (modelos compatíveis)
- * @property {PermissionHandler} [onPermissionRequest] - Handler de permissões (default configurável; efetivo: approve_all)
+ * @property {PermissionHandler} [onPermissionRequest] - Handler de permissões (default configurável; efetivo:
+ *   approve_all)
  * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest] - Handler de input interativo do usuario
  * @property {SessionConfig['onElicitationRequest']} [onElicitationRequest] - Handler de elicitation/form UI do SDK
  * @property {SessionConfig['hooks']} [hooks] - SessionHooks: onPreToolUse, onPostToolUse, onSessionStart, etc.
@@ -121,6 +131,8 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  * @property {string} [clientName] - Identificador do client no User-Agent do SDK
  * @property {string} [model] - Modelo alvo da sessão retomada, quando suportado
  * @property {ReasoningEffortLevel} [reasoningEffort] - Esforço de reasoning para a sessão retomada
+ * @property {import('@github/copilot-sdk').ReasoningSummary} [reasoningSummary] - Nível de sumarização do reasoning
+ * @property {import('@github/copilot-sdk').ContextTier} [contextTier] - Tier de contexto solicitado ao SDK
  * @property {PermissionHandler} [onPermissionRequest]
  * @property {SessionConfig['onUserInputRequest']} [onUserInputRequest]
  * @property {SessionConfig['onElicitationRequest']} [onElicitationRequest]
@@ -172,8 +184,7 @@ export async function resolveSessionCreateModel(model, fallback = DEFAULT_MODEL)
  * @returns {void}
  */
 function assertClient(client, caller, capability) {
-    const candidate =
-        client && typeof client === 'object' ? /** @type {Record<string, unknown>} */ (client) : null;
+    const candidate = client && typeof client === 'object' ? /** @type {Record<string, unknown>} */ (client) : null;
     if (!candidate || typeof candidate[capability] !== 'function') {
         throw new TypeError(`[lib/session/${caller}] client inválido ou sem capacidade '${capability}'.`);
     }
@@ -464,7 +475,10 @@ function buildSessionConfig(opts, mode) {
         );
     }
 
-    /** @type {Partial<import('@github/copilot-sdk').SessionConfig> & Partial<import('@github/copilot-sdk').ResumeSessionConfig> & { disableResume?: boolean }} */
+    /**
+     * @type {Partial<import('@github/copilot-sdk').SessionConfig> &
+     *     Partial<import('@github/copilot-sdk').ResumeSessionConfig> & { disableResume?: boolean }}
+     */
     const cfg = {
         streaming: opts.streaming ?? true,
         onPermissionRequest: opts.onPermissionRequest ?? createConfiguredPermissionHandler(),
@@ -622,18 +636,8 @@ function normalizeResumeModelSelection(options) {
     return {
         ...(selectedModel !== undefined ? { model: selectedModel } : {}),
         ...(options.reasoningEffort !== undefined ? { reasoningEffort: options.reasoningEffort } : {}),
-        ...(/** @type {{ reasoningSummary?: import('@github/copilot-sdk').ReasoningSummary }} */ (options)
-            .reasoningSummary !== undefined
-            ? {
-                  reasoningSummary:
-                      /** @type {{ reasoningSummary: import('@github/copilot-sdk').ReasoningSummary }} */ (options)
-                          .reasoningSummary,
-              }
-            : {}),
-        ...(/** @type {{ contextTier?: import('@github/copilot-sdk').ContextTier }} */ (options).contextTier !==
-        undefined
-            ? { contextTier: /** @type {{ contextTier: import('@github/copilot-sdk').ContextTier }} */ (options).contextTier }
-            : {}),
+        ...(options.reasoningSummary !== undefined ? { reasoningSummary: options.reasoningSummary } : {}),
+        ...(options.contextTier !== undefined ? { contextTier: options.contextTier } : {}),
     };
 }
 
@@ -738,10 +742,10 @@ export async function resumeSession(client, sessionId, opts) {
         delete sanitizedOptions.reasoningEffort;
     }
     if (normalizedSelection.reasoningSummary === undefined && 'reasoningSummary' in sanitizedOptions) {
-        delete /** @type {Record<string, unknown>} */ (sanitizedOptions)['reasoningSummary'];
+        delete (/** @type {Record<string, unknown>} */ (sanitizedOptions)['reasoningSummary']);
     }
     if (normalizedSelection.contextTier === undefined && 'contextTier' in sanitizedOptions) {
-        delete /** @type {Record<string, unknown>} */ (sanitizedOptions)['contextTier'];
+        delete (/** @type {Record<string, unknown>} */ (sanitizedOptions)['contextTier']);
     }
     const config = buildSessionConfig(sanitizedOptions, 'resume');
 
@@ -755,9 +759,7 @@ export async function resumeSession(client, sessionId, opts) {
             reasoningEffort: normalizedSelection.reasoningEffort ?? null,
             reasoningSummary: normalizedSelection.reasoningSummary ?? null,
             contextTier: normalizedSelection.contextTier ?? null,
-            suppressResumeEvent: Boolean(
-                /** @type {{ suppressResumeEvent?: boolean }} */ (config).suppressResumeEvent,
-            ),
+            suppressResumeEvent: Boolean(/** @type {{ suppressResumeEvent?: boolean }} */ (config).suppressResumeEvent),
         },
         run: async () => client.resumeSession(sessionId, config),
     });
@@ -802,7 +804,8 @@ export async function resumeOrCreate(client, existingSessionId, opts) {
 /**
  * Lista todas as sessoes ativas no cliente.
  *
- * @param {SessionLifecycleClientPort<SessionIdentityPort>} client - Cliente com as capacidades de lifecycle consumidas aqui
+ * @param {SessionLifecycleClientPort<SessionIdentityPort>} client - Cliente com as capacidades de lifecycle consumidas
+ *   aqui
  * @param {import('@github/copilot-sdk').SessionListFilter} [filter] - Filtro opcional
  * @returns {Promise<import('@github/copilot-sdk').SessionMetadata[]>}
  * @throws {Error} Se a comunicação com o SDK falhar
@@ -819,7 +822,8 @@ export async function listSessions(client, filter) {
 /**
  * Remove uma sessao pelo ID.
  *
- * @param {SessionLifecycleClientPort<SessionIdentityPort>} client - Cliente com as capacidades de lifecycle consumidas aqui
+ * @param {SessionLifecycleClientPort<SessionIdentityPort>} client - Cliente com as capacidades de lifecycle consumidas
+ *   aqui
  * @param {string} sessionId - ID da sessao a remover
  * @returns {Promise<void>}
  * @throws {Error} Se a comunicação com o SDK falhar

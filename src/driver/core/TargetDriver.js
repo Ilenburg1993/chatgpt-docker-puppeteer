@@ -1,4 +1,4 @@
-/** @import {Page} from "puppeteer-core" */
+/** @import {Page} from 'puppeteer-core' */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import { DRIVER_NAMES } from '#core/constants';
 import { STATUS_VALUES } from '#core/constants/tasks';

@@ -8,8 +8,8 @@
  * @module copilot/model-gateway/catalog/json-catalog-store
  */
 
-import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 
 import { readJson, writeJson } from '../../infra/storage/json-store.js';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
@@ -55,7 +55,9 @@ function isRecord(value) {
  * @returns {boolean}
  */
 function isSecretCatalogKey(key) {
-    return /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(key);
+    return /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu.test(
+        key,
+    );
 }
 
 /**
@@ -106,10 +108,16 @@ function readRecordArray(value) {
  */
 function stableCatalogValue(value) {
     if (Array.isArray(value)) {
-        return value.map(stableCatalogValue).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+        return value
+            .map(stableCatalogValue)
+            .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
     }
     if (isRecord(value)) {
-        return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableCatalogValue(value[key])]));
+        return Object.fromEntries(
+            Object.keys(value)
+                .sort()
+                .map((key) => [key, stableCatalogValue(value[key])]),
+        );
     }
     return value;
 }
@@ -123,7 +131,10 @@ export function createModelGatewayCatalogSnapshotId(snapshot) {
         schemaVersion: MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
         ...Object.fromEntries(CATALOG_ARRAY_FIELDS.map((field) => [field, readRecordArray(snapshot[field])])),
     };
-    return `catalog:${createHash('sha256').update(JSON.stringify(stableCatalogValue(stablePayload))).digest('hex').slice(0, 24)}`;
+    return `catalog:${createHash('sha256')
+        .update(JSON.stringify(stableCatalogValue(stablePayload)))
+        .digest('hex')
+        .slice(0, 24)}`;
 }
 
 /**
@@ -230,7 +241,9 @@ export class JsonModelGatewayCatalogStore {
         for (const field of CATALOG_ARRAY_FIELDS) {
             next[field] = readRecordArray(/** @type {Record<string, unknown>} */ (snapshot)[field]);
         }
-        next['snapshotId'] = optionalString(/** @type {Record<string, unknown>} */ (snapshot)['snapshotId']) ?? createModelGatewayCatalogSnapshotId(next);
+        next['snapshotId'] =
+            optionalString(/** @type {Record<string, unknown>} */ (snapshot)['snapshotId']) ??
+            createModelGatewayCatalogSnapshotId(next);
         await writeJson(this.#filePath, next);
     }
 }

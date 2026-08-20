@@ -1,19 +1,33 @@
 # Auditoria geral — WORKSPACE MCP após mudanças de autonomia/OAuth
 
-**Data:** 2026-05-24
-**Escopo:** MCP `WORKSPACE` conectado ao ChatGPT via Cloudflare Tunnel permanente e OAuth.
-**Modo desta auditoria:** predominantemente read-only. Não foram feitas alterações no código-fonte durante a coleta desta auditoria, exceto consultas e leitura de histórico.
-**Observação:** um `typecheck` e um `unit-mcp` haviam sido iniciados imediatamente antes da solicitação de “não rode mais validadores”; o histórico indica que ambos terminaram com sucesso. Após essa solicitação, a auditoria não depende de novos validadores.
+**Data:** 2026-05-24 **Escopo:** MCP `WORKSPACE` conectado ao ChatGPT via Cloudflare Tunnel
+permanente e OAuth. **Modo desta auditoria:** predominantemente read-only. Não foram feitas
+alterações no código-fonte durante a coleta desta auditoria, exceto consultas e leitura de
+histórico. **Observação:** um `typecheck` e um `unit-mcp` haviam sido iniciados imediatamente antes
+da solicitação de “não rode mais validadores”; o histórico indica que ambos terminaram com sucesso.
+Após essa solicitação, a auditoria não depende de novos validadores.
 
 ---
 
 ## 1. Resumo executivo
 
-O estado geral do MCP está forte e significativamente melhor que nas auditorias anteriores. O conector está em OAuth, com túnel permanente, resource/audience alinhados, issuer pronto, refresh-token anunciado pelo issuer, TTL de access token em 24h, refresh token em 30 dias, score de autonomia `95/A`, 71 ferramentas expostas e apenas 2 ferramentas classificadas como destrutivas.
+O estado geral do MCP está forte e significativamente melhor que nas auditorias anteriores. O
+conector está em OAuth, com túnel permanente, resource/audience alinhados, issuer pronto,
+refresh-token anunciado pelo issuer, TTL de access token em 24h, refresh token em 30 dias, score de
+autonomia `95/A`, 71 ferramentas expostas e apenas 2 ferramentas classificadas como destrutivas.
 
-Ainda assim, há gaps importantes. O status runtime continua `degraded`, mas agora por razões operacionais leves: smoke Cloudflare stale e ausência de smoke in-process após restart. O dirty workspace foi corretamente rebaixado para `informational`, não mais causa degradação. A nova ferramenta `mcp_oauth_friction_audit` indica `reauthRisk: low`, confirmando que a camada OAuth melhorou bastante.
+Ainda assim, há gaps importantes. O status runtime continua `degraded`, mas agora por razões
+operacionais leves: smoke Cloudflare stale e ausência de smoke in-process após restart. O dirty
+workspace foi corretamente rebaixado para `informational`, não mais causa degradação. A nova
+ferramenta `mcp_oauth_friction_audit` indica `reauthRisk: low`, confirmando que a camada OAuth
+melhorou bastante.
 
-O maior problema observado agora não é OAuth nem Cloudflare propriamente dito: é a interrupção do stream do ChatGPT web durante operações longas, especialmente validações e leituras de output. A captura de tela mostra “Conexão interrompida. Aguardando resposta completa”. Esse padrão é compatível com interrupção na camada host/browser/streaming do ChatGPT, não necessariamente falha do MCP. A evidência forte é que o job `unit-mcp` terminou com sucesso no servidor, mesmo quando a interface pareceu travar/interromper.
+O maior problema observado agora não é OAuth nem Cloudflare propriamente dito: é a interrupção do
+stream do ChatGPT web durante operações longas, especialmente validações e leituras de output. A
+captura de tela mostra “Conexão interrompida. Aguardando resposta completa”. Esse padrão é
+compatível com interrupção na camada host/browser/streaming do ChatGPT, não necessariamente falha do
+MCP. A evidência forte é que o job `unit-mcp` terminou com sucesso no servidor, mesmo quando a
+interface pareceu travar/interromper.
 
 ---
 
@@ -28,7 +42,8 @@ O maior problema observado agora não é OAuth nem Cloudflare propriamente dito:
   - `.codex/config.toml` modificado.
   - Vários documentos de auditoria não rastreados.
 
-Interpretação: o dirty workspace ainda existe, mas está corretamente tratado como informativo no runtime health.
+Interpretação: o dirty workspace ainda existe, mas está corretamente tratado como informativo no
+runtime health.
 
 ### 2.2 Runtime health
 
@@ -77,7 +92,8 @@ Interpretação:
 - O túnel permanente está configurado corretamente.
 - A URL está correta: `https://mcp.aurelin.org/mcp`.
 - O problema não é rota permanente; é frescor de smoke.
-- O tunnel temporário antigo ainda aparece como fallback stale, mas está marcado como `ignoredForOperationalReadiness: true`.
+- O tunnel temporário antigo ainda aparece como fallback stale, mas está marcado como
+  `ignoredForOperationalReadiness: true`.
 
 ### 2.4 OAuth
 
@@ -176,7 +192,8 @@ Interpretação:
 
 - CSP de Apps SDK não é fonte dos prompts/bloqueios atuais.
 - Não há widgets/UI resources.
-- Company Knowledge `search/fetch` não está implementado; isso é opcional e depende do objetivo futuro.
+- Company Knowledge `search/fetch` não está implementado; isso é opcional e depende do objetivo
+  futuro.
 
 ### 2.7 Autonomy score
 
@@ -219,7 +236,8 @@ Detalhes:
   - Status: completed
   - Exit code: 0
 
-Interpretação: apesar da interrupção visual no ChatGPT, o job unit-MCP terminou com sucesso no servidor.
+Interpretação: apesar da interrupção visual no ChatGPT, o job unit-MCP terminou com sucesso no
+servidor.
 
 ---
 
@@ -235,26 +253,30 @@ O botão de parar estava disponível e foi acionado antes de aguardar o eventual
 
 ### 3.2 Diagnóstico provável
 
-A evidência sugere uma interrupção no canal de streaming da interface ChatGPT, não uma falha direta do MCP.
+A evidência sugere uma interrupção no canal de streaming da interface ChatGPT, não uma falha direta
+do MCP.
 
 Motivos:
 
-1. `repo_status`, `mcp_runtime_health`, `mcp_tunnel_status`, `mcp_auth_profile`, `mcp_tools_status` e outras tools responderam normalmente.
-2. O `unit-mcp`, que parecia associado ao momento de instabilidade, consta no histórico como `completed/passed`.
+1. `repo_status`, `mcp_runtime_health`, `mcp_tunnel_status`, `mcp_auth_profile`, `mcp_tools_status`
+   e outras tools responderam normalmente.
+2. O `unit-mcp`, que parecia associado ao momento de instabilidade, consta no histórico como
+   `completed/passed`.
 3. O health não mostra `critical`.
 4. O túnel permanente está válido.
-5. A mensagem aparece mais frequentemente quando há validações ou outputs longos, que são operações com maior chance de exceder janelas/limites/tempos do host.
+5. A mensagem aparece mais frequentemente quando há validações ou outputs longos, que são operações
+   com maior chance de exceder janelas/limites/tempos do host.
 
 ### 3.3 Camadas possíveis
 
-| Camada | Probabilidade | Evidência | Observação |
-|---|---:|---|---|
-| ChatGPT web/browser streaming | Alta | UI mostra “aguardando resposta completa” enquanto job server-side termina | Principal hipótese |
-| ChatGPT host MCP orchestration | Alta | Ocorre em chamadas longas/validator output | Host pode perder/abortar stream mesmo com backend trabalhando |
-| MCP server | Baixa a média | Health ok; jobs concluem | Não parece queda generalizada |
-| Cloudflare Tunnel | Baixa a média | túnel ok, smoke antigo mas último ok | Smoke stale aumenta incerteza, mas não indica outage |
-| OAuth | Baixa | OAuth ready e reauthRisk low | Não é o padrão de erro observado |
-| Browser local/rede local | Média | UI web em navegador; operações longas são sensíveis | Pode agravar, mas não explica sozinho |
+| Camada                         | Probabilidade | Evidência                                                                 | Observação                                                    |
+| ------------------------------ | ------------: | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| ChatGPT web/browser streaming  |          Alta | UI mostra “aguardando resposta completa” enquanto job server-side termina | Principal hipótese                                            |
+| ChatGPT host MCP orchestration |          Alta | Ocorre em chamadas longas/validator output                                | Host pode perder/abortar stream mesmo com backend trabalhando |
+| MCP server                     | Baixa a média | Health ok; jobs concluem                                                  | Não parece queda generalizada                                 |
+| Cloudflare Tunnel              | Baixa a média | túnel ok, smoke antigo mas último ok                                      | Smoke stale aumenta incerteza, mas não indica outage          |
+| OAuth                          |         Baixa | OAuth ready e reauthRisk low                                              | Não é o padrão de erro observado                              |
+| Browser local/rede local       |         Média | UI web em navegador; operações longas são sensíveis                       | Pode agravar, mas não explica sozinho                         |
 
 ### 3.4 Por que validadores pioram isso
 
@@ -270,7 +292,8 @@ Validadores geram um conjunto de fatores ruins para ChatGPT web:
 
 ### 3.5 Conclusão prática
 
-Não devemos rodar validadores de modo síncrono/verboso dentro do ChatGPT web quando o objetivo é estabilidade. O padrão ideal é:
+Não devemos rodar validadores de modo síncrono/verboso dentro do ChatGPT web quando o objetivo é
+estabilidade. O padrão ideal é:
 
 1. iniciar job apenas quando necessário;
 2. não aguardar log completo;
@@ -284,15 +307,15 @@ Não devemos rodar validadores de modo síncrono/verboso dentro do ChatGPT web q
 
 ### BUG-1 — Runtime degraded por smoke antigo sem ferramenta clara de refresh
 
-**Severidade:** Média
-**Estado:** atual
+**Severidade:** Média **Estado:** atual
 
 O `mcp_runtime_health` está `degraded` por:
 
 - connector smoke 593 minutos antigo;
 - ausência de smoke in-process.
 
-Existe recomendação `refresh-connector-smoke`, mas a tool surface não evidencia uma ferramenta dedicada `mcp_connector_smoke_refresh`.
+Existe recomendação `refresh-connector-smoke`, mas a tool surface não evidencia uma ferramenta
+dedicada `mcp_connector_smoke_refresh`.
 
 **Impacto:** a saúde fica degradada mesmo com túnel permanente ok.
 
@@ -316,10 +339,10 @@ Ela deve:
 
 ### BUG-2 — No in-process smoke após restart degrada health
 
-**Severidade:** Baixa a média
-**Estado:** atual
+**Severidade:** Baixa a média **Estado:** atual
 
-Após restart, `lastWorkspaceSmoke` fica `null`. Isso degrada health até que `mcp_smoke_workspace` seja chamado.
+Após restart, `lastWorkspaceSmoke` fica `null`. Isso degrada health até que `mcp_smoke_workspace`
+seja chamado.
 
 **Correção sugerida:**
 
@@ -335,8 +358,7 @@ Melhor opção: startup smoke leve com timeout curto e sem tocar repo.
 
 ### BUG-3 — `job_cancel` aparece como remember candidate e também never remember
 
-**Severidade:** Média
-**Estado:** detectado em `mcp_tools_status`
+**Severidade:** Média **Estado:** detectado em `mcp_tools_status`
 
 `approvalFrictionProfile` informa:
 
@@ -364,10 +386,10 @@ neverRememberApproval = destructive + admin-cancel + raw batch destructive
 
 ### BUG-4 — `repo_apply_file_batch` é destrutivo porque mistura operações seguras e remove
 
-**Severidade:** Média/alta
-**Estado:** atual
+**Severidade:** Média/alta **Estado:** atual
 
-`repo_apply_file_batch` aparece como destructive. Isso faz sentido se a ferramenta aceita `remove_file`, mas penaliza batches seguros como create/move/quarantine.
+`repo_apply_file_batch` aparece como destructive. Isso faz sentido se a ferramenta aceita
+`remove_file`, mas penaliza batches seguros como create/move/quarantine.
 
 **Correção sugerida:**
 
@@ -395,10 +417,10 @@ repo_apply_destructive_file_batch
 
 ### BUG-5 — Diagnóstico OAuth público ainda é limitado
 
-**Severidade:** Média
-**Estado:** parcial
+**Severidade:** Média **Estado:** parcial
 
-`mcp_oauth_friction_audit` já tem `securitySchemes: noauth + oauth2`, ótimo. Mas outras ferramentas úteis continuam só OAuth:
+`mcp_oauth_friction_audit` já tem `securitySchemes: noauth + oauth2`, ótimo. Mas outras ferramentas
+úteis continuam só OAuth:
 
 - `mcp_auth_profile`
 - `mcp_oauth_issuer_diagnostics`
@@ -435,8 +457,7 @@ Com expor:
 
 ### BUG-6 — Refresh token é in-memory, então restart pode causar reauth
 
-**Severidade:** Média
-**Estado:** inferido de `mcp_oauth_friction_audit`
+**Severidade:** Média **Estado:** inferido de `mcp_oauth_friction_audit`
 
 A auditoria informa:
 
@@ -460,8 +481,7 @@ Com cleanup automático e rotação one-time.
 
 ### BUG-7 — DCR clients parecem in-memory
 
-**Severidade:** Baixa/média
-**Estado:** provável pelo desenho atual
+**Severidade:** Baixa/média **Estado:** provável pelo desenho atual
 
 CIMD está pronto, então isso não é grave. Mas clientes DCR podem se perder no restart.
 
@@ -473,8 +493,7 @@ Persistir DCR clients sanitizados ou preferir explicitamente CIMD em docs e diag
 
 ### BUG-8 — Output de job é longo e causa instabilidade na UI
 
-**Severidade:** Alta para uso real no ChatGPT web
-**Estado:** observado
+**Severidade:** Alta para uso real no ChatGPT web **Estado:** observado
 
 `job_get_output` com tails grandes e validadores podem interromper o stream da UI.
 
@@ -501,8 +520,7 @@ Eles devem retornar:
 
 ### BUG-9 — `mcp_last_validation_summary` é bom, mas poderia ser a ferramenta padrão pós-validator
 
-**Severidade:** Média
-**Estado:** atual
+**Severidade:** Média **Estado:** atual
 
 Já existe e funciona bem, mas o fluxo recomendado ainda inclui `job_get_output`.
 
@@ -526,8 +544,7 @@ mcp_run_safe_validation_suite -> mcp_last_validation_summary -> job_get_output t
 
 ### BUG-10 — `mcp_oauth_issuer_diagnostics` tem nextSteps genérico
 
-**Severidade:** Baixa
-**Estado:** atual
+**Severidade:** Baixa **Estado:** atual
 
 Mesmo com JWKS configurado, retorna:
 
@@ -635,7 +652,8 @@ Saída:
 
 ### GAP-5 — Output schemas ainda são genéricos em muitas ferramentas
 
-`coverage.outputSchema = 1`, mas o `metadataProfile` diz “registry-wide minimal passthrough schema; tool-specific schemas are the next hardening band”.
+`coverage.outputSchema = 1`, mas o `metadataProfile` diz “registry-wide minimal passthrough schema;
+tool-specific schemas are the next hardening band”.
 
 Proposta:
 
@@ -757,7 +775,9 @@ readiness: ready | stale-smoke | needs-smoke | failed
 informational: [...]
 ```
 
-O sistema hoje fica degraded por smoke stale; isso é tecnicamente correto, mas pode causar ruído. Talvez `status=ok` e `readinessWarnings` separado faça mais sentido quando:
+O sistema hoje fica degraded por smoke stale; isso é tecnicamente correto, mas pode causar ruído.
+Talvez `status=ok` e `readinessWarnings` separado faça mais sentido quando:
+
 - tunnel está válido;
 - OAuth ok;
 - último smoke ok, embora stale.
@@ -969,7 +989,8 @@ Atualizacao 2026-05-24:
 
 - [x] `make copilot-mcp-smoke-refresh` validou 74/74 tools remotas e persistiu smoke fresco.
 - [x] `make copilot-mcp-status` confirmou `ready=true` no tunnel permanente.
-- [x] `make copilot-mcp-oauth-smoke` confirmou OAuth, DCR, CIMD, refresh token, id token e `/oauth/userinfo`.
+- [x] `make copilot-mcp-oauth-smoke` confirmou OAuth, DCR, CIMD, refresh token, id token e
+      `/oauth/userinfo`.
 - [x] Restart MCP/Cloudflare corrigido para aguardar liberacao real da porta `127.0.0.1:3333`.
 - [x] `mcp_post_restart_readiness` criado como gate read-only compacto pos-restart.
 
@@ -985,7 +1006,8 @@ Atualizacao 2026-05-24:
 - [ ] Refino de output schemas.
 - [ ] Medição real de prompt friction.
 - [ ] Apps SDK widget/CSP apenas se algum widget for adicionado.
-- [ ] Company Knowledge `search/fetch` apenas se esse MCP precisar virar fonte universal de conhecimento.
+- [ ] Company Knowledge `search/fetch` apenas se esse MCP precisar virar fonte universal de
+      conhecimento.
 
 ---
 
@@ -1004,7 +1026,8 @@ Typecheck: passed
 Unit MCP: passed
 ```
 
-Os principais problemas restantes não são de “poder” bruto, mas de confiabilidade e fricção operacional:
+Os principais problemas restantes não são de “poder” bruto, mas de confiabilidade e fricção
+operacional:
 
 1. stream do ChatGPT web interrompe com operações longas;
 2. validator/log output precisa ser resumido;
@@ -1013,4 +1036,6 @@ Os principais problemas restantes não são de “poder” bruto, mas de confiab
 5. diagnósticos públicos/sanitizados ainda podem melhorar;
 6. refresh token precisa persistir para sobreviver a restart.
 
-A prioridade mais eficiente é atacar a experiência de uso real no ChatGPT: dashboards curtos, summary-first, smoke refresh dedicado e batch seguro. Isso tende a reduzir mais interrupções e prompts do que novas expansões de ferramenta.
+A prioridade mais eficiente é atacar a experiência de uso real no ChatGPT: dashboards curtos,
+summary-first, smoke refresh dedicado e batch seguro. Isso tende a reduzir mais interrupções e
+prompts do que novas expansões de ferramenta.

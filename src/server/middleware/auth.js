@@ -4,9 +4,9 @@
  *   NextFunction,
  *   Request,
  *   Response
- * } from "express"
+ * } from 'express'
  */
-/** @import {VerifyOptions} from "jsonwebtoken" */
+/** @import {VerifyOptions} from 'jsonwebtoken' */
 import { getJwtSecret, JWT_VERIFY_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
 import { getRbacUserByUsername } from '#infra/db/rbac_repo';
@@ -151,7 +151,6 @@ export function optionalAuthenticate(req, _res, next) {
             };
             log('DEBUG', `[AUTH] Optional auth successful: ${req.user?.['username']}`, req.id);
         } catch (/** @type {any} */ error) {
-
             // Ignorar erro - autenticação opcional
             log('DEBUG', `[AUTH] Optional auth failed, continuing without user`, req.id);
         }

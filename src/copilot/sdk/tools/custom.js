@@ -19,9 +19,7 @@
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { CustomToolsFileSchema } from '#copilot/core/schemas';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -41,9 +39,6 @@ let _buildTool = null;
 
 /** @type {Promise<void> | null} */
 let _loadPromise = null;
-
-/** @type {boolean} */
-let _loaded = false;
 
 /** @type {Promise<void>} */
 let _persistQueue = Promise.resolve();
@@ -82,19 +77,7 @@ const CUSTOM_TOOLS_PATH = resolvePersistentConfigFile('custom-tools.json');
  */
 async function _readRegistryFile() {
     try {
-        return await readFile(CUSTOM_TOOLS_PATH, 'utf8');
-    } catch (e) {
-        if (toError(e).code === 'ENOENT') return null;
-        throw e;
-    }
-}
-
-/**
- * @returns {string | null}
- */
-function _readRegistryFileSync() {
-    try {
-        return readFileSync(CUSTOM_TOOLS_PATH, 'utf8');
+        return (await readTextFreshTrusted(CUSTOM_TOOLS_PATH, { caller: 'sdk.tools.custom' })).content;
     } catch (e) {
         if (toError(e).code === 'ENOENT') return null;
         throw e;
@@ -213,67 +196,25 @@ export async function loadCustomToolsAsync() {
         const raw = await _readRegistryFile();
         if (raw === null) {
             _registry = new Map();
-            _loaded = true;
             log('DEBUG', '[custom-tools-registry] custom-tools.json ausente — registry vazio (opcional).');
             return;
         }
         const jsonResult = safeJsonParse(raw, '[custom-tools/loadCustomToolsAsync]');
         if (!jsonResult.ok) {
-            _loaded = true;
             log('WARN', '[custom-tools-registry] custom-tools.json JSON inválido.');
             return;
         }
         const jsonData = /** @type {unknown} */ (jsonResult.data);
         const result = CustomToolsFileSchema.safeParse(jsonData);
         if (!result.success || !result.data) {
-            _loaded = true;
             log('WARN', '[custom-tools-registry] custom-tools.json schema inválido — registry vazio.');
             return;
         }
         const items = result.data;
         _registry = new Map(items.map((item) => [item.name, item]));
-        _loaded = true;
         log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (async).`);
     } catch (e) {
         logSwallowed(e, 'sdk.customTools.loadRegistry');
-        _loaded = true;
-    }
-}
-
-/**
- * Carrega o registry de forma síncrona sob demanda, sem top-level await. Mantém `buildCustomTools()` síncrono sem
- * perder o carregamento inicial do arquivo persistido.
- *
- * @returns {void}
- */
-function ensureCustomToolsLoadedSync() {
-    if (_loaded) return;
-    try {
-        const raw = _readRegistryFileSync();
-        if (raw === null) {
-            _registry = new Map();
-            _loaded = true;
-            log('DEBUG', '[custom-tools-registry] custom-tools.json ausente — registry vazio (opcional).');
-            return;
-        }
-        const jsonResult = safeJsonParse(raw, '[custom-tools/ensureCustomToolsLoadedSync]');
-        if (!jsonResult.ok) {
-            _loaded = true;
-            log('WARN', '[custom-tools-registry] custom-tools.json JSON inválido.');
-            return;
-        }
-        const result = CustomToolsFileSchema.safeParse(/** @type {unknown} */ (jsonResult.data));
-        if (!result.success || !result.data) {
-            _loaded = true;
-            log('WARN', '[custom-tools-registry] custom-tools.json schema inválido — registry vazio.');
-            return;
-        }
-        _registry = new Map(result.data.map((item) => [item.name, item]));
-        _loaded = true;
-        log('INFO', `[custom-tools-registry] ${_registry.size} custom tool(s) carregadas do disco (sync).`);
-    } catch (e) {
-        _loaded = true;
-        logSwallowed(e, 'sdk.customTools.loadRegistrySync');
     }
 }
 
@@ -315,7 +256,6 @@ function _persistCustomToolsAsync() {
  * @returns {CustomToolDefinition[]}
  */
 export function getCustomToolDefinitions() {
-    ensureCustomToolsLoadedSync();
     return [..._registry.values()];
 }
 
@@ -326,7 +266,7 @@ export function getCustomToolDefinitions() {
  * @returns {Promise<{ ok: boolean; error?: string }>}
  */
 export async function registerCustomTool(def) {
-    ensureCustomToolsLoadedSync();
+    await initCustomTools();
     if (!def.name || typeof def.name !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(def.name)) {
         return { ok: false, error: 'name inválido: deve ser snake_case, 1–64 caracteres' };
     }
@@ -354,7 +294,7 @@ export async function registerCustomTool(def) {
  * @returns {Promise<{ ok: boolean; error?: string }>}
  */
 export async function removeCustomTool(name) {
-    ensureCustomToolsLoadedSync();
+    await initCustomTools();
     if (!_registry.has(name)) {
         return { ok: false, error: `Tool '${name}' não encontrada.` };
     }
@@ -380,7 +320,6 @@ export function isCustomToolsBuilderReady() {
  * @returns {import('@github/copilot-sdk').Tool[]}
  */
 export function buildCustomTools() {
-    ensureCustomToolsLoadedSync();
     const buildTool = requireCustomToolsBuilder();
     /** @type {import('@github/copilot-sdk').Tool[]} */
     const tools = [];
@@ -415,7 +354,6 @@ export function buildCustomTools() {
  * @internal
  */
 export function _resetRegistry() {
-    _loaded = false; // primeiro: impede que Promise em voo marque como loaded
-    _loadPromise = null; // segundo: descarta referência da Promise em voo
-    _registry = new Map(); // terceiro: limpa dados
+    _loadPromise = null; // descarta referência da Promise de hidratação anterior
+    _registry = new Map(); // limpa o snapshot em memória
 }

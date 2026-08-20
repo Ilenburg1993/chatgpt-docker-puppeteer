@@ -23,7 +23,6 @@ const CONFIDENCE_PRECEDENCE = Object.freeze({
     manual: 90,
 });
 
-
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -38,7 +37,10 @@ function isRecord(value) {
  */
 export function rankCatalogEvidenceConfidence(confidence) {
     if (typeof confidence !== 'string') return CONFIDENCE_PRECEDENCE.unknown;
-    return CONFIDENCE_PRECEDENCE[/** @type {keyof typeof CONFIDENCE_PRECEDENCE} */ (confidence)] ?? CONFIDENCE_PRECEDENCE.unknown;
+    return (
+        CONFIDENCE_PRECEDENCE[/** @type {keyof typeof CONFIDENCE_PRECEDENCE} */ (confidence)] ??
+        CONFIDENCE_PRECEDENCE.unknown
+    );
 }
 
 /**
@@ -47,11 +49,14 @@ export function rankCatalogEvidenceConfidence(confidence) {
  * @returns {number}
  */
 function compareEvidence(left, right) {
-    const confidenceDelta = rankCatalogEvidenceConfidence(right['confidence']) - rankCatalogEvidenceConfidence(left['confidence']);
+    const confidenceDelta =
+        rankCatalogEvidenceConfidence(right['confidence']) - rankCatalogEvidenceConfidence(left['confidence']);
     if (confidenceDelta !== 0) return confidenceDelta;
     const rightObservedAt = Date.parse(String(right['observedAt'] ?? ''));
     const leftObservedAt = Date.parse(String(left['observedAt'] ?? ''));
-    const observedDelta = (Number.isFinite(rightObservedAt) ? rightObservedAt : 0) - (Number.isFinite(leftObservedAt) ? leftObservedAt : 0);
+    const observedDelta =
+        (Number.isFinite(rightObservedAt) ? rightObservedAt : 0) -
+        (Number.isFinite(leftObservedAt) ? leftObservedAt : 0);
     if (observedDelta !== 0) return observedDelta;
     return String(left['evidenceId'] ?? '').localeCompare(String(right['evidenceId'] ?? ''));
 }
@@ -74,7 +79,10 @@ function stableJson(value) {
  * @returns {string[]}
  */
 function splitSafeFieldPath(fieldPath) {
-    const segments = fieldPath.split('.').map((segment) => segment.trim()).filter(Boolean);
+    const segments = fieldPath
+        .split('.')
+        .map((segment) => segment.trim())
+        .filter(Boolean);
     if (segments.length === 0 || segments.length > 8) {
         throw new Error(`[model-gateway/catalog] invalid fieldPath: ${fieldPath}`);
     }
@@ -130,7 +138,7 @@ function groupEvidenceByField(evidences) {
  * @returns {{
  *     projection: ReturnType<typeof createCanonicalModelProjection>;
  *     selectedEvidence: Record<string, Record<string, unknown>>;
- *     conflicts: Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>;
+ *     conflicts: { fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }[];
  * }}
  */
 export function mergeModelMetadataEvidence(evidences, base = {}) {
@@ -149,7 +157,7 @@ export function mergeModelMetadataEvidence(evidences, base = {}) {
     };
     /** @type {Record<string, Record<string, unknown>>} */
     const selectedEvidence = {};
-    /** @type {Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>} */
+    /** @type {{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }[]} */
     const conflicts = [];
 
     for (const [fieldPath, group] of groupEvidenceByField(evidences).entries()) {
@@ -192,7 +200,7 @@ export function mergeModelMetadataEvidence(evidences, base = {}) {
  * @returns {{
  *     projection: ReturnType<typeof createCanonicalProviderProjection>;
  *     selectedEvidence: Record<string, Record<string, unknown>>;
- *     conflicts: Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>;
+ *     conflicts: { fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }[];
  * }}
  */
 export function mergeProviderMetadataEvidence(evidences, base = {}) {
@@ -209,7 +217,7 @@ export function mergeProviderMetadataEvidence(evidences, base = {}) {
     };
     /** @type {Record<string, Record<string, unknown>>} */
     const selectedEvidence = {};
-    /** @type {Array<{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>} */
+    /** @type {{ fieldPath: string; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }[]} */
     const conflicts = [];
 
     for (const [fieldPath, group] of groupEvidenceByField(evidences).entries()) {

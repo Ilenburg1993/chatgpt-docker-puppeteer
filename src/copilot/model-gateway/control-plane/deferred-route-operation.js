@@ -2,9 +2,9 @@
 /**
  * Pure policy and safety classification for same-session route switches deferred to a safe turn boundary.
  *
- * Automatic promotion is deliberately fail-closed. A deferred operation is promotable only when the original,
- * confirmed mutation persisted an explicit authorization, the operation belongs to the currently live SDK session,
- * and its bounded authorization window remains valid.
+ * Automatic promotion is deliberately fail-closed. A deferred operation is promotable only when the original, confirmed
+ * mutation persisted an explicit authorization, the operation belongs to the currently live SDK session, and its
+ * bounded authorization window remains valid.
  *
  * @module copilot/model-gateway/control-plane/deferred-route-operation
  */
@@ -58,19 +58,19 @@ function promotionAuthorization(operation) {
  * @param {Record<string, unknown>} operation
  * @param {{ now?: number; maxAgeMs?: number; expectedSessionId?: string | null }} [options]
  * @returns {{
- *   classification: 'promotable' | 'expired' | 'review_required' | 'cancelled' | 'not_deferred' | 'invalid';
- *   promotable: boolean;
- *   expired: boolean;
- *   requiresReview: boolean;
- *   reason: string;
- *   nextActions: string[];
- *   operationId: string | null;
- *   sessionId: string | null;
- *   idempotencyKey: string | null;
- *   route: Record<string, unknown> | null;
- *   promotionPolicy: string;
- *   authorizationSource: string | null;
- *   expiresAt: string | null;
+ *     classification: 'promotable' | 'expired' | 'review_required' | 'cancelled' | 'not_deferred' | 'invalid';
+ *     promotable: boolean;
+ *     expired: boolean;
+ *     requiresReview: boolean;
+ *     reason: string;
+ *     nextActions: string[];
+ *     operationId: string | null;
+ *     sessionId: string | null;
+ *     idempotencyKey: string | null;
+ *     route: Record<string, unknown> | null;
+ *     promotionPolicy: string;
+ *     authorizationSource: string | null;
+ *     expiresAt: string | null;
  * }}
  */
 export function classifyModelGatewayDeferredRouteOperation(operation, options = {}) {
@@ -154,7 +154,10 @@ export function classifyModelGatewayDeferredRouteOperation(operation, options = 
             promotable: false,
             expired: false,
             requiresReview: true,
-            reason: operation['requiresNewSession'] !== false ? 'requires_new_session_not_false' : 'operation_not_retryable',
+            reason:
+                operation['requiresNewSession'] !== false
+                    ? 'requires_new_session_not_false'
+                    : 'operation_not_retryable',
             nextActions: ['inspect_operation_status', 'review_operation_invariants'],
         };
     }

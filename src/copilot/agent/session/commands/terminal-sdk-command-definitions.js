@@ -5,8 +5,8 @@
  * Primeira ponte canonica entre comandos operacionais do terminal e `CommandDefinition[]` do SDK.
  *
  * Esta camada nao reimplementa o REPL local. Ela registra comandos SDK seguros que materializam uma solicitacao
- * observavel no runtime. A execucao efetiva continua pertencendo ao nucleo local do terminal ate o catalogo unico
- * de comandos substituir as tabelas manuais de `/help`, `/menu` e `CMD_ROUTES`.
+ * observavel no runtime. A execucao efetiva continua pertencendo ao nucleo local do terminal ate o catalogo unico de
+ * comandos substituir as tabelas manuais de `/help`, `/menu` e `CMD_ROUTES`.
  *
  * @module copilot/agent/session/commands/terminal-sdk-command-definitions
  */
@@ -16,6 +16,7 @@ import { EMITTER_SDK_COMMAND_EXECUTED } from '#copilot/events';
 
 /**
  * @typedef {import('#copilot/sdk/types').CommandContext} CommandContext
+ *
  * @typedef {import('#copilot/sdk/types').CommandDefinition} CommandDefinition
  */
 

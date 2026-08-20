@@ -20,7 +20,9 @@ const OPTIONAL_PROCESSES = ['inference-gateway', 'ollama-host-supervisor', 'audi
  */
 const MANAGED_PROCESSES = [
     ...CORE_PROCESSES,
-    ...(String(process.env['ENABLE_AUDIT_AGENT_PM2_PROCESSES'] || '').toLowerCase() === 'true' ? OPTIONAL_PROCESSES : []),
+    ...(String(process.env['ENABLE_AUDIT_AGENT_PM2_PROCESSES'] || '').toLowerCase() === 'true'
+        ? OPTIONAL_PROCESSES
+        : []),
 ];
 
 /**

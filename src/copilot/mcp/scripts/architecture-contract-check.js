@@ -8,11 +8,12 @@
  * @module copilot/mcp/scripts/architecture-contract-check
  */
 
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
+const architectureWorkspaceIo = createWorkspaceIo({ workspaceRoot: ROOT });
 const PRESENTATION_ROOT = 'src/copilot/presentation';
 const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts']);
 
@@ -33,7 +34,7 @@ const HOTSPOT_BUDGETS = Object.freeze([
 
 /** @param {string} path */
 async function readWorkspaceText(path) {
-    return readFile(resolve(ROOT, path), 'utf8');
+    return (await architectureWorkspaceIo.readTextFresh(resolve(ROOT, path), { includeHash: false })).content;
 }
 
 /** @param {string} path */
@@ -41,19 +42,23 @@ async function collectSourceFiles(path) {
     const absolute = resolve(ROOT, path);
     /** @type {string[]} */
     const files = [];
-    for (const entry of await readdir(absolute, { withFileTypes: true })) {
-        const relative = `${path}/${entry.name}`;
-        if (entry.isDirectory()) files.push(...(await collectSourceFiles(relative)));
-        else if (entry.isFile() && SOURCE_EXTENSIONS.has(entry.name.slice(entry.name.lastIndexOf('.')))) files.push(relative);
+    const entries = (await architectureWorkspaceIo.listDirectoryNamesFresh(absolute)).entries;
+    for (const entryName of entries) {
+        const relative = `${path}/${entryName}`;
+        const info = (await architectureWorkspaceIo.lstatPath(resolve(ROOT, relative))).stats;
+        if (info.isSymbolicLink()) continue;
+        if (info.isDirectory()) files.push(...(await collectSourceFiles(relative)));
+        else if (info.isFile() && SOURCE_EXTENSIONS.has(entryName.slice(entryName.lastIndexOf('.'))))
+            files.push(relative);
     }
     return files;
 }
 
 /**
- * @returns {Promise<{ success: boolean; checks: Array<{ name: string; passed: boolean; detail: string }> }>}
+ * @returns {Promise<{ success: boolean; checks: { name: string; passed: boolean; detail: string }[] }>}
  */
 export async function runArchitectureContractCheck() {
-    /** @type {Array<{ name: string; passed: boolean; detail: string }>} */
+    /** @type {{ name: string; passed: boolean; detail: string }[]} */
     const checks = [];
 
     const presentationFiles = await collectSourceFiles(PRESENTATION_ROOT);
@@ -70,8 +75,11 @@ export async function runArchitectureContractCheck() {
 
     for (const budget of HOTSPOT_BUDGETS) {
         const absolute = resolve(ROOT, budget.path);
-        const stats = await stat(absolute);
-        const content = budget.maxLines === undefined ? null : await readFile(absolute, 'utf8');
+        const stats = (await architectureWorkspaceIo.statPath(absolute)).stats;
+        const content =
+            budget.maxLines === undefined
+                ? null
+                : (await architectureWorkspaceIo.readTextFresh(absolute, { includeHash: false })).content;
         const lines = content === null ? null : content.split(/\r?\n/u).length;
         const withinBytes = stats.size <= budget.maxBytes;
         const withinLines = budget.maxLines === undefined || (lines !== null && lines <= budget.maxLines);
@@ -136,11 +144,17 @@ export async function runArchitectureContractCheck() {
 
     const packageImports = packageJson?.imports && typeof packageJson.imports === 'object' ? packageJson.imports : {};
     for (const [key, target] of Object.entries(packageImports)) {
-        if (!key.startsWith('#copilot/sdk') || key.includes('*') || typeof target !== 'string' || !target.startsWith('./')) {
+        if (
+            !key.startsWith('#copilot/sdk') ||
+            key.includes('*') ||
+            typeof target !== 'string' ||
+            !target.startsWith('./')
+        ) {
             continue;
         }
-        const exists = await stat(resolve(ROOT, target.slice(2)))
-            .then((value) => value.isFile() || value.isDirectory())
+        const exists = await architectureWorkspaceIo
+            .statPath(resolve(ROOT, target.slice(2)))
+            .then((value) => value.stats.isFile() || value.stats.isDirectory())
             .catch(() => false);
         checks.push({
             name: `sdk-package-import-target:${key}`,
@@ -189,8 +203,9 @@ export async function runArchitectureContractCheck() {
         'src/copilot/mcp/scripts/io-cache-benchmark-worker.js',
         'src/copilot/mcp/scripts/scheduled-io-cache-benchmark-runner.js',
     ]) {
-        const exists = await stat(resolve(ROOT, path))
-            .then((value) => value.isFile())
+        const exists = await architectureWorkspaceIo
+            .statPath(resolve(ROOT, path))
+            .then((value) => value.stats.isFile())
             .catch(() => false);
         checks.push({
             name: `autonomy-control-plane-exists:${path}`,
@@ -199,8 +214,9 @@ export async function runArchitectureContractCheck() {
         });
     }
 
-    const byokLabels = await stat(resolve(ROOT, 'src/copilot/terminal/byok/rendering/labels.js'))
-        .then((value) => value.isFile())
+    const byokLabels = await architectureWorkspaceIo
+        .statPath(resolve(ROOT, 'src/copilot/terminal/byok/rendering/labels.js'))
+        .then((value) => value.stats.isFile())
         .catch(() => false);
     checks.push({
         name: 'byok-presentation-labels-extracted',

@@ -59,12 +59,10 @@ describe('terminal/human-question-renderer', () => {
     });
 
     it('humaniza sources de pergunta que nascem técnicos', () => {
-        const output = plain(
-            [
-                ...buildTerminalHumanQuestionCard({ question: 'Continuar?', source: 'runtime', compact: true }),
-                ...buildTerminalHumanQuestionCard({ question: 'Continuar?', source: 'headless', compact: true }),
-            ],
-        );
+        const output = plain([
+            ...buildTerminalHumanQuestionCard({ question: 'Continuar?', source: 'runtime', compact: true }),
+            ...buildTerminalHumanQuestionCard({ question: 'Continuar?', source: 'headless', compact: true }),
+        ]);
 
         expect(output).toContain('conversa');
         expect(output).toContain('sem interface');

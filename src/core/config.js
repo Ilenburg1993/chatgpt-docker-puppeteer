@@ -204,7 +204,8 @@ const ConfigSchema = z
         HEALTH_CHECK_INTERVAL: z.number().int().min(1000).default(30000),
         BROWSER_PAGE_TTL_MS: z.number().int().min(1000).default(3600000),
         BROWSER_ALLOCATE_MAX_ATTEMPTS: z.number().int().min(1).optional(),
-    })['passthrough'](); // Preserva chaves de comentário "//"
+    })
+    ['passthrough'](); // Preserva chaves de comentário "//"
 
 /**
  * 2. GESTOR REATIVO DE CONFIGURAÇÃO Implementa o padrão Singleton com capacidades de emissão de eventos.

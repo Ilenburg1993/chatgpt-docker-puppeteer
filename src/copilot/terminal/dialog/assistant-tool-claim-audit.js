@@ -9,8 +9,8 @@
  * @module copilot/terminal/dialog/assistant-tool-claim-audit
  */
 
-import { SEPARATOR, println } from './output.js';
 import { terminalThemeRow, terminalThemeText } from '../state/dialog/index.js';
+import { SEPARATOR, println } from './output.js';
 
 const SUCCESS_VERBS =
     '(?:execut(?:ad[ao]s?|ed|ou|ei)?|conclu(?:id[ao]s?|iu)|aplicad[ao]s?|applied|done|success|sucesso|ok|status:?\\s*(?:applied|ok|success)|returned|retornou|confirm|presente|limp[ao]|removed|deleted)';
@@ -159,9 +159,7 @@ export function auditAssistantToolClaims({ reply, projection }) {
 export function renderAssistantToolClaimAuditFindings(findings) {
     if (findings.length === 0) return false;
     println(SEPARATOR);
-    println(
-        terminalThemeRow('Verificação de tools', 'alegação pública sem lifecycle comprovado', { role: 'warn' }),
-    );
+    println(terminalThemeRow('Verificação de tools', 'alegação pública sem lifecycle comprovado', { role: 'warn' }));
     println('');
     for (const finding of findings) {
         const evidence = finding.evidenceOperations.length > 0 ? finding.evidenceOperations.join(', ') : 'nenhuma';

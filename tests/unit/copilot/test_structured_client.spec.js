@@ -118,13 +118,15 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const b = new mod.LlmBridgeClient();
 
         // Spy em chat() para retornar resposta estruturada sem rede
-        const mockChat = vi.fn(async (_msg, _opts) => (chatResultFixture({
-            taskId: 'task-abc',
-            response: structuredJsonResponse(),
-            responseLen: structuredJsonResponse().length,
-            chunks: [structuredJsonResponse()],
-            durationMs: 42,
-        })));
+        const mockChat = vi.fn(async (_msg, _opts) =>
+            chatResultFixture({
+                taskId: 'task-abc',
+                response: structuredJsonResponse(),
+                responseLen: structuredJsonResponse().length,
+                chunks: [structuredJsonResponse()],
+                durationMs: 42,
+            }),
+        );
         b.chat = mockChat;
 
         const result = await b.chatStructured({
@@ -147,13 +149,15 @@ describe('LlmBridgeClient › chatStructured()', () => {
         mod.setBridgeAgent(mockAgent);
         const b = new mod.LlmBridgeClient();
 
-        const mockChat = vi.fn(async () => (chatResultFixture({
-            taskId: 'task-1',
-            response: structuredJsonResponse({ responseType: 'plan', output: 'Plano A concluído.' }),
-            responseLen: 100,
-            chunks: [],
-            durationMs: 50,
-        })));
+        const mockChat = vi.fn(async () =>
+            chatResultFixture({
+                taskId: 'task-1',
+                response: structuredJsonResponse({ responseType: 'plan', output: 'Plano A concluído.' }),
+                responseLen: 100,
+                chunks: [],
+                durationMs: 50,
+            }),
+        );
         b.chat = mockChat;
 
         const result = await b.chatStructured({
@@ -171,13 +175,15 @@ describe('LlmBridgeClient › chatStructured()', () => {
         mod.setBridgeAgent(mockAgent);
         const b = new mod.LlmBridgeClient();
 
-        const mockChat = vi.fn(async () => (chatResultFixture({
-            taskId: 'task-2',
-            response: 'Desculpe, não entendi o protocolo. Pode repetir em português?',
-            responseLen: 56,
-            chunks: [],
-            durationMs: 30,
-        })));
+        const mockChat = vi.fn(async () =>
+            chatResultFixture({
+                taskId: 'task-2',
+                response: 'Desculpe, não entendi o protocolo. Pode repetir em português?',
+                responseLen: 56,
+                chunks: [],
+                durationMs: 30,
+            }),
+        );
         b.chat = mockChat;
 
         const result = await b.chatStructured({
@@ -195,13 +201,15 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const b = new mod.LlmBridgeClient();
 
         const responseText = structuredJsonResponse();
-        const mockChat = vi.fn(async () => (chatResultFixture({
-            taskId: 'task-3',
-            response: responseText,
-            responseLen: responseText.length,
-            chunks: [responseText],
-            durationMs: 10,
-        })));
+        const mockChat = vi.fn(async () =>
+            chatResultFixture({
+                taskId: 'task-3',
+                response: responseText,
+                responseLen: responseText.length,
+                chunks: [responseText],
+                durationMs: 10,
+            }),
+        );
         b.chat = mockChat;
 
         const result = await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' });
@@ -212,13 +220,15 @@ describe('LlmBridgeClient › chatStructured()', () => {
         mod.setBridgeAgent(mockAgent);
         const b = new mod.LlmBridgeClient();
 
-        const mockChat = vi.fn(async () => (chatResultFixture({
-            taskId: 'specific-task-id',
-            response: structuredJsonResponse(),
-            responseLen: 999,
-            chunks: ['chunk1', 'chunk2'],
-            durationMs: 1234,
-        })));
+        const mockChat = vi.fn(async () =>
+            chatResultFixture({
+                taskId: 'specific-task-id',
+                response: structuredJsonResponse(),
+                responseLen: 999,
+                chunks: ['chunk1', 'chunk2'],
+                durationMs: 1234,
+            }),
+        );
         b.chat = mockChat;
 
         const result = await b.chatStructured({ context: 'c', intent: 'i', responseType: 'diagnostic' });
@@ -236,7 +246,13 @@ describe('LlmBridgeClient › chatStructured()', () => {
         const captured = { value: undefined };
         const mockChat = vi.fn(async (_msg, opts) => {
             captured.value = opts;
-            return chatResultFixture({ taskId: '', response: structuredJsonResponse(), responseLen: 10, chunks: [], durationMs: 5 });
+            return chatResultFixture({
+                taskId: '',
+                response: structuredJsonResponse(),
+                responseLen: 10,
+                chunks: [],
+                durationMs: 5,
+            });
         });
         b.chat = mockChat;
 
@@ -255,7 +271,13 @@ describe('LlmBridgeClient › chatStructured()', () => {
         let capturedMsg = '';
         const mockChat = vi.fn(async (msg) => {
             capturedMsg = msg;
-            return chatResultFixture({ taskId: '', response: structuredJsonResponse(), responseLen: 10, chunks: [], durationMs: 5 });
+            return chatResultFixture({
+                taskId: '',
+                response: structuredJsonResponse(),
+                responseLen: 10,
+                chunks: [],
+                durationMs: 5,
+            });
         });
         b.chat = mockChat;
 
@@ -281,8 +303,8 @@ describe('LlmBridgeClient › chatStructured()', () => {
     it('lança ZodError para responseType inválido', async () => {
         const b = new mod.LlmBridgeClient();
 
-        await expect(
-            () => Reflect.apply(b.chatStructured, b, [{ context: 'c', intent: 'i', responseType: 'invalid_type' }]),
+        await expect(() =>
+            Reflect.apply(b.chatStructured, b, [{ context: 'c', intent: 'i', responseType: 'invalid_type' }]),
         ).rejects.toThrow();
     });
 });

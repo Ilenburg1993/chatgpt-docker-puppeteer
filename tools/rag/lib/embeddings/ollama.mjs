@@ -173,7 +173,6 @@ export class OllamaEmbeddingsProvider {
                 }
                 return vector;
             } catch (error) {
-
                 if (!isContextLengthError(error)) throw error;
                 hadContextOverflow = true;
                 contextOverflowsThisCall++;

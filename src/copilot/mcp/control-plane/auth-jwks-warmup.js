@@ -16,6 +16,7 @@ let warmupState = createInitialState();
 
 /**
  * @typedef {Awaited<ReturnType<typeof warmMcpRemoteJwks>>} McpAuthJwksWarmupResult
+ *
  * @typedef {(level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR', message: string, fields?: Record<string, unknown>) => void} McpAuthJwksWarmupLogFn
  */
 
@@ -37,9 +38,7 @@ export function scheduleMcpAuthJwksWarmup(options = {}) {
     const enabled = options.enabled ?? readBooleanEnv(env, 'COPILOT_MCP_JWKS_WARMUP_ENABLED', defaultEnabled);
     if (!enabled) return false;
 
-    const delayMs = normalizeDelay(
-        options.delayMs ?? Number(env['COPILOT_MCP_JWKS_WARMUP_DELAY_MS']),
-    );
+    const delayMs = normalizeDelay(options.delayMs ?? Number(env['COPILOT_MCP_JWKS_WARMUP_DELAY_MS']));
     const setTimeoutFn = options.setTimeoutFn ?? setTimeout;
     const warmupRunner = options.warmupRunner ?? warmMcpRemoteJwks;
     const logFn = options.logFn ?? logMcp;
@@ -69,7 +68,8 @@ export function readMcpAuthJwksWarmupState() {
  */
 export function resetMcpAuthJwksWarmupForTests() {
     if (typeof warmupTimer === 'number') clearTimeout(warmupTimer);
-    else if (warmupTimer && typeof warmupTimer === 'object' && Symbol.toPrimitive in warmupTimer) clearTimeout(/** @type {NodeJS.Timeout} */ (warmupTimer));
+    else if (warmupTimer && typeof warmupTimer === 'object' && Symbol.toPrimitive in warmupTimer)
+        clearTimeout(/** @type {NodeJS.Timeout} */ (warmupTimer));
     warmupTimer = null;
     warmupState = createInitialState();
 }

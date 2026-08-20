@@ -5,13 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-post-change-gates
  */
 
-import { z } from 'zod';
 import {
     auditCloudflareRemoteTunnel,
     isCloudflaredActionableOriginErrorLine,
     readCloudflaredMetricsSnapshot,
 } from '#copilot/mcp/cloudflare';
 import { okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 import { mcpTunnelStatusTool } from './tunnel-status.js';
 
 const MIN_HA_CONNECTIONS = 4;
@@ -26,10 +26,16 @@ export const mcpCloudflarePostChangeGatesTool = {
     description:
         'Run a read-only gate bundle after Cloudflare tunnel/origin/edge changes: tunnel status, remote audit, metrics and pass/fail recommendations.',
     inputSchema: {
-        includeDetails: z.boolean().optional()['describe']('Include full tunnel, remote audit and metrics objects. Defaults to false for faster compact responses.'),
+        includeDetails: z
+            .boolean()
+            .optional()
+            ['describe'](
+                'Include full tunnel, remote audit and metrics objects. Defaults to false for faster compact responses.',
+            ),
     },
     annotations: readOnlyAnnotations(),
-    handler: async (input) => okResult(await runCloudflarePostChangeGates({ includeDetails: input['includeDetails'] === true })),
+    handler: async (input) =>
+        okResult(await runCloudflarePostChangeGates({ includeDetails: input['includeDetails'] === true })),
 };
 
 /**
@@ -55,16 +61,18 @@ export async function runCloudflarePostChangeGates(options = {}) {
                 ? ['Post-change gates passed. Keep monitoring metrics before promoting the change as default.']
                 : ['Rollback or hold the change until every critical post-change gate passes.'],
     };
-    return options.includeDetails === true
-        ? { ...base, tunnelStatus, remoteAudit, metrics }
-        : base;
+    return options.includeDetails === true ? { ...base, tunnelStatus, remoteAudit, metrics } : base;
 }
 
 /**
  * @returns {Promise<Record<string, unknown>>}
  */
 /**
- * @param {{ tunnelStatus: Record<string, unknown>; remoteAudit: Record<string, unknown>; metrics: Record<string, unknown> }} input
+ * @param {{
+ *     tunnelStatus: Record<string, unknown>;
+ *     remoteAudit: Record<string, unknown>;
+ *     metrics: Record<string, unknown>;
+ * }} input
  * @returns {Record<string, unknown>}
  */
 function buildPostChangeGateSummary(input) {
@@ -102,7 +110,12 @@ async function safeRemoteAudit() {
     try {
         return await auditCloudflareRemoteTunnel();
     } catch (error) {
-        return { ok: false, success: false, error: sanitizeError(error), critical: ['Cloudflare remote audit threw before returning a structured result.'] };
+        return {
+            ok: false,
+            success: false,
+            error: sanitizeError(error),
+            critical: ['Cloudflare remote audit threw before returning a structured result.'],
+        };
     }
 }
 
@@ -115,7 +128,11 @@ async function safeMetricsSnapshot() {
 }
 
 /**
- * @param {{ tunnelStatus: Record<string, unknown>; remoteAudit: Record<string, unknown>; metrics: Record<string, unknown> }} input
+ * @param {{
+ *     tunnelStatus: Record<string, unknown>;
+ *     remoteAudit: Record<string, unknown>;
+ *     metrics: Record<string, unknown>;
+ * }} input
  * @returns {{ critical: string[]; warnings: string[]; passed: string[] }}
  */
 export function evaluateGates(input) {
@@ -137,7 +154,9 @@ export function evaluateGates(input) {
         lastSmokeCheckedAt,
     );
     const recentTunnelTransportErrors = filterRecentLogLines(
-        Array.isArray(originDiagnostics['recentTunnelTransportErrors']) ? originDiagnostics['recentTunnelTransportErrors'] : [],
+        Array.isArray(originDiagnostics['recentTunnelTransportErrors'])
+            ? originDiagnostics['recentTunnelTransportErrors']
+            : [],
         lastSmokeCheckedAt,
     );
     const recentMetricsBindErrors = filterRecentLogLines(
@@ -150,8 +169,14 @@ export function evaluateGates(input) {
     else critical.push('permanent tunnel smoke is not fresh.');
     if (noRecentActionableOriginErrors) passed.push('no actionable origin errors after the latest smoke.');
     else critical.push(`actionable origin errors after latest smoke: ${recentOriginErrors.length}.`);
-    if (recentTunnelTransportErrors.length > 0) warnings.push(`recent tunnel transport errors after latest smoke: ${recentTunnelTransportErrors.length}; recovered state is judged by HA connections, smoke and metrics.`);
-    if (recentMetricsBindErrors.length > 0) warnings.push(`recent cloudflared metrics bind errors after latest smoke: ${recentMetricsBindErrors.length}; ensure restart serialization remains enabled.`);
+    if (recentTunnelTransportErrors.length > 0)
+        warnings.push(
+            `recent tunnel transport errors after latest smoke: ${recentTunnelTransportErrors.length}; recovered state is judged by HA connections, smoke and metrics.`,
+        );
+    if (recentMetricsBindErrors.length > 0)
+        warnings.push(
+            `recent cloudflared metrics bind errors after latest smoke: ${recentMetricsBindErrors.length}; ensure restart serialization remains enabled.`,
+        );
 
     const remoteAuditOk = input.remoteAudit['ok'] === true;
     if (remoteAuditOk) passed.push('Cloudflare remote audit ok=true.');
@@ -197,7 +222,9 @@ export function evaluateGates(input) {
         critical.push(`metrics haConnections below ${MIN_HA_CONNECTIONS}.`);
     }
 
-    const transportProtocol = String(permanentTunnel['transportProtocol'] ?? input.tunnelStatus['transportProtocol'] ?? '');
+    const transportProtocol = String(
+        permanentTunnel['transportProtocol'] ?? input.tunnelStatus['transportProtocol'] ?? '',
+    );
     const quic = asRecord(input.metrics['quic']);
     if (transportProtocol === 'quic') {
         if (quic['present'] === true) passed.push('QUIC metrics are present for strict QUIC transport.');
@@ -205,7 +232,8 @@ export function evaluateGates(input) {
         const latestRttMs = toNumber(quic['latestRttMs']);
         const smoothedRttMs = toNumber(quic['smoothedRttMs']);
         const effectiveRttMs = smoothedRttMs ?? latestRttMs;
-        if (effectiveRttMs === null) warnings.push('QUIC RTT metrics unavailable; collect more samples before final promotion.');
+        if (effectiveRttMs === null)
+            warnings.push('QUIC RTT metrics unavailable; collect more samples before final promotion.');
         else if (effectiveRttMs > MAX_QUIC_RTT_MS) warnings.push(`QUIC RTT appears high: ${effectiveRttMs}ms.`);
         else passed.push(`QUIC RTT within budget: ${effectiveRttMs}ms.`);
     }

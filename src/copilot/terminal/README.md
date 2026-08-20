@@ -27,58 +27,58 @@ Use `module-map.js` como inventário executável da borda terminal. O mapa difer
 boot, orquestração, REPL, adapters de evento, estado local e subdiretórios de superfície. O mapa
 também declara `risk` e scorecard para orientar a ordem de decomposição.
 
-| Área                                     | Função                                                                     |
-| ---------------------------------------- | -------------------------------------------------------------------------- |
-| `module-map.js`                          | inventário executável da raiz do terminal                                  |
-| `index.js`                               | barrel público puro da borda terminal                                      |
-| `runtime-root.js`                        | composition root explícito do terminal                                     |
-| `frontend/`                              | consumer layer canônica do runtime para o terminal                         |
-| `frontend/gateways/sdk-session.js`       | única ponte runtime do terminal para helpers vanilla de sessão SDK         |
-| `frontend/gateways/tools.js`             | única ponte terminal-owned para file tools e introspecção de tools         |
-| `frontend/operational-guidance/`         | guidance operacional para boot, /status, /sdk doctor, /fs e recuperação    |
-| `state/sdk/`                             | sub-surface estreita para elicitations, permissões e user input do SDK     |
-| `state/ui/`                              | sub-surface estreita para display policy, detalhe e tema visual            |
-| `state/repl-runtime/`                    | sub-surface estreita para controles runtime do REPL e rate-limiter reset   |
-| `dialog/`                                | prompt dinâmico, output helpers, waiting UX, engine de diálogo             |
-| `commands/`                              | comandos REPL finos, orientados a operações do runtime                     |
-| `state/display-policy.js`                | presets de densidade visual e impacto em prompt/waiting                    |
-| `state/pending-question-answer.js`       | roteamento de respostas humanas para `ask_user` pendente sem deadlock      |
-| `state/pending-question-replay.js`       | dedupe/replay de perguntas pendentes após rewire/restart                   |
-| `presentation/state/ui-store/` | estado de UI compartilhado usado pelo terminal e outras bordas             |
-| `repl/repl-banner.js`                    | banner operacional do REPL e lista compacta de comandos/endpoints          |
-| `repl/repl-command-parser.js`            | parser puro de comandos slash e aliases resolvidos                         |
-| `repl/repl-input-routing.js`             | policy de comandos imediatos e fila durante input concorrente              |
-| `repl/repl-listeners.js`                 | tradução de eventos do agente/SDK para UX local                            |
-| `repl/repl-multiline.js`                 | estado de input multiline por continuação com barra invertida              |
-| `repl/auto-brief.js`                     | briefing progressivo de boot e pós-bootstrap com status real de tools/I/O  |
-| `repl/live-status-line.js`               | linha viva permanente com heartbeat, modelo, esforço e atividade atual     |
-| `terminal-phases/`                       | fases de boot do terminal e submódulos finos de banner/reflection/shutdown |
-| `events/event-adapters.js`               | composition root canônico dos adapters de eventos para REPL/headless       |
-| `events/event-adapter-events.js`         | matriz de eventos cobertos, em passthrough e ignorados no terminal         |
-| `events/sdk-session-events.js`           | tradução dedicada dos sinais vanilla da sessão SDK para stdout/SSE         |
-| `events/agent-runtime-events.js`         | tradução dedicada dos sinais normalizados do runtime/agent para stdout/SSE |
-| `events/tool-activity-presenter.js`      | narrativa operacional de tools, arquivos e comandos para o streaming live  |
-| `state/turn-trace-state.js`              | resumo canônico por turno de tools/arquivos tocados para `/activity`       |
-| `state/turn-materialization-state.js`    | materialização canônica de reply direto, `assistant.message` e deltas      |
-| `events/task-stream-events.js`           | render e SSE do streaming de tarefas internas (`task.*`)                   |
-| `events/task-transcript-accumulator.js`  | promoção elástica de deltas de tarefa para transcript persistente          |
-| `events/assistant-transcript-renderer.js` | renderer persistente de mensagens da LLM-B fora do turno ativo             |
-| `state/intent-state.js`                  | histórico elástico de intents explícitos para `/intent`, prompt e transcript |
-| `events/intent-renderer.js`              | renderer persistente de `assistant.intent`, `report_intent` e local fallback |
-| `events/agent-sse-passthrough.js`        | passthrough SSE explícito e estreito para eventos sem adapter dedicado     |
-| `wiring/terminal-agent-wiring.js`        | SSE + wiring de alto nível entre terminal e agent                          |
-| `index.js` / `bootstrap.js`              | boot do terminal                                                           |
+| Área                                      | Função                                                                       |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `module-map.js`                           | inventário executável da raiz do terminal                                    |
+| `index.js`                                | barrel público puro da borda terminal                                        |
+| `runtime-root.js`                         | composition root explícito do terminal                                       |
+| `frontend/`                               | consumer layer canônica do runtime para o terminal                           |
+| `frontend/gateways/sdk-session.js`        | única ponte runtime do terminal para helpers vanilla de sessão SDK           |
+| `frontend/gateways/tools.js`              | única ponte terminal-owned para file tools e introspecção de tools           |
+| `frontend/operational-guidance/`          | guidance operacional para boot, /status, /sdk doctor, /fs e recuperação      |
+| `state/sdk/`                              | sub-surface estreita para elicitations, permissões e user input do SDK       |
+| `state/ui/`                               | sub-surface estreita para display policy, detalhe e tema visual              |
+| `state/repl-runtime/`                     | sub-surface estreita para controles runtime do REPL e rate-limiter reset     |
+| `dialog/`                                 | prompt dinâmico, output helpers, waiting UX, engine de diálogo               |
+| `commands/`                               | comandos REPL finos, orientados a operações do runtime                       |
+| `state/display-policy.js`                 | presets de densidade visual e impacto em prompt/waiting                      |
+| `state/pending-question-answer.js`        | roteamento de respostas humanas para `ask_user` pendente sem deadlock        |
+| `state/pending-question-replay.js`        | dedupe/replay de perguntas pendentes após rewire/restart                     |
+| `presentation/state/ui-store/`            | estado de UI compartilhado usado pelo terminal e outras bordas               |
+| `repl/repl-banner.js`                     | banner operacional do REPL e lista compacta de comandos/endpoints            |
+| `repl/repl-command-parser.js`             | parser puro de comandos slash e aliases resolvidos                           |
+| `repl/repl-input-routing.js`              | policy de comandos imediatos e fila durante input concorrente                |
+| `repl/repl-listeners.js`                  | tradução de eventos do agente/SDK para UX local                              |
+| `repl/repl-multiline.js`                  | estado de input multiline por continuação com barra invertida                |
+| `repl/auto-brief.js`                      | briefing progressivo de boot e pós-bootstrap com status real de tools/I/O    |
+| `repl/live-status-line.js`                | linha viva permanente com heartbeat, modelo, esforço e atividade atual       |
+| `terminal-phases/`                        | fases de boot do terminal e submódulos finos de banner/reflection/shutdown   |
+| `events/event-adapters.js`                | composition root canônico dos adapters de eventos para REPL/headless         |
+| `events/event-adapter-events.js`          | matriz de eventos cobertos, em passthrough e ignorados no terminal           |
+| `events/sdk-session-events.js`            | tradução dedicada dos sinais vanilla da sessão SDK para stdout/SSE           |
+| `events/agent-runtime-events.js`          | tradução dedicada dos sinais normalizados do runtime/agent para stdout/SSE   |
+| `events/tool-activity-presenter.js`       | narrativa operacional de tools, arquivos e comandos para o streaming live    |
+| `state/turn-trace-state.js`               | resumo canônico por turno de tools/arquivos tocados para `/activity`         |
+| `state/turn-materialization-state.js`     | materialização canônica de reply direto, `assistant.message` e deltas        |
+| `events/task-stream-events.js`            | render e SSE do streaming de tarefas internas (`task.*`)                     |
+| `events/task-transcript-accumulator.js`   | promoção elástica de deltas de tarefa para transcript persistente            |
+| `events/assistant-transcript-renderer.js` | renderer persistente de mensagens da LLM-B fora do turno ativo               |
+| `state/intent-state.js`                   | histórico elástico de intents explícitos para `/intent`, prompt e transcript |
+| `events/intent-renderer.js`               | renderer persistente de `assistant.intent`, `report_intent` e local fallback |
+| `events/agent-sse-passthrough.js`         | passthrough SSE explícito e estreito para eventos sem adapter dedicado       |
+| `wiring/terminal-agent-wiring.js`         | SSE + wiring de alto nível entre terminal e agent                            |
+| `index.js` / `bootstrap.js`               | boot do terminal                                                             |
 
 ## Usage e billing atuais
 
-O terminal trata `assistant.usage`, tokens e `copilotUsage` como telemetria primária. `/usage` e `/usage-budget` devem
-falar em origem (`GitHub Copilot/AI Credits` versus `BYOK/provider`), attribution, tokens e chamadas do lifecycle.
-`/pr-budget` permanece somente como alias HTTP deprecated e eventos/snapshots `pr*` são apresentados como billing
-legacy quando reaparecem de estado/wire antigo. Nenhum `assistant.usage` novo é convertido localmente em Premium
-Request.
+O terminal trata `assistant.usage`, tokens e `copilotUsage` como telemetria primária. `/usage` e
+`/usage-budget` devem falar em origem (`GitHub Copilot/AI Credits` versus `BYOK/provider`),
+attribution, tokens e chamadas do lifecycle. `/pr-budget` permanece somente como alias HTTP
+deprecated e eventos/snapshots `pr*` são apresentados como billing legacy quando reaparecem de
+estado/wire antigo. Nenhum `assistant.usage` novo é convertido localmente em Premium Request.
 
-No harness live, `--control-only` significa que não é aberto um turno explícito de modelo. `--no-pr` é aceito apenas
-como alias deprecated para automações históricas.
+No harness live, `--control-only` significa que não é aberto um turno explícito de modelo. `--no-pr`
+é aceito apenas como alias deprecated para automações históricas.
 
 ## Intervenção Imediata
 
@@ -88,8 +88,8 @@ O terminal diferencia três intenções de input concorrente:
 - `/steer <msg>`: usa o modo SDK immediate para redirecionar o turno ativo;
 - `/interrupt <msg>`: aborta o turno SDK atual e enfileira a mensagem como substituta.
 
-`/abort` está disponível para abortar o turno ativo sem criar uma substituição. Esses comandos
-furam a fila local do REPL para evitar deadlocks em turnos longos ou degradados.
+`/abort` está disponível para abortar o turno ativo sem criar uma substituição. Esses comandos furam
+a fila local do REPL para evitar deadlocks em turnos longos ou degradados.
 
 ## Papéis da raiz
 
@@ -165,9 +165,9 @@ O terminal trata cada envio explícito como um turno materializado por fontes co
 
 A prioridade canônica é: `direct_reply` > `assistant_message` > `stream_delta` > `empty`. A
 materialização vive em `state/turn-materialization-state.js`; `dialog/engine.js` apenas registra
-deltas e consome o resultado final. Isso impede que a UX mascare uma falha do backend: `/activity`
-e logs recebem a fonte usada, contagem de deltas, caracteres visíveis e quantidade de mensagens
-SDK observadas no turno.
+deltas e consome o resultado final. Isso impede que a UX mascare uma falha do backend: `/activity` e
+logs recebem a fonte usada, contagem de deltas, caracteres visíveis e quantidade de mensagens SDK
+observadas no turno.
 
 ## Acesso ao runtime
 
@@ -203,8 +203,8 @@ Deve sair do `terminal/` quando virar:
 
 - `/plan` usa somente `mode.get/set` e `plan.read/update/delete` do SDK;
 - o prompt dinâmico mostra `MODE:<SDK>` quando a sessão está fora de `interactive`;
-- `presentation/state/ui-store/` não guarda mais um “plan mode local” paralelo — apenas a
-  última projeção observada do SDK;
+- `presentation/state/ui-store/` não guarda mais um “plan mode local” paralelo — apenas a última
+  projeção observada do SDK;
 - `events/sdk-session-events.js` reflete sinais vanilla da sessão SDK ao operador;
 - comandos, status, state e adapters consomem helpers vanilla da sessão SDK via
   `frontend/gateways/sdk-session.js`, sem imports diretos de `#copilot/sdk/session`;
@@ -240,9 +240,10 @@ Deve sair do `terminal/` quando virar:
 - composition roots devem ter nome explícito (`runtime-root.js`, `dialog-runtime.js`);
 - imports entre subpastas irmãs do terminal devem passar via barrels do respectivo submódulo;
 - imports same-folder privados podem permanecer diretos quando não cruzarem fronteiras de módulo.
-- imports do terminal para `#copilot/sdk/session` ficam restritos ao gateway `frontend/gateways/sdk-session.js`.
-- imports do terminal para `#copilot/tools` ficam restritos ao gateway `frontend/gateways/tools.js`; comandos e
-  projections devem consumir esse gateway.
+- imports do terminal para `#copilot/sdk/session` ficam restritos ao gateway
+  `frontend/gateways/sdk-session.js`.
+- imports do terminal para `#copilot/tools` ficam restritos ao gateway `frontend/gateways/tools.js`;
+  comandos e projections devem consumir esse gateway.
 
 ## Superfícies públicas autorizadas
 
@@ -256,7 +257,8 @@ Superfícies públicas canônicas do terminal no `package.json`:
 - `#copilot/terminal/stores`
 - `#copilot/terminal/state/repl-runtime`
 
-Regra: não expor wildcard `#copilot/terminal/*`; novos acessos públicos exigem barrel explícito e contrato deliberado.
+Regra: não expor wildcard `#copilot/terminal/*`; novos acessos públicos exigem barrel explícito e
+contrato deliberado.
 
 ## Nota de clareza arquitetural
 

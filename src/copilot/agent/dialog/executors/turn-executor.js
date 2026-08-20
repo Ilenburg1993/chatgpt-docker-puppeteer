@@ -64,13 +64,7 @@ import {
  * @typedef {{
  *     reply: string;
  *     outcome: 'public_reply' | 'pending_human_input' | 'tool_only' | 'protocol_transition' | 'empty';
- *     replySource:
- *         | 'loop.reply'
- *         | 'assistant.message'
- *         | 'delta'
- *         | 'pending_protocol'
- *         | 'direct_dispatch'
- *         | 'unknown';
+ *     replySource: 'loop.reply' | 'assistant.message' | 'delta' | 'pending_protocol' | 'direct_dispatch' | 'unknown';
  *     diagnostics: {
  *         dispatched: boolean;
  *         assistantMessageCount: number;

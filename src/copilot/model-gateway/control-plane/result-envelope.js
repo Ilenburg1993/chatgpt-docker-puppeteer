@@ -16,10 +16,21 @@ export const MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION = 'model-gateway.
  * @param {string} [input.status]
  * @param {boolean} [input.dryRun]
  * @param {string[]} [input.warnings]
- * @param {Array<{ code: string; message: string; retryable: boolean }>} [input.errors]
+ * @param {{ code: string; message: string; retryable: boolean }[]} [input.errors]
  * @param {string[]} [input.nextActions]
  * @param {Date | number | string} [input.observedAt]
- * @returns {{ schemaVersion: typeof MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION; operation: string; ok: boolean; status: string; dryRun: boolean; data: TData; warnings: string[]; errors: Array<{ code: string; message: string; retryable: boolean }>; nextActions: string[]; observedAt: string }}
+ * @returns {{
+ *     schemaVersion: typeof MODEL_GATEWAY_CONTROL_PLANE_RESULT_SCHEMA_VERSION;
+ *     operation: string;
+ *     ok: boolean;
+ *     status: string;
+ *     dryRun: boolean;
+ *     data: TData;
+ *     warnings: string[];
+ *     errors: { code: string; message: string; retryable: boolean }[];
+ *     nextActions: string[];
+ *     observedAt: string;
+ * }}
  */
 export function createModelGatewayControlPlaneResult(input) {
     const observedAt =

@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
     formatTerminalIsoTimestamp,
     formatTerminalIsoTimestampSeconds,
-    formatTerminalTimeParts,
     formatTerminalTimeLabel,
+    formatTerminalTimeParts,
     formatTerminalTimestamp,
     resolveTerminalTimeDisplayMode,
 } from '../../../../src/copilot/terminal/state/time-format.js';
@@ -23,9 +23,7 @@ describe('terminal/time-format', () => {
     });
 
     it('combina ISO completo e tempo relativo no modo dual', () => {
-        expect(formatTerminalTimeLabel(instant, { now, mode: 'dual' })).toBe(
-            '2026-06-03T16:30:45.678-03:00 (há 1m)',
-        );
+        expect(formatTerminalTimeLabel(instant, { now, mode: 'dual' })).toBe('2026-06-03T16:30:45.678-03:00 (há 1m)');
         expect(formatTerminalTimestamp(instant, { now })).toBe('2026-06-03T16:30:45.678-03:00 (há 1m)');
     });
 

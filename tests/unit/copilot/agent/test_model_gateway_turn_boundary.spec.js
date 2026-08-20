@@ -18,16 +18,12 @@ describe('wireAgentModelGatewayTurnBoundaryPromotion', () => {
             trackBackgroundTask: tasks.trackBackgroundTask,
         };
         const promote = vi.fn().mockImplementation(async ({ switchRoute }) => {
-            await switchRoute(
-                { providerId: 'ollama-cloud', providerModel: 'qwen3-coder-next' },
-                null,
-                {
-                    idempotencyKey: 'route-key',
-                    source: 'agent.dialog_turn_end.model_gateway_route_promotion',
-                    allowActiveDialogLoopReattach: true,
-                    forceApplyDeferred: true,
-                },
-            );
+            await switchRoute({ providerId: 'ollama-cloud', providerModel: 'qwen3-coder-next' }, null, {
+                idempotencyKey: 'route-key',
+                source: 'agent.dialog_turn_end.model_gateway_route_promotion',
+                allowActiveDialogLoopReattach: true,
+                forceApplyDeferred: true,
+            });
             return {
                 sessionId: 'session-stable',
                 scanned: 1,

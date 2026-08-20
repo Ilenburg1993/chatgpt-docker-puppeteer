@@ -7,7 +7,12 @@
  * @module copilot/config/system-prompt/sdk-introspection
  */
 
-import { getSectionDescription, getSectionNames, instructionSourcesGet, supportsCustomizeMode } from '../sdk-config-port.js';
+import {
+    getSectionDescription,
+    getSectionNames,
+    instructionSourcesGet,
+    supportsCustomizeMode,
+} from '../sdk-config-port.js';
 
 /**
  * @typedef {import('../sdk-config-port.js').CopilotSession} CopilotSession

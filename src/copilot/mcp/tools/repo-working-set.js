@@ -17,7 +17,13 @@ import {
     getScopeStats,
     refreshScope,
 } from '#copilot/infra/public/session';
-import { errorResult, getMcpWorkspaceRoot, okResult, readOnlyAnnotations, resolveReadPath } from '#copilot/mcp/control-plane';
+import {
+    errorResult,
+    getMcpWorkspaceRoot,
+    okResult,
+    readOnlyAnnotations,
+    resolveReadPath,
+} from '#copilot/mcp/control-plane';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute, relative } from 'node:path';
 import { z } from 'zod';
@@ -78,31 +84,74 @@ export const repoWorkingSetTool = {
         action: z.enum(['open', 'context', 'find', 'refresh', 'status', 'close']),
         workingSetId: z.string().min(1).max(128).optional()['describe']('Opaque id returned by action=open.'),
         path: z.string().optional()['describe']('Repository directory for action=open. Default: src/copilot.'),
-        maxFiles: z.number().int().min(1).max(500).optional()['describe']('Hard selected-file cap for open, or manifest cap for context. Open default: 80.'),
-        maxBytes: z.number().int().min(1024).max(65536).optional()['describe']('Context manifest UTF-8 budget. Default: 16 KiB.'),
+        maxFiles: z
+            .number()
+            .int()
+            .min(1)
+            .max(500)
+            .optional()
+            ['describe']('Hard selected-file cap for open, or manifest cap for context. Open default: 80.'),
+        maxBytes: z
+            .number()
+            .int()
+            .min(1024)
+            .max(65536)
+            .optional()
+            ['describe']('Context manifest UTF-8 budget. Default: 16 KiB.'),
         contextMode: z
             .enum(['auto', 'include', 'omit'])
-            .optional()['describe']('Inline context policy for open/refresh. Open auto includes; refresh auto includes only after refresh/failure.'),
-        concurrency: z.number().int().min(1).max(8).optional()['describe']('Bounded open/refresh concurrency. Default: 4.'),
+            .optional()
+            ['describe'](
+                'Inline context policy for open/refresh. Open auto includes; refresh auto includes only after refresh/failure.',
+            ),
+        concurrency: z
+            .number()
+            .int()
+            .min(1)
+            .max(8)
+            .optional()
+            ['describe']('Bounded open/refresh concurrency. Default: 4.'),
         parseSymbols: z.boolean().optional()['describe']('Parse symbols/imports during open. Default: true.'),
-        indexMode: z.enum(['auto', 'off']).optional()['describe']('auto refreshes only selected paths in the shared index. Default: auto.'),
+        indexMode: z
+            .enum(['auto', 'off'])
+            .optional()
+            ['describe']('auto refreshes only selected paths in the shared index. Default: auto.'),
         selectionMode: z
             .enum(['coverage', 'lexical'])
-            .optional()['describe']('Directory selection inside maxFiles. Default coverage; lexical preserves historical prefix ordering.'),
+            .optional()
+            ['describe'](
+                'Directory selection inside maxFiles. Default coverage; lexical preserves historical prefix ordering.',
+            ),
         seedPaths: z
             .array(z.string().min(1))
             .max(32)
-            .optional()['describe']('Preferred workspace-relative files for open. Eligible seeds count inside the same maxFiles cap.'),
+            .optional()
+            ['describe'](
+                'Preferred workspace-relative files for open. Eligible seeds count inside the same maxFiles cap.',
+            ),
         seedSymbols: z
             .array(z.string().min(1).max(256))
             .max(32)
-            .optional()['describe']('Exact symbols resolved from the local index into preferred files inside the same maxFiles cap.'),
+            .optional()
+            ['describe'](
+                'Exact symbols resolved from the local index into preferred files inside the same maxFiles cap.',
+            ),
         include: z.array(z.string().min(1)).max(32).optional(),
         exclude: z.array(z.string().min(1)).max(32).optional(),
-        modifiedPaths: z.array(z.string().min(1)).max(128).optional()['describe']('Explicit changed paths for action=refresh; omitted means known invalidations only.'),
+        modifiedPaths: z
+            .array(z.string().min(1))
+            .max(128)
+            .optional()
+            ['describe']('Explicit changed paths for action=refresh; omitted means known invalidations only.'),
         symbol: z.string().min(1).max(256).optional()['describe']('Symbol query for action=find.'),
         exactMatch: z.boolean().optional(),
-        maxResults: z.number().int().min(1).max(200).optional()['describe']('Maximum symbol matches for action=find. Default: 50.'),
+        maxResults: z
+            .number()
+            .int()
+            .min(1)
+            .max(200)
+            .optional()
+            ['describe']('Maximum symbol matches for action=find. Default: 50.'),
     },
     annotations: { ...readOnlyAnnotations(), idempotentHint: false },
     handler: async ({
@@ -134,7 +183,12 @@ export const repoWorkingSetTool = {
                 const seed = await resolveReadPath(candidate);
                 if (!seed.ok) return errorResult(seed.reason, seed);
                 const fromRoot = relative(resolved.resolved, seed.resolved);
-                if (fromRoot === '..' || fromRoot.startsWith('../') || fromRoot.startsWith('..\\') || isAbsolute(fromRoot)) {
+                if (
+                    fromRoot === '..' ||
+                    fromRoot.startsWith('../') ||
+                    fromRoot.startsWith('..\\') ||
+                    isAbsolute(fromRoot)
+                ) {
                     return errorResult('Working-set seed path must stay inside the opened root.', {
                         code: 'ERR_WORKING_SET_SEED_OUTSIDE_ROOT',
                         seedPath: candidate,
@@ -165,7 +219,9 @@ export const repoWorkingSetTool = {
             const stats = await handle.awaitReady();
             if (!getScopeStats(id)) {
                 mcpWorkingSets.delete(id);
-                return errorResult('Working set closed or evicted before becoming ready.', { code: 'ERR_WORKING_SET_EVICTED' });
+                return errorResult('Working set closed or evicted before becoming ready.', {
+                    code: 'ERR_WORKING_SET_EVICTED',
+                });
             }
             const effectiveContextMode = contextMode ?? 'auto';
             const contextIncluded = effectiveContextMode !== 'omit';
@@ -227,12 +283,15 @@ export const repoWorkingSetTool = {
         }
 
         if (action === 'find') {
-            if (!symbol) return errorResult('action=find requires symbol.', { code: 'ERR_WORKING_SET_SYMBOL_REQUIRED' });
+            if (!symbol)
+                return errorResult('action=find requires symbol.', { code: 'ERR_WORKING_SET_SYMBOL_REQUIRED' });
             const limit = maxResults ?? 50;
-            const matches = findSymbol(owned.scopeId, symbol, { exactMatch }).slice(0, limit).map((entry) => ({
-                path: toRepoPath(entry.filePath),
-                symbol: entry.symbol,
-            }));
+            const matches = findSymbol(owned.scopeId, symbol, { exactMatch })
+                .slice(0, limit)
+                .map((entry) => ({
+                    path: toRepoPath(entry.filePath),
+                    symbol: entry.symbol,
+                }));
             return okResult(
                 { workingSetId, symbol, exactMatch: exactMatch ?? false, matchCount: matches.length, matches },
                 `Working set ${workingSetId}: ${matches.length} match(es) for symbol ${symbol}.`,

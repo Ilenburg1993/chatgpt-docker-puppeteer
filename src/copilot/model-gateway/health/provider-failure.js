@@ -13,7 +13,16 @@
 import { toError } from '#copilot/core';
 
 /**
- * @typedef {'credits' | 'rate-limit' | 'auth' | 'model-or-route' | 'capability-unsupported' | 'invalid-request' | 'timeout' | 'network' | 'upstream' | 'unknown'} ByokProviderFailureKind
+ * @typedef {'credits'
+ *     | 'rate-limit'
+ *     | 'auth'
+ *     | 'model-or-route'
+ *     | 'capability-unsupported'
+ *     | 'invalid-request'
+ *     | 'timeout'
+ *     | 'network'
+ *     | 'upstream'
+ *     | 'unknown'} ByokProviderFailureKind
  */
 
 /**
@@ -71,8 +80,18 @@ export function isByokProviderFailure(value) {
 function readStructuredStatusCode(error) {
     if (!error || typeof error !== 'object') return null;
     const record = /** @type {Record<string, unknown>} */ (error);
-    const response = record['response'] && typeof record['response'] === 'object' ? /** @type {Record<string, unknown>} */ (record['response']) : {};
-    const candidates = [record['status'], record['statusCode'], record['responseStatus'], record['httpStatus'], response['status'], response['statusCode']];
+    const response =
+        record['response'] && typeof record['response'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (record['response'])
+            : {};
+    const candidates = [
+        record['status'],
+        record['statusCode'],
+        record['responseStatus'],
+        record['httpStatus'],
+        response['status'],
+        response['statusCode'],
+    ];
     for (const candidate of candidates) {
         if (typeof candidate === 'number' && Number.isInteger(candidate) && candidate >= 100 && candidate <= 599) {
             return candidate;
@@ -194,7 +213,8 @@ function readHeader(headers, name) {
     }
     if (!isRecord(headers)) return null;
     for (const [key, value] of Object.entries(headers)) {
-        if (key.toLowerCase() === lower) return stringValue(value) ?? (typeof value === 'number' ? String(value) : null);
+        if (key.toLowerCase() === lower)
+            return stringValue(value) ?? (typeof value === 'number' ? String(value) : null);
     }
     return null;
 }
@@ -213,7 +233,11 @@ function readHeaderSources(error) {
 /**
  * @param {unknown} error
  * @param {string} message
- * @returns {{ retryAfterSeconds: number | null; resetAt: string | null; limitHeaders: Record<string, string | number> }}
+ * @returns {{
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ *     limitHeaders: Record<string, string | number>;
+ * }}
  */
 function readLimitHints(error, message) {
     const limitHeaders = /** @type {Record<string, string | number>} */ ({});
@@ -236,28 +260,35 @@ function readLimitHints(error, message) {
             if (value !== null) limitHeaders[name] = finiteNumber(value) ?? value;
         }
     }
-    const retryHeader = headerSources.map((headers) => readHeader(headers, 'retry-after')).find((value) => value !== null);
+    const retryHeader = headerSources
+        .map((headers) => readHeader(headers, 'retry-after'))
+        .find((value) => value !== null);
     const retryAfterSeconds =
         retryHeader !== undefined && retryHeader !== null
             ? parseRetryAfterSeconds(retryHeader)
             : (() => {
-                  const match = message.match(/\b(?:retry(?:\s+after)?|try again in)\s+(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|m)\b/iu);
+                  const match = message.match(
+                      /\b(?:retry(?:\s+after)?|try again in)\s+(\d+(?:\.\d+)?)\s*(seconds?|secs?|s|minutes?|mins?|m)\b/iu,
+                  );
                   if (!match) return null;
                   const value = Number(match[1]);
                   return /m(?:in(?:ute)?s?)?/iu.test(match[2] ?? 's') ? value * 60 : value;
               })();
     const resetHeader = headerSources
-        .flatMap((headers) => ['x-ratelimit-reset', 'x-ratelimit-reset-requests', 'x-ratelimit-reset-tokens'].map((name) => readHeader(headers, name)))
+        .flatMap((headers) =>
+            ['x-ratelimit-reset', 'x-ratelimit-reset-requests', 'x-ratelimit-reset-tokens'].map((name) =>
+                readHeader(headers, name),
+            ),
+        )
         .find((value) => value !== null);
-    const resetFromHeader =
-        resetHeader !== undefined && resetHeader !== null
-            ? parseResetHeaderAt(resetHeader)
-            : null;
+    const resetFromHeader = resetHeader !== undefined && resetHeader !== null ? parseResetHeaderAt(resetHeader) : null;
     return {
         retryAfterSeconds,
         resetAt:
             resetFromHeader ??
-            (retryAfterSeconds !== null && retryAfterSeconds > 0 ? new Date(Date.now() + retryAfterSeconds * 1000).toISOString() : null),
+            (retryAfterSeconds !== null && retryAfterSeconds > 0
+                ? new Date(Date.now() + retryAfterSeconds * 1000).toISOString()
+                : null),
         limitHeaders,
     };
 }
@@ -351,7 +382,11 @@ function textLooksLikeUnsupportedCapabilityFailure(message) {
  * @param {ByokProviderFailureKind} kind
  * @param {number | null} statusCode
  * @param {string} message
- * @param {{ retryAfterSeconds: number | null; resetAt: string | null; limitHeaders: Record<string, string | number> }} limitHints
+ * @param {{
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ *     limitHeaders: Record<string, string | number>;
+ * }} limitHints
  * @returns {ByokProviderFailure}
  */
 function buildFailure(kind, statusCode, message, limitHints) {
@@ -498,7 +533,11 @@ export function classifyByokProviderFailure(error) {
     const statusCode = readStructuredStatusCode(error) ?? readMessageStatusCode(message);
     const code = readFailureCode(error);
     const limitHints = readLimitHints(error, message);
-    if (statusCode === 402 || /(?:insufficient_quota|quota_exceeded|credits?_exhausted)/iu.test(code) || textLooksLikeCreditsFailure(message)) {
+    if (
+        statusCode === 402 ||
+        /(?:insufficient_quota|quota_exceeded|credits?_exhausted)/iu.test(code) ||
+        textLooksLikeCreditsFailure(message)
+    ) {
         return buildFailure('credits', statusCode, message, limitHints);
     }
     if (statusCode === 429 || textLooksLikeRateLimitFailure(message)) {

@@ -9,8 +9,8 @@ import { createDefaultModelGatewayCatalogImporters } from '../catalog/default-im
 import { JsonModelGatewayCatalogStore } from '../catalog/json-catalog-store.js';
 import { planModelGatewayCatalogRefresh } from '../catalog/refresh-plan.js';
 import { refreshModelGatewayCatalog } from '../catalog/refresh.js';
-import { mirrorModelGatewayCatalogSnapshotToSqlite } from '../catalog/sqlite-migration.js';
 import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.js';
+import { mirrorModelGatewayCatalogSnapshotToSqlite } from '../catalog/sqlite-migration.js';
 import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
 import { assertModelGatewayCatalogWritePort } from './ports.js';
 import { createModelGatewayControlPlaneResult } from './result-envelope.js';
@@ -68,9 +68,9 @@ export class ModelGatewayCatalogControlPlane {
 
     /**
      * @param {{
-     *   catalogStore?: JsonModelGatewayCatalogStore;
-     *   sqliteStore?: SqliteModelGatewayCatalogStore;
-     *   env?: Record<string, string | undefined>;
+     *     catalogStore?: JsonModelGatewayCatalogStore;
+     *     sqliteStore?: SqliteModelGatewayCatalogStore;
+     *     env?: Record<string, string | undefined>;
      * }} [options]
      */
     constructor(options = {}) {
@@ -83,11 +83,11 @@ export class ModelGatewayCatalogControlPlane {
 
     /**
      * @param {{
-     *   includePublic: boolean;
-     *   includeAuthenticated: boolean;
-     *   force: boolean;
-     *   sourceIds: string[];
-     *   maxSourceResults: number;
+     *     includePublic: boolean;
+     *     includeAuthenticated: boolean;
+     *     force: boolean;
+     *     sourceIds: string[];
+     *     maxSourceResults: number;
      * }} input
      */
     async planRefresh(input) {
@@ -128,13 +128,13 @@ export class ModelGatewayCatalogControlPlane {
 
     /**
      * @param {{
-     *   includePublic: boolean;
-     *   includeAuthenticated: boolean;
-     *   force: boolean;
-     *   sourceIds: string[];
-     *   refreshAccountOverlays: boolean;
-     *   maxSourceResults: number;
-     *   idempotencyKey: string;
+     *     includePublic: boolean;
+     *     includeAuthenticated: boolean;
+     *     force: boolean;
+     *     sourceIds: string[];
+     *     refreshAccountOverlays: boolean;
+     *     maxSourceResults: number;
+     *     idempotencyKey: string;
      * }} input
      */
     async applyRefresh(input) {

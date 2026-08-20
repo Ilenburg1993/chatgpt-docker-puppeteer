@@ -5,15 +5,17 @@
  * @module copilot/mcp/tools/apps-sdk-readiness
  */
 
-import { readdir, readFile, stat } from 'node:fs/promises';
-import path from 'node:path';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import path from 'node:path';
 import { buildCompanyKnowledgeWidgetResource } from './apps-sdk-resources.js';
 import {
     COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
     COMPANY_KNOWLEDGE_SEARCH_TOOL_NAME,
     companyKnowledgeTools,
 } from './company-knowledge.js';
+
+const appsSdkWorkspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 /** @type {Record<string, string>} */
 const MARKERS = {
@@ -49,16 +51,18 @@ async function listJsFiles(directory) {
      */
     async function walk(current, depth) {
         if (depth > 8) return;
-        const entries = await readdir(current, { withFileTypes: true });
-        for (const entry of entries) {
-            const fullPath = path.join(current, entry.name);
-            if (entry.isDirectory()) {
-                if (entry.name === 'node_modules' || entry.name === '.git') continue;
+        const entries = (await appsSdkWorkspaceIo.listDirectoryNamesFresh(current)).entries;
+        for (const entryName of entries) {
+            const fullPath = path.join(current, entryName);
+            const info = (await appsSdkWorkspaceIo.lstatPath(fullPath)).stats;
+            if (info.isSymbolicLink()) continue;
+            if (info.isDirectory()) {
+                if (entryName === 'node_modules' || entryName === '.git') continue;
                 await walk(fullPath, depth + 1);
                 continue;
             }
-            if (entry.isFile() && entry.name === 'apps-sdk-readiness.js') continue;
-            if (entry.isFile() && /\.[cm]?[jt]s$/.test(entry.name)) files.push(fullPath);
+            if (info.isFile() && entryName === 'apps-sdk-readiness.js') continue;
+            if (info.isFile() && /\.[cm]?[jt]s$/.test(entryName)) files.push(fullPath);
         }
     }
     await walk(directory, 0);
@@ -74,9 +78,9 @@ async function scanMarkers(files) {
     const found = {};
     for (const [key] of Object.entries(MARKERS)) found[key] = [];
     for (const file of files) {
-        const stats = await stat(file);
+        const stats = (await appsSdkWorkspaceIo.statPath(file)).stats;
         if (stats.size > 512 * 1024) continue;
-        const text = await readFile(file, 'utf8');
+        const text = (await appsSdkWorkspaceIo.readTextFresh(file, { includeHash: false })).content;
         for (const [key, marker] of Object.entries(MARKERS)) {
             const matches = found[key] ?? [];
             if (text.includes(marker)) matches.push(path.relative(getMcpWorkspaceRoot(), file));
@@ -160,13 +164,17 @@ export const mcpAppsSdkReadinessTool = {
             companyKnowledge: {
                 searchFetchToolsDetected,
                 toolNames: searchFetchToolsDetected ? ['search', 'fetch'] : [],
-                outputCompatibility: searchFetchToolsDetected ? 'structuredContent plus JSON content text' : 'not-ready',
+                outputCompatibility: searchFetchToolsDetected
+                    ? 'structuredContent plus JSON content text'
+                    : 'not-ready',
                 note: searchFetchToolsDetected
                     ? 'Company Knowledge exact search/fetch tools are present and read-only.'
                     : 'Company Knowledge requires exact search/fetch tool shapes; this repo MCP currently exposes repo-specific read tools instead.',
             },
             recommendedActions: [
-                hasWidgetResource ? 'Keep _meta.ui.csp explicit for every widget resource.' : 'Do not spend prompt-friction time on CSP until a widget resource is added.',
+                hasWidgetResource
+                    ? 'Keep _meta.ui.csp explicit for every widget resource.'
+                    : 'Do not spend prompt-friction time on CSP until a widget resource is added.',
                 hasWidgetResource && !hasWidgetDomain
                     ? 'Add a dedicated HTTPS _meta.ui.domain plus matching openai/widgetDomain before plugin submission.'
                     : widgetDomainAliasesMatch

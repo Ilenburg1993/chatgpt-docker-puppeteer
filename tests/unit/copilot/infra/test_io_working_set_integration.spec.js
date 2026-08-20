@@ -6,6 +6,7 @@ import { afterAll, beforeEach, describe, it } from 'vitest';
 
 import { resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
 import { refreshIoIndexPaths } from '../../../../src/copilot/infra/io-index-registry.js';
+import { getParserCacheStats, resetParserCacheForTest } from '../../../../src/copilot/infra/io-parser.js';
 import {
     closeScope,
     declareScope,
@@ -13,7 +14,6 @@ import {
     getScopeContext,
     refreshScope,
 } from '../../../../src/copilot/infra/io-session-scope.js';
-import { getParserCacheStats, resetParserCacheForTest } from '../../../../src/copilot/infra/io-parser.js';
 
 const WORKSPACE_ROOT = process.cwd();
 const TOOLS_DIR = join(WORKSPACE_ROOT, 'src/copilot/mcp/tools');

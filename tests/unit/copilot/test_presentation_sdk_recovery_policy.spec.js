@@ -79,9 +79,9 @@ describe('presentation/sdk-recovery-policy', () => {
         expect(message.label).toBe('[sdk rede]');
         expect(message.detail).toContain('Falha transitória');
         expect(message.actionHint).not.toContain('Reautentique');
-        expect(getSdkRecoveryPolicy(new Error('Authentication failed: token validation upstream (502)'), 'session').kind).toBe(
-            'network',
-        );
+        expect(
+            getSdkRecoveryPolicy(new Error('Authentication failed: token validation upstream (502)'), 'session').kind,
+        ).toBe('network');
     });
 
     it('classifica bloqueios de conta e modelo sem sugerir reconnect local', () => {

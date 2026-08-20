@@ -6,12 +6,13 @@
  */
 
 import * as nodeFs from 'node:fs';
-import { copyFile, link, readFile, rename, stat, unlink } from 'node:fs/promises';
+import { copyFile, link, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
-import { sha256 } from '../../shared/hash.js';
+import { preflightIoCapacity } from './capacity-preflight.js';
 import { assertSuccessfulSync, syncFileBestEffort, syncParentDirectoryBestEffort } from './durability.js';
 import { emitMutationPhase } from './mutation-phase.js';
-import { preflightIoCapacity } from './capacity-preflight.js';
+import { markMutationAppliedError } from './mutation-state.js';
+import { readBinaryMutationSnapshot } from './snapshot.js';
 import { prepareSiblingTempPath } from './temp-path.js';
 
 /**
@@ -19,8 +20,8 @@ import { prepareSiblingTempPath } from './temp-path.js';
  * @returns {Promise<{ contentHash: string; bytes: number }>}
  */
 async function readFileIntegrity(filePath) {
-    const [stats, content] = await Promise.all([stat(filePath), readFile(filePath)]);
-    return { contentHash: sha256(content), bytes: stats.size };
+    const snapshot = await readBinaryMutationSnapshot(filePath, { snapshotMaxBytes: 0 });
+    return { contentHash: snapshot.contentHash, bytes: snapshot.bytesRead };
 }
 
 /**
@@ -49,10 +50,13 @@ async function readFileIntegrity(filePath) {
  * }>}
  */
 export async function moveFileUnlocked(source, destination, options = {}) {
+    let destinationPublished = false;
+    let sourceRemoved = false;
     if (!options.overwrite) {
         try {
             await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: true });
             await link(source, destination);
+            destinationPublished = true;
             await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: true });
             let destinationDirectorySync;
             try {
@@ -69,6 +73,7 @@ export async function moveFileUnlocked(source, destination, options = {}) {
             try {
                 await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: false });
                 await unlink(source);
+                sourceRemoved = true;
             } catch (unlinkError) {
                 return duplicatedMoveResult(options, unlinkError, false, undefined, { destinationDirectorySync });
             }
@@ -91,14 +96,23 @@ export async function moveFileUnlocked(source, destination, options = {}) {
             };
         } catch (error) {
             const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
-            if (errCode !== 'EXDEV') throw error;
-            return moveFileAcrossDevices(source, destination, options);
+            if (errCode === 'EXDEV' && !destinationPublished)
+                return moveFileAcrossDevices(source, destination, options);
+            if (destinationPublished) {
+                throw markMutationAppliedError(error, {
+                    phase: sourceRemoved ? 'source-removed' : 'destination-published',
+                    paths: [source, destination],
+                });
+            }
+            throw error;
         }
     }
 
     try {
         await emitMutationPhase(options, 'before-publish', { source, destination, exclusive: false });
         await rename(source, destination);
+        destinationPublished = true;
+        sourceRemoved = true;
         await emitMutationPhase(options, 'after-publish', { source, destination, exclusive: false });
         const destinationDirectorySync = await syncMoveDirectory(options, destination, 'destination', {
             source,
@@ -126,8 +140,14 @@ export async function moveFileUnlocked(source, destination, options = {}) {
         };
     } catch (error) {
         const errCode = /** @type {{ code?: unknown }} */ (error)?.code;
-        if (errCode !== 'EXDEV') throw error;
-        return moveFileAcrossDevices(source, destination, options);
+        if (errCode === 'EXDEV' && !destinationPublished) return moveFileAcrossDevices(source, destination, options);
+        if (destinationPublished) {
+            throw markMutationAppliedError(error, {
+                phase: sourceRemoved ? 'source-removed' : 'destination-published',
+                paths: [source, destination],
+            });
+        }
+        throw error;
     }
 }
 
@@ -151,6 +171,8 @@ async function moveFileAcrossDevices(source, destination, options) {
         ? options.tempPathFactory(destination, 'move')
         : await prepareSiblingTempPath(destination, 'move');
     let tmpCreated = false;
+    let destinationPublished = false;
+    let sourceRemoved = false;
     try {
         const sourceBefore =
             options.expectedSourceHash && typeof options.expectedSourceBytes === 'number'
@@ -163,7 +185,10 @@ async function moveFileAcrossDevices(source, destination, options) {
         await copyFile(source, tmpDestination, nodeFs.constants.COPYFILE_EXCL);
         tmpCreated = true;
         await emitMutationPhase(options, 'temp-written', { source, destination, tmpDestination, crossDevice: true });
-        const [sourceAfter, tempAfter] = await Promise.all([readFileIntegrity(source), readFileIntegrity(tmpDestination)]);
+        const [sourceAfter, tempAfter] = await Promise.all([
+            readFileIntegrity(source),
+            readFileIntegrity(tmpDestination),
+        ]);
         if (sourceAfter.contentHash !== sourceBefore.contentHash || sourceAfter.bytes !== sourceBefore.bytes) {
             const err = new Error(`Origem mudou durante move cross-device: ${source}`);
             /** @type {{ code?: string }} */ (err).code = 'ESOURCECHANGED';
@@ -176,18 +201,40 @@ async function moveFileAcrossDevices(source, destination, options) {
         }
         await emitMutationPhase(options, 'before-file-sync', { source, destination, target: tmpDestination });
         const syncResult = await (options.syncFile ?? syncFileBestEffort)(tmpDestination);
-        await emitMutationPhase(options, 'after-file-sync', { source, destination, target: tmpDestination, ...syncResult });
+        await emitMutationPhase(options, 'after-file-sync', {
+            source,
+            destination,
+            target: tmpDestination,
+            ...syncResult,
+        });
         assertSuccessfulSync(syncResult, {
             code: 'EFILESYNC',
             message: `Falha ao sincronizar move cross-device: ${tmpDestination}`,
         });
         if (options.overwrite) {
-            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: false });
+            await emitMutationPhase(options, 'before-publish', {
+                source,
+                destination,
+                tmpDestination,
+                exclusive: false,
+            });
             await rename(tmpDestination, destination);
-            await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: false });
+            destinationPublished = true;
+            await emitMutationPhase(options, 'after-publish', {
+                source,
+                destination,
+                tmpDestination,
+                exclusive: false,
+            });
         } else {
-            await emitMutationPhase(options, 'before-publish', { source, destination, tmpDestination, exclusive: true });
+            await emitMutationPhase(options, 'before-publish', {
+                source,
+                destination,
+                tmpDestination,
+                exclusive: true,
+            });
             await link(tmpDestination, destination);
+            destinationPublished = true;
             await emitMutationPhase(options, 'after-publish', { source, destination, tmpDestination, exclusive: true });
             await unlink(tmpDestination);
         }
@@ -209,6 +256,7 @@ async function moveFileAcrossDevices(source, destination, options) {
         try {
             await emitMutationPhase(options, 'before-source-unlink', { source, destination, crossDevice: true });
             await unlink(source);
+            sourceRemoved = true;
         } catch (unlinkError) {
             return duplicatedMoveResult(options, unlinkError, true, tempAfter, {
                 fileSync: syncResult,
@@ -236,6 +284,12 @@ async function moveFileAcrossDevices(source, destination, options) {
     } catch (error) {
         if (tmpCreated) {
             await unlink(tmpDestination).catch(() => undefined);
+        }
+        if (destinationPublished) {
+            throw markMutationAppliedError(error, {
+                phase: sourceRemoved ? 'source-removed' : 'destination-published',
+                paths: [source, destination],
+            });
         }
         throw error;
     }

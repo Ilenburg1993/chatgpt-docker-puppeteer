@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
+import { getCanonicalMcpTools } from '#copilot/mcp';
 import {
     MCP_AUTH_SCOPES,
     authorizeMcpToolCall,
@@ -17,7 +18,6 @@ import {
     scopesForMcpTool,
     securitySchemesForMcpTool,
 } from '#copilot/mcp/control-plane';
-import { getCanonicalMcpTools } from '#copilot/mcp';
 
 /** @type {import('#copilot/mcp').McpToolDefinition} */
 const readTool = {
@@ -91,7 +91,9 @@ describe('MCP auth hardening', () => {
         });
 
         assert.match(challenge, /^Bearer /u);
-        assert.ok(challenge.includes('resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource"'));
+        assert.ok(
+            challenge.includes('resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource"'),
+        );
         assert.ok(challenge.includes('scope="repo:read repo:write"'));
         assert.ok(!challenge.includes('\n'));
         assert.ok(!challenge.includes('\r'));
@@ -140,15 +142,10 @@ describe('MCP auth hardening', () => {
             COPILOT_MCP_STATIC_BEARER_TOKEN: 'local-static-token',
             COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
         });
-        const decision = await authorizeMcpToolCall(
-            readTool,
-            { bearerToken: 'local-static-token' },
-            config,
-            {
-                COPILOT_MCP_STATIC_BEARER_TOKEN: 'local-static-token',
-                COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
-            },
-        );
+        const decision = await authorizeMcpToolCall(readTool, { bearerToken: 'local-static-token' }, config, {
+            COPILOT_MCP_STATIC_BEARER_TOKEN: 'local-static-token',
+            COPILOT_MCP_STATIC_BEARER_TOKEN_ENABLED: 'true',
+        });
 
         assert.equal(decision.allowed, true);
         assert.equal(decision.method, 'static-bearer');

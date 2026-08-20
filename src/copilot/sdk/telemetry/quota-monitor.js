@@ -126,13 +126,17 @@ export function createQuotaMonitor(opts) {
                     onError(toError(err));
                 }
             });
-            _timer = registerInterval(_timerId, () => {
-                _fetch().catch((err) => {
-                    if (typeof onError === 'function') {
-                        onError(toError(err));
-                    }
-                });
-            }, intervalMs);
+            _timer = registerInterval(
+                _timerId,
+                () => {
+                    _fetch().catch((err) => {
+                        if (typeof onError === 'function') {
+                            onError(toError(err));
+                        }
+                    });
+                },
+                intervalMs,
+            );
             // Não bloquear processo
             if (
                 typeof _timer === 'object' &&

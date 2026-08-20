@@ -19,14 +19,14 @@ import { KILO_PROVIDER_ENDPOINTS } from './kilo.js';
 import { MISTRAL_PROVIDER_ENDPOINTS } from './mistral.js';
 import { NVIDIA_NIM_PROVIDER_ENDPOINTS } from './nvidia-nim.js';
 import { OLLAMA_PROVIDER_ENDPOINTS } from './ollama.js';
-import { OPENCODE_PROVIDER_ENDPOINTS } from './opencode.js';
 import { OPENAI_PROVIDER_ENDPOINTS } from './openai.js';
+import { OPENCODE_PROVIDER_ENDPOINTS } from './opencode.js';
 import { OPENROUTER_PROVIDER_ENDPOINTS } from './openrouter.js';
 import { ZAI_PROVIDER_ENDPOINTS } from './zai.js';
 export {
-    MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES,
     auditProviderEndpointImporterCoverage,
     listProviderEndpointSourceRecords,
+    MODEL_GATEWAY_ENDPOINT_RICHNESS_CATEGORIES,
     normalizeProviderEndpointRichness,
 } from './source-records.js';
 
@@ -110,8 +110,8 @@ export {
     MISTRAL_PROVIDER_ENDPOINTS,
     NVIDIA_NIM_PROVIDER_ENDPOINTS,
     OLLAMA_PROVIDER_ENDPOINTS,
-    OPENCODE_PROVIDER_ENDPOINTS,
     OPENAI_PROVIDER_ENDPOINTS,
+    OPENCODE_PROVIDER_ENDPOINTS,
     OPENROUTER_PROVIDER_ENDPOINTS,
     ZAI_PROVIDER_ENDPOINTS,
 };

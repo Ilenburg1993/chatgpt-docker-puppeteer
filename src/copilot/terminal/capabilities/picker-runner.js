@@ -2,8 +2,9 @@
 /**
  * Executor opt-in para pickers externos (`fzf`/`gum`).
  *
- * Este módulo não decide quando uma TUI pode tomar o terminal. Ele só executa a ferramenta depois que o comando chamador
- * já passou por `withTerminalExclusiveTty()`. Entrada e argumentos são sempre tokenizados; não há shell livre.
+ * Este módulo não decide quando uma TUI pode tomar o terminal. Ele só executa a ferramenta depois que o comando
+ * chamador já passou por `withTerminalExclusiveTty()`. Entrada e argumentos são sempre tokenizados; não há shell
+ * livre.
  *
  * @module copilot/terminal/capabilities/picker-runner
  */
@@ -127,7 +128,11 @@ export function runTerminalExternalPicker(items, options) {
         };
     }
 
-    const selectedLine = String(result.stdout ?? '').split(/\r?\n/u).find(Boolean)?.trim() ?? '';
+    const selectedLine =
+        String(result.stdout ?? '')
+            .split(/\r?\n/u)
+            .find(Boolean)
+            ?.trim() ?? '';
     const item = lineMap.get(selectedLine) ?? null;
     if (!item) {
         return { status: 'failed', item: null, renderer, reason: 'seleção não corresponde a item conhecido' };

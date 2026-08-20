@@ -1,26 +1,34 @@
 # Auditoria zero-base e correções — WORKSPACE MCP
 
-**Data:** 2026-05-23
-**Contexto:** nova auditoria completa após reinício do servidor MCP e correção de autenticação.
-**Escopo:** tools MCP, OAuth, Cloudflare permanent tunnel, runtime health, smoke, index, validação, permissões e fricção operacional do ChatGPT sobre o repo.
+**Data:** 2026-05-23 **Contexto:** nova auditoria completa após reinício do servidor MCP e correção
+de autenticação. **Escopo:** tools MCP, OAuth, Cloudflare permanent tunnel, runtime health, smoke,
+index, validação, permissões e fricção operacional do ChatGPT sobre o repo.
 
 ---
 
 ## 1. Resumo executivo
 
-A nova auditoria foi feita como zero-base, sem assumir que os bugs da auditoria anterior ainda existiam. O servidor reiniciado mostrou avanços relevantes:
+A nova auditoria foi feita como zero-base, sem assumir que os bugs da auditoria anterior ainda
+existiam. O servidor reiniciado mostrou avanços relevantes:
 
 - Autenticação MCP voltou a funcionar para chamadas reais após o ajuste externo de autenticação.
 - HEAD observado: `1e515dfe feat(copilot-mcp): harden permanent tunnel readiness`.
 - `mcp_tools_status` agora mostra **68 tools**.
-- A superfície tem **50 tools read-only**, **16 bounded-write**, **2 destrutivas** e **0 open-world**.
-- `mcp_runtime_health` agora considera o permanent tunnel como readiness principal e marca o quick tunnel temporário como fallback ignorado para readiness operacional.
-- O index auto-build está ativo e concluído, com **998 arquivos**, **5779 símbolos**, **2390 imports** e **1541 chunks**.
-- `mcp_last_validation_summary` agora inclui `effectiveChecks`, corrigindo a ambiguidade anterior em que um typecheck antigo falho obscurecia typecheck bem-sucedido dentro de suite.
-- OAuth continua ativo em `mode=oauth`, `enforcement=all`, com issuer `https://mcp.aurelin.org` pronto.
+- A superfície tem **50 tools read-only**, **16 bounded-write**, **2 destrutivas** e **0
+  open-world**.
+- `mcp_runtime_health` agora considera o permanent tunnel como readiness principal e marca o quick
+  tunnel temporário como fallback ignorado para readiness operacional.
+- O index auto-build está ativo e concluído, com **998 arquivos**, **5779 símbolos**, **2390
+  imports** e **1541 chunks**.
+- `mcp_last_validation_summary` agora inclui `effectiveChecks`, corrigindo a ambiguidade anterior em
+  que um typecheck antigo falho obscurecia typecheck bem-sucedido dentro de suite.
+- OAuth continua ativo em `mode=oauth`, `enforcement=all`, com issuer `https://mcp.aurelin.org`
+  pronto.
 - O permanent connector URL continua validado como `https://mcp.aurelin.org/mcp`.
 
-A auditoria encontrou um gap remanescente pequeno porém real: `chatgpt_connector_current_url_status` ainda retornava `recovery` do quick tunnel temporário quando a URL permanente estava válida. Isso podia induzir o ChatGPT/usuário a reiniciar o quick tunnel desnecessariamente.
+A auditoria encontrou um gap remanescente pequeno porém real: `chatgpt_connector_current_url_status`
+ainda retornava `recovery` do quick tunnel temporário quando a URL permanente estava válida. Isso
+podia induzir o ChatGPT/usuário a reiniciar o quick tunnel desnecessariamente.
 
 ---
 
@@ -69,7 +77,8 @@ recovery: permanentReady ? [] : temporaryTunnel.recovery,
 Efeito prático:
 
 - Quando o permanent tunnel está válido, `recovery` fica vazio.
-- O quick tunnel temporário continua visível como diagnóstico/fallback, mas com `ignoredForOperationalReadiness: true`.
+- O quick tunnel temporário continua visível como diagnóstico/fallback, mas com
+  `ignoredForOperationalReadiness: true`.
 - `permanentTunnel.ready` explicita que o caminho principal está pronto.
 
 ### 2.2. Arquivo alterado: `tests/unit/copilot/mcp/test_mcp_tools.spec.js`
@@ -102,7 +111,8 @@ head: 1e515dfe
 workspace dirty: true
 ```
 
-Itens dirty existentes foram ignorados conforme instrução explícita, pois estão validados e prontos para commit/push pelo usuário.
+Itens dirty existentes foram ignorados conforme instrução explícita, pois estão validados e prontos
+para commit/push pelo usuário.
 
 ### 3.2. Tools e metadados
 
@@ -124,7 +134,10 @@ repo_apply_file_batch
 repo_remove_file
 ```
 
-Observação: `repo_apply_file_batch` está marcada como destrutiva. Isso parece defensável porque uma batch pode incluir `remove_file`, `move_file` com overwrite ou operações múltiplas de alto impacto. Entretanto, ela deve continuar exigindo confirmação forte e cobertura de testes, especialmente para dry-run/limites/rollback.
+Observação: `repo_apply_file_batch` está marcada como destrutiva. Isso parece defensável porque uma
+batch pode incluir `remove_file`, `move_file` com overwrite ou operações múltiplas de alto impacto.
+Entretanto, ela deve continuar exigindo confirmação forte e cobertura de testes, especialmente para
+dry-run/limites/rollback.
 
 ### 3.3. OAuth
 
@@ -160,7 +173,8 @@ recommendedAction: use-permanent-hostname
 lastSmokeOk: true
 ```
 
-Também mostrou `temporaryFallbackTunnel.ignoredForOperationalReadiness = true`, o que confirma que o bug anterior no runtime principal já foi corrigido antes desta rodada.
+Também mostrou `temporaryFallbackTunnel.ignoredForOperationalReadiness = true`, o que confirma que o
+bug anterior no runtime principal já foi corrigido antes desta rodada.
 
 A correção desta rodada aplicou a mesma lógica para `chatgpt_connector_current_url_status`.
 
@@ -174,11 +188,13 @@ warnings:
 critical: []
 ```
 
-Como o usuário pediu para ignorar os dirty items, esse estado não foi tratado como problema operacional.
+Como o usuário pediu para ignorar os dirty items, esse estado não foi tratado como problema
+operacional.
 
 ### 3.6. Smoke
 
-`mcp_smoke_workspace` passou todos os checks funcionais e retornou `degraded` apenas por `WORKSPACE_DIRTY`.
+`mcp_smoke_workspace` passou todos os checks funcionais e retornou `degraded` apenas por
+`WORKSPACE_DIRTY`.
 
 Checks relevantes:
 
@@ -222,7 +238,8 @@ unit-mcp: passed via suite-mcp-fast
 lint: passed via lint
 ```
 
-Isso corrige o problema anterior em que `typecheck` isolado antigo falho podia ser interpretado como estado efetivo atual.
+Isso corrige o problema anterior em que `typecheck` isolado antigo falho podia ser interpretado como
+estado efetivo atual.
 
 ---
 
@@ -251,17 +268,22 @@ recommendedAlternatives: mcp_validation_plan, mcp_last_validation_summary
 mcpReachedServer: false
 ```
 
-Impacto: a alteração foi aplicada no repo, mas não consegui executar a suíte real nesta sessão pelo host ChatGPT.
+Impacto: a alteração foi aplicada no repo, mas não consegui executar a suíte real nesta sessão pelo
+host ChatGPT.
 
 ### 4.2. Bloqueios variáveis em reads após muitas chamadas
 
-Também ocorreu bloqueio host em pelo menos uma chamada read-only posterior (`repo_search_text`) e uma chamada `git_diff`. Isso sugere fricção variável da camada ChatGPT mesmo com OAuth funcional e tools read-only anotadas.
+Também ocorreu bloqueio host em pelo menos uma chamada read-only posterior (`repo_search_text`) e
+uma chamada `git_diff`. Isso sugere fricção variável da camada ChatGPT mesmo com OAuth funcional e
+tools read-only anotadas.
 
 Impacto: investigação continuou por chamadas alternativas, leitura direta e status tools.
 
 ### 4.3. Hot reload ausente
 
-Após alterar `src/copilot/mcp/tools/connection.js`, a chamada runtime de `chatgpt_connector_current_url_status` ainda retornou a resposta antiga. O arquivo no repo foi confirmado com a alteração, mas o processo MCP ativo ainda estava com a versão carregada em memória.
+Após alterar `src/copilot/mcp/tools/connection.js`, a chamada runtime de
+`chatgpt_connector_current_url_status` ainda retornou a resposta antiga. O arquivo no repo foi
+confirmado com a alteração, mas o processo MCP ativo ainda estava com a versão carregada em memória.
 
 Conclusão: para validar a alteração em runtime, será necessário reiniciar o processo MCP.
 
@@ -270,10 +292,14 @@ Conclusão: para validar a alteração em runtime, será necessário reiniciar o
 ## 5. Gaps remanescentes
 
 1. **Reiniciar MCP para validar a correção runtime** de `chatgpt_connector_current_url_status`.
-2. **Rodar `mcp-fast` após restart**, preferencialmente fora da camada bloqueante do ChatGPT se o host continuar bloqueando validation jobs.
-3. **Confirmar comportamento da nova `repo_apply_file_batch`** em dry-run e em casos de limite/erro parcial/rollback.
-4. **Reduzir fricção host para validators**, talvez usando remember approval na UI ou uma tool read-only de “validation request manifest” ainda mais estreita.
-5. **Manter `repo_apply_file_batch` como destrutiva** salvo se ela for dividida em duas tools: uma batch apenas não-destrutiva e outra destrutiva.
+2. **Rodar `mcp-fast` após restart**, preferencialmente fora da camada bloqueante do ChatGPT se o
+   host continuar bloqueando validation jobs.
+3. **Confirmar comportamento da nova `repo_apply_file_batch`** em dry-run e em casos de limite/erro
+   parcial/rollback.
+4. **Reduzir fricção host para validators**, talvez usando remember approval na UI ou uma tool
+   read-only de “validation request manifest” ainda mais estreita.
+5. **Manter `repo_apply_file_batch` como destrutiva** salvo se ela for dividida em duas tools: uma
+   batch apenas não-destrutiva e outra destrutiva.
 
 ---
 
@@ -297,7 +323,8 @@ mcp_last_validation_summary
 mcp_run_safe_validation_suite suite=mcp-fast
 ```
 
-3. Se `mcp_run_safe_validation_suite` for bloqueado novamente pelo host, rodar a validação localmente no terminal:
+3. Se `mcp_run_safe_validation_suite` for bloqueado novamente pelo host, rodar a validação
+   localmente no terminal:
 
 ```bash
 node src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
@@ -309,13 +336,15 @@ node src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
 mcp_validation_request_manifest
 ```
 
-read-only, que gera um comando seguro e um hash de intenção para validação fora do host quando ChatGPT bloquear jobs.
+read-only, que gera um comando seguro e um hash de intenção para validação fora do host quando
+ChatGPT bloquear jobs.
 
 ---
 
 ## 7. Veredito
 
-A nova auditoria zero-base mostra que os bugs principais anteriores foram majoritariamente corrigidos antes desta rodada. O sistema está em estado muito mais maduro:
+A nova auditoria zero-base mostra que os bugs principais anteriores foram majoritariamente
+corrigidos antes desta rodada. O sistema está em estado muito mais maduro:
 
 - OAuth funcional;
 - permanent tunnel estabilizado;
@@ -327,15 +356,21 @@ A nova auditoria zero-base mostra que os bugs principais anteriores foram majori
 - 0 open-world tools;
 - e surface total ampliada para 68 tools.
 
-A correção aplicada nesta rodada foi pontual e alinhada ao estado atual: remover recovery enganoso do quick tunnel em `chatgpt_connector_current_url_status` quando a URL permanente está válida. Também foi adicionada cobertura de teste para esse comportamento.
+A correção aplicada nesta rodada foi pontual e alinhada ao estado atual: remover recovery enganoso
+do quick tunnel em `chatgpt_connector_current_url_status` quando a URL permanente está válida.
+Também foi adicionada cobertura de teste para esse comportamento.
 
-A única limitação relevante foi operacional: a camada ChatGPT/OpenAI bloqueou a validação real `mcp_run_safe_validation_suite`, e o MCP ativo não fez hot reload da alteração. Portanto, a alteração está aplicada no repo, mas sua validação runtime depende de restart do MCP e nova execução da suíte.
+A única limitação relevante foi operacional: a camada ChatGPT/OpenAI bloqueou a validação real
+`mcp_run_safe_validation_suite`, e o MCP ativo não fez hot reload da alteração. Portanto, a
+alteração está aplicada no repo, mas sua validação runtime depende de restart do MCP e nova execução
+da suíte.
 
 ---
 
 ## 8. Continuação pós-restart — upgrades de fluidez operacional
 
-Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em runtime:
+Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em
+runtime:
 
 ```text
 chatgpt_connector_current_url_status.recovery = []
@@ -345,9 +380,12 @@ temporaryTunnel.ignoredForOperationalReadiness = true
 
 ### 8.1. Problema operacional investigado
 
-A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
+A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar
+múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas
+reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
 
-Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
+Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais
+propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
 
 ### 8.2. Upgrade implementado: `repo_apply_file_batch_plan`
 
@@ -395,15 +433,19 @@ tests/unit/copilot/mcp/test_mcp_repo_write.spec.js
 Mudanças:
 
 - `repo-write.js`: adicionada a tool `repo_apply_file_batch_plan` antes de `repo_apply_file_batch`.
-- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
+- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao
+  grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
 - `test_mcp_registry.spec.js`: lista esperada de tools atualizada.
-- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan` planeja sem criar arquivo.
+- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan`
+  planeja sem criar arquivo.
 
 ### 8.4. Estado de runtime/discovery
 
-Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em `list_resources`/discovery depois de novo restart do MCP.
+Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em
+`list_resources`/discovery depois de novo restart do MCP.
 
-Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas `repo_apply_file_batch`.
+Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas
+`repo_apply_file_batch`.
 
 ### 8.5. Próxima validação necessária
 
@@ -439,7 +481,8 @@ node src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
 
 ## 8. Continuação pós-restart — upgrades de fluidez operacional
 
-Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em runtime:
+Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em
+runtime:
 
 ```text
 chatgpt_connector_current_url_status.recovery = []
@@ -449,9 +492,12 @@ temporaryTunnel.ignoredForOperationalReadiness = true
 
 ### 8.1. Problema operacional investigado
 
-A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
+A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar
+múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas
+reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
 
-Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
+Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais
+propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
 
 ### 8.2. Upgrade implementado: `repo_apply_file_batch_plan`
 
@@ -499,15 +545,19 @@ tests/unit/copilot/mcp/test_mcp_repo_write.spec.js
 Mudanças:
 
 - `repo-write.js`: adicionada a tool `repo_apply_file_batch_plan` antes de `repo_apply_file_batch`.
-- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
+- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao
+  grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
 - `test_mcp_registry.spec.js`: lista esperada de tools atualizada.
-- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan` planeja sem criar arquivo.
+- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan`
+  planeja sem criar arquivo.
 
 ### 8.4. Estado de runtime/discovery
 
-Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em `list_resources`/discovery depois de novo restart do MCP.
+Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em
+`list_resources`/discovery depois de novo restart do MCP.
 
-Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas `repo_apply_file_batch`.
+Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas
+`repo_apply_file_batch`.
 
 ### 8.5. Próxima validação necessária
 
@@ -543,7 +593,8 @@ node src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
 
 ## 8. Continuação pós-restart — upgrades de fluidez operacional
 
-Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em runtime:
+Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em
+runtime:
 
 ```text
 chatgpt_connector_current_url_status.recovery = []
@@ -553,9 +604,12 @@ temporaryTunnel.ignoredForOperationalReadiness = true
 
 ### 8.1. Problema operacional investigado
 
-A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
+A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar
+múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas
+reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
 
-Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
+Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais
+propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
 
 ### 8.2. Upgrade implementado: `repo_apply_file_batch_plan`
 
@@ -603,15 +657,19 @@ tests/unit/copilot/mcp/test_mcp_repo_write.spec.js
 Mudanças:
 
 - `repo-write.js`: adicionada a tool `repo_apply_file_batch_plan` antes de `repo_apply_file_batch`.
-- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
+- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao
+  grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
 - `test_mcp_registry.spec.js`: lista esperada de tools atualizada.
-- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan` planeja sem criar arquivo.
+- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan`
+  planeja sem criar arquivo.
 
 ### 8.4. Estado de runtime/discovery
 
-Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em `list_resources`/discovery depois de novo restart do MCP.
+Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em
+`list_resources`/discovery depois de novo restart do MCP.
 
-Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas `repo_apply_file_batch`.
+Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas
+`repo_apply_file_batch`.
 
 ### 8.5. Próxima validação necessária
 
@@ -647,7 +705,8 @@ node src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
 
 ## 8. Continuação pós-restart — upgrades de fluidez operacional
 
-Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em runtime:
+Após o restart do MCP/Cloudflare, foi validado que a correção anterior carregou corretamente em
+runtime:
 
 ```text
 chatgpt_connector_current_url_status.recovery = []
@@ -657,9 +716,12 @@ temporaryTunnel.ignoredForOperationalReadiness = true
 
 ### 8.1. Problema operacional investigado
 
-A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
+A tool `repo_apply_file_batch` é intencionalmente marcada como destrutiva, pois pode agrupar
+múltiplas operações de arquivo em uma chamada. Isso é correto do ponto de vista de segurança, mas
+reduz fluidez quando o ChatGPT só precisa planejar/validar uma batch.
 
-Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
+Sintoma observado: chamadas envolvendo ferramentas destrutivas ou de validação continuam mais
+propensas a bloqueios pelo host ChatGPT/OpenAI, mesmo com OAuth funcional.
 
 ### 8.2. Upgrade implementado: `repo_apply_file_batch_plan`
 
@@ -707,15 +769,19 @@ tests/unit/copilot/mcp/test_mcp_repo_write.spec.js
 Mudanças:
 
 - `repo-write.js`: adicionada a tool `repo_apply_file_batch_plan` antes de `repo_apply_file_batch`.
-- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
+- `meta.js`: `CAPABILITIES_VERSION` atualizado para 14; `repo_apply_file_batch_plan` adicionada ao
+  grupo read; guidance operacional atualizada para preferir plan tools antes de apply tools.
 - `test_mcp_registry.spec.js`: lista esperada de tools atualizada.
-- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan` planeja sem criar arquivo.
+- `test_mcp_repo_write.spec.js`: adicionado teste que confirma que `repo_apply_file_batch_plan`
+  planeja sem criar arquivo.
 
 ### 8.4. Estado de runtime/discovery
 
-Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em `list_resources`/discovery depois de novo restart do MCP.
+Como a registry ativa é carregada no processo MCP, a nova tool só aparecerá em
+`list_resources`/discovery depois de novo restart do MCP.
 
-Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas `repo_apply_file_batch`.
+Antes do próximo restart, o código já está no repo, mas a lista ativa ainda mostra apenas
+`repo_apply_file_batch`.
 
 ### 8.5. Próxima validação necessária
 
@@ -751,11 +817,14 @@ node src/copilot/mcp/scripts/run-safe-validation-suite.js mcp-fast
 
 ## 9. Continuação pós-reconexão — melhorias de conexão e smoke freshness
 
-Após uma nova reconexão de autenticação, foi retomada a correção que havia sido interrompida por `401: Reauthentication required`.
+Após uma nova reconexão de autenticação, foi retomada a correção que havia sido interrompida por
+`401: Reauthentication required`.
 
 ### 9.1. Problema identificado
 
-O permanent tunnel podia ter `lastSmokeOk=true`, mas o smoke do conector estar antigo. Isso é sutil: um smoke antigo pode parecer suficiente para dizer que a conexão está saudável, mesmo depois de mudanças em DNS, Cloudflare, OAuth, rota `/mcp` ou restart do servidor.
+O permanent tunnel podia ter `lastSmokeOk=true`, mas o smoke do conector estar antigo. Isso é sutil:
+um smoke antigo pode parecer suficiente para dizer que a conexão está saudável, mesmo depois de
+mudanças em DNS, Cloudflare, OAuth, rota `/mcp` ou restart do servidor.
 
 Estado observado nesta rodada:
 
@@ -774,7 +843,8 @@ Foi adicionado:
 const CONNECTOR_SMOKE_STALE_AFTER_MINUTES = 60;
 ```
 
-E `mcp_runtime_health` agora gera warning quando o último smoke da Cloudflare/connector está OK, mas antigo demais:
+E `mcp_runtime_health` agora gera warning quando o último smoke da Cloudflare/connector está OK, mas
+antigo demais:
 
 ```text
 Cloudflare connector smoke is <N> minutes old; refresh smoke after tunnel, auth or DNS changes.
@@ -826,7 +896,8 @@ permanentTunnel.lastSmokeStaleAfterMinutes === 60
 
 ### 9.5. Impacto esperado
 
-Essas mudanças reduzem problemas silenciosos de conexão porque o status passa a mostrar quando um smoke antigo deve ser refeito. Isso ajuda especialmente após:
+Essas mudanças reduzem problemas silenciosos de conexão porque o status passa a mostrar quando um
+smoke antigo deve ser refeito. Isso ajuda especialmente após:
 
 - restart do MCP;
 - reconexão OAuth;

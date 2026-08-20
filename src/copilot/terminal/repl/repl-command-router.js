@@ -24,6 +24,7 @@ import {
     readRuntimeInterventionMailboxSummary,
     setRl,
 } from '../../presentation/state/index.js';
+import { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from '../byok/index.js';
 import {
     cmdActivity as _cmdActivity,
     cmdAlias as _cmdAlias,
@@ -106,7 +107,6 @@ import {
     stopTerminalAgentRuntimeSession,
     stopTerminalDialogMode,
 } from '../frontend/gateways/index.js';
-import { promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary } from '../byok/index.js';
 import { clearRateLimiters } from '../state/repl-runtime/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeRows } from '../state/repl/index.js';
 import { deliverEntryAsTurnIfIdle } from '../wiring/mailbox/index.js';
@@ -313,7 +313,13 @@ async function scheduleRestartSdkSessionBootSelection(tokens) {
             });
         }
         if (!resolved) {
-            println(terminalThemeRow('Sessão SDK', `não resolvida para ${target} · rode /session sdk para ver o inventário`, { role: 'warn' }));
+            println(
+                terminalThemeRow(
+                    'Sessão SDK',
+                    `não resolvida para ${target} · rode /session sdk para ver o inventário`,
+                    { role: 'warn' },
+                ),
+            );
             return null;
         }
         const result = await scheduleTerminalSdkSessionBootSelection({
@@ -329,11 +335,7 @@ async function scheduleRestartSdkSessionBootSelection(tokens) {
         return 'usar seleção automática de sessão SDK';
     }
     println(
-        terminalThemeRow(
-            'Uso',
-            '/restart [new|resume <id|#n|atual|última|primeiro-plano>|auto]',
-            { role: 'warn' },
-        ),
+        terminalThemeRow('Uso', '/restart [new|resume <id|#n|atual|última|primeiro-plano>|auto]', { role: 'warn' }),
     );
     return null;
 }
@@ -351,11 +353,17 @@ async function _cmdRestartSdkSession(args = []) {
         const promoted = await promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary({
             source: 'terminal.restart_sdk_session.route_promotion',
         }).catch((error) => {
-            println(terminalThemeRow('BYOK', `promoção diferida ignorada · ${toError(error).message}`, { role: 'warn' }));
+            println(
+                terminalThemeRow('BYOK', `promoção diferida ignorada · ${toError(error).message}`, { role: 'warn' }),
+            );
             return null;
         });
         if (promoted && promoted.promoted > 0) {
-            println(terminalThemeRow('BYOK', `${promoted.promoted} rota(s) diferida(s) promovida(s) antes do restart`, { role: 'success' }));
+            println(
+                terminalThemeRow('BYOK', `${promoted.promoted} rota(s) diferida(s) promovida(s) antes do restart`, {
+                    role: 'success',
+                }),
+            );
         }
         println(terminalThemeRow('Sessão SDK', 'encerrando runtime atual', { role: 'muted' }));
         const { promise: readyPromise, resolve: resolveReady, reject: rejectReady } = Promise.withResolvers();
@@ -399,14 +407,18 @@ async function _cmdRestartSdkSession(args = []) {
         );
     } catch (e) {
         println(terminalThemeRow('Sessão SDK', `falha ao reiniciar · ${toError(e).message}`, { role: 'error' }));
-        await ensureDialogLoop().catch((error) => logSwallowed(error, 'terminal.repl.restartSdkSession.ensureDialogLoop'));
+        await ensureDialogLoop().catch((error) =>
+            logSwallowed(error, 'terminal.repl.restartSdkSession.ensureDialogLoop'),
+        );
     }
 }
 
 async function _cmdPauseDialogLoop() {
     try {
         await pauseTerminalDialogLoop();
-        println(terminalThemeRow('Conversa', 'pausada · use /dialog-resume para retomar sem consumir PR', { role: 'warn' }));
+        println(
+            terminalThemeRow('Conversa', 'pausada · use /dialog-resume para retomar sem consumir PR', { role: 'warn' }),
+        );
     } catch (e) {
         println(terminalThemeRow('Conversa', `erro ao pausar · ${toError(e).message}`, { role: 'error' }));
     }
@@ -427,10 +439,18 @@ async function _cmdDialogResume() {
 async function _cmdAbortCurrentTurn() {
     try {
         await abortTerminalCurrentMessage();
-        println(terminalThemeRow('Abortar turno', 'turno SDK ativo abortado; a próxima mensagem da fila pode prosseguir', { role: 'warn' }));
+        println(
+            terminalThemeRow('Abortar turno', 'turno SDK ativo abortado; a próxima mensagem da fila pode prosseguir', {
+                role: 'warn',
+            }),
+        );
         return true;
     } catch (e) {
-        println(terminalThemeRow('Abortar turno', `falha ao abortar turno ativo · ${toError(e).message}`, { role: 'error' }));
+        println(
+            terminalThemeRow('Abortar turno', `falha ao abortar turno ativo · ${toError(e).message}`, {
+                role: 'error',
+            }),
+        );
         return false;
     }
 }
@@ -722,7 +742,11 @@ function _cmdQueueMailbox(message) {
     }
     if (!prompt) {
         _cmdMailbox('status');
-        println(terminalThemeRow('Uso', '/queue <mensagem> · /queue status · /queue consume · /queue clear', { role: 'command' }));
+        println(
+            terminalThemeRow('Uso', '/queue <mensagem> · /queue status · /queue consume · /queue clear', {
+                role: 'command',
+            }),
+        );
         return;
     }
     if (tryApplyImmediateTerminalZeroPr(prompt)) {
@@ -742,7 +766,7 @@ function _cmdQueueMailbox(message) {
     println(
         terminalThemeRow(
             'Fila',
-                `intervenção guardada para a próxima pergunta humana (${renderInterventionQueueTail(queued)})`,
+            `intervenção guardada para a próxima pergunta humana (${renderInterventionQueueTail(queued)})`,
             { role: 'success' },
         ),
     );

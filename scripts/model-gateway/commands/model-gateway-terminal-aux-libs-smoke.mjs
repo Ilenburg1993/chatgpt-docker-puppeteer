@@ -4,7 +4,8 @@
  * Smoke read-only dos adapters de libs auxiliares do Terminal LLM-B.
  *
  * O objetivo e provar, sem TUI e sem LLM, que os renderers externos sao opcionais e que o fallback JS permanece
- * funcional quando `PATH` esta vazio. O script nao modifica arquivos do projeto; fixtures vivem em diretorio temporario.
+ * funcional quando `PATH` esta vazio. O script nao modifica arquivos do projeto; fixtures vivem em diretorio
+ * temporario.
  */
 
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -88,7 +89,9 @@ function externalCheck(id, label, renderer, expected, available, fallbackReason)
             renderer,
             expected,
             status: renderer === 'js' ? 'pass' : 'fail',
-            detail: fallbackReason ? `ferramenta ausente; fallback ${fallbackReason}` : 'ferramenta ausente; fallback JS',
+            detail: fallbackReason
+                ? `ferramenta ausente; fallback ${fallbackReason}`
+                : 'ferramenta ausente; fallback JS',
         };
     }
     if (renderer === expected) {
@@ -100,7 +103,9 @@ function externalCheck(id, label, renderer, expected, available, fallbackReason)
         renderer,
         expected,
         status: 'degraded',
-        detail: fallbackReason ? `renderer externo degradou para fallback: ${fallbackReason}` : 'renderer externo degradou',
+        detail: fallbackReason
+            ? `renderer externo degradou para fallback: ${fallbackReason}`
+            : 'renderer externo degradou',
     };
 }
 
@@ -132,7 +137,9 @@ function hasUnsafeTerminalText(value) {
     }
     if (Array.isArray(value)) return value.some((item) => hasUnsafeTerminalText(item));
     if (value && typeof value === 'object') {
-        return Object.values(/** @type {Record<string, unknown>} */ (value)).some((item) => hasUnsafeTerminalText(item));
+        return Object.values(/** @type {Record<string, unknown>} */ (value)).some((item) =>
+            hasUnsafeTerminalText(item),
+        );
     }
     return false;
 }
@@ -273,7 +280,14 @@ async function main() {
         );
         const realDiff = renderTerminalDiffPreview(SAMPLE_DIFF, { color: 'always' });
         checks.push(
-            externalCheck('real-diff-preview', 'diff PATH real', realDiff.renderer, 'delta', hasTool('delta'), realDiff.fallbackReason),
+            externalCheck(
+                'real-diff-preview',
+                'diff PATH real',
+                realDiff.renderer,
+                'delta',
+                hasTool('delta'),
+                realDiff.fallbackReason,
+            ),
         );
         const realJson = renderTerminalStructuredPreview('{"scripts":{"smoke":"ok"},"b":2}', {
             format: 'json',
@@ -281,10 +295,21 @@ async function main() {
             color: 'never',
         });
         checks.push(
-            externalCheck('real-json-preview', 'json PATH real', realJson.renderer, 'jq', hasTool('jq'), realJson.fallbackReason),
+            externalCheck(
+                'real-json-preview',
+                'json PATH real',
+                realJson.renderer,
+                'jq',
+                hasTool('jq'),
+                realJson.fallbackReason,
+            ),
         );
         const limitedJson = renderTerminalStructuredPreview(
-            JSON.stringify({ scripts: Object.fromEntries(Array.from({ length: 40 }, (_, index) => [`script:${index}`, `node task-${index}.mjs`])) }),
+            JSON.stringify({
+                scripts: Object.fromEntries(
+                    Array.from({ length: 40 }, (_, index) => [`script:${index}`, `node task-${index}.mjs`]),
+                ),
+            }),
             {
                 format: 'json',
                 query: '.scripts',
@@ -310,7 +335,14 @@ async function main() {
             color: 'never',
         });
         checks.push(
-            externalCheck('real-yaml-preview', 'yaml PATH real', realYaml.renderer, 'yq', hasTool('yq'), realYaml.fallbackReason),
+            externalCheck(
+                'real-yaml-preview',
+                'yaml PATH real',
+                realYaml.renderer,
+                'yq',
+                hasTool('yq'),
+                realYaml.fallbackReason,
+            ),
         );
 
         const availableTools = capabilities

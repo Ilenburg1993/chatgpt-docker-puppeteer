@@ -1,9 +1,10 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { describe, expect, it, vi } from 'vitest';
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/now.js').readTerminalActivityProjection>} ActivityProjection */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/now.js').readTerminalActivityProjection
+>} ActivityProjection */
 /** @typedef {Pick<ActivityProjection, 'current' | 'history' | 'turnTrace'> & { streamDiagnostics?: unknown }} ActivityProjectionOverrides */
 
 /** @returns {ActivityProjection['streamDiagnostics']} */
@@ -239,7 +240,9 @@ describe('terminal/commands/activity', () => {
         expect(ctx.output()).toContain('Último turno concluído');
         expect(ctx.output()).toContain('Arquivos tocados');
         expect(ctx.output()).toMatch(/Arquivos\s+1/u);
-        expect((ctx.output().match(/Arquivo\s+leitura · src\/copilot\/terminal\/repl\/repl\.js ×2/gu) ?? [])).toHaveLength(1);
+        expect(
+            ctx.output().match(/Arquivo\s+leitura · src\/copilot\/terminal\/repl\/repl\.js ×2/gu) ?? [],
+        ).toHaveLength(1);
         expect(ctx.output()).toContain('Ler arquivo');
         expect(ctx.output()).not.toContain('workspace.read_file');
         expect(ctx.output()).toContain('Interações humanas');
@@ -269,7 +272,9 @@ describe('terminal/commands/activity', () => {
 
         expect(ctx.output()).toContain('Timeline completa');
         expect(ctx.output()).toContain('1 arquivo único · 2 registros');
-        expect(ctx.output()).toMatch(/\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u);
+        expect(ctx.output()).toMatch(
+            /\[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2} \(há \d+[smhda]\)\]/u,
+        );
         expect(ctx.output()).toContain('io-engine.fs.readFile.text');
         expect(ctx.output()).toContain('turn:turn-1');
         expect(ctx.output()).toContain('req=ui-1');
@@ -281,25 +286,12 @@ describe('terminal/commands/activity', () => {
     });
 
     it('humaniza fase de modelo sem vazar enum cru', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'model',
-                label: 'Troca de modelo solicitada',
-                detail:
-                    'solicitado: kilo-auto/free → terminal-ux-boundary-fixture · solicitação manual /byok model · origem terminal.byok_model · 2026-06-05T05:50:42.410Z',
-                source: 'terminal.byok_model',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 1200,
-            },
-            history: [
-                {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
                     phase: 'model',
                     label: 'Troca de modelo solicitada',
-                    detail: 'solicitado: kilo-auto/free → terminal-ux-boundary-fixture',
+                    detail: 'solicitado: kilo-auto/free → terminal-ux-boundary-fixture · solicitação manual /byok model · origem terminal.byok_model · 2026-06-05T05:50:42.410Z',
                     source: 'terminal.byok_model',
                     severity: 'info',
                     progress: null,
@@ -307,22 +299,36 @@ describe('terminal/commands/activity', () => {
                     startedAt: 1,
                     updatedAt: 2,
                     ageMs: 1200,
-                    ts: 2,
                 },
-            ],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-            streamDiagnostics: {
-                active: false,
-                pendingDeltas: 0,
-                pendingReasoning: 0,
-                pendingToolEvents: 0,
-                lastFlushAt: null,
-                lastDeltaAt: null,
-            },
-        }));
+                history: [
+                    {
+                        phase: 'model',
+                        label: 'Troca de modelo solicitada',
+                        detail: 'solicitado: kilo-auto/free → terminal-ux-boundary-fixture',
+                        source: 'terminal.byok_model',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 1200,
+                        ts: 2,
+                    },
+                ],
+                turnTrace: {
+                    current: null,
+                    recent: [],
+                },
+                streamDiagnostics: {
+                    active: false,
+                    pendingDeltas: 0,
+                    pendingReasoning: 0,
+                    pendingToolEvents: 0,
+                    lastFlushAt: null,
+                    lastDeltaAt: null,
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -334,54 +340,56 @@ describe('terminal/commands/activity', () => {
     });
 
     it('não chama trace concluído recente de turno atual quando não há current ativo', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'idle',
-                label: 'Pronto',
-                detail: 'Aguardando próxima mensagem',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 1200,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [
-                    {
-                        traceId: 'turn:done',
-                        turnId: 'done',
-                        source: 'assistant',
-                        status: 'completed',
-                        startedAt: 1,
-                        updatedAt: 2,
-                        finishedAt: 3,
-                        toolCount: 0,
-                        fileCount: 0,
-                        userInputCount: 1,
-                        tools: [],
-                        files: [],
-                        userInputs: [
-                            {
-                                requestId: 'ui-2',
-                                kind: 'question',
-                                question: 'Confirmar deploy?',
-                                choices: ['sim', 'não'],
-                                allowFreeform: false,
-                                status: 'requested',
-                                answerPreview: null,
-                                source: 'sdk',
-                                count: 1,
-                                updatedAt: 2,
-                            },
-                        ],
-                    },
-                ],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'idle',
+                    label: 'Pronto',
+                    detail: 'Aguardando próxima mensagem',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 1200,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [
+                        {
+                            traceId: 'turn:done',
+                            turnId: 'done',
+                            source: 'assistant',
+                            status: 'completed',
+                            startedAt: 1,
+                            updatedAt: 2,
+                            finishedAt: 3,
+                            toolCount: 0,
+                            fileCount: 0,
+                            userInputCount: 1,
+                            tools: [],
+                            files: [],
+                            userInputs: [
+                                {
+                                    requestId: 'ui-2',
+                                    kind: 'question',
+                                    question: 'Confirmar deploy?',
+                                    choices: ['sim', 'não'],
+                                    allowFreeform: false,
+                                    status: 'requested',
+                                    answerPreview: null,
+                                    source: 'sdk',
+                                    count: 1,
+                                    updatedAt: 2,
+                                },
+                            ],
+                        },
+                    ],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -392,55 +400,57 @@ describe('terminal/commands/activity', () => {
     });
 
     it('chama trace implícito local de atividade operacional, não turno de conversa', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'tool',
-                label: 'Arquivo: busca concluída',
-                detail: 'busca · data/copilot-terminal/live-scratch',
-                source: 'io',
-                severity: 'info',
-                progress: 100,
-                toolName: 'io.search',
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
                 current: {
-                    traceId: 'implicit:123',
-                    turnId: null,
-                    source: 'implicit',
-                    status: 'active',
+                    phase: 'tool',
+                    label: 'Arquivo: busca concluída',
+                    detail: 'busca · data/copilot-terminal/live-scratch',
+                    source: 'io',
+                    severity: 'info',
+                    progress: 100,
+                    toolName: 'io.search',
                     startedAt: 1,
                     updatedAt: 2,
-                    finishedAt: null,
-                    toolCount: 0,
-                    fileCount: 1,
-                    userInputCount: 0,
-                    tools: [],
-                    files: [
-                        {
-                            path: 'data/copilot-terminal/live-scratch/example.txt',
-                            operation: 'read',
-                            source: 'io',
-                            count: 1,
-                            updatedAt: 2,
-                        },
-                    ],
-                    userInputs: [],
+                    ageMs: 0,
                 },
-                recent: [],
-            },
-            streamDiagnostics: {
-                active: false,
-                pendingDeltas: 0,
-                pendingReasoning: 0,
-                pendingToolEvents: 0,
-                lastFlushAt: null,
-                lastDeltaAt: null,
-            },
-        }));
+                history: [],
+                turnTrace: {
+                    current: {
+                        traceId: 'implicit:123',
+                        turnId: null,
+                        source: 'implicit',
+                        status: 'active',
+                        startedAt: 1,
+                        updatedAt: 2,
+                        finishedAt: null,
+                        toolCount: 0,
+                        fileCount: 1,
+                        userInputCount: 0,
+                        tools: [],
+                        files: [
+                            {
+                                path: 'data/copilot-terminal/live-scratch/example.txt',
+                                operation: 'read',
+                                source: 'io',
+                                count: 1,
+                                updatedAt: 2,
+                            },
+                        ],
+                        userInputs: [],
+                    },
+                    recent: [],
+                },
+                streamDiagnostics: {
+                    active: false,
+                    pendingDeltas: 0,
+                    pendingReasoning: 0,
+                    pendingToolEvents: 0,
+                    lastFlushAt: null,
+                    lastDeltaAt: null,
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -451,89 +461,91 @@ describe('terminal/commands/activity', () => {
     });
 
     it('preserva trace operacional recente quando o SDK separa tools e ask_user em turnos distintos', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'idle',
-                label: 'Pronto',
-                detail: 'Turno concluído',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [
-                    {
-                        traceId: 'turn:ask',
-                        turnId: 'ask',
-                        source: 'assistant',
-                        status: 'completed',
-                        startedAt: 20,
-                        updatedAt: 30,
-                        finishedAt: 30,
-                        toolCount: 0,
-                        fileCount: 0,
-                        userInputCount: 1,
-                        tools: [],
-                        files: [],
-                        userInputs: [
-                            {
-                                requestId: 'ask-1',
-                                kind: 'question',
-                                question: 'ASK-CANONICAL?',
-                                choices: ['SIM'],
-                                allowFreeform: false,
-                                status: 'answered',
-                                answerPreview: 'SIM',
-                                source: 'sdk',
-                                count: 2,
-                                updatedAt: 30,
-                            },
-                        ],
-                    },
-                    {
-                        traceId: 'turn:tools',
-                        turnId: 'tools',
-                        source: 'assistant',
-                        status: 'completed',
-                        startedAt: 10,
-                        updatedAt: 19,
-                        finishedAt: 19,
-                        toolCount: 1,
-                        fileCount: 1,
-                        userInputCount: 0,
-                        tools: [
-                            {
-                                toolName: 'read_file_content',
-                                operation: 'read',
-                                path: 'package.json',
-                                target: 'package.json',
-                                source: 'sdk',
-                                status: 'completed',
-                                success: true,
-                                count: 1,
-                                updatedAt: 19,
-                            },
-                        ],
-                        files: [
-                            {
-                                path: 'package.json',
-                                operation: 'read',
-                                source: 'sdk',
-                                count: 1,
-                                updatedAt: 19,
-                            },
-                        ],
-                        userInputs: [],
-                    },
-                ],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'idle',
+                    label: 'Pronto',
+                    detail: 'Turno concluído',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [
+                        {
+                            traceId: 'turn:ask',
+                            turnId: 'ask',
+                            source: 'assistant',
+                            status: 'completed',
+                            startedAt: 20,
+                            updatedAt: 30,
+                            finishedAt: 30,
+                            toolCount: 0,
+                            fileCount: 0,
+                            userInputCount: 1,
+                            tools: [],
+                            files: [],
+                            userInputs: [
+                                {
+                                    requestId: 'ask-1',
+                                    kind: 'question',
+                                    question: 'ASK-CANONICAL?',
+                                    choices: ['SIM'],
+                                    allowFreeform: false,
+                                    status: 'answered',
+                                    answerPreview: 'SIM',
+                                    source: 'sdk',
+                                    count: 2,
+                                    updatedAt: 30,
+                                },
+                            ],
+                        },
+                        {
+                            traceId: 'turn:tools',
+                            turnId: 'tools',
+                            source: 'assistant',
+                            status: 'completed',
+                            startedAt: 10,
+                            updatedAt: 19,
+                            finishedAt: 19,
+                            toolCount: 1,
+                            fileCount: 1,
+                            userInputCount: 0,
+                            tools: [
+                                {
+                                    toolName: 'read_file_content',
+                                    operation: 'read',
+                                    path: 'package.json',
+                                    target: 'package.json',
+                                    source: 'sdk',
+                                    status: 'completed',
+                                    success: true,
+                                    count: 1,
+                                    updatedAt: 19,
+                                },
+                            ],
+                            files: [
+                                {
+                                    path: 'package.json',
+                                    operation: 'read',
+                                    source: 'sdk',
+                                    count: 1,
+                                    updatedAt: 19,
+                                },
+                            ],
+                            userInputs: [],
+                        },
+                    ],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -547,66 +559,68 @@ describe('terminal/commands/activity', () => {
     });
 
     it('não duplica ask_user como ferramenta quando a interação humana já aparece no resumo', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'idle',
-                label: 'Pronto',
-                detail: 'Turno concluído',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [
-                    {
-                        traceId: 'turn:ask',
-                        turnId: 'ask',
-                        source: 'assistant',
-                        status: 'completed',
-                        startedAt: 20,
-                        updatedAt: 25,
-                        finishedAt: 25,
-                        toolCount: 1,
-                        fileCount: 0,
-                        userInputCount: 1,
-                        tools: [
-                            {
-                                toolName: 'ask_user',
-                                operation: 'ask',
-                                path: null,
-                                target: 'ASK-CANONICAL: responda SIM para fechar o teste',
-                                source: 'sdk',
-                                status: 'completed',
-                                success: true,
-                                count: 1,
-                                updatedAt: 25,
-                            },
-                        ],
-                        files: [],
-                        userInputs: [
-                            {
-                                requestId: 'req-ask',
-                                kind: 'question',
-                                question: 'ASK-CANONICAL: responda SIM para fechar o teste',
-                                choices: [],
-                                allowFreeform: true,
-                                status: 'answered',
-                                answerPreview: 'SIM',
-                                source: 'sdk',
-                                count: 1,
-                                updatedAt: 25,
-                            },
-                        ],
-                    },
-                ],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'idle',
+                    label: 'Pronto',
+                    detail: 'Turno concluído',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [
+                        {
+                            traceId: 'turn:ask',
+                            turnId: 'ask',
+                            source: 'assistant',
+                            status: 'completed',
+                            startedAt: 20,
+                            updatedAt: 25,
+                            finishedAt: 25,
+                            toolCount: 1,
+                            fileCount: 0,
+                            userInputCount: 1,
+                            tools: [
+                                {
+                                    toolName: 'ask_user',
+                                    operation: 'ask',
+                                    path: null,
+                                    target: 'ASK-CANONICAL: responda SIM para fechar o teste',
+                                    source: 'sdk',
+                                    status: 'completed',
+                                    success: true,
+                                    count: 1,
+                                    updatedAt: 25,
+                                },
+                            ],
+                            files: [],
+                            userInputs: [
+                                {
+                                    requestId: 'req-ask',
+                                    kind: 'question',
+                                    question: 'ASK-CANONICAL: responda SIM para fechar o teste',
+                                    choices: [],
+                                    allowFreeform: true,
+                                    status: 'answered',
+                                    answerPreview: 'SIM',
+                                    source: 'sdk',
+                                    count: 1,
+                                    updatedAt: 25,
+                                },
+                            ],
+                        },
+                    ],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '40');
@@ -620,95 +634,99 @@ describe('terminal/commands/activity', () => {
     });
 
     it('prioriza falhas operacionais recentes em vez de reads triviais posteriores', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'idle',
-                label: 'Pronto',
-                detail: 'Turno concluído',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [
-                    {
-                        traceId: 'turn:empty-after-answer',
-                        turnId: 'empty-after-answer',
-                        source: 'assistant',
-                        status: 'failed',
-                        startedAt: 40,
-                        updatedAt: 45,
-                        finishedAt: 45,
-                        toolCount: 0,
-                        fileCount: 0,
-                        userInputCount: 0,
-                        tools: [],
-                        files: [],
-                        userInputs: [],
-                    },
-                    {
-                        traceId: 'turn:read-after',
-                        turnId: 'read-after',
-                        source: 'assistant',
-                        status: 'completed',
-                        startedAt: 30,
-                        updatedAt: 35,
-                        finishedAt: 35,
-                        toolCount: 1,
-                        fileCount: 1,
-                        userInputCount: 0,
-                        tools: [
-                            {
-                                toolName: 'read_file_content',
-                                operation: 'read',
-                                path: 'package.json',
-                                target: 'package.json',
-                                source: 'sdk',
-                                status: 'completed',
-                                success: true,
-                                count: 1,
-                                updatedAt: 35,
-                            },
-                        ],
-                        files: [{ path: 'package.json', operation: 'read', source: 'sdk', count: 1, updatedAt: 35 }],
-                        userInputs: [],
-                    },
-                    {
-                        traceId: 'turn:exec-failed',
-                        turnId: 'exec-failed',
-                        source: 'assistant',
-                        status: 'completed',
-                        startedAt: 20,
-                        updatedAt: 25,
-                        finishedAt: 25,
-                        toolCount: 1,
-                        fileCount: 0,
-                        userInputCount: 0,
-                        tools: [
-                            {
-                                toolName: 'exec_command',
-                                operation: 'run',
-                                path: null,
-                                target: 'node -e "process.exit(7)"',
-                                source: 'sdk',
-                                status: 'failed',
-                                success: false,
-                                count: 1,
-                                updatedAt: 25,
-                            },
-                        ],
-                        files: [],
-                        userInputs: [],
-                    },
-                ],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'idle',
+                    label: 'Pronto',
+                    detail: 'Turno concluído',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [
+                        {
+                            traceId: 'turn:empty-after-answer',
+                            turnId: 'empty-after-answer',
+                            source: 'assistant',
+                            status: 'failed',
+                            startedAt: 40,
+                            updatedAt: 45,
+                            finishedAt: 45,
+                            toolCount: 0,
+                            fileCount: 0,
+                            userInputCount: 0,
+                            tools: [],
+                            files: [],
+                            userInputs: [],
+                        },
+                        {
+                            traceId: 'turn:read-after',
+                            turnId: 'read-after',
+                            source: 'assistant',
+                            status: 'completed',
+                            startedAt: 30,
+                            updatedAt: 35,
+                            finishedAt: 35,
+                            toolCount: 1,
+                            fileCount: 1,
+                            userInputCount: 0,
+                            tools: [
+                                {
+                                    toolName: 'read_file_content',
+                                    operation: 'read',
+                                    path: 'package.json',
+                                    target: 'package.json',
+                                    source: 'sdk',
+                                    status: 'completed',
+                                    success: true,
+                                    count: 1,
+                                    updatedAt: 35,
+                                },
+                            ],
+                            files: [
+                                { path: 'package.json', operation: 'read', source: 'sdk', count: 1, updatedAt: 35 },
+                            ],
+                            userInputs: [],
+                        },
+                        {
+                            traceId: 'turn:exec-failed',
+                            turnId: 'exec-failed',
+                            source: 'assistant',
+                            status: 'completed',
+                            startedAt: 20,
+                            updatedAt: 25,
+                            finishedAt: 25,
+                            toolCount: 1,
+                            fileCount: 0,
+                            userInputCount: 0,
+                            tools: [
+                                {
+                                    toolName: 'exec_command',
+                                    operation: 'run',
+                                    path: null,
+                                    target: 'node -e "process.exit(7)"',
+                                    source: 'sdk',
+                                    status: 'failed',
+                                    success: false,
+                                    count: 1,
+                                    updatedAt: 25,
+                                },
+                            ],
+                            files: [],
+                            userInputs: [],
+                        },
+                    ],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '40');
@@ -719,21 +737,9 @@ describe('terminal/commands/activity', () => {
     });
 
     it('humaniza fases internas na timeline padrão', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'system',
-                label: 'Uso BYOK sem Premium Request',
-                detail: 'modelo kilo-auto/free',
-                source: 'agent',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [
-                {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
                     phase: 'system',
                     label: 'Uso BYOK sem Premium Request',
                     detail: 'modelo kilo-auto/free',
@@ -744,79 +750,93 @@ describe('terminal/commands/activity', () => {
                     startedAt: 1,
                     updatedAt: 2,
                     ageMs: 0,
-                    ts: 2,
                 },
-                {
-                    phase: 'task',
-                    label: 'Tarefa em segundo plano concluída',
-                    detail: 'Pergunta pendente persistida limpa',
-                    source: 'agent',
-                    severity: 'info',
-                    progress: null,
-                    toolName: null,
-                    startedAt: 1,
-                    updatedAt: 2,
-                    ageMs: 0,
-                    ts: 2,
+                history: [
+                    {
+                        phase: 'system',
+                        label: 'Uso BYOK sem Premium Request',
+                        detail: 'modelo kilo-auto/free',
+                        source: 'agent',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                    {
+                        phase: 'task',
+                        label: 'Tarefa em segundo plano concluída',
+                        detail: 'Pergunta pendente persistida limpa',
+                        source: 'agent',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                    {
+                        phase: 'turn',
+                        label: 'Preparando resposta',
+                        detail: 'Faça um teste integrado canônico do terminal',
+                        source: 'dialog',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                    {
+                        phase: 'turn',
+                        label: 'Intenção da LLM-B',
+                        detail: 'terminal live canonical deltas tools ask_user usage',
+                        source: 'sdk/assistant.intent',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                    {
+                        phase: 'system',
+                        label: 'Resposta concluída',
+                        detail: '9.5s',
+                        source: 'terminal',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                    {
+                        phase: 'boot',
+                        label: 'Inicializando terminal',
+                        detail: 'Preparando aliases',
+                        source: 'terminal',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                ],
+                turnTrace: {
+                    current: null,
+                    recent: [],
                 },
-                {
-                    phase: 'turn',
-                    label: 'Preparando resposta',
-                    detail: 'Faça um teste integrado canônico do terminal',
-                    source: 'dialog',
-                    severity: 'info',
-                    progress: null,
-                    toolName: null,
-                    startedAt: 1,
-                    updatedAt: 2,
-                    ageMs: 0,
-                    ts: 2,
-                },
-                {
-                    phase: 'turn',
-                    label: 'Intenção da LLM-B',
-                    detail: 'terminal live canonical deltas tools ask_user usage',
-                    source: 'sdk/assistant.intent',
-                    severity: 'info',
-                    progress: null,
-                    toolName: null,
-                    startedAt: 1,
-                    updatedAt: 2,
-                    ageMs: 0,
-                    ts: 2,
-                },
-                {
-                    phase: 'system',
-                    label: 'Resposta concluída',
-                    detail: '9.5s',
-                    source: 'terminal',
-                    severity: 'info',
-                    progress: null,
-                    toolName: null,
-                    startedAt: 1,
-                    updatedAt: 2,
-                    ageMs: 0,
-                    ts: 2,
-                },
-                {
-                    phase: 'boot',
-                    label: 'Inicializando terminal',
-                    detail: 'Preparando aliases',
-                    source: 'terminal',
-                    severity: 'info',
-                    progress: null,
-                    toolName: null,
-                    startedAt: 1,
-                    updatedAt: 2,
-                    ageMs: 0,
-                    ts: 2,
-                },
-            ],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-        }));
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -844,25 +864,27 @@ describe('terminal/commands/activity', () => {
     });
 
     it('mostra fase de conversa como estado humano em vez de turno cru', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'turn',
-                label: 'Pending messages alteradas',
-                detail: '0 mensagens pendentes',
-                source: 'sdk',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'turn',
+                    label: 'Pending messages alteradas',
+                    detail: '0 mensagens pendentes',
+                    source: 'sdk',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -874,25 +896,27 @@ describe('terminal/commands/activity', () => {
     });
 
     it('diferencia subestados de question no estado atual', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'question',
-                label: 'Resposta registrada',
-                detail: 'resposta registrada; aguardando resposta final da LLM-B · resposta SIM',
-                source: 'sdk',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'question',
+                    label: 'Resposta registrada',
+                    detail: 'resposta registrada; aguardando resposta final da LLM-B · resposta SIM',
+                    source: 'sdk',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [],
+                },
+            }),
+        );
         const responseCtx = mockCtx();
 
         cmdActivity({ println: responseCtx.println }, '5');
@@ -900,25 +924,27 @@ describe('terminal/commands/activity', () => {
         expect(responseCtx.output()).toMatch(/Estado\s+continuação/u);
         expect(responseCtx.output()).not.toMatch(/Estado\s+pergunta/u);
 
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'question',
-                label: 'Permissão SDK solicitada',
-                detail: 'editar arquivo src/app.js',
-                source: 'sdk',
-                severity: 'warn',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-        }));
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'question',
+                    label: 'Permissão SDK solicitada',
+                    detail: 'editar arquivo src/app.js',
+                    source: 'sdk',
+                    severity: 'warn',
+                    progress: null,
+                    toolName: null,
+                    startedAt: 1,
+                    updatedAt: 2,
+                    ageMs: 0,
+                },
+                history: [],
+                turnTrace: {
+                    current: null,
+                    recent: [],
+                },
+            }),
+        );
         const permissionCtx = mockCtx();
 
         cmdActivity({ println: permissionCtx.println }, '5');
@@ -928,39 +954,41 @@ describe('terminal/commands/activity', () => {
     });
 
     it('preserva nomes de protocolo em detalhes livres da intenção', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'idle',
-                label: 'Pronto',
-                detail: 'Turno concluído',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [
-                {
-                    phase: 'turn',
-                    label: 'Intenção da LLM-B',
-                    detail: 'terminal live canonical deltas tools ask_user usage',
-                    source: 'tool/report_intent_local',
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
+                    phase: 'idle',
+                    label: 'Pronto',
+                    detail: 'Turno concluído',
+                    source: 'terminal',
                     severity: 'info',
                     progress: null,
                     toolName: null,
                     startedAt: 1,
                     updatedAt: 2,
                     ageMs: 0,
-                    ts: 2,
                 },
-            ],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-        }));
+                history: [
+                    {
+                        phase: 'turn',
+                        label: 'Intenção da LLM-B',
+                        detail: 'terminal live canonical deltas tools ask_user usage',
+                        source: 'tool/report_intent_local',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                ],
+                turnTrace: {
+                    current: null,
+                    recent: [],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, 'detail 5');
@@ -972,54 +1000,56 @@ describe('terminal/commands/activity', () => {
     });
 
     it('trata confirmação cruzada SDK/IO do mesmo arquivo como uma operação única', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'idle',
-                label: 'Pronto',
-                detail: 'Turno concluído',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [],
-            turnTrace: {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
                 current: {
-                    traceId: 'turn:file-roundtrip',
-                    turnId: 'file-roundtrip',
-                    source: 'assistant',
-                    status: 'completed',
+                    phase: 'idle',
+                    label: 'Pronto',
+                    detail: 'Turno concluído',
+                    source: 'terminal',
+                    severity: 'info',
+                    progress: null,
+                    toolName: null,
                     startedAt: 1,
                     updatedAt: 2,
-                    finishedAt: 3,
-                    toolCount: 2,
-                    fileCount: 2,
-                    userInputCount: 0,
-                    tools: [],
-                    files: [
-                        {
-                            path: '/workspaces/chatgpt-docker-puppeteer/.tmp/terminal-live/source.txt',
-                            operation: 'move',
-                            source: 'sdk',
-                            count: 1,
-                            updatedAt: 2,
-                        },
-                        {
-                            path: '.tmp/terminal-live/source.txt',
-                            operation: 'move',
-                            source: 'io',
-                            count: 1,
-                            updatedAt: 3,
-                        },
-                    ],
-                    userInputs: [],
+                    ageMs: 0,
                 },
-                recent: [],
-            },
-        }));
+                history: [],
+                turnTrace: {
+                    current: {
+                        traceId: 'turn:file-roundtrip',
+                        turnId: 'file-roundtrip',
+                        source: 'assistant',
+                        status: 'completed',
+                        startedAt: 1,
+                        updatedAt: 2,
+                        finishedAt: 3,
+                        toolCount: 2,
+                        fileCount: 2,
+                        userInputCount: 0,
+                        tools: [],
+                        files: [
+                            {
+                                path: '/workspaces/chatgpt-docker-puppeteer/.tmp/terminal-live/source.txt',
+                                operation: 'move',
+                                source: 'sdk',
+                                count: 1,
+                                updatedAt: 2,
+                            },
+                            {
+                                path: '.tmp/terminal-live/source.txt',
+                                operation: 'move',
+                                source: 'io',
+                                count: 1,
+                                updatedAt: 3,
+                            },
+                        ],
+                        userInputs: [],
+                    },
+                    recent: [],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');
@@ -1031,21 +1061,9 @@ describe('terminal/commands/activity', () => {
     });
 
     it('mantém eventos de boot no default quando ainda não existe evento operacional melhor', () => {
-        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(activityProjectionFixture({
-            current: {
-                phase: 'boot',
-                label: 'Inicializando terminal',
-                detail: 'Preparando aliases',
-                source: 'terminal',
-                severity: 'info',
-                progress: null,
-                toolName: null,
-                startedAt: 1,
-                updatedAt: 2,
-                ageMs: 0,
-            },
-            history: [
-                {
+        vi.mocked(terminalFrontend.readTerminalActivityProjection).mockReturnValueOnce(
+            activityProjectionFixture({
+                current: {
                     phase: 'boot',
                     label: 'Inicializando terminal',
                     detail: 'Preparando aliases',
@@ -1056,14 +1074,28 @@ describe('terminal/commands/activity', () => {
                     startedAt: 1,
                     updatedAt: 2,
                     ageMs: 0,
-                    ts: 2,
                 },
-            ],
-            turnTrace: {
-                current: null,
-                recent: [],
-            },
-        }));
+                history: [
+                    {
+                        phase: 'boot',
+                        label: 'Inicializando terminal',
+                        detail: 'Preparando aliases',
+                        source: 'terminal',
+                        severity: 'info',
+                        progress: null,
+                        toolName: null,
+                        startedAt: 1,
+                        updatedAt: 2,
+                        ageMs: 0,
+                        ts: 2,
+                    },
+                ],
+                turnTrace: {
+                    current: null,
+                    recent: [],
+                },
+            }),
+        );
         const ctx = mockCtx();
 
         cmdActivity({ println: ctx.println }, '5');

@@ -125,13 +125,13 @@ function isLocalImportSource(source) {
 }
 
 const PACKAGE_IMPORTS_CACHE_TTL_MS = 30_000;
-/** @type {Promise<Array<[string, unknown]>> | null} */
+/** @type {Promise<[string, unknown][]> | null} */
 let packageImportEntriesPromise = null;
 let packageImportEntriesExpiresAtMs = 0;
 
 /**
- * Resolve the first usable string target from a Node.js package-import target.
- * Conditional objects prefer import/node/default and then fall back to declaration order.
+ * Resolve the first usable string target from a Node.js package-import target. Conditional objects prefer
+ * import/node/default and then fall back to declaration order.
  *
  * @param {unknown} value
  * @returns {string | null}
@@ -159,7 +159,7 @@ function selectPackageImportTarget(value) {
 }
 
 /**
- * @returns {Promise<Array<[string, unknown]>>}
+ * @returns {Promise<[string, unknown][]>}
  */
 async function readPackageImportEntries() {
     const now = Date.now();
@@ -178,7 +178,7 @@ async function readPackageImportEntries() {
 
 /**
  * @param {string} source
- * @param {Array<[string, unknown]>} entries
+ * @param {[string, unknown][]} entries
  * @returns {{ basePath: string; strategy: 'package-import-exact' | 'package-import-wildcard' } | null}
  */
 function resolvePackageImportBasePath(source, entries) {
@@ -302,7 +302,14 @@ async function classifyCandidateTargets(candidates) {
 }
 
 /**
- * @param {{ file: string; line: number; source: string; dynamic: boolean; attemptedTargets: string[]; resolutionStrategy: string }[]} rows
+ * @param {{
+ *     file: string;
+ *     line: number;
+ *     source: string;
+ *     dynamic: boolean;
+ *     attemptedTargets: string[];
+ *     resolutionStrategy: string;
+ * }[]} rows
  * @param {{ file: string; line: number; source: string; dynamic: boolean; resolutionStrategy: string }[]} protectedRows
  * @returns {string}
  */
@@ -346,7 +353,8 @@ export const repoIndexTools = [
         inputSchema: {
             path: z
                 .string()
-                .optional()['describe']('Workspace-relative directory path. Default: src/copilot. Empty string uses the default.'),
+                .optional()
+                ['describe']('Workspace-relative directory path. Default: src/copilot. Empty string uses the default.'),
             recursive: z.boolean().optional()['describe']('Index recursively. Default: true.'),
             depth: z.number().int().positive().max(50).optional()['describe']('Advisory scan depth. Default: 20.'),
             respectGitignore: z.boolean().optional()['describe']('Respect .gitignore. Default: true.'),
@@ -354,10 +362,17 @@ export const repoIndexTools = [
             exclude: z.array(z.string().min(1)).optional()['describe']('Exclude glob filters for scan candidates.'),
             extensions: z.array(z.string().min(1)).optional()['describe']('Textual file extensions to index.'),
             concurrency: z.number().int().positive().max(32).optional()['describe']('Advisory indexing concurrency.'),
-            maxFiles: z.number().int().positive().max(25_000).optional()['describe']('Maximum candidate files to index.'),
+            maxFiles: z
+                .number()
+                .int()
+                .positive()
+                .max(25_000)
+                .optional()
+                ['describe']('Maximum candidate files to index.'),
             pruneMissing: z
                 .boolean()
-                .optional()['describe']('Remove missing files from the indexed slice. Default: safe auto-prune.'),
+                .optional()
+                ['describe']('Remove missing files from the indexed slice. Default: safe auto-prune.'),
         },
         annotations: boundedWriteAnnotations(),
         handler: async ({
@@ -404,8 +419,15 @@ export const repoIndexTools = [
             query: z.string().min(1)['describe']('Text query for the FTS5 index.'),
             path: z
                 .string()
-                .optional()['describe']('Workspace-relative file or directory prefix. Default: entire indexed workspace.'),
-            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+                .optional()
+                ['describe']('Workspace-relative file or directory prefix. Default: entire indexed workspace.'),
+            maxResults: z
+                .number()
+                .int()
+                .positive()
+                .max(500)
+                .optional()
+                ['describe']('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_index_search call.'),
             includePattern: z.string().optional()['describe']('Include glob filter, for example *.ts.'),
             excludePattern: z.string().optional()['describe']('Exclude glob filter, for example node_modules.'),
@@ -469,7 +491,13 @@ export const repoIndexTools = [
             'Search persisted symbols in the shared local index. Use after repo_index_build for fast navigation.',
         inputSchema: {
             symbol: z.string().min(1)['describe']('Symbol name or substring.'),
-            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+            maxResults: z
+                .number()
+                .int()
+                .positive()
+                .max(500)
+                .optional()
+                ['describe']('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_index_find_symbol call.'),
             exactMatch: z.boolean().optional()['describe']('Require exact symbol name. Default: false.'),
         },
@@ -521,8 +549,17 @@ export const repoIndexTools = [
         title: 'Find repository imports',
         description: 'Find imports or dynamic imports by module source in the shared local index.',
         inputSchema: {
-            source: z.string().min(1)['describe']('Imported module/source substring, for example react, zod, or ./utils.'),
-            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+            source: z
+                .string()
+                .min(1)
+                ['describe']('Imported module/source substring, for example react, zod, or ./utils.'),
+            maxResults: z
+                .number()
+                .int()
+                .positive()
+                .max(500)
+                .optional()
+                ['describe']('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_imports call.'),
             exactSource: z.boolean().optional()['describe']('Require exact import source. Default: false.'),
         },
@@ -576,22 +613,34 @@ export const repoIndexTools = [
         inputSchema: {
             path: z
                 .string()
-                .optional()['describe'](
+                .optional()
+                ['describe'](
                     'Workspace-relative file or directory path. Default: src/copilot. Empty string uses default.',
                 ),
             recursive: z.boolean().optional()['describe']('Scan directories recursively. Default: true.'),
             depth: z.number().int().positive().max(50).optional()['describe']('Directory scan depth. Default: 20.'),
             respectGitignore: z
                 .boolean()
-                .optional()['describe']('Reserved for compatibility; directory scans use the current indexed rows.'),
-            includeDynamic: z.boolean().optional()['describe']('Also validate dynamic import() sources. Default: true.'),
+                .optional()
+                ['describe']('Reserved for compatibility; directory scans use the current indexed rows.'),
+            includeDynamic: z
+                .boolean()
+                .optional()
+                ['describe']('Also validate dynamic import() sources. Default: true.'),
             maxFiles: z
                 .number()
                 .int()
                 .positive()
                 .max(5000)
-                .optional()['describe']('Maximum files to parse. Default: 500.'),
-            maxResults: z.number().int().positive().max(500).optional()['describe']('Maximum returned rows. Default: 50.'),
+                .optional()
+                ['describe']('Maximum files to parse. Default: 500.'),
+            maxResults: z
+                .number()
+                .int()
+                .positive()
+                .max(500)
+                .optional()
+                ['describe']('Maximum returned rows. Default: 50.'),
             cursor: z.string().optional()['describe']('Cursor returned by a previous repo_find_orphan_imports call.'),
         },
         annotations: readOnlyAnnotations(),
@@ -602,16 +651,24 @@ export const repoIndexTools = [
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const stat = await statPathValidated(resolved.validatedReadPath);
             const fileLimit = normalizePositiveInteger(maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);
+            /**
+             * @type {{
+             *     file: string;
+             *     line: number;
+             *     source: string;
+             *     dynamic: boolean;
+             *     attemptedTargets: string[];
+             *     resolutionStrategy: string;
+             * }[]}
+             */
+            const orphanImports = [];
             /** @type {{
     file: string;
     line: number;
     source: string;
     dynamic: boolean;
-    attemptedTargets: string[];
     resolutionStrategy: string;
 }[]} */
-            const orphanImports = [];
-            /** @type {{ file: string; line: number; source: string; dynamic: boolean; resolutionStrategy: string }[]} */
             const protectedImports = [];
             /** @type {{ file: string; error: string }[]} */
             const parseErrors = [];
@@ -634,7 +691,7 @@ export const repoIndexTools = [
                     try {
                         const text = await readTextValidated(resolved.validatedReadPath);
                         const parsed = await parseFileForContext(resolved.resolved, text.content, {
-                            contentHash: text.contentHash,
+                            ...(typeof text.contentHash === 'string' ? { contentHash: text.contentHash } : {}),
                         });
                         for (const importEntry of parsed.symbols.imports) {
                             const source = String(importEntry.source ?? '');

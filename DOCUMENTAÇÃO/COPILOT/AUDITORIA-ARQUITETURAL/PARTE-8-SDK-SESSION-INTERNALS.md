@@ -1,10 +1,9 @@
 # PARTE 8 — SDK Session Internals: Mecanismos de Recuperação, ask_user e Consumo de PR
 
-**Data**: 2026-02-XX
-**Escopo**: Investigação profunda do `@github/copilot-sdk@0.2.0` — `client.js`, `session.js`,
-`types.d.ts`, `session-events.d.ts`
-**Objetivo**: Documentar como o SDK lida internamente com reconexão, retry, ask_user, consumo de
-Premium Requests (PR) e como nosso sistema se alinha a esses mecanismos.
+**Data**: 2026-02-XX **Escopo**: Investigação profunda do `@github/copilot-sdk@0.2.0` — `client.js`,
+`session.js`, `types.d.ts`, `session-events.d.ts` **Objetivo**: Documentar como o SDK lida
+internamente com reconexão, retry, ask_user, consumo de Premium Requests (PR) e como nosso sistema
+se alinha a esses mecanismos.
 
 ---
 
@@ -223,8 +222,8 @@ InfiniteSessionConfig {
 
 ### 7.1 Todos os Eventos do SDK (session-events.d.ts)
 
-| Evento                              | Escutamos?      | Handler                                     |
-| ----------------------------------- | --------------- | ------------------------------------------- |
+| Evento                              | Escutamos?       | Handler                                     |
+| ----------------------------------- | ---------------- | ------------------------------------------- |
 | `session.start`                     | ✅ KNOWN         | event-collector                             |
 | `session.resume`                    | ✅ KNOWN         | event-collector                             |
 | `session.error`                     | ✅ WIRED         | session-event-wirer → `session.error`       |
@@ -356,8 +355,8 @@ semântica.
 
 ## 9. Resumo Executivo
 
-| Aspecto              | Status              | Nota                               |
-| -------------------- | ------------------- | ---------------------------------- |
+| Aspecto              | Status               | Nota                               |
+| -------------------- | -------------------- | ---------------------------------- |
 | Reconexão            | ✅ Correto           | Alinhado com SDK (consumer-driven) |
 | ask_user/dialog loop | ✅ Correto           | Promise suspension pattern         |
 | PR consumption       | ✅ Minimizado        | Zero-PR em resume/reconnect        |

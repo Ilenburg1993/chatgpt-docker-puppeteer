@@ -67,6 +67,8 @@ export function htmlTableRows(html) {
  */
 export function htmlTables(html) {
     return [...html.matchAll(/<table\b[\s\S]*?<\/table>/giu)].map((table) =>
-        htmlTableRows(table[0]).map(htmlTableCells).filter((cells) => cells.length > 0),
+        htmlTableRows(table[0])
+            .map(htmlTableCells)
+            .filter((cells) => cells.length > 0),
     );
 }

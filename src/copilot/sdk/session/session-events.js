@@ -128,7 +128,7 @@ export function normalizeModelChangedEvent(eventOrData) {
  *
  * @typedef {object} NormalizedToolsUpdatedEvent
  * @property {number} count Total de tools disponíveis quando materializado; `0` também pode significar desconhecido
- * quando `countMaterialized=false`.
+ *   quando `countMaterialized=false`.
  * @property {ToolSummary[]} tools Lista enxuta de tools (nome + descrição).
  * @property {boolean} toolsMaterialized Indica que o SDK forneceu a lista de tools no payload.
  * @property {boolean} countMaterialized Indica que o SDK forneceu lista ou contador numérico explícito.

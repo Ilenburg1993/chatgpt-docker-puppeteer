@@ -551,7 +551,6 @@ async function retryWithBackoff(/** @type {any} */ fn, /** @type {any} */ option
         try {
             return await fn();
         } catch (error) {
-
             lastError = error;
             if (attempt < maxRetries - 1) {
                 const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
@@ -608,7 +607,6 @@ export async function ragHealth(/** @type {any} */ options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
-
                     // ignore
                 }
             }
@@ -950,7 +948,6 @@ export async function ragIndex(/** @type {any} */ options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
-
                     // ignore
                 }
 
@@ -1067,7 +1064,6 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                     try {
                         await db.close();
                     } catch (_) {
-
                         // ignore
                     }
                     return report;
@@ -1277,7 +1273,6 @@ export async function ragIndexChanged(/** @type {any} */ options = {}) {
                 try {
                     await db.close();
                 } catch (_) {
-
                     // ignore
                 }
 
@@ -1482,7 +1477,6 @@ export async function ragQuery(/** @type {any} */ options = {}) {
                         await db.close();
                         dbClosed = true;
                     } catch (_) {
-
                         // ignore close errors
                     }
                 }
@@ -1755,7 +1749,6 @@ export async function ragHybridSearch(options = {}) {
                         await db.close();
                         dbClosed = true;
                     } catch (_) {
-
                         // ignore close errors
                     }
                 }
@@ -1985,7 +1978,6 @@ async function canWrite(/** @type {any} */ dirPath) {
         await fs.unlink(testFile);
         return true;
     } catch (_) {
-
         return false;
     }
 }

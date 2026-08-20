@@ -27,7 +27,9 @@ export const MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_SOURCE = Object.freeze({
     NONE: 'none',
 });
 
-/** @type {Readonly<Record<string, { refreshSeconds: number; retentionSeconds: number; autoUnblockWithoutReset: boolean }>>} */
+/** @type {Readonly<
+    Record<string, { refreshSeconds: number; retentionSeconds: number; autoUnblockWithoutReset: boolean }>
+>} */
 const STATUS_POLICIES = Object.freeze({
     ok: { refreshSeconds: 3600, retentionSeconds: 3600, autoUnblockWithoutReset: false },
     unknown: { refreshSeconds: 900, retentionSeconds: 3600, autoUnblockWithoutReset: false },
@@ -44,7 +46,11 @@ const FAILURE_KIND_STATUS = Object.freeze({
     'rate-limit': 'rate_limited',
 });
 
-const DEFAULT_STATUS_POLICY = Object.freeze({ refreshSeconds: 900, retentionSeconds: 3600, autoUnblockWithoutReset: false });
+const DEFAULT_STATUS_POLICY = Object.freeze({
+    refreshSeconds: 900,
+    retentionSeconds: 3600,
+    autoUnblockWithoutReset: false,
+});
 
 /**
  * @param {unknown} value
@@ -122,21 +128,21 @@ function resolveStatusPolicy(status) {
  * @param {object} [options]
  * @param {string | number | Date} [options.now]
  * @returns {{
- *   status: string;
- *   failureKind: string | null;
- *   class: string;
- *   source: string;
- *   resetAt: string | null;
- *   resetKnown: boolean;
- *   resetActive: boolean;
- *   resetExpired: boolean;
- *   retryAfterSeconds: number | null;
- *   observedAt: string | null;
- *   nextRefreshAfter: string | null;
- *   retentionExpiresAt: string | null;
- *   autoUnblocksAt: string | null;
- *   blocksUntilRefresh: boolean;
- *   operatorAction: string;
+ *     status: string;
+ *     failureKind: string | null;
+ *     class: string;
+ *     source: string;
+ *     resetAt: string | null;
+ *     resetKnown: boolean;
+ *     resetActive: boolean;
+ *     resetExpired: boolean;
+ *     retryAfterSeconds: number | null;
+ *     observedAt: string | null;
+ *     nextRefreshAfter: string | null;
+ *     retentionExpiresAt: string | null;
+ *     autoUnblocksAt: string | null;
+ *     blocksUntilRefresh: boolean;
+ *     operatorAction: string;
  * }}
  */
 export function resolveModelGatewayAccountResetWindow(input, options = {}) {
@@ -206,23 +212,37 @@ export function resolveModelGatewayAccountResetWindow(input, options = {}) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} rows
+ * @param {Record<string, unknown>[]} rows
  * @param {Parameters<typeof resolveModelGatewayAccountResetWindow>[1]} [options]
  * @returns {{
- *   rows: Array<ReturnType<typeof resolveModelGatewayAccountResetWindow> & { providerId: string; accountOverlayId: string }>;
- *   summary: { total: number; temporary: number; durable: number; expired: number; unknown: number; notBlocking: number; byClass: Record<string, number> };
+ *     rows: (ReturnType<typeof resolveModelGatewayAccountResetWindow> & {
+ *         providerId: string;
+ *         accountOverlayId: string;
+ *     })[];
+ *     summary: {
+ *         total: number;
+ *         temporary: number;
+ *         durable: number;
+ *         expired: number;
+ *         unknown: number;
+ *         notBlocking: number;
+ *         byClass: Record<string, number>;
+ *     };
  * }}
  */
 export function summarizeModelGatewayAccountResetWindows(rows, options = {}) {
     const normalized = (Array.isArray(rows) ? rows : []).map((row) => {
-        const resetWindow = resolveModelGatewayAccountResetWindow({
-            status: optionalString(row['status']) ?? optionalString(row['limitStatus']),
-            failureKind: optionalString(row['failureKind']),
-            retryAfterSeconds: optionalNumber(row['retryAfterSeconds']),
-            resetAt: optionalDateInput(row['resetAt']),
-            observedAt: optionalDateInput(row['observedAt']),
-            expiresAt: optionalDateInput(row['expiresAt']),
-        }, options);
+        const resetWindow = resolveModelGatewayAccountResetWindow(
+            {
+                status: optionalString(row['status']) ?? optionalString(row['limitStatus']),
+                failureKind: optionalString(row['failureKind']),
+                retryAfterSeconds: optionalNumber(row['retryAfterSeconds']),
+                resetAt: optionalDateInput(row['resetAt']),
+                observedAt: optionalDateInput(row['observedAt']),
+                expiresAt: optionalDateInput(row['expiresAt']),
+            },
+            options,
+        );
         return {
             providerId: optionalString(row['providerId']) ?? 'unknown-provider',
             accountOverlayId: optionalString(row['accountOverlayId']) ?? 'unknown-overlay',
@@ -236,11 +256,13 @@ export function summarizeModelGatewayAccountResetWindows(rows, options = {}) {
         rows: normalized,
         summary: {
             total: normalized.length,
-            temporary: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.TEMPORARY).length,
+            temporary: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.TEMPORARY)
+                .length,
             durable: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.DURABLE).length,
             expired: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.EXPIRED).length,
             unknown: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.UNKNOWN).length,
-            notBlocking: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.NOT_BLOCKING).length,
+            notBlocking: normalized.filter((row) => row.class === MODEL_GATEWAY_ACCOUNT_RESET_WINDOW_CLASS.NOT_BLOCKING)
+                .length,
             byClass,
         },
     };

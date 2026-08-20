@@ -5,9 +5,9 @@
  * @module copilot/mcp/tools/copilot-session
  */
 
+import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { getActiveSdkSession, listActiveSdkSessions } from '#copilot/sdk/session';
 import { z } from 'zod';
-import { errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 /**
  * @param {ReturnType<typeof listActiveSdkSessions>[number]} entry

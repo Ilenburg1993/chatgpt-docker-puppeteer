@@ -77,7 +77,6 @@ export const cleanupOrphans = async function () {
                 totalCleaned++;
             }
         } catch (/** @type {any} */ _) {
-
             /* Falha em diretório específico não interrompe a higiene */
         }
     }

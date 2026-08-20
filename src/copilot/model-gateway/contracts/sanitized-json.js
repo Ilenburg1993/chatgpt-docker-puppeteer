@@ -10,37 +10,50 @@
  * @module copilot/model-gateway/contracts/sanitized-json
  */
 
-const SENSITIVE_JSON_KEY_RE = /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu;
+const SENSITIVE_JSON_KEY_RE =
+    /^(?:authorization|proxy-authorization|api[_-]?key|secret|token|bearer[_-]?token|access[_-]?token)$/iu;
 
 /**
  * Lower-case spellings accepted by SENSITIVE_JSON_KEY_RE. This is intentionally exact rather than broad: dynamic
  * Record<string, unknown> keys remain unknown-valued, while object literals with known safe keys retain their shape.
  *
- * @typedef {
- *   | 'authorization'
- *   | 'proxy-authorization'
- *   | 'apikey'
- *   | 'api_key'
- *   | 'api-key'
- *   | 'secret'
- *   | 'token'
- *   | 'bearertoken'
- *   | 'bearer_token'
- *   | 'bearer-token'
- *   | 'accesstoken'
- *   | 'access_token'
- *   | 'access-token'
- * } SanitizedSecretKey
+ * @typedef {'authorization'
+ *     | 'proxy-authorization'
+ *     | 'apikey'
+ *     | 'api_key'
+ *     | 'api-key'
+ *     | 'secret'
+ *     | 'token'
+ *     | 'bearertoken'
+ *     | 'bearer_token'
+ *     | 'bearer-token'
+ *     | 'accesstoken'
+ *     | 'access_token'
+ *     | 'access-token'} SanitizedSecretKey
  */
 
 /**
  * @template T
- * @typedef {T extends undefined ? null : T extends string ? string : T extends readonly (infer U)[] ? SanitizedJson<U>[] : T extends Record<string, unknown> ? SanitizedRecord<T> : T} SanitizedJson
+ * @typedef {T extends undefined
+ *     ? null
+ *     : T extends string
+ *       ? string
+ *       : T extends readonly (infer U)[]
+ *         ? SanitizedJson<U>[]
+ *         : T extends Record<string, unknown>
+ *           ? SanitizedRecord<T>
+ *           : T} SanitizedJson
  */
 
 /**
  * @template {Record<string, unknown>} T
- * @typedef {{ [K in keyof T]: K extends string ? Lowercase<K> extends SanitizedSecretKey ? string : SanitizedJson<T[K]> : SanitizedJson<T[K]> }} FiniteSanitizedRecord
+ * @typedef {{
+ *     [K in keyof T]: K extends string
+ *         ? Lowercase<K> extends SanitizedSecretKey
+ *             ? string
+ *             : SanitizedJson<T[K]>
+ *         : SanitizedJson<T[K]>;
+ * }} FiniteSanitizedRecord
  */
 
 /**

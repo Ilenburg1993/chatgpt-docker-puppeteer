@@ -4,8 +4,8 @@
 
 ## Estado atual
 
-O modulo `src/copilot/mcp` contem a primeira fundacao do servidor MCP para conectar o ChatGPT ao workspace via
-Streamable HTTP em `/mcp` ou via `stdio` local.
+O modulo `src/copilot/mcp` contem a primeira fundacao do servidor MCP para conectar o ChatGPT ao
+workspace via Streamable HTTP em `/mcp` ou via `stdio` local.
 
 ## Comandos
 
@@ -49,18 +49,27 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/*.spec.j
 - Lint completo de `src/copilot` e `tests/unit/copilot`: passou.
 - Testes MCP focados: passaram.
 - Suite unit completa possui falhas preexistentes fora do modulo MCP, registradas no plano canonico.
-- Faixa I repo-side: typecheck strict passou, lint completo passou, testes MCP focados passaram, smoke HTTP passou.
-- Faixa G.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 20 testes.
-- Suite unit completa apos G.1: 3019 testes totais, 3013 passaram, 6 falhas preexistentes fora do MCP permanecem.
-- Faixa H.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 21 testes.
-- Faixa H.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 6 arquivos e 22 testes.
-- Faixa J.1 MCP: typecheck strict passou, lint completo passou, lint MCP/config passou, testes MCP focados passaram com 7 arquivos e 24 testes.
-- Faixa J.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 8 arquivos e 27 testes.
-- Faixa K.1/K.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados passaram com 9 arquivos e 29 testes.
+- Faixa I repo-side: typecheck strict passou, lint completo passou, testes MCP focados passaram,
+  smoke HTTP passou.
+- Faixa G.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados
+  passaram com 6 arquivos e 20 testes.
+- Suite unit completa apos G.1: 3019 testes totais, 3013 passaram, 6 falhas preexistentes fora do
+  MCP permanecem.
+- Faixa H.1 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados
+  passaram com 6 arquivos e 21 testes.
+- Faixa H.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados
+  passaram com 6 arquivos e 22 testes.
+- Faixa J.1 MCP: typecheck strict passou, lint completo passou, lint MCP/config passou, testes MCP
+  focados passaram com 7 arquivos e 24 testes.
+- Faixa J.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP focados
+  passaram com 8 arquivos e 27 testes.
+- Faixa K.1/K.2 MCP: typecheck strict passou, lint completo passou, lint MCP passou, testes MCP
+  focados passaram com 9 arquivos e 29 testes.
 
 ## Proximo passo
 
-Faixa K foi preparada. Continuar para Faixa L/M: smoke HTTP completo e validacao externa quando houver endpoint HTTPS real.
+Faixa K foi preparada. Continuar para Faixa L/M: smoke HTTP completo e validacao externa quando
+houver endpoint HTTPS real.
 
 ## Jobs MCP
 
@@ -78,7 +87,8 @@ Aliases canonicos:
 - `run_unit_copilot`
 - `run_project_doctor`
 
-Jobs aceitam `timeoutMs` por chamada. O job record retorna `command`, `args`, `timeoutMs`, `signal` e `timedOut`.
+Jobs aceitam `timeoutMs` por chamada. O job record retorna `command`, `args`, `timeoutMs`, `signal`
+e `timedOut`.
 
 ## LLM-B opt-in MCP
 
@@ -102,7 +112,8 @@ Essas tools consultam o registry ativo sem criar, retomar ou acionar sessoes LLM
 - `GET /health` retorna metricas em memoria.
 - `mcp_runtime_health` retorna workspace root, uptime e metricas por tool.
 - `repo_remove_file` nao retorna snapshot base64 do conteudo removido.
-- Smoke HTTP local de release passou com 26 tools em `tools/list`, `mcp_runtime_health`, `repo_status` e metricas em `/health`.
+- Smoke HTTP local de release passou com 26 tools em `tools/list`, `mcp_runtime_health`,
+  `repo_status` e metricas em `/health`.
 
 ## Release operacional
 

@@ -375,8 +375,8 @@ function filterSubstantiveTimelineTurns(turns) {
 
 /**
  * Alguns exports reais combinam prefixos vivos de sistema (intenções) + miolo persistido no Hub + cauda viva
- * ask_user/postAsk. Se o Hub também contém um turno vazio posterior, a checagem de "cauda posterior ao último Hub"
- * fica conservadora demais e marca divergência apesar de a linha do tempo ser intercalável.
+ * ask_user/postAsk. Se o Hub também contém um turno vazio posterior, a checagem de "cauda posterior ao último Hub" fica
+ * conservadora demais e marca divergência apesar de a linha do tempo ser intercalável.
  *
  * @param {TerminalTimelineTurn[]} persistedTurns
  * @param {TerminalTimelineTurn[]} liveTurns
@@ -847,7 +847,9 @@ export function readTerminalTimelineProjection({
                     liveBridgeTailCount = liveBridgeTail.length;
                     reconciliationStatus = 'bridge_tail';
                 } else if (isInterleavableLiveTimeline(persistedTurns, liveBridgeTail)) {
-                    turns = dedupeTimelineTurns([...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp));
+                    turns = dedupeTimelineTurns(
+                        [...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp),
+                    );
                     liveBridgeTail = filterSyncableLiveTail(persistedTurns, liveBridgeTail);
                     timelineSource = 'mixed';
                     timelineAuthority = 'reconciled';
@@ -856,7 +858,9 @@ export function readTerminalTimelineProjection({
                 } else {
                     reconciliationStatus = 'diverged';
                     if (liveBridgeTail.length > 0) {
-                        turns = dedupeTimelineTurns([...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp));
+                        turns = dedupeTimelineTurns(
+                            [...persistedTurns, ...liveBridgeTail].sort((a, b) => a.timestamp - b.timestamp),
+                        );
                         timelineSource = 'mixed';
                         timelineAuthority = 'reconciled';
                         liveBridgeTailCount = liveBridgeTail.length;

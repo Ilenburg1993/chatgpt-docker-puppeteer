@@ -21,28 +21,30 @@ const MAX_HTTP_REQUEST_ACTIVITY_EVENTS = 512;
 
 /**
  * @typedef {{ from: string | null; to: string; gapMs: number; observedAt: number }} ToolGapTransition
+ *
  * @typedef {{
- *   activeCalls: number;
- *   burstCount: number;
- *   gapCount: number;
- *   totalGapMs: number;
- *   lastGapMs: number | null;
- *   maxGapMs: number | null;
- *   lastBurstCompletedAt: number | null;
- *   lastToolStartedAt: number | null;
- *   lastToolCompletedAt: number | null;
- *   lastStartedTool: string | null;
- *   lastCompletedTool: string | null;
- *   lastTransition: ToolGapTransition | null;
- *   maxTransition: ToolGapTransition | null;
- *   gapSamples: number[];
+ *     activeCalls: number;
+ *     burstCount: number;
+ *     gapCount: number;
+ *     totalGapMs: number;
+ *     lastGapMs: number | null;
+ *     maxGapMs: number | null;
+ *     lastBurstCompletedAt: number | null;
+ *     lastToolStartedAt: number | null;
+ *     lastToolCompletedAt: number | null;
+ *     lastStartedTool: string | null;
+ *     lastCompletedTool: string | null;
+ *     lastTransition: ToolGapTransition | null;
+ *     maxTransition: ToolGapTransition | null;
+ *     gapSamples: number[];
  * }} ToolInteractionMetrics
  */
 
 /**
- * Measures quiescent time between tool-call bursts at the MCP origin boundary.
- * A gap starts only when activeCalls reaches zero and ends when the next tool starts,
- * so parallel tool calls are not misclassified as model/orchestrator delay.
+ * Measures quiescent time between tool-call bursts at the MCP origin boundary. A gap starts only when activeCalls
+ * reaches zero and ends when the next tool starts, so parallel tool calls are not misclassified as model/orchestrator
+ * delay.
+ *
  * @type {ToolInteractionMetrics}
  */
 const TOOL_INTERACTION_METRICS = {
@@ -65,56 +67,105 @@ const TOOL_INTERACTION_METRICS = {
 
 /**
  * @typedef {{
- *   requestId: string;
- *   receivedAt: number;
- *   activated: boolean;
- *   responseFinished: boolean;
- *   toolName: string | null;
- *   toolCallId: string | null;
- *   handlerStartedAt: number | null;
- *   handlerEndedAt: number | null;
- *   edgeColo: string | null;
- *   activityActivated: boolean;
- *   activityFinished: boolean;
- *   httpMethod: string | null;
- *   routeClass: string | null;
- *   rpcMethod: string | null;
+ *     requestId: string;
+ *     receivedAt: number;
+ *     activated: boolean;
+ *     responseFinished: boolean;
+ *     toolName: string | null;
+ *     toolCallId: string | null;
+ *     handlerStartedAt: number | null;
+ *     handlerEndedAt: number | null;
+ *     edgeColo: string | null;
+ *     activityActivated: boolean;
+ *     activityFinished: boolean;
+ *     httpMethod: string | null;
+ *     routeClass: string | null;
+ *     rpcMethod: string | null;
  * }} McpHttpToolTimingContext
+ *
  * @typedef {{ count: number; totalMs: number; lastMs: number | null; maxMs: number | null; samples: number[] }} DurationSamples
- * @typedef {{ requestId: string; receivedAt: number; finishedAt: number; durationMs: number; httpMethod: string; routeClass: string; rpcMethod: string | null; statusCode: number | null; edgeColo: string | null }} HttpRequestActivityEvent
- * @typedef {{ count: number; completedCount: number; activeAtToolArrivalCount: number; persistentCrossGapCount: number; streamRequestCount: number; streamActiveAtToolArrivalCount: number; coveredMs: number; silentMs: number; coverageRatio: number; firstAuxiliaryDelayMs: number | null; tailSilentAfterAuxiliaryMs: number; auxiliarySpanMs: number; firstDiscreteRoute: string | null; firstDiscreteRpcMethod: string | null; lastDiscreteRoute: string | null; lastDiscreteRpcMethod: string | null; byRoute: Record<string, number>; byRpcMethod: Record<string, number> }} InterveningHttpActivity
- * @typedef {{ from: string | null; to: string; gapMs: number; observedAt: number; edgeColo: string | null; previousEdgeColo: string | null; interveningRequests: InterveningHttpActivity }} HttpToolGapTransition
+ *
  * @typedef {{
- *   activeRequests: number;
- *   requestCount: number;
- *   burstCount: number;
- *   overlapCount: number;
- *   gapCount: number;
- *   totalGapMs: number;
- *   lastGapMs: number | null;
- *   maxGapMs: number | null;
- *   lastResponseBurstFinishedAt: number | null;
- *   lastCompletedTool: string | null;
- *   lastCompletedEdgeColo: string | null;
- *   lastTransition: HttpToolGapTransition | null;
- *   maxTransition: HttpToolGapTransition | null;
- *   gapSamples: number[];
- *   silentGapSamples: number[];
- *   auxiliaryCoverageSamples: number[];
- *   firstAuxiliaryDelaySamples: number[];
- *   tailSilentAfterAuxiliarySamples: number[];
- *   totalSilentGapMs: number;
- *   totalAuxiliaryCoveredMs: number;
- *   edgeColoCounts: Map<string, number>;
- *   edgeGapSamples: Map<string, number[]>;
- *   preHandler: DurationSamples;
- *   postHandler: DurationSamples;
+ *     requestId: string;
+ *     receivedAt: number;
+ *     finishedAt: number;
+ *     durationMs: number;
+ *     httpMethod: string;
+ *     routeClass: string;
+ *     rpcMethod: string | null;
+ *     statusCode: number | null;
+ *     edgeColo: string | null;
+ * }} HttpRequestActivityEvent
+ *
+ * @typedef {{
+ *     count: number;
+ *     completedCount: number;
+ *     activeAtToolArrivalCount: number;
+ *     persistentCrossGapCount: number;
+ *     streamRequestCount: number;
+ *     streamActiveAtToolArrivalCount: number;
+ *     coveredMs: number;
+ *     silentMs: number;
+ *     coverageRatio: number;
+ *     firstAuxiliaryDelayMs: number | null;
+ *     tailSilentAfterAuxiliaryMs: number;
+ *     auxiliarySpanMs: number;
+ *     firstDiscreteRoute: string | null;
+ *     firstDiscreteRpcMethod: string | null;
+ *     lastDiscreteRoute: string | null;
+ *     lastDiscreteRpcMethod: string | null;
+ *     byRoute: Record<string, number>;
+ *     byRpcMethod: Record<string, number>;
+ * }} InterveningHttpActivity
+ *
+ * @typedef {{
+ *     from: string | null;
+ *     to: string;
+ *     gapMs: number;
+ *     observedAt: number;
+ *     edgeColo: string | null;
+ *     previousEdgeColo: string | null;
+ *     interveningRequests: InterveningHttpActivity;
+ * }} HttpToolGapTransition
+ *
+ * @typedef {{
+ *     activeRequests: number;
+ *     requestCount: number;
+ *     burstCount: number;
+ *     overlapCount: number;
+ *     gapCount: number;
+ *     totalGapMs: number;
+ *     lastGapMs: number | null;
+ *     maxGapMs: number | null;
+ *     lastResponseBurstFinishedAt: number | null;
+ *     lastCompletedTool: string | null;
+ *     lastCompletedEdgeColo: string | null;
+ *     lastTransition: HttpToolGapTransition | null;
+ *     maxTransition: HttpToolGapTransition | null;
+ *     gapSamples: number[];
+ *     silentGapSamples: number[];
+ *     auxiliaryCoverageSamples: number[];
+ *     firstAuxiliaryDelaySamples: number[];
+ *     tailSilentAfterAuxiliarySamples: number[];
+ *     totalSilentGapMs: number;
+ *     totalAuxiliaryCoveredMs: number;
+ *     edgeColoCounts: Map<string, number>;
+ *     edgeGapSamples: Map<string, number[]>;
+ *     preHandler: DurationSamples;
+ *     postHandler: DurationSamples;
  * }} HttpToolBoundaryMetrics
  */
 
 /** @type {AsyncLocalStorage<McpHttpToolTimingContext>} */
 const MCP_HTTP_TOOL_TIMING_CONTEXT = new AsyncLocalStorage();
-/** @type {{ totalRequests: number; completedRequests: number; active: Map<string, McpHttpToolTimingContext>; recent: HttpRequestActivityEvent[]; byRoute: Map<string, number>; byRpcMethod: Map<string, number> }} */
+/** @type {{
+    totalRequests: number;
+    completedRequests: number;
+    active: Map<string, McpHttpToolTimingContext>;
+    recent: HttpRequestActivityEvent[];
+    byRoute: Map<string, number>;
+    byRpcMethod: Map<string, number>;
+}} */
 const HTTP_REQUEST_ACTIVITY_METRICS = {
     totalRequests: 0,
     completedRequests: 0,
@@ -204,8 +255,8 @@ export function recordMcpHttpTransportMode(mode) {
 }
 
 /**
- * Record the start of one guarded MCP tool call and return the quiescent gap
- * since the previous completed tool burst, when one exists.
+ * Record the start of one guarded MCP tool call and return the quiescent gap since the previous completed tool burst,
+ * when one exists.
  *
  * @param {string} tool
  * @param {number} [observedAt]
@@ -249,8 +300,8 @@ export function recordMcpToolInteractionStart(tool, observedAt = Date.now()) {
 }
 
 /**
- * Record completion of one guarded MCP tool call. A new quiescent interval begins
- * only when the last active call in the current burst completes.
+ * Record completion of one guarded MCP tool call. A new quiescent interval begins only when the last active call in the
+ * current burst completes.
  *
  * @param {string} tool
  * @param {number} [observedAt]
@@ -265,9 +316,8 @@ export function recordMcpToolInteractionEnd(tool, observedAt = Date.now()) {
 }
 
 /**
- * Run one HTTP request inside a timing context that survives async SDK dispatch.
- * The caller owns request classification; non-tool MCP requests never activate
- * the tool-boundary counters.
+ * Run one HTTP request inside a timing context that survives async SDK dispatch. The caller owns request
+ * classification; non-tool MCP requests never activate the tool-boundary counters.
  *
  * @template T
  * @param {{ requestId: string; receivedAt?: number; edgeColo?: string | null }} input
@@ -296,9 +346,8 @@ export function runWithMcpHttpToolTimingContext(input, callback) {
 }
 
 /**
- * Record one sanitized HTTP request activity envelope. The caller supplies only
- * a fixed route class and HTTP method; raw URLs, query strings, headers and IPs
- * are deliberately not retained.
+ * Record one sanitized HTTP request activity envelope. The caller supplies only a fixed route class and HTTP method;
+ * raw URLs, query strings, headers and IPs are deliberately not retained.
  *
  * @param {{ httpMethod?: string | null; routeClass?: string | null }} [input]
  * @returns {((statusCode?: number | null, observedAt?: number) => void) | null}
@@ -312,11 +361,13 @@ export function activateMcpHttpRequestActivity(input = {}) {
     HTTP_REQUEST_ACTIVITY_METRICS.totalRequests += 1;
     HTTP_REQUEST_ACTIVITY_METRICS.active.set(context.requestId, context);
     incrementMapCount(HTTP_REQUEST_ACTIVITY_METRICS.byRoute, context.routeClass);
-    return (statusCode = null, observedAt = Date.now()) => finishMcpHttpRequestActivity(context, statusCode, observedAt);
+    return (statusCode = null, observedAt = Date.now()) =>
+        finishMcpHttpRequestActivity(context, statusCode, observedAt);
 }
 
 /**
  * Attach a sanitized JSON-RPC method label to the current request activity.
+ *
  * @param {string | null | undefined} method
  */
 export function recordMcpHttpRequestRpcMethod(method) {
@@ -328,9 +379,9 @@ export function recordMcpHttpRequestRpcMethod(method) {
 }
 
 /**
- * Mark the current HTTP request as a JSON-RPC tools/call request and return a
- * response-finalizer closure bound to this exact async context. The closure is
- * safe to register on both response `finish` and `close`; only its first call mutates metrics.
+ * Mark the current HTTP request as a JSON-RPC tools/call request and return a response-finalizer closure bound to this
+ * exact async context. The closure is safe to register on both response `finish` and `close`; only its first call
+ * mutates metrics.
  *
  * @param {string | null} toolName
  * @returns {((observedAt?: number) => void) | null}
@@ -415,8 +466,8 @@ export function activateMcpHttpToolRequestTiming(toolName) {
 }
 
 /**
- * Return only non-sensitive timing metadata for the current HTTP tools/call context.
- * Request IDs, headers, IPs and full Cloudflare Ray IDs are deliberately excluded.
+ * Return only non-sensitive timing metadata for the current HTTP tools/call context. Request IDs, headers, IPs and full
+ * Cloudflare Ray IDs are deliberately excluded.
  *
  * @returns {{ requestReceivedAt: number; edgeColo: string | null } | null}
  */
@@ -445,8 +496,9 @@ export function recordMcpHttpToolHandlerEnd(observedAt = Date.now()) {
 }
 
 /**
- * Mark one bound transport response as finished/closed.
- * Safe to call from both finish and close events; only the first call mutates metrics.
+ * Mark one bound transport response as finished/closed. Safe to call from both finish and close events; only the first
+ * call mutates metrics.
+ *
  * @param {McpHttpToolTimingContext} context
  * @param {number} [observedAt]
  */
@@ -466,8 +518,8 @@ function finishMcpHttpToolTimingContext(context, observedAt = Date.now()) {
 }
 
 /**
- * Finalize one sanitized HTTP activity record. Raw paths, query strings,
- * headers, IPs and request IDs are never exposed in retained snapshots.
+ * Finalize one sanitized HTTP activity record. Raw paths, query strings, headers, IPs and request IDs are never exposed
+ * in retained snapshots.
  *
  * @param {McpHttpToolTimingContext} context
  * @param {number | null} statusCode
@@ -500,9 +552,8 @@ function finishMcpHttpRequestActivity(context, statusCode, observedAt = Date.now
 }
 
 /**
- * Summarize sanitized requests that overlap the quiet interval before the next
- * tools/call. coveredMs is the union of observed intervals, so concurrency is
- * never double-counted.
+ * Summarize sanitized requests that overlap the quiet interval before the next tools/call. coveredMs is the union of
+ * observed intervals, so concurrency is never double-counted.
  *
  * @param {number} fromAt
  * @param {number} toAt
@@ -510,7 +561,7 @@ function finishMcpHttpRequestActivity(context, statusCode, observedAt = Date.now
  * @returns {InterveningHttpActivity}
  */
 function summarizeInterveningHttpActivity(fromAt, toAt, currentRequestId) {
-    /** @type {Array<[number, number]>} */
+    /** @type {[number, number][]} */
     const intervals = [];
     /** @type {Record<string, number>} */
     const byRoute = Object.create(null);
@@ -597,8 +648,7 @@ function summarizeInterveningHttpActivity(fromAt, toAt, currentRequestId) {
     const gapMs = Math.max(0, toAt - fromAt);
     const boundedCoveredMs = Math.min(gapMs, Math.max(0, coveredMs));
     const firstAuxiliaryDelayMs = firstAuxiliaryAt === null ? null : Math.max(0, firstAuxiliaryAt - fromAt);
-    const tailSilentAfterAuxiliaryMs =
-        lastAuxiliaryAt === null ? gapMs : Math.max(0, toAt - lastAuxiliaryAt);
+    const tailSilentAfterAuxiliaryMs = lastAuxiliaryAt === null ? gapMs : Math.max(0, toAt - lastAuxiliaryAt);
     const auxiliarySpanMs =
         firstAuxiliaryAt === null || lastAuxiliaryAt === null ? 0 : Math.max(0, lastAuxiliaryAt - firstAuxiliaryAt);
     return {
@@ -675,17 +725,16 @@ export function recordMcpToolMetric(tool, event) {
         );
         const skippedOperations = Math.max(
             0,
-            Math.min(
-                logicalOperations - failedOperations,
-                Math.floor(Number(event.execution.skippedOperations) || 0),
-            ),
+            Math.min(logicalOperations - failedOperations, Math.floor(Number(event.execution.skippedOperations) || 0)),
         );
         current.execution.logicalOperations += logicalOperations;
         current.execution.failedOperations += failedOperations;
         current.execution.skippedOperations += skippedOperations;
         current.execution.lastLogicalOperations = logicalOperations;
         current.execution.lastMode =
-            typeof event.execution.mode === 'string' && event.execution.mode.trim() ? event.execution.mode.trim() : null;
+            typeof event.execution.mode === 'string' && event.execution.mode.trim()
+                ? event.execution.mode.trim()
+                : null;
         if (logicalOperations > 1) current.execution.batchCalls += 1;
     } else {
         current.execution.logicalOperations += 1;
@@ -736,7 +785,16 @@ export function recordMcpToolMetric(tool, event) {
  *     interaction: {
  *         activeCalls: number;
  *         burstCount: number;
- *         gaps: { count: number; totalMs: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; p99Ms: number | null; lastMs: number | null; maxMs: number | null };
+ *         gaps: {
+ *             count: number;
+ *             totalMs: number;
+ *             averageMs: number;
+ *             p50Ms: number | null;
+ *             p95Ms: number | null;
+ *             p99Ms: number | null;
+ *             lastMs: number | null;
+ *             maxMs: number | null;
+ *         };
  *         lastBurstCompletedAt: number | null;
  *         lastToolStartedAt: number | null;
  *         lastToolCompletedAt: number | null;
@@ -747,19 +805,87 @@ export function recordMcpToolMetric(tool, event) {
  *             requestCount: number;
  *             burstCount: number;
  *             overlapCount: number;
- *             externalGaps: { count: number; totalMs: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; p99Ms: number | null; lastMs: number | null; maxMs: number | null };
- *             silentExternalGaps: { count: number; totalMs: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; p99Ms: number | null; lastMs: number | null; maxMs: number | null };
- *             auxiliaryCoverage: { count: number; totalMs: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; lastMs: number | null; overallCoverageRatio: number };
- *             discreteAuxiliaryTiming: { count: number; firstDelayP50Ms: number | null; firstDelayP95Ms: number | null; firstDelayLastMs: number | null; tailSilentP50Ms: number | null; tailSilentP95Ms: number | null; tailSilentLastMs: number | null; firstDelayToExternalP50Ratio: number; lastFirstDiscreteRpcMethod: string | null; lastFirstDiscreteRoute: string | null };
- *             preHandler: { count: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; p99Ms: number | null; lastMs: number | null; maxMs: number | null };
- *             postHandler: { count: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; p99Ms: number | null; lastMs: number | null; maxMs: number | null };
+ *             externalGaps: {
+ *                 count: number;
+ *                 totalMs: number;
+ *                 averageMs: number;
+ *                 p50Ms: number | null;
+ *                 p95Ms: number | null;
+ *                 p99Ms: number | null;
+ *                 lastMs: number | null;
+ *                 maxMs: number | null;
+ *             };
+ *             silentExternalGaps: {
+ *                 count: number;
+ *                 totalMs: number;
+ *                 averageMs: number;
+ *                 p50Ms: number | null;
+ *                 p95Ms: number | null;
+ *                 p99Ms: number | null;
+ *                 lastMs: number | null;
+ *                 maxMs: number | null;
+ *             };
+ *             auxiliaryCoverage: {
+ *                 count: number;
+ *                 totalMs: number;
+ *                 averageMs: number;
+ *                 p50Ms: number | null;
+ *                 p95Ms: number | null;
+ *                 lastMs: number | null;
+ *                 overallCoverageRatio: number;
+ *             };
+ *             discreteAuxiliaryTiming: {
+ *                 count: number;
+ *                 firstDelayP50Ms: number | null;
+ *                 firstDelayP95Ms: number | null;
+ *                 firstDelayLastMs: number | null;
+ *                 tailSilentP50Ms: number | null;
+ *                 tailSilentP95Ms: number | null;
+ *                 tailSilentLastMs: number | null;
+ *                 firstDelayToExternalP50Ratio: number;
+ *                 lastFirstDiscreteRpcMethod: string | null;
+ *                 lastFirstDiscreteRoute: string | null;
+ *             };
+ *             preHandler: {
+ *                 count: number;
+ *                 averageMs: number;
+ *                 p50Ms: number | null;
+ *                 p95Ms: number | null;
+ *                 p99Ms: number | null;
+ *                 lastMs: number | null;
+ *                 maxMs: number | null;
+ *             };
+ *             postHandler: {
+ *                 count: number;
+ *                 averageMs: number;
+ *                 p50Ms: number | null;
+ *                 p95Ms: number | null;
+ *                 p99Ms: number | null;
+ *                 lastMs: number | null;
+ *                 maxMs: number | null;
+ *             };
  *             lastResponseBurstFinishedAt: number | null;
  *             lastCompletedEdgeColo: string | null;
  *             edgeColoCounts: Record<string, number>;
- *             externalGapsByEdgeColo: Array<{ edgeColo: string; calls: number; gapSamples: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; maxMs: number | null }>;
+ *             externalGapsByEdgeColo: {
+ *                 edgeColo: string;
+ *                 calls: number;
+ *                 gapSamples: number;
+ *                 averageMs: number;
+ *                 p50Ms: number | null;
+ *                 p95Ms: number | null;
+ *                 maxMs: number | null;
+ *             }[];
  *             lastTransition: HttpToolGapTransition | null;
  *             maxTransition: HttpToolGapTransition | null;
- *             requestActivity: { totalRequests: number; completedRequests: number; activeRequests: number; byRoute: Record<string, number>; byRpcMethod: Record<string, number>; lastCompleted: ReturnType<typeof compactHttpRequestActivityEvent> };
+ *             requestActivity: {
+ *                 totalRequests: number;
+ *                 completedRequests: number;
+ *                 activeRequests: number;
+ *                 byRoute: Record<string, number>;
+ *                 byRpcMethod: Record<string, number>;
+ *                 lastCompleted: ReturnType<typeof compactHttpRequestActivityEvent>;
+ *             };
  *         };
  *     };
  *     tools: Record<
@@ -775,16 +901,18 @@ export function recordMcpToolMetric(tool, event) {
  * }}
  */
 export function readMcpMetricsSnapshot() {
-    /** @type {Record<
-    string,
-    ToolMetric & {
-        averageDurationMs: number;
-        phaseAverages: Record<
-            string,
-            { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }
-        >;
-    }
->} */
+    /**
+     * @type {Record<
+     *     string,
+     *     ToolMetric & {
+     *         averageDurationMs: number;
+     *         phaseAverages: Record<
+     *             string,
+     *             { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }
+     *         >;
+     *     }
+     * >}
+     */
     const tools = Object.create(null);
     let calls = 0;
     let errors = 0;
@@ -874,7 +1002,9 @@ export function readMcpMetricsSnapshot() {
                     totalMs: HTTP_TOOL_BOUNDARY_METRICS.totalSilentGapMs,
                     averageMs:
                         HTTP_TOOL_BOUNDARY_METRICS.gapCount > 0
-                            ? Math.round(HTTP_TOOL_BOUNDARY_METRICS.totalSilentGapMs / HTTP_TOOL_BOUNDARY_METRICS.gapCount)
+                            ? Math.round(
+                                  HTTP_TOOL_BOUNDARY_METRICS.totalSilentGapMs / HTTP_TOOL_BOUNDARY_METRICS.gapCount,
+                              )
                             : 0,
                     p50Ms: percentile(silentGapSamples, 0.5),
                     p95Ms: percentile(silentGapSamples, 0.95),
@@ -888,7 +1018,8 @@ export function readMcpMetricsSnapshot() {
                     averageMs:
                         HTTP_TOOL_BOUNDARY_METRICS.gapCount > 0
                             ? Math.round(
-                                  HTTP_TOOL_BOUNDARY_METRICS.totalAuxiliaryCoveredMs / HTTP_TOOL_BOUNDARY_METRICS.gapCount,
+                                  HTTP_TOOL_BOUNDARY_METRICS.totalAuxiliaryCoveredMs /
+                                      HTTP_TOOL_BOUNDARY_METRICS.gapCount,
                               )
                             : 0,
                     p50Ms: percentile(auxiliaryCoverageSamples, 0.5),
@@ -911,7 +1042,8 @@ export function readMcpMetricsSnapshot() {
                     tailSilentP50Ms: percentile(tailSilentAfterAuxiliarySamples, 0.5),
                     tailSilentP95Ms: percentile(tailSilentAfterAuxiliarySamples, 0.95),
                     tailSilentLastMs:
-                        HTTP_TOOL_BOUNDARY_METRICS.lastTransition?.interveningRequests.tailSilentAfterAuxiliaryMs ?? null,
+                        HTTP_TOOL_BOUNDARY_METRICS.lastTransition?.interveningRequests.tailSilentAfterAuxiliaryMs ??
+                        null,
                     firstDelayToExternalP50Ratio:
                         (percentile(httpGapSamples, 0.5) ?? 0) > 0
                             ? roundMetricRatio(
@@ -946,7 +1078,10 @@ export function readMcpMetricsSnapshot() {
                             maxMs: sorted.at(-1) ?? null,
                         };
                     })
-                    .sort((left, right) => right.gapSamples - left.gapSamples || left.edgeColo.localeCompare(right.edgeColo)),
+                    .sort(
+                        (left, right) =>
+                            right.gapSamples - left.gapSamples || left.edgeColo.localeCompare(right.edgeColo),
+                    ),
                 lastTransition: HTTP_TOOL_BOUNDARY_METRICS.lastTransition,
                 maxTransition: HTTP_TOOL_BOUNDARY_METRICS.maxTransition,
                 requestActivity: {

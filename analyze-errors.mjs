@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 
-/** @typedef {{ file: string, code: number }} DiagnosticEntry */
+/** @typedef {{ file: string; code: number }} DiagnosticEntry */
 /** @type {{ errors: DiagnosticEntry[] }} */
 const data = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 /** @type {Record<string, number[]>} */

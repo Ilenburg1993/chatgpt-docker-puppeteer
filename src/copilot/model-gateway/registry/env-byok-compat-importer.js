@@ -9,13 +9,19 @@
  */
 
 import { readConfiguredByokModelsFromEnv, readConfiguredByokState } from '#copilot/sdk/session';
-import { buildProviderModelId, createModelRecord, createProviderRecord, normalizeGatewayIdPart, optionalPositiveInteger } from '../contracts/records.js';
-import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
-import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
+import {
+    buildProviderModelId,
+    createModelRecord,
+    createProviderRecord,
+    normalizeGatewayIdPart,
+    optionalPositiveInteger,
+} from '../contracts/records.js';
 import {
     createModelGatewayEnvProfileStore,
     materializeModelGatewayActiveByokProfileEnv,
 } from '../profiles/env-profile-store.js';
+import { createEnvSecretRegistry } from '../secrets/env-secret-registry.js';
+import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
 
 /**
  * @param {unknown} value
@@ -40,12 +46,16 @@ function optionalNonNegativeNumber(value) {
  */
 function resolveProviderId(state, env) {
     const gatewayProviderId = env['COPILOT_MODEL_GATEWAY_PROVIDER_ID'];
-    if (typeof gatewayProviderId === 'string' && gatewayProviderId.trim()) return gatewayProviderId.trim().toLowerCase();
+    if (typeof gatewayProviderId === 'string' && gatewayProviderId.trim())
+        return gatewayProviderId.trim().toLowerCase();
     const activeProfile = createModelGatewayEnvProfileStore({ env }).getActive();
     if (typeof activeProfile?.providerId === 'string' && activeProfile.providerId.trim()) {
         return activeProfile.providerId.trim().toLowerCase();
     }
-    return normalizeGatewayIdPart(state.summary.preset ?? state.summary.providerType ?? 'byok-configured') || 'byok-configured';
+    return (
+        normalizeGatewayIdPart(state.summary.preset ?? state.summary.providerType ?? 'byok-configured') ||
+        'byok-configured'
+    );
 }
 
 /**
@@ -55,7 +65,10 @@ function resolveProviderId(state, env) {
 function bindingSource(env) {
     if (env['COPILOT_MODEL_GATEWAY_BINDING_SOURCE'] === 'gateway_route') return 'gateway_route';
     if (env['COPILOT_MODEL_GATEWAY_BINDING_SOURCE'] === 'gateway_profile') return 'gateway_profile';
-    if (typeof env['COPILOT_MODEL_GATEWAY_PROVIDER_ID'] === 'string' && env['COPILOT_MODEL_GATEWAY_PROVIDER_ID']?.trim()) {
+    if (
+        typeof env['COPILOT_MODEL_GATEWAY_PROVIDER_ID'] === 'string' &&
+        env['COPILOT_MODEL_GATEWAY_PROVIDER_ID']?.trim()
+    ) {
         return 'gateway_route';
     }
     if (createModelGatewayEnvProfileStore({ env }).getActive()) return 'gateway_profile';
@@ -138,8 +151,8 @@ function modelInfoToRecord(modelInfo, providerId, state) {
             vision: Boolean(supports['vision'] ?? byok['supportsVision'] ?? state.summary.capabilities.vision),
             reasoningEffort: Boolean(
                 supports['reasoningEffort'] ??
-                    byok['supportsReasoning'] ??
-                    state.summary.capabilities.sdkReasoningEffort,
+                byok['supportsReasoning'] ??
+                state.summary.capabilities.sdkReasoningEffort,
             ),
             tools: Boolean(byok['tools'] ?? false),
         },
@@ -148,9 +161,12 @@ function modelInfoToRecord(modelInfo, providerId, state) {
                 optionalPositiveInteger(limits['max_context_window_tokens']) ??
                 optionalPositiveInteger(byok['contextWindowTokens']) ??
                 state.summary.capabilities.contextWindowTokens,
-            maxRequestTokens: optionalPositiveInteger(rateLimits['maxRequestTokens']) ?? state.summary.limits.maxRequestTokens,
-            tokensPerMinute: optionalPositiveInteger(rateLimits['tokensPerMinute']) ?? state.summary.limits.tokensPerMinute,
-            requestsPerMinute: optionalPositiveInteger(rateLimits['requestsPerMinute']) ?? state.summary.limits.requestsPerMinute,
+            maxRequestTokens:
+                optionalPositiveInteger(rateLimits['maxRequestTokens']) ?? state.summary.limits.maxRequestTokens,
+            tokensPerMinute:
+                optionalPositiveInteger(rateLimits['tokensPerMinute']) ?? state.summary.limits.tokensPerMinute,
+            requestsPerMinute:
+                optionalPositiveInteger(rateLimits['requestsPerMinute']) ?? state.summary.limits.requestsPerMinute,
             dailyRequests: optionalPositiveInteger(rateLimits['dailyRequests']) ?? state.summary.limits.dailyRequests,
         },
         pricing: {

@@ -7,12 +7,11 @@
 
 export * from './http-body.js';
 export * from './http-protocol.js';
-export * from './http-stateful-router.js';
 export {
+    MCP_PATH,
     configureHttp1ServerTiming,
     configureHttp2ServerTiming,
     createMcpHttpRequestHandler,
-    MCP_PATH,
     notifyMcpHttpStarted,
     readHeader,
     readMcpHttpCorsPolicy,
@@ -22,6 +21,7 @@ export {
     readMcpHttpTransportPolicy,
     writeJson,
 } from './http-shared.js';
+export * from './http-stateful-router.js';
 export { startHttpMcpServer } from './http.js';
 export { readMcpHttp2ServerPolicy, startHttp2McpServer } from './http2.js';
 export { startStdioMcpServer } from './stdio.js';

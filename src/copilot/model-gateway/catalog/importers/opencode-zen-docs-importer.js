@@ -15,11 +15,8 @@ import {
     normalizeModelLifecycle,
     normalizeUsdPricing,
 } from '../normalizers.js';
-import {
-    OPENCODE_ZEN_BASE_URL,
-    OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
-} from './opencode-zen-models-importer.js';
 import { htmlTables } from './html-docs-parser.js';
+import { OPENCODE_ZEN_BASE_URL, OPENCODE_ZEN_CHAT_COMPLETIONS_URL } from './opencode-zen-models-importer.js';
 import { readCatalogResponseText } from './response-body.js';
 
 export const OPENCODE_ZEN_DOCS_URL = 'https://opencode.ai/docs/zen/';
@@ -90,9 +87,12 @@ function isoDateFromDocs(value) {
  * @returns {{ wireApi: string; family: string; routeLayer: string }}
  */
 function endpointPolicy(endpoint) {
-    if (endpoint.endsWith('/responses')) return { wireApi: 'openai_responses', family: 'openai', routeLayer: 'direct_provider' };
-    if (endpoint.endsWith('/messages')) return { wireApi: 'anthropic_messages', family: 'anthropic_compatible', routeLayer: 'direct_provider' };
-    if (endpoint.includes('/models/')) return { wireApi: 'google_generative_model', family: 'google', routeLayer: 'direct_provider' };
+    if (endpoint.endsWith('/responses'))
+        return { wireApi: 'openai_responses', family: 'openai', routeLayer: 'direct_provider' };
+    if (endpoint.endsWith('/messages'))
+        return { wireApi: 'anthropic_messages', family: 'anthropic_compatible', routeLayer: 'direct_provider' };
+    if (endpoint.includes('/models/'))
+        return { wireApi: 'google_generative_model', family: 'google', routeLayer: 'direct_provider' };
     return { wireApi: 'openai_chat_completions', family: 'openai_compatible', routeLayer: 'openai_compatible' };
 }
 
@@ -150,7 +150,11 @@ function parseOpenCodeDocsRows(html) {
                 const { displayName, tierLabel } = splitTierLabel(rawDisplay);
                 const providerModel = idByDisplay.get(displayKey(displayName));
                 if (!providerModel) continue;
-                const row = byId.get(providerModel) ?? { id: providerModel, displayName, docsUrl: OPENCODE_ZEN_DOCS_URL };
+                const row = byId.get(providerModel) ?? {
+                    id: providerModel,
+                    displayName,
+                    docsUrl: OPENCODE_ZEN_DOCS_URL,
+                };
                 const tier = {
                     label: tierLabel,
                     inputUsdPerMillion: pricePerMillion(cells[1] ?? ''),
@@ -171,7 +175,11 @@ function parseOpenCodeDocsRows(html) {
                 const providerModel = displayName ? idByDisplay.get(displayKey(displayName)) : null;
                 const expiresAt = isoDateFromDocs(cells[1] ?? '');
                 if (!providerModel || !expiresAt) continue;
-                const row = byId.get(providerModel) ?? { id: providerModel, displayName, docsUrl: OPENCODE_ZEN_DOCS_URL };
+                const row = byId.get(providerModel) ?? {
+                    id: providerModel,
+                    displayName,
+                    docsUrl: OPENCODE_ZEN_DOCS_URL,
+                };
                 row['expiresAt'] = expiresAt;
                 byId.set(providerModel, row);
             }
@@ -185,13 +193,13 @@ function parseOpenCodeDocsRows(html) {
  * @returns {Record<string, unknown>[]}
  */
 function parseOpenCodeDocsRaw(raw) {
-    return parseOpenCodeDocsRows(isRecord(raw) ? stringValue(raw['html']) ?? '' : String(raw ?? ''));
+    return parseOpenCodeDocsRows(isRecord(raw) ? (stringValue(raw['html']) ?? '') : String(raw ?? ''));
 }
 
 /**
  * @param {Record<string, unknown>} row
  * @param {number} nowMs
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row, nowMs) {
     const providerModel = stringValue(row['id']);
@@ -201,12 +209,18 @@ function modelEvidenceValues(row, nowMs) {
     const policy = endpoint ? endpointPolicy(endpoint) : endpointPolicy(OPENCODE_ZEN_CHAT_COMPLETIONS_URL);
     const lifecycle = normalizeModelLifecycle({ expiresAt: row['expiresAt'], providerModel, nowMs });
     const normalizedPricing = normalizeUsdPricing({
-        inputPerTokenUsd: typeof pricing['inputUsdPerMillion'] === 'number' ? pricing['inputUsdPerMillion'] / 1_000_000 : null,
-        outputPerTokenUsd: typeof pricing['outputUsdPerMillion'] === 'number' ? pricing['outputUsdPerMillion'] / 1_000_000 : null,
+        inputPerTokenUsd:
+            typeof pricing['inputUsdPerMillion'] === 'number' ? pricing['inputUsdPerMillion'] / 1_000_000 : null,
+        outputPerTokenUsd:
+            typeof pricing['outputUsdPerMillion'] === 'number' ? pricing['outputUsdPerMillion'] / 1_000_000 : null,
         cacheReadPerTokenUsd:
-            typeof pricing['cacheReadUsdPerMillion'] === 'number' ? pricing['cacheReadUsdPerMillion'] / 1_000_000 : null,
+            typeof pricing['cacheReadUsdPerMillion'] === 'number'
+                ? pricing['cacheReadUsdPerMillion'] / 1_000_000
+                : null,
         cacheWritePerTokenUsd:
-            typeof pricing['cacheWriteUsdPerMillion'] === 'number' ? pricing['cacheWriteUsdPerMillion'] / 1_000_000 : null,
+            typeof pricing['cacheWriteUsdPerMillion'] === 'number'
+                ? pricing['cacheWriteUsdPerMillion'] / 1_000_000
+                : null,
     });
     const aliases = normalizeModelAliases({ providerModel, canonicalSlug: `opencode/${providerModel}` });
     const identityTraits = normalizeModelIdentityTraits({
@@ -229,7 +243,10 @@ function modelEvidenceValues(row, nowMs) {
         { fieldPath: 'providerMetadata.opencode.aiSdkPackage', value: stringValue(row['aiSdkPackage']) },
         { fieldPath: 'providerMetadata.opencode.family', value: policy.family },
         { fieldPath: 'providerMetadata.opencode.pricingTiers', value: row['pricingTiers'] },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;

@@ -2,17 +2,17 @@
 /**
  * Cross-layer latency attribution for the ChatGPT -> Cloudflare -> MCP path.
  *
- * The diagnostic intentionally separates what this workspace can observe from
- * what only the ChatGPT client/model control plane can observe. External probes
- * are fixed to official OpenAI/ChatGPT endpoints and never accept arbitrary URLs.
+ * The diagnostic intentionally separates what this workspace can observe from what only the ChatGPT client/model
+ * control plane can observe. External probes are fixed to official OpenAI/ChatGPT endpoints and never accept arbitrary
+ * URLs.
  *
  * @module copilot/mcp/tools/latency-attribution
  */
 
 import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import {
-    readCloudflareHttpLatencyAnalytics,
     readCloudflaredMetricsSnapshot,
+    readCloudflareHttpLatencyAnalytics,
     readCloudflareTunnelConfig,
 } from '#copilot/mcp/cloudflare';
 import {
@@ -20,17 +20,17 @@ import {
     measureOpenAiEndpointLatency,
     okResult,
     openWorldReadOnlyAnnotations,
-    readMcpAuditEventTail,
     readClientLatencyEvidence,
+    readMcpAuditEventTail,
     readMcpMetricsSnapshot,
+    readOnlyAnnotations,
     readOpenAiEndpointLatencyHistory,
     readOpenAiEndpointLatencyMonitorState,
-    readOnlyAnnotations,
     summarizeClientLatencyEvidence,
     summarizeOpenAiEndpointLatencyHistory,
 } from '#copilot/mcp/control-plane';
-import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 import { z } from 'zod';
+import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 
 const DEFAULT_TIMEOUT_MS = 2_500;
 const MAX_STATUS_BODY_BYTES = 512 * 1024;
@@ -59,20 +59,21 @@ function pulseExperimentLabelSchema(description) {
     return z
         .string()
         .min(1)
-        .max(64)['regex'](/^[A-Za-z0-9._:-]+$/u)
+        .max(64)
+        ['regex'](/^[A-Za-z0-9._:-]+$/u)
         .optional()
         .describe(description);
 }
 
 /**
  * @typedef {{
- *   id: string;
- *   host: string;
- *   authority: 'observed-from-container';
- *   dns: { ok: boolean; durationMs: number; addressCount?: number; families?: number[]; error?: string };
- *   tls: { ok: boolean; durationMs: number; alpn?: string | null; authorized?: boolean; error?: string };
- *   http: { reachable: boolean; durationMs: number; status?: number; redirected?: boolean; error?: string };
- *   reachable: boolean;
+ *     id: string;
+ *     host: string;
+ *     authority: 'observed-from-container';
+ *     dns: { ok: boolean; durationMs: number; addressCount?: number; families?: number[]; error?: string };
+ *     tls: { ok: boolean; durationMs: number; alpn?: string | null; authorized?: boolean; error?: string };
+ *     http: { reachable: boolean; durationMs: number; status?: number; redirected?: boolean; error?: string };
+ *     reachable: boolean;
  * }} FixedEndpointProbe
  */
 
@@ -88,13 +89,18 @@ export const mcpLatencyPulseTool = {
         seriesId: z
             .string()
             .min(1)
-            .max(64)['regex'](/^[A-Za-z0-9._-]+$/u)
+            .max(64)
+            ['regex'](/^[A-Za-z0-9._-]+$/u)
             .optional()
             .describe('Optional short series identifier for a controlled pulse run.'),
         step: z.number().int().min(0).max(1000).optional()['describe']('Optional pulse step number.'),
-        networkLabel: pulseExperimentLabelSchema('Optional sanitized client network label, for example wifi-home or hotspot-cellular.'),
+        networkLabel: pulseExperimentLabelSchema(
+            'Optional sanitized client network label, for example wifi-home or hotspot-cellular.',
+        ),
         modelLabel: pulseExperimentLabelSchema('Optional sanitized model label for A/B comparison.'),
-        conversationLabel: pulseExperimentLabelSchema('Optional sanitized conversation condition, for example fresh-chat or long-chat.'),
+        conversationLabel: pulseExperimentLabelSchema(
+            'Optional sanitized conversation condition, for example fresh-chat or long-chat.',
+        ),
         clientLabel: pulseExperimentLabelSchema('Optional sanitized client label, for example desktop-app or browser.'),
         vpnLabel: pulseExperimentLabelSchema('Optional sanitized VPN condition, for example off or provider-a.'),
     },
@@ -128,10 +134,14 @@ export const mcpLatencyAttributionTool = {
     inputSchema: {
         reportedSlow: z
             .boolean()
-            .optional()['describe']('Set true when the user is currently experiencing slowness even if local MCP metrics look healthy.'),
+            .optional()
+            ['describe'](
+                'Set true when the user is currently experiencing slowness even if local MCP metrics look healthy.',
+            ),
         clientSchemaProjectionStale: z
             .boolean()
-            .optional()['describe'](
+            .optional()
+            ['describe'](
                 'Set true only when the caller has observed a client-advertised MCP schema that is stale relative to the restarted server implementation.',
             ),
         timeoutMs: z
@@ -139,10 +149,12 @@ export const mcpLatencyAttributionTool = {
             .int()
             .min(500)
             .max(5000)
-            .optional()['describe']('Per external probe timeout. Defaults to 2500ms.'),
+            .optional()
+            ['describe']('Per external probe timeout. Defaults to 2500ms.'),
         includeDetails: z
             .boolean()
-            .optional()['describe']('Include per-endpoint and per-source evidence. Defaults false to minimize context pressure.'),
+            .optional()
+            ['describe']('Include per-endpoint and per-source evidence. Defaults false to minimize context pressure.'),
     },
     annotations: openWorldReadOnlyAnnotations(),
     handler: async (input = {}) => {
@@ -249,8 +261,7 @@ export const mcpLatencyAttributionTool = {
                 clientModelPlane: {
                     authority: 'not-observable-from-workspace',
                     clientSchemaProjectionStale,
-                    note:
-                        'Model inference, ChatGPT session scheduling, client websocket behavior and conversation token pressure are not directly observable from this MCP origin.',
+                    note: 'Model inference, ChatGPT session scheduling, client websocket behavior and conversation token pressure are not directly observable from this MCP origin.',
                 },
             },
             remediation: attribution.remediation,
@@ -293,16 +304,22 @@ export const mcpLatencyAttributionTool = {
  * Pure classifier, exported for deterministic tests.
  *
  * @param {{
- *  reportedSlow: boolean;
- *  clientSchemaProjectionStale: boolean;
- *  local: ReturnType<typeof summarizeLocalMcpMetrics>;
- *  cloudflare: ReturnType<typeof summarizeCloudflareMetrics>;
- *  cloudflareHttpAnalytics: Record<string, unknown> & { ok: boolean; available: boolean };
- *  sessionRuntime: Record<string, unknown>;
- *  publicMcpLoopback: ReturnType<typeof correlatePublicLoopback>;
- *  reachability: ReturnType<typeof summarizeReachability>;
- *  endpointLatencyComparison?: Array<{ id: string; regression: boolean; currentTtfbP50Ms: number | null; baselineTtfbP50Ms: number | null; ttfbRatio: number | null }>;
- *  externalStatus: Awaited<ReturnType<typeof collectOfficialOpenAiAggregateStatus>>;
+ *     reportedSlow: boolean;
+ *     clientSchemaProjectionStale: boolean;
+ *     local: ReturnType<typeof summarizeLocalMcpMetrics>;
+ *     cloudflare: ReturnType<typeof summarizeCloudflareMetrics>;
+ *     cloudflareHttpAnalytics: Record<string, unknown> & { ok: boolean; available: boolean };
+ *     sessionRuntime: Record<string, unknown>;
+ *     publicMcpLoopback: ReturnType<typeof correlatePublicLoopback>;
+ *     reachability: ReturnType<typeof summarizeReachability>;
+ *     endpointLatencyComparison?: {
+ *         id: string;
+ *         regression: boolean;
+ *         currentTtfbP50Ms: number | null;
+ *         baselineTtfbP50Ms: number | null;
+ *         ttfbRatio: number | null;
+ *     }[];
+ *     externalStatus: Awaited<ReturnType<typeof collectOfficialOpenAiAggregateStatus>>;
  * }} input
  */
 export function classifyLatencyAttribution(input) {
@@ -513,13 +530,14 @@ export function classifyLatencyAttribution(input) {
         }
     } else if (input.externalStatus.status === 'inconclusive') {
         reasons.push('official-openai-status-evidence-inconclusive');
-        remediation.push('Treat status evidence as advisory and compare again later; do not infer individual-session health from stale aggregate metadata.');
+        remediation.push(
+            'Treat status evidence as advisory and compare again later; do not infer individual-session health from stale aggregate metadata.',
+        );
     }
 
     const localCritical =
         input.local.handler.status === 'degraded' || input.local.originHttpBoundary.internalStatus === 'degraded';
-    const transportCritical =
-        input.cloudflare.status === 'degraded' || input.publicMcpLoopback.status === 'degraded';
+    const transportCritical = input.cloudflare.status === 'degraded' || input.publicMcpLoopback.status === 'degraded';
     const reachabilityCritical = input.reachability.status === 'degraded';
     const officialCritical =
         input.externalStatus.status === 'aggregate-degraded' && input.externalStatus.chatgptAffected !== false;
@@ -605,7 +623,7 @@ export function summarizeLocalMcpMetrics(metrics) {
     let resultBytes = 0;
     let resultCalls = 0;
     let largeResultCalls = 0;
-    /** @type {Array<{ name: string; totalBytes: number; averageBytes: number; calls: number }>} */
+    /** @type {{ name: string; totalBytes: number; averageBytes: number; calls: number }[]} */
     const topResultProducers = [];
 
     for (const [name, metric] of toolRows) {
@@ -707,8 +725,7 @@ export function summarizeLocalMcpMetrics(metrics) {
                 internalPressure: ORIGIN_INTERNAL_PHASE_PRESSURE_MS,
                 internalDegraded: ORIGIN_INTERNAL_PHASE_DEGRADED_MS,
             },
-            note:
-                'externalGaps measures previous tools/call response finish → next tools/call request arrival. preHandler covers request arrival → guarded tool dispatch; postHandler covers guarded tool return → response finish.',
+            note: 'externalGaps measures previous tools/call response finish → next tools/call request arrival. preHandler covers request arrival → guarded tool dispatch; postHandler covers guarded tool return → response finish.',
         },
         interToolGap: {
             status: gapStatus,
@@ -725,8 +742,7 @@ export function summarizeLocalMcpMetrics(metrics) {
             lastTransition: interaction.lastTransition,
             maxTransition: interaction.maxTransition,
             thresholdsMs: { elevated: INTER_TOOL_GAP_ELEVATED_MS, high: INTER_TOOL_GAP_HIGH_MS },
-            note:
-                'Measures quiescent time from completion of one tool-call burst at the origin until the next tool handler begins. It excludes active MCP handler time but includes response return, client/model/orchestrator work, dispatch, transit, and potentially normal reasoning.',
+            note: 'Measures quiescent time from completion of one tool-call burst at the origin until the next tool handler begins. It excludes active MCP handler time but includes response return, client/model/orchestrator work, dispatch, transit, and potentially normal reasoning.',
         },
         contextPressure: {
             level: contextLevel,
@@ -780,7 +796,7 @@ export function summarizeReachability(probes) {
     };
 }
 
-/** @param {{ targets: Array<{ id: string; successRate: number }> }} snapshot */
+/** @param {{ targets: { id: string; successRate: number }[] }} snapshot */
 export function summarizeEndpointLatencyReachability(snapshot) {
     const failed = snapshot.targets.filter((target) => target.successRate < 1);
     return {
@@ -794,8 +810,9 @@ export function summarizeEndpointLatencyReachability(snapshot) {
 }
 
 /**
- * Measure a fixed public self-loop through the configured Cloudflare hostname and
- * back to this origin. This is a transport reference, not a model/session probe.
+ * Measure a fixed public self-loop through the configured Cloudflare hostname and back to this origin. This is a
+ * transport reference, not a model/session probe.
+ *
  * @param {number} timeoutMs
  */
 async function measurePublicMcpLoopback(timeoutMs) {
@@ -823,7 +840,12 @@ async function measurePublicMcpLoopback(timeoutMs) {
         .map((result) => result.durationMs)
         .sort((left, right) => left - right);
     return {
-        status: successfulDurations.length === results.length ? 'ok' : successfulDurations.length > 0 ? 'partial' : 'degraded',
+        status:
+            successfulDurations.length === results.length
+                ? 'ok'
+                : successfulDurations.length > 0
+                  ? 'partial'
+                  : 'degraded',
         authority: 'observed-container-public-mcp-self-loop-reference',
         samples: results.length,
         successful: successfulDurations.length,
@@ -831,14 +853,13 @@ async function measurePublicMcpLoopback(timeoutMs) {
         p95Ms: historicalPercentile(successfulDurations, 0.95),
         maxMs: successfulDurations.at(-1) ?? null,
         httpStatuses: results.map((result) => result.status),
-        note:
-            'Container → public Cloudflare hostname → tunnel → origin → container reference. It does not traverse the ChatGPT/model control plane and is not the same network path as OpenAI backend traffic.',
+        note: 'Container → public Cloudflare hostname → tunnel → origin → container reference. It does not traverse the ChatGPT/model control plane and is not the same network path as OpenAI backend traffic.',
     };
 }
 
 /**
- * Project session accumulation at the current process-local registration rate.
- * This is a capacity estimate, not a claim that every session survives until TTL.
+ * Project session accumulation at the current process-local registration rate. This is a capacity estimate, not a claim
+ * that every session survives until TTL.
  *
  * @param {Record<string, unknown>} runtime
  * @param {number} uptimeMs
@@ -928,9 +949,9 @@ async function collectOfficialOpenAiAggregateStatus(timeoutMs) {
 
     let summaryUpdatedAt = null;
     let summaryFreshness = 'unknown';
-    /** @type {Array<{ name: string; status: string | null; impact: string | null; updatedAt: string | null }>} */
+    /** @type {{ name: string; status: string | null; impact: string | null; updatedAt: string | null }[]} */
     let unresolvedIncidents = [];
-    /** @type {Array<{ name: string; status: string }>} */
+    /** @type {{ name: string; status: string }[]} */
     let degradedComponents = [];
     if (summary.ok) {
         try {
@@ -1014,30 +1035,28 @@ async function collectOfficialOpenAiAggregateStatus(timeoutMs) {
             durationMs: summary.durationMs,
             error: summary.error ?? null,
         },
-        caveat:
-            'Aggregate Statuspage evidence can be stale or differ from an individual model/tier/session; fresh structured degraded signals take precedence over a generic operational banner, but component scope still matters.',
+        caveat: 'Aggregate Statuspage evidence can be stale or differ from an individual model/tier/session; fresh structured degraded signals take precedence over a generic operational banner, but component scope still matters.',
     };
 }
 
 /**
- * Fuse official status sources by freshness and specificity.
- * Fresh structured degradation must not be overwritten by a generic HTML banner.
+ * Fuse official status sources by freshness and specificity. Fresh structured degradation must not be overwritten by a
+ * generic HTML banner.
  *
  * @param {{
- *   rootSignal: string;
- *   jsonIndicator: string | null;
- *   jsonFreshness: string;
- *   summaryFreshness: string;
- *   unresolvedIncidentCount: number;
- *   degradedComponentCount: number;
+ *     rootSignal: string;
+ *     jsonIndicator: string | null;
+ *     jsonFreshness: string;
+ *     summaryFreshness: string;
+ *     unresolvedIncidentCount: number;
+ *     degradedComponentCount: number;
  * }} input
  */
 export function resolveOfficialAggregateStatus(input) {
     const jsonFreshDegraded =
         input.jsonFreshness === 'fresh' && Boolean(input.jsonIndicator) && input.jsonIndicator !== 'none';
     const summaryFreshDegraded =
-        input.summaryFreshness === 'fresh' &&
-        (input.unresolvedIncidentCount > 0 || input.degradedComponentCount > 0);
+        input.summaryFreshness === 'fresh' && (input.unresolvedIncidentCount > 0 || input.degradedComponentCount > 0);
     const structuredDegraded = jsonFreshDegraded || summaryFreshDegraded;
     if (structuredDegraded) {
         return {
@@ -1056,7 +1075,11 @@ export function resolveOfficialAggregateStatus(input) {
             sourceConflict: input.rootSignal === 'degraded',
         };
     }
-    if (input.summaryFreshness === 'fresh' && input.unresolvedIncidentCount === 0 && input.degradedComponentCount === 0) {
+    if (
+        input.summaryFreshness === 'fresh' &&
+        input.unresolvedIncidentCount === 0 &&
+        input.degradedComponentCount === 0
+    ) {
         return {
             status: 'aggregate-operational',
             reason: 'fresh-summary-api-operational',
@@ -1072,7 +1095,8 @@ export function resolveOfficialAggregateStatus(input) {
 /** @param {string} text */
 function classifyStatusRootText(text) {
     const normalized = text.toLowerCase().replace(/\s+/gu, ' ');
-    if (normalized.includes("we're fully operational") || normalized.includes('all systems operational')) return 'operational';
+    if (normalized.includes("we're fully operational") || normalized.includes('all systems operational'))
+        return 'operational';
     if (
         normalized.includes('major outage') ||
         normalized.includes('partial outage') ||
@@ -1099,7 +1123,10 @@ async function fetchBoundedText(url, timeoutMs, maxBytes) {
     const started = performance.now();
     try {
         const response = await fetch(url, {
-            headers: { accept: 'text/html,application/json;q=0.9,*/*;q=0.1', 'user-agent': 'workspace-mcp-latency-attribution/1.0' },
+            headers: {
+                accept: 'text/html,application/json;q=0.9,*/*;q=0.1',
+                'user-agent': 'workspace-mcp-latency-attribution/1.0',
+            },
             signal: AbortSignal.timeout(timeoutMs),
         });
         const text = await readBoundedResponseText(response, { maxBytes, label: `latency attribution ${url}` });
@@ -1110,34 +1137,85 @@ async function fetchBoundedText(url, timeoutMs, maxBytes) {
 }
 
 /**
- * Reconstruct quiescent tool-burst gaps from persisted origin audit events.
- * Gaps above MAX_INTERACTIVE_AUDIT_GAP_MS are counted as idle pauses and excluded
- * from the interactive latency distribution.
+ * Reconstruct quiescent tool-burst gaps from persisted origin audit events. Gaps above MAX_INTERACTIVE_AUDIT_GAP_MS are
+ * counted as idle pauses and excluded from the interactive latency distribution.
  *
  * @param {Record<string, unknown>[]} events
  * @param {number} observedAt
- * @param {{ truncatedByBytes?: boolean; tailBytesRead?: number; fileBytes?: number; invalidLines?: number; auditReadOk?: boolean; auditReadError?: string | null }} [readMeta]
+ * @param {{
+ *     truncatedByBytes?: boolean;
+ *     tailBytesRead?: number;
+ *     fileBytes?: number;
+ *     invalidLines?: number;
+ *     auditReadOk?: boolean;
+ *     auditReadError?: string | null;
+ * }} [readMeta]
  * @returns {{
- *   authority: 'reconstructed-from-persisted-origin-audit-events';
- *   observedAt: string;
- *   eventCount: number;
- *   validTimelineEvents: number;
- *   ignoredTimelineEvents: number;
- *   interactiveGapCount: number;
- *   idleExcludedCount: number;
- *   maxInteractiveGapMs: number;
- *   windows: Record<string, ReturnType<typeof summarizeHistoricalGapRows>>;
- *   fastBaselineP25Ms: number | null;
- *   fastBaselineWindow: string | null;
- *   controlledPulse: ReturnType<typeof summarizeHistoricalGapRows>;
- *   controlledPulseSeries24h: Array<{ seriesId: string; networkLabel: string | null; modelLabel: string | null; conversationLabel: string | null; clientLabel: string | null; vpnLabel: string | null; count: number; averageMs: number; p25Ms: number | null; p50Ms: number | null; p95Ms: number | null; p99Ms: number | null; minMs: number | null; maxMs: number | null }>;
- *   coverage: { firstEventAt: string | null; lastEventAt: string | null; spanMs: number | null };
- *   hourlyUtc: Array<{ hour: string; count: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; maxMs: number | null }>;
- *   edgeColo24h: Array<{ edgeColo: string; count: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; maxMs: number | null }>;
- *   topTransitions24h: Array<{ from: string; to: string; count: number; totalGapMs: number; averageMs: number; p50Ms: number | null; p95Ms: number | null; maxMs: number | null }>;
- *   activeSessionAge24h: ReturnType<typeof summarizeActiveSessionAge>;
- *   read: { ok: boolean; truncatedByBytes: boolean; tailBytesRead: number; fileBytes: number; invalidLines: number; error: string | null };
- *   note: string;
+ *     authority: 'reconstructed-from-persisted-origin-audit-events';
+ *     observedAt: string;
+ *     eventCount: number;
+ *     validTimelineEvents: number;
+ *     ignoredTimelineEvents: number;
+ *     interactiveGapCount: number;
+ *     idleExcludedCount: number;
+ *     maxInteractiveGapMs: number;
+ *     windows: Record<string, ReturnType<typeof summarizeHistoricalGapRows>>;
+ *     fastBaselineP25Ms: number | null;
+ *     fastBaselineWindow: string | null;
+ *     controlledPulse: ReturnType<typeof summarizeHistoricalGapRows>;
+ *     controlledPulseSeries24h: {
+ *         seriesId: string;
+ *         networkLabel: string | null;
+ *         modelLabel: string | null;
+ *         conversationLabel: string | null;
+ *         clientLabel: string | null;
+ *         vpnLabel: string | null;
+ *         count: number;
+ *         averageMs: number;
+ *         p25Ms: number | null;
+ *         p50Ms: number | null;
+ *         p95Ms: number | null;
+ *         p99Ms: number | null;
+ *         minMs: number | null;
+ *         maxMs: number | null;
+ *     }[];
+ *     coverage: { firstEventAt: string | null; lastEventAt: string | null; spanMs: number | null };
+ *     hourlyUtc: {
+ *         hour: string;
+ *         count: number;
+ *         averageMs: number;
+ *         p50Ms: number | null;
+ *         p95Ms: number | null;
+ *         maxMs: number | null;
+ *     }[];
+ *     edgeColo24h: {
+ *         edgeColo: string;
+ *         count: number;
+ *         averageMs: number;
+ *         p50Ms: number | null;
+ *         p95Ms: number | null;
+ *         maxMs: number | null;
+ *     }[];
+ *     topTransitions24h: {
+ *         from: string;
+ *         to: string;
+ *         count: number;
+ *         totalGapMs: number;
+ *         averageMs: number;
+ *         p50Ms: number | null;
+ *         p95Ms: number | null;
+ *         maxMs: number | null;
+ *     }[];
+ *     activeSessionAge24h: ReturnType<typeof summarizeActiveSessionAge>;
+ *     read: {
+ *         ok: boolean;
+ *         truncatedByBytes: boolean;
+ *         tailBytesRead: number;
+ *         fileBytes: number;
+ *         invalidLines: number;
+ *         error: string | null;
+ *     };
+ *     note: string;
  * }}
  */
 export function summarizeAuditInterToolHistory(events, observedAt, readMeta = {}) {
@@ -1151,9 +1229,24 @@ export function summarizeAuditInterToolHistory(events, observedAt, readMeta = {}
     ]);
     /** @type {Map<string, { tool: string | null; edgeColo: string | null; seriesId: string | null }>} */
     const activeCalls = new Map();
-    /** @type {Array<{ gapMs: number; observedAt: number; from: string | null; to: string | null; edgeColo: string | null; previousEdgeColo: string | null; sessionAgeMs: number; seriesId: string | null; previousSeriesId: string | null; networkLabel: string | null; modelLabel: string | null; conversationLabel: string | null; clientLabel: string | null; vpnLabel: string | null }>} */
+    /** @type {{
+    gapMs: number;
+    observedAt: number;
+    from: string | null;
+    to: string | null;
+    edgeColo: string | null;
+    previousEdgeColo: string | null;
+    sessionAgeMs: number;
+    seriesId: string | null;
+    previousSeriesId: string | null;
+    networkLabel: string | null;
+    modelLabel: string | null;
+    conversationLabel: string | null;
+    clientLabel: string | null;
+    vpnLabel: string | null;
+}[]} */
     const interactiveGaps = [];
-    /** @type {Array<{ gapMs: number; observedAt: number }>} */
+    /** @type {{ gapMs: number; observedAt: number }[]} */
     const idleGaps = [];
     let lastBurstCompletedAt = null;
     let lastCompletedTool = null;
@@ -1216,12 +1309,9 @@ export function summarizeAuditInterToolHistory(events, observedAt, readMeta = {}
         lastEventAt = lastEventAt === null ? event.timestamp : Math.max(lastEventAt, event.timestamp);
         if (event.eventName === 'tool_call_started') {
             if (activeCalls.size === 0) {
-                const rawGapMs = lastBurstCompletedAt === null ? null : Math.max(0, event.timestamp - lastBurstCompletedAt);
-                if (
-                    activeClusterStartedAt === null ||
-                    rawGapMs === null ||
-                    rawGapMs > ACTIVE_WORK_CLUSTER_BREAK_MS
-                ) {
+                const rawGapMs =
+                    lastBurstCompletedAt === null ? null : Math.max(0, event.timestamp - lastBurstCompletedAt);
+                if (activeClusterStartedAt === null || rawGapMs === null || rawGapMs > ACTIVE_WORK_CLUSTER_BREAK_MS) {
                     activeClusterStartedAt = event.timestamp;
                     activeClusterCount += 1;
                 }
@@ -1328,9 +1418,7 @@ export function summarizeAuditInterToolHistory(events, observedAt, readMeta = {}
         })
         .sort((left, right) => right.count - left.count || left.edgeColo.localeCompare(right.edgeColo));
 
-    const recent24hGaps = interactiveGaps.filter(
-        (gap) => gap.observedAt >= hourlyCutoff && gap.observedAt <= now,
-    );
+    const recent24hGaps = interactiveGaps.filter((gap) => gap.observedAt >= hourlyCutoff && gap.observedAt <= now);
     const activeSessionAge24h = summarizeActiveSessionAge(recent24hGaps, activeClusterCount);
 
     /** @type {Map<string, { from: string; to: string; values: number[] }>} */
@@ -1361,7 +1449,18 @@ export function summarizeAuditInterToolHistory(events, observedAt, readMeta = {}
         .sort((left, right) => right.totalGapMs - left.totalGapMs || right.count - left.count)
         .slice(0, 20);
 
-    /** @type {Map<string, { seriesId: string; networkLabel: string | null; modelLabel: string | null; conversationLabel: string | null; clientLabel: string | null; vpnLabel: string | null; rows: typeof recent24hGaps }>} */
+    /** @type {Map<
+    string,
+    {
+        seriesId: string;
+        networkLabel: string | null;
+        modelLabel: string | null;
+        conversationLabel: string | null;
+        clientLabel: string | null;
+        vpnLabel: string | null;
+        rows: typeof recent24hGaps;
+    }
+>} */
     const pulseSeriesBuckets = new Map();
     for (const gap of recent24hGaps) {
         if (
@@ -1442,16 +1541,15 @@ export function summarizeAuditInterToolHistory(events, observedAt, readMeta = {}
             invalidLines: Math.max(0, Number(readMeta.invalidLines ?? 0) || 0),
             error: typeof readMeta.auditReadError === 'string' ? readMeta.auditReadError : null,
         },
-        note:
-            'Historical gaps are reconstructed from persisted tool-call audit events. Gaps above 60 seconds are classified as user/session idle and excluded from the interactive distribution; tail truncation can reduce historical coverage.',
+        note: 'Historical gaps are reconstructed from persisted tool-call audit events. Gaps above 60 seconds are classified as user/session idle and excluded from the interactive distribution; tail truncation can reduce historical coverage.',
     };
 }
 
 /**
- * Session-age heuristic for continuous work clusters. A new cluster starts after
- * more than 30 minutes without a tool-call burst; this is not a ChatGPT conversation ID.
+ * Session-age heuristic for continuous work clusters. A new cluster starts after more than 30 minutes without a
+ * tool-call burst; this is not a ChatGPT conversation ID.
  *
- * @param {Array<{ gapMs: number; sessionAgeMs: number }>} rows
+ * @param {{ gapMs: number; sessionAgeMs: number }[]} rows
  * @param {number} observedClusterCount
  */
 function summarizeActiveSessionAge(rows, observedClusterCount) {
@@ -1488,7 +1586,8 @@ function summarizeActiveSessionAge(rows, observedClusterCount) {
     const sufficientForTrend = (early?.count ?? 0) >= 20 && lateValues.length >= 20;
     let trend = 'insufficient-data';
     if (sufficientForTrend && lateToEarlyP50Ratio !== null) {
-        trend = lateToEarlyP50Ratio >= 1.5 ? 'slower-late' : lateToEarlyP50Ratio <= 0.8 ? 'faster-late' : 'roughly-stable';
+        trend =
+            lateToEarlyP50Ratio >= 1.5 ? 'slower-late' : lateToEarlyP50Ratio <= 0.8 ? 'faster-late' : 'roughly-stable';
     }
     return {
         authority: 'heuristic-from-origin-audit-not-chatgpt-session-id',
@@ -1501,13 +1600,20 @@ function summarizeActiveSessionAge(rows, observedClusterCount) {
         lateToEarlyP50Ratio,
         sufficientForTrend,
         trend,
-        note:
-            'Work clusters are inferred from tool activity and split after >30 minutes without a tool-call burst. The result can support or weaken a long-session degradation hypothesis but cannot identify a real ChatGPT conversation/session internally.',
+        note: 'Work clusters are inferred from tool activity and split after >30 minutes without a tool-call burst. The result can support or weaken a long-session degradation hypothesis but cannot identify a real ChatGPT conversation/session internally.',
     };
 }
 
 /**
- * @param {Array<{ gapMs: number; observedAt: number; from: string | null; to: string | null; edgeColo?: string | null; previousEdgeColo?: string | null; sessionAgeMs?: number }>} rows
+ * @param {{
+ *     gapMs: number;
+ *     observedAt: number;
+ *     from: string | null;
+ *     to: string | null;
+ *     edgeColo?: string | null;
+ *     previousEdgeColo?: string | null;
+ *     sessionAgeMs?: number;
+ * }[]} rows
  * @param {number} idleExcluded
  */
 function summarizeHistoricalGapRows(rows, idleExcluded) {
@@ -1623,7 +1729,9 @@ function compactCloudflareRaw(snapshot) {
 
 /** @param {unknown} value */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /** @param {unknown} value */

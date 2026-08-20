@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
 
-import {
-    SqliteModelGatewayCatalogStore,
-    buildModelGatewayRuntimeSelectorPlan,
-    buildModelGatewayRuntimeStandbyPlan,
-} from '#copilot/model-gateway';
+import { SqliteModelGatewayCatalogStore, buildModelGatewayRuntimeStandbyPlan } from '#copilot/model-gateway';
 
 import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { MODEL_GATEWAY_SCRIPT_PATHS, REPO_ROOT } from '../index.mjs';
@@ -25,7 +21,8 @@ if (argSet.has('--json')) {
 }
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-standby.mjs [--json] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--temporary-failure-cooldown-ms N] [--limit N] [--timeout-ms N] [--alternates-only] [--write-sqlite] [--read-sqlite|--persisted]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-standby.mjs [--json] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--temporary-failure-cooldown-ms N] [--limit N] [--timeout-ms N] [--alternates-only] [--write-sqlite] [--read-sqlite|--persisted]
 
 Build a read-only standby route list for model-gateway auto mode. It defaults to prefer_runtime_proved, does not call
 providers, run probes, mutate env or touch the terminal session. It renders ready replacement routes and one recommended
@@ -35,7 +32,6 @@ Use --read-sqlite or --persisted to list previously persisted standby plans with
 `);
     process.exit(0);
 }
-
 
 /**
  * @param {string} name
@@ -65,13 +61,17 @@ function runtimeSelectorArgs(/** @type {string} */ profile) {
     return forwarded;
 }
 
-/** @returns {{ ok?: boolean; runtimeSelectorPlan: ReturnType<typeof buildModelGatewayRuntimeSelectorPlan> }} */
+/** @returns {{ ok?: boolean; runtimeSelectorPlan: ReturnType<typeof import('#copilot/model-gateway').buildModelGatewayRuntimeSelectorPlan> }} */
 function readRuntimeSelectorPlan(/** @type {string} */ profile) {
-    const result = spawnSync(process.execPath, [MODEL_GATEWAY_SCRIPT_PATHS.runtimeSelector, ...runtimeSelectorArgs(profile)], {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-        maxBuffer: 32 * 1024 * 1024,
-    });
+    const result = spawnSync(
+        process.execPath,
+        [MODEL_GATEWAY_SCRIPT_PATHS.runtimeSelector, ...runtimeSelectorArgs(profile)],
+        {
+            cwd: REPO_ROOT,
+            encoding: 'utf8',
+            maxBuffer: 32 * 1024 * 1024,
+        },
+    );
     if (result.status !== 0) {
         throw new Error(`runtime selector failed: ${result.stderr || result.stdout || result.status}`);
     }

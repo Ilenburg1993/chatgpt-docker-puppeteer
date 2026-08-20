@@ -48,7 +48,8 @@ export const SystemPromptBindingSnapshotSchema = z.object({
 export const SnapshotIdSchema = z
     .string()
     .min(1)
-    .max(128)['regex'](/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u, 'snapshotId must be a safe file basename');
+    .max(128)
+    ['regex'](/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u, 'snapshotId must be a safe file basename');
 
 export const SnapshotListItemSchema = z.object({
     snapshotId: SnapshotIdSchema,
@@ -104,7 +105,8 @@ export const AliveAgentStateSchema = z
         pendingQuestion: z.string().nullable(),
         pendingQuestionMeta: PendingQuestionMetaSchema.nullable().optional(),
         systemPromptBinding: SystemPromptBindingSnapshotSchema.nullable().optional(),
-    })['passthrough']();
+    })
+    ['passthrough']();
 
 // ─── Ferramentas Customizadas (sdk/custom-tools.js) ──────────────────────────
 

@@ -22,14 +22,14 @@ export function createByokProbeState(env) {
 
 /**
  * @param {{
- *   profile?: string;
- *   model?: string;
- *   providerType?: 'openai' | 'azure' | 'anthropic';
- *   baseUrl?: string;
- *   apiKey?: string;
- *   preset?: string;
- *   extraProfile?: Record<string, unknown>;
- *   summaryWarnings?: string[];
+ *     profile?: string;
+ *     model?: string;
+ *     providerType?: 'openai' | 'azure' | 'anthropic';
+ *     baseUrl?: string;
+ *     apiKey?: string;
+ *     preset?: string;
+ *     extraProfile?: Record<string, unknown>;
+ *     summaryWarnings?: string[];
  * }} [options]
  */
 export function createReadyByokProbeFixture(options = {}) {
@@ -83,12 +83,12 @@ export function createProbeSessionRuntime(overrides = {}) {
  * Runtime determinístico para probes chat/streaming/json/vision.
  *
  * @param {{
- *   sessionId?: string;
- *   finalContent: string;
- *   deltas?: string[];
- *   onConfig?: (config: Parameters<ModelGatewayProbeSessionRuntime['withSession']>[0]) => void;
- *   onMessage?: (message: import('@github/copilot-sdk').MessageOptions, timeoutMs: number) => void;
- *   onUnsubscribe?: () => void;
+ *     sessionId?: string;
+ *     finalContent: string;
+ *     deltas?: string[];
+ *     onConfig?: (config: Parameters<ModelGatewayProbeSessionRuntime['withSession']>[0]) => void;
+ *     onMessage?: (message: import('@github/copilot-sdk').MessageOptions, timeoutMs: number) => void;
+ *     onUnsubscribe?: () => void;
  * }} options
  * @returns {ModelGatewayProbeSessionRuntime}
  */

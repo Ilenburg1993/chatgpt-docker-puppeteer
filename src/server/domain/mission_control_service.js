@@ -332,9 +332,11 @@ function createMissionCommand(/** @type {any} */ { actor = {}, reason, payload =
         ? String(autonomyModeRaw)
         : AUTONOMY_MODES.USER_ONLY;
     /** @type {Record<string, unknown>} */
-    const policy = payloadView['policy'] && typeof payloadView['policy'] === 'object' ? asRecord(payloadView['policy']) : {};
+    const policy =
+        payloadView['policy'] && typeof payloadView['policy'] === 'object' ? asRecord(payloadView['policy']) : {};
     /** @type {Record<string, unknown>} */
-    const context = payloadView['context'] && typeof payloadView['context'] === 'object' ? asRecord(payloadView['context']) : {};
+    const context =
+        payloadView['context'] && typeof payloadView['context'] === 'object' ? asRecord(payloadView['context']) : {};
 
     const created = createMission({
         title,

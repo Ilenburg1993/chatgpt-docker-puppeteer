@@ -8,12 +8,12 @@
  * @module copilot/terminal/commands/menu
  */
 
+import { buildTerminalPickerPlan, runTerminalExternalPicker } from '../capabilities/index.js';
 import {
     getTerminalPendingStructuredUserInputCount,
     readTerminalRuntimeControlState,
     readTerminalRuntimeState,
 } from '../frontend/gateways/index.js';
-import { buildTerminalPickerPlan, runTerminalExternalPicker } from '../capabilities/index.js';
 import { readTerminalIntentStats } from '../state/index.js';
 import {
     readTerminalElicitationSummary,
@@ -259,7 +259,11 @@ function countLabel(count, singular, plural) {
  */
 function renderTerminalSmartMenu(println, entries) {
     println('');
-    println(terminalThemeHeadline('assistant', 'Painel de ações', [countLabel(entries.length, 'ação contextual', 'ações contextuais')]));
+    println(
+        terminalThemeHeadline('assistant', 'Painel de ações', [
+            countLabel(entries.length, 'ação contextual', 'ações contextuais'),
+        ]),
+    );
     for (let i = 0; i < entries.length; i += 1) {
         const entry = /** @type {TerminalSmartMenuEntry} */ (entries[i]);
         println(
@@ -294,7 +298,11 @@ function renderTerminalPickerPlan(println, entries, ttyReadiness = null) {
         preferred: 'auto',
     });
     println('');
-    println(terminalThemeHeadline('assistant', 'Picker do menu', [countLabel(entries.length, 'ação contextual', 'ações contextuais')]));
+    println(
+        terminalThemeHeadline('assistant', 'Picker do menu', [
+            countLabel(entries.length, 'ação contextual', 'ações contextuais'),
+        ]),
+    );
     println(terminalThemeRow('Modo', plan.label, { role: plan.mode === 'external' ? 'success' : 'warn' }));
     println(terminalThemeRow('Fallback', plan.fallbackCommand, { role: 'command' }));
     if (plan.command) {
@@ -325,7 +333,16 @@ function buildTerminalMenuPickerItems(entries) {
  * @param {{ println: (text: string) => void }} ctx
  * @param {string} [arg=''] Default is `''`
  * @param {string[]} [rest=[]] Default is `[]`
- * @param {{ executeCommandLine?: (commandLine: string) => Promise<boolean>; readExclusiveTtyReadiness?: () => { ready: boolean; reasons: string[] }; withExclusiveTty?: <T>(operation: () => T | Promise<T>) => Promise<{ ok: true; value: T; reason: null; reasons: []; error: null } | { ok: false; value: null; reason: string; reasons: string[]; error: unknown }> }} [deps]
+ * @param {{
+ *     executeCommandLine?: (commandLine: string) => Promise<boolean>;
+ *     readExclusiveTtyReadiness?: () => { ready: boolean; reasons: string[] };
+ *     withExclusiveTty?: <T>(
+ *         operation: () => T | Promise<T>,
+ *     ) => Promise<
+ *         | { ok: true; value: T; reason: null; reasons: []; error: null }
+ *         | { ok: false; value: null; reason: string; reasons: string[]; error: unknown }
+ *     >;
+ * }} [deps]
  * @returns {Promise<void>}
  */
 export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
@@ -359,7 +376,9 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
         });
         if (plan.mode !== 'external' || !plan.command || !plan.toolId || !deps.withExclusiveTty) {
             renderTerminalPickerPlan(println, entries, ttyReadiness);
-            println(terminalThemeRow('Picker', 'interativo indisponível; use /menu <n> ou /menu <id>', { role: 'warn' }));
+            println(
+                terminalThemeRow('Picker', 'interativo indisponível; use /menu <n> ou /menu <id>', { role: 'warn' }),
+            );
             return;
         }
         const pickerCommand = plan.command;
@@ -389,7 +408,10 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
         println(terminalThemeRow('Ação', `${entry.label} · ${entry.commandLine}`, { role: 'command' }));
         if (typeof deps.executeCommandLine === 'function') {
             const ok = await deps.executeCommandLine(entry.commandLine);
-            if (!ok) println(terminalThemeRow('Ação', 'execução automática falhou; copie o comando acima', { role: 'warn' }));
+            if (!ok)
+                println(
+                    terminalThemeRow('Ação', 'execução automática falhou; copie o comando acima', { role: 'warn' }),
+                );
         }
         return;
     }
@@ -410,6 +432,10 @@ export async function cmdMenu({ println }, arg = '', rest = [], deps = {}) {
             println(terminalThemeRow('Ação', 'execução automática falhou; copie o comando acima', { role: 'warn' }));
         }
     } else {
-        println(terminalThemeRow('Ação', 'execução automática indisponível; copie e execute manualmente', { role: 'muted' }));
+        println(
+            terminalThemeRow('Ação', 'execução automática indisponível; copie e execute manualmente', {
+                role: 'muted',
+            }),
+        );
     }
 }

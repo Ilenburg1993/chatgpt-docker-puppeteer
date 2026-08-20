@@ -60,11 +60,7 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
     });
 
     it('recommends smoke-checking an alive but stale temporary tunnel', () => {
-        const summary = summarizeQuickTunnelState(
-            baseState,
-            Date.parse('2026-05-22T12:10:00.000Z'),
-            5 * 60 * 1000,
-        );
+        const summary = summarizeQuickTunnelState(baseState, Date.parse('2026-05-22T12:10:00.000Z'), 5 * 60 * 1000);
 
         assert.equal(summary.stateValid, true);
         assert.equal(summary.processAlive, true);
@@ -75,11 +71,7 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
     });
 
     it('recommends direct use for an alive fresh temporary tunnel', () => {
-        const summary = summarizeQuickTunnelState(
-            baseState,
-            Date.parse('2026-05-22T12:01:00.000Z'),
-            5 * 60 * 1000,
-        );
+        const summary = summarizeQuickTunnelState(baseState, Date.parse('2026-05-22T12:01:00.000Z'), 5 * 60 * 1000);
 
         assert.equal(summary.stateValid, true);
         assert.equal(summary.processAlive, true);
@@ -113,11 +105,7 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
         assert.equal(updated, true);
 
         const persisted = await readQuickTunnelState(stateFile);
-        const summary = summarizeQuickTunnelState(
-            persisted,
-            Date.parse('2026-05-22T12:05:00.000Z'),
-            10 * 60 * 1000,
-        );
+        const summary = summarizeQuickTunnelState(persisted, Date.parse('2026-05-22T12:05:00.000Z'), 10 * 60 * 1000);
 
         assert.equal(summary.lastSmokeOk, true);
         assert.equal(summary.lastSmokeAt, '2026-05-22T12:02:00.000Z');
@@ -143,9 +131,7 @@ describe('copilot MCP Cloudflare quick tunnel state', () => {
             assert.match(persisted.connectorUrl, /\?writer=\d+$/u);
             assert.equal((await fs.stat(stateFile)).mode & 0o777, 0o600);
             assert.equal(
-                (await fs.readdir(dir)).some(
-                    (name) => name.startsWith('quick-tunnel.json.') && name.endsWith('.tmp'),
-                ),
+                (await fs.readdir(dir)).some((name) => name.startsWith('quick-tunnel.json.') && name.endsWith('.tmp')),
                 false,
             );
         } finally {

@@ -9,7 +9,11 @@
  * @module copilot/model-gateway/catalog/importers/groq-docs-models-importer
  */
 
-import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createProviderMetadataEvidence } from '../contracts.js';
+import {
+    MODEL_GATEWAY_CATALOG_CONFIDENCE,
+    createModelMetadataEvidence,
+    createProviderMetadataEvidence,
+} from '../contracts.js';
 import {
     normalizeModelAliases,
     normalizeModelIdentityTraits,
@@ -85,10 +89,12 @@ function compactLimitFromText(value) {
  */
 function modelIdFromRow(rowHtml, firstCellText) {
     const idAttribute = rowHtml.match(/\bid=["']([^"']+(?:\/[^"']+)?)["']/iu)?.[1];
-    if (idAttribute && /^[a-z0-9_.:-]+(?:\/[a-z0-9_.:-]+)+$/iu.test(idAttribute)) return decodeHtmlEntities(idAttribute);
+    if (idAttribute && /^[a-z0-9_.:-]+(?:\/[a-z0-9_.:-]+)+$/iu.test(idAttribute))
+        return decodeHtmlEntities(idAttribute);
     const monoText = rowHtml.match(/font-mono[^>]*>([\s\S]*?)<\/span>/iu)?.[1];
     const monoCandidate = htmlText(monoText);
-    if (/^[a-z0-9_.:-]+(?:\/[a-z0-9_.:-]+)*$/iu.test(monoCandidate) && /[a-z]/iu.test(monoCandidate)) return monoCandidate;
+    if (/^[a-z0-9_.:-]+(?:\/[a-z0-9_.:-]+)*$/iu.test(monoCandidate) && /[a-z]/iu.test(monoCandidate))
+        return monoCandidate;
     const textCandidate = firstCellText.match(/[a-z0-9][a-z0-9_.:-]*(?:\/[a-z0-9][a-z0-9_.:-]*)+/iu)?.[0];
     return textCandidate ?? null;
 }
@@ -150,7 +156,8 @@ function capabilitiesFromModelId(providerModel) {
         capabilities['tools'] = true;
         capabilities['jsonMode'] = true;
     }
-    if (lower.includes('gpt-oss') || lower.includes('qwen3') || lower.includes('deepseek-r1')) capabilities['reasoning'] = true;
+    if (lower.includes('gpt-oss') || lower.includes('qwen3') || lower.includes('deepseek-r1'))
+        capabilities['reasoning'] = true;
     if (lower.includes('compound')) {
         capabilities['webSearch'] = true;
         capabilities['codeExecution'] = true;
@@ -165,7 +172,8 @@ function capabilitiesFromModelId(providerModel) {
 function modalitiesFromModelId(providerModel) {
     const lower = providerModel.toLowerCase();
     if (lower.includes('whisper')) return normalizeModelModalities({ input: ['audio'], output: ['text'] });
-    if (lower.includes('playai') || lower.includes('orpheus')) return normalizeModelModalities({ input: ['text'], output: ['audio'] });
+    if (lower.includes('playai') || lower.includes('orpheus'))
+        return normalizeModelModalities({ input: ['text'], output: ['audio'] });
     return normalizeModelModalities({ input: ['text'], output: ['text'] });
 }
 
@@ -204,16 +212,24 @@ function parseModelRowsFromDocsHtml(html) {
 
 /**
  * @param {string} text
- * @returns {Record<string, { cacheReadUsdPerMillion?: number; inputUsdPerMillion?: number; outputUsdPerMillion?: number }>}
+ * @returns {Record<
+ *     string,
+ *     { cacheReadUsdPerMillion?: number; inputUsdPerMillion?: number; outputUsdPerMillion?: number }
+ * >}
  */
 function parsePromptCachingPrices(text) {
-    /** @type {Record<string, { cacheReadUsdPerMillion?: number; inputUsdPerMillion?: number; outputUsdPerMillion?: number }>} */
+    /** @type {Record<
+    string,
+    { cacheReadUsdPerMillion?: number; inputUsdPerMillion?: number; outputUsdPerMillion?: number }
+>} */
     const result = {};
     for (const modelId of GROQ_PROMPT_CACHING_MODEL_IDS) {
         const index = text.indexOf(modelId);
         if (index < 0) continue;
         const window = text.slice(index, index + 700);
-        const prices = [...window.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)].map((match) => Number(match[1])).filter(Number.isFinite);
+        const prices = [...window.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)]
+            .map((match) => Number(match[1]))
+            .filter(Number.isFinite);
         if (prices.length >= 3) {
             const inputUsdPerMillion = prices[0];
             const cacheReadUsdPerMillion = prices[1];
@@ -241,7 +257,7 @@ function parsePromptCachingPrices(text) {
 function parseBuiltInToolPricing(text) {
     /** @type {Record<string, unknown>} */
     const tools = {};
-    /** @type {Array<[string, RegExp]>} */
+    /** @type {[string, RegExp][]} */
     const toolSpecs = [
         ['basicSearchUsdPerThousandRequests', /Basic Search[\s\S]{0,120}?\$+\s*([0-9]+(?:\.[0-9]+)?)/iu],
         ['advancedSearchUsdPerThousandRequests', /Advanced Search[\s\S]{0,120}?\$+\s*([0-9]+(?:\.[0-9]+)?)/iu],
@@ -262,8 +278,8 @@ function parseBuiltInToolPricing(text) {
  * @returns {Record<string, unknown>[]}
  */
 function parseGroqDocsRows(raw) {
-    const modelsHtml = isRecord(raw) ? stringValue(raw['modelsHtml']) ?? '' : typeof raw === 'string' ? raw : '';
-    const pricingHtml = isRecord(raw) ? stringValue(raw['pricingHtml']) ?? '' : '';
+    const modelsHtml = isRecord(raw) ? (stringValue(raw['modelsHtml']) ?? '') : typeof raw === 'string' ? raw : '';
+    const pricingHtml = isRecord(raw) ? (stringValue(raw['pricingHtml']) ?? '') : '';
     const pricingText = htmlText(pricingHtml, { keepScripts: true, decodeBeforeStrip: true, unescapeJsStrings: true });
     const promptCachingPrices = parsePromptCachingPrices(pricingText);
     const builtInToolPricing = parseBuiltInToolPricing(pricingText);
@@ -277,7 +293,7 @@ function parseGroqDocsRows(raw) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -300,7 +316,9 @@ function modelEvidenceValues(row) {
     });
     const normalizedPricing = normalizeUsdPricing({
         inputPerTokenUsd: pricing['inputUsdPerMillion'] ? Number(pricing['inputUsdPerMillion']) / 1_000_000 : undefined,
-        outputPerTokenUsd: pricing['outputUsdPerMillion'] ? Number(pricing['outputUsdPerMillion']) / 1_000_000 : undefined,
+        outputPerTokenUsd: pricing['outputUsdPerMillion']
+            ? Number(pricing['outputUsdPerMillion']) / 1_000_000
+            : undefined,
         cacheReadPerTokenUsd: promptCaching['cacheReadUsdPerMillion']
             ? Number(promptCaching['cacheReadUsdPerMillion']) / 1_000_000
             : undefined,
@@ -322,7 +340,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.groqDocs.pricing', value: pricing },
         { fieldPath: 'providerMetadata.groqDocs.promptCachingPricing', value: promptCaching },
         { fieldPath: 'providerMetadata.groqDocs.sourceText', value: stringValue(row['sourceText']) },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;

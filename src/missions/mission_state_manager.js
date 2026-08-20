@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import * as logger from '#core/logger';
 import fs from 'fs/promises';
 import path from 'node:path';
-import * as logger from '#core/logger';
 
 /**
  * Status válidos para missões.
@@ -11,7 +11,7 @@ const MISSION_STATUS = {
     RUNNING: 'running',
     PAUSED: 'paused',
     COMPLETED: 'completed',
-    FAILED: 'failed'
+    FAILED: 'failed',
 };
 
 /**
@@ -35,7 +35,10 @@ class MissionStateManager {
             await fs.mkdir(this.baseDir, { recursive: true });
             logger.log('INFO', `[MissionStateManager] Diretório inicializado: ${this.baseDir}`);
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionStateManager] Falha ao criar diretório: ${(/** @type {any} */ (error)).message}`);
+            logger.log(
+                'ERROR',
+                `[MissionStateManager] Falha ao criar diretório: ${/** @type {any} */ (error).message}`,
+            );
             throw error;
         }
     }
@@ -58,7 +61,7 @@ class MissionStateManager {
             await fs.access(missionDir);
             throw new Error(`Mission ${mission.id} já existe`);
         } catch (/** @type {any} */ error) {
-            if ((/** @type {any} */ (error)).code !== 'ENOENT') {
+            if (/** @type {any} */ (error).code !== 'ENOENT') {
                 throw error;
             }
         }
@@ -83,7 +86,7 @@ class MissionStateManager {
                 total_steps: mission.workflow.steps.length,
                 completed_tasks: 0,
                 total_tasks: this._calculateTotalTasks(mission.workflow),
-                percent: 0
+                percent: 0,
             },
             config: mission.config || {},
             feedback: /** @type {any[]} */ ([]),
@@ -92,9 +95,9 @@ class MissionStateManager {
                 {
                     ts: new Date().toISOString(),
                     event: 'MISSION_CREATED',
-                    msg: 'Missão criada'
-                }
-            ]
+                    msg: 'Missão criada',
+                },
+            ],
         };
 
         // Salva state.json
@@ -116,10 +119,13 @@ class MissionStateManager {
             const content = await fs.readFile(statePath, 'utf8');
             return JSON.parse(content);
         } catch (/** @type {any} */ error) {
-            if ((/** @type {any} */ (error)).code === 'ENOENT') {
+            if (/** @type {any} */ (error).code === 'ENOENT') {
                 return null;
             }
-            logger.log('ERROR', `[MissionStateManager] Erro ao ler missão ${missionId}: ${(/** @type {any} */ (error)).message}`);
+            logger.log(
+                'ERROR',
+                `[MissionStateManager] Erro ao ler missão ${missionId}: ${/** @type {any} */ (error).message}`,
+            );
             throw error;
         }
     }
@@ -133,7 +139,7 @@ class MissionStateManager {
     async listMissions(filters = {}) {
         try {
             const entries = await fs.readdir(this.baseDir, { withFileTypes: true });
-            const missionDirs = entries.filter(e => e.isDirectory());
+            const missionDirs = entries.filter((e) => e.isDirectory());
 
             const missions = [];
             for (const dir of missionDirs) {
@@ -153,7 +159,7 @@ class MissionStateManager {
 
             return missions;
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao listar missões: ${(/** @type {any} */ (error)).message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao listar missões: ${/** @type {any} */ (error).message}`);
             throw error;
         }
     }
@@ -182,7 +188,7 @@ class MissionStateManager {
         const updatedState = {
             ...state,
             ...updates,
-            updated_at: updatedAtIso
+            updated_at: updatedAtIso,
         };
 
         // Adiciona evento ao histórico se status mudou
@@ -190,7 +196,7 @@ class MissionStateManager {
             updatedState.history.push({
                 ts: updatedAtIso,
                 event: 'STATUS_CHANGED',
-                msg: `Status: ${state.status} → ${updates.status}`
+                msg: `Status: ${state.status} → ${updates.status}`,
             });
         }
 
@@ -212,7 +218,10 @@ class MissionStateManager {
             await fs.rm(missionDir, { recursive: true, force: true });
             logger.log('INFO', `[MissionStateManager] Missão deletada: ${missionId}`);
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao deletar missão ${missionId}: ${(/** @type {any} */ (error)).message}`);
+            logger.log(
+                'ERROR',
+                `[MissionStateManager] Erro ao deletar missão ${missionId}: ${/** @type {any} */ (error).message}`,
+            );
             throw error;
         }
     }
@@ -231,7 +240,7 @@ class MissionStateManager {
             await fs.writeFile(outputPath, content, 'utf8');
             logger.log('DEBUG', `[MissionStateManager] Output salvo: ${missionId}/${stepId}`);
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao salvar output: ${(/** @type {any} */ (error)).message}`);
+            logger.log('ERROR', `[MissionStateManager] Erro ao salvar output: ${/** @type {any} */ (error).message}`);
             throw error;
         }
     }
@@ -241,7 +250,7 @@ class MissionStateManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} stepId - ID do step
-     * @returns {Promise<string|null>} - Conteúdo ou null
+     * @returns {Promise<string | null>} - Conteúdo ou null
      */
     async getOutput(missionId, stepId) {
         const outputPath = path.join(this.baseDir, missionId, 'outputs', `${stepId}.txt`);
@@ -249,7 +258,7 @@ class MissionStateManager {
         try {
             return await fs.readFile(outputPath, 'utf8');
         } catch (/** @type {any} */ error) {
-            if ((/** @type {any} */ (error)).code === 'ENOENT') {
+            if (/** @type {any} */ (error).code === 'ENOENT') {
                 return null;
             }
             throw error;
@@ -264,12 +273,7 @@ class MissionStateManager {
      */
     async saveCheckpoint(missionId, checkpoint) {
         const checkpointPath = path.join(this.baseDir, missionId, 'checkpoints', 'checkpoint-latest.json');
-        const timestampedPath = path.join(
-            this.baseDir,
-            missionId,
-            'checkpoints',
-            `checkpoint-${Date.now()}.json`
-        );
+        const timestampedPath = path.join(this.baseDir, missionId, 'checkpoints', `checkpoint-${Date.now()}.json`);
 
         try {
             const data = JSON.stringify(checkpoint, null, 2);
@@ -278,7 +282,10 @@ class MissionStateManager {
 
             logger.log('INFO', `[MissionStateManager] Checkpoint salvo: ${missionId}`);
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionStateManager] Erro ao salvar checkpoint: ${(/** @type {any} */ (error)).message}`);
+            logger.log(
+                'ERROR',
+                `[MissionStateManager] Erro ao salvar checkpoint: ${/** @type {any} */ (error).message}`,
+            );
             throw error;
         }
     }
@@ -296,7 +303,7 @@ class MissionStateManager {
             const content = await fs.readFile(checkpointPath, 'utf8');
             return JSON.parse(content);
         } catch (/** @type {any} */ error) {
-            if ((/** @type {any} */ (error)).code === 'ENOENT') {
+            if (/** @type {any} */ (error).code === 'ENOENT') {
                 return null;
             }
             throw error;
@@ -308,7 +315,7 @@ class MissionStateManager {
      *
      * @param {string} missionId - ID da missão
      * @param {string} feedback - Feedback textual
-     * @param {any} [metadata={}] - Metadata adicional (processed_id, category, action_items, patterns)
+     * @param {any} [metadata={}] - Metadata adicional (processed_id, category, action_items, patterns). Default is `{}`
      */
     async addFeedback(missionId, feedback, metadata = {}) {
         const state = await this.getMission(missionId);
@@ -319,13 +326,13 @@ class MissionStateManager {
         state.feedback.push({
             ts: new Date().toISOString(),
             content: feedback,
-            metadata // Includes: processed_id, category, action_items, patterns
+            metadata, // Includes: processed_id, category, action_items, patterns
         });
 
         state.history.push({
             ts: new Date().toISOString(),
             event: 'FEEDBACK_ADDED',
-            msg: `Feedback: ${feedback.substring(0, 50)}${metadata.category ? ` (${metadata.category})` : ''}...`
+            msg: `Feedback: ${feedback.substring(0, 50)}${metadata.category ? ` (${metadata.category})` : ''}...`,
         });
 
         await this._saveState(missionId, state);
@@ -356,4 +363,4 @@ class MissionStateManager {
     }
 }
 
-export { MissionStateManager, MISSION_STATUS };
+export { MISSION_STATUS, MissionStateManager };

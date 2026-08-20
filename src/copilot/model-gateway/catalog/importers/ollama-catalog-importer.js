@@ -151,7 +151,7 @@ function capabilitiesFromOllama(capabilities) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['model']) ?? stringValue(row['name']);
@@ -196,12 +196,18 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.ollama.parameterSize', value: stringValue(details['parameter_size']) },
         { fieldPath: 'providerMetadata.ollama.quantizationLevel', value: stringValue(details['quantization_level']) },
         { fieldPath: 'providerMetadata.ollama.parentModel', value: stringValue(details['parent_model']) },
-        { fieldPath: 'providerMetadata.ollama.parameters', value: Object.keys(parameters).length > 0 ? parameters : null },
+        {
+            fieldPath: 'providerMetadata.ollama.parameters',
+            value: Object.keys(parameters).length > 0 ? parameters : null,
+        },
         { fieldPath: 'providerMetadata.ollama.parametersText', value: stringValue(row['parameters']) },
         { fieldPath: 'providerMetadata.ollama.template', value: stringValue(row['template']) },
         { fieldPath: 'providerMetadata.ollama.license', value: stringValue(row['license']) },
         { fieldPath: 'providerMetadata.ollama.modelInfo', value: Object.keys(modelInfo).length > 0 ? modelInfo : null },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'local' },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
@@ -238,7 +244,7 @@ export function createOllamaCatalogImporter(options = {}) {
             const tagRows = parseOllamaRows(tagsPayload);
             /** @type {Record<string, unknown>[]} */
             const models = [];
-            /** @type {Array<{ model: string; status: number }>} */
+            /** @type {{ model: string; status: number }[]} */
             const showErrors = [];
             for (const tagRow of tagRows) {
                 const providerModel = stringValue(tagRow['model']) ?? stringValue(tagRow['name']);
@@ -326,7 +332,7 @@ export function createOllamaCatalogImporter(options = {}) {
         toAccountOverlays(rows, context) {
             const sourceId = stringValue(context.source['id']) ?? 'ollama-catalog';
             const enabledModels = rows
-                .map((row) => (isRecord(row) ? stringValue(row['model']) ?? stringValue(row['name']) : null))
+                .map((row) => (isRecord(row) ? (stringValue(row['model']) ?? stringValue(row['name'])) : null))
                 .filter((model) => model !== null);
             const controls = normalizeAccountOverlayControls({
                 enabledModels,

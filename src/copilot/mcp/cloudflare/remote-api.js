@@ -5,10 +5,10 @@
  * @module copilot/mcp/cloudflare/remote-api
  */
 
+import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { createTtlCache } from '#copilot/mcp/control-plane';
 import Cloudflare from 'cloudflare';
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { createTtlCache } from '#copilot/mcp/control-plane';
 import { readCloudflareTunnelConfig } from './config.js';
 import {
     auditOriginRequestProfile as auditOriginRequestProfileBase,
@@ -69,7 +69,10 @@ export async function readCloudflareRemoteApiConfig(env = process.env) {
         publicHostname: tunnelConfig.publicHostname,
         expectedOriginUrl: tunnelConfig.originUrl,
         originServerName: tunnelConfig.originServerName,
-        enableHttp2Origin: readBooleanEnv(merged['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'], tunnelConfig.http2OriginRequested),
+        enableHttp2Origin: readBooleanEnv(
+            merged['COPILOT_MCP_CLOUDFLARE_HTTP2_ORIGIN'],
+            tunnelConfig.http2OriginRequested,
+        ),
         expectedPublicMcpUrl: tunnelConfig.publicMcpUrl ?? `https://${tunnelConfig.publicHostname}/mcp`,
         zone: tunnelConfig.zone,
         credentialSources: buildCredentialSources(env, fileEnv),
@@ -84,11 +87,10 @@ export async function auditCloudflareRemoteTunnel(options = {}) {
     const apiConfig = await readCloudflareRemoteApiConfig(options.env ?? process.env);
     const cacheTtlMs = readCacheTtlMs(options.cacheTtlMs);
     const cacheKey = buildRemoteAuditCacheKey(apiConfig);
-    return remoteAuditCache.getOrLoad(
-        cacheKey,
-        () => auditCloudflareRemoteTunnelUncached(apiConfig),
-        { forceRefresh: options.forceRefresh === true, ttlMs: cacheTtlMs },
-    );
+    return remoteAuditCache.getOrLoad(cacheKey, () => auditCloudflareRemoteTunnelUncached(apiConfig), {
+        forceRefresh: options.forceRefresh === true,
+        ttlMs: cacheTtlMs,
+    });
 }
 
 /**
@@ -250,7 +252,9 @@ function createClientCacheKey(value) {
 async function readLocalEnvFile() {
     return localEnvFileCache.getOrLoad(DEFAULT_ENV_FILE, async () => {
         try {
-            return parseEnvFile(await readFile(DEFAULT_ENV_FILE, 'utf8'));
+            return parseEnvFile(
+                (await readTextFreshTrusted(DEFAULT_ENV_FILE, { caller: 'mcp.cloudflare.remote-api' })).content,
+            );
         } catch {
             return {};
         }
@@ -304,7 +308,9 @@ function firstNonEmpty(...values) {
  * @returns {boolean}
  */
 function readBooleanEnv(value, fallback) {
-    const raw = String(value ?? '').trim().toLowerCase();
+    const raw = String(value ?? '')
+        .trim()
+        .toLowerCase();
     if (!raw) return fallback;
     if (raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on') return true;
     if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false;
@@ -386,7 +392,8 @@ function buildDesiredRemoteConfigSummary(config) {
 export async function resolveCloudflareRemoteTunnelReference(options = {}) {
     const config = await readCloudflareRemoteApiConfig(options.env ?? process.env);
     if (!config.apiToken) throw new Error('CLOUDFLARE_API_TOKEN is required to resolve the remote Cloudflare tunnel.');
-    if (!config.accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required to resolve the remote Cloudflare tunnel.');
+    if (!config.accountId)
+        throw new Error('CLOUDFLARE_ACCOUNT_ID is required to resolve the remote Cloudflare tunnel.');
     const client = new Cloudflare({ apiToken: config.apiToken, maxRetries: 1, timeout: 15000 });
     const lookup = await findRemoteTunnel(client, { ...config, accountId: config.accountId });
     if (!lookup.ok) {

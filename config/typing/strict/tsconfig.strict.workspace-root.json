@@ -15,7 +15,5 @@
     "../../../*.mts",
     "../../../*.cts"
   ],
-  "files": [
-    "../../../.dependency-cruiser.mjs"
-  ]
+  "files": ["../../../.dependency-cruiser.mjs"]
 }

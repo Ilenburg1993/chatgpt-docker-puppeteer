@@ -10,12 +10,11 @@ import { handleStatefulMcpHttpRequest, readMcpHttpSessionRuntimeState } from '#c
 import { createMcpHttpSessionRuntime, createMcpHttpStreamRegistry } from '#copilot/mcp/control-plane';
 import {
     createMcpTransportErrorCollector,
+    fakeMcpTransport,
     fakeMcpRequest as fakeReq,
     fakeMcpResponse as fakeRes,
-    fakeMcpTransport,
     readFakeMcpHeader as readHeader,
 } from './helpers/http-fakes.js';
-
 
 describe('MCP HTTP stream registry', () => {
     it('exposes stream registry metrics in the HTTP runtime snapshot', () => {

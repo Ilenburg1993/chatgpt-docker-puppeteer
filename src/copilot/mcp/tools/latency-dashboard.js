@@ -14,8 +14,8 @@ import {
     readMcpRoundTripAnalyticsSnapshot,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
-import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 import { z } from 'zod';
+import { readMcpHttpSessionRuntimeState } from '../control-plane/session-runtime.js';
 
 const DEFAULT_MIN_SAMPLE_CALLS = 5;
 
@@ -128,34 +128,43 @@ export const mcpLatencyDashboardTool = {
             .int()
             .min(1)
             .max(10_000)
-            .optional()['describe']('Minimum total calls before strict SLO status is meaningful.'),
+            .optional()
+            ['describe']('Minimum total calls before strict SLO status is meaningful.'),
         silentExternalGapP50WarnMs: z
             .number()
             .int()
             .min(100)
             .max(120000)
-            .optional()['describe']('Interaction SLO warning threshold for p50 origin-silent gap. Defaults to 3000ms.'),
+            .optional()
+            ['describe']('Interaction SLO warning threshold for p50 origin-silent gap. Defaults to 3000ms.'),
         silentExternalGapP95WarnMs: z
             .number()
             .int()
             .min(100)
             .max(120000)
-            .optional()['describe']('Interaction SLO warning threshold for p95 origin-silent gap. Defaults to 8000ms.'),
+            .optional()
+            ['describe']('Interaction SLO warning threshold for p95 origin-silent gap. Defaults to 8000ms.'),
         includeTools: z
             .boolean()
-            .optional()['describe']('Include detailed per-tool/per-phase ranking rows. Default: false; summary still names each top pressure source.'),
+            .optional()
+            ['describe'](
+                'Include detailed per-tool/per-phase ranking rows. Default: false; summary still names each top pressure source.',
+            ),
         maxRows: z
             .number()
             .int()
             .min(1)
             .max(50)
-            .optional()['describe']('Maximum slow tool/phase rows to return. Defaults to 12.'),
+            .optional()
+            ['describe']('Maximum slow tool/phase rows to return. Defaults to 12.'),
         persistSnapshot: z
             .boolean()
-            .optional()['describe']('Append a compact snapshot to the local latency history JSONL file. Defaults to false.'),
+            .optional()
+            ['describe']('Append a compact snapshot to the local latency history JSONL file. Defaults to false.'),
         compareHistory: z
             .boolean()
-            .optional()['describe'](
+            .optional()
+            ['describe'](
                 'Compare this snapshot with the latest persisted latency snapshot. Defaults to true when persistSnapshot=true.',
             ),
         historyLimit: z
@@ -163,13 +172,15 @@ export const mcpLatencyDashboardTool = {
             .int()
             .min(1)
             .max(500)
-            .optional()['describe']('Number of recent persisted snapshots to return when history is requested.'),
+            .optional()
+            ['describe']('Number of recent persisted snapshots to return when history is requested.'),
         maxHistorySnapshots: z
             .number()
             .int()
             .min(1)
             .max(10000)
-            .optional()['describe']('Maximum snapshots retained when persistSnapshot=true.'),
+            .optional()
+            ['describe']('Maximum snapshots retained when persistSnapshot=true.'),
     },
     annotations: readOnlyAnnotations(),
     handler: async (input = {}) => {
@@ -281,8 +292,7 @@ export const mcpLatencyDashboardTool = {
                 discreteAuxiliaryTiming: metrics.interaction.originBoundary.discreteAuxiliaryTiming,
                 lastTransition: metrics.interaction.originBoundary.lastTransition,
                 maxTransition: metrics.interaction.originBoundary.maxTransition,
-                note:
-                    'externalGaps measures prior tools/call response finish → next tools/call request arrival; preHandler and postHandler isolate the work inside the origin around the guarded handler.',
+                note: 'externalGaps measures prior tools/call response finish → next tools/call request arrival; preHandler and postHandler isolate the work inside the origin around the guarded handler.',
             },
             interToolGap: {
                 authority: 'observed-at-origin-boundary-external-segment-proxy',
@@ -291,8 +301,7 @@ export const mcpLatencyDashboardTool = {
                 ...metrics.interaction.gaps,
                 lastTransition: metrics.interaction.lastTransition,
                 maxTransition: metrics.interaction.maxTransition,
-                note:
-                    'Quiescent gap between completed and next-started tool bursts. Excludes active MCP handler time; includes response return, client/model/orchestrator work, dispatch/transit, and potentially normal reasoning.',
+                note: 'Quiescent gap between completed and next-started tool bursts. Excludes active MCP handler time; includes response return, client/model/orchestrator work, dispatch/transit, and potentially normal reasoning.',
             },
             byteAccounting,
             roundTripAnalytics: includeTools ? indexedRoundTrip : compactRoundTripAnalytics(indexedRoundTrip),
@@ -446,8 +455,8 @@ function buildToolRows(tools, maxRows) {
 }
 
 /**
- * Rank tools by cumulative handler cost. Average-only rankings hide hot tools whose per-call latency is modest but whose
- * repeated use dominates an interactive repo workflow.
+ * Rank tools by cumulative handler cost. Average-only rankings hide hot tools whose per-call latency is modest but
+ * whose repeated use dominates an interactive repo workflow.
  *
  * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number }>} tools
  * @param {number} totalCalls
@@ -467,7 +476,9 @@ function buildCumulativeCostRows(tools, totalCalls, maxRows) {
         .filter((row) => row.calls > 0)
         .sort(
             (left, right) =>
-                right.totalDurationMs - left.totalDurationMs || right.calls - left.calls || left.name.localeCompare(right.name),
+                right.totalDurationMs - left.totalDurationMs ||
+                right.calls - left.calls ||
+                left.name.localeCompare(right.name),
         )
         .slice(0, maxRows);
 }
@@ -491,14 +502,16 @@ function buildCallPressureRows(tools, totalCalls, maxRows) {
         .filter((row) => row.calls > 0)
         .sort(
             (left, right) =>
-                right.calls - left.calls || right.totalDurationMs - left.totalDurationMs || left.name.localeCompare(right.name),
+                right.calls - left.calls ||
+                right.totalDurationMs - left.totalDurationMs ||
+                left.name.localeCompare(right.name),
         )
         .slice(0, maxRows);
 }
 
 /**
- * Rank tools by their average result payload. Handler latency alone misses tools that are cheap to execute but expensive
- * to serialize, transport and inject into the model context.
+ * Rank tools by their average result payload. Handler latency alone misses tools that are cheap to execute but
+ * expensive to serialize, transport and inject into the model context.
  *
  * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric>} tools
  * @param {number} maxRows
@@ -632,8 +645,28 @@ function buildPhaseTotals(tools) {
 }
 
 /**
- * @param {Record<string, import('#copilot/mcp/control-plane').ToolMetric & { averageDurationMs: number; phaseAverages: Record<string, { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }> }>} tools
- * @returns {{ calls: number; hint: number; stringify: number; unknown: number; rejected: number; totalBytes: number; averageBytes: number | null; lastBytes: number | null; hintRate: number; stringifyRate: number }}
+ * @param {Record<
+ *     string,
+ *     import('#copilot/mcp/control-plane').ToolMetric & {
+ *         averageDurationMs: number;
+ *         phaseAverages: Record<
+ *             string,
+ *             { calls: number; totalDurationMs: number; lastDurationMs: number | null; averageDurationMs: number }
+ *         >;
+ *     }
+ * >} tools
+ * @returns {{
+ *     calls: number;
+ *     hint: number;
+ *     stringify: number;
+ *     unknown: number;
+ *     rejected: number;
+ *     totalBytes: number;
+ *     averageBytes: number | null;
+ *     lastBytes: number | null;
+ *     hintRate: number;
+ *     stringifyRate: number;
+ * }}
  */
 function buildByteAccounting(tools) {
     const totals = {
@@ -722,7 +755,15 @@ function buildRoundTripAccounting(tools, maxRows) {
  * @param {ReturnType<typeof readMcpMetricsSnapshot>} metrics
  * @param {Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>} phaseTotals
  * @param {LatencyDashboardBudgets} budgets
- * @returns {{ status: 'ok' | 'degraded' | 'insufficient-data'; originStatus: 'ok' | 'degraded' | 'insufficient-data'; interactionStatus: 'ok' | 'degraded' | 'insufficient-data'; summary: Record<string, unknown>; critical: string[]; warnings: string[]; passed: string[] }}
+ * @returns {{
+ *     status: 'ok' | 'degraded' | 'insufficient-data';
+ *     originStatus: 'ok' | 'degraded' | 'insufficient-data';
+ *     interactionStatus: 'ok' | 'degraded' | 'insufficient-data';
+ *     summary: Record<string, unknown>;
+ *     critical: string[];
+ *     warnings: string[];
+ *     passed: string[];
+ * }}
  */
 function assessLatencySnapshot(metrics, phaseTotals, budgets) {
     /** @type {string[]} */
@@ -831,7 +872,13 @@ function assessPhaseBudget(phaseTotals, phase, budgetMs, warnings, passed) {
 }
 
 /**
- * @param {{ status: string; originStatus: string; interactionStatus: string; critical: string[]; warnings: string[] }} assessment
+ * @param {{
+ *     status: string;
+ *     originStatus: string;
+ *     interactionStatus: string;
+ *     critical: string[];
+ *     warnings: string[];
+ * }} assessment
  * @param {number} calls
  * @param {LatencyDashboardBudgets} budgets
  * @returns {string[]}

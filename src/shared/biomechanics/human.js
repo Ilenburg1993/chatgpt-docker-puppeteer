@@ -240,7 +240,6 @@ async function detectKeyboardLayout(/** @type {any} */ page) {
             return lang.includes('fr') ? 'azerty' : 'qwerty';
         });
     } catch (/** @type {any} */ _err) {
-
         return 'qwerty';
     }
 }
@@ -920,7 +919,6 @@ async function humanClick(/** @type {any} */ ...args) {
             y = box.y + (box.height || 0) / 2;
         }
     } catch (/** @type {any} */ _err) {
-
         // ignore
     }
 
@@ -1026,7 +1024,6 @@ async function humanType(/** @type {any} */ ...args) {
                         await page.focus(selector);
                         await _sleep(HUMAN_CONFIG.TYPE_FOCUS_RESTORE_DELAY);
                     } catch (/** @type {any} */ _e) {
-
                         driver._emitVital('TYPE_ABORTED', {
                             selector,
                             reason: 'focus_restore_failed',

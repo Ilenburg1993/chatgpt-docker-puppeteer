@@ -79,7 +79,10 @@ function safeConcreteHttpUrl(value) {
  * @returns {'proven' | 'documented' | 'unknown' | 'unreliable' | 'unsupported' | null}
  */
 function reliability(value) {
-    const normalized = text(value)?.toLowerCase().replace(/[\s-]+/gu, '_') ?? null;
+    const normalized =
+        text(value)
+            ?.toLowerCase()
+            .replace(/[\s-]+/gu, '_') ?? null;
     if (!normalized) return null;
     if (['proven', 'verified', 'reliable', 'runtime_proven'].includes(normalized)) return 'proven';
     if (['documented', 'supported', 'supported_unproven', 'sdk_documented'].includes(normalized)) return 'documented';
@@ -180,7 +183,10 @@ function stringList(value) {
  * @returns {'full' | 'lossy' | 'unsupported' | 'unknown' | null}
  */
 function configRepresentability(value) {
-    const normalized = text(value)?.toLowerCase().replace(/[\s-]+/gu, '_') ?? null;
+    const normalized =
+        text(value)
+            ?.toLowerCase()
+            .replace(/[\s-]+/gu, '_') ?? null;
     if (normalized === 'full' || normalized === 'representable') return 'full';
     if (normalized === 'lossy' || normalized === 'partial') return 'lossy';
     if (normalized === 'unsupported' || normalized === 'not_representable') return 'unsupported';
@@ -206,7 +212,7 @@ function resolveDirectConfigRepresentability(route, traits) {
         configRepresentability(binding?.['directConfigRepresentability']) ??
         configRepresentability(binding?.['configRepresentability']);
     const traitValue = configRepresentability(traitBinding?.['configRepresentability']);
-    const value = explicit ?? (requiredHeaders.length > 0 ? 'lossy' : traitValue ?? (traits ? 'full' : 'unknown'));
+    const value = explicit ?? (requiredHeaders.length > 0 ? 'lossy' : (traitValue ?? (traits ? 'full' : 'unknown')));
     return {
         value,
         source: explicit
@@ -230,7 +236,12 @@ function resolveDirectConfigRepresentability(route, traits) {
  * @param {Record<string, unknown>} route
  * @param {string} providerId
  * @param {'openai' | 'azure' | 'anthropic' | 'unknown'} providerType
- * @returns {{ value: 'proven' | 'documented' | 'unknown' | 'unreliable' | 'unsupported'; source: string; reasons: string[]; requiresNonStandardHeaders: boolean }}
+ * @returns {{
+ *     value: 'proven' | 'documented' | 'unknown' | 'unreliable' | 'unsupported';
+ *     source: string;
+ *     reasons: string[];
+ *     requiresNonStandardHeaders: boolean;
+ * }}
  */
 function resolveDirectReliability(route, providerId, providerType) {
     const binding = explicitBindingEvidence(route);
@@ -252,7 +263,9 @@ function resolveDirectReliability(route, providerId, providerType) {
         boolean(runtime?.['sameSessionReattachOk']) ??
         boolean(runtime?.['providerRebindOk']) ??
         boolean(runtime?.['directRebindOk']);
-    const runtimeStatus = reliability(runtime?.['directRebindReliability'] ?? runtime?.['sameSessionReattachReliability']);
+    const runtimeStatus = reliability(
+        runtime?.['directRebindReliability'] ?? runtime?.['sameSessionReattachReliability'],
+    );
     if (runtimeOk === true || runtimeStatus === 'proven') {
         return {
             value: 'proven',
@@ -390,9 +403,9 @@ function requestedStrategy(route) {
  *
  * @param {Record<string, unknown>} route
  * @param {{
- *   currentRoute?: Record<string, unknown> | null;
- *   sessionId?: string | null;
- *   unknownReliabilityPolicy?: 'prefer_direct_when_unknown' | 'prefer_ingress_when_unknown';
+ *     currentRoute?: Record<string, unknown> | null;
+ *     sessionId?: string | null;
+ *     unknownReliabilityPolicy?: 'prefer_direct_when_unknown' | 'prefer_ingress_when_unknown';
  * }} [options]
  */
 export function resolveModelGatewayBindingStrategy(route, options = {}) {
@@ -449,10 +462,7 @@ export function resolveModelGatewayBindingStrategy(route, options = {}) {
         value: effectiveDirectValue,
         reliabilityValue: directReliability.value,
         reliabilitySource: directReliability.source,
-        source:
-            effectiveDirectValue === directReliability.value
-                ? directReliability.source
-                : directConfig.source,
+        source: effectiveDirectValue === directReliability.value ? directReliability.source : directConfig.source,
         reasons: [
             ...directReliability.reasons,
             ...(directConfig.value === 'lossy'
@@ -577,19 +587,19 @@ export function resolveModelGatewayBindingStrategy(route, options = {}) {
  * @template {Record<string, unknown>} T
  * @param {T} route
  * @param {{
- *   currentRoute?: Record<string, unknown> | null;
- *   sessionId?: string | null;
- *   unknownReliabilityPolicy?: 'prefer_direct_when_unknown' | 'prefer_ingress_when_unknown';
+ *     currentRoute?: Record<string, unknown> | null;
+ *     sessionId?: string | null;
+ *     unknownReliabilityPolicy?: 'prefer_direct_when_unknown' | 'prefer_ingress_when_unknown';
  * }} [options]
  * @returns {T & {
- *   bindingStrategy: 'direct' | 'ingress' | 'blocked';
- *   bindingDecision: ReturnType<typeof resolveModelGatewayBindingStrategy>;
- *   requiresIngress: boolean;
- *   useIngress: boolean;
- *   modelGatewayIngress: boolean;
- *   requiresNewSession: false;
- *   sdkRouteKey?: string;
- *   sdkVisibleModel?: string;
+ *     bindingStrategy: 'direct' | 'ingress' | 'blocked';
+ *     bindingDecision: ReturnType<typeof resolveModelGatewayBindingStrategy>;
+ *     requiresIngress: boolean;
+ *     useIngress: boolean;
+ *     modelGatewayIngress: boolean;
+ *     requiresNewSession: false;
+ *     sdkRouteKey?: string;
+ *     sdkVisibleModel?: string;
  * }}
  */
 export function applyModelGatewayBindingStrategy(route, options = {}) {

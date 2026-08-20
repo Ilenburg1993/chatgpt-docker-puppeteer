@@ -6,7 +6,10 @@ import {
     evaluateIoPathPolicy,
     evaluateIoPathPolicyAsync,
     evaluateIoUrlPolicy,
+    getIoPathPolicyCacheStats,
+    invalidateIoPathPolicyCache,
     IO_URL_MAX_REDIRECTS,
+    resetIoPathPolicyCacheForTest,
     resolveIoAdvisoryLimits,
     sanitizeIoTextOutput,
 } from '../../../../src/copilot/core/io-policy.js';
@@ -15,6 +18,8 @@ import {
 const TEMP_DIRS = [];
 
 afterEach(async () => {
+    delete process.env['IO_PATH_POLICY_CACHE_TTL_MS'];
+    resetIoPathPolicyCacheForTest();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -113,6 +118,33 @@ describe('core/io-policy evaluateIoPathPolicyAsync', () => {
         if (!result.ok) return;
         expect(result.symlinkResolved).toBe(true);
         expect(result.realPath).toBe(path.join(workspaceRoot, 'target.txt'));
+    });
+
+    it('reuses read-only realpath decisions inside a fixed window and invalidates them explicitly', async () => {
+        process.env['IO_PATH_POLICY_CACHE_TTL_MS'] = '1000';
+        resetIoPathPolicyCacheForTest();
+        const workspaceRoot = await createTempDir();
+        const targetA = path.join(workspaceRoot, 'target-a.txt');
+        const targetB = path.join(workspaceRoot, 'target-b.txt');
+        const linkPath = path.join(workspaceRoot, 'link.txt');
+        await Promise.all([writeFile(targetA, 'a', 'utf8'), writeFile(targetB, 'b', 'utf8')]);
+        await symlink(targetA, linkPath);
+
+        const first = await evaluateIoPathPolicyAsync('link.txt', { workspaceRoot, mode: 'read' });
+        const second = await evaluateIoPathPolicyAsync('link.txt', { workspaceRoot, mode: 'read' });
+        expect(first.ok && first.realPath).toBe(targetA);
+        expect(second.ok && second.realPath).toBe(targetA);
+        expect(getIoPathPolicyCacheStats()).toMatchObject({ hits: 1, misses: 1, sets: 1, size: 1 });
+
+        await rm(linkPath, { force: true });
+        await symlink(targetB, linkPath);
+        const stillCached = await evaluateIoPathPolicyAsync('link.txt', { workspaceRoot, mode: 'read' });
+        expect(stillCached.ok && stillCached.realPath).toBe(targetA);
+
+        expect(invalidateIoPathPolicyCache(linkPath)).toBe(1);
+        const refreshed = await evaluateIoPathPolicyAsync('link.txt', { workspaceRoot, mode: 'read' });
+        expect(refreshed.ok && refreshed.realPath).toBe(targetB);
+        expect(getIoPathPolicyCacheStats()).toMatchObject({ invalidationEvents: 1, invalidatedEntries: 1 });
     });
 });
 

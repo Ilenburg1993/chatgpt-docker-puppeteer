@@ -8,9 +8,7 @@
  */
 
 import { resolvePersistentConfigFile } from '#copilot/boot';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { existsSync } from 'node:fs';
-import { readFile as readFileAsync } from 'node:fs/promises';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { safeJsonParse } from '../core/safe-json.js';
 import {
     BUILTIN_HANDLER_MAP,
@@ -53,9 +51,8 @@ function readStringArray(value) {
  * @returns {Promise<SkillsConfig>}
  */
 export async function readSkillsConfig() {
-    if (!existsSync(SKILLS_PATH)) return { paths: [] };
     try {
-        const raw = await readFileAsync(SKILLS_PATH, 'utf8');
+        const raw = (await readTextFreshTrusted(SKILLS_PATH, { caller: 'config.declarative-runtime-config' })).content;
         const result = safeJsonParse(raw, '[config/declarative-runtime-config.readSkillsConfig]');
         return result.ok ? /** @type {SkillsConfig} */ (result.data) : { paths: [] };
     } catch {

@@ -41,7 +41,10 @@ function resolveTranscriptArchivePath() {
     if (_terminalTranscriptArchivePath) return _terminalTranscriptArchivePath;
     const day = new Date().toISOString().slice(0, 10);
     const configuredDir = process.env['TERMINAL_TRANSCRIPT_ARCHIVE_DIR'];
-    const archiveDir = typeof configuredDir === 'string' && configuredDir.trim() ? configuredDir : DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR;
+    const archiveDir =
+        typeof configuredDir === 'string' && configuredDir.trim()
+            ? configuredDir
+            : DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR;
     _terminalTranscriptArchivePath = join(archiveDir, `terminal-transcript-${day}.jsonl`);
     return _terminalTranscriptArchivePath;
 }

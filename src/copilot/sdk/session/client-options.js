@@ -146,10 +146,7 @@ function buildRuntimeConnectionFromCompatOptions(opts) {
     const connectionToken = opts.connectionToken;
 
     if (opts.cliUrl) {
-        return RuntimeConnection.forUri(
-            opts.cliUrl,
-            connectionToken ? { connectionToken } : undefined,
-        );
+        return RuntimeConnection.forUri(opts.cliUrl, connectionToken ? { connectionToken } : undefined);
     }
 
     if (opts.useStdio === false || opts.port !== undefined) {

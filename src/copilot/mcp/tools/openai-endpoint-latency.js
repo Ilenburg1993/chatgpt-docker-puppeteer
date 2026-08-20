@@ -5,7 +5,6 @@
  * @module copilot/mcp/tools/openai-endpoint-latency
  */
 
-import { z } from 'zod';
 import {
     appendOpenAiEndpointLatencySnapshot,
     compareOpenAiEndpointLatencyToBaseline,
@@ -16,6 +15,7 @@ import {
     readOpenAiEndpointLatencyMonitorState,
     summarizeOpenAiEndpointLatencyHistory,
 } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 /** @type {import('../registry.js').McpToolDefinition} */
 export const mcpOpenAiEndpointLatencyTool = {
@@ -25,14 +25,39 @@ export const mcpOpenAiEndpointLatencyTool = {
         'Measure fixed OpenAI/ChatGPT endpoints from the DevContainer using fresh HTTPS connections, decompose DNS/TCP/TLS/TTFB/total latency, compare against bounded local history, and optionally persist a sanitized snapshot. It never measures ChatGPT UI TTFT or accepts arbitrary URLs.',
     inputSchema: {
         sampleCount: z.number().int().min(1).max(10).optional()['describe']('Samples per fixed endpoint. Default: 3.'),
-        timeoutMs: z.number().int().min(500).max(10_000).optional()['describe']('Per-request timeout. Default: 3000ms.'),
+        timeoutMs: z
+            .number()
+            .int()
+            .min(500)
+            .max(10_000)
+            .optional()
+            ['describe']('Per-request timeout. Default: 3000ms.'),
         persistSnapshot: z.boolean().optional()['describe']('Persist the compact sanitized snapshot. Default: true.'),
-        historyLimit: z.number().int().min(1).max(2_000).optional()['describe']('Historical snapshots read for baseline. Default: 200.'),
-        maxHistorySnapshots: z.number().int().min(1).max(10_000).optional()['describe']('Maximum persisted snapshots retained. Default: 1000.'),
+        historyLimit: z
+            .number()
+            .int()
+            .min(1)
+            .max(2_000)
+            .optional()
+            ['describe']('Historical snapshots read for baseline. Default: 200.'),
+        maxHistorySnapshots: z
+            .number()
+            .int()
+            .min(1)
+            .max(10_000)
+            .optional()
+            ['describe']('Maximum persisted snapshots retained. Default: 1000.'),
         includeSamples: z.boolean().optional()['describe']('Include individual sanitized samples. Default: false.'),
     },
     annotations: openWorldBoundedWriteAnnotations(),
-    handler: async ({ sampleCount, timeoutMs, persistSnapshot, historyLimit, maxHistorySnapshots, includeSamples } = {}) => {
+    handler: async ({
+        sampleCount,
+        timeoutMs,
+        persistSnapshot,
+        historyLimit,
+        maxHistorySnapshots,
+        includeSamples,
+    } = {}) => {
         const history = await readOpenAiEndpointLatencyHistory({ limit: historyLimit });
         const baseline = summarizeOpenAiEndpointLatencyHistory(history.entries);
         const measurement = await measureOpenAiEndpointLatency({ sampleCount, timeoutMs });
@@ -58,9 +83,12 @@ export const mcpOpenAiEndpointLatencyTool = {
             persistence,
             monitor: readOpenAiEndpointLatencyMonitorState(),
             ttftSemantics: {
-                endpointTtfb: 'Measured here: request start at DevContainer -> first HTTP response headers from the fixed endpoint.',
-                openAiApiStreamingTtft: 'Not measured by this tool; requires an explicit authenticated streaming model request and can incur provider usage/cost.',
-                chatgptUiTtft: 'Not observable from this MCP origin; requires a client-side timestamp from user submit -> first rendered/streamed assistant token.',
+                endpointTtfb:
+                    'Measured here: request start at DevContainer -> first HTTP response headers from the fixed endpoint.',
+                openAiApiStreamingTtft:
+                    'Not measured by this tool; requires an explicit authenticated streaming model request and can incur provider usage/cost.',
+                chatgptUiTtft:
+                    'Not observable from this MCP origin; requires a client-side timestamp from user submit -> first rendered/streamed assistant token.',
             },
             ...(includeSamples === true ? { samples: measurement.samples } : {}),
         });

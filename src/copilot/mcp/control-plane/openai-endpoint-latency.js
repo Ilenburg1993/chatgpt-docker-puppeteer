@@ -2,17 +2,17 @@
 /**
  * Fixed OpenAI/ChatGPT endpoint latency observer with bounded local history.
  *
- * This module measures only the network path visible from the DevContainer.
- * It never claims to observe ChatGPT client/model scheduling or UI TTFT.
+ * This module measures only the network path visible from the DevContainer. It never claims to observe ChatGPT
+ * client/model scheduling or UI TTFT.
  *
  * @module copilot/mcp/control-plane/openai-endpoint-latency
  */
 
-import fs from 'node:fs/promises';
+import { appendTextLocked, mkdirPathLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
+import { readJsonlTailTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import https from 'node:https';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { appendTextLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
 
 export const OPENAI_ENDPOINT_LATENCY_TARGETS = Object.freeze([
@@ -34,60 +34,61 @@ const DEFAULT_BASELINE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * @typedef {{
- *   id: string;
- *   hostname: string;
- *   method: string;
- *   ok: boolean;
- *   observedAt: string;
- *   statusCode: number | null;
- *   protocol: string | null;
- *   alpn: string | null;
- *   remoteFamily: string | null;
- *   edgeColo: string | null;
- *   timings: {
- *     dnsMs: number | null;
- *     tcpMs: number | null;
- *     tlsMs: number | null;
- *     ttfbMs: number | null;
- *     serverWaitMs: number | null;
- *     bodyMs: number | null;
- *     totalMs: number;
- *   };
- *   error: string | null;
+ *     id: string;
+ *     hostname: string;
+ *     method: string;
+ *     ok: boolean;
+ *     observedAt: string;
+ *     statusCode: number | null;
+ *     protocol: string | null;
+ *     alpn: string | null;
+ *     remoteFamily: string | null;
+ *     edgeColo: string | null;
+ *     timings: {
+ *         dnsMs: number | null;
+ *         tcpMs: number | null;
+ *         tlsMs: number | null;
+ *         ttfbMs: number | null;
+ *         serverWaitMs: number | null;
+ *         bodyMs: number | null;
+ *         totalMs: number;
+ *     };
+ *     error: string | null;
  * }} OpenAiEndpointLatencySample
  *
- * @typedef {{
- *   id: string;
- *   hostname: string;
- *   samples: number;
- *   successful: number;
- *   successRate: number;
- *   statuses: number[];
- *   edgeColos: Record<string, number>;
- *   timings: {
- *     dns: ReturnType<typeof summarizeNumbers>;
- *     tcp: ReturnType<typeof summarizeNumbers>;
- *     tls: ReturnType<typeof summarizeNumbers>;
- *     ttfb: ReturnType<typeof summarizeNumbers>;
- *     serverWait: ReturnType<typeof summarizeNumbers>;
- *     total: ReturnType<typeof summarizeNumbers>;
- *   };
- * }} OpenAiEndpointLatencyTargetSummary
  *
  * @typedef {{
- *   schemaVersion: 1;
- *   observedAt: string;
- *   authority: 'observed-from-devcontainer-to-fixed-openai-endpoints';
- *   sampleCount: number;
- *   timeoutMs: number;
- *   targets: OpenAiEndpointLatencyTargetSummary[];
+ *     id: string;
+ *     hostname: string;
+ *     samples: number;
+ *     successful: number;
+ *     successRate: number;
+ *     statuses: number[];
+ *     edgeColos: Record<string, number>;
+ *     timings: {
+ *         dns: ReturnType<typeof summarizeNumbers>;
+ *         tcp: ReturnType<typeof summarizeNumbers>;
+ *         tls: ReturnType<typeof summarizeNumbers>;
+ *         ttfb: ReturnType<typeof summarizeNumbers>;
+ *         serverWait: ReturnType<typeof summarizeNumbers>;
+ *         total: ReturnType<typeof summarizeNumbers>;
+ *     };
+ * }} OpenAiEndpointLatencyTargetSummary
+ *
+ *
+ * @typedef {{
+ *     schemaVersion: 1;
+ *     observedAt: string;
+ *     authority: 'observed-from-devcontainer-to-fixed-openai-endpoints';
+ *     sampleCount: number;
+ *     timeoutMs: number;
+ *     targets: OpenAiEndpointLatencyTargetSummary[];
  * }} OpenAiEndpointLatencySnapshot
  */
 
 /**
- * Measure fixed OpenAI/ChatGPT endpoints using fresh HTTPS connections.
- * DNS/TCP/TLS/TTFB are measured on the same request path whenever Node emits
- * the corresponding socket milestones. No response body is retained.
+ * Measure fixed OpenAI/ChatGPT endpoints using fresh HTTPS connections. DNS/TCP/TLS/TTFB are measured on the same
+ * request path whenever Node emits the corresponding socket milestones. No response body is retained.
  *
  * @param {{ sampleCount?: number; timeoutMs?: number }} [options]
  * @returns {Promise<{ snapshot: OpenAiEndpointLatencySnapshot; samples: OpenAiEndpointLatencySample[] }>}
@@ -194,7 +195,14 @@ export function probeFixedOpenAiHttpsTarget(target, timeoutMs) {
         request.end();
 
         /**
-         * @param {{ ok: boolean; statusCode: number | null; protocol: string | null; edgeColo: string | null; endedAt: number; error?: string }} result
+         * @param {{
+         *     ok: boolean;
+         *     statusCode: number | null;
+         *     protocol: string | null;
+         *     edgeColo: string | null;
+         *     endedAt: number;
+         *     error?: string;
+         * }} result
          */
         function finish(result) {
             if (settled) return;
@@ -296,7 +304,10 @@ export async function appendOpenAiEndpointLatencySnapshot(snapshot, options = {}
         const { value: retainedSnapshots } = await withIoResourceLock(
             filePath,
             async () => {
-                await fs.mkdir(path.dirname(filePath), { recursive: true });
+                await mkdirPathLocked(path.dirname(filePath), {
+                    recursive: true,
+                    advisoryLimits: { domain: 'openai-endpoint-latency-parent' },
+                });
                 await appendTextLocked(filePath, entry, {
                     encoding: 'utf8',
                     advisoryLimits: { domain: 'openai-endpoint-latency-history' },
@@ -322,37 +333,33 @@ export async function appendOpenAiEndpointLatencySnapshot(snapshot, options = {}
 
 /**
  * @param {{ limit?: number; filePath?: string }} [options]
- * @returns {Promise<{ ok: boolean; path: string; entries: OpenAiEndpointLatencySnapshot[]; truncatedByBytes: boolean; error?: string }>}
+ * @returns {Promise<{
+ *     ok: boolean;
+ *     path: string;
+ *     entries: OpenAiEndpointLatencySnapshot[];
+ *     truncatedByBytes: boolean;
+ *     error?: string;
+ * }>}
  */
 export async function readOpenAiEndpointLatencyHistory(options = {}) {
     const filePath = resolveHistoryPath(options.filePath);
     const limit = boundedInteger(options.limit, 200, 1, 2_000);
     try {
-        const stats = await fs.stat(filePath);
-        const start = Math.max(0, stats.size - MAX_HISTORY_READ_BYTES);
-        const handle = await fs.open(filePath, 'r');
-        try {
-            const length = stats.size - start;
-            const buffer = Buffer.alloc(length);
-            await handle.read(buffer, 0, length, start);
-            let raw = buffer.toString('utf8');
-            if (start > 0) raw = raw.slice(Math.max(0, raw.indexOf('\n') + 1));
-            const entries = raw
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean)
-                .map(safeParseSnapshot)
-                .filter((entry) => entry !== null)
-                .slice(-limit);
-            return {
-                ok: true,
-                path: toWorkspaceRelativePath(filePath),
-                entries: /** @type {OpenAiEndpointLatencySnapshot[]} */ (entries),
-                truncatedByBytes: start > 0,
-            };
-        } finally {
-            await handle.close();
-        }
+        const tail = await readJsonlTailTrusted(filePath, {
+            caller: 'mcp.control-plane.openai-endpoint-latency',
+            maxLines: Math.min(10_000, Math.max(limit, limit * 5)),
+            maxBytes: MAX_HISTORY_READ_BYTES,
+        });
+        const entries = tail.records
+            .map(normalizeEndpointLatencySnapshot)
+            .filter((entry) => entry !== null)
+            .slice(-limit);
+        return {
+            ok: true,
+            path: toWorkspaceRelativePath(filePath),
+            entries: /** @type {OpenAiEndpointLatencySnapshot[]} */ (entries),
+            truncatedByBytes: tail.truncatedByByteLimit,
+        };
     } catch (error) {
         if (isNotFoundError(error)) {
             return { ok: true, path: toWorkspaceRelativePath(filePath), entries: [], truncatedByBytes: false };
@@ -374,7 +381,11 @@ export async function readOpenAiEndpointLatencyHistory(options = {}) {
  * @param {number} [now]
  * @param {number} [windowMs]
  */
-export function summarizeOpenAiEndpointLatencyHistory(entries, now = Date.now(), windowMs = DEFAULT_BASELINE_WINDOW_MS) {
+export function summarizeOpenAiEndpointLatencyHistory(
+    entries,
+    now = Date.now(),
+    windowMs = DEFAULT_BASELINE_WINDOW_MS,
+) {
     const cutoff = now - windowMs;
     /** @type {Map<string, { hostname: string; ttfb: number[]; total: number[]; tls: number[]; snapshots: number }>} */
     const buckets = new Map();
@@ -382,7 +393,13 @@ export function summarizeOpenAiEndpointLatencyHistory(entries, now = Date.now(),
         const observedAt = Date.parse(entry.observedAt);
         if (!Number.isFinite(observedAt) || observedAt < cutoff || observedAt > now) continue;
         for (const target of entry.targets ?? []) {
-            const bucket = buckets.get(target.id) ?? { hostname: target.hostname, ttfb: [], total: [], tls: [], snapshots: 0 };
+            const bucket = buckets.get(target.id) ?? {
+                hostname: target.hostname,
+                ttfb: [],
+                total: [],
+                tls: [],
+                snapshots: 0,
+            };
             bucket.snapshots += 1;
             pushFinite(bucket.ttfb, target.timings?.ttfb?.p50Ms);
             pushFinite(bucket.total, target.timings?.total?.p50Ms);
@@ -412,7 +429,10 @@ export function compareOpenAiEndpointLatencyToBaseline(current, baseline) {
         const previous = baselineById.get(target.id);
         const currentTtfb = target.timings.ttfb.p50Ms;
         const baselineTtfb = previous?.ttfb.p50Ms ?? null;
-        const ratio = currentTtfb !== null && baselineTtfb !== null && baselineTtfb > 0 ? roundRatio(currentTtfb / baselineTtfb) : null;
+        const ratio =
+            currentTtfb !== null && baselineTtfb !== null && baselineTtfb > 0
+                ? roundRatio(currentTtfb / baselineTtfb)
+                : null;
         const deltaMs = currentTtfb !== null && baselineTtfb !== null ? Math.round(currentTtfb - baselineTtfb) : null;
         return {
             id: target.id,
@@ -429,7 +449,7 @@ export function compareOpenAiEndpointLatencyToBaseline(current, baseline) {
     });
 }
 
-/** @param {Array<number | null | undefined>} values */
+/** @param {(number | null | undefined)[]} values */
 export function summarizeNumbers(values) {
     const sorted = values
         .filter((value) => value !== null && value !== undefined)
@@ -480,7 +500,7 @@ function resolveHistoryPath(overridePath) {
 
 /** @param {string} filePath @param {number} maxSnapshots */
 async function trimHistory(filePath, maxSnapshots) {
-    const raw = await fs.readFile(filePath, 'utf8');
+    const raw = (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.openai-endpoint-latency' })).content;
     const lines = raw.split('\n').filter((line) => line.trim());
     if (lines.length <= maxSnapshots) return lines.length;
     const retained = lines.slice(-maxSnapshots);
@@ -493,17 +513,13 @@ async function trimHistory(filePath, maxSnapshots) {
     return retained.length;
 }
 
-/** @param {string} line @returns {OpenAiEndpointLatencySnapshot | null} */
-function safeParseSnapshot(line) {
-    try {
-        const parsed = JSON.parse(line);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-        const record = /** @type {Record<string, unknown>} */ (parsed);
-        if (record['schemaVersion'] !== 1 || typeof record['observedAt'] !== 'string' || !Array.isArray(record['targets'])) return null;
-        return /** @type {OpenAiEndpointLatencySnapshot} */ (record);
-    } catch {
+/** @param {unknown} value @returns {OpenAiEndpointLatencySnapshot | null} */
+function normalizeEndpointLatencySnapshot(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const record = /** @type {Record<string, unknown>} */ (value);
+    if (record['schemaVersion'] !== 1 || typeof record['observedAt'] !== 'string' || !Array.isArray(record['targets']))
         return null;
-    }
+    return /** @type {OpenAiEndpointLatencySnapshot} */ (record);
 }
 
 /** @param {unknown} value @param {number} fallback @param {number} min @param {number} max */

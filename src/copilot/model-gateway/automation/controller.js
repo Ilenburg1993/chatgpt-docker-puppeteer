@@ -21,7 +21,9 @@ function text(value) {
  * @returns {Record<string, unknown>}
  */
 function record(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
@@ -70,7 +72,12 @@ function selectedRouteConfidence(decision) {
  * @param {boolean} input.allowedByPolicy
  * @param {string} input.policyGate
  * @param {string} input.policyDeniedReason
- * @returns {{ execute: boolean; authorization: 'authorized' | 'dry_run' | 'policy_denied'; policyGate: string; blockedReason: string | null }}
+ * @returns {{
+ *     execute: boolean;
+ *     authorization: 'authorized' | 'dry_run' | 'policy_denied';
+ *     policyGate: string;
+ *     blockedReason: string | null;
+ * }}
  */
 function effectAuthorization(input) {
     if (!input.allowEffects) {
@@ -101,18 +108,23 @@ function effectAuthorization(input) {
  * @param {object} input
  * @param {'pre_turn' | 'post_turn' | 'manual'} [input.phase]
  * @param {Record<string, unknown>} input.decision
- * @param {{ allowEffects?: boolean; allowLiveSetModel?: boolean; allowNewSession?: boolean; accountWideFailureKinds?: string[] }} [input.policy]
+ * @param {{
+ *     allowEffects?: boolean;
+ *     allowLiveSetModel?: boolean;
+ *     allowNewSession?: boolean;
+ *     accountWideFailureKinds?: string[];
+ * }} [input.policy]
  * @param {{ ok?: boolean; failureKind?: string | null; errorMessage?: string | null }} [input.turnOutcome]
  * @returns {{
- *   schema: 'model-gateway-runtime-automation-controller-step';
- *   ok: boolean;
- *   phase: 'pre_turn' | 'post_turn' | 'manual';
- *   action: string;
- *   effectMode: 'dry_run' | 'allowed';
- *   effects: Array<Record<string, unknown>>;
- *   blockers: string[];
- *   selectedRouteKey: string | null;
- *   operatorSummary: string;
+ *     schema: 'model-gateway-runtime-automation-controller-step';
+ *     ok: boolean;
+ *     phase: 'pre_turn' | 'post_turn' | 'manual';
+ *     action: string;
+ *     effectMode: 'dry_run' | 'allowed';
+ *     effects: Record<string, unknown>[];
+ *     blockers: string[];
+ *     selectedRouteKey: string | null;
+ *     operatorSummary: string;
  * }}
  */
 export function buildModelGatewayRuntimeAutomationControllerStep(input) {
@@ -207,6 +219,6 @@ export function buildModelGatewayRuntimeAutomationControllerStep(input) {
         operatorSummary:
             runnableEffects.length > 0
                 ? `${runnableEffects.length} efeito(s) autorizado(s) para ${action}.`
-                : text(decision['operatorSummary']) ?? 'Nenhum efeito automatico autorizado.',
+                : (text(decision['operatorSummary']) ?? 'Nenhum efeito automatico autorizado.'),
     };
 }

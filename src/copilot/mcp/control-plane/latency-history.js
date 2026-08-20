@@ -7,9 +7,9 @@
  * @module copilot/mcp/control-plane/latency-history
  */
 
-import fs from 'node:fs/promises';
+import { appendTextLocked, mkdirPathLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
+import { readJsonlTailTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import path from 'node:path';
-import { appendTextLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
 
 export const DEFAULT_MCP_LATENCY_HISTORY_RELATIVE_PATH = 'src/copilot/.ai/mcp/latency-dashboard.jsonl';
@@ -29,6 +29,7 @@ const MAX_LATENCY_HISTORY_READ_BYTES = 2 * 1024 * 1024;
  *     phaseTotals?: Record<string, { averageMs?: number | null; calls?: number; totalDurationMs?: number }>;
  * }} McpLatencyDashboardSnapshot
  *
+ *
  * @typedef {{
  *     schemaVersion: 1;
  *     capturedAt: string;
@@ -39,7 +40,10 @@ const MAX_LATENCY_HISTORY_READ_BYTES = 2 * 1024 * 1024;
 /**
  * @param {McpLatencyDashboardSnapshot} snapshot
  * @param {{ maxSnapshots?: number; filePath?: string }} [options]
- * @returns {Promise<{ persisted: true; path: string; maxSnapshots: number; retainedSnapshots: number } | { persisted: false; error: string; path: string | null }>}
+ * @returns {Promise<
+ *     | { persisted: true; path: string; maxSnapshots: number; retainedSnapshots: number }
+ *     | { persisted: false; error: string; path: string | null }
+ * >}
  */
 export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) {
     const filePath = getLatencyHistoryPath(options.filePath);
@@ -53,7 +57,10 @@ export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) 
         const { value: retainedSnapshots } = await withIoResourceLock(
             filePath,
             async () => {
-                await fs.mkdir(path.dirname(filePath), { recursive: true });
+                await mkdirPathLocked(path.dirname(filePath), {
+                    recursive: true,
+                    advisoryLimits: { domain: 'mcp-latency-history-parent' },
+                });
                 await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
                     encoding: 'utf8',
                     advisoryLimits: { domain: 'mcp-latency-history' },
@@ -75,24 +82,25 @@ export async function appendMcpLatencyDashboardSnapshot(snapshot, options = {}) 
 
 /**
  * @param {{ limit?: number; filePath?: string }} [options]
- * @returns {Promise<{ ok: true; path: string; entries: McpLatencyHistoryEntry[] } | { ok: false; path: string; error: string; entries: [] }>}
+ * @returns {Promise<
+ *     | { ok: true; path: string; entries: McpLatencyHistoryEntry[] }
+ *     | { ok: false; path: string; error: string; entries: [] }
+ * >}
  */
 export async function readMcpLatencyDashboardHistory(options = {}) {
     const filePath = getLatencyHistoryPath(options.filePath);
     const limit = readBoundedInteger(options.limit, 20, 1, 500);
     try {
-        const stats = await fs.stat(filePath);
-        const start = stats.size > MAX_LATENCY_HISTORY_READ_BYTES ? stats.size - MAX_LATENCY_HISTORY_READ_BYTES : 0;
-        const handle = await fs.open(filePath, 'r');
-        try {
-            const length = stats.size - start;
-            const buffer = Buffer.alloc(length);
-            await handle.read(buffer, 0, length, start);
-            const entries = parseHistoryLines(buffer.toString('utf8')).slice(-limit);
-            return { ok: true, path: toWorkspaceRelativePath(filePath), entries };
-        } finally {
-            await handle.close();
-        }
+        const tail = await readJsonlTailTrusted(filePath, {
+            caller: 'mcp.control-plane.latency-history',
+            maxLines: Math.min(10_000, Math.max(limit, limit * 10)),
+            maxBytes: MAX_LATENCY_HISTORY_READ_BYTES,
+        });
+        const entries = tail.records
+            .map(normalizeHistoryEntry)
+            .filter((entry) => entry !== null)
+            .slice(-limit);
+        return { ok: true, path: toWorkspaceRelativePath(filePath), entries };
     } catch (error) {
         if (isNotFoundError(error)) return { ok: true, path: toWorkspaceRelativePath(filePath), entries: [] };
         return { ok: false, path: toWorkspaceRelativePath(filePath), error: sanitizeError(error), entries: [] };
@@ -102,18 +110,41 @@ export async function readMcpLatencyDashboardHistory(options = {}) {
 /**
  * @param {McpLatencyDashboardSnapshot} current
  * @param {McpLatencyDashboardSnapshot | null | undefined} previous
- * @returns {{ available: boolean; comparedTo: string | null; deltas: Record<string, number | null>; interpretation: string[] }}
+ * @returns {{
+ *     available: boolean;
+ *     comparedTo: string | null;
+ *     deltas: Record<string, number | null>;
+ *     interpretation: string[];
+ * }}
  */
 export function compareMcpLatencyDashboardSnapshots(current, previous) {
-    if (!previous) return { available: false, comparedTo: null, deltas: {}, interpretation: ['No previous latency snapshot is available.'] };
+    if (!previous)
+        return {
+            available: false,
+            comparedTo: null,
+            deltas: {},
+            interpretation: ['No previous latency snapshot is available.'],
+        };
     const deltas = {
         totalCalls: numericDelta(current.summary?.['totalCalls'], previous.summary?.['totalCalls']),
         totalErrors: numericDelta(current.summary?.['totalErrors'], previous.summary?.['totalErrors']),
         errorRate: numericDelta(current.summary?.['errorRate'], previous.summary?.['errorRate']),
-        slowestAverageToolMs: numericDelta(current.summary?.['slowestAverageToolMs'], previous.summary?.['slowestAverageToolMs']),
-        authorizationAverageMs: numericDelta(current.phaseTotals?.['authorization']?.averageMs, previous.phaseTotals?.['authorization']?.averageMs),
-        handlerAverageMs: numericDelta(current.phaseTotals?.['handler']?.averageMs, previous.phaseTotals?.['handler']?.averageMs),
-        resultSizeAverageMs: numericDelta(current.phaseTotals?.['resultSize']?.averageMs, previous.phaseTotals?.['resultSize']?.averageMs),
+        slowestAverageToolMs: numericDelta(
+            current.summary?.['slowestAverageToolMs'],
+            previous.summary?.['slowestAverageToolMs'],
+        ),
+        authorizationAverageMs: numericDelta(
+            current.phaseTotals?.['authorization']?.averageMs,
+            previous.phaseTotals?.['authorization']?.averageMs,
+        ),
+        handlerAverageMs: numericDelta(
+            current.phaseTotals?.['handler']?.averageMs,
+            previous.phaseTotals?.['handler']?.averageMs,
+        ),
+        resultSizeAverageMs: numericDelta(
+            current.phaseTotals?.['resultSize']?.averageMs,
+            previous.phaseTotals?.['resultSize']?.averageMs,
+        ),
     };
     return {
         available: true,
@@ -156,7 +187,7 @@ function compactSnapshot(snapshot) {
  * @returns {Promise<number>}
  */
 async function trimLatencyHistoryFile(filePath, maxSnapshots) {
-    const raw = await fs.readFile(filePath, 'utf8');
+    const raw = (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.latency-history' })).content;
     const lines = raw.split('\n').filter((line) => line.trim());
     if (lines.length <= maxSnapshots) return lines.length;
     const retained = lines.slice(-maxSnapshots);
@@ -170,34 +201,16 @@ async function trimLatencyHistoryFile(filePath, maxSnapshots) {
 }
 
 /**
- * @param {string} raw
- * @returns {McpLatencyHistoryEntry[]}
- */
-function parseHistoryLines(raw) {
-    return raw
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => safeParseHistoryEntry(line))
-        .filter((entry) => entry !== null);
-}
-
-/**
- * @param {string} line
+ * @param {unknown} value
  * @returns {McpLatencyHistoryEntry | null}
  */
-function safeParseHistoryEntry(line) {
-    try {
-        const parsed = JSON.parse(line);
-        if (!parsed || typeof parsed !== 'object') return null;
-        const record = /** @type {Record<string, unknown>} */ (parsed);
-        if (record['schemaVersion'] !== 1) return null;
-        const snapshot = record['snapshot'];
-        if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null;
-        return /** @type {McpLatencyHistoryEntry} */ (record);
-    } catch {
-        return null;
-    }
+function normalizeHistoryEntry(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const record = /** @type {Record<string, unknown>} */ (value);
+    if (record['schemaVersion'] !== 1) return null;
+    const snapshot = record['snapshot'];
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null;
+    return /** @type {McpLatencyHistoryEntry} */ (record);
 }
 
 /**
@@ -223,8 +236,10 @@ function buildComparisonInterpretation(deltas) {
         else if (deltas['errorRate'] < 0) notes.push(`Error rate improved by ${Math.abs(deltas['errorRate'])}.`);
     }
     if (typeof deltas['slowestAverageToolMs'] === 'number') {
-        if (deltas['slowestAverageToolMs'] > 100) notes.push(`Slowest average tool latency regressed by ${deltas['slowestAverageToolMs']}ms.`);
-        else if (deltas['slowestAverageToolMs'] < -100) notes.push(`Slowest average tool latency improved by ${Math.abs(deltas['slowestAverageToolMs'])}ms.`);
+        if (deltas['slowestAverageToolMs'] > 100)
+            notes.push(`Slowest average tool latency regressed by ${deltas['slowestAverageToolMs']}ms.`);
+        else if (deltas['slowestAverageToolMs'] < -100)
+            notes.push(`Slowest average tool latency improved by ${Math.abs(deltas['slowestAverageToolMs'])}ms.`);
     }
     if (typeof deltas['authorizationAverageMs'] === 'number' && deltas['authorizationAverageMs'] > 50) {
         notes.push(`Authorization average regressed by ${deltas['authorizationAverageMs']}ms.`);

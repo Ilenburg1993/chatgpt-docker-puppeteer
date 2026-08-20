@@ -19,14 +19,14 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-selection-audit.mjs [--json] [--strict] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-selection-audit.mjs [--json] [--strict] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--fail-on-unselected] [--fail-on-supply-warning]
 
 Audit metadata-first model-gateway route selection from the persisted catalog. This does not fetch providers, execute
 runtime probes or call models.
 `);
     process.exit(0);
 }
-
 
 function readProfiles() {
     const profiles = [];
@@ -39,9 +39,11 @@ function readProfiles() {
 
 /** @param {Record<string, unknown> | null | undefined} counts */
 function formatCountMap(counts) {
-    return Object.entries(counts ?? {})
-        .map(([key, count]) => `${key}:${count}`)
-        .join(',') || '-';
+    return (
+        Object.entries(counts ?? {})
+            .map(([key, count]) => `${key}:${count}`)
+            .join(',') || '-'
+    );
 }
 
 const json = argSet.has('--json');
@@ -70,7 +72,9 @@ const summary = {
 if (json) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
 } else {
-    process.stdout.write(`model-gateway pre-runtime selection audit: ok=${selection.ok ? 'yes' : 'no'} mode=${selection.mode}\n`);
+    process.stdout.write(
+        `model-gateway pre-runtime selection audit: ok=${selection.ok ? 'yes' : 'no'} mode=${selection.mode}\n`,
+    );
     process.stdout.write(
         `snapshot: projections=${selection.snapshotContext['projectionCount']} routes=${selection.snapshotContext['routeOptionCount']} overlays=${selection.snapshotContext['accountOverlayCount']} eligibility=${selection.snapshotContext['eligibilityDecisionCount']} candidates=${selection.snapshotContext['candidateCount']}\n`,
     );
@@ -98,8 +102,11 @@ if (json) {
         }
     }
     if (localProviderOptIn.hasBlocks) {
-        process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
+        process.stdout.write(
+            `\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`,
+        );
     }
 }
 
-if (!integrity.ok || (failOnUnselected && !selection.ok) || (failOnSupplyWarning && summary.supplyWarningCount > 0)) process.exit(1);
+if (!integrity.ok || (failOnUnselected && !selection.ok) || (failOnSupplyWarning && summary.supplyWarningCount > 0))
+    process.exit(1);

@@ -8,11 +8,11 @@
  * @module copilot/mcp/scripts/latency-benchmark
  */
 
-import { connect as connectHttp2, constants as http2Constants } from 'node:http2';
-import { pathToFileURL } from 'node:url';
 import { readBoundedResponseBytes } from '#copilot/infra/public/http-response';
 import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
+import { connect as connectHttp2, constants as http2Constants } from 'node:http2';
+import { pathToFileURL } from 'node:url';
 
 const DEFAULT_PUBLIC_MCP_URL = 'https://mcp.aurelin.org/mcp';
 const DEFAULT_SAMPLES = 10;
@@ -20,9 +20,37 @@ const DEFAULT_TIMEOUT_MS = 10_000;
 const MAX_BENCHMARK_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /**
- * @typedef {{ ok: boolean; httpOk?: boolean; expectedStatusMatched?: boolean; status?: number; durationMs: number; ttfbMs?: number; downloadMs?: number; bytes?: number; contentLengthHeader?: number | null; contentEncoding?: string | null; cfCacheStatus?: string | null; age?: string | null; cfRay?: string | null; originProtocolMode?: string | null; originHttpVersion?: string | null; originAlpn?: string | null; transport?: string; tlsVerification?: string; error?: string }} LatencySample
+ * @typedef {{
+ *     ok: boolean;
+ *     httpOk?: boolean;
+ *     expectedStatusMatched?: boolean;
+ *     status?: number;
+ *     durationMs: number;
+ *     ttfbMs?: number;
+ *     downloadMs?: number;
+ *     bytes?: number;
+ *     contentLengthHeader?: number | null;
+ *     contentEncoding?: string | null;
+ *     cfCacheStatus?: string | null;
+ *     age?: string | null;
+ *     cfRay?: string | null;
+ *     originProtocolMode?: string | null;
+ *     originHttpVersion?: string | null;
+ *     originAlpn?: string | null;
+ *     transport?: string;
+ *     tlsVerification?: string;
+ *     error?: string;
+ * }} LatencySample
  *
- * @typedef {{ name: string; samples: LatencySample[]; summary: LatencySummary; ttfbSummary?: LatencySummary; downloadSummary?: LatencySummary }} LatencyProbeReport
+ *
+ * @typedef {{
+ *     name: string;
+ *     samples: LatencySample[];
+ *     summary: LatencySummary;
+ *     ttfbSummary?: LatencySummary;
+ *     downloadSummary?: LatencySummary;
+ * }} LatencyProbeReport
+ *
  *
  * @typedef {{
  *     count: number;
@@ -210,11 +238,10 @@ async function timedFetch(url, init, timeoutMs, acceptedStatuses) {
 }
 
 /**
- * Direct canonical HTTPS/H2 origin timing probe. The Node client does not trust
- * Cloudflare Origin CA by default, so certificate verification is disabled only
- * for this loopback latency diagnostic; SNI is still set to the configured
- * origin server name. Security posture is validated separately by Cloudflare
- * remote/origin audits where noTLSVerify must remain false.
+ * Direct canonical HTTPS/H2 origin timing probe. The Node client does not trust Cloudflare Origin CA by default, so
+ * certificate verification is disabled only for this loopback latency diagnostic; SNI is still set to the configured
+ * origin server name. Security posture is validated separately by Cloudflare remote/origin audits where noTLSVerify
+ * must remain false.
  *
  * @param {string} url
  * @param {RequestInit} init
@@ -358,12 +385,7 @@ async function timedHttp2OriginRequest(url, init, timeoutMs, servername, accepte
  * @returns {Promise<LatencySample>}
  */
 async function timedJsonRpc(mcpUrl, id, method, params, timeoutMs, options = {}) {
-    return timedFetch(
-        mcpUrl,
-        buildJsonRpcRequest(id, method, params, options),
-        timeoutMs,
-        options.acceptedStatuses,
-    );
+    return timedFetch(mcpUrl, buildJsonRpcRequest(id, method, params, options), timeoutMs, options.acceptedStatuses);
 }
 
 /**

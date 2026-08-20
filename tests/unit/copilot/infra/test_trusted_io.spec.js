@@ -1,8 +1,8 @@
 // @ts-check
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { statPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
@@ -20,9 +20,9 @@ describe('trusted IO facade', () => {
         cleanupPaths.push(root);
         const filePath = join(root, 'state.json');
 
-        await expect(
-            writeFileAtomicTrusted(filePath, '{}', /** @type {any} */ ({ mode: 0o600 })),
-        ).rejects.toThrow('requires a non-empty caller');
+        await expect(writeFileAtomicTrusted(filePath, '{}', /** @type {any} */ ({ mode: 0o600 }))).rejects.toThrow(
+            'requires a non-empty caller',
+        );
         await expect(readFile(filePath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     });
 

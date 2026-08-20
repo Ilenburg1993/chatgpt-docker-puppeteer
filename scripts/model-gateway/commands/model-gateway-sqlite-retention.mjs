@@ -99,7 +99,10 @@ const policy = {
         '--sdk-confirmation-max-rows',
         DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.sdkSessionConfirmationMaxRows,
     ),
-    refreshLogMaxRows: numberFor('--refresh-log-max-rows', DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows),
+    refreshLogMaxRows: numberFor(
+        '--refresh-log-max-rows',
+        DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.refreshLogMaxRows,
+    ),
     runtimeProbeRunMaxRows: numberFor(
         '--runtime-probe-run-max-rows',
         DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.runtimeProbeRunMaxRows,

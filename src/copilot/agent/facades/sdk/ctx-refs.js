@@ -68,9 +68,7 @@ export function getPermissionHandlerRef(ctx) {
 export function getToolRegistryRef(ctx) {
     const safeCtx = /** @type {any} */ (ctx);
     if (typeof safeCtx?.getToolRegistrySnapshot === 'function') {
-        return /** @type {import('#copilot/sdk/types').ToolRegistry | null} */ (
-            safeCtx.getToolRegistrySnapshot()
-        );
+        return /** @type {import('#copilot/sdk/types').ToolRegistry | null} */ (safeCtx.getToolRegistrySnapshot());
     }
     return /** @type {import('#copilot/sdk/types').ToolRegistry | null} */ (safeCtx?.toolsRegistry ?? null);
 }

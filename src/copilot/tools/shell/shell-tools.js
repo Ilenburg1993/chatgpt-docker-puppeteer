@@ -1,6 +1,7 @@
 // @ts-check
 import { defaultAuditLog } from '#copilot/audit';
 import { getShellTimeoutPolicy } from '#copilot/config';
+import { evaluateIoPathPolicyAsync } from '#copilot/core';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
@@ -25,7 +26,6 @@ import { ADVISORY_TIMEOUT_MS, runPipeline, runProcess, splitPipelineSegments, to
  * @see EventBus
  */
 
-import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {
     ALLOWED_EXECUTABLES,
@@ -70,37 +70,16 @@ function resolveTimeoutConfig(timeoutSeconds, enforceTimeout, fallbackSeconds) {
 }
 
 /**
- * Resolve caminho real garantindo restrição ao workspace, sem I/O síncrono.
+ * Resolve caminho real usando a mesma policy canônica aplicada pelas demais capabilities do workspace.
  *
  * @param {string} resolved
  * @returns {Promise<{ ok: true; resolved: string } | { ok: false; reason: string }>}
  */
 async function resolveWorkspaceRealPathSafe(resolved) {
-    let realResolved;
-    try {
-        realResolved = await fs.realpath(resolved);
-    } catch {
-        const parent = path.dirname(resolved);
-        try {
-            const parentReal = await fs.realpath(parent);
-            realResolved = path.join(parentReal, path.basename(resolved));
-        } catch {
-            return { ok: false, reason: `Acesso negado: caminho não resolvível com segurança (${resolved})` };
-        }
-    }
-
-    let rootReal;
-    try {
-        rootReal = await fs.realpath(WORKSPACE_ROOT);
-    } catch {
-        rootReal = WORKSPACE_ROOT;
-    }
-
-    if (!realResolved.startsWith(rootReal + path.sep) && realResolved !== rootReal) {
-        return { ok: false, reason: `Acesso negado: arquivo fora do workspace (${resolved})` };
-    }
-
-    return { ok: true, resolved: realResolved };
+    const policy = await evaluateIoPathPolicyAsync(resolved, { workspaceRoot: WORKSPACE_ROOT, mode: 'read' });
+    return policy.ok
+        ? { ok: true, resolved: policy.realPath }
+        : { ok: false, reason: `Acesso negado: ${policy.reason} (${resolved})` };
 }
 
 /**
@@ -132,17 +111,20 @@ const execCommandTool = buildTool({
             command: z.string().min(1)['describe']('Comando shell a executar (ex: "git status", "ls src/")'),
             cwd: z
                 .string()
-                .optional()['describe'](
+                .optional()
+                ['describe'](
                     'Diretório de trabalho (relativo ao workspace ou absoluto dentro de /workspaces/). Default: raiz do workspace.',
                 ),
             timeoutSeconds: z
                 .number()
                 .int()
                 .min(1)
-                .optional()['describe']('Timeout informativo em segundos. Default histórico: 30.'),
+                .optional()
+                ['describe']('Timeout informativo em segundos. Default histórico: 30.'),
             enforceTimeout: z
                 .boolean()
-                .optional()['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
+                .optional()
+                ['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (
@@ -300,15 +282,18 @@ const runNpmScriptTool = buildTool({
         z.object({
             script: z
                 .string()
-                .min(1)['describe']('Nome do script npm a executar (ex: "lint", "test:unit", "typecheck:node")'),
+                .min(1)
+                ['describe']('Nome do script npm a executar (ex: "lint", "test:unit", "typecheck:node")'),
             timeoutSeconds: z
                 .number()
                 .int()
                 .min(1)
-                .optional()['describe']('Timeout informativo em segundos. Default histórico: 60.'),
+                .optional()
+                ['describe']('Timeout informativo em segundos. Default histórico: 60.'),
             enforceTimeout: z
                 .boolean()
-                .optional()['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
+                .optional()
+                ['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (
@@ -383,16 +368,21 @@ const runNodeFileTool = buildTool({
         z.object({
             filePath: z
                 .string()
-                .min(1)['describe']('Caminho do arquivo .js ou .mjs (relativo ao workspace ou absoluto dentro de /workspaces/)'),
+                .min(1)
+                ['describe'](
+                    'Caminho do arquivo .js ou .mjs (relativo ao workspace ou absoluto dentro de /workspaces/)',
+                ),
             args: z.array(z.string()).optional()['describe']('Argumentos adicionais passados ao script (process.argv)'),
             timeoutSeconds: z
                 .number()
                 .int()
                 .min(1)
-                .optional()['describe']('Timeout informativo em segundos. Default histórico: 30.'),
+                .optional()
+                ['describe']('Timeout informativo em segundos. Default histórico: 30.'),
             enforceTimeout: z
                 .boolean()
-                .optional()['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
+                .optional()
+                ['describe']('Se true, aplica timeout hard nesta execução. Se omitido, usa política runtime.'),
         }),
     ),
     handler: async (

@@ -1,7 +1,7 @@
 // @ts-check
 /** HTTP, OAuth and MCP probe helpers for Cloudflare MCP CLI. */
-import https from 'node:https';
 import { mcpFetchStatus, mcpFetchText, mcpFetchTextWithRetry } from '#copilot/mcp/control-plane';
+import https from 'node:https';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const localInsecureHttpsAgent = new https.Agent({
@@ -13,29 +13,31 @@ const localInsecureHttpsAgent = new https.Agent({
 
 /**
  * @typedef {{
- *   method?: string;
- *   headers?: HeadersInit;
- *   body?: BodyInit | null;
- *   timeoutMs?: number;
- *   attempts?: number;
- *   delayMs?: number;
- *   protocolVersion?: string;
+ *     method?: string;
+ *     headers?: HeadersInit;
+ *     body?: BodyInit | null;
+ *     timeoutMs?: number;
+ *     attempts?: number;
+ *     delayMs?: number;
+ *     protocolVersion?: string;
  * }} ProbeJsonOptions
  *
- * @typedef {{
- *   timeoutMs?: number;
- *   allowInsecureHttps?: boolean;
- *   servername?: string;
- * }} ProbeHealthOptions
  *
  * @typedef {{
- *   ok: boolean;
- *   status: number;
- *   body?: unknown;
- *   rawBody?: string;
- *   headers?: Record<string, string>;
- *   error?: string;
- *   attempts?: number;
+ *     timeoutMs?: number;
+ *     allowInsecureHttps?: boolean;
+ *     servername?: string;
+ * }} ProbeHealthOptions
+ *
+ *
+ * @typedef {{
+ *     ok: boolean;
+ *     status: number;
+ *     body?: unknown;
+ *     rawBody?: string;
+ *     headers?: Record<string, string>;
+ *     error?: string;
+ *     attempts?: number;
  * }} ProbeJsonResult
  */
 
@@ -44,7 +46,9 @@ const localInsecureHttpsAgent = new https.Agent({
  * @returns {Record<string, unknown> | null}
  */
 export function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -105,23 +109,29 @@ export async function probeHealth(url, options = {}) {
  */
 function probeInsecureHttpsHealth(url, options) {
     return new Promise((resolve) => {
-        const request = https.request(url, {
-            method: 'GET',
-            rejectUnauthorized: false,
-            servername: options.servername,
-            agent: localInsecureHttpsAgent,
-        }, (response) => {
-            response.resume();
-            response.on('end', () => {
-                const result = {
-                    ok: Boolean(response.statusCode && response.statusCode >= 200 && response.statusCode < 300),
-                    tlsVerification: 'disabled-local-origin-diagnostic',
-                    ...(response.statusCode === undefined ? {} : { status: response.statusCode }),
-                };
-                resolve(result);
-            });
-        });
-        request.setTimeout(Number(options.timeoutMs ?? 3000), () => request.destroy(new Error('health probe timed out')));
+        const request = https.request(
+            url,
+            {
+                method: 'GET',
+                rejectUnauthorized: false,
+                servername: options.servername,
+                agent: localInsecureHttpsAgent,
+            },
+            (response) => {
+                response.resume();
+                response.on('end', () => {
+                    const result = {
+                        ok: Boolean(response.statusCode && response.statusCode >= 200 && response.statusCode < 300),
+                        tlsVerification: 'disabled-local-origin-diagnostic',
+                        ...(response.statusCode === undefined ? {} : { status: response.statusCode }),
+                    };
+                    resolve(result);
+                });
+            },
+        );
+        request.setTimeout(Number(options.timeoutMs ?? 3000), () =>
+            request.destroy(new Error('health probe timed out')),
+        );
         request.on('error', (error) => {
             resolve({ ok: false, error: error.message, tlsVerification: 'disabled-local-origin-diagnostic' });
         });
@@ -189,14 +199,24 @@ export function parseJsonOrMcpEventStream(rawBody, contentType = '') {
     const text = String(rawBody ?? '').trim();
     if (!text) return { body: null };
     if (contentType.includes('text/event-stream') || text.startsWith('event:') || text.startsWith('data:')) {
-        const data = text.split(/\r?\n/u).filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trim()).find(Boolean);
+        const data = text
+            .split(/\r?\n/u)
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trim())
+            .find(Boolean);
         if (data) return { body: safeJson(data) ?? { eventStreamData: data } };
     }
     return { body: safeJson(text) ?? text };
 }
 
 /** @param {string} text @returns {unknown | null} */
-function safeJson(text) { try { return JSON.parse(text); } catch { return null; } }
+function safeJson(text) {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
 
 /**
  * @param {ProbeJsonResult} probe
@@ -205,8 +225,18 @@ function safeJson(text) { try { return JSON.parse(text); } catch { return null; 
 export function summarizeToolsListProbe(probe) {
     const body = asRecord(probe.body);
     const result = asRecord(body?.['result']);
-    const tools = Array.isArray(result?.['tools']) ? result['tools'] : Array.isArray(body?.['tools']) ? body['tools'] : [];
-    return { ok: probe.ok, status: probe.status, toolCount: tools.length, toolNames: tools.map((tool) => asRecord(tool)?.['name']).filter((name) => typeof name === 'string'), error: probe.error };
+    const tools = Array.isArray(result?.['tools'])
+        ? result['tools']
+        : Array.isArray(body?.['tools'])
+          ? body['tools']
+          : [];
+    return {
+        ok: probe.ok,
+        status: probe.status,
+        toolCount: tools.length,
+        toolNames: tools.map((tool) => asRecord(tool)?.['name']).filter((name) => typeof name === 'string'),
+        error: probe.error,
+    };
 }
 
 /**
@@ -230,10 +260,18 @@ export function extractAuthorizationServer(protectedResource) {
 /**
  * @param {ProbeJsonResult} resourceProbe
  * @param {ProbeJsonResult | { ok: boolean; status?: number; error?: string }} authorizationProbe
- * @returns {{ ok: boolean; protectedResource: ReturnType<typeof summarizeProbeEnvelope>; authorizationServer: ReturnType<typeof summarizeProbeEnvelope> }}
+ * @returns {{
+ *     ok: boolean;
+ *     protectedResource: ReturnType<typeof summarizeProbeEnvelope>;
+ *     authorizationServer: ReturnType<typeof summarizeProbeEnvelope>;
+ * }}
  */
 export function summarizeOAuthReadiness(resourceProbe, authorizationProbe) {
-    return { ok: Boolean(resourceProbe.ok && authorizationProbe.ok), protectedResource: summarizeProbeEnvelope(resourceProbe), authorizationServer: summarizeProbeEnvelope(authorizationProbe) };
+    return {
+        ok: Boolean(resourceProbe.ok && authorizationProbe.ok),
+        protectedResource: summarizeProbeEnvelope(resourceProbe),
+        authorizationServer: summarizeProbeEnvelope(authorizationProbe),
+    };
 }
 
 /**
@@ -249,7 +287,12 @@ export function summarizeProtectedResourceProbe(probe) {
  * @returns {{ ok: boolean; status: number; toolCount: number; checkedAt: string }}
  */
 export function compactPersistedToolsListSummary(summary) {
-    return { ok: summary.ok, status: summary.status, toolCount: summary.toolCount, checkedAt: new Date().toISOString() };
+    return {
+        ok: summary.ok,
+        status: summary.status,
+        toolCount: summary.toolCount,
+        checkedAt: new Date().toISOString(),
+    };
 }
 
 /**
@@ -268,7 +311,9 @@ export function readPositiveIntegerEnv(name, fallback) {
  * @returns {boolean}
  */
 export function readBooleanEnv(name, fallback = false) {
-    const value = String(process.env[name] ?? '').trim().toLowerCase();
+    const value = String(process.env[name] ?? '')
+        .trim()
+        .toLowerCase();
     if (!value) return fallback;
     return ['1', 'true', 'yes', 'on'].includes(value);
 }

@@ -36,6 +36,7 @@ import { registerInvalidationHook } from './io-cache.js';
 import { createStaleSnapshotError } from './io/fs/read-bytes.js';
 import { readTextFileSnapshot } from './io/fs/read-text.js';
 import { statPathSnapshot } from './io/fs/stat.js';
+import { BABEL_PARSER_POLICY_VERSION } from './parse/babel-policy.js';
 import {
     buildOutline,
     extractBabelFileSymbols,
@@ -103,8 +104,7 @@ function readPositiveIntegerEnv(name, fallback) {
  * @returns {{ size: number; source: 'adaptive' | 'configured'; availableParallelism: number }}
  */
 export function resolveParserWorkerPoolPolicy(env = process.env, parallelism = availableParallelism()) {
-    const normalizedParallelism =
-        Number.isFinite(parallelism) && parallelism >= 1 ? Math.floor(parallelism) : 1;
+    const normalizedParallelism = Number.isFinite(parallelism) && parallelism >= 1 ? Math.floor(parallelism) : 1;
     const adaptiveSize = Math.max(1, Math.min(4, normalizedParallelism - 1));
     const configured = String(env['IO_PARSER_WORKER_POOL_SIZE'] ?? '').trim();
     if (!configured) {
@@ -233,11 +233,15 @@ let _parserInvalidationUnregister = null;
  *     workerQueueWaitMsMax: number;
  *     workerRestarts: number;
  *     workerRestartFailures: number;
+ *     workerInitFailures: number;
+ *     workerInitRecoveries: number;
  *     symbolCacheHits: number;
  *     symbolCacheMisses: number;
  *     symbolCacheStale: number;
  *     symbolSnapshotReads: number;
  *     symbolSuppliedSnapshots: number;
+ *     symbolFreshnessChecks: number;
+ *     symbolSnapshotPrechecksAvoided: number;
  *     symbolSnapshotConflicts: number;
  * }}
  */
@@ -256,11 +260,15 @@ const _parserRuntimeStats = {
     workerQueueWaitMsMax: 0,
     workerRestarts: 0,
     workerRestartFailures: 0,
+    workerInitFailures: 0,
+    workerInitRecoveries: 0,
     symbolCacheHits: 0,
     symbolCacheMisses: 0,
     symbolCacheStale: 0,
     symbolSnapshotReads: 0,
     symbolSuppliedSnapshots: 0,
+    symbolFreshnessChecks: 0,
+    symbolSnapshotPrechecksAvoided: 0,
     symbolSnapshotConflicts: 0,
 };
 
@@ -315,6 +323,8 @@ let _workerPoolInitialized = false;
 let _workerPoolDisabledByError = false;
 let _workerPoolShuttingDown = false;
 let _workerPoolGeneration = 0;
+let _workerPoolConsecutiveInitFailures = 0;
+let _workerPoolNextInitAttemptAtMs = 0;
 
 function ensureInvalidationHook() {
     if (_parserInvalidationUnregister) return;
@@ -356,6 +366,7 @@ function ensureInvalidationHook() {
  * @typedef {object} FileSymbols
  * @property {string} filePath - Path do arquivo.
  * @property {string} ext - Extensão (ex.: '.js', '.ts', '.json').
+ * @property {string} parserPolicyVersion - Versão da policy Babel que produziu esta projeção.
  * @property {SymbolEntry[]} symbols - Símbolos declarados/exportados.
  * @property {ImportEntry[]} imports - Imports do arquivo.
  * @property {string[]} exports - Nomes exportados (para ES module exports).
@@ -454,7 +465,9 @@ function makeParserWorkerRuntimeError(message, code) {
  * @returns {string | null}
  */
 function getParserWorkerRuntimeErrorCode(error) {
-    return typeof error === 'object' && error !== null && typeof /** @type {{ code?: unknown }} */ (error).code === 'string'
+    return typeof error === 'object' &&
+        error !== null &&
+        typeof (/** @type {{ code?: unknown }} */ (error).code) === 'string'
         ? /** @type {{ code: string }} */ (error).code
         : null;
 }
@@ -518,10 +531,7 @@ function dispatchQueuedWorkerTask(slot) {
         _workerInFlight.delete(task.id);
         cleanupWorkerTaskAbort(task);
         task.reject(
-            makeParserWorkerRuntimeError(
-                `parser worker timeout (${task.timeoutMs}ms)`,
-                'ERR_IO_PARSER_WORKER_TIMEOUT',
-            ),
+            makeParserWorkerRuntimeError(`parser worker timeout (${task.timeoutMs}ms)`, 'ERR_IO_PARSER_WORKER_TIMEOUT'),
         );
         void restartWorkerSlot(slot);
     }, remainingTimeoutMs);
@@ -669,15 +679,41 @@ async function restartWorkerSlot(slot) {
 }
 
 function ensureWorkerPool() {
-    if (!PARSER_WORKER_ENABLED || _workerPoolDisabledByError || _workerPoolInitialized) return;
-    _workerPoolInitialized = true;
+    if (!PARSER_WORKER_ENABLED || _workerPoolInitialized || _workerPoolShuttingDown) return;
+    const now = Date.now();
+    if (_workerPoolDisabledByError && now < _workerPoolNextInitAttemptAtMs) return;
+
+    /** @type {_WorkerSlot[]} */
+    const provisionalSlots = [];
     try {
         for (let i = 0; i < PARSER_WORKER_POOL_SIZE; i += 1) {
-            _workerPool.push(createWorkerSlot(i));
+            provisionalSlots.push(createWorkerSlot(i));
+        }
+        _workerPool.push(...provisionalSlots);
+        _workerPoolInitialized = true;
+        _workerPoolDisabledByError = false;
+        _workerPoolNextInitAttemptAtMs = 0;
+        if (_workerPoolConsecutiveInitFailures > 0) {
+            _parserRuntimeStats.workerInitRecoveries += 1;
+            _workerPoolConsecutiveInitFailures = 0;
         }
     } catch {
+        // Worker() pode falhar de forma transitória (limite de processo/memória, hot reload, arquivo momentaneamente
+        // indisponível). Não transforme isso em disable permanente nem abandone slots que já foram criados.
+        for (const slot of provisionalSlots) {
+            slot.worker.removeAllListeners();
+            slot.worker.unref?.();
+            void slot.worker.terminate().catch(() => undefined);
+        }
+        _workerPoolInitialized = false;
         _workerPoolDisabledByError = true;
-        _workerPool.length = 0;
+        _workerPoolConsecutiveInitFailures += 1;
+        _parserRuntimeStats.workerInitFailures += 1;
+        const retryIndex = Math.min(
+            _workerPoolConsecutiveInitFailures - 1,
+            PARSER_WORKER_RESTART_BACKOFF_MS.length - 1,
+        );
+        _workerPoolNextInitAttemptAtMs = now + (PARSER_WORKER_RESTART_BACKOFF_MS[retryIndex] ?? 5_000);
     }
 }
 
@@ -809,6 +845,8 @@ async function teardownWorkerPoolForTest() {
     _workerPoolInitialized = false;
     _workerPoolDisabledByError = false;
     _workerPoolShuttingDown = false;
+    _workerPoolConsecutiveInitFailures = 0;
+    _workerPoolNextInitAttemptAtMs = 0;
     _workerRequestSeq = 0;
 }
 
@@ -859,7 +897,8 @@ export async function parseFileSymbols(filePath, content, options = {}) {
     options.signal?.throwIfAborted();
     const ext = nodePath.extname(filePath).toLowerCase();
     const lang = classifyExtension(ext);
-    const parserOptions = lang === 'js' || lang === 'ts' ? resolveBabelParserOptions(filePath, lang) : null;
+    const parserOptions =
+        lang === 'js' || lang === 'ts' ? resolveBabelParserOptions(filePath, lang, { profile: 'symbols' }) : null;
     const bytes = utf8ByteLength(content, 'parser content');
     const truncated = bytes > MAX_PARSE_BYTES;
     const source = truncated ? truncateUtf8String(content, MAX_PARSE_BYTES).text : content;
@@ -870,6 +909,7 @@ export async function parseFileSymbols(filePath, content, options = {}) {
     const base = {
         filePath,
         ext,
+        parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
         symbols: [],
         imports: [],
         exports: [],
@@ -1007,22 +1047,27 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
 
         if (snapshot) {
             _parserRuntimeStats.symbolSuppliedSnapshots += 1;
-            const current = await statPathSnapshot(filePath);
-            options.signal?.throwIfAborted();
-            if (!parserFingerprintMatches(snapshot, current)) {
-                _parserRuntimeStats.symbolSnapshotConflicts += 1;
-                if (attempt <= maxRetries) continue;
-                throw createStaleSnapshotError(filePath, attempt);
-            }
             if (cached && parserFingerprintMatches(cached.fingerprint, snapshot)) {
+                _parserRuntimeStats.symbolFreshnessChecks += 1;
+                const current = await statPathSnapshot(filePath);
+                options.signal?.throwIfAborted();
+                if (!parserFingerprintMatches(snapshot, current)) {
+                    _parserRuntimeStats.symbolSnapshotConflicts += 1;
+                    if (attempt <= maxRetries) continue;
+                    throw createStaleSnapshotError(filePath, attempt);
+                }
                 _parserRuntimeStats.symbolCacheHits += 1;
                 return cached.symbols;
             }
+            // Em cache miss/stale, confirmar antes e depois do parse só duplica syscall no caminho normal. O snapshot
+            // fornecido já nasceu consistente; a confirmação pós-parse abaixo continua sendo a autoridade de freshness.
+            _parserRuntimeStats.symbolSnapshotPrechecksAvoided += 1;
             if (cached) {
                 _parserRuntimeStats.symbolCacheStale += 1;
                 _symbolCache.delete(cacheKey);
             }
         } else if (cached) {
+            _parserRuntimeStats.symbolFreshnessChecks += 1;
             const current = await statPathSnapshot(filePath);
             options.signal?.throwIfAborted();
             if (parserFingerprintMatches(cached.fingerprint, current)) {
@@ -1044,6 +1089,7 @@ export async function parseAndCacheSymbols(filePath, options = {}) {
             options.signal ? { signal: options.signal } : {},
         );
         options.signal?.throwIfAborted();
+        _parserRuntimeStats.symbolFreshnessChecks += 1;
         const current = await statPathSnapshot(filePath);
         options.signal?.throwIfAborted();
         if (!parserFingerprintMatches(snapshot, current)) {
@@ -1078,7 +1124,14 @@ function parserFingerprintFromSnapshot(value) {
 
 /**
  * @param {{ sizeBytes: number; mtimeMs: number; ctimeMs: number; dev: number | bigint; ino: number | bigint }} left
- * @param {{ sizeBytes?: number; size?: number; mtimeMs: number; ctimeMs: number; dev: number | bigint; ino: number | bigint }} right
+ * @param {{
+ *     sizeBytes?: number;
+ *     size?: number;
+ *     mtimeMs: number;
+ *     ctimeMs: number;
+ *     dev: number | bigint;
+ *     ino: number | bigint;
+ * }} right
  */
 function parserFingerprintMatches(left, right) {
     return richFingerprintMatches(
@@ -1264,6 +1317,8 @@ export function windowFileContext(context, options = {}) {
  *     symbolCacheStale: number;
  *     symbolSnapshotReads: number;
  *     symbolSuppliedSnapshots: number;
+ *     symbolFreshnessChecks: number;
+ *     symbolSnapshotPrechecksAvoided: number;
  *     symbolSnapshotConflicts: number;
  * }}
  */
@@ -1309,12 +1364,16 @@ function buildFileContextCacheKey(filePath, content, suppliedContentHash) {
  * @returns {boolean}
  */
 function isFileContextCacheEnabled() {
-    const value = String(process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] ?? '1').trim().toLowerCase();
+    const value = String(process.env['IO_PARSER_FILE_CONTEXT_CACHE_ENABLED'] ?? '1')
+        .trim()
+        .toLowerCase();
     return !FILE_CONTEXT_CACHE_DISABLED_VALUES.has(value);
 }
 
 export function getParserCacheStats() {
     return {
+        parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
+        parserProfile: 'symbols',
         size: _symbolCache.size,
         maxSize: SYMBOL_CACHE_MAX_ENTRIES,
         calculatedSize: _symbolCache.calculatedSize,
@@ -1349,6 +1408,8 @@ export function getParserCacheStats() {
         workerPoolDisabledByError: _workerPoolDisabledByError,
         workerPoolShuttingDown: _workerPoolShuttingDown,
         workerPoolRestarting: _workerPool.filter((slot) => slot.restarting).length,
+        workerPoolConsecutiveInitFailures: _workerPoolConsecutiveInitFailures,
+        workerPoolNextInitAttemptAtMs: _workerPoolNextInitAttemptAtMs || null,
         budgetExceeded: _parserRuntimeStats.budgetExceeded,
         skippedByLineGuard: _parserRuntimeStats.skippedByLineGuard,
         lastParseDurationMs: _parserRuntimeStats.lastParseDurationMs,
@@ -1363,11 +1424,15 @@ export function getParserCacheStats() {
         mainThreadFallbackMaxBytes: PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES,
         workerRestarts: _parserRuntimeStats.workerRestarts,
         workerRestartFailures: _parserRuntimeStats.workerRestartFailures,
+        workerInitFailures: _parserRuntimeStats.workerInitFailures,
+        workerInitRecoveries: _parserRuntimeStats.workerInitRecoveries,
         symbolCacheHits: _parserRuntimeStats.symbolCacheHits,
         symbolCacheMisses: _parserRuntimeStats.symbolCacheMisses,
         symbolCacheStale: _parserRuntimeStats.symbolCacheStale,
         symbolSnapshotReads: _parserRuntimeStats.symbolSnapshotReads,
         symbolSuppliedSnapshots: _parserRuntimeStats.symbolSuppliedSnapshots,
+        symbolFreshnessChecks: _parserRuntimeStats.symbolFreshnessChecks,
+        symbolSnapshotPrechecksAvoided: _parserRuntimeStats.symbolSnapshotPrechecksAvoided,
         symbolSnapshotConflicts: _parserRuntimeStats.symbolSnapshotConflicts,
     };
 }
@@ -1403,11 +1468,15 @@ export async function resetParserCacheForTest(options = {}) {
     _parserRuntimeStats.workerQueueWaitMsMax = 0;
     _parserRuntimeStats.workerRestarts = 0;
     _parserRuntimeStats.workerRestartFailures = 0;
+    _parserRuntimeStats.workerInitFailures = 0;
+    _parserRuntimeStats.workerInitRecoveries = 0;
     _parserRuntimeStats.symbolCacheHits = 0;
     _parserRuntimeStats.symbolCacheMisses = 0;
     _parserRuntimeStats.symbolCacheStale = 0;
     _parserRuntimeStats.symbolSnapshotReads = 0;
     _parserRuntimeStats.symbolSuppliedSnapshots = 0;
+    _parserRuntimeStats.symbolFreshnessChecks = 0;
+    _parserRuntimeStats.symbolSnapshotPrechecksAvoided = 0;
     _parserRuntimeStats.symbolSnapshotConflicts = 0;
     _parserInvalidationUnregister?.();
     _parserInvalidationUnregister = null;

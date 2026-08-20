@@ -28,13 +28,11 @@ const nerv = await createNerv({
 });
 
 // 2. Monitorar a API atual de telemetria e recepção
-nerv.telemetry.on((/** @type {{ type: string, meta?: unknown }} */ event) => {
+nerv.telemetry.on((/** @type {{ type: string; meta?: unknown }} */ event) => {
     console.log(`[NERV TELEMETRY] ${event.type}`, event.meta ?? '');
 });
-nerv.onReceive((/** @type {{ type: { message_type: string, action_code: string } }} */ envelope) => {
-    console.log(
-        `[NERV INBOUND] Recebido envelope tipo: ${envelope.type.message_type}/${envelope.type.action_code}`,
-    );
+nerv.onReceive((/** @type {{ type: { message_type: string; action_code: string } }} */ envelope) => {
+    console.log(`[NERV INBOUND] Recebido envelope tipo: ${envelope.type.message_type}/${envelope.type.action_code}`);
 });
 
 console.log('[DIAGNOSTIC] Transporte híbrido inicializado. Enviando ping em 3 segundos...');

@@ -105,15 +105,11 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('mantém falha de ask_user como pergunta ao operador em vez de tool genérica', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { buildTerminalToolActivityPresentation } = await import(
-            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
-        );
-        const { handleTerminalNativeToolComplete } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { buildTerminalToolActivityPresentation } =
+            await import('../../../../src/copilot/terminal/events/tool-activity-presenter.js');
+        const { handleTerminalNativeToolComplete } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const args = { question: 'ASK-CANONICAL: responda SIM para fechar o teste' };
@@ -154,15 +150,11 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('mantém completion externo de ask_user como pergunta respondida em vez de integração genérica', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { buildTerminalToolActivityPresentation } = await import(
-            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
-        );
-        const { handleTerminalExternalToolCompleted } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { buildTerminalToolActivityPresentation } =
+            await import('../../../../src/copilot/terminal/events/tool-activity-presenter.js');
+        const { handleTerminalExternalToolCompleted } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const args = { question: 'ASK-CANONICAL: responda SIM para fechar o teste' };
@@ -206,9 +198,8 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('renderiza tool.user_requested de request_user_input como pergunta humana sem linha Tool crua', async () => {
-        const { handleTerminalToolUserRequested } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { handleTerminalToolUserRequested } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         handleTerminalToolUserRequested({
             toolName: 'request_user_input',
@@ -251,12 +242,9 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('registra terminal.activity de report_intent com nome humano sem perder lifecycle técnico', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { handleTerminalNativeToolStart, handleTerminalNativeToolComplete } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { handleTerminalNativeToolStart, handleTerminalNativeToolComplete } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const args = { intent: 'auditar UX do terminal' };
@@ -315,12 +303,9 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('mantém alvo de exec_command quando tool.execution_start chega com arguments JSON', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { handleTerminalNativeToolStart } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { handleTerminalNativeToolStart } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
 
@@ -367,12 +352,9 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('redige secrets em partial result antes de emitir tool.lifecycle', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { handleTerminalNativeToolPartialResult } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { handleTerminalNativeToolPartialResult } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const secret = 'sk-supersecret1234567890';
@@ -400,19 +382,15 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('reconcilia postToolUse com exitCode não zero como falha visual da tool', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { buildTerminalToolActivityPresentation } = await import(
-            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
-        );
-        const { reconcileTerminalPostToolUseResult } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { buildTerminalToolActivityPresentation } =
+            await import('../../../../src/copilot/terminal/events/tool-activity-presenter.js');
+        const { reconcileTerminalPostToolUseResult } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const args = {
-            command: "node -e \"console.error('RECOVERABLE-TOOL-ERROR'); process.exit(7)\"",
+            command: 'node -e "console.error(\'RECOVERABLE-TOOL-ERROR\'); process.exit(7)"',
             timeoutSeconds: 10,
         };
         const presentation = buildTerminalToolActivityPresentation({
@@ -477,15 +455,11 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('não imprime sucesso provisório de external_completed para exec_command sem resultado estruturado', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { buildTerminalToolActivityPresentation } = await import(
-            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
-        );
-        const { handleTerminalExternalToolCompleted } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { buildTerminalToolActivityPresentation } =
+            await import('../../../../src/copilot/terminal/events/tool-activity-presenter.js');
+        const { handleTerminalExternalToolCompleted } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const args = { command: 'node -e "process.exit(7)"', timeoutSeconds: 10 };
@@ -529,15 +503,11 @@ describe('terminal/tool-lifecycle-runtime', () => {
     });
 
     it('adia sucesso provisório de patch_file até postToolUse estruturado', async () => {
-        const { createToolCallRegistry } = await import(
-            '../../../../src/copilot/terminal/state/tool-call-registry.js'
-        );
-        const { buildTerminalToolActivityPresentation } = await import(
-            '../../../../src/copilot/terminal/events/tool-activity-presenter.js'
-        );
-        const { handleTerminalExternalToolCompleted, reconcileTerminalPostToolUseResult } = await import(
-            '../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js'
-        );
+        const { createToolCallRegistry } = await import('../../../../src/copilot/terminal/state/tool-call-registry.js');
+        const { buildTerminalToolActivityPresentation } =
+            await import('../../../../src/copilot/terminal/events/tool-activity-presenter.js');
+        const { handleTerminalExternalToolCompleted, reconcileTerminalPostToolUseResult } =
+            await import('../../../../src/copilot/terminal/events/tool-lifecycle-runtime.js');
 
         const registry = createToolCallRegistry();
         const args = {

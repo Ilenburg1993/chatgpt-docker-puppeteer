@@ -13,10 +13,12 @@ import {
 
 type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
-const props = withDefaults(
-    defineProps<{ open?: boolean; title?: string; description?: string; size?: ModalSize }>(),
-    { open: false, title: '', description: '', size: 'md' },
-);
+const props = withDefaults(defineProps<{ open?: boolean; title?: string; description?: string; size?: ModalSize }>(), {
+    open: false,
+    title: '',
+    description: '',
+    size: 'md',
+});
 
 const emit = defineEmits<{ 'update:open': [open: boolean] }>();
 

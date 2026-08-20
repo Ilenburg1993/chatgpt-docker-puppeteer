@@ -15,10 +15,7 @@ import {
     sanitizeFtsQuery,
     shouldIndexFile,
 } from '../../../../src/copilot/infra/index-store/sqlite/index.js';
-import {
-    countPhysicalTextLines,
-    lineNumberAtTextOffset,
-} from '../../../../src/copilot/infra/shared/text-lines.js';
+import { countPhysicalTextLines, lineNumberAtTextOffset } from '../../../../src/copilot/infra/shared/text-lines.js';
 
 describe('infra/index-store/sqlite', () => {
     it('normaliza paths, extensões e filtros de arquivo', () => {

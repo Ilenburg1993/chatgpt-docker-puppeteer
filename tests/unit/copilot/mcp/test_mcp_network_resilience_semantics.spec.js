@@ -23,7 +23,7 @@ describe('MCP network resilience semantics', () => {
             { name: 'cloudflared_tunnel_response_by_code', labels: { code: '202' }, value: 5 },
         ]);
 
-        assert.deepEqual(operational['responseCodes'], { '200': 27, '401': 2, '202': 5 });
+        assert.deepEqual(operational['responseCodes'], { 200: 27, 401: 2, 202: 5 });
         assert.equal(operational['requestErrors'], 4);
     });
 
@@ -32,18 +32,18 @@ describe('MCP network resilience semantics', () => {
             {
                 totalRequests: 134,
                 requestErrors: 25,
-                responseCodes: { '200': 71, '201': 2, '202': 27, '204': 2, '302': 3, '401': 2 },
+                responseCodes: { 200: 71, 201: 2, 202: 27, 204: 2, 302: 3, 401: 2 },
             },
             {
                 totalRequests: 179,
                 requestErrors: 29,
-                responseCodes: { '200': 98, '201': 4, '202': 32, '204': 4, '302': 6, '401': 4 },
+                responseCodes: { 200: 98, 201: 4, 202: 32, 204: 4, 302: 6, 401: 4 },
             },
         );
         assert.deepEqual(delta, {
             totalRequests: 45,
             requestErrors: 4,
-            responseCodes: { '200': 27, '201': 2, '202': 5, '204': 2, '302': 3, '401': 2 },
+            responseCodes: { 200: 27, 201: 2, 202: 5, 204: 2, 302: 3, 401: 2 },
         });
 
         const health = classifyTransportWindow({
@@ -62,8 +62,20 @@ describe('MCP network resilience semantics', () => {
 
         const comparison = buildComparison(
             [
-                { profile: 'quic', smokeLatency: { p95Ms: 1000 }, comparable: true, clean: false, reviewRequired: true },
-                { profile: 'http2', smokeLatency: { p95Ms: 1000 }, comparable: true, clean: false, reviewRequired: true },
+                {
+                    profile: 'quic',
+                    smokeLatency: { p95Ms: 1000 },
+                    comparable: true,
+                    clean: false,
+                    reviewRequired: true,
+                },
+                {
+                    profile: 'http2',
+                    smokeLatency: { p95Ms: 1000 },
+                    comparable: true,
+                    clean: false,
+                    reviewRequired: true,
+                },
             ],
             'quic',
         );

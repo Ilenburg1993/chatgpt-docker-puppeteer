@@ -28,10 +28,10 @@ import {
     createMistralModelsImporter,
     createNvidiaNimModelsImporter,
     createOllamaCatalogImporter,
-    createOpenCodeZenDocsImporter,
-    createOpenCodeZenModelsImporter,
     createOpenAiDocsModelsImporter,
     createOpenAIModelsImporter,
+    createOpenCodeZenDocsImporter,
+    createOpenCodeZenModelsImporter,
     createOpenRouterKeyAccountImporter,
     createOpenRouterModelsImporter,
     createZaiModelsImporter,
@@ -70,9 +70,19 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
     const cerebrasSecret = readEnvSecret(env, ['CEREBRAS_API_KEY', 'CEREBRAS_KEY']);
     const mistralSecret = readEnvSecret(env, ['MISTRAL_API_KEY', 'MISTRAL_KEY']);
     const anthropicSecret = readEnvSecret(env, ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY', 'CLAUDE_API_KEY']);
-    const geminiSecret = readEnvSecret(env, ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY']);
+    const geminiSecret = readEnvSecret(env, [
+        'GEMINI_API_KEY',
+        'GOOGLE_API_KEY',
+        'GOOGLE_GENERATIVE_AI_API_KEY',
+        'GOOGLE_AI_STUDIO_API_KEY',
+    ]);
     const groqSecret = readEnvSecret(env, ['GROQ_API_KEY', 'GROQ_KEY']);
-    const huggingFaceSecret = readEnvSecret(env, ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN', 'HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY']);
+    const huggingFaceSecret = readEnvSecret(env, [
+        'HF_TOKEN',
+        'HUGGINGFACE_API_TOKEN',
+        'HUGGING_FACE_API_KEY',
+        'HUGGING_FACE_KEY',
+    ]);
     const kiloSecret = readEnvSecret(env, ['KILO_API_KEY', 'KILO_CODE_API_KEY', 'KILOCODE_API_KEY']);
     const openCodeSecret = readEnvSecret(env, ['OPENCODE_API_KEY']);
     const nvidiaSecret = readEnvSecret(env, ['NVIDIA_API_KEY', 'NVIDIA_KEY']);
@@ -99,7 +109,9 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                     ? { apiToken: cloudflareSecret.value, secretRef: cloudflareSecret.key }
                     : {}),
                 ...(env['CLOUDFLARE_ACCOUNT_ID'] === undefined ? {} : { accountId: env['CLOUDFLARE_ACCOUNT_ID'] }),
-                ...(env['CLOUDFLARE_AI_GATEWAY_ID'] === undefined ? {} : { gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'] }),
+                ...(env['CLOUDFLARE_AI_GATEWAY_ID'] === undefined
+                    ? {}
+                    : { gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'] }),
             }),
         );
         if (!includeAuthenticated || !huggingFaceSecret) {
@@ -165,7 +177,9 @@ export function createDefaultModelGatewayCatalogImporters(options = {}) {
                 apiToken: cloudflareSecret.value,
                 secretRef: cloudflareSecret.key,
                 accountId: env['CLOUDFLARE_ACCOUNT_ID'],
-                ...(env['CLOUDFLARE_AI_GATEWAY_ID'] === undefined ? {} : { gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'] }),
+                ...(env['CLOUDFLARE_AI_GATEWAY_ID'] === undefined
+                    ? {}
+                    : { gatewayId: env['CLOUDFLARE_AI_GATEWAY_ID'] }),
             }),
         );
     }

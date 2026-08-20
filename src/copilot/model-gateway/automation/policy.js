@@ -8,8 +8,7 @@
  * @module copilot/model-gateway/automation/policy
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { readFile } from 'node:fs/promises';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH =
@@ -323,7 +322,8 @@ export function readModelGatewayRuntimeAutomationPolicy(env = process.env) {
 export async function readModelGatewayRuntimeAutomationPolicyFile(options = {}) {
     const filePath = resolve(options.filePath ?? DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH);
     try {
-        return normalizePolicyPatch(record(JSON.parse(await readFile(filePath, 'utf8'))));
+        const snapshot = await readTextFreshTrusted(filePath, { caller: 'model-gateway.automation.policy' });
+        return normalizePolicyPatch(record(JSON.parse(snapshot.content)));
     } catch (error) {
         if (/** @type {NodeJS.ErrnoException} */ (error)?.code === 'ENOENT') return {};
         throw error;

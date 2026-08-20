@@ -2,8 +2,8 @@
 /**
  * Anthropic authenticated `/v1/models` catalog importer.
  *
- * The Anthropic models endpoint is account-scoped and paginated. It is strong evidence of model availability and release
- * metadata, but does not prove Messages/runtime behavior.
+ * The Anthropic models endpoint is account-scoped and paginated. It is strong evidence of model availability and
+ * release metadata, but does not prove Messages/runtime behavior.
  *
  * @module copilot/model-gateway/catalog/importers/anthropic-models-importer
  */
@@ -112,7 +112,7 @@ function capabilitiesFromModel(providerModel, row) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -132,7 +132,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'displayName', value: stringValue(row['display_name']) ?? providerModel },
         ...Object.entries(aliases).map(([key, value]) => ({ fieldPath: `aliases.${key}`, value })),
         { fieldPath: 'aliases.anthropicModelId', value: providerModel },
-        { fieldPath: 'aliases.anthropicRequestedModel', value: requestedModel && requestedModel !== providerModel ? requestedModel : null },
+        {
+            fieldPath: 'aliases.anthropicRequestedModel',
+            value: requestedModel && requestedModel !== providerModel ? requestedModel : null,
+        },
         ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         { fieldPath: 'providerMetadata.ownedBy', value: 'anthropic' },
@@ -140,9 +143,18 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.anthropic.family', value: family.family },
         { fieldPath: 'providerMetadata.anthropic.tier', value: family.tier },
         { fieldPath: 'providerMetadata.anthropic.generation', value: family.generation },
-        { fieldPath: 'providerMetadata.anthropic.supportsBatch', value: row['supports_batch'] ?? row['supports_batches'] },
-        { fieldPath: 'providerMetadata.anthropic.supportsPromptCaching', value: row['supports_prompt_caching'] ?? row['prompt_caching'] },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        {
+            fieldPath: 'providerMetadata.anthropic.supportsBatch',
+            value: row['supports_batch'] ?? row['supports_batches'],
+        },
+        {
+            fieldPath: 'providerMetadata.anthropic.supportsPromptCaching',
+            value: row['supports_prompt_caching'] ?? row['prompt_caching'],
+        },
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.created', value: stringValue(row['created_at']) },
         { fieldPath: 'openai.owned_by', value: 'anthropic' },
     ];
@@ -155,12 +167,12 @@ function modelEvidenceValues(row) {
  * @param {Record<string, unknown>[]} rows
  * @param {string} apiVersion
  * @param {string | undefined} apiKey
- * @returns {Promise<{ data: Record<string, unknown>[]; detailErrors: Array<{ model: string; status: number }> }>}
+ * @returns {Promise<{ data: Record<string, unknown>[]; detailErrors: { model: string; status: number }[] }>}
  */
 async function fetchAnthropicModelDetails(fetchImpl, baseUrl, rows, apiVersion, apiKey) {
     /** @type {Record<string, unknown>[]} */
     const data = [];
-    /** @type {Array<{ model: string; status: number }>} */
+    /** @type {{ model: string; status: number }[]} */
     const detailErrors = [];
     for (const row of rows) {
         const requestedModel = stringValue(row['id']);
@@ -311,7 +323,9 @@ export function createAnthropicModelsImporter(options = {}) {
         },
         toAccountOverlays(rows, context) {
             const sourceId = stringValue(context.source['id']) ?? 'anthropic-models';
-            const enabledModels = rows.map((row) => stringValue(isRecord(row) ? row['id'] : null)).filter((id) => id !== null);
+            const enabledModels = rows
+                .map((row) => stringValue(isRecord(row) ? row['id'] : null))
+                .filter((id) => id !== null);
             const controls = normalizeAccountOverlayControls({
                 enabledModels,
                 providerMetadata: {

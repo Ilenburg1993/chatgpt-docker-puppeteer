@@ -10,13 +10,13 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-explain.mjs [--json] [--profile ID]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-explain.mjs [--json] [--profile ID]
 
 Explain the current model-gateway automation decision together with the auto doctor. This command is read-only.
 `);
     process.exit(0);
 }
-
 
 /**
  * @param {keyof typeof MODEL_GATEWAY_SCRIPT_PATHS} scriptId
@@ -29,7 +29,11 @@ function runJson(scriptId, scriptArgs = []) {
         maxBuffer: 32 * 1024 * 1024,
     });
     if (result.status !== 0) {
-        return { ok: false, error: result.stderr || result.stdout || `command failed with status ${result.status}`, json: null };
+        return {
+            ok: false,
+            error: result.stderr || result.stdout || `command failed with status ${result.status}`,
+            json: null,
+        };
     }
     try {
         return { ok: true, error: null, json: JSON.parse(result.stdout) };
@@ -62,7 +66,9 @@ if (argSet.has('--json')) {
     process.stdout.write(
         `  decision: action=${decision['action'] ?? '-'} route=${decision['selectedRouteKey'] ?? '-'} ok=${decision['ok'] === true ? 'yes' : 'no'}\n`,
     );
-    process.stdout.write(`  doctor: blockers=${doctor.json?.['blockers']?.length ?? '-'} warnings=${doctor.json?.['warnings']?.length ?? '-'}\n`);
+    process.stdout.write(
+        `  doctor: blockers=${doctor.json?.['blockers']?.length ?? '-'} warnings=${doctor.json?.['warnings']?.length ?? '-'}\n`,
+    );
     for (const [key, error] of Object.entries(summary.failures)) {
         process.stdout.write(`  ${key} failed: ${String(error).slice(0, 500)}\n`);
     }

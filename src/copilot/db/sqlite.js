@@ -24,10 +24,9 @@
 import { resolveWorkspacePath } from '#copilot/boot';
 import { ConfigError, registerShutdownHandler, runShutdown, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
 import Database from 'better-sqlite3';
-import fs from 'node:fs';
-import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
+import { mkdirPathUnlocked } from '../infra/io/fs/mkdir.js';
 import { COPILOT_MIGRATIONS } from './migrations.js';
 
 /**
@@ -179,17 +178,6 @@ function getCopilotDb() {
 
     const dbPath = resolveCopilotDbPath();
 
-    // Não tenta criar diretório para :memory:
-    if (dbPath !== ':memory:') {
-        const dir = path.dirname(dbPath);
-        try {
-            fs.mkdirSync(dir, { recursive: true });
-        } catch (err) {
-            log('ERROR', `[CopilotDB] Failed to create directory: ${dir} — ${toError(err).message ?? String(err)}`);
-            throw err;
-        }
-    }
-
     const db = new Database(dbPath);
     applyPragmas(db);
     migrate(db);
@@ -257,15 +245,20 @@ function registerExitHandler() {
 }
 
 /**
- * F93: Garante que o diretório do banco exista via fs/promises. Chamar no boot (antes de getCopilotDb) para evitar
- * mkdirSync no lazy init.
+ * Garante que o diretório do banco exista pela primitive low-level de namespace. O DB não pode depender das facades
+ * públicas de IO porque essas facades alimentam journal/L2 que, por sua vez, dependem do próprio DB. O boot chama esta
+ * etapa antes de getCopilotDb(); getCopilotDb permanece síncrono e não materializa diretórios implicitamente.
  *
  * @returns {Promise<void>}
  */
 async function ensureCopilotDbDir() {
     const dbPath = resolveCopilotDbPath();
     if (dbPath === ':memory:') return;
-    await mkdir(path.dirname(dbPath), { recursive: true });
+    await mkdirPathUnlocked(path.dirname(dbPath), {
+        recursive: true,
+        mode: 0o700,
+        durability: 'file-and-directory',
+    });
 }
 
 export { closeCopilotDb, ensureCopilotDbDir, getCopilotDb, resolveCopilotDbPath };

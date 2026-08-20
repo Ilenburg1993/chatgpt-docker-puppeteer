@@ -21,10 +21,7 @@ import {
     listDirectoryTool,
     readFileContentTool,
 } from '../../../../../src/copilot/tools/file/read-tools.js';
-import {
-    searchInFilesTool,
-    workspaceSymbolSearchTool,
-} from '../../../../../src/copilot/tools/search/index.js';
+import { searchInFilesTool, workspaceSymbolSearchTool } from '../../../../../src/copilot/tools/search/index.js';
 
 /**
  * Extract handler from buildTool result

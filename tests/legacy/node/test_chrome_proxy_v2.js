@@ -4,13 +4,16 @@ console.log('[TEST] ChromeProxyService v2.0 - Starting tests...\n');
 
 import ChromeProxyService from '#infra/proxy/chromeProxyService';
 
-/** @typedef {{
+/**
+ * @typedef {{
  *     state: string;
  *     onFailure: () => void;
  *     call: <T>(operation: () => Promise<T>) => Promise<T>;
- * }} CircuitBreakerTestPort */
+ * }} CircuitBreakerTestPort
+ */
 
-/** @typedef {{
+/**
+ * @typedef {{
  *     circuitBreaker: CircuitBreakerTestPort;
  *     rewriteWebSocketURL: (data: string, host: string) => string;
  *     _getCORSHeaders: (request: { headers: { origin?: string } }) => Record<string, string>;
@@ -19,7 +22,8 @@ import ChromeProxyService from '#infra/proxy/chromeProxyService';
  *     _incrementMetric: (metric: { inc: (...args: unknown[]) => void }, labels: Record<string, unknown>) => void;
  *     config: { PUBLIC_IP: string };
  *     _getDockerInternalIP: () => string | null;
- * }} ChromeProxyTestPort */
+ * }} ChromeProxyTestPort
+ */
 
 /** @param {unknown} error @returns {string} */
 function errorMessage(error) {

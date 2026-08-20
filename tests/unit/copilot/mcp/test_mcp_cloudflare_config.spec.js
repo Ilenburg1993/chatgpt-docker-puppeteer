@@ -7,18 +7,18 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
-    buildTemporaryConnectorUrl,
-    DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS,
-    extractTryCloudflareUrl,
     buildManagedTunnelArgs,
     buildQuickTunnelArgs,
+    buildTemporaryConnectorUrl,
     DEFAULT_CLOUDFLARE_PUBLIC_URL,
+    DEFAULT_QUICK_TUNNEL_STALE_AFTER_MS,
+    extractTryCloudflareUrl,
     normalizeOriginUrl,
     normalizePublicHostname,
-    normalizeStateFile,
     normalizeStaleAfterMs,
-    normalizeTunnelMode,
+    normalizeStateFile,
     normalizeTransportProtocol,
+    normalizeTunnelMode,
     readCloudflareTunnelConfig,
     validateConfiguredPublicUrl,
 } from '#copilot/mcp/cloudflare';
@@ -134,7 +134,10 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
 
     it('requires the public hostname to be the zone or a real subdomain', () => {
         assert.equal(normalizePublicHostname(undefined, 'workspace-mcp-dev', 'aurelin.org'), 'mcp.aurelin.org');
-        assert.equal(normalizePublicHostname('https://mcp.aurelin.org/mcp', 'workspace-mcp-dev', 'aurelin.org'), 'mcp.aurelin.org');
+        assert.equal(
+            normalizePublicHostname('https://mcp.aurelin.org/mcp', 'workspace-mcp-dev', 'aurelin.org'),
+            'mcp.aurelin.org',
+        );
         assert.equal(normalizePublicHostname('aurelin.org', 'workspace-mcp-dev', 'aurelin.org'), 'aurelin.org');
         assert.throws(
             () => normalizePublicHostname('evilaurelin.org', 'workspace-mcp-dev', 'aurelin.org'),
@@ -170,8 +173,7 @@ describe('copilot MCP Cloudflare Tunnel config', () => {
     });
 
     it('extracts and normalizes temporary trycloudflare connector URLs', () => {
-        const text =
-            'Your quick Tunnel has been created! Visit it at https://alpha-beta-gamma.trycloudflare.com';
+        const text = 'Your quick Tunnel has been created! Visit it at https://alpha-beta-gamma.trycloudflare.com';
         assert.equal(extractTryCloudflareUrl(text), 'https://alpha-beta-gamma.trycloudflare.com');
         assert.equal(
             buildTemporaryConnectorUrl('https://alpha-beta-gamma.trycloudflare.com'),

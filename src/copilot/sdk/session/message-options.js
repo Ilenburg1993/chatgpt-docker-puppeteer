@@ -2,8 +2,8 @@
 /**
  * Contrato local canônico para `MessageOptions` do @github/copilot-sdk.
  *
- * A intenção deste módulo é falhar cedo, com feedback acionável, antes de
- * deixar o SDK receber payloads ambíguos ou parcialmente inválidos.
+ * A intenção deste módulo é falhar cedo, com feedback acionável, antes de deixar o SDK receber payloads ambíguos ou
+ * parcialmente inválidos.
  *
  * @module copilot/sdk/session/message-options
  */
@@ -72,9 +72,7 @@ function requireFiniteNumber(value, field) {
 function assertKnownKeys(obj, allowed, context) {
     const unknown = Object.keys(obj).filter((key) => !allowed.has(key));
     if (unknown.length > 0) {
-        throw new TypeError(
-            `[sdk/message-options] ${context} contém campo(s) desconhecido(s): ${unknown.join(', ')}.`,
-        );
+        throw new TypeError(`[sdk/message-options] ${context} contém campo(s) desconhecido(s): ${unknown.join(', ')}.`);
     }
 }
 

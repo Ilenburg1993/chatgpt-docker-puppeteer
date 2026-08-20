@@ -2,11 +2,13 @@
 /**
  * Kilo Gateway authenticated account importer.
  *
- * Kilo documents public model/provider catalogs and runtime error semantics, but not a stable standalone account/balance
- * endpoint. This importer therefore stays conservative: it authenticates against `/models`, decodes only non-sensitive
- * JWT claims locally, and records explicit account-policy fields only when the endpoint returns them.
+ * Kilo documents public model/provider catalogs and runtime error semantics, but not a stable standalone
+ * account/balance endpoint. This importer therefore stays conservative: it authenticates against `/models`, decodes
+ * only non-sensitive JWT claims locally, and records explicit account-policy fields only when the endpoint returns
+ * them.
  *
  * Sources checked 2026-05-26:
+ *
  * - https://kilo.ai/docs/gateway/authentication
  * - https://kilo.ai/docs/gateway/models-and-providers
  * - https://kilo.ai/docs/gateway/api-reference
@@ -96,7 +98,10 @@ function sanitizeKiloValue(value) {
  */
 function decodeJwtJsonSegment(segment) {
     try {
-        const padded = segment.replace(/-/gu, '+').replace(/_/gu, '/').padEnd(Math.ceil(segment.length / 4) * 4, '=');
+        const padded = segment
+            .replace(/-/gu, '+')
+            .replace(/_/gu, '/')
+            .padEnd(Math.ceil(segment.length / 4) * 4, '=');
         const parsed = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
         return isRecord(parsed) ? parsed : null;
     } catch {
@@ -159,7 +164,9 @@ function providerModel(row) {
  */
 function isFreeModel(row) {
     const id = providerModel(row) ?? '';
-    return row['isFree'] === true || id.includes(':free') || id === 'openrouter/free' || id.startsWith('kilo-auto/free');
+    return (
+        row['isFree'] === true || id.includes(':free') || id === 'openrouter/free' || id.startsWith('kilo-auto/free')
+    );
 }
 
 /**
@@ -270,15 +277,21 @@ export function parseKiloGatewayAccountRows(raw) {
 
 /**
  * @param {Record<string, unknown>} raw
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function providerEvidenceValues(raw) {
     const token = isRecord(raw['tokenClaims']) ? raw['tokenClaims'] : {};
     const rows = modelRows(raw);
     const account = accountRecord(raw);
     const explicitRows = rows.filter(hasExplicitAccessField);
-    const enabled = rows.filter((row) => explicitAccess(row) === 'enabled').map(providerModel).filter(Boolean);
-    const blocked = rows.filter((row) => explicitAccess(row) === 'blocked').map(providerModel).filter(Boolean);
+    const enabled = rows
+        .filter((row) => explicitAccess(row) === 'enabled')
+        .map(providerModel)
+        .filter(Boolean);
+    const blocked = rows
+        .filter((row) => explicitAccess(row) === 'blocked')
+        .map(providerModel)
+        .filter(Boolean);
     return [
         { fieldPath: 'providerMetadata.kilo.accountApi.authenticatedModelsStatus', value: raw['modelsStatus'] },
         { fieldPath: 'providerMetadata.kilo.accountApi.visibleModelCount', value: rows.length },
@@ -322,8 +335,10 @@ export function createKiloGatewayAccountImporter(options = {}) {
         refreshPolicy: 'manual',
         ttlSeconds: 900,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Kilo Gateway account import');
-            if (!options.apiKey) throw new Error('KILO_API_KEY or KILO_CODE_API_KEY is required for Kilo Gateway account import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Kilo Gateway account import');
+            if (!options.apiKey)
+                throw new Error('KILO_API_KEY or KILO_CODE_API_KEY is required for Kilo Gateway account import');
             const headers = {
                 accept: 'application/json',
                 authorization: `Bearer ${options.apiKey}`,
@@ -337,7 +352,8 @@ export function createKiloGatewayAccountImporter(options = {}) {
             } catch (error) {
                 body = { parseError: error instanceof Error ? error.message : 'unknown response parse error' };
             }
-            if (!response.ok) throw new Error(`Kilo Gateway authenticated models fetch failed with HTTP ${response.status}`);
+            if (!response.ok)
+                throw new Error(`Kilo Gateway authenticated models fetch failed with HTTP ${response.status}`);
             return {
                 tokenClaims: decodeKiloJwtClaims(options.apiKey),
                 organizationIdConfigured: Boolean(options.organizationId),

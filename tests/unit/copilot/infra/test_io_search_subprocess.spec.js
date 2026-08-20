@@ -43,7 +43,7 @@ describe('infra/io/search/subprocess', () => {
             process.execPath,
             [
                 '-e',
-                "let i = 0; const t = setInterval(() => { console.log(`line-${i++}`); if (i > 100) clearInterval(t); }, 1);",
+                'let i = 0; const t = setInterval(() => { console.log(`line-${i++}`); if (i > 100) clearInterval(t); }, 1);',
             ],
             {
                 collectStdout: false,
@@ -66,7 +66,7 @@ describe('infra/io/search/subprocess', () => {
             process.execPath,
             [
                 '-e',
-                "process.stdout.write(Buffer.from([0xf0, 0x9f])); setTimeout(() => process.stdout.write(Buffer.from([0x98, 0x80, 0x0a])), 20);",
+                'process.stdout.write(Buffer.from([0xf0, 0x9f])); setTimeout(() => process.stdout.write(Buffer.from([0x98, 0x80, 0x0a])), 20);',
             ],
             { onStdoutLine: (line) => void lines.push(line) },
         );

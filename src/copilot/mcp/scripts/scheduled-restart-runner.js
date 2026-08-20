@@ -8,11 +8,11 @@
  * @module copilot/mcp/scripts/scheduled-restart-runner
  */
 
-import { spawn } from 'node:child_process';
-import process from 'node:process';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { spawn } from 'node:child_process';
+import { dirname, resolve } from 'node:path';
+import process from 'node:process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
@@ -49,7 +49,7 @@ function parseArgs(argv) {
     /** @param {string} name */
     const read = (name) => {
         const index = argv.indexOf(name);
-        return index >= 0 ? argv[index + 1] ?? '' : '';
+        return index >= 0 ? (argv[index + 1] ?? '') : '';
     };
     const requestId = read('--request-id');
     const profile = read('--profile');
@@ -125,7 +125,12 @@ async function main() {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     main().catch(async (error) => {
         try {
-            await writeState({ schemaVersion: 1, status: 'failed', completedAt: Date.now(), error: error instanceof Error ? error.message : String(error) });
+            await writeState({
+                schemaVersion: 1,
+                status: 'failed',
+                completedAt: Date.now(),
+                error: error instanceof Error ? error.message : String(error),
+            });
         } catch {
             // Best effort: there is no safe recovery path if the fixed state file itself cannot be written.
         }

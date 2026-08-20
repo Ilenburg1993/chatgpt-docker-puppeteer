@@ -8,11 +8,12 @@
  * @module copilot/mcp/scripts/docs-contract-check
  */
 
-import { readFile, stat } from 'node:fs/promises';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = process.cwd();
+const docsWorkspaceIo = createWorkspaceIo({ workspaceRoot: ROOT });
 const ACTIVE_DOCS = Object.freeze([
     'src/copilot/README.md',
     'src/copilot/agent/README.md',
@@ -31,7 +32,7 @@ const FORBIDDEN_ACTIVE_REFERENCES = Object.freeze([
  * @returns {Promise<string>}
  */
 async function readWorkspaceText(path) {
-    return readFile(resolve(ROOT, path), 'utf8');
+    return (await docsWorkspaceIo.readTextFresh(resolve(ROOT, path), { includeHash: false })).content;
 }
 
 /**
@@ -40,7 +41,7 @@ async function readWorkspaceText(path) {
  */
 async function pathExists(path) {
     try {
-        await stat(resolve(ROOT, path));
+        await docsWorkspaceIo.statPath(resolve(ROOT, path));
         return true;
     } catch {
         return false;
@@ -48,10 +49,10 @@ async function pathExists(path) {
 }
 
 /**
- * @returns {Promise<{ success: boolean; checks: Array<{ name: string; passed: boolean; detail: string }> }>}
+ * @returns {Promise<{ success: boolean; checks: { name: string; passed: boolean; detail: string }[] }>}
  */
 export async function runDocsContractCheck() {
-    /** @type {Array<{ name: string; passed: boolean; detail: string }>} */
+    /** @type {{ name: string; passed: boolean; detail: string }[]} */
     const checks = [];
 
     const docs = new Map();

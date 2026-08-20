@@ -12,11 +12,10 @@
  * @see EventBus
  */
 
-import { readFile } from 'node:fs/promises';
 import { logSwallowed, toError } from '#copilot/core/error-handlers';
 import { safeJsonParse } from '#copilot/core/safe-json';
 import { ToolsConfigSchema } from '#copilot/core/schemas';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 
@@ -51,7 +50,7 @@ export function resetToolsConfigForTests() {
  */
 export async function loadToolsConfigAsync() {
     try {
-        const raw = await readFile(TOOLS_CONFIG_PATH, 'utf8');
+        const raw = (await readTextFreshTrusted(TOOLS_CONFIG_PATH, { caller: 'sdk.tools.state' })).content;
         const jsonResult = safeJsonParse(raw, '[tools-state/loadToolsConfigAsync]');
         if (!jsonResult.ok) {
             log('WARN', '[tools-state] tools-config.json JSON inválido — mantendo defaults.');

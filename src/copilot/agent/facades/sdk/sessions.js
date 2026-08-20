@@ -12,10 +12,10 @@ import {
     createSession,
     deleteSession,
     getConfiguredSessionFsHandler,
-    readConfiguredSessionFsState,
     listSessions,
-    resumeSession,
+    readConfiguredSessionFsState,
     resumeOrCreate,
+    resumeSession,
 } from '#copilot/sdk/session';
 import { log } from '../../ports/logging/index.js';
 import { requireClient } from './core/index.js';
@@ -79,7 +79,9 @@ export async function deleteAgentSdkSessionByClient(client, sessionId) {
 /**
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {Record<string, unknown>} options
- * @returns {Promise<import('../../../sdk/session/lifecycle.js').SessionResult<import('#copilot/sdk/types').CopilotSession>>}
+ * @returns {Promise<
+ *     import('../../../sdk/session/lifecycle.js').SessionResult<import('#copilot/sdk/types').CopilotSession>
+ * >}
  */
 export async function createAgentSdkSessionByClient(client, options) {
     return createSession(client, options);
@@ -104,7 +106,9 @@ export function readAgentConfiguredSessionFsState(sessionId) {
  * @param {import('#copilot/sdk/types').CopilotClient} client
  * @param {string | null | undefined} sessionId
  * @param {Record<string, unknown>} options
- * @returns {Promise<import('../../../sdk/session/lifecycle.js').SessionResult<import('#copilot/sdk/types').CopilotSession>>}
+ * @returns {Promise<
+ *     import('../../../sdk/session/lifecycle.js').SessionResult<import('#copilot/sdk/types').CopilotSession>
+ * >}
  */
 export async function resumeOrCreateAgentSdkSession(client, sessionId, options) {
     if (options['requireSameSession'] === true) {

@@ -13,9 +13,9 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
+import { createPermissionHandler } from '#copilot/sdk/session';
 import { createErrorHandler } from '../error-handler.js';
 import { log } from '../logger.js';
-import { createPermissionHandler } from '#copilot/sdk/session';
 
 /**
  * @typedef {import('../types.js').SessionHooks} SessionHooks

@@ -6,10 +6,7 @@ import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, it } from 'vitest';
 
-import {
-    appendMcpLatencyDashboardSnapshot,
-    readMcpLatencyDashboardHistory,
-} from '#copilot/mcp/control-plane';
+import { appendMcpLatencyDashboardSnapshot, readMcpLatencyDashboardHistory } from '#copilot/mcp/control-plane';
 
 describe('MCP latency history persistence', () => {
     it('serializes concurrent append/trim cycles without losing the retained tail', async () => {

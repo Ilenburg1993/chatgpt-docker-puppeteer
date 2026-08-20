@@ -63,8 +63,7 @@ export function utf8ByteLength(value, label = 'utf8 text') {
  */
 function isArrayBufferStorage(value) {
     return (
-        value instanceof ArrayBuffer ||
-        (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer)
+        value instanceof ArrayBuffer || (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer)
     );
 }
 

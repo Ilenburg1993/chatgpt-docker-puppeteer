@@ -1102,8 +1102,7 @@ Transformações aplicadas:
   - métricas de convergência são emitidas por dependência de telemetry
     (`sdkTelemetry.emitOperationMetric`).
 - A decisão `sdk↔fs` foi exposta para presentation por um adapter dedicado
-  (`presentation/files/routing.js`), removendo acoplamento indevido de frontend terminal com
-  `core`.
+  (`presentation/files/routing.js`), removendo acoplamento indevido de frontend terminal com `core`.
 - `session-setup.js` passou a aplicar policy dinâmica de tool em runtime mesmo quando denylist,
   allowlist e exclusões default estão vazias. Isso mantém a regra operacional: **nenhum
   limite/default bloqueia a LLM-B**, mas o operador ainda pode desabilitar tools dinamicamente.

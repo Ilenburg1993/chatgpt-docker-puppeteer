@@ -22,6 +22,7 @@ const SESSION_ID_SAFE_PATTERN = /^[\x21-\x7e]+$/u;
 /**
  * @typedef {'client_delete' | 'ttl_expired' | 'server_shutdown' | 'auth_mismatch' | 'runtime_error' | 'replaced'} McpHttpSessionTerminateReason
  *
+ *
  * @typedef {object} McpHttpSessionPolicy
  * @property {boolean} enabled
  * @property {boolean} requested
@@ -85,8 +86,12 @@ export function readMcpHttpStatefulSessionPolicy(env = process.env) {
     const explicitFalse = raw === 'false' || raw === '0' || raw === 'no' || raw === 'off' || raw === 'disabled';
     const oauthEnforcementRequiresStateful =
         !explicitFalse &&
-        String(env['COPILOT_MCP_AUTH_MODE'] ?? '').trim().toLowerCase() === 'oauth' &&
-        String(env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? '').trim().toLowerCase() === 'all';
+        String(env['COPILOT_MCP_AUTH_MODE'] ?? '')
+            .trim()
+            .toLowerCase() === 'oauth' &&
+        String(env['COPILOT_MCP_AUTH_ENFORCEMENT'] ?? '')
+            .trim()
+            .toLowerCase() === 'all';
     const requested = explicitTrue || oauthEnforcementRequiresStateful;
     const statelessCompat = readBooleanEnv(env, 'COPILOT_MCP_HTTP_STATELESS_COMPAT', false);
     const enabled = requested && !statelessCompat;
@@ -123,7 +128,8 @@ function buildMcpHttpSessionRuntime(options = {}) {
     const ttlMs = normalizePositiveInteger(options.ttlMs, DEFAULT_MCP_HTTP_SESSION_TTL_MS, 10_000);
     const maxSessions = normalizePositiveInteger(options.maxSessions, DEFAULT_MCP_HTTP_MAX_SESSIONS, 1);
     const now = options.now ?? (() => Date.now());
-    const sessionIdSecret = options.sessionIdSecret || process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] || DEFAULT_SESSION_ID_SECRET;
+    const sessionIdSecret =
+        options.sessionIdSecret || process.env['COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET'] || DEFAULT_SESSION_ID_SECRET;
     const store = options.store === undefined ? null : options.store;
     /** @type {Map<string, McpHttpLiveSessionEntry>} */
     const sessions = new Map();
@@ -404,7 +410,10 @@ function sanitizeAuthBinding(value) {
         resource: boundedString(input['resource'], 512),
         audience: boundedString(input['audience'], 512),
         scopes: Array.isArray(input['scopes'])
-            ? input['scopes'].map((item) => boundedString(item, 128)).filter(Boolean).slice(0, 64)
+            ? input['scopes']
+                  .map((item) => boundedString(item, 128))
+                  .filter(Boolean)
+                  .slice(0, 64)
             : [],
     };
 }
@@ -428,7 +437,8 @@ function sanitizeTransportBinding(value) {
  * @returns {void}
  */
 function closeLiveObject(object) {
-    const close = object && typeof object === 'object' ? /** @type {Record<string, unknown>} */ (object)['close'] : null;
+    const close =
+        object && typeof object === 'object' ? /** @type {Record<string, unknown>} */ (object)['close'] : null;
     if (typeof close !== 'function') return;
     try {
         void close.call(object);

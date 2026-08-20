@@ -7,8 +7,6 @@
 
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
-import { WORKSPACE_ROOT } from '#copilot/tools';
-import { z } from 'zod';
 import {
     errorResult,
     getMcpWorkspaceRoot,
@@ -19,6 +17,8 @@ import {
     resolveValidatorCommand,
     resolveWritePath,
 } from '#copilot/mcp/control-plane';
+import { WORKSPACE_ROOT } from '#copilot/tools';
+import { z } from 'zod';
 
 const { readTextValidated, statPath } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
@@ -144,7 +144,10 @@ export const repoPlanTools = [
             path: z.string().min(1)['describe']('Workspace-relative file path to plan.'),
             content: z.string().optional()['describe']('Planned initial content. Default: empty string.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
-            includeDiffPreview: z.boolean().optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
+            includeDiffPreview: z
+                .boolean()
+                .optional()
+                ['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, content, maxDiffLines, includeDiffPreview }) => {
@@ -184,10 +187,21 @@ export const repoPlanTools = [
             replace_all: z.boolean().optional()['describe']('Plan replacing every occurrence. Default: false.'),
             diffContextLines: z.number().int().min(0).max(20).optional()['describe']('Context lines in diff preview.'),
             maxDiffLines: z.number().int().min(1).max(2000).optional()['describe']('Maximum diff preview lines.'),
-            includeDiffPreview: z.boolean().optional()['describe']('Include textual diffPreview in the tool result. Default: false.'),
+            includeDiffPreview: z
+                .boolean()
+                .optional()
+                ['describe']('Include textual diffPreview in the tool result. Default: false.'),
         },
         annotations: readOnlyAnnotations(),
-        handler: async ({ path, old_string, new_string, replace_all, diffContextLines, maxDiffLines, includeDiffPreview }) => {
+        handler: async ({
+            path,
+            old_string,
+            new_string,
+            replace_all,
+            diffContextLines,
+            maxDiffLines,
+            includeDiffPreview,
+        }) => {
             const resolved = await resolveReadPath(path, { issueReadCapability: true });
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readTextValidated(resolved.validatedReadPath);
@@ -337,12 +351,16 @@ export const repoPlanTools = [
         title: 'Plan MCP validation',
         description: 'Plan validation escalation; defaults to inspect-first and no validator.',
         inputSchema: {
-            suite: z.enum(['mcp-fast', 'mcp-full', 'copilot-fast']).optional()['describe']('Explicit broad escalation.'),
+            suite: z
+                .enum(['mcp-fast', 'mcp-full', 'copilot-fast'])
+                .optional()
+                ['describe']('Explicit broad escalation.'),
             testFile: z
                 .string()
                 .min(1)
                 .max(1024)
-                .optional()['describe']('Explicit tests/unit/copilot/**/*.spec.js path.'),
+                .optional()
+                ['describe']('Explicit tests/unit/copilot/**/*.spec.js path.'),
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ suite, testFile }) => {

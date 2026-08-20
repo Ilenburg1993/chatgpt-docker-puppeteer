@@ -37,8 +37,10 @@
  *         | undefined;
  *     pauseDialogLoop?: ((sessionId: string | null) => Promise<void>) | undefined;
  *     isDialogLoopPaused?: (() => boolean) | undefined;
- *     getDialogUsageMetricsSnapshot?: (() => import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null) | undefined;
- *     getDialogPrMetricsSnapshot?: (() => import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null) | undefined;
+ *     getDialogUsageMetricsSnapshot?:
+ *         (() => import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null) | undefined;
+ *     getDialogPrMetricsSnapshot?:
+ *         (() => import('../dialog/state/cost-ledger.js').DialogCostLedgerSnapshot | null) | undefined;
  *     getLastPrInfoSnapshot?:
  *         | (() => { model?: string; cost?: number; quotaSnapshots?: Record<string, unknown>; ts: number } | null)
  *         | undefined;

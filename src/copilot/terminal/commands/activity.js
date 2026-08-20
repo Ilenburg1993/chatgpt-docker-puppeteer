@@ -1,17 +1,7 @@
 // @ts-check
 
-import { readTerminalIoActivityProjection } from '../events/projections/index.js';
-import { renderTerminalQuestionActivityPhaseLabel } from '../events/presenters/question/index.js';
 import { renderTerminalTraceSummaryTitle } from '../events/index.js';
-import { readTerminalActivityProjection, readTerminalConfigProjection } from '../frontend/index.js';
-import {
-    formatTerminalElapsedDuration,
-    formatTerminalTimeLabel,
-    terminalThemeDivider,
-    terminalThemeHeadline,
-    terminalThemeRow,
-    terminalThemeWrappedRow,
-} from '../state/ui/index.js';
+import { renderTerminalQuestionActivityPhaseLabel } from '../events/presenters/question/index.js';
 import {
     buildTerminalToolActivityPresentation,
     compactTerminalDiagnosticId,
@@ -21,6 +11,16 @@ import {
     humanizeTerminalToolSurfaceText,
     isTerminalInternalCallIdentifier,
 } from '../events/presenters/tools/index.js';
+import { readTerminalIoActivityProjection } from '../events/projections/index.js';
+import { readTerminalActivityProjection, readTerminalConfigProjection } from '../frontend/index.js';
+import {
+    formatTerminalElapsedDuration,
+    formatTerminalTimeLabel,
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeRow,
+    terminalThemeWrappedRow,
+} from '../state/ui/index.js';
 
 /**
  * @typedef {{ println: (text: string) => void }} ActivityContext
@@ -291,11 +291,21 @@ function renderToolSummary(tool, opts) {
 }
 
 /**
- * @param {Array<{ path: string; operation: string; source?: string | null; count?: number; updatedAt?: number }>} files
- * @returns {Array<{ path: string; operation: string; source?: string | null; count?: number; updatedAt?: number }>}
+ * @param {{ path: string; operation: string; source?: string | null; count?: number; updatedAt?: number }[]} files
+ * @returns {{ path: string; operation: string; source?: string | null; count?: number; updatedAt?: number }[]}
  */
 function aggregateTurnTraceFiles(files) {
-    /** @type {Map<string, { path: string; operation: string; source?: string | null; count?: number; updatedAt?: number; repeatedRows: number }>} */
+    /** @type {Map<
+    string,
+    {
+        path: string;
+        operation: string;
+        source?: string | null;
+        count?: number;
+        updatedAt?: number;
+        repeatedRows: number;
+    }
+>} */
     const groups = new Map();
     for (const file of files) {
         const displayPath = formatTerminalToolPathForOperator(file.path);
@@ -378,8 +388,7 @@ function isHumanInteractionTurnTool(tool) {
 function printTurnTraceSummary(println, title, trace, opts) {
     const tools = /** @type {any[]} */ (Array.isArray(trace.tools) ? trace.tools : []);
     const userInputs = /** @type {any[]} */ (Array.isArray(trace.userInputs) ? trace.userInputs : []);
-    const visibleTools =
-        userInputs.length > 0 ? tools.filter((tool) => !isHumanInteractionTurnTool(tool)) : tools;
+    const visibleTools = userInputs.length > 0 ? tools.filter((tool) => !isHumanInteractionTurnTool(tool)) : tools;
     const rawToolCount = Math.max(Number(trace.toolCount ?? 0), tools.length);
     const hiddenHumanToolCount = Math.max(0, tools.length - visibleTools.length);
     const aggregatedFiles = aggregateTurnTraceFiles(Array.isArray(trace.files) ? trace.files : []);
@@ -408,7 +417,12 @@ function printTurnTraceSummary(println, title, trace, opts) {
         );
     }
     if (opts.detail) {
-        println(terminalThemeRow('Trace', compactTerminalDiagnosticId(trace.traceId) ?? String(trace.traceId ?? 'sem trace')));
+        println(
+            terminalThemeRow(
+                'Trace',
+                compactTerminalDiagnosticId(trace.traceId) ?? String(trace.traceId ?? 'sem trace'),
+            ),
+        );
     }
 
     if (aggregatedFiles.length > 0) {
@@ -448,7 +462,8 @@ function printTurnTraceSummary(println, title, trace, opts) {
                     ? ` · opções ${userInput.choices.join('|')}`
                     : '';
             const answer = userInput.answerPreview ? ` · resposta ${userInput.answerPreview}` : '';
-            const requestId = opts.detail && userInput.requestId ? ` · req=${compactTerminalDiagnosticId(userInput.requestId)}` : '';
+            const requestId =
+                opts.detail && userInput.requestId ? ` · req=${compactTerminalDiagnosticId(userInput.requestId)}` : '';
             const source = opts.detail ? ` · ${renderSourceLabel(userInput.source ?? 'sdk')}` : '';
             println(
                 terminalThemeRow(
@@ -467,7 +482,13 @@ function printTurnTraceSummary(println, title, trace, opts) {
  * @returns {any | null}
  */
 function pickMostUsefulRecentTurnTrace(recent) {
-    return pickRecentFailedTurnTrace(recent) ?? pickRecentOperationalTurnTrace(recent) ?? pickRecentHumanTurnTrace(recent) ?? recent[0] ?? null;
+    return (
+        pickRecentFailedTurnTrace(recent) ??
+        pickRecentOperationalTurnTrace(recent) ??
+        pickRecentHumanTurnTrace(recent) ??
+        recent[0] ??
+        null
+    );
 }
 
 /**
@@ -556,7 +577,8 @@ function printStreamDiagnostics(println, diagnostics) {
         for (const entry of diagnostics.recent.slice(0, 5)) {
             const ts = formatTerminalTimeLabel(entry.timestamp, { mode: 'dual' });
             if (entry.kind === 'delta') {
-                const role = entry.action === 'suppressed' ? 'warn' : entry.action === 'normalized' ? 'assistant' : 'muted';
+                const role =
+                    entry.action === 'suppressed' ? 'warn' : entry.action === 'normalized' ? 'assistant' : 'muted';
                 println(
                     terminalThemeRow(
                         'Delta',
@@ -637,7 +659,11 @@ export function cmdActivity({ println }, arg) {
     if (latestCompletedTurnTrace && latestCompletedTurnTrace.traceId !== activeTurnTrace?.traceId) {
         printTurnTraceSummary(
             println,
-            renderTerminalTraceSummaryTitle('Último turno concluído', 'Atividade operacional recente', latestCompletedTurnTrace),
+            renderTerminalTraceSummaryTitle(
+                'Último turno concluído',
+                'Atividade operacional recente',
+                latestCompletedTurnTrace,
+            ),
             latestCompletedTurnTrace,
             { detail },
         );
@@ -659,8 +685,8 @@ export function cmdActivity({ println }, arg) {
                 typeof entry.bytesRead === 'number'
                     ? ` · ${renderBytes(entry.bytesRead)} lidos`
                     : typeof entry.bytesWritten === 'number'
-                    ? ` · ${renderBytes(entry.bytesWritten)} escritos`
-                    : '';
+                      ? ` · ${renderBytes(entry.bytesWritten)} escritos`
+                      : '';
             const duration = typeof entry.durationMs === 'number' ? ` · ${entry.durationMs}ms` : '';
             const engine = entry.engine ? ` · ${entry.engine}` : '';
             const engineDetail = detail ? engine : '';

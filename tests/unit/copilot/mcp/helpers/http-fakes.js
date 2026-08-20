@@ -3,31 +3,36 @@
  * Structural HTTP fakes for MCP adapter tests.
  *
  * These deliberately model only the protocol surface consumed by the MCP HTTP adapters. Tests that need a real Node
- * socket/server continue to use node:http directly; adapter unit tests should not cast plain records to ServerResponse.
+ * socket/server continue to use node:http directly; adapter unit tests should not cast plain records to
+ * ServerResponse.
  */
 
 /**
  * @typedef {{
- *   method: string;
- *   headers: Record<string, string>;
- *   httpVersionMajor: number;
+ *     method: string;
+ *     headers: Record<string, string>;
+ *     httpVersionMajor: number;
  * }} FakeMcpHttpRequest
+ *
  * @typedef {{
- *   headersSent: boolean;
- *   writableEnded: boolean;
- *   statusCode: number;
- *   body: string;
- *   headers: Record<string, string>;
- *   setHeader: (name: string, value: string | number | readonly string[]) => void;
- *   write: (chunk: unknown) => void;
- *   end: () => void;
+ *     headersSent: boolean;
+ *     writableEnded: boolean;
+ *     statusCode: number;
+ *     body: string;
+ *     headers: Record<string, string>;
+ *     setHeader: (name: string, value: string | number | readonly string[]) => void;
+ *     write: (chunk: unknown) => void;
+ *     end: () => void;
  * }} FakeMcpHttpResponse
+ *
  * @typedef {{ error: string; error_description: string }} FakeMcpTransportError
+ *
  * @typedef {{ statusCode: number; error: FakeMcpTransportError }} CapturedMcpTransportError
+ *
  * @typedef {{
- *   handleRequest?: (req: FakeMcpHttpRequest, res: FakeMcpHttpResponse, body?: unknown) => Promise<void> | void;
- *   close?: () => Promise<void> | void;
- *   send?: (message: unknown) => Promise<unknown> | unknown;
+ *     handleRequest?: (req: FakeMcpHttpRequest, res: FakeMcpHttpResponse, body?: unknown) => Promise<void> | void;
+ *     close?: () => Promise<void> | void;
+ *     send?: (message: unknown) => Promise<unknown> | unknown;
  * }} FakeMcpTransportHandlers
  */
 

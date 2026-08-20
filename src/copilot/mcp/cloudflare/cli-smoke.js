@@ -1,13 +1,29 @@
 // @ts-check
 /** Cloudflare MCP smoke orchestration. */
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
+import {
+    buildToolsListSmokeHeaders,
+    extractAuthorizationServer,
+    probeJsonWithRetry,
+    readSmokeBearerToken,
+    summarizeOAuthReadiness,
+    summarizeProbeEnvelope,
+    summarizeToolsListProbe,
+} from './cli-probe.js';
 import { writeConnectorSmokeState } from './state.js';
-import { buildToolsListSmokeHeaders, extractAuthorizationServer, probeJsonWithRetry, readSmokeBearerToken, summarizeOAuthReadiness, summarizeProbeEnvelope, summarizeToolsListProbe } from './cli-probe.js';
 
 const DEFAULT_MCP_PROTOCOL_VERSION = '2025-11-25';
 const DEFAULT_SMOKE_ATTEMPTS = 3;
 const DEFAULT_SMOKE_DELAY_MS = 1_000;
-const DEFAULT_CRITICAL_TOOL_NAMES = ['repo_status', 'repo_tree', 'repo_read_file', 'repo_search_text', 'repo_apply_file_batch', 'mcp_runtime_health', 'mcp_tunnel_status'];
+const DEFAULT_CRITICAL_TOOL_NAMES = [
+    'repo_status',
+    'repo_tree',
+    'repo_read_file',
+    'repo_search_text',
+    'repo_apply_file_batch',
+    'mcp_runtime_health',
+    'mcp_tunnel_status',
+];
 
 /**
  * @param {{
@@ -33,9 +49,7 @@ export async function runCloudflareSmoke({
     const probeOptions = { attempts: smokeAttempts, delayMs: smokeDelayMs };
     const bearerToken = authenticated ? readSmokeBearerToken(env) : null;
     if (authenticated && !bearerToken) {
-        throw new Error(
-            'Authenticated Cloudflare smoke requires a valid COPILOT_MCP_SMOKE_BEARER_TOKEN.',
-        );
+        throw new Error('Authenticated Cloudflare smoke requires a valid COPILOT_MCP_SMOKE_BEARER_TOKEN.');
     }
     const startedAt = Date.now();
     const discoveryStartedAt = Date.now();
@@ -45,7 +59,12 @@ export async function runCloudflareSmoke({
         probeJsonWithRetry(connectorUrl, {
             method: 'POST',
             headers: buildToolsListSmokeHeaders(bearerToken, { protocolVersion }),
-            body: JSON.stringify({ jsonrpc: '2.0', id: 'cloudflare-smoke-tools-list', method: 'tools/list', params: {} }),
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 'cloudflare-smoke-tools-list',
+                method: 'tools/list',
+                params: {},
+            }),
             ...probeOptions,
         }),
     ]);
@@ -53,7 +72,10 @@ export async function runCloudflareSmoke({
     const authorizationServer = extractAuthorizationServer(protectedResource);
     const authorizationStartedAt = Date.now();
     const authorization = authorizationServer
-        ? await probeJsonWithRetry(new URL('/.well-known/oauth-authorization-server', authorizationServer).toString(), probeOptions)
+        ? await probeJsonWithRetry(
+              new URL('/.well-known/oauth-authorization-server', authorizationServer).toString(),
+              probeOptions,
+          )
         : { ok: false, error: 'missing-authorization-server' };
     const authorizationServerMs = Date.now() - authorizationStartedAt;
     const tools = summarizeToolsListProbe(toolsList);
@@ -135,7 +157,9 @@ function readPositiveIntegerEnv(env, name, fallback, minimum, maximum) {
  * @returns {string}
  */
 function resolveConnectorUrl(config, env) {
-    const explicit = String(env['COPILOT_MCP_SMOKE_URL'] ?? env['COPILOT_MCP_PUBLIC_URL'] ?? config.publicMcpUrl ?? '').trim();
+    const explicit = String(
+        env['COPILOT_MCP_SMOKE_URL'] ?? env['COPILOT_MCP_PUBLIC_URL'] ?? config.publicMcpUrl ?? '',
+    ).trim();
     if (explicit) return explicit;
     throw new Error('Smoke requires COPILOT_MCP_SMOKE_URL, COPILOT_MCP_PUBLIC_URL, or configured public URL.');
 }
@@ -161,13 +185,23 @@ function summarizeCriticalTools(toolNames, env, localToolNames) {
  */
 function readExpectedCriticalTools(env) {
     return String(env['COPILOT_MCP_CRITICAL_TOOLS'] ?? '').trim()
-        ? String(env['COPILOT_MCP_CRITICAL_TOOLS']).split(',').map((item) => item.trim()).filter(Boolean)
+        ? String(env['COPILOT_MCP_CRITICAL_TOOLS'])
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean)
         : DEFAULT_CRITICAL_TOOL_NAMES;
 }
 
 /**
  * @param {NodeJS.ProcessEnv} env
- * @returns {{ ok: true; expected: string[]; missing: string[]; unknownExpected: string[]; skipped: true; reason: string }}
+ * @returns {{
+ *     ok: true;
+ *     expected: string[];
+ *     missing: string[];
+ *     unknownExpected: string[];
+ *     skipped: true;
+ *     reason: string;
+ * }}
  */
 function summarizeSkippedCriticalTools(env) {
     return {
@@ -184,7 +218,13 @@ function summarizeSkippedCriticalTools(env) {
  * @param {{ status?: number; headers?: Record<string, string> }} probe
  * @param {ReturnType<typeof readMcpAuthConfig>} authConfig
  * @param {boolean} authenticated
- * @returns {{ ok: boolean; expected: boolean; status: number | null; wwwAuthenticatePresent: boolean; reason: string | null }}
+ * @returns {{
+ *     ok: boolean;
+ *     expected: boolean;
+ *     status: number | null;
+ *     wwwAuthenticatePresent: boolean;
+ *     reason: string | null;
+ * }}
  */
 function summarizeExpectedAuthChallenge(probe, authConfig, authenticated) {
     const protectedByOauth = authConfig.mode !== 'none-dev' && authConfig.enforcement !== 'off';

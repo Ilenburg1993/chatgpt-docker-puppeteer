@@ -3,15 +3,15 @@
  * Protocol-level proof for MCP Apps resource registration.
  */
 
-import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'vitest';
 
-import { createCopilotMcpServer } from '../../../../src/copilot/mcp/server.js';
 import { COMPANY_KNOWLEDGE_WIDGET_URI } from '#copilot/mcp/tools';
+import { createCopilotMcpServer } from '../../../../src/copilot/mcp/server.js';
 
-/** @type {Array<{ close: () => Promise<void> | void }>} */
+/** @type {{ close: () => Promise<void> | void }[]} */
 const closeables = [];
 
 afterEach(async () => {

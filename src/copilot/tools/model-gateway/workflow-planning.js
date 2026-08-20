@@ -217,7 +217,12 @@ function normalizeWorkflowCandidate(candidate, rank) {
 
 /**
  * @param {Record<string, any>} routeData
- * @param {{ candidateModelIds?: string[]; providerId?: string | null; maxCandidates: number; probeStrategy?: string }} input
+ * @param {{
+ *     candidateModelIds?: string[];
+ *     providerId?: string | null;
+ *     maxCandidates: number;
+ *     probeStrategy?: string;
+ * }} input
  * @returns {Record<string, any>[]}
  */
 export function buildWorkflowProbeCandidateChain(routeData, input) {
@@ -274,15 +279,15 @@ export function buildWorkflowProbeCandidateChain(routeData, input) {
 
 /**
  * @param {{
- *   runtimeId?: string | null;
- *   taskProfile: string;
- *   selectionGoal: string;
- *   requireRuntimeProof: boolean;
- *   maxRuntimeProofAgeHours: number;
- *   currentModel: string | null;
- *   discoveryRoute: Record<string, any> | null;
- *   provedRoute: Record<string, any> | null;
- *   candidates: Record<string, any>[];
+ *     runtimeId?: string | null;
+ *     taskProfile: string;
+ *     selectionGoal: string;
+ *     requireRuntimeProof: boolean;
+ *     maxRuntimeProofAgeHours: number;
+ *     currentModel: string | null;
+ *     discoveryRoute: Record<string, any> | null;
+ *     provedRoute: Record<string, any> | null;
+ *     candidates: Record<string, any>[];
  * }} input
  * @returns {WorkflowSelectionDecision}
  */
@@ -386,7 +391,10 @@ export function buildWorkflowSelectionDecision(input) {
                   : status === 'probe_required'
                     ? 'Sonde somente a candidata #1 atual; depois descarte este ranking e execute o workflow novamente, independentemente de sucesso ou falha.'
                     : 'Inspecione blockers, catálogo e credenciais; não enfraqueça restrições silenciosamente.',
-        alternatives: input.candidates.slice(0, 4).map(explainCandidate).filter((candidate) => candidate !== null),
+        alternatives: input.candidates
+            .slice(0, 4)
+            .map(explainCandidate)
+            .filter((candidate) => candidate !== null),
     };
     return {
         status,

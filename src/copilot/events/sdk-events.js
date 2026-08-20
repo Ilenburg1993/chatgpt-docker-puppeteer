@@ -11,7 +11,6 @@
  * @module copilot/events/sdk-events
  */
 
-export { SESSION_EVENTS } from '../sdk/constants.js';
 export {
     ALL_EVENT_TYPES,
     getSessionCapabilities,
@@ -29,3 +28,4 @@ export {
     onSessionEvent,
     onSessionEvents,
 } from '#copilot/sdk/session';
+export { SESSION_EVENTS } from '../sdk/constants.js';

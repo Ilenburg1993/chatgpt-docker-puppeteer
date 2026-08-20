@@ -16,10 +16,10 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { modelGatewayScriptPath } from '../index.mjs';
-import { classifyModelGatewayTerminalStartupBlocker } from './model-gateway-terminal-live-blocker.mjs';
 import { parseModelGatewayAdaptiveSelectionOutcome } from '../../../src/copilot/model-gateway/control-plane/adaptive-selection-outcome.js';
 import { resolveModelGatewayAdmissionCandidateSelectionPolicy } from '../../../src/copilot/model-gateway/control-plane/runtime-admission-policy.js';
+import { modelGatewayScriptPath } from '../index.mjs';
+import { classifyModelGatewayTerminalStartupBlocker } from './model-gateway-terminal-live-blocker.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const DEFAULT_TIMEOUT_MS = 180_000;
@@ -54,6 +54,7 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
 
 /**
  * @typedef {{ answer: string; trigger: 'ask'; delayMs: number }} LiveScenarioAnswerStep
+ *
  * @typedef {{
  *     name: string;
  *     renderedName: string;
@@ -61,7 +62,11 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     allowFocusTransitions?: boolean;
  *     minSuccessfulCalls?: number;
  * }} LiveScenarioLifecycleTool
+ *
+ *
  * @typedef {{ toolName: string; renderedName: string; badge: string; forbiddenBadge: string }} LiveScenarioTerminalRender
+ *
+ *
  * @typedef {{
  *     id: string;
  *     description: string;
@@ -82,6 +87,8 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     invalidChoiceExpected?: boolean;
  *     recoverableToolErrorExpected?: boolean;
  * }} LiveScenarioInput
+ *
+ *
  * @typedef {{
  *     id: string;
  *     description: string;
@@ -107,8 +114,12 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     postAskFinalRe: RegExp;
  *     finalAnswerRe: RegExp;
  * }} LiveScenario
+ *
+ *
  * @typedef {{ canonical: LiveScenario; [id: string]: LiveScenario }} LiveScenarioMap
+ *
  * @typedef {Record<string, string | undefined>} StringEnv
+ *
  * @typedef {{
  *     preset?: string | undefined;
  *     providerType?: string | undefined;
@@ -120,7 +131,10 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     apiKey?: string | undefined;
  *     model?: string | undefined;
  * }} ByokProfile
+ *
+ *
  * @typedef {Record<string, ByokProfile>} ByokProfileMap
+ *
  * @typedef {{
  *     routeProfile?: string;
  *     sourceRouteProfile?: string;
@@ -140,12 +154,16 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     runtimeObservedOnly?: boolean;
  *     runtimeEvidence?: Record<string, unknown>;
  * }} RuntimeSelectedRoute
+ *
+ *
  * @typedef {{
  *     profileId?: string;
  *     status?: string;
  *     reasons?: string[];
  *     selected?: RuntimeSelectedRoute;
  * }} RuntimeSelectorRoute
+ *
+ *
  * @typedef {{
  *     ok?: boolean;
  *     runtimeExecuted?: boolean;
@@ -161,15 +179,29 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     };
  *     routeDecisionPersistence?: { attempted?: boolean; ok?: boolean; written?: number; error?: string };
  *     runtimeProbePersistence?: {
- *         attempted?: boolean; ok?: boolean; runId?: string; probeResults?: number; skippedResults?: number;
- *         successCount?: number; failureCount?: number; error?: string;
+ *         attempted?: boolean;
+ *         ok?: boolean;
+ *         runId?: string;
+ *         probeResults?: number;
+ *         skippedResults?: number;
+ *         successCount?: number;
+ *         failureCount?: number;
+ *         error?: string;
  *     };
  *     runtimeHealthPersistence?: {
- *         attempted?: boolean; ok?: boolean; runId?: string; records?: number; healthObservations?: number;
- *         probeResults?: number; skippedRecords?: number; error?: string;
+ *         attempted?: boolean;
+ *         ok?: boolean;
+ *         runId?: string;
+ *         records?: number;
+ *         healthObservations?: number;
+ *         probeResults?: number;
+ *         skippedRecords?: number;
+ *         error?: string;
  *     };
  *     runtimeSelectorPlan?: { routes?: RuntimeSelectorRoute[] };
  * }} RuntimeSelectorSummary
+ *
+ *
  * @typedef {{
  *     requested: boolean;
  *     ok: boolean;
@@ -183,12 +215,18 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     selectedRoute: RuntimeSelectorRoute | null;
  *     error: string | null;
  * }} RuntimeSelectorLiveResult
+ *
+ *
  * @typedef {{ id: string; pass: boolean; detail?: string | undefined; required?: boolean; severity?: string }} LiveCriterion
+ *
+ *
  * @typedef {{
  *     id: string;
  *     detail?: string;
  *     outcome?: ReturnType<typeof parseModelGatewayAdaptiveSelectionOutcome>;
  * }} LiveBlocker
+ *
+ *
  * @typedef {{
  *     content?: string;
  *     chunk?: string;
@@ -230,6 +268,8 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     runtimeProofRequired?: boolean;
  *     [key: string]: unknown;
  * }} EventPayload
+ *
+ *
  * @typedef {{
  *     id?: number | string | null;
  *     eventId?: number | string;
@@ -239,6 +279,8 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     turnId?: string | number;
  *     traceId?: string;
  * }} TerminalEvent
+ *
+ *
  * @typedef {{
  *     connected: boolean;
  *     eventCount: number;
@@ -252,7 +294,10 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     statusCode?: number | null;
  *     disabled?: boolean;
  * }} SseSummary
+ *
+ *
  * @typedef {{ attempted?: boolean; recorded?: boolean; ok?: boolean; reason?: string }} RecordStatus
+ *
  * @typedef {{
  *     readonly raw: string;
  *     events: TerminalEvent[];
@@ -260,6 +305,8 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     close: () => void;
  *     summary: () => SseSummary;
  * }} SseCollector
+ *
+ *
  * @typedef {{
  *     ok: boolean;
  *     detail: string;
@@ -272,7 +319,11 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     envelopes: { source: string; traceId: string | null; turnId: string | null; eventId: string | null }[];
  *     content: string;
  * }} ExportSummary
+ *
+ *
  * @typedef {{ line: string; waitBeforeMs?: number; advanceAfterMs?: number; waitFor?: string | RegExp | null }} LiveCommandEntry
+ *
+ *
  * @typedef {{
  *     id: string;
  *     label: string;
@@ -283,7 +334,17 @@ const LIVE_BLOCKING_PROBE_KINDS = Object.freeze([
  *     lastSessionId?: string;
  *     transport: string;
  * }} SessionCycleBootResult
- * @typedef {{ outDir: string; requestedTransport: string; timeoutMs: number; terminalPort: number; startedAt: string }} RunCycleOptions
+ *
+ *
+ * @typedef {{
+ *     outDir: string;
+ *     requestedTransport: string;
+ *     timeoutMs: number;
+ *     terminalPort: number;
+ *     startedAt: string;
+ * }} RunCycleOptions
+ *
+ *
  * @typedef {{
  *     liveScenario?: LiveScenario;
  *     answerSent?: boolean;
@@ -381,8 +442,7 @@ function hasCommand(/** @type {string} */ name) {
 const HUMAN_TERMINAL_SHUTDOWN_RE = /Terminal\s+fechado; API local permanece ativa até o processo encerrar/u;
 const LEGACY_TERMINAL_SHUTDOWN_RE = /\[terminal\]\s+(?:readline fechado|Encerrando sessão)/iu;
 const LIVE_TEST_COPILOT_MODEL = process.env['COPILOT_LIVE_TEST_COPILOT_MODEL'] || 'auto';
-const MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL =
-    process.env['COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL'] || 'auto';
+const MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL = process.env['COPILOT_MODEL_GATEWAY_CONTROL_PLANE_MODEL'] || 'auto';
 
 function hasHumanTerminalShutdownCopy(/** @type {unknown} */ plain) {
     const text = String(plain ?? '');
@@ -476,7 +536,9 @@ function findDivergentScenarioAsk(
     if (scenario.askRenderedRe.test(text)) return null;
     const prefix = scenario.askQuestion.split(':')[0];
     if (!prefix) return null;
-    const match = text.match(new RegExp(`\\[(?:PERGUNTA|ASK)\\]\\s+(?<question>${escapeRegExp(prefix)}[^\\n\\r]*)`, 'iu'));
+    const match = text.match(
+        new RegExp(`\\[(?:PERGUNTA|ASK)\\]\\s+(?<question>${escapeRegExp(prefix)}[^\\n\\r]*)`, 'iu'),
+    );
     const question = match?.groups?.['question']?.trim() ?? '';
     if (!question || question === scenario.askQuestion) return null;
     return {
@@ -695,7 +757,8 @@ const LIVE_SCENARIOS = Object.freeze({
         id: 'model-gateway-tools-readonly',
         description: 'model-gateway control-plane guide e workflow planner via tool calls reais read-only',
         askQuestion: 'ASK-MODEL-GATEWAY-TOOLS: responda SIM depois das tools read-only',
-        finalMarker: 'POST-ASK-MODEL-GATEWAY-TOOLS-FINAL: tools model-gateway read-only concluídas e usuário confirmou SIM',
+        finalMarker:
+            'POST-ASK-MODEL-GATEWAY-TOOLS-FINAL: tools model-gateway read-only concluídas e usuário confirmou SIM',
         answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
         beforeDeltaInstructions: [
             'Depois do read_file_content, invoque a ferramenta real model_gateway_control_plane_guide com objective="same_session_switch", includeTerminalCommands=true e includeApplyExamples=true.',
@@ -738,8 +801,7 @@ const LIVE_SCENARIOS = Object.freeze({
         id: 'model-gateway-adaptive-probe',
         description: 'LLM-B seleciona e prova adaptativamente a melhor rota repo_agent sem promover antes da prova',
         askQuestion: 'ASK-MODEL-GATEWAY-ADAPTIVE: responda SIM depois da seleção adaptativa',
-        finalMarker:
-            'POST-ASK-MODEL-GATEWAY-ADAPTIVE-FINAL: seleção adaptativa concluída e usuário confirmou SIM',
+        finalMarker: 'POST-ASK-MODEL-GATEWAY-ADAPTIVE-FINAL: seleção adaptativa concluída e usuário confirmou SIM',
         answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
         beforeDeltaInstructions: [
             'Você é o operador real de seleção do terminal:llm-b. Há autorização explícita para consumir chamadas BYOK necessárias. Não otimize por custo; otimize pela melhor rota plenamente funcional para repo_agent.',
@@ -912,12 +974,28 @@ const LIVE_SCENARIOS = Object.freeze({
         ],
         expectedLifecycleTools: [
             { name: 'model_gateway_overview', renderedName: 'Model Gateway overview', allowFocusTransitions: true },
-            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway', allowFocusTransitions: true },
+            {
+                name: 'model_gateway_operation_status',
+                renderedName: 'Status de operação Model Gateway',
+                allowFocusTransitions: true,
+            },
             { name: 'model_gateway_model_switch', renderedName: 'Trocar modelo runtime', allowFocusTransitions: true },
             { name: 'model_gateway_route_switch', renderedName: 'Trocar rota runtime', allowFocusTransitions: true },
-            { name: 'model_gateway_runtime_reconcile', renderedName: 'Reconciliar runtime de modelo', allowFocusTransitions: true },
-            { name: 'model_gateway_catalog_refresh', renderedName: 'Atualizar catálogo de modelos', allowFocusTransitions: true },
-            { name: 'model_gateway_maintenance', renderedName: 'Manutenção Model Gateway', allowFocusTransitions: true },
+            {
+                name: 'model_gateway_runtime_reconcile',
+                renderedName: 'Reconciliar runtime de modelo',
+                allowFocusTransitions: true,
+            },
+            {
+                name: 'model_gateway_catalog_refresh',
+                renderedName: 'Atualizar catálogo de modelos',
+                allowFocusTransitions: true,
+            },
+            {
+                name: 'model_gateway_maintenance',
+                renderedName: 'Manutenção Model Gateway',
+                allowFocusTransitions: true,
+            },
             { name: 'model_gateway_profile_manage', renderedName: 'Gerir perfil BYOK', allowFocusTransitions: true },
         ],
         expectedOutputMarkers: [
@@ -936,8 +1014,7 @@ const LIVE_SCENARIOS = Object.freeze({
         id: 'model-gateway-route-apply-minimal',
         description: 'route_switch plan/apply mínimo prova deferimento seguro de reattach durante tool-turn ativo',
         askQuestion: 'ASK-MODEL-GATEWAY-ROUTE-APPLY: responda SIM depois do route_switch mínimo',
-        finalMarker:
-            'POST-ASK-MODEL-GATEWAY-ROUTE-APPLY-FINAL: route_switch mínimo concluído e usuário confirmou SIM',
+        finalMarker: 'POST-ASK-MODEL-GATEWAY-ROUTE-APPLY-FINAL: route_switch mínimo concluído e usuário confirmou SIM',
         answerSteps: [{ answer: 'SIM', trigger: 'ask', delayMs: 500 }],
         beforeDeltaInstructions: [
             'Autorização humana explícita para este teste: execute somente model_gateway_overview, model_gateway_operation_status e model_gateway_route_switch conforme listado. Não chame model_gateway_model_switch, model_gateway_runtime_reconcile, model_gateway_catalog_refresh, model_gateway_maintenance nem model_gateway_profile_manage.',
@@ -985,20 +1062,12 @@ const LIVE_SCENARIOS = Object.freeze({
                 minSuccessfulCalls: 2,
             },
         ],
-        postAnswerCommands: [
-            '/byok',
-            '/activity 40',
-        ],
+        postAnswerCommands: ['/byok', '/activity 40'],
         // A route apply is deliberately deferred to the turn boundary. Keep this first turn free of a
         // human question, then leave the process alive long enough for the scheduler to reattach.
         deferAskUntilDeltaContinuation: true,
         postCompletionGraceMs: 15_000,
-        expectedOutputMarkers: [
-            'operation.inspect',
-            'route.switch',
-            'deferred_until_turn_boundary',
-            'same_session',
-        ],
+        expectedOutputMarkers: ['operation.inspect', 'route.switch', 'deferred_until_turn_boundary', 'same_session'],
         expectedPlainOutputMarkers: ['Rota efetiva  ollama-cloud · qwen3-coder-next'],
     }),
     'model-gateway-admin-apply': createLiveScenario({
@@ -1041,9 +1110,21 @@ const LIVE_SCENARIOS = Object.freeze({
         ],
         expectedLifecycleTools: [
             { name: 'model_gateway_overview', renderedName: 'Model Gateway overview', allowFocusTransitions: true },
-            { name: 'model_gateway_operation_status', renderedName: 'Status de operação Model Gateway', allowFocusTransitions: true },
-            { name: 'model_gateway_catalog_refresh', renderedName: 'Atualizar catálogo de modelos', allowFocusTransitions: true },
-            { name: 'model_gateway_maintenance', renderedName: 'Manutenção Model Gateway', allowFocusTransitions: true },
+            {
+                name: 'model_gateway_operation_status',
+                renderedName: 'Status de operação Model Gateway',
+                allowFocusTransitions: true,
+            },
+            {
+                name: 'model_gateway_catalog_refresh',
+                renderedName: 'Atualizar catálogo de modelos',
+                allowFocusTransitions: true,
+            },
+            {
+                name: 'model_gateway_maintenance',
+                renderedName: 'Manutenção Model Gateway',
+                allowFocusTransitions: true,
+            },
             { name: 'model_gateway_profile_manage', renderedName: 'Gerir perfil BYOK', allowFocusTransitions: true },
         ],
         expectedOutputMarkers: [
@@ -1124,15 +1205,13 @@ function buildMissingRequiredAskRecoveryPrompt(/** @type {LiveScenario} */ scena
     ].join(' ');
 }
 
-function scenarioSpecificRecoveryInstructions(
-    /** @type {LiveScenario} */ scenario,
-    /** @type {string} */ toolName,
-) {
-    const normalizedToolName = String(toolName ?? '').trim().toLowerCase();
+function scenarioSpecificRecoveryInstructions(/** @type {LiveScenario} */ scenario, /** @type {string} */ toolName) {
+    const normalizedToolName = String(toolName ?? '')
+        .trim()
+        .toLowerCase();
     if (!normalizedToolName || !Array.isArray(scenario?.beforeDeltaInstructions)) return [];
     return scenario.beforeDeltaInstructions.filter(
-        (instruction) =>
-            typeof instruction === 'string' && instruction.toLowerCase().includes(normalizedToolName),
+        (instruction) => typeof instruction === 'string' && instruction.toLowerCase().includes(normalizedToolName),
     );
 }
 
@@ -1362,10 +1441,7 @@ function collectSecretValues(/** @type {StringEnv} */ env) {
     return values;
 }
 
-function hasSecretLeak(
-    /** @type {string} */ text,
-    /** @type {{ key: string; value: string }[]} */ secretValues,
-) {
+function hasSecretLeak(/** @type {string} */ text, /** @type {{ key: string; value: string }[]} */ secretValues) {
     return secretValues.some(({ value }) => value.length > 0 && text.includes(value));
 }
 
@@ -1387,8 +1463,7 @@ function parseProfilesJson(/** @type {string | undefined} */ raw) {
                 providerType: typeof source['providerType'] === 'string' ? source['providerType'] : undefined,
                 provider: typeof source['provider'] === 'string' ? source['provider'] : undefined,
                 name: typeof source['name'] === 'string' ? source['name'] : undefined,
-                bearerTokenEnv:
-                    typeof source['bearerTokenEnv'] === 'string' ? source['bearerTokenEnv'] : undefined,
+                bearerTokenEnv: typeof source['bearerTokenEnv'] === 'string' ? source['bearerTokenEnv'] : undefined,
                 apiKeyEnv: typeof source['apiKeyEnv'] === 'string' ? source['apiKeyEnv'] : undefined,
                 bearerToken: typeof source['bearerToken'] === 'string' ? source['bearerToken'] : undefined,
                 apiKey: typeof source['apiKey'] === 'string' ? source['apiKey'] : undefined,
@@ -1478,7 +1553,8 @@ function selectRuntimeSelectorEffectiveRoute(
 
 /** @returns {RuntimeSelectorLiveResult} */
 function runRuntimeSelectorLiveRoute(
-    /** @type {{
+    /**
+     * @type {{
      *     profileId?: string;
      *     fallbackProfiles?: string[];
      *     execute?: boolean;
@@ -1488,16 +1564,17 @@ function runRuntimeSelectorLiveRoute(
      *     temporaryFailureCooldownMs?: number;
      *     timeoutMs?: number;
      *     selectionPolicy?: string;
-     * }} */ {
-    profileId,
-    fallbackProfiles = [],
-    execute = false,
-    allowProbe = false,
-    maxAttempts = 8,
-    maxAttemptsPerProvider = 4,
-    temporaryFailureCooldownMs = 0,
-    timeoutMs = 45_000,
-    selectionPolicy = '',
+     * }}
+     */ {
+        profileId,
+        fallbackProfiles = [],
+        execute = false,
+        allowProbe = false,
+        maxAttempts = 8,
+        maxAttemptsPerProvider = 4,
+        temporaryFailureCooldownMs = 0,
+        timeoutMs = 45_000,
+        selectionPolicy = '',
     } = {},
 ) {
     const requestedProfile = optionalRuntimeSelectorString(profileId);
@@ -1537,10 +1614,7 @@ function runRuntimeSelectorLiveRoute(
         args.push(`--temporary-failure-cooldown-ms=${Math.max(1, Math.trunc(temporaryFailureCooldownMs))}`);
     }
     const childTimeoutMs = execute
-        ? Math.min(
-              600_000,
-              Math.max(30_000, Math.trunc(timeoutMs) * Math.max(1, Math.trunc(maxAttempts)) + 15_000),
-          )
+        ? Math.min(600_000, Math.max(30_000, Math.trunc(timeoutMs) * Math.max(1, Math.trunc(maxAttempts)) + 15_000))
         : Math.min(45_000, Math.max(10_000, Math.trunc(timeoutMs)));
     const result = spawnSync(process.execPath, args, {
         cwd: ROOT,
@@ -1678,7 +1752,8 @@ function runtimeSelectorRouteDetails(/** @type {RuntimeSelectorLiveResult} */ ru
 }
 
 async function buildRealByokRuntime(
-    /** @type {{
+    /**
+     * @type {{
      *     dotenvEnv: StringEnv;
      *     requestedProfile: string;
      *     requestedAltProfile: string;
@@ -1694,22 +1769,23 @@ async function buildRealByokRuntime(
      *     runtimeSelectorTimeoutMs?: number;
      *     runtimeSelectorSelectionPolicy?: string;
      *     requireAgentAdmission?: boolean;
-     * }} */ {
-    dotenvEnv,
-    requestedProfile,
-    requestedAltProfile,
-    requestedModel,
-    requestedAltModel,
-    runtimeSelectorProfile,
-    runtimeSelectorFallbackProfiles: fallbackProfiles = [],
-    runtimeSelectorExecute = false,
-    runtimeSelectorAllowProbe = false,
-    runtimeSelectorMaxAttempts = 8,
-    runtimeSelectorMaxAttemptsPerProvider = 4,
-    runtimeSelectorTemporaryFailureCooldownMs = 0,
-    runtimeSelectorTimeoutMs = 45_000,
-    runtimeSelectorSelectionPolicy = '',
-    requireAgentAdmission = false,
+     * }}
+     */ {
+        dotenvEnv,
+        requestedProfile,
+        requestedAltProfile,
+        requestedModel,
+        requestedAltModel,
+        runtimeSelectorProfile,
+        runtimeSelectorFallbackProfiles: fallbackProfiles = [],
+        runtimeSelectorExecute = false,
+        runtimeSelectorAllowProbe = false,
+        runtimeSelectorMaxAttempts = 8,
+        runtimeSelectorMaxAttemptsPerProvider = 4,
+        runtimeSelectorTemporaryFailureCooldownMs = 0,
+        runtimeSelectorTimeoutMs = 45_000,
+        runtimeSelectorSelectionPolicy = '',
+        requireAgentAdmission = false,
     },
 ) {
     const mergedEnv = { ...process.env, ...dotenvEnv };
@@ -2000,7 +2076,10 @@ function renderedReadFileToolOk(/** @type {string} */ plain) {
 function defaultToolNarrationLines(/** @type {unknown} */ plain) {
     return String(plain ?? '')
         .split(/\r?\n/u)
-        .filter((line) => /\[(?:TOOL|INTENT|DONE|TOOLS|ASK)\]/u.test(line) || /^\s*(?:Ferramenta|Conclu[ií]do)\s/u.test(line));
+        .filter(
+            (line) =>
+                /\[(?:TOOL|INTENT|DONE|TOOLS|ASK)\]/u.test(line) || /^\s*(?:Ferramenta|Conclu[ií]do)\s/u.test(line),
+        );
 }
 
 function hasRawInternalIdInDefaultToolNarration(/** @type {unknown} */ plain) {
@@ -2041,7 +2120,8 @@ function byokLiveMaterializationState(
 }
 
 async function recordByokLiveProtocolHealth(
-    /** @type {{
+    /**
+     * @type {{
      *     realByok: Awaited<ReturnType<typeof buildRealByokRuntime>> | null;
      *     blocker: LiveBlocker | null;
      *     criteria: LiveCriterion[];
@@ -2050,16 +2130,8 @@ async function recordByokLiveProtocolHealth(
      *     durationMs: number;
      *     controlOnly: boolean;
      *     byokControlProbe: boolean;
-     * }} */ {
-    realByok,
-    blocker,
-    criteria,
-    plain,
-    startedAt,
-    durationMs,
-    controlOnly,
-    byokControlProbe,
-    },
+     * }}
+     */ { realByok, blocker, criteria, plain, startedAt, durationMs, controlOnly, byokControlProbe },
 ) {
     if (!realByok || controlOnly || byokControlProbe)
         return { attempted: false, recorded: false, reason: 'not_full_byok_live_turn' };
@@ -2246,7 +2318,8 @@ function isModelGatewayToolScenario(/** @type {LiveScenario} */ liveScenario) {
 }
 
 function buildByokRealPreflightCommands(
-    /** @type {{
+    /**
+     * @type {{
      *     profile?: string;
      *     altProfile?: string;
      *     model?: string;
@@ -2254,7 +2327,8 @@ function buildByokRealPreflightCommands(
      *     provider?: string;
      *     altProvider?: string;
      *     runtimeRoute?: ReturnType<typeof runtimeSelectorRouteDetails>;
-     * }} */ {
+     * }}
+     */ {
         profile = '',
         altProfile = '',
         model = '',
@@ -2450,7 +2524,8 @@ function sessionCycleBootCriteria(
 
 /** @returns {Promise<SessionCycleBootResult>} */
 async function runSessionCycleBoot(
-    /** @type {{
+    /**
+     * @type {{
      *     id: string;
      *     label: string;
      *     outDir: string;
@@ -2458,7 +2533,8 @@ async function runSessionCycleBoot(
      *     terminalPort: number;
      *     requestedTransport: string;
      *     timeoutMs: number;
-     * }} */ { id, label, outDir, commands, terminalPort, requestedTransport, timeoutMs },
+     * }}
+     */ { id, label, outDir, commands, terminalPort, requestedTransport, timeoutMs },
 ) {
     const canUsePty = requestedTransport === 'pty' && hasCommand('script');
     const transport = canUsePty ? 'pty:script' : 'stdio:headless';
@@ -3153,13 +3229,22 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     };
     const fsReadStart = plain.indexOf('/fs read data/copilot-terminal/live-scratch/');
     const fsPreviewStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsReadStart));
-    const fsMarkdownStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsPreviewStart + 1));
-    const fsJsonStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsMarkdownStart + 1));
+    const fsMarkdownStart = plain.indexOf(
+        '/fs preview data/copilot-terminal/live-scratch/',
+        Math.max(0, fsPreviewStart + 1),
+    );
+    const fsJsonStart = plain.indexOf(
+        '/fs preview data/copilot-terminal/live-scratch/',
+        Math.max(0, fsMarkdownStart + 1),
+    );
     const fsYamlStart = plain.indexOf('/fs preview data/copilot-terminal/live-scratch/', Math.max(0, fsJsonStart + 1));
     const fsSearchStart = plain.indexOf('/fs search TERMINAL_DIAGNOSTIC_UX_', Math.max(0, fsYamlStart));
     const terminalLibsStart = plain.indexOf('/terminal libs', Math.max(0, fsSearchStart));
     const menuPickerStart = plain.indexOf('/menu picker', Math.max(0, terminalLibsStart));
-    const gitDiffStart = plain.indexOf('/git diff --plain src/copilot/terminal/README.md', Math.max(0, menuPickerStart));
+    const gitDiffStart = plain.indexOf(
+        '/git diff --plain src/copilot/terminal/README.md',
+        Math.max(0, menuPickerStart),
+    );
     const activityStart = plain.indexOf('/activity 8', Math.max(0, gitDiffStart));
     const liveFullStart = plain.indexOf('/live full');
     const healthFullStart = plain.indexOf('/health full', Math.max(0, liveFullStart));
@@ -3185,7 +3270,10 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const dbSessionsStart = plain.indexOf('/db-sessions 6', Math.max(0, dbHistoryStart));
     const scopeDeclareStart = plain.indexOf('/scope declare terminal-ux-scope', Math.max(0, dbSessionsStart));
     const scopeContextStart = plain.indexOf('/scope context terminal-ux-scope', Math.max(0, scopeDeclareStart));
-    const scopeFindStart = plain.indexOf('/scope find terminal-ux-scope cmdScope --exact', Math.max(0, scopeContextStart));
+    const scopeFindStart = plain.indexOf(
+        '/scope find terminal-ux-scope cmdScope --exact',
+        Math.max(0, scopeContextStart),
+    );
     const scopeCloseStart = plain.indexOf('/scope close terminal-ux-scope', Math.max(0, scopeFindStart));
     const whoStart = plain.indexOf('/who', Math.max(0, scopeCloseStart));
     const countStart = plain.indexOf('/count', Math.max(0, whoStart));
@@ -3328,7 +3416,9 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
             id: 'diagnostic-ux-no-old-intervention-jargon',
             pass:
                 /Operar[\s\S]*Entrada[\s\S]*texto direto = próxima pergunta[\s\S]*API local/iu.test(plain) &&
-                !/Sistema\s+HTTP\s+:\d+|mailbox zero-PR|texto livre → fila (?:zero-PR|de intervenção)|\[mailbox/iu.test(plain),
+                !/Sistema\s+HTTP\s+:\d+|mailbox zero-PR|texto livre → fila (?:zero-PR|de intervenção)|\[mailbox/iu.test(
+                    plain,
+                ),
             detail: 'terminal banner/help/intervention cycle used compact first-viewport copy without old mailbox/intervention jargon',
         },
         {
@@ -3350,9 +3440,7 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
                 !/\bsearch\b|phase:|approve_all|not_needed|\bempty\b|Turno observado|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     liveFullSurface,
                 ) &&
-                !/Runtime\s+default|Timeline\s+.*persistent only|Cache\/escopo|não pausada/iu.test(
-                    liveFullSurface,
-                ),
+                !/Runtime\s+default|Timeline\s+.*persistent only|Cache\/escopo|não pausada/iu.test(liveFullSurface),
             detail: '/live full rendered detailed flow with complete ISO 8601 timestamps plus relative time and without raw labels, permission constants, empty/not_needed states, raw runtime/timeline labels, or UUIDs',
         },
         {
@@ -3434,7 +3522,8 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
                 /Comandos[\s\S]*\/session sdk controla sessões SDK[\s\S]*\/restart reinicia só a conversa[\s\S]*Próximo boot[\s\S]*\/session sdk next new[\s\S]*Filtros[\s\S]*offset=<n>/iu.test(
                     sdkInventorySurface,
                 ) &&
-                (!/Tempo/iu.test(sdkInventorySurface) || (hasIsoSeconds(sdkInventorySurface) && hasRelativeAge(sdkInventorySurface))) &&
+                (!/Tempo/iu.test(sdkInventorySurface) ||
+                    (hasIsoSeconds(sdkInventorySurface) && hasRelativeAge(sdkInventorySurface))) &&
                 !/Vínculo BYOK\s+BYOK|\/session sdk controla sessão SDK;|\/session sdk next new \||Foreground|probe-residue|\blast\b|\bforeground\b|operator-next-boot|sdk-resume-fallback|provider-boundary|\bsdk-(?:current|old|probe|new|last|second)\b|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/iu.test(
                     sdkInventorySurface,
                 ),
@@ -3460,9 +3549,7 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
                 /BYOK contas e chaves[\s\S]*Catálogo[\s\S]*Estados[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
                     byokAccountsSurface,
                 ) &&
-                /BYOK overlays de conta[\s\S]*Catálogo[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
-                    byokOverlaysSurface,
-                ) &&
+                /BYOK overlays de conta[\s\S]*Catálogo[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(byokOverlaysSurface) &&
                 /BYOK limites de conta[\s\S]*Catálogo[\s\S]*Estados[\s\S]*Fontes[\s\S]*(?:Provedor|Resultado|Nota)/iu.test(
                     byokLimitsSurface,
                 ) &&
@@ -3477,7 +3564,9 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
         {
             id: 'diagnostic-ux-permission-human',
             pass:
-                /Modo de permissões[\s\S]*(automáticas|auditoria sem janelas|seletivas)/iu.test(permissionModeSurface) &&
+                /Modo de permissões[\s\S]*(automáticas|auditoria sem janelas|seletivas)/iu.test(
+                    permissionModeSurface,
+                ) &&
                 /Permissões SDK[\s\S]*(Pendentes|Mudanças)/iu.test(permissionCockpitSurface) &&
                 !/approve_all|audit_only|selective|file_write|fs\.write|requestId|\\x1b\[/iu.test(
                     `${permissionModeSurface}\n${permissionCockpitSurface}`,
@@ -3499,8 +3588,8 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
             pass:
                 /Histórico/iu.test(historySurface) &&
                 (/Histórico\s+(?:sem mensagens visíveis nesta janela|vazio)/iu.test(historySurface) ||
-                    (!/(LLM-B|Você|Sistema)/iu.test(historySurface) ||
-                        (hasIsoSeconds(historySurface) && hasRelativeAge(historySurface)))) &&
+                    !/(LLM-B|Você|Sistema)/iu.test(historySurface) ||
+                    (hasIsoSeconds(historySurface) && hasRelativeAge(historySurface))) &&
                 !/reconciled|\bmixed\b|\[live\]|(?:Você|LLM-B|Sistema)\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*(?:\n|$)/iu.test(
                     historySurface,
                 ),
@@ -3513,7 +3602,8 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
                     dbHistorySurface,
                 ) &&
                 /Histórico DB|Últimos \d+ turnos da sessão atual/iu.test(dbHistorySurface) &&
-                (!/Últimos/iu.test(dbHistorySurface) || (hasIsoSeconds(dbHistorySurface) && hasRelativeAge(dbHistorySurface))) &&
+                (!/Últimos/iu.test(dbHistorySurface) ||
+                    (hasIsoSeconds(dbHistorySurface) && hasRelativeAge(dbHistorySurface))) &&
                 !/(?:Você|LLM-B|Sistema)\s+\d{4}-\d{2}-\d{2}T[^\n]*·\s*(?:\n|$)/iu.test(dbHistorySurface),
             detail: '/db-history rendered visible persisted turns or empty state with ISO seconds plus relative time and without empty rows',
         },
@@ -3521,7 +3611,8 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
             id: 'diagnostic-ux-db-sessions-human',
             pass:
                 /(sessões persistidas|Nenhuma sessão persistida)/iu.test(dbSessionsSurface) &&
-                (!/sessões persistidas/iu.test(dbSessionsSurface) || (hasIsoSeconds(dbSessionsSurface) && hasRelativeAge(dbSessionsSurface))) &&
+                (!/sessões persistidas/iu.test(dbSessionsSurface) ||
+                    (hasIsoSeconds(dbSessionsSurface) && hasRelativeAge(dbSessionsSurface))) &&
                 !/hub sessions|id [0-9a-f]{8}/iu.test(dbSessionsSurface),
             detail: '/db-sessions rendered persisted session list with ISO seconds plus relative time and without English hub-sessions copy or raw ids',
         },
@@ -3530,8 +3621,7 @@ function diagnosticUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
             pass:
                 /Escopo declarado[\s\S]*Contexto de escopo[\s\S]*Busca de símbolo no escopo[\s\S]*Escopo fechado/iu.test(
                     scopeSurface,
-                ) &&
-                !/\\x1b\[|\bready\b|\bwarming\b|files=|parsed=|parseSymbols=|recursive=/iu.test(scopeSurface),
+                ) && !/\\x1b\[|\bready\b|\bwarming\b|files=|parsed=|parseSymbols=|recursive=/iu.test(scopeSurface),
             detail: '/scope declare/context/find/close rendered themed scope output without ANSI literals or old diagnostic key=value labels',
         },
         {
@@ -3598,17 +3688,33 @@ async function runDiagnosticUxCycleLiveTest(
                 },
                 { line: `/fs read ${scratchPath}`, waitFor: 'leitura · motor', advanceAfterMs: 1_000 },
                 { line: `/fs preview ${scratchPath} --lines 20`, waitFor: 'Preview', advanceAfterMs: 1_000 },
-                { line: `/fs preview ${markdownPath} --markdown`, waitFor: 'Terminal UX Markdown', advanceAfterMs: 1_000 },
+                {
+                    line: `/fs preview ${markdownPath} --markdown`,
+                    waitFor: 'Terminal UX Markdown',
+                    advanceAfterMs: 1_000,
+                },
                 {
                     line: `/fs preview ${jsonPath} --json --plain --lines 5`,
                     waitFor: 'linhas omitidas',
                     advanceAfterMs: 1_000,
                 },
-                { line: `/fs preview ${yamlPath} --yaml --plain --lines 5`, waitFor: 'leitura · motor', advanceAfterMs: 1_000 },
-                { line: `/fs search ${marker} data/copilot-terminal/live-scratch`, waitFor: 'Resultados', advanceAfterMs: 1_000 },
+                {
+                    line: `/fs preview ${yamlPath} --yaml --plain --lines 5`,
+                    waitFor: 'leitura · motor',
+                    advanceAfterMs: 1_000,
+                },
+                {
+                    line: `/fs search ${marker} data/copilot-terminal/live-scratch`,
+                    waitFor: 'Resultados',
+                    advanceAfterMs: 1_000,
+                },
                 { line: '/terminal libs', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 1_000 },
                 { line: '/menu picker', waitFor: 'Picker do menu', advanceAfterMs: 1_000 },
-                { line: '/git diff --plain src/copilot/terminal/README.md', waitFor: 'Git diff', advanceAfterMs: 1_000 },
+                {
+                    line: '/git diff --plain src/copilot/terminal/README.md',
+                    waitFor: 'Git diff',
+                    advanceAfterMs: 1_000,
+                },
                 { line: '/activity 8', waitFor: 'Atividade Atual da LLM-B', advanceAfterMs: 1_000 },
                 { line: '/live full', waitFor: 'Fluxo operacional detalhado', advanceAfterMs: 1_000 },
                 { line: '/health full', waitFor: 'Diagnóstico do Terminal LLM-B', advanceAfterMs: 1_000 },
@@ -3630,7 +3736,11 @@ async function runDiagnosticUxCycleLiveTest(
                 },
                 { line: '/permission mode', waitFor: 'Modo de permissões', advanceAfterMs: 1_000 },
                 { line: '/permission cockpit', waitFor: 'Permissões SDK', advanceAfterMs: 1_000 },
-                { line: '/queue intervenção visual sem turno novo', waitFor: 'intervenção guardada', advanceAfterMs: 1_000 },
+                {
+                    line: '/queue intervenção visual sem turno novo',
+                    waitFor: 'intervenção guardada',
+                    advanceAfterMs: 1_000,
+                },
                 { line: '/queue status', waitFor: 'Fila de intervenção', advanceAfterMs: 1_000 },
                 { line: '/queue clear', waitFor: 'limpa', advanceAfterMs: 1_000 },
                 { line: '/history 6', waitFor: 'Histórico', advanceAfterMs: 1_000 },
@@ -3642,7 +3752,11 @@ async function runDiagnosticUxCycleLiveTest(
                     advanceAfterMs: 1_000,
                 },
                 { line: '/scope context terminal-ux-scope', waitFor: 'Contexto de escopo', advanceAfterMs: 1_000 },
-                { line: '/scope find terminal-ux-scope cmdScope --exact', waitFor: 'Busca de símbolo no escopo', advanceAfterMs: 1_000 },
+                {
+                    line: '/scope find terminal-ux-scope cmdScope --exact',
+                    waitFor: 'Busca de símbolo no escopo',
+                    advanceAfterMs: 1_000,
+                },
                 { line: '/scope close terminal-ux-scope', waitFor: 'Escopo fechado', advanceAfterMs: 1_000 },
                 { line: '/who', waitFor: 'Atores ativos nesta sessão', advanceAfterMs: 1_000 },
                 { line: '/count', waitFor: 'Estatísticas da sessão', advanceAfterMs: 1_000 },
@@ -3686,7 +3800,9 @@ async function runDiagnosticUxCycleLiveTest(
                 '',
                 '## Criteria',
                 '',
-                ...criteria.map((criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`),
+                ...criteria.map(
+                    (criterion) => `- ${criterion.pass ? '[x]' : '[ ]'} ${criterion.id}: ${criterion.detail}`,
+                ),
                 '',
                 '## Logs',
                 '',
@@ -3713,20 +3829,24 @@ function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const statusStart = plain.indexOf('Status do Terminal LLM-B');
     const nowPanelStart = plain.indexOf('\n  Agora');
     const nowStart = nowPanelStart >= 0 ? nowPanelStart + 1 : plain.indexOf('[agora]');
-    const usageStart = [
-        plain.indexOf('Janela de contexto', Math.max(0, nowStart)),
-        plain.indexOf('Medição       SDK ainda não reportou tokens usados nesta sessão', Math.max(0, nowStart)),
-        plain.indexOf('Atenção       dados da janela de contexto', Math.max(0, nowStart)),
-        plain.indexOf('\n  BYOK', Math.max(0, nowStart)),
-        plain.indexOf('BYOK ativo', Math.max(0, nowStart)),
-        plain.indexOf('Uso Copilot', Math.max(0, nowStart)),
-    ]
-        .filter((index) => index >= 0)
-        .sort((a, b) => a - b)[0] ?? -1;
+    const usageStart =
+        [
+            plain.indexOf('Janela de contexto', Math.max(0, nowStart)),
+            plain.indexOf('Medição       SDK ainda não reportou tokens usados nesta sessão', Math.max(0, nowStart)),
+            plain.indexOf('Atenção       dados da janela de contexto', Math.max(0, nowStart)),
+            plain.indexOf('\n  BYOK', Math.max(0, nowStart)),
+            plain.indexOf('BYOK ativo', Math.max(0, nowStart)),
+            plain.indexOf('Uso Copilot', Math.max(0, nowStart)),
+        ]
+            .filter((index) => index >= 0)
+            .sort((a, b) => a - b)[0] ?? -1;
     const healthStart = plain.indexOf('Saúde do Terminal LLM-B');
     const waitsStart = plain.lastIndexOf('Esperas humanas');
     const byokStatusStart = plain.indexOf('BYOK status', Math.max(0, waitsStart));
-    const byokModelCommandStart = plain.indexOf('/byok model terminal-ux-boundary-fixture', Math.max(0, byokStatusStart));
+    const byokModelCommandStart = plain.indexOf(
+        '/byok model terminal-ux-boundary-fixture',
+        Math.max(0, byokStatusStart),
+    );
     const byokModelStatusStart =
         byokModelCommandStart >= 0 ? plain.indexOf('BYOK status', byokModelCommandStart + 1) : -1;
     const byokModelActivityStart =
@@ -3909,16 +4029,16 @@ function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
                 /Libs auxiliares do terminal[\s\S]*filtro adiadas[\s\S]*(Atuin|zoxide)/iu.test(
                     terminalLibsFilteredSurface,
                 ) &&
-                !/\bfzf\b|renderer externo|preview read-only com syntax highlighting/iu.test(terminalLibsFilteredSurface),
+                !/\bfzf\b|renderer externo|preview read-only com syntax highlighting/iu.test(
+                    terminalLibsFilteredSurface,
+                ),
             detail: '/terminal libs deferred rendered a focused filtered surface without accepted-tool noise',
         },
         {
             id: 'ux-cycle-terminal-libs-json-contract',
             pass:
                 /"schema":\s*"terminal-external-tools-capability-summary"/u.test(terminalLibsJsonSurface) &&
-                /"generatedAt":\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/u.test(
-                    terminalLibsJsonSurface,
-                ) &&
+                /"generatedAt":\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/u.test(terminalLibsJsonSurface) &&
                 /"policy":\s*\{[\s\S]*"optionalByDefault":\s*true[\s\S]*"noAutomaticTui":\s*true/u.test(
                     terminalLibsJsonSurface,
                 ) &&
@@ -3969,23 +4089,27 @@ function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
         {
             id: 'ux-cycle-usage-byok-current-first',
             pass:
-                (/^\s*Rota BYOK\s{2,}/imu.test(usageSurface) || /^\s*BYOK\s{2,}/imu.test(usageSurface) || /BYOK ativo/iu.test(usageSurface)
+                (/^\s*Rota BYOK\s{2,}/imu.test(usageSurface) ||
+                /^\s*BYOK\s{2,}/imu.test(usageSurface) ||
+                /BYOK ativo/iu.test(usageSurface)
                     ? /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*Rota BYOK[\s\S]*Histórico\s+Copilot|Rota BYOK[\s\S]*Histórico\s+Copilot/iu.test(
                           usageSurface,
                       )
                     : /(?:Janela de contexto|Medição\s+SDK ainda não reportou tokens usados nesta sessão|Atenção\s+dados da janela de contexto)[\s\S]*(?:Uso Copilot|Telemetria Copilot legacy|Origem\s+GitHub Copilot\/AI Credits)|Uso Copilot/iu.test(
                           usageSurface,
                       )) &&
-                !/Quota Copilot|side-channel|não é cobrança BYOK|BYOK ativo|BYOK\s+provedor|Histórico Copilot/iu.test(usageSurface),
+                !/Quota Copilot|side-channel|não é cobrança BYOK|BYOK ativo|BYOK\s+provedor|Histórico Copilot/iu.test(
+                    usageSurface,
+                ),
             detail: '/usage now rendered BYOK as current state and Copilot telemetry as compact historical side-channel',
         },
         {
             id: 'ux-cycle-byok-boundary-human',
             pass:
                 /BYOK status[\s\S]*Preparada[\s\S]*Sessão viva[\s\S]*Fronteira/iu.test(byokStatusSurface) &&
-                (/(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmação[\s\S]*(?:confirmação do SDK|modelo efetivo))/iu.test(
+                /(?:Sessão atual usa outro provedor\/perfil[\s\S]*modelo preparado para o próximo boot[\s\S]*sem troca cruzada na conversa viva)|(?:Modelo vivo[\s\S]*solicitado[\s\S]*Confirmação[\s\S]*(?:confirmação do SDK|modelo efetivo))/iu.test(
                     byokModelOutcomeSurface,
-                )) &&
+                ) &&
                 /BYOK status[\s\S]*(seleção preparada cruza provedor ou perfil da sessão atual|seleção preparada e sessão BYOK atual estão alinhadas|modelo preparado confirmado no runtime vivo; vínculo de boot original permanece até nova sessão|rota BYOK da sessão atual coincide; o modelo preparado ainda precisa de confirmação|sem sessão SDK viva)/iu.test(
                     byokAfterModelSurface,
                 ) &&
@@ -4020,9 +4144,7 @@ function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
         {
             id: 'ux-cycle-session-sdk-boundary-human',
             pass:
-                /Sessão SDK[\s\S]*Vínculo SDK[\s\S]*Preparado[\s\S]*Limite BYOK/iu.test(
-                    sessionSdkAfterByokSurface,
-                ) &&
+                /Sessão SDK[\s\S]*Vínculo SDK[\s\S]*Preparado[\s\S]*Limite BYOK/iu.test(sessionSdkAfterByokSurface) &&
                 !/\bbinding\b|provider-boundary|provider\/perfil|Foreground|operator-next-boot|sdk-resume-fallback/iu.test(
                     sessionSdkAfterByokSurface,
                 ) &&
@@ -4067,7 +4189,8 @@ function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
             pass:
                 /Capacidades SDK[\s\S]*UI[\s\S]*Tools[\s\S]*Plano[\s\S]*Detalhe\s+\/sdk capabilities detail/iu.test(
                     sdkCapabilitiesSurface,
-                ) && !/(?:^|\n)\s*SDK Capabilities\b|\[OK\]|\[ERR\]|\bRetorno\b|\{\s*"ui"/u.test(sdkCapabilitiesSurface),
+                ) &&
+                !/(?:^|\n)\s*SDK Capabilities\b|\[OK\]|\[ERR\]|\bRetorno\b|\{\s*"ui"/u.test(sdkCapabilitiesSurface),
             detail: '/sdk capabilities rendered a themed human panel without raw JSON in the default surface',
         },
         {
@@ -4105,9 +4228,8 @@ function defaultUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
         {
             id: 'ux-cycle-events-complete-iso',
             pass:
-                /Eventos SSE[\s\S]*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u.test(
-                    eventsSurface,
-                ) && !/\btraceId=|\bturnId=|\bhubSessionId=/u.test(eventsSurface),
+                /Eventos SSE[\s\S]*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}/u.test(eventsSurface) &&
+                !/\btraceId=|\bturnId=|\bhubSessionId=/u.test(eventsSurface),
             detail: '/events default rendered complete ISO 8601 timestamps without raw diagnostic ids',
         },
         {
@@ -4144,13 +4266,21 @@ async function runDefaultUxCycleLiveTest(
             { line: '/help full', waitFor: 'Terminal LLM-B - Ajuda completa', advanceAfterMs: 5_000 },
             { line: '/terminal libs detail', waitFor: 'Libs auxiliares do terminal', advanceAfterMs: 2_000 },
             { line: '/terminal libs deferred', waitFor: 'filtro adiadas', advanceAfterMs: 1_000 },
-            { line: '/terminal libs json', waitFor: 'terminal-external-tools-capability-summary', advanceAfterMs: 1_500 },
+            {
+                line: '/terminal libs json',
+                waitFor: 'terminal-external-tools-capability-summary',
+                advanceAfterMs: 1_500,
+            },
             { line: '/status', waitFor: 'Status do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/now', waitFor: '\n  Agora', advanceAfterMs: 1_500 },
             { line: '/usage now', waitFor: 'Janela de contexto', advanceAfterMs: 1_500 },
             { line: '/health', waitFor: 'Saúde do Terminal LLM-B', advanceAfterMs: 1_500 },
             { line: '/tools', waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u, advanceAfterMs: 1_500 },
-            { line: '/tools diag', waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u, advanceAfterMs: 1_500 },
+            {
+                line: '/tools diag',
+                waitFor: /Ferramentas observadas|Nenhuma ferramenta observada/u,
+                advanceAfterMs: 1_500,
+            },
             { line: '/sdk', waitFor: 'SDK do Terminal', advanceAfterMs: 1_500 },
             { line: '/sdk capabilities', waitFor: 'Capacidades SDK', advanceAfterMs: 1_500 },
             { line: '/workspace list', waitFor: 'Workspace SDK virtual', advanceAfterMs: 1_500 },
@@ -4403,7 +4533,10 @@ function operatorUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
     const contextStart = commandStart('/context');
     const sessionSaveStart = commandStart('/session save terminal-ux-live');
     const attachEmptyStart = commandStart('/attach');
-    const attachAddStart = commandStart('/attach src/copilot/terminal/commands/workspace-index.js', Math.max(0, attachEmptyStart + 1));
+    const attachAddStart = commandStart(
+        '/attach src/copilot/terminal/commands/workspace-index.js',
+        Math.max(0, attachEmptyStart + 1),
+    );
     const mailboxStart = commandStart('/queue clear');
     const modelListStart = commandStart('/model list');
     const byokModelStart = commandStart('/byok model terminal-ux-boundary-fixture');
@@ -4511,7 +4644,9 @@ function operatorUxCycleCriteria(/** @type {SessionCycleBootResult} */ boot) {
                 /Atividade Atual da LLM-B[\s\S]{0,700}(?:Troca de modelo solicitada|Modelo SDK confirmado)/iu.test(
                     surfaceAt(activityAfterByokModelStart),
                 ) &&
-                /Timeline operacional[\s\S]{0,900}Troca de modelo solicitada/iu.test(surfaceAt(activityAfterByokModelStart)) &&
+                /Timeline operacional[\s\S]{0,900}Troca de modelo solicitada/iu.test(
+                    surfaceAt(activityAfterByokModelStart),
+                ) &&
                 /Estado\s+modelo/iu.test(surfaceAt(activityAfterByokModelStart)) &&
                 /confirma pedido terminal \/byok model/iu.test(surfaceAt(liveStart)) &&
                 !/Estado\s+model\b|provider-boundary|binding de nascimento|binding da sessão viva|provider BYOK|terminal\.byok_model/iu.test(
@@ -4548,7 +4683,11 @@ async function runOperatorUxCycleLiveTest(
                 advanceAfterMs: 1_500,
             },
             { line: '/queue clear', waitFor: 'Fila de intervenção', advanceAfterMs: 1_500 },
-            { line: '/model list', waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u, advanceAfterMs: 1_500 },
+            {
+                line: '/model list',
+                waitFor: /Modelos disponíveis|Nenhum modelo retornado pelo SDK/u,
+                advanceAfterMs: 1_500,
+            },
             {
                 line: '/byok model terminal-ux-boundary-fixture',
                 waitFor:
@@ -4618,7 +4757,11 @@ function hasReturnedToNormalReplPrompt(/** @type {string} */ plain, /** @type {n
 
 function extractTerminalUxRowValue(/** @type {string} */ surface, /** @type {string} */ label) {
     const pattern = new RegExp(`(?:^|\\n)\\s*${escapeRegExp(label)}\\s+([^\\n\\r]+)`, 'u');
-    return String(surface ?? '').match(pattern)?.[1]?.trim() ?? '';
+    return (
+        String(surface ?? '')
+            .match(pattern)?.[1]
+            ?.trim() ?? ''
+    );
 }
 
 function findAssistantEndedBeforeRequiredAsk(
@@ -4702,7 +4845,8 @@ function criterionMarker(/** @type {LiveCriterion} */ criterion) {
 }
 
 function buildReport(
-    /** @type {{
+    /**
+     * @type {{
      *     criteria: LiveCriterion[];
      *     durationMs: number;
      *     exitCode: number | null;
@@ -4720,24 +4864,25 @@ function buildReport(
      *     liveScenarioRunRecord?: RecordStatus | null | undefined;
      *     sdkSessionBootSelection?: RecordStatus | null | undefined;
      *     liveScenario: LiveScenario | null;
-     * }} */ {
-    criteria,
-    durationMs,
-    exitCode,
-    blocker,
-    outputPath,
-    plainOutputPath,
-    exportPath,
-    exportSummary,
-    sseRawPath,
-    sseJsonlPath,
-    sseSummary,
-    startedAt,
-    transport,
-    liveHealthRecord,
-    liveScenarioRunRecord,
-    sdkSessionBootSelection,
-    liveScenario,
+     * }}
+     */ {
+        criteria,
+        durationMs,
+        exitCode,
+        blocker,
+        outputPath,
+        plainOutputPath,
+        exportPath,
+        exportSummary,
+        sseRawPath,
+        sseJsonlPath,
+        sseSummary,
+        startedAt,
+        transport,
+        liveHealthRecord,
+        liveScenarioRunRecord,
+        sdkSessionBootSelection,
+        liveScenario,
     },
 ) {
     const ok = allRequiredCriteriaPassed(criteria);
@@ -4789,7 +4934,8 @@ function buildReport(
 }
 
 function liveScenarioKind(
-    /** @type {{
+    /**
+     * @type {{
      *     autoControlProbe: boolean;
      *     byokControlProbe: boolean;
      *     byokFixture: boolean;
@@ -4805,22 +4951,23 @@ function liveScenarioKind(
      *     operatorUxCycle: boolean;
      *     modelControlProbe: boolean;
      *     liveScenario: LiveScenario | null;
-     * }} */ {
-    autoControlProbe,
-    byokControlProbe,
-    byokFixture,
-    byokReal,
-    controlOnly,
-    sessionCycle,
-    structuredInputCycle,
-    menuCycle,
-    pickerInteractiveCycle,
-    uxCycle,
-    diagnosticUxCycle,
-    auditUxCycle,
-    operatorUxCycle,
-    modelControlProbe,
-    liveScenario,
+     * }}
+     */ {
+        autoControlProbe,
+        byokControlProbe,
+        byokFixture,
+        byokReal,
+        controlOnly,
+        sessionCycle,
+        structuredInputCycle,
+        menuCycle,
+        pickerInteractiveCycle,
+        uxCycle,
+        diagnosticUxCycle,
+        auditUxCycle,
+        operatorUxCycle,
+        modelControlProbe,
+        liveScenario,
     },
 ) {
     if (sessionCycle) return 'session_cycle';
@@ -4905,7 +5052,8 @@ async function scheduleFreshSdkSessionForCanonicalScenario(
 }
 
 async function recordLiveScenarioRunToSqlite(
-    /** @type {{
+    /**
+     * @type {{
      *     criteria: LiveCriterion[];
      *     startedAt: string;
      *     durationMs: number;
@@ -4918,19 +5066,20 @@ async function recordLiveScenarioRunToSqlite(
      *     plainPath: string;
      *     sseJsonlPath: string;
      *     transport: string;
-     * }} */ {
-    criteria,
-    startedAt,
-    durationMs,
-    exitCode,
-    blocker,
-    scenarioKind,
-    outDir,
-    mdPath,
-    rawPath,
-    plainPath,
-    sseJsonlPath,
-    transport,
+     * }}
+     */ {
+        criteria,
+        startedAt,
+        durationMs,
+        exitCode,
+        blocker,
+        scenarioKind,
+        outDir,
+        mdPath,
+        rawPath,
+        plainPath,
+        sseJsonlPath,
+        transport,
     },
 ) {
     const failedCriteria = criteria.filter(isHardCriterionFailure);
@@ -4982,7 +5131,8 @@ async function recordLiveScenarioRunToSqlite(
 }
 
 async function writeEarlyBlockedSummary(
-    /** @type {{
+    /**
+     * @type {{
      *     blocker: LiveBlocker;
      *     startedAt: string;
      *     outDir: string;
@@ -4997,21 +5147,22 @@ async function writeEarlyBlockedSummary(
      *     realByok: Awaited<ReturnType<typeof buildRealByokRuntime>> | null;
      *     sdkSessionBootSelection?: RecordStatus | null;
      *     liveScenario: LiveScenario;
-     * }} */ {
-    blocker,
-    startedAt,
-    outDir,
-    rawPath,
-    plainPath,
-    exportPath,
-    sseRawPath,
-    sseJsonlPath,
-    jsonPath,
-    mdPath,
-    transport,
-    realByok,
-    sdkSessionBootSelection,
-    liveScenario,
+     * }}
+     */ {
+        blocker,
+        startedAt,
+        outDir,
+        rawPath,
+        plainPath,
+        exportPath,
+        sseRawPath,
+        sseJsonlPath,
+        jsonPath,
+        mdPath,
+        transport,
+        realByok,
+        sdkSessionBootSelection,
+        liveScenario,
     },
 ) {
     const durationMs = Date.now() - Date.parse(startedAt);
@@ -5246,7 +5397,11 @@ function detectLiveBlocker(/** @type {string} */ plain, /** @type {LiveRuntimeSt
                     `\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(scenario.answerSteps.at(-1)?.answer ?? '')}`,
                     'iu',
                 ).test(plain));
-        const id = answered ? 'assistant-empty-after-user-input' : asked ? 'assistant-empty-after-ask' : 'assistant-empty-turn';
+        const id = answered
+            ? 'assistant-empty-after-user-input'
+            : asked
+              ? 'assistant-empty-after-ask'
+              : 'assistant-empty-turn';
         const recoveredAfterUserInput =
             id === 'assistant-empty-after-user-input' &&
             scenario.postAskFinalRe.test(plain) &&
@@ -5299,7 +5454,9 @@ function findAskBeforeRequiredPublicDeltas(
     /** @type {LiveScenario} */ scenario = LIVE_SCENARIOS.canonical,
 ) {
     if (!Array.isArray(events) || !scenario?.askQuestion) return null;
-    const askIndex = events.findIndex((evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending');
+    const askIndex = events.findIndex(
+        (evt) => evt?.event === 'user_input.requested' || evt?.event === 'elicitation.pending',
+    );
     if (askIndex < 0) return null;
     let deltaMarkersBeforeAsk = 0;
     for (const evt of events.slice(0, askIndex)) {
@@ -5331,7 +5488,9 @@ function findUnexpectedScenarioTool(
 ) {
     const allowedTools = Array.isArray(scenario?.allowedTools) ? [...scenario.allowedTools] : [];
     if (allowedTools.length === 0 || !Array.isArray(events)) return null;
-    const expectedLifecycleTools = Array.isArray(scenario?.expectedLifecycleTools) ? scenario.expectedLifecycleTools : [];
+    const expectedLifecycleTools = Array.isArray(scenario?.expectedLifecycleTools)
+        ? scenario.expectedLifecycleTools
+        : [];
     for (const evt of events) {
         if (evt?.event !== 'tool.lifecycle') continue;
         const payload = evt.data && typeof evt.data === 'object' ? evt.data : {};
@@ -5678,7 +5837,8 @@ function parseToolResultPayload(/** @type {unknown} */ toolResult) {
 }
 
 function evaluateAdaptiveSelectionReadyEvidence(/** @type {TerminalEvent[]} */ events) {
-    const readyRe = /(?:^|\n)ADAPTIVE-SELECTION-READY provider=([^\s]+) model=([^\s]+) decision=(use_current|switch_recommended)(?:\n|$)/u;
+    const readyRe =
+        /(?:^|\n)ADAPTIVE-SELECTION-READY provider=([^\s]+) model=([^\s]+) decision=(use_current|switch_recommended)(?:\n|$)/u;
     let latestAuthority = null;
     let marker = null;
     for (let index = 0; index < (Array.isArray(events) ? events.length : 0); index += 1) {
@@ -5701,7 +5861,8 @@ function evaluateAdaptiveSelectionReadyEvidence(/** @type {TerminalEvent[]} */ e
                 const currentModel = typeof decision?.currentModel === 'string' ? decision.currentModel : null;
                 const terminalDecision = status === 'use_current' || status === 'switch_recommended';
                 const runtimeProofRequired = decision?.runtimeProofRequired === true;
-                const currentRouteConsistent = status !== 'use_current' || (currentModel !== null && currentModel === model);
+                const currentRouteConsistent =
+                    status !== 'use_current' || (currentModel !== null && currentModel === model);
                 latestAuthority = {
                     index,
                     eventId: eventPublicId(evt),
@@ -5738,10 +5899,10 @@ function evaluateAdaptiveSelectionReadyEvidence(/** @type {TerminalEvent[]} */ e
     const authority = marker && latestAuthority && latestAuthority.index < marker.index ? latestAuthority : null;
     const matchesAuthority = Boolean(
         marker &&
-            authority?.valid === true &&
-            marker.providerId === authority.providerId &&
-            marker.model === authority.model &&
-            marker.status === authority.status,
+        authority?.valid === true &&
+        marker.providerId === authority.providerId &&
+        marker.model === authority.model &&
+        marker.status === authority.status,
     );
     return {
         marker,
@@ -5781,7 +5942,8 @@ function summarizePostToolUseResult(/** @type {EventPayload} */ payload, /** @ty
 }
 
 function summarizeCanonicalToolLifecycle(/** @type {TerminalEvent[]} */ events) {
-    /** @type {{
+    /**
+     * @type {{
      *     reportIntentStart: boolean;
      *     reportIntentDone: boolean;
      *     readFileStart: boolean;
@@ -5791,7 +5953,8 @@ function summarizeCanonicalToolLifecycle(/** @type {TerminalEvent[]} */ events) 
      *     readFileIo: boolean;
      *     toolLifecycleEvents: number;
      *     matchedEventIds: number[];
-     * }} */
+     * }}
+     */
     const summary = {
         reportIntentStart: false,
         reportIntentDone: false,
@@ -5829,12 +5992,7 @@ function summarizeCanonicalToolLifecycle(/** @type {TerminalEvent[]} */ events) 
             }
             if (isLifecycleCompletionType(type) && success) summary.reportIntentDone = true;
             if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
-        } else if (
-            isLifecycleCompletionType(type) &&
-            success &&
-            toolCallId &&
-            reportIntentCallIds.has(toolCallId)
-        ) {
+        } else if (isLifecycleCompletionType(type) && success && toolCallId && reportIntentCallIds.has(toolCallId)) {
             // SDK 1.0.9 humanizes some completion names, but preserves the originating tool call id.
             summary.reportIntentDone = true;
             if (isFiniteNumber(eventId)) summary.matchedEventIds.push(eventId);
@@ -5851,15 +6009,28 @@ function summarizeCanonicalToolLifecycle(/** @type {TerminalEvent[]} */ events) 
 }
 
 function summarizeNamedToolLifecycle(/** @type {TerminalEvent[]} */ events, /** @type {string} */ expectedName) {
-    /** @type {{
-     *     start: boolean; done: boolean; io: boolean; failed: boolean;
-     *     postToolSuccess: boolean; postToolFailure: boolean;
-     *     postToolSuccessCount: number; postToolFailureCount: number;
-     *     startCount: number; completionSuccessCount: number; completionFailureCount: number;
-     *     successfulCallCount: number; failedCallCount: number;
-     *     resultTypes: string[]; exitCodes: number[]; matchedEventIds: number[];
-     *     startEventIds: number[]; completionEventIds: number[];
-     * }} */
+    /**
+     * @type {{
+     *     start: boolean;
+     *     done: boolean;
+     *     io: boolean;
+     *     failed: boolean;
+     *     postToolSuccess: boolean;
+     *     postToolFailure: boolean;
+     *     postToolSuccessCount: number;
+     *     postToolFailureCount: number;
+     *     startCount: number;
+     *     completionSuccessCount: number;
+     *     completionFailureCount: number;
+     *     successfulCallCount: number;
+     *     failedCallCount: number;
+     *     resultTypes: string[];
+     *     exitCodes: number[];
+     *     matchedEventIds: number[];
+     *     startEventIds: number[];
+     *     completionEventIds: number[];
+     * }}
+     */
     const summary = {
         start: false,
         done: false,
@@ -6301,9 +6472,7 @@ function evaluateSseCriteria(
     const summary = summarizeSseEvents(sseSummary.events);
     const { publicEvents, ids, names, payloadObjects, sourceEnvelopeEvents, traceEvents, traceIds, criticalEvents } =
         summary;
-    const monotonic = ids.every(
-        (id, index) => index === 0 || id > (ids[index - 1] ?? Number.NEGATIVE_INFINITY),
-    );
+    const monotonic = ids.every((id, index) => index === 0 || id > (ids[index - 1] ?? Number.NEGATIVE_INFINITY));
     const plainTraceIds = extractPlainTraceIds(plain);
     const traceOverlap = traceIds.filter((traceId) => plainTraceIds.includes(traceId));
     const criticalWithSource = criticalEvents.filter(
@@ -6352,11 +6521,7 @@ function evaluateSseCriteria(
         },
         {
             id: 'sse-stdout-trace-overlap',
-            pass:
-                !expectPublicEvents ||
-                traceIds.length === 0 ||
-                plainTraceIds.length === 0 ||
-                traceOverlap.length > 0,
+            pass: !expectPublicEvents || traceIds.length === 0 || plainTraceIds.length === 0 || traceOverlap.length > 0,
             detail: `stdout traceIds=${plainTraceIds.slice(0, 5).join(', ') || 'ocultos na cauda default/raw'} · sse traceIds=${traceIds.slice(0, 5).join(', ') || '-'} · interseção=${traceOverlap.slice(0, 5).join(', ') || '-'}`,
         },
     ];
@@ -6375,9 +6540,7 @@ function evaluateOutput(
     const answerText = scenario.answerSteps.at(-1)?.answer ?? '';
     const questionIndex = scenario.askQuestion ? beforeRawDiagnosticsPlain.search(scenario.askQuestionRe) : -1;
     const answerPromptIndex = answerText
-        ? beforeRawDiagnosticsPlain.search(
-              new RegExp(`\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(answerText)}`, 'iu'),
-          )
+        ? beforeRawDiagnosticsPlain.search(new RegExp(`\\[PERG(?:UNTA)?\\]›\\s*${escapeRegExp(answerText)}`, 'iu'))
         : -1;
     const questionWaitSurface =
         questionIndex >= 0
@@ -6388,12 +6551,16 @@ function evaluateOutput(
             : '';
     const postAnswerPublicPlain =
         answerPromptIndex >= 0 ? beforeRawDiagnosticsPlain.slice(answerPromptIndex) : beforeRawDiagnosticsPlain;
-    const activity40Sections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/activity\s+40\b[^\n\r]*/iu).slice(1);
+    const activity40Sections = beforeRawDiagnosticsPlain
+        .split(/\n\s*voc[eê]\[[^\n]*?›\s+\/activity\s+40\b[^\n\r]*/iu)
+        .slice(1);
     const latestActivity40Section =
         activity40Sections
             .at(-1)
             ?.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/(?:intent|tools|events|usage|errors|health|export|quit)\b/iu)[0] ?? '';
-    const intentDefaultSections = beforeRawDiagnosticsPlain.split(/\n\s*voc[eê]\[[^\n]*?›\s+\/intent\s+5\b[^\n\r]*/iu).slice(1);
+    const intentDefaultSections = beforeRawDiagnosticsPlain
+        .split(/\n\s*voc[eê]\[[^\n]*?›\s+\/intent\s+5\b[^\n\r]*/iu)
+        .slice(1);
     const latestIntentDefaultSection =
         intentDefaultSections
             .at(-1)
@@ -6445,10 +6612,7 @@ function evaluateOutput(
                 `(?:\\[[^\\]]+\\][^\\n]*${renderedName}|Ferramenta\\s+[^\\n]*${renderedName})`,
                 'iu',
             ),
-            doneRe: new RegExp(
-                `(?:✅\\s+\\[OK\\][^\\n]*${renderedName}|Conclu[ií]do\\s+[^\\n]*${renderedName})`,
-                'iu',
-            ),
+            doneRe: new RegExp(`(?:✅\\s+\\[OK\\][^\\n]*${renderedName}|Conclu[ií]do\\s+[^\\n]*${renderedName})`, 'iu'),
         };
     });
     const adaptiveReadyEvidence =
@@ -6564,11 +6728,9 @@ function evaluateOutput(
         /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Mensagem da LLM-B\s+(?:LLM-B via SDK|SDK assistant))/u;
     const postAskAssistantTranscriptHeadingRe =
         /^\s*(?:\[LLM-B\]\s+Mensagem|Mensagem\s+sdk\/assistant\.message|Resposta (?:da LLM-B|pós-pergunta)\s+(?:sdk\/assistant\.message|LLM-B via SDK))/u;
-    const assistantMessageDeltaBlockVisible = terminalBlockContains(
-        preEventsPlain,
-        assistantMessageTranscriptHeadingRe,
-        REQUIRED_DELTA_TAIL_RE,
-    ) || assistantMessageDeltaMarkerCount >= 8;
+    const assistantMessageDeltaBlockVisible =
+        terminalBlockContains(preEventsPlain, assistantMessageTranscriptHeadingRe, REQUIRED_DELTA_TAIL_RE) ||
+        assistantMessageDeltaMarkerCount >= 8;
     const postAskFinalRe = scenario.postAskFinalRe;
     const finalRenderedByLiveTurn = terminalBlockContains(
         preEventsPlain,
@@ -6590,7 +6752,9 @@ function evaluateOutput(
         /(?:^|\n)voc[eê]\[[^\]\r\n]+\](?!\[PERG(?:UNTA)?\])›[ \t]*(?:\r[^\n\r]*){1,8}\r?[ \t]*─{3,}[\s\S]{0,320}^\s*LLM-B\s+·/imu.test(
             plain,
         );
-    const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b|LLM-B\s+(?:turno|pensando|iniciando)\s+·/iu.test(plain);
+    const inlineStatusRendered = /(?:⟲|⏳|⌛)\s+(?:LLM-B|aguardando)\b|LLM-B\s+(?:turno|pensando|iniciando)\s+·/iu.test(
+        plain,
+    );
     const promptlessDiagnosticCommand =
         /(?:^|\n)\/(?:usage now|activity \d+|intent(?: detail)? \d+|tools diag|events \d+(?: --raw)?|errors \d+|health full|export \S+|quit)\s*(?:\r?\n|$)/iu.test(
             plain,
@@ -6620,8 +6784,9 @@ function evaluateOutput(
     const scenarioUsesFileRoundtrip = ['create_file', 'move_file', 'delete_file'].every((toolName) =>
         scenario.expectedLifecycleTools.some((tool) => tool.name === toolName),
     );
-    const fileRoundtripSingleSummaryCoverage =
-        /Arquivos\s+CRIAR\b[^\n\r]*\bMOVER\b[^\n\r]*\bEXCLUIR\b/iu.test(beforeRawDiagnosticsPlain);
+    const fileRoundtripSingleSummaryCoverage = /Arquivos\s+CRIAR\b[^\n\r]*\bMOVER\b[^\n\r]*\bEXCLUIR\b/iu.test(
+        beforeRawDiagnosticsPlain,
+    );
     const fileRoundtripDistributedSummaryCoverage =
         /(?:Ações|Arquivos)\s+CRIAR\b/iu.test(beforeRawDiagnosticsPlain) &&
         /(?:Ações|Arquivos)\s+MOVER\b/iu.test(beforeRawDiagnosticsPlain) &&
@@ -6840,8 +7005,7 @@ function evaluateOutput(
                               `${escapeRegExp(scenario.answerSteps[0]?.answer ?? '')}[\\s\\S]{0,2400}${escapeRegExp(scenario.askQuestion)}`,
                               'iu',
                           ).test(plain),
-                      detail:
-                          'choice-only scenario rejected the invalid answer locally or re-opened the question before accepting the valid choice',
+                      detail: 'choice-only scenario rejected the invalid answer locally or re-opened the question before accepting the valid choice',
                   },
               ]
             : []),
@@ -6918,18 +7082,15 @@ function evaluateOutput(
                 !/SDK assistant|pergunta humana SDK|agente\/usage|export envelope|Sessão SDK|Hook iniciado|Hook concluído/u.test(
                     latestEventsDefaultSection,
                 ),
-            detail:
-                '/events default rendered transcript/user/usage/export sources as operator-facing labels before raw diagnostics',
+            detail: '/events default rendered transcript/user/usage/export sources as operator-facing labels before raw diagnostics',
         },
         {
             id: 'sse-archive-default-control-noise-hidden',
             pass:
                 !/^\s*(Atividade|Ocupado|Sessão atualizada|Rotina iniciada|Rotina concluída|Streaming|Turno iniciado|Turno concluído)\s{2,}\d{4}-\d{2}-\d{2}T/imu.test(
                     beforeRawDiagnosticsPlain,
-                ) &&
-                !/^\s*Uso LLM\s{2,}\d{4}-\d{2}-\d{2}T[^\n]*diálogo/imu.test(beforeRawDiagnosticsPlain),
-            detail:
-                '/events default hides routine activity, lifecycle, hook, turn, streaming and duplicate usage rows before raw diagnostics',
+                ) && !/^\s*Uso LLM\s{2,}\d{4}-\d{2}-\d{2}T[^\n]*diálogo/imu.test(beforeRawDiagnosticsPlain),
+            detail: '/events default hides routine activity, lifecycle, hook, turn, streaming and duplicate usage rows before raw diagnostics',
         },
         {
             id: 'sse-archive-human-operational-events',
@@ -6939,8 +7100,7 @@ function evaluateOutput(
                 ) &&
                 (!/Erro do SDK sem mensagem estruturada|erro de provider BYOK/iu.test(latestEventsDefaultSection) ||
                     /Erro BYOK|falha do provider BYOK/iu.test(latestEventsDefaultSection)),
-            detail:
-                '/events default rendered provider failures, cancellations, empty turns, and usage classifications as human operational events',
+            detail: '/events default rendered provider failures, cancellations, empty turns, and usage classifications as human operational events',
         },
         {
             id: 'sse-archive-raw-visible',
@@ -7539,10 +7699,9 @@ function evaluateByokProbeOutput(
         },
         {
             id: 'byok-model-filters-visible',
-            pass:
-                /BYOK (?:models|modelos)[\s\S]{0,800}filtros[\s\S]{0,120}gratuito[\s\S]{0,120}raciocínio[\s\S]{0,120}modo seguro/iu.test(
-                    plain,
-                ),
+            pass: /BYOK (?:models|modelos)[\s\S]{0,800}filtros[\s\S]{0,120}gratuito[\s\S]{0,120}raciocínio[\s\S]{0,120}modo seguro/iu.test(
+                plain,
+            ),
             detail: '/byok models accepted operator filters for free/reasoning/safe discovery',
         },
         {
@@ -7601,7 +7760,9 @@ function evaluateByokProbeOutput(
             },
             {
                 id: 'byok-fixture-model-list',
-                pass: /BYOK (?:models|modelos)[\s\S]{0,800}fixture\/model-a/iu.test(plain) && /fixture\/model-b/.test(plain),
+                pass:
+                    /BYOK (?:models|modelos)[\s\S]{0,800}fixture\/model-a/iu.test(plain) &&
+                    /fixture\/model-b/.test(plain),
                 detail: '/byok models refresh returned fixture model catalog',
             },
             {
@@ -7752,8 +7913,7 @@ function evaluateAutoProbeOutput(
             pass:
                 /BYOK prontidão automática/.test(plain) &&
                 /sem chamada\s+a\s+provedor/iu.test(plain) &&
-                ((/Provar\s+\/byok probe/u.test(plain) &&
-                    /Novo boot\s+\/session sdk next new/u.test(plain)) ||
+                ((/Provar\s+\/byok probe/u.test(plain) && /Novo boot\s+\/session sdk next new/u.test(plain)) ||
                     /nenhuma rota de prontid[aã]o foi derivada do seletor atual/iu.test(plain)),
             detail: '/byok auto standby rendered ready replacement commands or an explicit empty state without provider calls',
         },
@@ -7845,9 +8005,7 @@ function evaluateModelProbeOutput(/** @type {string} */ plain, /** @type {SseSum
         },
         {
             id: 'model-explicit-visible',
-            pass:
-                /Modelo solicitado\s+·\s+auto → gpt-4\.1-mini/u.test(plain) &&
-                /Raciocínio\s+high → off/u.test(plain),
+            pass: /Modelo solicitado\s+·\s+auto → gpt-4\.1-mini/u.test(plain) && /Raciocínio\s+high → off/u.test(plain),
             detail: '/model <id> rendered a local model change and reasoning guidance',
         },
         {
@@ -7901,11 +8059,13 @@ function evaluateModelProbeOutput(/** @type {string} */ plain, /** @type {SseSum
 function evaluateByokRealOutput(
     /** @type {string} */ plain,
     /** @type {{ key: string; value: string }[]} */ secretValues,
-    /** @type {Partial<Awaited<ReturnType<typeof buildRealByokRuntime>>> & {
+    /**
+     * @type {Partial<Awaited<ReturnType<typeof buildRealByokRuntime>>> & {
      *     controlOnly?: boolean;
      *     requireVisionProbe?: boolean;
      *     liveScenario?: LiveScenario;
-     * }} */ {
+     * }}
+     */ {
         profile,
         altProfile,
         model,
@@ -7921,17 +8081,14 @@ function evaluateByokRealOutput(
     const renderedProfileRe = (/** @type {string} */ candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
         return new RegExp(
-            [
-                `profile:\\s+${escaped}`,
-                `Perfil\\s+${escaped}`,
-                `ativo\\s+${escaped}`,
-                `perfil\\s+${escaped}`,
-            ].join('|'),
+            [`profile:\\s+${escaped}`, `Perfil\\s+${escaped}`, `ativo\\s+${escaped}`, `perfil\\s+${escaped}`].join('|'),
             'iu',
         );
     };
     const byokModels = [
-        ...new Set([model, altModel].flatMap((value) => (typeof value === 'string' && value.length > 0 ? [value] : []))),
+        ...new Set(
+            [model, altModel].flatMap((value) => (typeof value === 'string' && value.length > 0 ? [value] : [])),
+        ),
     ];
     const byokModelLegacyRequestLines = byokModels.flatMap((candidate) => {
         const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
@@ -7964,7 +8121,9 @@ function evaluateByokRealOutput(
     const byokVisionProbeStatus = findByokProbeResultStatus(plain, 'vision');
     const leanModelGatewayPreflight = isModelGatewayToolScenario(liveScenario);
     const selectorPreparedBootstrap =
-        runtimeSelector?.requested === true && runtimeSelector?.ok === true && Boolean(runtimeRoute?.providerId && runtimeRoute?.providerModel);
+        runtimeSelector?.requested === true &&
+        runtimeSelector?.ok === true &&
+        Boolean(runtimeRoute?.providerId && runtimeRoute?.providerModel);
     const runtimeProviderId = runtimeRoute?.providerId ?? '';
     const runtimeProviderModel = runtimeRoute?.providerModel ?? '';
     const admissionExecutionOk =
@@ -8227,7 +8386,8 @@ function evaluateBlockedOutput(
     const blockedByByokProvider =
         blocker?.id === 'byok-provider-turn-failed' || blocker?.id === 'byok-route-no-response';
     const adaptiveExhausted = blocker?.id === 'adaptive-selection-exhausted';
-    const adaptiveOutcome = adaptiveExhausted && blocker?.outcome && typeof blocker.outcome === 'object' ? blocker.outcome : null;
+    const adaptiveOutcome =
+        adaptiveExhausted && blocker?.outcome && typeof blocker.outcome === 'object' ? blocker.outcome : null;
     return [
         {
             id: 'ready',
@@ -8577,14 +8737,15 @@ async function main() {
               requireAgentAdmission: !controlOnly && isModelGatewayToolScenario(liveScenario),
           })
         : null;
-    const secretValues = byokReal || modelGatewayControlPlaneProbes
-        ? collectSecretValues({
-              ...process.env,
-              ...dotenvEnv,
-              ...(controlPlaneHostEnv ?? {}),
-              ...(realByok?.env ?? {}),
-          })
-        : [];
+    const secretValues =
+        byokReal || modelGatewayControlPlaneProbes
+            ? collectSecretValues({
+                  ...process.env,
+                  ...dotenvEnv,
+                  ...(controlPlaneHostEnv ?? {}),
+                  ...(realByok?.env ?? {}),
+              })
+            : [];
     if (byokReal && byokRealRuntimeSelectorProfile && !realByok?.runtimeRoute) {
         const blocker = {
             id:
@@ -8752,7 +8913,9 @@ async function main() {
                         ...buildByokRealPreflightCommands(realByok ?? {}, {
                             lean: isModelGatewayToolScenario(liveScenario),
                         }),
-                        ...(controlOnly ? buildByokRealControlOnlyDiagnosticCommands() : [buildScenarioPrompt(liveScenario)]),
+                        ...(controlOnly
+                            ? buildByokRealControlOnlyDiagnosticCommands()
+                            : [buildScenarioPrompt(liveScenario)]),
                     ]
                         .filter(Boolean)
                         .join('\n')
@@ -8768,7 +8931,12 @@ async function main() {
     }
 
     const shouldForceFreshSdkSession =
-        !reuseSdkSession && !controlOnly && !sessionCycle && !byokControlProbe && !autoControlProbe && !modelControlProbe;
+        !reuseSdkSession &&
+        !controlOnly &&
+        !sessionCycle &&
+        !byokControlProbe &&
+        !autoControlProbe &&
+        !modelControlProbe;
     const sdkSessionBootSelection = await scheduleFreshSdkSessionForCanonicalScenario({
         enabled: shouldForceFreshSdkSession,
         model: modelGatewayControlPlaneProbes ? MODEL_GATEWAY_CONTROL_PLANE_COPILOT_MODEL : LIVE_TEST_COPILOT_MODEL,
@@ -8937,8 +9105,9 @@ async function main() {
         onPromptSynchronizedCommandsDrained = onDrained;
         waitingForPromptSynchronizedCommand = false;
         const plain = stripAnsi(raw);
-        const promptSearchOffset =
-            Number.isFinite(promptAfterOffset) ? Math.max(0, Number(promptAfterOffset)) : Math.max(0, plain.length - 512);
+        const promptSearchOffset = Number.isFinite(promptAfterOffset)
+            ? Math.max(0, Number(promptAfterOffset))
+            : Math.max(0, plain.length - 512);
         if (hasReturnedToReplPrompt(plain, promptSearchOffset)) {
             sendNextPromptSynchronizedCommand();
             return;
@@ -8987,7 +9156,9 @@ async function main() {
         if (byokReal) {
             diagnostics.splice(6, 0, '/byok providers', '/byok health', '/byok recommend reasoning safe 8');
         }
-        startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: Math.max(30_000, diagnostics.length * 3_000) });
+        startDiagnosticCommandSequenceThenQuit(diagnostics, {
+            forceKillDelayMs: Math.max(30_000, diagnostics.length * 3_000),
+        });
         return true;
     };
     const scheduleStartupBlockerDiagnostics = (/** @type {LiveBlocker | null} */ blocker) => {
@@ -9160,35 +9331,38 @@ async function main() {
         /** @type {{ delayMs?: number }} */ { delayMs = DEFAULT_MISSING_REQUIRED_ASK_GRACE_MS } = {},
     ) => {
         if (postCommandsSent || missingRequiredAskDiagnosticTimer) return;
-        missingRequiredAskDiagnosticTimer = setTimeout(() => {
-            missingRequiredAskDiagnosticTimer = null;
-            if (postCommandsSent || answerSent || liveScenario.askRenderedRe.test(stripAnsi(raw))) return;
-            if (!missingRequiredAskRecoverySent) {
-                missingRequiredAskRecoverySent = true;
-                missingRequiredAskRecoveryPlainOffset = stripAnsi(raw).length;
+        missingRequiredAskDiagnosticTimer = setTimeout(
+            () => {
+                missingRequiredAskDiagnosticTimer = null;
+                if (postCommandsSent || answerSent || liveScenario.askRenderedRe.test(stripAnsi(raw))) return;
+                if (!missingRequiredAskRecoverySent) {
+                    missingRequiredAskRecoverySent = true;
+                    missingRequiredAskRecoveryPlainOffset = stripAnsi(raw).length;
+                    console.warn(
+                        '[terminal-live] cenário canônico: deltas públicos concluídos sem ask_user; enviando continuação controlada.',
+                    );
+                    write(buildMissingRequiredAskRecoveryPrompt(liveScenario));
+                    return;
+                }
+                postCommandsSent = true;
                 console.warn(
-                    '[terminal-live] cenário canônico: deltas públicos concluídos sem ask_user; enviando continuação controlada.',
+                    '[terminal-live] cenário canônico: ask_user obrigatório continuou ausente após recuperação; coletando diagnósticos.',
                 );
-                write(buildMissingRequiredAskRecoveryPrompt(liveScenario));
-                return;
-            }
-            postCommandsSent = true;
-            console.warn(
-                '[terminal-live] cenário canônico: ask_user obrigatório continuou ausente após recuperação; coletando diagnósticos.',
-            );
-            const diagnostics = [
-                '/activity 40',
-                '/intent 5',
-                '/intent detail 5',
-                '/tools diag',
-                '/events 60',
-                '/events 100 --raw',
-                '/errors 10',
-                '/health full',
-                `/export ${exportArg}`,
-            ];
-            startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
-        }, Math.max(0, delayMs));
+                const diagnostics = [
+                    '/activity 40',
+                    '/intent 5',
+                    '/intent detail 5',
+                    '/tools diag',
+                    '/events 60',
+                    '/events 100 --raw',
+                    '/errors 10',
+                    '/health full',
+                    `/export ${exportArg}`,
+                ];
+                startDiagnosticCommandSequenceThenQuit(diagnostics, { forceKillDelayMs: diagnostics.length * 2_000 });
+            },
+            Math.max(0, delayMs),
+        );
         missingRequiredAskDiagnosticTimer.unref();
     };
     const sendIncompleteExpectedToolRecovery = (
@@ -9520,7 +9694,9 @@ async function main() {
             /Turno conclu[ií]do\s+tools executadas; a LLM-B não emitiu síntese pública/iu.test(scenarioTailPlain) &&
             hasReturnedToNormalReplPrompt(plain, scenarioPlainOffset)
         ) {
-            sendIncompleteExpectedToolRecovery(findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario));
+            sendIncompleteExpectedToolRecovery(
+                findIncompleteExpectedToolChain(sseCollector?.events ?? [], liveScenario),
+            );
         }
         if (
             scenarioSent &&
@@ -9648,7 +9824,11 @@ async function main() {
               });
     const evaluateScenarioWithBlocker = shouldEvaluateScenarioDespiteBlocker(blocker);
     const exportSummary =
-        controlOnly || byokControlProbe || autoControlProbe || modelControlProbe || (blocker && !evaluateScenarioWithBlocker)
+        controlOnly ||
+        byokControlProbe ||
+        autoControlProbe ||
+        modelControlProbe ||
+        (blocker && !evaluateScenarioWithBlocker)
             ? null
             : await inspectExportedMarkdown(exportPath, liveScenario);
     const baseCriteria = blocker

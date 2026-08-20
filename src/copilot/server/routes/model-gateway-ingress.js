@@ -3,16 +3,16 @@
  * OpenAI-compatible HTTP ingress for Model Gateway live routes.
  *
  * Mounted under `/v1/model-gateway-ingress/:routeId`, this router is the SDK-facing local provider endpoint. It
- * authenticates with the per-route local API key and forwards requests to the real upstream provider through the
- * Model Gateway ingress primitives.
+ * authenticates with the per-route local API key and forwards requests to the real upstream provider through the Model
+ * Gateway ingress primitives.
  *
  * @module copilot/server/routes/model-gateway-ingress
  */
 
+import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import express from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { readBoundedResponseText } from '#copilot/infra/public/http-response';
 import {
     MODEL_GATEWAY_INGRESS_HOP_BY_HOP_HEADERS,
     defaultModelGatewayIngressRouteRegistry,
@@ -53,11 +53,7 @@ function readBearerToken(req) {
  * @returns {string | null}
  */
 function readProvidedLocalApiKey(req) {
-    return (
-        readBearerToken(req) ??
-        optionalString(req.headers['x-api-key']) ??
-        optionalString(req.headers['api-key'])
-    );
+    return readBearerToken(req) ?? optionalString(req.headers['x-api-key']) ?? optionalString(req.headers['api-key']);
 }
 
 /**
@@ -87,7 +83,7 @@ async function sendUpstreamResponse(res, upstreamResponse) {
     res.status(status);
 
     const headers = upstreamResponse['headers'];
-    if (headers && typeof /** @type {{ forEach?: unknown }} */ (headers).forEach === 'function') {
+    if (headers && typeof (/** @type {{ forEach?: unknown }} */ (headers).forEach) === 'function') {
         /** @type {{ forEach: (callback: (value: string, key: string) => void) => void }} */ (headers).forEach(
             (value, key) => {
                 const normalizedKey = key.toLowerCase();
@@ -97,7 +93,7 @@ async function sendUpstreamResponse(res, upstreamResponse) {
     }
 
     const body = upstreamResponse['body'];
-    if (body && typeof /** @type {{ getReader?: unknown }} */ (body).getReader === 'function') {
+    if (body && typeof (/** @type {{ getReader?: unknown }} */ (body).getReader) === 'function') {
         await new Promise((resolve, reject) => {
             Readable.fromWeb(/** @type {import('node:stream/web').ReadableStream} */ (body))
                 .on('error', reject)
@@ -107,7 +103,7 @@ async function sendUpstreamResponse(res, upstreamResponse) {
         return;
     }
 
-    if (typeof /** @type {{ text?: unknown }} */ (upstreamResponse).text === 'function') {
+    if (typeof (/** @type {{ text?: unknown }} */ (upstreamResponse).text) === 'function') {
         res.send(
             await readBoundedResponseText(/** @type {Response} */ (/** @type {unknown} */ (upstreamResponse)), {
                 maxBytes: 16 * 1024 * 1024,
@@ -135,7 +131,10 @@ function errorMessage(error) {
 /**
  * @param {object} [options]
  * @param {import('../../model-gateway/ingress/route-registry.js').ModelGatewayIngressRouteRegistry} [options.registry]
- * @param {(url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<unknown>} [options.fetchImpl]
+ * @param {(
+ *     url: string,
+ *     init: { method: string; headers: Record<string, string>; body: string },
+ * ) => Promise<unknown>} [options.fetchImpl]
  * @returns {import('express').Router}
  */
 export function createModelGatewayIngressRouter(options = {}) {

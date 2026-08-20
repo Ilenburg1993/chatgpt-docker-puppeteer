@@ -119,7 +119,11 @@ function _updatePatch(id, fields = {}) {
                 ? existing['dry_run_result_json']
                 : _safeJsonString(fields['dry_run_result_json'], 'null'),
         approval_required:
-            fields['approval_required'] === undefined ? existing['approval_required'] : fields['approval_required'] ? 1 : 0,
+            fields['approval_required'] === undefined
+                ? existing['approval_required']
+                : fields['approval_required']
+                  ? 1
+                  : 0,
         approved_by: fields['approved_by'] === undefined ? existing['approved_by'] : fields['approved_by'],
         approved_at_ms: fields['approved_at_ms'] === undefined ? existing['approved_at_ms'] : fields['approved_at_ms'],
         applied_by: fields['applied_by'] === undefined ? existing['applied_by'] : fields['applied_by'],

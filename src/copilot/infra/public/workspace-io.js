@@ -19,6 +19,7 @@ import {
 } from '../io/policy/validated-path.js';
 import {
     appendTextLocked,
+    chmodFileLocked,
     copyFileLocked,
     createOrReplaceFileAtomic,
     deleteFileLocked,
@@ -27,9 +28,14 @@ import {
     patchTextBatchLocked,
     patchTextLocked,
     readBytes,
+    readBytesFresh,
+    readBytesRangeFresh,
     readLines,
     readText,
+    readTextFresh,
     readTextChunks,
+    listDirectoryNamesFresh,
+    lstatPath,
     removePathLocked,
     statPath,
     withIoResourceLock,
@@ -41,11 +47,11 @@ import { warmReadThroughContext } from '../io-prefetch.js';
 import { scanDirectory } from '../io-scanner.js';
 
 /**
- * @typedef {'append' | 'copy' | 'delete' | 'mkdir' | 'move' | 'patch' | 'read' | 'scan' | 'search' | 'stat' | 'write'} WorkspaceIoMode
+ * @typedef {'append' | 'copy' | 'delete' | 'metadata' | 'mkdir' | 'move' | 'patch' | 'read' | 'scan' | 'search' | 'stat' | 'write'} WorkspaceIoMode
  * @typedef {{ workspaceRoot: string; blockedSegments?: readonly string[] }} WorkspaceIoContext
  */
 
-const MUTABLE_MODES = new Set(['append', 'copy', 'delete', 'mkdir', 'move', 'patch', 'write']);
+const MUTABLE_MODES = new Set(['append', 'copy', 'delete', 'metadata', 'mkdir', 'move', 'patch', 'write']);
 
 /**
  * @param {unknown[]} args
@@ -145,7 +151,7 @@ function bindValidatedReadOperation(operation, mode, context) {
  * @template {unknown[]} Args
  * @template Result
  * @param {(filePath: string, ...args: Args) => Promise<Result>} operation
- * @param {'write' | 'patch'} mode
+ * @param {'write' | 'patch' | 'metadata'} mode
  * @param {WorkspaceIoContext} context
  * @returns {(capability: unknown, ...args: Args) => Promise<Result>}
  */
@@ -369,8 +375,10 @@ export function createWorkspaceIo(context) {
         });
 
     const readBytesValidated = bindValidatedReadOperation(readBytes, 'read', context);
+    const readBytesRangeFreshValidated = bindValidatedReadOperation(readBytesRangeFresh, 'read', context);
     const readTextValidated = bindValidatedReadOperation(readText, 'read', context);
     const readTextChunksValidated = bindValidatedReadOperation(readTextChunks, 'read', context);
+    const lstatPathValidated = bindValidatedReadOperation(lstatPath, 'stat', context);
     const statPathValidated = bindValidatedReadOperation(statPath, 'stat', context);
     const diffTextValidated = bindValidatedReadPairOperation(diffText, context);
     const scanDirectoryValidated = bindValidatedReadOperation(
@@ -383,6 +391,7 @@ export function createWorkspaceIo(context) {
         context,
     );
     const copyFileLockedValidated = bindValidatedReadMutablePairOperation(copyFileLocked, context);
+    const chmodFileLockedValidated = bindValidatedMutableOperation(chmodFileLocked, 'metadata', context);
     const createOrReplaceFileAtomicValidated = bindValidatedMutableOperation(createOrReplaceFileAtomic, 'write', context);
     const moveFileLockedValidated = bindValidatedMutablePairOperation(moveFileLocked, context);
     const patchTextBatchLockedValidated = bindValidatedMutableOperation(patchTextBatchLocked, 'patch', context);
@@ -409,6 +418,8 @@ export function createWorkspaceIo(context) {
 
     return Object.freeze({
         appendTextLocked: bindWorkspacePathOperation(appendTextLocked, 'append', context),
+        chmodFileLocked: bindWorkspacePathOperation(chmodFileLocked, 'metadata', context),
+        chmodFileLockedValidated,
         copyFileLocked: bindWorkspacePathPairOperation(copyFileLocked, 'read', 'write', context),
         copyFileLockedValidated,
         createOrReplaceFileAtomic: bindWorkspacePathOperation(createOrReplaceFileAtomic, 'write', context),
@@ -424,13 +435,20 @@ export function createWorkspaceIo(context) {
         patchTextLocked: bindWorkspacePathOperation(patchTextLocked, 'patch', context),
         patchTextLockedValidated,
         readBytes: bindWorkspacePathOperation(readBytes, 'read', context),
+        readBytesFresh: bindWorkspacePathOperation(readBytesFresh, 'read', context),
+        readBytesRangeFresh: bindWorkspacePathOperation(readBytesRangeFresh, 'read', context),
+        readBytesRangeFreshValidated,
         readBytesValidated,
         readLines: bindWorkspacePathOperation(readLines, 'read', context),
         readText: bindWorkspacePathOperation(readText, 'read', context),
+        readTextFresh: bindWorkspacePathOperation(readTextFresh, 'read', context),
         readTextValidated,
         readTextChunks: bindWorkspacePathOperation(readTextChunks, 'read', context),
         readTextChunksValidated,
         removePathLocked: bindWorkspaceRemovePathOperation(removePathLocked, context),
+        listDirectoryNamesFresh: bindWorkspacePathOperation(listDirectoryNamesFresh, 'scan', context),
+        lstatPath: bindWorkspacePathOperation(lstatPath, 'stat', context),
+        lstatPathValidated,
         scanDirectory: scanWorkspaceDirectory,
         scanDirectoryValidated,
         searchText: searchWorkspaceText,

@@ -79,12 +79,7 @@ function cleanMarkdownCell(value) {
  * @returns {string[]}
  */
 function splitMarkdownRow(line) {
-    return line
-        .trim()
-        .replace(/^\|/u, '')
-        .replace(/\|$/u, '')
-        .split('|')
-        .map(cleanMarkdownCell);
+    return line.trim().replace(/^\|/u, '').replace(/\|$/u, '').split('|').map(cleanMarkdownCell);
 }
 
 /**
@@ -117,7 +112,8 @@ function modelIdFromDisplayName(name) {
  * @returns {ZaiPricingRow[]}
  */
 function parseZaiPricingRows(raw) {
-    const markdown = typeof raw === 'string' ? raw : isRecord(raw) && typeof raw['markdown'] === 'string' ? raw['markdown'] : '';
+    const markdown =
+        typeof raw === 'string' ? raw : isRecord(raw) && typeof raw['markdown'] === 'string' ? raw['markdown'] : '';
     /** @type {'text' | 'vision' | null} */
     let section = null;
     /** @type {ZaiPricingRow[]} */
@@ -210,7 +206,7 @@ function modalitiesForRow(row) {
 
 /**
  * @param {ZaiPricingRow} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const modalities = modalitiesForRow(row);
@@ -245,7 +241,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.zai.cacheWriteNote', value: row.cacheWriteNote },
         { fieldPath: 'providerMetadata.zai.builtInWebSearchUsdPerUse', value: ZAI_BUILT_IN_WEB_SEARCH_USD_PER_USE },
         { fieldPath: 'providerMetadata.zai.sourceLine', value: row.sourceLine },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'zai' },
     ];
     return values.filter((item) => {

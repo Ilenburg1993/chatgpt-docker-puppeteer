@@ -292,9 +292,7 @@ export class ResumeSessionConfigBuilder {
     build() {
         return sanitizeResumeSessionConfig({
             ...this.#base.build(),
-            ...(this.#suppressResumeEvent !== undefined
-                ? { suppressResumeEvent: this.#suppressResumeEvent }
-                : {}),
+            ...(this.#suppressResumeEvent !== undefined ? { suppressResumeEvent: this.#suppressResumeEvent } : {}),
             ...(this.#openCanvases !== undefined ? { openCanvases: this.#openCanvases } : {}),
         });
     }

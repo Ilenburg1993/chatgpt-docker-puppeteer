@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * tests/unit/copilot/test_hooks_bus.spec.js
  *
@@ -78,7 +77,9 @@ describe('HookBus — emissão e escuta', () => {
         const eventBus = createEventBus();
         /** @type {any[]} */
         const events = [];
-        eventBus.on('hook:error_occurred', (evt) => { events.push(evt); });
+        eventBus.on('hook:error_occurred', (evt) => {
+            events.push(evt);
+        });
         bus.setEventBus(eventBus);
 
         bus.emitHook(

@@ -287,7 +287,7 @@ if (inputProtocol) {
    ```bash
    # Move analyzer de volta
    mv src/shared/sadi/analyzer.js src/driver/modules/analyzer.js
-   
+
    # Reverte imports (4 arquivos)
    # prerequisite_validator.js: @shared/sadi/analyzer → @driver/modules/analyzer
    # biomechanics_engine.js: @shared/sadi/analyzer → ./analyzer

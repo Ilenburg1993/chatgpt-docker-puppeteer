@@ -1,5 +1,5 @@
-import { log } from '#core/logger';
 import { CONNECTION_MODES } from '#core/constants/browser';
+import { log } from '#core/logger';
 
 // Configuração de teste
 process.env['NODE_ENV'] = 'test';
@@ -21,14 +21,16 @@ async function testChromeProxyIntegration() {
     let nerv = null;
     let browserPool = null;
 
-    /** @type {{
+    /**
+     * @type {{
      *     proxyStart: boolean;
      *     proxyHealth: boolean;
      *     poolValidation: boolean;
      *     poolConnection: boolean;
-     *     nervEvents: Array<{ actor: unknown; action: unknown; payload: Record<string, unknown>; timestamp: number }>;
+     *     nervEvents: { actor: unknown; action: unknown; payload: Record<string, unknown>; timestamp: number }[];
      *     shutdown: boolean;
-     * }} */
+     * }}
+     */
     const results = {
         proxyStart: false,
         proxyHealth: false,
@@ -201,7 +203,10 @@ async function testChromeProxyIntegration() {
             if (browserPool && typeof browserPool.shutdown === 'function') await browserPool.shutdown();
             if (chromeProxy) await chromeProxy.stop();
         } catch (cleanupError) {
-            log('WARN', `Erro no cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`);
+            log(
+                'WARN',
+                `Erro no cleanup: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
+            );
         }
 
         process.exit(1);

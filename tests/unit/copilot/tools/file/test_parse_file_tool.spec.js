@@ -131,10 +131,7 @@ describe('workspace_parse_file', () => {
             ...PARSED_PAYLOAD,
             symbols: {
                 ...PARSED_PAYLOAD.symbols,
-                symbols: [
-                    ...PARSED_PAYLOAD.symbols.symbols,
-                    { name: 'second', kind: 'function', line: 9 },
-                ],
+                symbols: [...PARSED_PAYLOAD.symbols.symbols, { name: 'second', kind: 'function', line: 9 }],
             },
         });
 

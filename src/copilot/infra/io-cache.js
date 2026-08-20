@@ -25,9 +25,9 @@ import * as fsPromises from 'node:fs/promises';
 import * as nodePath from 'node:path';
 import { normalizeIoCacheKey } from './cache/l1/index.js';
 import { publishIoInvalidation, registerIoInvalidationHook } from './io/invalidation/bus.js';
+import { readEnvIntAtLeast, readEnvPositiveInt } from './shared/env.js';
 import { fingerprintMatches, richFingerprintMatches } from './shared/fingerprint-match.js';
 import { sha256 } from './shared/hash.js';
-import { readEnvIntAtLeast, readEnvPositiveInt } from './shared/env.js';
 
 // ---------------------------------------------------------------------------
 // Config

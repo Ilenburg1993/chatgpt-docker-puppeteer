@@ -11,7 +11,10 @@ import { iterateTextLines } from '../shared/text-lines.js';
  * Extrai top-level keys de um JSON completo ou da primeira linha JSONL válida.
  *
  * @param {string} content
- * @returns {{ symbols: Array<{ kind: 'variable'; name: string; exported: false; line: number; docComment: null }>; parseError: string | null }}
+ * @returns {{
+ *     symbols: { kind: 'variable'; name: string; exported: false; line: number; docComment: null }[];
+ *     parseError: string | null;
+ * }}
  */
 export function extractJsonSchema(content) {
     try {

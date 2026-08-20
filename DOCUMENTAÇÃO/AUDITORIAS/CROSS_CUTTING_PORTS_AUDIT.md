@@ -590,17 +590,17 @@ describe('Docker Port Mapping', () => {
    # =============================================================================
    # NETWORKING & PORTS
    # =============================================================================
-   
+
    # Server URL (base URL for API/Dashboard)
    SERVER_URL=http://localhost:3008
-   
+
    # Health check endpoint
    HEALTH_CHECK_URL=http://localhost:3008/api/health
-   
+
    # Port hunting configuration
    ENABLE_PORT_HUNTING=true
    MAX_PORT_ATTEMPTS=5
-   
+
    # Chrome connection configuration
    CHROME_CONNECTION_TIMEOUT=5000
    CHROME_CONNECTION_RETRIES=3

@@ -49,35 +49,32 @@ describe('MCP OAuth smoke hardening', () => {
         };
 
         const fetchMock = vi.fn(async (input, init = {}) => {
-                const url = String(input);
-                const method = String(init.method ?? 'GET').toUpperCase();
-                if (url.endsWith('/oauth/token')) throw new Error('token endpoint must not be called after state mismatch');
-                if (method === 'OPTIONS') return optionsResponse();
-                if (url.endsWith('/.well-known/oauth-protected-resource')) {
-                    return jsonResponse({ authorization_servers: [authorizationServer] });
-                }
-                if (url.endsWith('/.well-known/oauth-authorization-server')) return jsonResponse(metadata);
-                if (url.endsWith('/oauth/jwks.json')) return jsonResponse({ keys: [] });
-                if (url.endsWith('/oauth/register')) {
-                    return jsonResponse({
-                        client_id: 'registered-client',
-                        redirect_uris: ['https://chatgpt.com/connector/oauth/codex-smoke'],
-                    });
-                }
-                if (url.startsWith(`${authorizationServer}/oauth/authorize`)) {
-                    return new Response('', {
-                        status: 302,
-                        headers: {
-                            location: 'https://chatgpt.com/connector/oauth/codex-smoke?code=abc&state=wrong-state',
-                        },
-                    });
-                }
-                return jsonResponse({ error: 'unexpected', url, method }, { status: 500 });
-            });
-        vi.stubGlobal(
-            'fetch',
-            fetchMock,
-        );
+            const url = String(input);
+            const method = String(init.method ?? 'GET').toUpperCase();
+            if (url.endsWith('/oauth/token')) throw new Error('token endpoint must not be called after state mismatch');
+            if (method === 'OPTIONS') return optionsResponse();
+            if (url.endsWith('/.well-known/oauth-protected-resource')) {
+                return jsonResponse({ authorization_servers: [authorizationServer] });
+            }
+            if (url.endsWith('/.well-known/oauth-authorization-server')) return jsonResponse(metadata);
+            if (url.endsWith('/oauth/jwks.json')) return jsonResponse({ keys: [] });
+            if (url.endsWith('/oauth/register')) {
+                return jsonResponse({
+                    client_id: 'registered-client',
+                    redirect_uris: ['https://chatgpt.com/connector/oauth/codex-smoke'],
+                });
+            }
+            if (url.startsWith(`${authorizationServer}/oauth/authorize`)) {
+                return new Response('', {
+                    status: 302,
+                    headers: {
+                        location: 'https://chatgpt.com/connector/oauth/codex-smoke?code=abc&state=wrong-state',
+                    },
+                });
+            }
+            return jsonResponse({ error: 'unexpected', url, method }, { status: 500 });
+        });
+        vi.stubGlobal('fetch', fetchMock);
 
         const result = await runMcpOAuthSmoke({
             resource: authorizationServer,
@@ -92,13 +89,15 @@ describe('MCP OAuth smoke hardening', () => {
         const flow = /** @type {{ token: { ok: boolean; error: string | null } }} */ (result['dcrFlow']);
         assert.equal(flow.token.ok, false);
         assert.equal(flow.token.error, 'authorization state mismatch');
-        assert.equal(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/oauth/token')), false);
+        assert.equal(
+            fetchMock.mock.calls.some(([input]) => String(input).endsWith('/oauth/token')),
+            false,
+        );
     });
 
     it('normalizes Streamable HTTP POST SSE frames into JSON-RPC objects', () => {
         const parsed = parseMcpJsonResponseText(
-            'event: message\n' +
-                'data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"repo_status"}]}}\n\n',
+            'event: message\n' + 'data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"repo_status"}]}}\n\n',
         );
 
         assert.deepEqual(parsed, {

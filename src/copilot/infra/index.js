@@ -23,7 +23,6 @@ export { createIoL2SqliteCache, isIoL2Cache } from './io-cache-l2-sqlite.js';
 
 export { getIoL2Cache, getIoL2CacheHealth, getIoL2CacheStats, resetIoL2CacheForTest } from './io-cache-l2-registry.js';
 
-export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 export {
     DEFAULT_BULK_CONCURRENCY,
     DEFAULT_BULK_MAX_ITEMS,
@@ -31,11 +30,8 @@ export {
     MAX_BULK_CONCURRENCY,
     runBoundedOperationBatch,
 } from './bulk-executor.js';
-export {
-    beginIoAdvisoryBudget,
-    getIoAdvisoryBudgetStats,
-    resetIoAdvisoryBudgetForTest,
-} from './io-advisory-budget.js';
+export { beginIoAdvisoryBudget, getIoAdvisoryBudgetStats, resetIoAdvisoryBudgetForTest } from './io-advisory-budget.js';
+export { aggregateIoCacheTierStats, buildIoCacheTierPlan } from './io-cache-tiering.js';
 export {
     buildIoIndexForDirectory,
     findIoIndexSymbol,
@@ -49,11 +45,13 @@ export { createIoIndexSqlite, isIoIndex } from './io-index-sqlite.js';
 
 export {
     appendTextLocked,
+    chmodFileLocked,
     copyFileLocked,
     createOrReplaceFileAtomic,
     deleteFileLocked,
     diffText,
     moveFileLocked,
+    openDetachedAppendSinkLocked,
     patchTextLocked,
     readBytes,
     readLines,

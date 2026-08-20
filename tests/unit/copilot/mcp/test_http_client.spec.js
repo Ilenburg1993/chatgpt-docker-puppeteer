@@ -68,9 +68,9 @@ describe('MCP HTTP client', () => {
 
     it('rejects invalid UTF-8 and enforces response byte budgets', async () => {
         const invalidBaseUrl = await startServer((_request, response) => {
-            response.writeHead(200, { 'content-type': 'application/json' }).end(
-                Buffer.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]),
-            );
+            response
+                .writeHead(200, { 'content-type': 'application/json' })
+                .end(Buffer.from([0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xff, 0x22, 0x7d]));
         });
         const invalid = await mcpFetchText(`${invalidBaseUrl}/invalid`, { timeoutMs: 1000 });
 

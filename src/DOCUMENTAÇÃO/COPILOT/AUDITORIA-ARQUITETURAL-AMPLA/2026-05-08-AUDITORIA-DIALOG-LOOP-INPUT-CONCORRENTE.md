@@ -105,8 +105,7 @@ para limpar o multiline.
 
 ## Rodada complementar — steer e interrupção
 
-A investigação foi aprofundada em
-`2026-05-08-AUDITORIA-DIALOG-LOOP-STEER-E-INTERRUPCAO.md`.
+A investigação foi aprofundada em `2026-05-08-AUDITORIA-DIALOG-LOOP-STEER-E-INTERRUPCAO.md`.
 
 Resultado aplicado: o canal principal `/inject` passou a aceitar `mode=queue|steer|interrupt`, e o
 terminal ganhou comandos imediatos `/steer`, `/interrupt` e `/abort`. Com isso, a LLM-A e o humano

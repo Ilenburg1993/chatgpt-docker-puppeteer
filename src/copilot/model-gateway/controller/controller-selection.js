@@ -115,11 +115,12 @@ function evaluateByokControllerRoute(route, context) {
     const providerModel = text(selected['providerModel']) ?? text(route['providerModel']);
     if (!providerId || !providerModel) return null;
     const runtimeHealth = record(route['runtimeHealth']);
-    const health = Object.keys(record(runtimeHealth['health'])).length > 0
-        ? record(runtimeHealth['health'])
-        : Object.keys(record(route['health'])).length > 0
-          ? record(route['health'])
-          : runtimeHealth;
+    const health =
+        Object.keys(record(runtimeHealth['health'])).length > 0
+            ? record(runtimeHealth['health'])
+            : Object.keys(record(route['health'])).length > 0
+              ? record(route['health'])
+              : runtimeHealth;
     const proof = summarizeGatewayRuntimeProofFreshness(health, {
         ...(context.now !== undefined ? { now: context.now } : {}),
         maxAgeMs: context.maxAgentProofAgeMs,
@@ -139,7 +140,9 @@ function evaluateByokControllerRoute(route, context) {
             maxAgeMs: proof.maxAgeMs,
             stale: proof.stale,
         },
-        rejectedReasons: eligible ? [] : [proof.hasHistoricalProof ? 'agent_proof_stale_or_missing' : 'agent_proof_missing'],
+        rejectedReasons: eligible
+            ? []
+            : [proof.hasHistoricalProof ? 'agent_proof_stale_or_missing' : 'agent_proof_missing'],
     };
 }
 
@@ -147,14 +150,19 @@ function evaluateByokControllerRoute(route, context) {
  * Build a deterministic controller selection plan.
  *
  * @param {{
- *   sdkModels?: unknown[];
- *   sdkQuota?: unknown;
- *   byokRoutes?: unknown[];
- *   currentController?: { substrate?: string | null; modelId?: string | null; providerId?: string | null; providerModel?: string | null } | null;
- *   now?: string | number | Date;
- *   minContextWindowTokens?: number;
- *   maxAgentProofAgeMs?: number;
- *   allowOpaqueSdkAutoFallback?: boolean;
+ *     sdkModels?: unknown[];
+ *     sdkQuota?: unknown;
+ *     byokRoutes?: unknown[];
+ *     currentController?: {
+ *         substrate?: string | null;
+ *         modelId?: string | null;
+ *         providerId?: string | null;
+ *         providerModel?: string | null;
+ *     } | null;
+ *     now?: string | number | Date;
+ *     minContextWindowTokens?: number;
+ *     maxAgentProofAgeMs?: number;
+ *     allowOpaqueSdkAutoFallback?: boolean;
  * }} [input]
  */
 export function buildModelGatewayControllerSelectionPlan(input = {}) {
@@ -162,25 +170,36 @@ export function buildModelGatewayControllerSelectionPlan(input = {}) {
     const quotaSummary = quota.summary;
     const nativeBlockedByQuota = Number(quotaSummary.blocked ?? 0) > 0;
     const quotaStatus = text(quotaSummary.status) ?? 'unknown';
-    const minContextWindowTokens =
-        finiteNumber(input.minContextWindowTokens) ?? DEFAULT_MIN_CONTEXT_WINDOW_TOKENS;
+    const minContextWindowTokens = finiteNumber(input.minContextWindowTokens) ?? DEFAULT_MIN_CONTEXT_WINDOW_TOKENS;
     const maxAgentProofAgeMs = finiteNumber(input.maxAgentProofAgeMs) ?? DEFAULT_AGENT_PROOF_MAX_AGE_MS;
     const current = input.currentController ?? null;
-    const currentModelId = current?.substrate === MODEL_GATEWAY_CONTROLLER_SUBSTRATES.COPILOT
-        ? text(current.modelId)
-        : null;
+    const currentModelId =
+        current?.substrate === MODEL_GATEWAY_CONTROLLER_SUBSTRATES.COPILOT ? text(current.modelId) : null;
     const nativeCandidates = (Array.isArray(input.sdkModels) ? input.sdkModels : [])
         .map((model) => evaluateNativeModel(record(model), { minContextWindowTokens, quotaStatus, currentModelId }))
         .filter((candidate) => candidate !== null)
-        .sort((left, right) => Number(right.eligible) - Number(left.eligible) || right.score - left.score || left.modelId.localeCompare(right.modelId));
+        .sort(
+            (left, right) =>
+                Number(right.eligible) - Number(left.eligible) ||
+                right.score - left.score ||
+                left.modelId.localeCompare(right.modelId),
+        );
     const nativeEligible = nativeBlockedByQuota ? [] : nativeCandidates.filter((candidate) => candidate.eligible);
     const byokCandidates = (Array.isArray(input.byokRoutes) ? input.byokRoutes : [])
-        .map((route) => evaluateByokControllerRoute(record(route), {
-            ...(input.now !== undefined ? { now: input.now } : {}),
-            maxAgentProofAgeMs,
-        }))
+        .map((route) =>
+            evaluateByokControllerRoute(record(route), {
+                ...(input.now !== undefined ? { now: input.now } : {}),
+                maxAgentProofAgeMs,
+            }),
+        )
         .filter((candidate) => candidate !== null)
-        .sort((left, right) => Number(right.eligible) - Number(left.eligible) || right.score - left.score || left.providerId.localeCompare(right.providerId) || left.providerModel.localeCompare(right.providerModel));
+        .sort(
+            (left, right) =>
+                Number(right.eligible) - Number(left.eligible) ||
+                right.score - left.score ||
+                left.providerId.localeCompare(right.providerId) ||
+                left.providerModel.localeCompare(right.providerModel),
+        );
     const byokEligible = byokCandidates.filter((candidate) => candidate.eligible);
 
     if (nativeEligible[0]) {
@@ -192,7 +211,8 @@ export function buildModelGatewayControllerSelectionPlan(input = {}) {
             selected,
             requiresNewSession:
                 Boolean(current?.substrate) &&
-                (current?.substrate !== MODEL_GATEWAY_CONTROLLER_SUBSTRATES.COPILOT || text(current?.modelId) !== selected.modelId),
+                (current?.substrate !== MODEL_GATEWAY_CONTROLLER_SUBSTRATES.COPILOT ||
+                    text(current?.modelId) !== selected.modelId),
             quota,
             nativeBlockedByQuota,
             nativeCandidates,
@@ -200,7 +220,9 @@ export function buildModelGatewayControllerSelectionPlan(input = {}) {
             reasons: [
                 'native_copilot_account_visible_model_selected',
                 `sdk_quota:${quotaStatus}`,
-                quotaStatus === 'critical' || quotaStatus === 'warn' ? 'quota_pressure_cost_weight_increased' : 'quality_reliability_first',
+                quotaStatus === 'critical' || quotaStatus === 'warn'
+                    ? 'quota_pressure_cost_weight_increased'
+                    : 'quality_reliability_first',
             ],
         };
     }
@@ -212,7 +234,8 @@ export function buildModelGatewayControllerSelectionPlan(input = {}) {
             status: MODEL_GATEWAY_CONTROLLER_SELECTION_STATUS.BYOK_FALLBACK_READY,
             ready: true,
             selected,
-            requiresNewSession: current?.substrate !== MODEL_GATEWAY_CONTROLLER_SUBSTRATES.BYOK ||
+            requiresNewSession:
+                current?.substrate !== MODEL_GATEWAY_CONTROLLER_SUBSTRATES.BYOK ||
                 text(current?.providerId) !== selected.providerId ||
                 text(current?.providerModel) !== selected.providerModel,
             quota,
@@ -241,7 +264,10 @@ export function buildModelGatewayControllerSelectionPlan(input = {}) {
             nativeBlockedByQuota,
             nativeCandidates,
             byokCandidates,
-            reasons: ['sdk_model_catalog_unavailable_or_empty', 'opaque_auto_allowed_only_as_explicit_compatibility_fallback'],
+            reasons: [
+                'sdk_model_catalog_unavailable_or_empty',
+                'opaque_auto_allowed_only_as_explicit_compatibility_fallback',
+            ],
         };
     }
 

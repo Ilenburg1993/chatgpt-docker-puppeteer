@@ -30,7 +30,7 @@ const CATEGORY_TOOL_MAP = {
 };
 ```
 
-Novos modules (hub*\*, todo*_, session*rpc*_, permission\_\*) não estão no mapa. `list_tools` com
+Novos modules (hub*\*, todo*\_, session*rpc*_, permission\_\*) não estão no mapa. `list_tools` com
 `category: 'todo'` retornaria lista vazia.
 
 **Impacto**: Médio — funcionalidade de categorização por `list_tools` está quebrada para metade das

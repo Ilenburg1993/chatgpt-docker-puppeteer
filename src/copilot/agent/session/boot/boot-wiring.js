@@ -79,8 +79,8 @@ import {
  * }) => void} receiveHandoff
  * @property {() => void} ensureDialogLoopAttached — Garante DLM attached
  * @property {() => Promise<void>} resumeDialogLoop — Retoma dialog loop
- * @property {(bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>} startDialogLoop —
- *   Inicia dialog loop
+ * @property {(bootPrompt?: string, opts?: { resumeSessionAttach?: boolean }) => Promise<void>} startDialogLoop — Inicia
+ *   dialog loop
  * @property {(options?: {
  *     isIdle?: () => boolean;
  *     onKeepalive?: (info: { ts: number; strategy: 'client.ping' | 'session.send' }) => void;
@@ -161,9 +161,10 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
         return;
     }
 
-    const rawClientEvents = /** @type {{ on?: (...args: unknown[]) => unknown; off?: (...args: unknown[]) => void }} */ (
-        /** @type {unknown} */ (client)
-    );
+    const rawClientEvents =
+        /** @type {{ on?: (...args: unknown[]) => unknown; off?: (...args: unknown[]) => void }} */ (
+            /** @type {unknown} */ (client)
+        );
     if (typeof rawClientEvents.on === 'function') {
         /** @param {unknown} rawError */
         const onRawClientError = (rawError) => {
@@ -207,8 +208,8 @@ function stepRegisterClientLifecycleHandlers(client, ctx, state) {
 
 // ── 10. Quota Monitor (F118 — Faixa 25) ──
 /**
- * Mantido em `boot-wiring.js` como ponto canônico visível do quota monitor para auditorias estruturais existentes.
- * O import canônico permanece na façade de SDK do agent; não há alias folha para quota.
+ * Mantido em `boot-wiring.js` como ponto canônico visível do quota monitor para auditorias estruturais existentes. O
+ * import canônico permanece na façade de SDK do agent; não há alias folha para quota.
  *
  * @param {CopilotClient} client
  * @param {BootWiringContext} ctx

@@ -3,28 +3,60 @@
 Data: 2026-06-10  
 Workspace: `/workspaces/chatgpt-docker-puppeteer`  
 Branch/HEAD observado: `main` / `e69ec3d8`  
-Documento gerado por auditoria read-mostly do conector `WORKSPACE`, com validação controlada `mcp-full` e consulta a documentações oficiais atuais.
+Documento gerado por auditoria read-mostly do conector `WORKSPACE`, com validação controlada
+`mcp-full` e consulta a documentações oficiais atuais.
 
 ---
 
 ## 1. Sumário executivo
 
-O sistema está em um patamar funcional alto: o conector remoto permanente `https://mcp.aurelin.org/mcp` está pronto para uso, com OAuth ligado em modo obrigatório, túnel Cloudflare nomeado, transporte QUIC, origem HTTPS/HTTP2, regras Cloudflare de bypass de cache para rotas dinâmicas e proteção de `/oauth/token`. A superfície MCP é ampla e bem categorizada: 96 tools anunciadas, 74 read-only, 20 bounded-write, 2 destructive e 0 open-world. A pontuação interna de autonomia é `96/A`.
+O sistema está em um patamar funcional alto: o conector remoto permanente
+`https://mcp.aurelin.org/mcp` está pronto para uso, com OAuth ligado em modo obrigatório, túnel
+Cloudflare nomeado, transporte QUIC, origem HTTPS/HTTP2, regras Cloudflare de bypass de cache para
+rotas dinâmicas e proteção de `/oauth/token`. A superfície MCP é ampla e bem categorizada: 96 tools
+anunciadas, 74 read-only, 20 bounded-write, 2 destructive e 0 open-world. A pontuação interna de
+autonomia é `96/A`.
 
-Apesar disso, a situação não deve ser considerada “perfeita” nem “fechada”. A auditoria encontrou problemas e oportunidades importantes:
+Apesar disso, a situação não deve ser considerada “perfeita” nem “fechada”. A auditoria encontrou
+problemas e oportunidades importantes:
 
-1. **Validação CI local falhando por lint**: o `mcp-full` passou no typecheck, mas falhou no lint por dois imports `Cloudflare` não usados em `src/copilot/mcp/cloudflare/config-audit.js` e `src/copilot/mcp/cloudflare/edge-audit.js`.
-2. **Estado Git sujo**: há alterações não commitadas em Cloudflare, runtime-health, tunnel-status, TTL cache e testes, além de arquivos MD não rastreados.
-3. **Runtime “degraded” por ausência de smoke in-process**: o sistema está `ok`, mas o health report marca `degraded` porque não havia resultado registrado de `mcp_smoke_workspace` no processo.
-4. **Latência ainda pouco instrumentada por requisição MCP real**: há métricas Cloudflare/QUIC e métricas por tool, mas faltam SLOs formais, histograma end-to-end por operação JSON-RPC, `cf-ray`, `colo`, payload size, compressão, versão de protocolo e custo de autenticação por chamada.
-5. **QUIC atual parece saudável, mas precisa de benchmark comparativo**: QUIC está ativo, com 4 conexões HA, RTT suavizado de ~30 ms e erro de request 0; porém há logs recentes de reconexão e erros antigos de TLS handshake com a origem.
-6. **Cloudflare edge tem boa blindagem, mas gaps residuais**: há bypass de cache e passthrough para MCP/OAuth, mas ainda não há rate limit explícito de `/mcp` na borda; o fallback de origem está ativo para anônimo. Zone-wide Browser Integrity Check, Rocket Loader, RUM e Email Obfuscation aparecem ligados, embora uma regra route-scoped mitigue parte disso.
-7. **OAuth está muito bom para ChatGPT, mas precisa de governança**: issuer, PRM, JWKS, PKCE S256, DCR/CIMD, resource parameter e refresh-token rotation estão alinhados. Ainda assim, a loja local já tem dezenas de clients/tokens e merece política de prune, auditoria e perfis de escopo menos “max-power” para usos fora do ChatGPT principal.
-8. **MCP Streamable HTTP está robusto, mas falta avançar em sessões/resumability**: o endpoint `/mcp` é central, com headers de versão e CORS restrito. Porém a política atual é stateless; `Mcp-Session-Id`, GET SSE durável, `Last-Event-ID` e replay devem virar uma faixa experimental separada.
-9. **OpenAI Apps SDK ainda não é explorado como camada de UI**: não há widget resource, CSP aplicável, `outputTemplate` ou shapes de Company Knowledge. Isso não é bug; é oportunidade funcional.
-10. **Claude é compatível em tese, mas precisa de perfil próprio**: o servidor público e OAuth são adequados para remote MCP, mas Claude deve ter smoke, instruções, escopos, limites e recomendações próprias, especialmente porque o ecossistema Claude enfatiza review de permissões e cautela com write-tools.
+1. **Validação CI local falhando por lint**: o `mcp-full` passou no typecheck, mas falhou no lint
+   por dois imports `Cloudflare` não usados em `src/copilot/mcp/cloudflare/config-audit.js` e
+   `src/copilot/mcp/cloudflare/edge-audit.js`.
+2. **Estado Git sujo**: há alterações não commitadas em Cloudflare, runtime-health, tunnel-status,
+   TTL cache e testes, além de arquivos MD não rastreados.
+3. **Runtime “degraded” por ausência de smoke in-process**: o sistema está `ok`, mas o health report
+   marca `degraded` porque não havia resultado registrado de `mcp_smoke_workspace` no processo.
+4. **Latência ainda pouco instrumentada por requisição MCP real**: há métricas Cloudflare/QUIC e
+   métricas por tool, mas faltam SLOs formais, histograma end-to-end por operação JSON-RPC,
+   `cf-ray`, `colo`, payload size, compressão, versão de protocolo e custo de autenticação por
+   chamada.
+5. **QUIC atual parece saudável, mas precisa de benchmark comparativo**: QUIC está ativo, com 4
+   conexões HA, RTT suavizado de ~30 ms e erro de request 0; porém há logs recentes de reconexão e
+   erros antigos de TLS handshake com a origem.
+6. **Cloudflare edge tem boa blindagem, mas gaps residuais**: há bypass de cache e passthrough para
+   MCP/OAuth, mas ainda não há rate limit explícito de `/mcp` na borda; o fallback de origem está
+   ativo para anônimo. Zone-wide Browser Integrity Check, Rocket Loader, RUM e Email Obfuscation
+   aparecem ligados, embora uma regra route-scoped mitigue parte disso.
+7. **OAuth está muito bom para ChatGPT, mas precisa de governança**: issuer, PRM, JWKS, PKCE S256,
+   DCR/CIMD, resource parameter e refresh-token rotation estão alinhados. Ainda assim, a loja local
+   já tem dezenas de clients/tokens e merece política de prune, auditoria e perfis de escopo menos
+   “max-power” para usos fora do ChatGPT principal.
+8. **MCP Streamable HTTP está robusto, mas falta avançar em sessões/resumability**: o endpoint
+   `/mcp` é central, com headers de versão e CORS restrito. Porém a política atual é stateless;
+   `Mcp-Session-Id`, GET SSE durável, `Last-Event-ID` e replay devem virar uma faixa experimental
+   separada.
+9. **OpenAI Apps SDK ainda não é explorado como camada de UI**: não há widget resource, CSP
+   aplicável, `outputTemplate` ou shapes de Company Knowledge. Isso não é bug; é oportunidade
+   funcional.
+10. **Claude é compatível em tese, mas precisa de perfil próprio**: o servidor público e OAuth são
+    adequados para remote MCP, mas Claude deve ter smoke, instruções, escopos, limites e
+    recomendações próprias, especialmente porque o ecossistema Claude enfatiza review de permissões
+    e cautela com write-tools.
 
-Conclusão: a prioridade não é “reconstruir” o sistema. A prioridade é **estabilizar lint/validação, formalizar SLOs, benchmarkar transporte, limpar gaps Cloudflare, evoluir observabilidade por chamada e criar perfis de compatibilidade ChatGPT/Claude/OpenAI Apps SDK sem degradar a segurança atual**.
+Conclusão: a prioridade não é “reconstruir” o sistema. A prioridade é **estabilizar lint/validação,
+formalizar SLOs, benchmarkar transporte, limpar gaps Cloudflare, evoluir observabilidade por chamada
+e criar perfis de compatibilidade ChatGPT/Claude/OpenAI Apps SDK sem degradar a segurança atual**.
 
 ---
 
@@ -36,39 +68,48 @@ Antes da auditoria profunda, a pré-auditoria respondeu a quatro perguntas:
 
 1. O workspace está em estado confiável para diagnóstico?
 2. O conector está operacional de ponta a ponta?
-3. Quais áreas têm maior risco: protocolo MCP, OAuth, Cloudflare, transporte, latência, compatibilidade OpenAI/Claude, código ou validação?
+3. Quais áreas têm maior risco: protocolo MCP, OAuth, Cloudflare, transporte, latência,
+   compatibilidade OpenAI/Claude, código ou validação?
 4. Qual roteiro de auditoria maximiza evidência e minimiza mutação acidental?
 
 ### 2.2 Plano detalhado da auditoria
 
-| Etapa | Pergunta | Ferramentas/Fontes | Resultado esperado |
-|---|---|---|---|
-| A0 | Estado do repo | `repo_status`, árvore raiz | Dirty state, arquivos alterados, arquivos novos |
-| A1 | Superfície MCP | `mcp_capabilities_summary`, `mcp_tools_status`, `mcp_autonomy_power_score` | Tools, escopos, anotações, risco, autonomia |
-| A2 | Runtime | `mcp_runtime_health`, `mcp_post_restart_readiness`, `project_doctor` | Saúde local, Node, processos, index, métricas |
-| A3 | Túnel e transporte | `mcp_tunnel_status`, `mcp_cloudflare_metrics_snapshot`, `mcp_cloudflare_transport_benchmark_plan` | QUIC/HTTP2, HA connections, RTT, plano de benchmark |
-| A4 | Cloudflare edge/config | `mcp_cloudflare_config_audit`, `mcp_cloudflare_remote_audit`, `mcp_cloudflare_edge_audit`, `mcp_cloudflare_edge_policy_diff` | Cache, WAF, rate-limit, transforms, originRequest |
-| A5 | OAuth | `mcp_auth_profile`, `mcp_oauth_issuer_diagnostics`, `mcp_oauth_friction_audit`, `mcp_connection_readiness` | PRM, issuer metadata, JWKS, scopes, reauth risk |
-| A6 | Compatibilidade OpenAI/Claude | `chatgpt_connector_profile`, `claude_connector_profile`, docs oficiais OpenAI/Anthropic | Requisitos de conector e gaps funcionais |
-| A7 | Código fonte | árvore `src/copilot/mcp`, busca textual, leitura seletiva | Arquitetura adapters/http/cloudflare/control-plane/tools |
-| A8 | Validação | `mcp_validation_plan`, `mcp_run_safe_validation_suite`, `job_get_summary`, `job_get_output` | Estado real de CI local |
-| A9 | Documentação oficial | MCP, RFCs OAuth, Cloudflare, OpenAI Apps SDK, Claude | Critérios normativos para situação ideal |
+| Etapa | Pergunta                      | Ferramentas/Fontes                                                                                                           | Resultado esperado                                       |
+| ----- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| A0    | Estado do repo                | `repo_status`, árvore raiz                                                                                                   | Dirty state, arquivos alterados, arquivos novos          |
+| A1    | Superfície MCP                | `mcp_capabilities_summary`, `mcp_tools_status`, `mcp_autonomy_power_score`                                                   | Tools, escopos, anotações, risco, autonomia              |
+| A2    | Runtime                       | `mcp_runtime_health`, `mcp_post_restart_readiness`, `project_doctor`                                                         | Saúde local, Node, processos, index, métricas            |
+| A3    | Túnel e transporte            | `mcp_tunnel_status`, `mcp_cloudflare_metrics_snapshot`, `mcp_cloudflare_transport_benchmark_plan`                            | QUIC/HTTP2, HA connections, RTT, plano de benchmark      |
+| A4    | Cloudflare edge/config        | `mcp_cloudflare_config_audit`, `mcp_cloudflare_remote_audit`, `mcp_cloudflare_edge_audit`, `mcp_cloudflare_edge_policy_diff` | Cache, WAF, rate-limit, transforms, originRequest        |
+| A5    | OAuth                         | `mcp_auth_profile`, `mcp_oauth_issuer_diagnostics`, `mcp_oauth_friction_audit`, `mcp_connection_readiness`                   | PRM, issuer metadata, JWKS, scopes, reauth risk          |
+| A6    | Compatibilidade OpenAI/Claude | `chatgpt_connector_profile`, `claude_connector_profile`, docs oficiais OpenAI/Anthropic                                      | Requisitos de conector e gaps funcionais                 |
+| A7    | Código fonte                  | árvore `src/copilot/mcp`, busca textual, leitura seletiva                                                                    | Arquitetura adapters/http/cloudflare/control-plane/tools |
+| A8    | Validação                     | `mcp_validation_plan`, `mcp_run_safe_validation_suite`, `job_get_summary`, `job_get_output`                                  | Estado real de CI local                                  |
+| A9    | Documentação oficial          | MCP, RFCs OAuth, Cloudflare, OpenAI Apps SDK, Claude                                                                         | Critérios normativos para situação ideal                 |
 
 ### 2.3 Documentações oficiais consultadas
 
-- MCP 2025-06-18 — Transports: <https://modelcontextprotocol.io/specification/2025-06-18/basic/transports>
-- MCP 2025-06-18 — Authorization: <https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization>
-- MCP — Security Best Practices: <https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices>
+- MCP 2025-06-18 — Transports:
+  <https://modelcontextprotocol.io/specification/2025-06-18/basic/transports>
+- MCP 2025-06-18 — Authorization:
+  <https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization>
+- MCP — Security Best Practices:
+  <https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices>
 - RFC 9728 — OAuth 2.0 Protected Resource Metadata: <https://www.rfc-editor.org/rfc/rfc9728.html>
 - RFC 8414 — OAuth 2.0 Authorization Server Metadata: <https://www.rfc-editor.org/rfc/rfc8414.html>
-- RFC 7591 — OAuth 2.0 Dynamic Client Registration Protocol: <https://www.rfc-editor.org/rfc/rfc7591.html>
-- Cloudflare Tunnel — run parameters: <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/>
-- Cloudflare Tunnel — origin parameters: <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/origin-parameters/>
+- RFC 7591 — OAuth 2.0 Dynamic Client Registration Protocol:
+  <https://www.rfc-editor.org/rfc/rfc7591.html>
+- Cloudflare Tunnel — run parameters:
+  <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/>
+- Cloudflare Tunnel — origin parameters:
+  <https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/origin-parameters/>
 - OpenAI Apps SDK — Authentication: <https://developers.openai.com/apps-sdk/build/auth>
 - OpenAI Apps SDK — Reference: <https://developers.openai.com/apps-sdk/reference>
-- Anthropic/Claude — Custom connectors using remote MCP: <https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp>
+- Anthropic/Claude — Custom connectors using remote MCP:
+  <https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp>
 - Anthropic/Claude Code — MCP: <https://code.claude.com/docs/en/mcp>
-- Anthropic API docs — MCP connector: <https://platform.claude.com/docs/en/agents-and-tools/mcp-connector>
+- Anthropic API docs — MCP connector:
+  <https://platform.claude.com/docs/en/agents-and-tools/mcp-connector>
 
 ---
 
@@ -97,7 +138,9 @@ Arquivos não rastreados relevantes:
 - `src/copilot/ANALISE-FERRAMENTAS-FALTANTES.md`
 - `src/copilot/docs/DIAGNOSTICO-MCP-OAUTH-CLOUDFLARE-2026-06-10.md`
 
-Diagnóstico: o sistema está operável, mas qualquer roadmap deve começar por uma faixa de higiene: corrigir lint, registrar/commit ou separar alterações, e preservar snapshots antes de mudanças Cloudflare.
+Diagnóstico: o sistema está operável, mas qualquer roadmap deve começar por uma faixa de higiene:
+corrigir lint, registrar/commit ou separar alterações, e preservar snapshots antes de mudanças
+Cloudflare.
 
 ### 3.2 Superfície MCP
 
@@ -116,21 +159,29 @@ Estado observado:
 
 Categorias principais:
 
-- Leitura de repo: `repo_tree`, `repo_read_file`, `repo_search_text`, `repo_file_outline`, `repo_symbol_search`, etc.
-- Índice local: `repo_index_build`, `repo_index_search`, `repo_find_imports`, `repo_find_orphan_imports`.
-- Escrita controlada: `repo_patch_plan` -> `repo_apply_patch`, `repo_create_file_plan` -> `repo_create_file`, quarantine/restore, batch ops.
+- Leitura de repo: `repo_tree`, `repo_read_file`, `repo_search_text`, `repo_file_outline`,
+  `repo_symbol_search`, etc.
+- Índice local: `repo_index_build`, `repo_index_search`, `repo_find_imports`,
+  `repo_find_orphan_imports`.
+- Escrita controlada: `repo_patch_plan` -> `repo_apply_patch`, `repo_create_file_plan` ->
+  `repo_create_file`, quarantine/restore, batch ops.
 - Git: status, diff, log, branch.
 - Validação: typecheck, lint, unit, suites MCP, dashboard e jobs.
 - Runtime/Cloudflare/OAuth: health, tunnel, metrics, audits, policy plan/diff/apply.
 - Conexão: ChatGPT connector profile, Claude connector profile, OAuth diagnostics.
 - Copilot SDK/session: list/get sessions.
 
-Ponto forte: a divisão read-only/bounded/destructive e o padrão plan-first são adequados para minimizar prompts de host e risco operacional.
+Ponto forte: a divisão read-only/bounded/destructive e o padrão plan-first são adequados para
+minimizar prompts de host e risco operacional.
 
 Gaps:
 
-- Ainda há 2 tools marcadas destructive (`repo_apply_file_batch` e `repo_remove_file`). `repo_apply_file_batch` deveria ser reavaliada: ela contém operações reversíveis e irreversíveis; talvez deva ser subdividida em `batch_safe_ops` e `batch_destructive_ops` para reduzir atrito sem mascarar risco.
-- `job_cancel` aparece como bounded-write com `repo:admin`; deve continuar fora de remembered approval.
+- Ainda há 2 tools marcadas destructive (`repo_apply_file_batch` e `repo_remove_file`).
+  `repo_apply_file_batch` deveria ser reavaliada: ela contém operações reversíveis e irreversíveis;
+  talvez deva ser subdividida em `batch_safe_ops` e `batch_destructive_ops` para reduzir atrito sem
+  mascarar risco.
+- `job_cancel` aparece como bounded-write com `repo:admin`; deve continuar fora de remembered
+  approval.
 - Para Claude/Research, recomenda-se perfil de tools com write-tools desabilitadas por padrão.
 
 ### 3.3 Runtime local
@@ -147,7 +198,8 @@ Estado observado:
   - arquivos: `1333`
   - símbolos: `9632`
   - chunks: `2487`
-- Runtime status: `degraded`, não por falha crítica, mas por ausência de resultado in-process de `mcp_smoke_workspace`.
+- Runtime status: `degraded`, não por falha crítica, mas por ausência de resultado in-process de
+  `mcp_smoke_workspace`.
 
 Métricas internas recentes:
 
@@ -177,11 +229,17 @@ O código aponta para uma arquitetura adequada:
 - política de keep-alive e request timeout;
 - rate limit anônimo na origem;
 - PRM e OAuth metadata expostos;
-- versão de protocolo default observada no código: `2025-11-25`, com suporte a `2025-06-18` e fallback `2025-03-26`.
+- versão de protocolo default observada no código: `2025-11-25`, com suporte a `2025-06-18` e
+  fallback `2025-03-26`.
 
-A especificação MCP 2025-06-18 exige que Streamable HTTP use um único endpoint que suporte POST e GET, com `Accept: application/json` e `text/event-stream` para POST, e `text/event-stream` para GET quando SSE for suportado. Ela também exige validação de `Origin`, autenticação adequada para conexões e uso do header `MCP-Protocol-Version` em requisições HTTP subsequentes.
+A especificação MCP 2025-06-18 exige que Streamable HTTP use um único endpoint que suporte POST e
+GET, com `Accept: application/json` e `text/event-stream` para POST, e `text/event-stream` para GET
+quando SSE for suportado. Ela também exige validação de `Origin`, autenticação adequada para
+conexões e uso do header `MCP-Protocol-Version` em requisições HTTP subsequentes.
 
-Gap relevante: a política atual de sessão é stateless; o próprio código declara que sessões stateful estão desabilitadas para preservar compatibilidade com body parsing do SDK. Isso é defensável, mas deixa incompletas as capacidades avançadas de:
+Gap relevante: a política atual de sessão é stateless; o próprio código declara que sessões stateful
+estão desabilitadas para preservar compatibilidade com body parsing do SDK. Isso é defensável, mas
+deixa incompletas as capacidades avançadas de:
 
 - `Mcp-Session-Id` persistente;
 - GET SSE durável;
@@ -189,7 +247,8 @@ Gap relevante: a política atual de sessão é stateless; o próprio código dec
 - replay/resumability;
 - notificações server-to-client de longa duração.
 
-Recomendação: manter stateless como baseline de produção e criar uma faixa experimental separada para sessões/resumability, com feature flag e canary por cliente.
+Recomendação: manter stateless como baseline de produção e criar uma faixa experimental separada
+para sessões/resumability, com feature flag e canary por cliente.
 
 ### 3.5 OAuth e autorização
 
@@ -217,7 +276,9 @@ Estado observado:
 - Tokens persistidos: apenas hashes
 - Contagem observada: 117 refresh tokens e 40 dynamic clients
 
-Diagnóstico: a implementação está fortemente alinhada a MCP Authorization, RFC 9728 e OpenAI Apps SDK Auth. O servidor publica PRM, authorization server metadata, scopes, JWKS, PKCE S256, e usa `WWW-Authenticate` com `resource_metadata`.
+Diagnóstico: a implementação está fortemente alinhada a MCP Authorization, RFC 9728 e OpenAI Apps
+SDK Auth. O servidor publica PRM, authorization server metadata, scopes, JWKS, PKCE S256, e usa
+`WWW-Authenticate` com `resource_metadata`.
 
 Gaps/opções de hardening:
 
@@ -229,8 +290,10 @@ Gaps/opções de hardening:
    - `claude-safe`: leitura e validação, sem write/admin por padrão.
    - `public-diagnostics`: apenas health/OAuth/metadata.
 4. Considerar `private_key_jwt` como modo preferencial para clients confidenciais futuros.
-5. Avaliar DPoP apenas quando houver necessidade real; adiciona complexidade e pode reduzir compatibilidade.
-6. Evitar Cloudflare Access ou outro desafio interativo na frente de `/mcp`, salvo redesign completo do auth flow.
+5. Avaliar DPoP apenas quando houver necessidade real; adiciona complexidade e pode reduzir
+   compatibilidade.
+6. Evitar Cloudflare Access ou outro desafio interativo na frente de `/mcp`, salvo redesign completo
+   do auth flow.
 
 ### 3.6 Cloudflare Tunnel e transporte QUIC/HTTP2
 
@@ -269,12 +332,17 @@ Pontos fortes:
 
 Riscos/gaps:
 
-- Há logs recentes de `accept stream listener encountered a failure` e `Connection terminated` no momento de restart/reconexão.
+- Há logs recentes de `accept stream listener encountered a failure` e `Connection terminated` no
+  momento de restart/reconexão.
 - Há logs antigos de TLS handshake timeout com a origem.
-- O plano de benchmark considera `auto` como candidato importante porque tenta QUIC e cai para HTTP/2 se UDP falhar.
-- O candidato HTTP/2 deve ser mantido como rollback de TCP, especialmente para ambientes com UDP ruim.
+- O plano de benchmark considera `auto` como candidato importante porque tenta QUIC e cai para
+  HTTP/2 se UDP falhar.
+- O candidato HTTP/2 deve ser mantido como rollback de TCP, especialmente para ambientes com UDP
+  ruim.
 
-Recomendação: manter QUIC como baseline enquanto requestErrorRate=0, HA=4 e smoke passa. Rodar benchmark controlado `quic` vs `auto` vs `http2`, com pelo menos 5 amostras por protocolo, medindo tool calls reais e não apenas métricas de túnel.
+Recomendação: manter QUIC como baseline enquanto requestErrorRate=0, HA=4 e smoke passa. Rodar
+benchmark controlado `quic` vs `auto` vs `http2`, com pelo menos 5 amostras por protocolo, medindo
+tool calls reais e não apenas métricas de túnel.
 
 ### 3.7 Cloudflare edge/config
 
@@ -288,7 +356,8 @@ Estado observado:
   - rocket_loader off.
 - Rate limit ativo para `/oauth/token`.
 - Não há regra explícita de rate-limit para `/mcp` na borda.
-- Fallback de rate limit anônimo na origem está ativo: janela 10s, 40 requests/window, até 10.000 buckets.
+- Fallback de rate limit anônimo na origem está ativo: janela 10s, 40 requests/window, até 10.000
+  buckets.
 - WAF/challenge amplo não detectado para `/mcp`.
 - Sensitive header transform não detectado.
 
@@ -302,16 +371,22 @@ Zone settings que ainda geram warnings:
 - Bot Fight Mode: não audível/undefined.
 - Zaraz: não audível/not found.
 
-Diagnóstico: a regra route-scoped reduz impacto nas rotas MCP/OAuth, mas ainda há ruído operacional. A situação ideal é que API routes sejam tratadas como API routes, não como browser pages.
+Diagnóstico: a regra route-scoped reduz impacto nas rotas MCP/OAuth, mas ainda há ruído operacional.
+A situação ideal é que API routes sejam tratadas como API routes, não como browser pages.
 
 Recomendação de edge:
 
 1. Manter bypass de cache para runtime e token routes.
-2. Avaliar short-cache apenas para discovery GET-only: `/.well-known/*` e `/chatgpt-connector.json`, com TTL curto e rollback simples.
-3. Avaliar desabilitar compressão apenas para `/mcp` se benchmark confirmar ganho em `tools/list` e JSON-RPC pequeno/médio.
-4. Não transformar `Authorization`, `WWW-Authenticate`, `Set-Cookie`, `Location`, `Content-Type`, `Cache-Control` ou CORS.
-5. Adicionar rate limit edge apenas para `/oauth/token` e `/mcp` sem `Authorization`, sem limitar sessões autenticadas ChatGPT/Claude.
-6. Nunca adicionar managed challenge, JS challenge, Under Attack ou Cloudflare Access interativo em `/mcp`.
+2. Avaliar short-cache apenas para discovery GET-only: `/.well-known/*` e `/chatgpt-connector.json`,
+   com TTL curto e rollback simples.
+3. Avaliar desabilitar compressão apenas para `/mcp` se benchmark confirmar ganho em `tools/list` e
+   JSON-RPC pequeno/médio.
+4. Não transformar `Authorization`, `WWW-Authenticate`, `Set-Cookie`, `Location`, `Content-Type`,
+   `Cache-Control` ou CORS.
+5. Adicionar rate limit edge apenas para `/oauth/token` e `/mcp` sem `Authorization`, sem limitar
+   sessões autenticadas ChatGPT/Claude.
+6. Nunca adicionar managed challenge, JS challenge, Under Attack ou Cloudflare Access interativo em
+   `/mcp`.
 
 ### 3.8 OpenAI / ChatGPT / Apps SDK
 
@@ -320,23 +395,32 @@ Estado observado:
 - Perfil ChatGPT: `chatgpt-max-autonomy-permanent-cloudflare-oauth`.
 - Connector URL: `https://mcp.aurelin.org/mcp`.
 - Auth: OAuth.
-- A implementação já publica PRM, authorization server metadata, `securitySchemes`, scopes e challenge.
-- `mcp_apps_sdk_readiness` não encontrou widget resource, CSP, frame domains, widget description ou output template.
+- A implementação já publica PRM, authorization server metadata, `securitySchemes`, scopes e
+  challenge.
+- `mcp_apps_sdk_readiness` não encontrou widget resource, CSP, frame domains, widget description ou
+  output template.
 - Company Knowledge shapes não foram detectados.
 
-Diagnóstico: ChatGPT connector está operacional. Apps SDK UI ainda é uma oportunidade, não um requisito de estabilidade. O ganho principal de curto prazo vem de latência, observabilidade e metadata per-tool, não de widgets.
+Diagnóstico: ChatGPT connector está operacional. Apps SDK UI ainda é uma oportunidade, não um
+requisito de estabilidade. O ganho principal de curto prazo vem de latência, observabilidade e
+metadata per-tool, não de widgets.
 
 O que a documentação OpenAI reforça:
 
-- ChatGPT precisa de PRM em `.well-known/oauth-protected-resource` ou de `WWW-Authenticate` apontando para PRM.
-- O servidor deve publicar metadata OAuth, ecoar o `resource` parameter, suportar PKCE S256 e validar issuer/audience/scopes/expiração no servidor.
-- Para tool-level OAuth UI, é preciso combinar `securitySchemes` por tool, PRM e `_meta["mcp/www_authenticate"]`/`WWW-Authenticate` em erro de auth.
-- mTLS OpenAI pode virar camada opcional futura para autenticar o cliente ChatGPT no nível TLS, mantendo OAuth para usuário final.
+- ChatGPT precisa de PRM em `.well-known/oauth-protected-resource` ou de `WWW-Authenticate`
+  apontando para PRM.
+- O servidor deve publicar metadata OAuth, ecoar o `resource` parameter, suportar PKCE S256 e
+  validar issuer/audience/scopes/expiração no servidor.
+- Para tool-level OAuth UI, é preciso combinar `securitySchemes` por tool, PRM e
+  `_meta["mcp/www_authenticate"]`/`WWW-Authenticate` em erro de auth.
+- mTLS OpenAI pode virar camada opcional futura para autenticar o cliente ChatGPT no nível TLS,
+  mantendo OAuth para usuário final.
 
 Roadmap OpenAI:
 
 1. Manter MCP connector como núcleo.
-2. Adicionar `read-only dashboard widgets` só quando houver casos claros: health dashboard, validation dashboard, Cloudflare tunnel panel.
+2. Adicionar `read-only dashboard widgets` só quando houver casos claros: health dashboard,
+   validation dashboard, Cloudflare tunnel panel.
 3. Adicionar `outputTemplate` e CSP apenas para componentes reais.
 4. Criar adapter `search/fetch` se quiser compatibilidade com Company Knowledge-like workflows.
 5. Avaliar mTLS OpenAI apenas depois de SLOs e OAuth estáveis.
@@ -351,19 +435,25 @@ Estado observado:
 
 O que a documentação Claude reforça:
 
-- Custom connectors remote MCP estão em beta e são acessados por Claude cloud infra, então o servidor precisa ser publicamente alcançável.
+- Custom connectors remote MCP estão em beta e são acessados por Claude cloud infra, então o
+  servidor precisa ser publicamente alcançável.
 - É possível adicionar remote MCP server URL e, opcionalmente, OAuth client ID/secret.
-- Claude recomenda review cuidadoso de permissões, uso de “Allow always” apenas para tools confiáveis, e desabilitar tools irrelevantes.
-- Claude Research pode invocar tools automaticamente; para esse modo, write-tools devem ficar desabilitadas.
-- Claude Code recomenda remote HTTP para MCP remoto; SSE é legado/deprecated e `streamable-http` é alias de HTTP.
+- Claude recomenda review cuidadoso de permissões, uso de “Allow always” apenas para tools
+  confiáveis, e desabilitar tools irrelevantes.
+- Claude Research pode invocar tools automaticamente; para esse modo, write-tools devem ficar
+  desabilitadas.
+- Claude Code recomenda remote HTTP para MCP remoto; SSE é legado/deprecated e `streamable-http` é
+  alias de HTTP.
 
 Roadmap Claude:
 
-1. Criar perfil `claude-safe-read-validate` com tools de escrita/admin ocultas ou desaconselhadas por padrão.
+1. Criar perfil `claude-safe-read-validate` com tools de escrita/admin ocultas ou desaconselhadas
+   por padrão.
 2. Criar smoke prompts Claude específicos.
 3. Implementar tool grouping/search se Claude Code ou grandes superfícies sofrerem com 96 tools.
 4. Garantir descrições curtas, não ambíguas e sem prompt-injection surface.
-5. Medir latência com Claude separadamente; Claude cloud pode sair de regiões diferentes das usadas pelo ChatGPT.
+5. Medir latência com Claude separadamente; Claude cloud pode sair de regiões diferentes das usadas
+   pelo ChatGPT.
 
 ### 3.10 DevContainer e rede local
 
@@ -377,7 +467,8 @@ Estado observado:
 - Docker embedded DNS split: disabled.
 - Network control plane: skipped.
 
-Diagnóstico: DNS local não é o gargalo principal no momento, mas o warning de porta e o control plane skipped devem ser tratados para que a rede não seja uma “caixa preta”.
+Diagnóstico: DNS local não é o gargalo principal no momento, mas o warning de porta e o control
+plane skipped devem ser tratados para que a rede não seja uma “caixa preta”.
 
 ### 3.11 Validação
 
@@ -389,7 +480,8 @@ Resultado da suíte `mcp-full`:
   - `src/copilot/mcp/cloudflare/config-audit.js`: `Cloudflare` definido mas não usado.
   - `src/copilot/mcp/cloudflare/edge-audit.js`: `Cloudflare` definido mas não usado.
 
-Classificação: **P0 operacional pequeno**. Não indica falha de arquitetura, mas bloqueia confiança em qualquer mudança posterior.
+Classificação: **P0 operacional pequeno**. Não indica falha de arquitetura, mas bloqueia confiança
+em qualquer mudança posterior.
 
 ---
 
@@ -397,29 +489,36 @@ Classificação: **P0 operacional pequeno**. Não indica falha de arquitetura, m
 
 ### 4.1 Princípios
 
-1. **API first, não browser first**: `/mcp`, `/oauth/*`, `/.well-known/*` e `/health` devem ser tratados como endpoints de API, sem otimizações/challenges de browser.
-2. **MCP spec first**: Streamable HTTP, headers, Origin validation, PRM, OAuth metadata, version negotiation e backwards compatibility devem guiar decisões.
-3. **Latência medida antes de tuning**: não promover QUIC, `auto`, cache metadata, compressão off ou rate-limit edge sem baseline e rollback.
-4. **Autonomia com freios**: muitas tools são desejáveis, mas perfis por cliente e escopo evitam atrito e risco.
-5. **Compatibilidade por perfil**: ChatGPT, Claude, Claude Code, OpenAI Apps SDK e eventuais clientes MCP não devem compartilhar exatamente o mesmo contrato operacional.
-6. **Observabilidade e rollback como feature**: cada mudança Cloudflare/OAuth/MCP deve ter snapshot, diff, smoke e rollback documentado.
-7. **Segurança anti-prompt-injection**: minimizar tool descriptions perigosas, outputs não confiáveis, write tools automáticas e mixed-context confusion.
+1. **API first, não browser first**: `/mcp`, `/oauth/*`, `/.well-known/*` e `/health` devem ser
+   tratados como endpoints de API, sem otimizações/challenges de browser.
+2. **MCP spec first**: Streamable HTTP, headers, Origin validation, PRM, OAuth metadata, version
+   negotiation e backwards compatibility devem guiar decisões.
+3. **Latência medida antes de tuning**: não promover QUIC, `auto`, cache metadata, compressão off ou
+   rate-limit edge sem baseline e rollback.
+4. **Autonomia com freios**: muitas tools são desejáveis, mas perfis por cliente e escopo evitam
+   atrito e risco.
+5. **Compatibilidade por perfil**: ChatGPT, Claude, Claude Code, OpenAI Apps SDK e eventuais
+   clientes MCP não devem compartilhar exatamente o mesmo contrato operacional.
+6. **Observabilidade e rollback como feature**: cada mudança Cloudflare/OAuth/MCP deve ter snapshot,
+   diff, smoke e rollback documentado.
+7. **Segurança anti-prompt-injection**: minimizar tool descriptions perigosas, outputs não
+   confiáveis, write tools automáticas e mixed-context confusion.
 
 ### 4.2 SLOs propostos
 
-| Métrica | Target inicial | Target ideal | Observação |
-|---|---:|---:|---|
-| Public `/health` availability | 99.5% dev | 99.9% | Medido por smoke externo |
-| MCP initialize/tools/list p50 | < 900 ms | < 500 ms | End-to-end pelo cliente |
-| MCP initialize/tools/list p95 | < 2200 ms | < 1200 ms | Separar cold/warm |
-| Tool read-only simples p50 | < 800 ms | < 400 ms | Ex.: `repo_status`, `mcp_auth_profile` |
-| Tool read-only simples p95 | < 1800 ms | < 900 ms | Incluir auth + transport |
-| Tool ampla com árvore/busca p95 | < 3500 ms | < 2000 ms | Depende de payload size |
-| Request error rate | 0% steady | < 0.1% mensal | Excluir restarts planejados |
-| HA connections | 4 | 4 | Túnel permanente |
-| QUIC smoothed RTT | < 80 ms | < 50 ms | Região GRU atual está boa |
-| OAuth reauth involuntário | raro | quase zero | Exceto prune/rotação planejada |
-| CI `mcp-full` | pass | pass obrigatório | Gate antes de Cloudflare mutation |
+| Métrica                         | Target inicial |     Target ideal | Observação                             |
+| ------------------------------- | -------------: | ---------------: | -------------------------------------- |
+| Public `/health` availability   |      99.5% dev |            99.9% | Medido por smoke externo               |
+| MCP initialize/tools/list p50   |       < 900 ms |         < 500 ms | End-to-end pelo cliente                |
+| MCP initialize/tools/list p95   |      < 2200 ms |        < 1200 ms | Separar cold/warm                      |
+| Tool read-only simples p50      |       < 800 ms |         < 400 ms | Ex.: `repo_status`, `mcp_auth_profile` |
+| Tool read-only simples p95      |      < 1800 ms |         < 900 ms | Incluir auth + transport               |
+| Tool ampla com árvore/busca p95 |      < 3500 ms |        < 2000 ms | Depende de payload size                |
+| Request error rate              |      0% steady |    < 0.1% mensal | Excluir restarts planejados            |
+| HA connections                  |              4 |                4 | Túnel permanente                       |
+| QUIC smoothed RTT               |        < 80 ms |          < 50 ms | Região GRU atual está boa              |
+| OAuth reauth involuntário       |           raro |       quase zero | Exceto prune/rotação planejada         |
+| CI `mcp-full`                   |           pass | pass obrigatório | Gate antes de Cloudflare mutation      |
 
 ### 4.3 Arquitetura alvo
 
@@ -464,7 +563,8 @@ Workspace repo / validators / Cloudflare audits / Copilot sessions
 - `Mcp-Session-Id` e `Last-Event-ID` em faixa experimental antes de produção.
 - Backwards compatibility com HTTP+SSE apenas se houver cliente real que necessite.
 - Tool descriptions curtas e seguras.
-- `tools/list_changed` controlado por flag e usado apenas quando houver mutação real de tool surface.
+- `tools/list_changed` controlado por flag e usado apenas quando houver mutação real de tool
+  surface.
 
 #### OAuth
 
@@ -476,7 +576,8 @@ Workspace repo / validators / Cloudflare audits / Copilot sessions
 - Scopes por perfil, não apenas max-power.
 - Dynamic clients e refresh tokens com prune.
 - `WWW-Authenticate` e `_meta["mcp/www_authenticate"]` consistentes.
-- Opcional futuro: `private_key_jwt` para clients confidenciais; mTLS OpenAI para autenticar cliente ChatGPT.
+- Opcional futuro: `private_key_jwt` para clients confidenciais; mTLS OpenAI para autenticar cliente
+  ChatGPT.
 
 #### Cloudflare
 
@@ -611,7 +712,8 @@ Subfases:
 1. Criar `mcp_latency_dashboard` read-only.
 2. Expor top slow tools.
 3. Expor regressões desde último baseline.
-4. Expor recomendações automáticas: payload grande, auth lenta, tunnel instável, Cloudflare edge etc.
+4. Expor recomendações automáticas: payload grande, auth lenta, tunnel instável, Cloudflare edge
+   etc.
 
 Critério de aceite:
 
@@ -663,7 +765,8 @@ Plano:
 
 Critério de promoção:
 
-- Promover `auto` se preservar 4 HA connections, erro 0, OAuth ok e p95 igual ou melhor que QUIC, com fallback útil.
+- Promover `auto` se preservar 4 HA connections, erro 0, OAuth ok e p95 igual ou melhor que QUIC,
+  com fallback útil.
 - Manter `quic` se ele continuar superior e estável.
 - Manter `http2` como rollback documentado.
 
@@ -687,7 +790,8 @@ Critério de aceite:
 Subfases:
 
 1. Manter fallback origin atual.
-2. Se Cloudflare plan suportar regra header-aware, adicionar rate limit para `/mcp` sem `Authorization`.
+2. Se Cloudflare plan suportar regra header-aware, adicionar rate limit para `/mcp` sem
+   `Authorization`.
 3. Não rate-limitar requests autenticados com Bearer válido na borda.
 4. Manter `/oauth/token` com limite moderado.
 
@@ -741,7 +845,8 @@ Subfases:
 
 1. Garantir JWKS cache e in-flight de-duplication.
 2. Cachear parsing de policy por tool.
-3. Opcional: cache curto de token verification por hash do token até `min(exp, ttlCurto)`, sem pular escopo/audience.
+3. Opcional: cache curto de token verification por hash do token até `min(exp, ttlCurto)`, sem pular
+   escopo/audience.
 4. Medir auth phase antes/depois.
 
 Critério de aceite:
@@ -1012,16 +1117,16 @@ Critério de aceite:
 
 ## 7. Riscos e trade-offs
 
-| Decisão | Benefício | Risco | Mitigação |
-|---|---|---|---|
-| QUIC estrito | menor RTT quando UDP é bom | instabilidade se UDP falhar | benchmark `auto`; rollback HTTP2 |
-| `auto` como default | fallback QUIC->HTTP2 | pode esconder regressão QUIC | registrar protocolo efetivo por conexão |
-| HTTP/2 origin | multiplexing e performance | exige TLS/cert correto | `originServerName`, smoke TLS, rollback |
-| short-cache metadata | reduz discovery latency | metadata stale em mudança OAuth | TTL curto, cache bust, smoke OAuth |
-| edge rate limit `/mcp` | reduz abuso anônimo | pode bloquear clientes legítimos sem header | limitar só sem `Authorization` |
-| max-power scopes | autonomia ChatGPT | excesso para Claude/Research | perfis por cliente |
-| stateful sessions | resumability e notificações | complexidade e bugs de replay | feature flag/canary |
-| Apps SDK widgets | UX rica | CSP/UI overhead | read-only primeiro |
+| Decisão                | Benefício                   | Risco                                       | Mitigação                               |
+| ---------------------- | --------------------------- | ------------------------------------------- | --------------------------------------- |
+| QUIC estrito           | menor RTT quando UDP é bom  | instabilidade se UDP falhar                 | benchmark `auto`; rollback HTTP2        |
+| `auto` como default    | fallback QUIC->HTTP2        | pode esconder regressão QUIC                | registrar protocolo efetivo por conexão |
+| HTTP/2 origin          | multiplexing e performance  | exige TLS/cert correto                      | `originServerName`, smoke TLS, rollback |
+| short-cache metadata   | reduz discovery latency     | metadata stale em mudança OAuth             | TTL curto, cache bust, smoke OAuth      |
+| edge rate limit `/mcp` | reduz abuso anônimo         | pode bloquear clientes legítimos sem header | limitar só sem `Authorization`          |
+| max-power scopes       | autonomia ChatGPT           | excesso para Claude/Research                | perfis por cliente                      |
+| stateful sessions      | resumability e notificações | complexidade e bugs de replay               | feature flag/canary                     |
+| Apps SDK widgets       | UX rica                     | CSP/UI overhead                             | read-only primeiro                      |
 
 ---
 
@@ -1044,12 +1149,20 @@ Critério de aceite:
 
 ## 9. Veredito final
 
-O sistema atual já é sofisticado e funcional: tem OAuth moderno, PRM, DCR/CIMD, JWKS, Cloudflare named tunnel, QUIC, HTTP/2 to origin, edge bypass para rotas dinâmicas, índice local, tools categorizadas e boas práticas de plan-first. O problema não é falta de engenharia; é falta de **governança de maturidade**: validação limpa, SLOs, benchmarks, perfis por cliente, observabilidade granular e runbooks.
+O sistema atual já é sofisticado e funcional: tem OAuth moderno, PRM, DCR/CIMD, JWKS, Cloudflare
+named tunnel, QUIC, HTTP/2 to origin, edge bypass para rotas dinâmicas, índice local, tools
+categorizadas e boas práticas de plan-first. O problema não é falta de engenharia; é falta de
+**governança de maturidade**: validação limpa, SLOs, benchmarks, perfis por cliente, observabilidade
+granular e runbooks.
 
-A situação ideal não é aumentar indiscriminadamente a superfície. É criar uma plataforma MCP multi-cliente com três qualidades simultâneas:
+A situação ideal não é aumentar indiscriminadamente a superfície. É criar uma plataforma MCP
+multi-cliente com três qualidades simultâneas:
 
 1. **rápida** — latência medida e otimizada em cada camada;
 2. **compatível** — ChatGPT, Claude, Claude Code, MCP Inspector e Apps SDK com perfis próprios;
-3. **segura/autônoma** — OAuth e tool permissions fortes, mas com pouco atrito para fluxos confiáveis.
+3. **segura/autônoma** — OAuth e tool permissions fortes, mas com pouco atrito para fluxos
+   confiáveis.
 
-O primeiro passo concreto é pequeno e simbólico: limpar os dois erros de lint. Depois disso, o avanço real é construir a régua de latência e executar o benchmark de transporte antes de qualquer mudança Cloudflare agressiva.
+O primeiro passo concreto é pequeno e simbólico: limpar os dois erros de lint. Depois disso, o
+avanço real é construir a régua de latência e executar o benchmark de transporte antes de qualquer
+mudança Cloudflare agressiva.

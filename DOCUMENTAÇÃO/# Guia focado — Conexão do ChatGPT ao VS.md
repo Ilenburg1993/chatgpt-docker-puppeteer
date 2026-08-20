@@ -1,8 +1,10 @@
 # Guia focado — Conexão do ChatGPT ao VS Code em WSL2 Docker Dev Container via MCP
 
-**Versão:** 2.0 — guia focado de conexão
-**Ambiente-alvo:** Windows + WSL2 + Docker Desktop + VS Code Dev Containers + Node 24 + GitHub Copilot SDK 0.3.0
-**Objetivo:** permitir que o ChatGPT em `https://chatgpt.com/`, e também outras LLMs compatíveis, conectem-se ao repositório real aberto no VS Code dentro de um Dev Container, por meio de um MCP server local controlado, rápido, auditável e com ampla capacidade operacional.
+**Versão:** 2.0 — guia focado de conexão **Ambiente-alvo:** Windows + WSL2 + Docker Desktop + VS
+Code Dev Containers + Node 24 + GitHub Copilot SDK 0.3.0 **Objetivo:** permitir que o ChatGPT em
+`https://chatgpt.com/`, e também outras LLMs compatíveis, conectem-se ao repositório real aberto no
+VS Code dentro de um Dev Container, por meio de um MCP server local controlado, rápido, auditável e
+com ampla capacidade operacional.
 
 ---
 
@@ -45,19 +47,27 @@
 
 Este documento concentra-se em uma única pergunta prática:
 
-> Como fazer o ChatGPT, pela interface `chatgpt.com`, conectar-se ao nosso repositório real aberto no VS Code, dentro de WSL2 + Docker Dev Container, e operar esse projeto por meio de um MCP server escrito para Node 24?
+> Como fazer o ChatGPT, pela interface `chatgpt.com`, conectar-se ao nosso repositório real aberto
+> no VS Code, dentro de WSL2 + Docker Dev Container, e operar esse projeto por meio de um MCP server
+> escrito para Node 24?
 
-O foco aqui não é explicar toda a plataforma de agentes, nem fornecer código completo. O foco é a conexão: o caminho físico, lógico e protocolar entre a conversa no ChatGPT e o ambiente real de desenvolvimento.
+O foco aqui não é explicar toda a plataforma de agentes, nem fornecer código completo. O foco é a
+conexão: o caminho físico, lógico e protocolar entre a conversa no ChatGPT e o ambiente real de
+desenvolvimento.
 
-O documento também considera o GitHub Copilot SDK 0.3.0, não como substituto do MCP, mas como uma camada local adicional para orquestração, execução assistida e possível delegação a um agente Copilot rodando dentro do mesmo ambiente do projeto.
+O documento também considera o GitHub Copilot SDK 0.3.0, não como substituto do MCP, mas como uma
+camada local adicional para orquestração, execução assistida e possível delegação a um agente
+Copilot rodando dentro do mesmo ambiente do projeto.
 
 ---
 
 ## 2. A ideia central em uma página
 
-O ChatGPT não acessa diretamente o seu VS Code, seu terminal, seu `localhost` do Windows ou seu filesystem. O ChatGPT acessa **um servidor MCP**.
+O ChatGPT não acessa diretamente o seu VS Code, seu terminal, seu `localhost` do Windows ou seu
+filesystem. O ChatGPT acessa **um servidor MCP**.
 
-Esse MCP server, por sua vez, roda no mesmo ambiente onde o projeto realmente vive: o Dev Container do VS Code, dentro do WSL2/Docker.
+Esse MCP server, por sua vez, roda no mesmo ambiente onde o projeto realmente vive: o Dev Container
+do VS Code, dentro do WSL2/Docker.
 
 A topologia ideal é:
 
@@ -73,10 +83,13 @@ Project Control Plane
 /workspaces/<repo> — o repositório real do VS Code
 ```
 
-Para uso local, o VS Code e outros clientes dentro do container podem usar `stdio`. Para o ChatGPT remoto, o transporte correto é Streamable HTTP em `/mcp`, exposto por HTTPS ou por Secure MCP Tunnel.
+Para uso local, o VS Code e outros clientes dentro do container podem usar `stdio`. Para o ChatGPT
+remoto, o transporte correto é Streamable HTTP em `/mcp`, exposto por HTTPS ou por Secure MCP
+Tunnel.
 
-A documentação oficial do ChatGPT Apps SDK indica que o conector deve receber a URL pública do endpoint `/mcp` do servidor. Para desenvolvimento local, essa URL precisa ser alcançável por HTTPS, normalmente via túnel.
-Fonte oficial: https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
+A documentação oficial do ChatGPT Apps SDK indica que o conector deve receber a URL pública do
+endpoint `/mcp` do servidor. Para desenvolvimento local, essa URL precisa ser alcançável por HTTPS,
+normalmente via túnel. Fonte oficial: https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
 
 ---
 
@@ -84,39 +97,48 @@ Fonte oficial: https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
 
 ### ChatGPT
 
-A interface em `https://chatgpt.com/`. Neste documento, “ChatGPT” significa esta superfície remota da OpenAI, capaz de chamar tools por meio de um app/conector MCP.
+A interface em `https://chatgpt.com/`. Neste documento, “ChatGPT” significa esta superfície remota
+da OpenAI, capaz de chamar tools por meio de um app/conector MCP.
 
 ### VS Code
 
-O editor usado pelo humano. Ele está conectado ao ambiente WSL2 e reabre o projeto dentro de um Dev Container.
+O editor usado pelo humano. Ele está conectado ao ambiente WSL2 e reabre o projeto dentro de um Dev
+Container.
 
 ### WSL2
 
-O ambiente Linux real dentro do Windows. Deve conter o clone do projeto para evitar a lentidão do filesystem `C:\` quando usado por Docker e ferramentas Linux.
+O ambiente Linux real dentro do Windows. Deve conter o clone do projeto para evitar a lentidão do
+filesystem `C:\` quando usado por Docker e ferramentas Linux.
 
 ### Docker Dev Container
 
-O container de desenvolvimento aberto pelo VS Code. É o ambiente onde o Node 24, Git, dependências, scripts e o MCP server rodam.
+O container de desenvolvimento aberto pelo VS Code. É o ambiente onde o Node 24, Git, dependências,
+scripts e o MCP server rodam.
 
 ### MCP
 
-Model Context Protocol. É o protocolo que permite que aplicações de IA descubram e chamem tools, leiam resources e usem prompts expostos por um servidor externo.
+Model Context Protocol. É o protocolo que permite que aplicações de IA descubram e chamem tools,
+leiam resources e usem prompts expostos por um servidor externo.
 
 ### MCP server
 
-O processo que publicará as capacidades do projeto. Ele deve ser escrito de modo a acessar o repo real e executar operações controladas.
+O processo que publicará as capacidades do projeto. Ele deve ser escrito de modo a acessar o repo
+real e executar operações controladas.
 
 ### Tool
 
-Uma função publicada pelo MCP server. Exemplos: ler arquivo, buscar no repo, retornar `git diff`, rodar teste, aplicar patch, criar branch.
+Uma função publicada pelo MCP server. Exemplos: ler arquivo, buscar no repo, retornar `git diff`,
+rodar teste, aplicar patch, criar branch.
 
 ### Transport
 
-O meio pelo qual o cliente MCP e o servidor MCP trocam mensagens. Neste projeto, os transportes relevantes são `stdio` e Streamable HTTP. SSE fica apenas como fallback legado.
+O meio pelo qual o cliente MCP e o servidor MCP trocam mensagens. Neste projeto, os transportes
+relevantes são `stdio` e Streamable HTTP. SSE fica apenas como fallback legado.
 
 ### Project Control Plane
 
-A camada local que organiza operações sobre o projeto: filesystem, Git, jobs, logs, auditoria, locks, permissões, memória operacional e integração com Copilot.
+A camada local que organiza operações sobre o projeto: filesystem, Git, jobs, logs, auditoria,
+locks, permissões, memória operacional e integração com Copilot.
 
 ---
 
@@ -136,7 +158,8 @@ Portanto, a conexão real é:
 ChatGPT → MCP endpoint → MCP server → repo no Dev Container
 ```
 
-O VS Code aparece porque é o ambiente humano de edição e porque o Dev Container aberto no VS Code é o lugar onde tudo deve rodar.
+O VS Code aparece porque é o ambiente humano de edição e porque o Dev Container aberto no VS Code é
+o lugar onde tudo deve rodar.
 
 ---
 
@@ -176,15 +199,19 @@ Node 24 + MCP server + Copilot SDK + repo
 
 ### Regra fundamental
 
-O MCP server deve rodar onde o repo é real. Se o projeto está em `/workspaces/meu-repo` dentro do Dev Container, o MCP server deve rodar nesse mesmo container ou em um container com o mesmo mount, os mesmos caminhos e o mesmo contexto Git.
+O MCP server deve rodar onde o repo é real. Se o projeto está em `/workspaces/meu-repo` dentro do
+Dev Container, o MCP server deve rodar nesse mesmo container ou em um container com o mesmo mount,
+os mesmos caminhos e o mesmo contexto Git.
 
 ---
 
 ## 6. Papel do WSL2
 
-O WSL2 é a base Linux dentro do Windows. Para projetos com Docker e Dev Containers, o local do filesystem importa muito.
+O WSL2 é a base Linux dentro do Windows. Para projetos com Docker e Dev Containers, o local do
+filesystem importa muito.
 
-A Microsoft recomenda que projetos usados com Dev Containers no Windows fiquem no filesystem do WSL2, por exemplo:
+A Microsoft recomenda que projetos usados com Dev Containers no Windows fiquem no filesystem do
+WSL2, por exemplo:
 
 ```text
 /home/<usuario>/projects/<repo>
@@ -196,7 +223,8 @@ Evite manter o projeto em:
 C:\Users\<usuario>\projects\<repo>
 ```
 
-Motivo: quando o Docker acessa arquivos no filesystem Windows a partir de um container Linux, há uma ponte cross-OS mais lenta. Com o repo no filesystem WSL2, o I/O fica mais próximo de Linux nativo.
+Motivo: quando o Docker acessa arquivos no filesystem Windows a partir de um container Linux, há uma
+ponte cross-OS mais lenta. Com o repo no filesystem WSL2, o I/O fica mais próximo de Linux nativo.
 
 Fonte oficial: https://learn.microsoft.com/en-us/windows/dev-environment/docker/dev-containers
 
@@ -204,7 +232,8 @@ Fonte oficial: https://learn.microsoft.com/en-us/windows/dev-environment/docker/
 
 ## 7. Papel do Docker Dev Container
 
-O Dev Container torna o ambiente reprodutível. Em vez de depender do Node, Git, scripts e ferramentas instaladas no Windows, o projeto define seu ambiente em container.
+O Dev Container torna o ambiente reprodutível. Em vez de depender do Node, Git, scripts e
+ferramentas instaladas no Windows, o projeto define seu ambiente em container.
 
 O Dev Container deve conter:
 
@@ -216,7 +245,8 @@ O Dev Container deve conter:
 - Acesso ao repo em `/workspaces/<repo>`.
 - Local persistente para `.ai/`, logs, histórico de jobs e estado operacional.
 
-O VS Code permite configurar MCP servers dentro de Dev Containers por meio da seção `customizations.vscode.mcp` no `devcontainer.json`.
+O VS Code permite configurar MCP servers dentro de Dev Containers por meio da seção
+`customizations.vscode.mcp` no `devcontainer.json`.
 
 Fonte oficial: https://code.visualstudio.com/docs/copilot/customization/mcp-servers
 
@@ -253,7 +283,9 @@ integrações
   repo-ai CLI
 ```
 
-O Node Permission Model pode ser usado como mitigação operacional, mas não deve ser tratado como sandbox absoluto. Para liberdade ampla com segurança, a camada mais importante é o próprio desenho do MCP server: paths restritos ao workspace, logs, grants, locks e auditoria.
+O Node Permission Model pode ser usado como mitigação operacional, mas não deve ser tratado como
+sandbox absoluto. Para liberdade ampla com segurança, a camada mais importante é o próprio desenho
+do MCP server: paths restritos ao workspace, logs, grants, locks e auditoria.
 
 Fonte oficial: https://nodejs.org/docs/latest-v24.x/api/permissions.html
 
@@ -275,8 +307,9 @@ Ele deve:
 - Ser rápido para leituras comuns.
 - Ser previsível para escrita e execução.
 
-A documentação da OpenAI descreve que o MCP server define tools, aplica autenticação e retorna dados; o modelo decide quando chamar as tools com base na descrição e metadados.
-Fonte oficial: https://developers.openai.com/apps-sdk/build/mcp-server
+A documentação da OpenAI descreve que o MCP server define tools, aplica autenticação e retorna
+dados; o modelo decide quando chamar as tools com base na descrição e metadados. Fonte oficial:
+https://developers.openai.com/apps-sdk/build/mcp-server
 
 ---
 
@@ -284,7 +317,8 @@ Fonte oficial: https://developers.openai.com/apps-sdk/build/mcp-server
 
 ### `stdio`
 
-`stdio` é o transporte local. O cliente inicia o processo do MCP server e fala com ele por stdin/stdout.
+`stdio` é o transporte local. O cliente inicia o processo do MCP server e fala com ele por
+stdin/stdout.
 
 Use para:
 
@@ -293,17 +327,20 @@ Use para:
 - Testes dentro do Dev Container.
 - Ferramentas que rodam no mesmo namespace do projeto.
 
-Não use como conexão direta do ChatGPT remoto, porque o ChatGPT não consegue iniciar um processo dentro do seu WSL2/Dev Container.
+Não use como conexão direta do ChatGPT remoto, porque o ChatGPT não consegue iniciar um processo
+dentro do seu WSL2/Dev Container.
 
 ### Streamable HTTP
 
-Streamable HTTP é o transporte remoto moderno do MCP. O servidor expõe um endpoint único, normalmente:
+Streamable HTTP é o transporte remoto moderno do MCP. O servidor expõe um endpoint único,
+normalmente:
 
 ```text
 /mcp
 ```
 
-A especificação MCP define que esse transporte usa HTTP `POST` e `GET`, e pode usar SSE internamente para streaming. O servidor deve oferecer um único endpoint MCP que suporte esses métodos.
+A especificação MCP define que esse transporte usa HTTP `POST` e `GET`, e pode usar SSE internamente
+para streaming. O servidor deve oferecer um único endpoint MCP que suporte esses métodos.
 
 Use para:
 
@@ -317,7 +354,8 @@ Fonte oficial: https://modelcontextprotocol.io/specification/2025-03-26/basic/tr
 
 ### SSE legado
 
-SSE legado é o transporte antigo HTTP+SSE. Ele costuma envolver endpoints separados, como `/sse` e `/messages`.
+SSE legado é o transporte antigo HTTP+SSE. Ele costuma envolver endpoints separados, como `/sse` e
+`/messages`.
 
 Use apenas se um cliente antigo exigir. Não deve ser a fundação nova do projeto.
 
@@ -333,11 +371,14 @@ SSE legado: apenas fallback.
 
 ## 11. Por que o ChatGPT precisa de `/mcp` via HTTPS ou túnel
 
-O ChatGPT em `chatgpt.com` roda fora da sua máquina. Ele não conhece o `localhost` do seu Windows, nem o `localhost` do WSL2, nem o `localhost` do container.
+O ChatGPT em `chatgpt.com` roda fora da sua máquina. Ele não conhece o `localhost` do seu Windows,
+nem o `localhost` do WSL2, nem o `localhost` do container.
 
-Por isso, quando você preenche o formulário de conector no ChatGPT, o campo “URL do servidor MCP” precisa apontar para uma URL que o ChatGPT consiga alcançar.
+Por isso, quando você preenche o formulário de conector no ChatGPT, o campo “URL do servidor MCP”
+precisa apontar para uma URL que o ChatGPT consiga alcançar.
 
-A documentação oficial de conexão do ChatGPT diz para fornecer a URL pública do endpoint `/mcp`, como no padrão:
+A documentação oficial de conexão do ChatGPT diz para fornecer a URL pública do endpoint `/mcp`,
+como no padrão:
 
 ```text
 https://<host-publico-ou-tunel>/mcp
@@ -351,7 +392,8 @@ No nosso caso, como o MCP server é privado e local, a opção mais alinhada é 
 
 ## 12. Secure MCP Tunnel
 
-O Secure MCP Tunnel permite conectar servidores MCP privados a produtos OpenAI sem expor o servidor diretamente à internet.
+O Secure MCP Tunnel permite conectar servidores MCP privados a produtos OpenAI sem expor o servidor
+diretamente à internet.
 
 A lógica é:
 
@@ -365,13 +407,15 @@ tunnel-client rodando no nosso ambiente
 MCP server local em 127.0.0.1:<porta>/mcp
 ```
 
-O `tunnel-client` deve rodar dentro da rede que já alcança o MCP server. Em nosso caso, isso significa:
+O `tunnel-client` deve rodar dentro da rede que já alcança o MCP server. Em nosso caso, isso
+significa:
 
 - preferencialmente dentro do Dev Container; ou
 - em um container companheiro na mesma rede Docker; ou
 - no WSL2 host, se ele conseguir alcançar o endpoint interno do MCP server.
 
-O MCP server não precisa ter listener público. Ele pode escutar apenas em localhost, e o túnel faz a ponte outbound para a OpenAI.
+O MCP server não precisa ter listener público. Ele pode escutar apenas em localhost, e o túnel faz a
+ponte outbound para a OpenAI.
 
 Fonte oficial: https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
 
@@ -401,7 +445,8 @@ MCP Server para Repo VS Code
 
 ### Descrição
 
-A descrição é importante porque ajuda o modelo a entender quando usar o conector. Ela deve dizer o que o servidor faz e em que contexto deve ser usado.
+A descrição é importante porque ajuda o modelo a entender quando usar o conector. Ela deve dizer o
+que o servidor faz e em que contexto deve ser usado.
 
 Exemplo conceitual:
 
@@ -429,15 +474,20 @@ Se for Secure MCP Tunnel, use o endpoint fornecido pela configuração do túnel
 
 ### Autenticação
 
-Para desenvolvimento, pode haver modo sem autenticação dependendo do cenário e da configuração disponível. Para uso real, prefira OAuth ou uma combinação com túnel, grants locais e auditoria.
+Para desenvolvimento, pode haver modo sem autenticação dependendo do cenário e da configuração
+disponível. Para uso real, prefira OAuth ou uma combinação com túnel, grants locais e auditoria.
 
-A documentação de autenticação da OpenAI observa que o ChatGPT não apresenta API keys customizadas nem grants machine-to-machine como client credentials; para identificação de cliente, há suporte a mecanismos como mTLS gerenciado pela OpenAI em servidores MCP que validam certificados de cliente.
+A documentação de autenticação da OpenAI observa que o ChatGPT não apresenta API keys customizadas
+nem grants machine-to-machine como client credentials; para identificação de cliente, há suporte a
+mecanismos como mTLS gerenciado pela OpenAI em servidores MCP que validam certificados de cliente.
 
 Fonte oficial: https://developers.openai.com/apps-sdk/build/auth
 
 ### Aviso de risco
 
-O aviso existe porque um MCP server pode executar ações reais. No nosso caso, isso é intencional: queremos controle amplo do repo. A resposta correta não é desativar poder; é desenhar poder com auditoria, grants, locks e reversibilidade via Git.
+O aviso existe porque um MCP server pode executar ações reais. No nosso caso, isso é intencional:
+queremos controle amplo do repo. A resposta correta não é desativar poder; é desenhar poder com
+auditoria, grants, locks e reversibilidade via Git.
 
 ---
 
@@ -447,11 +497,14 @@ A conexão tem três camadas de confiança:
 
 ### Camada 1 — Transporte
 
-O endpoint deve ser HTTPS quando acessado pelo ChatGPT. Com Secure MCP Tunnel, a conexão externa fica mediada pela infraestrutura da OpenAI e o tráfego do ambiente local sai por conexão outbound.
+O endpoint deve ser HTTPS quando acessado pelo ChatGPT. Com Secure MCP Tunnel, a conexão externa
+fica mediada pela infraestrutura da OpenAI e o tráfego do ambiente local sai por conexão outbound.
 
 ### Camada 2 — Identidade do cliente
 
-Em produção, use OAuth, mTLS validado, allowlist ou controles equivalentes conforme o tipo de publicação. Evite depender de segredo fixo em header se o cliente não puder apresentá-lo oficialmente.
+Em produção, use OAuth, mTLS validado, allowlist ou controles equivalentes conforme o tipo de
+publicação. Evite depender de segredo fixo em header se o cliente não puder apresentá-lo
+oficialmente.
 
 ### Camada 3 — Permissões internas do projeto
 
@@ -477,7 +530,8 @@ O MCP server deve ter um `REPO_ROOT` explícito, por exemplo:
 /workspaces/<repo>
 ```
 
-Todas as operações de arquivo devem resolver caminhos relativos a esse root. O servidor deve recusar:
+Todas as operações de arquivo devem resolver caminhos relativos a esse root. O servidor deve
+recusar:
 
 - paths absolutos fora do workspace;
 - `..` que escapem do root;
@@ -586,7 +640,8 @@ copilot_steer
 copilot_get_events
 ```
 
-`run_admin_command` não deve ser a primeira tool do sistema. Ela é útil, mas deve vir com token local temporário, auditoria e kill switch.
+`run_admin_command` não deve ser a primeira tool do sistema. Ela é útil, mas deve vir com token
+local temporário, auditoria e kill switch.
 
 ---
 
@@ -604,7 +659,9 @@ MCP server Node 24
 repo local
 ```
 
-Para HTTP, o VS Code pode conectar a servidores MCP por `type: "http"`; a documentação informa que ele tenta HTTP Stream e faz fallback para SSE quando necessário. Também há suporte a HTTP via Unix socket ou named pipe em cenários específicos.
+Para HTTP, o VS Code pode conectar a servidores MCP por `type: "http"`; a documentação informa que
+ele tenta HTTP Stream e faz fallback para SSE quando necessário. Também há suporte a HTTP via Unix
+socket ou named pipe em cenários específicos.
 
 Fonte oficial: https://code.visualstudio.com/docs/copilot/reference/mcp-configuration
 
@@ -619,11 +676,14 @@ Ele pode atuar de duas maneiras:
 1. Como consumidor do nosso MCP server local.
 2. Como runtime local de agente por meio de Copilot CLI headless.
 
-A documentação do GitHub diz que o Copilot SDK pode integrar MCP servers que rodam como processos separados e expõem tools. Ela também distingue servidores locais/stdio e HTTP/SSE.
+A documentação do GitHub diz que o Copilot SDK pode integrar MCP servers que rodam como processos
+separados e expõem tools. Ela também distingue servidores locais/stdio e HTTP/SSE.
 
 Fonte oficial: https://docs.github.com/en/copilot/how-tos/copilot-sdk/use-copilot-sdk/mcp-servers
 
-As release notes do SDK 0.3.0 indicam mudanças importantes: a terminologia de configuração MCP foi alinhada para `stdio` e `http`, e o vocabulário de permissões foi refinado para resultados como `approve-once`, `approve-for-session` e `approve-for-location`.
+As release notes do SDK 0.3.0 indicam mudanças importantes: a terminologia de configuração MCP foi
+alinhada para `stdio` e `http`, e o vocabulário de permissões foi refinado para resultados como
+`approve-once`, `approve-for-session` e `approve-for-location`.
 
 Fonte oficial: https://github.com/github/copilot-sdk/releases
 
@@ -631,7 +691,8 @@ Fonte oficial: https://github.com/github/copilot-sdk/releases
 
 ## 21. Copilot CLI headless + `cliUrl`
 
-O modo mais robusto para integrar Copilot local é rodar o Copilot CLI em modo headless dentro do Dev Container ou em container companheiro.
+O modo mais robusto para integrar Copilot local é rodar o Copilot CLI em modo headless dentro do Dev
+Container ou em container companheiro.
 
 A ideia:
 
@@ -643,9 +704,11 @@ Copilot SDK Node 24
 ChatGPT ou outro orquestrador
 ```
 
-Segundo a documentação do GitHub, nesse modo a CLI roda como servidor persistente; o backend se conecta por TCP usando `cliUrl`; múltiplos clientes SDK podem compartilhar o mesmo servidor.
+Segundo a documentação do GitHub, nesse modo a CLI roda como servidor persistente; o backend se
+conecta por TCP usando `cliUrl`; múltiplos clientes SDK podem compartilhar o mesmo servidor.
 
-Fonte oficial: https://docs.github.com/en/copilot/how-tos/copilot-sdk/set-up-copilot-sdk/backend-services
+Fonte oficial:
+https://docs.github.com/en/copilot/how-tos/copilot-sdk/set-up-copilot-sdk/backend-services
 
 Isso não substitui o MCP server. Ele complementa:
 
@@ -663,13 +726,15 @@ Copilot CLI headless
 repo
 ```
 
-O ChatGPT continua chamando tools MCP. O Copilot local pode ser acionado como executor especializado.
+O ChatGPT continua chamando tools MCP. O Copilot local pode ser acionado como executor
+especializado.
 
 ---
 
 ## 22. Como outras LLMs entram no sistema
 
-Outras LLMs ou agentes podem usar o mesmo projeto se suportarem MCP ou se forem conectadas por uma ponte própria.
+Outras LLMs ou agentes podem usar o mesmo projeto se suportarem MCP ou se forem conectadas por uma
+ponte própria.
 
 Modelos de conexão:
 
@@ -680,7 +745,8 @@ LLM remota → túnel → MCP server
 Copilot SDK → stdio/http → MCP server
 ```
 
-A vantagem do MCP é evitar criar uma integração diferente para cada LLM. O repositório expõe um contrato comum; cada cliente usa o transporte compatível.
+A vantagem do MCP é evitar criar uma integração diferente para cada LLM. O repositório expõe um
+contrato comum; cada cliente usa o transporte compatível.
 
 ---
 
@@ -709,13 +775,15 @@ Essa pasta serve para:
 - reduzir dependência da memória da conversa;
 - permitir que terminal, ChatGPT, VS Code e Copilot compartilhem contexto.
 
-Para humanos e LLMs, o arquivo mais importante é o `context-pack.md`, que deve explicar o estado atual do projeto, próximos passos, comandos recentes, diffs relevantes e decisões tomadas.
+Para humanos e LLMs, o arquivo mais importante é o `context-pack.md`, que deve explicar o estado
+atual do projeto, próximos passos, comandos recentes, diffs relevantes e decisões tomadas.
 
 ---
 
 ## 24. Segurança sem amputar liberdade
 
-O objetivo não é limitar o sistema a leitura. O objetivo é permitir controle amplo de maneira rastreável.
+O objetivo não é limitar o sistema a leitura. O objetivo é permitir controle amplo de maneira
+rastreável.
 
 Princípios:
 
@@ -872,7 +940,8 @@ Prováveis causas:
 - Tools retornando contexto excessivo.
 - Jobs longos sendo executados de modo síncrono.
 
-A documentação do VS Code recomenda volumes nomeados para diretórios de alta escrita, como `node_modules`, caches e build outputs, quando performance de bind mount é um problema.
+A documentação do VS Code recomenda volumes nomeados para diretórios de alta escrita, como
+`node_modules`, caches e build outputs, quando performance de bind mount é um problema.
 
 Fonte oficial: https://code.visualstudio.com/remote/advancedcontainers/improve-performance
 
@@ -902,28 +971,23 @@ Fonte oficial: https://code.visualstudio.com/remote/advancedcontainers/improve-p
 
 ### OpenAI / ChatGPT / MCP
 
-- Connect from ChatGPT — Apps SDK:
-  https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
+- Connect from ChatGPT — Apps SDK: https://developers.openai.com/apps-sdk/deploy/connect-chatgpt
 
-- Build your MCP server — Apps SDK:
-  https://developers.openai.com/apps-sdk/build/mcp-server
+- Build your MCP server — Apps SDK: https://developers.openai.com/apps-sdk/build/mcp-server
 
-- Secure MCP Tunnel — OpenAI API:
-  https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+- Secure MCP Tunnel — OpenAI API: https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
 
 - MCP and Connectors — OpenAI API:
   https://developers.openai.com/api/docs/guides/tools-connectors-mcp
 
-- Authentication — Apps SDK:
-  https://developers.openai.com/apps-sdk/build/auth
+- Authentication — Apps SDK: https://developers.openai.com/apps-sdk/build/auth
 
 ### Model Context Protocol
 
 - MCP specification — transports:
   https://modelcontextprotocol.io/specification/2025-03-26/basic/transports
 
-- MCP specification index:
-  https://modelcontextprotocol.io/specification
+- MCP specification index: https://modelcontextprotocol.io/specification
 
 ### VS Code / Dev Containers / WSL2
 
@@ -950,27 +1014,26 @@ Fonte oficial: https://code.visualstudio.com/remote/advancedcontainers/improve-p
 - Copilot SDK with MCP servers:
   https://docs.github.com/en/copilot/how-tos/copilot-sdk/use-copilot-sdk/mcp-servers
 
-- Copilot SDK releases:
-  https://github.com/github/copilot-sdk/releases
+- Copilot SDK releases: https://github.com/github/copilot-sdk/releases
 
-- About GitHub Copilot CLI:
-  https://docs.github.com/copilot/concepts/agents/about-copilot-cli
+- About GitHub Copilot CLI: https://docs.github.com/copilot/concepts/agents/about-copilot-cli
 
 ### Node.js
 
-- Node.js documentation:
-  https://nodejs.org/docs/latest-v24.x/api/
+- Node.js documentation: https://nodejs.org/docs/latest-v24.x/api/
 
-- Node.js Permission Model:
-  https://nodejs.org/docs/latest-v24.x/api/permissions.html
+- Node.js Permission Model: https://nodejs.org/docs/latest-v24.x/api/permissions.html
 
 ---
 
 ## 30. Conclusão
 
-A conexão correta entre ChatGPT e o nosso VS Code em WSL2 Docker Dev Container não é uma conexão visual com o editor, nem uma tentativa de controlar a tela do terminal. É uma conexão protocolar.
+A conexão correta entre ChatGPT e o nosso VS Code em WSL2 Docker Dev Container não é uma conexão
+visual com o editor, nem uma tentativa de controlar a tela do terminal. É uma conexão protocolar.
 
-O ChatGPT se conecta a um endpoint MCP. Esse endpoint chega a um MCP server Node 24 rodando dentro do Dev Container. Esse servidor opera o repositório real, com tools bem definidas, logs, grants, Git, jobs e memória compartilhada.
+O ChatGPT se conecta a um endpoint MCP. Esse endpoint chega a um MCP server Node 24 rodando dentro
+do Dev Container. Esse servidor opera o repositório real, com tools bem definidas, logs, grants,
+Git, jobs e memória compartilhada.
 
 O desenho final é simples na superfície e forte internamente:
 
@@ -988,8 +1051,13 @@ Project Control Plane
 Repo real do VS Code
 ```
 
-Para o humano, isso significa poder pedir ao ChatGPT para investigar, editar, testar, revisar e coordenar o projeto. Para outras LLMs, significa uma interface padronizada. Para o sistema, significa que o projeto deixa de depender de uma conversa específica e passa a ter uma superfície operacional própria.
+Para o humano, isso significa poder pedir ao ChatGPT para investigar, editar, testar, revisar e
+coordenar o projeto. Para outras LLMs, significa uma interface padronizada. Para o sistema,
+significa que o projeto deixa de depender de uma conversa específica e passa a ter uma superfície
+operacional própria.
 
-A implementação deve começar pequena: leitura, Git e diagnóstico. Em seguida, escrita controlada. Depois, jobs. Por fim, Copilot SDK 0.3.0, Copilot CLI headless, worktrees, event bus e multiagente.
+A implementação deve começar pequena: leitura, Git e diagnóstico. Em seguida, escrita controlada.
+Depois, jobs. Por fim, Copilot SDK 0.3.0, Copilot CLI headless, worktrees, event bus e multiagente.
 
-O resultado esperado é um ambiente no qual o ChatGPT e outros agentes não apenas “comentam” sobre o projeto, mas conseguem operar o projeto dentro do mesmo ambiente real em que ele é desenvolvido.
+O resultado esperado é um ambiente no qual o ChatGPT e outros agentes não apenas “comentam” sobre o
+projeto, mas conseguem operar o projeto dentro do mesmo ambiente real em que ele é desenvolvido.

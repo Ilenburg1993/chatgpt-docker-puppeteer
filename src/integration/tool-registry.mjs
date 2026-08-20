@@ -331,9 +331,10 @@ export class ToolRegistry {
 
                 // Check if retryable
                 if (!retryEnabled || !classification.retryable || attempt >= maxAttempts) {
-                    throw new Error( // eslint-disable-line preserve-caught-error
+                    throw new Error(
                         `Tool ${name} execution failed: ${error.message} ` +
                             `(${classification.reasonCode}, attempt ${attempt}/${maxAttempts})`,
+                        { cause: _raw_error },
                     );
                 }
 

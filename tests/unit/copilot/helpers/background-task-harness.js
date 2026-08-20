@@ -1,11 +1,12 @@
 // @ts-check
 /**
- * Deterministic harness for Agent background-task ports.
- * Mirrors the production contract while exposing tracked promises to tests without relying on untyped arrays.
+ * Deterministic harness for Agent background-task ports. Mirrors the production contract while exposing tracked
+ * promises to tests without relying on untyped arrays.
  */
 
 /**
  * @typedef {{ label?: string; description?: string }} BackgroundTaskMeta
+ *
  * @typedef {{ task: Promise<unknown>; meta: BackgroundTaskMeta | undefined }} TrackedBackgroundTask
  */
 

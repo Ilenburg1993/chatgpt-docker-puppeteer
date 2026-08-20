@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 import { createToolFailureResult } from '../infra/tool-feedback.js';
-import { validatePath, WORKSPACE_ROOT } from './shared.js';
+import { WORKSPACE_ROOT, validatePath } from './shared.js';
 /**
  * src/copilot/tools/file/write-tools.js
  *
@@ -17,8 +17,8 @@ import { validatePath, WORKSPACE_ROOT } from './shared.js';
  * @see module:copilot/tools/file/shared
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { IO_CAPABILITY, IO_RISK, capabilityForCreate, riskForOverwrite } from '#copilot/infra/public/policy';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     ADVISORY_WRITE_CONTENT_BYTES,
     buildMutationChangeSet,
@@ -45,28 +45,32 @@ const {
     writeFileAtomicValidated,
 } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
-/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof writeFileAtomic>[1]} content @param {Parameters<typeof writeFileAtomic>[2]} options */
+/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof writeFileAtomic>[1]} content
+  @param {Parameters<typeof writeFileAtomic>[2]} options */
 function writeValidatedOrString(validatedWritePath, resolved, content, options) {
     return validatedWritePath
         ? writeFileAtomicValidated(validatedWritePath, content, options)
         : writeFileAtomic(resolved, content, options);
 }
 
-/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof createOrReplaceFileAtomic>[1]} content @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options */
+/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof createOrReplaceFileAtomic>[1]}
+  content @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options */
 function createValidatedOrString(validatedWritePath, resolved, content, options) {
     return validatedWritePath
         ? createOrReplaceFileAtomicValidated(validatedWritePath, content, options)
         : createOrReplaceFileAtomic(resolved, content, options);
 }
 
-/** @param {{ resolved: string; validatedReadPath?: unknown }} source @param {{ resolved: string; validatedWritePath?: unknown }} destination @param {Parameters<typeof copyFileLocked>[2]} options */
+/** @param {{ resolved: string; validatedReadPath?: unknown }} source @param {{ resolved: string; validatedWritePath?:
+  unknown }} destination @param {Parameters<typeof copyFileLocked>[2]} options */
 function copyValidatedPairOrString(source, destination, options) {
     return source.validatedReadPath && destination.validatedWritePath
         ? copyFileLockedValidated(source.validatedReadPath, destination.validatedWritePath, options)
         : copyFileLocked(source.resolved, destination.resolved, options);
 }
 
-/** @param {{ resolved: string; validatedWritePath?: unknown }} source @param {{ resolved: string; validatedWritePath?: unknown }} destination @param {Parameters<typeof moveFileLocked>[2]} options */
+/** @param {{ resolved: string; validatedWritePath?: unknown }} source @param {{ resolved: string; validatedWritePath?:
+  unknown }} destination @param {Parameters<typeof moveFileLocked>[2]} options */
 function moveValidatedPairOrString(source, destination, options) {
     return source.validatedWritePath && destination.validatedWritePath
         ? moveFileLockedValidated(source.validatedWritePath, destination.validatedWritePath, options)
@@ -82,8 +86,7 @@ function moveValidatedPairOrString(source, destination, options) {
  */
 const patchBundlePlanTool = buildTool({
     name: 'patch_bundle_plan',
-    description:
-        'Simula aplicação de um patch bundle multi-arquivo usando dry-run. Não modifica arquivos.',
+    description: 'Simula aplicação de um patch bundle multi-arquivo usando dry-run. Não modifica arquivos.',
     instructions:
         'Use patch_bundle_plan para validar mudanças em múltiplos arquivos antes de executar patch_file. Sempre forneça um ' +
         'plano válido no formato de patch-plan. Nunca use este tool para mutação real.',
@@ -127,16 +130,24 @@ const writeFileContentTool = buildTool({
         encoding: z
             .enum(['utf8', 'base64'])
             .optional()
-            .default('utf8')['describe']('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
+            .default('utf8')
+            ['describe']('Codificação do conteúdo (utf8 para texto, base64 para binário)'),
         expectedHash: z
             .string()
-            .optional()['describe']('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
+            .optional()
+            ['describe']('SHA-256 esperado do conteúdo atual. Se o arquivo mudou, a escrita falha sem aplicar.'),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Não altera atomicidade, locks ou path policy.'),
+            .optional()
+            ['describe'](
+                'Perfil de persistência após crash; default file-and-directory. Não altera atomicidade, locks ou path policy.',
+            ),
     }),
     handler: async ({ path: filePath, content, encoding, expectedHash, durability }) => {
-        const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
+        const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, {
+            mode: 'write',
+            issueMutableCapability: true,
+        });
         if (!ok) {
             return pathFailureResult('write_file_content', reason ?? 'Caminho inválido.', {
                 path: filePath,
@@ -261,21 +272,30 @@ const createFileTool = buildTool({
         encoding: z
             .enum(['utf8', 'base64'])
             .optional()
-            .default('utf8')['describe']('Codificação do conteúdo inicial (utf8 para texto, base64 para binário)'),
+            .default('utf8')
+            ['describe']('Codificação do conteúdo inicial (utf8 para texto, base64 para binário)'),
         createParentDirs: z
             .boolean()
             .optional()
-            .default(true)['describe']('Se true, cria diretórios intermediários se não existirem'),
+            .default(true)
+            ['describe']('Se true, cria diretórios intermediários se não existirem'),
         overwrite: z
             .boolean()
             .optional()
-            .default(false)['describe']('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
+            .default(false)
+            ['describe']('Se true, sobrescreve o arquivo se já existir (⚠️ destrutivo)'),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Atomicidade e policy permanecem ativas.'),
+            .optional()
+            ['describe'](
+                'Perfil de persistência após crash; default file-and-directory. Atomicidade e policy permanecem ativas.',
+            ),
     }),
     handler: async ({ path: filePath, content, encoding, createParentDirs, overwrite, durability }) => {
-        const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, { mode: 'write', issueMutableCapability: true });
+        const { ok, reason, resolved, validatedWritePath } = await validatePath(filePath, {
+            mode: 'write',
+            issueMutableCapability: true,
+        });
         if (!ok) {
             return pathFailureResult('create_file', reason ?? 'Caminho inválido.', {
                 path: filePath,
@@ -499,7 +519,8 @@ const copyFileTool = buildTool({
         overwrite: z.boolean().optional().default(false)['describe']('Sobrescrever destino se existir'),
         expectedSourceHash: z
             .string()
-            .optional()['describe']('SHA-256 esperado da origem. Se ela mudou, a cópia falha sem publicar o destino.'),
+            .optional()
+            ['describe']('SHA-256 esperado da origem. Se ela mudou, a cópia falha sem publicar o destino.'),
     }),
     handler: async ({ source, destination, overwrite, expectedSourceHash }) => {
         const src = await validatePath(source, { mode: 'read', issueReadCapability: true });

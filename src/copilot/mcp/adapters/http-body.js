@@ -9,8 +9,8 @@
  * @module copilot/mcp/adapters/http-body
  */
 
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 export const DEFAULT_MCP_HTTP_BODY_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -28,18 +28,19 @@ const DEFAULT_ENCODING = 'utf8';
  * @typedef {{ maxBytes?: number }} McpHttpJsonBodyOptions
  *
  * @typedef {{
- *     ok: true;
- *     kind: 'not-post' | 'initialize' | 'session-bound';
- *     sessionId: string | null;
- *     initializeRequest: boolean;
- * } | {
- *     ok: false;
- *     statusCode: 400;
- *     error: McpHttpBodyError;
- *     kind: 'missing-session' | 'initialize-with-session';
- *     sessionId: string | null;
- *     initializeRequest: boolean;
- * }} McpPostSessionClassification
+ *           ok: true;
+ *           kind: 'not-post' | 'initialize' | 'session-bound';
+ *           sessionId: string | null;
+ *           initializeRequest: boolean;
+ *       }
+ *     | {
+ *           ok: false;
+ *           statusCode: 400;
+ *           error: McpHttpBodyError;
+ *           kind: 'missing-session' | 'initialize-with-session';
+ *           sessionId: string | null;
+ *           initializeRequest: boolean;
+ *       }} McpPostSessionClassification
  */
 
 /**
@@ -69,7 +70,12 @@ export async function readMcpHttpJsonBody(req, options = {}) {
             const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), DEFAULT_ENCODING);
             bytesRead += buffer.byteLength;
             if (bytesRead > maxBytes) {
-                return bodyFailure(413, 'request_entity_too_large', 'MCP request body exceeds configured limit.', bytesRead);
+                return bodyFailure(
+                    413,
+                    'request_entity_too_large',
+                    'MCP request body exceeds configured limit.',
+                    bytesRead,
+                );
             }
             chunks.push(buffer);
         }
@@ -82,10 +88,7 @@ export async function readMcpHttpJsonBody(req, options = {}) {
     }
 
     try {
-        const raw = decodeUtf8Buffer(
-            concatBufferViews(chunks, bytesRead),
-            'MCP request body contains invalid UTF-8.',
-        );
+        const raw = decodeUtf8Buffer(concatBufferViews(chunks, bytesRead), 'MCP request body contains invalid UTF-8.');
         const body = JSON.parse(raw);
         return { ok: true, body, bytesRead, initializeRequest: isMcpInitializeRequestBody(body) };
     } catch {

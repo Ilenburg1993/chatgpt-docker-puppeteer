@@ -18,7 +18,8 @@
 
 Este anexo responde a uma pergunta mais específica do que a auditoria anterior respondeu:
 
-**a cadeia de eventos de sessão/agent está implementada de ponta a ponta, de forma canônica, com UX terminal clara e sem arquiteturas paralelas desnecessárias?**
+**a cadeia de eventos de sessão/agent está implementada de ponta a ponta, de forma canônica, com UX
+terminal clara e sem arquiteturas paralelas desnecessárias?**
 
 O foco está nas famílias do intervalo `946–1828`, incluindo:
 
@@ -45,16 +46,20 @@ O foco está nas famílias do intervalo `946–1828`, incluindo:
 
 ## 2. Princípio canônico confirmado pelo SDK 0.3.0
 
-O README oficial do SDK e o arquivo tipado confirmam uma separação correta entre três classes de sinal:
+O README oficial do SDK e o arquivo tipado confirmam uma separação correta entre três classes de
+sinal:
 
 1. **eventos finais/persistíveis**
-   - ex.: `assistant.message`, `assistant.reasoning`, `tool.execution_complete`, `permission.completed`
+   - ex.: `assistant.message`, `assistant.reasoning`, `tool.execution_complete`,
+     `permission.completed`
 2. **eventos efêmeros de streaming/progresso**
    - ex.: `assistant.message_delta`, `assistant.reasoning_delta`, `tool.execution_progress`
 3. **eventos de coordenação/UI/runtime**
-   - ex.: `capabilities.changed`, `commands.changed`, `system.notification`, `exit_plan_mode.requested`
+   - ex.: `capabilities.changed`, `commands.changed`, `system.notification`,
+     `exit_plan_mode.requested`
 
-O problema não está nessa modelagem. O problema aparece quando a superfície terminal trata sinais semanticamente importantes **apenas como transientes**, sem promoção para narrativa durável.
+O problema não está nessa modelagem. O problema aparece quando a superfície terminal trata sinais
+semanticamente importantes **apenas como transientes**, sem promoção para narrativa durável.
 
 ---
 
@@ -64,11 +69,8 @@ O problema não está nessa modelagem. O problema aparece quando a superfície t
 
 O fluxo dominante identificado no repositório é:
 
-`SDK session event vanilla`
-→ `src/copilot/event-handlers/**`
-→ `agent event normalizado`
-→ `src/copilot/terminal/events/**`
-→ `stdout local + SSE + activity-state + transcript/turn-trace`
+`SDK session event vanilla` → `src/copilot/event-handlers/**` → `agent event normalizado` →
+`src/copilot/terminal/events/**` → `stdout local + SSE + activity-state + transcript/turn-trace`
 
 Esse desenho é correto e preferível a consumir diretamente o SDK em múltiplas camadas de UI.
 
@@ -103,13 +105,26 @@ Estava parcial, latente ou subexposto para:
 - `exit_plan_mode.requested`
 - attachments `blob` no terminal
 
-Após a retomada contínua sobre baseline verde, os itens acima deixaram de ser apenas backlog conceitual: todos ganharam tratamento material, restando sobretudo aprofundamento de UX/diffs e não mais ausência total de surface.
+Após a retomada contínua sobre baseline verde, os itens acima deixaram de ser apenas backlog
+conceitual: todos ganharam tratamento material, restando sobretudo aprofundamento de UX/diffs e não
+mais ausência total de surface.
 
-Um complemento importante desta rodada é que `requestHeaders` por turno deixaram de ser gap abstrato do roadmap e viraram contrato implementado. A solução adotada foi deliberadamente canônica: em vez de fingir que o caminho `ask_user` do dialog loop aceita headers por turno, o terminal faz bounce controlado para `llmBridgeClient.chat(...)` quando há headers one-shot, e reanexa o dialog loop ao fim.
+Um complemento importante desta rodada é que `requestHeaders` por turno deixaram de ser gap abstrato
+do roadmap e viraram contrato implementado. A solução adotada foi deliberadamente canônica: em vez
+de fingir que o caminho `ask_user` do dialog loop aceita headers por turno, o terminal faz bounce
+controlado para `llmBridgeClient.chat(...)` quando há headers one-shot, e reanexa o dialog loop ao
+fim.
 
-Outro complemento importante é que a camada local de `CopilotClient` também foi auditada e endurecida em paralelo: metadata dedicada de sessão, builder/options full e baseline declarativo do boot agora estão alinhados com o `client.d.ts` realmente instalado, evitando que a cadeia terminal/session opere sobre uma fachada parcialmente incompleta.
+Outro complemento importante é que a camada local de `CopilotClient` também foi auditada e
+endurecida em paralelo: metadata dedicada de sessão, builder/options full e baseline declarativo do
+boot agora estão alinhados com o `client.d.ts` realmente instalado, evitando que a cadeia
+terminal/session opere sobre uma fachada parcialmente incompleta.
 
-Um terceiro complemento importante desta rodada é que `SessionConfig`, `ResumeSessionConfig` e `CustomAgentConfig` também foram auditados em profundidade: agora existe builder dedicado de resume, sanitização estrutural explícita e a camada local de subagentes deixou de divergir do SDK em `description?`, `skills?`, `mcpServers?` e `tools=[]`. Isso reduz o risco de a cadeia terminal/session operar sobre contratos locais mais restritivos do que o SDK oficial.
+Um terceiro complemento importante desta rodada é que `SessionConfig`, `ResumeSessionConfig` e
+`CustomAgentConfig` também foram auditados em profundidade: agora existe builder dedicado de resume,
+sanitização estrutural explícita e a camada local de subagentes deixou de divergir do SDK em
+`description?`, `skills?`, `mcpServers?` e `tools=[]`. Isso reduz o risco de a cadeia
+terminal/session operar sobre contratos locais mais restritivos do que o SDK oficial.
 
 ---
 
@@ -181,10 +196,12 @@ Se a resposta depender de lembrar um “flash” que sumiu, a UX está funcional
 ### Situação ideal
 
 1. **cada família de evento tem um owner terminal claro**;
-2. **eventos efêmeros continuam efêmeros no wire, mas snapshots operacionais relevantes são promovidos a histórico visível**;
+2. **eventos efêmeros continuam efêmeros no wire, mas snapshots operacionais relevantes são
+   promovidos a histórico visível**;
 3. **não há caminhos paralelos competindo para narrar o mesmo fato**;
 4. **nenhum evento relevante para operação contínua depende apenas de inline status**;
-5. **o terminal deixa claro o que é turn do assistente, o que é progresso de tool, o que é background agent, o que é shell, o que é prompt/permission/UI**.
+5. **o terminal deixa claro o que é turn do assistente, o que é progresso de tool, o que é
+   background agent, o que é shell, o que é prompt/permission/UI**.
 
 ---
 
@@ -241,7 +258,8 @@ Se a resposta depender de lembrar um “flash” que sumiu, a UX está funcional
 
 - `requestHeaders` por turno já entregues por `/sdk headers` com store one-shot local
 - gateway de diálogo faz dispatch SDK direto com reanexo do dialog loop quando necessário
-- residual futuro: avaliar se existe no SDK um caminho zero-PR nativo que carregue headers sem bounce explícito
+- residual futuro: avaliar se existe no SDK um caminho zero-PR nativo que carregue headers sem
+  bounce explícito
 
 ---
 
@@ -251,20 +269,25 @@ Nesta rodada adicional, foram iniciados hardenings concretos alinhados a este an
 
 1. snapshots duráveis de progresso de tool em `compact`;
 2. heartbeat de tool longa tornando-se visível também no histórico textual do terminal;
-3. promoção terminal de `agent.background.completed`, `agent.background.idle`, `agent.shell.completed` e `agent.shell.detached_completed`.
+3. promoção terminal de `agent.background.completed`, `agent.background.idle`,
+   `agent.shell.completed` e `agent.shell.detached_completed`.
 
-Isso não encerra a trilha, mas corrige imediatamente o tipo de UX que o operador relatou como problemática.
+Isso não encerra a trilha, mas corrige imediatamente o tipo de UX que o operador relatou como
+problemática.
 
 ### 8.1. Gate de retomada já fechado
 
-Antes de continuar as próximas fases deste anexo, a baseline de validação foi estabilizada nesta mesma rodada:
+Antes de continuar as próximas fases deste anexo, a baseline de validação foi estabilizada nesta
+mesma rodada:
 
 - runner misto Vitest corrigido para separar specs Copilot e genéricas por configuração;
 - `vitest.copilot.config.js` endurecido para `threads` com concorrência default mais conservadora;
 - warnings de teardown zerados;
-- `lint`, `typecheck` estrito de `src.copilot`, `typecheck` estrito de testes, `test:copilot:unit` e `test:unit` todos verdes.
+- `lint`, `typecheck` estrito de `src.copilot`, `typecheck` estrito de testes, `test:copilot:unit` e
+  `test:unit` todos verdes.
 
-Isso importa aqui porque a continuação das fases B e C deste anexo só faz sentido sobre uma baseline de validação confiável e repetível.
+Isso importa aqui porque a continuação das fases B e C deste anexo só faz sentido sobre uma baseline
+de validação confiável e repetível.
 
 ---
 
@@ -272,7 +295,8 @@ Isso importa aqui porque a continuação das fases B e C deste anexo só faz sen
 
 O recorte `946–1828` não revelou uma arquitetura quebrada. Revelou algo mais sutil:
 
-**o sistema estava mais maduro no transporte e normalização dos eventos do que na promoção deles para uma UX terminal verdadeiramente operacional.**
+**o sistema estava mais maduro no transporte e normalização dos eventos do que na promoção deles
+para uma UX terminal verdadeiramente operacional.**
 
 Esse é exatamente o tipo de detalhe que, para a LLM-B, não é detalhe.
 

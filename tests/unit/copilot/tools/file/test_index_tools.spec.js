@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -209,8 +208,24 @@ describe('tools/file/index-tools', () => {
     it('includes all results when exactMatch is false (default)', async () => {
         mocks.getIoIndexStats.mockReturnValue({ available: true, files: 5 });
         mocks.findIoIndexSymbol.mockReturnValue([
-            { filePath: '/ws/a.js', relativePath: 'a.js', symbolName: 'alpha', symbolKind: 'function', exported: 0, line: 1, docComment: null },
-            { filePath: '/ws/b.js', relativePath: 'b.js', symbolName: 'alphaHelper', symbolKind: 'function', exported: 0, line: 2, docComment: null },
+            {
+                filePath: '/ws/a.js',
+                relativePath: 'a.js',
+                symbolName: 'alpha',
+                symbolKind: 'function',
+                exported: 0,
+                line: 1,
+                docComment: null,
+            },
+            {
+                filePath: '/ws/b.js',
+                relativePath: 'b.js',
+                symbolName: 'alphaHelper',
+                symbolKind: 'function',
+                exported: 0,
+                line: 2,
+                docComment: null,
+            },
         ]);
 
         const result = await getHandler(workspaceIndexFindSymbolTool)({ symbol: 'alpha' });
@@ -310,8 +325,22 @@ describe('tools/file/index-tools', () => {
         // Mock simulates io-index-sqlite filtering behavior
         mocks.findIoIndexImports.mockImplementation((source, options) => {
             const rows = [
-                { filePath: '/ws/a.js', relativePath: 'a.js', source: 'react', specifiersJson: '["useState"]', isDynamic: 0, line: 1 },
-                { filePath: '/ws/b.js', relativePath: 'b.js', source: 'react-dom', specifiersJson: '["render"]', isDynamic: 0, line: 2 },
+                {
+                    filePath: '/ws/a.js',
+                    relativePath: 'a.js',
+                    source: 'react',
+                    specifiersJson: '["useState"]',
+                    isDynamic: 0,
+                    line: 1,
+                },
+                {
+                    filePath: '/ws/b.js',
+                    relativePath: 'b.js',
+                    source: 'react-dom',
+                    specifiersJson: '["render"]',
+                    isDynamic: 0,
+                    line: 2,
+                },
             ];
             return options?.exactSource ? rows.filter((r) => r.source === source) : rows;
         });
@@ -327,8 +356,22 @@ describe('tools/file/index-tools', () => {
     it('includes all results when exactSource is false (default)', async () => {
         mocks.getIoIndexStats.mockReturnValue({ available: true, files: 10 });
         mocks.findIoIndexImports.mockReturnValue([
-            { filePath: '/ws/a.js', relativePath: 'a.js', source: 'react', specifiersJson: '[]', isDynamic: 0, line: 1 },
-            { filePath: '/ws/b.js', relativePath: 'b.js', source: 'react-dom', specifiersJson: '[]', isDynamic: 0, line: 2 },
+            {
+                filePath: '/ws/a.js',
+                relativePath: 'a.js',
+                source: 'react',
+                specifiersJson: '[]',
+                isDynamic: 0,
+                line: 1,
+            },
+            {
+                filePath: '/ws/b.js',
+                relativePath: 'b.js',
+                source: 'react-dom',
+                specifiersJson: '[]',
+                isDynamic: 0,
+                line: 2,
+            },
         ]);
 
         const result = await getHandler(workspaceIndexFindImportsTool)({ source: 'react' });

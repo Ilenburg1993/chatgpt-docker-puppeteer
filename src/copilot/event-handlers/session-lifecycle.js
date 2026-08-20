@@ -18,8 +18,8 @@ import {
     EMITTER_SESSION_SCHEDULE_CREATED,
     SESSION_EVENTS,
 } from '#copilot/events';
-import { log } from '#copilot/observability';
 import { normalizeModelChangedEvent, normalizeToolsUpdatedEvent, onSessionEvent } from '#copilot/events/sdk-events';
+import { log } from '#copilot/observability';
 
 /**
  * @param {unknown} raw
@@ -208,7 +208,13 @@ export function wireSessionLifecycleEvents(session, { emit }) {
                       ? data['severity']
                       : null;
             log('INFO', `[session-lifecycle] custom_notification: ${title ?? message ?? '(sem mensagem)'}`);
-            emit(EMITTER_SESSION_CUSTOM_NOTIFICATION, { title, message, level, data, ts: evt?.timestamp ?? Date.now() });
+            emit(EMITTER_SESSION_CUSTOM_NOTIFICATION, {
+                title,
+                message,
+                level,
+                data,
+                ts: evt?.timestamp ?? Date.now(),
+            });
         }),
 
         // ── session.extensions.attachments_pushed ───────────────────────
@@ -253,7 +259,12 @@ export function wireSessionLifecycleEvents(session, { emit }) {
                     : typeof data['id'] === 'string'
                       ? data['id']
                       : null;
-            const title = typeof data['title'] === 'string' ? data['title'] : typeof data['name'] === 'string' ? data['name'] : null;
+            const title =
+                typeof data['title'] === 'string'
+                    ? data['title']
+                    : typeof data['name'] === 'string'
+                      ? data['name']
+                      : null;
             log('INFO', `[session-lifecycle] schedule_created: ${scheduleId ?? title ?? '(sem id)'}`);
             emit(EMITTER_SESSION_SCHEDULE_CREATED, { scheduleId, title, data, ts: evt?.timestamp ?? Date.now() });
         }),
@@ -265,7 +276,12 @@ export function wireSessionLifecycleEvents(session, { emit }) {
                     : typeof data['id'] === 'string'
                       ? data['id']
                       : null;
-            const title = typeof data['title'] === 'string' ? data['title'] : typeof data['name'] === 'string' ? data['name'] : null;
+            const title =
+                typeof data['title'] === 'string'
+                    ? data['title']
+                    : typeof data['name'] === 'string'
+                      ? data['name']
+                      : null;
             log('INFO', `[session-lifecycle] schedule_cancelled: ${scheduleId ?? title ?? '(sem id)'}`);
             emit(EMITTER_SESSION_SCHEDULE_CANCELLED, { scheduleId, title, data, ts: evt?.timestamp ?? Date.now() });
         }),

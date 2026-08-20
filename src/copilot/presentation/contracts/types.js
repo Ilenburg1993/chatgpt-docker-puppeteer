@@ -47,6 +47,7 @@
  *     description?: string;
  * }} RuntimeElicitationStringField
  *
+ *
  * @typedef {{
  *     type: 'array';
  *     minItems?: number;
@@ -57,12 +58,14 @@
  *     description?: string;
  * }} RuntimeElicitationArrayField
  *
+ *
  * @typedef {{
  *     type: 'boolean';
  *     default?: boolean;
  *     title?: string;
  *     description?: string;
  * }} RuntimeElicitationBooleanField
+ *
  *
  * @typedef {{
  *     type: 'number' | 'integer';
@@ -73,8 +76,12 @@
  *     description?: string;
  * }} RuntimeElicitationNumberField
  *
- * @typedef {RuntimeElicitationStringField | RuntimeElicitationArrayField | RuntimeElicitationBooleanField |
- * RuntimeElicitationNumberField} RuntimeElicitationSchemaField
+ *
+ * @typedef {RuntimeElicitationStringField
+ *     | RuntimeElicitationArrayField
+ *     | RuntimeElicitationBooleanField
+ *     | RuntimeElicitationNumberField} RuntimeElicitationSchemaField
+ *
  *
  * @typedef {{
  *     type: 'object';
@@ -83,6 +90,7 @@
  *     title?: string;
  *     description?: string;
  * }} RuntimeElicitationSchema
+ *
  *
  * @typedef {{
  *     message: string;
@@ -98,6 +106,7 @@
  *     url?: string;
  *     [key: string]: unknown;
  * }} RuntimeElicitationContext
+ *
  *
  * @typedef {{
  *     action: 'accept' | 'decline' | 'cancel';
@@ -138,9 +147,15 @@
  *         inputModalities?: string[];
  *         outputModalities?: string[];
  *         supportsReasoning?: boolean;
+ *         capabilities?: Record<string, unknown>;
+ *         gatewayId?: string | null;
+ *         providerModel?: string | null;
+ *         confidence?: string | null;
+ *         providerOwner?: string | null;
  *         [key: string]: unknown;
  *     };
  * }} RuntimeModelInfo
+ *
  *
  * @typedef {{
  *     sessionId: string;
@@ -162,6 +177,7 @@
  *     context?: unknown;
  *     [key: string]: unknown;
  * }} RuntimeSessionMetadata
+ *
  *
  * @typedef {{
  *     sessionId?: string;

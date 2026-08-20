@@ -11,5 +11,6 @@ export {
     bindAgentSessionExcludedTools,
     bindAgentSessionTools,
     bootstrapAgentTools,
+    hydrateAgentCustomTools,
     isAgentToolDisabled,
 } from '../tool-port.js';

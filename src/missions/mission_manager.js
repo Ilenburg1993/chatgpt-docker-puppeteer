@@ -1,17 +1,17 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
-import { v4 as uuidv4 } from 'uuid';
-import * as logger from '#core/logger';
 import CONFIG from '#core/config';
+import * as logger from '#core/logger';
 import { getDb } from '#infra/db/sqlite';
 import { insertTask, TASK_STAGES } from '#infra/db/task_repo';
-import { MissionStateManager, MISSION_STATUS } from './mission_state_manager.js';
-import { WorkflowGenerator } from './workflow_generator.js';
-import { ActionCode, MessageType } from '#shared/nerv/constants';
-import { ContextManager } from '#orchestrator/context_manager';
-import { FeedbackProcessor } from './feedback_processor.js';
 import { CheckpointManager } from '#orchestrator/checkpoint_manager';
+import { ContextManager } from '#orchestrator/context_manager';
+import { ActionCode, MessageType } from '#shared/nerv/constants';
 import { getActionCode, getMessageType, getPayload } from '#shared/nerv/envelope_reader';
 import crypto from 'node:crypto';
+import { v4 as uuidv4 } from 'uuid';
+import { FeedbackProcessor } from './feedback_processor.js';
+import { MISSION_STATUS, MissionStateManager } from './mission_state_manager.js';
+import { WorkflowGenerator } from './workflow_generator.js';
 
 function _hashId(/** @type {any} */ input) {
     return crypto.createHash('sha256').update(String(input), 'utf8').digest('hex').slice(0, 20);
@@ -31,7 +31,15 @@ class MissionManager {
      * @param {any} [deps.feedbackProcessor] - FeedbackProcessor (opcional)
      * @param {any} [deps.checkpointManager] - CheckpointManager (opcional)
      */
-    constructor({ kernel = null, nerv, stateManager = null, workflowGenerator = null, contextManager = null, feedbackProcessor = null, checkpointManager = null }) {
+    constructor({
+        kernel = null,
+        nerv,
+        stateManager = null,
+        workflowGenerator = null,
+        contextManager = null,
+        feedbackProcessor = null,
+        checkpointManager = null,
+    }) {
         if (!nerv) {
             throw new Error('MissionManager requer NERV');
         }
@@ -50,7 +58,9 @@ class MissionManager {
         // Caso contrário, testes/instâncias com baseDir customizado acabam poluindo ./missions no root do repo.
         const checkpointBaseDir = checkpointManager
             ? null
-            : (this.stateManager && typeof this.stateManager.baseDir === 'string' ? this.stateManager.baseDir : 'missions');
+            : this.stateManager && typeof this.stateManager.baseDir === 'string'
+              ? this.stateManager.baseDir
+              : 'missions';
         this.checkpointManager = checkpointManager || new CheckpointManager({ baseDir: checkpointBaseDir });
 
         // Cache de missões em execução: mission_id → { currentStepIndex, taskIds }
@@ -72,6 +82,7 @@ class MissionManager {
      * Inicializa o MissionManager.
      *
      * Realiza crash recovery automático:
+     *
      * - Busca missões em estado RUNNING
      * - Se tiverem checkpoints, recupera do último checkpoint
      * - Retoma execução do step onde parou
@@ -119,8 +130,8 @@ class MissionManager {
             workflow,
             config: {
                 template: templateId,
-                params
-            }
+                params,
+            },
         };
 
         let state;
@@ -138,7 +149,7 @@ class MissionManager {
             // Rollback: if context init fails after mission created, log and rethrow
             logger.log(
                 'ERROR',
-                `[MissionManager] Mission ${missionId} creation failed during context init: ${(/** @type {any} */ (err))?.message}`
+                `[MissionManager] Mission ${missionId} creation failed during context init: ${/** @type {any} */ (err)?.message}`,
             );
             throw err;
         }
@@ -188,6 +199,7 @@ class MissionManager {
      * Inicia execução de uma missão.
      *
      * Fluxo:
+     *
      * 1. Carrega state da missão
      * 2. Identifica próximo step a executar
      * 3. Gera Task V5 baseado no step
@@ -212,7 +224,7 @@ class MissionManager {
 
         // Atualiza status para RUNNING
         await this.stateManager.updateMission(missionId, {
-            status: MISSION_STATUS.RUNNING
+            status: MISSION_STATUS.RUNNING,
         });
         this._syncMissionStatusToDb({ ...state, status: MISSION_STATUS.RUNNING }, MISSION_STATUS.RUNNING);
 
@@ -222,7 +234,7 @@ class MissionManager {
         this.activeMissions.set(missionId, {
             currentStepIndex: state.progress.current_step,
             steps: state.workflow.steps,
-            taskIds: []
+            taskIds: [],
         });
 
         // Executa primeiro step
@@ -247,7 +259,7 @@ class MissionManager {
 
         // Atualiza status
         await this.stateManager.updateMission(missionId, {
-            status: MISSION_STATUS.PAUSED
+            status: MISSION_STATUS.PAUSED,
         });
         this._syncMissionStatusToDb({ ...state, status: MISSION_STATUS.PAUSED }, MISSION_STATUS.PAUSED);
 
@@ -275,14 +287,14 @@ class MissionManager {
 
         // Atualiza status e retoma execução
         await this.stateManager.updateMission(missionId, {
-            status: MISSION_STATUS.RUNNING
+            status: MISSION_STATUS.RUNNING,
         });
         this._syncMissionStatusToDb({ ...state, status: MISSION_STATUS.RUNNING }, MISSION_STATUS.RUNNING);
 
         this.activeMissions.set(missionId, {
             currentStepIndex: state.progress.current_step,
             steps: state.workflow.steps,
-            taskIds: []
+            taskIds: [],
         });
 
         logger.log('INFO', `[MissionManager] Missão resumida: ${missionId}`);
@@ -294,8 +306,8 @@ class MissionManager {
     /**
      * Adiciona feedback a uma missão.
      *
-     * O feedback será processado, categorizado e armazenado no MemoryStore.
-     * Será injetado nos próximos steps executados.
+     * O feedback será processado, categorizado e armazenado no MemoryStore. Será injetado nos próximos steps
+     * executados.
      *
      * @param {string} missionId - ID da missão
      * @param {string} feedback - Feedback textual
@@ -310,7 +322,7 @@ class MissionManager {
         // Processa feedback com FeedbackProcessor
         const processed = this.feedbackProcessor.processFeedback(feedback, {
             mission_id: missionId,
-            step_id: mission.workflow.steps[mission.progress.current_step]?.id
+            step_id: mission.workflow.steps[mission.progress.current_step]?.id,
         });
 
         // Salva feedback processado no state
@@ -318,10 +330,13 @@ class MissionManager {
             processed_id: processed.id,
             category: processed.category,
             action_items: processed.actionItems,
-            patterns: processed.patterns
+            patterns: processed.patterns,
         });
 
-        logger.log('INFO', `[MissionManager] Feedback processado e adicionado: ${missionId} (${processed.category}, ${processed.actionItems.length} action items, ${processed.patterns.length} patterns)`);
+        logger.log(
+            'INFO',
+            `[MissionManager] Feedback processado e adicionado: ${missionId} (${processed.category}, ${processed.actionItems.length} action items, ${processed.patterns.length} patterns)`,
+        );
 
         return processed;
     }
@@ -343,7 +358,7 @@ class MissionManager {
             status: state.status,
             progress: state.progress,
             current_step: state.workflow.steps[state.progress.current_step],
-            is_active: this.activeMissions.has(missionId)
+            is_active: this.activeMissions.has(missionId),
         };
     }
 
@@ -378,7 +393,10 @@ class MissionManager {
 
         const step = workflow.steps[currentStepIndex];
 
-        logger.log('INFO', `[MissionManager] Executando step ${currentStepIndex + 1}/${workflow.steps.length}: ${step.id}`);
+        logger.log(
+            'INFO',
+            `[MissionManager] Executando step ${currentStepIndex + 1}/${workflow.steps.length}: ${step.id}`,
+        );
 
         // Gera correlationId estável por missão+step
         const correlationId = `mission-${missionId}-step-${currentStepIndex}`;
@@ -388,11 +406,15 @@ class MissionManager {
             : null;
 
         // Gera Task V5 baseado no step com vínculo explícito de causalidade.
-        const taskV5 = this._generateTaskV5FromStep(step, state, /** @type {any} */ ({
-            stepIndex: currentStepIndex,
-            parentTaskId,
-            correlationId,
-        }));
+        const taskV5 = this._generateTaskV5FromStep(
+            step,
+            state,
+            /** @type {any} */ ({
+                stepIndex: currentStepIndex,
+                parentTaskId,
+                correlationId,
+            }),
+        );
 
         const dispatchMode = this._resolveDispatchMode();
 
@@ -418,8 +440,11 @@ class MissionManager {
                 }
             }
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionManager] Erro ao despachar task (${dispatchMode}): ${(/** @type {any} */ (error)).message}`);
-            await this._failMission(missionId, (/** @type {any} */ (error)).message);
+            logger.log(
+                'ERROR',
+                `[MissionManager] Erro ao despachar task (${dispatchMode}): ${/** @type {any} */ (error).message}`,
+            );
+            await this._failMission(missionId, /** @type {any} */ (error).message);
         }
     }
 
@@ -427,9 +452,12 @@ class MissionManager {
         const raw =
             process.env['MISSION_STEP_DISPATCH_MODE'] ||
             CONFIG.get('MISSION_STEP_DISPATCH_MODE', CONFIG?.all?.['MISSION_STEP_DISPATCH_MODE'] || 'ssot_queue');
-        const contingencyEnabled = String(process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] || '').trim() === 'true';
+        const contingencyEnabled =
+            String(process.env['MISSION_MANAGER_LEGACY_DISPATCH_ENABLED'] || '').trim() === 'true';
 
-        const normalized = String(raw || 'ssot_queue').trim().toLowerCase();
+        const normalized = String(raw || 'ssot_queue')
+            .trim()
+            .toLowerCase();
         if (normalized === 'legacy_direct' && contingencyEnabled) {
             return 'legacy_direct';
         }
@@ -437,14 +465,16 @@ class MissionManager {
         if (normalized === 'legacy_direct' && !contingencyEnabled) {
             logger.log(
                 'WARN',
-                '[MissionManager] MISSION_STEP_DISPATCH_MODE=legacy_direct ignorado; habilite MISSION_MANAGER_LEGACY_DISPATCH_ENABLED=true apenas para contingência'
+                '[MissionManager] MISSION_STEP_DISPATCH_MODE=legacy_direct ignorado; habilite MISSION_MANAGER_LEGACY_DISPATCH_ENABLED=true apenas para contingência',
             );
         }
         return 'ssot_queue';
     }
 
     _mapMissionStatusToDb(/** @type {any} */ status) {
-        const normalized = String(status || '').trim().toLowerCase();
+        const normalized = String(status || '')
+            .trim()
+            .toLowerCase();
         if (normalized === 'running') return 'RUNNING';
         if (normalized === 'paused') return 'PAUSED';
         if (normalized === 'completed') return 'DONE';
@@ -483,7 +513,7 @@ class MissionManager {
                     updated_at_ms = @updated_at_ms,
                     started_at_ms = COALESCE(missions.started_at_ms, @started_at_ms),
                     completed_at_ms = COALESCE(@completed_at_ms, missions.completed_at_ms)
-            `
+            `,
             ).run({
                 id: missionId,
                 title,
@@ -498,14 +528,25 @@ class MissionManager {
                 completed_at_ms: completedAtMs,
             });
         } catch (/** @type {any} */ error) {
-            logger.log('WARN', `[MissionManager] Falha ao sincronizar missão no SQLite: ${(/** @type {any} */ (error)).message}`);
+            logger.log(
+                'WARN',
+                `[MissionManager] Falha ao sincronizar missão no SQLite: ${/** @type {any} */ (error).message}`,
+            );
         }
     }
 
     /**
      * Gera Task V5 a partir de um step do workflow.
      */
-    _generateTaskV5FromStep(/** @type {any} */ step, /** @type {any} */ missionState, { stepIndex = /** @type {any} */ (null), parentTaskId = /** @type {any} */ (null), correlationId = /** @type {any} */ (null) } = {}) {
+    _generateTaskV5FromStep(
+        /** @type {any} */ step,
+        /** @type {any} */ missionState,
+        {
+            stepIndex = /** @type {any} */ (null),
+            parentTaskId = /** @type {any} */ (null),
+            correlationId = /** @type {any} */ (null),
+        } = {},
+    ) {
         const stableSeed = `${missionState?.id || 'mission'}|${step?.id || 'step'}|${stepIndex ?? 'na'}`;
         const taskId = `task-${_hashId(stableSeed)}`;
 
@@ -545,13 +586,13 @@ class MissionManager {
                     normalized: latestFeedback.content.toLowerCase().trim(),
                     category: latestFeedback.metadata.category || 'GENERAL',
                     actionItems: latestFeedback.metadata.action_items || [],
-                    patterns: latestFeedback.metadata.patterns || []
+                    patterns: latestFeedback.metadata.patterns || [],
                 };
             } else {
                 // Processa feedback agora (fallback para feedback antigo)
                 processedFeedback = this.feedbackProcessor.processFeedback(latestFeedback.content, {
                     mission_id: missionState.id,
-                    step_id: step.id
+                    step_id: step.id,
                 });
             }
 
@@ -559,7 +600,7 @@ class MissionManager {
             finalPrompt = this.feedbackProcessor.injectIntoStep(finalPrompt, processedFeedback, {
                 format: 'structured',
                 includeCategory: true,
-                includeActionItems: true
+                includeActionItems: true,
             });
         }
 
@@ -580,15 +621,15 @@ class MissionManager {
             spec: {
                 target: 'chatgpt', // Default, pode ser configurável
                 payload: {
-                    user_message: finalPrompt
+                    user_message: finalPrompt,
                 },
                 execution: step.execution || { strategy: 'SINGLE_SHOT' },
-                validation: step.validation || { validators: [] }
+                validation: step.validation || { validators: [] },
             },
             state: {
                 status: 'PENDING',
                 created_at: new Date().toISOString(),
-                history: {}
+                history: {},
             },
             policy: {
                 max_cost_cents: 500, // TODO: calcular baseado em estimate
@@ -603,7 +644,12 @@ class MissionManager {
     /**
      * Handler: Task completada com sucesso.
      */
-    async _handleTaskCompleted(/** @type {any} */ missionId, /** @type {any} */ stepIndex, /** @type {any} */ taskId, /** @type {any} */ result) {
+    async _handleTaskCompleted(
+        /** @type {any} */ missionId,
+        /** @type {any} */ stepIndex,
+        /** @type {any} */ taskId,
+        /** @type {any} */ result,
+    ) {
         logger.log('INFO', `[MissionManager] Task completada: ${taskId} (mission=${missionId}, step=${stepIndex})`);
 
         const state = await this.getMission(missionId);
@@ -626,11 +672,11 @@ class MissionManager {
             ...state.progress,
             current_step: stepIndex + 1,
             completed_tasks: state.progress.completed_tasks + 1,
-            percent: Math.round(((stepIndex + 1) / state.workflow.steps.length) * 100)
+            percent: Math.round(((stepIndex + 1) / state.workflow.steps.length) * 100),
         };
 
         await this.stateManager.updateMission(missionId, {
-            progress: updatedProgress
+            progress: updatedProgress,
         });
 
         const missionCache = this.activeMissions.get(missionId);
@@ -643,7 +689,7 @@ class MissionManager {
         await this.checkpointManager.saveCheckpoint(missionId, stepIndex + 1, updatedState, {
             reason: 'step_completed',
             task_id: taskId,
-            step_id: step.id
+            step_id: step.id,
         });
 
         // Executa próximo step
@@ -653,7 +699,12 @@ class MissionManager {
     /**
      * Handler: Task falhou.
      */
-    async _handleTaskFailed(/** @type {any} */ missionId, /** @type {any} */ stepIndex, /** @type {any} */ taskId, /** @type {any} */ error) {
+    async _handleTaskFailed(
+        /** @type {any} */ missionId,
+        /** @type {any} */ stepIndex,
+        /** @type {any} */ taskId,
+        /** @type {any} */ error,
+    ) {
         logger.log('ERROR', `[MissionManager] Task falhou: ${taskId} (mission=${missionId}, step=${stepIndex})`);
 
         await this._failMission(missionId, `Task ${taskId} falhou: ${error}`);
@@ -686,7 +737,10 @@ class MissionManager {
                     continue;
                 }
 
-                logger.log('INFO', `[MissionManager] 🔄 Recovering mission ${mission.id} from checkpoint (step ${checkpoint.step_index})`);
+                logger.log(
+                    'INFO',
+                    `[MissionManager] 🔄 Recovering mission ${mission.id} from checkpoint (step ${checkpoint.step_index})`,
+                );
 
                 // Restaura estado da missão a partir do checkpoint
                 // (Não precisa fazer nada além de logar, o checkpoint já está salvo)
@@ -694,7 +748,7 @@ class MissionManager {
                 // Retoma execução a partir do step checkpoint
                 this.activeMissions.set(mission.id, {
                     currentStepIndex: checkpoint.step_index,
-                    taskIds: []
+                    taskIds: [],
                 });
 
                 // Continua execução
@@ -703,7 +757,7 @@ class MissionManager {
                 logger.log('INFO', `[MissionManager] ✅ Mission ${mission.id} recovered and resumed`);
             }
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[MissionManager] Error during crash recovery: ${(/** @type {any} */ (error)).message}`);
+            logger.log('ERROR', `[MissionManager] Error during crash recovery: ${/** @type {any} */ (error).message}`);
         }
     }
 
@@ -712,7 +766,7 @@ class MissionManager {
      */
     async _completeMission(/** @type {any} */ missionId) {
         await this.stateManager.updateMission(missionId, {
-            status: MISSION_STATUS.COMPLETED
+            status: MISSION_STATUS.COMPLETED,
         });
         this._syncMissionStatusToDb({ id: missionId, status: MISSION_STATUS.COMPLETED }, MISSION_STATUS.COMPLETED);
 
@@ -734,7 +788,7 @@ class MissionManager {
     async _failMission(/** @type {any} */ missionId, /** @type {any} */ reason) {
         await this.stateManager.updateMission(missionId, {
             status: MISSION_STATUS.FAILED,
-            failure_reason: reason
+            failure_reason: reason,
         });
         this._syncMissionStatusToDb({ id: missionId, status: MISSION_STATUS.FAILED }, MISSION_STATUS.FAILED);
 
@@ -848,4 +902,4 @@ class MissionManager {
 }
 
 /** Reexport público: MISSION_STATUS. */
-export { MissionManager, MISSION_STATUS };
+export { MISSION_STATUS, MissionManager };

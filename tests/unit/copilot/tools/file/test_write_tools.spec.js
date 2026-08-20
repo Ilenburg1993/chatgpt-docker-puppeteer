@@ -1,113 +1,62 @@
 // @ts-check
 /**
- * @file Faixa 35 — Write Tools Test Suite (F181-F188)
+ * File write tools — semantic boundary tests.
  *
- *   Testes para src/copilot/tools/file/write-tools.js:
- *
- *   - write_file_content, create_file, delete_file, copy_file, move_file, patch_file
- *   - atomicWrite, validatePath safety, export shape
+ * These tests intentionally stop at the workspace-io boundary. Atomic publish, fsync, EXDEV fallback, descriptor
+ * lifecycle and rollback sidecar durability are covered by the infra/io suites; this file proves that tools issue the
+ * right path capabilities, preserve mutation preconditions, map IO outcomes to tool envelopes and never fall back to a
+ * string path after validatePath already issued a validated capability.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Readable } from 'node:stream';
 
-// ─── Mocks ───────────────────────────────────────────────────────────────────
-
-const mocks = vi.hoisted(() => ({
-    mockLog: vi.fn(),
+const toolMocks = vi.hoisted(() => ({
+    log: vi.fn(),
     buildTool: vi.fn((config) => config),
     withSkipPermission: vi.fn((tool) => tool),
-    streamPayloads: new Map(),
 }));
 
-vi.mock('node:fs', async () => {
-    const actual = /** @type {Record<string, unknown>} */ (await vi.importActual('node:fs'));
-    const streamActual = /** @type {{ Readable: { from: (chunks: unknown[]) => unknown } }} */ (
-        await vi.importActual('node:stream')
-    );
-    return {
-        ...actual,
-        createReadStream: vi.fn((filePath) =>
-            streamActual.Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
-        ),
-    };
-});
-
-vi.mock('../../../../../src/copilot/tools/infra/logger.js', () => ({
-    log: mocks.mockLog,
+const workspaceIoMocks = vi.hoisted(() => ({
+    writeFileAtomic: vi.fn(),
+    writeFileAtomicValidated: vi.fn(),
+    createOrReplaceFileAtomic: vi.fn(),
+    createOrReplaceFileAtomicValidated: vi.fn(),
+    deleteFileLocked: vi.fn(),
+    copyFileLocked: vi.fn(),
+    copyFileLockedValidated: vi.fn(),
+    moveFileLocked: vi.fn(),
+    moveFileLockedValidated: vi.fn(),
+    patchTextLocked: vi.fn(),
+    patchTextLockedValidated: vi.fn(),
+    patchTextBatchLocked: vi.fn(),
+    patchTextBatchLockedValidated: vi.fn(),
 }));
 
-/**
- * @type {{
- *     access: import('vitest').Mock;
- *     writeFile: import('vitest').Mock;
- *     rename: import('vitest').Mock;
- *     mkdir: import('vitest').Mock;
- *     stat: import('vitest').Mock;
- *     unlink: import('vitest').Mock;
- *     copyFile: import('vitest').Mock;
- *     readFile: import('vitest').Mock;
- *     link: import('vitest').Mock;
- *     open: import('vitest').Mock;
- *     chmod: import('vitest').Mock;
- * }}
- */
-const fsMock = {
-    access: vi.fn(),
-    writeFile: vi.fn(),
-    rename: vi.fn(),
-    mkdir: vi.fn(),
-    stat: vi.fn(),
-    unlink: vi.fn(),
-    copyFile: vi.fn(),
-    readFile: vi.fn(),
-    link: vi.fn(),
-    open: vi.fn(async (filePath) => ({
-        stat: async () => fsMock.stat(filePath),
-        readFile: async () => fsMock.readFile(filePath),
-        createReadStream: () => Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
-        sync: async () => undefined,
-        close: async () => undefined,
-    })),
-    chmod: vi.fn(),
-};
+const mockValidatePath = vi.hoisted(() => vi.fn());
 
-vi.mock('node:fs/promises', () => fsMock);
+vi.mock('#copilot/infra/public/workspace-io', () => ({
+    createWorkspaceIo: vi.fn(() => workspaceIoMocks),
+}));
 
-const mockValidatePath = vi.fn();
 vi.mock('#copilot/tools/file/shared', () => ({
     validatePath: mockValidatePath,
     WORKSPACE_ROOT: '/workspace',
 }));
 
-// buildTool mock: retorna o handler diretamente para teste isolado
+vi.mock('../../../../../src/copilot/tools/infra/logger.js', () => ({
+    log: toolMocks.log,
+}));
+
 vi.mock('../../../../../src/copilot/tools/infra/tool-factory.js', () => ({
-    buildTool: mocks.buildTool,
-    withSkipPermission: mocks.withSkipPermission,
+    buildTool: toolMocks.buildTool,
+    withSkipPermission: toolMocks.withSkipPermission,
 }));
 
-// crypto mock para atomicWrite
-vi.mock('node:crypto', () => ({
-    hash: vi.fn(() => 'mock-sha256'),
-    createHash: vi.fn(() => {
-        /** @type {{ update: import('vitest').Mock; digest: import('vitest').Mock }} */
-        const hash = {
-            update: vi.fn(() => hash),
-            digest: vi.fn(() => 'mock-sha256'),
-        };
-        return hash;
-    }),
-    randomBytes: vi.fn(() => ({ toString: () => 'abcd1234' })),
-    randomUUID: vi.fn(() => 'op-test-id'),
-}));
-
-// ─── Import após mocks ──────────────────────────────────────────────────────
-
-const { fileWriteTools } = await import('../../../../../src/copilot/tools/file/index.js');
+const { fileWriteTools } = await import('../../../../../src/copilot/tools/file/write-tools.js');
 
 /** @param {string} name */
 function requireTool(name) {
-    const tool = fileWriteTools.find((t) => t.name === name);
+    const tool = fileWriteTools.find((candidate) => candidate.name === name);
     if (!tool) throw new Error(`Tool não encontrada: ${name}`);
     return /** @type {any} */ (tool);
 }
@@ -121,112 +70,278 @@ const patchFileTool = requireTool('patch_file');
 const rollbackFileChangesTool = requireTool('rollback_file_changes');
 const rollbackSidecarsStatusTool = requireTool('rollback_sidecars_status');
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Helper para configurar validatePath como sucesso */
-function pathOk(resolved = '/workspace/test.txt') {
-    mockValidatePath.mockResolvedValue({ ok: true, resolved, reason: undefined });
+/** @param {string} operation @param {string} traceId */
+function ioMeta(operation, traceId) {
+    return {
+        operation,
+        targetKind: 'file',
+        traceId,
+        durationMs: 1,
+    };
 }
 
-/** Helper para configurar validatePath como falha */
-function pathFail(reason = 'Caminho inválido') {
-    mockValidatePath.mockResolvedValue({ ok: false, resolved: undefined, reason });
+/** @param {number} [bytesWritten] */
+function writeOutcome(bytesWritten = 5) {
+    return {
+        bytesWritten,
+        previousHash: 'previous-hash',
+        contentHash: 'content-hash',
+        previousBytes: 3,
+        previousSnapshotBase64: Buffer.from('old').toString('base64'),
+        previousRollbackSidecar: null,
+        io: ioMeta('write', 'trace-write'),
+    };
 }
 
-/** @returns {Error & { code: string }} */
-function enoent() {
-    return /** @type {Error & { code: string }} */ (Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+/** @param {{ overwrite?: boolean; bytesWritten?: number }} [options] */
+function createOutcome(options = {}) {
+    const overwrite = options.overwrite === true;
+    const bytesWritten = options.bytesWritten ?? 5;
+    return {
+        bytesWritten,
+        previousHash: overwrite ? 'previous-hash' : null,
+        contentHash: 'content-hash',
+        previousBytes: overwrite ? 3 : 0,
+        previousSnapshotBase64: overwrite ? Buffer.from('old').toString('base64') : null,
+        previousRollbackSidecar: null,
+        io: ioMeta('write', 'trace-create'),
+    };
 }
 
-/** @returns {Error & { code: string }} */
-function exdev() {
-    return /** @type {Error & { code: string }} */ (Object.assign(new Error('EXDEV'), { code: 'EXDEV' }));
+function deleteOutcome() {
+    return {
+        deleted: true,
+        path: '/workspace/doomed.txt',
+        previousHash: 'previous-hash',
+        previousBytes: 6,
+        previousSnapshotBase64: Buffer.from('doomed').toString('base64'),
+        previousRollbackSidecar: null,
+        io: ioMeta('delete', 'trace-delete'),
+    };
 }
 
-/** @param {number} size */
-function stableStats(size) {
-    return { size, dev: 1, ino: 1, mtimeMs: 1, ctimeMs: 1 };
+function copyOutcome() {
+    return {
+        bytesWritten: 6,
+        sourceBytes: 6,
+        sourceHash: 'source-hash',
+        destinationHash: 'destination-hash',
+        staged: true,
+        destinationPreviousHash: null,
+        destinationPreviousBytes: 0,
+        destinationPreviousSnapshotBase64: null,
+        destinationPreviousSnapshotTruncated: false,
+        destinationPreviousRollbackSidecar: null,
+        lockWaitMs: 0,
+        io: ioMeta('copy', 'trace-copy'),
+    };
+}
+
+/** @param {{ crossDevice?: boolean; overwrite?: boolean }} [options] */
+function moveOutcome(options = {}) {
+    return {
+        sourceBytes: 4,
+        sourceHash: 'source-hash',
+        destinationPreviousHash: options.overwrite ? 'destination-previous-hash' : null,
+        destinationPreviousBytes: options.overwrite ? 7 : 0,
+        destinationPreviousSnapshotBase64: options.overwrite ? Buffer.from('old-dst').toString('base64') : null,
+        destinationPreviousSnapshotTruncated: false,
+        destinationPreviousRollbackSidecar: null,
+        crossDevice: options.crossDevice === true,
+        duplicatedAfterCrossDeviceMove: false,
+        sourceUnlinkErrorCode: null,
+        destinationHash: 'source-hash',
+        destinationBytes: 4,
+        lockWaitMs: 0,
+        io: ioMeta('move', 'trace-move'),
+    };
+}
+
+/** @param {Partial<Record<string, unknown>>} [overrides] */
+function patchOutcome(overrides = {}) {
+    return {
+        dryRun: false,
+        occurrences: 1,
+        replacedOccurrences: 1,
+        projectedBytes: 13,
+        previousBytes: 12,
+        byteDelta: 1,
+        firstMatchLine: 1,
+        lastMatchLine: 1,
+        lineDelta: 0,
+        occurrenceIndex: null,
+        noop: false,
+        diffPreview: '-old\n+new',
+        diffPreviewTruncated: false,
+        diffPreviewLines: 2,
+        diffPreviewBytes: 9,
+        diffContextLines: 3,
+        previousHash: 'previous-hash',
+        contentHash: 'content-hash',
+        previousSnapshotBase64: Buffer.from('old').toString('base64'),
+        previousRollbackSidecar: null,
+        io: ioMeta('patch', 'trace-patch'),
+        ...overrides,
+    };
+}
+
+/**
+ * @param {string} code
+ * @param {string} message
+ * @param {Record<string, unknown>} [details]
+ * @returns {Error & { code: string; details?: Record<string, unknown> }}
+ */
+function codedError(code, message, details) {
+    return /** @type {Error & { code: string; details?: Record<string, unknown> }} */ (
+        Object.assign(new Error(message), { code, ...(details ? { details } : {}) })
+    );
+}
+
+/** @param {string} resolved @param {{ read?: boolean; write?: boolean }} [capabilities] */
+function pathOk(resolved = '/workspace/test.txt', capabilities = { write: true }) {
+    const result = {
+        ok: true,
+        resolved,
+        reason: undefined,
+        ...(capabilities.read ? { validatedReadPath: Object.freeze({ kind: 'read-capability', resolved }) } : {}),
+        ...(capabilities.write ? { validatedWritePath: Object.freeze({ kind: 'write-capability', resolved }) } : {}),
+    };
+    mockValidatePath.mockResolvedValue(result);
+    return result;
+}
+
+/** @param {string} source @param {string} destination @param {'copy' | 'move'} mode */
+function pathPairOk(source, destination, mode) {
+    const sourceCapability = Object.freeze({ kind: mode === 'copy' ? 'read-capability' : 'write-capability', source });
+    const destinationCapability = Object.freeze({ kind: 'write-capability', destination });
+    mockValidatePath
+        .mockResolvedValueOnce({
+            ok: true,
+            resolved: source,
+            ...(mode === 'copy' ? { validatedReadPath: sourceCapability } : { validatedWritePath: sourceCapability }),
+        })
+        .mockResolvedValueOnce({ ok: true, resolved: destination, validatedWritePath: destinationCapability });
+    return { sourceCapability, destinationCapability };
+}
+
+function pathFail(reason = 'Path traversal blocked') {
+    mockValidatePath.mockResolvedValue({ ok: false, reason });
 }
 
 beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'true');
-    for (const mock of Object.values(fsMock)) mock.mockReset();
-    fsMock.open.mockImplementation(async (filePath) => ({
-        stat: async () => fsMock.stat(filePath),
-        readFile: async () => fsMock.readFile(filePath),
-        createReadStream: () => Readable.from([mocks.streamPayloads.get(String(filePath)) ?? Buffer.alloc(0)]),
-        sync: async () => undefined,
-        close: async () => undefined,
-    }));
-    fsMock.stat.mockResolvedValue(stableStats(0));
-    fsMock.chmod.mockResolvedValue(undefined);
-    mocks.streamPayloads.clear();
+    workspaceIoMocks.writeFileAtomic.mockResolvedValue(writeOutcome());
+    workspaceIoMocks.writeFileAtomicValidated.mockResolvedValue(writeOutcome());
+    workspaceIoMocks.createOrReplaceFileAtomic.mockResolvedValue(createOutcome());
+    workspaceIoMocks.createOrReplaceFileAtomicValidated.mockResolvedValue(createOutcome());
+    workspaceIoMocks.deleteFileLocked.mockResolvedValue(deleteOutcome());
+    workspaceIoMocks.copyFileLocked.mockResolvedValue(copyOutcome());
+    workspaceIoMocks.copyFileLockedValidated.mockResolvedValue(copyOutcome());
+    workspaceIoMocks.moveFileLocked.mockResolvedValue(moveOutcome());
+    workspaceIoMocks.moveFileLockedValidated.mockResolvedValue(moveOutcome());
+    workspaceIoMocks.patchTextLocked.mockResolvedValue(patchOutcome());
+    workspaceIoMocks.patchTextLockedValidated.mockResolvedValue(patchOutcome());
+    workspaceIoMocks.patchTextBatchLocked.mockResolvedValue({
+        operations: [],
+        bytesWritten: 0,
+        io: ioMeta('patch', 'trace-patch-batch'),
+    });
+    workspaceIoMocks.patchTextBatchLockedValidated.mockResolvedValue({
+        operations: [],
+        bytesWritten: 0,
+        io: ioMeta('patch', 'trace-patch-batch'),
+    });
 });
 
 afterEach(() => {
     vi.unstubAllEnvs();
 });
 
-/**
- * @param {string} filePath
- * @param {string | Buffer} content
- */
-function streamPayload(filePath, content) {
-    mocks.streamPayloads.set(filePath, Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8'));
-}
+describe('write_file_content — validated mutation capability', () => {
+    const handler = /** @type {Function} */ (writeFileContentTool.handler);
 
-/**
- * @param {unknown} source
- * @param {unknown} destination
- */
-function copyStreamPayload(source, destination) {
-    mocks.streamPayloads.set(String(destination), mocks.streamPayloads.get(String(source)) ?? Buffer.alloc(0));
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// F181-F182: write_file_content
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('F35 — write_file_content (F181-F182)', () => {
-    const handler = /** @type {any} */ (writeFileContentTool.handler);
-
-    it('escreve conteúdo em arquivo existente (utf8)', async () => {
-        pathOk('/workspace/file.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
+    it('usa capability validada até a porta workspace-io e retorna envelope/changeSet', async () => {
+        const validation = pathOk('/workspace/file.txt');
 
         const result = await handler({ path: 'file.txt', content: 'hello', encoding: 'utf8' });
 
-        expect(result, JSON.stringify(result)).toMatchObject({ success: true, path: '/workspace/file.txt' });
-        expect(result.io?.operation).toBe('write');
-        expect(result.operation).toMatchObject({
-            operationId: 'op-test-id',
-            capability: 'file.write',
-            status: 'applied',
-        });
-        expect(result.bytesWritten).toBe(5);
+        expect(result).toMatchObject({ success: true, path: '/workspace/file.txt', bytesWritten: 5 });
+        expect(result.operation).toMatchObject({ capability: 'file.write', status: 'applied' });
         expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
             action: 'write',
-            previousHash: 'mock-sha256',
-            contentHash: 'mock-sha256',
-            snapshotBase64: expect.any(String),
+            target: '/workspace/file.txt',
+            previousHash: 'previous-hash',
+            contentHash: 'content-hash',
         });
-        expect(fsMock.writeFile).toHaveBeenCalledOnce();
-        expect(fsMock.rename).toHaveBeenCalledOnce();
+        expect(workspaceIoMocks.writeFileAtomicValidated).toHaveBeenCalledWith(
+            validation.validatedWritePath,
+            Buffer.from('hello'),
+            expect.objectContaining({ requireExists: true, captureRollback: true, riskClass: 'high' }),
+        );
+        expect(workspaceIoMocks.writeFileAtomic).not.toHaveBeenCalled();
         expect(mockValidatePath).toHaveBeenCalledWith('file.txt', {
             mode: 'write',
             issueMutableCapability: true,
         });
     });
 
-    it('mantém rollback automático desligado por padrão/política sem impedir a escrita', async () => {
+    it('preserva expectedHash e durability na primitive validada', async () => {
+        pathOk('/workspace/file.txt');
+
+        await handler({
+            path: 'file.txt',
+            content: 'next',
+            encoding: 'utf8',
+            expectedHash: 'expected-current-hash',
+            durability: 'none',
+        });
+
+        expect(workspaceIoMocks.writeFileAtomicValidated).toHaveBeenCalledWith(
+            expect.anything(),
+            Buffer.from('next'),
+            expect.objectContaining({ expectedHash: 'expected-current-hash', durability: 'none' }),
+        );
+    });
+
+    it('decodifica base64 antes da porta e rejeita base64 inválido sem IO', async () => {
+        pathOk('/workspace/binary.bin');
+        const payload = Buffer.from([0x00, 0xff, 0x7f]);
+
+        const ok = await handler({ path: 'binary.bin', content: payload.toString('base64'), encoding: 'base64' });
+        expect(ok).toMatchObject({ success: true, bytesWritten: 3 });
+        expect(workspaceIoMocks.writeFileAtomicValidated.mock.calls[0]?.[1]).toEqual(payload);
+
+        vi.clearAllMocks();
+        pathOk('/workspace/binary.bin');
+        const invalid = await handler({ path: 'binary.bin', content: '%%%', encoding: 'base64' });
+        expect(invalid).toMatchObject({ success: false });
+        expect(invalid.toolFeedback).toMatchObject({ category: 'invalid-parameters' });
+        expect(workspaceIoMocks.writeFileAtomicValidated).not.toHaveBeenCalled();
+    });
+
+    it('converte falha da porta em feedback da tool e não mascara a causa', async () => {
+        pathOk('/workspace/file.txt');
+        workspaceIoMocks.writeFileAtomicValidated.mockRejectedValue(new Error('ENOSPC: disk full'));
+
+        const result = await handler({ path: 'file.txt', content: 'x', encoding: 'utf8' });
+
+        expect(result).toMatchObject({ success: false });
+        expect(result.error).toContain('ENOSPC');
+        expect(result.operation).toMatchObject({ capability: 'file.write', status: 'failed' });
+    });
+
+    it('nega antes de criar envelope de IO quando validatePath falha', async () => {
+        pathFail();
+        const result = await handler({ path: '../../etc/passwd', content: 'x', encoding: 'utf8' });
+        expect(result).toMatchObject({ success: false, error: 'Path traversal blocked' });
+        expect(workspaceIoMocks.writeFileAtomicValidated).not.toHaveBeenCalled();
+        expect(workspaceIoMocks.writeFileAtomic).not.toHaveBeenCalled();
+    });
+
+    it('mantém rollback automático desabilitável por política sem impedir a escrita', async () => {
         vi.stubEnv('COPILOT_IO_ROLLBACK_ENABLED', 'false');
         pathOk('/workspace/file.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
 
         const result = await handler({ path: 'file.txt', content: 'hello', encoding: 'utf8' });
 
@@ -237,130 +352,16 @@ describe('F35 — write_file_content (F181-F182)', () => {
             stepCount: 0,
             steps: [],
             reason: 'disabled_by_default',
-            policy: expect.objectContaining({ enabled: false }),
         });
-    });
-
-    it('escreve em base64', async () => {
-        pathOk('/workspace/binary.bin');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const b64 = Buffer.from('binary content').toString('base64');
-        const result = await handler({ path: 'binary.bin', content: b64, encoding: 'base64' });
-
-        expect(result.success).toBe(true);
-        expect(result.bytesWritten).toBe(14); // 'binary content'.length
-    });
-
-    it('rejeita base64 inválido antes de escrever', async () => {
-        pathOk('/workspace/binary.bin');
-
-        const result = await handler({ path: 'binary.bin', content: '%%%', encoding: 'base64' });
-
-        expect(result.success).toBe(false);
-        expect(result.toolFeedback).toMatchObject({
-            toolName: 'write_file_content',
-            category: 'invalid-parameters',
-            receivedParameters: expect.objectContaining({ encoding: 'base64' }),
-        });
-        expect(fsMock.writeFile).not.toHaveBeenCalled();
-    });
-
-    it('falha se arquivo não existe', async () => {
-        pathOk('/workspace/nofile.txt');
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
-
-        const result = await handler({ path: 'nofile.txt', content: 'x', encoding: 'utf8' });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('Arquivo não encontrado');
-        expect(result.operation).toMatchObject({ capability: 'file.write', status: 'failed' });
-    });
-
-    it('falha se validatePath rejeita', async () => {
-        pathFail('Path traversal blocked');
-
-        const result = await handler({ path: '../../etc/passwd', content: 'x', encoding: 'utf8' });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toBe('Path traversal blocked');
-    });
-
-    it('retorna erro em exceção de fs.writeFile', async () => {
-        pathOk('/workspace/file.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockRejectedValue(new Error('ENOSPC'));
-
-        const result = await handler({ path: 'file.txt', content: 'x', encoding: 'utf8' });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('ENOSPC');
-    });
-
-    it('usa atomicWrite durável por temp exclusivo + rename', async () => {
-        pathOk('/workspace/f.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        await handler({ path: 'f.txt', content: 'ok', encoding: 'utf8' });
-
-        const tmpPath = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[0]);
-        const writeOptions = /** @type {Record<string, unknown>} */ (fsMock.writeFile.mock.calls[0]?.[2]);
-        expect(tmpPath).toContain('.tmp');
-        expect(writeOptions).toMatchObject({ flag: 'wx', flush: true });
-        expect(fsMock.rename).toHaveBeenCalledWith(tmpPath, '/workspace/f.txt');
-    });
-
-    it('durability=none preserva temp+rename mas desativa flush de persistência', async () => {
-        pathOk('/workspace/fast.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const result = await handler({
-            path: 'fast.txt',
-            content: 'ok',
-            encoding: 'utf8',
-            durability: 'none',
-        });
-
-        expect(result.success).toBe(true);
-        const tmpPath = /** @type {string} */ (fsMock.writeFile.mock.calls[0]?.[0]);
-        const writeOptions = /** @type {Record<string, unknown>} */ (fsMock.writeFile.mock.calls[0]?.[2]);
-        expect(tmpPath).toContain('.tmp');
-        expect(writeOptions).toMatchObject({ flag: 'wx' });
-        expect('flush' in writeOptions).toBe(false);
-        expect(fsMock.rename).toHaveBeenCalledWith(tmpPath, '/workspace/fast.txt');
-    });
-
-    it('loga a operação de escrita', async () => {
-        pathOk('/workspace/logged.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        await handler({ path: 'logged.txt', content: 'x', encoding: 'utf8' });
-
-        expect(mocks.mockLog).toHaveBeenCalledWith('INFO', expect.stringContaining('write_file_content'));
     });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// F184: create_file
-// ═══════════════════════════════════════════════════════════════════════════════
+describe('create_file — create/overwrite contract', () => {
+    const handler = /** @type {Function} */ (createFileTool.handler);
 
-describe('F35 — create_file (F184)', () => {
-    const handler = /** @type {any} */ (createFileTool.handler);
-
-    it('cria novo arquivo com conteúdo', async () => {
-        pathOk('/workspace/new.txt');
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
+    it('cria arquivo novo pela capability validada e preserva createParentDirs', async () => {
+        const validation = pathOk('/workspace/new.txt');
+        workspaceIoMocks.createOrReplaceFileAtomicValidated.mockResolvedValue(createOutcome({ bytesWritten: 11 }));
 
         const result = await handler({
             path: 'new.txt',
@@ -369,23 +370,53 @@ describe('F35 — create_file (F184)', () => {
             overwrite: false,
         });
 
-        expect(result.success).toBe(true);
+        expect(result).toMatchObject({ success: true, path: '/workspace/new.txt', bytesWritten: 11 });
+        expect(result.operation).toMatchObject({ capability: 'file.create', status: 'applied' });
         expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
             action: 'delete',
+            target: '/workspace/new.txt',
             previousHash: null,
-            contentHash: 'mock-sha256',
         });
-        expect(result.bytesWritten).toBe(11);
-        expect(fsMock.mkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
-        expect(mockValidatePath).toHaveBeenCalledWith('new.txt', {
-            mode: 'write',
-            issueMutableCapability: true,
-        });
+        expect(workspaceIoMocks.createOrReplaceFileAtomicValidated).toHaveBeenCalledWith(
+            validation.validatedWritePath,
+            Buffer.from('hello world'),
+            expect.objectContaining({ createParentDirs: true, failIfExists: true, captureRollback: false }),
+        );
+        expect(workspaceIoMocks.createOrReplaceFileAtomic).not.toHaveBeenCalled();
     });
 
-    it('falha se arquivo já existe e overwrite=false', async () => {
+    it('overwrite=true preserva snapshot anterior no rollback', async () => {
         pathOk('/workspace/existing.txt');
-        fsMock.access.mockResolvedValue(undefined);
+        workspaceIoMocks.createOrReplaceFileAtomicValidated.mockResolvedValue(
+            createOutcome({ overwrite: true, bytesWritten: 8 }),
+        );
+
+        const result = await handler({
+            path: 'existing.txt',
+            content: 'replaced',
+            createParentDirs: true,
+            overwrite: true,
+        });
+
+        expect(result.success).toBe(true);
+        expect(result.operation).toMatchObject({ capability: 'file.create-or-overwrite', status: 'applied' });
+        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
+            action: 'write',
+            previousHash: 'previous-hash',
+            snapshotBase64: expect.any(String),
+        });
+        expect(workspaceIoMocks.createOrReplaceFileAtomicValidated).toHaveBeenCalledWith(
+            expect.anything(),
+            Buffer.from('replaced'),
+            expect.objectContaining({ failIfExists: false, captureRollback: true }),
+        );
+    });
+
+    it('propaga EEXIST da primitive em vez de reproduzir check-then-act na tool', async () => {
+        pathOk('/workspace/existing.txt');
+        workspaceIoMocks.createOrReplaceFileAtomicValidated.mockRejectedValue(
+            codedError('EEXIST', 'Arquivo já existe: /workspace/existing.txt'),
+        );
 
         const result = await handler({
             path: 'existing.txt',
@@ -398,300 +429,126 @@ describe('F35 — create_file (F184)', () => {
         expect(result.error).toContain('já existe');
     });
 
-    it('sobrescreve arquivo existente com overwrite=true', async () => {
-        pathOk('/workspace/existing.txt');
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const result = await handler({
-            path: 'existing.txt',
-            content: 'replaced',
-            createParentDirs: true,
-            overwrite: true,
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
-            action: 'write',
-            snapshotBase64: expect.any(String),
-        });
-    });
-
-    it('cria diretórios intermediários quando createParentDirs=true', async () => {
-        pathOk('/workspace/deep/nested/file.txt');
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        await handler({
-            path: 'deep/nested/file.txt',
-            content: '',
-            createParentDirs: true,
-            overwrite: false,
-        });
-
-        expect(fsMock.mkdir).toHaveBeenCalledWith('/workspace/deep/nested', { recursive: true });
-    });
-
-    it('cria arquivo vazio quando content omitido', async () => {
-        pathOk('/workspace/empty.txt');
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const result = await handler({
-            path: 'empty.txt',
-            content: '',
-            createParentDirs: true,
-            overwrite: false,
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.bytesWritten).toBe(0);
-    });
-
-    it('retorna bytes escritos reais para UTF-8 multibyte', async () => {
+    it('retorna contagem real de bytes UTF-8 e binários', async () => {
         pathOk('/workspace/unicode.txt');
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const result = await handler({
+        const unicodeBytes = Buffer.byteLength('ação 🚀', 'utf8');
+        workspaceIoMocks.createOrReplaceFileAtomicValidated.mockResolvedValue(
+            createOutcome({ bytesWritten: unicodeBytes }),
+        );
+        const unicode = await handler({
             path: 'unicode.txt',
             content: 'ação 🚀',
             createParentDirs: true,
             overwrite: false,
         });
+        expect(unicode.bytesWritten).toBe(unicodeBytes);
 
-        expect(result.success).toBe(true);
-        expect(result.bytesWritten).toBe(Buffer.byteLength('ação 🚀', 'utf8'));
-    });
-
-    it('cria arquivo binário novo a partir de base64 em uma operação', async () => {
+        vi.clearAllMocks();
         pathOk('/workspace/new.bin');
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
         const payload = Buffer.from([0x00, 0xff, 0x7f]);
-
-        const result = await handler({
+        workspaceIoMocks.createOrReplaceFileAtomicValidated.mockResolvedValue(createOutcome({ bytesWritten: 3 }));
+        const binary = await handler({
             path: 'new.bin',
             content: payload.toString('base64'),
             encoding: 'base64',
             createParentDirs: true,
             overwrite: false,
         });
-
-        expect(result).toMatchObject({ success: true, bytesWritten: payload.byteLength });
-        expect(fsMock.writeFile.mock.calls[0]?.[1]).toEqual(payload);
-    });
-
-    it('rejeita base64 inválido antes de criar arquivo', async () => {
-        pathOk('/workspace/new.bin');
-
-        const result = await handler({
-            path: 'new.bin',
-            content: '%%%',
-            encoding: 'base64',
-            createParentDirs: true,
-            overwrite: false,
-        });
-
-        expect(result).toMatchObject({ success: false });
-        expect(result.toolFeedback).toMatchObject({ toolName: 'create_file', category: 'invalid-parameters' });
-        expect(fsMock.writeFile).not.toHaveBeenCalled();
-    });
-
-    it('falha se validatePath rejeita', async () => {
-        pathFail('Blocked');
-
-        const result = await handler({
-            path: '../evil',
-            content: 'x',
-            createParentDirs: true,
-            overwrite: false,
-        });
-
-        expect(result).toMatchObject({ success: false, error: 'Blocked' });
+        expect(binary).toMatchObject({ success: true, bytesWritten: 3 });
+        expect(workspaceIoMocks.createOrReplaceFileAtomicValidated.mock.calls[0]?.[1]).toEqual(payload);
     });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// F185: delete_file
-// ═══════════════════════════════════════════════════════════════════════════════
+describe('delete_file — semantic delete boundary', () => {
+    const handler = /** @type {Function} */ (deleteFileTool.handler);
 
-describe('F35 — delete_file (F185)', () => {
-    const handler = /** @type {any} */ (deleteFileTool.handler);
-
-    it('deleta arquivo existente', async () => {
-        pathOk('/workspace/doomed.txt');
-        fsMock.stat.mockResolvedValue({ ...stableStats(6), isDirectory: () => false });
-        fsMock.readFile.mockResolvedValue(Buffer.from('doomed', 'utf8'));
-        streamPayload('/workspace/doomed.txt', 'doomed');
-        fsMock.unlink.mockResolvedValue(undefined);
-
+    it('delega delete à primitive e preserva snapshot de rollback', async () => {
+        pathOk('/workspace/doomed.txt', { write: false });
         const result = await handler({ path: 'doomed.txt' });
 
-        expect(result).toMatchObject({ success: true, deleted: true });
-        expect(result.io?.operation).toBe('delete');
-        expect(result.previousHash).toBe('mock-sha256');
-        expect(result.previousBytes).toBe(6);
+        expect(result).toMatchObject({ success: true, deleted: true, previousHash: 'previous-hash', previousBytes: 6 });
         expect(result.operation).toMatchObject({ capability: 'file.delete', status: 'applied' });
-        expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
-        expect(result.changeSet?.rollback?.steps?.[0]?.snapshotBase64).toBeTypeOf('string');
-        expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/doomed.txt');
+        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
+            action: 'write',
+            target: '/workspace/doomed.txt',
+            snapshotBase64: expect.any(String),
+        });
+        expect(workspaceIoMocks.deleteFileLocked).toHaveBeenCalledWith('/workspace/doomed.txt');
         expect(mockValidatePath).toHaveBeenCalledWith('doomed.txt', { mode: 'write' });
     });
 
-    it('falha se é diretório', async () => {
-        pathOk('/workspace/somedir');
-        fsMock.unlink.mockRejectedValue(Object.assign(new Error('EISDIR'), { code: 'EISDIR' }));
+    it('traduz EISDIR para erro de parâmetros e preserva ENOENT genérico', async () => {
+        pathOk('/workspace/somedir', { write: false });
+        workspaceIoMocks.deleteFileLocked.mockRejectedValue(codedError('EISDIR', 'is a directory'));
+        const directory = await handler({ path: 'somedir' });
+        expect(directory.success).toBe(false);
+        expect(directory.error).toContain('diretório');
+        expect(directory.toolFeedback).toMatchObject({ category: 'invalid-parameters' });
 
-        const result = await handler({ path: 'somedir' });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('diretório');
-    });
-
-    it('falha se stat lança (arquivo não existe)', async () => {
-        pathOk('/workspace/ghost.txt');
-        fsMock.unlink.mockRejectedValue(enoent());
-
-        const result = await handler({ path: 'ghost.txt' });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('ENOENT');
-    });
-
-    it('falha se validatePath rejeita', async () => {
-        pathFail('Nope');
-
-        const result = await handler({ path: '../etc/passwd' });
-
-        expect(result).toMatchObject({ success: false, error: 'Nope' });
+        vi.clearAllMocks();
+        pathOk('/workspace/ghost.txt', { write: false });
+        workspaceIoMocks.deleteFileLocked.mockRejectedValue(codedError('ENOENT', 'ENOENT: ghost'));
+        const missing = await handler({ path: 'ghost.txt' });
+        expect(missing.success).toBe(false);
+        expect(missing.error).toContain('ENOENT');
     });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// F186: copy_file + move_file
-// ═══════════════════════════════════════════════════════════════════════════════
+describe('copy_file — validated source/destination pair', () => {
+    const handler = /** @type {Function} */ (copyFileTool.handler);
 
-describe('F35 — copy_file (F186)', () => {
-    const handler = /** @type {any} */ (copyFileTool.handler);
-
-    it('copia arquivo com sucesso', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/src.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/dst.txt', reason: undefined });
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
-        fsMock.readFile.mockResolvedValue(Buffer.from('source', 'utf8'));
-        streamPayload('/workspace/src.txt', 'source');
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.copyFile.mockImplementation(async (source, destination) => copyStreamPayload(source, destination));
-        fsMock.stat.mockResolvedValue(stableStats(6));
+    it('consome read capability + mutable capability sem revalidar paths na porta', async () => {
+        const caps = pathPairOk('/workspace/src.txt', '/workspace/dst.txt', 'copy');
 
         const result = await handler({ source: 'src.txt', destination: 'dst.txt', overwrite: false });
 
-        expect(result, JSON.stringify(result)).toMatchObject({ success: true, bytesWritten: 6, staged: true });
-        expect(result.sourceHash).toBe('mock-sha256');
-        expect(result.destinationHash).toBe('mock-sha256');
-        expect(result.sourceBytes).toBe(6);
-        expect(result.io?.operation).toBe('copy');
-        expect(fsMock.copyFile).toHaveBeenCalledWith(
-            '/workspace/src.txt',
-            expect.stringContaining('.dst.txt.'),
-            expect.any(Number),
+        expect(result).toMatchObject({
+            success: true,
+            source: '/workspace/src.txt',
+            destination: '/workspace/dst.txt',
+            sourceHash: 'source-hash',
+            destinationHash: 'destination-hash',
+            bytesWritten: 6,
+            staged: true,
+        });
+        expect(workspaceIoMocks.copyFileLockedValidated).toHaveBeenCalledWith(
+            caps.sourceCapability,
+            caps.destinationCapability,
+            { overwrite: false },
         );
-        expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.dst.txt.'), '/workspace/dst.txt');
+        expect(workspaceIoMocks.copyFileLocked).not.toHaveBeenCalled();
         expect(mockValidatePath.mock.calls[0]?.[1]).toEqual({ mode: 'read', issueReadCapability: true });
         expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write', issueMutableCapability: true });
     });
 
-    it('aplica expectedSourceHash antes de publicar a cópia', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/src.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/dst.txt', reason: undefined });
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
-        fsMock.readFile.mockResolvedValue(Buffer.from('source', 'utf8'));
-        streamPayload('/workspace/src.txt', 'source');
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.copyFile.mockImplementation(async (source, destination) => copyStreamPayload(source, destination));
-        fsMock.stat.mockResolvedValue(stableStats(6));
-
-        const result = await handler({
+    it('preserva expectedSourceHash e overwrite na primitive', async () => {
+        pathPairOk('/workspace/src.txt', '/workspace/dst.txt', 'copy');
+        await handler({
             source: 'src.txt',
             destination: 'dst.txt',
-            overwrite: false,
-            expectedSourceHash: 'wrong-hash',
+            overwrite: true,
+            expectedSourceHash: 'source-precondition',
         });
-
-        expect(result.success).toBe(false);
-        expect(fsMock.link).not.toHaveBeenCalled();
-        expect(fsMock.rename).not.toHaveBeenCalled();
+        expect(workspaceIoMocks.copyFileLockedValidated).toHaveBeenCalledWith(expect.anything(), expect.anything(), {
+            overwrite: true,
+            expectedSourceHash: 'source-precondition',
+        });
     });
 
-    it('falha se destino existe e overwrite=false', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/src.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/dst.txt', reason: undefined });
-        fsMock.access.mockResolvedValue(undefined);
-
-        const result = await handler({ source: 'src.txt', destination: 'dst.txt', overwrite: false });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('Destino já existe');
-    });
-
-    it('sobrescreve com overwrite=true', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/a.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue(Buffer.from('copy', 'utf8'));
-        streamPayload('/workspace/a.txt', 'copy');
-        streamPayload('/workspace/b.txt', 'copy');
-        fsMock.copyFile.mockImplementation(async (source, destination) => copyStreamPayload(source, destination));
-        fsMock.stat.mockResolvedValue(stableStats(4));
-
-        const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
-
-        expect(result.success).toBe(true);
-        expect(result.sourceHash).toBe('mock-sha256');
-        expect(result.destinationHash).toBe('mock-sha256');
-        expect(result.staged).toBe(true);
-        expect(fsMock.rename).toHaveBeenCalledWith(expect.stringContaining('.b.txt.'), '/workspace/b.txt');
-        expect(result.operation).toMatchObject({ capability: 'file.copy', status: 'applied' });
-        expect(result.changeSet?.rollback?.stepCount).toBeGreaterThanOrEqual(1);
-        expect(result.changeSet?.rollback?.steps?.[0]?.action).toBe('write');
-        expect(result.changeSet?.rollback?.steps?.[0]?.contentHash).toBe('mock-sha256');
-    });
-
-    it('falha se source path inválido', async () => {
+    it('interrompe após source inválida sem validar destination', async () => {
         mockValidatePath.mockResolvedValueOnce({ ok: false, reason: 'Invalid source' });
-
         const result = await handler({ source: '../bad', destination: 'ok.txt', overwrite: false });
-
         expect(result).toMatchObject({ success: false, error: 'Invalid source' });
+        expect(mockValidatePath).toHaveBeenCalledTimes(1);
+        expect(workspaceIoMocks.copyFileLockedValidated).not.toHaveBeenCalled();
     });
 });
 
-describe('F35 — move_file (F186)', () => {
-    const handler = /** @type {any} */ (moveFileTool.handler);
+describe('move_file — atomic semantic move boundary', () => {
+    const handler = /** @type {Function} */ (moveFileTool.handler);
 
-    it('move arquivo com sucesso', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/old.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/new.txt', reason: undefined });
-        fsMock.access.mockRejectedValue(new Error('ENOENT'));
-        fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
-        streamPayload('/workspace/old.txt', 'move');
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
+    it('usa duas mutable capabilities e expõe metadados da primitive', async () => {
+        const caps = pathPairOk('/workspace/old.txt', '/workspace/new.txt', 'move');
 
         const result = await handler({ source: 'old.txt', destination: 'new.txt', overwrite: false });
 
@@ -699,97 +556,58 @@ describe('F35 — move_file (F186)', () => {
             success: true,
             source: '/workspace/old.txt',
             destination: '/workspace/new.txt',
-            sourceHash: 'mock-sha256',
+            sourceHash: 'source-hash',
             sourceBytes: 4,
+            crossDevice: false,
         });
-        expect(fsMock.link).toHaveBeenCalledWith('/workspace/old.txt', '/workspace/new.txt');
-        expect(fsMock.rename).not.toHaveBeenCalled();
-        expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/old.txt');
-        expect(mockValidatePath.mock.calls[0]?.[1]).toEqual({ mode: 'write', issueMutableCapability: true });
-        expect(mockValidatePath.mock.calls[1]?.[1]).toEqual({ mode: 'write', issueMutableCapability: true });
+        expect(workspaceIoMocks.moveFileLockedValidated).toHaveBeenCalledWith(
+            caps.sourceCapability,
+            caps.destinationCapability,
+            { overwrite: false },
+        );
+        expect(workspaceIoMocks.moveFileLocked).not.toHaveBeenCalled();
     });
 
-    it('falha se destino existe sem overwrite', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/old.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/exists.txt', reason: undefined });
-        fsMock.access.mockResolvedValue(undefined);
+    it('não reimplementa EXDEV na tool: propaga o resultado cross-device da primitive', async () => {
+        pathPairOk('/workspace/a.txt', '/workspace/b.txt', 'move');
+        workspaceIoMocks.moveFileLockedValidated.mockResolvedValue(moveOutcome({ crossDevice: true }));
 
-        const result = await handler({ source: 'old.txt', destination: 'exists.txt', overwrite: false });
+        const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: false });
 
-        expect(result.success).toBe(false);
+        expect(result).toMatchObject({
+            success: true,
+            crossDevice: true,
+            duplicatedAfterCrossDeviceMove: false,
+            sourceUnlinkErrorCode: null,
+        });
     });
 
-    it('move com overwrite=true', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/a.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
-        streamPayload('/workspace/a.txt', 'move');
-        streamPayload('/workspace/b.txt', 'move');
-        fsMock.rename.mockResolvedValue(undefined);
+    it('overwrite conserva restauração do destino e retorno da origem no changeSet', async () => {
+        pathPairOk('/workspace/a.txt', '/workspace/b.txt', 'move');
+        workspaceIoMocks.moveFileLockedValidated.mockResolvedValue(moveOutcome({ overwrite: true }));
 
         const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: true });
 
         expect(result.success).toBe(true);
-        expect(result.sourceHash).toBe('mock-sha256');
-        expect(result.operation).toMatchObject({ capability: 'file.move', status: 'applied' });
         expect(result.changeSet?.rollback?.stepCount).toBe(2);
-        expect(result.changeSet?.rollback?.steps?.[0]).toMatchObject({
-            action: 'move',
-            source: '/workspace/b.txt',
-            destination: '/workspace/a.txt',
-            contentHash: 'mock-sha256',
-        });
-        expect(result.changeSet?.rollback?.steps?.[1]).toMatchObject({
-            action: 'write',
-            target: '/workspace/b.txt',
-            contentHash: null,
-        });
-    });
-
-    it('move EXDEV publica via temp verificado antes de remover origem', async () => {
-        mockValidatePath
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/a.txt', reason: undefined })
-            .mockResolvedValueOnce({ ok: true, resolved: '/workspace/b.txt', reason: undefined });
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.mkdir.mockResolvedValue(undefined);
-        fsMock.link.mockRejectedValueOnce(exdev()).mockResolvedValueOnce(undefined);
-        fsMock.copyFile.mockResolvedValue(undefined);
-        fsMock.unlink.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue(Buffer.from('move', 'utf8'));
-        fsMock.stat.mockResolvedValue(stableStats(4));
-        streamPayload('/workspace/a.txt', 'move');
-
-        const result = await handler({ source: 'a.txt', destination: 'b.txt', overwrite: false });
-
-        expect(result.success).toBe(true);
-        expect(result.crossDevice).toBe(true);
-        expect(result.duplicatedAfterCrossDeviceMove).toBe(false);
-        expect(fsMock.copyFile).toHaveBeenCalledWith(
-            '/workspace/a.txt',
-            expect.stringContaining('.b.txt.'),
-            expect.any(Number),
+        expect(result.changeSet?.rollback?.steps).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    action: 'move',
+                    source: '/workspace/b.txt',
+                    destination: '/workspace/a.txt',
+                }),
+                expect.objectContaining({ action: 'write', target: '/workspace/b.txt' }),
+            ]),
         );
-        expect(fsMock.link).toHaveBeenCalledWith(expect.stringContaining('.b.txt.'), '/workspace/b.txt');
-        expect(fsMock.unlink).toHaveBeenCalledWith('/workspace/a.txt');
     });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// F187: patch_file
-// ═══════════════════════════════════════════════════════════════════════════════
+describe('patch_file — exact patch contract over validated path', () => {
+    const handler = /** @type {Function} */ (patchFileTool.handler);
 
-describe('F35 — patch_file (F187)', () => {
-    const handler = /** @type {any} */ (patchFileTool.handler);
-
-    it('aplica patch com sucesso', async () => {
-        pathOk('/workspace/target.js');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('const x = 1;\nconst y = 2;\n');
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
+    it('usa patchTextLockedValidated e publica resumo estrutural', async () => {
+        const validation = pathOk('/workspace/target.js');
 
         const result = await handler({
             path: 'target.js',
@@ -797,14 +615,50 @@ describe('F35 — patch_file (F187)', () => {
             new_string: 'const x = 42;',
         });
 
-        expect(result.success).toBe(true);
+        expect(result).toMatchObject({
+            success: true,
+            path: '/workspace/target.js',
+            dryRun: false,
+            occurrences: 1,
+            replacedOccurrences: 1,
+            previousHash: 'previous-hash',
+            contentHash: 'content-hash',
+        });
         expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'applied' });
+        expect(workspaceIoMocks.patchTextLockedValidated).toHaveBeenCalledWith(
+            validation.validatedWritePath,
+            expect.objectContaining({ oldString: 'const x = 1;', newString: 'const x = 42;' }),
+        );
+        expect(workspaceIoMocks.patchTextLocked).not.toHaveBeenCalled();
     });
 
-    it('simula patch com dryRun sem escrever no disco', async () => {
+    it('preserva occurrence_index, expectedHash e durability', async () => {
+        pathOk('/workspace/repeated.txt');
+        workspaceIoMocks.patchTextLockedValidated.mockResolvedValue(
+            patchOutcome({ occurrences: 2, occurrenceIndex: 2, replacedOccurrences: 1 }),
+        );
+
+        const result = await handler({
+            path: 'repeated.txt',
+            old_string: 'same',
+            new_string: 'changed',
+            occurrence_index: 2,
+            expectedHash: 'expected-current',
+            durability: 'file',
+        });
+
+        expect(result).toMatchObject({ success: true, occurrences: 2, occurrenceIndex: 2 });
+        expect(workspaceIoMocks.patchTextLockedValidated).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ occurrenceIndex: 2, expectedHash: 'expected-current', durability: 'file' }),
+        );
+    });
+
+    it('dryRun retorna changeSet abortado sem mudar o contrato da capability', async () => {
         pathOk('/workspace/target.js');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('const x = 1;\n');
+        workspaceIoMocks.patchTextLockedValidated.mockResolvedValue(
+            patchOutcome({ dryRun: true, contentHash: 'previous-hash' }),
+        );
 
         const result = await handler({
             path: 'target.js',
@@ -813,42 +667,13 @@ describe('F35 — patch_file (F187)', () => {
             dryRun: true,
         });
 
-        expect(result.success).toBe(true);
-        expect(result.dryRun).toBe(true);
+        expect(result).toMatchObject({ success: true, dryRun: true });
         expect(result.operation).toMatchObject({ capability: 'file.patch', status: 'dry-run' });
         expect(result.changeSet?.status).toBe('aborted');
-        expect(result.diffPreview).toContain('-const x = 1;');
-        expect(result.diffPreview).toContain('+const x = 42;');
-        expect(result.diffPreviewTruncated).toBe(false);
-        expect(fsMock.writeFile).not.toHaveBeenCalled();
-        expect(fsMock.rename).not.toHaveBeenCalled();
     });
 
-    it('aplica occurrence_index para old_string repetido', async () => {
-        pathOk('/workspace/repeated.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('same\nmiddle\nsame\n');
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const result = await handler({
-            path: 'repeated.txt',
-            old_string: 'same',
-            new_string: 'changed',
-            occurrence_index: 2,
-        });
-
-        expect(result.success).toBe(true);
-        expect(result.occurrences).toBe(2);
-        expect(result.replacedOccurrences).toBe(1);
-        expect(result.occurrenceIndex).toBe(2);
-        const writtenContent = String(fsMock.writeFile.mock.calls[0]?.[1]);
-        expect(writtenContent).toBe('same\nmiddle\nchanged\n');
-    });
-
-    it('falha com feedback claro quando replace_all e occurrence_index conflitam', async () => {
+    it('rejeita modos conflitantes antes de chamar workspace-io', async () => {
         pathOk('/workspace/conflict.txt');
-
         const result = await handler({
             path: 'conflict.txt',
             old_string: 'same',
@@ -856,233 +681,87 @@ describe('F35 — patch_file (F187)', () => {
             replace_all: true,
             occurrence_index: 1,
         });
-
         expect(result).toMatchObject({
             success: false,
             code: 'ERR_PATCH_CONFLICTING_MODE',
-            toolFeedback: {
-                category: 'invalid-parameters',
-            },
+            toolFeedback: { category: 'invalid-parameters' },
         });
-        expect(result.toolFeedback.fix).toContain('Escolha apenas um modo');
-        expect(result.terminalSummary).toMatchObject({
-            operation: 'patch',
-            status: 'failed',
-            code: 'ERR_PATCH_CONFLICTING_MODE',
-            nextAction: expect.stringContaining('replace_all'),
-        });
-        expect(result.presentation).toMatchObject({
-            operation: 'patch',
-            status: 'failed',
-            targetKinds: ['file'],
-            summary: expect.stringContaining('Patch falhou'),
-        });
-        expect(fsMock.readFile).not.toHaveBeenCalled();
+        expect(workspaceIoMocks.patchTextLockedValidated).not.toHaveBeenCalled();
     });
 
-    it('falha se old_string não encontrada', async () => {
+    it('mantém códigos e detalhes causais de not-found/ambiguous da primitive', async () => {
         pathOk('/workspace/file.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('hello world');
-
-        const result = await handler({
-            path: 'file.txt',
-            old_string: 'not in file',
-            new_string: 'replaced',
-        });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('não encontrado');
-        expect(result.toolFeedback).toMatchObject({
-            category: 'not-found',
-            details: {
-                code: 'ERR_PATCH_NOT_FOUND',
-                path: '/workspace/file.txt',
-            },
-        });
-        expect(result.toolFeedback.fix).toContain('Releia o arquivo');
-        expect(result.operationName).toBe('patch');
-        expect(result.terminalSummary).toMatchObject({
-            operation: 'patch',
-            status: 'failed',
+        workspaceIoMocks.patchTextLockedValidated.mockRejectedValue(
+            codedError('ERR_PATCH_NOT_FOUND', 'old_string não encontrado', { occurrenceCount: 0 }),
+        );
+        const missing = await handler({ path: 'file.txt', old_string: 'absent', new_string: 'next' });
+        expect(missing).toMatchObject({
+            success: false,
             code: 'ERR_PATCH_NOT_FOUND',
-            nextAction: expect.stringContaining('old_string'),
-        });
-        expect(result.presentation.summary).toContain('/workspace/file.txt');
-    });
-
-    it('falha se old_string encontrada múltiplas vezes', async () => {
-        pathOk('/workspace/file.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('aaa bbb aaa');
-
-        const result = await handler({
-            path: 'file.txt',
-            old_string: 'aaa',
-            new_string: 'ccc',
-        });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('2 vezes');
-        expect(result.toolFeedback).toMatchObject({
-            category: 'invalid-parameters',
-            details: {
-                code: 'ERR_PATCH_AMBIGUOUS_MATCH',
-                occurrenceCount: 2,
-            },
-        });
-        expect(result.toolFeedback.fix).toContain('occurrence_index');
-        expect(result.terminalSummary).toMatchObject({
-            operation: 'patch',
-            status: 'failed',
-            code: 'ERR_PATCH_AMBIGUOUS_MATCH',
-            nextAction: expect.stringContaining('occurrence_index'),
-        });
-    });
-
-    it('falha antes de ler quando old_string é vazia', async () => {
-        pathOk('/workspace/empty-old.txt');
-
-        const result = await handler({
-            path: 'empty-old.txt',
-            old_string: '',
-            new_string: 'x',
-        });
-
-        expect(result).toMatchObject({
-            success: false,
-            code: 'ERR_PATCH_INVALID_OLD_STRING',
-            toolFeedback: {
-                category: 'invalid-parameters',
-            },
-        });
-        expect(result.terminalSummary).toMatchObject({
-            operation: 'patch',
-            status: 'failed',
-            code: 'ERR_PATCH_INVALID_OLD_STRING',
-            nextAction: expect.stringContaining('old_string'),
-        });
-        expect(fsMock.readFile).not.toHaveBeenCalled();
-    });
-
-    it('falha se arquivo não existe', async () => {
-        pathOk('/workspace/nope.txt');
-        fsMock.access.mockRejectedValue(enoent());
-        fsMock.readFile.mockRejectedValue(enoent());
-
-        const result = await handler({
-            path: 'nope.txt',
-            old_string: 'x',
-            new_string: 'y',
-        });
-
-        expect(result).toMatchObject({
-            success: false,
-            code: 'ENOENT',
             toolFeedback: { category: 'not-found' },
         });
-    });
+        expect(missing.toolFeedback.fix).toContain('Releia o arquivo');
 
-    it('falha se validatePath rejeita', async () => {
-        pathFail('Blocked');
-
-        const result = await handler({
-            path: '../evil',
-            old_string: 'x',
-            new_string: 'y',
+        vi.clearAllMocks();
+        pathOk('/workspace/file.txt');
+        workspaceIoMocks.patchTextLockedValidated.mockRejectedValue(
+            codedError('ERR_PATCH_AMBIGUOUS_MATCH', 'old_string encontrado 2 vezes', { occurrenceCount: 2 }),
+        );
+        const ambiguous = await handler({ path: 'file.txt', old_string: 'same', new_string: 'next' });
+        expect(ambiguous).toMatchObject({
+            success: false,
+            code: 'ERR_PATCH_AMBIGUOUS_MATCH',
+            toolFeedback: { category: 'invalid-parameters' },
         });
-
-        expect(result.success).toBe(false);
+        expect(ambiguous.toolFeedback.fix).toContain('occurrence_index');
     });
 
-    it('escapa $ em new_string (BUG-HIGH-01 fix)', async () => {
+    it('new_string com $ e string vazia atravessam literalmente a porta', async () => {
         pathOk('/workspace/dollar.js');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('placeholder');
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
+        await handler({ path: 'dollar.js', old_string: 'placeholder', new_string: 'cost is $100' });
+        expect(workspaceIoMocks.patchTextLockedValidated).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ newString: 'cost is $100' }),
+        );
 
-        await handler({
-            path: 'dollar.js',
-            old_string: 'placeholder',
-            new_string: 'cost is $100',
-        });
-
-        // O conteúdo escrito deve conter $100 literalmente
-        const writtenContent = String(fsMock.writeFile.mock.calls[0]?.[1]);
-        expect(writtenContent).toContain('$100');
-    });
-
-    it('pode deletar texto (new_string vazio)', async () => {
+        vi.clearAllMocks();
         pathOk('/workspace/del.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockResolvedValue('keep this remove this keep that');
-        fsMock.writeFile.mockResolvedValue(undefined);
-        fsMock.rename.mockResolvedValue(undefined);
-
-        const result = await handler({
-            path: 'del.txt',
-            old_string: ' remove this',
-            new_string: '',
-        });
-
-        expect(result.success).toBe(true);
-        const writtenContent = String(fsMock.writeFile.mock.calls[0]?.[1]);
-        expect(writtenContent).toBe('keep this keep that');
-    });
-
-    it('falha em erro de leitura de arquivo', async () => {
-        pathOk('/workspace/unreadable.txt');
-        fsMock.access.mockResolvedValue(undefined);
-        fsMock.readFile.mockRejectedValue(new Error('EPERM'));
-
-        const result = await handler({
-            path: 'unreadable.txt',
-            old_string: 'x',
-            new_string: 'y',
-        });
-
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('EPERM');
+        await handler({ path: 'del.txt', old_string: ' remove this', new_string: '' });
+        expect(workspaceIoMocks.patchTextLockedValidated).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ newString: '' }),
+        );
     });
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// F188: Export shape
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('F35 — fileWriteTools export shape (F188)', () => {
-    it('exporta array com 10 tools', () => {
+describe('fileWriteTools surface', () => {
+    it('mantém as 10 tools, nomes únicos e exports operacionais esperados', () => {
         expect(fileWriteTools).toHaveLength(10);
-    });
-
-    it('cada tool tem name, description, handler', () => {
-        for (const tool of fileWriteTools) {
-            expect(tool).toHaveProperty('name');
-            expect(tool).toHaveProperty('description');
-            expect(tool).toHaveProperty('handler');
-        }
-    });
-
-    it('nomes de tools são únicos', () => {
-        const names = fileWriteTools.map((t) => t.name);
+        const names = fileWriteTools.map((tool) => tool.name);
         expect(new Set(names).size).toBe(names.length);
-    });
-
-    it('exporta named exports individuais', () => {
-        expect(writeFileContentTool.name).toBe('write_file_content');
-        expect(createFileTool.name).toBe('create_file');
-        expect(deleteFileTool.name).toBe('delete_file');
-        expect(copyFileTool.name).toBe('copy_file');
-        expect(moveFileTool.name).toBe('move_file');
-        expect(patchFileTool.name).toBe('patch_file');
+        expect(names).toEqual(
+            expect.arrayContaining([
+                'write_file_content',
+                'create_file',
+                'delete_file',
+                'patch_bundle_plan',
+                'patch_files_batch',
+                'copy_file',
+                'move_file',
+                'patch_file',
+                'rollback_file_changes',
+                'rollback_sidecars_status',
+            ]),
+        );
         expect(rollbackFileChangesTool.name).toBe('rollback_file_changes');
         expect(rollbackSidecarsStatusTool.name).toBe('rollback_sidecars_status');
-    });
-
-    it('descriptions não prometem aprovação manual', () => {
         for (const tool of fileWriteTools) {
-            expect(tool.description).not.toMatch(/requer aprovação|approval|ask_user/i);
+            expect(tool).toMatchObject({
+                name: expect.any(String),
+                description: expect.any(String),
+                handler: expect.any(Function),
+            });
+            expect(tool.description).not.toMatch(/requer aprovação|approval|ask_user/iu);
         }
     });
 });

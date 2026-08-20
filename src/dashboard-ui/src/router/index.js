@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {RouteRecordRaw} from "vue-router" */
+/** @import {RouteRecordRaw} from 'vue-router' */
 import { createRouter, createWebHistory } from 'vue-router';
 
 /** @type {RouteRecordRaw[]} */

@@ -12,9 +12,9 @@
  */
 
 import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
+import { redactSecretRecord, redactSecretText } from '../../core/index.js';
 import { PROVIDER_TYPES } from '../constants.js';
 import { log } from '../logger.js';
-import { redactSecretRecord, redactSecretText } from '../../core/index.js';
 
 const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
@@ -49,7 +49,12 @@ const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
  * @property {{ apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean }} auth
  * @property {{ configured: boolean; count: number }} modelList
  * @property {{ reasoningEffort: boolean; sdkReasoningEffort?: boolean; vision: boolean; contextWindowTokens: number }} capabilities
- * @property {{ maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null }} limits
+ * @property {{
+ *     maxRequestTokens: number | null;
+ *     tokensPerMinute: number | null;
+ *     requestsPerMinute: number | null;
+ *     dailyRequests: number | null;
+ * }} limits
  * @property {{ routeId: string; revision: number; targetFingerprint: string; sdkVisibleModel: string } | undefined} [modelGatewayIngress]
  * @property {string[]} warnings
  * @property {string[]} errors
@@ -61,7 +66,8 @@ const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
  * @property {boolean} ready
  * @property {ProviderConfig | null} provider
  * @property {string | null} model
- * @property {{ supports?: { reasoningEffort?: boolean; vision?: boolean }; limits?: { max_context_window_tokens?: number } } | undefined} modelCapabilities
+ * @property {{ supports?: { reasoningEffort?: boolean; vision?: boolean }; limits?: { max_context_window_tokens?: number } }
+ *     | undefined} modelCapabilities
  * @property {ByokSummary} summary
  * @property {string[]} warnings
  * @property {string[]} errors
@@ -73,7 +79,8 @@ const BYOK_MODEL_DISCOVERY_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /**
  * BYOK model metadata is a first-class runtime extension over the SDK's ModelInfo. The SDK only requires the base
- * fields, while terminal routing/discovery also consumes the provider-specific metadata attached by createByokModelInfo.
+ * fields, while terminal routing/discovery also consumes the provider-specific metadata attached by
+ * createByokModelInfo.
  *
  * @typedef {import('../types.js').ModelInfo & { byok: ReturnType<typeof buildByokModelMetadata> }} ByokModelInfo
  */
@@ -255,7 +262,9 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
     },
     'ollama-local': {
         providerType: PROVIDER_TYPES.OPENAI,
-        baseUrl: (env) => normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_LOCAL_BASE_URL', 'OLLAMA_BASE_URL'])) ?? 'http://localhost:11434/v1',
+        baseUrl: (env) =>
+            normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_LOCAL_BASE_URL', 'OLLAMA_BASE_URL'])) ??
+            'http://localhost:11434/v1',
         modelEnvKeys: Object.freeze(['OLLAMA_DEFAULT_MODEL', 'OLLAMA_CHAT_MODEL']),
         defaultModel: 'qwen3-coder-next',
         staticModels: Object.freeze(['qwen3-coder-next']),
@@ -277,7 +286,8 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
     },
     'kilo-code': {
         providerType: PROVIDER_TYPES.OPENAI,
-        baseUrl: (env) => firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
+        baseUrl: (env) =>
+            firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
         modelEnvKeys: Object.freeze(['KILO_MODEL', 'KILO_DEFAULT_MODEL']),
         bearerTokenEnvKeys: Object.freeze(['KILO_API_KEY', 'KILO_CODE_API_KEY']),
         defaultModel: 'kilo-auto/free',
@@ -289,7 +299,8 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
     },
     'kilo-gateway': {
         providerType: PROVIDER_TYPES.OPENAI,
-        baseUrl: (env) => firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
+        baseUrl: (env) =>
+            firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
         modelEnvKeys: Object.freeze(['KILO_MODEL', 'KILO_DEFAULT_MODEL']),
         bearerTokenEnvKeys: Object.freeze(['KILO_API_KEY', 'KILO_CODE_API_KEY']),
         defaultModel: 'kilo-auto/free',
@@ -301,7 +312,8 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
     },
     kilo: {
         providerType: PROVIDER_TYPES.OPENAI,
-        baseUrl: (env) => firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
+        baseUrl: (env) =>
+            firstEnv(env, ['KILO_GATEWAY_BASE_URL', 'KILO_BASE_URL']) ?? 'https://api.kilo.ai/api/gateway',
         modelEnvKeys: Object.freeze(['KILO_MODEL', 'KILO_DEFAULT_MODEL']),
         bearerTokenEnvKeys: Object.freeze(['KILO_API_KEY', 'KILO_CODE_API_KEY']),
         defaultModel: 'kilo-auto/free',
@@ -317,7 +329,12 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         modelEnvKeys: Object.freeze(['OPENROUTER_MODEL', 'OPEN_ROUTER_MODEL']),
         apiKeyEnvKeys: Object.freeze(['OPENROUTER_API_KEY', 'OPEN_ROUTER_KEY']),
         defaultModel: 'openrouter/free',
-        staticModels: Object.freeze(['openrouter/free', 'deepseek/deepseek-v4-flash:free', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', 'google/gemma-4-31b-it:free']),
+        staticModels: Object.freeze([
+            'openrouter/free',
+            'deepseek/deepseek-v4-flash:free',
+            'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+            'google/gemma-4-31b-it:free',
+        ]),
         contextWindowTokens: 128_000,
         supportsReasoning: true,
         supportsVision: true,
@@ -329,7 +346,12 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         modelEnvKeys: Object.freeze(['GROQ_MODEL']),
         apiKeyEnvKeys: Object.freeze(['GROQ_API_KEY', 'GROQ_KEY']),
         defaultModel: 'qwen/qwen3-32b',
-        staticModels: Object.freeze(['qwen/qwen3-32b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile']),
+        staticModels: Object.freeze([
+            'qwen/qwen3-32b',
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-20b',
+            'llama-3.3-70b-versatile',
+        ]),
         contextWindowTokens: 131_072,
         supportsReasoning: true,
         supportsVision: false,
@@ -339,9 +361,20 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         providerType: PROVIDER_TYPES.OPENAI,
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
         modelEnvKeys: Object.freeze(['GEMINI_MODEL', 'GOOGLE_GENERATIVE_AI_MODEL']),
-        apiKeyEnvKeys: Object.freeze(['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY', 'GEMINI_KEY']),
+        apiKeyEnvKeys: Object.freeze([
+            'GEMINI_API_KEY',
+            'GOOGLE_API_KEY',
+            'GOOGLE_GENERATIVE_AI_API_KEY',
+            'GOOGLE_AI_STUDIO_API_KEY',
+            'GEMINI_KEY',
+        ]),
         defaultModel: 'gemini-2.5-flash',
-        staticModels: Object.freeze(['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.5-pro', 'gemini-embedding-001']),
+        staticModels: Object.freeze([
+            'gemini-2.5-flash',
+            'gemini-flash-latest',
+            'gemini-2.5-pro',
+            'gemini-embedding-001',
+        ]),
         contextWindowTokens: 1_048_576,
         supportsReasoning: true,
         supportsVision: true,
@@ -365,7 +398,11 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         modelEnvKeys: Object.freeze(['HUGGING_FACE_MODEL', 'HF_MODEL']),
         apiKeyEnvKeys: Object.freeze(['HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY', 'HF_TOKEN']),
         defaultModel: 'openai/gpt-oss-120b:fastest',
-        staticModels: Object.freeze(['openai/gpt-oss-120b:fastest', 'deepseek-ai/DeepSeek-R1:fastest', 'Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest']),
+        staticModels: Object.freeze([
+            'openai/gpt-oss-120b:fastest',
+            'deepseek-ai/DeepSeek-R1:fastest',
+            'Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest',
+        ]),
         contextWindowTokens: 128_000,
         supportsReasoning: true,
         supportsVision: false,
@@ -380,7 +417,11 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         modelEnvKeys: Object.freeze(['CLOUDFLARE_MODEL', 'CLOUDFLARE_WORKERS_AI_MODEL']),
         apiKeyEnvKeys: Object.freeze(['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_KEY']),
         defaultModel: '@cf/meta/llama-3.1-8b-instruct',
-        staticModels: Object.freeze(['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3.1-70b-instruct', '@cf/qwen/qwen1.5-14b-chat-awq']),
+        staticModels: Object.freeze([
+            '@cf/meta/llama-3.1-8b-instruct',
+            '@cf/meta/llama-3.1-70b-instruct',
+            '@cf/qwen/qwen1.5-14b-chat-awq',
+        ]),
         contextWindowTokens: 32_768,
         supportsReasoning: false,
         supportsVision: false,
@@ -392,7 +433,11 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         modelEnvKeys: Object.freeze(['NVIDIA_MODEL', 'NVIDIA_NIM_MODEL']),
         apiKeyEnvKeys: Object.freeze(['NVIDIA_API_KEY', 'NVIDIA_KEY']),
         defaultModel: 'openai/gpt-oss-120b',
-        staticModels: Object.freeze(['openai/gpt-oss-120b', 'meta/llama-3.1-70b-instruct', 'meta/llama-3.1-405b-instruct']),
+        staticModels: Object.freeze([
+            'openai/gpt-oss-120b',
+            'meta/llama-3.1-70b-instruct',
+            'meta/llama-3.1-405b-instruct',
+        ]),
         contextWindowTokens: 131_072,
         supportsReasoning: true,
         supportsVision: true,
@@ -432,7 +477,13 @@ const BYOK_PROVIDER_PRESETS = Object.freeze({
         modelEnvKeys: Object.freeze(['OPENCODE_MODEL', 'OPENCODE_DEFAULT_MODEL']),
         apiKeyEnvKeys: Object.freeze(['OPENCODE_API_KEY']),
         defaultModel: 'gpt-5.1-codex',
-        staticModels: Object.freeze(['gpt-5.1-codex', 'claude-sonnet-4-5', 'gemini-3.5-flash', 'glm-5.1', 'deepseek-v4-flash-free']),
+        staticModels: Object.freeze([
+            'gpt-5.1-codex',
+            'claude-sonnet-4-5',
+            'gemini-3.5-flash',
+            'glm-5.1',
+            'deepseek-v4-flash-free',
+        ]),
         contextWindowTokens: 200_000,
         supportsReasoning: true,
         supportsVision: true,
@@ -624,7 +675,9 @@ function parseHeaders(raw) {
  * @returns {Record<string, unknown>}
  */
 function asPlainObject(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
@@ -696,7 +749,10 @@ function applyProfileToEnv(profile, env) {
     const providerType = firstProfileString(profile, 'providerType', ['type', 'COPILOT_BYOK_PROVIDER_TYPE']);
     const baseUrl = firstProfileString(profile, 'baseUrl', ['baseURL', 'url', 'COPILOT_BYOK_BASE_URL']);
     const wireApi = firstProfileString(profile, 'wireApi', ['COPILOT_BYOK_WIRE_API']);
-    const azureApiVersion = firstProfileString(profile, 'azureApiVersion', ['apiVersion', 'COPILOT_BYOK_AZURE_API_VERSION']);
+    const azureApiVersion = firstProfileString(profile, 'azureApiVersion', [
+        'apiVersion',
+        'COPILOT_BYOK_AZURE_API_VERSION',
+    ]);
     const model = firstProfileString(profile, 'model', ['modelId', 'id', 'COPILOT_BYOK_MODEL']);
     const models = firstProfileString(profile, 'models', ['COPILOT_BYOK_MODELS']);
     const modelsEndpoint = firstProfileString(profile, 'modelsEndpoint', [
@@ -706,7 +762,9 @@ function applyProfileToEnv(profile, env) {
         'COPILOT_BYOK_MODELS_ENDPOINT',
     ]);
     const modelDiscoveryEnabled = optionalBooleanString(
-        profile['modelDiscoveryEnabled'] ?? profile['discoverModels'] ?? profile['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'],
+        profile['modelDiscoveryEnabled'] ??
+            profile['discoverModels'] ??
+            profile['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'],
     );
     const modelDiscoveryTimeoutMs = optionalNumberString(
         profile['modelDiscoveryTimeoutMs'] ?? profile['COPILOT_BYOK_MODEL_DISCOVERY_TIMEOUT_MS'],
@@ -728,7 +786,10 @@ function applyProfileToEnv(profile, env) {
         profile['requestsPerMinute'] ?? profile['rpm'] ?? profile['COPILOT_BYOK_REQUESTS_PER_MINUTE'],
     );
     const dailyRequests = optionalNumberString(
-        profile['dailyRequests'] ?? profile['requestsPerDay'] ?? profile['rpd'] ?? profile['COPILOT_BYOK_DAILY_REQUESTS'],
+        profile['dailyRequests'] ??
+            profile['requestsPerDay'] ??
+            profile['rpd'] ??
+            profile['COPILOT_BYOK_DAILY_REQUESTS'],
     );
     const supportsReasoning = optionalBooleanString(
         profile['supportsReasoning'] ?? profile['reasoning'] ?? profile['COPILOT_BYOK_SUPPORTS_REASONING'],
@@ -737,10 +798,13 @@ function applyProfileToEnv(profile, env) {
         profile['supportsVision'] ?? profile['vision'] ?? profile['COPILOT_BYOK_SUPPORTS_VISION'],
     );
     const apiKey = firstProfileSecret(profile, env, 'apiKey', ['key', 'COPILOT_BYOK_API_KEY'], ['apiKeyEnv', 'keyEnv']);
-    const bearerToken = firstProfileSecret(profile, env, 'bearerToken', ['token', 'COPILOT_BYOK_BEARER_TOKEN'], [
-        'bearerTokenEnv',
-        'tokenEnv',
-    ]);
+    const bearerToken = firstProfileSecret(
+        profile,
+        env,
+        'bearerToken',
+        ['token', 'COPILOT_BYOK_BEARER_TOKEN'],
+        ['bearerTokenEnv', 'tokenEnv'],
+    );
     const headersJson =
         typeof profile['headers'] === 'object' && profile['headers'] !== null
             ? JSON.stringify(profile['headers'])
@@ -797,7 +861,18 @@ export function readConfiguredByokProfilesFromEnv(env = process.env) {
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @returns {Array<{ name: string; preset: string | null; providerType: string | null; baseUrl: string | null; model: string | null; ready: boolean; auth: { apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean }; metadataKeys: string[]; warnings: string[]; errors: string[] }>}
+ * @returns {{
+ *     name: string;
+ *     preset: string | null;
+ *     providerType: string | null;
+ *     baseUrl: string | null;
+ *     model: string | null;
+ *     ready: boolean;
+ *     auth: { apiKeyConfigured: boolean; bearerTokenConfigured: boolean; headersConfigured: boolean };
+ *     metadataKeys: string[];
+ *     warnings: string[];
+ *     errors: string[];
+ * }[]}
  */
 export function readConfiguredByokProfileSummaries(env = process.env) {
     const profiles = readConfiguredByokProfilesFromEnv(env);
@@ -889,11 +964,7 @@ function resolveProfileEnv(env) {
         for (const key of explicitOverrideKeys) {
             if (optionalString(env[key])) profileEnv[key] = env[key];
         }
-        const explicitCatalogKeys = [
-            'COPILOT_BYOK_MODELS',
-            'COPILOT_BYOK_MODELS_JSON',
-            'COPILOT_BYOK_MODELS_ENDPOINT',
-        ];
+        const explicitCatalogKeys = ['COPILOT_BYOK_MODELS', 'COPILOT_BYOK_MODELS_JSON', 'COPILOT_BYOK_MODELS_ENDPOINT'];
         if (explicitCatalogKeys.some((key) => optionalString(env[key]))) {
             for (const key of explicitCatalogKeys) {
                 if (!optionalString(env[key])) delete profileEnv[key];
@@ -1009,7 +1080,10 @@ function inferBaseUrl(env, preset, providerType) {
     const presetBaseUrl = resolvePresetBaseUrl(definition, env);
     if (presetBaseUrl) return presetBaseUrl;
     if (preset === 'ollama-local') {
-        return normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_LOCAL_BASE_URL', 'OLLAMA_BASE_URL'])) ?? 'http://localhost:11434/v1';
+        return (
+            normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_LOCAL_BASE_URL', 'OLLAMA_BASE_URL'])) ??
+            'http://localhost:11434/v1'
+        );
     }
     if (preset === 'ollama-cloud') {
         return normalizeOllamaBaseUrl(firstEnv(env, ['OLLAMA_CLOUD_BASE_URL'])) ?? 'https://ollama.com/v1';
@@ -1169,20 +1243,33 @@ function inferModelContextWindow(item) {
 /**
  * @param {string} id
  * @param {Record<string, unknown>} item
- * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
+ * @param {{
+ *     contextWindowTokens: number;
+ *     supportsReasoning: boolean;
+ *     supportsVision: boolean;
+ *     maxRequestTokens?: number | null;
+ *     tokensPerMinute?: number | null;
+ *     requestsPerMinute?: number | null;
+ *     dailyRequests?: number | null;
+ * }} caps
  * @param {'static' | 'remote'} source
  * @returns {{
- *   source: 'static' | 'remote';
- *   provider: string | null;
- *   freeTier: boolean | null;
- *   pricing: { prompt: number | null; completion: number | null; request: number | null };
- *   inputModalities: string[];
- *   outputModalities: string[];
- *   supportedParameters: string[];
- *   contextWindowTokens: number;
- *   rateLimits: { maxRequestTokens: number | null; tokensPerMinute: number | null; requestsPerMinute: number | null; dailyRequests: number | null };
- *   supportsReasoning: boolean;
- *   supportsVision: boolean;
+ *     source: 'static' | 'remote';
+ *     provider: string | null;
+ *     freeTier: boolean | null;
+ *     pricing: { prompt: number | null; completion: number | null; request: number | null };
+ *     inputModalities: string[];
+ *     outputModalities: string[];
+ *     supportedParameters: string[];
+ *     contextWindowTokens: number;
+ *     rateLimits: {
+ *         maxRequestTokens: number | null;
+ *         tokensPerMinute: number | null;
+ *         requestsPerMinute: number | null;
+ *         dailyRequests: number | null;
+ *     };
+ *     supportsReasoning: boolean;
+ *     supportsVision: boolean;
  * }}
  */
 function buildByokModelMetadata(id, item, caps, source) {
@@ -1204,7 +1291,8 @@ function buildByokModelMetadata(id, item, caps, source) {
         priceNumberFromUnknown(pricing['output']) ??
         priceNumberFromUnknown(item['output_price']) ??
         null;
-    const requestPrice = priceNumberFromUnknown(pricing['request']) ?? priceNumberFromUnknown(item['request_price']) ?? null;
+    const requestPrice =
+        priceNumberFromUnknown(pricing['request']) ?? priceNumberFromUnknown(item['request_price']) ?? null;
     const inputModalities = stringArrayFromUnknown(architecture['input_modalities'] ?? item['input_modalities']);
     const outputModalities = stringArrayFromUnknown(architecture['output_modalities'] ?? item['output_modalities']);
     const supportedParameters = stringArrayFromUnknown(item['supported_parameters'] ?? item['supportedParameters']);
@@ -1245,10 +1333,13 @@ function buildByokModelMetadata(id, item, caps, source) {
         item['is_free'] === true ||
         item['freeTier'] === true ||
         /(?:^|[:/_-])free(?:$|[:/_-])/u.test(lowercaseId);
-    const zeroPriced = pricingKnown && (promptPrice ?? 0) === 0 && (completionPrice ?? 0) === 0 && (requestPrice ?? 0) === 0;
+    const zeroPriced =
+        pricingKnown && (promptPrice ?? 0) === 0 && (completionPrice ?? 0) === 0 && (requestPrice ?? 0) === 0;
     const supportsReasoning =
         (allowProviderCapabilityFallback && caps.supportsReasoning) ||
-        supportedParameters.some((param) => /reasoning|include_reasoning|reasoning_effort/u.test(param.toLowerCase())) ||
+        supportedParameters.some((param) =>
+            /reasoning|include_reasoning|reasoning_effort/u.test(param.toLowerCase()),
+        ) ||
         /(?:reasoning|deepseek-r1|qwq|qwen3|gpt-oss|magistral|glm-[45]|glm-5|gemini-[23]|o[134])/u.test(lowercaseId);
     const supportsVision =
         (allowProviderCapabilityFallback && caps.supportsVision) ||
@@ -1289,10 +1380,10 @@ function renderByokModelTerms(metadata) {
 }
 
 /**
- * O SDK/CLI do Copilot tambem usa `:` como separador em algumas rotas internas de opções de modelo. Em BYOK,
- * providers como OpenRouter/HuggingFace/Ollama usam `:` como parte legitima do ID (`:free`, `:fastest`,
- * `:80b-cloud`). Nesses casos o modelo pode ser capaz de "raciocinar", mas o parametro SDK `reasoningEffort`
- * não é um canal seguro para configurar esse raciocinio, pois pode ser reinterpretado como chave de opção.
+ * O SDK/CLI do Copilot tambem usa `:` como separador em algumas rotas internas de opções de modelo. Em BYOK, providers
+ * como OpenRouter/HuggingFace/Ollama usam `:` como parte legitima do ID (`:free`, `:fastest`, `:80b-cloud`). Nesses
+ * casos o modelo pode ser capaz de "raciocinar", mas o parametro SDK `reasoningEffort` não é um canal seguro para
+ * configurar esse raciocinio, pois pode ser reinterpretado como chave de opção.
  *
  * @param {string | null | undefined} model
  * @returns {boolean}
@@ -1303,7 +1394,15 @@ function supportsSdkReasoningEffortForByokModel(model) {
 
 /**
  * @param {string | Record<string, unknown>} item
- * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
+ * @param {{
+ *     contextWindowTokens: number;
+ *     supportsReasoning: boolean;
+ *     supportsVision: boolean;
+ *     maxRequestTokens?: number | null;
+ *     tokensPerMinute?: number | null;
+ *     requestsPerMinute?: number | null;
+ *     dailyRequests?: number | null;
+ * }} caps
  * @param {'static' | 'remote'} [source]
  * @returns {ByokModelInfo}
  */
@@ -1329,7 +1428,15 @@ function createByokModelInfo(item, caps, source = 'static') {
 
 /**
  * @param {unknown} payload
- * @param {{ contextWindowTokens: number; supportsReasoning: boolean; supportsVision: boolean; maxRequestTokens?: number | null; tokensPerMinute?: number | null; requestsPerMinute?: number | null; dailyRequests?: number | null }} caps
+ * @param {{
+ *     contextWindowTokens: number;
+ *     supportsReasoning: boolean;
+ *     supportsVision: boolean;
+ *     maxRequestTokens?: number | null;
+ *     tokensPerMinute?: number | null;
+ *     requestsPerMinute?: number | null;
+ *     dailyRequests?: number | null;
+ * }} caps
  * @returns {ByokModelInfo[]}
  */
 function normalizeDiscoveredModels(payload, caps) {
@@ -1348,7 +1455,13 @@ function normalizeDiscoveredModels(payload, caps) {
         const id = modelIdFromUnknown(item);
         if (!id || seen.has(id)) continue;
         seen.add(id);
-        models.push(createByokModelInfo(typeof item === 'object' && item !== null ? /** @type {Record<string, unknown>} */ (item) : id, caps, 'remote'));
+        models.push(
+            createByokModelInfo(
+                typeof item === 'object' && item !== null ? /** @type {Record<string, unknown>} */ (item) : id,
+                caps,
+                'remote',
+            ),
+        );
     }
     return models;
 }
@@ -1383,7 +1496,11 @@ function createByokModelDiscoveryHeaders(provider) {
     if (provider.bearerToken && headers['Authorization'] === undefined && headers['authorization'] === undefined) {
         headers['Authorization'] = `Bearer ${provider.bearerToken}`;
     } else if (provider.apiKey) {
-        if (provider.type === PROVIDER_TYPES.AZURE && headers['api-key'] === undefined && headers['Api-Key'] === undefined) {
+        if (
+            provider.type === PROVIDER_TYPES.AZURE &&
+            headers['api-key'] === undefined &&
+            headers['Api-Key'] === undefined
+        ) {
             headers['api-key'] = provider.apiKey;
         } else if (
             provider.baseUrl.includes('generativelanguage.googleapis.com') &&
@@ -1405,14 +1522,16 @@ function createByokModelDiscoveryHeaders(provider) {
  * @returns {string}
  */
 function byokDiscoveryCacheKey(endpoint, provider) {
-    const headerKeys = Object.keys(provider.headers ?? {}).sort().join(',');
+    const headerKeys = Object.keys(provider.headers ?? {})
+        .sort()
+        .join(',');
     const authMode = provider.bearerToken ? 'bearer' : provider.apiKey ? 'apiKey' : 'none';
     return `${provider.type ?? PROVIDER_TYPES.OPENAI}|${endpoint}|${authMode}|${headerKeys}`;
 }
 
 /**
- * A sessão BYOK ainda precisa nascer com um `model` explícito. Quando o catálogo remoto é fresco, o cockpit deve
- * saber se esse seletor continua existindo no provider sem substituir silenciosamente a escolha do operador.
+ * A sessão BYOK ainda precisa nascer com um `model` explícito. Quando o catálogo remoto é fresco, o cockpit deve saber
+ * se esse seletor continua existindo no provider sem substituir silenciosamente a escolha do operador.
  *
  * @param {string | null} model
  * @param {import('../types.js').ModelInfo[]} models
@@ -1449,10 +1568,10 @@ export function readConfiguredByokState(env = process.env) {
     const explicitEnabled = parseBoolean(effectiveEnv['COPILOT_BYOK_ENABLED']);
     const hasIntent = Boolean(
         effectiveEnv['COPILOT_BYOK_PROVIDER_PRESET'] ||
-            effectiveEnv['COPILOT_BYOK_PROVIDER_TYPE'] ||
-            effectiveEnv['COPILOT_BYOK_BASE_URL'] ||
-            effectiveEnv['COPILOT_BYOK_MODEL'] ||
-            effectiveEnv['COPILOT_BYOK_PROFILE'],
+        effectiveEnv['COPILOT_BYOK_PROVIDER_TYPE'] ||
+        effectiveEnv['COPILOT_BYOK_BASE_URL'] ||
+        effectiveEnv['COPILOT_BYOK_MODEL'] ||
+        effectiveEnv['COPILOT_BYOK_PROFILE'],
     );
     const enabled = explicitEnabled ?? hasIntent;
     const warnings = [];
@@ -1465,7 +1584,8 @@ export function readConfiguredByokState(env = process.env) {
     );
     const supportsReasoning =
         parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ?? presetDefinition?.supportsReasoning ?? false;
-    const supportsVision = parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? presetDefinition?.supportsVision ?? false;
+    const supportsVision =
+        parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? presetDefinition?.supportsVision ?? false;
     const limits = {
         maxRequestTokens: parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_MAX_REQUEST_TOKENS']),
         tokensPerMinute: parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_TOKENS_PER_MINUTE']),
@@ -1497,7 +1617,16 @@ export function readConfiguredByokState(env = process.env) {
         errors: [],
     };
     if (!enabled) {
-        return { enabled: false, ready: false, provider: null, model: null, modelCapabilities: undefined, summary: disabledSummary, warnings: [], errors: [] };
+        return {
+            enabled: false,
+            ready: false,
+            provider: null,
+            model: null,
+            modelCapabilities: undefined,
+            summary: disabledSummary,
+            warnings: [],
+            errors: [],
+        };
     }
 
     /** @type {ProviderType | null} */
@@ -1536,7 +1665,9 @@ export function readConfiguredByokState(env = process.env) {
                 ...(presetDefinition.apiKeyEnvKeys ?? []),
                 ...(presetDefinition.bearerTokenEnvKeys ?? []),
             ]);
-            warnings.push(`${preset} BYOK is configured without an auth secret. Accepted env keys: ${acceptedKeys.join(', ')}.`);
+            warnings.push(
+                `${preset} BYOK is configured without an auth secret. Accepted env keys: ${acceptedKeys.join(', ')}.`,
+            );
         }
         if (baseUrl) {
             provider = validateConfig({
@@ -1584,7 +1715,12 @@ export function readConfiguredByokState(env = process.env) {
         azureApiVersion,
         auth: { apiKeyConfigured, bearerTokenConfigured, headersConfigured },
         modelList: { configured: models.length > 0, count: models.length },
-        capabilities: { reasoningEffort: supportsReasoning, sdkReasoningEffort, vision: supportsVision, contextWindowTokens },
+        capabilities: {
+            reasoningEffort: supportsReasoning,
+            sdkReasoningEffort,
+            vision: supportsVision,
+            contextWindowTokens,
+        },
         limits,
         warnings,
         errors,
@@ -1631,20 +1767,33 @@ export function readConfiguredByokModelsFromEnv(env = process.env, fallback = {}
     const presetDefinition = getByokPresetDefinition(preset);
     const contextWindowTokens =
         fallback.contextWindowTokens ??
-        parsePositiveInteger(effectiveEnv['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'], presetDefinition?.contextWindowTokens ?? 128_000);
+        parsePositiveInteger(
+            effectiveEnv['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'],
+            presetDefinition?.contextWindowTokens ?? 128_000,
+        );
     const supportsReasoning =
         fallback.supportsReasoning ??
-        (parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ?? presetDefinition?.supportsReasoning ?? false);
+        parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_REASONING']) ??
+        presetDefinition?.supportsReasoning ??
+        false;
     const supportsVision =
-        fallback.supportsVision ?? (parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ?? presetDefinition?.supportsVision ?? false);
+        fallback.supportsVision ??
+        parseBoolean(effectiveEnv['COPILOT_BYOK_SUPPORTS_VISION']) ??
+        presetDefinition?.supportsVision ??
+        false;
     const rateLimits = {
-        maxRequestTokens: fallback.maxRequestTokens ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_MAX_REQUEST_TOKENS']),
-        tokensPerMinute: fallback.tokensPerMinute ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_TOKENS_PER_MINUTE']),
-        requestsPerMinute: fallback.requestsPerMinute ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_REQUESTS_PER_MINUTE']),
-        dailyRequests: fallback.dailyRequests ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_DAILY_REQUESTS']),
+        maxRequestTokens:
+            fallback.maxRequestTokens ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_MAX_REQUEST_TOKENS']),
+        tokensPerMinute:
+            fallback.tokensPerMinute ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_TOKENS_PER_MINUTE']),
+        requestsPerMinute:
+            fallback.requestsPerMinute ??
+            parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_REQUESTS_PER_MINUTE']),
+        dailyRequests:
+            fallback.dailyRequests ?? parseOptionalPositiveInteger(effectiveEnv['COPILOT_BYOK_DAILY_REQUESTS']),
     };
 
-    /** @type {Array<string | Record<string, unknown>>} */
+    /** @type {(string | Record<string, unknown>)[]} */
     let items = [];
     const json = effectiveEnv['COPILOT_BYOK_MODELS_JSON'];
     if (json && json.trim()) {
@@ -1664,15 +1813,16 @@ export function readConfiguredByokModelsFromEnv(env = process.env, fallback = {}
     if (items.length === 0 && presetDefinition?.staticModels?.length) items = [...presetDefinition.staticModels];
     if (items.length === 0 && fallback.model) items = [fallback.model];
 
-    return uniqueStrings(items.map((item) => (typeof item === 'string' ? item : modelIdFromUnknown(item) ?? '')))
-        .map((id) => {
+    return uniqueStrings(items.map((item) => (typeof item === 'string' ? item : (modelIdFromUnknown(item) ?? '')))).map(
+        (id) => {
             const objectItem = items.find((item) => typeof item !== 'string' && modelIdFromUnknown(item) === id);
             return createByokModelInfo(
                 objectItem && typeof objectItem !== 'string' ? objectItem : id,
                 { contextWindowTokens, supportsReasoning, supportsVision, ...rateLimits },
                 'static',
             );
-        });
+        },
+    );
 }
 
 /**
@@ -1844,7 +1994,9 @@ export function resolveConfiguredByokSessionOverrides(env = process.env, request
     const state = readConfiguredByokState(env);
     if (!state.enabled) return { enabled: false, ready: false, summary: state.summary };
     if (!state.ready || !state.provider || !state.model) {
-        throw new Error(`[sdk/provider] BYOK is enabled but not ready: ${state.errors.join('; ') || 'invalid configuration'}`);
+        throw new Error(
+            `[sdk/provider] BYOK is enabled but not ready: ${state.errors.join('; ') || 'invalid configuration'}`,
+        );
     }
     let model = requestedModel && requestedModel !== 'auto' ? requestedModel : state.model;
     /** @type {string | null} */

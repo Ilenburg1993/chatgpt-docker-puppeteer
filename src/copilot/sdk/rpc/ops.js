@@ -55,12 +55,13 @@ import { assertRpcSession } from './guards.js';
  * @returns {() => Promise<CompactionCompactResult>}
  */
 function getCompactionMethod(session) {
-    const rpc = /**
-     * @type {{
-     *     history?: { compact?: () => Promise<CompactionCompactResult> };
-     *     compaction?: { compact?: () => Promise<CompactionCompactResult> };
-     * }}
-     */ (session.rpc);
+    const rpc =
+        /**
+         * @type {{
+         *     history?: { compact?: () => Promise<CompactionCompactResult> };
+         *     compaction?: { compact?: () => Promise<CompactionCompactResult> };
+         * }}
+         */ (session.rpc);
     // Usar closure ao invés de bind para clareza de contexto e tipagem correta
     // Guardar referência para validação strict
     if (rpc.history && typeof rpc.history.compact === 'function') {

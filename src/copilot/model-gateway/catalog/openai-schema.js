@@ -8,8 +8,8 @@
  * @module copilot/model-gateway/catalog/openai-schema
  */
 
-import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { explainModelGatewayEligibilityDecision } from '../eligibility/index.js';
+import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
 export const OPENAI_MODEL_OBJECT = 'model';
 export const OPENAI_MODEL_LIST_OBJECT = 'list';
@@ -123,7 +123,8 @@ function findProviderProjection(projection, providerProjections) {
     if (!providerId || !subjectProviderId) return null;
     return (
         providerProjections.find(
-            (candidate) => candidate['providerId'] === providerId && candidate['subjectProviderId'] === subjectProviderId,
+            (candidate) =>
+                candidate['providerId'] === providerId && candidate['subjectProviderId'] === subjectProviderId,
         ) ?? null
     );
 }
@@ -206,7 +207,11 @@ function buildRouteOptionExtension(route) {
 
 /**
  * @param {Record<string, unknown>} projection
- * @param {{ providerProjections?: Record<string, unknown>[]; eligibilityDecisions?: Record<string, unknown>[]; routeOptions?: Record<string, unknown>[] }} [options]
+ * @param {{
+ *     providerProjections?: Record<string, unknown>[];
+ *     eligibilityDecisions?: Record<string, unknown>[];
+ *     routeOptions?: Record<string, unknown>[];
+ * }} [options]
  */
 function buildGatewayExtension(projection, options = {}) {
     const providerProjection = findProviderProjection(projection, options.providerProjections ?? []);
@@ -245,7 +250,11 @@ function buildGatewayExtension(projection, options = {}) {
 
 /**
  * @param {Record<string, unknown>} projection
- * @param {{ providerProjections?: Record<string, unknown>[]; eligibilityDecisions?: Record<string, unknown>[]; routeOptions?: Record<string, unknown>[] }} [options]
+ * @param {{
+ *     providerProjections?: Record<string, unknown>[];
+ *     eligibilityDecisions?: Record<string, unknown>[];
+ *     routeOptions?: Record<string, unknown>[];
+ * }} [options]
  */
 export function toOpenAIModelCatalogEntry(projection, options = {}) {
     const openai = isRecord(projection['openai']) ? projection['openai'] : {};
@@ -260,7 +269,11 @@ export function toOpenAIModelCatalogEntry(projection, options = {}) {
 
 /**
  * @param {Record<string, unknown>[]} projections
- * @param {{ providerProjections?: Record<string, unknown>[]; eligibilityDecisions?: Record<string, unknown>[]; routeOptions?: Record<string, unknown>[] }} [options]
+ * @param {{
+ *     providerProjections?: Record<string, unknown>[];
+ *     eligibilityDecisions?: Record<string, unknown>[];
+ *     routeOptions?: Record<string, unknown>[];
+ * }} [options]
  * @returns {{ object: 'list'; data: ReturnType<typeof toOpenAIModelCatalogEntry>[] }}
  */
 export function toOpenAIModelCatalogList(projections, options = {}) {

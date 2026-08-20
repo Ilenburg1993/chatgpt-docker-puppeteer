@@ -240,24 +240,17 @@ node scripts/healthcheck.js
 
 ## 📦 Ferramentas de Código
 
-### codemods/
+### Codemods históricos de constantes — aposentados
 
-**Propósito**: Transformações automatizadas de código
+A migração antiga de `STATUS_VALUES`, `LOG_CATEGORIES` e `CONNECTION_MODES` foi concluída e os
+codemods baseados em `jscodeshift` foram retirados do workspace ativo. Eles ainda apontavam para
+módulos `.js` que hoje são fontes TypeScript `.ts` e, se reexecutados, podiam gerar imports
+inexistentes. Os artefatos foram preservados na quarentena reversível do MCP apenas para
+rastreabilidade histórica; não fazem parte da toolchain canônica.
 
-**Conteúdo**:
-
-- `convert-status-values.js`: STATUS_VALUES migration
-- `convert-connection-modes.js`: CONNECTION_MODES migration
-- `convert-actor-roles.js`: ActorRole migration
-- `convert-message-types.js`: MessageType migration
-- `convert-action-codes.js`: ActionCode migration
-
-**Uso**:
-
-```bash
-bash scripts/apply-all-codemods.sh # Aplica todas as transformações
-bash scripts/test-codemods.sh      # Testa antes de aplicar
-```
+Transformações sintáticas novas devem reutilizar a policy Babel 8 em
+`src/copilot/infra/parse/babel-policy.js` e somente adotar geração de código quando houver um caso
+de uso atual, testado e explicitamente necessário.
 
 ---
 

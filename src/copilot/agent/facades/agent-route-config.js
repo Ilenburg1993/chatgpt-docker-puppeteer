@@ -15,10 +15,7 @@ import {
     executeModelGatewayRuntimeRouteSwitch,
     readModelGatewayDirectRebindEvidence,
 } from '#copilot/model-gateway';
-import {
-    persistAgentRuntimeStatePartial,
-    readAgentRuntimePersistedStateSync,
-} from './agent-runtime-state.js';
+import { persistAgentRuntimeStatePartial, readAgentRuntimePersistedStateSync } from './agent-runtime-state.js';
 
 /**
  * @param {unknown} value
@@ -59,7 +56,8 @@ function routeUrl(value, field) {
 function routeText(value, field, maxLength) {
     if (value === null || value === undefined || value === '') return null;
     const hasControlCharacter =
-        typeof value === 'string' && [...value].some((character) => character.charCodeAt(0) <= 31 || character.charCodeAt(0) === 127);
+        typeof value === 'string' &&
+        [...value].some((character) => character.charCodeAt(0) <= 31 || character.charCodeAt(0) === 127);
     if (typeof value !== 'string' || value.length > maxLength || hasControlCharacter) {
         throw new Error(`MODEL_GATEWAY_ROUTE_${field}_INVALID`);
     }
@@ -109,8 +107,7 @@ function normalizedRoute(route) {
         directRebindReliability: routeText(route['directRebindReliability'], 'DIRECT_REBIND_RELIABILITY', 80),
         directRebindSupported:
             typeof route['directRebindSupported'] === 'boolean' ? route['directRebindSupported'] : null,
-        directRebindReliable:
-            typeof route['directRebindReliable'] === 'boolean' ? route['directRebindReliable'] : null,
+        directRebindReliable: typeof route['directRebindReliable'] === 'boolean' ? route['directRebindReliable'] : null,
         directConfigRepresentability: routeText(
             route['directConfigRepresentability'],
             'DIRECT_CONFIG_REPRESENTABILITY',
@@ -184,12 +181,12 @@ function ingressRegistryEntryMatchesRoute(entry, route) {
  * @param {import('../agent-context.js').AgentContext} ctx
  * @param {Record<string, unknown>} targetRoute
  * @param {{
- *   idempotencyKey?: string;
- *   timeoutMs?: number;
- *   source?: string;
- *   reattach: (route: Record<string, unknown>) => Promise<import('#copilot/sdk/types').CopilotSession>;
- *   allowActiveDialogLoopReattach?: boolean;
- *   forceApplyDeferred?: boolean;
+ *     idempotencyKey?: string;
+ *     timeoutMs?: number;
+ *     source?: string;
+ *     reattach: (route: Record<string, unknown>) => Promise<import('#copilot/sdk/types').CopilotSession>;
+ *     allowActiveDialogLoopReattach?: boolean;
+ *     forceApplyDeferred?: boolean;
  * }} options
  */
 export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
@@ -215,8 +212,7 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
                           'github-copilot-sdk',
                   ),
                   providerModel: ctx.getModelSnapshot(),
-                  providerProfile:
-                      typeof previousBinding['profile'] === 'string' ? previousBinding['profile'] : null,
+                  providerProfile: typeof previousBinding['profile'] === 'string' ? previousBinding['profile'] : null,
                   baseUrl: typeof previousBinding['baseUrl'] === 'string' ? previousBinding['baseUrl'] : null,
               };
     const normalizedPreviousRoute = normalizedRoute(fallbackRoute);
@@ -310,7 +306,8 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
                       dialogLoopActive: true,
                       sameSessionRequired: true,
                       requiresNewSession: false,
-                      safeContinuation: 'finish_current_turn_then_agent_restarts_transport_and_reattaches_same_session_id',
+                      safeContinuation:
+                          'finish_current_turn_then_agent_restarts_transport_and_reattaches_same_session_id',
                       promotionAuthorization: {
                           authorized: options.source === 'llm-b.model_gateway_route_switch',
                           policy:
@@ -347,9 +344,7 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
                     : providerModel;
             const nativeSdkRoute = providerId === 'github-copilot-sdk';
             const liveProvider = String(
-                Reflect.get(live, '__copilotModelGatewayProviderId') ??
-                    Reflect.get(live, '__copilotByokPreset') ??
-                    '',
+                Reflect.get(live, '__copilotModelGatewayProviderId') ?? Reflect.get(live, '__copilotByokPreset') ?? '',
             );
             const liveModel = String(
                 Reflect.get(live, '__copilotConfiguredModel') ??
@@ -384,9 +379,7 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
         ? ingressRegistryEntryForRoute(normalizedPreviousRoute)
         : null;
     const operationState = String(operationRecord['state'] ?? 'unknown');
-    const operationWarnings = Array.isArray(operationRecord['warnings'])
-        ? operationRecord['warnings'].map(String)
-        : [];
+    const operationWarnings = Array.isArray(operationRecord['warnings']) ? operationRecord['warnings'].map(String) : [];
     const registryWarnings = [];
     let registryReconciliationRequired = operationRecord['reconciliationRequired'] === true;
 
@@ -417,10 +410,9 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
             }
         } else if (targetUsesIngress && targetIngressRegistryEntryAfter) {
             try {
-                defaultModelGatewayIngressRouteRegistry.delete(
-                    targetIngressRegistryEntryAfter.ingressRoute.routeId,
-                    { expectedRevision: targetIngressRegistryEntryAfter.revision },
-                );
+                defaultModelGatewayIngressRouteRegistry.delete(targetIngressRegistryEntryAfter.ingressRoute.routeId, {
+                    expectedRevision: targetIngressRegistryEntryAfter.revision,
+                });
             } catch {
                 registryWarnings.push('rolled_back_ingress_registry_cleanup_revision_conflict');
                 registryReconciliationRequired = true;
@@ -446,20 +438,31 @@ export async function switchAgentRouteTransactional(ctx, targetRoute, options) {
             previousRevision: previousIngressRegistryEntryBefore?.revision ?? null,
             verified: !registryReconciliationRequired,
         },
-        warnings: [
-            ...new Set([
-                ...operationWarnings,
-                ...bindingEvidenceWarnings,
-                ...registryWarnings,
-            ]),
-        ],
+        warnings: [...new Set([...operationWarnings, ...bindingEvidenceWarnings, ...registryWarnings])],
     };
 }
 
 /**
- * @param {{ switchRoute?: (route: Record<string, unknown>, options?: { idempotencyKey?: string; timeoutMs?: number; source?: string; allowActiveDialogLoopReattach?: boolean; forceApplyDeferred?: boolean }) => Promise<Record<string, unknown>> }} runtime
+ * @param {{
+ *     switchRoute?: (
+ *         route: Record<string, unknown>,
+ *         options?: {
+ *             idempotencyKey?: string;
+ *             timeoutMs?: number;
+ *             source?: string;
+ *             allowActiveDialogLoopReattach?: boolean;
+ *             forceApplyDeferred?: boolean;
+ *         },
+ *     ) => Promise<Record<string, unknown>>;
+ * }} runtime
  * @param {Record<string, unknown>} route
- * @param {{ idempotencyKey?: string; timeoutMs?: number; source?: string; allowActiveDialogLoopReattach?: boolean; forceApplyDeferred?: boolean }} [options]
+ * @param {{
+ *     idempotencyKey?: string;
+ *     timeoutMs?: number;
+ *     source?: string;
+ *     allowActiveDialogLoopReattach?: boolean;
+ *     forceApplyDeferred?: boolean;
+ * }} [options]
  */
 export function switchRuntimeRouteTransactional(runtime, route, options = {}) {
     if (typeof runtime.switchRoute !== 'function') throw new Error('AGENT_RUNTIME_ROUTE_SWITCH_UNAVAILABLE');

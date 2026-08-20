@@ -10,7 +10,8 @@ import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.
 
 /**
  * Persistência mínima exigida pelo executor de probes. O executor não depende das demais responsabilidades do catálogo
- * SQLite; manter esta porta estrutural permite stores alternativos e harnesses determinísticos sem herdar a classe inteira.
+ * SQLite; manter esta porta estrutural permite stores alternativos e harnesses determinísticos sem herdar a classe
+ * inteira.
  *
  * @typedef {Pick<SqliteModelGatewayCatalogStore, 'readRuntimeProbeRunRecord' | 'writeRuntimeProbeRun'>} ModelGatewayProbeStore
  */
@@ -43,22 +44,22 @@ import { redactModelGatewayAuditedValue } from '../secrets/index.js';
  * extensible through the Record intersection and are intentionally consumed via Reflect by specialized renderers.
  *
  * @typedef {Record<string, unknown> & {
- *   ok: boolean;
- *   status: string;
- *   providerAttempted: boolean;
- *   elapsedMs: number;
- *   model: string | null;
- *   profile: string | null;
- *   preset: string | null;
- *   providerType: string | null;
- *   deltaCount: number;
- *   deltaChars: number;
- *   finalChars: number;
- *   observedFinalEvent: boolean;
- *   sessionId: string | null;
- *   errors: string[];
- *   warnings: string[];
- *   providerFailure?: ByokProviderFailure | null;
+ *     ok: boolean;
+ *     status: string;
+ *     providerAttempted: boolean;
+ *     elapsedMs: number;
+ *     model: string | null;
+ *     profile: string | null;
+ *     preset: string | null;
+ *     providerType: string | null;
+ *     deltaCount: number;
+ *     deltaChars: number;
+ *     finalChars: number;
+ *     observedFinalEvent: boolean;
+ *     sessionId: string | null;
+ *     errors: string[];
+ *     warnings: string[];
+ *     providerFailure?: ByokProviderFailure | null;
  * }} ModelGatewayExecutableProbeResult
  */
 
@@ -76,8 +77,8 @@ import { redactModelGatewayAuditedValue } from '../secrets/index.js';
  * @property {string} [model]
  * @property {number} [timeoutMs]
  * @property {{
- *   evaluateAdmission?: ModelGatewayProbeAdmissionEvaluator;
- *   classifyProviderFailure?: typeof classifyByokProviderFailure;
+ *     evaluateAdmission?: ModelGatewayProbeAdmissionEvaluator;
+ *     classifyProviderFailure?: typeof classifyByokProviderFailure;
  * }} [deps]
  */
 
@@ -119,7 +120,6 @@ function optionalIdentityString(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
-
 /**
  * @param {unknown} value
  * @returns {number | null}
@@ -127,7 +127,6 @@ function optionalIdentityString(value) {
 function optionalFiniteNumber(value) {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
-
 
 /**
  * @param {ModelGatewayExecutableProbeResult} probe
@@ -254,8 +253,22 @@ function persistedStringArray(value) {
 function projectPersistedProbeResult(result) {
     if (!result) return null;
     const requiredKeys = [
-        'ok', 'status', 'providerAttempted', 'elapsedMs', 'model', 'profile', 'preset', 'providerType',
-        'deltaCount', 'deltaChars', 'finalChars', 'observedFinalEvent', 'sessionId', 'errors', 'warnings', 'providerFailure',
+        'ok',
+        'status',
+        'providerAttempted',
+        'elapsedMs',
+        'model',
+        'profile',
+        'preset',
+        'providerType',
+        'deltaCount',
+        'deltaChars',
+        'finalChars',
+        'observedFinalEvent',
+        'sessionId',
+        'errors',
+        'warnings',
+        'providerFailure',
     ];
     if (!requiredKeys.every((key) => Object.hasOwn(result, key))) return null;
     const status = optionalIdentityString(result['status']);
@@ -339,23 +352,31 @@ export async function readModelGatewayProbeOperation(idempotencyKey, options = {
 
 /**
  * @param {{
- *   kind: string;
- *   env?: Record<string, string | undefined>;
- *   model?: string | null;
- *   timeoutMs?: number;
- *   idempotencyKey: string;
- *   source?: string;
- *   identity?: { routeProfile?: string | null; providerId?: string | null; providerModel?: string | null };
- *   deps?: {
- *     sqliteStore?: ModelGatewayProbeStore;
- *     evaluateAdmission?: ModelGatewayProbeAdmissionEvaluator;
- *     classifyProviderFailure?: typeof classifyByokProviderFailure;
- *     emit?: (event: Record<string, unknown>) => void;
- *     now?: () => number;
- *     runProbe?: (options: ModelGatewayExecutableProbeOptions) => Promise<ModelGatewayExecutableProbeResult>;
- *     recordHealth?: (kind: string, probe: ModelGatewayExecutableProbeResult, identity?: Record<string, unknown> | null) => Promise<boolean>;
- *     buildEvent?: (input: { probeKind: string; result: ModelGatewayExecutableProbeResult; providerAttempted: boolean }) => Record<string, unknown>;
- *   };
+ *     kind: string;
+ *     env?: Record<string, string | undefined>;
+ *     model?: string | null;
+ *     timeoutMs?: number;
+ *     idempotencyKey: string;
+ *     source?: string;
+ *     identity?: { routeProfile?: string | null; providerId?: string | null; providerModel?: string | null };
+ *     deps?: {
+ *         sqliteStore?: ModelGatewayProbeStore;
+ *         evaluateAdmission?: ModelGatewayProbeAdmissionEvaluator;
+ *         classifyProviderFailure?: typeof classifyByokProviderFailure;
+ *         emit?: (event: Record<string, unknown>) => void;
+ *         now?: () => number;
+ *         runProbe?: (options: ModelGatewayExecutableProbeOptions) => Promise<ModelGatewayExecutableProbeResult>;
+ *         recordHealth?: (
+ *             kind: string,
+ *             probe: ModelGatewayExecutableProbeResult,
+ *             identity?: Record<string, unknown> | null,
+ *         ) => Promise<boolean>;
+ *         buildEvent?: (input: {
+ *             probeKind: string;
+ *             result: ModelGatewayExecutableProbeResult;
+ *             providerAttempted: boolean;
+ *         }) => Record<string, unknown>;
+ *     };
  * }} input
  */
 export async function executeModelGatewayProbe(input) {

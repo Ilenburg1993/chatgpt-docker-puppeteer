@@ -2,7 +2,8 @@
 
 ## Validadores oficiais desta trilha
 
-O escopo informado é `src/copilot`, com Node 24+ ESM e typecheck strict. Os validadores a preservar são:
+O escopo informado é `src/copilot`, com Node 24+ ESM e typecheck strict. Os validadores a preservar
+são:
 
 ```bash
 npm run typecheck:strict:src.copilot
@@ -86,9 +87,9 @@ Estado após transformações em andamento:
 src/copilot/infra: files 99 cycles 0
 ```
 
-O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e fazendo parser/index
-dependerem dessa porta baixa em vez de `io-engine.js`. A extração avançou com `read-lines.js` e `read-chunks.js`,
-mantendo leitura por linhas fora da facade compatível.
+O ciclo foi removido extraindo leitura textual baixa para `src/copilot/infra/io/fs/read-text.js` e
+fazendo parser/index dependerem dessa porta baixa em vez de `io-engine.js`. A extração avançou com
+`read-lines.js` e `read-chunks.js`, mantendo leitura por linhas fora da facade compatível.
 
 ## Imports diretos de tools para infra interna
 
@@ -105,8 +106,8 @@ src/copilot/tools/file/scope-tools.js -> #copilot/infra/io-session-scope
 src/copilot/tools/web/web-tools.js -> ../../infra/io-observability.js
 ```
 
-`src/copilot/tools/file/index-tools.js` já usa `../../infra/index.js`, que é melhor, mas ainda depende de um barrel
-de infra largo e flat.
+`src/copilot/tools/file/index-tools.js` já usa `../../infra/index.js`, que é melhor, mas ainda
+depende de um barrel de infra largo e flat.
 
 Estado após transformações iniciais:
 
@@ -163,29 +164,37 @@ Tools:
 - module-map de infra completo: coberto.
 - facades públicas cache/testing: coberto.
 - índice FTS/symbol com `maxResults`: coberto.
-- subdomínios baixos `shared/`, `policy/`, `scan/`: cobertos por typecheck, testes focados e module-map.
+- subdomínios baixos `shared/`, `policy/`, `scan/`: cobertos por typecheck, testes focados e
+  module-map.
 - `list_directory` com cursor: coberto.
-- `policy/output-window` com cursor de linhas e items: coberto por `test_output_window_policy.spec.js`.
-- `policy/budgets` com budgets de search/subprocesso e facade pública: coberto por `test_policy_budgets.spec.js`,
-  contrato de boundary, typecheck strict e lint.
+- `policy/output-window` com cursor de linhas e items: coberto por
+  `test_output_window_policy.spec.js`.
+- `policy/budgets` com budgets de search/subprocesso e facade pública: coberto por
+  `test_policy_budgets.spec.js`, contrato de boundary, typecheck strict e lint.
 - `policy/path-resource` com resource keys, workspace candidates e byte nulo: coberto por
-  `test_policy_path_resource.spec.js`, `test_locks.spec.js`, contrato de boundary e typecheck strict.
+  `test_policy_path_resource.spec.js`, `test_locks.spec.js`, contrato de boundary e typecheck
+  strict.
 - `policy/capabilities` e `policy/risk` com capabilities canônicas e risco de mutação: cobertos por
   `test_policy_capabilities_risk.spec.js` e `test_write_tools.spec.js`.
 - `storage/` sem dependência de `io-engine`: coberto.
 - `parse/` sem dependências altas de IO/cache/session: coberto.
 - operation envelope em write tools: coberto.
-- `io/fs` expandido para bytes/texto/linhas/chunks/stat/mkdir/append/remove/copy/move: coberto por testes focados de
-  engine/write/storage, `test_io_fs_read_chunks.spec.js` e typecheck strict.
+- `io/fs` expandido para bytes/texto/linhas/chunks/stat/mkdir/append/remove/copy/move: coberto por
+  testes focados de engine/write/storage, `test_io_fs_read_chunks.spec.js` e typecheck strict.
 - `io/patch` com patch/diff textual puro: coberto por `test_io_patch.spec.js`.
-- `io/search` com helpers de índice, grep fallback, busca simbólica e paginação de resultados: coberto por
-  `test_io_search.spec.js`.
+- `io/search` com helpers de índice, grep fallback, busca simbólica e paginação de resultados:
+  coberto por `test_io_search.spec.js`.
 - `io/invalidation` com bus, eventos normalizados e helper de tiers L1/L2: coberto por
   `test_io_invalidation_bus.spec.js`, `test_io_engine.spec.js`, typecheck strict e `madge`.
-- `cache/l1` com chaves canônicas de L1: coberto por `test_cache_l1_keys.spec.js` e `test_io_cache.spec.js`.
-- limpeza awaitable de cache persistente de modelos SDK: estabiliza `test_sdk_models.spec.js`/`test_sdk_client.spec.js`
-  quando a suíte completa reutiliza cache L2 entre testes.
-- `index-store/sqlite` com schema, paths, query e chunks puros: coberto por `test_index_store_sqlite.spec.js`.
-- `expectedHash` SHA-256 em write/patch e `dryRun` em patch: cobertos por `test_io_engine.spec.js` e contrato de tools.
-- snapshots hash/bytes em delete/copy/move: cobertos por `test_io_engine.spec.js` e `test_write_tools.spec.js`.
+- `cache/l1` com chaves canônicas de L1: coberto por `test_cache_l1_keys.spec.js` e
+  `test_io_cache.spec.js`.
+- limpeza awaitable de cache persistente de modelos SDK: estabiliza
+  `test_sdk_models.spec.js`/`test_sdk_client.spec.js` quando a suíte completa reutiliza cache L2
+  entre testes.
+- `index-store/sqlite` com schema, paths, query e chunks puros: coberto por
+  `test_index_store_sqlite.spec.js`.
+- `expectedHash` SHA-256 em write/patch e `dryRun` em patch: cobertos por `test_io_engine.spec.js` e
+  contrato de tools.
+- snapshots hash/bytes em delete/copy/move: cobertos por `test_io_engine.spec.js` e
+  `test_write_tools.spec.js`.
 - audit log JSONL opt-in de runtime: coberto por `test_runtime_audit_log.spec.js`.

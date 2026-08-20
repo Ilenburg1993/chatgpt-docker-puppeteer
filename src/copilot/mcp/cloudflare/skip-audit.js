@@ -3,8 +3,8 @@
  * Read-only Cloudflare skip/non-interference audit for the Copilot MCP hostname.
  *
  * This module does not mutate Cloudflare. It inspects rulesets that can skip or challenge Cloudflare products and
- * combines that with MCP-specific configuration findings to decide whether an MCP skip rule is necessary, or whether
- * a narrower configuration rule should be preferred first.
+ * combines that with MCP-specific configuration findings to decide whether an MCP skip rule is necessary, or whether a
+ * narrower configuration rule should be preferred first.
  *
  * @module copilot/mcp/cloudflare/skip-audit
  */
@@ -24,15 +24,7 @@ const SKIP_AUDIT_PHASES = [
 ];
 
 const MCP_DYNAMIC_PATHS = ['/mcp', '/oauth/', '/.well-known/', '/health'];
-const SKIPPABLE_PRODUCTS = [
-    'bic',
-    'securityLevel',
-    'uaBlock',
-    'zoneLockdown',
-    'waf',
-    'botFightMode',
-    'rateLimit',
-];
+const SKIPPABLE_PRODUCTS = ['bic', 'securityLevel', 'uaBlock', 'zoneLockdown', 'waf', 'botFightMode', 'rateLimit'];
 const NON_SKIPPABLE_OR_CONFIG_FIRST_PRODUCTS = ['rocketLoader', 'rum', 'emailObfuscation', 'zaraz'];
 const DEFAULT_SKIP_AUDIT_CACHE_TTL_MS = 60_000;
 
@@ -105,11 +97,10 @@ export async function auditCloudflareSkipPosture(options = {}) {
     }
 
     const cacheKey = buildSkipAuditCacheKey(auditConfig);
-    return skipAuditCache.getOrLoad(
-        cacheKey,
-        () => auditCloudflareSkipPostureUncached(auditConfig, options),
-        { forceRefresh: options.forceRefresh === true, ttlMs: readSkipAuditCacheTtlMs(options.cacheTtlMs) },
-    );
+    return skipAuditCache.getOrLoad(cacheKey, () => auditCloudflareSkipPostureUncached(auditConfig, options), {
+        forceRefresh: options.forceRefresh === true,
+        ttlMs: readSkipAuditCacheTtlMs(options.cacheTtlMs),
+    });
 }
 
 /**
@@ -181,7 +172,13 @@ async function auditCloudflareSkipPostureUncached(auditConfig, options) {
  * @param {SkipRuleSummary[]} skipRules
  * @param {Record<string, unknown> & { ok: boolean }} configBaseline
  * @param {{ publicHostname: string }} context
- * @returns {{ critical: string[]; warnings: string[]; findings: Record<string, unknown>; recommendation: Record<string, unknown>; nextActions: string[] }}
+ * @returns {{
+ *     critical: string[];
+ *     warnings: string[];
+ *     findings: Record<string, unknown>;
+ *     recommendation: Record<string, unknown>;
+ *     nextActions: string[];
+ * }}
  */
 export function analyzeSkipPosture(skipRules, configBaseline, context) {
     /** @type {string[]} */
@@ -203,24 +200,37 @@ export function analyzeSkipPosture(skipRules, configBaseline, context) {
     const unknownSettings = Number(configFindings['unknownSettings'] ?? 0);
 
     if (broadSkipRules.length > 0) {
-        critical.push('Detected an enabled MCP-scoped skip rule that skips all products or rate limiting; this may bypass intended protections.');
+        critical.push(
+            'Detected an enabled MCP-scoped skip rule that skips all products or rate limiting; this may bypass intended protections.',
+        );
     }
     if (dynamicSkipRules.length === 0) {
         warnings.push('No MCP/OAuth-scoped skip rule exists for BIC/Security Level/WAF products.');
     }
     if (productSkipCoverage.has('rateLimit') || productSkipCoverage.has('http_ratelimit')) {
-        critical.push('Detected a skip rule that may skip rate limiting for MCP routes; rate limits should not be broadly skipped.');
+        critical.push(
+            'Detected a skip rule that may skip rate limiting for MCP routes; rate limits should not be broadly skipped.',
+        );
     }
 
     const skipNeeded = potentiallyInterfering > 0 && !productSkipCoverage.has('bic') ? 'maybe' : 'not-yet';
     const configRulePreferred = needsExplicitOff > 0 || responseBufferingRules === 0 || bicOffRules === 0;
     const rationale = [];
-    if (potentiallyInterfering > 0) rationale.push('Browser Integrity Check or similarly interfering product appears enabled zone-wide.');
-    if (needsExplicitOff > 0) rationale.push('Browser/site optimization products are enabled and should be explicitly disabled for MCP/OAuth routes.');
+    if (potentiallyInterfering > 0)
+        rationale.push('Browser Integrity Check or similarly interfering product appears enabled zone-wide.');
+    if (needsExplicitOff > 0)
+        rationale.push(
+            'Browser/site optimization products are enabled and should be explicitly disabled for MCP/OAuth routes.',
+        );
     if (configRulesCount === 0) rationale.push('No http_config_settings rules currently scope MCP/OAuth behavior.');
-    if (configRulesCount > 0 && bicOffRules > 0 && responseBufferingRules > 0) rationale.push('A scoped http_config_settings passthrough rule already exists; prefer evidence-based skip only if Cloudflare still challenges MCP traffic.');
-    if (responseBufferingRules === 0) rationale.push('No response_body_buffering=none rule currently protects /mcp streaming/SSE.');
-    if (unknownSettings > 0) rationale.push('Some products could not be determined by the current API/token and remain audit gaps.');
+    if (configRulesCount > 0 && bicOffRules > 0 && responseBufferingRules > 0)
+        rationale.push(
+            'A scoped http_config_settings passthrough rule already exists; prefer evidence-based skip only if Cloudflare still challenges MCP traffic.',
+        );
+    if (responseBufferingRules === 0)
+        rationale.push('No response_body_buffering=none rule currently protects /mcp streaming/SSE.');
+    if (unknownSettings > 0)
+        rationale.push('Some products could not be determined by the current API/token and remain audit gaps.');
     if (broadSkipRules.length > 0) rationale.push('Existing skip posture is too broad for MCP safety.');
 
     return {
@@ -289,7 +299,11 @@ async function readSkipRules(apiToken, zoneId, publicHostname, options) {
             }
         }
         return {
-            rules: rules.sort((left, right) => `${left.phase ?? ''}:${left.description ?? ''}`.localeCompare(`${right.phase ?? ''}:${right.description ?? ''}`)),
+            rules: rules.sort((left, right) =>
+                `${left.phase ?? ''}:${left.description ?? ''}`.localeCompare(
+                    `${right.phase ?? ''}:${right.description ?? ''}`,
+                ),
+            ),
             warnings: [],
             permissionGaps: [],
         };
@@ -327,10 +341,18 @@ function simplifySkipRule(rule, phase, publicHostname) {
         phases,
         actionParameterKeys: Object.keys(actionParameters).sort((left, right) => left.localeCompare(right)),
         hostScoped: expressionMentionsHost(expression, publicHostname),
-        dynamicMcpScoped: expressionMentionsHost(expression, publicHostname) && expressionMentionsAnyPath(expression, MCP_DYNAMIC_PATHS),
-        mcpEndpointScoped: expressionMentionsHost(expression, publicHostname) && expressionMentionsAnyPath(expression, ['/mcp']),
-        skipsRateLimit: products.includes('rateLimit') || products.includes('http_ratelimit') || phases.includes('http_ratelimit'),
-        skipsAllProducts: products.length === 0 && phases.length === 0 && typeof record['action'] === 'string' && record['action'] === 'skip',
+        dynamicMcpScoped:
+            expressionMentionsHost(expression, publicHostname) &&
+            expressionMentionsAnyPath(expression, MCP_DYNAMIC_PATHS),
+        mcpEndpointScoped:
+            expressionMentionsHost(expression, publicHostname) && expressionMentionsAnyPath(expression, ['/mcp']),
+        skipsRateLimit:
+            products.includes('rateLimit') || products.includes('http_ratelimit') || phases.includes('http_ratelimit'),
+        skipsAllProducts:
+            products.length === 0 &&
+            phases.length === 0 &&
+            typeof record['action'] === 'string' &&
+            record['action'] === 'skip',
     };
 }
 
@@ -399,24 +421,57 @@ function buildEmptyFindings(publicHostname) {
 /**
  * @param {import('cloudflare').default} client
  * @param {{ zoneId: string | undefined; accountId: string | undefined; zone: string }} config
- * @returns {Promise<{ zoneId: string | null; source: string | null; zoneName: string; zoneIdRedaction: string | null; warnings: string[] }>}
+ * @returns {Promise<{
+ *     zoneId: string | null;
+ *     source: string | null;
+ *     zoneName: string;
+ *     zoneIdRedaction: string | null;
+ *     warnings: string[];
+ * }>}
  */
 async function resolveZoneId(client, config) {
     const configuredZoneId = String(config.zoneId ?? '').trim();
     if (configuredZoneId) {
-        return { zoneId: configuredZoneId, source: 'configured:CLOUDFLARE_ZONE_ID', zoneName: config.zone, zoneIdRedaction: redactSecret(configuredZoneId), warnings: [] };
+        return {
+            zoneId: configuredZoneId,
+            source: 'configured:CLOUDFLARE_ZONE_ID',
+            zoneName: config.zone,
+            zoneIdRedaction: redactSecret(configuredZoneId),
+            warnings: [],
+        };
     }
     try {
-        const query = typeof config.accountId === 'string' && config.accountId ? { name: config.zone, account: { id: config.accountId } } : { name: config.zone };
+        const query =
+            typeof config.accountId === 'string' && config.accountId
+                ? { name: config.zone, account: { id: config.accountId } }
+                : { name: config.zone };
         for await (const zone of client.zones.list(query)) {
             const record = asRecord(zone);
             if (record['name'] === config.zone && typeof record['id'] === 'string') {
-                return { zoneId: record['id'], source: 'cloudflare:zones.list', zoneName: config.zone, zoneIdRedaction: redactSecret(record['id']), warnings: [] };
+                return {
+                    zoneId: record['id'],
+                    source: 'cloudflare:zones.list',
+                    zoneName: config.zone,
+                    zoneIdRedaction: redactSecret(record['id']),
+                    warnings: [],
+                };
             }
         }
-        return { zoneId: null, source: null, zoneName: config.zone, zoneIdRedaction: null, warnings: [`Cloudflare zone ${config.zone} was not found by zones.list.`] };
+        return {
+            zoneId: null,
+            source: null,
+            zoneName: config.zone,
+            zoneIdRedaction: null,
+            warnings: [`Cloudflare zone ${config.zone} was not found by zones.list.`],
+        };
     } catch (error) {
-        return { zoneId: null, source: null, zoneName: config.zone, zoneIdRedaction: null, warnings: [`Could not resolve Cloudflare zone ID: ${sanitizeError(error)}`] };
+        return {
+            zoneId: null,
+            source: null,
+            zoneName: config.zone,
+            zoneIdRedaction: null,
+            warnings: [`Could not resolve Cloudflare zone ID: ${sanitizeError(error)}`],
+        };
     }
 }
 
@@ -444,7 +499,12 @@ function buildSkipAuditCacheKey(config) {
  * @returns {string[]}
  */
 function extractStringArray(value) {
-    return Array.isArray(value) ? value.filter((item) => typeof item === 'string').map((item) => item.trim()).filter(Boolean) : [];
+    return Array.isArray(value)
+        ? value
+              .filter((item) => typeof item === 'string')
+              .map((item) => item.trim())
+              .filter(Boolean)
+        : [];
 }
 
 /**
@@ -453,7 +513,9 @@ function extractStringArray(value) {
  * @returns {boolean}
  */
 function expressionMentionsHost(expression, hostname) {
-    return String(expression ?? '').toLowerCase().includes(hostname.toLowerCase());
+    return String(expression ?? '')
+        .toLowerCase()
+        .includes(hostname.toLowerCase());
 }
 
 /**
@@ -471,11 +533,18 @@ function expressionMentionsAnyPath(expression, paths) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
- * @param {{ apiToken?: string | undefined; accountId?: string | undefined; zoneId?: string | undefined; credentialSources: string[] }} config
+ * @param {{
+ *     apiToken?: string | undefined;
+ *     accountId?: string | undefined;
+ *     zoneId?: string | undefined;
+ *     credentialSources: string[];
+ * }} config
  * @returns {Record<string, unknown>}
  */
 function summarizeCredentials(config) {

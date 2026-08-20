@@ -2,18 +2,14 @@
 /**
  * CLI entrypoint for the Copilot MCP server.
  *
- * This file is intentionally separate from index.js so process managers can start
- * a concrete transport without importing legacy startup paths. Stdio bootstrap
- * keeps stdout reserved for JSON-RPC frames; HTTP/1.1 and HTTP/2 return a Node
- * server instance that can be shut down by SIGINT/SIGTERM.
+ * This file is intentionally separate from index.js so process managers can start a concrete transport without
+ * importing legacy startup paths. Stdio bootstrap keeps stdout reserved for JSON-RPC frames; HTTP/1.1 and HTTP/2 return
+ * a Node server instance that can be shut down by SIGINT/SIGTERM.
  *
  * @module copilot/mcp/cli
  */
 
-import {
-    enableCopilotNodeCompileCache,
-    flushCopilotNodeCompileCache,
-} from '#copilot/infra/public/node-runtime';
+import { enableCopilotNodeCompileCache, flushCopilotNodeCompileCache } from '#copilot/infra/public/node-runtime';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
@@ -37,7 +33,11 @@ const SHUTDOWN_GRACE_MS = 5000;
 
 /**
  * @typedef {'http' | 'http2' | 'stdio'} McpCliTransport
- * @typedef {import('node:http').Server | import('node:https').Server | import('node:http2').Http2Server | import('node:http2').Http2SecureServer} ClosableMcpServer
+ *
+ * @typedef {import('node:http').Server
+ *     | import('node:https').Server
+ *     | import('node:http2').Http2Server
+ *     | import('node:http2').Http2SecureServer} ClosableMcpServer
  */
 
 /**
@@ -139,7 +139,11 @@ function installHttpShutdownHandlers(server, transport, logMcp) {
         process.exitCode = 0;
         logMcp('INFO', 'Stopping MCP HTTP server.', { transport, signal });
         const timeout = setTimeout(() => {
-            logMcp('ERROR', 'Timed out while stopping MCP HTTP server.', { transport, signal, timeoutMs: SHUTDOWN_GRACE_MS });
+            logMcp('ERROR', 'Timed out while stopping MCP HTTP server.', {
+                transport,
+                signal,
+                timeoutMs: SHUTDOWN_GRACE_MS,
+            });
             process.exit(1);
         }, SHUTDOWN_GRACE_MS);
         timeout.unref();
@@ -161,17 +165,18 @@ function installHttpShutdownHandlers(server, transport, logMcp) {
 }
 
 /**
- * Some legacy startup paths still write diagnostics to stdout while modules are
- * imported. Stdio MCP reserves stdout for JSON-RPC frames, so bootstrap noise is
- * redirected to stderr until the transport takes ownership of stdout.
+ * Some legacy startup paths still write diagnostics to stdout while modules are imported. Stdio MCP reserves stdout for
+ * JSON-RPC frames, so bootstrap noise is redirected to stderr until the transport takes ownership of stdout.
  *
  * @returns {() => void}
  */
 function redirectStdoutDuringBootstrap() {
     const originalWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = /** @type {typeof process.stdout.write} */ ((chunk, encoding, callback) => {
-        return process.stderr.write(chunk, encoding, callback);
-    });
+    process.stdout.write = /** @type {typeof process.stdout.write} */ (
+        (chunk, encoding, callback) => {
+            return process.stderr.write(chunk, encoding, callback);
+        }
+    );
     return () => {
         process.stdout.write = originalWrite;
     };

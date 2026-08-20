@@ -8,13 +8,13 @@
  * @module copilot/model-gateway/catalog/importer-runner
  */
 
-import { createCatalogImportRun, createSanitizedRawPayloadRef } from './import-runs.js';
 import {
     MODEL_GATEWAY_CATALOG_CONFIDENCE,
     MODEL_GATEWAY_CATALOG_SCHEMA_VERSION,
     createProviderAccountOverlay,
     createProviderCatalogSource,
 } from './contracts.js';
+import { createCatalogImportRun, createSanitizedRawPayloadRef } from './import-runs.js';
 import { classifyModelGatewayCatalogImporterFailure } from './importer-failures.js';
 import { createModelGatewayCatalogSnapshotId } from './json-catalog-store.js';
 
@@ -31,7 +31,7 @@ import { createModelGatewayCatalogSnapshotId } from './json-catalog-store.js';
  * Canonical snapshot produced by one importer batch. Unlike a stored snapshot, every populated collection below comes
  * directly from a validated catalog factory in this process; no persisted JSON is promoted into these types.
  *
- * @template {CatalogRouteOption} [TRouteOption=CatalogRouteOption]
+ * @template {CatalogRouteOption} [TRouteOption=CatalogRouteOption] Default is `CatalogRouteOption`
  * @typedef {object} FreshCatalogImporterSnapshot
  * @property {number} schemaVersion
  * @property {string} snapshotId
@@ -53,9 +53,9 @@ import { createModelGatewayCatalogSnapshotId } from './json-catalog-store.js';
  */
 
 /**
- * @template [TRaw=unknown]
- * @template [TRow=unknown]
- * @template {CatalogRouteOption} [TRouteOption=CatalogRouteOption]
+ * @template [TRaw=unknown] Default is `unknown`
+ * @template [TRow=unknown] Default is `unknown`
+ * @template {CatalogRouteOption} [TRouteOption=CatalogRouteOption] Default is `CatalogRouteOption`
  * @typedef {object} CatalogImporter
  * @property {string} id
  * @property {string} providerId
@@ -68,11 +68,23 @@ import { createModelGatewayCatalogSnapshotId } from './json-catalog-store.js';
  * @property {number} [ttlSeconds]
  * @property {() => Promise<TRaw> | TRaw} fetchRaw
  * @property {(raw: TRaw) => Promise<TRow[]> | TRow[]} parseRows
- * @property {(rows: TRow[], context: CatalogImporterContext) => Promise<CatalogModelEvidence[]> | CatalogModelEvidence[]} toEvidenceFacts
- * @property {(rows: TRow[], context: CatalogImporterContext) => Promise<CatalogProviderEvidence[]> | CatalogProviderEvidence[]} [toProviderEvidenceFacts]
+ * @property {(
+ *     rows: TRow[],
+ *     context: CatalogImporterContext,
+ * ) => Promise<CatalogModelEvidence[]> | CatalogModelEvidence[]} toEvidenceFacts
+ * @property {(
+ *     rows: TRow[],
+ *     context: CatalogImporterContext,
+ * ) => Promise<CatalogProviderEvidence[]> | CatalogProviderEvidence[]} [toProviderEvidenceFacts]
  * @property {(rows: TRow[], context: CatalogImporterContext) => Promise<TRouteOption[]> | TRouteOption[]} [toRouteOptions]
- * @property {(rows: TRow[], context: CatalogImporterContext) => Promise<CatalogAccountOverlay[]> | CatalogAccountOverlay[]} [toAccountOverlays]
- * @property {(error: unknown, context: CatalogImporterContext) => Promise<CatalogAccountOverlay[]> | CatalogAccountOverlay[]} [toFailureAccountOverlays]
+ * @property {(
+ *     rows: TRow[],
+ *     context: CatalogImporterContext,
+ * ) => Promise<CatalogAccountOverlay[]> | CatalogAccountOverlay[]} [toAccountOverlays]
+ * @property {(
+ *     error: unknown,
+ *     context: CatalogImporterContext,
+ * ) => Promise<CatalogAccountOverlay[]> | CatalogAccountOverlay[]} [toFailureAccountOverlays]
  */
 
 /**
@@ -88,7 +100,6 @@ import { createModelGatewayCatalogSnapshotId } from './json-catalog-store.js';
 export function defineCatalogImporter(importer) {
     return importer;
 }
-
 
 /**
  * @typedef {object} CatalogImporterProgressEvent
@@ -124,7 +135,13 @@ function errorMessage(error) {
  * @returns {string}
  */
 function idPart(value) {
-    return value.trim().toLowerCase().replace(/[^a-z0-9_.:-]+/gu, '-').replace(/^-+|-+$/gu, '') || 'unknown';
+    return (
+        value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9_.:-]+/gu, '-')
+            .replace(/^-+|-+$/gu, '') || 'unknown'
+    );
 }
 
 /**
@@ -175,7 +192,11 @@ function defaultSecretRef(importer) {
  * @returns {boolean}
  */
 function failureSourceCanProduceOverlay(sourceKind) {
-    return sourceKind === 'local_daemon' || sourceKind === 'authenticated_api' || sourceKind === 'authenticated_account_api';
+    return (
+        sourceKind === 'local_daemon' ||
+        sourceKind === 'authenticated_api' ||
+        sourceKind === 'authenticated_account_api'
+    );
 }
 
 /**
@@ -211,7 +232,9 @@ function createDefaultFailureAccountOverlays(importer, error, source) {
             secretRef: defaultSecretRef(importer) ?? undefined,
             sourceId,
             sourceKind: importer.sourceKind,
-            confidence: localDaemon ? MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG : MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
+            confidence: localDaemon
+                ? MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG
+                : MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
             quota: creditsExhausted ? { remainingCreditsUsd: 0 } : {},
             rateLimits: rateLimited
                 ? {
@@ -294,7 +317,7 @@ function emitProgress(onProgress, event) {
  * @param {TExisting[]} records
  * @param {TAddition[]} additions
  * @param {(record: TExisting | TAddition) => string} key
- * @returns {Array<TExisting | TAddition>}
+ * @returns {(TExisting | TAddition)[]}
  */
 function upsertMany(records, additions, key) {
     /** @type {Map<string, TExisting | TAddition>} */
@@ -310,14 +333,16 @@ function upsertMany(records, additions, key) {
 function accountOverlayKey(overlay) {
     const explicit = Reflect.get(overlay, 'accountOverlayId');
     if (typeof explicit === 'string' && explicit) return explicit;
-    return [
-        Reflect.get(overlay, 'providerId'),
-        Reflect.get(overlay, 'accountScope'),
-        Reflect.get(overlay, 'secretRef'),
-        Reflect.get(overlay, 'sourceId'),
-    ]
-        .filter((item) => typeof item === 'string' && item)
-        .join(':') || JSON.stringify(overlay);
+    return (
+        [
+            Reflect.get(overlay, 'providerId'),
+            Reflect.get(overlay, 'accountScope'),
+            Reflect.get(overlay, 'secretRef'),
+            Reflect.get(overlay, 'sourceId'),
+        ]
+            .filter((item) => typeof item === 'string' && item)
+            .join(':') || JSON.stringify(overlay)
+    );
 }
 
 /**
@@ -325,15 +350,17 @@ function accountOverlayKey(overlay) {
  * @returns {string}
  */
 function routeOptionKey(option) {
-    return [
-        Reflect.get(option, 'providerId'),
-        Reflect.get(option, 'providerModel'),
-        Reflect.get(option, 'routeProfile') ?? 'default',
-        Reflect.get(option, 'selectorKind'),
-        Reflect.get(option, 'selectorSyntax'),
-    ]
-        .filter((item) => typeof item === 'string' && item)
-        .join(':') || JSON.stringify(option);
+    return (
+        [
+            Reflect.get(option, 'providerId'),
+            Reflect.get(option, 'providerModel'),
+            Reflect.get(option, 'routeProfile') ?? 'default',
+            Reflect.get(option, 'selectorKind'),
+            Reflect.get(option, 'selectorSyntax'),
+        ]
+            .filter((item) => typeof item === 'string' && item)
+            .join(':') || JSON.stringify(option)
+    );
 }
 
 /**
@@ -432,7 +459,9 @@ export async function runCatalogImporters(input = {}) {
                 rowCount: rows.length,
             });
             const context = { source, rawPayloadRef: rawRef.rawPayloadRef };
-            providerEvidences = importer.toProviderEvidenceFacts ? await importer.toProviderEvidenceFacts(rows, context) : [];
+            providerEvidences = importer.toProviderEvidenceFacts
+                ? await importer.toProviderEvidenceFacts(rows, context)
+                : [];
             evidences = await importer.toEvidenceFacts(rows, context);
             routeOptions = importer.toRouteOptions ? await importer.toRouteOptions(rows, context) : [];
             accountOverlays = importer.toAccountOverlays ? await importer.toAccountOverlays(rows, context) : [];
@@ -484,7 +513,9 @@ export async function runCatalogImporters(input = {}) {
                 rowCount: 0,
                 errors: [errorMessage(error), ...failureOverlays.errors],
             });
-            const errors = Array.isArray(run['errors']) ? run['errors'].map((item) => String(item)) : ['unknown catalog importer error'];
+            const errors = Array.isArray(run['errors'])
+                ? run['errors'].map((item) => String(item))
+                : ['unknown catalog importer error'];
             emitProgress(input.onProgress, {
                 ...baseProgress,
                 phase: 'importer_failed',
@@ -499,15 +530,17 @@ export async function runCatalogImporters(input = {}) {
         snapshot = {
             ...snapshot,
             sources: upsertMany(snapshot.sources, [source], (item) => String(item['id'])),
-            providerEvidences: upsertMany(
-                snapshot.providerEvidences,
-                providerEvidences,
-                (item) => String(item['evidenceId'] ?? JSON.stringify(item)),
+            providerEvidences: upsertMany(snapshot.providerEvidences, providerEvidences, (item) =>
+                String(item['evidenceId'] ?? JSON.stringify(item)),
             ),
-            evidences: upsertMany(snapshot.evidences, evidences, (item) => String(item['evidenceId'] ?? JSON.stringify(item))),
+            evidences: upsertMany(snapshot.evidences, evidences, (item) =>
+                String(item['evidenceId'] ?? JSON.stringify(item)),
+            ),
             routeOptions: upsertMany(snapshot.routeOptions, routeOptions, routeOptionKey),
             accountOverlays: upsertMany(snapshot.accountOverlays, accountOverlays, accountOverlayKey),
-            rawPayloadRefs: upsertMany(snapshot.rawPayloadRefs, rawPayloadRefs, (item) => String(item['rawPayloadRef'])),
+            rawPayloadRefs: upsertMany(snapshot.rawPayloadRefs, rawPayloadRefs, (item) =>
+                String(item['rawPayloadRef']),
+            ),
             importRuns: [...snapshot.importRuns, run],
         };
     }

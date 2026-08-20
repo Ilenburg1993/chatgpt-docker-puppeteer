@@ -1,28 +1,32 @@
 # Auditoria Arquitetural Canônica — `src/copilot/`
 
-> **Data:** 2026-05-10
-> **Auditor:** Kilo (automated)
-> **Repositório:** `chatgpt-docker-puppeteer`
-> **Escopo primário:** `src/copilot/tools/` (32 arquivos) — `src/copilot/sdk/` (~20 arquivos) — `src/copilot/terminal/` (~103 arquivos) — `src/copilot/hooks/` — `src/copilot/observability/` — `src/copilot/core/`
-> **Versão:** Consolidação canônica final (Fase 1 + Fase 2)
+> **Data:** 2026-05-10 **Auditor:** Kilo (automated) **Repositório:** `chatgpt-docker-puppeteer`
+> **Escopo primário:** `src/copilot/tools/` (32 arquivos) — `src/copilot/sdk/` (~20 arquivos) —
+> `src/copilot/terminal/` (~103 arquivos) — `src/copilot/hooks/` — `src/copilot/observability/` —
+> `src/copilot/core/` **Versão:** Consolidação canônica final (Fase 1 + Fase 2)
 
 ---
 
 ## Atualização de status — revalidação profunda em 2026-05-11
 
-> **Importante**: este documento nasceu como snapshot externo de 2026-05-10. As contagens agregadas e o texto das tabelas abaixo continuam úteis como **histórico de investigação**, mas **não são mais a fonte de verdade isolada** sobre o estado atual do código.
+> **Importante**: este documento nasceu como snapshot externo de 2026-05-10. As contagens agregadas
+> e o texto das tabelas abaixo continuam úteis como **histórico de investigação**, mas **não são
+> mais a fonte de verdade isolada** sobre o estado atual do código.
 >
-> A fonte operacional corrente passa a ser esta seção de revalidação + o roadmap canônico em `2026-05-10-ROADMAP-REBUILD-TOOLS-CANONICO.md`.
+> A fonte operacional corrente passa a ser esta seção de revalidação + o roadmap canônico em
+> `2026-05-10-ROADMAP-REBUILD-TOOLS-CANONICO.md`.
 
 ### Síntese executiva do estado atual
 
 - O escopo `src/copilot` foi revalidado com:
-    - `npm run typecheck:strict:src.copilot` ✅
-    - `npm run typecheck:strict:tests.unit` ✅
-    - `npx eslint src/copilot tests/unit/copilot tests/integration/copilot` ✅
-    - `npm run test:copilot` ✅
-- Parte importante dos achados desta auditoria externa ficou **corrigida**, **obsoleta** ou **reescopada**.
-- Nesta rodada, o blind spot de observabilidade para denies no runtime canônico do agent foi fechado no plano principal de stats de tools.
+  - `npm run typecheck:strict:src.copilot` ✅
+  - `npm run typecheck:strict:tests.unit` ✅
+  - `npx eslint src/copilot tests/unit/copilot tests/integration/copilot` ✅
+  - `npm run test:copilot` ✅
+- Parte importante dos achados desta auditoria externa ficou **corrigida**, **obsoleta** ou
+  **reescopada**.
+- Nesta rodada, o blind spot de observabilidade para denies no runtime canônico do agent foi fechado
+  no plano principal de stats de tools.
 
 ### Matriz objetiva de reclassificação
 
@@ -51,35 +55,54 @@
 ### Novos recortes encontrados na investigação profunda
 
 1. **O problema de observabilidade mudou de forma**
-     - a claim antiga de “dupla métrica por duas factories” ficou desatualizada;
-    - o risco principal já não é mais a coexistência de planos paralelos para tools nativas: o runtime principal agora converge em `observability/tool-stats.js`, com `MetricsStore` atuando como facade do mesmo backend.
-    - o residual arquitetural ficou concentrado em duas frentes:
-        - MCP bridge ainda fora da factory canônica (`createTool` direto);
-        - warnings recoverable/TDZ-safe do `tool-factory` sob certos mocks SSR/Vitest.
-     - isso gera drift de ownership e naming (`exec_command` vs `shell.exec_command` vs `sdk.<tool>`), não necessariamente double-counting universal.
+   - a claim antiga de “dupla métrica por duas factories” ficou desatualizada;
+   - o risco principal já não é mais a coexistência de planos paralelos para tools nativas: o
+     runtime principal agora converge em `observability/tool-stats.js`, com `MetricsStore` atuando
+     como facade do mesmo backend.
+   - o residual arquitetural ficou concentrado em duas frentes:
+     - MCP bridge ainda fora da factory canônica (`createTool` direto);
+     - warnings recoverable/TDZ-safe do `tool-factory` sob certos mocks SSR/Vitest.
+   - isso gera drift de ownership e naming (`exec_command` vs `shell.exec_command` vs `sdk.<tool>`),
+     não necessariamente double-counting universal.
 
 2. **Persistem warnings TDZ-safe em certas árvores de import de teste**
-     - em execuções completas ainda aparecem warnings recoverable do `tool-factory` durante alguns grafos de import SSR/mocks;
-     - os testes passam porque o fallback atual é resiliente, mas o ruído evidencia oportunidade de endurecimento da normalização lazy de schema.
+   - em execuções completas ainda aparecem warnings recoverable do `tool-factory` durante alguns
+     grafos de import SSR/mocks;
+   - os testes passam porque o fallback atual é resiliente, mas o ruído evidencia oportunidade de
+     endurecimento da normalização lazy de schema.
 
 ### Conclusão desta revalidação
 
-O documento externo continua valioso como catálogo de hipóteses e de hotspots, mas o estado real em 2026-05-11 é:
+O documento externo continua valioso como catálogo de hipóteses e de hotspots, mas o estado real em
+2026-05-11 é:
 
 - **estabilização funcional concluída** para boa parte dos P0/P1 originais;
 - **blind spot de denies fechado** no runtime canônico do agent;
 - **backlog ativo deslocado** para três eixos principais:
-    1. política canônica para `Infinity` nas file tools;
-    2. encapsulamento/normalização do MCP bridge;
-    3. migração do MCP bridge para a surface canônica de factory/telemetria.
+  1. política canônica para `Infinity` nas file tools;
+  2. encapsulamento/normalização do MCP bridge;
+  3. migração do MCP bridge para a surface canônica de factory/telemetria.
 
 ---
 
 ## Sumário Executivo
 
-O módulo `src/copilot/tools/` é o **registry central de Custom Tools** do Always-Alive Agent, com 10 categorias funcionais (~55 tools), infraestrutura transversal (factory, DI tokens, logger, metrics proxy, contract verifier) e integrações profundas com `sdk/`, `terminal/`, `hooks/` e `observability/`. A arquitetura demonstra **maturidade moderada-alta** — padrões de DI por setter injection são consistentes, a factory é uniforme e a separação leitura/escrita é explícita — mas apresenta **déficits estruturais** mensuráveis: estado global mutável em 11+ variáveis module-level, duas fábricas paralelas com lógica duplicada, ausência de limites de módulo formalizados e cinco mecanismos de permissão não coordenados.
+O módulo `src/copilot/tools/` é o **registry central de Custom Tools** do Always-Alive Agent, com 10
+categorias funcionais (~55 tools), infraestrutura transversal (factory, DI tokens, logger, metrics
+proxy, contract verifier) e integrações profundas com `sdk/`, `terminal/`, `hooks/` e
+`observability/`. A arquitetura demonstra **maturidade moderada-alta** — padrões de DI por setter
+injection são consistentes, a factory é uniforme e a separação leitura/escrita é explícita — mas
+apresenta **déficits estruturais** mensuráveis: estado global mutável em 11+ variáveis module-level,
+duas fábricas paralelas com lógica duplicada, ausência de limites de módulo formalizados e cinco
+mecanismos de permissão não coordenados.
 
-A auditoria identificou **34 bugs funcionais** (BUG-01 a BUG-34), **12 bugs de integração SDK↔Tools** (SDK-BUG-01 a SDK-BUG-12), **3 bugs de observabilidade** (OBS-BUG-01 a OBS-BUG-03), **16 gaps sistêmicos** (SYS-GAP-01 a SYS-GAP-16), **4 problemas de segurança** (SEC-01 a SEC-04), **5 vazamentos de encapsulamento** (ENC-01 a ENC-05), **6 inconsistências técnicas** (INC-01 a INC-06) e **5 gaps de testabilidade** (TEST-01 a TEST-05). Dois bugs foram corrigidos durante o desenvolvimento (BUG-29, BUG-30); um não foi reproduzido (BUG-35, removido). Total de itens ativos: **84**.
+A auditoria identificou **34 bugs funcionais** (BUG-01 a BUG-34), **12 bugs de integração
+SDK↔Tools** (SDK-BUG-01 a SDK-BUG-12), **3 bugs de observabilidade** (OBS-BUG-01 a OBS-BUG-03), **16
+gaps sistêmicos** (SYS-GAP-01 a SYS-GAP-16), **4 problemas de segurança** (SEC-01 a SEC-04), **5
+vazamentos de encapsulamento** (ENC-01 a ENC-05), **6 inconsistências técnicas** (INC-01 a INC-06) e
+**5 gaps de testabilidade** (TEST-01 a TEST-05). Dois bugs foram corrigidos durante o
+desenvolvimento (BUG-29, BUG-30); um não foi reproduzido (BUG-35, removido). Total de itens ativos:
+**84**.
 
 ---
 
@@ -307,23 +330,37 @@ src/copilot/core/
 
 ### 2.1 Forças
 
-**DI por setter injection consistente.** O padrão `let _x = null; export function setX(v) { _x = v; }` é aplicado uniformemente em todos os subdomínios que requerem serviço externo (`setHub`, `setPermissionAgent`, `setSessionRpc`, `setExperimentalSession`, `setToolsLogger`, `setToolsMetrics`, `configureHookTools`), evitando import cycles.
+**DI por setter injection consistente.** O padrão
+`let _x = null; export function setX(v) { _x = v; }` é aplicado uniformemente em todos os
+subdomínios que requerem serviço externo (`setHub`, `setPermissionAgent`, `setSessionRpc`,
+`setExperimentalSession`, `setToolsLogger`, `setToolsMetrics`, `configureHookTools`), evitando
+import cycles.
 
-**Factory pattern uniforme.** Quase todas as tools usam `buildTool()` do `tool-factory.js`, que encapsula `defineTool` do SDK com logging automático, conversão Zod→JSON Schema e semântica `skipPermission`.
+**Factory pattern uniforme.** Quase todas as tools usam `buildTool()` do `tool-factory.js`, que
+encapsula `defineTool` do SDK com logging automático, conversão Zod→JSON Schema e semântica
+`skipPermission`.
 
-**Separação explícita leitura/escrita.** `todoReadTools` vs `todoWriteTools`, `fileReadTools` vs `fileWriteTools`, `withSkipPermission()` aplicado consistentemente em tools read-only.
+**Separação explícita leitura/escrita.** `todoReadTools` vs `todoWriteTools`, `fileReadTools` vs
+`fileWriteTools`, `withSkipPermission()` aplicado consistentemente em tools read-only.
 
 **Barrels organizados.** Cada subdomínio tem `index.js` barrel com exports explícitos.
 
-**Tool Contract Verifier.** Mecanismo maduro de validação de metadados em runtime (`tool-contract-verifier.js`).
+**Tool Contract Verifier.** Mecanismo maduro de validação de metadados em runtime
+(`tool-contract-verifier.js`).
 
-**Observabilidade integrada.** `metrics-proxy.js` e `logger.js` com injeção — sem dependência direta de `observability/`.
+**Observabilidade integrada.** `metrics-proxy.js` e `logger.js` com injeção — sem dependência direta
+de `observability/`.
 
 ### 2.2 Fraquezas Estruturais
 
-**Problema 1 — `file/` é um God Module.** 8 arquivos, 28+ tools, ~40% do módulo total. Mistura IO de baixo nível, busca/indexação, escopo de sessão e infraestrutura compartilhada em um único namespace sem subdivisão formal.
+**Problema 1 — `file/` é um God Module.** 8 arquivos, 28+ tools, ~40% do módulo total. Mistura IO de
+baixo nível, busca/indexação, escopo de sessão e infraestrutura compartilhada em um único namespace
+sem subdivisão formal.
 
-**Problema 2 — `todo/store.js` mistura domínio e transporte.** Um único arquivo acumula: persistência SQLite, migração legada (JSON→SQLite), lógica de domínio (validação de transições, geração de IDs), helpers puros e agendamento de cleanup. Store não pode ser reutilizado fora do contexto de tools.
+**Problema 2 — `todo/store.js` mistura domínio e transporte.** Um único arquivo acumula:
+persistência SQLite, migração legada (JSON→SQLite), lógica de domínio (validação de transições,
+geração de IDs), helpers puros e agendamento de cleanup. Store não pode ser reutilizado fora do
+contexto de tools.
 
 **Problema 3 — Estado global mutável em 11+ variáveis module-level.**
 
@@ -340,21 +377,31 @@ src/copilot/core/
 | `logger.js`                 | `_injectedLogger`                                                                                                   |
 | `web-tools.js`              | `RATE_WINDOW`                                                                                                       |
 
-**Problema 4 — `tool-factory.js` é um God Object (345 linhas, 5+ responsabilidades).** Além de `buildTool()` e `withSkipPermission()`, contém: loading dinâmico de `zod-to-json-schema`, fallback para Zod v4 nativo, validação de schema, detecção de erros recuperáveis, logger local.
+**Problema 4 — `tool-factory.js` é um God Object (345 linhas, 5+ responsabilidades).** Além de
+`buildTool()` e `withSkipPermission()`, contém: loading dinâmico de `zod-to-json-schema`, fallback
+para Zod v4 nativo, validação de schema, detecção de erros recuperáveis, logger local.
 
-**Problema 5 — Ausência de limites de módulo formalizados.** Arquivos em `tools/file/` importam diretamente de `../../infra/*` e `../../db/*` sem nenhuma regra declarativa (ESLint `no-restricted-imports` ou equivalente), permitindo degradação arquitetural silenciosa.
+**Problema 5 — Ausência de limites de módulo formalizados.** Arquivos em `tools/file/` importam
+diretamente de `../../infra/*` e `../../db/*` sem nenhuma regra declarativa (ESLint
+`no-restricted-imports` ou equivalente), permitindo degradação arquitetural silenciosa.
 
-**Problema 6 — Inconsistência `createTool` vs `buildTool`.** ~5 arquivos usam `createTool` diretamente do SDK (sem logging automático, sem conversão Zod, sem tratamento de factory errors), enquanto ~10 arquivos usam `buildTool`. Cria disparidade de observabilidade.
+**Problema 6 — Inconsistência `createTool` vs `buildTool`.** ~5 arquivos usam `createTool`
+diretamente do SDK (sem logging automático, sem conversão Zod, sem tratamento de factory errors),
+enquanto ~10 arquivos usam `buildTool`. Cria disparidade de observabilidade.
 
-**Problema 7 — `user-input-state.js` é um singleton global frágil.** Estado de pending inputs em variáveis module-level sem mecanismo de reset entre sessões. Em ambientes multi-sessão, IDs colidem e resolvers antigos persistem.
+**Problema 7 — `user-input-state.js` é um singleton global frágil.** Estado de pending inputs em
+variáveis module-level sem mecanismo de reset entre sessões. Em ambientes multi-sessão, IDs colidem
+e resolvers antigos persistem.
 
-**Problema 8 — Barrels expõem detalhes de implementação.** `tools/index.js` exporta `readStore` (acesso direto ao SQLite), `TOOLS_LOGGER`, `TOOLS_METRICS` e funções de reset para testes — detalhes que consumidores externos não deveriam acessar diretamente.
+**Problema 8 — Barrels expõem detalhes de implementação.** `tools/index.js` exporta `readStore`
+(acesso direto ao SQLite), `TOOLS_LOGGER`, `TOOLS_METRICS` e funções de reset para testes — detalhes
+que consumidores externos não deveriam acessar diretamente.
 
 ---
 
 ## 3. Catálogo de Bugs Funcionais
 
-*Classificação: CRITICAL > HIGH > MEDIUM > LOW*
+_Classificação: CRITICAL > HIGH > MEDIUM > LOW_
 
 | ID         | Arquivo                                                    | Severidade                       | Descrição                                                                                                                                                                                                                                                                                                                                                                                | Correção Sugerida                                                                                                  |
 | ---------- | ---------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -397,7 +444,8 @@ src/copilot/core/
 
 ## 4. Bugs de Integração SDK↔Tools
 
-O projeto possui duas factories de tools com responsabilidades sobrepostas e lógica quase idêntica de conversão Zod→JSON Schema, mantidas em sincronia manualmente:
+O projeto possui duas factories de tools com responsabilidades sobrepostas e lógica quase idêntica
+de conversão Zod→JSON Schema, mantidas em sincronia manualmente:
 
 ```
 sdk/tools/core.js (Fábrica SDK)
@@ -415,20 +463,20 @@ tools/tool-factory.js (Fábrica Tools)
 └── wrappedHandler() + logToolFactory() ← CONFLITANTE com sdk/tools/core.js
 ```
 
-| ID             | Severidade   | Descrição                                                                                                                                                                                                                                                                                                                                        | Arquivos                                                              | Correção Sugerida                                                                                                                  |
-| -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **SDK-BUG-01** | **CRITICAL** | `tools/buildTool()` não usa `sdk/createTool()` internamente — usa `sdk/defineTool` diretamente. Cada tool passa por **dois layers de wrapping**: factory handler log (tool-factory) + SDK handler log (sdk/tools/core). Resultado: 2 entradas de log DEBUG e potencialmente 2 chamadas ao sistema de métricas por invocação.                     | `tools/tool-factory.js:193` × `sdk/tools/core.js:239`                 | Definir claramente qual layer é o único responsável por observabilidade antes de fundir as factories.                              |
-| **SDK-BUG-02** | **HIGH**     | `sdk/tools/custom.js:351` usa `_buildTool ?? createToolSync`. `_buildTool` é injetado via `setCustomToolsBuilder()` em `observability/bootstrap.js:218`. Se `bootstrapLateDeps()` for chamado antes de `setToolsLogger/Metrics`, o builder terá dependências não-inicializadas. Ordem de bootstrap frágil e não documentada.                     | `sdk/tools/custom.js:351` × `observability/bootstrap.js:215-219`      | Documentar a ordem obrigatória de bootstrap; adicionar verificação de dependências no builder.                                     |
-| **SDK-BUG-03** | **HIGH**     | `sdk/tools/registry.js:76` — `registerTool()` sobrescreve silenciosamente tools com mesmo nome (`Map.set`). A detecção de duplicatas em `bootstrap.js:150-160` ocorre **após** o registro. Se o registry for usado antes do bootstrap completar (ex: em testes), duplicatas passam despercebidas.                                                | `sdk/tools/registry.js:76`                                            | Adicionar warning no `registerTool()` quando key já existir.                                                                       |
-| **SDK-BUG-04** | **HIGH**     | `sdk/tools/state.js:30` — `_toolsConfig` é module-level mutable state sem mecanismo de reset para testes (ao contrário de `custom.js` que tem `_resetRegistry()`). Testes que verificam policy de tools não conseguem isolar estado.                                                                                                             | `sdk/tools/state.js:30`                                               | Adicionar `_resetToolsConfig()` export para testes.                                                                                |
-| **SDK-BUG-05** | **MEDIUM**   | `sdk/rpc/ops.js` executa `toolsHandlePendingCall` sobre o ToolRegistry sem documentar como o registry é sincronizado entre sessões. Tools podem vazar entre sessões se o registry for compartilhado.                                                                                                                                             | `sdk/rpc/ops.js:57` × `sdk/tools/registry.js`                         | Garantir registry isolado por sessão, ou documentar o modelo de compartilhamento explicitamente.                                   |
-| **SDK-BUG-06** | **MEDIUM**   | Dois sistemas paralelos gerenciam "o usuário precisa fornecer input" (ver §11.3): `sdk/session/user-input.js` (moderno) e `tools/user-input-state.js` (legado via `hook-tools.js`). Um usuário respondendo via Path B não resolve pending input do Path A.                                                                                       | `sdk/session/user-input.js` × `tools/user-input-state.js`             | Depreciar Path A; delegar `request_user_input` ao `createQueuedInputHandler()` do SDK.                                             |
-| **SDK-BUG-07** | **MEDIUM**   | `sdk/tools/custom.js:89-123` expõe valores de env vars via handler `env_read` enquanto `shell/sandbox.js` remove env vars sensíveis via `safeEnv()`. Inconsistência de security posture: o modelo pode obter um valor via `env_read` e tentar usá-lo em `exec_command`, mas o subprocesso não o verá. Comportamento correto mas não documentado. | `sdk/tools/custom.js:89` × `tools/shell/sandbox.js:213`               | Documentar escopo de cada mecanismo e a interação entre eles.                                                                      |
-| **SDK-BUG-08** | **MEDIUM**   | `observability/tool-stats.js:97-118` — `wrapWithStats()` registra métrica de latência imediatamente ao completar o handler async. Para `request_user_input` (que retorna Promise suspensa até o usuário responder), a métrica de latência é enganosa: registra apenas o tempo de criação da Promise, não o tempo real decorrido.                 | `observability/tool-stats.js:108-110` × `tools/hook-tools.js:251-297` | Filtrar tools interativas do stats wrapping, ou registrar métricas após resolução real da Promise.                                 |
-| **SDK-BUG-09** | **MEDIUM**   | `sdk/tools/core.js:49-61` — `loadZodToJsonSchema()` usa `createRequire(import.meta.url)` para carregar `zod-to-json-schema`. Em ambientes ESM puros sem CJS interop, `requireFromHere` falha com `ERR_REQUIRE_ESM`. O catch é vazio — tools com Zod ficam sem JSON Schema silenciosamente.                                                       | `sdk/tools/core.js:49-61`                                             | Adicionar fallback para `import('zod-to-json-schema')` dinâmico antes de desistir.                                                 |
-| **SDK-BUG-10** | **LOW**      | `sdk/tools/core.js:141` — `tryZodToJsonSchema` verifica `'_def' in schema                                                                                                                                                                                                                                                                        |                                                                       | '_zod' in schema`. Objeto literal com propriedade `_def` (ex: `{ _def: 'test' }`) é falso-positivamente detectado como Zod schema. | `sdk/tools/core.js:141` | Verificação mais robusta: `schema instanceof z.ZodType` ou checar estrutura interna específica de Zod. |
-| **SDK-BUG-11** | **MEDIUM**   | `sdk/tools/state.js:30` — `_toolsConfig` compartilhado. Se `patchToolsConfig` for chamado de dois lugares simultaneamente, há race condition no estado (last-write-wins sem atomicidade).                                                                                                                                                        | `sdk/tools/state.js:30`                                               | Usar mutex ou snapshot isolation para updates concorrentes.                                                                        |
-| **SDK-BUG-12** | **HIGH**     | Não há heartbeat/health-check entre SDK e tools. Se um tool handler travar (ex: infinite loop em `exec_command`), o SDK não tem mecanismo de timeout ou circuit-breaker. O timeout advisory de 120s em `ADVISORY_TIMEOUT_MS` é puramente informativo.                                                                                            | `sdk/rpc/ops.js` (implícito)                                          | Implementar health-check periódico e circuit-breaker para chamadas de tools de longa duração.                                      |
+| ID             | Severidade   | Descrição                                                                                                                                                                                                                                                                                                                                        | Arquivos                                                              | Correção Sugerida                                                                                                                |
+| -------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **SDK-BUG-01** | **CRITICAL** | `tools/buildTool()` não usa `sdk/createTool()` internamente — usa `sdk/defineTool` diretamente. Cada tool passa por **dois layers de wrapping**: factory handler log (tool-factory) + SDK handler log (sdk/tools/core). Resultado: 2 entradas de log DEBUG e potencialmente 2 chamadas ao sistema de métricas por invocação.                     | `tools/tool-factory.js:193` × `sdk/tools/core.js:239`                 | Definir claramente qual layer é o único responsável por observabilidade antes de fundir as factories.                            |
+| **SDK-BUG-02** | **HIGH**     | `sdk/tools/custom.js:351` usa `_buildTool ?? createToolSync`. `_buildTool` é injetado via `setCustomToolsBuilder()` em `observability/bootstrap.js:218`. Se `bootstrapLateDeps()` for chamado antes de `setToolsLogger/Metrics`, o builder terá dependências não-inicializadas. Ordem de bootstrap frágil e não documentada.                     | `sdk/tools/custom.js:351` × `observability/bootstrap.js:215-219`      | Documentar a ordem obrigatória de bootstrap; adicionar verificação de dependências no builder.                                   |
+| **SDK-BUG-03** | **HIGH**     | `sdk/tools/registry.js:76` — `registerTool()` sobrescreve silenciosamente tools com mesmo nome (`Map.set`). A detecção de duplicatas em `bootstrap.js:150-160` ocorre **após** o registro. Se o registry for usado antes do bootstrap completar (ex: em testes), duplicatas passam despercebidas.                                                | `sdk/tools/registry.js:76`                                            | Adicionar warning no `registerTool()` quando key já existir.                                                                     |
+| **SDK-BUG-04** | **HIGH**     | `sdk/tools/state.js:30` — `_toolsConfig` é module-level mutable state sem mecanismo de reset para testes (ao contrário de `custom.js` que tem `_resetRegistry()`). Testes que verificam policy de tools não conseguem isolar estado.                                                                                                             | `sdk/tools/state.js:30`                                               | Adicionar `_resetToolsConfig()` export para testes.                                                                              |
+| **SDK-BUG-05** | **MEDIUM**   | `sdk/rpc/ops.js` executa `toolsHandlePendingCall` sobre o ToolRegistry sem documentar como o registry é sincronizado entre sessões. Tools podem vazar entre sessões se o registry for compartilhado.                                                                                                                                             | `sdk/rpc/ops.js:57` × `sdk/tools/registry.js`                         | Garantir registry isolado por sessão, ou documentar o modelo de compartilhamento explicitamente.                                 |
+| **SDK-BUG-06** | **MEDIUM**   | Dois sistemas paralelos gerenciam "o usuário precisa fornecer input" (ver §11.3): `sdk/session/user-input.js` (moderno) e `tools/user-input-state.js` (legado via `hook-tools.js`). Um usuário respondendo via Path B não resolve pending input do Path A.                                                                                       | `sdk/session/user-input.js` × `tools/user-input-state.js`             | Depreciar Path A; delegar `request_user_input` ao `createQueuedInputHandler()` do SDK.                                           |
+| **SDK-BUG-07** | **MEDIUM**   | `sdk/tools/custom.js:89-123` expõe valores de env vars via handler `env_read` enquanto `shell/sandbox.js` remove env vars sensíveis via `safeEnv()`. Inconsistência de security posture: o modelo pode obter um valor via `env_read` e tentar usá-lo em `exec_command`, mas o subprocesso não o verá. Comportamento correto mas não documentado. | `sdk/tools/custom.js:89` × `tools/shell/sandbox.js:213`               | Documentar escopo de cada mecanismo e a interação entre eles.                                                                    |
+| **SDK-BUG-08** | **MEDIUM**   | `observability/tool-stats.js:97-118` — `wrapWithStats()` registra métrica de latência imediatamente ao completar o handler async. Para `request_user_input` (que retorna Promise suspensa até o usuário responder), a métrica de latência é enganosa: registra apenas o tempo de criação da Promise, não o tempo real decorrido.                 | `observability/tool-stats.js:108-110` × `tools/hook-tools.js:251-297` | Filtrar tools interativas do stats wrapping, ou registrar métricas após resolução real da Promise.                               |
+| **SDK-BUG-09** | **MEDIUM**   | `sdk/tools/core.js:49-61` — `loadZodToJsonSchema()` usa `createRequire(import.meta.url)` para carregar `zod-to-json-schema`. Em ambientes ESM puros sem CJS interop, `requireFromHere` falha com `ERR_REQUIRE_ESM`. O catch é vazio — tools com Zod ficam sem JSON Schema silenciosamente.                                                       | `sdk/tools/core.js:49-61`                                             | Adicionar fallback para `import('zod-to-json-schema')` dinâmico antes de desistir.                                               |
+| **SDK-BUG-10** | **LOW**      | `sdk/tools/core.js:141` — `tryZodToJsonSchema` verifica `'_def' in schema                                                                                                                                                                                                                                                                        |                                                                       | '_zod' in schema`. Objeto literal com propriedade `_def`(ex:`{ _def: 'test' }`) é falso-positivamente detectado como Zod schema. | `sdk/tools/core.js:141` | Verificação mais robusta: `schema instanceof z.ZodType` ou checar estrutura interna específica de Zod. |
+| **SDK-BUG-11** | **MEDIUM**   | `sdk/tools/state.js:30` — `_toolsConfig` compartilhado. Se `patchToolsConfig` for chamado de dois lugares simultaneamente, há race condition no estado (last-write-wins sem atomicidade).                                                                                                                                                        | `sdk/tools/state.js:30`                                               | Usar mutex ou snapshot isolation para updates concorrentes.                                                                      |
+| **SDK-BUG-12** | **HIGH**     | Não há heartbeat/health-check entre SDK e tools. Se um tool handler travar (ex: infinite loop em `exec_command`), o SDK não tem mecanismo de timeout ou circuit-breaker. O timeout advisory de 120s em `ADVISORY_TIMEOUT_MS` é puramente informativo.                                                                                            | `sdk/rpc/ops.js` (implícito)                                          | Implementar health-check periódico e circuit-breaker para chamadas de tools de longa duração.                                    |
 
 ---
 
@@ -538,7 +586,9 @@ tools/tool-factory.js:normalizeParameters()
     3. Fallback: schema.toJSONSchema() (Zod v4 nativo)
 ```
 
-Qualquer correção na lógica de conversão deve ser aplicada em dois lugares. A fusão é factível mas requer resolver: (a) dependência circular entre SDK e tools; (b) TDZ em ESM; (c) `buildTool()` adiciona lógica específica do projeto (`withSkipPermission`) que `createTool()` do SDK não tem.
+Qualquer correção na lógica de conversão deve ser aplicada em dois lugares. A fusão é factível mas
+requer resolver: (a) dependência circular entre SDK e tools; (b) TDZ em ESM; (c) `buildTool()`
+adiciona lógica específica do projeto (`withSkipPermission`) que `createTool()` do SDK não tem.
 
 **Inconsistências de nomenclatura entre SDK e Tools:**
 
@@ -552,7 +602,8 @@ Qualquer correção na lógica de conversão deve ser aplicada em dois lugares. 
 
 ### 11.2 Fragmentação da Camada de Permissões
 
-O sistema possui **cinco mecanismos independentes** de enforcement de permissões que não se coordenam:
+O sistema possui **cinco mecanismos independentes** de enforcement de permissões que não se
+coordenam:
 
 | #   | Mecanismo                     | Origem                                                                   | Escopo                                                                                          |
 | --- | ----------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
@@ -563,43 +614,57 @@ O sistema possui **cinco mecanismos independentes** de enforcement de permissõe
 | 5   | `sdk/tools/agent-policy.js`   | `AgentToolPolicy` class                                                  | Per-agent allowlists + global allow/deny                                                        |
 
 **Problemas:**
-- Decisões contraditórias possíveis: tool permitida pelo mecanismo 3 pode ser bloqueada pelo 5 sem chain of authority definida.
-- Auditoria fragmentada: cada mecanismo registra decisões em seu próprio log/sistema — sem audit trail unificado.
-- Tools desabilitadas via `toggle_tool` são removidas de `_registeredTools` mas **permanecem** no `ToolRegistry` do SDK — bypass via RPC ainda as encontra.
 
-**Correção recomendada:** Fundir em um único engine de políticas estendendo `createPermissionHandler()` do SDK para receber decisões de `AgentToolPolicy` como pre-processor e consultar `introspection-tools` para estado de toggle.
+- Decisões contraditórias possíveis: tool permitida pelo mecanismo 3 pode ser bloqueada pelo 5 sem
+  chain of authority definida.
+- Auditoria fragmentada: cada mecanismo registra decisões em seu próprio log/sistema — sem audit
+  trail unificado.
+- Tools desabilitadas via `toggle_tool` são removidas de `_registeredTools` mas **permanecem** no
+  `ToolRegistry` do SDK — bypass via RPC ainda as encontra.
+
+**Correção recomendada:** Fundir em um único engine de políticas estendendo
+`createPermissionHandler()` do SDK para receber decisões de `AgentToolPolicy` como pre-processor e
+consultar `introspection-tools` para estado de toggle.
 
 ### 11.3 O Sistema Duplo de User-Input
 
 Dois caminhos paralelos gerenciam o mesmo conceito:
 
 **Path A — `tools/user-input-state.js` (legado)**
+
 - `requestUserInput()` cria pending resolver em `_pendingInputResolvers`
 - `resolveUserInput()` chamado de `tool-port.js:resolveAgentUserInput()`
 - Auto-cleanup por timer hardcoded de 10 minutos
 - Usado por `hook-tools.js:request_user_input`
 
 **Path B — `sdk/session/user-input.js` (moderno)**
+
 - `createQueuedInputHandler()` — fila com maxSize configurável
 - `createReadlineInputHandler()` — readline de terminal
 - `createStaticInputHandler()` — para testes
 - Normaliza eventos via `normalizeUserInputRequestedEvent()` / `normalizeUserInputCompletedEvent()`
 - Integrado ao lifecycle de sessão do SDK
 
-**Incompatibilidades:** Usuário respondendo via Path B não resolve pending input do Path A. Path A não normaliza eventos. Timeout de 10 min hardcoded sem configuração via SDK.
+**Incompatibilidades:** Usuário respondendo via Path B não resolve pending input do Path A. Path A
+não normaliza eventos. Timeout de 10 min hardcoded sem configuração via SDK.
 
-**Correção recomendada:** Depreciar Path A. `user-input-state.js` deve se tornar adapter fino para compatibilidade reversa, delegando ao `createQueuedInputHandler()` do SDK.
+**Correção recomendada:** Depreciar Path A. `user-input-state.js` deve se tornar adapter fino para
+compatibilidade reversa, delegando ao `createQueuedInputHandler()` do SDK.
 
 ### 11.4 O Blind Spot do tool-interceptor
 
-`hooks/tool-interceptor.js` bloqueia tools ANTES da execução retornando `{ permissionDecision: 'deny' }`. Consequências:
+`hooks/tool-interceptor.js` bloqueia tools ANTES da execução retornando
+`{ permissionDecision: 'deny' }`. Consequências:
 
 1. Tools bloqueadas nunca executam → `wrapWithStats()` nunca as registra
 2. Não há contador de "tentativas bloqueadas"
-3. Atacante pode enumerar tools observando padrão de sucesso vs. deny — **blind spot de segurança invisível no dashboard**
-4. Tools desabilitadas em runtime ainda aparecem em `list_tools` (introspecção mostra todas as registradas)
+3. Atacante pode enumerar tools observando padrão de sucesso vs. deny — **blind spot de segurança
+   invisível no dashboard**
+4. Tools desabilitadas em runtime ainda aparecem em `list_tools` (introspecção mostra todas as
+   registradas)
 
-**Correção recomendada:** Adicionar `recordBlockedToolCall()` em `observability/tool-stats.js` e chamar do interceptor em decisões deny.
+**Correção recomendada:** Adicionar `recordBlockedToolCall()` em `observability/tool-stats.js` e
+chamar do interceptor em decisões deny.
 
 ### 11.5 Conflito de Logging (Três Fontes)
 
@@ -609,7 +674,8 @@ Dois caminhos paralelos gerenciam o mesmo conceito:
 | `sdk/logger.js`                    | Proxy via `setSdkLogger()`   | Apenas `console.warn/console.error` (suprime INFO/DEBUG) |
 | `tool-factory.js:logToolFactory()` | `console.*` direto           | — (sem logger injetado)                                  |
 
-`logToolFactory()` ignora `tools/logger.js` e `sdk/logger.js`. Logs da factory durante cold-start vão para console raw sem rotação de nível consistente nem integração com observabilidade.
+`logToolFactory()` ignora `tools/logger.js` e `sdk/logger.js`. Logs da factory durante cold-start
+vão para console raw sem rotação de nível consistente nem integração com observabilidade.
 
 ### 11.6 Conflito de Métricas (Dois Sistemas)
 
@@ -618,11 +684,15 @@ Dois caminhos paralelos gerenciam o mesmo conceito:
 | SDK-level   | `observability/tool-stats.js` | `wrapWithStats()` — rastreia latência/erros                |
 | Tools-level | `tools/metrics-proxy.js`      | `recordToolCall()` — proxy para `observability/metrics.js` |
 
-As mesmas tools são rastreadas nos dois sistemas com granularidades diferentes. A categorização também é inconsistente: `tool-stats.js:136-141` usa `name.split('.')[0]` para inferir categoria, mas tools registradas via introspecção usam `snake_case` flat (ex: `git_status` em vez de `git.status`).
+As mesmas tools são rastreadas nos dois sistemas com granularidades diferentes. A categorização
+também é inconsistente: `tool-stats.js:136-141` usa `name.split('.')[0]` para inferir categoria, mas
+tools registradas via introspecção usam `snake_case` flat (ex: `git_status` em vez de `git.status`).
 
 ### 11.7 Terminal Bypassa a Abstração do Agent
 
-`terminal/commands/sdk.js` e `terminal/commands/fs.js` importam diretamente de `#copilot/tools`, usando `findTool()` e `getToolHandler()` sobre as arrays de tools, em vez de usar `agent/ports/tool-port.js`. Isso quebra a abstração pretendida:
+`terminal/commands/sdk.js` e `terminal/commands/fs.js` importam diretamente de `#copilot/tools`,
+usando `findTool()` e `getToolHandler()` sobre as arrays de tools, em vez de usar
+`agent/ports/tool-port.js`. Isso quebra a abstração pretendida:
 
 ```javascript
 // Padrão atual (incorreto arquiteturalmente)
@@ -720,113 +790,128 @@ Objetivo: Substituir singletons por injeção explícita.
 
 ### ADR-001 — Duas Fábricas de Tools
 
-**Contexto:** O projeto tem `tools/tool-factory.js` e `sdk/tools/core.js`, ambas implementando normalização Zod→JSON Schema, logging e fallback.
+**Contexto:** O projeto tem `tools/tool-factory.js` e `sdk/tools/core.js`, ambas implementando
+normalização Zod→JSON Schema, logging e fallback.
 
-**Decisão:** Manter as duas separadas inicialmente. A fusão requer resolver: (a) dependência circular SDK↔tools, (b) TDZ em ESM, (c) `buildTool()` adiciona lógica específica do projeto (`withSkipPermission`) que `createTool()` do SDK não tem.
+**Decisão:** Manter as duas separadas inicialmente. A fusão requer resolver: (a) dependência
+circular SDK↔tools, (b) TDZ em ESM, (c) `buildTool()` adiciona lógica específica do projeto
+(`withSkipPermission`) que `createTool()` do SDK não tem.
 
-**Consequência:** Correções na lógica de conversão devem ser aplicadas em dois lugares. Risco de divergência permanente.
+**Consequência:** Correções na lógica de conversão devem ser aplicadas em dois lugares. Risco de
+divergência permanente.
 
-**Reversibilidade:** Média. A fusão pode ser feita movendo toda a lógica para `sdk/tools/core.js` e fazendo `tools/buildTool` ser um thin wrapper.
+**Reversibilidade:** Média. A fusão pode ser feita movendo toda a lógica para `sdk/tools/core.js` e
+fazendo `tools/buildTool` ser um thin wrapper.
 
 ### ADR-002 — Module-Level State em vez de DI Container
 
-**Contexto:** `_session`, `_rpc`, `_agent` e outras variáveis module-level são o padrão dominante em vez de constructor injection.
+**Contexto:** `_session`, `_rpc`, `_agent` e outras variáveis module-level são o padrão dominante em
+vez de constructor injection.
 
-**Decisão:** Manter o padrão atual. Constructor injection é incompatível com as constraints do runtime ESM do SDK, onde module evaluation order é não-determinístico (TDZ).
+**Decisão:** Manter o padrão atual. Constructor injection é incompatível com as constraints do
+runtime ESM do SDK, onde module evaluation order é não-determinístico (TDZ).
 
-**Consequência:** Testes requerem monkey-patching. Race conditions possíveis em cenários multi-sessão.
+**Consequência:** Testes requerem monkey-patching. Race conditions possíveis em cenários
+multi-sessão.
 
-**Reversibilidade:** Baixa. Os DI tokens (`di-tokens.js`) já existem como passo intermediário — a injeção real ainda é feita via setters.
+**Reversibilidade:** Baixa. Os DI tokens (`di-tokens.js`) já existem como passo intermediário — a
+injeção real ainda é feita via setters.
 
 ### ADR-003 — Interceptação de Hooks Fora de `tools/`
 
-**Contexto:** `hooks/tool-interceptor.js` implementa `onPreToolUse`/`onPostToolUse` hooks em `src/copilot/hooks/`, não em `src/copilot/tools/`.
+**Contexto:** `hooks/tool-interceptor.js` implementa `onPreToolUse`/`onPostToolUse` hooks em
+`src/copilot/hooks/`, não em `src/copilot/tools/`.
 
-**Decisão:** Manter separação. Hooks são compostos independentemente das tools (`createProductionHooks()`, `createHooks()`), enquanto tools podem ser registradas sem conhecimento do sistema de hooks.
+**Decisão:** Manter separação. Hooks são compostos independentemente das tools
+(`createProductionHooks()`, `createHooks()`), enquanto tools podem ser registradas sem conhecimento
+do sistema de hooks.
 
-**Consequência:** Duas fontes de verdade sobre permissões. O blind spot de observabilidade (SYS-GAP-04) é consequência direta desta separação.
+**Consequência:** Duas fontes de verdade sobre permissões. O blind spot de observabilidade
+(SYS-GAP-04) é consequência direta desta separação.
 
-**Reversibilidade:** Média. Mover lógica de interceptação para dentro de `tools/` quebraria a composição de hooks que dependem de `hooks/bus.js`.
+**Reversibilidade:** Média. Mover lógica de interceptação para dentro de `tools/` quebraria a
+composição de hooks que dependem de `hooks/bus.js`.
 
 ---
 
 ## 15. Priorização Consolidada
 
-*Legenda: 🔴 P0 (crítico/imediato) — 🟠 P1 (alto/sprint dedicado) — 🟡 P2 (médio/backlog priorizado) — 🟢 P3 (baixo/melhoria contínua)*
+_Legenda: 🔴 P0 (crítico/imediato) — 🟠 P1 (alto/sprint dedicado) — 🟡 P2 (médio/backlog priorizado)
+— 🟢 P3 (baixo/melhoria contínua)_
 
 | #   | Prioridade | ID              | Item                                                                    | Esforço | Impacto                                     |
 | --- | ---------- | --------------- | ----------------------------------------------------------------------- | ------- | ------------------------------------------- |
-| 1   | 🔴 P0       | BUG-01          | `getAllTools(registry)` ignora parâmetro — contrato quebrado            | Baixo   | Tools dinâmicas perdidas silenciosamente    |
-| 2   | 🔴 P0       | BUG-04 / BUG-10 | Limites `Infinity` → OOM no `read_file_content`                         | Médio   | Produção down com arquivos grandes          |
-| 3   | 🔴 P0       | SDK-BUG-01      | Double-wrapping logging/metrics entre as duas factories                 | Médio   | Dados de observabilidade incorretos         |
-| 4   | 🔴 P0       | BUG-02          | `resolveRpcTimeoutMs()` é código morto — timeouts RPC inoperantes       | Baixo   | Timeouts RPC completamente ignorados        |
-| 5   | 🔴 P0       | BUG-24          | MCP circuit breaker: state mutable module-level                         | Médio   | Corrupção de estado em concorrência         |
-| 6   | 🟠 P1       | SEC-01          | `safeEnv()` cache frágil + TTL 1s                                       | Baixo   | Credenciais expostas entre reconstruções    |
-| 7   | 🟠 P1       | ENC-03          | Deadlock potencial no mutex do todo store                               | Médio   | Agente trava permanentemente                |
-| 8   | 🟠 P1       | BUG-11          | Memory leak em promises pendentes no shutdown                           | Médio   | Vazamento de memória acumulativo            |
-| 9   | 🟠 P1       | BUG-03          | Fallback no factory sem normalização Zod                                | Médio   | Tools quebram no cold start                 |
-| 10  | 🟠 P1       | SYS-GAP-01      | Sem contrato formal SDK↔Tools                                           | Médio   | Bugs de tipo em runtime                     |
-| 11  | 🟠 P1       | SYS-GAP-04      | Blind spot: bloqueios não rastreados em métricas                        | Médio   | Ataques de enumeração invisíveis            |
-| 12  | 🟠 P1       | SYS-GAP-02      | Dois registries desatualizados (registry Map vs introspecção)           | Médio   | Introspecção mostra estado stale            |
-| 13  | 🟠 P1       | BUG-12          | `production.js` importa `isToolDisabled` diretamente — stale reference  | Médio   | Stale reference em testes e reloads         |
-| 14  | 🟠 P1       | SYS-GAP-14      | `active-tool-call-registry` singleton vs session-scoped                 | Médio   | Vazamento cross-session                     |
-| 15  | 🟠 P1       | SYS-GAP-11      | Terminal sem limites de módulo (nenhuma ESLint rule)                    | Médio   | Degradação arquitetural livre               |
-| 16  | 🟠 P1       | SYS-GAP-12      | Event adapter coverage sem validação build-time                         | Médio   | Eventos silenciosamente ignorados           |
-| 17  | 🟠 P1       | BUG-25          | MCP tools sem `buildTool` wrapper (observabilidade degradada)           | Médio   | Dois tiers de qualidade de tools            |
-| 18  | 🟠 P1       | BUG-33          | Audit preset registra "allow" para hooks denied                         | Médio   | Auditoria enganosa                          |
-| 19  | 🟠 P1       | SDK-BUG-12      | Sem circuit-breaker para hangs em tools                                 | Médio   | Tools podem travar indefinidamente          |
-| 20  | 🟠 P1       | SDK-BUG-02      | Ordem de bootstrap frágil para custom tools builder                     | Médio   | Custom tools inicializam sem logger/metrics |
-| 21  | 🟠 P1       | SDK-BUG-03      | `registerTool()` sobrescreve silenciosamente duplicatas                 | Médio   | Sem detecção de duplicatas em testes        |
-| 22  | 🟠 P1       | SDK-BUG-04      | `_toolsConfig` sem mecanismo de reset para testes                       | Baixo   | Isolamento de testes comprometido           |
-| 23  | 🟠 P1       | OBS-BUG-02      | Double-wrapping de métricas entre as duas factories                     | Médio   | Double counting de métricas                 |
-| 24  | 🟡 P2       | INC-01          | Padronizar `buildTool` universalmente                                   | Médio   | Observabilidade inconsistente               |
-| 25  | 🟡 P2       | SYS-GAP-05      | Sem versionamento semântico das tools                                   | Baixo   | Quebras silenciosas em updates SDK          |
-| 26  | 🟡 P2       | BUG-13          | `custom.js` persiste `handlerId` inválido                               | Médio   | Custom tools falham em build                |
-| 27  | 🟡 P2       | BUG-15          | Shallow copy em `state.js` — corrupção de estado                        | Baixo   | Arrays mutáveis compartilhados              |
-| 28  | 🟡 P2       | BUG-07          | JSON parse sem try/catch específico (DDG fallback)                      | Baixo   | Erro genérico sem informação diagnóstica    |
-| 29  | 🟡 P2       | TEST-04         | Abstrair storage do todo store para injeção de mock                     | Médio   | Testabilidade                               |
-| 30  | 🟡 P2       | SYS-GAP-13      | Dois sistemas paralelos de eventos no terminal                          | Baixo   | Duplicação de lógica de tradução            |
-| 31  | 🟡 P2       | SYS-GAP-15      | MCP bridge não usa `buildTool` — dois tiers de tools                    | Médio   | Inconsistência de qualidade                 |
-| 32  | 🟡 P2       | SYS-GAP-16      | Event adapter coverage não testado em CI                                | Baixo   | Cobertura não verificada                    |
-| 33  | 🟡 P2       | INC-06          | Terminal bypassa agent facade para acessar tools                        | Médio   | Acoplamento direto                          |
-| 34  | 🟡 P2       | SDK-BUG-05      | ToolRegistry compartilhado entre sessões sem documentação               | Médio   | Ferramentas podem vazar entre sessões       |
-| 35  | 🟡 P2       | SDK-BUG-06      | Dois sistemas paralelos de user-input incompatíveis                     | Médio   | Respostas perdidas entre os dois paths      |
-| 36  | 🟡 P2       | SDK-BUG-09      | `loadZodToJsonSchema()` usa CJS require — falha em ESM puro             | Baixo   | Tools com Zod ficam sem JSON Schema         |
-| 37  | 🟡 P2       | SDK-BUG-11      | Race condition em `_toolsConfig` concorrente                            | Baixo   | Corrupção de estado                         |
-| 38  | 🟡 P2       | INC-04          | Migração `_migrateJsonLegacy()` síncrona e bloqueante                   | Baixo   | Boot lento com arquivos grandes             |
-| 39  | 🟡 P2       | BUG-20          | `sdk-session-events.js` 1103 linhas — God Object                        | Médio   | Manutenção e teste prejudicados             |
-| 40  | 🟡 P2       | BUG-21          | `agent-runtime-events.js` 691 linhas — God Object                       | Médio   | Manutenção e teste prejudicados             |
-| 41  | 🟢 P3       | SEC-02          | `checkCommandBlocklist` regex — risco de ReDoS                          | Baixo   | Edge case adversarial                       |
-| 42  | 🟢 P3       | SEC-03          | Race no limite de requests de user-input                                | Baixo   | Edge case raro                              |
-| 43  | 🟢 P3       | SEC-04          | Parâmetros advisory mal nomeados em `web-tools`                         | Baixo   | Confusão do usuário                         |
-| 44  | 🟢 P3       | BUG-08          | Timeout git apenas advisory — comandos podem travar                     | Baixo   | Repos gigantes                              |
-| 45  | 🟢 P3       | BUG-14          | `normalizeAgentToolList` não filtra null                                | Baixo   | Entrada fantasma em Set                     |
-| 46  | 🟢 P3       | BUG-16          | Race condition em `answerNext()`                                        | Baixo   | Double-consume assíncrono                   |
-| 47  | 🟢 P3       | BUG-17          | `generateId()` usa `Math.random()`                                      | Baixo   | Colisão remota de IDs de todo               |
-| 48  | 🟢 P3       | BUG-22          | `io-activity-events.js` sem tratamento de erro                          | Baixo   | Falhas silenciosas no listener              |
-| 49  | 🟢 P3       | BUG-23          | Acoplamento forte em `terminal-agent-wiring.js`                         | Baixo   | Fragilidade a mudanças no agent             |
-| 50  | 🟢 P3       | BUG-26          | AbortSignal + withRetry interação defeituosa                            | Baixo   | Erro engolido em retry                      |
-| 51  | 🟢 P3       | BUG-27          | `getAllTools()` sem cache em `deps.js`                                  | Baixo   | Recomputação por request HTTP               |
-| 52  | 🟢 P3       | BUG-28          | `defaultBus` singleton cross-session                                    | Baixo   | Event bleed entre sessões                   |
-| 53  | 🟢 P3       | BUG-29          | `composeHandlers` — semântica de `{}` ambígua (parcialmente corrigido)  | Baixo   | Verificar e documentar contrato             |
-| 54  | 🟢 P3       | BUG-31          | `AuditTrail` race condition read/write                                  | Baixo   | Snapshot potencialmente corrompido          |
-| 55  | 🟢 P3       | BUG-32          | `createRuntimeDisableHook` sem fallback null                            | Baixo   | Crash se null inesperado                    |
-| 56  | 🟢 P3       | BUG-34          | `hooks/index.js` JSDoc duplicado                                        | Baixo   | Documentação confusa                        |
-| 57  | 🟢 P3       | INC-02          | `zPriority`/`zStatus` em `store.js` em vez de `todo-schema.js`          | Baixo   | Acoplamento desnecessário                   |
-| 58  | 🟢 P3       | INC-03          | `maxBytes`/`timeoutMs` sem prefixo `advisory`                           | Baixo   | Inconsistência de nomenclatura              |
-| 59  | 🟢 P3       | INC-05          | `wrapWithStats` sem try/catch individual por tool                       | Baixo   | Falha silenciosa de instrumentação          |
-| 60  | 🟢 P3       | SDK-BUG-07      | Inconsistência de security posture entre `env_read` e `safeEnv`         | Baixo   | Comportamento não documentado               |
-| 61  | 🟢 P3       | SDK-BUG-08      | Métrica de latência enganosa para `request_user_input`                  | Baixo   | Latência reportada incorretamente           |
-| 62  | 🟢 P3       | SDK-BUG-10      | Falso positivo na detecção de Zod (propriedade `_def`)                  | Baixo   | Erro silencioso de conversão                |
-| 63  | 🟢 P3       | SYS-GAP-03      | Sem versionamento de compatibilidade de tools com SDK                   | Baixo   | Quebras silenciosas em updates              |
-| 64  | 🟢 P3       | SYS-GAP-06      | Sem health-check por domínio de tools                                   | Baixo   | Diagnóstico manual                          |
-| 65  | 🟢 P3       | SYS-GAP-07      | Sem health-check granular por subsistema                                | Baixo   | Diagnóstico manual                          |
-| 66  | 🟢 P3       | SYS-GAP-08      | Sem circuit-breaker para hangs em tools internas                        | Baixo   | Tools podem travar indefinidamente          |
-| 67  | 🟢 P3       | SYS-GAP-09      | Segurança fragmentada (safeEnv, BLOCKED_PATTERNS, allowlist, blocklist) | Baixo   | Inconsistência defensiva                    |
-| 68  | 🟢 P3       | SYS-GAP-10      | Sem versionamento semântico das tools para o SDK                        | Baixo   | Quebras silenciosas                         |
-| 69  | 🟢 P3       | OBS-BUG-01      | `logToolFactory()` cai para `console.*`                                 | Baixo   | Logs perdidos durante cold-start            |
-| 70  | 🟢 P3       | OBS-GAP-01      | EventBus desconectado de HookBus até bootstrap                          | Baixo   | Mitigado por ordem de bootstrap             |
-| 71  | 🟢 P3       | OBS-GAP-02      | `defaultBus` singleton causa event bleed cross-session                  | Baixo   | Relacionado a BUG-28                        |
+| 1   | 🔴 P0      | BUG-01          | `getAllTools(registry)` ignora parâmetro — contrato quebrado            | Baixo   | Tools dinâmicas perdidas silenciosamente    |
+| 2   | 🔴 P0      | BUG-04 / BUG-10 | Limites `Infinity` → OOM no `read_file_content`                         | Médio   | Produção down com arquivos grandes          |
+| 3   | 🔴 P0      | SDK-BUG-01      | Double-wrapping logging/metrics entre as duas factories                 | Médio   | Dados de observabilidade incorretos         |
+| 4   | 🔴 P0      | BUG-02          | `resolveRpcTimeoutMs()` é código morto — timeouts RPC inoperantes       | Baixo   | Timeouts RPC completamente ignorados        |
+| 5   | 🔴 P0      | BUG-24          | MCP circuit breaker: state mutable module-level                         | Médio   | Corrupção de estado em concorrência         |
+| 6   | 🟠 P1      | SEC-01          | `safeEnv()` cache frágil + TTL 1s                                       | Baixo   | Credenciais expostas entre reconstruções    |
+| 7   | 🟠 P1      | ENC-03          | Deadlock potencial no mutex do todo store                               | Médio   | Agente trava permanentemente                |
+| 8   | 🟠 P1      | BUG-11          | Memory leak em promises pendentes no shutdown                           | Médio   | Vazamento de memória acumulativo            |
+| 9   | 🟠 P1      | BUG-03          | Fallback no factory sem normalização Zod                                | Médio   | Tools quebram no cold start                 |
+| 10  | 🟠 P1      | SYS-GAP-01      | Sem contrato formal SDK↔Tools                                           | Médio   | Bugs de tipo em runtime                     |
+| 11  | 🟠 P1      | SYS-GAP-04      | Blind spot: bloqueios não rastreados em métricas                        | Médio   | Ataques de enumeração invisíveis            |
+| 12  | 🟠 P1      | SYS-GAP-02      | Dois registries desatualizados (registry Map vs introspecção)           | Médio   | Introspecção mostra estado stale            |
+| 13  | 🟠 P1      | BUG-12          | `production.js` importa `isToolDisabled` diretamente — stale reference  | Médio   | Stale reference em testes e reloads         |
+| 14  | 🟠 P1      | SYS-GAP-14      | `active-tool-call-registry` singleton vs session-scoped                 | Médio   | Vazamento cross-session                     |
+| 15  | 🟠 P1      | SYS-GAP-11      | Terminal sem limites de módulo (nenhuma ESLint rule)                    | Médio   | Degradação arquitetural livre               |
+| 16  | 🟠 P1      | SYS-GAP-12      | Event adapter coverage sem validação build-time                         | Médio   | Eventos silenciosamente ignorados           |
+| 17  | 🟠 P1      | BUG-25          | MCP tools sem `buildTool` wrapper (observabilidade degradada)           | Médio   | Dois tiers de qualidade de tools            |
+| 18  | 🟠 P1      | BUG-33          | Audit preset registra "allow" para hooks denied                         | Médio   | Auditoria enganosa                          |
+| 19  | 🟠 P1      | SDK-BUG-12      | Sem circuit-breaker para hangs em tools                                 | Médio   | Tools podem travar indefinidamente          |
+| 20  | 🟠 P1      | SDK-BUG-02      | Ordem de bootstrap frágil para custom tools builder                     | Médio   | Custom tools inicializam sem logger/metrics |
+| 21  | 🟠 P1      | SDK-BUG-03      | `registerTool()` sobrescreve silenciosamente duplicatas                 | Médio   | Sem detecção de duplicatas em testes        |
+| 22  | 🟠 P1      | SDK-BUG-04      | `_toolsConfig` sem mecanismo de reset para testes                       | Baixo   | Isolamento de testes comprometido           |
+| 23  | 🟠 P1      | OBS-BUG-02      | Double-wrapping de métricas entre as duas factories                     | Médio   | Double counting de métricas                 |
+| 24  | 🟡 P2      | INC-01          | Padronizar `buildTool` universalmente                                   | Médio   | Observabilidade inconsistente               |
+| 25  | 🟡 P2      | SYS-GAP-05      | Sem versionamento semântico das tools                                   | Baixo   | Quebras silenciosas em updates SDK          |
+| 26  | 🟡 P2      | BUG-13          | `custom.js` persiste `handlerId` inválido                               | Médio   | Custom tools falham em build                |
+| 27  | 🟡 P2      | BUG-15          | Shallow copy em `state.js` — corrupção de estado                        | Baixo   | Arrays mutáveis compartilhados              |
+| 28  | 🟡 P2      | BUG-07          | JSON parse sem try/catch específico (DDG fallback)                      | Baixo   | Erro genérico sem informação diagnóstica    |
+| 29  | 🟡 P2      | TEST-04         | Abstrair storage do todo store para injeção de mock                     | Médio   | Testabilidade                               |
+| 30  | 🟡 P2      | SYS-GAP-13      | Dois sistemas paralelos de eventos no terminal                          | Baixo   | Duplicação de lógica de tradução            |
+| 31  | 🟡 P2      | SYS-GAP-15      | MCP bridge não usa `buildTool` — dois tiers de tools                    | Médio   | Inconsistência de qualidade                 |
+| 32  | 🟡 P2      | SYS-GAP-16      | Event adapter coverage não testado em CI                                | Baixo   | Cobertura não verificada                    |
+| 33  | 🟡 P2      | INC-06          | Terminal bypassa agent facade para acessar tools                        | Médio   | Acoplamento direto                          |
+| 34  | 🟡 P2      | SDK-BUG-05      | ToolRegistry compartilhado entre sessões sem documentação               | Médio   | Ferramentas podem vazar entre sessões       |
+| 35  | 🟡 P2      | SDK-BUG-06      | Dois sistemas paralelos de user-input incompatíveis                     | Médio   | Respostas perdidas entre os dois paths      |
+| 36  | 🟡 P2      | SDK-BUG-09      | `loadZodToJsonSchema()` usa CJS require — falha em ESM puro             | Baixo   | Tools com Zod ficam sem JSON Schema         |
+| 37  | 🟡 P2      | SDK-BUG-11      | Race condition em `_toolsConfig` concorrente                            | Baixo   | Corrupção de estado                         |
+| 38  | 🟡 P2      | INC-04          | Migração `_migrateJsonLegacy()` síncrona e bloqueante                   | Baixo   | Boot lento com arquivos grandes             |
+| 39  | 🟡 P2      | BUG-20          | `sdk-session-events.js` 1103 linhas — God Object                        | Médio   | Manutenção e teste prejudicados             |
+| 40  | 🟡 P2      | BUG-21          | `agent-runtime-events.js` 691 linhas — God Object                       | Médio   | Manutenção e teste prejudicados             |
+| 41  | 🟢 P3      | SEC-02          | `checkCommandBlocklist` regex — risco de ReDoS                          | Baixo   | Edge case adversarial                       |
+| 42  | 🟢 P3      | SEC-03          | Race no limite de requests de user-input                                | Baixo   | Edge case raro                              |
+| 43  | 🟢 P3      | SEC-04          | Parâmetros advisory mal nomeados em `web-tools`                         | Baixo   | Confusão do usuário                         |
+| 44  | 🟢 P3      | BUG-08          | Timeout git apenas advisory — comandos podem travar                     | Baixo   | Repos gigantes                              |
+| 45  | 🟢 P3      | BUG-14          | `normalizeAgentToolList` não filtra null                                | Baixo   | Entrada fantasma em Set                     |
+| 46  | 🟢 P3      | BUG-16          | Race condition em `answerNext()`                                        | Baixo   | Double-consume assíncrono                   |
+| 47  | 🟢 P3      | BUG-17          | `generateId()` usa `Math.random()`                                      | Baixo   | Colisão remota de IDs de todo               |
+| 48  | 🟢 P3      | BUG-22          | `io-activity-events.js` sem tratamento de erro                          | Baixo   | Falhas silenciosas no listener              |
+| 49  | 🟢 P3      | BUG-23          | Acoplamento forte em `terminal-agent-wiring.js`                         | Baixo   | Fragilidade a mudanças no agent             |
+| 50  | 🟢 P3      | BUG-26          | AbortSignal + withRetry interação defeituosa                            | Baixo   | Erro engolido em retry                      |
+| 51  | 🟢 P3      | BUG-27          | `getAllTools()` sem cache em `deps.js`                                  | Baixo   | Recomputação por request HTTP               |
+| 52  | 🟢 P3      | BUG-28          | `defaultBus` singleton cross-session                                    | Baixo   | Event bleed entre sessões                   |
+| 53  | 🟢 P3      | BUG-29          | `composeHandlers` — semântica de `{}` ambígua (parcialmente corrigido)  | Baixo   | Verificar e documentar contrato             |
+| 54  | 🟢 P3      | BUG-31          | `AuditTrail` race condition read/write                                  | Baixo   | Snapshot potencialmente corrompido          |
+| 55  | 🟢 P3      | BUG-32          | `createRuntimeDisableHook` sem fallback null                            | Baixo   | Crash se null inesperado                    |
+| 56  | 🟢 P3      | BUG-34          | `hooks/index.js` JSDoc duplicado                                        | Baixo   | Documentação confusa                        |
+| 57  | 🟢 P3      | INC-02          | `zPriority`/`zStatus` em `store.js` em vez de `todo-schema.js`          | Baixo   | Acoplamento desnecessário                   |
+| 58  | 🟢 P3      | INC-03          | `maxBytes`/`timeoutMs` sem prefixo `advisory`                           | Baixo   | Inconsistência de nomenclatura              |
+| 59  | 🟢 P3      | INC-05          | `wrapWithStats` sem try/catch individual por tool                       | Baixo   | Falha silenciosa de instrumentação          |
+| 60  | 🟢 P3      | SDK-BUG-07      | Inconsistência de security posture entre `env_read` e `safeEnv`         | Baixo   | Comportamento não documentado               |
+| 61  | 🟢 P3      | SDK-BUG-08      | Métrica de latência enganosa para `request_user_input`                  | Baixo   | Latência reportada incorretamente           |
+| 62  | 🟢 P3      | SDK-BUG-10      | Falso positivo na detecção de Zod (propriedade `_def`)                  | Baixo   | Erro silencioso de conversão                |
+| 63  | 🟢 P3      | SYS-GAP-03      | Sem versionamento de compatibilidade de tools com SDK                   | Baixo   | Quebras silenciosas em updates              |
+| 64  | 🟢 P3      | SYS-GAP-06      | Sem health-check por domínio de tools                                   | Baixo   | Diagnóstico manual                          |
+| 65  | 🟢 P3      | SYS-GAP-07      | Sem health-check granular por subsistema                                | Baixo   | Diagnóstico manual                          |
+| 66  | 🟢 P3      | SYS-GAP-08      | Sem circuit-breaker para hangs em tools internas                        | Baixo   | Tools podem travar indefinidamente          |
+| 67  | 🟢 P3      | SYS-GAP-09      | Segurança fragmentada (safeEnv, BLOCKED_PATTERNS, allowlist, blocklist) | Baixo   | Inconsistência defensiva                    |
+| 68  | 🟢 P3      | SYS-GAP-10      | Sem versionamento semântico das tools para o SDK                        | Baixo   | Quebras silenciosas                         |
+| 69  | 🟢 P3      | OBS-BUG-01      | `logToolFactory()` cai para `console.*`                                 | Baixo   | Logs perdidos durante cold-start            |
+| 70  | 🟢 P3      | OBS-GAP-01      | EventBus desconectado de HookBus até bootstrap                          | Baixo   | Mitigado por ordem de bootstrap             |
+| 71  | 🟢 P3      | OBS-GAP-02      | `defaultBus` singleton causa event bleed cross-session                  | Baixo   | Relacionado a BUG-28                        |
 
 ---
 
@@ -850,9 +935,9 @@ Objetivo: Substituir singletons por injeção explícita.
 
 ### 16.2 Métricas de Acoplamento (`tools/`)
 
-| Métrica                                                    | Valor                       | Avaliação            |
-| ---------------------------------------------------------- | --------------------------- | -------------------- |
-| Fan-out médio por arquivo                                  | 4.2 imports externos        | Moderado             |
+| Métrica                                                    | Valor                       | Avaliação             |
+| ---------------------------------------------------------- | --------------------------- | --------------------- |
+| Fan-out médio por arquivo                                  | 4.2 imports externos        | Moderado              |
 | Fan-in máximo                                              | `bootstrap.js` (12 imports) | Alto ⚠️               |
 | Arquivos com >5 imports externos                           | 8                           | ⚠️                    |
 | Módulos `#copilot/infra` acessados diretamente de `tools/` | 6 violações                 | ⚠️ Violação de camada |
@@ -898,7 +983,7 @@ Objetivo: Substituir singletons por injeção explícita.
 
 ---
 
-*Documento canônico consolidado gerado em 2026-05-10.*
-*Inclui análise completa de Fase 1 (tools + SDK) e Fase 2 (terminal, hooks, events, bridges, observability, core).*
-*BUG-30 CORRIGIDO na versão atual do código. BUG-35 NÃO REPRODUZIDO (removido). BUG-29 PARCIALMENTE CORRIGIDO.*
-*Auditor: Kilo (automated) — Repositório: chatgpt-docker-puppeteer*
+_Documento canônico consolidado gerado em 2026-05-10._ _Inclui análise completa de Fase 1 (tools +
+SDK) e Fase 2 (terminal, hooks, events, bridges, observability, core)._ _BUG-30 CORRIGIDO na versão
+atual do código. BUG-35 NÃO REPRODUZIDO (removido). BUG-29 PARCIALMENTE CORRIGIDO._ _Auditor: Kilo
+(automated) — Repositório: chatgpt-docker-puppeteer_

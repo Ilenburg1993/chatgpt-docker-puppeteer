@@ -14,6 +14,21 @@ export {
     writeTerminalDisplayToggle,
 } from '../display-policy.js';
 export {
+    renderTerminalPendingQuestionKindLabel,
+    renderTerminalPendingQuestionPromptTag,
+} from '../pending-question-labels.js';
+export {
+    TERMINAL_TIME_DISPLAY_MODES,
+    formatTerminalElapsedDuration,
+    formatTerminalIsoTimestamp,
+    formatTerminalIsoTimestampSeconds,
+    formatTerminalRelativeAge,
+    formatTerminalTimeLabel,
+    formatTerminalTimeParts,
+    formatTerminalTimestamp,
+    resolveTerminalTimeDisplayMode,
+} from '../time-format.js';
+export {
     TERMINAL_DETAIL_LEVELS,
     getTerminalDetailLevel,
     isTerminalDetailLevel,
@@ -21,10 +36,6 @@ export {
     readTerminalUiPreferences,
     setTerminalDetailLevel,
 } from '../ui-preferences.js';
-export {
-    renderTerminalPendingQuestionKindLabel,
-    renderTerminalPendingQuestionPromptTag,
-} from '../pending-question-labels.js';
 export {
     getTerminalThemeName,
     isTerminalThemeName,
@@ -42,14 +53,3 @@ export {
     terminalThemeText,
     terminalThemeWrappedRow,
 } from '../ui-theme.js';
-export {
-    TERMINAL_TIME_DISPLAY_MODES,
-    formatTerminalElapsedDuration,
-    formatTerminalIsoTimestamp,
-    formatTerminalIsoTimestampSeconds,
-    formatTerminalRelativeAge,
-    formatTerminalTimeParts,
-    formatTerminalTimeLabel,
-    formatTerminalTimestamp,
-    resolveTerminalTimeDisplayMode,
-} from '../time-format.js';

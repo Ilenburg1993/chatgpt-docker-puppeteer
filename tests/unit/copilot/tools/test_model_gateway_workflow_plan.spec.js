@@ -34,12 +34,17 @@ function result(input) {
 
 /**
  * @param {{
- *   promotionAuthorization?: { authorized?: boolean; policy?: string; source?: string | null; expiresAt?: string | null };
- *   state?: string;
- *   operationId?: string | null;
- *   sessionId?: string | null;
- *   idempotencyKey?: string | null;
- *   targetRoute?: Record<string, unknown> | null;
+ *     promotionAuthorization?: {
+ *         authorized?: boolean;
+ *         policy?: string;
+ *         source?: string | null;
+ *         expiresAt?: string | null;
+ *     };
+ *     state?: string;
+ *     operationId?: string | null;
+ *     sessionId?: string | null;
+ *     idempotencyKey?: string | null;
+ *     targetRoute?: Record<string, unknown> | null;
  * }} operation
  */
 function classifyDeferredOperation(operation) {
@@ -185,9 +190,7 @@ describe('model_gateway_workflow_plan', () => {
         expect(JSON.stringify(parsed)).not.toContain('"requiresNewSession":true');
     });
 
-    it.each(['__UNSET__', '__none__'])(
-        'normaliza runtimeId %s como runtime default no overview',
-        async (runtimeId) => {
+    it.each(['__UNSET__', '__none__'])('normaliza runtimeId %s como runtime default no overview', async (runtimeId) => {
         inspectOverview.mockResolvedValue(
             result({
                 operation: 'overview',
@@ -235,8 +238,7 @@ describe('model_gateway_workflow_plan', () => {
             errors: [],
         });
         expect(JSON.stringify(parsed)).not.toContain(runtimeId);
-        },
-    );
+    });
 
     it('normaliza runtimeId __none__ antes de aplicar route_switch same-session', async () => {
         const route = {
@@ -380,7 +382,7 @@ describe('model_gateway_workflow_plan', () => {
             requireRuntimeProof: true,
         });
         const parsed = JSON.parse(String(raw));
-        const steps = /** @type {Array<Record<string, any>>} */ (parsed.data.steps);
+        const steps = /** @type {Record<string, any>[]} */ (parsed.data.steps);
         const routeSwitchPlan = steps.find((step) => step['id'] === 'route_switch_plan');
         const routeSwitchApply = steps.find((step) => step['id'] === 'route_switch_apply');
 
@@ -506,7 +508,7 @@ describe('model_gateway_workflow_plan', () => {
             maxRuntimeProofAgeHours: 24,
         });
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const steps = /** @type {Array<Record<string, any>>} */ (parsed.data?.steps ?? []);
+        const steps = /** @type {Record<string, any>[]} */ (parsed.data?.steps ?? []);
 
         expect(parsed).toMatchObject({
             ok: true,

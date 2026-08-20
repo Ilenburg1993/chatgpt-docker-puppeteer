@@ -21,7 +21,10 @@ separado, porta 3009). A comunicação se dá **exclusivamente via HTTP** usando
 **Regra fundamental**: Você (LLM-A) NUNCA fala diretamente com a LLM-B — toda comunicação é
 intermediada pelo Terminal Permanente ativo na porta 3009.
 
-**Identidade de modelo também pertence ao terminal**: não assuma que LLM-B é um modelo fixo. O Model Gateway pode manter ou promover uma rota BYOK diferente preservando a mesma sessão SDK. Para selecionar, provar ou trocar provider/model, carregue `llm-b-route-operator`; comunicação e seleção devem convergir no mesmo `terminal:llm-b`.
+**Identidade de modelo também pertence ao terminal**: não assuma que LLM-B é um modelo fixo. O Model
+Gateway pode manter ou promover uma rota BYOK diferente preservando a mesma sessão SDK. Para
+selecionar, provar ou trocar provider/model, carregue `llm-b-route-operator`; comunicação e seleção
+devem convergir no mesmo `terminal:llm-b`.
 
 ---
 

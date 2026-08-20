@@ -1,13 +1,13 @@
 // @ts-check
 
 import { describe, expect, it } from 'vitest';
+import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
 import {
     getIoDurabilityStats,
     getIoLatencyStats,
     publishIoOperation,
     recordIoLatency,
 } from '../../../../src/copilot/infra/io-observability.js';
-import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
 
 describe('infra/io-observability bounds', () => {
     it('limits diagnostic histogram cardinality for dynamic operation names', () => {

@@ -1,10 +1,11 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-    activity: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/state/activity-state.js').readTerminalActivitySnapshot>} */ ({
+    activity: /** @type {ReturnType<
+    typeof import('../../../../src/copilot/terminal/state/activity-state.js').readTerminalActivitySnapshot
+>} */ ({
         phase: 'tool',
         label: 'Executando tool',
         detail: 'lendo arquivo · src/copilot/terminal/repl/repl-lifecycle.js',
@@ -17,7 +18,9 @@ const mocks = vi.hoisted(() => ({
         updatedAt: Date.parse('2026-05-07T22:00:00.000-03:00'),
         ageMs: 0,
     }),
-    runtime: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeState>} */ ({
+    runtime: /** @type {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalRuntimeState
+>} */ ({
         runtimeId: 'default',
         model: 'auto',
         reasoningEffort: 'xhigh',
@@ -39,7 +42,9 @@ const mocks = vi.hoisted(() => ({
         lastPrInfo: null,
         lastLlmUsage: null,
     }),
-    stream: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalDialogStreamMeta>} */ ({
+    stream: /** @type {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/agent-runtime.js').readTerminalDialogStreamMeta
+>} */ ({
         model: 'claude-sonnet-4.6',
         reasoningEffort: 'xhigh',
     }),
@@ -185,8 +190,7 @@ describe('terminal/live-status-line', () => {
             label: 'Ferramenta em uso',
             detail: 'executando comando longo',
             toolName: 'exec_command',
-            toolTarget:
-                'node -e "setTimeout(() => console.log(\'LONG-TOOL-HEARTBEAT-DONE\'), 4000)"',
+            toolTarget: 'node -e "setTimeout(() => console.log(\'LONG-TOOL-HEARTBEAT-DONE\'), 4000)"',
         };
         const { formatTerminalLiveStatusLine } =
             await import('../../../../src/copilot/terminal/repl/live-status-line.js');
@@ -719,8 +723,7 @@ describe('terminal/live-status-line', () => {
             ...mocks.activity,
             phase: 'error',
             label: 'Falha da rota BYOK no turno',
-            detail:
-                'rota BYOK ficou sem resposta dentro da janela esperada · sem uso do GitHub Copilot/AI Credits · perfil kilo · provedor kilo-code · modelo kilo-auto/free',
+            detail: 'rota BYOK ficou sem resposta dentro da janela esperada · sem uso do GitHub Copilot/AI Credits · perfil kilo · provedor kilo-code · modelo kilo-auto/free',
             source: 'dialog',
             severity: 'error',
             toolName: null,
@@ -749,8 +752,7 @@ describe('terminal/live-status-line', () => {
             ...mocks.activity,
             phase: 'model',
             label: 'Troca de modelo solicitada',
-            detail:
-                'solicitado: old-model → openai/gpt-oss-120b · solicitação manual /byok model · confiança catalog · origem terminal.byok_model · 2026-05-08T01:00:00.000Z · aguardando confirmação do SDK ou próximo uso observado',
+            detail: 'solicitado: old-model → openai/gpt-oss-120b · solicitação manual /byok model · confiança catalog · origem terminal.byok_model · 2026-05-08T01:00:00.000Z · aguardando confirmação do SDK ou próximo uso observado',
             source: 'terminal.byok_model',
             severity: 'info',
             toolName: null,
@@ -779,8 +781,7 @@ describe('terminal/live-status-line', () => {
             ...mocks.activity,
             phase: 'model',
             label: 'Modelo SDK confirmado',
-            detail:
-                'confirmado: kilo-auto/free → terminal-ux-boundary-fixture · raciocínio high · confirma pedido terminal.byok_model',
+            detail: 'confirmado: kilo-auto/free → terminal-ux-boundary-fixture · raciocínio high · confirma pedido terminal.byok_model',
             source: 'sdk',
             severity: 'info',
             toolName: null,

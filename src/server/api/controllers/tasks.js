@@ -1094,14 +1094,12 @@ router.post('/bulk', schemaGuard(bulkTasksSchema), async (req, res) => {
             return res.status(400).json({ success: false, error: 'params.priority inválido', request_id: req.id });
         }
         if (action === 'set_execute_after') {
-            if (
-                !(
-                    executeAfterParam === null ||
-                    executeAfterParam === undefined ||
-                    Number.isFinite(Number(executeAfterParam)) ||
-                    typeof executeAfterParam === 'string'
-                )
-            ) {
+            if (!(
+                executeAfterParam === null ||
+                executeAfterParam === undefined ||
+                Number.isFinite(Number(executeAfterParam)) ||
+                typeof executeAfterParam === 'string'
+            )) {
                 return res
                     .status(400)
                     .json({ success: false, error: 'params.execute_after_ms inválido', request_id: req.id });

@@ -11,8 +11,8 @@
  */
 
 import { defaultAuditLog } from '#copilot/audit';
-import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 import { getTerminalHumanToolName } from '../events/presenters/tools/index.js';
+import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
 
 /**
  * @typedef {object} AuditContext
@@ -96,7 +96,10 @@ function renderAuditTimestamp(entry) {
  * @returns {string}
  */
 function renderAuditDescription(entry, typeLabel) {
-    const data = entry['data'] && typeof entry['data'] === 'object' ? /** @type {Record<string, unknown>} */ (entry['data']) : {};
+    const data =
+        entry['data'] && typeof entry['data'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (entry['data'])
+            : {};
     const toolName = firstString(entry['toolName'], data['toolName']);
     if (toolName) {
         const parts = [getTerminalHumanToolName(toolName)];

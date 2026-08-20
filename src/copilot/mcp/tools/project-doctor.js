@@ -5,10 +5,13 @@
  * @module copilot/mcp/tools/project-doctor
  */
 
-import { readFile } from 'node:fs/promises';
-import { z } from 'zod';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { execGit } from '#copilot/mcp/tools/shared';
+import { join } from 'node:path';
+import { z } from 'zod';
+
+const projectDoctorWorkspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 /**
  * @type {import('../registry.js').McpToolDefinition}
@@ -22,9 +25,9 @@ export const projectDoctorTool = {
     },
     annotations: readOnlyAnnotations(),
     handler: async ({ includeScripts }) => {
-        const packageJsonUrl = new URL('../../../../package.json', import.meta.url);
+        const packageJsonPath = join(getMcpWorkspaceRoot(), 'package.json');
         const packageJson = /** @type {{ scripts?: Record<string, string> }} */ (
-            JSON.parse(await readFile(packageJsonUrl, 'utf8'))
+            JSON.parse((await projectDoctorWorkspaceIo.readTextFresh(packageJsonPath, { includeHash: false })).content)
         );
         const scripts = packageJson.scripts ?? {};
         const relevantScripts = Object.fromEntries(

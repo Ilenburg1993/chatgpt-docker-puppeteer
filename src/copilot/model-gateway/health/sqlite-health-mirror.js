@@ -3,12 +3,17 @@
  * Mirror operational BYOK health into the model-gateway SQLite runtime layer.
  *
  * The source of truth for runtime health remains probe/live execution. This helper only materializes the latest
- * operational health facts into SQLite so catalog explain/search layers can consult them without reading terminal files.
+ * operational health facts into SQLite so catalog explain/search layers can consult them without reading terminal
+ * files.
  *
  * @module copilot/model-gateway/health/sqlite-health-mirror
  */
 
-import { flushByokProviderHealth, listByokProviderModelHealth, subscribeByokProviderHealthChanges } from './provider-health.js';
+import {
+    flushByokProviderHealth,
+    listByokProviderModelHealth,
+    subscribeByokProviderHealthChanges,
+} from './provider-health.js';
 
 const DEFAULT_HEALTH_SQLITE_MIRROR_DEBOUNCE_MS = 1_000;
 
@@ -32,10 +37,21 @@ function errorMessage(value) {
 
 /**
  * @param {object} input
- * @param {{ writeRuntimeHealthRecords(records: readonly unknown[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {{
+ *     writeRuntimeHealthRecords(
+ *         records: readonly unknown[],
+ *         options?: { runId?: string; observedAt?: string | number | Date },
+ *     ): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }>;
+ * }} input.sqliteStore
  * @param {Record<string, unknown>[]} [input.records]
  * @param {string | number | Date} [input.observedAt]
- * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number; records: number }>}
+ * @returns {Promise<{
+ *     runId: string;
+ *     healthObservations: number;
+ *     probeResults: number;
+ *     skippedRecords: number;
+ *     records: number;
+ * }>}
  */
 export async function mirrorByokProviderHealthToSqlite(input) {
     const records = input.records ?? listByokProviderModelHealth();
@@ -55,10 +71,22 @@ export async function mirrorByokProviderHealthToSqlite(input) {
  * runtime facts durable in both operational stores before readiness/live tooling reads them.
  *
  * @param {object} input
- * @param {{ writeRuntimeHealthRecords(records: readonly unknown[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {{
+ *     writeRuntimeHealthRecords(
+ *         records: readonly unknown[],
+ *         options?: { runId?: string; observedAt?: string | number | Date },
+ *     ): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }>;
+ * }} input.sqliteStore
  * @param {Record<string, unknown>[]} [input.records]
  * @param {string | number | Date} [input.observedAt]
- * @returns {Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords: number; records: number; flushed: boolean }>}
+ * @returns {Promise<{
+ *     runId: string;
+ *     healthObservations: number;
+ *     probeResults: number;
+ *     skippedRecords: number;
+ *     records: number;
+ *     flushed: boolean;
+ * }>}
  */
 export async function flushAndMirrorByokProviderHealthToSqlite(input) {
     await flushByokProviderHealth();
@@ -103,7 +131,12 @@ export async function flushAndMirrorByokProviderHealthToSqlite(input) {
  * edge and materializes the latest redacted facts into SQLite for explain/readiness/selection layers.
  *
  * @param {object} input
- * @param {{ writeRuntimeHealthRecords(records: readonly unknown[], options?: { runId?: string; observedAt?: string | number | Date }): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }> }} input.sqliteStore
+ * @param {{
+ *     writeRuntimeHealthRecords(
+ *         records: readonly unknown[],
+ *         options?: { runId?: string; observedAt?: string | number | Date },
+ *     ): Promise<{ runId: string; healthObservations: number; probeResults: number; skippedRecords?: number }>;
+ * }} input.sqliteStore
  * @param {number} [input.debounceMs]
  * @param {boolean} [input.enabled]
  * @param {(error: unknown) => void} [input.onError]

@@ -201,11 +201,10 @@ fluxos operacionais**.
 
 Hoje o sistema tem avanços reais de 2.1:
 
-1. **Boot canônico único já existe e está claro**:
-   `terminal/bootstrap.js` → `boot/runtime-bootstrap.js` → `runtime-wiring.js` → `terminal/` +
-   `server/`.
-2. **`presentation/` já opera como camada compartilhada de borda**, evitando que `server/` e
-   partes compartilhadas de `terminal/` importem detalhes internos do runtime diretamente.
+1. **Boot canônico único já existe e está claro**: `terminal/bootstrap.js` →
+   `boot/runtime-bootstrap.js` → `runtime-wiring.js` → `terminal/` + `server/`.
+2. **`presentation/` já opera como camada compartilhada de borda**, evitando que `server/` e partes
+   compartilhadas de `terminal/` importem detalhes internos do runtime diretamente.
 3. **`agent/` já está materialmente modularizado** em `dialog/`, `lifecycle/`, `session/`,
    `messaging/`, `infra/`, `facades/`, `runtime/`, `ports/`, `state/` e `context/`.
 4. **`AgentContext` e o singleton default já foram parcialmente saneados**, reduzindo acoplamento
@@ -215,15 +214,16 @@ Mas o AS-IS ainda revela quatro classes de confusão arquitetural:
 
 ### Métrica objetiva (2026-05-13) — imports internos via barrel no `agent` (comparado ao padrão do `terminal`)
 
-Para evitar avaliação subjetiva, foi aplicada a mesma régua nos dois domínios (`import` relativo para `.../index.js` vs
-`import` relativo para arquivo folha):
+Para evitar avaliação subjetiva, foi aplicada a mesma régua nos dois domínios (`import` relativo
+para `.../index.js` vs `import` relativo para arquivo folha):
 
 | Domínio    | Imports relativos totais | Via barrel (`index.js`) | Via arquivo folha | % barrel relativo |
 | ---------- | -----------------------: | ----------------------: | ----------------: | ----------------: |
 | `agent`    |                      238 |                      36 |               202 |            15.13% |
 | `terminal` |                      233 |                     153 |                80 |            65.66% |
 
-Leitura: no critério “barrel-first interno”, o `agent` ainda está muito distante do padrão já praticado no `terminal`.
+Leitura: no critério “barrel-first interno”, o `agent` ainda está muito distante do padrão já
+praticado no `terminal`.
 
 Gap estrutural de barrels no `agent` (atual):
 
@@ -253,8 +253,8 @@ Hoje há mais de um caminho operacional legítimo para falar com a mesma sessão
 4. **hub conversacional** via `conversation-hub/send-pipeline.js`;
 5. **bridge em-processo** via `channel/client.js`.
 
-Esses caminhos não são todos bugs — alguns são necessários —, porém **a política de quando usar
-cada um está espalhada**, e não concentrada em um único orquestrador de interação.
+Esses caminhos não são todos bugs — alguns são necessários —, porém **a política de quando usar cada
+um está espalhada**, e não concentrada em um único orquestrador de interação.
 
 ### C) Root do `agent/` ainda está “barrel-first”, mas não “root-clean”
 
@@ -461,8 +461,8 @@ Toda entrada de mensagem/comando deve ser classificada por uma **única orquestr
 3. **intervention**
 4. **hub-send**
 
-Mas a decisão e a política de fallback entre eles deve viver em **um único módulo orquestrador**,
-em vez de ficar dividida entre `presentation/agent/control/handlers.js`, `conversation-hub` e
+Mas a decisão e a política de fallback entre eles deve viver em **um único módulo orquestrador**, em
+vez de ficar dividida entre `presentation/agent/control/handlers.js`, `conversation-hub` e
 `channel/client`.
 
 Em outras palavras: múltiplas capacidades podem continuar existindo, mas **o cérebro que escolhe o
@@ -615,8 +615,8 @@ Não deve continuar funcionando como “barrel de quase tudo”.
 
 #### Subfase C1.3 — Barrelização interna completa do `agent` (modelo operacional já praticado no `terminal`)
 
-Objetivo desta subfase: tornar o `agent` **100% importável via barrel index** no consumo interno entre subdomínios,
-eliminando imports relativos para arquivos folha como caminho padrão.
+Objetivo desta subfase: tornar o `agent` **100% importável via barrel index** no consumo interno
+entre subdomínios, eliminando imports relativos para arquivos folha como caminho padrão.
 
 Escopo de ataque prioritário (por impacto medido):
 
@@ -705,8 +705,8 @@ Gate de saída Onda 3:
 #### Subfase C3.2 — `always-alive.js`
 
 - Status 2026-05-13: **iniciada / parcialmente concluída**.
-- Leitura nova desta auditoria: o objetivo já não é só “reduzir linhas”, e sim **retirar da classe
-  o papel de super-hub operacional**.
+- Leitura nova desta auditoria: o objetivo já não é só “reduzir linhas”, e sim **retirar da classe o
+  papel de super-hub operacional**.
 - Próximo passo correto:
   1. continuar extraindo delegações em subfachadas;
   2. reduzir imports diretos da root surface interna;
@@ -763,8 +763,7 @@ Gate de saída Onda 3:
 
 #### Subfase D2.3 — Testes de fluxo único
 
-- Validar que `server`, `channel`, `hub` e `terminal` convergem para a taxonomia única de
-  interação;
+- Validar que `server`, `channel`, `hub` e `terminal` convergem para a taxonomia única de interação;
 - detectar fallback silencioso e policy drift;
 - DoD: nenhuma borda cria fluxo paralelo sem contrato deliberado.
 
@@ -793,33 +792,36 @@ Dependências críticas:
 - **A pronta:** zero hangs conhecidos de shutdown/turn/restart + races críticas saneadas.
 - **B pronta:** boundary SDK resiliente + hook/system context robustos.
 - **C pronta:** runtime com superfície única, fluxo único e root-clean.
-- **C pronta:** runtime com superfície única, fluxo único, root-clean e imports internos do `agent` via barrel index.
+- **C pronta:** runtime com superfície única, fluxo único, root-clean e imports internos do `agent`
+  via barrel index.
 - **D pronta:** CI/testes impedem retorno de superfícies paralelas e fluxos paralelos.
 
 ---
 
 ## 5.1) Atualização executiva — ONDA 2 barrel-first fechada (2026-05-13)
 
-A ONDA 2 citada no artefato C3.2 foi retomada antes de avançar na decomposição de `AlwaysAliveAgent`. A validação
-começou pelo gate solicitado:
+A ONDA 2 citada no artefato C3.2 foi retomada antes de avançar na decomposição de
+`AlwaysAliveAgent`. A validação começou pelo gate solicitado:
 
 - `npm run typecheck:strict:src.copilot`.
 
-O primeiro strict falhou por problema estrutural da migração parcial anterior: três barrels novos estavam
-auto-referenciais e, por isso, não exportavam os contratos que os consumidores já esperavam.
+O primeiro strict falhou por problema estrutural da migração parcial anterior: três barrels novos
+estavam auto-referenciais e, por isso, não exportavam os contratos que os consumidores já esperavam.
 
 Correções:
 
 - `src/copilot/agent/error/index.js` → reexporta `../error-policy.js`;
 - `src/copilot/agent/runtime/contracts/index.js` → reexporta `../../runtime-contracts.js`;
-- `src/copilot/agent/event-bridge/index.js` → reexporta `../event-bridge-wiring.js` e `../event-bridge-map.js`.
+- `src/copilot/agent/event-bridge/index.js` → reexporta `../event-bridge-wiring.js` e
+  `../event-bridge-map.js`.
 
 Depois disso, a ONDA 2 avançou para o padrão de `terminal`/`presentation`:
 
 - todo `index.js` do `agent` permanece barrel puro;
 - imports operacionais cross-folder dentro de `agent` passam por `*/index.js`;
-- dependências externas a `agent` passam por superfícies públicas (`#copilot/config`, `#copilot/config/agent`, `#copilot/core`,
-  `#copilot/dialog`, `#copilot/bridges`, `#copilot/event-handlers`, `#copilot/observability`, `#copilot/sdk`);
+- dependências externas a `agent` passam por superfícies públicas (`#copilot/config`,
+  `#copilot/config/agent`, `#copilot/core`, `#copilot/dialog`, `#copilot/bridges`,
+  `#copilot/event-handlers`, `#copilot/observability`, `#copilot/sdk`);
 - same-folder privado continua permitido, conforme a política 2.1 já validada em `terminal`;
 - reexports leaf dentro de `index.js` continuam permitidos por serem a própria função dos barrels.
 
@@ -828,8 +830,8 @@ Superfícies públicas ajustadas:
 - `#copilot/dialog` formalizado no `package.json` e em `tsconfig.base.json`;
 - `#copilot/bridges` exporta `createMcpToolBridge`;
 - `#copilot/observability` exporta `buildStatusSnapshot`;
-- `#copilot/config/agent` foi formalizado como sub-barrel público das constantes operacionais de `config/agent.js`,
-  preservando o root `#copilot/config` mais estreito.
+- `#copilot/config/agent` foi formalizado como sub-barrel público das constantes operacionais de
+  `config/agent.js`, preservando o root `#copilot/config` mais estreito.
 
 Métrica final da ONDA 2:
 
@@ -851,10 +853,11 @@ Gates executados:
 
 Impacto no roadmap:
 
-- D1.1 deixa de ser apenas recomendação e passa a ter guardrail real para o padrão barrel-first do `agent`;
+- D1.1 deixa de ser apenas recomendação e passa a ter guardrail real para o padrão barrel-first do
+  `agent`;
 - C3.2 pode prosseguir sobre base de imports/exports estabilizada;
-- `#copilot/agent/*` wildcard permanece como compatibilidade white-box/testes, ainda pendente para uma etapa futura de
-  fechamento total de surface pública, mas sem bloquear a ONDA 2.
+- `#copilot/agent/*` wildcard permanece como compatibilidade white-box/testes, ainda pendente para
+  uma etapa futura de fechamento total de surface pública, mas sem bloquear a ONDA 2.
 
 ---
 
@@ -870,10 +873,10 @@ verdade. Mas ainda falta o passo decisivo desta fase 2.1:
 > **transformar a arquitetura “modular e robusta” em arquitetura “única, padronizada e sem fluxos
 > paralelos”**.
 
-**Diretriz executiva atualizada:** a prioridade já não deve ser apenas continuar quebrando
-hotspots; a prioridade deve ser **unificar o fluxo operacional e a taxonomia de interação**, limpar
-o root do `agent/`, reduzir superfícies concorrentes e devolver `presentation/` ao papel estrito de
-camada compartilhada de borda.
+**Diretriz executiva atualizada:** a prioridade já não deve ser apenas continuar quebrando hotspots;
+a prioridade deve ser **unificar o fluxo operacional e a taxonomia de interação**, limpar o root do
+`agent/`, reduzir superfícies concorrentes e devolver `presentation/` ao papel estrito de camada
+compartilhada de borda.
 
 Esse é o caminho para cumprir, de fato, a arquitetura 2.0/2.1 pretendida: **um runtime owner, uma
 política de acesso, um fluxo único, um conjunto pequeno de superfícies explícitas e governança dura
@@ -884,8 +887,8 @@ contra regressão**.
 ## 6.1) Atualização factual — seam canônico `#copilot/runtime` (2026-05-13)
 
 Depois da revisão completa do estado da ONDA 2/3 e da execução de `typecheck` estrito também para os
-testes de `src/copilot`, foi consolidado o ponto de acoplamento externo entre `agent` e o restante do
-copilot:
+testes de `src/copilot`, foi consolidado o ponto de acoplamento externo entre `agent` e o restante
+do copilot:
 
 - novo barrel `src/copilot/runtime/index.js`;
 - novo alias `#copilot/runtime`;

@@ -62,7 +62,6 @@ describe('terminal/capabilities/picker-runner', () => {
         );
     });
 
-
     it('falha fechado quando stdout não corresponde a item conhecido', () => {
         const result = runTerminalExternalPicker(ITEMS, {
             command: 'gum',

@@ -1,12 +1,19 @@
 import fs from 'fs';
 
-/** @typedef {{ code: number, message: string, file?: string, line: number, column: number }} DiagnosticEntry */
+/** @typedef {{ code: number; message: string; file?: string; line: number; column: number }} DiagnosticEntry */
 /** @typedef {DiagnosticEntry & { reason: string }} CategorizedDiagnostic */
 /** @type {{ errors: DiagnosticEntry[] }} */
 const report = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
 // Categorias de erros
-/** @type {{ runtimeBugs: CategorizedDiagnostic[], typeWarnings: CategorizedDiagnostic[], falsPositives: CategorizedDiagnostic[], configIssues: CategorizedDiagnostic[] }} */
+/**
+ * @type {{
+ *     runtimeBugs: CategorizedDiagnostic[];
+ *     typeWarnings: CategorizedDiagnostic[];
+ *     falsPositives: CategorizedDiagnostic[];
+ *     configIssues: CategorizedDiagnostic[];
+ * }}
+ */
 const categories = {
     runtimeBugs: [], // Erros que podem causar bugs em runtime
     typeWarnings: [], // Avisos de tipo (não afetam runtime)

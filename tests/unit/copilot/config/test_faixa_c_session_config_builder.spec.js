@@ -721,20 +721,30 @@ describe('ClientOptionsBuilder', () => {
             process.env['COPILOT_BYOK_MODELS'] = 'provider-model,provider-model-2';
             process.env['COPILOT_BYOK_API_KEY'] = 'secret';
             process.env['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'] = 'false';
-            const gatewayHandler = vi.fn(async () => [{
-                id: 'gateway-model',
-                name: 'Gateway Model',
-                capabilities: { supports: { vision: false, reasoningEffort: false }, limits: { max_context_window_tokens: 128000 } },
-            }]);
+            const gatewayHandler = vi.fn(async () => [
+                {
+                    id: 'gateway-model',
+                    name: 'Gateway Model',
+                    capabilities: {
+                        supports: { vision: false, reasoningEffort: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
+                },
+            ]);
 
             const opts = buildTerminalCopilotClientOptions({ onListModels: gatewayHandler });
 
             expect(opts.onListModels).toBe(gatewayHandler);
-            await expect(opts.onListModels?.()).resolves.toEqual([{
-                id: 'gateway-model',
-                name: 'Gateway Model',
-                capabilities: { supports: { vision: false, reasoningEffort: false }, limits: { max_context_window_tokens: 128000 } },
-            }]);
+            await expect(opts.onListModels?.()).resolves.toEqual([
+                {
+                    id: 'gateway-model',
+                    name: 'Gateway Model',
+                    capabilities: {
+                        supports: { vision: false, reasoningEffort: false },
+                        limits: { max_context_window_tokens: 128000 },
+                    },
+                },
+            ]);
             expect(gatewayHandler).toHaveBeenCalledTimes(1);
         } finally {
             process.env = original;

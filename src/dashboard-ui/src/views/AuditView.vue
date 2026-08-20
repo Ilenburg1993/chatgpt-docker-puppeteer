@@ -130,7 +130,8 @@ onMounted(async () => {
         await listJobs();
         stats.value = {
             jobsTotal: jobs.value.length,
-            jobsPending: jobs.value.filter((j: { status?: string }) => j.status === 'pending' || j.status === 'running').length,
+            jobsPending: jobs.value.filter((j: { status?: string }) => j.status === 'pending' || j.status === 'running')
+                .length,
             patchesApproved: jobs.value.filter((j: { status?: string }) => j.status === 'waiting_approval').length,
             findingsCount: 0,
         };

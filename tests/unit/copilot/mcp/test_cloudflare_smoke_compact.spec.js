@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
 import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,
@@ -10,6 +8,8 @@ import {
     parseConnectorSmokeJsonOutput,
     summarizeConnectorSmokeReport,
 } from '#copilot/mcp/tools';
+import { readFile } from 'node:fs/promises';
+import { describe, expect, it } from 'vitest';
 
 describe('cloudflare connector smoke compact mode', () => {
     it('runs the canonical connector smoke in-process instead of paying child-process lifetime overhead', async () => {
@@ -88,8 +88,10 @@ describe('cloudflare connector smoke compact mode', () => {
     });
 
     it('classifies origin errors separately from recovered tunnel transport errors', () => {
-        const originLine = '2026-06-10T16:14:19Z ERR failed to serve incoming request error="Failed to proxy HTTP: Unable to reach the origin service: tls: first record does not look like a TLS handshake"';
-        const transportLine = '2026-06-10T16:14:19Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=0';
+        const originLine =
+            '2026-06-10T16:14:19Z ERR failed to serve incoming request error="Failed to proxy HTTP: Unable to reach the origin service: tls: first record does not look like a TLS handshake"';
+        const transportLine =
+            '2026-06-10T16:14:19Z ERR failed to accept incoming stream requests error="failed to accept QUIC stream: timeout: no recent network activity" connIndex=0';
 
         expect(isCloudflaredOriginErrorLine(originLine)).toBe(true);
         expect(isCloudflaredTunnelTransportErrorLine(originLine)).toBe(false);

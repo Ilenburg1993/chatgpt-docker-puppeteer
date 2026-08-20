@@ -69,7 +69,11 @@ export function cmdUsage({ println }, arg) {
     const tokens = cleanArg.trim().toLowerCase().split(/\s+/u).filter(Boolean);
     const trimmed = tokens.join(' ');
     const showNow = tokens.includes('now');
-    const detail = tokens.includes('detail') || tokens.includes('--detail') || tokens.includes('debug') || tokens.includes('--debug');
+    const detail =
+        tokens.includes('detail') ||
+        tokens.includes('--detail') ||
+        tokens.includes('debug') ||
+        tokens.includes('--debug');
 
     if (showNow) {
         const projection = callWithRuntimeTarget(readTerminalUsageNowProjection, runtimeId);
@@ -80,27 +84,25 @@ export function cmdUsage({ println }, arg) {
             const bar = _renderBar(ctx.utilization);
             println('');
             println(terminalThemeHeadline('command', 'Janela de contexto', [`${bar} ${pct}%`]));
-            println(terminalThemeRow('Tokens', `${ctx.tokens.toLocaleString('pt-BR')} / ${ctx.tokenLimit.toLocaleString('pt-BR')}`, {
-                role: 'info',
-            }));
+            println(
+                terminalThemeRow(
+                    'Tokens',
+                    `${ctx.tokens.toLocaleString('pt-BR')} / ${ctx.tokenLimit.toLocaleString('pt-BR')}`,
+                    {
+                        role: 'info',
+                    },
+                ),
+            );
         } else {
             const knownLimit = readKnownContextLimit(configProjection);
             println('');
             println(terminalThemeHeadline('command', 'Janela de contexto', ['uso ainda não medido']));
-            println(
-                terminalThemeRow(
-                    'Medição',
-                    'SDK ainda não reportou tokens usados nesta sessão',
-                    { role: 'warn' },
-                ),
-            );
+            println(terminalThemeRow('Medição', 'SDK ainda não reportou tokens usados nesta sessão', { role: 'warn' }));
             if (knownLimit !== null) {
                 println(
-                    terminalThemeRow(
-                        'Limite do modelo',
-                        `${knownLimit.toLocaleString('pt-BR')} tokens`,
-                        { role: 'info' },
-                    ),
+                    terminalThemeRow('Limite do modelo', `${knownLimit.toLocaleString('pt-BR')} tokens`, {
+                        role: 'info',
+                    }),
                 );
             }
         }
@@ -117,11 +119,7 @@ export function cmdUsage({ println }, arg) {
                 : `rota ${modelBilling.displayModel}${modelBilling.observedModel && modelBilling.observedModel !== modelBilling.displayModel ? ` · observado ${modelBilling.observedModel}` : ''}`;
             if (byokActive) {
                 println(
-                    terminalThemeRow(
-                        'Rota BYOK',
-                        `${byokRouteLabel} · modelo ${byokModelLabel}`,
-                        { role: 'success' },
-                    ),
+                    terminalThemeRow('Rota BYOK', `${byokRouteLabel} · modelo ${byokModelLabel}`, { role: 'success' }),
                 );
                 println(
                     terminalThemeRow(
@@ -138,20 +136,13 @@ export function cmdUsage({ println }, arg) {
                 );
             }
         } else if (byokActive) {
-            println(
-                terminalThemeRow(
-                    'Rota BYOK',
-                    `${byokRouteLabel} · modelo ${byokModelLabel}`,
-                    { role: 'success' },
-                ),
-            );
+            println(terminalThemeRow('Rota BYOK', `${byokRouteLabel} · modelo ${byokModelLabel}`, { role: 'success' }));
             println(terminalThemeRow('Histórico', 'Copilot sem snapshot histórico classificado'));
         } else {
             println(terminalThemeRow('Uso Copilot', 'sem snapshot histórico classificado'));
         }
         if (projection.llmUsage) {
-            const llmCost =
-                projection.llmUsageBilling.cost === null ? '?' : projection.llmUsageBilling.cost.toFixed(4);
+            const llmCost = projection.llmUsageBilling.cost === null ? '?' : projection.llmUsageBilling.cost.toFixed(4);
             const llmClass =
                 typeof projection.llmUsage['classification'] === 'string'
                     ? projection.llmUsage['classification']
@@ -183,15 +174,15 @@ export function cmdUsage({ println }, arg) {
                 );
                 println(terminalThemeRow('Origem', billingSource));
                 println(terminalThemeRow('Tipo', llmUsageKind));
-                println(terminalThemeRow('Mais detalhes', '/usage now detail para classe técnica', { role: 'command' }));
+                println(
+                    terminalThemeRow('Mais detalhes', '/usage now detail para classe técnica', { role: 'command' }),
+                );
             }
             if (/ask_user|user_input/iu.test(llmClass) || /ask_user|user_input/iu.test(llmReason)) {
                 println(
-                    terminalThemeRow(
-                        'Pergunta',
-                        'telemetria pós-resposta humana separada da fala inicial',
-                        { role: 'success' },
-                    ),
+                    terminalThemeRow('Pergunta', 'telemetria pós-resposta humana separada da fala inicial', {
+                        role: 'success',
+                    }),
                 );
                 println(
                     terminalThemeRow('Conferir', '/events event=assistant.message · /export', {
@@ -207,14 +198,22 @@ export function cmdUsage({ println }, arg) {
             println(
                 detail
                     ? terminalThemeRow('Vínculo', `ambiente ${runtimeLabel} · SDK ${sdkLabel} · hub ${hubLabel}`)
-                    : terminalThemeRow('Conexão', `${renderUsageBindingSummary({
-                          runtimeSessionId: projection.runtimeSessionId,
-                          sdkSessionId: projection.binding.sdkSessionId,
-                          hubSessionId: projection.binding.hubSessionId,
-                      })} · IDs em /usage now detail`),
+                    : terminalThemeRow(
+                          'Conexão',
+                          `${renderUsageBindingSummary({
+                              runtimeSessionId: projection.runtimeSessionId,
+                              sdkSessionId: projection.binding.sdkSessionId,
+                              hubSessionId: projection.binding.hubSessionId,
+                          })} · IDs em /usage now detail`,
+                      ),
             );
         }
-        println(terminalThemeRow('Modo', `SDK ${renderUsageSdkMode(configProjection.sdkSessionMode)} · plano ${configProjection.sdkPlanOperation ?? '(sem alterações)'}`));
+        println(
+            terminalThemeRow(
+                'Modo',
+                `SDK ${renderUsageSdkMode(configProjection.sdkSessionMode)} · plano ${configProjection.sdkPlanOperation ?? '(sem alterações)'}`,
+            ),
+        );
         println('');
         return;
     }

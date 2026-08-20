@@ -5,8 +5,8 @@
  * @module copilot/infra/storage/json-store
  */
 
-import { existsSync } from 'node:fs';
 import { writeFileAtomicPortable } from '../io/fs/portable-atomic.js';
+import { statPath } from '../io/fs/read-services.js';
 import { readTextFileSnapshot } from '../io/fs/read-text.js';
 
 /**
@@ -35,8 +35,15 @@ export async function writeJson(filePath, data) {
 
 /**
  * @param {string} filePath
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-export function fileExists(filePath) {
-    return existsSync(filePath);
+export async function fileExists(filePath) {
+    try {
+        const { stats } = await statPath(filePath, { advisoryLimits: { caller: 'infra.storage.json-store' } });
+        return stats.isFile() || stats.isDirectory();
+    } catch (error) {
+        const code = /** @type {{ code?: unknown }} */ (error)?.code;
+        if (code === 'ENOENT' || code === 'ENOTDIR') return false;
+        throw error;
+    }
 }

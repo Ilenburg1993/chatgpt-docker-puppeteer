@@ -1,7 +1,6 @@
 // @ts-check
 import { toError, withIoMeta } from '#copilot/core';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
-import { stat as fsStat } from 'node:fs/promises';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
@@ -9,8 +8,8 @@ import { readFileContentTool, readFilesBatchTool } from './read/index.js';
 /**
  * src/copilot/tools/file/read-tools.js
  *
- * Barrel canônico das file read tools. Contém: readFileContent, listDirectory, diffFiles.
- * Search tools (search_in_files, workspace_symbol_search, find_symbol_usages) vivem em `../search/`.
+ * Barrel canônico das file read tools. Contém: readFileContent, listDirectory, diffFiles. Search tools
+ * (search_in_files, workspace_symbol_search, find_symbol_usages) vivem em `../search/`.
  *
  * @module copilot/tools/file/read-tools
  */
@@ -24,20 +23,28 @@ import {
     WORKSPACE_ROOT,
 } from './shared.js';
 
-const { diffText, diffTextValidated, scanDirectory, scanDirectoryValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { diffText, diffTextValidated, scanDirectory, scanDirectoryValidated, statPath, statPathValidated } =
+    createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
-/** @param {{ resolved: string; validatedReadPath?: unknown }} target @param {Parameters<typeof scanDirectory>[1]} options */
+/** @param {{ resolved: string; validatedReadPath?: unknown }} target @param {Parameters<typeof scanDirectory>[1]}
+  options */
 function scanValidatedOrString(target, options) {
     return target.validatedReadPath
         ? scanDirectoryValidated(target.validatedReadPath, options)
         : scanDirectory(target.resolved, options);
 }
 
-/** @param {{ resolved: string; validatedReadPath?: unknown }} pathA @param {{ resolved: string; validatedReadPath?: unknown }} pathB @param {Parameters<typeof diffText>[2]} options */
+/** @param {{ resolved: string; validatedReadPath?: unknown }} pathA @param {{ resolved: string; validatedReadPath?:
+  unknown }} pathB @param {Parameters<typeof diffText>[2]} options */
 function diffValidatedPairOrString(pathA, pathB, options) {
     return pathA.validatedReadPath && pathB.validatedReadPath
         ? diffTextValidated(pathA.validatedReadPath, pathB.validatedReadPath, options)
         : diffText(pathA.resolved, pathB.resolved, options);
+}
+
+/** @param {{ resolved: string; validatedReadPath?: unknown }} target */
+function statValidatedOrString(target) {
+    return target.validatedReadPath ? statPathValidated(target.validatedReadPath) : statPath(target.resolved);
 }
 
 export { readFileContentTool, readFilesBatchTool } from './read/index.js';
@@ -67,7 +74,8 @@ export const listDirectoryTool = buildTool({
             .int()
             .min(1)
             .optional()
-            .default(3)['describe']('Profundidade máxima para listagem recursiva. Informativa e controlada pelo caller.'),
+            .default(3)
+            ['describe']('Profundidade máxima para listagem recursiva. Informativa e controlada pelo caller.'),
         showHidden: z.boolean().optional().default(false)['describe']('Incluir arquivos/diretórios ocultos (dotfiles)'),
         filter: z.string().optional()['describe']('Glob pattern para filtrar entradas (ex: *.js, *.md)'),
         maxEntries: z.number().int().positive().optional()['describe']('Máximo de entradas de topo a retornar.'),
@@ -90,7 +98,7 @@ export const listDirectoryTool = buildTool({
          */
 
         try {
-            const stats = await fsStat(resolved);
+            const stats = (await statValidatedOrString(validated)).stats;
             if (!stats.isDirectory()) return { success: false, error: 'Não é um diretório, use read_file_content.' };
             const scan = await scanValidatedOrString(validated, {
                 recursive,
@@ -168,7 +176,8 @@ export const diffFilesTool = buildTool({
             .int()
             .min(0)
             .optional()
-            .default(3)['describe']('Número de linhas de contexto exibidas ao redor de cada mudança (padrão histórico: 3)'),
+            .default(3)
+            ['describe']('Número de linhas de contexto exibidas ao redor de cada mudança (padrão histórico: 3)'),
     }),
     handler: async ({ path_a, path_b, context_lines }) => {
         const va = await validatePath(path_a, { mode: 'read', issueReadCapability: true });

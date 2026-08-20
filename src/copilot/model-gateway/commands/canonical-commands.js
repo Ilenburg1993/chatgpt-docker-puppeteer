@@ -57,7 +57,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'orientation',
         surface: 'package',
         command: 'npm run model-gateway:operator-ready',
-        summary: 'Show the read-only operator/LLM readiness cockpit with checks, standby routes and next safe commands.',
+        summary:
+            'Show the read-only operator/LLM readiness cockpit with checks, standby routes and next safe commands.',
     },
     {
         id: 'lint.scoped',
@@ -148,7 +149,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'pre-runtime',
         surface: 'package',
         command: 'npm run model-gateway:runtime-health:mirror',
-        summary: 'Mirror already-observed BYOK health into SQLite runtime tables without provider calls or catalog mutation.',
+        summary:
+            'Mirror already-observed BYOK health into SQLite runtime tables without provider calls or catalog mutation.',
     },
     {
         id: 'sqlite.retention',
@@ -163,7 +165,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'metadata',
         surface: 'package',
         command: 'npm run model-gateway:sqlite:retention:apply -- --json',
-        summary: 'Apply SQLite operational retention for account/key quota, rate-limit, spending, route, refresh and runtime health tables.',
+        summary:
+            'Apply SQLite operational retention for account/key quota, rate-limit, spending, route, refresh and runtime health tables.',
     },
     {
         id: 'prebuild.all',
@@ -304,7 +307,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'automation',
         surface: 'package',
         command: 'npm run model-gateway:auto:doctor',
-        summary: 'Explain model-gateway auto policy, blockers, ledgers and next operational steps without runtime calls.',
+        summary:
+            'Explain model-gateway auto policy, blockers, ledgers and next operational steps without runtime calls.',
     },
     {
         id: 'automation.explain',
@@ -339,14 +343,16 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'automation',
         surface: 'package',
         command: 'npm run model-gateway:auto:proof-plan',
-        summary: 'Build a read-only queue of explicit provider/model runtime proof commands for blocked auto fallback candidates.',
+        summary:
+            'Build a read-only queue of explicit provider/model runtime proof commands for blocked auto fallback candidates.',
     },
     {
         id: 'automation.standby',
         phase: 'automation',
         surface: 'package',
         command: 'npm run model-gateway:auto:standby',
-        summary: 'List selected and alternate standby routes with explicit operator commands without calling providers.',
+        summary:
+            'List selected and alternate standby routes with explicit operator commands without calling providers.',
     },
     {
         id: 'automation.standby-write-sqlite',
@@ -381,8 +387,10 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         id: 'runtime-health.clear',
         phase: 'live-readiness',
         surface: 'package',
-        command: 'npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent --apply',
-        summary: 'Clear scoped operational runtime health after reset or fixture contamination; dry-run unless --apply is provided.',
+        command:
+            'npm run model-gateway:runtime-health:clear -- --provider=zai --model=glm-4.5-flash --profile=repo_agent --apply',
+        summary:
+            'Clear scoped operational runtime health after reset or fixture contamination; dry-run unless --apply is provided.',
     },
     {
         id: 'live.readiness',
@@ -439,8 +447,7 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         surface: 'package',
         command:
             'npm run model-gateway:live:llm-b -- --byok-real --byok-real-route-profile=repo_agent --byok-real-route-fallback-profiles=code,tool_agent --byok-real-route-selection-policy=prefer_runtime_proved --byok-real-route-execute --byok-real-route-allow-probe --byok-real-route-temporary-failure-cooldown-ms=900000 --byok-real-route-max-attempts=8 --byok-real-route-max-attempts-per-provider=4 --byok-real-route-timeout-ms=20000 --no-pr --timeout-ms=240000',
-        summary:
-            'Run real BYOK preflight probes only after the runtime selector chooses the route profile to apply.',
+        summary: 'Run real BYOK preflight probes only after the runtime selector chooses the route profile to apply.',
     },
     {
         id: 'live.terminal.byok-real-full',
@@ -728,7 +735,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         id: 'make.runtime-health-clear',
         phase: 'live-readiness',
         surface: 'make',
-        command: 'make model-gateway-runtime-health-clear ARGS="--provider=zai --model=glm-4.5-flash --profile=repo_agent"',
+        command:
+            'make model-gateway-runtime-health-clear ARGS="--provider=zai --model=glm-4.5-flash --profile=repo_agent"',
         summary: 'Makefile alias for scoped runtime health clear preview/apply.',
     },
     {
@@ -883,7 +891,8 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'automation',
         surface: 'terminal',
         command: '/byok auto proof-plan profile:repo_agent 12',
-        summary: 'Render explicit provider/model probe commands for blocked runtime-selector fallback candidates without calling providers.',
+        summary:
+            'Render explicit provider/model probe commands for blocked runtime-selector fallback candidates without calling providers.',
     },
     {
         id: 'terminal.auto-standby',
@@ -904,21 +913,24 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
         phase: 'automation',
         surface: 'terminal',
         command: '/byok auto recovery-fixture profile:repo_agent provider:zai model:glm-4.5-flash failure:rate-limit',
-        summary: 'Persist a synthetic post-turn recovery attempt and fixture-scoped runtime health fact without calling providers.',
+        summary:
+            'Persist a synthetic post-turn recovery attempt and fixture-scoped runtime health fact without calling providers.',
     },
     {
         id: 'terminal.health-clear',
         phase: 'live-readiness',
         surface: 'terminal',
         command: '/byok health clear provider:zai model:glm-4.5-flash profile:repo_agent',
-        summary: 'Clear scoped BYOK runtime health from the live terminal when quota resets or an operator wants to retry a route.',
+        summary:
+            'Clear scoped BYOK runtime health from the live terminal when quota resets or an operator wants to retry a route.',
     },
     {
         id: 'terminal.probe-agent-provider-route',
         phase: 'runtime-probes',
         surface: 'terminal',
         command: '/byok probe agent provider:<provider> model:<provider-model> timeout:20000',
-        summary: 'Run a disposable agent probe against an explicit provider/model route so auto fallback candidates can be promoted into verified runtime health.',
+        summary:
+            'Run a disposable agent probe against an explicit provider/model route so auto fallback candidates can be promoted into verified runtime health.',
     },
     {
         id: 'terminal.auto-off',
@@ -1115,12 +1127,14 @@ export const MODEL_GATEWAY_CANONICAL_COMMANDS = Object.freeze([
  * @param {object} [options]
  * @param {string} [options.surface]
  * @param {string} [options.phase]
- * @returns {Array<(typeof MODEL_GATEWAY_CANONICAL_COMMANDS)[number]>}
+ * @returns {(typeof MODEL_GATEWAY_CANONICAL_COMMANDS)[number][]}
  */
 export function listModelGatewayCanonicalCommands(options = {}) {
     const surface = typeof options.surface === 'string' && options.surface ? options.surface : null;
     const phase = typeof options.phase === 'string' && options.phase ? options.phase : null;
-    return MODEL_GATEWAY_CANONICAL_COMMANDS.filter((entry) => (!surface || entry.surface === surface) && (!phase || entry.phase === phase));
+    return MODEL_GATEWAY_CANONICAL_COMMANDS.filter(
+        (entry) => (!surface || entry.surface === surface) && (!phase || entry.phase === phase),
+    );
 }
 
 /**
@@ -1132,5 +1146,7 @@ export function listModelGatewayCanonicalCommands(options = {}) {
 export function renderModelGatewayCanonicalCommandLines(options = {}) {
     const commands = listModelGatewayCanonicalCommands(options);
     if (commands.length === 0) return ['No canonical model-gateway commands matched the requested filters.'];
-    return commands.map((entry) => `${entry.surface.padEnd(8)} ${entry.phase.padEnd(11)} ${entry.command} :: ${entry.summary}`);
+    return commands.map(
+        (entry) => `${entry.surface.padEnd(8)} ${entry.phase.padEnd(11)} ${entry.command} :: ${entry.summary}`,
+    );
 }

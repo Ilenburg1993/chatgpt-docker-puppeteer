@@ -1,15 +1,15 @@
 # `src/copilot/tools/`
 
-**Propósito**: superfície canônica de tools do runtime Copilot (definição, composição, introspecção e estado mínimo compartilhado).
-**Status documental**: Canônico ativo.
-**Público**: mantenedores de `agent/`, `terminal/`, `server/` e integrações SDK/MCP.
-**Última atualização**: 10 de maio de 2026.
+**Propósito**: superfície canônica de tools do runtime Copilot (definição, composição, introspecção
+e estado mínimo compartilhado). **Status documental**: Canônico ativo. **Público**: mantenedores de
+`agent/`, `terminal/`, `server/` e integrações SDK/MCP. **Última atualização**: 10 de maio de 2026.
 
 ---
 
 ## O que esta pasta contém
 
-- definição das tools por domínio (`code`, `file`, `git`, `hook`, `hub`, `permission`, `session`, `shell`, `task`, `todo`, `web`);
+- definição das tools por domínio (`code`, `file`, `git`, `hook`, `hub`, `permission`, `session`,
+  `shell`, `task`, `todo`, `web`);
 - composition root de registro (`bootstrap.js`);
 - barrel público único (`index.js`) para consumo externo de `tools`;
 - fundação interna (`infra/`) com factory, logging e métricas de tools;
@@ -19,7 +19,8 @@
 
 - regra de domínio de negócio de alto nível que pertença a `core/` ou `agent/`;
 - wiring externo fora da superfície pública do subsistema;
-- imports externos diretos para submódulos internos de `tools/` (ex.: `tools/infra/*`, `tools/*/index.js`) vindos de fora de `tools/`.
+- imports externos diretos para submódulos internos de `tools/` (ex.: `tools/infra/*`,
+  `tools/*/index.js`) vindos de fora de `tools/`.
 
 ---
 
@@ -50,9 +51,12 @@
 
 1. **Hub externo único de `tools/`:** `#copilot/tools` (barrel raiz de `tools/index.js`).
 2. **Consumidores fora de `src/copilot/tools/**`:** devem importar apenas do barrel raiz.
-3. **Módulos internos de `src/copilot/tools/**`:** não podem importar `#copilot/tools`; devem usar `tools/infra/*` ou barrels internos do próprio domínio.
-3. **Sub-barrels de `tools/**`:** não podem se comunicar com módulos fora de `src/copilot/tools/**`; são internos ao subsistema.
-4. **`index.js` em `tools/**` é barrel-only:** sem lógica local, sem estado local, sem imports não-barrel.
+3. **Módulos internos de `src/copilot/tools/**`:** não podem importar `#copilot/tools`; devem usar
+   `tools/infra/*` ou barrels internos do próprio domínio.
+4. **Sub-barrels de `tools/**`:** não podem se comunicar com módulos fora de `src/copilot/tools/**`;
+   são internos ao subsistema.
+5. **`index.js` em `tools/**` é barrel-only:** sem lógica local, sem estado local, sem imports
+   não-barrel.
 
 ### Enforcement automatizado
 
@@ -66,7 +70,8 @@
 - [`./index.js`](./index.js) — API pública canônica de `tools`.
 - [`./bootstrap.js`](./bootstrap.js) — composição e registro de todas as tools.
 - [`./module-map.js`](./module-map.js) — mapa executável da pasta.
-- [`./infra/tool-factory.js`](./infra/tool-factory.js) — factory canônica de definição/normalização de tools.
+- [`./infra/tool-factory.js`](./infra/tool-factory.js) — factory canônica de definição/normalização
+  de tools.
 
 ---
 

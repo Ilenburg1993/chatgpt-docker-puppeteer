@@ -8,8 +8,8 @@
 import { toError } from '#copilot/core/error-handlers';
 import {
     HOOK_ERROR_OCCURRED,
-    HOOK_POST_TOOL_USE_FAILURE,
     HOOK_POST_TOOL_USE,
+    HOOK_POST_TOOL_USE_FAILURE,
     HOOK_PRE_MCP_TOOL_CALL,
     HOOK_PRE_TOOL_USE,
     HOOK_PROMPT_SUBMITTED,

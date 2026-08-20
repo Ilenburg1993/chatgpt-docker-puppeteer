@@ -268,10 +268,7 @@ describe('refreshScope', () => {
         await declareScope({ sessionId, paths: [pathA], parseSymbols: true }).awaitReady();
         invalidateScopePath(sessionId, pathA);
 
-        const [first, second] = await Promise.all([
-            refreshScope(sessionId, [pathA]),
-            refreshScope(sessionId, [pathA]),
-        ]);
+        const [first, second] = await Promise.all([refreshScope(sessionId, [pathA]), refreshScope(sessionId, [pathA])]);
         const stats = getScopeStats(sessionId);
 
         assert.strictEqual(first.refreshed + second.refreshed, 1);
@@ -317,7 +314,7 @@ describe('refreshScope', () => {
     it('converge remoção legítima sem degradar nem preencher o slot com outro arquivo', async () => {
         const sessionId = 'test-scope-refresh-removed';
         const vanishingPath = path.join(tmpDir, 'vanishing-refresh.js');
-        await fs.writeFile(vanishingPath, "export function vanishing() { return true; }\n", 'utf8');
+        await fs.writeFile(vanishingPath, 'export function vanishing() { return true; }\n', 'utf8');
         await declareScope({ sessionId, paths: [vanishingPath], parseSymbols: true, indexMode: 'off' }).awaitReady();
         assert.strictEqual(findSymbol(sessionId, 'vanishing', { exactMatch: true }).length, 1);
         await fs.rm(vanishingPath, { force: true });

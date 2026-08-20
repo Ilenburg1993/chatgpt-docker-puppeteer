@@ -25,8 +25,10 @@ import { sha256 } from './shared/hash.js';
  * @property {number} [concurrency=8] Default is `8`
  * @property {boolean} [textMode=true] Default is `true`
  * @property {boolean} [silent=true] Default is `true`
- * @property {boolean} [captureTextSnapshots=false] Retorna snapshots textuais efêmeros para encadear parser/index sem reread.
+ * @property {boolean} [captureTextSnapshots=false] Retorna snapshots textuais efêmeros para encadear parser/index sem
+ *   reread. Default is `false`
  * @property {boolean} [cacheBytes=true] Quando captureTextSnapshots=true, também prima a entrada bytes. Default: true.
+ *   Default is `true`
  * @property {AbortSignal} [signal]
  */
 
@@ -180,7 +182,13 @@ function textSnapshotFromCacheEntry(filePath, entry) {
  *
  * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
- * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number; snapshots: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }>}
+ * @returns {Promise<{
+ *     preloaded: number;
+ *     failed: number;
+ *     skipped: number;
+ *     durationMs: number;
+ *     snapshots: Map<string, import('./io/fs/read-text.js').TextFileSnapshot>;
+ * }>}
  */
 export async function warmTextSnapshotsForPaths(paths, opts = {}) {
     const { concurrency = 8, silent = true, signal, cacheBytes = false } = opts;
@@ -244,7 +252,13 @@ export async function warmTextSnapshotsForPaths(paths, opts = {}) {
 /**
  * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
- * @returns {Promise<{ preloaded: number; failed: number; skipped: number; durationMs: number; snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }>}
+ * @returns {Promise<{
+ *     preloaded: number;
+ *     failed: number;
+ *     skipped: number;
+ *     durationMs: number;
+ *     snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot>;
+ * }>}
  */
 export async function warmCacheForPaths(paths, opts = {}) {
     if (opts.captureTextSnapshots === true) return warmTextSnapshotsForPaths(paths, opts);
@@ -297,7 +311,9 @@ export async function warmCacheForPaths(paths, opts = {}) {
  * @param {string} sessionId
  * @param {string[]} paths
  * @param {PrefetchOptions} [opts]
- * @returns {Promise<SessionScopeStats & { snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }>}
+ * @returns {Promise<
+ *     SessionScopeStats & { snapshots?: Map<string, import('./io/fs/read-text.js').TextFileSnapshot> }
+ * >}
  */
 export async function startSessionScope(sessionId, paths, opts = {}) {
     /** @type {_SessionScope} */
@@ -359,9 +375,9 @@ export function listSessionScopes() {
 }
 
 /**
- * Select a deterministic bounded working set without additional filesystem I/O.
- * Coverage mode favors top-level structural breadth, while lexical preserves the historical prefix behavior.
- * Preferred paths are honored first only when they are already eligible candidates and always count inside maxFiles.
+ * Select a deterministic bounded working set without additional filesystem I/O. Coverage mode favors top-level
+ * structural breadth, while lexical preserves the historical prefix behavior. Preferred paths are honored first only
+ * when they are already eligible candidates and always count inside maxFiles.
  *
  * @param {string[]} allCandidateFiles
  * @param {string} baseDir
@@ -390,7 +406,8 @@ function selectDirectoryWorkingSetPaths(allCandidateFiles, baseDir, requestedMax
     /** @param {string} filePath */
     const addSelected = (filePath) => {
         const normalized = nodePath.resolve(filePath);
-        if (selected.length >= effectiveMaxFiles || selectedSet.has(normalized) || !candidateSet.has(normalized)) return false;
+        if (selected.length >= effectiveMaxFiles || selectedSet.has(normalized) || !candidateSet.has(normalized))
+            return false;
         selected.push(normalized);
         selectedSet.add(normalized);
         return true;
@@ -416,7 +433,7 @@ function selectDirectoryWorkingSetPaths(allCandidateFiles, baseDir, requestedMax
             addSelected(filePath);
         }
     } else {
-        /** @type {Map<string, Array<{ filePath: string; relative: string; depth: number; utilityRank: number }>>} */
+        /** @type {Map<string, { filePath: string; relative: string; depth: number; utilityRank: number }[]>} */
         const buckets = new Map();
         for (const filePath of allCandidateFiles) {
             const normalized = nodePath.resolve(filePath);
@@ -488,6 +505,7 @@ function selectDirectoryWorkingSetPaths(allCandidateFiles, baseDir, requestedMax
  * @param {string[]} [opts.include]
  * @param {string[]} [opts.exclude]
  * @param {'coverage' | 'lexical'} [opts.selectionMode='coverage'] Selection policy inside the hard maxFiles cap.
+ *   Default is `'coverage'`
  * @param {string[]} [opts.preferredPaths] Eligible candidate files to prioritize inside the same hard cap.
  * @param {boolean} [opts.recursive=true] Default is `true`
  * @param {PrefetchOptions} [prefetchOpts]
@@ -635,21 +653,20 @@ export async function warmReadThroughContext(filePath, opts = {}) {
             Number.isFinite(cachedText.ctime) &&
             Number.isFinite(cachedText.dev) &&
             Number.isFinite(cachedText.ino);
-        const text =
-            canReuseTextCache
-                ? {
-                      path: filePath,
-                      content: /** @type {string} */ (cachedText.content),
-                      bytesRead: /** @type {NonNullable<typeof cachedText>} */ (cachedText).bytes,
-                      sizeBytes: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).size),
-                      mtimeMs: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).mtime),
-                      ctimeMs: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).ctime),
-                      dev: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).dev),
-                      ino: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).ino),
-                      attempts: 0,
-                      consistent: /** @type {const} */ (true),
-                  }
-                : await readTextFileSnapshot(filePath);
+        const text = canReuseTextCache
+            ? {
+                  path: filePath,
+                  content: /** @type {string} */ (cachedText.content),
+                  bytesRead: /** @type {NonNullable<typeof cachedText>} */ (cachedText).bytes,
+                  sizeBytes: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).size),
+                  mtimeMs: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).mtime),
+                  ctimeMs: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).ctime),
+                  dev: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).dev),
+                  ino: Number(/** @type {NonNullable<typeof cachedText>} */ (cachedText).ino),
+                  attempts: 0,
+                  consistent: /** @type {const} */ (true),
+              }
+            : await readTextFileSnapshot(filePath);
         reusedTextCache = canReuseTextCache;
         const textHash = sha256(text.content);
         if (!reusedTextCache) {
@@ -674,40 +691,53 @@ export async function warmReadThroughContext(filePath, opts = {}) {
             primedByteCache = true;
         }
 
+        // Quando o caller também pediu imports relacionados, parseamos uma única vez a partir do snapshot já lido e
+        // entregamos a mesma projeção ao índice. Antes, `indexTextFile()` parseava JS/TS e `parseAndCacheSymbols()`
+        // repetia imediatamente o mesmo Babel parse para descobrir imports.
+        const symbols = relatedImports
+            ? await parseAndCacheSymbols(filePath, { snapshot: text }).catch(() => null)
+            : null;
+
         if (index) {
-            const indexStore = /**
-             * @type {{
-             *     indexTextFile?: (input: {
-             *         filePath: string;
-             *         workspaceRoot: string;
-             *         content: string;
-             *         sizeBytes: number;
-             *         mtimeMs: number;
-             *         ctimeMs: number | null;
-             *         dev?: number | null;
-             *         ino?: number | null;
-             *         metadata?: Record<string, unknown>;
-             *     }) => Promise<unknown>;
-             * } | null}
-             */ (getIoIndex());
+            const indexStore =
+                /**
+                 * @type {{
+                 *     indexTextFile?: (
+                 *         input: {
+                 *             filePath: string;
+                 *             workspaceRoot: string;
+                 *             content: string;
+                 *             sizeBytes: number;
+                 *             mtimeMs: number;
+                 *             ctimeMs: number | null;
+                 *             dev?: number | null;
+                 *             ino?: number | null;
+                 *             metadata?: Record<string, unknown>;
+                 *         },
+                 *         internal?: { parsedSymbols?: import('./io-parser.js').FileSymbols },
+                 *     ) => Promise<unknown>;
+                 * } | null}
+                 */ (getIoIndex());
             if (typeof indexStore?.indexTextFile === 'function') {
-                await indexStore.indexTextFile({
-                    filePath,
-                    workspaceRoot,
-                    content: text.content,
-                    sizeBytes: text.sizeBytes,
-                    mtimeMs: text.mtimeMs,
-                    ctimeMs: text.ctimeMs,
-                    dev: text.dev,
-                    ino: text.ino,
-                    metadata: { source: 'read-through', limitMode: 'informative' },
-                });
+                await indexStore.indexTextFile(
+                    {
+                        filePath,
+                        workspaceRoot,
+                        content: text.content,
+                        sizeBytes: text.sizeBytes,
+                        mtimeMs: text.mtimeMs,
+                        ctimeMs: text.ctimeMs,
+                        dev: text.dev,
+                        ino: text.ino,
+                        metadata: { source: 'read-through', limitMode: 'informative' },
+                    },
+                    symbols ? { parsedSymbols: symbols } : {},
+                );
                 indexed = true;
             }
         }
 
         if (relatedImports) {
-            const symbols = await parseAndCacheSymbols(filePath, { snapshot: text }).catch(() => null);
             relatedPaths = await resolveRelativeImportTargets(filePath, symbols?.imports ?? []);
             if (relatedPaths.length > 0) {
                 const warm = await warmCacheForPaths(relatedPaths, { concurrency, silent, textMode: true });

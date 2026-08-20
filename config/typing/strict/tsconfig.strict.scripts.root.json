@@ -10,7 +10,6 @@
     "noEmit": true
   },
   "include": [
-    "../../../src/types/madge.d.ts",
     "../../../scripts/*",
     "../../../scripts/codemods/**/*",
     "../../../scripts/fixes/**/*",

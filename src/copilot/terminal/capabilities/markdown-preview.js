@@ -32,7 +32,7 @@ const ANSI_ESCAPE_PATTERN = new RegExp(
 
 /**
  * @param {string} text
- * @param {number} [max=MAX_MARKDOWN_PREVIEW_CHARS]
+ * @param {number} [max=MAX_MARKDOWN_PREVIEW_CHARS] Default is `MAX_MARKDOWN_PREVIEW_CHARS`
  * @returns {{ output: string; truncated: boolean }}
  */
 function truncateMarkdownPreview(text, max = MAX_MARKDOWN_PREVIEW_CHARS) {

@@ -78,7 +78,8 @@ export const mcpSessionProfileTool = {
             approvalGuidance: {
                 rememberTrustedBoundedWritesWhenOffered: true,
                 avoidUnlessExplicitlyNeeded: ['repo_remove_file', 'job_cancel'],
-                strategy: 'apply bounded batches directly when intent is clear; plan only when preview adds value; prefer reversible operations',
+                strategy:
+                    'apply bounded batches directly when intent is clear; plan only when preview adds value; prefer reversible operations',
             },
             performancePolicy: {
                 deepDiagnosticsDefault: false,

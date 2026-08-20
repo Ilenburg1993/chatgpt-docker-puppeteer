@@ -1,24 +1,38 @@
 # Model Gateway e LLM-B: Diagnostico, Estado Ideal e Roadmap Canonico
 
-> Reconstruido em 2026-08-14. Este arquivo substitui o diario incremental de junho como fonte canonica do estado, das decisoes e da continuidade. Evidencias operacionais dinamicas ficam em `artifacts/` e no SQLite local; nao contem segredos e nao entram no Git.
+> Reconstruido em 2026-08-14. Este arquivo substitui o diario incremental de junho como fonte
+> canonica do estado, das decisoes e da continuidade. Evidencias operacionais dinamicas ficam em
+> `artifacts/` e no SQLite local; nao contem segredos e nao entram no Git.
 
 ## 1. Decisao Executiva
 
-Em 2026-08-14 a LLM-B respondeu de verdade. Nao foi encontrada uma quebra externa persistente que impedisse o provider Kilo/SDK de responder. A causa percebida como "nao responde" era uma combinacao de tres fatores locais:
+Em 2026-08-14 a LLM-B respondeu de verdade. Nao foi encontrada uma quebra externa persistente que
+impedisse o provider Kilo/SDK de responder. A causa percebida como "nao responde" era uma combinacao
+de tres fatores locais:
 
-1. O boot podia anunciar `LLM-B pronta` sem repintar de forma garantida o prompt REPL. O primeiro comando automatico parecia sair de uma linha sem prompt.
-2. O harness de troca de rota encerrava o terminal antes do reattach diferido no limite do turno. Isso fabricava `SAME_SESSION_ROUTE_REATTACH_FAILED` durante o shutdown.
-3. O catalogo estava cerca de 59 dias vencido. A atualizacao de JSON nao espelhava o SQLite no caminho CLI, entao a readiness corretamente acusava paridade quebrada.
+1. O boot podia anunciar `LLM-B pronta` sem repintar de forma garantida o prompt REPL. O primeiro
+   comando automatico parecia sair de uma linha sem prompt.
+2. O harness de troca de rota encerrava o terminal antes do reattach diferido no limite do turno.
+   Isso fabricava `SAME_SESSION_ROUTE_REATTACH_FAILED` durante o shutdown.
+3. O catalogo estava cerca de 59 dias vencido. A atualizacao de JSON nao espelhava o SQLite no
+   caminho CLI, entao a readiness corretamente acusava paridade quebrada.
 
-As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao para `@github/copilot-sdk` 1.0.9 tambem trouxe novos eventos e `assistant.turn_end` intermediarios em workflows com tools; os contratos e o scheduler foram ajustados. A configuracao padrao de `npm run terminal:llm-b` inicia com BYOK Kilo pronto; o alerta de quota Premium do Copilot permanece apenas telemetria lateral e nao bloqueia a rota BYOK.
+As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao para
+`@github/copilot-sdk` 1.0.9 tambem trouxe novos eventos e `assistant.turn_end` intermediarios em
+workflows com tools; os contratos e o scheduler foram ajustados. A configuracao padrao de
+`npm run terminal:llm-b` inicia com BYOK Kilo pronto; o alerta de quota Premium do Copilot permanece
+apenas telemetria lateral e nao bloqueia a rota BYOK.
 
 ## 2. Evidencia Atual
 
 ### 2.1 Terminal padrao
 
-- [x] `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000` passou em 2026-08-14.
-- [x] A sessao mostrou `LLM-B pronta`, prompt interativo, `kilo-auto/free`, BYOK pronto e 127 ferramentas.
-- [x] `/usage`, `/activity`, `/session sdk`, `/health`, `/events` e `/errors 10` responderam; erros rastreados: zero.
+- [x] `node scripts/model-gateway/run.mjs llmBLiveTest --no-pr --timeout-ms=180000` passou em
+      2026-08-14.
+- [x] A sessao mostrou `LLM-B pronta`, prompt interativo, `kilo-auto/free`, BYOK pronto e 127
+      ferramentas.
+- [x] `/usage`, `/activity`, `/session sdk`, `/health`, `/events` e `/errors 10` responderam; erros
+      rastreados: zero.
 - [x] O prompt apareceu antes de `/usage now`; nao houve pintura dupla no boot.
 - [x] O encerramento foi feito por `/quit`, sem processo de teste ativo remanescente.
 - Evidencia: `artifacts/terminal-live/2026-08-14T-llmb-default-boot-ready/summary.md`.
@@ -26,19 +40,31 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao p
 ### 2.2 Fluxo vivo de troca de provider/modelo
 
 - [x] `model-gateway-route-apply-minimal` passou em PTY com SDK e provider reais.
-- [x] A LLM-B chamou `report_intent`, `read_file_content`, duas vezes `model_gateway_overview`, duas vezes `model_gateway_operation_status` e `model_gateway_route_switch` em `plan` e `apply`.
+- [x] A LLM-B chamou `report_intent`, `read_file_content`, duas vezes `model_gateway_overview`, duas
+      vezes `model_gateway_operation_status` e `model_gateway_route_switch` em `plan` e `apply`.
 - [x] Os oito `DELTA-CANONICAL` foram publicados antes de `ask_user`.
-- [x] `ask_user` exibiu pergunta persistente, recebeu `SIM` de autoria humana e a LLM-B publicou o marcador final.
-- [x] O apply retornou deferimento seguro e a promocao posterior confirmou a mesma sessao no SQLite: `kilo-auto/free` para `ollama-cloud/qwen3-coder-next`.
-- [x] Nenhum erro SSE, nenhum erro do terminal, nenhum novo `sessionId` e nenhum fallback oculto foram observados.
-- [x] A repeticao apos SDK 1.0.9 completou tools reais, deltas, `ask_user`, resposta humana e marcador final, com rota efetiva `ollama-cloud/qwen3-coder-next`; a promocao ocorreu depois da recuperacao pos-tools, nao em concorrencia com ela.
-- [x] O verificador live foi atualizado para correlacionar lifecycle humanizado do SDK por `toolCallId` e para reconhecer o cartao de pergunta atual, sem depender do prompt visual legado.
-- Evidencias: `artifacts/terminal-live/2026-08-14T-llmb-route-promotion-verified/summary.md` e `artifacts/terminal-live/2026-08-14T-llmb-sdk-1-0-9-route-promotion-fixed-r3/summary.md`. O segundo artefato documenta o fluxo completo; seu unico FAIL foi a assercao de lifecycle que foi corrigida posteriormente por correlacao de `toolCallId`.
+- [x] `ask_user` exibiu pergunta persistente, recebeu `SIM` de autoria humana e a LLM-B publicou o
+      marcador final.
+- [x] O apply retornou deferimento seguro e a promocao posterior confirmou a mesma sessao no SQLite:
+      `kilo-auto/free` para `ollama-cloud/qwen3-coder-next`.
+- [x] Nenhum erro SSE, nenhum erro do terminal, nenhum novo `sessionId` e nenhum fallback oculto
+      foram observados.
+- [x] A repeticao apos SDK 1.0.9 completou tools reais, deltas, `ask_user`, resposta humana e
+      marcador final, com rota efetiva `ollama-cloud/qwen3-coder-next`; a promocao ocorreu depois da
+      recuperacao pos-tools, nao em concorrencia com ela.
+- [x] O verificador live foi atualizado para correlacionar lifecycle humanizado do SDK por
+      `toolCallId` e para reconhecer o cartao de pergunta atual, sem depender do prompt visual
+      legado.
+- Evidencias: `artifacts/terminal-live/2026-08-14T-llmb-route-promotion-verified/summary.md` e
+  `artifacts/terminal-live/2026-08-14T-llmb-sdk-1-0-9-route-promotion-fixed-r3/summary.md`. O
+  segundo artefato documenta o fluxo completo; seu unico FAIL foi a assercao de lifecycle que foi
+  corrigida posteriormente por correlacao de `toolCallId`.
 
 ### 2.3 Catalogo e readiness
 
 - [x] Os 25 importadores vencidos foram atualizados em 2026-08-14.
-- [x] O refresh detectou mudanca externa real: 307 adicoes, 157 remocoes e 865 alteracoes de projecao na primeira rodada.
+- [x] O refresh detectou mudanca externa real: 307 adicoes, 157 remocoes e 865 alteracoes de
+      projecao na primeira rodada.
 - [x] A revisao atual e `catalog:32d63087aea2afdba080e6b6`; a data do snapshot foi renovada.
 - [x] O espelho JSON/SQLite passou com zero divergencias de contagem e chave.
 - [x] `liveReadiness --json` esta verde.
@@ -49,44 +75,58 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao p
 
 - [x] `npm run typecheck` passou em modo strict.
 - [x] `npm run lint` passou.
-- [x] `npm run test:copilot` passou apos a atualizacao: 6.858 aprovados, zero falhas e 33 pendentes declarados (6.891 testes no total).
-- [x] A fixture de `/history` que chamava uma timeline reconciliada de divergente foi corrigida; o caso agora exige a mensagem de bloqueio somente para o estado `diverged`.
+- [x] `npm run test:copilot` passou apos a atualizacao: 6.858 aprovados, zero falhas e 33 pendentes
+      declarados (6.891 testes no total).
+- [x] A fixture de `/history` que chamava uma timeline reconciliada de divergente foi corrigida; o
+      caso agora exige a mensagem de bloqueio somente para o estado `diverged`.
 
 ### 2.5 Skill de operacao autonoma
 
-- [x] Foram auditadas as skills existentes: `llm-b-comms` cobre transporte/saude e `llm-b-ops` cobre trabalho no workspace; nenhuma cobria selecao e promocao de rota.
-- [x] A skill `llm-b-route-operator` foi criada em `.github/skills`, diretorio descoberto pelo SDK, com modos inspect/recover/switch/prepare e referencia de protocolo.
-- [x] O prompt do terminal manda carregar a skill ao detectar indisponibilidade, falha ou pedido de troca BYOK.
+- [x] Foram auditadas as skills existentes: `llm-b-comms` cobre transporte/saude e `llm-b-ops` cobre
+      trabalho no workspace; nenhuma cobria selecao e promocao de rota.
+- [x] A skill `llm-b-route-operator` foi criada em `.github/skills`, diretorio descoberto pelo SDK,
+      com modos inspect/recover/switch/prepare e referencia de protocolo.
+- [x] O prompt do terminal manda carregar a skill ao detectar indisponibilidade, falha ou pedido de
+      troca BYOK.
 - [x] O handler real `invoke_skill` carregou a skill e o boot real `--no-pr` passou apos a mudanca.
 
 ### 2.6 Compatibilidade SDK 1.0.9
 
 - [x] O system prompt passou a incluir a secao oficial `preamble`.
-- [x] O catalogo de eventos locais passou a cobrir os 25 eventos publicos novos do SDK, incluindo canvas, tools delta/progress, headers MCP, limites e agendamento.
-- [x] O teste de contrato passou a extrair somente interfaces de evento, evitando contar nomes incidentais no pacote SDK.
-- [x] A promocao de rota aguarda tambem `ctx.isProcessing()`, alem de fila e pergunta humana; um teste reproduz `tool_only -> recuperacao -> public_reply`.
+- [x] O catalogo de eventos locais passou a cobrir os 25 eventos publicos novos do SDK, incluindo
+      canvas, tools delta/progress, headers MCP, limites e agendamento.
+- [x] O teste de contrato passou a extrair somente interfaces de evento, evitando contar nomes
+      incidentais no pacote SDK.
+- [x] A promocao de rota aguarda tambem `ctx.isProcessing()`, alem de fila e pergunta humana; um
+      teste reproduz `tool_only -> recuperacao -> public_reply`.
 
 ## 3. Achados e Correcoes Aplicadas
 
-| Prioridade | Achado | Correcao | Prova |
-| --- | --- | --- | --- |
-| P0 | Prompt podia faltar apos `LLM-B pronta`. | `engine.js` faz redraw forcado apos reattach pronto. | Boot padrao e criterio `ux-diagnostic-commands-start-at-prompt` passaram. |
-| P0 | O teste matava a sessao durante a promocao diferida. | Cenario de rota ganhou fase de deltas, continuacao separada para `ask_user` e grace de 15 s pos-final. | Handoff `committed` e confirmacao `route_confirmed_same_session`. |
-| P0 | `model-gateway:refresh` deixava SQLite obsoleto. | O CLI agora espelha o snapshot commitado e devolve `sqlite.parityOk`. | `liveReadiness` voltou a verde apos refresh. |
-| P1 | `snapshotId` antigo sobrevivia a revisoes de conteudo. | Refresh recalcula o hash depois de elegibilidade e retencao. | Id mudou de `catalog:88612...` para `catalog:32d630...`. |
-| P1 | Um processo de teste orfao segurava a porta 3010. | Processo sem pai foi encerrado durante a auditoria. | Nenhuma instancia LLM-B de teste ficou ativa apos as validacoes. |
-| P0 | SDK 1.0.9 emite `assistant.turn_end` intermediario depois de tools; o reattach podia concorrer com a recuperacao de sintese. | O scheduler so promove quando pergunta, fila e `isProcessing()` estao ociosos. | Teste unitario de recuperacao pos-tools e execucao viva com promocao posterior ao texto publico. |
-| P1 | O SDK humaniza a conclusao de `report_intent` e a UI atual exibe cartao de pergunta sem o prompt legado. | Harness correlaciona lifecycle por `toolCallId` e aceita o cartao `[PERGUNTA]` com `/answer`. | SSE SDK 1.0.9 e teste sintatico do harness. |
-| P2 | A fixture de `/history` combinava estado `reconciliada` com expectativa exclusiva de `diverged`. | A expectativa passou a respeitar o contrato de apresentacao do estado. | Suite de comandos e suite maxima verdes. |
+| Prioridade | Achado                                                                                                                       | Correcao                                                                                               | Prova                                                                                            |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| P0         | Prompt podia faltar apos `LLM-B pronta`.                                                                                     | `engine.js` faz redraw forcado apos reattach pronto.                                                   | Boot padrao e criterio `ux-diagnostic-commands-start-at-prompt` passaram.                        |
+| P0         | O teste matava a sessao durante a promocao diferida.                                                                         | Cenario de rota ganhou fase de deltas, continuacao separada para `ask_user` e grace de 15 s pos-final. | Handoff `committed` e confirmacao `route_confirmed_same_session`.                                |
+| P0         | `model-gateway:refresh` deixava SQLite obsoleto.                                                                             | O CLI agora espelha o snapshot commitado e devolve `sqlite.parityOk`.                                  | `liveReadiness` voltou a verde apos refresh.                                                     |
+| P1         | `snapshotId` antigo sobrevivia a revisoes de conteudo.                                                                       | Refresh recalcula o hash depois de elegibilidade e retencao.                                           | Id mudou de `catalog:88612...` para `catalog:32d630...`.                                         |
+| P1         | Um processo de teste orfao segurava a porta 3010.                                                                            | Processo sem pai foi encerrado durante a auditoria.                                                    | Nenhuma instancia LLM-B de teste ficou ativa apos as validacoes.                                 |
+| P0         | SDK 1.0.9 emite `assistant.turn_end` intermediario depois de tools; o reattach podia concorrer com a recuperacao de sintese. | O scheduler so promove quando pergunta, fila e `isProcessing()` estao ociosos.                         | Teste unitario de recuperacao pos-tools e execucao viva com promocao posterior ao texto publico. |
+| P1         | O SDK humaniza a conclusao de `report_intent` e a UI atual exibe cartao de pergunta sem o prompt legado.                     | Harness correlaciona lifecycle por `toolCallId` e aceita o cartao `[PERGUNTA]` com `/answer`.          | SSE SDK 1.0.9 e teste sintatico do harness.                                                      |
+| P2         | A fixture de `/history` combinava estado `reconciliada` com expectativa exclusiva de `diverged`.                             | A expectativa passou a respeitar o contrato de apresentacao do estado.                                 | Suite de comandos e suite maxima verdes.                                                         |
 
 ## 4. Arquitetura Alvo
 
-1. **Boot previsivel:** banner, readiness e exatamente um prompt utilizavel; nenhum comando interno pode atravessar o limite visual do prompt.
-2. **Uma sessao SDK:** toda troca de model/provider usa a mesma sessao. Durante um tool-turn, o apply cria handoff autorizado; o scheduler promove somente apos `dialog.turn_end` estavel.
-3. **Commit verificavel:** `committed` significa reattach concluido, rota/projecao confirmada e ledger atualizado. `deferred_until_turn_boundary` nunca e apresentado como troca concluida.
-4. **Catalogo revisionado:** JSON redigido e SQLite sao um par atomico para a operacao. `snapshotId` identifica o conteudo e `generatedAt` identifica observacao; paridade e bloqueador de readiness.
-5. **Observabilidade humana:** SSE e ledger preservam ids tecnicos, enquanto a superficie REPL mostra estados, rotas e acoes compreensiveis sem segredos.
-6. **Teste vivo determinista:** o harness separa etapas que dependem de fronteira de turno, aguarda a promocao e falha por evidencia ausente, nao por encerramento prematuro do proprio teste.
+1. **Boot previsivel:** banner, readiness e exatamente um prompt utilizavel; nenhum comando interno
+   pode atravessar o limite visual do prompt.
+2. **Uma sessao SDK:** toda troca de model/provider usa a mesma sessao. Durante um tool-turn, o
+   apply cria handoff autorizado; o scheduler promove somente apos `dialog.turn_end` estavel.
+3. **Commit verificavel:** `committed` significa reattach concluido, rota/projecao confirmada e
+   ledger atualizado. `deferred_until_turn_boundary` nunca e apresentado como troca concluida.
+4. **Catalogo revisionado:** JSON redigido e SQLite sao um par atomico para a operacao. `snapshotId`
+   identifica o conteudo e `generatedAt` identifica observacao; paridade e bloqueador de readiness.
+5. **Observabilidade humana:** SSE e ledger preservam ids tecnicos, enquanto a superficie REPL
+   mostra estados, rotas e acoes compreensiveis sem segredos.
+6. **Teste vivo determinista:** o harness separa etapas que dependem de fronteira de turno, aguarda
+   a promocao e falha por evidencia ausente, nao por encerramento prematuro do proprio teste.
 
 ## 5. Estado Operacional e Riscos Residuais
 
@@ -95,14 +135,28 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao p
 - A rota default usa BYOK Kilo (`kilo-auto/free`) e respondeu no teste vivo.
 - A rota de teste `ollama-cloud/qwen3-coder-next` foi promovida na mesma sessao e confirmada.
 - O catalogo foi renovado, o SQLite esta em paridade e ha standby persistido.
-- A quota Premium do Copilot aparece como informacao lateral de conta. Ela nao foi usada para a chamada BYOK comprovada e nao e criterio de bloqueio da LLM-B.
+- A quota Premium do Copilot aparece como informacao lateral de conta. Ela nao foi usada para a
+  chamada BYOK comprovada e nao e criterio de bloqueio da LLM-B.
 
 ### Acompanhar, sem bloquear o uso
 
-- [ ] **P1 - Timeline/export:** o export do run completo preservou todo o conteudo correto, mas seu cabecalho ainda declarou `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`. A reproducao mostrou eventos locais de `ask_user` entre duas mensagens Hub ja persistidas, sem chave canonica comum; a regra fail-closed esta correta e evita gravacao insegura, portanto nao ha perda de conversa. Falta correlacionar esses eventos por identidade/ordem antes de permitir reconciliacao.
-- [ ] **P1 - Resultado compacto de tool:** `model_gateway_overview` ainda pode entregar payload grande ao modelo. Criar visao resumida limitada para LLM-B, mantendo `detail/raw` somente em diagnostico, reduz pressao de contexto em workflows longos.
-- [ ] **P2 - Saude de alternativas:** o standby e baseado em evidencia e nao substitui probes recentes. Antes de promover uma alternativa em producao, executar probe autorizado para a rota escolhida.
-- [ ] **P2 - Variabilidade do provider inicial:** em uma repeticao, o modelo inicial tentou uma leitura auxiliar fora do roteiro e encerrou antes da cadeia de rota. O terminal registrou o turno vazio e preservou a sessao; o fluxo completo foi reproduzido na rodada seguinte. Investigar retries semanticos somente se a frequencia se tornar operacionalmente relevante; nao mascarar tool-calls invalidos como sucesso.
+- [ ] **P1 - Timeline/export:** o export do run completo preservou todo o conteudo correto, mas seu
+      cabecalho ainda declarou `timeline=mixed/diverged` e `sync=blocked:diverged-no-overlap`. A
+      reproducao mostrou eventos locais de `ask_user` entre duas mensagens Hub ja persistidas, sem
+      chave canonica comum; a regra fail-closed esta correta e evita gravacao insegura, portanto nao
+      ha perda de conversa. Falta correlacionar esses eventos por identidade/ordem antes de permitir
+      reconciliacao.
+- [ ] **P1 - Resultado compacto de tool:** `model_gateway_overview` ainda pode entregar payload
+      grande ao modelo. Criar visao resumida limitada para LLM-B, mantendo `detail/raw` somente em
+      diagnostico, reduz pressao de contexto em workflows longos.
+- [ ] **P2 - Saude de alternativas:** o standby e baseado em evidencia e nao substitui probes
+      recentes. Antes de promover uma alternativa em producao, executar probe autorizado para a rota
+      escolhida.
+- [ ] **P2 - Variabilidade do provider inicial:** em uma repeticao, o modelo inicial tentou uma
+      leitura auxiliar fora do roteiro e encerrou antes da cadeia de rota. O terminal registrou o
+      turno vazio e preservou a sessao; o fluxo completo foi reproduzido na rodada seguinte.
+      Investigar retries semanticos somente se a frequencia se tornar operacionalmente relevante;
+      nao mascarar tool-calls invalidos como sucesso.
 
 ## 6. Roadmap Executavel
 
@@ -120,10 +174,13 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao p
 - [x] 1.1 Forcar a pintura do prompt no marco de readiness apos reattach.
 - [x] 1.2 Registrar teste unitario que protege o redraw forcado.
 - [x] 1.3 Separar deltas e `ask_user` no cenario que testa promocao de rota.
-- [x] 1.4 Aguardar grace suficiente para `dialog.turn_end` e scheduler antes dos diagnosticos/`/quit`.
+- [x] 1.4 Aguardar grace suficiente para `dialog.turn_end` e scheduler antes dos
+      diagnosticos/`/quit`.
 - [x] 1.5 Provar `route_confirmed_same_session` no ledger vivo.
-- [ ] 1.6 Adicionar ao harness uma espera por estado `committed` (alem do grace temporal) para tornar a prova independente de latencia.
-- [x] 1.7 Bloquear promocao quando a recuperacao pos-tools ainda estiver em `processing`, preservando a proxima fronteira semantica.
+- [ ] 1.6 Adicionar ao harness uma espera por estado `committed` (alem do grace temporal) para
+      tornar a prova independente de latencia.
+- [x] 1.7 Bloquear promocao quando a recuperacao pos-tools ainda estiver em `processing`,
+      preservando a proxima fronteira semantica.
 
 ### Faixa 2 - Catalogo, SQLite e Selecao
 
@@ -132,32 +189,48 @@ As tres causas foram corrigidas e comprovadas por execucao viva. A atualizacao p
 - [x] 2.3 Expor `sqlite.mirrored` e `sqlite.parityOk` no resumo do CLI.
 - [x] 2.4 Recalcular `snapshotId` para cada revisao material.
 - [x] 2.5 Validar integridade, paridade, `liveReadiness` e `operatorReady` apos refresh.
-- [x] 2.6 Tornar falha de paridade no CLI explicitamente nao-zero, preservando resumo redigido para diagnostico.
-- [ ] 2.7 Adicionar um teste de integracao do CLI com stores temporarios para cobrir refresh + mirror sem depender de rede.
+- [x] 2.6 Tornar falha de paridade no CLI explicitamente nao-zero, preservando resumo redigido para
+      diagnostico.
+- [ ] 2.7 Adicionar um teste de integracao do CLI com stores temporarios para cobrir refresh +
+      mirror sem depender de rede.
 
 ### Faixa 3 - Contexto, Timeline e Export
 
-- [x] 3.1 Reproduzir em evidencia a sequencia `tool-turn -> deltas -> ask_user -> resposta -> promocao -> export` que hoje resulta em `diverged-no-overlap`; os eventos locais de `ask_user` ficam intercalados entre mensagens Hub sem identidade comum.
-- [ ] 3.2 Diferenciar cauda temporalmente segura de divergencia genuina, usando `traceId`, `turnId`, `requestId` e ordem SSE quando presentes.
-- [ ] 3.3 Manter bloqueio fail-closed para conflito real; nunca gravar ou deduplicar por heuristica fraca.
-- [ ] 3.4 Fazer o header do export comunicar estado humano, sem enums internos, e incluir causa tecnica apenas no modo diagnostico.
+- [x] 3.1 Reproduzir em evidencia a sequencia
+      `tool-turn -> deltas -> ask_user -> resposta -> promocao -> export` que hoje resulta em
+      `diverged-no-overlap`; os eventos locais de `ask_user` ficam intercalados entre mensagens Hub
+      sem identidade comum.
+- [ ] 3.2 Diferenciar cauda temporalmente segura de divergencia genuina, usando `traceId`, `turnId`,
+      `requestId` e ordem SSE quando presentes.
+- [ ] 3.3 Manter bloqueio fail-closed para conflito real; nunca gravar ou deduplicar por heuristica
+      fraca.
+- [ ] 3.4 Fazer o header do export comunicar estado humano, sem enums internos, e incluir causa
+      tecnica apenas no modo diagnostico.
 - [ ] 3.5 Repetir o cenario vivo e exigir `bridge_tail` ou `aligned` quando a evidencia permitir.
 
 ### Faixa 4 - Ergonomia e Carga de Contexto
 
 - [ ] 4.1 Definir contrato `summary`/`detail` para `model_gateway_overview` e `operation_status`.
-- [ ] 4.2 Limitar listas de perfis/operacoes na resposta injetada no modelo, sem limitar `/events --raw` ou APIs diagnosticas.
-- [ ] 4.3 Medir tokens de tool definitions e de resultados em cenarios de troca; fixar orcamento maximo no harness.
-- [ ] 4.4 Executar regressao viva com todas as tools Model Gateway em serializacao de uma tool por resposta.
-- [x] 4.5 Criar skill operacional para a LLM-B selecionar, provar e promover rota alternativa com participacao humana minima.
-- [x] 4.6 Fixar gatilho de skill no prompt e contrato de regressao para descoberta, plano, prova e same-session.
+- [ ] 4.2 Limitar listas de perfis/operacoes na resposta injetada no modelo, sem limitar
+      `/events --raw` ou APIs diagnosticas.
+- [ ] 4.3 Medir tokens de tool definitions e de resultados em cenarios de troca; fixar orcamento
+      maximo no harness.
+- [ ] 4.4 Executar regressao viva com todas as tools Model Gateway em serializacao de uma tool por
+      resposta.
+- [x] 4.5 Criar skill operacional para a LLM-B selecionar, provar e promover rota alternativa com
+      participacao humana minima.
+- [x] 4.6 Fixar gatilho de skill no prompt e contrato de regressao para descoberta, plano, prova e
+      same-session.
 
 ### Faixa 5 - Validacao e Governanca Continua
 
 - [x] 5.1 Validacao focada: syntax, ESLint e suites de contratos, turn boundary e promocao diferida.
-- [x] 5.2 Executar typecheck strict, lint e testes maximos de `src/copilot` antes de publicar a proxima leva.
-- [x] 5.3 Executar live full apos alteracao de scheduler, rota ou protocolo de pergunta; registrar tambem divergencia de provider sem confundi-la com sucesso.
-- [ ] 5.4 Atualizar este arquivo ao concluir cada subfase; marcar apenas evidencia observada, com caminho do artefato.
+- [x] 5.2 Executar typecheck strict, lint e testes maximos de `src/copilot` antes de publicar a
+      proxima leva.
+- [x] 5.3 Executar live full apos alteracao de scheduler, rota ou protocolo de pergunta; registrar
+      tambem divergencia de provider sem confundi-la com sucesso.
+- [ ] 5.4 Atualizar este arquivo ao concluir cada subfase; marcar apenas evidencia observada, com
+      caminho do artefato.
 
 ## 7. Comandos de Operacao
 
@@ -184,4 +257,7 @@ node scripts/model-gateway/run.mjs catalogIntegrity --json
 
 ## 8. Criterio de Encerramento da Proxima Leva
 
-Somente considerar a proxima leva concluida quando os itens da Faixa 3 ou 4 escolhidos tiverem testes unitarios, lint e uma evidencia live pertinente. `PASS` de boot nao prova provider switch; `route_confirmed_same_session` nao prova catalogo fresco; e paridade de catalogo nao prova conversa. Cada criterio tem sua propria prova para evitar regressao por inferencia.
+Somente considerar a proxima leva concluida quando os itens da Faixa 3 ou 4 escolhidos tiverem
+testes unitarios, lint e uma evidencia live pertinente. `PASS` de boot nao prova provider switch;
+`route_confirmed_same_session` nao prova catalogo fresco; e paridade de catalogo nao prova conversa.
+Cada criterio tem sua propria prova para evitar regressao por inferencia.

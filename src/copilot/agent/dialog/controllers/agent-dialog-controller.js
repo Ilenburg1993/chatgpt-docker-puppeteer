@@ -12,9 +12,9 @@
  * @see EventBus
  */
 
+import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config/agent';
 import { container, SessionError } from '#copilot/core';
 import { EMITTER_DIALOG_LOOP_CHANGED, EMITTER_DIALOG_RECOVERY, EMITTER_SESSION_KEEPALIVE } from '#copilot/events';
-import { CONTEXT_UTIL_BLOCK_THRESHOLD, CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config/agent';
 import { withAgentErrorPolicy } from '../../error/index.js';
 import { switchModelTransactional } from '../../facades/agent-model-config.js';
 import { log } from '../../ports/logging/index.js';
@@ -38,7 +38,8 @@ import { wireDialogLoopEvents } from '../orchestrators/index.js';
  * @property {string} reason
  * @property {'not_needed' | 'paused' | 'reuse_ready' | 'restart_with_model_call'} strategy
  * @property {boolean} additionalModelCall
- * @property {boolean} prConsumed - Legacy alias for compatibility; mirrors additionalModelCall and is not a billing claim.
+ * @property {boolean} prConsumed - Legacy alias for compatibility; mirrors additionalModelCall and is not a billing
+ *   claim.
  * @property {number} durationMs
  */
 
@@ -161,8 +162,8 @@ export async function dialogStop(ctx, host, opts) {
 /**
  * Recupera semanticamente o canal de input do dialog loop quando a borda detecta `active + idle + sem READY`.
  *
- * Regra operacional: se ainda houver `READY` pendente, a recuperação reutiliza a sessão sem nova chamada de modelo;
- * só reiniciamos o loop quando o canal de input está de fato ausente. A decisão pertence ao Agent, não à presentation.
+ * Regra operacional: se ainda houver `READY` pendente, a recuperação reutiliza a sessão sem nova chamada de modelo; só
+ * reiniciamos o loop quando o canal de input está de fato ausente. A decisão pertence ao Agent, não à presentation.
  *
  * @param {AgentContext} ctx
  * @param {DialogHost} host
@@ -193,7 +194,14 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
             prConsumed: false,
             success: true,
         });
-        return { recovered: false, reason, strategy: 'paused', additionalModelCall: false, prConsumed: false, durationMs };
+        return {
+            recovered: false,
+            reason,
+            strategy: 'paused',
+            additionalModelCall: false,
+            prConsumed: false,
+            durationMs,
+        };
     }
 
     if (ctx.isDialogLoopActive() && ctx.isWaitingForInput() && ctx.getPendingQuestionKind() === 'ready') {
@@ -204,7 +212,14 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
             prConsumed: false,
             success: true,
         });
-        return { recovered: true, reason, strategy: 'reuse_ready', additionalModelCall: false, prConsumed: false, durationMs };
+        return {
+            recovered: true,
+            reason,
+            strategy: 'reuse_ready',
+            additionalModelCall: false,
+            prConsumed: false,
+            durationMs,
+        };
     }
 
     const mustRestart = ctx.isDialogLoopActive() && ctx.isIdle() && !ctx.hasPendingQuestion();
@@ -216,7 +231,14 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
             prConsumed: false,
             success: true,
         });
-        return { recovered: false, reason, strategy: 'not_needed', additionalModelCall: false, prConsumed: false, durationMs };
+        return {
+            recovered: false,
+            reason,
+            strategy: 'not_needed',
+            additionalModelCall: false,
+            prConsumed: false,
+            durationMs,
+        };
     }
 
     try {
@@ -229,7 +251,14 @@ export async function dialogRecoverInputChannel(ctx, host, opts = {}) {
             prConsumed: true,
             success: true,
         });
-        return { recovered: true, reason, strategy: 'restart_with_model_call', additionalModelCall: true, prConsumed: true, durationMs };
+        return {
+            recovered: true,
+            reason,
+            strategy: 'restart_with_model_call',
+            additionalModelCall: true,
+            prConsumed: true,
+            durationMs,
+        };
     } catch (error) {
         emitRecovery({
             recovered: false,

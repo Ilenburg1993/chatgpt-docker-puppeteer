@@ -114,10 +114,7 @@ function shouldSkipDuplicateMessageDelta(session, rawEvent, data) {
 
 /**
  * @param {import('./contracts.js').CopilotSessionLike} session
- * @param {Pick<
- *     import('./contracts.js').SessionWirerCallbacks,
- *     'emit' | 'isProcessing' | 'dialogLoopActive'
- * >} cb
+ * @param {Pick<import('./contracts.js').SessionWirerCallbacks, 'emit' | 'isProcessing' | 'dialogLoopActive'>} cb
  * @returns {(() => void)[]}
  */
 export function wireStreamingEvents(session, { emit, isProcessing, dialogLoopActive }) {

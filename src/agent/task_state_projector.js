@@ -220,7 +220,10 @@ class TaskStateProjector {
 
         const base = Number(CONFIG?.all?.['TASK_TIMEOUT_MS'] || 1800000) || 1800000;
         this.runningLockTtlMs = Math.max(60000, base + 60000);
-        this.admissionLockTtlMs = Math.max(60000, Number(CONFIG?.all?.['TASK_ADMISSION_LOCK_TTL_MS'] || 300000) || 300000);
+        this.admissionLockTtlMs = Math.max(
+            60000,
+            Number(CONFIG?.all?.['TASK_ADMISSION_LOCK_TTL_MS'] || 300000) || 300000,
+        );
     }
 
     /**
@@ -565,7 +568,9 @@ class TaskStateProjector {
             const result = payload['result'];
             const text = typeof result === 'string' ? result : JSON.stringify(result ?? null);
             const storage =
-                payload['storage'] && typeof payload['storage'] === 'object' ? payload['storage'] : _storagePointers(taskId);
+                payload['storage'] && typeof payload['storage'] === 'object'
+                    ? payload['storage']
+                    : _storagePointers(taskId);
 
             const artifactIds = _registerResponseArtifacts({ storage, actor: 'system' });
 
@@ -821,7 +826,8 @@ class TaskStateProjector {
                         );
                         const diagIds = _registerDiagnosticArtifacts({ storage: diagStorage, actor: 'system' });
                         const diagJson = JSON.stringify(diagIds);
-                        const summary = payloadDetails['diagnosis_summary'] || payloadDetails['diagnosisSummary'] || null;
+                        const summary =
+                            payloadDetails['diagnosis_summary'] || payloadDetails['diagnosisSummary'] || null;
                         const summaryJson = summary ? JSON.stringify(summary).slice(0, 10000) : null;
 
                         updateAttempt(attemptId, {

@@ -4,7 +4,8 @@ Data: 2026-06-03
 
 Atualização canônica: 2026-06-04
 
-Escopo: `src/copilot/terminal`, integrações diretas com `src/copilot/model-gateway`, comandos canônicos e lives da LLM-B.
+Escopo: `src/copilot/terminal`, integrações diretas com `src/copilot/model-gateway`, comandos
+canônicos e lives da LLM-B.
 
 Documento-guia complementar ao roadmap principal:
 
@@ -12,7 +13,8 @@ Documento-guia complementar ao roadmap principal:
 
 ## 1. Objetivo
 
-Este documento define a arquitetura de adoção, rejeição ou adiamento de ferramentas auxiliares de terminal:
+Este documento define a arquitetura de adoção, rejeição ou adiamento de ferramentas auxiliares de
+terminal:
 
 - `gum`
 - `fzf`
@@ -24,19 +26,23 @@ Este documento define a arquitetura de adoção, rejeição ou adiamento de ferr
 - `jq`
 - `yq`
 
-O objetivo não é "embelezar por dependência". O objetivo é tornar o terminal da LLM-B mais fluido, técnico,
-legível, previsível e poderoso, preservando portabilidade e mantendo o prompt vivo sempre pronto.
+O objetivo não é "embelezar por dependência". O objetivo é tornar o terminal da LLM-B mais fluido,
+técnico, legível, previsível e poderoso, preservando portabilidade e mantendo o prompt vivo sempre
+pronto.
 
 ## 2. Princípios não negociáveis
 
 - [x] Nenhuma dessas ferramentas deve virar dependência obrigatória do terminal.
 - [x] Nenhuma dessas ferramentas deve ser instalada automaticamente pelo terminal.
-- [x] O terminal deve funcionar igual em CI, devcontainer mínimo, VS Code terminal, SSH e shell comum.
+- [x] O terminal deve funcionar igual em CI, devcontainer mínimo, VS Code terminal, SSH e shell
+      comum.
 - [x] Quando uma ferramenta existir, ela pode enriquecer preview, seleção, paginação ou validação.
 - [x] Quando uma ferramenta não existir, o fallback JavaScript atual deve continuar correto.
-- [x] Toda chamada a binário externo deve passar por adaptador central, sem interpolar argumentos em shell livre.
+- [x] Toda chamada a binário externo deve passar por adaptador central, sem interpolar argumentos em
+      shell livre.
 - [x] O input vivo da LLM-B não pode ser ocupado por uma TUI externa sem ação explícita do operador.
-- [x] Recursos TUI interativos devem ser opt-in por comando ou configuração, nunca por efeito colateral.
+- [x] Recursos TUI interativos devem ser opt-in por comando ou configuração, nunca por efeito
+      colateral.
 - [x] Saídas com ANSI devem ser normalizadas quando forem reimpressas em superfícies default.
 - [x] Logs diagnósticos podem ser detalhados; superfícies default devem ser humanas e curtas.
 
@@ -48,9 +54,10 @@ Atualização 2026-06-04:
 - [x] A conclusão continua: as libs são aceleradores de UX, não fundação obrigatória.
 - [x] `fzf`, `gum`, `bat`, `glow`, `delta`, `jq` e `yq` ficam aceitos como enriquecimento explícito.
 - [x] `atuin` e `zoxide` seguem adiados porque alteram estado pessoal do shell e do operador.
-- [x] O terminal LLM-B deve sempre ser capaz de explicar qual renderer foi usado e qual fallback foi aplicado.
-- [x] O fluxo canônico continua sendo JS/Node para contratos internos; binários externos só em preview,
-      seleção ou diagnóstico explícitos.
+- [x] O terminal LLM-B deve sempre ser capaz de explicar qual renderer foi usado e qual fallback foi
+      aplicado.
+- [x] O fluxo canônico continua sendo JS/Node para contratos internos; binários externos só em
+      preview, seleção ou diagnóstico explícitos.
 
 ### 3.1 `gum`
 
@@ -66,13 +73,14 @@ Achados técnicos:
 - [x] `gum confirm` usa código de saída para afirmar ou negar.
 - [x] `gum filter` e `gum choose` podem selecionar múltiplos itens.
 - [x] `gum input` e `gum write` tomam controle do TTY, portanto competem com o prompt vivo.
-- [x] A própria lista oficial de comandos mostra que `gum` mistura componentes passivos
-      (`style`, `table`, `format`) com componentes interativos (`input`, `choose`, `filter`,
-      `pager`), logo o adaptador precisa declarar o tipo de tomada de TTY de cada subcomando.
+- [x] A própria lista oficial de comandos mostra que `gum` mistura componentes passivos (`style`,
+      `table`, `format`) com componentes interativos (`input`, `choose`, `filter`, `pager`), logo o
+      adaptador precisa declarar o tipo de tomada de TTY de cada subcomando.
 
 Decisão:
 
-- [x] Aceitar como candidato de fase posterior para menus, confirmações explícitas e pickers simples.
+- [x] Aceitar como candidato de fase posterior para menus, confirmações explícitas e pickers
+      simples.
 - [x] Não usar como base da linha viva, do prompt principal ou de `ask_user` canônico.
 - [x] Requer adaptador com guarda `isInteractiveTty`, timeout e fallback textual.
 
@@ -85,17 +93,17 @@ Fontes oficiais:
 
 Achados técnicos:
 
-- [x] `fzf` é filtro fuzzy de propósito geral para listas, arquivos, histórico, processos, hostnames,
-      commits e outras coleções.
+- [x] `fzf` é filtro fuzzy de propósito geral para listas, arquivos, histórico, processos,
+      hostnames, commits e outras coleções.
 - [x] A seleção é emitida por stdout, o que encaixa bem em adapters.
 - [x] O valor real para nosso terminal está em seleção de arquivos/contexto, comandos, sessões,
       modelos BYOK e resultados de busca.
 - [x] Preview com `bat` é padrão de uso documentado pela comunidade do próprio `bat` e compatível
       com arquitetura de preview opcional.
-- [x] A documentação oficial de `fzf --preview` alerta que o preview é executado por `$SHELL -c`
-      e que não deve ser colocado globalmente em `FZF_DEFAULT_OPTS`.
-- [x] Decisão de segurança: nosso adapter de `fzf` pode usar preview apenas com comandos próprios
-      e argumentos escapados/controlados; a fase atual aceita seleção sem preview shell livre.
+- [x] A documentação oficial de `fzf --preview` alerta que o preview é executado por `$SHELL -c` e
+      que não deve ser colocado globalmente em `FZF_DEFAULT_OPTS`.
+- [x] Decisão de segurança: nosso adapter de `fzf` pode usar preview apenas com comandos próprios e
+      argumentos escapados/controlados; a fase atual aceita seleção sem preview shell livre.
 
 Decisão:
 
@@ -113,7 +121,8 @@ Fonte oficial:
 
 Achados técnicos:
 
-- [x] `bat` fornece syntax highlighting, integração com Git e visualização de caracteres não imprimíveis.
+- [x] `bat` fornece syntax highlighting, integração com Git e visualização de caracteres não
+      imprimíveis.
 - [x] A documentação oficial mostra uso com stdin e linguagem explícita.
 - [x] A documentação oficial recomenda `--color=always` e `--line-range` para preview com `fzf`.
 - [x] Em Debian/Ubuntu antigos o binário pode chamar `batcat`, não `bat`.
@@ -144,7 +153,8 @@ Achados técnicos:
 
 Decisão:
 
-- [x] Aceitar como renderer opcional de Markdown para `/help full`, docs, planos, auditorias e previews.
+- [x] Aceitar como renderer opcional de Markdown para `/help full`, docs, planos, auditorias e
+      previews.
 - [x] Usar preferencialmente modo CLI/pager explícito, não TUI automática.
 - [x] Não usar para renderizar deltas da LLM-B em tempo real.
 
@@ -180,8 +190,8 @@ Achados técnicos:
 
 - [x] Atuin substitui o histórico de shell por SQLite e registra contexto adicional dos comandos.
 - [x] Sync é opcional e criptografado ponta a ponta, mas ainda envolve estado sensível do operador.
-- [x] A documentação oficial indica hooks de shell e suportes para zsh, bash, fish, nushell, xonsh
-      e PowerShell.
+- [x] A documentação oficial indica hooks de shell e suportes para zsh, bash, fish, nushell, xonsh e
+      PowerShell.
 - [x] A integração real depende do shell interativo; IDEs podem iniciar shell sem carregar hooks.
 - [x] A documentação oficial sobre IDEs e AI coding assistants reforça que Atuin depende de hooks
       `preexec`/`precmd`, shell interativo e configuração do shell, podendo falhar em terminais
@@ -194,7 +204,8 @@ Decisão:
 - [x] Adiar.
 - [x] Não integrar ao terminal LLM-B como backend de histórico neste momento.
 - [x] Pode ser documentado como ferramenta pessoal do operador, não como componente do produto.
-- [x] Qualquer uso futuro deve ser opt-in, sem sync automático e sem ler histórico externo por padrão.
+- [x] Qualquer uso futuro deve ser opt-in, sem sync automático e sem ler histórico externo por
+      padrão.
 - [x] Não chamar `atuin search`, `atuin history` ou `atuin sync` automaticamente; qualquer futura
       integração precisa de consentimento explícito e isolamento de histórico do operador.
 
@@ -219,8 +230,8 @@ Decisão:
 - [x] Adiar.
 - [x] Não usar para navegação automática do terminal LLM-B.
 - [x] Pode ser útil para operador humano fora do produto, mas não deve afetar cwd canônico.
-- [x] Um futuro `/cd --interactive` pode consultar `zoxide` apenas se o operador pedir e se o
-      escopo permitir; defaults seguem presos ao workspace do produto.
+- [x] Um futuro `/cd --interactive` pode consultar `zoxide` apenas se o operador pedir e se o escopo
+      permitir; defaults seguem presos ao workspace do produto.
 
 ### 3.8 `jq`
 
@@ -242,8 +253,8 @@ Decisão:
 
 - [x] Aceitar como ferramenta opcional de inspeção/validação diagnóstica.
 - [x] Não substituir parsers JS canônicos por `jq`.
-- [x] Pode alimentar comandos como `/events --jq`, `/byok ... --jq`, `/status --json | jq` quando
-      a arquitetura de adapters existir.
+- [x] Pode alimentar comandos como `/events --jq`, `/byok ... --jq`, `/status --json | jq` quando a
+      arquitetura de adapters existir.
 
 ### 3.9 `yq`
 
@@ -259,8 +270,8 @@ Achados técnicos:
 - [x] O README oficial inclui nota de segurança para Docker/Podman com privilégios restritos.
 - [x] Valor real para nós: `.env`, YAML de configs futuras, GitHub Actions, manifests, relatórios e
       contratos estruturados externos.
-- [x] A documentação de `yq` inclui operadores de arquivo e `eval`; por isso, no terminal LLM-B,
-      o adapter deve desabilitar operações de env/file quando estiver formatando stdin diagnóstico.
+- [x] A documentação de `yq` inclui operadores de arquivo e `eval`; por isso, no terminal LLM-B, o
+      adapter deve desabilitar operações de env/file quando estiver formatando stdin diagnóstico.
 
 Decisão:
 
@@ -314,8 +325,8 @@ Decisão:
 
 ### 5.3 Integração UX
 
-- [x] `/menu` pode oferecer picker textual seguro se o operador pedir e o terminal ainda nao
-      tiver controle exclusivo do TTY para `fzf`/`gum`.
+- [x] `/menu` pode oferecer picker textual seguro se o operador pedir e o terminal ainda nao tiver
+      controle exclusivo do TTY para `fzf`/`gum`.
 - [x] `/menu` pode abrir picker externo real se `fzf`/`gum` estiverem disponíveis, o operador pedir
       e o REPL entregar handoff exclusivo de TTY.
 - [ ] `/search` pode oferecer preview com `bat`/`glow` sem mudar resultado canônico.
@@ -328,14 +339,14 @@ Decisão:
 
 ## 6. Riscos
 
-- [x] TUI externa nao deve sequestrar o prompt vivo sem handoff explícito; `/menu picker`
-      atualmente renderiza guarda textual.
+- [x] TUI externa nao deve sequestrar o prompt vivo sem handoff explícito; `/menu picker` atualmente
+      renderiza guarda textual.
 - [x] Dependência ausente quebrar fluxo principal: mitigado por registry/fallback; continuar
       cobrindo em teste com `PATH` controlado.
 - [x] ANSI externo vazar para logs/testes: mitigado por `--color=never`/sanitização em previews;
       continuar verificando em comandos default.
-- [x] Tool externa ler arquivo sensível em preview sem ação explícita: mitigado por exigir `/fs
-      preview`/`--preview`; não acionar preview automático por fluxo da LLM-B.
+- [x] Tool externa ler arquivo sensível em preview sem ação explícita: mitigado por exigir
+      `/fs     preview`/`--preview`; não acionar preview automático por fluxo da LLM-B.
 - [x] Shell quoting inseguro ao montar comandos com paths: mitigado por `spawnSync` com arrays;
       proibido `shell: true`.
 - [x] Windows/WSL/macOS/Linux divergirem em nomes de binário: mitigado para `batcat`; pendente
@@ -344,8 +355,8 @@ Decisão:
       `deferred` e `defaultEnabled=false`.
 - [x] `jq`/`yq` virarem fonte canônica paralela e divergente do JS: mitigado por contrato
       "diagnóstico/preview apenas".
-- [ ] Preview shell dentro de `fzf --preview` introduzir vetor de quoting: decisão atual é não
-      usar `--preview` até haver adapter próprio de preview tokenizado.
+- [ ] Preview shell dentro de `fzf --preview` introduzir vetor de quoting: decisão atual é não usar
+      `--preview` até haver adapter próprio de preview tokenizado.
 - [ ] TUI completa visual em terminal real ainda não foi validada manualmente; automação filtrada
       prova handoff, seleção e restauração, mas não prova estética completa.
 
@@ -356,7 +367,8 @@ Decisão:
 - [x] O registry deve ter fallback determinístico quando `PATH` não contiver a ferramenta.
 - [x] O terminal deve explicar "disponível", "ausente", "adiado" e "não recomendado por default".
 - [x] Cada adapter deve receber argumentos já tokenizados, nunca uma string shell livre.
-- [x] `execFile`/`spawn` com array de args é o padrão; `shell: true` fica proibido para estes adapters.
+- [x] `execFile`/`spawn` com array de args é o padrão; `shell: true` fica proibido para estes
+      adapters.
 - [x] Saídas externas devem ter limite de bytes, timeout e truncamento explícito.
 - [x] `atuin` e `zoxide` não entram em adapters ativos nesta etapa.
 
@@ -391,8 +403,8 @@ Decisão:
 
 - [x] `src/copilot/terminal/capabilities/external-tools.js` implementa registry read-only, cache,
       detecção por `PATH`, suporte a `batcat` e version probe com timeout.
-- [x] `src/copilot/terminal/commands/terminal.js` expõe `/terminal libs`,
-      `/terminal libs detail`, `/terminal libs json`, `/terminal libs refresh` e atalho `/libs`.
+- [x] `src/copilot/terminal/commands/terminal.js` expõe `/terminal libs`, `/terminal libs detail`,
+      `/terminal libs json`, `/terminal libs refresh` e atalho `/libs`.
 - [x] `src/copilot/terminal/capabilities/file-preview.js` implementa preview read-only com
       `bat`/`batcat`, `spawnSync` sem shell, timeout, `maxBuffer`, limite de linhas e fallback JS.
 - [x] `/fs preview <path>` e `/fs read <path> --preview` ativam preview explicitamente sem alterar
@@ -411,8 +423,7 @@ Decisão:
       `npx vitest run tests/unit/copilot/terminal/test_commands_fs.spec.js tests/unit/copilot/terminal/test_external_tool_capabilities.spec.js tests/unit/copilot/terminal/test_commands_terminal.spec.js`.
 - [x] Resultado: 3 arquivos, 15 testes.
 - [x] Lint escopado passou nos arquivos alterados de terminal/capabilities/commands e testes.
-- [x] Typecheck strict de `src/copilot` passou:
-      `npm run typecheck:strict:src.copilot`.
+- [x] Typecheck strict de `src/copilot` passou: `npm run typecheck:strict:src.copilot`.
 - [x] Live PTY diagnóstico passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=190000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-aux-libs-20260603-1950`.
 - [x] Resultado live: PASS em 24/24 critérios, incluindo `diagnostic-ux-fs-preview` e
@@ -424,8 +435,8 @@ Decisão:
 - [x] Testes D.5 passaram:
       `npx vitest run tests/unit/copilot/terminal/test_file_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
 - [x] Resultado: 2 arquivos, 9 testes.
-- [x] Faixa E: `markdown-preview.js` implementa Markdown explícito com `glow` via stdin,
-      sem pager/TUI automático, com fallback JS e truncamento.
+- [x] Faixa E: `markdown-preview.js` implementa Markdown explícito com `glow` via stdin, sem
+      pager/TUI automático, com fallback JS e truncamento.
 - [x] `/fs preview <path> --markdown` e `/fs read <path> --preview --markdown` ativam renderer
       Markdown explicitamente.
 - [x] Testes/lint Faixa E passaram:
@@ -437,10 +448,10 @@ Decisão:
 - [x] Live PTY Faixa E passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=200000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-markdown-clean-20260603-2000`.
 - [x] Resultado: PASS em 25/25 critérios, incluindo `diagnostic-ux-fs-markdown-preview`.
-- [x] Faixa F: `diff-preview.js` implementa preview explícito de unified diff com `delta`
-      via stdin, `--paging=never`, fallback JS, truncamento, timeout e `maxBuffer`.
-- [x] `/git diff [--staged] [--plain] [file]` e `/gh pr diff <n> [--plain]` usam o adapter
-      comum, com cabeçalho humano e indicação de renderer/fallback.
+- [x] Faixa F: `diff-preview.js` implementa preview explícito de unified diff com `delta` via stdin,
+      `--paging=never`, fallback JS, truncamento, timeout e `maxBuffer`.
+- [x] `/git diff [--staged] [--plain] [file]` e `/gh pr diff <n> [--plain]` usam o adapter comum,
+      com cabeçalho humano e indicação de renderer/fallback.
 - [x] Achado live: o bridge Git executava a partir de `/src`, embora o operador use paths
       repo-relativos; `/git diff src/copilot/...` podia retornar vazio sem erro.
 - [x] Correção: bridges Git de leitura e escrita agora executam a partir da raiz do repositório.
@@ -467,20 +478,21 @@ Decisão:
 - [x] Testes Faixa H passaram:
       `npx vitest run tests/unit/copilot/terminal/test_structured_preview.spec.js tests/unit/copilot/terminal/test_commands_fs.spec.js`.
 - [x] Resultado: 2 arquivos, 12 testes.
-- [x] Typecheck strict de `src/copilot` passou após Faixa H:
-      `npm run typecheck:strict:src.copilot`.
+- [x] Typecheck strict de `src/copilot` passou após Faixa H: `npm run typecheck:strict:src.copilot`.
 - [x] Live PTY Faixa H passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --diagnostic-ux-cycle --timeout-ms=240000 --transport=pty --out-dir=artifacts/terminal-live/diagnostic-ux-structured-preview-20260603-2040`.
 - [x] Resultado live: PASS em 28/28 critérios, incluindo `diagnostic-ux-fs-json-preview` e
       `diagnostic-ux-fs-yaml-preview`.
-- [x] Faixa G.0/G.3: `picker-plan.js` cria planner seguro para `fzf`/`gum`; `/menu picker`
-      renderiza guarda textual quando nao ha handoff explícito de TTY.
+- [x] Faixa G.0/G.3: `picker-plan.js` cria planner seguro para `fzf`/`gum`; `/menu picker` renderiza
+      guarda textual quando nao ha handoff explícito de TTY.
 - [x] Faixa G.5 base: `readTerminalExclusiveTtyReadiness()` e `withTerminalExclusiveTty()`
-      centralizam pausas de readline, render lock, limpeza de linha viva e restauração forçada do prompt.
+      centralizam pausas de readline, render lock, limpeza de linha viva e restauração forçada do
+      prompt.
 - [x] Decisão Faixa G: antes de lançar qualquer TUI externa, o terminal deve provar controle
-      exclusivo de stdin/stdout, ausencia de pergunta humana pendente e restauração limpa da linha viva.
-- [x] Decisão Faixa G: `/menu picker` consome as razões reais de prontidão do REPL, como TTY ausente,
-      turno em execução ou input humano parcialmente digitado.
+      exclusivo de stdin/stdout, ausencia de pergunta humana pendente e restauração limpa da linha
+      viva.
+- [x] Decisão Faixa G: `/menu picker` consome as razões reais de prontidão do REPL, como TTY
+      ausente, turno em execução ou input humano parcialmente digitado.
 - [x] Achado live corrigido: a primeira integração de prontidão reportava o render lock do próprio
       dispatcher como bloqueio; o router agora ignora esse lock externo ao consultar `/menu picker`.
 - [x] Testes/lint Faixa G.0 passaram:
@@ -501,8 +513,8 @@ Decisão:
       handoff ainda nao entregue, sem falso bloqueio de renderização.
 - [x] Faixa G.6: `picker-runner.js` executa `fzf`/`gum` como adapter opcional, com argumentos
       tokenizados, stdin controlado e captura de seleção sem shell livre.
-- [x] Integração Faixa G.6: `/menu picker --interactive` usa `withTerminalExclusiveTty()` e só
-      tenta TUI real quando a prontidão do REPL aprova; `/menu picker` permanece textual por padrão.
+- [x] Integração Faixa G.6: `/menu picker --interactive` usa `withTerminalExclusiveTty()` e só tenta
+      TUI real quando a prontidão do REPL aprova; `/menu picker` permanece textual por padrão.
 - [x] Harness Faixa G.6: `diagnostic-ux-menu-picker-guard` agora reprova se voltar a aparecer o
       falso bloqueio `renderização terminal em andamento`.
 - [x] Testes Faixa G.6 passaram:
@@ -513,9 +525,11 @@ Decisão:
 - [x] Resultado live: PASS em 29/29 critérios com guarda textual default e sem falso bloqueio de
       renderização.
 - [x] Achado live Faixa G.8: `fzf` TUI completo abriu, mas o harness baseado em `script` nao
-      responde a `CSI 6n`, portanto nao é emulador de terminal suficiente para validar TUI visual completa.
+      responde a `CSI 6n`, portanto nao é emulador de terminal suficiente para validar TUI visual
+      completa.
 - [x] Decisão Faixa G.8: automação usa `COPILOT_TERMINAL_PICKER_FILTER=Status` para exercer
-      `fzf`/handoff/seleção sem TUI; validação visual completa permanece manual/assistida em terminal real.
+      `fzf`/handoff/seleção sem TUI; validação visual completa permanece manual/assistida em
+      terminal real.
 - [x] Live PTY Faixa G.8 filtrada passou:
       `node scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs --picker-interactive-cycle --timeout-ms=90000 --transport=pty --out-dir=artifacts/terminal-live/picker-interactive-filtered-fzf-20260603-2110`.
 - [x] Resultado live: PASS em 5/5 critérios; `fzf --filter` selecionou `Status completo`, restaurou
@@ -525,9 +539,12 @@ Decisão:
 
 - [x] Fase D.1: criar adapter de preview com `bat`/`batcat`.
 - [x] Fase D.2: fallback JS com largura, limite e linguagem opcional.
-- [x] Fase D.3: plugar primeiro em comando diagnóstico/explicitamente solicitado, não em fluxo automático.
-- [x] Fase D.4: validar que arquivos grandes não travam o terminal via timeout/maxBuffer/truncamento.
-- [x] Fase D.5: adicionar detecção fina de binários antes de preview externo em arquivos não-textuais.
+- [x] Fase D.3: plugar primeiro em comando diagnóstico/explicitamente solicitado, não em fluxo
+      automático.
+- [x] Fase D.4: validar que arquivos grandes não travam o terminal via
+      timeout/maxBuffer/truncamento.
+- [x] Fase D.5: adicionar detecção fina de binários antes de preview externo em arquivos
+      não-textuais.
 
 ### Faixa E: Markdown e documentação
 
@@ -549,17 +566,18 @@ Decisão:
 - [x] Fase G.1: criar adapter `fzf` para listas com handoff real de TTY.
 - [x] Fase G.2: avaliar `gum filter`/`gum choose` como alternativa com o mesmo handoff.
 - [x] Fase G.3: plugar `/menu picker` como opção explícita textual e segura.
-- [x] Fase G.4: impedir execução sem autorização interativa explícita ou com pergunta humana pendente.
-- [x] Fase G.5: criar contrato central para pausar linha viva/readline, entregar TTY exclusivo
-      a uma operação e restaurar prompt vivo sem corromper input.
+- [x] Fase G.4: impedir execução sem autorização interativa explícita ou com pergunta humana
+      pendente.
+- [x] Fase G.5: criar contrato central para pausar linha viva/readline, entregar TTY exclusivo a uma
+      operação e restaurar prompt vivo sem corromper input.
 - [x] Fase G.6: criar adapter executor de `fzf`/`gum` usando o contrato de TTY exclusivo.
 - [x] Fase G.7: tratar seleção, cancelamento, falha e retorno desconhecido sem shell livre.
 - [x] Fase G.8: auditar executor real em PTY filtrado, validando restauração visual apos seleção
       automatizada por `fzf --filter`.
 - [ ] Fase G.9: auditar TUI visual completa em terminal real/manual, validando seleção/cancelamento
       em `fzf` e, quando instalado, `gum`.
-- [ ] Fase G.10: projetar preview integrado ao picker sem string shell livre, ou rejeitar preview
-      de picker e manter preview antes/depois da seleção.
+- [ ] Fase G.10: projetar preview integrado ao picker sem string shell livre, ou rejeitar preview de
+      picker e manter preview antes/depois da seleção.
 
 ### Faixa H: contratos estruturados
 
@@ -588,8 +606,8 @@ Decisão:
 
 - [x] Fase J.1: criar helper central capaz de ISO, relativo, dual e elapsed.
 - [x] Fase J.2: default humano `dual`: ISO local até segundos + relativo.
-- [ ] Fase J.3: adicionar helper de partes (`iso`, `relative`, `elapsed`, `label`) para callers
-      que precisam compor layout sem reparsear timestamps.
+- [ ] Fase J.3: adicionar helper de partes (`iso`, `relative`, `elapsed`, `label`) para callers que
+      precisam compor layout sem reparsear timestamps.
 - [ ] Fase J.4: substituir superfícies humanas remanescentes que usam apenas ISO com milissegundos
       por `formatTerminalTimeLabel` ou helper equivalente.
 - [ ] Fase J.5: manter raw/export técnico com ISO estável quando isso for melhor para máquina.
@@ -610,6 +628,6 @@ Motivo:
 
 - A maior parte das Faixas B-H já foi implementada e validada de modo escopado.
 - O pedido atual exige ISO 8601 até segundos e tempo relativo em superfícies humanas.
-- O helper já existe, mas precisa ser ampliado para callers compostos e aplicado onde ainda há
-  ISO cru com milissegundos.
+- O helper já existe, mas precisa ser ampliado para callers compostos e aplicado onde ainda há ISO
+  cru com milissegundos.
 - Essa mudança melhora auditabilidade e legibilidade sem depender de nenhuma lib externa.

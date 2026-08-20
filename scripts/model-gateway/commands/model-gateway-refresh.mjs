@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { config as loadDotenv } from 'dotenv';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { config as loadDotenv } from 'dotenv';
 import {
     createDefaultModelGatewayCatalogImporters,
     createEnvSecretRegistry,
@@ -20,13 +20,16 @@ const args = process.argv.slice(2);
 /** @param {string} name */
 const hasFlag = (name) => args.includes(name);
 /** @param {string} name */
-const valuesFor = (name) => args
-    .filter((arg) => arg.startsWith(`${name}=`))
-    .flatMap((arg) => arg.slice(name.length + 1).split(','))
-    .map((value) => value.trim())
-    .filter(Boolean);
+const valuesFor = (name) =>
+    args
+        .filter((arg) => arg.startsWith(`${name}=`))
+        .flatMap((arg) => arg.slice(name.length + 1).split(','))
+        .map((value) => value.trim())
+        .filter(Boolean);
 
-const providers = new Set([...valuesFor('--provider'), ...valuesFor('--providers')].map((value) => value.toLowerCase()));
+const providers = new Set(
+    [...valuesFor('--provider'), ...valuesFor('--providers')].map((value) => value.toLowerCase()),
+);
 const importerIds = new Set([...valuesFor('--importer'), ...valuesFor('--source')].map((value) => value.toLowerCase()));
 const sourceIds = valuesFor('--source-id');
 const preview = hasFlag('--preview');
@@ -35,7 +38,9 @@ const planOnly = hasFlag('--plan') || hasFlag('--dry-run');
 const incremental = !hasFlag('--all');
 const force = hasFlag('--force') || hasFlag('--all');
 const json = hasFlag('--json');
-const logPath = resolve(valuesFor('--log')[0] ?? `logs/model-gateway-refresh/${new Date().toISOString().replace(/[:.]/gu, '-')}.jsonl`);
+const logPath = resolve(
+    valuesFor('--log')[0] ?? `logs/model-gateway-refresh/${new Date().toISOString().replace(/[:.]/gu, '-')}.jsonl`,
+);
 
 if (hasFlag('--help') || hasFlag('-h')) {
     process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-refresh.mjs [options]
@@ -88,9 +93,10 @@ function label(value) {
 function formatProgressLine(event) {
     const pct = typeof event['progressPct'] === 'number' ? `${String(event['progressPct']).padStart(3)}%` : ' --%';
     const elapsed = typeof event['elapsedMs'] === 'number' ? `${event['elapsedMs']}ms` : '-';
-    const importer = event['importer'] && typeof event['importer'] === 'object'
-        ? /** @type {Record<string, any>} */ (event['importer'])['importerId']
-        : event['importerId'];
+    const importer =
+        event['importer'] && typeof event['importer'] === 'object'
+            ? /** @type {Record<string, any>} */ (event['importer'])['importerId']
+            : event['importerId'];
     const counts = [
         typeof event['selectedCount'] === 'number' ? `selected=${event['selectedCount']}` : '',
         typeof event['skippedCount'] === 'number' ? `skipped=${event['skippedCount']}` : '',
@@ -100,7 +106,9 @@ function formatProgressLine(event) {
         typeof event['addedCount'] === 'number' ? `added=${event['addedCount']}` : '',
         typeof event['removedCount'] === 'number' ? `removed=${event['removedCount']}` : '',
         typeof event['changedCount'] === 'number' ? `changed=${event['changedCount']}` : '',
-    ].filter(Boolean).join(' ');
+    ]
+        .filter(Boolean)
+        .join(' ');
     const failed = Array.isArray(event['errors']) && event['errors'].length > 0 ? ` error=${event['errors'][0]}` : '';
     return `[model-gateway:refresh] ${pct} ${event['phase']} importer=${label(String(importer ?? ''))} elapsed=${elapsed}${counts ? ` ${counts}` : ''}${failed}`;
 }
@@ -155,9 +163,12 @@ if (planOnly) {
     if (json) {
         process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
     } else {
-        process.stdout.write(`model-gateway refresh plan: selected=${summary.selected.length} skipped=${summary.skipped.length}\n`);
+        process.stdout.write(
+            `model-gateway refresh plan: selected=${summary.selected.length} skipped=${summary.skipped.length}\n`,
+        );
         for (const item of summary.selected) process.stdout.write(`  run ${item.sourceId}: ${item.reason}\n`);
-        for (const item of summary.skipped.slice(0, 20)) process.stdout.write(`  skip ${item.sourceId}: ${item.reason}\n`);
+        for (const item of summary.skipped.slice(0, 20))
+            process.stdout.write(`  skip ${item.sourceId}: ${item.reason}\n`);
         process.stdout.write(`full log: ${summary.logPath}\n`);
     }
     process.exit(0);

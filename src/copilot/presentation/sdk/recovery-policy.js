@@ -176,11 +176,12 @@ export function getSdkRecoveryPolicy(error, scope = 'connection') {
  * @returns {RuntimeSdkRecoveryMessage}
  */
 export function describeSdkRecoveryPolicy(policy, error) {
-    const message = error instanceof Error
-        ? /** @type {Error} */ (error).message
-        : typeof error === 'object' && error !== null
-          ? String(/** @type {Record<string, unknown>} */ (error)['message'] ?? error)
-          : String(error);
+    const message =
+        error instanceof Error
+            ? /** @type {Error} */ (error).message
+            : typeof error === 'object' && error !== null
+              ? String(/** @type {Record<string, unknown>} */ (error)['message'] ?? error)
+              : String(error);
     switch (policy.kind) {
         case 'auth':
             return {

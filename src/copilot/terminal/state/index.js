@@ -30,11 +30,6 @@ export {
     writeTerminalDisplayState,
     writeTerminalDisplayToggle,
 } from './display-policy.js';
-export { shouldConsumeTerminalPendingAnswerInput, tryAnswerTerminalPendingQuestionInput } from './pending-question-answer.js';
-export {
-    renderTerminalPendingQuestionKindLabel,
-    renderTerminalPendingQuestionPromptTag,
-} from './pending-question-labels.js';
 export {
     appendTerminalIntent,
     clearTerminalIntentHistory,
@@ -44,10 +39,24 @@ export {
     readTerminalIntentStats,
 } from './intent-state.js';
 export {
+    shouldConsumeTerminalPendingAnswerInput,
+    tryAnswerTerminalPendingQuestionInput,
+} from './pending-question-answer.js';
+export {
+    renderTerminalPendingQuestionKindLabel,
+    renderTerminalPendingQuestionPromptTag,
+} from './pending-question-labels.js';
+export {
     buildTerminalPendingQuestionReplayKey,
     createTerminalPendingQuestionReplayState,
 } from './pending-question-replay.js';
 export { clearRateLimiters, registerClearRateLimiters, resetRateLimiterStateForTests } from './rate-limiter-state.js';
+export {
+    clearTerminalPromptHookEvents,
+    listTerminalPromptHookEvents,
+    readTerminalPromptHookSummary,
+    recordTerminalPromptHookSubmitted,
+} from './sdk-hook-events.js';
 export {
     classifyTerminalSdkQuota,
     clearTerminalElicitation,
@@ -64,41 +73,55 @@ export {
     readTerminalElicitationSummary,
     readTerminalPermissionSummary,
     readTerminalUserInputSummary,
-    recordTerminalUserInputAnswerEchoGuard,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
     recordTerminalPermissionCompleted,
     recordTerminalPermissionModeChanged,
     recordTerminalPermissionRequested,
+    recordTerminalUserInputAnswerEchoGuard,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     terminalPermissionModeSkipsSdkPrompts,
 } from './sdk-interactions.js';
 export {
-    clearTerminalPromptHookEvents,
-    listTerminalPromptHookEvents,
-    readTerminalPromptHookSummary,
-    recordTerminalPromptHookSubmitted,
-} from './sdk-hook-events.js';
-export { createToolCallRegistry } from './tool-call-registry.js';
+    flushTerminalSseEventArchive,
+    readTerminalSseEventArchiveState,
+    readTerminalSseEventArchiveTail,
+    recordTerminalSseEventArchive,
+    resetTerminalSseEventArchiveForTests,
+} from './sse-event-archive.js';
 export {
-    clearTerminalToolLifecycleDiagnostics,
-    readTerminalToolLifecycleProjection,
-    recordTerminalToolLifecycleDiagnostic,
-} from './tool-lifecycle-state.js';
+    clearTerminalStreamDiagnosticsForTests,
+    readTerminalStreamDiagnosticsProjection,
+    recordTerminalFinalReconciliationDiagnostic,
+    recordTerminalStreamDeltaDiagnostic,
+} from './stream-diagnostics-state.js';
+export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from './thinking-labels.js';
 export {
     TERMINAL_TIME_DISPLAY_MODES,
     formatTerminalElapsedDuration,
     formatTerminalIsoTimestamp,
     formatTerminalIsoTimestampSeconds,
     formatTerminalRelativeAge,
-    formatTerminalTimeParts,
     formatTerminalTimeLabel,
+    formatTerminalTimeParts,
     formatTerminalTimestamp,
     resolveTerminalTimeDisplayMode,
 } from './time-format.js';
-export { buildTerminalTaskThinkingId, formatTerminalThinkingRef } from './thinking-labels.js';
+export { createToolCallRegistry } from './tool-call-registry.js';
+export {
+    clearTerminalToolLifecycleDiagnostics,
+    readTerminalToolLifecycleProjection,
+    recordTerminalToolLifecycleDiagnostic,
+} from './tool-lifecycle-state.js';
+export { flushTerminalTranscriptArchive } from './transcript-archive.js';
+export {
+    appendTerminalTranscriptTurn,
+    clearTerminalTranscriptTurns,
+    readTerminalTranscriptStats,
+    readTerminalTranscriptTurns,
+} from './transcript-state.js';
 export {
     beginTerminalTurnTrace,
     clearTerminalTurnTraceState,
@@ -109,26 +132,6 @@ export {
     recordTerminalTurnToolActivity,
     recordTerminalTurnUserInputActivity,
 } from './turn-trace-state.js';
-export {
-    appendTerminalTranscriptTurn,
-    clearTerminalTranscriptTurns,
-    readTerminalTranscriptStats,
-    readTerminalTranscriptTurns,
-} from './transcript-state.js';
-export { flushTerminalTranscriptArchive } from './transcript-archive.js';
-export {
-    clearTerminalStreamDiagnosticsForTests,
-    readTerminalStreamDiagnosticsProjection,
-    recordTerminalFinalReconciliationDiagnostic,
-    recordTerminalStreamDeltaDiagnostic,
-} from './stream-diagnostics-state.js';
-export {
-    flushTerminalSseEventArchive,
-    readTerminalSseEventArchiveState,
-    readTerminalSseEventArchiveTail,
-    recordTerminalSseEventArchive,
-    resetTerminalSseEventArchiveForTests,
-} from './sse-event-archive.js';
 export {
     TERMINAL_DETAIL_LEVELS,
     getTerminalDetailLevel,

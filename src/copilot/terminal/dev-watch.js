@@ -19,7 +19,7 @@
  */
 
 import { toError } from '#copilot/core';
-import { watch as fsWatch } from 'node:fs';
+import { watchPathTrusted } from '#copilot/infra/public/trusted-io';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
@@ -124,18 +124,22 @@ function _startNotifyWatcher(watchPath, debounceMs) {
     /** @type {ReturnType<typeof setTimeout> | null} */
     let debounceTimer = null;
 
-    const watcher = fsWatch(watchPath, { recursive: true }, (_eventType, filename) => {
-        if (isShuttingDown()) return;
-        const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
-        pendingFiles.add(rel);
+    const watcher = watchPathTrusted(
+        watchPath,
+        { caller: 'terminal.dev-watch', recursive: true },
+        (_eventType, filename) => {
+            if (isShuttingDown()) return;
+            const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
+            pendingFiles.add(rel);
 
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            const files = [...pendingFiles];
-            pendingFiles.clear();
-            _recordChanges(files, watchPath);
-        }, debounceMs);
-    });
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const files = [...pendingFiles];
+                pendingFiles.clear();
+                _recordChanges(files, watchPath);
+            }, debounceMs);
+        },
+    );
 
     watcher.on('error', (/** @type {Error} */ err) => {
         log('WARN', `[dev-watch] Watcher erro: ${toError(err).message}`);
@@ -160,19 +164,23 @@ function _startAutoWatcher(watchPath, debounceMs) {
 
     log('WARN', '[dev-watch] Modo AUTO activo — mudanças em src/copilot/** reiniciarão o processo.');
 
-    const watcher = fsWatch(watchPath, { recursive: true }, (eventType, filename) => {
-        if (triggered || isShuttingDown()) return;
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
+    const watcher = watchPathTrusted(
+        watchPath,
+        { caller: 'terminal.dev-watch', recursive: true },
+        (eventType, filename) => {
             if (triggered || isShuttingDown()) return;
-            triggered = true;
-            const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
-            log('INFO', `[dev-watch] Mudança detectada (${eventType}: ${rel}) — graceful restart.`);
-            runShutdown('dev_watch_reload')
-                .catch(() => {})
-                .finally(() => process.exit(0));
-        }, debounceMs);
-    });
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                if (triggered || isShuttingDown()) return;
+                triggered = true;
+                const rel = filename ? relative(watchPath, resolve(watchPath, String(filename))) : 'unknown';
+                log('INFO', `[dev-watch] Mudança detectada (${eventType}: ${rel}) — graceful restart.`);
+                runShutdown('dev_watch_reload')
+                    .catch(() => {})
+                    .finally(() => process.exit(0));
+            }, debounceMs);
+        },
+    );
 
     watcher.on('error', (/** @type {Error} */ err) => {
         log('WARN', `[dev-watch] Watcher erro: ${toError(err).message}`);

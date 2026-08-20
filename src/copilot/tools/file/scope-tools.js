@@ -138,7 +138,12 @@ export const workspaceScopeDeclareTool = buildTool({
             }
             if (resolvedDirectory) {
                 const fromRoot = relative(resolvedDirectory, pathCheck.resolved);
-                if (fromRoot === '..' || fromRoot.startsWith('../') || fromRoot.startsWith('..\\') || isAbsolute(fromRoot)) {
+                if (
+                    fromRoot === '..' ||
+                    fromRoot.startsWith('../') ||
+                    fromRoot.startsWith('..\\') ||
+                    isAbsolute(fromRoot)
+                ) {
                     return {
                         success: false,
                         error: 'seedPath deve permanecer dentro do directory declarado.',

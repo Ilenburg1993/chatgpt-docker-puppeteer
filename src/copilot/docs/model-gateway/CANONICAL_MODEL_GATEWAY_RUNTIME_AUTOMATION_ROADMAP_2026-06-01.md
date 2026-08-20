@@ -3,7 +3,8 @@
 Status: guia historico. O guia ativo agora e
 `CANONICAL_MODEL_GATEWAY_AUTO_RUNTIME_OPERABILITY_ROADMAP_2026-06-01.md`.
 
-Escopo primario: `src/copilot/model-gateway`, `src/copilot/terminal`, `src/copilot/sdk`, `scripts/model-gateway`.
+Escopo primario: `src/copilot/model-gateway`, `src/copilot/terminal`, `src/copilot/sdk`,
+`scripts/model-gateway`.
 
 Guia legado: `CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`.
 
@@ -34,28 +35,30 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 ### 2.1 Banco de metadados
 
 - [x] SQLite existe e tem schema versionado.
-- [x] Store persiste snapshots, sources, model evidence, provider evidence, projections, route options, account overlays,
-  runtime probes, health observations, route decisions e refresh log.
+- [x] Store persiste snapshots, sources, model evidence, provider evidence, projections, route
+      options, account overlays, runtime probes, health observations, route decisions e refresh log.
 - [x] Build de metadados existe como comando canonico.
 - [x] Refresh provider-scoped existe.
 - [x] Diagnostics SQLite existe.
 - [x] Retention operacional existe.
 - [x] Raw payload refs existem com politica de redacao.
 - [x] Redaction audit existe.
-- [ ] Ainda falta um plano claro de migracao incremental quando novos provider fields exigirem novas colunas/materializacoes.
-- [ ] Ainda falta um resumo operacional unico que diga se o banco esta pronto para ser usado pelo terminal sem build full.
+- [ ] Ainda falta um plano claro de migracao incremental quando novos provider fields exigirem novas
+      colunas/materializacoes.
+- [ ] Ainda falta um resumo operacional unico que diga se o banco esta pronto para ser usado pelo
+      terminal sem build full.
 
 ### 2.2 Importers e catalogo
 
-- [x] Ha importers para OpenAI, OpenRouter, Zai, Kilo, OpenCode, Cerebras, Groq, Gemini, Mistral, Anthropic, Chutes,
-  Cloudflare Workers AI, HuggingFace, Nvidia NIM, Ollama e docs associadas.
+- [x] Ha importers para OpenAI, OpenRouter, Zai, Kilo, OpenCode, Cerebras, Groq, Gemini, Mistral,
+      Anthropic, Chutes, Cloudflare Workers AI, HuggingFace, Nvidia NIM, Ollama e docs associadas.
 - [x] Providers tem specs/endpoints em arquivos proprios.
 - [x] Ollama local e suportado.
 - [x] Ollama local nao deve ser selecionado por default.
-- [ ] Ainda falta matriz unica por provider com endpoints disponiveis, auth, list models, account limits, rate-limit headers
-  e particularidades de auto selection.
-- [ ] Ainda falta auditoria automatica de cobertura por provider baseada naquilo que o provider poderia expor e aquilo que
-  coletamos.
+- [ ] Ainda falta matriz unica por provider com endpoints disponiveis, auth, list models, account
+      limits, rate-limit headers e particularidades de auto selection.
+- [ ] Ainda falta auditoria automatica de cobertura por provider baseada naquilo que o provider
+      poderia expor e aquilo que coletamos.
 
 ### 2.3 Pre-runtime
 
@@ -68,8 +71,8 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] Runtime selector execution bounded existe.
 - [x] Route decisions sao persistiveis.
 - [x] Score reasons chegam ao runtime selector e ao route decision ledger.
-- [x] Existe objeto unico de `runtime automation decision` que combina politica, rota selecionada, aplicabilidade
-  na sessao viva e proxima acao.
+- [x] Existe objeto unico de `runtime automation decision` que combina politica, rota selecionada,
+      aplicabilidade na sessao viva e proxima acao.
 
 ### 2.4 Terminal
 
@@ -79,8 +82,8 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] Dialog engine registra falhas BYOK de turno como provider health.
 - [x] Admission control bloqueia ou avisa quando o envelope de tokens parece incompatível.
 - [x] Existe comando read-only de modo automatico do model-gateway no terminal.
-- [ ] Ainda falta um controlador que rode antes/depois do turno e decida se deve manter, trocar modelo, solicitar novo boot
-  ou aguardar reset.
+- [ ] Ainda falta um controlador que rode antes/depois do turno e decida se deve manter, trocar
+      modelo, solicitar novo boot ou aguardar reset.
 - [x] Existe UX read-only para explicar quando a troca pode ser live e quando exige nova sessao.
 
 ### 2.5 SDK boundary
@@ -89,8 +92,8 @@ O objetivo e transformar o model-gateway em um sistema operacional completo para
 - [x] Projection preserva provider-local id, gateway id, route id e metadados BYOK.
 - [x] Auto model nativo do GitHub Copilot existe como outra politica.
 - [ ] Ainda falta separar claramente "Copilot SDK auto" de "model-gateway auto".
-- [x] Existe policy inicial que diz quando podemos usar `setModel`, quando precisamos `session sdk next new`, e quando
-  devemos apenas preparar env para o proximo boot.
+- [x] Existe policy inicial que diz quando podemos usar `setModel`, quando precisamos
+      `session sdk next new`, e quando devemos apenas preparar env para o proximo boot.
 
 ### 2.6 Scripts e comandos
 

@@ -18,9 +18,9 @@ import {
     EMITTER_TOOL_EXECUTION_PROGRESS,
 } from '#copilot/events';
 import { log } from '#copilot/observability';
-import { createChunkRetention } from './chunk-retention.js';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { logSwallowed, toError } from '../core/error-handlers.js';
+import { createChunkRetention } from './chunk-retention.js';
 import {
     dialogTurnDetailed as _dialogTurnDetailed,
     startDialogMode as _startDialogMode,

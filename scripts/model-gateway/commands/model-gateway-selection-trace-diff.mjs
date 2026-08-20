@@ -12,9 +12,9 @@ const args = process.argv.slice(2);
 const readArg = createArgReader(args);
 const argSet = new Set(args);
 
-
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-selection-trace-diff.mjs [--json] [--trace-dir <path>] [--left <path>] [--right <path>]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-selection-trace-diff.mjs [--json] [--trace-dir <path>] [--left <path>] [--right <path>]
 
 Compare two persisted model-gateway selection decision traces. If left/right are omitted, compare the two newest
 historical traces in the trace directory. latest.json is intentionally ignored for automatic pair discovery.

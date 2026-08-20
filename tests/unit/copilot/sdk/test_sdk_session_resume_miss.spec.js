@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * Testes — isExpectedResumeMiss (sdk/session/lifecycle.js)
  *
- * Valida que a função classifica corretamente os padrões de "resume miss esperado"
- * após expansão dos padrões suportados (HTTP 404/410 + variações SDK).
+ * Valida que a função classifica corretamente os padrões de "resume miss esperado" após expansão dos padrões suportados
+ * (HTTP 404/410 + variações SDK).
  */
 
 import { describe, expect, it, vi } from 'vitest';

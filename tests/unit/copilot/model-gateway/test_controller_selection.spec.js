@@ -29,7 +29,12 @@ function sdkModel(id, { contextWindow = 128_000, reasoning = true, vision = fals
 
 /**
  * @param {number} remainingPercentage
- * @param {Partial<{ remainingPercentage: number; isUnlimitedEntitlement: boolean; usageAllowedWithExhaustedQuota: boolean; overageAllowedWithExhaustedQuota: boolean }>} [overrides]
+ * @param {Partial<{
+ *     remainingPercentage: number;
+ *     isUnlimitedEntitlement: boolean;
+ *     usageAllowedWithExhaustedQuota: boolean;
+ *     overageAllowedWithExhaustedQuota: boolean;
+ * }>} [overrides]
  */
 function sdkQuota(remainingPercentage, overrides = {}) {
     return {

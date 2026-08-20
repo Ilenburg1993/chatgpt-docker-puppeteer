@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {SignOptions} from "jsonwebtoken" */
+/** @import {SignOptions} from 'jsonwebtoken' */
 import { getJwtSecret, JWT_SIGN_OPTIONS } from '#core/jwt_config';
 import { log } from '#core/logger';
 import { getRbacUserByUsername, verifyRbacCredentials } from '#infra/db/rbac_repo';

@@ -16,7 +16,8 @@ const PRE_K_CHECKS = Object.freeze([
         id: 'sdk_provider_config_boundary',
         track: 'J',
         passed: true,
-        summary: 'SDK/session keeps ProviderConfig validation and compat exports; gateway projects safe overrides above it.',
+        summary:
+            'SDK/session keeps ProviderConfig validation and compat exports; gateway projects safe overrides above it.',
     }),
     Object.freeze({
         id: 'sdk_does_not_import_gateway',
@@ -40,7 +41,8 @@ const PRE_K_CHECKS = Object.freeze([
         id: 'terminal_is_operator_layer',
         track: 'J',
         passed: true,
-        summary: 'Terminal renders gateway projections, route decisions, probes and health instead of owning provider truth.',
+        summary:
+            'Terminal renders gateway projections, route decisions, probes and health instead of owning provider truth.',
     }),
     Object.freeze({
         id: 'deprecated_exports_are_not_removed',
@@ -52,7 +54,8 @@ const PRE_K_CHECKS = Object.freeze([
         id: 'route_trace_attributes_are_stable',
         track: 'I',
         passed: true,
-        summary: 'Route decisions carry llm.provider, llm.model, llm.gateway.model_id and llm.route.decision_id attributes.',
+        summary:
+            'Route decisions carry llm.provider, llm.model, llm.gateway.model_id and llm.route.decision_id attributes.',
     }),
     Object.freeze({
         id: 'provider_endpoint_inventory_is_barreled',
@@ -115,7 +118,7 @@ const PREBUILD_CHECKS = Object.freeze([
  *     total: number;
  *     passed: number;
  *     failed: number;
- *     checks: Array<{ id: string; track: string; passed: boolean; summary: string }>;
+ *     checks: { id: string; track: string; passed: boolean; summary: string }[];
  * }}
  */
 export function buildModelGatewayPreKCompatibilityReport() {
@@ -138,7 +141,7 @@ export function buildModelGatewayPreKCompatibilityReport() {
  *     total: number;
  *     passed: number;
  *     failed: number;
- *     checks: Array<{ id: string; track: string; passed: boolean; summary: string }>;
+ *     checks: { id: string; track: string; passed: boolean; summary: string }[];
  * }}
  */
 export function buildModelGatewayPreBuildReadinessReport() {

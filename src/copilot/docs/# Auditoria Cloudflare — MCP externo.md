@@ -1,8 +1,8 @@
 # Auditoria Cloudflare 1 — MCP externo do ChatGPT.com vs runtime local `src/copilot`
 
-Data: 2026-05-24
-Escopo deste turno: Cloudflare, Cloudflare Tunnel, SDK/API oficial Node/TypeScript, operação do hostname `mcp.aurelin.org`, e superfície MCP externa usada pelo ChatGPT.com.
-Modo: diagnóstico/auditoria somente leitura. Nenhuma transformação foi aplicada no workspace.
+Data: 2026-05-24 Escopo deste turno: Cloudflare, Cloudflare Tunnel, SDK/API oficial Node/TypeScript,
+operação do hostname `mcp.aurelin.org`, e superfície MCP externa usada pelo ChatGPT.com. Modo:
+diagnóstico/auditoria somente leitura. Nenhuma transformação foi aplicada no workspace.
 
 ---
 
@@ -11,16 +11,20 @@ Modo: diagnóstico/auditoria somente leitura. Nenhuma transformação foi aplica
 Há duas camadas que não devem ser confundidas:
 
 1. **Runtime local `src/copilot` / GitHub Copilot SDK local / LLM-B no workspace**
-   - Código, ferramentas, jobs, indexação, validações, runtime do agente, SSE local, plugins e documentação interna.
+   - Código, ferramentas, jobs, indexação, validações, runtime do agente, SSE local, plugins e
+     documentação interna.
    - Vive no repositório e roda no Dev Container/host local.
    - Pode existir sem exposição pública.
 
 2. **MCP Server + Cloudflare para ChatGPT.com**
    - Camada de publicação externa para que o ChatGPT.com consiga alcançar o MCP local.
-   - Envolve `cloudflared`, Cloudflare Tunnel, hostname público, OAuth do MCP, token de túnel, observabilidade e recuperação pós-restart.
+   - Envolve `cloudflared`, Cloudflare Tunnel, hostname público, OAuth do MCP, token de túnel,
+     observabilidade e recuperação pós-restart.
    - Deve ser tratada como borda/rede/identidade, não como “SDK Copilot local”.
 
-A integração futura desejável é: o runtime local fornece capacidades; o MCP expõe uma interface segura; a Cloudflare publica essa interface com alta disponibilidade e observabilidade. Mas as falhas de cada camada precisam ser diagnosticadas separadamente.
+A integração futura desejável é: o runtime local fornece capacidades; o MCP expõe uma interface
+segura; a Cloudflare publica essa interface com alta disponibilidade e observabilidade. Mas as
+falhas de cada camada precisam ser diagnosticadas separadamente.
 
 ---
 
@@ -33,16 +37,22 @@ Fonte: `https://developers.cloudflare.com/fundamentals/get-started/`
 Pontos relevantes:
 
 - Cloudflare exige uma conta antes do uso dos produtos.
-- Se múltiplas pessoas administram a conta, a documentação orienta configurar permissões de membros para controlar acesso por recurso.
+- Se múltiplas pessoas administram a conta, a documentação orienta configurar permissões de membros
+  para controlar acesso por recurso.
 - A documentação separa “Build” de “Protect & Connect”.
-- Zero Trust é explicitamente o domínio para proteger usuários/dispositivos internos e recursos acessados por eles.
-- A área de API aparece como superfície própria, com criação de token, chamadas de API, restrição/rotação de tokens e referência REST/GraphQL/SDK.
+- Zero Trust é explicitamente o domínio para proteger usuários/dispositivos internos e recursos
+  acessados por eles.
+- A área de API aparece como superfície própria, com criação de token, chamadas de API,
+  restrição/rotação de tokens e referência REST/GraphQL/SDK.
 
 Aplicação ao nosso caso:
 
-- A ponte ChatGPT.com → MCP deve ficar no domínio **Protect & Connect / Zero Trust / Tunnel**, não no domínio do SDK local.
-- Tokens da Cloudflare devem ser tratados como credenciais de borda, com menor privilégio, rotação e auditoria.
-- Um módulo de automação Cloudflare no workspace deve ser uma integração de infraestrutura, separada do core Copilot local.
+- A ponte ChatGPT.com → MCP deve ficar no domínio **Protect & Connect / Zero Trust / Tunnel**, não
+  no domínio do SDK local.
+- Tokens da Cloudflare devem ser tratados como credenciais de borda, com menor privilégio, rotação e
+  auditoria.
+- Um módulo de automação Cloudflare no workspace deve ser uma integração de infraestrutura, separada
+  do core Copilot local.
 
 ### 1.2 Cloudflare API Node/TypeScript SDK
 
@@ -51,22 +61,28 @@ Fonte: `https://developers.cloudflare.com/api/node/`
 Pontos relevantes:
 
 - Instalação oficial: `npm install cloudflare`.
-- Uso oficial: `import Cloudflare from 'cloudflare'; const client = new Cloudflare({ apiToken: process.env['CLOUDFLARE_API_TOKEN'] })`.
+- Uso oficial:
+  `import Cloudflare from 'cloudflare'; const client = new Cloudflare({ apiToken: process.env['CLOUDFLARE_API_TOKEN'] })`.
 - O SDK inclui tipos TypeScript para parâmetros de request e campos de response.
-- Erros da API geram subclasses de `APIError`, com tipos para 400, 401, 403, 404, 422, 429, >=500 e falha de conexão.
+- Erros da API geram subclasses de `APIError`, com tipos para 400, 401, 403, 404, 422, 429, >=500 e
+  falha de conexão.
 - O SDK faz retry automático por padrão em erros de conexão, 408, 409, 429 e >=500.
 - Timeout padrão de requests: 1 minuto, configurável por cliente ou por request.
 - Listagens são paginadas e podem ser consumidas com `for await`.
 - O SDK permite obter response bruto e headers via `.asResponse()` / `.withResponse()`.
-- Também permite chamadas customizadas/undocumented via `client.get`, `client.post`, etc., respeitando opções do client.
+- Também permite chamadas customizadas/undocumented via `client.get`, `client.post`, etc.,
+  respeitando opções do client.
 - Há suporte a `fetch` customizado, útil para logging/middleware.
 
 Aplicação ao nosso caso:
 
 - Falta uma integração Cloudflare API de auditoria/diagnóstico no workspace.
-- O uso do SDK permitiria confirmar a configuração remota do túnel, ingress/service/hostname e DNS, sem depender apenas dos logs do `cloudflared`.
-- O SDK deve ser encapsulado por uma camada read-only primeiro, com timeout curto, retries controlados e redaction de tokens/IDs sensíveis.
-- Como a API é paginada, qualquer ferramenta MCP que liste recursos Cloudflare deve ter limite, cursor e sumário, para não reproduzir o problema de payload grande que já existe em outras áreas.
+- O uso do SDK permitiria confirmar a configuração remota do túnel, ingress/service/hostname e DNS,
+  sem depender apenas dos logs do `cloudflared`.
+- O SDK deve ser encapsulado por uma camada read-only primeiro, com timeout curto, retries
+  controlados e redaction de tokens/IDs sensíveis.
+- Como a API é paginada, qualquer ferramenta MCP que liste recursos Cloudflare deve ter limite,
+  cursor e sumário, para não reproduzir o problema de payload grande que já existe em outras áreas.
 
 ### 1.3 Cloudflare Tunnel: criação por dashboard/API, origem, parâmetros, firewall, métricas e disponibilidade
 
@@ -87,19 +103,27 @@ Pontos relevantes:
 - Túneis permitem conectar recursos à Cloudflare sem IP público roteável.
 - A configuração de Public Hostname/Service é parte crítica do túnel.
 - `cloudflared` estabelece conexões outbound-only com a rede Cloudflare.
-- Para alta disponibilidade, a documentação afirma que uma instância cria quatro conexões outbound para servidores distribuídos em pelo menos dois data centers.
-- É possível usar réplicas de `cloudflared` para disponibilidade/failover; réplicas apontam para o mesmo túnel.
-- Réplicas não são mecanismo de traffic steering inteligente; para steering/failover mais sofisticado, a documentação remete a Load Balancers.
-- Métricas do `cloudflared` são expostas em formato Prometheus; o endpoint padrão fica em `127.0.0.1:<porta>/metrics` fora de containers, e em `0.0.0.0:<porta>/metrics` em ambientes containerizados.
+- Para alta disponibilidade, a documentação afirma que uma instância cria quatro conexões outbound
+  para servidores distribuídos em pelo menos dois data centers.
+- É possível usar réplicas de `cloudflared` para disponibilidade/failover; réplicas apontam para o
+  mesmo túnel.
+- Réplicas não são mecanismo de traffic steering inteligente; para steering/failover mais
+  sofisticado, a documentação remete a Load Balancers.
+- Métricas do `cloudflared` são expostas em formato Prometheus; o endpoint padrão fica em
+  `127.0.0.1:<porta>/metrics` fora de containers, e em `0.0.0.0:<porta>/metrics` em ambientes
+  containerizados.
 - O endereço de métricas pode ser configurado com `--metrics`.
 
 Aplicação ao nosso caso:
 
-- A configuração remota de ingress do túnel precisa ser tratada como fonte de verdade, não apenas o default local em código.
+- A configuração remota de ingress do túnel precisa ser tratada como fonte de verdade, não apenas o
+  default local em código.
 - A suspeita `localhost` → IPv6 `::1` é Cloudflare/Tunnel, não GitHub Copilot SDK.
-- Dev Containers costumam ter peculiaridades de rede; preferir `127.0.0.1` para origem local evita resolução dual-stack inesperada.
+- Dev Containers costumam ter peculiaridades de rede; preferir `127.0.0.1` para origem local evita
+  resolução dual-stack inesperada.
 - Métricas Prometheus de `cloudflared` ainda não estão integradas ao diagnóstico MCP.
-- Alta disponibilidade hoje parece limitada a um processo `cloudflared` local; réplicas ou restart supervisionado são upgrades futuros.
+- Alta disponibilidade hoje parece limitada a um processo `cloudflared` local; réplicas ou restart
+  supervisionado são upgrades futuros.
 
 ---
 
@@ -129,7 +153,8 @@ Resumo:
 - Token direto: ausente
 - Token file: presente
 - Último smoke permanente: `ok`, fresco dentro da janela configurada
-- Fallback temporário `trycloudflare`: existe em state file, mas processo morto/stale e ignorado para readiness operacional
+- Fallback temporário `trycloudflare`: existe em state file, mas processo morto/stale e ignorado
+  para readiness operacional
 
 ### 2.3 Inconsistência crítica: origem local em código vs origem remota efetiva
 
@@ -155,13 +180,15 @@ Diagnóstico:
 
 - O código local já tem default correto (`127.0.0.1`).
 - O processo `cloudflared` está recebendo configuração remota do túnel com `localhost`.
-- Em ambientes onde `localhost` resolve para `::1` antes de `127.0.0.1`, e o servidor MCP escuta em `127.0.0.1:3333`, a ponte externa pode falhar intermitentemente.
+- Em ambientes onde `localhost` resolve para `::1` antes de `127.0.0.1`, e o servidor MCP escuta em
+  `127.0.0.1:3333`, a ponte externa pode falhar intermitentemente.
 - Isso é um problema Cloudflare Tunnel/ingress remoto, não um problema do GitHub Copilot SDK local.
 
 Impacto provável:
 
 - Mensagens de “conexão perdida” no ChatGPT.com quando Cloudflare tenta encaminhar para `::1:3333`.
-- Falhas intermitentes: nem sempre ocorrem se há retry, reconfiguração, cache, outro socket, ou se o origin volta por IPv4 em outra tentativa.
+- Falhas intermitentes: nem sempre ocorrem se há retry, reconfiguração, cache, outro socket, ou se o
+  origin volta por IPv4 em outra tentativa.
 - Diagnóstico local pode parecer saudável, pois `http://127.0.0.1:3333/mcp` funciona localmente.
 
 Prioridade: **P0/P1**.
@@ -172,7 +199,8 @@ Ação recomendada futura:
 - Trocar o service remoto do public hostname para `http://127.0.0.1:3333`.
 - Confirmar que o dashboard/API parou de empurrar `http://localhost:3333`.
 - Reiniciar `cloudflared` se necessário.
-- Validar logs posteriores: não deve haver `originService=http://localhost:3333` nem `dial tcp [::1]:3333`.
+- Validar logs posteriores: não deve haver `originService=http://localhost:3333` nem
+  `dial tcp [::1]:3333`.
 
 ---
 
@@ -204,7 +232,8 @@ Conclusão:
 Observações:
 
 - Comandos: `doctor`, `quick`, `status`, `smoke`, `up`, `down`, `restart`, `run`.
-- `doctor` cruza versão `cloudflared`, health local, public URL validation, pid files e estado temporário.
+- `doctor` cruza versão `cloudflared`, health local, public URL validation, pid files e estado
+  temporário.
 - `status` resume modo permanente/temporário, processo, smoke, URL, auth e ação recomendada.
 - `smoke` chama `/health`, metadados OAuth e `tools/list` remoto via MCP JSON-RPC.
 - `run` dispara `cloudflared tunnel --no-autoupdate run --token` ou `--token-file`.
@@ -216,7 +245,8 @@ Observações:
 Conclusão:
 
 - O wrapper é operacionalmente útil.
-- Falta uma camada de controle Cloudflare remota, ou seja, “o que o dashboard/API está de fato servindo?”.
+- Falta uma camada de controle Cloudflare remota, ou seja, “o que o dashboard/API está de fato
+  servindo?”.
 
 ### 3.3 `src/copilot/mcp/tools/tunnel-status.js`
 
@@ -253,11 +283,13 @@ Evidência:
 Hipótese:
 
 - A configuração do Public Hostname no dashboard/Zero Trust ainda está `http://localhost:3333`.
-- Como o túnel é remotely-managed, o `cloudflared` recebe essa configuração de Cloudflare e ignora o default local do wrapper para o serviço publicado.
+- Como o túnel é remotely-managed, o `cloudflared` recebe essa configuração de Cloudflare e ignora o
+  default local do wrapper para o serviço publicado.
 
 Correção futura:
 
-- Usar dashboard ou Cloudflare API para alterar Public Hostname Service para `http://127.0.0.1:3333`.
+- Usar dashboard ou Cloudflare API para alterar Public Hostname Service para
+  `http://127.0.0.1:3333`.
 - Criar ferramenta read-only para confirmar essa configuração antes de qualquer alteração.
 
 ### CF-02 — Ausência de auditoria remota via Cloudflare API/SDK
@@ -283,7 +315,8 @@ Risco:
 
 Recomendação:
 
-- Criar `src/copilot/mcp/cloudflare/api-client.js` ou equivalente, isolado do runtime Copilot SDK local.
+- Criar `src/copilot/mcp/cloudflare/api-client.js` ou equivalente, isolado do runtime Copilot SDK
+  local.
 - Criar modo read-only primeiro.
 - Variáveis sugeridas:
   - `CLOUDFLARE_API_TOKEN`
@@ -297,7 +330,8 @@ Recomendação:
 
 Severidade: **P1/P2**
 
-A documentação oficial mostra que `cloudflared` expõe endpoint Prometheus e que `--metrics` permite configurar host/porta.
+A documentação oficial mostra que `cloudflared` expõe endpoint Prometheus e que `--metrics` permite
+configurar host/porta.
 
 No workspace:
 
@@ -335,7 +369,8 @@ No workspace:
 
 Recomendação:
 
-- Adicionar `COPILOT_MCP_CLOUDFLARE_LOGLEVEL` com allowlist (`debug`, `info`, `warn`, `error`, conforme suporte da versão `cloudflared`).
+- Adicionar `COPILOT_MCP_CLOUDFLARE_LOGLEVEL` com allowlist (`debug`, `info`, `warn`, `error`,
+  conforme suporte da versão `cloudflared`).
 - Incluir modo temporário de diagnóstico elevado por janela curta.
 - Parsear eventos de:
   - config update;
@@ -352,7 +387,8 @@ Severidade: **P2**
 Pelos dados atuais:
 
 - Há um processo `cloudflared` permanente.
-- A documentação oficial diz que uma instância já estabelece quatro conexões outbound-only distribuídas.
+- A documentação oficial diz que uma instância já estabelece quatro conexões outbound-only
+  distribuídas.
 - Mas a própria documentação também orienta réplicas para disponibilidade/failover de host.
 - Não observei estratégia local de supervisor externo robusta além de `up/down/restart` e pid files.
 
@@ -408,9 +444,11 @@ No workspace:
 Recomendação:
 
 - Criar token de auditoria Cloudflare separado do tunnel token.
-- Permissões mínimas: leitura de Zero Trust/Tunnel, leitura de DNS/Zone, leitura de audit logs quando necessário.
+- Permissões mínimas: leitura de Zero Trust/Tunnel, leitura de DNS/Zone, leitura de audit logs
+  quando necessário.
 - Para alterações futuras, usar token separado e escopo mínimo.
-- Ferramentas MCP de Cloudflare devem ser read-only por padrão; qualquer write deve exigir plano e confirmação.
+- Ferramentas MCP de Cloudflare devem ser read-only por padrão; qualquer write deve exigir plano e
+  confirmação.
 
 ### CF-08 — Falta detector “remote desired state vs observed local state”
 
@@ -494,7 +532,8 @@ src/copilot/
       docs/                  # runbooks Cloudflare específicos
 ```
 
-O módulo Cloudflare deve expor fatos para o MCP, mas não deve importar runtime Copilot SDK local exceto onde estritamente necessário para smoke de ferramentas.
+O módulo Cloudflare deve expor fatos para o MCP, mas não deve importar runtime Copilot SDK local
+exceto onde estritamente necessário para smoke de ferramentas.
 
 ---
 
@@ -502,7 +541,9 @@ O módulo Cloudflare deve expor fatos para o MCP, mas não deve importar runtime
 
 ### Causa principal provável
 
-A configuração remota do Cloudflare Tunnel usa `http://localhost:3333`, o que pode resolver para `::1`. O MCP local escuta em `127.0.0.1:3333`. Quando Cloudflare tenta encaminhar para `::1:3333`, recebe `connection refused`.
+A configuração remota do Cloudflare Tunnel usa `http://localhost:3333`, o que pode resolver para
+`::1`. O MCP local escuta em `127.0.0.1:3333`. Quando Cloudflare tenta encaminhar para `::1:3333`,
+recebe `connection refused`.
 
 ### Causas secundárias possíveis
 
@@ -512,14 +553,16 @@ A configuração remota do Cloudflare Tunnel usa `http://localhost:3333`, o que 
 
 2. **SSE/streaming local**
    - O runtime local tinha evidência de timeout/heartbeat muito apertados.
-   - Isso pertence mais ao `src/copilot` local, não ao Cloudflare, mas afeta percepção no ChatGPT.com.
+   - Isso pertence mais ao `src/copilot` local, não ao Cloudflare, mas afeta percepção no
+     ChatGPT.com.
 
 3. **Restart ou stale state**
    - Se `cloudflared` reinicia ou recebe config update, pode haver janela de queda.
    - Health pós-restart precisa diferenciar liveness local, config remota e smoke externo.
 
 4. **Ausência de métricas**
-   - Sem Prometheus snapshot, não é fácil correlacionar perda com active streams, HA connections ou config pushes.
+   - Sem Prometheus snapshot, não é fácil correlacionar perda com active streams, HA connections ou
+     config pushes.
 
 ---
 
@@ -675,6 +718,13 @@ Depois de qualquer mudança Cloudflare:
 
 ## 9. Conclusão
 
-A auditoria Cloudflare reforça que o principal risco atual não está no GitHub Copilot SDK local, mas na camada de publicação externa MCP+Cloudflare: o túnel permanente está operacional, mas há forte evidência de drift remoto no ingress service (`localhost`) que contradiz o desired local (`127.0.0.1`) e já produziu erro `dial tcp [::1]:3333`.
+A auditoria Cloudflare reforça que o principal risco atual não está no GitHub Copilot SDK local, mas
+na camada de publicação externa MCP+Cloudflare: o túnel permanente está operacional, mas há forte
+evidência de drift remoto no ingress service (`localhost`) que contradiz o desired local
+(`127.0.0.1`) e já produziu erro `dial tcp [::1]:3333`.
 
-O próximo passo mais valioso não é mexer no runtime local; é criar ou executar uma auditoria remota Cloudflare, preferencialmente com o SDK oficial Node/TypeScript, para verificar a configuração efetiva do túnel e corrigir o service do public hostname. Em paralelo, a ponte precisa ganhar métricas Prometheus e um modelo claro de desired-vs-actual, para que “conexão perdida” deixe de ser tratada apenas por logs e smoke eventual.
+O próximo passo mais valioso não é mexer no runtime local; é criar ou executar uma auditoria remota
+Cloudflare, preferencialmente com o SDK oficial Node/TypeScript, para verificar a configuração
+efetiva do túnel e corrigir o service do public hostname. Em paralelo, a ponte precisa ganhar
+métricas Prometheus e um modelo claro de desired-vs-actual, para que “conexão perdida” deixe de ser
+tratada apenas por logs e smoke eventual.

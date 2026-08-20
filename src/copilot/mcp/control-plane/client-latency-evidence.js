@@ -2,17 +2,16 @@
 /**
  * Sanitized client-observed latency evidence for ChatGPT TTFT experiments.
  *
- * This store deliberately contains timings and closed experiment labels only.
- * It must never persist prompts, completions, HAR bodies, URLs, tokens, cookies,
- * public IPs or other raw client/network payloads.
+ * This store deliberately contains timings and closed experiment labels only. It must never persist prompts,
+ * completions, HAR bodies, URLs, tokens, cookies, public IPs or other raw client/network payloads.
  *
  * @module copilot/mcp/control-plane/client-latency-evidence
  */
 
+import { appendTextLocked, mkdirPathLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
+import { readJsonlTailTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import { randomUUID } from 'node:crypto';
-import fs from 'node:fs/promises';
 import path from 'node:path';
-import { appendTextLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
 
 export const DEFAULT_CLIENT_LATENCY_EVIDENCE_RELATIVE_PATH = 'src/copilot/.ai/mcp/client-latency-evidence.jsonl';
@@ -22,42 +21,44 @@ const MAX_READ_BYTES = 4 * 1024 * 1024;
 
 /**
  * @typedef {'manual' | 'har' | 'client-observer'} ClientLatencyEvidenceSource
+ *
  * @typedef {'low' | 'medium' | 'high' | 'unknown'} ClientThinkingMode
+ *
  * @typedef {{
- *   schemaVersion: 1;
- *   sampleId: string;
- *   recordedAt: string;
- *   observedAt: string;
- *   source: ClientLatencyEvidenceSource;
- *   ttftMs: number;
- *   firstToolDispatchMs: number | null;
- *   turnCompleteMs: number | null;
- *   conditions: {
- *     thinkingMode: ClientThinkingMode;
- *     modelLabel: string | null;
- *     networkLabel: string | null;
- *     conversationLabel: string | null;
- *     clientLabel: string | null;
- *     vpnLabel: string | null;
- *     seriesId: string | null;
- *   };
+ *     schemaVersion: 1;
+ *     sampleId: string;
+ *     recordedAt: string;
+ *     observedAt: string;
+ *     source: ClientLatencyEvidenceSource;
+ *     ttftMs: number;
+ *     firstToolDispatchMs: number | null;
+ *     turnCompleteMs: number | null;
+ *     conditions: {
+ *         thinkingMode: ClientThinkingMode;
+ *         modelLabel: string | null;
+ *         networkLabel: string | null;
+ *         conversationLabel: string | null;
+ *         clientLabel: string | null;
+ *         vpnLabel: string | null;
+ *         seriesId: string | null;
+ *     };
  * }} ClientLatencyEvidenceEntry
  */
 
 /**
  * @param {{
- *   observedAt?: string;
- *   source: ClientLatencyEvidenceSource;
- *   ttftMs: number;
- *   firstToolDispatchMs?: number | null;
- *   turnCompleteMs?: number | null;
- *   thinkingMode?: ClientThinkingMode;
- *   modelLabel?: string | null;
- *   networkLabel?: string | null;
- *   conversationLabel?: string | null;
- *   clientLabel?: string | null;
- *   vpnLabel?: string | null;
- *   seriesId?: string | null;
+ *     observedAt?: string;
+ *     source: ClientLatencyEvidenceSource;
+ *     ttftMs: number;
+ *     firstToolDispatchMs?: number | null;
+ *     turnCompleteMs?: number | null;
+ *     thinkingMode?: ClientThinkingMode;
+ *     modelLabel?: string | null;
+ *     networkLabel?: string | null;
+ *     conversationLabel?: string | null;
+ *     clientLabel?: string | null;
+ *     vpnLabel?: string | null;
+ *     seriesId?: string | null;
  * }} evidence
  * @param {{ maxEntries?: number; filePath?: string }} [options]
  */
@@ -88,7 +89,10 @@ export async function appendClientLatencyEvidence(evidence, options = {}) {
     const { value: retainedEntries } = await withIoResourceLock(
         filePath,
         async () => {
-            await fs.mkdir(path.dirname(filePath), { recursive: true });
+            await mkdirPathLocked(path.dirname(filePath), {
+                recursive: true,
+                advisoryLimits: { domain: 'client-latency-evidence-parent' },
+            });
             await appendTextLocked(filePath, `${JSON.stringify(entry)}\n`, {
                 encoding: 'utf8',
                 advisoryLimits: { domain: 'client-latency-evidence' },
@@ -107,37 +111,33 @@ export async function appendClientLatencyEvidence(evidence, options = {}) {
 
 /**
  * @param {{ limit?: number; filePath?: string }} [options]
- * @returns {Promise<{ ok: boolean; path: string; entries: ClientLatencyEvidenceEntry[]; truncatedByBytes: boolean; error?: string }>}
+ * @returns {Promise<{
+ *     ok: boolean;
+ *     path: string;
+ *     entries: ClientLatencyEvidenceEntry[];
+ *     truncatedByBytes: boolean;
+ *     error?: string;
+ * }>}
  */
 export async function readClientLatencyEvidence(options = {}) {
     const filePath = resolveEvidencePath(options.filePath);
     const limit = boundedInteger(options.limit, 500, 1, 5_000);
     try {
-        const stats = await fs.stat(filePath);
-        const start = Math.max(0, stats.size - MAX_READ_BYTES);
-        const handle = await fs.open(filePath, 'r');
-        try {
-            const length = stats.size - start;
-            const buffer = Buffer.alloc(length);
-            await handle.read(buffer, 0, length, start);
-            let raw = buffer.toString('utf8');
-            if (start > 0) raw = raw.slice(Math.max(0, raw.indexOf('\n') + 1));
-            const entries = raw
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean)
-                .map(safeParseEntry)
-                .filter((entry) => entry !== null)
-                .slice(-limit);
-            return {
-                ok: true,
-                path: toWorkspaceRelativePath(filePath),
-                entries: /** @type {ClientLatencyEvidenceEntry[]} */ (entries),
-                truncatedByBytes: start > 0,
-            };
-        } finally {
-            await handle.close();
-        }
+        const tail = await readJsonlTailTrusted(filePath, {
+            caller: 'mcp.control-plane.client-latency-evidence',
+            maxLines: Math.min(10_000, Math.max(limit, limit * 2)),
+            maxBytes: MAX_READ_BYTES,
+        });
+        const entries = tail.records
+            .map(normalizeEvidenceEntry)
+            .filter((entry) => entry !== null)
+            .slice(-limit);
+        return {
+            ok: true,
+            path: toWorkspaceRelativePath(filePath),
+            entries: /** @type {ClientLatencyEvidenceEntry[]} */ (entries),
+            truncatedByBytes: tail.truncatedByByteLimit,
+        };
     } catch (error) {
         if (isNotFoundError(error)) {
             return { ok: true, path: toWorkspaceRelativePath(filePath), entries: [], truncatedByBytes: false };
@@ -209,8 +209,14 @@ function summarizeEvidenceRows(rows) {
         ttft: summarizeNumbers(rows.map((entry) => entry.ttftMs)),
         firstToolDispatch: summarizeNumbers(rows.map((entry) => entry.firstToolDispatchMs)),
         turnComplete: summarizeNumbers(rows.map((entry) => entry.turnCompleteMs)),
-        firstObservedAt: rows.length > 0 ? rows.map((entry) => entry.observedAt).sort()[0] ?? null : null,
-        lastObservedAt: rows.length > 0 ? rows.map((entry) => entry.observedAt).sort().at(-1) ?? null : null,
+        firstObservedAt: rows.length > 0 ? (rows.map((entry) => entry.observedAt).sort()[0] ?? null) : null,
+        lastObservedAt:
+            rows.length > 0
+                ? (rows
+                      .map((entry) => entry.observedAt)
+                      .sort()
+                      .at(-1) ?? null)
+                : null,
     };
 }
 
@@ -232,12 +238,12 @@ function groupEvidence(rows, selector) {
         .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 }
 
-/** @param {Array<number | null | undefined>} values */
+/** @param {(number | null | undefined)[]} values */
 export function summarizeClientLatencyNumbers(values) {
     return summarizeNumbers(values);
 }
 
-/** @param {Array<number | null | undefined>} values */
+/** @param {(number | null | undefined)[]} values */
 function summarizeNumbers(values) {
     const sorted = values
         .filter((value) => value !== null && value !== undefined)
@@ -306,7 +312,7 @@ function resolveEvidencePath(overridePath) {
 
 /** @param {string} filePath @param {number} maxEntries */
 async function trimEvidence(filePath, maxEntries) {
-    const raw = await fs.readFile(filePath, 'utf8');
+    const raw = (await readTextFreshTrusted(filePath, { caller: 'mcp.control-plane.client-latency-evidence' })).content;
     const lines = raw.split('\n').filter((line) => line.trim());
     if (lines.length <= maxEntries) return lines.length;
     const retained = lines.slice(-maxEntries);
@@ -319,26 +325,21 @@ async function trimEvidence(filePath, maxEntries) {
     return retained.length;
 }
 
-/** @param {string} line @returns {ClientLatencyEvidenceEntry | null} */
-function safeParseEntry(line) {
-    try {
-        const parsed = JSON.parse(line);
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-        const record = /** @type {Record<string, unknown>} */ (parsed);
-        if (
-            record['schemaVersion'] !== 1 ||
-            typeof record['sampleId'] !== 'string' ||
-            typeof record['observedAt'] !== 'string' ||
-            typeof record['ttftMs'] !== 'number' ||
-            !record['conditions'] ||
-            typeof record['conditions'] !== 'object'
-        ) {
-            return null;
-        }
-        return /** @type {ClientLatencyEvidenceEntry} */ (record);
-    } catch {
+/** @param {unknown} value @returns {ClientLatencyEvidenceEntry | null} */
+function normalizeEvidenceEntry(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const record = /** @type {Record<string, unknown>} */ (value);
+    if (
+        record['schemaVersion'] !== 1 ||
+        typeof record['sampleId'] !== 'string' ||
+        typeof record['observedAt'] !== 'string' ||
+        typeof record['ttftMs'] !== 'number' ||
+        !record['conditions'] ||
+        typeof record['conditions'] !== 'object'
+    ) {
         return null;
     }
+    return /** @type {ClientLatencyEvidenceEntry} */ (record);
 }
 
 /** @param {unknown} value @param {number} fallback @param {number} min @param {number} max */

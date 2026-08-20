@@ -30,8 +30,18 @@ describe('terminal/question-activity-presenter', () => {
         ],
         ['decision', { label: 'Permissão SDK solicitada', detail: 'editar arquivo src/app.js' }, 'decisão', 'decisão'],
         ['decision', { label: 'Formulário SDK solicitado', detail: 'choices=sim/não' }, 'decisão', 'decisão'],
-        ['integration', { label: 'OAuth SDK solicitado', detail: 'autorização externa pendente' }, 'integração', 'integração'],
-        ['integration', { label: 'Sampling MCP solicitado', detail: 'aguardando modelo auxiliar' }, 'integração', 'integração'],
+        [
+            'integration',
+            { label: 'OAuth SDK solicitado', detail: 'autorização externa pendente' },
+            'integração',
+            'integração',
+        ],
+        [
+            'integration',
+            { label: 'Sampling MCP solicitado', detail: 'aguardando modelo auxiliar' },
+            'integração',
+            'integração',
+        ],
         ['prompt', { label: 'Pergunta ao operador', detail: 'ask_user aguardando resposta' }, 'pergunta', 'pergunta'],
         ['interaction', { label: 'Interação SDK', detail: 'estado não classificado' }, 'interação', 'interação'],
     ])('classifica %s com rótulos canônicos para linha viva e activity', (kind, entry, liveLabel, phaseLabel) => {

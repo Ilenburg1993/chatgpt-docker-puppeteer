@@ -15,12 +15,6 @@ import { CONVERSATION_STORE, HUB } from '#copilot/conversation-hub';
 import { getAgentRuntimeControlStateForTarget } from '#copilot/runtime';
 import { configureDefaultUserInputContext } from '#copilot/sdk';
 import { setHub, setModelGatewayRuntimeControl, setPermissionAgent } from '#copilot/tools';
-import { readRuntimeCapabilitiesProjection } from './presentation/runtime/capabilities.js';
-import {
-    readRuntimeModelStatsProjection,
-    switchRuntimeModelProjection,
-    switchRuntimeRouteProjection,
-} from './presentation/runtime/models.js';
 import { setBridgeAgent } from './channel/client.js';
 import { conversationHub } from './conversation-hub/hub.js';
 import { setFallbackAgent } from './conversation-hub/orchestrator.js';
@@ -29,6 +23,12 @@ import { container } from './core/di-container.js';
 import { SHUTDOWN_PRIORITY } from './core/shutdown-priorities.js';
 import { registerShutdownHandler } from './core/shutdown.js';
 import { log } from './observability/logger.js';
+import { readRuntimeCapabilitiesProjection } from './presentation/runtime/capabilities.js';
+import {
+    readRuntimeModelStatsProjection,
+    switchRuntimeModelProjection,
+    switchRuntimeRouteProjection,
+} from './presentation/runtime/models.js';
 
 /** @type {boolean} */
 let _runtimeDiWired = false;

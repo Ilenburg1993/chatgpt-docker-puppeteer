@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { describe, it } from 'vitest';
+import { describe, it, vi } from 'vitest';
 
 import { getIoL1Cache, invalidateIoCachePath } from '#copilot/infra/io-cache.js';
 import { getCanonicalMcpTools } from '#copilot/mcp';
@@ -69,6 +69,7 @@ describe('copilot MCP tools', () => {
     });
 
     it('repo_read_file supports reduced hash payload modes', async () => {
+        resetRepoReadResponseCacheForTest();
         const tool = findTool('repo_read_file');
         const returnedOnly = await tool.handler({
             path: 'src/copilot/mcp/README.md',
@@ -91,6 +92,32 @@ describe('copilot MCP tools', () => {
         assert.equal(noHashes.structuredContent?.['hashMode'], 'none');
         assert.equal(noHashes.structuredContent?.['sha256'], undefined);
         assert.equal(noHashes.structuredContent?.['returnedSha256'], undefined);
+        // Uma única entrada rica por path+range serve variantes menos exigentes sem duplicar o corpo em memória.
+        assert.equal(readRepoReadFileResultCacheStats().size, 1);
+    });
+
+    it('repo_read_file promove uma variante de hash pobre sem duplicar a entrada de resposta', async () => {
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file');
+        const args = { path: 'src/copilot/mcp/README.md', startLine: 1, endLine: 8 };
+
+        const none = await tool.handler({ ...args, hashMode: 'none' });
+        assert.equal(none.structuredContent?.['sha256'], undefined);
+        assert.equal(readRepoReadFileResultCacheStats().size, 1);
+
+        const full = await tool.handler({ ...args, hashMode: 'full' });
+        const afterUpgrade = readRepoReadFileResultCacheStats();
+        assert.equal(typeof full.structuredContent?.['sha256'], 'string');
+        assert.equal(typeof full.structuredContent?.['returnedSha256'], 'string');
+        assert.equal(afterUpgrade.size, 1);
+        assert.equal(afterUpgrade['hashVariantMisses'], 1);
+
+        const returned = await tool.handler({ ...args, hashMode: 'returned' });
+        const afterRichHit = readRepoReadFileResultCacheStats();
+        assert.equal(returned.structuredContent?.['sha256'], undefined);
+        assert.equal(typeof returned.structuredContent?.['returnedSha256'], 'string');
+        assert.equal(afterRichHit.size, 1);
+        assert.equal(afterRichHit['hits'], 1);
     });
 
     it('repo_read_file batches several reads in one call without duplicating file bodies into legacy text', async () => {
@@ -200,7 +227,10 @@ describe('copilot MCP tools', () => {
         assert.equal(result.structuredContent?.['succeededCount'], 3);
         assert.equal(result.structuredContent?.['failedCount'], 1);
         const rows = /** @type {Record<string, unknown>[]} */ (result.structuredContent?.['results']);
-        assert.deepEqual(rows.map((row) => row['op']), ['read', 'search', 'stat', 'stat']);
+        assert.deepEqual(
+            rows.map((row) => row['op']),
+            ['read', 'search', 'stat', 'stat'],
+        );
         assert.equal(rows[0]?.['success'], true);
         assert.equal(rows[1]?.['success'], true);
         assert.equal(rows[2]?.['success'], true);
@@ -228,6 +258,8 @@ describe('copilot MCP tools', () => {
         assert.ok(afterFirst.bytes > 0);
         assert.equal(typeof afterFirst.maxBytes, 'number');
         assert.equal(afterSecond['hits'], 1);
+        assert.equal(afterSecond['trustWindowHits'], 1);
+        assert.equal(afterSecond['fingerprintValidations'], 0);
         assert.equal(afterSecond.size, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
@@ -238,7 +270,46 @@ describe('copilot MCP tools', () => {
         assert.equal(afterInvalidation.size, 0);
     });
 
+    it('repo_read_file usa trust window fixa, sem renová-la em hits sucessivos', async () => {
+        const previousTrustWindow = process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
+        process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = '25';
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(1_000);
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file');
+        const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-read-fixed-window-'));
+        const filePath = join(tempDir, 'fixed-window.txt');
+        const relativePath = relative(process.cwd(), filePath);
+        try {
+            await writeFile(filePath, 'alpha\n', 'utf8');
+            const first = await tool.handler({ path: relativePath });
+            assert.equal(first.structuredContent?.['content'], 'alpha\n');
+
+            await writeFile(filePath, 'omega\n', 'utf8');
+            vi.setSystemTime(1_010);
+            const insideWindow = await tool.handler({ path: relativePath });
+            assert.equal(insideWindow.structuredContent?.['content'], 'alpha\n');
+
+            vi.setSystemTime(1_026);
+            getIoL1Cache().clear();
+            const afterFixedWindow = await tool.handler({ path: relativePath });
+            const stats = readRepoReadFileResultCacheStats();
+            assert.equal(afterFixedWindow.structuredContent?.['content'], 'omega\n');
+            assert.equal(stats['trustWindowHits'], 1);
+            assert.equal(stats['fingerprintValidations'], 1);
+            assert.equal(stats['stale'], 1);
+        } finally {
+            vi.useRealTimers();
+            if (previousTrustWindow === undefined) delete process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
+            else process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = previousTrustWindow;
+            await rm(tempDir, { recursive: true, force: true });
+            resetRepoReadResponseCacheForTest();
+        }
+    });
+
     it('repo_read_file invalida cache shaped por fingerprint rico mesmo com size+mtime preservados externamente', async () => {
+        const previousTrustWindow = process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
+        process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = '0';
         resetRepoReadResponseCacheForTest();
         const tool = findTool('repo_read_file');
         const tempDir = await mkdtemp(join(process.cwd(), '.tmp-copilot-read-fingerprint-'));
@@ -263,6 +334,8 @@ describe('copilot MCP tools', () => {
             assert.equal(cacheStats['stale'], 1);
             assert.equal(cacheStats['misses'], 2);
         } finally {
+            if (previousTrustWindow === undefined) delete process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'];
+            else process.env['COPILOT_MCP_REPO_READ_TRUST_WINDOW_MS'] = previousTrustWindow;
             await rm(tempDir, { recursive: true, force: true });
             resetRepoReadResponseCacheForTest();
         }
@@ -476,7 +549,8 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['path'], 'src/copilot/mcp/tools/repo-read.js');
         assert.ok(Array.isArray(structured['chunks']));
         assert.equal(structured['chunkLines'], 20);
-        assert.ok('nextCursor' in structured);
+        assert.equal(structured['nextCursor'], '46');
+        assert.equal(structured['cursor'], null);
     });
 
     it('repo_read_file_chunks returns identical results for repeated same-window chunk reads through the extracted cache module', async () => {
@@ -510,6 +584,28 @@ describe('copilot MCP tools', () => {
         assert.equal(afterInvalidation.chunkSize, 0);
     });
 
+    it('repo_read_file_chunks keeps cursor presentation caller-local across canonical cache hits', async () => {
+        resetRepoReadResponseCacheForTest();
+        const tool = findTool('repo_read_file_chunks');
+        const base = {
+            path: 'src/copilot/mcp/tools/repo-read.js',
+            chunkLines: 10,
+            endLine: 20,
+        };
+        const byStartLine = await tool.handler({ ...base, startLine: 1 });
+        const byCursor = await tool.handler({ ...base, cursor: '1' });
+        const stats = readRepoReadFileResultCacheStats();
+
+        assert.equal(byStartLine.isError, undefined);
+        assert.equal(byCursor.isError, undefined);
+        assert.equal(byStartLine.structuredContent?.['cursor'], null);
+        assert.equal(byCursor.structuredContent?.['cursor'], '1');
+        assert.deepEqual(byCursor.structuredContent?.['chunks'], byStartLine.structuredContent?.['chunks']);
+        assert.equal(stats['chunkMisses'], 1);
+        assert.equal(stats['chunkHits'], 1);
+        assert.equal(stats.chunkSize, 1);
+    });
+
     it('repo_read_file_chunks coalesces concurrent same-window chunk reads through singleflight', async () => {
         resetRepoReadResponseCacheForTest();
         const tool = findTool('repo_read_file_chunks');
@@ -519,12 +615,17 @@ describe('copilot MCP tools', () => {
             startLine: 1,
             endLine: 30,
         };
-        const [first, second] = await Promise.all([tool.handler(args), tool.handler(args)]);
+        const [first, second] = await Promise.all([
+            tool.handler(args),
+            tool.handler({ path: args.path, chunkLines: args.chunkLines, cursor: '1', endLine: args.endLine }),
+        ]);
         const stats = readRepoReadFileResultCacheStats();
 
         assert.equal(first.isError, undefined);
         assert.equal(second.isError, undefined);
-        assert.deepEqual(second.structuredContent, first.structuredContent);
+        assert.equal(first.structuredContent?.['cursor'], null);
+        assert.equal(second.structuredContent?.['cursor'], '1');
+        assert.deepEqual(second.structuredContent?.['chunks'], first.structuredContent?.['chunks']);
         assert.equal(stats['chunkMisses'], 1);
         assert.equal(stats['chunkSingleflightLeaders'], 1);
         assert.equal(stats['chunkSingleflightJoins'], 1);
@@ -545,6 +646,7 @@ describe('copilot MCP tools', () => {
         assert.equal(structured['returnedChunkCount'], 3);
         assert.equal(structured['fileTotalLinesKnown'], false);
         assert.equal(structured['fileTotalLines'], null);
+        assert.equal(structured['nextCursor'], '4');
         assert.ok(Number(structured['lastScannedLine'] ?? 0) >= 3);
     });
 
@@ -579,9 +681,7 @@ describe('copilot MCP tools', () => {
         assert.equal(boundedOutline.structuredContent?.['truncated'], true);
         assert.equal(boundedOutline.structuredContent?.['maxItems'], 1);
         assert.ok(Number(boundedOutline.structuredContent?.['returnedContentBytes'] ?? Infinity) <= 512);
-        assert.ok(
-            /** @type {unknown[]} */ (boundedOutline.structuredContent?.['symbols'] ?? []).length <= 1,
-        );
+        assert.ok(/** @type {unknown[]} */ (boundedOutline.structuredContent?.['symbols'] ?? []).length <= 1);
     });
 
     it('mcp_smoke_workspace runs read-only end-to-end checks', async () => {
@@ -698,9 +798,7 @@ describe('copilot MCP tools', () => {
             assert.equal(protectedResult.structuredContent?.['success'], true);
             assert.equal(protectedResult.structuredContent?.['trueOrphanCount'], 0);
             assert.ok(Number(protectedResult.structuredContent?.['protectedCount'] ?? 0) >= 1);
-            assert.ok(
-                String(protectedResult.structuredContent?.['output'] ?? '').includes('protected/unverifiable'),
-            );
+            assert.ok(String(protectedResult.structuredContent?.['output'] ?? '').includes('protected/unverifiable'));
         } finally {
             await rm(tempDir, { recursive: true, force: true });
         }
@@ -846,7 +944,10 @@ describe('copilot MCP tools', () => {
         assert.ok(ioGuidance.some((entry) => entry.includes('up to 64 independent operations')));
         assert.ok(ioGuidance.some((entry) => entry.includes('up to 128 exact-string patches across up to 64 targets')));
         assert.ok(ioGuidance.some((entry) => entry.includes('concurrency is intentionally capped at 1')));
-        assert.equal(ioGuidance.some((entry) => entry.includes('use 2 only for genuinely independent gates')), false);
+        assert.equal(
+            ioGuidance.some((entry) => entry.includes('use 2 only for genuinely independent gates')),
+            false,
+        );
     });
 
     it('mcp_tools_status exposes annotation and approval planning metadata', async () => {
@@ -927,7 +1028,9 @@ describe('copilot MCP tools', () => {
         assert.equal(publicationWorkflow['preferred'], 'git_publish_changes');
         assert.match(String(publicationWorkflow['happyPath']), /one governed git_publish_changes call/u);
         assert.ok(
-            /** @type {string[]} */ (publicationWorkflow['granularFallbackOnlyFor']).includes('preexisting-staged-index'),
+            /** @type {string[]} */ (publicationWorkflow['granularFallbackOnlyFor']).includes(
+                'preexisting-staged-index',
+            ),
         );
         const wirePayloadAudit = /** @type {Record<string, unknown>} */ (structured['wirePayloadAudit']);
         assert.equal(wirePayloadAudit['detailsTool'], 'mcp_tool_payload_audit');
@@ -1088,7 +1191,10 @@ describe('copilot MCP tools', () => {
         assert.equal(focused.structuredContent?.['testFile'], 'tests/unit/copilot/mcp/test_mcp_tools.spec.js');
         const focusedPlan = /** @type {{ step?: string }[]} */ (focused.structuredContent?.['plan']);
         assert.ok(focusedPlan.some((step) => step.step === 'run_copilot_validator'));
-        assert.equal(focusedPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'), false);
+        assert.equal(
+            focusedPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'),
+            false,
+        );
 
         const missingFocusedFile = await tool.handler({ mission: 'validate-focused', dryRun: true });
         assert.equal(missingFocusedFile.isError, true);
@@ -1099,14 +1205,20 @@ describe('copilot MCP tools', () => {
         assert.equal(cacheBenchmark.structuredContent?.['executed'], false);
         const cacheBenchmarkPlan = /** @type {{ step?: string }[]} */ (cacheBenchmark.structuredContent?.['plan']);
         assert.ok(cacheBenchmarkPlan.some((step) => step.step === 'scheduled_io_cache_benchmark_runner'));
-        assert.equal(cacheBenchmarkPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'), false);
+        assert.equal(
+            cacheBenchmarkPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'),
+            false,
+        );
 
         const benchmark = await tool.handler({ mission: 'benchmark-transport', dryRun: true });
         assert.equal(benchmark.isError, undefined);
         assert.equal(benchmark.structuredContent?.['executed'], false);
         const benchmarkPlan = /** @type {{ step?: string }[]} */ (benchmark.structuredContent?.['plan']);
         assert.ok(benchmarkPlan.some((step) => step.step === 'scheduled_transport_benchmark_runner'));
-        assert.equal(benchmarkPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'), false);
+        assert.equal(
+            benchmarkPlan.some((step) => step.step === 'mcp_run_safe_validation_suite'),
+            false,
+        );
     });
 
     it('mcp_golden_prompts returns real-ChatGPT measurement prompts', async () => {
@@ -1313,7 +1425,7 @@ describe('copilot MCP tools', () => {
             assert.deepEqual(failureSummary['failureClassCounts'], { 'stale-context': 1 });
             assert.deepEqual(failureSummary['retryabilityCounts'], { 'caller-refresh': 1 });
             assert.equal(failureSummary['recoveryRequiredTargetCount'], 1);
-            const failures = /** @type {Array<Record<string, unknown>>} */ (fast.structuredContent?.['failures']);
+            const failures = /** @type {Record<string, unknown>[]} */ (fast.structuredContent?.['failures']);
             assert.equal(failures.length, 1);
             assert.equal(failures[0]?.['failureClass'], 'stale-context');
             assert.equal(failures[0]?.['failureScope'], 'target');
@@ -1333,7 +1445,7 @@ describe('copilot MCP tools', () => {
             });
             assert.equal(converged.isError, true);
             const convergedEnvelope = /** @type {Record<string, unknown>} */ (converged.structuredContent?.['details']);
-            assert.equal(convergedEnvelope['failureClass'], 'stale-context');
+            assert.equal(convergedEnvelope['failureClass'], 'already-converged-candidate');
             assert.equal(convergedEnvelope['retryability'], 'manual-decision');
             assert.equal(convergedEnvelope['mutationState'], 'already-converged-candidate');
             assert.equal(convergedEnvelope['recoveryRequired'], false);

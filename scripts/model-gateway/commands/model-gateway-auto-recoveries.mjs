@@ -17,13 +17,13 @@ if (argSet.has('--json')) {
 }
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-recoveries.mjs [--json] [--limit N]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-recoveries.mjs [--json] [--limit N]
 
 Read persisted model-gateway post-turn recovery attempts. This command is read-only and does not call providers.
 `);
     process.exit(0);
 }
-
 
 const limit = Math.max(1, Math.min(Number(readArg('--limit', '20')) || 20, 100));
 const rows = await new SqliteModelGatewayCatalogStore().readRecoveryAttemptRecords({ limit });

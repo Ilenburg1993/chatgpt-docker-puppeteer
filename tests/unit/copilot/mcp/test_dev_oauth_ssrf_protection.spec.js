@@ -31,8 +31,8 @@ describe('dev OAuth SSRF protection', () => {
 
     it('rejects literal private and IPv4-mapped metadata hosts', () => {
         expect(devOAuthTestHarness.isAllowedClientMetadataUrl('https://127.0.0.1/client.json')).toBe(false);
-        expect(
-            devOAuthTestHarness.isAllowedClientMetadataUrl('https://[::ffff:169.254.169.254]/client.json'),
-        ).toBe(false);
+        expect(devOAuthTestHarness.isAllowedClientMetadataUrl('https://[::ffff:169.254.169.254]/client.json')).toBe(
+            false,
+        );
     });
 });

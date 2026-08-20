@@ -24,7 +24,7 @@ import { SCHEMA_VERSION } from './todo-schema.js';
  * @see module:copilot/db/sqlite
  */
 
-import * as fs from 'node:fs';
+import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 
 export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPriority, zStatus } from './todo-schema.js';
 
@@ -44,19 +44,31 @@ const TODOS_FILE = resolveHooksStateFile('todos.json');
 // SQLite backend — persistência
 // ---------------------------------------------------------------------------
 
+/** @type {Promise<void> | null} */
+let _legacyMigrationPromise = null;
+
 /**
- * Migração one-shot do arquivo JSON legado (todos.json) para o SQLite isolado. Executada apenas se a tabela estiver
- * vazia e o arquivo legado existir.
+ * Migração one-shot JSON -> SQLite. A primeira operação assíncrona do store a executa sob uma promise compartilhada;
+ * importar o módulo nunca bloqueia o event loop com filesystem síncrono.
  *
- * @returns {void}
+ * @returns {Promise<void>}
  */
-function _migrateJsonLegacy() {
-    // FS-SYNC: init-time-safe (one-shot migration)
-    try {
-        const db = getCopilotDb();
-        const count = /** @type {{ n: number }} */ (db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get());
-        if (count.n === 0 && fs.existsSync(TODOS_FILE)) {
-            const raw = fs.readFileSync(TODOS_FILE, 'utf8');
+async function ensureTodoLegacyMigration() {
+    if (_legacyMigrationPromise) return _legacyMigrationPromise;
+    _legacyMigrationPromise = (async () => {
+        try {
+            const db = getCopilotDb();
+            const count = /** @type {{ n: number }} */ (
+                db.prepare('SELECT COUNT(*) AS n FROM copilot_todo_tasks').get()
+            );
+            if (count.n !== 0) return;
+            let raw;
+            try {
+                raw = (await readTextFreshTrusted(TODOS_FILE, { caller: 'tools.todo.store.migration' })).content;
+            } catch (error) {
+                if (toError(error).code === 'ENOENT') return;
+                throw error;
+            }
             const data = JSON.parse(raw);
             const tasks = typeof data?.tasks === 'object' ? data.tasks : {};
             const insert = db.prepare('INSERT OR IGNORE INTO copilot_todo_tasks (id, data) VALUES (?, ?)');
@@ -68,19 +80,13 @@ function _migrateJsonLegacy() {
             );
             if (rows.length > 0) {
                 insertMany(rows);
-                log('INFO', `[todo/store] Migração JSON→SQLite: ${rows.length} tarefas importadas.`);
+                log('INFO', `[todo/store] Migração JSON->SQLite: ${rows.length} tarefas importadas.`);
             }
+        } catch (error) {
+            log('WARN', `[todo/store] Migração JSON legado falhou (não-crítico): ${toError(error).message}`);
         }
-    } catch (e) {
-        log('WARN', `[todo/store] Migração JSON legado falhou (não-crítico): ${/** @type {Error} */ (e).message}`);
-    }
-}
-
-// Executa migração legada na carga do módulo (síncrono, one-time).
-try {
-    _migrateJsonLegacy();
-} catch (e) {
-    log('WARN', `[todo/store] _migrateJsonLegacy falhou: ${/** @type {Error} */ (e).message}`);
+    })();
+    return _legacyMigrationPromise;
 }
 
 // BUG-CRIT-04 (fix): mutex serial para serializar ciclos read-modify-write do store.
@@ -95,6 +101,7 @@ let _storeMutex = Promise.resolve();
  * @returns {Promise<T>}
  */
 export async function withStore(fn) {
+    await ensureTodoLegacyMigration();
     const acquire = _storeMutex.then(() => undefined);
     /** @type {() => void} */
     let release = () => {};
@@ -120,6 +127,7 @@ export async function withStore(fn) {
  * @returns {Promise<T>}
  */
 export async function withStoreRead(fn) {
+    await ensureTodoLegacyMigration();
     const acquire = _storeMutex.then(() => undefined);
     await acquire;
     const store = await _readStoreRaw();
@@ -231,6 +239,7 @@ function deserializeTaskRows(rows) {
  * }>}
  */
 export async function readTasksPage(opts = {}) {
+    await ensureTodoLegacyMigration();
     const { status, priority, tag, parentId, text, overdueOnly, limit = 100, offset = 0 } = opts;
 
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 100;
@@ -333,6 +342,7 @@ export async function readTasksPage(opts = {}) {
  * }>}
  */
 export async function searchTasksPage(opts) {
+    await ensureTodoLegacyMigration();
     const { terms, status, priority, limit = 100, offset = 0 } = opts;
     const safeTerms = terms.map((t) => t.trim().toLowerCase()).filter((t) => t.length > 0);
     const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 100;

@@ -3,19 +3,36 @@
 **Data:** 2026-06-09  
 **Workspace:** `/workspaces/chatgpt-docker-puppeteer`  
 **Branch:** `main`  
-**Escopo:** MCP remoto do Workspace, Cloudflare Tunnel, OAuth, Apps SDK/ChatGPT, validação, performance, segurança, autonomia e utilidades para desenvolvimento.
+**Escopo:** MCP remoto do Workspace, Cloudflare Tunnel, OAuth, Apps SDK/ChatGPT, validação,
+performance, segurança, autonomia e utilidades para desenvolvimento.
 
 ---
 
 ## 1. Sumário executivo
 
-O conector Workspace MCP está em um estágio **avançado e funcional**, com postura muito acima do normal para um MCP de desenvolvimento: URL permanente, OAuth ativo, Cloudflare Tunnel nomeado, HTTP/2 até a origem, ferramentas anotadas por risco, workflows de plano antes de escrita, quarentena reversível, validação allowlisted, índice local e auditorias específicas de Cloudflare/OAuth.
+O conector Workspace MCP está em um estágio **avançado e funcional**, com postura muito acima do
+normal para um MCP de desenvolvimento: URL permanente, OAuth ativo, Cloudflare Tunnel nomeado,
+HTTP/2 até a origem, ferramentas anotadas por risco, workflows de plano antes de escrita, quarentena
+reversível, validação allowlisted, índice local e auditorias específicas de Cloudflare/OAuth.
 
-A pontuação interna de autonomia reportada foi **96 / A**, com **95 ferramentas anunciadas**, **73 read-only**, **20 bounded-write**, **2 destructive**, **0 open-world** e **12 ferramentas de plano**. A superfície atual já resolve o problema central: permitir que o ChatGPT leia, navegue, diagnostique, modifique e valide o repositório de forma auditável, sem shell arbitrário e sem caminhos arbitrários.
+A pontuação interna de autonomia reportada foi **96 / A**, com **95 ferramentas anunciadas**, **73
+read-only**, **20 bounded-write**, **2 destructive**, **0 open-world** e **12 ferramentas de
+plano**. A superfície atual já resolve o problema central: permitir que o ChatGPT leia, navegue,
+diagnostique, modifique e valide o repositório de forma auditável, sem shell arbitrário e sem
+caminhos arbitrários.
 
-A situação, porém, não é “ideal”. O runtime está **degraded**, não por falha crítica do protocolo, mas por dívida operacional e de produto: smoke remoto antigo, readiness pós-restart falso por falha de health local, testes antigos falhando, um teste de escrita com timeout, ausência de Apps SDK widget/Company Knowledge, possível excesso de tokens OAuth persistidos, ausência de rate limit explícito para tráfego anônimo `/mcp`, e alguns problemas de ergonomia para resultados grandes.
+A situação, porém, não é “ideal”. O runtime está **degraded**, não por falha crítica do protocolo,
+mas por dívida operacional e de produto: smoke remoto antigo, readiness pós-restart falso por falha
+de health local, testes antigos falhando, um teste de escrita com timeout, ausência de Apps SDK
+widget/Company Knowledge, possível excesso de tokens OAuth persistidos, ausência de rate limit
+explícito para tráfego anônimo `/mcp`, e alguns problemas de ergonomia para resultados grandes.
 
-A linha estratégica correta é: **não tentar “burlar” confirmações do ChatGPT**. O próprio MCP recomenda humano no loop para ferramentas, e o Apps SDK documenta que `readOnlyHint`, `destructiveHint`, `openWorldHint` e `idempotentHint` apenas moldam a forma como o ChatGPT apresenta a chamada; o servidor ainda precisa impor autorização. A autonomia ideal deve vir de ferramentas estreitas, reversíveis, plan-first, batched, com escopos OAuth adequados, schemas fortes, saídas compactas, validação agrupada e telemetria.
+A linha estratégica correta é: **não tentar “burlar” confirmações do ChatGPT**. O próprio MCP
+recomenda humano no loop para ferramentas, e o Apps SDK documenta que `readOnlyHint`,
+`destructiveHint`, `openWorldHint` e `idempotentHint` apenas moldam a forma como o ChatGPT apresenta
+a chamada; o servidor ainda precisa impor autorização. A autonomia ideal deve vir de ferramentas
+estreitas, reversíveis, plan-first, batched, com escopos OAuth adequados, schemas fortes, saídas
+compactas, validação agrupada e telemetria.
 
 ---
 
@@ -26,7 +43,8 @@ A linha estratégica correta é: **não tentar “burlar” confirmações do Ch
 - MCP Specification 2025-06-18: https://modelcontextprotocol.io/specification/2025-06-18
 - MCP Tools: https://modelcontextprotocol.io/specification/2025-06-18/server/tools
 - MCP Authorization: https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization
-- MCP Transports / Streamable HTTP: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
+- MCP Transports / Streamable HTTP:
+  https://modelcontextprotocol.io/specification/2025-06-18/basic/transports
 - Official TypeScript SDK: https://github.com/modelcontextprotocol/typescript-sdk
 
 ### OpenAI / Apps SDK / ChatGPT MCP
@@ -46,7 +64,8 @@ A linha estratégica correta é: **não tentar “burlar” confirmações do Ch
 
 ### Cloudflare
 
-- Cloudflare Tunnel origin parameters: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/origin-parameters/
+- Cloudflare Tunnel origin parameters:
+  https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/origin-parameters/
 - Cloudflare Configuration Rules: https://developers.cloudflare.com/rules/configuration-rules/
 - Cloudflare Cache Rules: https://developers.cloudflare.com/cache/how-to/cache-rules/
 - Cloudflare Rate Limiting Rules: https://developers.cloudflare.com/waf/rate-limiting-rules/
@@ -68,11 +87,16 @@ status:
   ?? src/copilot/ANALISE-FERRAMENTAS-FALTANTES.md
 ```
 
-**Diagnóstico:** o workspace está sujo. Isso não bloqueia o MCP, mas reduz a confiabilidade de validações e torna qualquer patch mais arriscado. Antes de mudanças estruturais, convém separar o que é alteração intencional, artefato temporário e relatório.
+**Diagnóstico:** o workspace está sujo. Isso não bloqueia o MCP, mas reduz a confiabilidade de
+validações e torna qualquer patch mais arriscado. Antes de mudanças estruturais, convém separar o
+que é alteração intencional, artefato temporário e relatório.
 
-**Risco:** médio operacional. Não é risco de segurança, mas é risco de regressão e confusão em auditorias.
+**Risco:** médio operacional. Não é risco de segurança, mas é risco de regressão e confusão em
+auditorias.
 
-**Ação ideal:** criar uma rotina de sessão MCP que sempre começa com `repo_status`, sumariza diffs locais, e classifica arquivos não versionados como `source`, `artifact`, `report`, `tmp`, `secret/protected` ou `unknown`.
+**Ação ideal:** criar uma rotina de sessão MCP que sempre começa com `repo_status`, sumariza diffs
+locais, e classifica arquivos não versionados como `source`, `artifact`, `report`, `tmp`,
+`secret/protected` ou `unknown`.
 
 ---
 
@@ -92,11 +116,17 @@ Do `package.json`:
 - `typescript`: `^6.0.3`
 - `vitest`: `^4.1.8`
 
-**Diagnóstico:** a base está moderna e coerente com Node 24+. O pacote oficial TypeScript do MCP, entretanto, já está sinalizando uma transição: o repositório oficial informa que o branch principal contém o SDK v2 em pré-alpha, enquanto v1.x permanece recomendado para produção até o ciclo estável do v2. Como o projeto usa `@modelcontextprotocol/sdk ^1.29.0`, a opção atual é conservadora e adequada.
+**Diagnóstico:** a base está moderna e coerente com Node 24+. O pacote oficial TypeScript do MCP,
+entretanto, já está sinalizando uma transição: o repositório oficial informa que o branch principal
+contém o SDK v2 em pré-alpha, enquanto v1.x permanece recomendado para produção até o ciclo estável
+do v2. Como o projeto usa `@modelcontextprotocol/sdk ^1.29.0`, a opção atual é conservadora e
+adequada.
 
-**Gap:** falta uma política explícita de upgrade para MCP SDK v2 quando estabilizar. Sem isso, há risco de uma migração reativa e cara.
+**Gap:** falta uma política explícita de upgrade para MCP SDK v2 quando estabilizar. Sem isso, há
+risco de uma migração reativa e cara.
 
-**Ação ideal:** manter v1.29.x como linha de produção, congelar contratos de tool descriptors e transports, e criar uma branch/lane experimental para MCP SDK v2 quando ele se tornar estável.
+**Ação ideal:** manter v1.29.x como linha de produção, congelar contratos de tool descriptors e
+transports, e criar uma branch/lane experimental para MCP SDK v2 quando ele se tornar estável.
 
 ---
 
@@ -136,18 +166,24 @@ runtime / cloudflare / auth:
 
 1. A superfície é ampla, mas não “open-world”: nenhum tool foi classificado como `openWorld`.
 2. O servidor distingue leitura, plano, escrita bounded, escrita destrutiva e validação.
-3. Há workflows de baixa fricção: plan-first, batch, quarantine, validation suite e delegated runner.
+3. Há workflows de baixa fricção: plan-first, batch, quarantine, validation suite e delegated
+   runner.
 4. Há controles de tamanho de resultado e validação de descritores.
 5. Há auditoria e métricas por tool.
 
 **Gaps:**
 
-1. A contagem de ferramentas é alta. Embora 95 ainda esteja dentro da política interna (`DEFAULT_MAX_REGISTERED_TOOLS = 250`), aumenta custo cognitivo para seleção automática.
-2. O próprio perfil interno indica que tool-specific schemas são a próxima faixa de hardening. A cobertura existe, mas ainda há espaço para schemas semânticos mais fortes.
-3. Há risco de over-disclosure de superfície: ferramentas Cloudflare/admin aparecem no mesmo servidor do fluxo comum de leitura/escrita.
-4. Não há “profiles” por sessão/cliente suficientes para expor superfícies reduzidas: `read-only`, `dev`, `max-power`, `cloudflare-admin`, `ci`.
+1. A contagem de ferramentas é alta. Embora 95 ainda esteja dentro da política interna
+   (`DEFAULT_MAX_REGISTERED_TOOLS = 250`), aumenta custo cognitivo para seleção automática.
+2. O próprio perfil interno indica que tool-specific schemas são a próxima faixa de hardening. A
+   cobertura existe, mas ainda há espaço para schemas semânticos mais fortes.
+3. Há risco de over-disclosure de superfície: ferramentas Cloudflare/admin aparecem no mesmo
+   servidor do fluxo comum de leitura/escrita.
+4. Não há “profiles” por sessão/cliente suficientes para expor superfícies reduzidas: `read-only`,
+   `dev`, `max-power`, `cloudflare-admin`, `ci`.
 
-**Recomendação:** preservar o perfil max-power para uso privado, mas implementar perfis de superfície MCP mais seletivos por audiência/cliente.
+**Recomendação:** preservar o perfil max-power para uso privado, mas implementar perfis de
+superfície MCP mais seletivos por audiência/cliente.
 
 ---
 
@@ -164,11 +200,16 @@ openWorld: 0
 planOnly: 12
 ```
 
-O host ChatGPT ainda pode pedir confirmação para escrita e operações sensíveis. Isso não é bug do servidor. É coerente com a especificação MCP e com o Apps SDK.
+O host ChatGPT ainda pode pedir confirmação para escrita e operações sensíveis. Isso não é bug do
+servidor. É coerente com a especificação MCP e com o Apps SDK.
 
-A especificação MCP recomenda humano no loop para invocações de ferramentas e indica que hosts devem apresentar confirmações para operações. O Apps SDK, por sua vez, documenta que hints como `readOnlyHint`, `destructiveHint`, `openWorldHint` e `idempotentHint` influenciam como o ChatGPT enquadra a chamada, mas o servidor deve continuar impondo sua própria autorização.
+A especificação MCP recomenda humano no loop para invocações de ferramentas e indica que hosts devem
+apresentar confirmações para operações. O Apps SDK, por sua vez, documenta que hints como
+`readOnlyHint`, `destructiveHint`, `openWorldHint` e `idempotentHint` influenciam como o ChatGPT
+enquadra a chamada, mas o servidor deve continuar impondo sua própria autorização.
 
-**Diagnóstico:** a estratégia atual está correta: não tentar remover confirmações por meios frágeis. O caminho certo é reduzir quantidade e ambiguidade de confirmações.
+**Diagnóstico:** a estratégia atual está correta: não tentar remover confirmações por meios frágeis.
+O caminho certo é reduzir quantidade e ambiguidade de confirmações.
 
 **O que já está bom:**
 
@@ -181,9 +222,11 @@ A especificação MCP recomenda humano no loop para invocações de ferramentas 
 
 **Oportunidades:**
 
-- Criar `repo_edit_session_plan`: agrupa leitura, impacto, plano de patch, validação proposta e rollback.
+- Criar `repo_edit_session_plan`: agrupa leitura, impacto, plano de patch, validação proposta e
+  rollback.
 - Criar `repo_apply_patch_bundle`: aplica múltiplos patches com hashes esperados em uma confirmação.
-- Criar `repo_safe_commit_plan`: não executa git commit, mas gera mensagem, arquivos afetados e riscos.
+- Criar `repo_safe_commit_plan`: não executa git commit, mas gera mensagem, arquivos afetados e
+  riscos.
 - Criar `approval_friction_report`: mede prompts reais usando os `mcp_golden_prompts`.
 
 ---
@@ -239,15 +282,26 @@ code_challenge_methods_supported: S256
 grant_types_supported: authorization_code, refresh_token
 ```
 
-**Conformidade:** muito boa. A implementação segue a arquitetura esperada por MCP HTTP com OAuth: protected resource metadata, authorization server metadata, JWKS, PKCE S256, DCR/CIMD e resource parameter.
+**Conformidade:** muito boa. A implementação segue a arquitetura esperada por MCP HTTP com OAuth:
+protected resource metadata, authorization server metadata, JWKS, PKCE S256, DCR/CIMD e resource
+parameter.
 
-**Gap 1 — built-in issuer vs IdP estabelecido:** a documentação da OpenAI recomenda fortemente usar um provedor de identidade estabelecido em vez de implementar auth do zero. O issuer embutido é aceitável para ambiente privado/dev, mas não é a situação ideal para produção multiusuário.
+**Gap 1 — built-in issuer vs IdP estabelecido:** a documentação da OpenAI recomenda fortemente usar
+um provedor de identidade estabelecido em vez de implementar auth do zero. O issuer embutido é
+aceitável para ambiente privado/dev, mas não é a situação ideal para produção multiusuário.
 
-**Gap 2 — lifetime divergente:** o `mcp_auth_profile` mostra templates com access token TTL de 36000s e refresh token TTL de 2592000s, mas o `mcp_oauth_friction_audit` reportou política efetiva de 3600s e 604800s. Pode ser intencional, mas deve ser documentado como decisão de segurança/fricção.
+**Gap 2 — lifetime divergente:** o `mcp_auth_profile` mostra templates com access token TTL de
+36000s e refresh token TTL de 2592000s, mas o `mcp_oauth_friction_audit` reportou política efetiva
+de 3600s e 604800s. Pode ser intencional, mas deve ser documentado como decisão de
+segurança/fricção.
 
-**Gap 3 — acúmulo de tokens/clientes:** foram reportados 102 refresh tokens persistidos e 40 dynamic clients. O armazenamento guarda hashes, o que é bom, mas ainda há necessidade de retenção, expiração, limpeza e dashboard.
+**Gap 3 — acúmulo de tokens/clientes:** foram reportados 102 refresh tokens persistidos e 40 dynamic
+clients. O armazenamento guarda hashes, o que é bom, mas ainda há necessidade de retenção,
+expiração, limpeza e dashboard.
 
-**Gap 4 — escopos max-power por padrão:** max-power (`repo:read repo:write repo:validate repo:admin`) reduz reauth e aumenta liberdade, mas amplia blast radius. Para uso pessoal é aceitável; para uso compartilhado, deve haver perfis com escopos menores.
+**Gap 4 — escopos max-power por padrão:** max-power
+(`repo:read repo:write repo:validate repo:admin`) reduz reauth e aumenta liberdade, mas amplia blast
+radius. Para uso pessoal é aceitável; para uso compartilhado, deve haver perfis com escopos menores.
 
 **Situação ideal OAuth:**
 
@@ -313,13 +367,19 @@ remote ingress:
 4. `connectTimeout: 5s` melhora recuperação quando a origem cai.
 5. Há auditoria remota e edge diff.
 
-**Gap 1 — smoke antigo:** o último connector smoke persistido é de 2026-06-01, mais de 11.500 minutos antes do diagnóstico. Isso torna parte do readiness enganosa.
+**Gap 1 — smoke antigo:** o último connector smoke persistido é de 2026-06-01, mais de 11.500
+minutos antes do diagnóstico. Isso torna parte do readiness enganosa.
 
-**Gap 2 — readiness pós-restart falso:** `mcp_post_restart_readiness` retornou `ready=false` por `localHealth.ok=false` com `fetch failed`, embora processos MCP e cloudflared estejam vivos. Isso indica problema de health endpoint, TLS local, bind, certificado, path, ou rotina de health.
+**Gap 2 — readiness pós-restart falso:** `mcp_post_restart_readiness` retornou `ready=false` por
+`localHealth.ok=false` com `fetch failed`, embora processos MCP e cloudflared estejam vivos. Isso
+indica problema de health endpoint, TLS local, bind, certificado, path, ou rotina de health.
 
-**Gap 3 — temporário stale:** o túnel `trycloudflare` está configurado, mas morto/stale. Como fallback, está inútil no momento. Como o permanente está pronto, não é crítico.
+**Gap 3 — temporário stale:** o túnel `trycloudflare` está configurado, mas morto/stale. Como
+fallback, está inútil no momento. Como o permanente está pronto, não é crítico.
 
-**Gap 4 — benchmark bloqueado:** a chamada `mcp_cloudflare_transport_benchmark_plan` foi bloqueada pelo host. Precisa ser classificada com `mcp_host_block_diagnostics` e talvez renomeada/reestruturada para parecer claramente read-only.
+**Gap 4 — benchmark bloqueado:** a chamada `mcp_cloudflare_transport_benchmark_plan` foi bloqueada
+pelo host. Precisa ser classificada com `mcp_host_block_diagnostics` e talvez
+renomeada/reestruturada para parecer claramente read-only.
 
 **Situação ideal Cloudflare:**
 
@@ -381,9 +441,13 @@ Bound anonymous /mcp traffic:
   characteristics: cf.colo.id + ip.src
 ```
 
-**Diagnóstico:** como sessões autenticadas devem permanecer de alta capacidade, o rate limit deve mirar apenas tráfego anônimo e não mexer no fluxo ChatGPT/Claude autenticado.
+**Diagnóstico:** como sessões autenticadas devem permanecer de alta capacidade, o rate limit deve
+mirar apenas tráfego anônimo e não mexer no fluxo ChatGPT/Claude autenticado.
 
-**Gap secundário:** audit de config encontrou BIC, Rocket Loader, RUM e Email Obfuscation ligados em nível de zona, embora haja regra scoped desativando alguns deles para MCP/OAuth. Bot Fight Mode e Zaraz não foram determinados. Isso deve permanecer como gap de auditoria, não necessariamente como bug.
+**Gap secundário:** audit de config encontrou BIC, Rocket Loader, RUM e Email Obfuscation ligados em
+nível de zona, embora haja regra scoped desativando alguns deles para MCP/OAuth. Bot Fight Mode e
+Zaraz não foram determinados. Isso deve permanecer como gap de auditoria, não necessariamente como
+bug.
 
 ---
 
@@ -417,11 +481,14 @@ informational:
   - Workspace has uncommitted or untracked changes
 ```
 
-Depois foi executado `mcp_smoke_workspace` e o smoke local MCP retornou `status: degraded`, mas com todas as checagens técnicas OK e apenas warning de workspace sujo.
+Depois foi executado `mcp_smoke_workspace` e o smoke local MCP retornou `status: degraded`, mas com
+todas as checagens técnicas OK e apenas warning de workspace sujo.
 
-**Diagnóstico:** a saúde real parece melhor do que o status agregado inicial, mas a política de freshness está correta: smoke antigo degrada confiabilidade.
+**Diagnóstico:** a saúde real parece melhor do que o status agregado inicial, mas a política de
+freshness está correta: smoke antigo degrada confiabilidade.
 
-**Ação ideal:** refresh de smoke deve ser gatilho obrigatório após restart, mudança OAuth, mudança Cloudflare, mudança registry e início de sessão longa.
+**Ação ideal:** refresh de smoke deve ser gatilho obrigatório após restart, mudança OAuth, mudança
+Cloudflare, mudança registry e início de sessão longa.
 
 ---
 
@@ -447,17 +514,22 @@ Error: Test timed out in 15000ms
 line: 27
 ```
 
-O teste passa um caminho absoluto dentro de `src/copilot/.ai/jobs/...`, escreve `before\n`, chama `repo_write_file` com `includeDiffPreview: true`, espera diff com `-before` e `+after`, e verifica escrita.
+O teste passa um caminho absoluto dentro de `src/copilot/.ai/jobs/...`, escreve `before\n`, chama
+`repo_write_file` com `includeDiffPreview: true`, espera diff com `-before` e `+after`, e verifica
+escrita.
 
 **Hipóteses de causa:**
 
-1. `repo_write_file` com diff preview textual e `writeFileAtomic` pode estar esperando lock/IO em cenários de teste.
-2. O teste usa path absoluto, embora o contrato público diga “workspace-relative path”. Se absoluto for suportado por compatibilidade, deve ser documentado; se não for, o teste está errado.
+1. `repo_write_file` com diff preview textual e `writeFileAtomic` pode estar esperando lock/IO em
+   cenários de teste.
+2. O teste usa path absoluto, embora o contrato público diga “workspace-relative path”. Se absoluto
+   for suportado por compatibilidade, deve ser documentado; se não for, o teste está errado.
 3. Diretório dentro de `.ai/jobs` pode interagir com rotinas de job/log/lock.
 4. A geração de diff é O(n) simples e não parece ser a causa para arquivo pequeno.
 5. O timeout pode ser intermitente de CI ou contenda com SQLite/auditoria.
 
-**Não dá para cravar raiz sem reproduzir focado.** O relatório deve tratar isso como bug real até prova em contrário.
+**Não dá para cravar raiz sem reproduzir focado.** O relatório deve tratar isso como bug real até
+prova em contrário.
 
 Detalhe `unit-copilot`:
 
@@ -476,7 +548,8 @@ Sinais:
 - há falhas tipo `STACK_TRACE_ERROR` em migração SDK e buildUserPrompt;
 - job `unit-copilot` expirou em 120s.
 
-**Diagnóstico:** isso é dívida maior fora do MCP, mas afeta a confiabilidade do workspace como ambiente de desenvolvimento. O conector MCP está melhor que o restante da suíte.
+**Diagnóstico:** isso é dívida maior fora do MCP, mas afeta a confiabilidade do workspace como
+ambiente de desenvolvimento. O conector MCP está melhor que o restante da suíte.
 
 ---
 
@@ -500,9 +573,14 @@ failed: 0
 
 **Ponto forte:** índice local existe, é fresco e acelera buscas. Auto-build está habilitado.
 
-**Gap:** a métrica `indexed: 29` vs `files: 1317` e `skipped: 1274` precisa de semântica mais clara no relatório. Pode significar “arquivos novos/alterados indexados nesta build” e “inalterados pulados”, mas para o operador humano parece baixa cobertura.
+**Gap:** a métrica `indexed: 29` vs `files: 1317` e `skipped: 1274` precisa de semântica mais clara
+no relatório. Pode significar “arquivos novos/alterados indexados nesta build” e “inalterados
+pulados”, mas para o operador humano parece baixa cobertura.
 
-**Problema real observado:** uma chamada ampla de `repo_tree path="." recursive=true depth=3 maxEntries=1000` produziu 17,7 MB e foi rejeitada pelo registry. O limite de resultado é 2 MB. Isso é bom como proteção, mas a ferramenta deveria antecipar o tamanho e devolver um resumo paginado em vez de rejeitar depois.
+**Problema real observado:** uma chamada ampla de
+`repo_tree path="." recursive=true depth=3 maxEntries=1000` produziu 17,7 MB e foi rejeitada pelo
+registry. O limite de resultado é 2 MB. Isso é bom como proteção, mas a ferramenta deveria antecipar
+o tamanho e devolver um resumo paginado em vez de rejeitar depois.
 
 **Ações ideais:**
 
@@ -526,7 +604,8 @@ outputTemplate: []
 companyKnowledge.searchFetchToolsDetected: false
 ```
 
-**Diagnóstico:** não é bug para um conector de repositório. É gap de produto se a ambição for transformar o Workspace MCP em app visual do ChatGPT ou fonte pesquisável de Company Knowledge.
+**Diagnóstico:** não é bug para um conector de repositório. É gap de produto se a ambição for
+transformar o Workspace MCP em app visual do ChatGPT ou fonte pesquisável de Company Knowledge.
 
 **Oportunidade Apps SDK:**
 
@@ -554,7 +633,8 @@ companyKnowledge.searchFetchToolsDetected: false
 
 **Evidência:** `connectorSmoke.checkedAt = 2026-06-01T06:31:57.805Z`, `fresh=false`.
 
-**Impacto:** readiness pode parecer melhor do que está. OAuth/Cloudflare podem ter drift não detectado.
+**Impacto:** readiness pode parecer melhor do que está. OAuth/Cloudflare podem ter drift não
+detectado.
 
 **Correção:**
 
@@ -589,7 +669,8 @@ mcp_post_restart_readiness
 
 **Evidência:** `test_mcp_repo_write.spec.js`, teste “writes existing files with diff previews”.
 
-**Impacto:** ferramenta de escrita central tem teste vermelho. Mesmo que produção funcione, confiança cai.
+**Impacto:** ferramenta de escrita central tem teste vermelho. Mesmo que produção funcione,
+confiança cai.
 
 **Correção:**
 
@@ -729,7 +810,9 @@ Requisitos:
 
 #### P3.2 — mTLS / allowlist ChatGPT
 
-OpenAI documenta que ChatGPT apresenta certificado de cliente gerenciado em conexões MCP e também publica egress IP ranges. Para hardening de produção, usar mTLS para autenticar o cliente ChatGPT no transporte, mantendo OAuth para usuário final.
+OpenAI documenta que ChatGPT apresenta certificado de cliente gerenciado em conexões MCP e também
+publica egress IP ranges. Para hardening de produção, usar mTLS para autenticar o cliente ChatGPT no
+transporte, mantendo OAuth para usuário final.
 
 #### P3.3 — Observabilidade longa
 
@@ -747,7 +830,8 @@ OpenAI documenta que ChatGPT apresenta certificado de cliente gerenciado em cone
 
 ## 5. Situação ideal proposta
 
-A situação ideal não é “ChatGPT sem pedir nada”. Isso seria incompatível com o espírito do MCP para operações sensíveis. A situação ideal é:
+A situação ideal não é “ChatGPT sem pedir nada”. Isso seria incompatível com o espírito do MCP para
+operações sensíveis. A situação ideal é:
 
 ### 5.1 Para liberdade máxima
 
@@ -1015,7 +1099,8 @@ repo_restore_quarantined_file se necessário
 
 **Decisão:** manter `@modelcontextprotocol/sdk ^1.29.0` como linha operacional.
 
-**Motivo:** o repositório oficial indica v2 em desenvolvimento/pre-alpha, enquanto v1.x segue recomendado para produção.
+**Motivo:** o repositório oficial indica v2 em desenvolvimento/pre-alpha, enquanto v1.x segue
+recomendado para produção.
 
 ### ADR-002 — Max-power só para ambiente pessoal
 
@@ -1027,11 +1112,13 @@ repo_restore_quarantined_file se necessário
 
 **Decisão:** `/mcp`, `/oauth`, `/.well-known` e `/health` devem ter regras scoped de API.
 
-**Motivo:** recursos de browser, challenge interativo, transforms e caching agressivo são incompatíveis com MCP/OAuth.
+**Motivo:** recursos de browser, challenge interativo, transforms e caching agressivo são
+incompatíveis com MCP/OAuth.
 
 ### ADR-004 — Human-in-loop por design
 
-**Decisão:** não tentar contornar confirmações do host. Otimizar por ferramentas estreitas, reversíveis e agrupadas.
+**Decisão:** não tentar contornar confirmações do host. Otimizar por ferramentas estreitas,
+reversíveis e agrupadas.
 
 **Motivo:** MCP e Apps SDK modelam consentimento e confirmação como parte da segurança.
 
@@ -1039,7 +1126,8 @@ repo_restore_quarantined_file se necessário
 
 **Decisão:** não priorizar CSP/widget até haver dashboard útil.
 
-**Motivo:** readiness atual mostra que CSP não é fonte de fricção. Widget mal feito aumenta superfície sem ganho.
+**Motivo:** readiness atual mostra que CSP não é fonte de fricção. Widget mal feito aumenta
+superfície sem ganho.
 
 ---
 
@@ -1079,7 +1167,12 @@ repo_restore_quarantined_file se necessário
 
 ## 10. Conclusão
 
-O Workspace MCP está muito próximo de uma arquitetura ideal para desenvolvimento pessoal assistido por ChatGPT: seguro, auditável, rápido, rico em ferramentas e com boa separação entre leitura, plano, escrita e validação. O maior ganho agora não vem de adicionar mais poder bruto; vem de **estabilizar readiness**, **corrigir validações**, **reduzir resultados grandes**, **criar perfis**, **limpar OAuth state**, **fechar gaps Cloudflare edge** e **consolidar utilidades orientadas a tarefa**.
+O Workspace MCP está muito próximo de uma arquitetura ideal para desenvolvimento pessoal assistido
+por ChatGPT: seguro, auditável, rápido, rico em ferramentas e com boa separação entre leitura,
+plano, escrita e validação. O maior ganho agora não vem de adicionar mais poder bruto; vem de
+**estabilizar readiness**, **corrigir validações**, **reduzir resultados grandes**, **criar
+perfis**, **limpar OAuth state**, **fechar gaps Cloudflare edge** e **consolidar utilidades
+orientadas a tarefa**.
 
 A prioridade deve ser:
 
@@ -1089,4 +1182,6 @@ A prioridade deve ser:
 4. criar ferramentas compactas de contexto e patch bundle;
 5. só depois investir em Apps SDK widget e Company Knowledge.
 
-Com isso, o conector deixa de ser apenas “um MCP poderoso” e vira uma estação de trabalho agentic madura: liberdade máxima para o operador, mas com limites formais, reversibilidade, auditoria e performance previsível.
+Com isso, o conector deixa de ser apenas “um MCP poderoso” e vira uma estação de trabalho agentic
+madura: liberdade máxima para o operador, mas com limites formais, reversibilidade, auditoria e
+performance previsível.

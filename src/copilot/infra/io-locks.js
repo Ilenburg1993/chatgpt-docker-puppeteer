@@ -9,13 +9,13 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { publishIoLifecycleEvent } from './io-observability.js';
 import {
     acquireFileResourceLock,
     getFileResourceLockStats,
     hashFileResourceLockKey,
     shouldAcquireFileResourceLock,
 } from './locks/file-resource-lock.js';
-import { publishIoLifecycleEvent } from './io-observability.js';
 import { createBoundedLockWaitMetrics, sanitizeLockOperation } from './locks/lock-observability.js';
 import { normalizePathResourceKey } from './policy/path-resource.js';
 import { readEnvPositiveInt } from './shared/env.js';
@@ -43,14 +43,17 @@ const lockCounters = {
     queueDepthHighWater: 0,
 };
 /**
- * @type {Map<string, {
- *     resourceHash: string;
- *     operation: string;
- *     acquiredAtMs: number;
- *     waitMs: number;
- *     l0WaitMs: number;
- *     fileLockEnabled: boolean;
- * }>}
+ * @type {Map<
+ *     string,
+ *     {
+ *         resourceHash: string;
+ *         operation: string;
+ *         acquiredAtMs: number;
+ *         waitMs: number;
+ *         l0WaitMs: number;
+ *         fileLockEnabled: boolean;
+ *     }
+ * >}
  */
 const activeLeases = new Map();
 const warnedLeaseKeys = new Set();
@@ -243,10 +246,7 @@ export async function acquireIoResourceLock(resourceKey, options = {}) {
     if (wasContended) {
         lockCounters.contended += 1;
         lockCounters.queuedWaiters += 1;
-        lockCounters.queueDepthHighWater = Math.max(
-            lockCounters.queueDepthHighWater,
-            lockCounters.queuedWaiters,
-        );
+        lockCounters.queueDepthHighWater = Math.max(lockCounters.queueDepthHighWater, lockCounters.queuedWaiters);
     }
     const previous = tails.get(key) ?? Promise.resolve();
     const { promise: current, resolve: releaseCurrent } = Promise.withResolvers();
@@ -513,14 +513,14 @@ export async function withIoResourceLocks(resourceKeys, operation, options = {})
  *     staleActiveLeases: number;
  *     oldestActiveLeaseAgeMs: number;
  *     wait: ReturnType<ReturnType<typeof createBoundedLockWaitMetrics>['snapshot']>;
- *     activeLeaseSample: Array<{
+ *     activeLeaseSample: {
  *         resourceHash: string;
  *         operation: string;
  *         ageMs: number;
  *         waitMs: number;
  *         l0WaitMs: number;
  *         fileLockEnabled: boolean;
- *     }>;
+ *     }[];
  *     fileLocks: ReturnType<typeof getFileResourceLockStats>;
  * }}
  */

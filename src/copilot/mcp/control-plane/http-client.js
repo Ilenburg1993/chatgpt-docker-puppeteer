@@ -2,9 +2,9 @@
 /**
  * Shared HTTP helpers for MCP control-plane code.
  *
- * This module centralizes timeout, retry and response-text handling for read-only probes used by
- * Cloudflare, OAuth and MCP smoke diagnostics. It intentionally stays thin over the platform fetch
- * implementation so callers keep protocol semantics while avoiding duplicated timeout/retry code.
+ * This module centralizes timeout, retry and response-text handling for read-only probes used by Cloudflare, OAuth and
+ * MCP smoke diagnostics. It intentionally stays thin over the platform fetch implementation so callers keep protocol
+ * semantics while avoiding duplicated timeout/retry code.
  *
  * @module copilot/mcp/control-plane/http-client
  */
@@ -19,29 +19,32 @@ const DEFAULT_RETRYABLE_STATUS = Object.freeze([0, 408, 425, 429, 500, 502, 503,
 
 /**
  * @typedef {{
- *   method?: string;
- *   headers?: HeadersInit;
- *   body?: BodyInit | null;
- *   timeoutMs?: number;
- *   signal?: AbortSignal;
- *   redirect?: RequestRedirect;
- *   cache?: RequestCache;
- *   maxBytes?: number;
+ *     method?: string;
+ *     headers?: HeadersInit;
+ *     body?: BodyInit | null;
+ *     timeoutMs?: number;
+ *     signal?: AbortSignal;
+ *     redirect?: RequestRedirect;
+ *     cache?: RequestCache;
+ *     maxBytes?: number;
  * }} McpFetchTextOptions
  *
+ *
  * @typedef {{
- *   ok: boolean;
- *   status: number;
- *   rawBody: string;
- *   headers: Record<string, string>;
- *   error?: string;
+ *     ok: boolean;
+ *     status: number;
+ *     rawBody: string;
+ *     headers: Record<string, string>;
+ *     error?: string;
  * }} McpFetchTextResult
  *
+ *
  * @typedef {McpFetchTextOptions & {
- *   attempts?: number;
- *   delayMs?: number;
- *   retryStatuses?: readonly number[];
+ *     attempts?: number;
+ *     delayMs?: number;
+ *     retryStatuses?: readonly number[];
  * }} McpFetchRetryOptions
+ *
  *
  * @typedef {McpFetchTextResult & { attempts: number }} McpFetchTextRetryResult
  */
@@ -53,7 +56,8 @@ const DEFAULT_RETRYABLE_STATUS = Object.freeze([0, 408, 425, 429, 500, 502, 503,
  */
 export async function mcpFetchText(url, options = {}) {
     try {
-        const signal = options.signal ?? AbortSignal.timeout(normalizePositiveInteger(options.timeoutMs, DEFAULT_TIMEOUT_MS));
+        const signal =
+            options.signal ?? AbortSignal.timeout(normalizePositiveInteger(options.timeoutMs, DEFAULT_TIMEOUT_MS));
         /** @type {RequestInit} */
         const init = {
             method: options.method ?? 'GET',

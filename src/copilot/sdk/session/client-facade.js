@@ -12,9 +12,9 @@
  * @see module:copilot/sdk/config
  */
 
+import { logSwallowed } from '#copilot/core/error-handlers';
 import { forceStopClient, getClient, getClientState, stopClient } from './client.js';
 import { createSession, deleteSession, disconnectSession, resumeOrCreate } from './lifecycle.js';
-import { logSwallowed } from '#copilot/core/error-handlers';
 
 /**
  * @typedef {import('@github/copilot-sdk').CopilotSession} CopilotSession
@@ -113,7 +113,10 @@ function withCleanupTimeout(promise, timeoutMs, label) {
     return Promise.race([
         promise,
         new Promise((_, reject) => {
-            const timeout = setTimeout(() => reject(new Error(`[sdk/client-facade] ${label} excedeu ${timeoutMs}ms`)), timeoutMs);
+            const timeout = setTimeout(
+                () => reject(new Error(`[sdk/client-facade] ${label} excedeu ${timeoutMs}ms`)),
+                timeoutMs,
+            );
             timeout.unref?.();
         }),
     ]);

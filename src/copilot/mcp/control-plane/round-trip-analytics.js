@@ -3,7 +3,8 @@
  * Incremental, rebuildable analytics over the append-only MCP audit JSONL.
  *
  * The JSONL remains the source of record. This module stores only sanitized derived event fields plus a byte cursor in
- * the shared SQLite database so repeated diagnostics process only new audit bytes instead of rescanning a growing file.
+ * the shared SQLite database so repeated diagnostics process only new audit bytes instead of rescanning a growing
+ * file.
  *
  * @module copilot/mcp/control-plane/round-trip-analytics
  */
@@ -52,12 +53,12 @@ const PLAN_APPLY_PAIRS = new Map([
 
 /**
  * @param {{
- *   db?: import('better-sqlite3').Database;
- *   readSlice?: typeof readMcpAuditEventSlice;
- *   chunkBytes?: number;
- *   maxChunks?: number;
- *   retentionMs?: number;
- *   now?: () => number;
+ *     db?: import('better-sqlite3').Database;
+ *     readSlice?: typeof readMcpAuditEventSlice;
+ *     chunkBytes?: number;
+ *     maxChunks?: number;
+ *     retentionMs?: number;
+ *     now?: () => number;
  * }} [options]
  */
 export function createMcpRoundTripAnalytics(options = {}) {
@@ -65,7 +66,12 @@ export function createMcpRoundTripAnalytics(options = {}) {
     const readSlice = options.readSlice ?? readMcpAuditEventSlice;
     const chunkBytes = boundedInteger(options.chunkBytes, DEFAULT_CHUNK_BYTES, 64 * 1024, 16 * 1024 * 1024);
     const maxChunks = boundedInteger(options.maxChunks, DEFAULT_MAX_CHUNKS, 1, 32);
-    const retentionMs = boundedInteger(options.retentionMs, DEFAULT_RETENTION_MS, 60 * 60 * 1000, 90 * 24 * 60 * 60 * 1000);
+    const retentionMs = boundedInteger(
+        options.retentionMs,
+        DEFAULT_RETENTION_MS,
+        60 * 60 * 1000,
+        90 * 24 * 60 * 60 * 1000,
+    );
     const now = options.now ?? Date.now;
     ensureSchema(db);
 
@@ -168,7 +174,8 @@ export function createMcpRoundTripAnalytics(options = {}) {
             for (const entry of entries) {
                 const sourceOffset = Number(entry?.sourceOffset);
                 const event = entry?.event;
-                if (!Number.isInteger(sourceOffset) || sourceOffset < 0 || !event || typeof event !== 'object') continue;
+                if (!Number.isInteger(sourceOffset) || sourceOffset < 0 || !event || typeof event !== 'object')
+                    continue;
                 const normalized = normalizeAuditEvent(/** @type {Record<string, unknown>} */ (event));
                 if (!normalized) continue;
                 normalizedRows.push({ sourceIdentity: fileIdentity ?? 'unknown', sourceOffset, ...normalized });
@@ -227,7 +234,7 @@ export function createMcpRoundTripAnalytics(options = {}) {
             .all(cutoff, MAX_SUMMARY_ROWS);
         return {
             ingestion,
-            ...summarizeRows(/** @type {Array<Record<string, unknown>>} */ (rows), { windowMs, top, includeSynthetic }),
+            ...summarizeRows(/** @type {Record<string, unknown>[]} */ (rows), { windowMs, top, includeSynthetic }),
         };
     }
 
@@ -248,15 +255,15 @@ export async function readMcpRoundTripAnalytics(options = {}) {
 }
 
 /**
- * Read the already-materialized derived index without creating tables, advancing cursors or ingesting audit bytes.
- * This is safe for read-only dashboards; the background monitor or explicit analytics tool owns synchronization.
+ * Read the already-materialized derived index without creating tables, advancing cursors or ingesting audit bytes. This
+ * is safe for read-only dashboards; the background monitor or explicit analytics tool owns synchronization.
  *
  * @param {{
- *   db?: import('better-sqlite3').Database;
- *   windowMs?: number;
- *   top?: number;
- *   includeSynthetic?: boolean;
- *   now?: () => number;
+ *     db?: import('better-sqlite3').Database;
+ *     windowMs?: number;
+ *     top?: number;
+ *     includeSynthetic?: boolean;
+ *     now?: () => number;
  * }} [options]
  */
 export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
@@ -317,7 +324,7 @@ export function readMcpRoundTripAnalyticsSnapshot(options = {}) {
         .all(cutoff, MAX_SUMMARY_ROWS);
     return {
         available: true,
-        ...summarizeRows(/** @type {Array<Record<string, unknown>>} */ (rows), {
+        ...summarizeRows(/** @type {Record<string, unknown>[]} */ (rows), {
             windowMs,
             top,
             includeSynthetic,
@@ -331,7 +338,7 @@ export function normalizeMcpRoundTripAuditEvent(event) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} rows
+ * @param {Record<string, unknown>[]} rows
  * @param {{ windowMs: number; top: number; includeSynthetic: boolean }} options
  */
 export function summarizeMcpRoundTripRows(rows, options) {
@@ -371,7 +378,7 @@ function normalizeAuditEvent(event) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} rows
+ * @param {Record<string, unknown>[]} rows
  * @param {{ windowMs: number; top: number; includeSynthetic: boolean }} options
  */
 function summarizeRows(rows, options) {
@@ -402,7 +409,11 @@ function summarizeRows(rows, options) {
         const event = String(row['event'] ?? '');
         const tool = stringOrNull(row['tool']);
         const tsMs = Number(row['ts_ms'] ?? row['tsMs'] ?? 0);
-        if (event === 'repo_apply_patch_failed' || event === 'repo_apply_patch_batch_preflight_blocked' || event === 'repo_apply_patch_batch_partial_failure') {
+        if (
+            event === 'repo_apply_patch_failed' ||
+            event === 'repo_apply_patch_batch_preflight_blocked' ||
+            event === 'repo_apply_patch_batch_partial_failure'
+        ) {
             const code = stringOrNull(row['code']) ?? 'aggregate-or-legacy';
             increment(failureCodes, code);
             const failureClass = stringOrNull(row['failure_class'] ?? row['failureClass']) ?? 'unknown-or-legacy';
@@ -423,7 +434,9 @@ function summarizeRows(rows, options) {
         if (event !== 'tool_call_started' || !tool) continue;
         increment(toolStarts, tool);
         if (tool === 'git_publish_changes') gitOneShotCalls += 1;
-        if (['git_stage_plan', 'git_stage', 'git_commit_plan', 'git_commit', 'git_push_plan', 'git_push'].includes(tool)) {
+        if (
+            ['git_stage_plan', 'git_stage', 'git_commit_plan', 'git_commit', 'git_push_plan', 'git_push'].includes(tool)
+        ) {
             gitGranularCalls += 1;
             increment(gitGranularByTool, tool);
         }
@@ -577,7 +590,11 @@ function ensureSchema(db) {
 /** @param {import('better-sqlite3').Database} db */
 function readCursor(db) {
     const row = /** @type {Record<string, unknown> | undefined} */ (
-        db.prepare(`SELECT file_identity, byte_offset, file_bytes, updated_at_ms FROM ${CURSOR_TABLE} WHERE cursor_id = ?`).get(CURSOR_ID)
+        db
+            .prepare(
+                `SELECT file_identity, byte_offset, file_bytes, updated_at_ms FROM ${CURSOR_TABLE} WHERE cursor_id = ?`,
+            )
+            .get(CURSOR_ID)
     );
     if (!row) return null;
     return {

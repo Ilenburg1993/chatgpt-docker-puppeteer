@@ -476,10 +476,14 @@ export function describeConfiguredSessionFs(sessionId) {
  * Lê estado operacional mínimo de SessionFs para cockpit/diagnóstico.
  *
  * @param {string | null | undefined} [sessionId]
- * @returns {Promise<ReturnType<typeof describeConfiguredSessionFs> & {
- *     storageRoot: ReturnType<typeof describeConfiguredSessionFs>['storageRoot'] & { exists: boolean | null };
- *     session: (NonNullable<ReturnType<typeof describeConfiguredSessionFs>['session']> & { exists: boolean | null }) | null;
- * }>}
+ * @returns {Promise<
+ *     ReturnType<typeof describeConfiguredSessionFs> & {
+ *         storageRoot: ReturnType<typeof describeConfiguredSessionFs>['storageRoot'] & { exists: boolean | null };
+ *         session:
+ *             | (NonNullable<ReturnType<typeof describeConfiguredSessionFs>['session']> & { exists: boolean | null })
+ *             | null;
+ *     }
+ * >}
  */
 export async function readConfiguredSessionFsState(sessionId) {
     const descriptor = describeConfiguredSessionFs(sessionId);

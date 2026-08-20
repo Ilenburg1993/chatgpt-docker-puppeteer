@@ -117,7 +117,8 @@ describe('terminal/event-adapter-events.js — contrato', () => {
         expect(findTerminalPublicStreamSourcePolicyByEvent('session.usage')).toEqual(
             expect.objectContaining({
                 id: 'usage.telemetry',
-                fallback: 'usage is attributed by origin/tokens/AI usage; request-based fields are legacy-only when explicitly received',
+                fallback:
+                    'usage is attributed by origin/tokens/AI usage; request-based fields are legacy-only when explicitly received',
             }),
         );
         expect(findTerminalPublicStreamSourcePolicyByEvent('session.autopilot_objective_changed')).toEqual(

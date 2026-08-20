@@ -52,8 +52,16 @@ declare module '#shared/utils/execution_context_filler' {
         task: TTask,
         options?: FillExecutionContextOptions,
     ): Promise<TTask & { execution: ExecutionContext }>;
-    export function incrementTacticalAttempts(task: ExecutionContextTask, errorRecovered?: string, backoffMs?: number): void;
-    export function incrementStrategicAttempts(task: ExecutionContextTask, errorRecovered?: string, backoffMs?: number): void;
+    export function incrementTacticalAttempts(
+        task: ExecutionContextTask,
+        errorRecovered?: string,
+        backoffMs?: number,
+    ): void;
+    export function incrementStrategicAttempts(
+        task: ExecutionContextTask,
+        errorRecovered?: string,
+        backoffMs?: number,
+    ): void;
 }
 
 // ============================================================

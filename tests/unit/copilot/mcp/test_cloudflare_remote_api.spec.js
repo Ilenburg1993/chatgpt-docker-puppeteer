@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { compareRemoteConfig, parseEnvFile } from '#copilot/mcp/cloudflare';
+import { describe, expect, it } from 'vitest';
 import { getCloudflareClient } from '../../../../src/copilot/mcp/cloudflare/remote-api.js';
 import { compactCloudflareRemoteAudit } from '../../../../src/copilot/mcp/tools/cloudflare-remote.js';
 
@@ -75,7 +75,9 @@ EMPTY=
         expect(result.critical).toEqual([
             'Ingress service for mcp.aurelin.org is http://localhost:3333; expected http://127.0.0.1:3333.',
         ]);
-        const remote = /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } } }} */ (result.remote);
+        const remote = /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } } }} */ (
+            result.remote
+        );
         expect(remote.config.hostnameRule?.matchesExpectedOrigin).toBe(false);
     });
 
@@ -117,7 +119,13 @@ EMPTY=
                             score: { explicitMatches: 9, explicitRecommendedCount: 9, explicitCoverage: 1 },
                             fieldFindings: [
                                 { key: 'http2Origin', status: 'ok' },
-                                { key: 'connectTimeout', status: 'warning', actualValue: '30s', recommendedValue: '5s', action: 'pin' },
+                                {
+                                    key: 'connectTimeout',
+                                    status: 'warning',
+                                    actualValue: '30s',
+                                    recommendedValue: '5s',
+                                    action: 'pin',
+                                },
                             ],
                             critical: [],
                             warnings: ['one drift'],
@@ -169,9 +177,10 @@ EMPTY=
 
         expect(result.critical).toEqual([]);
         expect(result.warnings).toEqual([]);
-        const remote = /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } }; connections: { active: number } }} */ (
-            result.remote
-        );
+        const remote =
+            /** @type {{ config: { hostnameRule?: { matchesExpectedOrigin?: boolean } }; connections: { active: number } }} */ (
+                result.remote
+            );
         expect(remote.config.hostnameRule?.matchesExpectedOrigin).toBe(true);
         expect(remote.connections.active).toBe(1);
     });

@@ -322,7 +322,7 @@ pm2 list | grep proxy
    ```bash
    # Erro típico
    Error: illegal value for flag --max-old-space-size=6144--max-old-space-size=6144
-   
+
    # Solução: Limpar NODE_OPTIONS
    unset NODE_OPTIONS
    node scripts/chrome-proxy-service.js &
@@ -345,7 +345,7 @@ pm2 list | grep proxy
    ```bash
    # Erro
    Error: Cannot find module 'axios'
-   
+
    # Solução
    npm install axios
    ```
@@ -387,7 +387,7 @@ Target closed.
    ```bash
    # Container: Testar latência
    ping -c 5 host.docker.internal
-   
+
    # Se alta latência (>50ms), reiniciar Docker Desktop
    ```
 

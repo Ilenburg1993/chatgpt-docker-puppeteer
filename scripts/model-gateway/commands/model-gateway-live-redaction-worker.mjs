@@ -29,7 +29,15 @@ function readPositiveInteger(value, fallback) {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-/** @param {{ ok?: unknown, leakCount?: unknown, scannedStringCount?: unknown, sampleCount?: unknown, tableCount?: unknown }} audit */
+/**
+ * @param {{
+ *     ok?: unknown;
+ *     leakCount?: unknown;
+ *     scannedStringCount?: unknown;
+ *     sampleCount?: unknown;
+ *     tableCount?: unknown;
+ * }} audit
+ */
 function compactAudit(audit) {
     return {
         ok: audit.ok === true,
@@ -88,7 +96,7 @@ async function loadModeContext(mode) {
     }
 }
 
-/** @param {{ mode?: unknown, maxRowsPerTable?: unknown }} input */
+/** @param {{ mode?: unknown; maxRowsPerTable?: unknown }} input */
 async function runAudit(input) {
     const mode = typeof input?.mode === 'string' ? input.mode : '';
     const maxRowsPerTable = readPositiveInteger(input?.maxRowsPerTable, 25);

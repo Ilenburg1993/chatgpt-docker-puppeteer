@@ -214,7 +214,8 @@ function normalize(envelope) {
     const messageType = envelope['messageType'] || (envelope['type'] && envelope['type'].message_type);
     const actionCode = envelope['actionCode'] || (envelope['type'] && envelope['type'].action_code);
     const payload = envelope['payload'] || envelope['data'] || {};
-    const correlationId = envelope['correlationId'] || (envelope['causality'] && envelope['causality'].correlation_id) || null;
+    const correlationId =
+        envelope['correlationId'] || (envelope['causality'] && envelope['causality'].correlation_id) || null;
     const target = envelope['target'] || (envelope['identity'] && envelope['identity'].target) || null;
 
     return createEnvelope({ actor, messageType, actionCode, payload, correlationId, target });

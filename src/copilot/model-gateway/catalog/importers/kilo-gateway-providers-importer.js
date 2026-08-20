@@ -8,10 +8,7 @@
  * @module copilot/model-gateway/catalog/importers/kilo-gateway-providers-importer
  */
 
-import {
-    MODEL_GATEWAY_CATALOG_CONFIDENCE,
-    createProviderMetadataEvidence,
-} from '../contracts.js';
+import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createProviderMetadataEvidence } from '../contracts.js';
 import { readCatalogResponseJson } from './response-body.js';
 
 export const KILO_GATEWAY_PROVIDERS_CATALOG_URL = 'https://api.kilo.ai/api/gateway/providers';
@@ -68,7 +65,7 @@ function readIcon(row) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function providerEvidenceValues(row) {
     const dataPolicy = readDataPolicy(row);
@@ -109,7 +106,8 @@ export function createKiloGatewayProvidersImporter(options = {}) {
         refreshPolicy: 'scheduled',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Kilo Gateway providers import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Kilo Gateway providers import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Kilo Gateway providers fetch failed with HTTP ${response.status}`);
             return readCatalogResponseJson(response, { label: 'Kilo Gateway providers' });

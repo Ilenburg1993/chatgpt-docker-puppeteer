@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /**
  * tests/unit/copilot/terminal/test_commands_session.spec.js
  *
@@ -9,12 +8,30 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/session/index.js').listTerminalSdkSessionInventory>>} TerminalSdkSessionInventory */
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState>>} TerminalSessionFsState */
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail>>} TerminalSseArchiveProjection */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/frontend/gateways/session/index.js').listTerminalSdkSessionInventory
+    >
+>} TerminalSdkSessionInventory */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').readTerminalConfiguredSessionFsState
+    >
+>} TerminalSessionFsState */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail
+    >
+>} TerminalSseArchiveProjection */
 /** @typedef {TerminalSseArchiveProjection['entries'][number]} TerminalSseArchiveEntry */
-/** @typedef {Omit<Partial<TerminalSdkSessionInventory>, 'sessionFs'> & { sessionFs?: Partial<TerminalSessionFsState> }} TerminalSdkSessionInventoryOverrides */
-/** @typedef {Omit<Partial<TerminalSseArchiveProjection>, 'state' | 'filters' | 'tailRead'> & { state?: Partial<TerminalSseArchiveProjection['state']>; filters?: Partial<TerminalSseArchiveProjection['filters']>; tailRead?: Partial<TerminalSseArchiveProjection['tailRead']> }} TerminalSseArchiveProjectionOverrides */
+/** @typedef {Omit<Partial<TerminalSdkSessionInventory>, 'sessionFs'> & {
+    sessionFs?: Partial<TerminalSessionFsState>;
+}} TerminalSdkSessionInventoryOverrides */
+/** @typedef {Omit<Partial<TerminalSseArchiveProjection>, 'state' | 'filters' | 'tailRead'> & {
+    state?: Partial<TerminalSseArchiveProjection['state']>;
+    filters?: Partial<TerminalSseArchiveProjection['filters']>;
+    tailRead?: Partial<TerminalSseArchiveProjection['tailRead']>;
+}} TerminalSseArchiveProjectionOverrides */
 
 /**
  * @param {Partial<TerminalSessionFsState>} [overrides]
@@ -153,13 +170,15 @@ const conversationMocks = vi.hoisted(() => ({
 
 const answerPendingQuestion = vi.fn((/** @type {string} */ _arg) => true);
 const clearPendingQuestionShadow = vi.fn(() => true);
-const listTerminalSdkSessionInventory = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/gateways/session/index.js').listTerminalSdkSessionInventory>} */ (
-    vi.fn(async () => sdkSessionInventoryFixture())
-);
+const listTerminalSdkSessionInventory = /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/session/index.js').listTerminalSdkSessionInventory
+>} */ (vi.fn(async () => sdkSessionInventoryFixture()));
 const readTerminalSdkSessionBootSelection = vi.fn(async () => null);
 const scheduleTerminalSdkSessionBootSelection = vi.fn(async () => ({ ok: true, data: {}, error: null }));
 const deleteTerminalSdkSession = vi.fn(async () => undefined);
-const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail>} */ (
+const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail
+>} */ (
     vi.fn(async (input = {}) =>
         sseArchiveProjectionFixture(typeof input.event === 'string' ? input.event : null, {
             filters: { limit: Number(input.limit ?? 20) },
@@ -167,9 +186,15 @@ const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<typeof 
     )
 );
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimeControlState>} RuntimeControlState */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimeInteractionState>} RuntimeInteractionState */
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimePrBudgetSnapshot>} RuntimePrBudgetSnapshot */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimeControlState
+>} RuntimeControlState */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimeInteractionState
+>} RuntimeInteractionState */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/agent/facades/agent-runtime-controls.js').readRuntimePrBudgetSnapshot
+>} RuntimePrBudgetSnapshot */
 /**
  * @typedef {{
  *     status?: string;
@@ -185,6 +210,7 @@ const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<typeof 
  *     systemPromptFreshness?: { isStale?: boolean; reason?: string; recommendedAction?: string } | null;
  * }} TestAgentStatusSnapshot
  *
+ *
  * @typedef {{
  *     ok: boolean;
  *     healthy: boolean;
@@ -193,6 +219,7 @@ const readTerminalSseEventArchiveTail = /** @type {import('vitest').Mock<typeof 
  *     backgroundPendingCount: number;
  *     recommendedAction: string;
  * }} TestAgentHealthSnapshot
+ *
  *
  * @typedef {{
  *     status: string;
@@ -1099,32 +1126,34 @@ describe('commands/session — async commands', () => {
         scheduleTerminalSdkSessionBootSelection.mockResolvedValue({ ok: true, data: {}, error: null });
         deleteTerminalSdkSession.mockClear();
         readTerminalSseEventArchiveTail.mockClear();
-        readTerminalSseEventArchiveTail.mockResolvedValue(sseArchiveProjectionFixture(null, {
-            entries: [],
-            state: {
-                enabled: true,
-                path: '/tmp/terminal-sse-events.jsonl',
-                error: null,
-                events: 0,
-                bytes: 0,
-                queueDepth: 0,
-                flushScheduled: false,
-                flushInFlight: false,
-                failedEvents: 0,
-                droppedEvents: 0,
-                lastEventId: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValue(
+            sseArchiveProjectionFixture(null, {
+                entries: [],
+                state: {
+                    enabled: true,
+                    path: '/tmp/terminal-sse-events.jsonl',
+                    error: null,
+                    events: 0,
+                    bytes: 0,
+                    queueDepth: 0,
+                    flushScheduled: false,
+                    flushInFlight: false,
+                    failedEvents: 0,
+                    droppedEvents: 0,
+                    lastEventId: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+            }),
+        );
     });
 
     it('cmdSessionSdk distingue inventário SDK de resume do hub e snapshots', async () => {
@@ -1145,17 +1174,19 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk resume comandos SDK chamados no archive principal', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(sseArchiveProjectionFixture(null, {
-            entries: [
-                sseArchiveEntryFixture('sdk.command.executed', {
-                    commandName: 'terminal_status',
-                    localCommand: '/status',
-                    status: 'completed',
-                }),
-            ],
-            state: { error: null },
-            filters: {},
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            sseArchiveProjectionFixture(null, {
+                entries: [
+                    sseArchiveEntryFixture('sdk.command.executed', {
+                        commandName: 'terminal_status',
+                        localCommand: '/status',
+                        status: 'completed',
+                    }),
+                ],
+                state: { error: null },
+                filters: {},
+            }),
+        );
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
 
@@ -1166,27 +1197,29 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk respeita limite numérico e compacta previews longos', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
-            currentSessionId: 'sdk-current',
-            lastSessionId: 'sdk-last',
-            foregroundSessionId: null,
-            sessions: [
-                {
-                    sessionId: 'sdk-current',
-                    startTime: new Date('2026-05-21T00:00:00.000Z'),
-                    modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
-                    summary: `Prompt longo ${'delta '.repeat(80)}`,
-                    isRemote: false,
-                },
-                {
-                    sessionId: 'sdk-second',
-                    startTime: new Date('2026-05-21T00:02:00.000Z'),
-                    modifiedTime: new Date('2026-05-21T00:03:00.000Z'),
-                    summary: 'segunda sessão',
-                    isRemote: false,
-                },
-            ],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sdkSessionInventoryFixture({
+                currentSessionId: 'sdk-current',
+                lastSessionId: 'sdk-last',
+                foregroundSessionId: null,
+                sessions: [
+                    {
+                        sessionId: 'sdk-current',
+                        startTime: new Date('2026-05-21T00:00:00.000Z'),
+                        modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                        summary: `Prompt longo ${'delta '.repeat(80)}`,
+                        isRemote: false,
+                    },
+                    {
+                        sessionId: 'sdk-second',
+                        startTime: new Date('2026-05-21T00:02:00.000Z'),
+                        modifiedTime: new Date('2026-05-21T00:03:00.000Z'),
+                        summary: 'segunda sessão',
+                        isRemote: false,
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '1');
         expect(ctx.output()).toContain('sessão #1');
@@ -1200,12 +1233,17 @@ describe('commands/session — async commands', () => {
         expect(ctx.output()).not.toContain('/session sdk controla sessão SDK;');
         expect(ctx.output()).not.toContain('/session sdk next new |');
         expect(ctx.output()).toContain('...');
-        const summaryLine = ctx.output().split('\n').find((line) => line.includes('Resumo'));
+        const summaryLine = ctx
+            .output()
+            .split('\n')
+            .find((line) => line.includes('Resumo'));
         expect(summaryLine?.length ?? 0).toBeLessThanOrEqual(112);
         expect(ctx.output()).not.toContain('2026-05-21T');
         expect(ctx.output()).not.toContain('last');
         expect(ctx.output()).not.toContain('foreground');
-        expect(ctx.output()).not.toContain('delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta');
+        expect(ctx.output()).not.toContain(
+            'delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta delta',
+        );
     });
 
     it('cmdSessionSdk pagina, filtra e mostra metadata local/session fs segura', async () => {
@@ -1224,43 +1262,49 @@ describe('commands/session — async commands', () => {
                 exists: true,
             },
         });
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
-            currentSessionId: 'sdk-current',
-            lastSessionId: 'sdk-last',
-            foregroundSessionId: null,
-            sessionFs: currentSessionFs,
-            sessions: [
-                {
-                    sessionId: 'sdk-first',
-                    startTime: new Date('2026-05-21T00:00:00.000Z'),
-                    modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
-                    summary: 'primeira',
-                    isRemote: false,
-                },
-                {
-                    sessionId: 'sdk-current',
-                    startTime: new Date('2026-05-21T00:02:00.000Z'),
-                    modifiedTime: new Date('2026-05-21T00:03:00.000Z'),
-                    summary: 'atual',
-                    isRemote: false,
-                    localMetadata: {
-                        model: 'kilo-auto/free',
-                        provider: { kind: 'byok', model: 'kilo-auto/free' },
-                        boundary: { reason: 'provider-boundary: binding BYOK model mudou' },
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sdkSessionInventoryFixture({
+                currentSessionId: 'sdk-current',
+                lastSessionId: 'sdk-last',
+                foregroundSessionId: null,
+                sessionFs: currentSessionFs,
+                sessions: [
+                    {
+                        sessionId: 'sdk-first',
+                        startTime: new Date('2026-05-21T00:00:00.000Z'),
+                        modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                        summary: 'primeira',
+                        isRemote: false,
                     },
-                    sessionFs: currentSessionFs,
-                },
-            ],
-        }));
+                    {
+                        sessionId: 'sdk-current',
+                        startTime: new Date('2026-05-21T00:02:00.000Z'),
+                        modifiedTime: new Date('2026-05-21T00:03:00.000Z'),
+                        summary: 'atual',
+                        isRemote: false,
+                        localMetadata: {
+                            model: 'kilo-auto/free',
+                            provider: { kind: 'byok', model: 'kilo-auto/free' },
+                            boundary: { reason: 'provider-boundary: binding BYOK model mudou' },
+                        },
+                        sessionFs: currentSessionFs,
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '1 offset=1 branch=main repo=owner/repo');
-        expect(listTerminalSdkSessionInventory).toHaveBeenCalledWith(null, {
-            branch: 'main',
-            repository: 'owner/repo',
-        }, {
-            enrichLimit: 1,
-            enrichOffset: 1,
-        });
+        expect(listTerminalSdkSessionInventory).toHaveBeenCalledWith(
+            null,
+            {
+                branch: 'main',
+                repository: 'owner/repo',
+            },
+            {
+                enrichLimit: 1,
+                enrichOffset: 1,
+            },
+        );
         expect(ctx.output()).toContain('filtro branch main');
         expect(ctx.output()).toContain('deslocamento 1');
         expect(ctx.output()).toContain('Arquivos');
@@ -1292,20 +1336,22 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk apaga sessão persistida por índice fora da sessão viva', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
-            currentSessionId: 'sdk-current',
-            lastSessionId: 'sdk-current',
-            foregroundSessionId: null,
-            sessions: [
-                {
-                    sessionId: 'sdk-old',
-                    startTime: new Date('2026-05-20T00:00:00.000Z'),
-                    modifiedTime: new Date('2026-05-20T00:01:00.000Z'),
-                    summary: 'sessão antiga',
-                    isRemote: false,
-                },
-            ],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sdkSessionInventoryFixture({
+                currentSessionId: 'sdk-current',
+                lastSessionId: 'sdk-current',
+                foregroundSessionId: null,
+                sessions: [
+                    {
+                        sessionId: 'sdk-old',
+                        startTime: new Date('2026-05-20T00:00:00.000Z'),
+                        modifiedTime: new Date('2026-05-20T00:01:00.000Z'),
+                        summary: 'sessão antiga',
+                        isRemote: false,
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'delete #1');
         expect(deleteTerminalSdkSession).toHaveBeenCalledWith('sdk-old', null);
@@ -1324,20 +1370,22 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk marca resíduos de probes antigos sem esconder a sessão', async () => {
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
-            currentSessionId: 'sdk-current',
-            lastSessionId: 'sdk-current',
-            foregroundSessionId: null,
-            sessions: [
-                {
-                    sessionId: 'sdk-probe',
-                    startTime: new Date('2026-05-21T00:00:00.000Z'),
-                    modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
-                    summary: 'Responda somente com o texto BYOK_PROBE_OK.',
-                    isRemote: false,
-                },
-            ],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sdkSessionInventoryFixture({
+                currentSessionId: 'sdk-current',
+                lastSessionId: 'sdk-current',
+                foregroundSessionId: null,
+                sessions: [
+                    {
+                        sessionId: 'sdk-probe',
+                        startTime: new Date('2026-05-21T00:00:00.000Z'),
+                        modifiedTime: new Date('2026-05-21T00:01:00.000Z'),
+                        summary: 'Responda somente com o texto BYOK_PROBE_OK.',
+                        isRemote: false,
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, '2');
         expect(ctx.output()).not.toContain('sdk-probe');
@@ -1358,26 +1406,28 @@ describe('commands/session — async commands', () => {
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'groq';
         process.env['COPILOT_BYOK_MODEL'] = 'qwen/qwen3-32b';
         process.env['GROQ_API_KEY'] = 'test-session-sdk-groq-key-that-must-not-render';
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
-            currentSessionId: 'sdk-new',
-            lastSessionId: 'sdk-new',
-            foregroundSessionId: 'sdk-new',
-            persistedByokBinding: {
-                enabled: true,
-                profile: 'groq-free',
-                preset: 'groq',
-                providerType: 'openai',
-                model: 'qwen/qwen3-32b',
-            },
-            lastBootDecision: {
-                outcome: 'created',
-                requestedMode: 'auto',
-                selectedSessionId: 'sdk-new',
-                resumeCandidateSessionId: null,
-                reason: 'provider-boundary: binding BYOK model mudou',
-            },
-            sessions: [],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sdkSessionInventoryFixture({
+                currentSessionId: 'sdk-new',
+                lastSessionId: 'sdk-new',
+                foregroundSessionId: 'sdk-new',
+                persistedByokBinding: {
+                    enabled: true,
+                    profile: 'groq-free',
+                    preset: 'groq',
+                    providerType: 'openai',
+                    model: 'qwen/qwen3-32b',
+                },
+                lastBootDecision: {
+                    outcome: 'created',
+                    requestedMode: 'auto',
+                    selectedSessionId: 'sdk-new',
+                    resumeCandidateSessionId: null,
+                    reason: 'provider-boundary: binding BYOK model mudou',
+                },
+                sessions: [],
+            }),
+        );
         const ctx = mockCtx();
         try {
             await cmdSessionSdk({ println: ctx.println }, '');
@@ -1417,18 +1467,20 @@ describe('commands/session — async commands', () => {
         process.env['COPILOT_BYOK_PROVIDER_PRESET'] = 'ollama-cloud';
         process.env['COPILOT_BYOK_MODEL'] = 'qwen3-coder-next';
         process.env['OLLAMA_CLOUD_API_KEY'] = 'session-sdk-secret-that-must-not-render';
-        listTerminalSdkSessionInventory.mockResolvedValueOnce(sdkSessionInventoryFixture({
-            currentSessionId: 'sdk-current',
-            lastSessionId: 'sdk-current',
-            foregroundSessionId: 'sdk-current',
-            persistedByokBinding: {
-                enabled: true,
-                preset: 'ollama-cloud',
-                providerType: 'openai',
-                model: 'qwen3-coder-next',
-            },
-            sessions: [],
-        }));
+        listTerminalSdkSessionInventory.mockResolvedValueOnce(
+            sdkSessionInventoryFixture({
+                currentSessionId: 'sdk-current',
+                lastSessionId: 'sdk-current',
+                foregroundSessionId: 'sdk-current',
+                persistedByokBinding: {
+                    enabled: true,
+                    preset: 'ollama-cloud',
+                    providerType: 'openai',
+                    model: 'qwen3-coder-next',
+                },
+                sessions: [],
+            }),
+        );
         const ctx = mockCtx();
 
         try {
@@ -1449,104 +1501,108 @@ describe('commands/session — async commands', () => {
 
     it('cmdSessionSdkEvents resume lifecycle e commands pelo archive SSE canônico', async () => {
         readTerminalSseEventArchiveTail
-            .mockResolvedValueOnce(sseArchiveProjectionFixture('sdk.lifecycle', {
-                entries: [
-                    {
-                        schemaVersion: 1,
-                        ts: '2026-05-22T00:00:00.000Z',
-                        timestamp: Date.parse('2026-05-22T00:00:00.000Z'),
-                        event: 'sdk.lifecycle',
-                        eventId: 10,
-                        source: 'agent/sdk.lifecycle',
-                        eventSource: 'agent/sdk.lifecycle',
-                        traceId: null,
-                        turnId: null,
-                        hubSessionId: null,
-                        payload: { type: 'session.updated', sessionId: 'sdk-current' },
-                    },
-                    {
-                        schemaVersion: 1,
-                        ts: '2026-05-22T00:00:01.000Z',
-                        timestamp: Date.parse('2026-05-22T00:00:01.000Z'),
-                        event: 'sdk.lifecycle',
-                        eventId: 11,
-                        source: 'agent/sdk.lifecycle',
-                        eventSource: 'agent/sdk.lifecycle',
-                        traceId: null,
-                        turnId: null,
-                        hubSessionId: null,
-                        payload: { type: 'session.updated', sessionId: 'sdk-current' },
-                    },
-                ],
-                state: {
-                    enabled: true,
-                    path: '/tmp/terminal-sse-events.jsonl',
-                    error: null,
-                    events: 22,
-                    bytes: 1024,
-                    queueDepth: 0,
-                    flushScheduled: false,
-                    flushInFlight: false,
-                    failedEvents: 0,
-                    droppedEvents: 0,
-                    lastEventId: 12,
-                },
-                filters: {
-                    limit: 5,
-                    event: 'sdk.lifecycle',
-                    traceId: null,
-                    turnId: null,
-                    source: null,
-                    toolCallId: null,
-                    requestId: null,
-                    hubSessionId: null,
-                },
-            }))
-            .mockResolvedValueOnce(sseArchiveProjectionFixture('sdk.command.executed', {
-                entries: [
-                    {
-                        schemaVersion: 1,
-                        ts: '2026-05-22T00:00:02.000Z',
-                        timestamp: Date.parse('2026-05-22T00:00:02.000Z'),
-                        event: 'sdk.command.executed',
-                        eventId: 12,
-                        source: 'agent/sdk.command',
-                        eventSource: 'agent/sdk.command',
-                        traceId: null,
-                        turnId: null,
-                        hubSessionId: null,
-                        payload: {
-                            commandName: 'terminal_status',
-                            localCommand: '/status',
-                            sessionId: 'sdk-current',
-                            status: 'completed',
+            .mockResolvedValueOnce(
+                sseArchiveProjectionFixture('sdk.lifecycle', {
+                    entries: [
+                        {
+                            schemaVersion: 1,
+                            ts: '2026-05-22T00:00:00.000Z',
+                            timestamp: Date.parse('2026-05-22T00:00:00.000Z'),
+                            event: 'sdk.lifecycle',
+                            eventId: 10,
+                            source: 'agent/sdk.lifecycle',
+                            eventSource: 'agent/sdk.lifecycle',
+                            traceId: null,
+                            turnId: null,
+                            hubSessionId: null,
+                            payload: { type: 'session.updated', sessionId: 'sdk-current' },
                         },
+                        {
+                            schemaVersion: 1,
+                            ts: '2026-05-22T00:00:01.000Z',
+                            timestamp: Date.parse('2026-05-22T00:00:01.000Z'),
+                            event: 'sdk.lifecycle',
+                            eventId: 11,
+                            source: 'agent/sdk.lifecycle',
+                            eventSource: 'agent/sdk.lifecycle',
+                            traceId: null,
+                            turnId: null,
+                            hubSessionId: null,
+                            payload: { type: 'session.updated', sessionId: 'sdk-current' },
+                        },
+                    ],
+                    state: {
+                        enabled: true,
+                        path: '/tmp/terminal-sse-events.jsonl',
+                        error: null,
+                        events: 22,
+                        bytes: 1024,
+                        queueDepth: 0,
+                        flushScheduled: false,
+                        flushInFlight: false,
+                        failedEvents: 0,
+                        droppedEvents: 0,
+                        lastEventId: 12,
                     },
-                ],
-                state: {
-                    enabled: true,
-                    path: '/tmp/terminal-sse-events.jsonl',
-                    error: null,
-                    events: 22,
-                    bytes: 1024,
-                    queueDepth: 0,
-                    flushScheduled: false,
-                    flushInFlight: false,
-                    failedEvents: 0,
-                    droppedEvents: 0,
-                    lastEventId: 12,
-                },
-                filters: {
-                    limit: 5,
-                    event: 'sdk.command.executed',
-                    traceId: null,
-                    turnId: null,
-                    source: null,
-                    toolCallId: null,
-                    requestId: null,
-                    hubSessionId: null,
-                },
-            }));
+                    filters: {
+                        limit: 5,
+                        event: 'sdk.lifecycle',
+                        traceId: null,
+                        turnId: null,
+                        source: null,
+                        toolCallId: null,
+                        requestId: null,
+                        hubSessionId: null,
+                    },
+                }),
+            )
+            .mockResolvedValueOnce(
+                sseArchiveProjectionFixture('sdk.command.executed', {
+                    entries: [
+                        {
+                            schemaVersion: 1,
+                            ts: '2026-05-22T00:00:02.000Z',
+                            timestamp: Date.parse('2026-05-22T00:00:02.000Z'),
+                            event: 'sdk.command.executed',
+                            eventId: 12,
+                            source: 'agent/sdk.command',
+                            eventSource: 'agent/sdk.command',
+                            traceId: null,
+                            turnId: null,
+                            hubSessionId: null,
+                            payload: {
+                                commandName: 'terminal_status',
+                                localCommand: '/status',
+                                sessionId: 'sdk-current',
+                                status: 'completed',
+                            },
+                        },
+                    ],
+                    state: {
+                        enabled: true,
+                        path: '/tmp/terminal-sse-events.jsonl',
+                        error: null,
+                        events: 22,
+                        bytes: 1024,
+                        queueDepth: 0,
+                        flushScheduled: false,
+                        flushInFlight: false,
+                        failedEvents: 0,
+                        droppedEvents: 0,
+                        lastEventId: 12,
+                    },
+                    filters: {
+                        limit: 5,
+                        event: 'sdk.command.executed',
+                        traceId: null,
+                        turnId: null,
+                        source: null,
+                        toolCallId: null,
+                        requestId: null,
+                        hubSessionId: null,
+                    },
+                }),
+            );
         const ctx = mockCtx();
         await cmdSessionSdk({ println: ctx.println }, 'events 5');
         expect(readTerminalSseEventArchiveTail).toHaveBeenCalledWith({ event: 'sdk.lifecycle', limit: 5 });
@@ -1605,11 +1661,13 @@ describe('commands/session — async commands', () => {
     });
 
     it('cmdSessionSdk descreve erro do arquivo SSE sem termo archive cru', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(sseArchiveProjectionFixture(null, {
-            entries: [],
-            state: { error: 'falha de leitura' },
-            filters: {},
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            sseArchiveProjectionFixture(null, {
+                entries: [],
+                state: { error: 'falha de leitura' },
+                filters: {},
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdSessionSdk({ println: ctx.println }, '2');

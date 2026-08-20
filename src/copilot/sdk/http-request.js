@@ -10,10 +10,10 @@
  * @see module:copilot/tools/web-tools
  */
 
-import http from 'node:http';
-import https from 'node:https';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
+import http from 'node:http';
+import https from 'node:https';
 
 /**
  * Executa uma requisição HTTP(S) simples para URLs `http://` e `https://`.

@@ -9,12 +9,17 @@
 import { emitNerv } from '#copilot/bridges';
 import {
     LLM_B_BOOT_TIMEOUT_MS,
+    readConfiguredByokSummary,
     TERMINAL_BYOK_TURN_TIMEOUT_MS,
     TERMINAL_LIVE_STATUS_ENABLED,
-    readConfiguredByokSummary,
 } from '#copilot/config';
 import { cancelTimer, container, registerInterval, sleepMs, toError } from '#copilot/core';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import {
+    classifyByokProviderFailure,
+    readModelGatewayRuntimeAutomationEffectivePolicy,
+    recordByokProviderModelCallFailure,
+} from '#copilot/model-gateway';
 import { defaultErrorTracker, log, METRICS_STORE } from '#copilot/observability';
 import { resolveOptionalDialogTimeout } from '../../presentation/dialog-timeout-policy.js';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
@@ -32,6 +37,16 @@ import {
     getShowUsage,
     setBusy,
 } from '../../presentation/state/index.js';
+import {
+    describeTerminalByokGatewayAutoEffect,
+    runTerminalByokGatewayPostTurnAutomation,
+    runTerminalByokGatewayPreTurnAutomation,
+} from '../byok/gateway/index.js';
+import {
+    evaluateTerminalByokTurnBudget,
+    readTerminalByokAdmissionMode,
+    TERMINAL_BYOK_ADMISSION_MODE_ENV,
+} from '../byok/policy/index.js';
 import { renderTerminalAssistantTranscript } from '../events/transcript/index.js';
 import {
     readTerminalDialogStreamMeta,
@@ -55,31 +70,23 @@ import {
     clearTerminalTurnMaterialization,
     completeTerminalTurnMaterialization,
     completeTerminalTurnTrace,
+    readTerminalTurnCorrelation,
+    readTerminalTurnTraceProjection,
     recordTerminalFinalReconciliationDiagnostic,
     recordTerminalStreamDeltaDiagnostic,
     recordTerminalTurnDelta,
-    readTerminalTurnCorrelation,
-    readTerminalTurnTraceProjection,
     reviseRecentTerminalTurnTraceStatus,
     shouldSuppressTerminalAssistantMessageAsUserInputEcho,
     waitForTerminalTurnMaterializationQuiescence,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
+import { auditAssistantToolClaims, renderAssistantToolClaimAuditFindings } from './assistant-tool-claim-audit.js';
+import { presentByokTurnFailure } from './byok-turn-error-presentation.js';
 import {
-    TERMINAL_BYOK_ADMISSION_MODE_ENV,
-    evaluateTerminalByokTurnBudget,
-    readTerminalByokAdmissionMode,
-} from '../byok/policy/index.js';
-import {
-    describeTerminalByokGatewayAutoEffect,
-    runTerminalByokGatewayPostTurnAutomation,
-    runTerminalByokGatewayPreTurnAutomation,
-} from '../byok/gateway/index.js';
-import {
-    classifyByokProviderFailure,
-    readModelGatewayRuntimeAutomationEffectivePolicy,
-    recordByokProviderModelCallFailure,
-} from '#copilot/model-gateway';
+    buildTerminalEmptyOutputDiagnosis,
+    classifyTerminalEmptyOutput,
+    hasTerminalPendingHumanInputOutcome,
+} from './empty-output-diagnosis.js';
 import { drainPendingNotifications, getPersistenceFailureCount, persistTurnToHub } from './engine-persistence.js';
 import {
     BOOT_PROMPT,
@@ -95,16 +102,6 @@ import {
     writeInlineStatus,
 } from './output.js';
 import { broadcastSse } from './sse.js';
-import {
-    auditAssistantToolClaims,
-    renderAssistantToolClaimAuditFindings,
-} from './assistant-tool-claim-audit.js';
-import { presentByokTurnFailure } from './byok-turn-error-presentation.js';
-import {
-    buildTerminalEmptyOutputDiagnosis,
-    classifyTerminalEmptyOutput,
-    hasTerminalPendingHumanInputOutcome,
-} from './empty-output-diagnosis.js';
 import {
     createDeltaCallback,
     createDisplayState,
@@ -172,7 +169,8 @@ function extractOriginalExactAskQuestion(message) {
 
 /**
  * Recovery pós-tools deve preservar o contrato do turno original. Sem isso, um modelo pode "recuperar" uma falha
- * chamando ferramenta fora da allowlist ou inventando uma pergunta diferente, o que piora a UX e quebra lives canônicos.
+ * chamando ferramenta fora da allowlist ou inventando uma pergunta diferente, o que piora a UX e quebra lives
+ * canônicos.
  *
  * @param {string} originalMessage
  * @returns {string}
@@ -381,7 +379,14 @@ function errorCodeOf(error) {
 /**
  * @param {unknown} error
  * @param {ReturnType<typeof readConfiguredByokSummary>} byok
- * @returns {{ message: string; errorContext: string; provider: string | null; profile: string | null; model: string | null; failure: import('../../model-gateway/health/provider-failure.js').ByokProviderFailure } | null}
+ * @returns {{
+ *     message: string;
+ *     errorContext: string;
+ *     provider: string | null;
+ *     profile: string | null;
+ *     model: string | null;
+ *     failure: import('../../model-gateway/health/provider-failure.js').ByokProviderFailure;
+ * } | null}
  */
 function resolveByokTurnErrorDescriptor(error, byok) {
     if (byok.enabled !== true || byok.ready !== true) return null;
@@ -531,9 +536,9 @@ function nonNegativeFiniteNumber(value) {
 
 /**
  * Um turno vazio antes de qualquer tool/pergunta é recuperável: não houve efeito colateral observável e a causa mais
- * provável é o modelo/adapter ter encerrado a chamada sem materializar protocolo público. Depois de tools, perguntas
- * ou transições de protocolo, retry automático deixa de ser seguro porque poderia duplicar ação ou atropelar o
- * contrato do SDK.
+ * provável é o modelo/adapter ter encerrado a chamada sem materializar protocolo público. Depois de tools, perguntas ou
+ * transições de protocolo, retry automático deixa de ser seguro porque poderia duplicar ação ou atropelar o contrato do
+ * SDK.
  *
  * @param {import('../frontend/gateways/dialog.js').TerminalDialogTurnResult} turnResult
  * @param {{
@@ -635,11 +640,15 @@ function recordTerminalExplicitEmptyOutput(input) {
     if (classification.kind === 'tool_only' || classification.kind === 'protocol_transition') {
         const toolOnly = classification.kind === 'tool_only';
         reviseRecentTerminalTurnTraceStatus({ timestamp, status: 'completed' });
-        recordTerminalActivity('turn', toolOnly ? 'Turno tool-only sem síntese pública' : 'Transição de protocolo sem transcript', {
-            detail: failureDetail,
-            source: 'dialog',
-            severity: toolOnly ? 'warn' : 'info',
-        });
+        recordTerminalActivity(
+            'turn',
+            toolOnly ? 'Turno tool-only sem síntese pública' : 'Transição de protocolo sem transcript',
+            {
+                detail: failureDetail,
+                source: 'dialog',
+                severity: toolOnly ? 'warn' : 'info',
+            },
+        );
         broadcastSse(
             'terminal.turn.non_text_outcome',
             withTerminalTurnCorrelation({
@@ -1081,15 +1090,23 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
         const u = ctxState.utilization;
         if (u >= 0.95) {
             println(
-                terminalThemeRow('Atenção', `context window em ${(u * 100).toFixed(0)}%; risco de perda de contexto. Use /compact antes de continuar`, {
-                    role: 'error',
-                }),
+                terminalThemeRow(
+                    'Atenção',
+                    `context window em ${(u * 100).toFixed(0)}%; risco de perda de contexto. Use /compact antes de continuar`,
+                    {
+                        role: 'error',
+                    },
+                ),
             );
         } else if (u >= 0.85) {
             println(
-                terminalThemeRow('Atenção', `context window em ${(u * 100).toFixed(0)}%; considere usar /compact em breve`, {
-                    role: 'warn',
-                }),
+                terminalThemeRow(
+                    'Atenção',
+                    `context window em ${(u * 100).toFixed(0)}%; considere usar /compact em breve`,
+                    {
+                        role: 'warn',
+                    },
+                ),
             );
         }
     }
@@ -1131,9 +1148,13 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }),
             );
             println(
-                terminalThemeRow('Bloqueado', 'turno não enviado à rota BYOK; estimativa excede o limite declarado antes do streaming', {
-                    role: 'error',
-                }),
+                terminalThemeRow(
+                    'Bloqueado',
+                    'turno não enviado à rota BYOK; estimativa excede o limite declarado antes do streaming',
+                    {
+                        role: 'error',
+                    },
+                ),
             );
             return null;
         }
@@ -1168,9 +1189,13 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             severity: 'warn',
         });
         println(
-            terminalThemeRow('Headers', `requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo`, {
-                role: 'muted',
-            }),
+            terminalThemeRow(
+                'Headers',
+                `requestHeaders por turno detectados (${Object.keys(requestHeaders).join(', ')}); usando dispatch SDK direto com reanexo`,
+                {
+                    role: 'muted',
+                },
+            ),
         );
     }
     broadcastSse(
@@ -1222,7 +1247,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 focusMode: 'background',
             });
             if (process.env['COPILOT_TERMINAL_DURABLE_WAITING_NARRATION'] === 'true') {
-                println(terminalThemeRow('LLM-B', `pensando · ${elapsedSeconds}s sem resposta visível`, { role: 'muted' }));
+                println(
+                    terminalThemeRow('LLM-B', `pensando · ${elapsedSeconds}s sem resposta visível`, { role: 'muted' }),
+                );
             }
         };
         renderWaitingStatus();
@@ -1268,7 +1295,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }
             }
         } catch (embedErr) {
-            println(terminalThemeRow('Anexos', `falha ao embutir anexos: ${toError(embedErr).message}`, { role: 'warn' }));
+            println(
+                terminalThemeRow('Anexos', `falha ao embutir anexos: ${toError(embedErr).message}`, { role: 'warn' }),
+            );
         }
     }
 
@@ -1374,7 +1403,14 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             onReasoning,
             ...(requestHeaders ? { requestHeaders } : {}),
         });
-        /** @type {{ attempted: boolean; attempts: number; firstOutcome: string | null; firstReplySource: string | null; recovered: boolean; durationMs: number | null } | null} */
+        /** @type {{
+    attempted: boolean;
+    attempts: number;
+    firstOutcome: string | null;
+    firstReplySource: string | null;
+    recovered: boolean;
+    durationMs: number | null;
+} | null} */
         let emptyTurnRecovery = null;
         if (
             shouldAttemptPreActionEmptyTurnRecovery(turnResult, {
@@ -1428,7 +1464,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             emptyTurnRecovery.recovered = typeof turnResult.reply === 'string' && turnResult.reply.trim().length > 0;
             recordTerminalActivity(
                 emptyTurnRecovery.recovered ? 'turn' : 'error',
-                emptyTurnRecovery.recovered ? 'Turno recuperado após saída vazia' : 'Recuperação de turno sem saída falhou',
+                emptyTurnRecovery.recovered
+                    ? 'Turno recuperado após saída vazia'
+                    : 'Recuperação de turno sem saída falhou',
                 {
                     detail:
                         `${emptyTurnRecovery.durationMs}ms · ` +
@@ -1475,11 +1513,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 }),
             );
             println(
-                terminalThemeRow(
-                    'Recuperação',
-                    'tools concluídas sem síntese; pedindo continuação segura uma vez',
-                    { role: 'warn' },
-                ),
+                terminalThemeRow('Recuperação', 'tools concluídas sem síntese; pedindo continuação segura uma vez', {
+                    role: 'warn',
+                }),
             );
             turnResult = await runTerminalDialogTurnDetailed(buildToolOnlyRecoveryPrompt(enrichedMessage), {
                 timeout: timeoutDecision.timeoutMs,
@@ -1785,7 +1821,9 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
                 severity: 'error',
                 source: 'dialog',
             });
-            println(terminalThemeRow(byokFailurePresentation.title, byokFailurePresentation.summary, { role: 'error' }));
+            println(
+                terminalThemeRow(byokFailurePresentation.title, byokFailurePresentation.summary, { role: 'error' }),
+            );
             println(terminalThemeRow('Destino', byokFailurePresentation.destination, { role: 'muted' }));
             if (byokFailurePresentation.window) {
                 println(terminalThemeRow('Janela', byokFailurePresentation.window, { role: 'warn' }));
@@ -1802,7 +1840,10 @@ async function _executeTurn(message, actor, attachments = [], requestHeaders = n
             println(terminalThemeRow('Erro', err.message, { role: 'error' }));
         }
         if (byokFailure) {
-            log('WARN', `[TerminalServer] Turno BYOK encerrado após apresentação operacional ao usuário: ${err.message}`);
+            log(
+                'WARN',
+                `[TerminalServer] Turno BYOK encerrado após apresentação operacional ao usuário: ${err.message}`,
+            );
         } else {
             log('ERROR', `[TerminalServer] Erro no turno ${actor}: ${err.message}`);
         }

@@ -8,16 +8,16 @@
  * @module copilot/terminal/commands/byok
  */
 
-import fs from 'node:fs/promises';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { join, resolve } from 'node:path';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { executeModelGatewayProbe } from '../../model-gateway/control-plane/probe-execution.js';
 
 import {
+    activateModelGatewayByokProfileEnv,
     applyModelGatewayEligibilityToSnapshot,
     auditCatalogImporterSet,
     auditModelGatewayCatalogSnapshotIntegrity,
-    activateModelGatewayByokProfileEnv,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     buildCatalogRefreshEventBatch,
@@ -32,7 +32,6 @@ import {
     buildModelGatewaySelectionDecisionTrace,
     buildProbeCompletedEvent,
     buildRouteDecisionEvent,
-    materializeModelGatewayActiveByokProfileEnv,
     classifyByokProviderFailure,
     clearByokProviderModelHealth,
     compareModelGatewaySelectionAudits,
@@ -60,6 +59,7 @@ import {
     listProviderEndpointInventory,
     listProviderGatewayTraits,
     listProviderWireProbeMatrix,
+    materializeModelGatewayActiveByokProfileEnv,
     mirrorModelGatewayCatalogSnapshotToSqlite,
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     persistModelGatewaySelectionDecisionTrace,
@@ -67,6 +67,7 @@ import {
     planModelGatewayProbeBackoff,
     readByokProviderHealthState,
     readByokProviderModelHealth,
+    readModelGatewayByokProfileCostHint,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     readModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationPolicyFile,
@@ -84,7 +85,6 @@ import {
     resolveModelGatewaySelectionPolicy,
     resolveProviderEndpointInventory,
     resolveProviderGatewayTraits,
-    readModelGatewayByokProfileCostHint,
     routeGatewayModels,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
@@ -94,13 +94,13 @@ import {
     searchModelGatewayCatalogEntries,
     SqliteModelGatewayCatalogStore,
     summarizeCanonicalModelProjectionDiff,
+    summarizeGatewayRuntimeProofFreshness,
     summarizeModelGatewayAccountOverlays,
     summarizeModelGatewayEligibilityDiff,
     summarizeModelGatewayLocalProviderOptInBlocks,
     summarizeModelGatewayProviderEnvRequirements,
     summarizeModelGatewayProviderQuotaCapabilities,
     summarizeModelGatewayRefreshLogText,
-    summarizeGatewayRuntimeProofFreshness,
     summarizeModelGatewayRuntimeAccountOverlays,
     summarizeProviderWireProbeMatrix,
     toOpenAIModelCatalogList,
@@ -109,10 +109,7 @@ import {
 } from '#copilot/model-gateway';
 import { config as loadDotenv } from 'dotenv';
 
-import {
-    discoverConfiguredByokModelsFromEnv,
-    readConfiguredByokModelDiscoveryCacheFromEnv,
-} from '#copilot/config';
+import { discoverConfiguredByokModelsFromEnv, readConfiguredByokModelDiscoveryCacheFromEnv } from '#copilot/config';
 import {
     classifyTerminalByokSdkBinding,
     isSameTerminalByokProviderBoundary,
@@ -164,6 +161,8 @@ import {
     terminalThemeWrappedRow,
 } from '../state/theme/index.js';
 
+const terminalByokWorkspaceIo = createWorkspaceIo({ workspaceRoot: process.cwd() });
+
 const DEFAULT_BYOK_MODELS_DISPLAY_LIMIT = 24;
 const DEFAULT_BYOK_RECOMMEND_DISPLAY_LIMIT = 8;
 const DEFAULT_BYOK_SHORTLIST_PROBE_LIMIT = 3;
@@ -199,6 +198,8 @@ const BYOK_RUNTIME_SELECTOR_ENV_KEYS = Object.freeze([
 
 /**
  * @typedef {import('../../model-gateway/control-plane/probe-execution.js').ModelGatewayExecutableProbeResult} ByokProbeResult
+ *
+ *
  * @typedef {'chat' | 'agent' | 'streaming' | 'json' | 'vision'} ByokProbeMode
  */
 
@@ -214,13 +215,15 @@ function printByokSdkSessionBoundaryHint(println, options = {}) {
     const prefix = options.persisted
         ? 'A seleção persistida será reaplicada à identidade da sessão atual.'
         : 'A seleção BYOK foi preparada no processo atual.';
+    println(terminalThemeRow('Próximo', `${prefix} Mudança de provedor usa reattach do mesmo sessionId.`));
     println(
-        terminalThemeRow('Próximo', `${prefix} Mudança de provedor usa reattach do mesmo sessionId.`),
-    );
-    println(
-        terminalThemeRow('Sessão SDK', '/restart reinicia a sessão SDK; /conversation-restart reinicia só a conversa.', {
-            role: 'command',
-        }),
+        terminalThemeRow(
+            'Sessão SDK',
+            '/restart reinicia a sessão SDK; /conversation-restart reinicia só a conversa.',
+            {
+                role: 'command',
+            },
+        ),
     );
     println(
         terminalThemeRow('Modelo vivo', '/byok model, provider e use tentam aplicar a seleção na sessão atual.', {
@@ -265,11 +268,9 @@ async function tryApplyLiveByokModelSwitch(summary, model, println, options = {}
             source: 'terminal.byok_model',
         });
         println(
-            terminalThemeRow(
-                'Troca modelo',
-                'sem sessão viva; seleção preservada e nenhuma sessão nova foi criada',
-                { role: 'warn' },
-            ),
+            terminalThemeRow('Troca modelo', 'sem sessão viva; seleção preservada e nenhuma sessão nova foi criada', {
+                role: 'warn',
+            }),
         );
         return;
     }
@@ -341,59 +342,10 @@ async function tryApplyLiveByokModelSwitch(summary, model, println, options = {}
 
 /**
  * @param {import('../../presentation/contracts/index.js').RuntimeModelInfo} model
- * @returns {{
- *           freeTier?: boolean | null;
- *           pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
- *           rateLimits?: {
- *               maxRequestTokens?: number | null;
- *               tokensPerMinute?: number | null;
- *               requestsPerMinute?: number | null;
- *               dailyRequests?: number | null;
- *           };
- *           provider?: string | null;
- *           profile?: string | null;
- *           source?: string;
- *           profileFreeTier?: boolean | null;
- *           profileCostSource?: string | null;
- *           profileCostDetail?: string | null;
- *           inputModalities?: string[];
- *           outputModalities?: string[];
- *           supportsReasoning?: boolean;
- *           capabilities?: Record<string, unknown>;
- *           gatewayId?: string | null;
- *           providerModel?: string | null;
- *           confidence?: string | null;
- *           providerOwner?: string | null;
- *       }
- *     | undefined}
+ * @returns {import('../../presentation/contracts/index.js').RuntimeModelInfo['byok']}
  */
 function getByokModelMetadata(model) {
-    return (/** @type {{
-    byok?: {
-        freeTier?: boolean | null;
-        pricing?: { prompt?: number | null; completion?: number | null; request?: number | null };
-        rateLimits?: {
-            maxRequestTokens?: number | null;
-            tokensPerMinute?: number | null;
-            requestsPerMinute?: number | null;
-            dailyRequests?: number | null;
-        };
-        provider?: string | null;
-        profile?: string | null;
-        source?: string;
-        profileFreeTier?: boolean | null;
-        profileCostSource?: string | null;
-        profileCostDetail?: string | null;
-        inputModalities?: string[];
-        outputModalities?: string[];
-        supportsReasoning?: boolean;
-        capabilities?: Record<string, unknown>;
-        gatewayId?: string | null;
-        providerModel?: string | null;
-        confidence?: string | null;
-        providerOwner?: string | null;
-    };
-}} */ (model)).byok;
+    return model.byok;
 }
 
 /**
@@ -2403,10 +2355,7 @@ async function renderStatus(projection, println) {
             `${gatewayCounts.providerCount} provedores · ${gatewayCounts.modelCount} modelos · ${gatewayCounts.enabledModelCount} habilitados · origem ${renderByokSourceLabel(gateway.source)}`,
         ),
     );
-    const gatewayActive = resolveByokGatewayActiveRoute(
-        projection,
-        runtimeConfig.modelGatewayProjection ?? null,
-    );
+    const gatewayActive = resolveByokGatewayActiveRoute(projection, runtimeConfig.modelGatewayProjection ?? null);
     const gatewayActiveLabel = renderByokGatewayActiveRouteLabel(gatewayActive);
     if (gatewayActiveLabel) {
         println(terminalThemeRow('Gateway ativo', gatewayActiveLabel));
@@ -2458,12 +2407,7 @@ async function renderStatus(projection, println) {
         println(terminalThemeRow('Erro', error, { role: 'error' }));
     }
     renderActiveByokHealthGuidance(projection, activeHealth, println);
-    println(
-        terminalThemeRow(
-            'Arquivo',
-            '.env.local · persistência de configuração; troca viva preserva o sessionId',
-        ),
-    );
+    println(terminalThemeRow('Arquivo', '.env.local · persistência de configuração; troca viva preserva o sessionId'));
     printByokSdkSessionBoundaryHint(println);
     println(
         terminalThemeRow('Rotina', '/byok providers · /byok profiles · /byok models · /byok recommend', {
@@ -3223,7 +3167,10 @@ function renderByokGatewayEnvRequirements(println, rest) {
     const selector = optionalScalarString(
         rest.find((item) => !/^(secrets|secret|env|requirements|requisitos|missing)$/iu.test(item)),
     );
-    const rows = evaluateModelGatewayProviderEnvRequirements({ env: process.env, ...(selector === null ? {} : { providerId: selector }) });
+    const rows = evaluateModelGatewayProviderEnvRequirements({
+        env: process.env,
+        ...(selector === null ? {} : { providerId: selector }),
+    });
     const summary = summarizeModelGatewayProviderEnvRequirements(rows);
 
     println('');
@@ -3559,16 +3506,12 @@ async function renderByokGatewayOperatorReady(println, rest) {
                 { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Recomendado', row.recommendedCommand ?? '-', { role: 'command', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Recomendado', row.recommendedCommand ?? '-', { role: 'command', columns: 112 }),
+        );
         println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
         println(terminalThemeWrappedRow('Usar', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }));
-        println(
-            terminalThemeWrappedRow(
-                'Novo boot',
-                row.commands.provider ?? '-',
-                { role: 'command', columns: 112 },
-            ),
-        );
+        println(terminalThemeWrappedRow('Novo boot', row.commands.provider ?? '-', { role: 'command', columns: 112 }));
         if (row.providerId && row.providerModel) {
             println(
                 terminalThemeWrappedRow(
@@ -3954,7 +3897,7 @@ async function findLatestModelGatewayRefreshLogPath() {
     const dir = resolve('logs/model-gateway-refresh');
     let entries;
     try {
-        entries = await fs.readdir(dir);
+        entries = (await terminalByokWorkspaceIo.listDirectoryNamesFresh(dir)).entries;
     } catch {
         return null;
     }
@@ -3963,7 +3906,7 @@ async function findLatestModelGatewayRefreshLogPath() {
     for (const entry of entries.filter((item) => item.endsWith('.jsonl'))) {
         const filePath = join(dir, entry);
         try {
-            const metadata = await fs.stat(filePath);
+            const metadata = (await terminalByokWorkspaceIo.statPath(filePath)).stats;
             if (metadata.isFile()) candidates.push({ path: filePath, mtimeMs: metadata.mtimeMs });
         } catch {
             // Operational logs can rotate while the terminal is open; ignore vanished files.
@@ -3992,7 +3935,7 @@ async function renderByokGatewayCatalogRefreshLog(println) {
         println('');
         return;
     }
-    const text = await fs.readFile(logPath, 'utf8');
+    const text = (await terminalByokWorkspaceIo.readTextFresh(logPath, { includeHash: false })).content;
     const summary = summarizeModelGatewayRefreshLogText(text, { logPath });
     println(
         terminalThemeWrappedRow(
@@ -5521,7 +5464,9 @@ async function renderByokGatewayAutoStandby(println, rest) {
                 { role: row.needsProbe ? 'warn' : 'success', columns: 112 },
             ),
         );
-        println(terminalThemeWrappedRow('Recomendado', row.recommendedCommand ?? '-', { role: 'command', columns: 112 }));
+        println(
+            terminalThemeWrappedRow('Recomendado', row.recommendedCommand ?? '-', { role: 'command', columns: 112 }),
+        );
         println(terminalThemeWrappedRow('Provar', row.commands.probeAgent ?? '-', { role: 'command', columns: 112 }));
         println(
             terminalThemeWrappedRow('Mesmo provedor', row.commands.liveModel ?? '-', { role: 'command', columns: 112 }),
@@ -5725,12 +5670,16 @@ async function renderByokGatewayAutoHandoffs(println, rest) {
         const model = optionalScalarString(row['targetModel']) ?? optionalScalarString(row['model']) ?? '-';
         const route = optionalScalarString(row['selectedRouteKey']) ?? '-';
         const sessionId = optionalScalarString(row['sessionId']) ?? '-';
-        const operation = row['operation'] && typeof row['operation'] === 'object' ? /** @type {Record<string, unknown>} */ (row['operation']) : {};
+        const operation =
+            row['operation'] && typeof row['operation'] === 'object'
+                ? /** @type {Record<string, unknown>} */ (row['operation'])
+                : {};
         const targetRoute =
             operation['targetRoute'] && typeof operation['targetRoute'] === 'object'
                 ? /** @type {Record<string, unknown>} */ (operation['targetRoute'])
                 : {};
-        const providerId = optionalScalarString(targetRoute['providerId']) ?? optionalScalarString(row['providerId']) ?? '-';
+        const providerId =
+            optionalScalarString(targetRoute['providerId']) ?? optionalScalarString(row['providerId']) ?? '-';
         const providerModel =
             optionalScalarString(targetRoute['providerModel']) ?? optionalScalarString(row['providerModel']) ?? '-';
         const authorization =
@@ -5743,7 +5692,8 @@ async function renderByokGatewayAutoHandoffs(println, rest) {
                 : authorization['authorized'] === false || row['promotionAuthorized'] === false
                   ? 'não autorizada'
                   : 'não informada';
-        const expiresAt = optionalScalarString(authorization['expiresAt']) ?? optionalScalarString(row['expiresAt']) ?? '-';
+        const expiresAt =
+            optionalScalarString(authorization['expiresAt']) ?? optionalScalarString(row['expiresAt']) ?? '-';
         const requestedAt = optionalScalarString(row['requestedAt']) ?? optionalScalarString(row['timestamp']) ?? '-';
         println(
             terminalThemeWrappedRow(
@@ -7407,7 +7357,7 @@ async function runByokProbe(mode, selection, eventBus = null) {
               : mode === 'json'
                 ? runConfiguredByokJsonProbe
                 : mode === 'vision'
-              ? runConfiguredByokVisionProbe
+                  ? runConfiguredByokVisionProbe
                   : runConfiguredByokChatProbe;
     const emitEvent = eventBus?.emit ? eventBus.emit.bind(eventBus) : null;
     const executed = await executeModelGatewayProbe({
@@ -7437,8 +7387,7 @@ async function runByokProbe(mode, selection, eventBus = null) {
             buildEvent: (input) => buildProbeCompletedEvent(input),
             ...(emitEvent
                 ? {
-                      emit: (event) =>
-                          emitEvent(/** @type {{ type: string; [key: string]: unknown }} */ (event)),
+                      emit: (event) => emitEvent(/** @type {{ type: string; [key: string]: unknown }} */ (event)),
                   }
                 : {}),
         },
@@ -7529,14 +7478,13 @@ function mutateEnvLocal(mutate) {
             const path = '.env.local';
             let text = '';
             try {
-                text = await fs.readFile(path, 'utf8');
+                text = (await readTextFreshTrusted(path, { caller: 'terminal.commands.byok' })).content;
             } catch (error) {
                 if (/** @type {{ code?: string }} */ (error).code !== 'ENOENT') throw error;
             }
             const next = mutate(text);
             const normalized = next.endsWith('\n') ? next : `${next}\n`;
             await writeFileAtomicTrusted(path, normalized, { caller: 'terminal.commands.byok', mode: 0o600 });
-            await Promise.resolve(fs.chmod(path, 0o600)).catch(() => undefined);
         });
     envLocalMutationQueue = operation.then(
         () => undefined,
@@ -8139,12 +8087,7 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             );
         const selection = buildByokProbeSelection(explicitMode ? rest.slice(1) : rest);
         println('');
-        println(
-            terminalThemeHeadline(
-                'tool',
-                `BYOK ${mode} probe / BYOK sonda ${renderByokTokenLabel(mode)}`,
-            ),
-        );
+        println(terminalThemeHeadline('tool', `BYOK ${mode} probe / BYOK sonda ${renderByokTokenLabel(mode)}`));
         println(
             terminalThemeRow(
                 'Escopo',
@@ -8229,11 +8172,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             : '-';
         println('');
         println(
-            terminalThemeHeadline(
-                'tool',
-                'BYOK providers / BYOK provedores',
-                [countLabel(profiles.length, 'perfil', 'perfis')],
-            ),
+            terminalThemeHeadline('tool', 'BYOK providers / BYOK provedores', [
+                countLabel(profiles.length, 'perfil', 'perfis'),
+            ]),
         );
         println(terminalThemeDivider(64));
         println(
@@ -8384,7 +8325,9 @@ export async function cmdByok({ println, eventBus = null }, arg) {
             ),
         );
         println(terminalThemeRow('Ordenação', `free/capability/context · filtros ${filterLabel || '-'}`));
-        println(terminalThemeRow('Máquina', `filtros=${renderByokMachineFilterLabel(filters) || '-'}`, { role: 'muted' }));
+        println(
+            terminalThemeRow('Máquina', `filtros=${renderByokMachineFilterLabel(filters) || '-'}`, { role: 'muted' }),
+        );
         for (const error of discovered.errors.slice(0, 6)) {
             println(
                 terminalThemeRow('Aviso', `descoberta remota indisponível (${error}); usando catálogo disponível`, {

@@ -18,7 +18,9 @@ const filters = {
 
 if (args.has('--json')) {
     const filtered = MODEL_GATEWAY_CANONICAL_COMMANDS.filter(
-        (entry) => (!filters.surface || entry.surface === filters.surface) && (!filters.phase || entry.phase === filters.phase),
+        (entry) =>
+            (!filters.surface || entry.surface === filters.surface) &&
+            (!filters.phase || entry.phase === filters.phase),
     );
     console.log(JSON.stringify({ schema: 'model-gateway-canonical-commands', commands: filtered }, null, 2));
 } else {

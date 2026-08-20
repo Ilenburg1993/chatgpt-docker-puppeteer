@@ -14,10 +14,13 @@ import * as yamlModule from 'js-yaml';
 
 import { readTerminalExternalToolCapabilities, sanitizeTerminalExternalToolText } from './external-tools.js';
 
-const yaml = /** @type {{
- *     load: (content: string) => unknown;
- *     dump: (value: unknown, options?: { lineWidth?: number; noRefs?: boolean; sortKeys?: boolean }) => string;
- * }} */ (/** @type {unknown} */ (yamlModule));
+const yaml =
+    /**
+     * @type {{
+     *     load: (content: string) => unknown;
+     *     dump: (value: unknown, options?: { lineWidth?: number; noRefs?: boolean; sortKeys?: boolean }) => string;
+     * }}
+     */ (/** @type {unknown} */ (yamlModule));
 
 /**
  * @typedef {'json' | 'yaml'} TerminalStructuredPreviewFormat
@@ -144,7 +147,13 @@ function validateExternalStructuredQuery(query) {
 
 /**
  * @param {string} content
- * @param {{ format: TerminalStructuredPreviewFormat; query?: string; forceJs?: boolean; color?: 'auto' | 'always' | 'never'; lineLimit?: number }} options
+ * @param {{
+ *     format: TerminalStructuredPreviewFormat;
+ *     query?: string;
+ *     forceJs?: boolean;
+ *     color?: 'auto' | 'always' | 'never';
+ *     lineLimit?: number;
+ * }} options
  * @returns {TerminalStructuredPreview}
  */
 export function renderTerminalStructuredPreview(content, options) {

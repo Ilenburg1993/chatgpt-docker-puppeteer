@@ -10,10 +10,10 @@
  */
 
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
-import { watch } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { getRecentIoInvalidation, publishIoInvalidation } from './bus.js';
 import { readEnvNonNegativeInt, readEnvPositiveInt } from '../../shared/env.js';
+import { watchPath } from '../fs/watch.js';
+import { getRecentIoInvalidation, publishIoInvalidation } from './bus.js';
 
 const DEFAULT_DEBOUNCE_MS = 125;
 const DEFAULT_MAX_BATCH = 256;
@@ -67,18 +67,21 @@ export function readIoExternalWatchConfig(env = process.env) {
         enabled: !['0', 'false', 'off', 'no'].includes(enabledRaw),
         debounceMs: Math.min(2_000, readEnvNonNegativeInt('IO_EXTERNAL_WATCH_DEBOUNCE_MS', DEFAULT_DEBOUNCE_MS)),
         maxBatch: Math.min(HARD_MAX_BATCH, readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_BATCH', DEFAULT_MAX_BATCH)),
-        maxPending: Math.min(HARD_MAX_PENDING, readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_PENDING', DEFAULT_MAX_PENDING)),
+        maxPending: Math.min(
+            HARD_MAX_PENDING,
+            readEnvPositiveInt('IO_EXTERNAL_WATCH_MAX_PENDING', DEFAULT_MAX_PENDING),
+        ),
     };
 }
 
 /**
  * @param {string} rootPath
  * @param {{
- *   enabled?: boolean;
- *   debounceMs?: number;
- *   maxBatch?: number;
- *   maxPending?: number;
- *   onInvalidate?: (filePath: string, event: { recursive: boolean; source: string }) => void;
+ *     enabled?: boolean;
+ *     debounceMs?: number;
+ *     maxBatch?: number;
+ *     maxPending?: number;
+ *     onInvalidate?: (filePath: string, event: { recursive: boolean; source: string }) => void;
  * }} [options]
  */
 export function startIoExternalWatch(rootPath, options = {}) {
@@ -104,9 +107,13 @@ export function startIoExternalWatch(rootPath, options = {}) {
     };
     invalidateCallback = options.onInvalidate ?? ((filePath, event) => publishIoInvalidation(filePath, event));
     try {
-        const watcher = watch(resolvedRoot, { recursive: true, persistent: false }, (_eventType, filename) => {
-            handleExternalWatchEvent(filename);
-        });
+        const watcher = watchPath(
+            resolvedRoot,
+            { recursive: true, persistent: false, encoding: 'utf8' },
+            (_eventType, filename) => {
+                handleExternalWatchEvent(filename);
+            },
+        );
         watcher.on('error', (error) => {
             stats.errors += 1;
             stats.lastError = error.message;
@@ -163,15 +170,19 @@ function handleExternalWatchEvent(filename) {
 /** @param {number} delayMs */
 function armFlush(delayMs) {
     if (flushTimer || pendingPaths.size === 0) return;
-    flushTimer = setTimeout(() => {
-        flushTimer = null;
-        flushIoExternalWatchHints();
-    }, Math.max(0, delayMs));
+    flushTimer = setTimeout(
+        () => {
+            flushTimer = null;
+            flushIoExternalWatchHints();
+        },
+        Math.max(0, delayMs),
+    );
     flushTimer.unref?.();
 }
 
 /**
  * Flush watcher hints into the canonical invalidation bus.
+ *
  * @returns {number}
  */
 export function flushIoExternalWatchHints() {

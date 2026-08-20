@@ -57,7 +57,8 @@ const injectBodyBaseSchema = z
         context_files: z.array(z.string().min(1)).optional(),
         attachments: z.array(z.object({})['passthrough']()).optional(),
         metadata: z.record(z.string(), z.unknown()).optional(),
-    })['passthrough']();
+    })
+    ['passthrough']();
 
 const injectBodySchema = injectBodyBaseSchema.refine(
     (/** @type {{ message?: unknown; content?: unknown; mode?: unknown }} */ body) =>
@@ -81,10 +82,12 @@ const pipelineBodySchema = z
                         prompt: z.string()['trim']().min(1),
                         from: z.string().optional(),
                         waitMs: z.number().int().min(0).optional(),
-                    })['passthrough'](),
+                    })
+                    ['passthrough'](),
             )
             .min(1),
-    })['passthrough']();
+    })
+    ['passthrough']();
 
 const handoffParamsSchema = z.object({
     handoffId: z.string().min(1),

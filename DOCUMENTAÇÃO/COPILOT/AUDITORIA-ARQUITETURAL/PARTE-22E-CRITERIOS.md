@@ -523,7 +523,7 @@ process.exit(totalScore >= maxScore * 0.9 ? 0 : 1);
 | Milestone 1  | O1~O4             | ~30/100        | C5, C1 parcial               |
 | Milestone 2  | O5~O7, P1         | ~40/100        | C6, C5 total, C11 início     |
 | Milestone 3  | P2~P5             | ~55/100        | C2, C1 quase total           |
-| Milestone 4  | P6~P8, Q1~Q2      | ~70/100        | C10, C7 parcial              |
+| Milestone 4  | P6~~P8, Q1~~Q2    | ~70/100        | C10, C7 parcial              |
 | Milestone 5  | Q3~Q5             | ~82/100        | C7 total, C12                |
 | Target Final | R1~R3             | **≥95/100**    | C3, C11 total, C2 confirmado |
 

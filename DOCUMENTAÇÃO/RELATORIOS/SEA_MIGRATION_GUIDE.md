@@ -171,11 +171,9 @@ Dependências nativas precisam ser compiladas para a arquitetura alvo.
 
 ## 📊 Comparação de Tamanho
 
-| Método     | Tamanho Aproximado | Vantagens                  |
-| ---------- | ------------------ | -------------------------- | ------------- |
-| **SEA**    | ~150-200MB         | Completo, oficial, moderno |
-| **PKG**    | ~100-150MB         | -                          | ❌ Deprecated |
-| **Docker** | ~500MB+            | Portabilidade máxima       |               |
+| Método | Tamanho Aproximado | Vantagens | | ---------- | ------------------ |
+-------------------------- | ------------- | | **SEA** | ~150-200MB | Completo, oficial, moderno | |
+**PKG** | ~100-150MB | - | ❌ Deprecated | | **Docker** | ~500MB+ | Portabilidade máxima | |
 
 ## 🔄 Migração do PKG
 

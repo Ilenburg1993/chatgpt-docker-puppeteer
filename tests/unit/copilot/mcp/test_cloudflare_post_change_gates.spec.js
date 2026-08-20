@@ -116,9 +116,7 @@ describe('Cloudflare post-change gates', () => {
         });
 
         assert.deepEqual(result.critical, []);
-        assert.ok(
-            result.warnings.some((warning) => warning.includes('aggregate requestErrorRate is 0.092683')),
-        );
+        assert.ok(result.warnings.some((warning) => warning.includes('aggregate requestErrorRate is 0.092683')));
         assert.ok(result.passed.includes('no actionable origin errors after the latest smoke.'));
     });
 

@@ -20,8 +20,8 @@ Guias anteriores:
 - `CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`
 - `CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`
 
-Este arquivo passa a ser o guia operacional para o modo auto funcional. Os arquivos anteriores continuam como historico e
-contexto.
+Este arquivo passa a ser o guia operacional para o modo auto funcional. Os arquivos anteriores
+continuam como historico e contexto.
 
 ---
 
@@ -54,13 +54,17 @@ O sistema deve:
 
 - [x] Scripts operacionais do model-gateway estao em `scripts/model-gateway/`.
 - [x] Existe barril `scripts/model-gateway/index.mjs`.
-- [x] Runner live LLM-B foi migrado para `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`, acessado pelo runner `scripts/model-gateway/run.mjs`.
-- [x] Wrapper legado `scripts/copilot/run-terminal-llm-b-live-test.mjs` foi removido para evitar dois caminhos concorrentes.
+- [x] Runner live LLM-B foi migrado para
+      `scripts/model-gateway/commands/model-gateway-terminal-llm-b-live-test.mjs`, acessado pelo
+      runner `scripts/model-gateway/run.mjs`.
+- [x] Wrapper legado `scripts/copilot/run-terminal-llm-b-live-test.mjs` foi removido para evitar
+      dois caminhos concorrentes.
 - [x] `package.json` possui comandos `model-gateway:*`.
 - [x] Makefile possui comandos `model-gateway-*`.
 - [x] `model-gateway:ops` existe e e read-only.
 - [x] `model-gateway:auto:status` existe e e read-only por padrao.
-- [x] `model-gateway:auto:status -- --write-sqlite` persiste decisao operacional sem executar provider.
+- [x] `model-gateway:auto:status -- --write-sqlite` persiste decisao operacional sem executar
+      provider.
 - [x] `model-gateway:live:plan` existe e gera plano sem runtime.
 - [x] `model-gateway:live:readiness` existe.
 - [x] `model-gateway:live:llm-b` e o comando canonico do runner live.
@@ -83,14 +87,20 @@ O sistema deve:
 
 - [x] `model-gateway:ops` deixou de mostrar readiness nulo e le o schema atual.
 - [x] `/byok auto on` e uma superficie propria e mostra env seguro para o proximo boot.
-- [x] Existe policy persistente simples em `data/copilot/model-gateway/runtime-automation-policy.json`.
+- [x] Existe policy persistente simples em
+      `data/copilot/model-gateway/runtime-automation-policy.json`.
 - [x] O controller pre-turn roda antes de cada turno quando a policy efetiva esta ligada.
-- [ ] O controller post-turn ainda e parcial; falhas BYOK geram dica com policy efetiva, mas nao fecham ciclo automatico.
-- [ ] `apply_live_model` altera projecao terminal, mas nao grava uma confirmacao de aplicacao efetiva.
+- [ ] O controller post-turn ainda e parcial; falhas BYOK geram dica com policy efetiva, mas nao
+      fecham ciclo automatico.
+- [ ] `apply_live_model` altera projecao terminal, mas nao grava uma confirmacao de aplicacao
+      efetiva.
 - [ ] Falta reconciliacao com `session.model_changed` / `usage/session.model_changed`.
-- [ ] Falta representar no cockpit a diferenca entre "proximo boot preparado" e "boot SDK ja refeito".
-- [ ] Falta uma linha unica "sistema pronto para live tests" combinando ops, readiness, plan e policy.
-- [x] Existe teste de contrato do barril `scripts/model-gateway` e do runner `model-gateway:live:llm-b`.
+- [ ] Falta representar no cockpit a diferenca entre "proximo boot preparado" e "boot SDK ja
+      refeito".
+- [ ] Falta uma linha unica "sistema pronto para live tests" combinando ops, readiness, plan e
+      policy.
+- [x] Existe teste de contrato do barril `scripts/model-gateway` e do runner
+      `model-gateway:live:llm-b`.
 - [x] Existe teste de terminal para `/byok auto on`.
 - [x] Existe teste de terminal para executor compartilhado de efeitos auto.
 - [ ] Falta teste de terminal para boundary diferente exigindo novo boot.
@@ -102,11 +112,16 @@ O sistema deve:
 ### 2.3 Riscos Arquiteturais Atuais
 
 - [ ] Se o operador espera automacao continua, ainda ha passos manuais demais.
-- [ ] Se um modelo esgota quota no meio do turno, o sistema registra health, mas o proximo turno ainda depende de comando.
-- [ ] Se o provider troca, a aplicacao live nao pode resolver; o sistema precisa preparar boot novo com clareza.
-- [ ] Se uma falha de conta e account-wide, ela pode bloquear outros modelos do mesmo provider, mas isso depende de policy.
-- [ ] Se uma falha e rate-limit resetavel, ela deve entrar em cooldown e voltar depois sem apagar metadados.
-- [ ] Se a key muda, overlays antigos precisam expirar ou ser diferenciados por accountScope/secretRef.
+- [ ] Se um modelo esgota quota no meio do turno, o sistema registra health, mas o proximo turno
+      ainda depende de comando.
+- [ ] Se o provider troca, a aplicacao live nao pode resolver; o sistema precisa preparar boot novo
+      com clareza.
+- [ ] Se uma falha de conta e account-wide, ela pode bloquear outros modelos do mesmo provider, mas
+      isso depende de policy.
+- [ ] Se uma falha e rate-limit resetavel, ela deve entrar em cooldown e voltar depois sem apagar
+      metadados.
+- [ ] Se a key muda, overlays antigos precisam expirar ou ser diferenciados por
+      accountScope/secretRef.
 - [ ] Se Ollama esta catalogado, defaults nunca devem seleciona-lo sem pedido explicito.
 - [ ] Se o SDK nativo tem quota baixa, isso nao deve ser misturado com quota BYOK provider.
 

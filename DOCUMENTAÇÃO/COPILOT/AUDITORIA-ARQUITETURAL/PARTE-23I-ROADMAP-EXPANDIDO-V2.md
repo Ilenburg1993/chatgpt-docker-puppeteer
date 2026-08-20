@@ -179,11 +179,11 @@ FAIXA-6 ░░░░░░░░░░░░░░░░░░░░░░░░
 
 > Deprecação das fontes paralelas; migração gradual de importadores
 
-| Sub  | Tarefa                                                                           | Tipo       | Esforço | Status    |
-| ---- | -------------------------------------------------------------------------------- | ---------- | ------- | --------- |
-| 2B.1 | core/events.js → `@deprecated` JSDoc + re-exports de events/agent-events.js      | [MIGRAÇÃO] | Baixo   | ✅        |
-| 2B.2 | conversation-hub/events.js → `@deprecated` (aponta para #copilot/events)         | [MIGRAÇÃO] | Baixo   | ✅        |
-| 2B.3 | Backward-compat: array AGENT_EVENTS mantido em core/events.js (3 consumers)      | —          | —       | ✅        |
+| Sub  | Tarefa                                                                           | Tipo       | Esforço | Status   |
+| ---- | -------------------------------------------------------------------------------- | ---------- | ------- | -------- |
+| 2B.1 | core/events.js → `@deprecated` JSDoc + re-exports de events/agent-events.js      | [MIGRAÇÃO] | Baixo   | ✅       |
+| 2B.2 | conversation-hub/events.js → `@deprecated` (aponta para #copilot/events)         | [MIGRAÇÃO] | Baixo   | ✅       |
+| 2B.3 | Backward-compat: array AGENT_EVENTS mantido em core/events.js (3 consumers)      | —          | —       | ✅       |
 | 2B.4 | Migrar ~6 importadores de HUB_EVENTS → events/ (adiado — hub-events ok por hora) | [MIGRAÇÃO] | Médio   | ⏭ adiado |
 | 2B.5 | Migrar ~8 importadores de AGENT_EVENTS → events/                                 | [MIGRAÇÃO] | Médio   | ⏭ adiado |
 | 2B.6 | Migrar ~4 importadores de types/events → events/                                 | [MIGRAÇÃO] | Baixo   | ⏭ adiado |

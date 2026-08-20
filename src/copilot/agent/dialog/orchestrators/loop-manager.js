@@ -11,7 +11,8 @@
  * @see module:copilot/agent/dialog/watchdog
  */
 
-import { SessionError } from '#copilot/core';
+import { logSwallowed, SessionError } from '#copilot/core';
+import { DialogProtocol } from '#copilot/dialog';
 import {
     EMITTER_LOOP_CHANGED,
     EMITTER_LOOP_COMPACTION_REQUESTED,
@@ -23,8 +24,6 @@ import {
     EMITTER_LOOP_STALLED,
 } from '#copilot/events';
 import { EventEmitter } from 'node:events';
-import { logSwallowed } from '#copilot/core';
-import { DialogProtocol } from '#copilot/dialog';
 import {
     persistAgentRuntimeDialogState,
     readAgentRuntimeDialogPersistedState,
@@ -353,7 +352,8 @@ export class DialogLoopManager extends EventEmitter {
             { dialogLoopActive: true, dialogPaused: false },
             {
                 label: 'dialog.state.resumed_session_attach',
-                description: 'Persist dialogLoopActive=true after resumed session attach without an additional model call',
+                description:
+                    'Persist dialogLoopActive=true after resumed session attach without an additional model call',
             },
         );
         void this.#persistUsageMetrics(
@@ -786,9 +786,11 @@ export class DialogLoopManager extends EventEmitter {
         return this.#trackBackgroundTask(
             persistAgentRuntimeDialogState(data, label).then(
                 (
-                    /** @type {import('../../error/index.js').AgentPolicyResult<
-    import('../../lifecycle/state/index.js').AliveAgentState
->} */ result,
+                    /**
+                     * @type {import('../../error/index.js').AgentPolicyResult<
+                     *     import('../../lifecycle/state/index.js').AliveAgentState
+                     * >}
+                     */ result,
                 ) => {
                     if (!result.ok) {
                         const failure = /** @type {import('../../error/index.js').AgentPolicyFailure} */ (result);

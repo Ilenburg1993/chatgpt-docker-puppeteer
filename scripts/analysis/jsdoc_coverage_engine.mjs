@@ -1,7 +1,8 @@
 // @ts-check
+import { parse as babelParse } from '@babel/parser';
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from './typescript-compat.mjs';
+import { resolveBabelParserOptions } from '../../src/copilot/infra/parse/babel-policy.js';
 
 /** Schema version for the JSON report emitted by the JSDoc coverage tooling. */
 export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.1.0';
@@ -99,9 +100,7 @@ export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.1.0';
  * }} JSDocCoverageReport
  */
 
-/**
- * @typedef {{ node: ts.Node; kind: ExportKind }} LocalExportTarget
- */
+/** @typedef {{ node: any; kind: ExportKind }} LocalExportTarget */
 
 const JS_EXT_RE = /\.(js|mjs|cjs)$/i;
 const OPTIONS_PARAM_RE = /(?:options|opts|params|config)$/i;
@@ -152,17 +151,10 @@ function inferPrefix(file) {
     return parts[0] || 'root';
 }
 
-/**
- * @param {ts.Node} node
- * @param {ts.SourceFile} sourceFile
- * @returns {number | null}
- */
-function getLine(node, sourceFile) {
-    try {
-        return sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-    } catch {
-        return null;
-    }
+/** @param {any} node @returns {number | null} */
+function getLine(node) {
+    const line = Number(node?.loc?.start?.line);
+    return Number.isInteger(line) && line > 0 ? line : null;
 }
 
 /**
@@ -175,100 +167,172 @@ function countMatches(text, expression) {
     return matches ? matches.length : 0;
 }
 
-/**
- * @param {ts.Node} node
- * @returns {ts.JSDoc[]}
- */
+/** @param {any} node */
 function getJSDocBlocks(node) {
-    const nodeWithDocs = /** @type {ts.Node & { jsDoc?: ts.JSDoc[] }} */ (node);
-    return Array.isArray(nodeWithDocs.jsDoc) ? nodeWithDocs.jsDoc : [];
+    const comments = Array.isArray(node?.leadingComments) ? node.leadingComments : [];
+    return comments.filter(
+        (/** @type {any} */ comment) => comment?.type === 'CommentBlock' && String(comment.value ?? '').startsWith('*'),
+    );
+}
+
+/** @param {any} node @returns {string} */
+function getJSDocText(node) {
+    return getJSDocBlocks(node)
+        .map((/** @type {any} */ comment) => `/*${String(comment.value ?? '')}*/`)
+        .join('\n');
+}
+
+/** @param {any} comment @returns {string} */
+function jsDocCommentText(comment) {
+    return `/*${String(comment?.value ?? '')}*/`;
 }
 
 /**
- * @param {ts.Node} node
+ * Extrai o nome documentado de um `@param` sem tentar interpretar o tipo inteiro. O scanner de chaves é necessário
+ * porque object-shapes JSDoc podem conter chaves aninhadas; regex até o primeiro `}` classificaria propriedades como
+ * parâmetros raiz de forma incorreta.
+ *
+ * @param {string} rawTagTail
+ * @returns {string | null}
+ */
+function extractDocumentedParamName(rawTagTail) {
+    let rest = rawTagTail.trim();
+    if (rest.startsWith('{')) {
+        let depth = 0;
+        let closedAt = -1;
+        for (let index = 0; index < rest.length; index += 1) {
+            const char = rest[index];
+            if (char === '{') depth += 1;
+            else if (char === '}') {
+                depth -= 1;
+                if (depth === 0) {
+                    closedAt = index;
+                    break;
+                }
+            }
+        }
+        if (closedAt >= 0) rest = rest.slice(closedAt + 1).trim();
+        else return null;
+    }
+    const token = rest.match(/^(?:\.\.\.)?(\[[^\]]*\]|[^\s-]+)/u)?.[1] ?? null;
+    if (!token) return null;
+    return token.replace(/^\[/u, '').replace(/\]$/u, '').split('=')[0]?.trim() || null;
+}
+
+/**
+ * @typedef {{ name: string; nestedParam: boolean }} ParsedJSDocTag
+ */
+
+/**
+ * Parser estrutural mínimo para a semântica pública usada por este relatório. Diferentemente de um regex global, ele
+ * preserva a hierarquia que o parser TypeScript expunha: `@property` após `@typedef` pertence ao typedef, e `@param
+ * options.foo` pertence ao parâmetro raiz `options`.
+ *
+ * @param {string} text
+ * @returns {ParsedJSDocTag[]}
+ */
+function parseTopLevelJSDocTags(text) {
+    /** @type {ParsedJSDocTag[]} */
+    const tags = [];
+    const matches = [...text.matchAll(/(?:^|\s)@([A-Za-z][\w-]*)\b/gmu)];
+    let insideTypedefProperties = false;
+    for (let index = 0; index < matches.length; index += 1) {
+        const match = matches[index];
+        const name = match?.[1];
+        if (!name || match.index === undefined) continue;
+        const markerOffset = match[0].lastIndexOf('@');
+        const tagStart = match.index + markerOffset;
+        const tailStart = tagStart + name.length + 1;
+        const nextMatch = matches[index + 1];
+        const tailEnd = nextMatch?.index ?? text.length;
+        const tail = text
+            .slice(tailStart, tailEnd)
+            .replace(/\r?\n\s*\*\s?/gu, ' ')
+            .replace(/\*\/$/u, '')
+            .trim();
+        if ((name === 'property' || name === 'prop') && insideTypedefProperties) continue;
+        if (name === 'typedef') insideTypedefProperties = true;
+        else if (name !== 'property' && name !== 'prop') insideTypedefProperties = false;
+        const paramName = name === 'param' ? extractDocumentedParamName(tail) : null;
+        const nestedParam = Boolean(paramName && /[.[]/u.test(paramName));
+        tags.push({ name, nestedParam });
+    }
+    return tags;
+}
+
+/**
+ * Replica a semântica estrutural de `TypeScript#getJSDocTags`: tags de typedef/callback soltas que Babel anexa ao
+ * próximo declaration não viram tags da implementação. Blocos `@overload` anteriores contribuem antes das tags do bloco
+ * primário, reproduzindo também a ordem observável do parser TypeScript.
+ *
+ * @param {any} node
  * @returns {string[]}
  */
 function getJSDocTags(node) {
-    const tags = ts.getJSDocTags(node) || [];
-    return Array.from(new Set(tags.map((tag) => String(tag.tagName?.escapedText || '').trim()).filter(Boolean)));
-}
-
-/**
- * @param {ts.Node} node
- * @param {ts.SourceFile} sourceFile
- * @returns {string}
- */
-function getJSDocText(node, sourceFile) {
     const blocks = getJSDocBlocks(node);
-    if (blocks.length === 0) return '';
-    return blocks.map((block) => block.getFullText(sourceFile)).join('\n');
+    if (blocks.length === 0) return [];
+    const tags = [];
+    for (const block of blocks.slice(0, -1)) {
+        if (/(?:^|\s)@overload\b/mu.test(jsDocCommentText(block))) tags.push('overload');
+    }
+    for (const tag of parseTopLevelJSDocTags(jsDocCommentText(blocks.at(-1)))) {
+        if (!tag.nestedParam) tags.push(tag.name);
+    }
+    return [...new Set(tags)];
 }
 
-/**
- * @param {ts.Node} node
- * @returns {boolean}
- */
+/** @param {any} node @returns {boolean} */
 function hasJsDoc(node) {
     return getJSDocBlocks(node).length > 0;
 }
 
-/**
- * @param {ts.Node} node
- * @returns {number}
- */
+/** @param {any} node @returns {boolean} */
+function isFunctionNode(node) {
+    return ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node?.type);
+}
+
+/** @param {any} node @returns {number} */
 function getFunctionParamCount(node) {
-    if (!ts.isFunctionDeclaration(node) && !ts.isFunctionExpression(node) && !ts.isArrowFunction(node)) {
-        return 0;
-    }
-    return node.parameters.length;
+    return isFunctionNode(node) ? (node.params?.length ?? 0) : 0;
 }
 
-/**
- * @param {ts.Node} node
- * @returns {number}
- */
+/** @param {any} node @returns {number} */
 function getParamTagCount(node) {
-    return (ts.getJSDocTags(node) || []).filter((tag) => {
-        const tagName = String(tag.tagName?.escapedText || '').trim();
-        return tagName === 'param';
-    }).length;
+    const primary = getJSDocBlocks(node).at(-1);
+    if (!primary) return 0;
+    return parseTopLevelJSDocTags(jsDocCommentText(primary)).filter((tag) => tag.name === 'param' && !tag.nestedParam)
+        .length;
 }
 
-/**
- * @param {ts.SourceFile} sourceFile
- * @returns {Set<string>}
- */
-function collectDeclaredTypedefs(sourceFile) {
+/** @param {any} sourceFile @param {string} sourceText @returns {Set<string>} */
+function collectDeclaredTypedefs(sourceFile, sourceText) {
+    void sourceFile;
     const typedefs = new Set();
-    const text = sourceFile.getFullText(sourceFile);
+    const text = sourceText;
     for (const match of text.matchAll(TYPEDEF_OBJECT_RE)) {
         if (match[1]) typedefs.add(match[1]);
     }
     return typedefs;
 }
 
-/**
- * @param {ts.Node} node
- * @returns {string[]}
- */
+/** @param {any} node @returns {string[]} */
 function collectOptionParamNames(node) {
-    if (!ts.isFunctionDeclaration(node) && !ts.isFunctionExpression(node) && !ts.isArrowFunction(node)) {
-        return [];
-    }
+    if (!isFunctionNode(node)) return [];
     /** @type {string[]} */
     const names = [];
-    for (const param of node.parameters) {
-        if (ts.isIdentifier(param.name) && OPTIONS_PARAM_RE.test(param.name.text)) {
-            names.push(param.name.text);
+    for (const param of node.params ?? []) {
+        if (param?.type === 'Identifier' && OPTIONS_PARAM_RE.test(param.name)) {
+            names.push(param.name);
             continue;
         }
-        if (ts.isIdentifier(param.name) && param.initializer && ts.isObjectLiteralExpression(param.initializer)) {
-            names.push(param.name.text);
+        if (param?.type === 'AssignmentPattern' && param.left?.type === 'Identifier') {
+            const isDirectObjectLiteralDefault =
+                param.right?.type === 'ObjectExpression' && !param.right?.extra?.parenthesized;
+            if (OPTIONS_PARAM_RE.test(param.left.name) || isDirectObjectLiteralDefault) names.push(param.left.name);
             continue;
         }
-        if (ts.isObjectBindingPattern(param.name)) {
-            names.push('destructured');
-        }
+        if (param?.type === 'ObjectPattern') names.push('destructured');
+        if (param?.type === 'AssignmentPattern' && param.left?.type === 'ObjectPattern') names.push('destructured');
     }
     return names;
 }
@@ -298,11 +362,7 @@ function hasOptionsTypedef(jsdocText, optionParamNames, declaredTypedefs) {
     return false;
 }
 
-/**
- * @param {ts.Node} node
- * @param {ExportKind} kind
- * @returns {boolean}
- */
+/** @param {any} node @param {ExportKind} kind @returns {boolean} */
 function isFunctionExport(node, kind) {
     return kind === 'function' && getFunctionParamCount(node) >= 0;
 }
@@ -338,68 +398,64 @@ function assessQuality(
     return { missing, quality };
 }
 
-/**
- * @param {ts.Node} node
- * @param {ts.SyntaxKind} kind
- * @returns {boolean}
- */
-function hasModifierKind(node, kind) {
-    const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-    return Boolean(modifiers?.some((modifier) => modifier.kind === kind));
+/** @param {any} target @param {any} owner @returns {any} */
+function inheritJSDocComments(target, owner) {
+    if (!target || !owner) return target;
+    if (getJSDocBlocks(target).length === 0 && getJSDocBlocks(owner).length > 0) {
+        target.leadingComments = owner.leadingComments;
+    }
+    return target;
 }
 
-/**
- * @param {ts.Statement} statement
- * @returns {boolean}
- */
-function isExportedStatement(statement) {
-    return hasModifierKind(statement, ts.SyntaxKind.ExportKeyword);
+/** @param {any} identifier @returns {string | null} */
+function identifierName(identifier) {
+    if (!identifier) return null;
+    if (identifier.type === 'Identifier') return identifier.name;
+    if (identifier.type === 'StringLiteral') return identifier.value;
+    return null;
 }
 
-/**
- * @param {ts.SourceFile} sourceFile
- * @returns {Map<string, LocalExportTarget>}
- */
+/** @param {any} sourceFile @returns {Map<string, LocalExportTarget>} */
 function collectLocalExportTargets(sourceFile) {
     /** @type {Map<string, LocalExportTarget>} */
     const targets = new Map();
-
-    for (const statement of sourceFile.statements) {
-        if (ts.isFunctionDeclaration(statement) && statement.name) {
-            targets.set(statement.name.text, { node: statement, kind: 'function' });
+    for (const rawStatement of sourceFile.body ?? []) {
+        const statement =
+            rawStatement?.type === 'ExportNamedDeclaration' && rawStatement.declaration
+                ? inheritJSDocComments(rawStatement.declaration, rawStatement)
+                : rawStatement;
+        if (statement?.type === 'FunctionDeclaration' && statement.id?.name) {
+            targets.set(statement.id.name, { node: statement, kind: 'function' });
             continue;
         }
-        if (ts.isClassDeclaration(statement) && statement.name) {
-            targets.set(statement.name.text, { node: statement, kind: 'class' });
+        if (statement?.type === 'ClassDeclaration' && statement.id?.name) {
+            targets.set(statement.id.name, { node: statement, kind: 'class' });
             continue;
         }
-        if (ts.isTypeAliasDeclaration(statement)) {
-            targets.set(statement.name.text, { node: statement, kind: 'typedef' });
+        if (statement?.type === 'TSTypeAliasDeclaration' && statement.id?.name) {
+            targets.set(statement.id.name, { node: statement, kind: 'typedef' });
             continue;
         }
-        if (ts.isVariableStatement(statement)) {
-            for (const declaration of statement.declarationList.declarations) {
-                if (ts.isIdentifier(declaration.name)) {
-                    targets.set(declaration.name.text, { node: statement, kind: 'const' });
-                }
+        if (statement?.type === 'VariableDeclaration') {
+            for (const declaration of statement.declarations ?? []) {
+                const name = identifierName(declaration.id);
+                if (name) targets.set(name, { node: statement, kind: 'const' });
             }
         }
     }
-
     return targets;
 }
 
 /**
- * @param {ts.Node} node
- * @param {ts.SourceFile} sourceFile
+ * @param {any} node
  * @param {string} exportName
  * @param {ExportKind} kind
  * @param {Set<string>} declaredTypedefs
  * @returns {ExportJSDocAssessment}
  */
-function buildAssessment(node, sourceFile, exportName, kind, declaredTypedefs) {
+function buildAssessment(node, exportName, kind, declaredTypedefs) {
     const tags = getJSDocTags(node);
-    const jsdocText = getJSDocText(node, sourceFile);
+    const jsdocText = getJSDocText(node);
     const hasJsdoc = hasJsDoc(node);
     const hasReturnsTag = tags.includes('returns') || tags.includes('return');
     const paramCount = getFunctionParamCount(node);
@@ -432,7 +488,7 @@ function buildAssessment(node, sourceFile, exportName, kind, declaredTypedefs) {
         tags_present: tags,
         missing_tags: hasJsdoc ? assessed.missing : kind === 'function' ? ['returns', 'param'] : [],
         quality_level: qualityLevel,
-        line: getLine(node, sourceFile),
+        line: getLine(node),
         param_count: paramCount,
         param_tags_count: paramTagsCount,
         has_complete_param_tags: hasCompleteParamTags,
@@ -446,82 +502,79 @@ function buildAssessment(node, sourceFile, exportName, kind, declaredTypedefs) {
     };
 }
 
-/**
- * @param {ts.SourceFile} sourceFile
- * @returns {ExportJSDocAssessment[]}
- */
-function collectExportsFromSourceFile(sourceFile) {
+/** @param {any} sourceFile @param {string} sourceText @returns {ExportJSDocAssessment[]} */
+function collectExportsFromSourceFile(sourceFile, sourceText) {
     /** @type {ExportJSDocAssessment[]} */
     const exportedSymbols = [];
     const localTargets = collectLocalExportTargets(sourceFile);
-    const declaredTypedefs = collectDeclaredTypedefs(sourceFile);
+    const declaredTypedefs = collectDeclaredTypedefs(sourceFile, sourceText);
 
-    for (const statement of sourceFile.statements) {
-        if (ts.isFunctionDeclaration(statement) && isExportedStatement(statement)) {
-            const exportName =
-                statement.name?.text || (hasModifierKind(statement, ts.SyntaxKind.DefaultKeyword) ? 'default' : null);
-            if (!exportName) continue;
-            exportedSymbols.push(buildAssessment(statement, sourceFile, exportName, 'function', declaredTypedefs));
-            continue;
-        }
-
-        if (ts.isClassDeclaration(statement) && isExportedStatement(statement)) {
-            const exportName =
-                statement.name?.text || (hasModifierKind(statement, ts.SyntaxKind.DefaultKeyword) ? 'default' : null);
-            if (!exportName) continue;
-            exportedSymbols.push(buildAssessment(statement, sourceFile, exportName, 'class', declaredTypedefs));
-            continue;
-        }
-
-        if (ts.isVariableStatement(statement) && isExportedStatement(statement)) {
-            for (const declaration of statement.declarationList.declarations) {
-                if (ts.isIdentifier(declaration.name)) {
-                    exportedSymbols.push(
-                        buildAssessment(statement, sourceFile, declaration.name.text, 'const', declaredTypedefs),
-                    );
-                }
+    for (const statement of sourceFile.body ?? []) {
+        if (statement?.type === 'ExportNamedDeclaration') {
+            const declaration = statement.declaration ? inheritJSDocComments(statement.declaration, statement) : null;
+            if (declaration?.type === 'FunctionDeclaration') {
+                const exportName = declaration.id?.name ?? null;
+                if (exportName)
+                    exportedSymbols.push(buildAssessment(declaration, exportName, 'function', declaredTypedefs));
+                continue;
             }
-            continue;
-        }
-
-        if (ts.isTypeAliasDeclaration(statement) && isExportedStatement(statement)) {
-            exportedSymbols.push(
-                buildAssessment(statement, sourceFile, statement.name.text, 'typedef', declaredTypedefs),
-            );
-            continue;
-        }
-
-        if (ts.isExportAssignment(statement)) {
-            if (ts.isIdentifier(statement.expression)) {
-                const local = localTargets.get(statement.expression.text);
-                if (local) {
-                    exportedSymbols.push(
-                        buildAssessment(local.node, sourceFile, 'default', local.kind, declaredTypedefs),
-                    );
-                    continue;
-                }
+            if (declaration?.type === 'ClassDeclaration') {
+                const exportName = declaration.id?.name ?? null;
+                if (exportName)
+                    exportedSymbols.push(buildAssessment(declaration, exportName, 'class', declaredTypedefs));
+                continue;
             }
-            exportedSymbols.push(buildAssessment(statement, sourceFile, 'default', 'reexport', declaredTypedefs));
-            continue;
-        }
-
-        if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
-            for (const element of statement.exportClause.elements) {
-                const isLocalExport = !statement.moduleSpecifier;
-                const localName = element.propertyName?.text || element.name.text;
-                if (isLocalExport) {
+            if (declaration?.type === 'VariableDeclaration') {
+                for (const item of declaration.declarations ?? []) {
+                    const exportName = identifierName(item.id);
+                    if (exportName)
+                        exportedSymbols.push(buildAssessment(statement, exportName, 'const', declaredTypedefs));
+                }
+                continue;
+            }
+            if (declaration?.type === 'TSTypeAliasDeclaration' && declaration.id?.name) {
+                exportedSymbols.push(buildAssessment(declaration, declaration.id.name, 'typedef', declaredTypedefs));
+                continue;
+            }
+            for (const element of statement.specifiers ?? []) {
+                if (element?.type !== 'ExportSpecifier') continue;
+                const exportName = identifierName(element.exported);
+                const localName = identifierName(element.local);
+                if (!exportName) continue;
+                if (!statement.source && localName) {
                     const local = localTargets.get(localName);
                     if (local) {
-                        exportedSymbols.push(
-                            buildAssessment(local.node, sourceFile, element.name.text, local.kind, declaredTypedefs),
-                        );
+                        exportedSymbols.push(buildAssessment(local.node, exportName, local.kind, declaredTypedefs));
                         continue;
                     }
                 }
-                exportedSymbols.push(
-                    buildAssessment(statement, sourceFile, element.name.text, 'reexport', declaredTypedefs),
-                );
+                exportedSymbols.push(buildAssessment(statement, exportName, 'reexport', declaredTypedefs));
             }
+            continue;
+        }
+
+        if (statement?.type === 'ExportDefaultDeclaration') {
+            const declaration = inheritJSDocComments(statement.declaration, statement);
+            if (declaration?.type === 'FunctionDeclaration') {
+                exportedSymbols.push(
+                    buildAssessment(declaration, declaration.id?.name ?? 'default', 'function', declaredTypedefs),
+                );
+                continue;
+            }
+            if (declaration?.type === 'ClassDeclaration') {
+                exportedSymbols.push(
+                    buildAssessment(declaration, declaration.id?.name ?? 'default', 'class', declaredTypedefs),
+                );
+                continue;
+            }
+            if (declaration?.type === 'Identifier') {
+                const local = localTargets.get(declaration.name);
+                if (local) {
+                    exportedSymbols.push(buildAssessment(local.node, 'default', local.kind, declaredTypedefs));
+                    continue;
+                }
+            }
+            exportedSymbols.push(buildAssessment(statement, 'default', 'reexport', declaredTypedefs));
         }
     }
 
@@ -535,8 +588,11 @@ function collectExportsFromSourceFile(sourceFile) {
 function parseFile(file) {
     const absoluteFile = path.resolve(file);
     const sourceText = fs.readFileSync(absoluteFile, 'utf8');
-    const sourceFile = ts.createSourceFile(absoluteFile, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
-    const exportedSymbols = collectExportsFromSourceFile(sourceFile);
+    const sourceFile = babelParse(
+        sourceText,
+        /** @type {any} */ (resolveBabelParserOptions(absoluteFile, 'js', { profile: 'documentation' })),
+    ).program;
+    const exportedSymbols = collectExportsFromSourceFile(sourceFile, sourceText);
     const exportsTotal = exportedSymbols.length;
     const exportsWithJsdoc = exportedSymbols.filter((symbol) => symbol.has_jsdoc).length;
     const coveragePct = exportsTotal > 0 ? Number(((exportsWithJsdoc / exportsTotal) * 100).toFixed(1)) : 100;

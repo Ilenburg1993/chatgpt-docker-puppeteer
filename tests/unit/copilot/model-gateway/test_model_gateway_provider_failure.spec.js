@@ -20,9 +20,7 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
     });
 
     it('preserva classes diferentes para auth, modelo/rota e rede', () => {
-        expect(classifyByokProviderFailure(Object.assign(new Error('Forbidden'), { status: 403 })).kind).toBe(
-            'auth',
-        );
+        expect(classifyByokProviderFailure(Object.assign(new Error('Forbidden'), { status: 403 })).kind).toBe('auth');
         expect(classifyByokProviderFailure('HTTP status code 404').kind).toBe('model-or-route');
         expect(
             classifyByokProviderFailure(
@@ -39,9 +37,9 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
                 ),
             ).kind,
         ).toBe('capability-unsupported');
-        expect(
-            classifyByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind,
-        ).toBe('network');
+        expect(classifyByokProviderFailure(Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' })).kind).toBe(
+            'network',
+        );
     });
 
     it('classifica rate-limit, timeout, upstream e desconhecido sem colapsar em fallback unico', () => {
@@ -65,7 +63,9 @@ describe('model-gateway BYOK provider failure taxonomy', () => {
     });
 
     it('trata HTTP 400 residual como request permanente da rota, sem repetir a mesma chamada', () => {
-        const failure = classifyByokProviderFailure(Object.assign(new Error('400 400 400 Bad Request'), { status: 400 }));
+        const failure = classifyByokProviderFailure(
+            Object.assign(new Error('400 400 400 Bad Request'), { status: 400 }),
+        );
         const decision = resolveModelGatewayRuntimeRetryDecision(
             /** @type {any} */ ({
                 ok: false,

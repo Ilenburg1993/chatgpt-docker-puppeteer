@@ -118,13 +118,23 @@ function firstBoolean(record, keys) {
 /**
  * @param {Record<string, unknown>} rateLimits
  * @param {number} nowMs
- * @returns {{ limited: boolean; retryAfterSeconds: number | null; resetAt: string | null; remainingRequests: number | null; remainingTokens: number | null; limitRequests: number | null; limitTokens: number | null }}
+ * @returns {{
+ *     limited: boolean;
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ *     remainingRequests: number | null;
+ *     remainingTokens: number | null;
+ *     limitRequests: number | null;
+ *     limitTokens: number | null;
+ * }}
  */
 function normalizeRateLimitState(rateLimits, nowMs) {
     const retryAfterSeconds = firstNumber(rateLimits, ['retryAfterSeconds', 'retry_after_seconds', 'retryAfter']);
     const resetAt =
         isoDate(firstString(rateLimits, ['resetAt', 'reset_at', 'requestsResetAt', 'tokensResetAt'])) ??
-        (retryAfterSeconds !== null && retryAfterSeconds > 0 ? new Date(nowMs + retryAfterSeconds * 1000).toISOString() : null);
+        (retryAfterSeconds !== null && retryAfterSeconds > 0
+            ? new Date(nowMs + retryAfterSeconds * 1000).toISOString()
+            : null);
     const remainingRequests = firstNumber(rateLimits, [
         'remainingRequests',
         'requestsRemaining',
@@ -172,17 +182,24 @@ function quotaResetWindow(quotaState, nowMs) {
  * @param {Record<string, unknown>} overlay
  * @param {{ now?: string | number | Date }} [options]
  * @returns {{
- *   status: string;
- *   keyDisabled: boolean;
- *   spendingExhausted: boolean;
- *   quotaExhausted: boolean;
- *   rateLimited: boolean;
- *   retryAfterSeconds: number | null;
- *   resetAt: string | null;
- *   spending: { limitUsd: number | null; usageUsd: number | null; remainingUsd: number | null; unlimited: boolean };
- *   quota: { remainingCreditsUsd: number | null; dailyRequests: number | null; dailyTokens: number | null; resetAt: string | null; resetActive: boolean; resetExpired: boolean };
- *   rateLimit: ReturnType<typeof normalizeRateLimitState>;
- *   resetWindow: ReturnType<typeof resolveModelGatewayAccountResetWindow>;
+ *     status: string;
+ *     keyDisabled: boolean;
+ *     spendingExhausted: boolean;
+ *     quotaExhausted: boolean;
+ *     rateLimited: boolean;
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ *     spending: { limitUsd: number | null; usageUsd: number | null; remainingUsd: number | null; unlimited: boolean };
+ *     quota: {
+ *         remainingCreditsUsd: number | null;
+ *         dailyRequests: number | null;
+ *         dailyTokens: number | null;
+ *         resetAt: string | null;
+ *         resetActive: boolean;
+ *         resetExpired: boolean;
+ *     };
+ *     rateLimit: ReturnType<typeof normalizeRateLimitState>;
+ *     resetWindow: ReturnType<typeof resolveModelGatewayAccountResetWindow>;
  * }}
  */
 export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
@@ -201,7 +218,9 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
         remainingCreditsUsd: firstNumber(quota, ['remainingCreditsUsd', 'remainingUsd']),
         dailyRequests: firstNumber(quota, ['dailyRequests', 'requestsPerDay']),
         dailyTokens: firstNumber(quota, ['dailyTokens', 'tokensPerDay']),
-        resetAt: isoDate(firstString(quota, ['resetAt', 'quotaResetAt', 'dailyResetAt', 'monthlyResetAt', 'creditResetAt'])),
+        resetAt: isoDate(
+            firstString(quota, ['resetAt', 'quotaResetAt', 'dailyResetAt', 'monthlyResetAt', 'creditResetAt']),
+        ),
     };
     const quotaWindow = quotaResetWindow(quotaState, nowMs);
     const quotaResetNoLongerBlocks = quotaWindow.resetExpired;
@@ -224,14 +243,17 @@ export function normalizeModelGatewayAccountLimitState(overlay, options = {}) {
             : rateLimit.limited
               ? MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS.RATE_LIMITED
               : MODEL_GATEWAY_ACCOUNT_LIMIT_STATUS.OK;
-    const resetWindow = resolveModelGatewayAccountResetWindow({
-        status,
-        failureKind: optionalString(providerMetadata['failureKind']),
-        retryAfterSeconds: rateLimit.retryAfterSeconds,
-        resetAt: rateLimit.resetAt ?? quotaState.resetAt,
-        observedAt: isoDate(overlay['observedAt']),
-        expiresAt: isoDate(overlay['expiresAt']),
-    }, { now: nowMs });
+    const resetWindow = resolveModelGatewayAccountResetWindow(
+        {
+            status,
+            failureKind: optionalString(providerMetadata['failureKind']),
+            retryAfterSeconds: rateLimit.retryAfterSeconds,
+            resetAt: rateLimit.resetAt ?? quotaState.resetAt,
+            observedAt: isoDate(overlay['observedAt']),
+            expiresAt: isoDate(overlay['expiresAt']),
+        },
+        { now: nowMs },
+    );
     return {
         status,
         keyDisabled,

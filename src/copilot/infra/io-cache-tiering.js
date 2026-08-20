@@ -64,7 +64,9 @@ export function buildIoCacheTierPlan(input = {}) {
     }
     if (!l2Enabled && representativeBenchmarkPassed) {
         l2Decision = 'enable-supported-by-benchmark';
-        recommendations.push('Representative benchmark supports L2 enablement; promote through the experimental profile first.');
+        recommendations.push(
+            'Representative benchmark supports L2 enablement; promote through the experimental profile first.',
+        );
     }
     if (l2Enabled && !l3Enabled && workspaceFiles > 20000) {
         recommendations.push('Prepare L3 design for multi-runtime sharing and cold-start reduction.');

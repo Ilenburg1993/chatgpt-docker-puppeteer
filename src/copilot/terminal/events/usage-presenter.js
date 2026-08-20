@@ -73,5 +73,7 @@ export function renderTerminalLlmUsageKind(llmClass, llmReason) {
     if (/tool/iu.test(usageClass) || /tool/iu.test(reason)) return 'ferramenta/automação';
     if (/stream|delta/iu.test(usageClass) || /stream|delta/iu.test(reason)) return 'streaming';
     if (usageClass === 'unknown' && reason === 'n/d') return 'sem classificação';
-    return renderTerminalLlmUsageClassification(usageClass) || usageClass.replace(/[_-]+/gu, ' ') || 'sem classificação';
+    return (
+        renderTerminalLlmUsageClassification(usageClass) || usageClass.replace(/[_-]+/gu, ' ') || 'sem classificação'
+    );
 }

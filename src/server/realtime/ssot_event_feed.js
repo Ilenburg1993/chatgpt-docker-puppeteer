@@ -69,20 +69,22 @@ function _fetchMissionCounts(/** @type {any} */ db, /** @type {any} */ missionId
         )
         .all(...missionIds, ...missionIds);
 
-    /** @type {Record<
-    string,
-    {
-        tasks_total: number;
-        by_stage: Record<string, number>;
-        by_status: Record<string, number>;
-        proposed: number;
-        blocked: number;
-        running: number;
-        pending: number;
-        done: number;
-        failed: number;
-    }
->} */
+    /**
+     * @type {Record<
+     *     string,
+     *     {
+     *         tasks_total: number;
+     *         by_stage: Record<string, number>;
+     *         by_status: Record<string, number>;
+     *         proposed: number;
+     *         blocked: number;
+     *         running: number;
+     *         pending: number;
+     *         done: number;
+     *         failed: number;
+     *     }
+     * >}
+     */
     const out = {};
     for (const row of /** @type {{ mission_id: unknown; stage: unknown; status: unknown; c: unknown }[]} */ (rows)) {
         const mid = String(row.mission_id);

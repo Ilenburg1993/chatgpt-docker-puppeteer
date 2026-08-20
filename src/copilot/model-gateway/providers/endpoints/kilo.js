@@ -29,5 +29,11 @@ export const KILO_PROVIDER_ENDPOINTS = Object.freeze({
         Object.freeze({ kind: 'chat_completions', method: 'POST', path: '/chat/completions' }),
         Object.freeze({ kind: 'fim_completions', method: 'POST', path: '/fim/completions' }),
     ]),
-    routeSelectors: Object.freeze(['exact_model', 'gateway_auto', 'provider_model', 'organization_overlay', 'byok_internal']),
+    routeSelectors: Object.freeze([
+        'exact_model',
+        'gateway_auto',
+        'provider_model',
+        'organization_overlay',
+        'byok_internal',
+    ]),
 });

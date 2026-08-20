@@ -100,15 +100,17 @@ function stringLabel(value) {
  * @returns {string}
  */
 function compactText(value, limit = 180) {
-    const text = String(value ?? '').replace(/\s+/gu, ' ').trim();
+    const text = String(value ?? '')
+        .replace(/\s+/gu, ' ')
+        .trim();
     if (text.length <= limit) return text;
     return `${text.slice(0, Math.max(1, limit - 1)).trimEnd()}…`;
 }
 
 /**
- * FTS5 usa marcadores textuais nos snippets (`[match]`). Isso é bom para a saída estruturada/Markdown das tools, mas
- * no terminal humano parece caminho adulterado (`src/copilot/[terminal]`) e dificulta copiar o texto. A superfície
- * visual converte esses marcadores em destaque ANSI, mantendo o texto real sem colchetes artificiais.
+ * FTS5 usa marcadores textuais nos snippets (`[match]`). Isso é bom para a saída estruturada/Markdown das tools, mas no
+ * terminal humano parece caminho adulterado (`src/copilot/[terminal]`) e dificulta copiar o texto. A superfície visual
+ * converte esses marcadores em destaque ANSI, mantendo o texto real sem colchetes artificiais.
  *
  * @param {unknown} value
  * @returns {string}
@@ -214,9 +216,13 @@ function subscribeIndexBuildProgress(ctx, rootPath) {
             const current = typeof event['currentPath'] === 'string' ? compactPath(event['currentPath']) : null;
             printProgress('Varrendo', terminalThemeJoin([scanned !== null ? `${scanned} entradas` : null, current]));
         } else if (phase === 'complete') {
-            printProgress('Varredura', terminalThemeJoin([scanned !== null ? `${scanned} entradas` : null, 'selecionando candidatos']), {
-                force: true,
-            });
+            printProgress(
+                'Varredura',
+                terminalThemeJoin([scanned !== null ? `${scanned} entradas` : null, 'selecionando candidatos']),
+                {
+                    force: true,
+                },
+            );
         }
     }
 
@@ -351,7 +357,9 @@ function printStats(ctx) {
         return;
     }
     const latest =
-        typeof stats['latestIndexedAtMs'] === 'number' ? formatTerminalTimeLabel(stats['latestIndexedAtMs'], { mode: 'dual' }) : '-';
+        typeof stats['latestIndexedAtMs'] === 'number'
+            ? formatTerminalTimeLabel(stats['latestIndexedAtMs'], { mode: 'dual' })
+            : '-';
     ctx.println('');
     ctx.println(terminalThemeHeadline('index', 'Índice L2 local'));
     ctx.println(
@@ -427,7 +435,11 @@ async function runBuild(ctx, parts) {
         unsubscribeProgress();
     }
     if (result['available'] === false) {
-        ctx.println(terminalThemeRow('Índice L2', `falhou · ${stringLabel(result['reason'] ?? 'index-unavailable')}`, { role: 'error' }));
+        ctx.println(
+            terminalThemeRow('Índice L2', `falhou · ${stringLabel(result['reason'] ?? 'index-unavailable')}`, {
+                role: 'error',
+            }),
+        );
         ctx.println('');
         return;
     }
@@ -455,7 +467,10 @@ async function runBuild(ctx, parts) {
     ctx.println(
         terminalThemeRow(
             'Workspace',
-            terminalThemeJoin([compactPath(String(result['workspaceRoot'] ?? directory)), `duração ${numberLabel(result['durationMs'])}ms`]),
+            terminalThemeJoin([
+                compactPath(String(result['workspaceRoot'] ?? directory)),
+                `duração ${numberLabel(result['durationMs'])}ms`,
+            ]),
         ),
     );
     ctx.println('');
@@ -483,7 +498,9 @@ function runSearch(ctx, parts) {
         );
     }
     if (results.length === 0)
-        ctx.println(terminalThemeRow('Resultado', 'sem resultados · rode /index build src/copilot se o índice estiver vazio'));
+        ctx.println(
+            terminalThemeRow('Resultado', 'sem resultados · rode /index build src/copilot se o índice estiver vazio'),
+        );
     ctx.println('');
 }
 

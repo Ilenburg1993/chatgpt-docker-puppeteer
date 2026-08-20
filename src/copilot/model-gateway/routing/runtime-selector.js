@@ -7,6 +7,13 @@
  * sanitized health and route-decision outcomes without moving provider payloads into canonical metadata.
  */
 
+import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
+import { classifyByokProviderFailure } from '../health/provider-failure.js';
+import {
+    flushByokProviderHealth,
+    recordByokProviderModelCallFailure,
+    recordByokProviderModelCallSuccess,
+} from '../health/provider-health.js';
 import { buildRouteDecisionEvent } from '../observability/events.js';
 import { recordModelGatewayRouteDecision } from '../observability/route-decision-ledger.js';
 import {
@@ -14,16 +21,11 @@ import {
     didConfiguredByokProbeAttemptProvider,
     runConfiguredByokChatProbe,
 } from '../probes/index.js';
-import {
-    flushByokProviderHealth,
-    recordByokProviderModelCallFailure,
-    recordByokProviderModelCallSuccess,
-} from '../health/provider-health.js';
-import { classifyByokProviderFailure } from '../health/provider-failure.js';
-import { evaluateModelGatewayProviderEnvRequirements } from '../secrets/requirements.js';
-import { resolveModelGatewayProviderSecretRefs } from '../secrets/requirements.js';
 import { resolveProviderEndpointInventory } from '../providers/endpoints/index.js';
-import { resolveModelGatewayAccountResetWindow } from '../account-access/reset-windows.js';
+import {
+    evaluateModelGatewayProviderEnvRequirements,
+    resolveModelGatewayProviderSecretRefs,
+} from '../secrets/requirements.js';
 import {
     createGatewayRuntimeHealthIndex,
     evaluateGatewayModelHealthRoute,
@@ -32,7 +34,6 @@ import {
 } from './health-routing.js';
 
 const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
-
 
 /**
  * @typedef {object} RuntimeSelectorProbeResult
@@ -60,21 +61,20 @@ const DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS = 30_000;
 
 /** @typedef {(options?: RuntimeSelectorProbeOptions) => Promise<RuntimeSelectorProbeResult>} RuntimeSelectorProbeRunner */
 
-
 /**
  * Minimal selected-route contract consumed by the execution layer. Planning may attach richer metadata, but execution
  * must not depend on the planner's complete internal representation.
  *
  * @typedef {Record<string, unknown> & {
- *   id?: string;
- *   providerId?: string;
- *   providerModel?: string;
- *   routeProfile?: string | null;
- *   selectorSyntax?: string;
- *   score?: number | null;
- *   scoreBreakdown?: Record<string, unknown> | null;
- *   reasons?: string[];
- *   hasRuntimeProof?: boolean;
+ *     id?: string;
+ *     providerId?: string;
+ *     providerModel?: string;
+ *     routeProfile?: string | null;
+ *     selectorSyntax?: string;
+ *     score?: number | null;
+ *     scoreBreakdown?: Record<string, unknown> | null;
+ *     reasons?: string[];
+ *     hasRuntimeProof?: boolean;
  * }} RuntimeSelectorExecutionSelected
  */
 
@@ -130,7 +130,9 @@ const RUNTIME_ROUTE_ENV_RESET_KEYS = Object.freeze([
  * @returns {Record<string, unknown> | null}
  */
 function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -158,7 +160,7 @@ function stringList(value) {
 }
 
 /**
- * @param {Array<string[] | null | undefined>} lists
+ * @param {(string[] | null | undefined)[]} lists
  * @param {number} limit
  * @returns {string[]}
  */
@@ -279,7 +281,8 @@ function routeSdkWireApi(selected) {
     const explicit = sdkWireApiForRoute(routeMetadataString(selected, 'wireApi'));
     if (explicit) return explicit;
     const routeLayer = routeMetadataString(selected, 'routeLayer');
-    const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
+    const baseUrl =
+        routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
     if (baseUrl && routeLayer && routeLayer.includes('openai_compatible')) return 'completions';
     return null;
 }
@@ -304,11 +307,14 @@ function firstConfiguredEnvValue(env, refs) {
  * @returns {string | null}
  */
 function resolveRuntimeRouteBaseUrl(providerId, selected, env) {
-    const explicit = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
+    const explicit =
+        routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
     if (explicit) return explicit;
     if (providerId === 'ollama-local' || providerId === 'ollama') {
         const configured = optionalString(env['OLLAMA_LOCAL_BASE_URL']) ?? optionalString(env['OLLAMA_BASE_URL']);
-        return configured ? `${configured.replace(/\/+$/u, '').replace(/\/api$/u, '')}/v1` : 'http://localhost:11434/v1';
+        return configured
+            ? `${configured.replace(/\/+$/u, '').replace(/\/api$/u, '')}/v1`
+            : 'http://localhost:11434/v1';
     }
     if (providerId === 'ollama-cloud') {
         const configured = optionalString(env['OLLAMA_CLOUD_BASE_URL']);
@@ -461,7 +467,10 @@ function orderRuntimeSelectorAttemptProfileIds(profileIds, routeByProfileId, pre
  */
 function runtimeSelectorProfileRequiresAgentProbe(profileId, options = {}) {
     if (Array.isArray(options.requireAgentProbeProfiles)) {
-        return options.requireAgentProbeProfiles.map(optionalString).filter((item) => item !== null).includes(profileId);
+        return options.requireAgentProbeProfiles
+            .map(optionalString)
+            .filter((item) => item !== null)
+            .includes(profileId);
     }
     return profileId === 'repo_agent' || profileId === 'tool_agent';
 }
@@ -470,8 +479,8 @@ function runtimeSelectorProfileRequiresAgentProbe(profileId, options = {}) {
  * Build the environment for a Model Gateway control-plane host that must stay on the native Copilot SDK while still
  * retaining provider credentials for disposable BYOK probes.
  *
- * Active route/model/base-url materialization is removed. Generic BYOK credentials are restored only as dormant
- * probe inputs; `COPILOT_BYOK_ENABLED=false` prevents them from becoming the controller session binding.
+ * Active route/model/base-url materialization is removed. Generic BYOK credentials are restored only as dormant probe
+ * inputs; `COPILOT_BYOK_ENABLED=false` prevents them from becoming the controller session binding.
  *
  * @param {Record<string, string | undefined>} [baseEnv]
  * @returns {Record<string, string | undefined>}
@@ -505,7 +514,8 @@ export function buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv = pro
     const providerId = optionalString(selected?.['providerId']);
     const providerModel = optionalString(selected?.['providerModel']);
     const providerProfile = optionalString(selected?.['providerProfile']);
-    const baseUrl = routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
+    const baseUrl =
+        routeMetadataString(selected, 'openAICompatibleBaseUrl') ?? routeMetadataString(selected, 'baseUrl');
     const sdkWireApi = routeSdkWireApi(selected);
     if (providerId === 'github-copilot-sdk') {
         env['COPILOT_BYOK_ENABLED'] = 'false';
@@ -551,22 +561,20 @@ export function buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv = pro
  * @param {Record<string, unknown> | null} selected
  * @param {Record<string, string | undefined>} [baseEnv]
  * @returns {{
- *   providerId: string | null;
- *   providerModel: string | null;
- *   providerPreset: string | null;
- *   model: string | null;
- *   status: 'ready' | 'missing' | 'partial';
- *   configuredKeys: string[];
- *   missingRequiredKeys: string[];
- *   missingRecommendedKeys: string[];
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     providerPreset: string | null;
+ *     model: string | null;
+ *     status: 'ready' | 'missing' | 'partial';
+ *     configuredKeys: string[];
+ *     missingRequiredKeys: string[];
+ *     missingRecommendedKeys: string[];
  * }}
  */
 export function evaluateModelGatewayRuntimeSelectorRouteEnv(selected, baseEnv = process.env) {
     const env = buildModelGatewayRuntimeSelectorProbeEnv(selected, baseEnv);
     const providerId = optionalString(selected?.['providerId']);
-    const requirement = providerId
-        ? evaluateModelGatewayProviderEnvRequirements({ env, providerId })[0]
-        : null;
+    const requirement = providerId ? evaluateModelGatewayProviderEnvRequirements({ env, providerId })[0] : null;
     return {
         providerId,
         providerModel: optionalString(selected?.['providerModel']),
@@ -630,7 +638,9 @@ function normalizeRuntimeRouteAccountAccess(value) {
         accessConfidence: optionalString(record['accessConfidence']),
         failureClass: optionalString(record['failureClass']),
         overlayRefs: stringList(record['overlayRefs']),
-        resetWindows: Array.isArray(record['resetWindows']) ? record['resetWindows'].map(optionalRecord).filter((item) => item !== null) : [],
+        resetWindows: Array.isArray(record['resetWindows'])
+            ? record['resetWindows'].map(optionalRecord).filter((item) => item !== null)
+            : [],
         hardReasons: stringList(record['hardReasons']),
         softReasons: stringList(record['softReasons']),
         reasons: stringList(record['reasons']),
@@ -669,7 +679,12 @@ function runtimeRoute(route) {
         canonicalModelId: optionalString(route['canonicalModelId']),
         routeProfile: optionalString(route['routeProfile']),
         routeOptionRef: optionalString(route['routeOptionRef']),
-        routeOptionRefs: Array.isArray(route['routeOptionRefs']) ? route['routeOptionRefs'].map(optionalString).filter((item) => item !== null).slice(0, 8) : [],
+        routeOptionRefs: Array.isArray(route['routeOptionRefs'])
+            ? route['routeOptionRefs']
+                  .map(optionalString)
+                  .filter((item) => item !== null)
+                  .slice(0, 8)
+            : [],
         selectorKind: optionalString(route['selectorKind']),
         routeLayer: routeMetadataString(route, 'routeLayer'),
         wireApi: routeMetadataString(route, 'wireApi'),
@@ -718,7 +733,7 @@ function selectedFromPolicyRow(row) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ label: string; selected: Record<string, unknown> }>}
+ * @returns {{ label: string; selected: Record<string, unknown> }[]}
  */
 function selectedCandidatesFromPolicyRow(row) {
     const candidates = [
@@ -781,11 +796,7 @@ function selectionReasons(selected, row) {
  */
 function routeDecisionReasons(selected, row, extraReasons = []) {
     return uniqueStringList(
-        [
-            stringList(selected?.['reasons']),
-            row ? selectionReasons(selected, row) : [],
-            extraReasons,
-        ],
+        [stringList(selected?.['reasons']), row ? selectionReasons(selected, row) : [], extraReasons],
         32,
     );
 }
@@ -836,7 +847,8 @@ function candidateBlockReasons(candidate) {
     if (candidate['runtimeProofBlocked'] === true) reasons.push('runtime_proof_required');
     if (candidate['runtimeEnvBlocked'] === true) reasons.push('runtime_env_not_ready');
     const runtimeHealth = optionalRecord(candidate['runtimeHealth']);
-    if (candidate['runtimeHealthBlocked'] === true) reasons.push(`runtime_health:${optionalString(runtimeHealth?.['reason']) ?? 'failed'}`);
+    if (candidate['runtimeHealthBlocked'] === true)
+        reasons.push(`runtime_health:${optionalString(runtimeHealth?.['reason']) ?? 'failed'}`);
     const providerCooldown = optionalRecord(candidate['providerCooldown']);
     if (candidate['providerCooldownBlocked'] === true) {
         const failureKinds = Array.isArray(providerCooldown?.['failureKinds'])
@@ -852,14 +864,19 @@ function candidateBlockReasons(candidate) {
 }
 
 /**
- * @param {Array<Record<string, unknown>>} candidateEvaluations
+ * @param {Record<string, unknown>[]} candidateEvaluations
  * @returns {{
- *   evaluatedCount: number;
- *   usableCount: number;
- *   blockedCount: number;
- *   providerCount: number;
- *   rejectionReasonCounts: Record<string, number>;
- *   topBlockedRoutes: Array<{ label: string; providerId: string | null; providerModel: string | null; reasons: string[] }>;
+ *     evaluatedCount: number;
+ *     usableCount: number;
+ *     blockedCount: number;
+ *     providerCount: number;
+ *     rejectionReasonCounts: Record<string, number>;
+ *     topBlockedRoutes: {
+ *         label: string;
+ *         providerId: string | null;
+ *         providerModel: string | null;
+ *         reasons: string[];
+ *     }[];
  * }}
  */
 function summarizeRuntimeSelectorAlternatives(candidateEvaluations) {
@@ -896,12 +913,21 @@ function summarizeRuntimeSelectorAlternatives(candidateEvaluations) {
 /**
  * @param {unknown} alternativeSummary
  * @param {{ limit?: number; timeoutMs?: number }} [options]
- * @returns {Array<{ mode: 'agent' | 'chat'; providerId: string; providerModel: string; command: string; reasons: string[] }>}
+ * @returns {{
+ *     mode: 'agent' | 'chat';
+ *     providerId: string;
+ *     providerModel: string;
+ *     command: string;
+ *     reasons: string[];
+ * }[]}
  */
 export function buildModelGatewayRuntimeProofCommands(alternativeSummary, options = {}) {
     const summary = optionalRecord(alternativeSummary) ?? {};
     const blockedRoutes = Array.isArray(summary['topBlockedRoutes']) ? summary['topBlockedRoutes'] : [];
-    const limit = typeof options.limit === 'number' && Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 3;
+    const limit =
+        typeof options.limit === 'number' && Number.isFinite(options.limit)
+            ? Math.max(1, Math.floor(options.limit))
+            : 3;
     const timeoutMs =
         typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)
             ? Math.max(5_000, Math.floor(options.timeoutMs))
@@ -913,7 +939,9 @@ export function buildModelGatewayRuntimeProofCommands(alternativeSummary, option
         const providerId = optionalString(row?.['providerId']);
         const providerModel = optionalString(row?.['providerModel']);
         if (!providerId || !providerModel) continue;
-        const reasons = Array.isArray(row?.['reasons']) ? row['reasons'].map(optionalString).filter((item) => item !== null) : [];
+        const reasons = Array.isArray(row?.['reasons'])
+            ? row['reasons'].map(optionalString).filter((item) => item !== null)
+            : [];
         const needsAgentProbe = reasons.some((reason) =>
             /agent_probe_(?:missing|not_verified|failed)|runtime_probe_failed:agent/iu.test(reason),
         );
@@ -946,12 +974,12 @@ function runtimeSelectorRouteModel(selected) {
  * @param {Record<string, unknown> | null | undefined} selected
  * @param {number} timeoutMs
  * @returns {{
- *   probeAgent: string | null;
- *   probeChat: string | null;
- *   liveModel: string | null;
- *   provider: string | null;
- *   persistProvider: string | null;
- *   explicitNewSession: string;
+ *     probeAgent: string | null;
+ *     probeChat: string | null;
+ *     liveModel: string | null;
+ *     provider: string | null;
+ *     persistProvider: string | null;
+ *     explicitNewSession: string;
  * }}
  */
 function runtimeSelectorStandbyCommands(selected, timeoutMs) {
@@ -959,8 +987,14 @@ function runtimeSelectorStandbyCommands(selected, timeoutMs) {
     const providerModel = optionalString(selected?.['providerModel']);
     const model = runtimeSelectorRouteModel(selected);
     return {
-        probeAgent: providerId && providerModel ? `/byok probe agent provider:${providerId} model:${providerModel} timeout:${timeoutMs}` : null,
-        probeChat: providerId && providerModel ? `/byok probe chat provider:${providerId} model:${providerModel} timeout:${timeoutMs}` : null,
+        probeAgent:
+            providerId && providerModel
+                ? `/byok probe agent provider:${providerId} model:${providerModel} timeout:${timeoutMs}`
+                : null,
+        probeChat:
+            providerId && providerModel
+                ? `/byok probe chat provider:${providerId} model:${providerModel} timeout:${timeoutMs}`
+                : null,
         liveModel: model ? `/byok model ${model}` : null,
         provider: providerId && model ? `/byok provider ${providerId} ${model}` : null,
         persistProvider: providerId && model ? `/byok persist provider ${providerId} ${model}` : null,
@@ -969,7 +1003,11 @@ function runtimeSelectorStandbyCommands(selected, timeoutMs) {
 }
 
 /**
- * @param {{ hasRuntimeProof: boolean; standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider'; commands: ReturnType<typeof runtimeSelectorStandbyCommands> }} row
+ * @param {{
+ *     hasRuntimeProof: boolean;
+ *     standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider';
+ *     commands: ReturnType<typeof runtimeSelectorStandbyCommands>;
+ * }} row
  * @returns {{ action: 'probe_agent' | 'live_model' | 'unavailable'; command: string | null }}
  */
 function runtimeSelectorStandbyRecommendation(row) {
@@ -988,30 +1026,33 @@ function runtimeSelectorStandbyRecommendation(row) {
 /**
  * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} runtimeSelectorPlan
  * @param {{ limit?: number; timeoutMs?: number; includeSelected?: boolean }} [options]
- * @returns {Array<{
- *   profileId: string;
- *   rank: number;
- *   source: 'selected' | 'candidate_alternative';
- *   selectedRouteKey: string | null;
- *   providerId: string | null;
- *   providerModel: string | null;
- *   selectorSyntax: string | null;
- *   routeLayer: string | null;
- *   wireApi: string | null;
- *   upstreamProvider: string | null;
- *   score: number | null;
- *   hasRuntimeProof: boolean;
- *   needsProbe: boolean;
- *   standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider';
- *   recommendedAction: 'probe_agent' | 'live_model' | 'unavailable';
- *   recommendedCommand: string | null;
- *   runtimeEnvStatus: string | null;
- *   reasons: string[];
- *   commands: ReturnType<typeof runtimeSelectorStandbyCommands>;
- * }>}
+ * @returns {{
+ *     profileId: string;
+ *     rank: number;
+ *     source: 'selected' | 'candidate_alternative';
+ *     selectedRouteKey: string | null;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     selectorSyntax: string | null;
+ *     routeLayer: string | null;
+ *     wireApi: string | null;
+ *     upstreamProvider: string | null;
+ *     score: number | null;
+ *     hasRuntimeProof: boolean;
+ *     needsProbe: boolean;
+ *     standbyClass: 'selected_route' | 'new_model_same_provider' | 'new_provider';
+ *     recommendedAction: 'probe_agent' | 'live_model' | 'unavailable';
+ *     recommendedCommand: string | null;
+ *     runtimeEnvStatus: string | null;
+ *     reasons: string[];
+ *     commands: ReturnType<typeof runtimeSelectorStandbyCommands>;
+ * }[]}
  */
 export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, options = {}) {
-    const limit = typeof options.limit === 'number' && Number.isFinite(options.limit) ? Math.max(1, Math.floor(options.limit)) : 12;
+    const limit =
+        typeof options.limit === 'number' && Number.isFinite(options.limit)
+            ? Math.max(1, Math.floor(options.limit))
+            : 12;
     const timeoutMs =
         typeof options.timeoutMs === 'number' && Number.isFinite(options.timeoutMs)
             ? Math.max(5_000, Math.floor(options.timeoutMs))
@@ -1054,8 +1095,8 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
                 candidate.source === 'selected'
                     ? 'selected_route'
                     : providerId && selectedProviderId && providerId === selectedProviderId
-                        ? 'new_model_same_provider'
-                        : 'new_provider';
+                      ? 'new_model_same_provider'
+                      : 'new_provider';
             const commands = runtimeSelectorStandbyCommands(selected, timeoutMs);
             const recommendation = runtimeSelectorStandbyRecommendation({
                 hasRuntimeProof,
@@ -1091,31 +1132,37 @@ export function buildModelGatewayRuntimeStandbyRoutes(runtimeSelectorPlan, optio
 
 /**
  * @param {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} runtimeSelectorPlan
- * @param {{ limit?: number; timeoutMs?: number; includeSelected?: boolean; profileId?: string | null; nextCommandLimit?: number }} [options]
+ * @param {{
+ *     limit?: number;
+ *     timeoutMs?: number;
+ *     includeSelected?: boolean;
+ *     profileId?: string | null;
+ *     nextCommandLimit?: number;
+ * }} [options]
  * @returns {{
- *   schema: 'model-gateway-runtime-standby-plan';
- *   ok: boolean;
- *   generatedAt: string;
- *   profileId: string | null;
- *   selectorOk: boolean;
- *   runtimeSelectorReady: boolean;
- *   summary: {
- *     routeCount: number;
- *     selectedCount: number;
- *     alternateCount: number;
- *     runtimeProofCount: number;
- *     needsProbeCount: number;
- *     providerCount: number;
- *     selectedRouteCount: number;
- *     newModelSameProviderCount: number;
- *     newProviderCount: number;
- *     sameBoundaryCommandCount: number;
- *     newProviderCommandCount: number;
- *     probeCommandCount: number;
- *     recommendedCommandCount: number;
- *   };
- *   routes: ReturnType<typeof buildModelGatewayRuntimeStandbyRoutes>;
- *   nextCommands: string[];
+ *     schema: 'model-gateway-runtime-standby-plan';
+ *     ok: boolean;
+ *     generatedAt: string;
+ *     profileId: string | null;
+ *     selectorOk: boolean;
+ *     runtimeSelectorReady: boolean;
+ *     summary: {
+ *         routeCount: number;
+ *         selectedCount: number;
+ *         alternateCount: number;
+ *         runtimeProofCount: number;
+ *         needsProbeCount: number;
+ *         providerCount: number;
+ *         selectedRouteCount: number;
+ *         newModelSameProviderCount: number;
+ *         newProviderCount: number;
+ *         sameBoundaryCommandCount: number;
+ *         newProviderCommandCount: number;
+ *         probeCommandCount: number;
+ *         recommendedCommandCount: number;
+ *     };
+ *     routes: ReturnType<typeof buildModelGatewayRuntimeStandbyRoutes>;
+ *     nextCommands: string[];
  * }}
  */
 export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options = {}) {
@@ -1129,11 +1176,7 @@ export function buildModelGatewayRuntimeStandbyPlan(runtimeSelectorPlan, options
         .slice(0, Math.min(routes.length, nextCommandLimit))
         .map((row) => row.recommendedCommand)
         .filter(isNonEmptyString);
-    const nextCommands = [
-        ...new Set(
-            nextCommandCandidates,
-        ),
-    ];
+    const nextCommands = [...new Set(nextCommandCandidates)];
     return {
         schema: 'model-gateway-runtime-standby-plan',
         ok: routes.length > 0,
@@ -1298,7 +1341,9 @@ function runtimeSelectorRouteAttempts(route) {
  */
 function runtimeSelectorPlanForRouteAttempt(plan, route) {
     const profileId = optionalString(route['profileId']);
-    const routes = plan.routes.map((candidateRoute) => (candidateRoute.profileId === profileId ? route : candidateRoute));
+    const routes = plan.routes.map((candidateRoute) =>
+        candidateRoute.profileId === profileId ? route : candidateRoute,
+    );
     return {
         ...plan,
         routes,
@@ -1307,7 +1352,25 @@ function runtimeSelectorPlanForRouteAttempt(plan, route) {
 
 /**
  * @param {Record<string, unknown>} selectionPolicyOrTrace
- * @param {{ sessionId?: string | null; source?: string; requireRuntimeProof?: boolean; requireRuntimeEnvReady?: boolean; requireAgentProbeProfiles?: string[]; preferProviderDiversity?: boolean; avoidDuplicateRoutes?: boolean; env?: Record<string, string | undefined>; runtimeHealthRecords?: Record<string, unknown>[]; runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>; blockFailedProbeKinds?: string[]; now?: string | number | Date; maxRuntimeProofAgeMs?: number; temporaryFailureCooldownMs?: number; providerCooldownWindowMs?: number; providerCooldownMinFailedModels?: number; providerCooldownFailureKinds?: string[] }} [options]
+ * @param {{
+ *     sessionId?: string | null;
+ *     source?: string;
+ *     requireRuntimeProof?: boolean;
+ *     requireRuntimeEnvReady?: boolean;
+ *     requireAgentProbeProfiles?: string[];
+ *     preferProviderDiversity?: boolean;
+ *     avoidDuplicateRoutes?: boolean;
+ *     env?: Record<string, string | undefined>;
+ *     runtimeHealthRecords?: Record<string, unknown>[];
+ *     runtimeHealthIndex?: ReturnType<typeof createGatewayRuntimeHealthIndex>;
+ *     blockFailedProbeKinds?: string[];
+ *     now?: string | number | Date;
+ *     maxRuntimeProofAgeMs?: number;
+ *     temporaryFailureCooldownMs?: number;
+ *     providerCooldownWindowMs?: number;
+ *     providerCooldownMinFailedModels?: number;
+ *     providerCooldownFailureKinds?: string[];
+ * }} [options]
  */
 export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, options = {}) {
     const input = optionalRecord(selectionPolicyOrTrace) ?? {};
@@ -1318,7 +1381,9 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
     const avoidDuplicateRoutes = options.avoidDuplicateRoutes === true || preferProviderDiversity;
     const runtimeHealthSource =
         options.runtimeHealthIndex ??
-        (Array.isArray(options.runtimeHealthRecords) ? createGatewayRuntimeHealthIndex(options.runtimeHealthRecords) : null);
+        (Array.isArray(options.runtimeHealthRecords)
+            ? createGatewayRuntimeHealthIndex(options.runtimeHealthRecords)
+            : null);
     const selectedRouteKeysForPlan = new Set();
     const selectedProviderIdsForPlan = new Set();
     const routes = rows.map((row) => {
@@ -1420,7 +1485,12 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                 ? usableCandidates.find((candidate) => {
                       const key = routeKey(candidate.selected);
                       const providerId = optionalString(candidate.selected?.['providerId']);
-                      return key && !selectedRouteKeysForPlan.has(key) && providerId && !selectedProviderIdsForPlan.has(providerId);
+                      return (
+                          key &&
+                          !selectedRouteKeysForPlan.has(key) &&
+                          providerId &&
+                          !selectedProviderIdsForPlan.has(providerId)
+                      );
                   })
                 : null;
             chosen = primaryAvailable
@@ -1431,7 +1501,10 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         }
         const selected = routeWithRuntimeProfile(chosen?.blocked ? null : (chosen?.selected ?? null), profileId);
         const alternativeSummary = summarizeRuntimeSelectorAlternatives(candidateEvaluations);
-        const selectedForReasons = routeWithRuntimeProfile(chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row)), profileId);
+        const selectedForReasons = routeWithRuntimeProfile(
+            chosen?.selected ?? runtimeRoute(selectedFromPolicyRow(row)),
+            profileId,
+        );
         const hasRuntimeProof = chosen?.hasRuntimeProof === true;
         const runtimeProofStale = chosen?.runtimeProofStale === true;
         const runtimeEnv = chosen?.runtimeEnv ?? null;
@@ -1458,9 +1531,11 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
         if (chosen?.label && chosen.label !== 'selected') reasons.push(`runtime_selector_fallback:${chosen.label}`);
         if (blocked && !selected) reasons.push('blocked:no_selected_route');
         if (blocked && accountAccessBlocked) reasons.push('blocked:account_access_denies_attempt');
-        if (blocked && chosen?.selected && requireRuntimeProof && !hasRuntimeProof) reasons.push('blocked:runtime_proof_required');
+        if (blocked && chosen?.selected && requireRuntimeProof && !hasRuntimeProof)
+            reasons.push('blocked:runtime_proof_required');
         if (blocked && chosen?.selected && runtimeEnvBlocked) reasons.push('blocked:runtime_env_not_ready');
-        if (blocked && chosen?.selected && runtimeHealthBlocked) reasons.push(`blocked:runtime_health:${runtimeHealth?.reason ?? 'failed'}`);
+        if (blocked && chosen?.selected && runtimeHealthBlocked)
+            reasons.push(`blocked:runtime_health:${runtimeHealth?.reason ?? 'failed'}`);
         if (blocked && chosen?.selected && providerCooldownBlocked) {
             reasons.push(`blocked:provider_health_cooldown:${providerCooldown?.failureKinds.join('+') || 'temporary'}`);
         }
@@ -1479,7 +1554,10 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
                 const candidateSelected = routeWithRuntimeProfile(candidate.selected, profileId);
                 const candidateHasRuntimeProof = candidate['hasRuntimeProof'] === true;
                 const candidateRuntimeProofStale = candidate['runtimeProofStale'] === true;
-                const candidateSelectedWithProofFlag = routeWithRuntimeProofFlag(candidateSelected, candidateHasRuntimeProof);
+                const candidateSelectedWithProofFlag = routeWithRuntimeProofFlag(
+                    candidateSelected,
+                    candidateHasRuntimeProof,
+                );
                 const label = optionalString(candidate['label']);
                 const candidateReasons = selectionReasons(candidateSelectedWithProofFlag, row);
                 if (candidateRuntimeProofStale) candidateReasons.push('runtime_proof:stale');
@@ -1552,10 +1630,15 @@ export function buildModelGatewayRuntimeSelectorPlan(selectionPolicyOrTrace, opt
             profileCount: routes.length,
             selectedProfileCount: routes.filter((route) => route.status === 'selected').length,
             blockedProfileCount: routes.filter((route) => route.status === 'blocked').length,
-            accountAccessBlockedCount: routes.filter((route) => route.reasons.includes('blocked:account_access_denies_attempt')).length,
-            runtimeProofSelectedCount: routes.filter((route) => route.status === 'selected' && route.hasRuntimeProof).length,
+            accountAccessBlockedCount: routes.filter((route) =>
+                route.reasons.includes('blocked:account_access_denies_attempt'),
+            ).length,
+            runtimeProofSelectedCount: routes.filter((route) => route.status === 'selected' && route.hasRuntimeProof)
+                .length,
             runtimeEnvReadyCount: routes.filter((route) => route.runtimeEnv?.status === 'ready').length,
-            runtimeEnvBlockedCount: routes.filter((route) => route.runtimeEnv !== null && route.runtimeEnv.status !== 'ready').length,
+            runtimeEnvBlockedCount: routes.filter(
+                (route) => route.runtimeEnv !== null && route.runtimeEnv.status !== 'ready',
+            ).length,
             runtimeHealthBlockedCount: routes.filter((route) =>
                 route.reasons.some((reason) => reason.startsWith('blocked:runtime_health:')),
             ).length,
@@ -1584,32 +1667,32 @@ export function selectModelGatewayRuntimeRoute(plan, profileId) {
 /**
  * @param {RuntimeSelectorExecutionPlan} plan
  * @param {{
- *   profileId?: string;
- *   timeoutMs?: number;
- *   prompt?: string;
- *   recordHealth?: boolean;
- *   env?: Record<string, string | undefined>;
- *   deps?: {
- *     runChatProbe?: RuntimeSelectorProbeRunner;
- *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
- *     recordFailure?: typeof recordByokProviderModelCallFailure;
- *     flushHealth?: typeof flushByokProviderHealth;
- *     classifyProviderFailure?: typeof classifyByokProviderFailure;
- *     recordRouteDecision?: typeof recordModelGatewayRouteDecision;
- *   };
+ *     profileId?: string;
+ *     timeoutMs?: number;
+ *     prompt?: string;
+ *     recordHealth?: boolean;
+ *     env?: Record<string, string | undefined>;
+ *     deps?: {
+ *         runChatProbe?: RuntimeSelectorProbeRunner;
+ *         recordSuccess?: typeof recordByokProviderModelCallSuccess;
+ *         recordFailure?: typeof recordByokProviderModelCallFailure;
+ *         flushHealth?: typeof flushByokProviderHealth;
+ *         classifyProviderFailure?: typeof classifyByokProviderFailure;
+ *         recordRouteDecision?: typeof recordModelGatewayRouteDecision;
+ *     };
  * }} [options]
  * @returns {Promise<{
- *   schema: 'model-gateway-runtime-selector-execution-result';
- *   ok: boolean;
- *   status: 'ok' | 'blocked' | 'failed';
- *   profileId: string | null;
- *   route: ReturnType<typeof selectModelGatewayRuntimeRoute> | null;
- *   probe: RuntimeSelectorProbeResult | null;
- *   providerFailure: ReturnType<typeof classifyByokProviderFailure> | null;
- *   failureScope: 'provider' | 'controller_substrate' | 'preflight' | null;
- *   healthRecorded: boolean;
- *   routeDecisionRecordedCount: number;
- *   error: string | null;
+ *     schema: 'model-gateway-runtime-selector-execution-result';
+ *     ok: boolean;
+ *     status: 'ok' | 'blocked' | 'failed';
+ *     profileId: string | null;
+ *     route: ReturnType<typeof selectModelGatewayRuntimeRoute> | null;
+ *     probe: RuntimeSelectorProbeResult | null;
+ *     providerFailure: ReturnType<typeof classifyByokProviderFailure> | null;
+ *     failureScope: 'provider' | 'controller_substrate' | 'preflight' | null;
+ *     healthRecorded: boolean;
+ *     routeDecisionRecordedCount: number;
+ *     error: string | null;
  * }>}
  */
 export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {}) {
@@ -1686,7 +1769,12 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
             : providerAttempted
               ? `runtime_probe_failed:${probe.status}`
               : `runtime_controller_substrate_failed:${probe.status}`;
-        if (tryRecordRouteDecision(recordRouteDecision, buildRuntimeOutcomeDecisionEvent(route, { ok: probe.ok, failure }))) {
+        if (
+            tryRecordRouteDecision(
+                recordRouteDecision,
+                buildRuntimeOutcomeDecisionEvent(route, { ok: probe.ok, failure }),
+            )
+        ) {
             routeDecisionRecordedCount += 1;
         }
         return {
@@ -1738,16 +1826,16 @@ export async function executeModelGatewayRuntimeSelectorPlan(plan, options = {})
  * @param {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>} execution
  * @param {{ retryDelayMs?: number; maxRetryDelayMs?: number; now?: string | number | Date }} [options]
  * @returns {{
- *   schema: 'model-gateway-runtime-selector-retry-decision';
- *   retryRoute: boolean;
- *   fallbackRoute: boolean;
- *   permanent: boolean;
- *   waitMs: number;
- *   reason: string;
- *   failureKind: string | null;
- *   retryAfterSeconds: number | null;
- *   resetAt: string | null;
- *   resetWindow: ReturnType<typeof resolveModelGatewayAccountResetWindow> | null;
+ *     schema: 'model-gateway-runtime-selector-retry-decision';
+ *     retryRoute: boolean;
+ *     fallbackRoute: boolean;
+ *     permanent: boolean;
+ *     waitMs: number;
+ *     reason: string;
+ *     failureKind: string | null;
+ *     retryAfterSeconds: number | null;
+ *     resetAt: string | null;
+ *     resetWindow: ReturnType<typeof resolveModelGatewayAccountResetWindow> | null;
  * }}
  */
 export function resolveModelGatewayRuntimeRetryDecision(execution, options = {}) {
@@ -1766,18 +1854,23 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
         };
     }
     const failureScope =
-        optionalString(execution.failureScope) ?? classifyConfiguredByokProbeFailureScope(optionalRecord(execution.probe));
-    const providerFailure = optionalRecord(execution.providerFailure) ?? optionalRecord(execution.probe?.providerFailure);
+        optionalString(execution.failureScope) ??
+        classifyConfiguredByokProbeFailureScope(optionalRecord(execution.probe));
+    const providerFailure =
+        optionalRecord(execution.providerFailure) ?? optionalRecord(execution.probe?.providerFailure);
     const failureKind = optionalString(providerFailure?.['kind']);
     const retryAfterSeconds = optionalNumber(providerFailure?.['retryAfterSeconds']);
     const resetAt = optionalString(providerFailure?.['resetAt']);
     const nowMs = dateMs(options.now) ?? Date.now();
-    const resetWindow = resolveModelGatewayAccountResetWindow({
-        failureKind,
-        retryAfterSeconds,
-        resetAt,
-        observedAt: options.now ?? nowMs,
-    }, { now: nowMs });
+    const resetWindow = resolveModelGatewayAccountResetWindow(
+        {
+            failureKind,
+            retryAfterSeconds,
+            resetAt,
+            observedAt: options.now ?? nowMs,
+        },
+        { now: nowMs },
+    );
     const fallbackDelayMs = positiveInteger(options.retryDelayMs) ?? 0;
     const maxRetryDelayMs = positiveInteger(options.maxRetryDelayMs) ?? DEFAULT_MAX_RUNTIME_RETRY_DELAY_MS;
     if (execution.status === 'blocked') {
@@ -1860,40 +1953,40 @@ export function resolveModelGatewayRuntimeRetryDecision(execution, options = {})
 /**
  * @param {RuntimeSelectorExecutionPlan} plan
  * @param {{
- *   profileId?: string;
- *   fallbackProfileIds?: string[];
- *   maxAttempts?: number;
- *   maxAttemptsPerProvider?: number;
- *   attemptsPerRoute?: number;
- *   retryDelayMs?: number;
- *   maxRetryDelayMs?: number;
- *   timeoutMs?: number;
- *   prompt?: string;
- *   recordHealth?: boolean;
- *   env?: Record<string, string | undefined>;
- *   deps?: {
- *     runChatProbe?: RuntimeSelectorProbeRunner;
- *     recordSuccess?: typeof recordByokProviderModelCallSuccess;
- *     recordFailure?: typeof recordByokProviderModelCallFailure;
- *     flushHealth?: typeof flushByokProviderHealth;
- *     classifyProviderFailure?: typeof classifyByokProviderFailure;
- *     recordRouteDecision?: typeof recordModelGatewayRouteDecision;
- *     sleep?: typeof sleepMs;
- *   };
+ *     profileId?: string;
+ *     fallbackProfileIds?: string[];
+ *     maxAttempts?: number;
+ *     maxAttemptsPerProvider?: number;
+ *     attemptsPerRoute?: number;
+ *     retryDelayMs?: number;
+ *     maxRetryDelayMs?: number;
+ *     timeoutMs?: number;
+ *     prompt?: string;
+ *     recordHealth?: boolean;
+ *     env?: Record<string, string | undefined>;
+ *     deps?: {
+ *         runChatProbe?: RuntimeSelectorProbeRunner;
+ *         recordSuccess?: typeof recordByokProviderModelCallSuccess;
+ *         recordFailure?: typeof recordByokProviderModelCallFailure;
+ *         flushHealth?: typeof flushByokProviderHealth;
+ *         classifyProviderFailure?: typeof classifyByokProviderFailure;
+ *         recordRouteDecision?: typeof recordModelGatewayRouteDecision;
+ *         sleep?: typeof sleepMs;
+ *     };
  * }} [options]
  * @returns {Promise<{
- *   schema: 'model-gateway-runtime-selector-fallback-execution-result';
- *   ok: boolean;
- *   status: 'ok' | 'blocked' | 'failed';
- *   attemptedCount: number;
- *   selectedProfileId: string | null;
- *   attempts: Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>;
- *   retryDecisions: Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>;
- *   skippedAttemptCount: number;
- *   skippedAttempts: Array<Record<string, unknown>>;
- *   routeDecisionRecordedCount: number;
- *   final: Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null;
- *   error: string | null;
+ *     schema: 'model-gateway-runtime-selector-fallback-execution-result';
+ *     ok: boolean;
+ *     status: 'ok' | 'blocked' | 'failed';
+ *     attemptedCount: number;
+ *     selectedProfileId: string | null;
+ *     attempts: Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>;
+ *     retryDecisions: ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>[];
+ *     skippedAttemptCount: number;
+ *     skippedAttempts: Record<string, unknown>[];
+ *     routeDecisionRecordedCount: number;
+ *     final: Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null;
+ *     error: string | null;
  * }>}
  */
 export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, options = {}) {
@@ -1911,7 +2004,9 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
         selectedRoutes.some((route) => route.profileId === profileId),
     );
     const attemptsPerRoute =
-        typeof options.attemptsPerRoute === 'number' && Number.isFinite(options.attemptsPerRoute) && options.attemptsPerRoute > 0
+        typeof options.attemptsPerRoute === 'number' &&
+        Number.isFinite(options.attemptsPerRoute) &&
+        options.attemptsPerRoute > 0
             ? Math.floor(options.attemptsPerRoute)
             : 1;
     const retryDelayMs =
@@ -1951,9 +2046,9 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
     const recordRouteDecision = options.deps?.recordRouteDecision ?? recordModelGatewayRouteDecision;
     /** @type {Array<Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>>} */
     const attempts = [];
-    /** @type {Array<ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>>} */
+    /** @type {ReturnType<typeof resolveModelGatewayRuntimeRetryDecision>[]} */
     const retryDecisions = [];
-    /** @type {Array<Record<string, unknown>>} */
+    /** @type {Record<string, unknown>[]} */
     const skippedAttempts = [];
     let skippedRouteDecisionRecordedCount = 0;
     routeLoop: for (const { profileId, route } of routeAttempts) {
@@ -1968,7 +2063,12 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
                 reason: failure,
                 maxAttemptsPerProvider,
             });
-            if (tryRecordRouteDecision(recordRouteDecision, buildRuntimeOutcomeDecisionEvent(route, { ok: false, failure }))) {
+            if (
+                tryRecordRouteDecision(
+                    recordRouteDecision,
+                    buildRuntimeOutcomeDecisionEvent(route, { ok: false, failure }),
+                )
+            ) {
                 skippedRouteDecisionRecordedCount += 1;
             }
             continue;
@@ -1977,14 +2077,17 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
             if (attempts.length >= maxAttempts) break routeLoop;
             if ((providerAttemptCounts.get(providerId) ?? 0) >= maxAttemptsPerProvider) break;
             providerAttemptCounts.set(providerId, (providerAttemptCounts.get(providerId) ?? 0) + 1);
-            const attempt = await executeModelGatewayRuntimeSelectorPlan(runtimeSelectorPlanForRouteAttempt(plan, route), {
-                profileId,
-                ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
-                ...(options.prompt ? { prompt: options.prompt } : {}),
-                ...(options.recordHealth !== undefined ? { recordHealth: options.recordHealth } : {}),
-                ...(options.env ? { env: options.env } : {}),
-                ...(options.deps ? { deps: options.deps } : {}),
-            });
+            const attempt = await executeModelGatewayRuntimeSelectorPlan(
+                runtimeSelectorPlanForRouteAttempt(plan, route),
+                {
+                    profileId,
+                    ...(typeof options.timeoutMs === 'number' ? { timeoutMs: options.timeoutMs } : {}),
+                    ...(options.prompt ? { prompt: options.prompt } : {}),
+                    ...(options.recordHealth !== undefined ? { recordHealth: options.recordHealth } : {}),
+                    ...(options.env ? { env: options.env } : {}),
+                    ...(options.deps ? { deps: options.deps } : {}),
+                },
+            );
             attempts.push(attempt);
             if (attempt.ok) {
                 return {
@@ -2041,19 +2144,26 @@ export async function executeModelGatewayRuntimeSelectorPlanWithFallbacks(plan, 
  * The generated object is intentionally catalog-neutral: it captures proof attempts and probe statuses, but does not
  * mutate model metadata, account overlays or eligibility decisions.
  *
- * @param {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlanWithFallbacks>> | Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>> | null} execution
- * @param {{ runId?: string; observedAt?: string | number | Date; accountScope?: string | null; probeProfile?: string | null }} [options]
+ * @param {Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlanWithFallbacks>>
+ *     | Awaited<ReturnType<typeof executeModelGatewayRuntimeSelectorPlan>>
+ *     | null} execution
+ * @param {{
+ *     runId?: string;
+ *     observedAt?: string | number | Date;
+ *     accountScope?: string | null;
+ *     probeProfile?: string | null;
+ * }} [options]
  * @returns {{
- *   schema: 'model-gateway-runtime-selector-probe-run';
- *   runId?: string;
- *   probeProfile: string;
- *   accountScope: string;
- *   status: string;
- *   startedAt: number;
- *   completedAt: number;
- *   skippedCount: number;
- *   payload: Record<string, unknown>;
- *   results: Record<string, unknown>[];
+ *     schema: 'model-gateway-runtime-selector-probe-run';
+ *     runId?: string;
+ *     probeProfile: string;
+ *     accountScope: string;
+ *     status: string;
+ *     startedAt: number;
+ *     completedAt: number;
+ *     skippedCount: number;
+ *     payload: Record<string, unknown>;
+ *     results: Record<string, unknown>[];
  * }}
  */
 export function buildModelGatewayRuntimeSelectorProbeRun(execution, options = {}) {
@@ -2073,21 +2183,24 @@ export function buildModelGatewayRuntimeSelectorProbeRun(execution, options = {}
             ),
         )
         .filter((result) => result !== null);
-    const selectedProfileId = optionalString(executionRecord?.['selectedProfileId']) ?? optionalString(executionRecord?.['profileId']);
+    const selectedProfileId =
+        optionalString(executionRecord?.['selectedProfileId']) ?? optionalString(executionRecord?.['profileId']);
     const status = executionRecord?.['ok'] === true ? 'completed' : attempts.length > 0 ? 'failed' : 'blocked';
     const skippedCount = Math.max(0, optionalNumber(executionRecord?.['skippedAttemptCount']) ?? 0);
-    /** @type {{
-     *   schema: 'model-gateway-runtime-selector-probe-run';
-     *   runId?: string;
-     *   probeProfile: string;
-     *   accountScope: string;
-     *   status: string;
-     *   startedAt: number;
-     *   completedAt: number;
-     *   skippedCount: number;
-     *   payload: Record<string, unknown>;
-     *   results: Record<string, unknown>[];
-     * }} */
+    /**
+     * @type {{
+     *     schema: 'model-gateway-runtime-selector-probe-run';
+     *     runId?: string;
+     *     probeProfile: string;
+     *     accountScope: string;
+     *     status: string;
+     *     startedAt: number;
+     *     completedAt: number;
+     *     skippedCount: number;
+     *     payload: Record<string, unknown>;
+     *     results: Record<string, unknown>[];
+     * }}
+     */
     const run = {
         schema: 'model-gateway-runtime-selector-probe-run',
         probeProfile: optionalString(options.probeProfile) ?? selectedProfileId ?? 'runtime-selector',

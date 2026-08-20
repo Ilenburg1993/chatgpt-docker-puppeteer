@@ -34,9 +34,11 @@ export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
 export * as ErrorCodes from './error-codes.js';
 export { isFatalError, isTransientError, logSwallowed, toError, toExecError, wrapAsync } from './error-handlers.js';
 export * from './errors.js';
+export { isAutoModelSelector, resolveModelSelectionMismatch } from './model-selection.js';
 export { withRetry, withTimeout } from './retry.js';
 export { parseJsonOrThrow, safeJsonParse, safeJsonStringify } from './safe-json.js';
 export * from './schemas.js';
+export { classifySdkError, classifySdkRateLimitScope, getSdkErrorFingerprint } from './sdk-error-taxonomy.js';
 export { SHUTDOWN_PRIORITY } from './shutdown-priorities.js';
 export {
     getLastShutdownReport,
@@ -60,12 +62,6 @@ export {
     sleepMs,
 } from './timer-registry.js';
 export { TOOL_NAME_RE, sanitizeToolNames } from './tool-name-policy.js';
-export { isAutoModelSelector, resolveModelSelectionMismatch } from './model-selection.js';
-export {
-    classifySdkError,
-    classifySdkRateLimitScope,
-    getSdkErrorFingerprint,
-} from './sdk-error-taxonomy.js';
 
 // ─── DI Container ─────────────────────────────────────────────────────────────
 export { container } from './di-container.js';
@@ -76,10 +72,7 @@ export { createContainer, createToken } from './di.js';
 export { EventBus, bridgeEmitter, createEventBus } from './event-bus.js';
 
 // ─── Security ─────────────────────────────────────────────────────────────────
-export {
-    redactSecretRecord,
-    redactSecretText,
-} from './security/redaction.js';
+export { redactSecretRecord, redactSecretText } from './security/redaction.js';
 export {
     checkResolvedIp,
     isPrivateIp,
@@ -118,6 +111,10 @@ export {
     evaluateIoPathPolicy,
     evaluateIoPathPolicyAsync,
     evaluateIoUrlPolicy,
+    getIoPathPolicyCacheStats,
+    invalidateIoPathPolicyCache,
+    readIoPathPolicyCacheConfig,
+    resetIoPathPolicyCacheForTest,
     resolveIoAdvisoryLimits,
     sanitizeIoTextOutput,
 } from './io-policy.js';

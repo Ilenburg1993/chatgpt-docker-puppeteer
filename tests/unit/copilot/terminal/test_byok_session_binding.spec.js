@@ -70,9 +70,7 @@ describe('terminal/byok/session-binding', () => {
 
         expect(result.state).toBe('live-model-confirmed');
         expect(result.sameProviderBoundary).toBe(true);
-        expect(result.headline).toBe(
-            'modelo preparado confirmado no runtime vivo e preservado na sessão atual',
-        );
+        expect(result.headline).toBe('modelo preparado confirmado no runtime vivo e preservado na sessão atual');
         expect(result.action).toBe(null);
         expect(result.headline).not.toMatch(/\bbinding\b|provider-boundary|precisa de confirmação/u);
     });
@@ -93,7 +91,9 @@ describe('terminal/byok/session-binding', () => {
 
         expect(result.state).toBe('same-session-reattach-required');
         expect(result.sameProviderBoundary).toBe(false);
-        expect(result.headline).toBe('seleção preparada cruza provedor ou perfil e requer reattach preservando a sessão atual');
+        expect(result.headline).toBe(
+            'seleção preparada cruza provedor ou perfil e requer reattach preservando a sessão atual',
+        );
         expect(result.action).toContain('reatache a sessão atual');
         expect(result.headline).not.toMatch(/\bprovider\b|\bbinding\b|provider\/perfil/u);
     });

@@ -1,443 +1,141 @@
 #!/usr/bin/env node
 // @ts-check
+/**
+ * CLI canônica de análise do grafo de dependências.
+ *
+ * O grafo é construído por `dependency-graph.mjs` via Babel + resolvedor Node; não depende da API AST do TypeScript.
+ */
+
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from './typescript-compat.mjs';
+
+import { buildDependencyGraph } from './dependency-graph.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
-const TSCONFIG = path.join(ROOT, 'tsconfig.node.json');
-const JSCONFIG = path.join(ROOT, 'jsconfig.json');
-
-// Parse command line arguments
 const args = process.argv.slice(2);
+
+/** @param {string} name @param {string} fallback */
+function valueAfter(name, fallback) {
+    const index = args.indexOf(name);
+    return index >= 0 ? (args[index + 1] ?? fallback) : fallback;
+}
+
 const options = {
-    showDeps: args.includes('--deps'),
+    scope: valueAfter('--root', 'src'),
     findCircular: args.includes('--circular'),
     mapNerv: args.includes('--nerv'),
     findOrphans: args.includes('--orphans'),
     showStats: args.includes('--stats') || args.length === 0,
     exportJson: args.includes('--export-json'),
     exportDot: args.includes('--export-dot'),
+    jsonStdout: args.includes('--json-stdout'),
 };
 
-// Resolve config in canonical order: tsconfig first, jsconfig fallback.
-const configPath = fs.existsSync(TSCONFIG) ? TSCONFIG : JSCONFIG;
-const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
-if (configFile.error) {
-    throw new Error(`Failed to read ${configPath}`);
+const report = buildDependencyGraph(options.scope, { workspaceRoot: ROOT });
+const edgeCount = Object.values(report.graph).reduce((total, dependencies) => total + dependencies.length, 0);
+const topLevelCounts = new Map();
+for (const file of report.files) {
+    const top = file.split('/')[0] || '(root)';
+    topLevelCounts.set(top, (topLevelCounts.get(top) ?? 0) + 1);
 }
-const parsedConfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, ROOT);
 
-console.log('🔍 TypeScript Language Server Analysis\n');
-console.log(`📁 Root: ${ROOT}`);
-console.log(`📝 Config: ${configPath}`);
-console.log(`📦 Files: ${parsedConfig.fileNames.length}\n`);
+const rank = (/** @type {Record<string, string[]>} */ graph) =>
+    Object.entries(graph)
+        .map(([file, dependencies]) => ({ file, count: dependencies.length }))
+        .sort((a, b) => b.count - a.count || a.file.localeCompare(b.file))
+        .slice(0, 15);
 
-// Create TypeScript program
-const program = ts.createProgram(parsedConfig.fileNames, parsedConfig.options);
-
-// Data structures for analysis
-const dependencyGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependencies]
-const reverseGraph = /** @type {Map<string, string[]>} */ (new Map()); // file -> [dependents]
-const nervEvents = /** @type {{ emitters: Record<string, string[]>; listeners: Record<string, string[]> }} */ ({
-    emitters: {},
-    listeners: {},
-});
-const moduleStats = {
-    total: 0,
-    byDirectory: /** @type {Record<string, number>} */ ({}),
-    topImporters: [],
-    topImported: [],
+const payload = {
+    schemaVersion: 2,
+    scopeRoot: report.scopeRoot,
+    files: report.files.length,
+    edges: edgeCount,
+    cycles: report.cycles,
+    orphans: report.orphans,
+    parseErrors: report.parseErrors,
+    unresolvedLocalImports: report.unresolvedLocalImports,
+    topFanOut: rank(report.graph),
+    topFanIn: rank(report.reverseGraph),
+    nervEvents: report.nervEvents,
 };
 
-/**
- * Normalize file path relative to root
- *
- * @param {string} filePath
- */
-function normalizePath(filePath) {
-    return path.relative(ROOT, filePath).replace(/\\/g, '/');
-}
+if (options.jsonStdout) {
+    process.stdout.write(`${JSON.stringify(payload)}\n`);
+} else {
+    console.log('Dependency graph analysis');
+    console.log(`root=${report.scopeRoot} files=${report.files.length} edges=${edgeCount}`);
 
-/**
- * Get module category (nerv, kernel, driver, etc.)
- *
- * @param {string} filePath
- */
-function getModuleCategory(filePath) {
-    const normalized = normalizePath(filePath);
-    if (normalized.startsWith('src/nerv/')) {
-        return 'NERV';
-    }
-    if (normalized.startsWith('src/kernel/')) {
-        return 'KERNEL';
-    }
-    if (normalized.startsWith('src/driver/')) {
-        return 'DRIVER';
-    }
-    if (normalized.startsWith('src/server/')) {
-        return 'SERVER';
-    }
-    if (normalized.startsWith('src/infra/')) {
-        return 'INFRA';
-    }
-    if (normalized.startsWith('src/core/')) {
-        return 'CORE';
-    }
-    if (normalized.startsWith('tests/')) {
-        return 'TESTS';
-    }
-    if (normalized.startsWith('scripts/')) {
-        return 'SCRIPTS';
-    }
-    return 'OTHER';
-}
-
-/**
- * Extract dependencies from a source file
- *
- * @param {any} sourceFile
- */
-function extractDependencies(sourceFile) {
-    /** @type {string[]} */
-    const deps = [];
-
-    /** @param {any} node */
-    function visit(node) {
-        // require() calls
-        if (
-            ts.isCallExpression(node) &&
-            node.expression.kind === ts.SyntaxKind.Identifier &&
-            /** @type {any} */ (node.expression).text === 'require' &&
-            node.arguments.length > 0
-        ) {
-            const arg = /** @type {any} */ (node.arguments[0]);
-            if (ts.isStringLiteral(arg)) {
-                deps.push(arg.text);
-            }
+    if (options.showStats) {
+        console.log('\nModules by top-level directory:');
+        for (const [name, count] of [...topLevelCounts.entries()].sort((a, b) => b[1] - a[1])) {
+            console.log(`  ${name.padEnd(24)} ${count}`);
         }
-
-        // import statements (if any ES6 imports)
-        if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-            deps.push(node.moduleSpecifier.text);
-        }
-
-        ts.forEachChild(node, visit);
+        console.log('\nTop fan-out:');
+        for (const row of payload.topFanOut.slice(0, 10))
+            console.log(`  ${row.count.toString().padStart(3)}  ${row.file}`);
+        console.log('\nTop fan-in:');
+        for (const row of payload.topFanIn.slice(0, 10))
+            console.log(`  ${row.count.toString().padStart(3)}  ${row.file}`);
     }
 
-    visit(sourceFile);
-    return deps;
-}
-
-/**
- * Extract NERV event emissions and listeners
- *
- * @param {any} sourceFile
- */
-function extractNervEvents(sourceFile) {
-    /** @type {{ emits: string[]; listens: string[] }} */
-    const events = { emits: [], listens: [] };
-
-    /** @param {any} node */
-    function visit(node) {
-        // nerv.emit('EVENT_NAME', ...)
-        if (ts.isCallExpression(node)) {
-            const expr = node.expression;
-            if (
-                ts.isPropertyAccessExpression(expr) &&
-                expr.name.text === 'emit' &&
-                node.arguments.length > 0 &&
-                ts.isStringLiteral(/** @type {any} */ (node.arguments[0]))
-            ) {
-                events.emits.push(/** @type {any} */ (node.arguments[0]).text);
-            }
-
-            // nerv.on('EVENT_NAME', ...)
-            if (
-                ts.isPropertyAccessExpression(expr) &&
-                expr.name.text === 'on' &&
-                node.arguments.length > 0 &&
-                ts.isStringLiteral(/** @type {any} */ (node.arguments[0]))
-            ) {
-                events.listens.push(/** @type {any} */ (node.arguments[0]).text);
-            }
-        }
-
-        ts.forEachChild(node, visit);
+    if (options.findCircular) {
+        console.log('\nCircular dependency components:');
+        if (report.cycles.length === 0) console.log('  none');
+        for (const [index, cycle] of report.cycles.entries()) console.log(`  ${index + 1}. ${cycle.join(' <-> ')}`);
     }
 
-    visit(sourceFile);
-    return events;
-}
-
-/**
- * Build dependency graph
- */
-function buildDependencyGraph() {
-    program.getSourceFiles().forEach((sourceFile) => {
-        if (sourceFile.fileName.includes('node_modules')) {
-            return;
-        }
-
-        const filePath = normalizePath(sourceFile.fileName);
-        const deps = extractDependencies(sourceFile);
-
-        dependencyGraph.set(filePath, deps);
-        moduleStats.total++;
-
-        const category = getModuleCategory(sourceFile.fileName);
-        moduleStats.byDirectory[category] = (moduleStats.byDirectory[category] || 0) + 1;
-
-        // Build reverse graph
-        deps.forEach((dep) => {
-            if (!reverseGraph.has(dep)) {
-                reverseGraph.set(dep, []);
-            }
-            reverseGraph.get(dep)?.push(filePath);
-        });
-
-        // Extract NERV events
-        if (options.mapNerv) {
-            const events = extractNervEvents(sourceFile);
-            events.emits.forEach((evt) => {
-                if (!nervEvents.emitters[evt]) {
-                    nervEvents.emitters[evt] = [];
-                }
-                nervEvents.emitters[evt].push(filePath);
-            });
-            events.listens.forEach((evt) => {
-                if (!nervEvents.listeners[evt]) {
-                    nervEvents.listeners[evt] = [];
-                }
-                nervEvents.listeners[evt].push(filePath);
-            });
-        }
-    });
-}
-
-/**
- * Find circular dependencies
- */
-function findCircularDependencies() {
-    const visited = new Set();
-    const stack = new Set();
-    /** @type {string[][]} */
-    const cycles = [];
-
-    /** @param {string} node @param {string[]} path */
-    function dfs(node, path = []) {
-        if (stack.has(node)) {
-            const cycleStart = path.indexOf(node);
-            cycles.push([...path.slice(cycleStart), node]);
-            return;
-        }
-
-        if (visited.has(node)) {
-            return;
-        }
-
-        visited.add(node);
-        stack.add(node);
-        path.push(node);
-
-        const deps = dependencyGraph.get(node) || [];
-        deps.forEach((dep) => {
-            // Resolve relative paths
-            const resolvedDep = resolveImport(node, dep);
-            if (resolvedDep) {
-                dfs(resolvedDep, [...path]);
-            }
-        });
-
-        stack.delete(node);
+    if (options.findOrphans) {
+        console.log(`\nOrphan candidates (${report.orphans.length}):`);
+        for (const file of report.orphans) console.log(`  - ${file}`);
     }
 
-    dependencyGraph.forEach((_, file) => dfs(file));
-    return cycles;
-}
-
-/**
- * Resolve import path
- *
- * @param {string} fromFile
- * @param {string} importPath
- */
-function resolveImport(fromFile, importPath) {
-    if (importPath.startsWith('.')) {
-        const dir = path.dirname(fromFile);
-        const resolved = path.resolve(ROOT, dir, importPath);
-        const withExt = resolved.endsWith('.js') ? resolved : `${resolved}.js`;
-        return normalizePath(withExt);
-    }
-    return null;
-}
-
-/**
- * Find orphaned modules
- */
-function findOrphans() {
-    /** @type {string[]} */
-    const orphans = [];
-    dependencyGraph.forEach((_deps, file) => {
-        const dependents = reverseGraph.get(file) || [];
-        if (dependents.length === 0 && !file.startsWith('src/main.js') && !file.startsWith('tests/')) {
-            orphans.push(file);
+    if (options.mapNerv) {
+        const events = new Set([
+            ...Object.keys(report.nervEvents.emitters),
+            ...Object.keys(report.nervEvents.listeners),
+        ]);
+        console.log(`\nNERV events (${events.size}):`);
+        for (const event of [...events].sort()) {
+            console.log(`  ${event}`);
+            if (report.nervEvents.emitters[event]?.length)
+                console.log(`    emit: ${report.nervEvents.emitters[event].join(', ')}`);
+            if (report.nervEvents.listeners[event]?.length)
+                console.log(`    on:   ${report.nervEvents.listeners[event].join(', ')}`);
         }
-    });
-    return orphans;
-}
+    }
 
-/**
- * Calculate statistics
- */
-function calculateStats() {
-    // Top importers (most dependencies)
-    const importers = Array.from(dependencyGraph.entries())
-        .map(([file, deps]) => ({ file, count: deps.length }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-    // Top imported (most dependents)
-    const imported = Array.from(reverseGraph.entries())
-        .map(([file, deps]) => ({ file, count: deps.length }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10);
-
-    return { importers, imported };
-}
-
-// ===== MAIN ANALYSIS =====
-
-buildDependencyGraph();
-
-// Show statistics
-if (options.showStats) {
-    console.log('📊 Architecture Statistics\n');
-    console.log(`Total modules: ${moduleStats.total}`);
-    console.log('\nModules by category:');
-    Object.entries(moduleStats.byDirectory)
-        .sort((a, b) => b[1] - a[1])
-        .forEach(([cat, count]) => {
-            console.log(`  ${cat.padEnd(10)} ${count}`);
-        });
-
-    const stats = calculateStats();
-
-    console.log('\n🔝 Top 10 Importers (most dependencies):');
-    stats.importers.forEach(({ file, count }, i) => {
-        console.log(`  ${(i + 1).toString().padStart(2)}. ${file} (${count} deps)`);
-    });
-
-    console.log('\n🎯 Top 10 Imported (most dependents):');
-    stats.imported.forEach(({ file, count }, i) => {
-        console.log(`  ${(i + 1).toString().padStart(2)}. ${file} (${count} refs)`);
-    });
-}
-
-// Find circular dependencies
-if (options.findCircular) {
-    console.log('\n🔄 Circular Dependencies\n');
-    const cycles = findCircularDependencies();
-    if (cycles.length === 0) {
-        console.log('✅ No circular dependencies found!');
-    } else {
-        console.log(`⚠️  Found ${cycles.length} circular dependencies:\n`);
-        cycles.forEach((cycle, i) => {
-            console.log(`${i + 1}. ${cycle.join(' → ')}`);
-        });
+    if (report.unresolvedLocalImports.length > 0) {
+        console.warn(`\nwarning: ${report.unresolvedLocalImports.length} local imports could not be resolved`);
+    }
+    if (report.parseErrors.length > 0) {
+        console.error(`\nparse errors (${report.parseErrors.length}):`);
+        for (const error of report.parseErrors.slice(0, 30)) console.error(`  ${error.file}: ${error.message}`);
     }
 }
 
-// Find orphans
-if (options.findOrphans) {
-    console.log('\n🏝️  Orphaned Modules\n');
-    const orphans = findOrphans();
-    if (orphans.length === 0) {
-        console.log('✅ No orphaned modules found!');
-    } else {
-        console.log(`Found ${orphans.length} orphaned modules:\n`);
-        orphans.forEach((file) => console.log(`  - ${file}`));
-    }
-}
-
-// Map NERV events
-if (options.mapNerv) {
-    console.log('\n📡 NERV Event Flow Map\n');
-    const allEvents = new Set([...Object.keys(nervEvents.emitters), ...Object.keys(nervEvents.listeners)]);
-
-    if (allEvents.size === 0) {
-        console.log('ℹ️  No NERV events detected (requires .emit() and .on() calls)');
-    } else {
-        allEvents.forEach((event) => {
-            const emitters = nervEvents.emitters[event] || [];
-            const listeners = nervEvents.listeners[event] || [];
-
-            console.log(`Event: ${event}`);
-            if (emitters.length > 0) {
-                console.log(`  📤 Emitters: ${emitters.join(', ')}`);
-            }
-            if (listeners.length > 0) {
-                console.log(`  📥 Listeners: ${listeners.join(', ')}`);
-            }
-            console.log('');
-        });
-    }
-}
-
-// Export results
 if (options.exportJson) {
-    const outputPath = path.join(ROOT, 'analysis', 'code-graph.json');
-    const output = {
-        timestamp: new Date().toISOString(),
-        stats: moduleStats,
-        dependencies: Object.fromEntries(dependencyGraph),
-        reverseDependencies: Object.fromEntries(reverseGraph),
-        nervEvents,
-        circular: options.findCircular ? findCircularDependencies() : [],
-        orphans: options.findOrphans ? findOrphans() : [],
-    };
-
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
-    console.log(`\n💾 Exported to: ${outputPath}`);
+    const output = path.join(ROOT, 'analysis', 'code-graph.json');
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.writeFileSync(
+        output,
+        `${JSON.stringify({ ...payload, dependencies: report.graph, reverseDependencies: report.reverseGraph }, null, 2)}\n`,
+    );
+    if (!options.jsonStdout) console.log(`\nJSON: ${path.relative(ROOT, output)}`);
 }
 
-// Export DOT format for Graphviz
 if (options.exportDot) {
-    const outputPath = path.join(ROOT, 'analysis', 'dependency-graph.dot');
-    let dot = 'digraph Dependencies {\n';
-    dot += '  rankdir=LR;\n';
-    dot += '  node [shape=box, style=rounded];\n\n';
-
-    dependencyGraph.forEach((deps, file) => {
-        const category = getModuleCategory(path.join(ROOT, file));
-        const colorMap = /** @type {Record<string, string>} */ ({
-            NERV: 'lightblue',
-            KERNEL: 'lightgreen',
-            DRIVER: 'lightyellow',
-            SERVER: 'lightpink',
-            INFRA: 'lightgray',
-            CORE: 'orange',
-        });
-        const color = colorMap[category];
-        if (color) {
-            dot += `  "${file}" [style="rounded,filled", fillcolor="${color}"];\n`;
-        }
-
-        deps.forEach((dep) => {
-            const resolvedDep = resolveImport(file, dep);
-            if (resolvedDep) {
-                dot += `  "${file}" -> "${resolvedDep}";\n`;
-            }
-        });
-    });
-
-    dot += '}\n';
-
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, dot);
-    console.log(`\n📊 Exported Graphviz DOT to: ${outputPath}`);
-    console.log('   Generate image: dot -Tsvg analysis/dependency-graph.dot -o analysis/graph.svg');
+    const output = path.join(ROOT, 'analysis', 'dependency-graph.dot');
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    const lines = ['digraph Dependencies {', '  rankdir=LR;', '  node [shape=box, style=rounded];'];
+    for (const [file, dependencies] of Object.entries(report.graph)) {
+        if (dependencies.length === 0) lines.push(`  ${JSON.stringify(file)};`);
+        for (const dependency of dependencies)
+            lines.push(`  ${JSON.stringify(file)} -> ${JSON.stringify(dependency)};`);
+    }
+    lines.push('}');
+    fs.writeFileSync(output, `${lines.join('\n')}\n`);
+    if (!options.jsonStdout) console.log(`DOT: ${path.relative(ROOT, output)}`);
 }
 
-console.log('\n✅ Analysis complete!\n');
+if (report.parseErrors.length > 0 || report.unresolvedLocalImports.length > 0) process.exitCode = 2;
+else if (options.findCircular && report.cycles.length > 0) process.exitCode = 1;

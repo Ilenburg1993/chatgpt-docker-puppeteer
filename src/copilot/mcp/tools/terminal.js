@@ -14,11 +14,11 @@ import {
     controlTerminalSession,
     executeTerminalCommand,
     executeTerminalCommandBatch,
+    okResult,
     openTerminalSession,
     openWorldDestructiveAnnotations,
     readOnlyAnnotations,
     readTerminalSession,
-    okResult,
 } from '#copilot/mcp/control-plane';
 
 const envSchema = z.record(z.string(), z.union([z.string(), z.null()]));

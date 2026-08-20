@@ -6,6 +6,7 @@
  * metadata, which can exclude impossible routes before runtime when a key is exhausted or capped.
  *
  * Source checked 2026-05-26:
+ *
  * - https://openrouter.ai/docs/api-reference/limits
  *
  * @module copilot/model-gateway/catalog/importers/openrouter-key-account-importer
@@ -57,7 +58,7 @@ export function parseOpenRouterKeyRows(raw) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function providerEvidenceValues(row) {
     const rateLimit = isRecord(row['rate_limit']) ? row['rate_limit'] : {};
@@ -68,7 +69,12 @@ function providerEvidenceValues(row) {
         { fieldPath: 'providerMetadata.openrouter.keyDisabled', value: row['disabled'] },
         { fieldPath: 'providerMetadata.openrouter.freeTier', value: row['is_free_tier'] },
         { fieldPath: 'providerMetadata.openrouter.rateLimit', value: rateLimit },
-    ].filter((item) => item.value !== null && item.value !== undefined && !(isRecord(item.value) && Object.keys(item.value).length === 0));
+    ].filter(
+        (item) =>
+            item.value !== null &&
+            item.value !== undefined &&
+            !(isRecord(item.value) && Object.keys(item.value).length === 0),
+    );
 }
 
 /**
@@ -157,7 +163,9 @@ export function createOpenRouterKeyAccountImporter(options = {}) {
                     sourceKind: 'authenticated_account_api',
                     confidence: MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG,
                     quota: {
-                        ...(typeof spending.remainingUsd === 'number' ? { remainingCreditsUsd: spending.remainingUsd } : {}),
+                        ...(typeof spending.remainingUsd === 'number'
+                            ? { remainingCreditsUsd: spending.remainingUsd }
+                            : {}),
                     },
                     spendingLimits: spending,
                     rateLimits: rateLimit,

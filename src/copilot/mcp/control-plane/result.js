@@ -7,16 +7,19 @@
 
 /**
  * @typedef {import('@modelcontextprotocol/sdk/types.js').CallToolResult} CallToolResult
+ *
  * @typedef {CallToolResult & {
  *     content: { type: 'text'; text: string }[];
  *     structuredContent: Record<string, any>;
  * }} StructuredCallToolResult
+ *
  *
  * @typedef {{
  *     bytes: number;
  *     strategy: 'exact' | 'conservative-estimate';
  *     source: string;
  * }} ResultSizeHint
+ *
  * @typedef {{
  *     logicalOperations: number;
  *     failedOperations?: number;
@@ -145,8 +148,8 @@ export function getResultSizeHint(result) {
 }
 
 /**
- * Estimate JSON bytes without materializing the whole result string. This preserves the result-size guard while avoiding
- * the large temporary allocation that `stableJsonStringify(result)` creates for hot read/search/patch tools.
+ * Estimate JSON bytes without materializing the whole result string. This preserves the result-size guard while
+ * avoiding the large temporary allocation that `stableJsonStringify(result)` creates for hot read/search/patch tools.
  *
  * @param {unknown} value
  * @param {WeakSet<object>} [seen]
@@ -155,7 +158,8 @@ export function getResultSizeHint(result) {
 function estimateJsonBytes(value, seen = new WeakSet()) {
     if (value === null) return 4;
     if (typeof value === 'string') return Buffer.byteLength(JSON.stringify(value), 'utf8');
-    if (typeof value === 'number') return Buffer.byteLength(JSON.stringify(Number.isFinite(value) ? value : null), 'utf8');
+    if (typeof value === 'number')
+        return Buffer.byteLength(JSON.stringify(Number.isFinite(value) ? value : null), 'utf8');
     if (typeof value === 'boolean') return value ? 4 : 5;
     if (typeof value === 'bigint') return Buffer.byteLength(JSON.stringify(String(value)), 'utf8');
     if (typeof value === 'undefined' || typeof value === 'function' || typeof value === 'symbol') return 0;
@@ -167,7 +171,10 @@ function estimateJsonBytes(value, seen = new WeakSet()) {
         for (let index = 0; index < value.length; index += 1) {
             if (index > 0) total += 1;
             const item = value[index];
-            total += item === undefined || typeof item === 'function' || typeof item === 'symbol' ? 4 : estimateJsonBytes(item, seen);
+            total +=
+                item === undefined || typeof item === 'function' || typeof item === 'symbol'
+                    ? 4
+                    : estimateJsonBytes(item, seen);
         }
         return total;
     }

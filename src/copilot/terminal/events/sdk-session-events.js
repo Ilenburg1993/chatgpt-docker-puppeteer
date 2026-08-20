@@ -26,9 +26,9 @@ import {
     EMITTER_COMMANDS_CHANGED,
     EMITTER_ELICITATION_COMPLETED,
     EMITTER_ELICITATION_PENDING,
-    EMITTER_EXTENSION_CONTEXT,
     EMITTER_EXIT_PLAN_MODE_COMPLETED,
     EMITTER_EXIT_PLAN_MODE_REQUESTED,
+    EMITTER_EXTENSION_CONTEXT,
     EMITTER_EXTERNAL_TOOL_COMPLETED,
     EMITTER_EXTERNAL_TOOL_REQUESTED,
     EMITTER_HOOK_END,
@@ -83,8 +83,12 @@ import {
     setLastSdkPlanOperation,
     setSdkSessionMode,
 } from '../../presentation/state/index.js';
-import { broadcastSse, println } from '../dialog/io/index.js';
+import {
+    consumeTerminalLiveByokModelSwitchConfirmation,
+    promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary,
+} from '../byok/live/index.js';
 import { sanitizeTerminalRenderText } from '../dialog/index.js';
+import { broadcastSse, println } from '../dialog/io/index.js';
 import {
     answerTerminalPendingQuestion,
     classifyTerminalPermissionDecision,
@@ -93,11 +97,6 @@ import {
     readTerminalToolRegistrySnapshot,
 } from '../frontend/gateways/index.js';
 import { observeTerminalModelChangeProjection } from '../frontend/projections/index.js';
-import {
-    consumeTerminalLiveByokModelSwitchConfirmation,
-    promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary,
-} from '../byok/live/index.js';
-import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import {
     appendTerminalTranscriptTurn,
     beginTerminalTurnMaterialization,
@@ -109,6 +108,8 @@ import {
     getTerminalDetailLevel,
     hasRecentTerminalTurnPublicMaterialization,
     markTerminalActivityIdle,
+    readTerminalTurnMaterialization,
+    readTerminalTurnTraceProjection,
     recordTerminalActivity,
     recordTerminalElicitationCompleted,
     recordTerminalElicitationPending,
@@ -117,8 +118,6 @@ import {
     recordTerminalPermissionRequested,
     recordTerminalTurnAssistantMessage,
     recordTerminalTurnFileActivity,
-    readTerminalTurnMaterialization,
-    readTerminalTurnTraceProjection,
     recordTerminalTurnUserInputActivity,
     recordTerminalUserInputCompleted,
     recordTerminalUserInputRequested,
@@ -127,9 +126,10 @@ import {
     terminalThemeText,
     withTerminalTurnCorrelation,
 } from '../state/events/index.js';
+import { terminalPermissionModeSkipsSdkPrompts } from '../state/index.js';
 import { drainMailboxToTurnIfIdle } from '../wiring/mailbox/index.js';
-import { summarizeAfterUserInputContinuation } from './dialog-recovery-presenter.js';
 import { renderTerminalAssistantTranscript } from './assistant-transcript-renderer.js';
+import { summarizeAfterUserInputContinuation } from './dialog-recovery-presenter.js';
 import { printTerminalHumanQuestionCard } from './human-question-renderer.js';
 import {
     buildTerminalModelTransitionPresentation,
@@ -296,7 +296,9 @@ function compactSummaryText(value, max = 36) {
  * @returns {string}
  */
 function compactOneLine(value) {
-    return String(value ?? '').replace(/\s+/gu, ' ').trim();
+    return String(value ?? '')
+        .replace(/\s+/gu, ' ')
+        .trim();
 }
 
 /**
@@ -323,7 +325,9 @@ function renderSdkOperatorMessage(value) {
  * @returns {boolean}
  */
 function isHumanInputToolName(value) {
-    const normalized = String(value ?? '').trim().toLowerCase();
+    const normalized = String(value ?? '')
+        .trim()
+        .toLowerCase();
     return normalized === 'ask_user' || normalized === 'request_user_input' || normalized.endsWith('.ask_user');
 }
 
@@ -988,17 +992,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         const modelRetry = infoType === 'model_retry';
         const configurationInfo = infoType === 'configuration';
         const renderedInfo = renderSdkSessionInfoForOperator(infoType, message);
-        recordTerminalActivity(
-            'system',
-            renderedInfo.label,
-            {
-                detail: renderedInfo.detail,
-                source: 'sdk',
-                severity: modelRetry ? 'warn' : 'info',
-                recordHistory: modelRetry,
-                updateCurrent: !configurationInfo,
-            },
-        );
+        recordTerminalActivity('system', renderedInfo.label, {
+            detail: renderedInfo.detail,
+            source: 'sdk',
+            severity: modelRetry ? 'warn' : 'info',
+            recordHistory: modelRetry,
+            updateCurrent: !configurationInfo,
+        });
         if (shouldPrintSessionNarration('verbose') && !configurationInfo) {
             println(terminalThemeRow(renderedInfo.label, renderedInfo.detail));
             if (evt?.url) println(terminalThemeRow('URL', String(evt.url), { role: 'command' }));
@@ -1251,7 +1251,8 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
                 const mailboxSummary = readRuntimeInterventionMailboxSummary(runtimeId);
                 const sourceLabel = renderInterventionSourceLabel(mailboxEntry.source);
                 const modeLabel = renderInterventionModeLabel(mailboxEntry.modeHint);
-                const mergedLabel = mailboxEntry.mergedCount > 0 ? ` · ${pluralPt(mailboxEntry.mergedCount, 'mescla', 'mesclas')}` : '';
+                const mergedLabel =
+                    mailboxEntry.mergedCount > 0 ? ` · ${pluralPt(mailboxEntry.mergedCount, 'mescla', 'mesclas')}` : '';
                 recordTerminalActivity('question', 'Fila de intervenção aplicada em pergunta humana', {
                     detail: `origem ${sourceLabel} · ${modeLabel}${mergedLabel}`,
                     source: 'sdk',
@@ -1343,7 +1344,10 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     const onSessionWarning = (/** @type {{ warningType?: string; message?: string; url?: string }} */ evt) => {
         const warningType = evt?.warningType ?? 'warning';
         const message = renderSdkOperatorMessage(evt?.message ?? '(sem mensagem)');
-        const warningLabel = String(warningType).replace(/[._-]+/gu, ' ').trim() || 'aviso';
+        const warningLabel =
+            String(warningType)
+                .replace(/[._-]+/gu, ' ')
+                .trim() || 'aviso';
         recordTerminalActivity('system', `Aviso da sessão · ${warningLabel}`, {
             detail: message,
             severity: 'warn',
@@ -1403,8 +1407,7 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: changed,
             updateCurrent: changed,
         });
-        const shouldPrintModelTransition =
-            changed || matchedRequest !== null || shouldPrintSessionNarration('verbose');
+        const shouldPrintModelTransition = changed || matchedRequest !== null || shouldPrintSessionNarration('verbose');
         if (shouldPrintModelTransition) {
             println(
                 `\n${renderTerminalModelTransitionRow({
@@ -1700,7 +1703,11 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             source: 'sdk',
         });
         if (shouldPrintSessionNarration('important')) {
-            println(terminalThemeRow('Handoff SDK', `${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}`, { role: 'info' }));
+            println(
+                terminalThemeRow('Handoff SDK', `${fromAgent} → ${toAgent}${reason ? ` · ${reason}` : ''}`, {
+                    role: 'info',
+                }),
+            );
         }
         broadcastSse(
             'session.handoff',
@@ -1765,8 +1772,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         );
     };
 
-    const onSessionCustomAgentsUpdated = (/** @type {{ count?: number; agents?: unknown[]; data?: Record<string, unknown> }} */ evt) => {
-        const count = Number.isFinite(Number(evt?.count)) ? Number(evt?.count) : Array.isArray(evt?.agents) ? evt.agents.length : 0;
+    const onSessionCustomAgentsUpdated = (
+        /** @type {{ count?: number; agents?: unknown[]; data?: Record<string, unknown> }} */ evt,
+    ) => {
+        const count = Number.isFinite(Number(evt?.count))
+            ? Number(evt?.count)
+            : Array.isArray(evt?.agents)
+              ? evt.agents.length
+              : 0;
         recordTerminalActivity('subagent', 'Agentes customizados atualizados', {
             detail: pluralPt(count, 'agente', 'agentes'),
             source: 'sdk',
@@ -1786,13 +1799,22 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
     };
 
     const onSessionCustomNotification = (
-        /** @type {{ title?: string | null; message?: string | null; level?: string | null; data?: Record<string, unknown> }} */ evt,
+        /** @type {{
+    title?: string | null;
+    message?: string | null;
+    level?: string | null;
+    data?: Record<string, unknown>;
+}} */ evt,
     ) => {
         const title = compactOneLine(evt?.title ?? '');
         const message = renderSdkOperatorMessage(evt?.message ?? '');
         const level = compactOneLine(evt?.level ?? '');
         const severity = /warn|error|fail|denied|blocked/iu.test(level) ? 'warn' : 'info';
-        const detail = [title || null, message ? compactSummaryText(message, 140) : null, level ? `nível ${level}` : null]
+        const detail = [
+            title || null,
+            message ? compactSummaryText(message, 140) : null,
+            level ? `nível ${level}` : null,
+        ]
             .filter(Boolean)
             .join(' · ');
         recordTerminalActivity('system', 'Notificação customizada SDK', {
@@ -1843,9 +1865,16 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         );
     };
 
-    const onSessionRemoteSteerableChanged = (/** @type {{ enabled?: boolean | null; data?: Record<string, unknown> }} */ evt) => {
+    const onSessionRemoteSteerableChanged = (
+        /** @type {{ enabled?: boolean | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
         const enabled = typeof evt?.enabled === 'boolean' ? evt.enabled : null;
-        const detail = enabled === true ? 'controle remoto ativado' : enabled === false ? 'controle remoto desativado' : 'estado remoto alterado';
+        const detail =
+            enabled === true
+                ? 'controle remoto ativado'
+                : enabled === false
+                  ? 'controle remoto desativado'
+                  : 'estado remoto alterado';
         recordTerminalActivity('system', 'Controle remoto da sessão alterado', {
             detail,
             source: 'sdk',
@@ -1868,10 +1897,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         );
     };
 
-    const onSessionScheduleCreated = (/** @type {{ scheduleId?: string | null; title?: string | null; data?: Record<string, unknown> }} */ evt) => {
+    const onSessionScheduleCreated = (
+        /** @type {{ scheduleId?: string | null; title?: string | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
         const scheduleId = compactOneLine(evt?.scheduleId ?? '');
         const title = compactOneLine(evt?.title ?? '');
-        const detail = [title || null, scheduleId ? renderSdkRequestLabel(scheduleId) : null].filter(Boolean).join(' · ');
+        const detail = [title || null, scheduleId ? renderSdkRequestLabel(scheduleId) : null]
+            .filter(Boolean)
+            .join(' · ');
         recordTerminalActivity('task', 'Agendamento SDK criado', {
             detail: detail || 'agendamento criado',
             source: 'sdk',
@@ -1890,10 +1923,14 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         );
     };
 
-    const onSessionScheduleCancelled = (/** @type {{ scheduleId?: string | null; title?: string | null; data?: Record<string, unknown> }} */ evt) => {
+    const onSessionScheduleCancelled = (
+        /** @type {{ scheduleId?: string | null; title?: string | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
         const scheduleId = compactOneLine(evt?.scheduleId ?? '');
         const title = compactOneLine(evt?.title ?? '');
-        const detail = [title || null, scheduleId ? renderSdkRequestLabel(scheduleId) : null].filter(Boolean).join(' · ');
+        const detail = [title || null, scheduleId ? renderSdkRequestLabel(scheduleId) : null]
+            .filter(Boolean)
+            .join(' · ');
         recordTerminalActivity('task', 'Agendamento SDK cancelado', {
             detail: detail || 'agendamento cancelado',
             source: 'sdk',
@@ -1912,7 +1949,9 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         );
     };
 
-    const onExtensionContext = (/** @type {{ extensionName?: string | null; data?: Record<string, unknown> }} */ evt) => {
+    const onExtensionContext = (
+        /** @type {{ extensionName?: string | null; data?: Record<string, unknown> }} */ evt,
+    ) => {
         const extensionName = compactOneLine(evt?.extensionName ?? '');
         recordTerminalActivity('system', 'Contexto de extensão atualizado', {
             detail: extensionName || 'contexto recebido',
@@ -2277,7 +2316,12 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
             recordHistory: false,
         });
         if (shouldPrintSessionNarration('verbose')) {
-            println(terminalThemeRow('Comandos SDK', `${pluralPt(count, 'comando', 'comandos')}${preview ? ` · ${preview}` : ''}`));
+            println(
+                terminalThemeRow(
+                    'Comandos SDK',
+                    `${pluralPt(count, 'comando', 'comandos')}${preview ? ` · ${preview}` : ''}`,
+                ),
+            );
         }
         broadcastSse('commands.changed', withSdkSessionSseEnvelope({ count, commands }, 'sdk/commands.changed'));
         refreshPromptIfIdle();
@@ -2333,9 +2377,13 @@ export function setupTerminalSdkSessionEventListeners({ agent, refreshPromptIfId
         });
         if (shouldPrintSessionNarration('important')) {
             println(
-                terminalThemeRow('Modo automático', `SDK solicitou troca automática${errorCode ? ` · ${errorCode}` : ''}`, {
-                    role: 'warn',
-                }),
+                terminalThemeRow(
+                    'Modo automático',
+                    `SDK solicitou troca automática${errorCode ? ` · ${errorCode}` : ''}`,
+                    {
+                        role: 'warn',
+                    },
+                ),
             );
         }
         broadcastSse(

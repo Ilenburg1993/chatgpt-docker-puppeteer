@@ -8,7 +8,7 @@
  * @module copilot/config/auth
  */
 
-/** @import {VerifyOptions} from "jsonwebtoken" */
+/** @import {VerifyOptions} from 'jsonwebtoken' */
 
 /** @type {string | null} */
 let _cachedSecret = null;

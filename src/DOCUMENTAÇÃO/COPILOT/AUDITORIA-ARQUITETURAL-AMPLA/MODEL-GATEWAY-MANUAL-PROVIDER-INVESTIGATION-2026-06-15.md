@@ -1,7 +1,8 @@
 # Investigação Manual de Configuração de Provedores Model Gateway
 
 **Data**: 2026-06-15  
-**Objetivo**: Investigar configuração manual de provedores para habilitar modelos fora do kilo-code e zai
+**Objetivo**: Investigar configuração manual de provedores para habilitar modelos fora do kilo-code
+e zai
 
 ## Análise Arquitetural Atual
 
@@ -18,7 +19,7 @@ O sistema usa um padrão de adaptadores de provedores com:
 ```javascript
 // Provedores registrados no registry:
 - openRouterAdapter
-- ollamaAdapter  
+- ollamaAdapter
 - geminiAdapter
 - anthropicAdapter
 - ...openAIProviderFamilyAdapters (inclu cerebras, chutes, groq, mistral)
@@ -60,7 +61,7 @@ function resolveProviderAuth(provider, secrets) {
     const auth = provider['auth'] ?? {};
     const bearerRefs = stringArray(auth['bearerTokenRefs']);
     const apiKeyRefs = stringArray(auth['apiKeyRefs']);
-    
+
     // Busca tokens no registry de segredos
     for (const ref of bearerRefs) {
         const token = secrets.get(ref);
@@ -84,7 +85,7 @@ Para cada provedor, é necessário configurar variáveis de ambiente:
 # Para Groq
 export GROQ_KEY="sua_chave_groq"
 
-# Para Mistral  
+# Para Mistral
 export MISTRAL_KEY="sua_chave_mistral"
 
 # Para Cerebras
@@ -102,7 +103,7 @@ Os perfis existentes no sistema já estão configurados:
 // Existe perfil "groq-free" mas requer GROQ_KEY
 {
     "name": "groq-free",
-    "providerId": "groq", 
+    "providerId": "groq",
     "model": "qwen/qwen3-32b",
     "secretRefs": ["GROQ_KEY"]
 }
@@ -111,6 +112,7 @@ Os perfis existentes no sistema já estão configurados:
 ### 3. Problema de Probes
 
 Os probes falham porque:
+
 - Não há endpoint de probe configurado para provedores manualmente adicionados
 - O sistema espera probes pré-existentes no catálogo
 
@@ -158,11 +160,13 @@ const manualProviderConfig = {
 ## Verificação de Viabilidade
 
 ### ZAI (Funcionando)
+
 - ✅ Segredos configurados via Z_AI_KEY
 - ✅ Probe disponível
 - ✅ Modelo glm-4.5-flash funcional
 
 ### Outros Provedores (Falhando)
+
 - ❌ Falta de probes no catálogo
 - ❌ Falta de configuração manual
 - ❌ Sistema de autenticação não testado
@@ -176,7 +180,8 @@ const manualProviderConfig = {
 
 ## Conclusão
 
-A arquitetura suporta configuração manual, mas o sistema atual depende fortemente do catálogo pré-existente. A solução mais viável é:
+A arquitetura suporta configuração manual, mas o sistema atual depende fortemente do catálogo
+pré-existente. A solução mais viável é:
 
 1. Configurar segredos manualmente
 2. Usar openAI-compatible-adapter como fallback

@@ -3,6 +3,7 @@
  * Governed dependency maintenance for the workspace root.
  *
  * This module intentionally exposes only two fixed workflows:
+ *
  * - inspect the current root package against npm registry `latest` versions via the already-installed npm-check-updates;
  * - upgrade the root package manifests and installed tree using the packageManager-pinned npm version; lock resolution
  *   runs without lifecycle scripts, while the final install deliberately enables them and verifies native bindings.
@@ -13,11 +14,11 @@
  */
 
 import { spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 import { writeFileAtomic } from '#copilot/infra/public/io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 export const MCP_DEPENDENCY_MAINTENANCE_VERSION = 2;
@@ -42,20 +43,21 @@ export const MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES = Object.freeze([
     'vue-demi',
 ]);
 const TRUSTED_INSTALL_SCRIPT_PACKAGE_SET = new Set(MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES);
+const { readTextFresh: readWorkspaceTextFresh } = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 /**
  * @typedef {{
- *   success: boolean;
- *   command: string;
- *   args: string[];
- *   exitCode: number | null;
- *   signal: NodeJS.Signals | null;
- *   timedOut: boolean;
- *   durationMs: number;
- *   stdout: string;
- *   stderr: string;
- *   outputTruncated: boolean;
- *   phase?: string;
+ *     success: boolean;
+ *     command: string;
+ *     args: string[];
+ *     exitCode: number | null;
+ *     signal: NodeJS.Signals | null;
+ *     timedOut: boolean;
+ *     durationMs: number;
+ *     stdout: string;
+ *     stderr: string;
+ *     outputTruncated: boolean;
+ *     phase?: string;
  * }} FixedCommandResult
  */
 
@@ -67,11 +69,7 @@ const TRUSTED_INSTALL_SCRIPT_PACKAGE_SET = new Set(MCP_DEPENDENCY_TRUSTED_INSTAL
 export async function inspectRootDependencyUpdates(options = {}) {
     const timeoutMs = normalizeTimeout(options.timeoutMs, DEFAULT_TIMEOUT_MS);
     const [result, runtimeNpm] = await Promise.all([
-        runFixedCommand(
-            NCU_COMMAND,
-            [...NCU_BASE_ARGS, '--jsonUpgraded', '--target', 'latest'],
-            { timeoutMs },
-        ),
+        runFixedCommand(NCU_COMMAND, [...NCU_BASE_ARGS, '--jsonUpgraded', '--target', 'latest'], { timeoutMs }),
         runFixedCommand('npm', ['--version'], { timeoutMs: Math.min(timeoutMs, 30_000) }),
     ]);
     const upgrades = result.success ? parseNcuJson(result.stdout) : {};
@@ -107,8 +105,9 @@ export async function inspectRootDependencyUpdates(options = {}) {
 
 /**
  * Upgrade the root package to registry latest versions. The caller must have already established an acceptable dirty
- * worktree policy. The function snapshots the incoming package.json/package-lock.json exactly and restores that incoming
- * state on failure before reconciling node_modules, so pre-existing manifest work is preserved rather than discarded.
+ * worktree policy. The function snapshots the incoming package.json/package-lock.json exactly and restores that
+ * incoming state on failure before reconciling node_modules, so pre-existing manifest work is preserved rather than
+ * discarded.
  *
  * @param {{ timeoutMs?: number; install?: boolean }} [options]
  */
@@ -117,8 +116,8 @@ export async function upgradeRootDependenciesToLatest(options = {}) {
     const packagePath = path.join(workspaceRoot, PACKAGE_JSON);
     const lockPath = path.join(workspaceRoot, PACKAGE_LOCK);
     const before = {
-        packageJson: await fs.readFile(packagePath, 'utf8'),
-        packageLock: await fs.readFile(lockPath, 'utf8'),
+        packageJson: (await readWorkspaceTextFresh(packagePath, { includeHash: false })).content,
+        packageLock: (await readWorkspaceTextFresh(lockPath, { includeHash: false })).content,
     };
     const timeoutMs = normalizeTimeout(options.timeoutMs, UPGRADE_TIMEOUT_MS);
     const install = options.install !== false;
@@ -193,12 +192,9 @@ export async function upgradeRootDependenciesToLatest(options = {}) {
                 });
             }
 
-            const smokeResult = await runMaintenanceStep(
-                'native-smoke',
-                process.execPath,
-                [NATIVE_SMOKE_SCRIPT],
-                { timeoutMs: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS) },
-            );
+            const smokeResult = await runMaintenanceStep('native-smoke', process.execPath, [NATIVE_SMOKE_SCRIPT], {
+                timeoutMs: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS),
+            });
             steps.push(smokeResult);
             nativeSmoke = parseJsonObject(smokeResult.stdout);
             if (!smokeResult.success || nativeSmoke?.['success'] !== true) {
@@ -261,9 +257,12 @@ export function readDeclaredNpmVersionFromPackageText(packageJsonText) {
 
 /** @returns {Promise<string>} */
 async function readDeclaredNpmVersion() {
-    const packageText = await fs.readFile(path.join(getMcpWorkspaceRoot(), PACKAGE_JSON), 'utf8');
+    const packageText = (
+        await readWorkspaceTextFresh(path.join(getMcpWorkspaceRoot(), PACKAGE_JSON), { includeHash: false })
+    ).content;
     const version = readDeclaredNpmVersionFromPackageText(packageText);
-    if (!version) throw new Error('package.json must declare an exact npm packageManager version before dependency maintenance.');
+    if (!version)
+        throw new Error('package.json must declare an exact npm packageManager version before dependency maintenance.');
     return version;
 }
 
@@ -287,12 +286,9 @@ async function runMaintenanceStep(phase, command, args, options) {
  * @param {number} timeoutMs
  */
 function runDeclaredNpmStep(phase, npmVersion, npmArgs, timeoutMs) {
-    return runMaintenanceStep(
-        phase,
-        NCU_COMMAND,
-        ['--yes', `--package=npm@${npmVersion}`, 'npm', ...npmArgs],
-        { timeoutMs },
-    );
+    return runMaintenanceStep(phase, NCU_COMMAND, ['--yes', `--package=npm@${npmVersion}`, 'npm', ...npmArgs], {
+        timeoutMs,
+    });
 }
 
 /**
@@ -312,12 +308,9 @@ async function restoreAndReconcileDependencyTree(before, timeoutMs, steps) {
     );
     steps.push(restoreInstall);
     if (!restoreInstall.success) return { treeReconciled: false, npmVersion };
-    const smoke = await runMaintenanceStep(
-        'rollback-native-smoke',
-        process.execPath,
-        [NATIVE_SMOKE_SCRIPT],
-        { timeoutMs: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS) },
-    );
+    const smoke = await runMaintenanceStep('rollback-native-smoke', process.execPath, [NATIVE_SMOKE_SCRIPT], {
+        timeoutMs: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS),
+    });
     steps.push(smoke);
     const parsedSmoke = parseJsonObject(smoke.stdout);
     return { treeReconciled: smoke.success && parsedSmoke?.['success'] === true, npmVersion };
@@ -334,7 +327,13 @@ export function summarizeInstallScriptPolicy(payload) {
         const record = /** @type {Record<string, unknown>} */ (row);
         const name = typeof record['name'] === 'string' ? record['name'] : '';
         const changes = Array.isArray(record['changes']) ? record['changes'] : [];
-        if (!name || !changes.some((change) => change && typeof change === 'object' && !Array.isArray(change) && change['change'] === 'pending')) {
+        if (
+            !name ||
+            !changes.some(
+                (change) =>
+                    change && typeof change === 'object' && !Array.isArray(change) && change['change'] === 'pending',
+            )
+        ) {
             continue;
         }
         pending.push(name);
@@ -399,7 +398,12 @@ async function reconcileInstallScriptPolicy(npmVersion, timeoutMs, steps) {
         );
         steps.push(rebuild);
         if (!rebuild.success) {
-            return { success: false, error: 'Rebuild after trusted install-script approval failed.', initial, approved };
+            return {
+                success: false,
+                error: 'Rebuild after trusted install-script approval failed.',
+                initial,
+                approved,
+            };
         }
     }
 
@@ -427,20 +431,20 @@ async function reconcileInstallScriptPolicy(npmVersion, timeoutMs, steps) {
 }
 
 /**
- * Remove stale exact-version approvals only for the repository-maintained trusted package set.
- * Unknown/manual policy entries are preserved byte-for-byte at the semantic JSON level.
+ * Remove stale exact-version approvals only for the repository-maintained trusted package set. Unknown/manual policy
+ * entries are preserved byte-for-byte at the semantic JSON level.
  */
 async function pruneStaleTrustedAllowScripts() {
     const workspaceRoot = getMcpWorkspaceRoot();
     const packagePath = path.join(workspaceRoot, PACKAGE_JSON);
     const lockPath = path.join(workspaceRoot, PACKAGE_LOCK);
-    const packageText = await fs.readFile(packagePath, 'utf8');
+    const packageText = (await readWorkspaceTextFresh(packagePath, { includeHash: false })).content;
     const parsedPackage = JSON.parse(packageText);
     const allowScripts = parsedPackage.allowScripts;
     if (!allowScripts || typeof allowScripts !== 'object' || Array.isArray(allowScripts)) {
         return { changed: false, removed: [] };
     }
-    const lock = JSON.parse(await fs.readFile(lockPath, 'utf8'));
+    const lock = JSON.parse((await readWorkspaceTextFresh(lockPath, { includeHash: false })).content);
     const packages = lock?.packages && typeof lock.packages === 'object' ? lock.packages : {};
     /** @type {Map<string, Set<string>>} */
     const lockedVersions = new Map(MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES.map((name) => [name, new Set()]));
@@ -455,7 +459,9 @@ async function pruneStaleTrustedAllowScripts() {
     }
     const removed = [];
     for (const key of Object.keys(allowScripts)) {
-        const name = MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES.find((candidate) => key.startsWith(`${candidate}@`));
+        const name = MCP_DEPENDENCY_TRUSTED_INSTALL_SCRIPT_PACKAGES.find((candidate) =>
+            key.startsWith(`${candidate}@`),
+        );
         if (!name) continue;
         const version = key.slice(name.length + 1);
         if (!lockedVersions.get(name)?.has(version)) {
@@ -489,7 +495,9 @@ async function restoreRootManifests(snapshot) {
 
 /** @returns {Promise<Record<string, string>>} */
 async function readRootPackageVersions() {
-    const packageText = await fs.readFile(path.join(getMcpWorkspaceRoot(), PACKAGE_JSON), 'utf8');
+    const packageText = (
+        await readWorkspaceTextFresh(path.join(getMcpWorkspaceRoot(), PACKAGE_JSON), { includeHash: false })
+    ).content;
     const parsed = JSON.parse(packageText);
     const npmVersion = readDeclaredNpmVersionFromPackageText(packageText);
     return {
@@ -518,9 +526,7 @@ function classifySpecUpgrade(current, latest) {
 /** @param {string} value */
 function extractNumericVersion(value) {
     const match = String(value).match(/(\d+)\.(\d+)\.(\d+)/u);
-    return match
-        ? { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) }
-        : null;
+    return match ? { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) } : null;
 }
 
 /** @param {string} stdout @returns {Record<string, unknown> | null} */
@@ -688,12 +694,12 @@ function normalizeTimeout(value, fallback) {
  * @param {string} error
  * @param {FixedCommandResult[]} steps
  * @param {{
- *   rollbackPerformed: boolean;
- *   rollbackTreeReconciled: boolean;
- *   npmVersion?: string;
- *   rollbackNpmVersion?: string | null;
- *   nativeSmoke?: Record<string, unknown> | null;
- *   installScriptPolicy?: Record<string, unknown> | null;
+ *     rollbackPerformed: boolean;
+ *     rollbackTreeReconciled: boolean;
+ *     npmVersion?: string;
+ *     rollbackNpmVersion?: string | null;
+ *     nativeSmoke?: Record<string, unknown> | null;
+ *     installScriptPolicy?: Record<string, unknown> | null;
  * }} rollback
  */
 function buildUpgradeFailure(error, steps, rollback) {

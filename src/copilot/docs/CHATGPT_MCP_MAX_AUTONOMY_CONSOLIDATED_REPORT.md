@@ -1,10 +1,9 @@
 # Relatorio consolidado — Autonomia maxima do ChatGPT sobre o repo via MCP
 
-**Data:** 2026-05-23
-**Escopo:** `src/copilot/`
-**Documento-base lido integralmente:** `src/copilot/docs/Plano consolidado de autonomia maxima.md`
-**Objetivo:** reduzir bloqueios e janelas de autorizacao no `https://chatgpt.com/`, aumentando o
-poder pratico do ChatGPT sobre este repo por meio do MCP server.
+**Data:** 2026-05-23 **Escopo:** `src/copilot/` **Documento-base lido integralmente:**
+`src/copilot/docs/Plano consolidado de autonomia maxima.md` **Objetivo:** reduzir bloqueios e
+janelas de autorizacao no `https://chatgpt.com/`, aumentando o poder pratico do ChatGPT sobre este
+repo por meio do MCP server.
 
 ---
 
@@ -45,12 +44,10 @@ runner local para execucao longa
 
 ## 2. Fontes oficiais consideradas
 
-1. OpenAI Apps SDK Quickstart
-   URL: `https://developers.openai.com/apps-sdk/quickstart`
-   Ponto aplicado: apps usam MCP para conectar ao ChatGPT; o MCP server define capabilities/tools.
+1. OpenAI Apps SDK Quickstart URL: `https://developers.openai.com/apps-sdk/quickstart` Ponto
+   aplicado: apps usam MCP para conectar ao ChatGPT; o MCP server define capabilities/tools.
 
-2. OpenAI ChatGPT Developer Mode
-   URL: `https://developers.openai.com/api/docs/guides/developer-mode`
+2. OpenAI ChatGPT Developer Mode URL: `https://developers.openai.com/api/docs/guides/developer-mode`
    Pontos aplicados:
    - Developer Mode fornece suporte MCP para tools read e write.
    - Streaming HTTP e SSE sao protocolos aceitos.
@@ -60,24 +57,21 @@ runner local para execucao longa
    - `readOnlyHint` e respeitado.
    - aprovacoes lembradas valem para a conversa e podem voltar apos refresh/nova conversa.
 
-3. OpenAI Apps SDK Reference
-   URL: `https://developers.openai.com/apps-sdk/reference`
-   Pontos aplicados:
+3. OpenAI Apps SDK Reference URL: `https://developers.openai.com/apps-sdk/reference` Pontos
+   aplicados:
    - annotations relevantes: `readOnlyHint`, `destructiveHint`, `openWorldHint`, `idempotentHint`.
    - esses hints influenciam como o ChatGPT enquadra a chamada.
    - o servidor ainda precisa impor a propria autorizacao.
 
-4. OpenAI Apps SDK Define tools
-   URL: `https://developers.openai.com/apps-sdk/plan/tools`
-   Pontos aplicados:
+4. OpenAI Apps SDK Define tools URL: `https://developers.openai.com/apps-sdk/plan/tools` Pontos
+   aplicados:
    - uma tarefa por tool.
    - inputs explicitos, enums e defaults documentados.
    - outputs previsiveis e estruturados.
    - separar read de write para respeitar confirmation flows.
 
-5. OpenAI Apps SDK Test your integration
-   URL: `https://developers.openai.com/apps-sdk/deploy/testing`
-   Pontos aplicados:
+5. OpenAI Apps SDK Test your integration URL:
+   `https://developers.openai.com/apps-sdk/deploy/testing` Pontos aplicados:
    - testar localmente com MCP Inspector.
    - validar em ChatGPT Developer Mode com golden prompts.
    - registrar argumentos passados, tool escolhida e prompts de confirmacao.
@@ -1229,8 +1223,8 @@ Subfases:
 1. Mapear scopes por tool: implementado.
 2. Implementar protected resource metadata: implementado no HTTP adapter.
 3. Implementar authorization server metadata: pendente; depende de issuer real externo.
-4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`: implementado no wrapper
-   do registry quando enforcement exige token e o bearer esta ausente/invalido.
+4. Implementar runtime challenge `_meta["mcp/www_authenticate"]`: implementado no wrapper do
+   registry quando enforcement exige token e o bearer esta ausente/invalido.
 5. Validar com MCP Inspector e ChatGPT: pendente em modo OAuth real.
 
 Pronto quando:
@@ -1280,41 +1274,52 @@ Resultado implementado:
    - default em `oauth`: `all`;
    - modos explicitos: `off`, `read`, `write`, `validate`, `admin`, `all`.
 10. Validador de bearer token suporta:
-   - token estatico local via `COPILOT_MCP_STATIC_BEARER_TOKEN`, util para testes controlados;
-   - OAuth/JWT por JWKS via `COPILOT_MCP_OAUTH_JWKS_URI`;
-   - issuer via `COPILOT_MCP_OAUTH_EXPECTED_ISSUER`;
-   - audience/resource via `COPILOT_MCP_OAUTH_AUDIENCE`;
-   - checagem de scopes `scope` ou `scp`.
-11. `mcp_auth_profile` reporta enforcement, issuer, audience, JWKS e static bearer sem revelar segredo.
-    Tambem retorna templates redigidos de ambiente para:
-   - tunnel temporario sem auth;
-   - teste local `mixed-auth` com bearer estatico nao commitado;
-   - OAuth/JWKS com issuer real.
+
+- token estatico local via `COPILOT_MCP_STATIC_BEARER_TOKEN`, util para testes controlados;
+- OAuth/JWT por JWKS via `COPILOT_MCP_OAUTH_JWKS_URI`;
+- issuer via `COPILOT_MCP_OAUTH_EXPECTED_ISSUER`;
+- audience/resource via `COPILOT_MCP_OAUTH_AUDIENCE`;
+- checagem de scopes `scope` ou `scp`.
+
+11. `mcp_auth_profile` reporta enforcement, issuer, audience, JWKS e static bearer sem revelar
+    segredo. Tambem retorna templates redigidos de ambiente para:
+
+- tunnel temporario sem auth;
+- teste local `mixed-auth` com bearer estatico nao commitado;
+- OAuth/JWKS com issuer real.
+
 12. `mcp_oauth_issuer_diagnostics` valida, quando houver issuer real, os documentos:
-   - `/.well-known/oauth-authorization-server`;
-   - `/.well-known/openid-configuration`.
+
+- `/.well-known/oauth-authorization-server`;
+- `/.well-known/openid-configuration`.
+
 13. O diagnostico de issuer verifica:
-   - `issuer`;
-   - `authorization_endpoint`;
-   - `token_endpoint`;
-   - `token_endpoint_auth_methods_supported`;
-   - `code_challenge_methods_supported` com `S256`;
-   - scopes de repo.
+
+- `issuer`;
+- `authorization_endpoint`;
+- `token_endpoint`;
+- `token_endpoint_auth_methods_supported`;
+- `code_challenge_methods_supported` com `S256`;
+- scopes de repo.
+
 14. Validacao focada:
-   - `npm run typecheck:strict:src.copilot`: passou;
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
-     passou com 34 testes.
-   - `npm run lint:copilot`: passou.
-   - `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 82 testes MCP.
-   - `npm run test:copilot:unit`: passou com 3081 testes.
+
+- `npm run typecheck:strict:src.copilot`: passou;
+- `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+  passou com 34 testes.
+- `npm run lint:copilot`: passou.
+- `npm run copilot:mcp:safe-suite -- mcp-full`: passou com typecheck, lint e 82 testes MCP.
+- `npm run test:copilot:unit`: passou com 3081 testes.
+
 15. `mcp_autonomy_power_score` mede postura de autonomia do conector por:
-   - cobertura de tools;
-   - proporcao read-only/low-friction;
-   - seguranca de escrita e plan-only;
-   - cobertura de outputSchema/security metadata;
-   - prontidao de validadores;
-   - postura auth/tunnel;
-   - ausencia de open-world tools.
+
+- cobertura de tools;
+- proporcao read-only/low-friction;
+- seguranca de escrita e plan-only;
+- cobertura de outputSchema/security metadata;
+- prontidao de validadores;
+- postura auth/tunnel;
+- ausencia de open-world tools.
 
 Pendencias da Faixa I:
 
@@ -1349,11 +1354,11 @@ Fontes oficiais Cloudflare rechecadas:
    - Confirma que tunnels remotos podem rodar por token e que Quick Tunnels sao apenas para
      desenvolvimento/testes.
 2. `https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/`
-   - Confirma que qualquer pessoa com o tunnel token pode rodar o tunnel; portanto o token nao
-     deve ser versionado nem impresso.
+   - Confirma que qualquer pessoa com o tunnel token pode rodar o tunnel; portanto o token nao deve
+     ser versionado nem impresso.
 3. `https://developers.cloudflare.com/tunnel/advanced/run-parameters/`
-   - Confirma `cloudflared tunnel run --token <TOKEN>` e `--token-file <PATH>` para
-     tunnels remotamente gerenciados.
+   - Confirma `cloudflared tunnel run --token <TOKEN>` e `--token-file <PATH>` para tunnels
+     remotamente gerenciados.
 4. `https://developers.cloudflare.com/tunnel/routing/`
    - Confirma o modelo public hostname -> local service.
 5. `https://developers.cloudflare.com/tunnel/`
@@ -1389,13 +1394,13 @@ Mudancas estruturais aplicadas:
 3. O caminho preferido e `CLOUDFLARE_TUNNEL_TOKEN_FILE`, para reduzir risco de vazamento em
    historico de shell.
 4. `mcp_tunnel_status`, `mcp_runtime_health`, `mcp_smoke_workspace`, `mcp_session_profile`,
-   `chatgpt_connector_profile` e `chatgpt_connector_current_url_status` passam a tratar o
-   tunnel permanente como fonte primaria.
-5. `npm run copilot:mcp:cloudflare:up` inicia MCP HTTP e `cloudflared` em background,
-   escrevendo PID/log/metadados em `src/copilot/.ai/cloudflare/`.
+   `chatgpt_connector_profile` e `chatgpt_connector_current_url_status` passam a tratar o tunnel
+   permanente como fonte primaria.
+5. `npm run copilot:mcp:cloudflare:up` inicia MCP HTTP e `cloudflared` em background, escrevendo
+   PID/log/metadados em `src/copilot/.ai/cloudflare/`.
 6. `npm run copilot:mcp:cloudflare:down` encerra os processos controlados por PID local.
-7. O supervisor do `up` compara assinatura de comando/env e reinicia processos quando ha drift
-   de URL publica, modo, token-file ou argumentos de execucao.
+7. O supervisor do `up` compara assinatura de comando/env e reinicia processos quando ha drift de
+   URL publica, modo, token-file ou argumentos de execucao.
 8. Quick Tunnel continua disponivel como fallback:
    - `COPILOT_MCP_CLOUDFLARE_MODE=temporary-quick npm run copilot:mcp:cloudflare:quick`.
 
@@ -1438,8 +1443,8 @@ Estado externo apos criacao da rota `mcp.aurelin.org`:
 Pendencias externas:
 
 1. Atualizar ou recriar o conector no ChatGPT para a URL permanente.
-2. Rodar teste real no ChatGPT com `mcp_tunnel_status`, `repo_status`, `mcp_autonomy_power_score`
-   e `mcp_run_safe_validation_suite`.
+2. Rodar teste real no ChatGPT com `mcp_tunnel_status`, `repo_status`, `mcp_autonomy_power_score` e
+   `mcp_run_safe_validation_suite`.
 3. Quando OAuth real for escolhido, repetir smoke com auth `OAuth`.
 
 Validacao local desta virada:
@@ -1550,8 +1555,8 @@ Data: 2026-05-23.
 
 ### 14.1. Nova decisao canonica
 
-O conector permanente deixa de ter `No authentication` como postura padrao. A nova postura
-canonica e:
+O conector permanente deixa de ter `No authentication` como postura padrao. A nova postura canonica
+e:
 
 1. endpoint MCP:
    - `https://mcp.aurelin.org/mcp`;
@@ -1577,21 +1582,19 @@ write-heavy anonima.
 1. Apps SDK Authentication:
    - `https://developers.openai.com/apps-sdk/build/auth`;
    - confirma OAuth 2.1 para MCP autenticado;
-   - confirma protected resource metadata em
-     `/.well-known/oauth-protected-resource`;
+   - confirma protected resource metadata em `/.well-known/oauth-protected-resource`;
    - confirma OAuth metadata no authorization server;
    - confirma `resource` parameter e audience do token;
    - confirma authorization-code flow com PKCE `S256`;
-   - confirma que a UI de linking OAuth do ChatGPT depende de `securitySchemes`,
-     resource metadata e `_meta["mcp/www_authenticate"]`.
+   - confirma que a UI de linking OAuth do ChatGPT depende de `securitySchemes`, resource metadata e
+     `_meta["mcp/www_authenticate"]`.
 2. Apps SDK Reference:
    - `https://developers.openai.com/apps-sdk/reference`;
-   - confirma `outputSchema`, `structuredContent`, `securitySchemes`,
-     annotations e `_meta["mcp/www_authenticate"]`.
+   - confirma `outputSchema`, `structuredContent`, `securitySchemes`, annotations e
+     `_meta["mcp/www_authenticate"]`.
 3. Apps SDK Define tools:
    - `https://developers.openai.com/apps-sdk/plan/tools`;
-   - reforca separacao read/write, hints read-only/destructive/open-world e
-     auth coerente por tool.
+   - reforca separacao read/write, hints read-only/destructive/open-world e auth coerente por tool.
 4. Apps SDK Build MCP server:
    - `https://developers.openai.com/apps-sdk/build/mcp-server`;
    - reforca que o MCP server define tools, aplica auth e retorna structured data.
@@ -1684,8 +1687,8 @@ Faixa OAUTH-P5 - Validacao:
    - PKCE S256;
    - scopes `repo:read`, `repo:write`, `repo:validate`, `repo:admin`.
 3. O MCP valida tokens antes de tool calls.
-4. O ChatGPT continua podendo pedir confirmacao para writes, mas a superficie deixa de ser anonima
-   e passa a ser governada por scopes.
+4. O ChatGPT continua podendo pedir confirmacao para writes, mas a superficie deixa de ser anonima e
+   passa a ser governada por scopes.
 5. O fallback `none-dev` permanece possivel, mas deixa de ser recomendado.
 
 ### 14.6. Resultado implementado nesta faixa
@@ -1712,8 +1715,8 @@ Mudancas aplicadas:
    - tokens RS256 de curta duracao;
    - JWKS publico em `/oauth/jwks.json`.
 6. O registry passa a enviar `securitySchemes` top-level e `_meta.securitySchemes`.
-7. `chatgpt_connector_profile`, `chatgpt_connector_current_url_status` e `cloudflare:status`
-   passam a refletir `OAuth` como autenticacao canonica.
+7. `chatgpt_connector_profile`, `chatgpt_connector_current_url_status` e `cloudflare:status` passam
+   a refletir `OAuth` como autenticacao canonica.
 8. Criado script:
    - `src/copilot/mcp/scripts/oauth-smoke.js`.
 9. Criado npm script:
@@ -1746,8 +1749,8 @@ Mudancas aplicadas:
       `COPILOT_MODEL_PERSISTENT_CACHE_ENABLED`, `LLM_B_TERMINAL_PORT` e knobs de teste/cache.
 16. Corrigido bug de hermeticidade dos unitarios Copilot:
     - o cache persistente de catalogo de modelos continua ativo por default em runtime normal;
-    - em `NODE_ENV=test`, o default interno desabilita L2 persistente para impedir interferencia entre
-      arquivos de teste paralelos;
+    - em `NODE_ENV=test`, o default interno desabilita L2 persistente para impedir interferencia
+      entre arquivos de teste paralelos;
     - o knob `COPILOT_MODEL_PERSISTENT_CACHE_ENABLED=true|false` permite override explicito.
 
 Validacao live ja executada e consolidada:
@@ -1802,8 +1805,8 @@ Roadmap restante da faixa OAuth:
 2. Registrar comportamento real de linking, scopes e prompts no golden log.
 3. Decidir se o issuer dev embutido continua suficiente ou se a proxima faixa deve integrar IdP
    externo.
-4. Evoluir `cloudflare:smoke` para tambem executar uma tool autenticada quando houver bearer/fluxo OAuth
-   disponivel, mantendo `oauth:smoke` como verificador autoritativo.
+4. Evoluir `cloudflare:smoke` para tambem executar uma tool autenticada quando houver bearer/fluxo
+   OAuth disponivel, mantendo `oauth:smoke` como verificador autoritativo.
 
 ### 14.7. Continuidade pos-commit — persistencia da chave OAuth dev
 
@@ -1812,17 +1815,18 @@ Data: 2026-05-23.
 Motivo:
 
 1. O issuer dev embutido gerava uma chave RS256 em memoria.
-2. Isso era correto para um primeiro smoke, mas fazia tokens anteriores perderem validade apos restart.
-3. Para o uso diario do ChatGPT em `https://mcp.aurelin.org/mcp`, a postura mais profissional e manter
-   a chave dev estavel no workspace local, sem comita-la.
+2. Isso era correto para um primeiro smoke, mas fazia tokens anteriores perderem validade apos
+   restart.
+3. Para o uso diario do ChatGPT em `https://mcp.aurelin.org/mcp`, a postura mais profissional e
+   manter a chave dev estavel no workspace local, sem comita-la.
 
 Mudanca aplicada:
 
 1. `src/copilot/mcp/control-plane/dev-oauth.js` agora tenta ler a chave privada de:
    - `COPILOT_MCP_DEV_OAUTH_KEY_FILE`;
    - default: `src/copilot/.ai/mcp/oauth-dev-private-key.pem`.
-2. Se o arquivo nao existir ou estiver ilegivel, o issuer gera uma nova chave RS256 e tenta persisti-la
-   com permissao `0600`.
+2. Se o arquivo nao existir ou estiver ilegivel, o issuer gera uma nova chave RS256 e tenta
+   persisti-la com permissao `0600`.
 3. Se a persistencia falhar, o issuer continua operando com chave em memoria.
 4. Rotacao explicita:
    - `COPILOT_MCP_DEV_OAUTH_ROTATE_KEY=true`.
@@ -1836,8 +1840,8 @@ Validacao executada apos essa continuidade:
 
 1. `npm run typecheck:strict:src.copilot`: passou.
 2. `npm run lint:copilot`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`:
-   passou com 85 testes MCP.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 85 testes MCP.
 4. `npm run copilot:mcp:safe-suite -- mcp-full`: passou.
 5. `npm run test:copilot:unit`: passou com 3084/3084 testes.
 6. `node scripts/env/audit-env-surface.mjs`: passou.
@@ -1881,14 +1885,14 @@ Diagnostico das telas anexadas:
    - resource/issuer base: `https://mcp.aurelin.org`.
 2. A tela mostrou o aviso "CIMD indisponivel" porque o issuer dev nao anunciava
    `client_id_metadata_document_supported: true` no authorization server metadata.
-3. OIDC estava marcado como habilitado, mas a tela exibia `https://example.com` como userinfo placeholder,
-   indicando ausencia pratica de `userinfo_endpoint` no metadata.
-4. Os escopos padrao apareciam como `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
-   A interpretacao temporaria de reduzir o primeiro linking foi revogada em 14.11: para este repo, o contrato
-   canonico e dar ao ChatGPT o pacote repo max-power por default, usando `COPILOT_MCP_OAUTH_INITIAL_SCOPES` apenas
-   como escape hatch operacional.
-5. As telas confirmaram que o caminho Cloudflare permanente esta correto; o problema estava no contrato OAuth/OIDC
-   e nos sinais de transporte, nao no hostname.
+3. OIDC estava marcado como habilitado, mas a tela exibia `https://example.com` como userinfo
+   placeholder, indicando ausencia pratica de `userinfo_endpoint` no metadata.
+4. Os escopos padrao apareciam como `repo:read`, `repo:write`, `repo:validate` e `repo:admin`. A
+   interpretacao temporaria de reduzir o primeiro linking foi revogada em 14.11: para este repo, o
+   contrato canonico e dar ao ChatGPT o pacote repo max-power por default, usando
+   `COPILOT_MCP_OAUTH_INITIAL_SCOPES` apenas como escape hatch operacional.
+5. As telas confirmaram que o caminho Cloudflare permanente esta correto; o problema estava no
+   contrato OAuth/OIDC e nos sinais de transporte, nao no hostname.
 
 Mudancas estruturais aplicadas nesta fatia:
 
@@ -1901,15 +1905,17 @@ Mudancas estruturais aplicadas nesta fatia:
    - escopos OIDC `openid`, `profile`, `email` junto dos escopos repo.
 2. O issuer dev agora aceita Client ID Metadata Documents:
    - `client_id` HTTPS com path pode ser usado como identificador;
-   - o servidor busca o documento, exige `client_id` exatamente igual a URL e valida `redirect_uris`;
+   - o servidor busca o documento, exige `client_id` exatamente igual a URL e valida
+     `redirect_uris`;
    - hosts locais/privados sao bloqueados para reduzir risco SSRF mesmo em dev.
-3. O endpoint `GET /oauth/userinfo` foi implementado com verificacao RS256/JWKS local do access token.
+3. O endpoint `GET /oauth/userinfo` foi implementado com verificacao RS256/JWKS local do access
+   token.
 4. O token endpoint passa a emitir `id_token` quando o escopo `openid` e concedido.
 5. `buildProtectedResourceMetadata()` passou a separar escopos suportados de escopos iniciais:
    - default canonico apos 14.11: `repo:read`, `repo:write`, `repo:validate`, `repo:admin`;
    - override operacional: `COPILOT_MCP_OAUTH_INITIAL_SCOPES`.
-6. `WWW-Authenticate` agora inclui `error` e `error_description`, alem de `resource_metadata` e `scope`,
-   alinhando o gatilho de UI OAuth do ChatGPT com a documentacao do Apps SDK.
+6. `WWW-Authenticate` agora inclui `error` e `error_description`, alem de `resource_metadata` e
+   `scope`, alinhando o gatilho de UI OAuth do ChatGPT com a documentacao do Apps SDK.
 7. O adapter HTTP passou a:
    - aceitar/expor `MCP-Protocol-Version` nos headers CORS;
    - validar `Origin` quando presente;
@@ -1927,7 +1933,8 @@ Notas de conformidade MCP 2025-11-25:
 2. Transport:
    - seguimos em Streamable HTTP no endpoint unico `/mcp`;
    - o modo continua stateless para preservar compatibilidade dos smokes e do ChatGPT atual;
-   - sessao stateful com `MCP-Session-Id` fica como faixa propria porque exige armazenar transports por sessao.
+   - sessao stateful com `MCP-Session-Id` fica como faixa propria porque exige armazenar transports
+     por sessao.
 3. Authorization:
    - resource indicator ja e exigido no authorize/token;
    - token audience/issuer ja e validado no resource server;
@@ -1935,23 +1942,28 @@ Notas de conformidade MCP 2025-11-25:
    - DCR continua disponivel como fallback.
 4. Utilities:
    - ping/cancellation/progress ficam majoritariamente sob o SDK;
-   - tasks existem no SDK 1.29 como experimental e devem virar faixa propria antes de migrar jobs longos.
+   - tasks existem no SDK 1.29 como experimental e devem virar faixa propria antes de migrar jobs
+     longos.
 
 Roadmap OAuth/MCP restante:
 
 1. Testar no ChatGPT a criacao do app com metodo CIMD, confirmando que o aviso desaparece.
 2. Conferir se a tela de OIDC deixa de mostrar userinfo placeholder apos refresh do metadata.
-3. Medir se o primeiro linking sugere o pacote max-power completo `repo:read`/`repo:write`/`repo:validate`/
-   `repo:admin`.
-4. Evoluir jobs longos (`run_*`, safe suite) para task-augmented requests do SDK quando a API experimental estabilizar.
-5. Avaliar sessao stateful HTTP com cache de transports por `MCP-Session-Id`, sem quebrar smokes diretos.
-6. Decidir se o issuer dev continua aceitavel para uso interno ou se a proxima faixa deve trocar para IdP externo.
+3. Medir se o primeiro linking sugere o pacote max-power completo
+   `repo:read`/`repo:write`/`repo:validate`/ `repo:admin`.
+4. Evoluir jobs longos (`run_*`, safe suite) para task-augmented requests do SDK quando a API
+   experimental estabilizar.
+5. Avaliar sessao stateful HTTP com cache de transports por `MCP-Session-Id`, sem quebrar smokes
+   diretos.
+6. Decidir se o issuer dev continua aceitavel para uso interno ou se a proxima faixa deve trocar
+   para IdP externo.
 
 Validacao executada nesta fatia:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 85/85.
 4. `npm run test:copilot:unit`: passou com 3084/3084.
 5. `make copilot-mcp-restart`: passou e reiniciou:
    - `mcp-http` PID `91552`;
@@ -1961,10 +1973,12 @@ Validacao executada nesta fatia:
    - `client_id_metadata_document_supported=true`;
    - `userinfo_endpoint=https://mcp.aurelin.org/oauth/userinfo`;
    - escopos OIDC anunciados.
-8. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou, naquela fatia, a reducao para
-   `repo:read` e `repo:validate`; essa direcao foi substituida pela correcao max-power de 14.11.
+8. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou, naquela fatia, a
+   reducao para `repo:read` e `repo:validate`; essa direcao foi substituida pela correcao max-power
+   de 14.11.
 9. `make copilot-mcp-smoke`: passou com 67/67 tools remotas.
-10. `make copilot-mcp-oauth-smoke`: passou com DCR, JWKS, token e chamada autenticada `mcp_runtime_health`.
+10. `make copilot-mcp-oauth-smoke`: passou com DCR, JWKS, token e chamada autenticada
+    `mcp_runtime_health`.
 
 ### 14.9. Continuidade — smoke CIMD e Cloudflare OAuth guardrail
 
@@ -1973,9 +1987,10 @@ Data: 2026-05-23.
 Problema restante apos 14.8:
 
 1. O servidor anunciava CIMD, mas o smoke publico ainda provava principalmente DCR.
-2. `cloudflare:smoke` validava `/health` e `tools/list`, mas nao falhava se a metadata OAuth/OIDC regredisse.
-3. Os novos knobs `COPILOT_MCP_OAUTH_INITIAL_SCOPES` e `COPILOT_MCP_ALLOWED_ORIGINS` ainda precisavam entrar na
-   governanca de ambiente.
+2. `cloudflare:smoke` validava `/health` e `tools/list`, mas nao falhava se a metadata OAuth/OIDC
+   regredisse.
+3. Os novos knobs `COPILOT_MCP_OAUTH_INITIAL_SCOPES` e `COPILOT_MCP_ALLOWED_ORIGINS` ainda
+   precisavam entrar na governanca de ambiente.
 
 Mudancas aplicadas:
 
@@ -1983,8 +1998,8 @@ Mudancas aplicadas:
    - `GET /.well-known/oauth-client/codex-smoke.json`;
    - `client_id` exatamente igual a URL publica HTTPS;
    - `redirect_uris=["https://chatgpt.com/connector/oauth/codex-smoke"]`.
-2. `npm run copilot:mcp:oauth:smoke` passou a exercitar dois fluxos; em 14.11 esses fluxos foram elevados para o
-   pacote max-power:
+2. `npm run copilot:mcp:oauth:smoke` passou a exercitar dois fluxos; em 14.11 esses fluxos foram
+   elevados para o pacote max-power:
    - DCR com `repo:read repo:write repo:validate repo:admin`;
    - CIMD com `repo:read repo:write repo:validate repo:admin openid profile email`.
 3. O fluxo CIMD do smoke confirma:
@@ -1993,7 +2008,8 @@ Mudancas aplicadas:
    - token endpoint;
    - `id_token`;
    - `/oauth/userinfo`.
-4. `npm run copilot:mcp:cloudflare:smoke` agora tambem valida OAuth quando `COPILOT_MCP_AUTH_MODE=oauth|mixed-auth`:
+4. `npm run copilot:mcp:cloudflare:smoke` agora tambem valida OAuth quando
+   `COPILOT_MCP_AUTH_MODE=oauth|mixed-auth`:
    - protected resource metadata;
    - `repo:read`, `repo:write`, `repo:validate` e `repo:admin` como escopos iniciais canonicos;
    - authorization server metadata;
@@ -2009,7 +2025,8 @@ Validacao executada nesta continuidade:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 85/85.
 4. `npm run test:copilot:unit`: passou com 3084/3084.
 5. `make copilot-mcp-restart`: passou e reiniciou:
    - `mcp-http` PID `94757`;
@@ -2029,8 +2046,10 @@ Validacao executada nesta continuidade:
 Roadmap restante atualizado:
 
 1. Testar novamente na UI do ChatGPT e registrar se a opcao CIMD deixa de aparecer indisponivel.
-2. Fazer o ChatGPT executar tools de escrita/admin e confirmar que o token inicial max-power ja cobre essas chamadas.
-3. Evoluir `mcp_oauth_issuer_diagnostics` para testar tambem o documento CIMD quando o issuer for o proprio resource.
+2. Fazer o ChatGPT executar tools de escrita/admin e confirmar que o token inicial max-power ja
+   cobre essas chamadas.
+3. Evoluir `mcp_oauth_issuer_diagnostics` para testar tambem o documento CIMD quando o issuer for o
+   proprio resource.
 4. Projetar faixa separada para tasks MCP experimentais em jobs longos.
 
 ### 14.10. Continuidade — diagnostico MCP tambem cobre CIMD
@@ -2050,13 +2069,15 @@ Mudanca aplicada:
    - `redirect_uris`;
    - `token_endpoint_auth_method`;
    - campos faltantes e warnings.
-3. A readiness geral do diagnostico passa a considerar a metadata OAuth e, quando aplicavel, a metadata CIMD.
+3. A readiness geral do diagnostico passa a considerar a metadata OAuth e, quando aplicavel, a
+   metadata CIMD.
 
 Validacao executada nesta microfatia:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 85/85.
 
 ### 14.11. Correcao de direcao — OAuth max-power por default
 
@@ -2064,10 +2085,12 @@ Data: 2026-05-23.
 
 Motivo da correcao:
 
-1. A reducao de escopos iniciais para `repo:read`/`repo:validate` seguia uma leitura defensiva de primeiro linking,
-   mas conflita com o objetivo canonico deste repo: dar ao ChatGPT liberdade maxima sobre o workspace/repo.
-2. Para este conector, `repo:write` e `repo:admin` nao sao excecoes futuras; fazem parte do contrato operacional
-   esperado. O host pode ainda mostrar consentimento OAuth, mas a metadata publica deve anunciar o pacote completo.
+1. A reducao de escopos iniciais para `repo:read`/`repo:validate` seguia uma leitura defensiva de
+   primeiro linking, mas conflita com o objetivo canonico deste repo: dar ao ChatGPT liberdade
+   maxima sobre o workspace/repo.
+2. Para este conector, `repo:write` e `repo:admin` nao sao excecoes futuras; fazem parte do contrato
+   operacional esperado. O host pode ainda mostrar consentimento OAuth, mas a metadata publica deve
+   anunciar o pacote completo.
 3. `COPILOT_MCP_OAUTH_INITIAL_SCOPES` permanece como knob de emergencia, nao como politica padrao.
 
 Mudancas aplicadas nesta correcao:
@@ -2077,21 +2100,24 @@ Mudancas aplicadas nesta correcao:
    - `repo:write`;
    - `repo:validate`;
    - `repo:admin`.
-2. `mcp_auth_profile` passa a montar o challenge preview com os quatro escopos repo quando o operador nao informa
-   uma lista customizada.
+2. `mcp_auth_profile` passa a montar o challenge preview com os quatro escopos repo quando o
+   operador nao informa uma lista customizada.
 3. `copilot:mcp:oauth:smoke` passa a provar:
    - DCR com `repo:read repo:write repo:validate repo:admin`;
    - CIMD com `repo:read repo:write repo:validate repo:admin openid profile email`.
-4. `copilot:mcp:cloudflare:smoke` passa a falhar se qualquer escopo repo max-power desaparecer do protected resource
-   metadata.
-5. `.env.example`, `.env.local.example` e `.env.schema.json` passam a documentar max-power como default.
-6. Os testes MCP passam a tratar `repo:admin` no protected resource metadata como esperado, nao regressao.
+4. `copilot:mcp:cloudflare:smoke` passa a falhar se qualquer escopo repo max-power desaparecer do
+   protected resource metadata.
+5. `.env.example`, `.env.local.example` e `.env.schema.json` passam a documentar max-power como
+   default.
+6. Os testes MCP passam a tratar `repo:admin` no protected resource metadata como esperado, nao
+   regressao.
 
 Validacao executada nesta correcao:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 85/85.
 4. `npm run test:copilot:unit`: passou com 3084/3084.
 5. `node scripts/env/audit-env-surface.mjs`: passou.
 6. `node scripts/env/validate-env.js`: passou.
@@ -2100,8 +2126,8 @@ Validacao executada nesta correcao:
    - `mcp-http` PID `4314`;
    - `cloudflared` PID `4320`.
 9. `make copilot-mcp-status`: passou com `ready=true`.
-10. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou `scopes_supported` com
-    `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
+10. `curl https://mcp.aurelin.org/.well-known/oauth-protected-resource`: confirmou
+    `scopes_supported` com `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
 11. `make copilot-mcp-smoke`: passou com OAuth readiness max-power e 67/67 tools remotas.
 12. `make copilot-mcp-oauth-smoke`: passou e confirmou:
     - `dcrFlow.token.scope="repo:read repo:write repo:validate repo:admin"`;
@@ -2115,10 +2141,11 @@ Data: 2026-05-23.
 
 Problema restante apos 14.11:
 
-1. O runtime publico ja anunciava os quatro escopos, mas algumas tools de introspeccao ainda descreviam a metadata como
-   heranca dev/noauth ou nao mostravam explicitamente se o default max-power estava ativo.
-2. Isso criava risco de o proprio ChatGPT receber sinais conflitantes ao chamar `mcp_capabilities_summary` ou
-   `mcp_autonomy_power_score`.
+1. O runtime publico ja anunciava os quatro escopos, mas algumas tools de introspeccao ainda
+   descreviam a metadata como heranca dev/noauth ou nao mostravam explicitamente se o default
+   max-power estava ativo.
+2. Isso criava risco de o proprio ChatGPT receber sinais conflitantes ao chamar
+   `mcp_capabilities_summary` ou `mcp_autonomy_power_score`.
 
 Mudancas aplicadas:
 
@@ -2131,9 +2158,10 @@ Mudancas aplicadas:
 2. `mcp_autonomy_power_score` passou a incluir:
    - `auth.initialScopes`;
    - `auth.maxPowerRepoScopesByDefault`;
-   - blocker explicito se o default deixar de conter `repo:read`, `repo:write`, `repo:validate` e `repo:admin`.
-3. O texto de `metadataProfile.securitySchemes` foi atualizado para OAuth registry-wide com escopos repo max-power
-   por default, removendo a mensagem antiga de dev/noauth.
+   - blocker explicito se o default deixar de conter `repo:read`, `repo:write`, `repo:validate` e
+     `repo:admin`.
+3. O texto de `metadataProfile.securitySchemes` foi atualizado para OAuth registry-wide com escopos
+   repo max-power por default, removendo a mensagem antiga de dev/noauth.
 4. `CAPABILITIES_VERSION` subiu para `13`, marcando a mudanca de contrato de introspeccao.
 
 Validacao executada nesta continuidade:
@@ -2142,7 +2170,8 @@ Validacao executada nesta continuidade:
 2. `npm run lint:copilot -- --quiet`: passou.
 3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
    passou com 30/30.
-4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 85/85.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 85/85.
 5. `npm run test:copilot:unit`: passou com 3084/3084.
 6. `make copilot-mcp-restart`: passou e reiniciou:
    - `mcp-http` PID `8031`;
@@ -2158,11 +2187,13 @@ Data: 2026-05-23.
 Entrada lida integralmente:
 
 1. `src/copilot/docs/Auditoria profunda — WORKSPACE MCP após.md`.
-2. A auditoria confirmou 67 tools, OAuth max-power, outputSchema/securitySchemes em 100% das tools, index funcional apos
-   build manual, writes/quarantine/delete reais funcionando e validation suite MCP passando.
-3. A auditoria tambem apontou problemas operacionais: auth inconsistente em `mcp_tunnel_status`, ruido de quick tunnel
-   antigo, auto-build de index desabilitado, smoke sem warning proprio para index indisponivel, summary de validacao sem
-   agregacao efetiva por suite e quarantine sujando o workspace.
+2. A auditoria confirmou 67 tools, OAuth max-power, outputSchema/securitySchemes em 100% das tools,
+   index funcional apos build manual, writes/quarantine/delete reais funcionando e validation suite
+   MCP passando.
+3. A auditoria tambem apontou problemas operacionais: auth inconsistente em `mcp_tunnel_status`,
+   ruido de quick tunnel antigo, auto-build de index desabilitado, smoke sem warning proprio para
+   index indisponivel, summary de validacao sem agregacao efetiva por suite e quarantine sujando o
+   workspace.
 
 Correcoes aplicadas:
 
@@ -2171,17 +2202,19 @@ Correcoes aplicadas:
    - `Mixed Authentication`;
    - `Secure MCP Tunnel`;
    - `No authentication`.
-2. `mcp_tunnel_status` deixou de reportar `none-dev` hardcoded e agora usa a auth efetiva. O quick tunnel antigo fica
-   marcado como `temporaryFallback` e `ignoredForOperationalReadiness` quando o modo permanente e valido.
+2. `mcp_tunnel_status` deixou de reportar `none-dev` hardcoded e agora usa a auth efetiva. O quick
+   tunnel antigo fica marcado como `temporaryFallback` e `ignoredForOperationalReadiness` quando o
+   modo permanente e valido.
 3. `copilot:mcp:cloudflare:smoke` agora persiste tambem o smoke do connector URL permanente em
    `src/copilot/.ai/cloudflare/connector-smoke.json`.
-4. `mcp_runtime_health` usa esse smoke do connector URL atual, em vez de tratar o quick tunnel temporario stale como
-   sinal operacional principal quando `named-permanent` esta ativo.
-5. `mcp_smoke_workspace` passa a emitir `INDEX_UNAVAILABLE` quando o indice IO esta habilitado, mas indisponivel.
-6. `COPILOT_MCP_INDEX_AUTO_BUILD` passou a defaultar para `true`, com path `src/copilot` e limite 5000 arquivos; os
-   templates/schema de ambiente foram atualizados.
-7. `mcp_last_validation_summary` ganhou `effectiveChecks`, agregando suites como fonte efetiva de `typecheck`,
-   `lint`, `unit-mcp` e `unit-copilot`.
+4. `mcp_runtime_health` usa esse smoke do connector URL atual, em vez de tratar o quick tunnel
+   temporario stale como sinal operacional principal quando `named-permanent` esta ativo.
+5. `mcp_smoke_workspace` passa a emitir `INDEX_UNAVAILABLE` quando o indice IO esta habilitado, mas
+   indisponivel.
+6. `COPILOT_MCP_INDEX_AUTO_BUILD` passou a defaultar para `true`, com path `src/copilot` e limite
+   5000 arquivos; os templates/schema de ambiente foram atualizados.
+7. `mcp_last_validation_summary` ganhou `effectiveChecks`, agregando suites como fonte efetiva de
+   `typecheck`, `lint`, `unit-mcp` e `unit-copilot`.
 8. `.gitignore` passou a ignorar `src/copilot/.ai/quarantine/*`, preservando `.gitkeep` se existir.
 9. `mcp_tools_status` e `mcp_golden_prompts` passaram a separar explicitamente:
    - OAuth max-power/escopos concedidos;
@@ -2189,21 +2222,24 @@ Correcoes aplicadas:
 
 Nota sobre janelas de confirmacao do ChatGPT:
 
-1. OAuth max-power remove falta de escopo/autorizacao MCP, mas nao controla a UI de confirmacao de acoes de escrita do
-   ChatGPT.
-2. A documentacao oficial de Developer Mode declara que write actions exigem confirmacao por default e que tools sem
-   `readOnlyHint` sao tratadas como write actions.
-3. A documentacao de annotations declara que `readOnlyHint=true` deve ser usado apenas para tools que nao criam,
-   atualizam, deletam ou enviam dados. Portanto, marcar `repo_create_file`, `repo_move_file` ou `repo_remove_file`
-   como read-only para esconder janelas seria metadata falsa e deixaria o host menos correto.
-4. A estrategia legitima implementada e reduzir janelas por batch/workflows confiaveis, plan-only tools, suites
-   agregadas e "remember approval" quando o proprio ChatGPT oferecer essa opcao na conversa.
+1. OAuth max-power remove falta de escopo/autorizacao MCP, mas nao controla a UI de confirmacao de
+   acoes de escrita do ChatGPT.
+2. A documentacao oficial de Developer Mode declara que write actions exigem confirmacao por default
+   e que tools sem `readOnlyHint` sao tratadas como write actions.
+3. A documentacao de annotations declara que `readOnlyHint=true` deve ser usado apenas para tools
+   que nao criam, atualizam, deletam ou enviam dados. Portanto, marcar `repo_create_file`,
+   `repo_move_file` ou `repo_remove_file` como read-only para esconder janelas seria metadata falsa
+   e deixaria o host menos correto.
+4. A estrategia legitima implementada e reduzir janelas por batch/workflows confiaveis, plan-only
+   tools, suites agregadas e "remember approval" quando o proprio ChatGPT oferecer essa opcao na
+   conversa.
 
 Validacao executada nesta continuidade:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 86/86.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 86/86.
 4. `npm run test:copilot:unit`: passou com 3085/3085.
 5. `node scripts/env/audit-env-surface.mjs`: passou.
 6. `node scripts/env/validate-env.js`: passou.
@@ -2211,8 +2247,8 @@ Validacao executada nesta continuidade:
 8. `make copilot-mcp-restart`: passou e reiniciou:
    - `mcp-http` PID `16717`;
    - `cloudflared` PID `16723`.
-9. `make copilot-mcp-status`: passou com `ready=true`, `authentication="OAuth"` e `permanentTunnel.lastSmoke`
-   inicialmente vazio antes do smoke.
+9. `make copilot-mcp-status`: passou com `ready=true`, `authentication="OAuth"` e
+   `permanentTunnel.lastSmoke` inicialmente vazio antes do smoke.
 10. `make copilot-mcp-smoke`: passou com:
     - `permanentSmokeUpdated=true`;
     - smoke persistido em `src/copilot/.ai/cloudflare/connector-smoke.json`;
@@ -2220,8 +2256,8 @@ Validacao executada nesta continuidade:
     - 67/67 tools remotas.
 11. `make copilot-mcp-status` apos o smoke: passou com `permanentTunnel.lastSmoke.ok=true`.
 12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.
-13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, `indexed=999`,
-    `symbols=5776` e `imports=2394`.
+13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`,
+    `indexed=999`, `symbols=5776` e `imports=2394`.
 
 ### 14.14. Continuidade — lote de operacoes de arquivo para reduzir confirmacoes
 
@@ -2229,15 +2265,18 @@ Data: 2026-05-23.
 
 Problema tratado:
 
-1. O ChatGPT ainda pode exibir janela de confirmacao para create/move/delete, mesmo quando OAuth ja concedeu todos os
-   escopos repo.
-2. Essa janela e host-side para write action; o servidor MCP nao possui API documentada para desativa-la.
-3. Reclassificar create/move/delete como `readOnlyHint=true` seria falso, porque a referencia do Apps SDK define
-   `readOnlyHint` apenas para tools que nao criam, atualizam, deletam ou enviam dados.
+1. O ChatGPT ainda pode exibir janela de confirmacao para create/move/delete, mesmo quando OAuth ja
+   concedeu todos os escopos repo.
+2. Essa janela e host-side para write action; o servidor MCP nao possui API documentada para
+   desativa-la.
+3. Reclassificar create/move/delete como `readOnlyHint=true` seria falso, porque a referencia do
+   Apps SDK define `readOnlyHint` apenas para tools que nao criam, atualizam, deletam ou enviam
+   dados.
 
 Upgrade aplicado:
 
-1. Criada `repo_apply_file_batch`, uma tool de lote para aplicar varias operacoes de arquivo em uma chamada:
+1. Criada `repo_apply_file_batch`, uma tool de lote para aplicar varias operacoes de arquivo em uma
+   chamada:
    - `create_file`;
    - `move_file`;
    - `quarantine_file`;
@@ -2245,27 +2284,30 @@ Upgrade aplicado:
 2. A tool usa `dryRun=true` por default.
 3. Para aplicar, exige `dryRun=false` e `confirmBatch=true`.
 4. `remove_file` dentro do lote tambem exige `confirm=true` na operacao individual.
-5. O lote e limitado a 10 operacoes, usa paths workspace-relative validados, reaproveita locks/atomicidade da camada IO
-   e grava audit events.
-6. `mcp_capabilities_summary`, `mcp_session_profile`, `mcp_golden_prompts`, smoke Cloudflare e testes de registry foram
-   atualizados para conhecer a nova tool.
+5. O lote e limitado a 10 operacoes, usa paths workspace-relative validados, reaproveita
+   locks/atomicidade da camada IO e grava audit events.
+6. `mcp_capabilities_summary`, `mcp_session_profile`, `mcp_golden_prompts`, smoke Cloudflare e
+   testes de registry foram atualizados para conhecer a nova tool.
 
 Efeito esperado:
 
 1. Nao promete remover toda janela do chatgpt.com, porque isso e controle do host.
-2. Reduz a quantidade de janelas potenciais ao permitir que ChatGPT aplique varias mudancas confiaveis em uma unica
-   chamada.
-3. Mantem metadata honesta: por suportar remocao, a tool e `destructiveHint=true`; para fluxos menos sensiveis, a
-   orientacao continua preferir `quarantine_file` a delete real.
+2. Reduz a quantidade de janelas potenciais ao permitir que ChatGPT aplique varias mudancas
+   confiaveis em uma unica chamada.
+3. Mantem metadata honesta: por suportar remocao, a tool e `destructiveHint=true`; para fluxos menos
+   sensiveis, a orientacao continua preferir `quarantine_file` a delete real.
 
 Validacao executada nesta continuidade:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_repo_write.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`: passou com 45/45.
-4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 87/87.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_repo_write.spec.js tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+   passou com 45/45.
+4. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 87/87.
 5. `npm run test:copilot:unit`: passou com 3086/3086.
-6. `make copilot-mcp-restart`: passou e reiniciou `mcp-http` PID `21276` e `cloudflared` PID `21277`.
+6. `make copilot-mcp-restart`: passou e reiniciou `mcp-http` PID `21276` e `cloudflared` PID
+   `21277`.
 7. `make copilot-mcp-status`: passou com `ready=true` e `authentication="OAuth"`.
 8. `make copilot-mcp-smoke`: passou com `permanentSmokeUpdated=true` e 68/68 tools remotas.
 9. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `id_token` e `/oauth/userinfo`.
@@ -2277,68 +2319,76 @@ Data: 2026-05-23/2026-05-24.
 Entrada lida integralmente:
 
 1. `src/copilot/docs/# Plano completo de patches OAuth.md`.
-2. O plano consolidava patches para reduzir reauth OAuth, publicar metadata sem ambiguidade e diagnosticar friccao de
-   conector.
-3. A revisao confirmou que a implementacao anterior estava incompleta: `mcp_oauth_friction_audit` havia sido criado
-   como arquivo de uma linha com `\n` literais, fora do padrao real do registry; os TTLs novos nao estavam totalmente
-   cobertos pela governanca de ambiente; e o smoke OAuth nao provava renovacao via `refresh_token`.
+2. O plano consolidava patches para reduzir reauth OAuth, publicar metadata sem ambiguidade e
+   diagnosticar friccao de conector.
+3. A revisao confirmou que a implementacao anterior estava incompleta: `mcp_oauth_friction_audit`
+   havia sido criado como arquivo de uma linha com `\n` literais, fora do padrao real do registry;
+   os TTLs novos nao estavam totalmente cobertos pela governanca de ambiente; e o smoke OAuth nao
+   provava renovacao via `refresh_token`.
 
 Correcoes aplicadas:
 
-1. `dev-oauth.js` passou a usar nomes canônicos `REFRESH_TOKEN_GRANT`/`REFRESH_TOKEN_PREFIX`, mantendo o wire protocol
-   padrao `grant_type=refresh_token` e parametro `refresh_token`.
+1. `dev-oauth.js` passou a usar nomes canônicos `REFRESH_TOKEN_GRANT`/`REFRESH_TOKEN_PREFIX`,
+   mantendo o wire protocol padrao `grant_type=refresh_token` e parametro `refresh_token`.
 2. O issuer dev embutido anuncia `refresh_token` em:
    - `grant_types_supported`;
    - metadata DCR;
    - Client ID Metadata Document.
-3. O token endpoint emite access token de 24h por default e refresh token rotativo de 30 dias por default:
+3. O token endpoint emite access token de 24h por default e refresh token rotativo de 30 dias por
+   default:
    - `expires_in=86400`;
    - `refresh_token`;
    - `refresh_token_expires_in=2592000`.
-4. A rotacao invalida o refresh token somente apos validar client/resource/expiracao, evitando invalidacao por tentativa
-   incorreta de outro cliente.
-5. `readDevOAuthTokenLifetimePolicy()` virou helper exportado para que diagnosticos e emissor compartilhem a mesma
-   leitura de TTL.
+4. A rotacao invalida o refresh token somente apos validar client/resource/expiracao, evitando
+   invalidacao por tentativa incorreta de outro cliente.
+5. `readDevOAuthTokenLifetimePolicy()` virou helper exportado para que diagnosticos e emissor
+   compartilhem a mesma leitura de TTL.
 6. `mcp_oauth_friction_audit` foi refeito como tool MCP real:
    - `// @ts-check`;
    - `readOnlyAnnotations()`;
    - `okResult()`;
-   - checagem de resource/audience/issuer, authorization servers, CIMD, PKCE S256, `authorization_code`,
-     `refresh_token`, escopos max-power e profile de tool scopes;
+   - checagem de resource/audience/issuer, authorization servers, CIMD, PKCE S256,
+     `authorization_code`, `refresh_token`, escopos max-power e profile de tool scopes;
    - mensagem explicita sobre o limite OAuth versus aprovacoes host-side.
-7. `copilot:mcp:oauth:smoke` agora testa refresh-token em DCR e CIMD e usa token renovado para chamar
-   `mcp_runtime_health`.
+7. `copilot:mcp:oauth:smoke` agora testa refresh-token em DCR e CIMD e usa token renovado para
+   chamar `mcp_runtime_health`.
 8. `.env.example`, `.env.local.example` e `.env.schema.json` passaram a cobrir:
    - `COPILOT_MCP_DEV_OAUTH_ACCESS_TOKEN_TTL_SECONDS`;
    - `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_TTL_SECONDS`;
    - `COPILOT_MCP_PUBLIC_OAUTH_DIAGNOSTICS`.
-9. Os testes de conexao confirmam `refresh_token` e `token_endpoint_auth_methods_supported=["none"]`.
+9. Os testes de conexao confirmam `refresh_token` e
+   `token_endpoint_auth_methods_supported=["none"]`.
 
 Validacao executada nesta continuidade:
 
 1. `npm run typecheck:strict:src.copilot -- --pretty false`: passou.
 2. `npm run lint:copilot -- --quiet`: passou.
-3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou com 91/91.
-4. `npm run test:copilot:unit`: passou no rerun limpo com 3090/3090. A primeira execucao completa teve um flake de
-   timeout em `ConversationHub`; o teste focado passou 9/9 e o rerun completo passou.
+3. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp --reporter=dot`: passou
+   com 91/91.
+4. `npm run test:copilot:unit`: passou no rerun limpo com 3090/3090. A primeira execucao completa
+   teve um flake de timeout em `ConversationHub`; o teste focado passou 9/9 e o rerun completo
+   passou.
 5. `node scripts/env/audit-env-surface.mjs`: passou com 276 envs referenciadas e 417 cobertas.
 6. `node scripts/env/validate-env.js`: passou.
 7. `node scripts/env/check-env-local.mjs`: passou.
 8. `git diff --check`: passou.
-9. `make copilot-mcp-restart`: passou e reiniciou `mcp-http` PID `71023` e `cloudflared` PID `71029`.
+9. `make copilot-mcp-restart`: passou e reiniciou `mcp-http` PID `71023` e `cloudflared` PID
+   `71029`.
 10. `make copilot-mcp-status`: passou com `ready=true` e `authentication="OAuth"`.
 11. `make copilot-mcp-smoke`: passou com 71/71 tools remotas e `permanentSmokeUpdated=true`.
-12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `refresh_token`, `id_token` e `/oauth/userinfo`.
-13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`, `indexed=1002`,
-    `symbols=5815` e `imports=2405`.
+12. `make copilot-mcp-oauth-smoke`: passou com DCR/CIMD max-power, `refresh_token`, `id_token` e
+    `/oauth/userinfo`.
+13. `curl https://mcp.aurelin.org/health`: confirmou `indexAutoBuild.status="completed"`,
+    `indexed=1002`, `symbols=5815` e `imports=2405`.
 
 Estado resultante:
 
-1. O ChatGPT recebe OAuth max-power por default, com tokens de 24h e refresh tokens de 30 dias no issuer dev embutido.
-2. O diagnostico publico `mcp_oauth_friction_audit` consegue explicar friccao de OAuth mesmo quando o conector perdeu
-   contexto de bearer token.
-3. A fronteira permanece honesta: OAuth reduz reauth/linking/401, mas nao promete desligar confirmacoes host-side de
-   escrita/destruicao.
+1. O ChatGPT recebe OAuth max-power por default, com tokens de 24h e refresh tokens de 30 dias no
+   issuer dev embutido.
+2. O diagnostico publico `mcp_oauth_friction_audit` consegue explicar friccao de OAuth mesmo quando
+   o conector perdeu contexto de bearer token.
+3. A fronteira permanece honesta: OAuth reduz reauth/linking/401, mas nao promete desligar
+   confirmacoes host-side de escrita/destruicao.
 
 ---
 
@@ -2352,18 +2402,22 @@ Documento lido integralmente nesta rodada:
 src/copilot/docs/AUDIT_EXT_24-05-2026.md
 ```
 
-O relatorio externo confirma que houve grande progresso no MCP permanente em `https://mcp.aurelin.org/mcp`, mas aponta
-um conjunto coerente de gaps de segunda ordem:
+O relatorio externo confirma que houve grande progresso no MCP permanente em
+`https://mcp.aurelin.org/mcp`, mas aponta um conjunto coerente de gaps de segunda ordem:
 
 1. o estado runtime ainda podia aparecer `degraded` por smoke Cloudflare stale;
-2. as novas tools compactas de validacao existiam, mas nao estavam refletidas em todas as superficies meta;
-3. `mcp_tools_status` ainda anunciava `job_cancel` como candidato a aprovacao lembravel no campo top-level;
-4. prompts de smoke e golden prompts ainda empurravam o ChatGPT para `job_get_output` como caminho primario;
+2. as novas tools compactas de validacao existiam, mas nao estavam refletidas em todas as
+   superficies meta;
+3. `mcp_tools_status` ainda anunciava `job_cancel` como candidato a aprovacao lembravel no campo
+   top-level;
+4. prompts de smoke e golden prompts ainda empurravam o ChatGPT para `job_get_output` como caminho
+   primario;
 5. `repo_search_text` ainda exigia `pattern`, embora clientes MCP frequentemente usem `query`;
 6. `mcp_validation_dashboard` era estrito demais para argumentos opcionais benignos;
 7. o cliente SSE local nao validava status/content-type antes de tratar resposta como stream;
 8. o writer SSE compartilhado nao registrava backpressure;
-9. o roadmap precisava distinguir melhor o fallback temporario de Cloudflare do caminho permanente padrao.
+9. o roadmap precisava distinguir melhor o fallback temporario de Cloudflare do caminho permanente
+   padrao.
 
 ### 15.2. Documentacao oficial reconsultada
 
@@ -2372,8 +2426,8 @@ Fontes externas atuais reconsultadas nesta rodada:
 1. OpenAI Apps SDK Quickstart: `https://developers.openai.com/apps-sdk/quickstart`
    - confirma que apps para ChatGPT conectam por MCP;
    - confirma que o servidor deve expor um endpoint publico HTTPS com caminho `/mcp`;
-   - confirma que, no fluxo de desenvolvimento, o conector do ChatGPT recebe a URL publica completa, por exemplo
-     `https://<host>/mcp`.
+   - confirma que, no fluxo de desenvolvimento, o conector do ChatGPT recebe a URL publica completa,
+     por exemplo `https://<host>/mcp`.
 2. Cloudflare Tunnel Routing: `https://developers.cloudflare.com/tunnel/routing/`
    - confirma que uma published application mapeia hostname publico para um servico local;
    - o desenho atual `mcp.aurelin.org -> http://localhost:3333` esta alinhado com esse modelo.
@@ -2397,14 +2451,16 @@ Auth enforcement:      all
 Fallback temporario:   trycloudflare apenas como contingencia explicita
 ```
 
-A causa mais provavel das interrupcoes observadas no ChatGPT web segue sendo tamanho/duracao de chamadas e leitura de
-logs, nao falha primaria de OAuth. Por isso, a prioridade desta rodada e transformar a experiencia em:
+A causa mais provavel das interrupcoes observadas no ChatGPT web segue sendo tamanho/duracao de
+chamadas e leitura de logs, nao falha primaria de OAuth. Por isso, a prioridade desta rodada e
+transformar a experiencia em:
 
 ```text
 dashboard primeiro -> summary por job -> output pequeno apenas se falhar
 ```
 
-Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a resposta enquanto o job local conclui.
+Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a resposta enquanto o
+job local conclui.
 
 ### 15.4. Correcoes aplicadas nesta rodada
 
@@ -2414,7 +2470,8 @@ Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a 
    - `job_get_summary` em `validation`;
    - `mcp_connector_smoke_refresh` em `runtime`;
    - guidance explicito para refresh de smoke apos restart Cloudflare/MCP.
-2. `mcp_tools_status` agora remove `job_cancel` tambem do campo top-level `rememberApprovalCandidates`.
+2. `mcp_tools_status` agora remove `job_cancel` tambem do campo top-level
+   `rememberApprovalCandidates`.
    - `job_cancel` permanece em `neverRememberApproval`;
    - destructive tools continuam fora da primeira onda de aprovacao lembravel.
 3. `chatgpt_connector_profile` passou a recomendar fluxo summary-first:
@@ -2422,9 +2479,10 @@ Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a 
    - `job_get_summary`;
    - `job_get_output tailBytes` pequeno somente em falha ou debugging necessario.
 4. `mcp_golden_prompts` foi atualizado para versao 4.
-   - O prompt `validation-one-job` deixou de tratar `job_get_output` como ferramenta esperada primaria.
-5. `delegate_to_repo_autonomy_runner mission=validate-mcp-full` agora orienta o caller para dashboard e summary antes de
-   qualquer leitura de log.
+   - O prompt `validation-one-job` deixou de tratar `job_get_output` como ferramenta esperada
+     primaria.
+5. `delegate_to_repo_autonomy_runner mission=validate-mcp-full` agora orienta o caller para
+   dashboard e summary antes de qualquer leitura de log.
 6. `repo_search_text` passou a aceitar `query` como alias de `pattern`.
    - `pattern` continua suportado;
    - ausencia de ambos retorna erro estruturado `ERR_SEARCH_PATTERN_REQUIRED`;
@@ -2452,16 +2510,18 @@ Isso reduz payload, reduz tempo de stream e reduz chance de o host web perder a 
 12. O writer SSE compartilhado passou a registrar backpressure:
     - `sse.writer.backpressure_total`;
     - `sse.writer.backpressure_drained_total`.
-13. O restart Cloudflare/MCP foi corrigido para aguardar a liberacao real do processo antigo antes de iniciar um novo
-    origin HTTP.
-    - Antes, `make copilot-mcp-restart` podia iniciar um novo `mcp-http` enquanto o processo antigo ainda segurava
-      `127.0.0.1:3333`, causando `EADDRINUSE`, origin morto e 502 no Cloudflare.
-    - Agora `stopPidFileProcess()` aguarda a saida apos `SIGTERM` e so entao remove pid/metadata e inicia o novo
-      processo.
+13. O restart Cloudflare/MCP foi corrigido para aguardar a liberacao real do processo antigo antes
+    de iniciar um novo origin HTTP.
+    - Antes, `make copilot-mcp-restart` podia iniciar um novo `mcp-http` enquanto o processo antigo
+      ainda segurava `127.0.0.1:3333`, causando `EADDRINUSE`, origin morto e 502 no Cloudflare.
+    - Agora `stopPidFileProcess()` aguarda a saida apos `SIGTERM` e so entao remove pid/metadata e
+      inicia o novo processo.
 14. Iniciada a proxima subfase com `mcp_post_restart_readiness`.
     - A tool retorna um snapshot compacto pos-restart antes de o ChatGPT iniciar trabalho pesado.
-    - Ela combina URL publica, pids de `mcp-http`/`cloudflared`, health local, smoke persistido e proximas acoes.
-    - Ela e read-only e complementa `mcp_connector_smoke_refresh`, que continua sendo o refresh persistente do smoke.
+    - Ela combina URL publica, pids de `mcp-http`/`cloudflared`, health local, smoke persistido e
+      proximas acoes.
+    - Ela e read-only e complementa `mcp_connector_smoke_refresh`, que continua sendo o refresh
+      persistente do smoke.
 
 ### 15.5. Roadmap atualizado
 
@@ -2500,7 +2560,8 @@ Subfases:
 1. [x] Aceitar `repo_search_text.query`.
 2. [x] Preservar `pattern` como contrato principal para retrocompatibilidade.
 3. [x] Adicionar teste unitario do alias.
-4. [ ] Avaliar uma futura tool `repo_search_text_continue` se a paginacao por cursor for usada em sessoes reais.
+4. [ ] Avaliar uma futura tool `repo_search_text_continue` se a paginacao por cursor for usada em
+       sessoes reais.
 
 #### Faixa D — Estabilidade de streams e payloads
 
@@ -2512,7 +2573,8 @@ Subfases:
 2. [x] Adicionar timeout de conexao SSE.
 3. [x] Registrar backpressure no writer SSE compartilhado.
 4. [ ] Considerar budget comum de resposta para tools MCP de alto payload.
-5. [ ] Medir em ChatGPT real se `mcp_validation_dashboard -> job_get_summary` elimina interrupcoes de validacao.
+5. [ ] Medir em ChatGPT real se `mcp_validation_dashboard -> job_get_summary` elimina interrupcoes
+       de validacao.
 
 #### Faixa E — Validacao e publicacao
 
@@ -2535,7 +2597,8 @@ Para esta rodada ser considerada concluida:
 3. `mcp_golden_prompts` deve recomendar summaries antes de log tails.
 4. `repo_search_text` deve funcionar com `pattern` e com `query`.
 5. `mcp_connector_smoke_refresh` deve aparecer no registry e no capabilities summary.
-6. `make copilot-mcp-smoke-refresh` deve conseguir atualizar o smoke permanente quando o tunnel estiver vivo.
+6. `make copilot-mcp-smoke-refresh` deve conseguir atualizar o smoke permanente quando o tunnel
+   estiver vivo.
 7. Os tres validadores do escopo `src/copilot` devem passar antes do commit:
    - typecheck strict;
    - lint;
@@ -2546,8 +2609,8 @@ Para esta rodada ser considerada concluida:
 1. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`
    - passou com 40/40.
 2. `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_repo_write.spec.js tests/unit/copilot/conversation-hub/test_hub.spec.js --reporter=dot`
-   - passou com 20/20 apos ajustar testes para `includeDiffPreview=true` no novo contrato de diffs suprimidos por
-     default.
+   - passou com 20/20 apos ajustar testes para `includeDiffPreview=true` no novo contrato de diffs
+     suprimidos por default.
 3. `npm run typecheck:strict:src.copilot -- --pretty false`
    - passou.
 4. `npm run lint:copilot -- --quiet`
@@ -2564,8 +2627,8 @@ Para esta rodada ser considerada concluida:
 9. `make copilot-mcp-status`
    - passou com `ready=true`, `recommendedAction=use`, `authentication=OAuth` e smoke fresco.
 10. `make copilot-mcp-oauth-smoke`
-    - passou com protected resource, OAuth metadata, JWKS, DCR, CIMD, refresh token, id token CIMD, `/oauth/userinfo` e
-      chamada autenticada `mcp_runtime_health`.
+    - passou com protected resource, OAuth metadata, JWKS, DCR, CIMD, refresh token, id token CIMD,
+      `/oauth/userinfo` e chamada autenticada `mcp_runtime_health`.
 
 Estado operacional final desta rodada:
 
@@ -2585,12 +2648,13 @@ Apos o commit `671cf024`, a sessao prosseguiu para a subfase seguinte:
 
 1. `mcp_post_restart_readiness` foi implementado como tool read-only.
 2. `mcp_capabilities_summary` subiu para `CAPABILITIES_VERSION=18`.
-3. `mcp_session_profile` passou a sugerir `mcp_post_restart_readiness` entre chamadas iniciais e leituras de baixa
-   friccao.
+3. `mcp_session_profile` passou a sugerir `mcp_post_restart_readiness` entre chamadas iniciais e
+   leituras de baixa friccao.
 4. O smoke Cloudflare passou a considerar `mcp_post_restart_readiness` como critical tool.
 5. Validacao executada:
    - `npm run typecheck:strict:src.copilot -- --pretty false`: passou;
-   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`: passou com 41/41;
+   - `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp/test_mcp_registry.spec.js tests/unit/copilot/mcp/test_mcp_tools.spec.js --reporter=dot`:
+     passou com 41/41;
    - `npm run lint:copilot -- --quiet`: passou;
    - `npm run test:copilot:unit`: passou com 3093/3093;
    - `git diff --check`: passou;
@@ -2614,7 +2678,8 @@ Data: 2026-05-24.
 
 Escopo desta rodada:
 
-1. aprofundar a relacao entre Cloudflare Tunnel permanente, dominio `mcp.aurelin.org`, OAuth do MCP e ChatGPT;
+1. aprofundar a relacao entre Cloudflare Tunnel permanente, dominio `mcp.aurelin.org`, OAuth do MCP
+   e ChatGPT;
 2. reduzir reautorizacoes desnecessarias no ChatGPT;
 3. garantir que refresh tokens sobrevivam a restart do MCP;
 4. deixar CORS/preflight coerentes em `/mcp`, metadata OAuth e endpoints do issuer;
@@ -2623,46 +2688,45 @@ Escopo desta rodada:
 
 ### 16.1. Fontes oficiais rechecadas
 
-1. OpenAI Apps SDK — Quickstart
-   URL: `https://developers.openai.com/apps-sdk/quickstart`
-   Aplicacao local: confirmar que o endpoint MCP HTTP e a superficie de tools sao o contrato de conexao do app ao
-   ChatGPT.
+1. OpenAI Apps SDK — Quickstart URL: `https://developers.openai.com/apps-sdk/quickstart` Aplicacao
+   local: confirmar que o endpoint MCP HTTP e a superficie de tools sao o contrato de conexao do app
+   ao ChatGPT.
 
-2. OpenAI Apps SDK — Build your MCP server
-   URL: `https://developers.openai.com/apps-sdk/build/mcp-server`
-   Aplicacao local: o MCP server define tools, aplica auth e retorna dados estruturados; o ChatGPT escolhe quando chamar
-   tools com base nos metadados.
+2. OpenAI Apps SDK — Build your MCP server URL:
+   `https://developers.openai.com/apps-sdk/build/mcp-server` Aplicacao local: o MCP server define
+   tools, aplica auth e retorna dados estruturados; o ChatGPT escolhe quando chamar tools com base
+   nos metadados.
 
-3. OpenAI Apps SDK — Authenticate users
-   URL: `https://developers.openai.com/apps-sdk/build/auth`
+3. OpenAI Apps SDK — Authenticate users URL: `https://developers.openai.com/apps-sdk/build/auth`
    Aplicacao local:
    - publicar `/.well-known/oauth-protected-resource`;
    - devolver `WWW-Authenticate` com `resource_metadata` em 401;
    - publicar metadata OAuth/OIDC do authorization server;
    - anunciar `authorization_endpoint`, `token_endpoint`, `client_id_metadata_document_supported`,
-     `registration_endpoint`, `token_endpoint_auth_methods_supported` e `code_challenge_methods_supported=["S256"]`.
+     `registration_endpoint`, `token_endpoint_auth_methods_supported` e
+     `code_challenge_methods_supported=["S256"]`.
 
-4. Cloudflare Tunnel — Overview
-   URL: `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/`
-   Aplicacao local: `cloudflared` cria conexoes outbound para a rede Cloudflare; o origin local nao precisa expor IP
-   publico.
+4. Cloudflare Tunnel — Overview URL:
+   `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/`
+   Aplicacao local: `cloudflared` cria conexoes outbound para a rede Cloudflare; o origin local nao
+   precisa expor IP publico.
 
-5. Cloudflare Tunnel — DNS records
-   URL: `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/`
-   Aplicacao local: `mcp.aurelin.org` deve apontar via CNAME para `<UUID>.cfargotunnel.com`; o DNS e o tunnel sao
-   independentes, portanto o DNS pode existir enquanto o tunnel esta parado.
+5. Cloudflare Tunnel — DNS records URL:
+   `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/dns/`
+   Aplicacao local: `mcp.aurelin.org` deve apontar via CNAME para `<UUID>.cfargotunnel.com`; o DNS e
+   o tunnel sao independentes, portanto o DNS pode existir enquanto o tunnel esta parado.
 
-6. Cloudflare Tunnel — run parameters
-   URL: `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/`
+6. Cloudflare Tunnel — run parameters URL:
+   `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/`
    Aplicacao local:
    - `--token` associa uma instancia `cloudflared` a um tunnel remoto;
    - `--token-file` e proprio para tunnel remotamente gerenciado;
    - manter token fora de logs e de argumentos persistidos quando possivel.
 
-7. Cloudflare Access — CORS
-   URL: `https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/`
-   Aplicacao local: mesmo que nosso endpoint publico nao use Cloudflare Access como IdP, preflight e headers CORS devem
-   ser previsiveis para clients web e ferramentas de diagnostico.
+7. Cloudflare Access — CORS URL:
+   `https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/cors/`
+   Aplicacao local: mesmo que nosso endpoint publico nao use Cloudflare Access como IdP, preflight e
+   headers CORS devem ser previsiveis para clients web e ferramentas de diagnostico.
 
 ### 16.2. Diagnostico local apos a pesquisa
 
@@ -2682,22 +2746,29 @@ Pontos bons:
 
 1. `readCloudflareTunnelConfig()` ja usa `named-permanent` como padrao.
 2. O dominio permanente e o tunnel permanente ja aparecem no package/Makefile.
-3. O issuer OAuth embutido ja publica metadata OAuth/OIDC, JWKS, DCR, CIMD, authorize, token e userinfo.
-4. O smoke OAuth cobre DCR, CIMD, PKCE, refresh-token, id-token, userinfo e chamada autenticada a tool.
-5. O smoke Cloudflare cobre `/health`, protected resource metadata, OAuth metadata e registry remoto.
-6. O MCP HTTP adapter ja aceita CORS em `/mcp` com `Authorization`, `content-type`, `mcp-session-id` e
-   `mcp-protocol-version`.
+3. O issuer OAuth embutido ja publica metadata OAuth/OIDC, JWKS, DCR, CIMD, authorize, token e
+   userinfo.
+4. O smoke OAuth cobre DCR, CIMD, PKCE, refresh-token, id-token, userinfo e chamada autenticada a
+   tool.
+5. O smoke Cloudflare cobre `/health`, protected resource metadata, OAuth metadata e registry
+   remoto.
+6. O MCP HTTP adapter ja aceita CORS em `/mcp` com `Authorization`, `content-type`, `mcp-session-id`
+   e `mcp-protocol-version`.
 
 Gaps confirmados:
 
 1. Refresh tokens do issuer dev eram rotativos, mas ficavam somente em memoria.
-   - Consequencia: apos restart do MCP, um refresh token ainda dentro de 30 dias podia deixar de funcionar.
-   - Impacto: o ChatGPT poderia iniciar novo fluxo de autorizacao mesmo quando o usuario ja havia linkado o conector.
+   - Consequencia: apos restart do MCP, um refresh token ainda dentro de 30 dias podia deixar de
+     funcionar.
+   - Impacto: o ChatGPT poderia iniciar novo fluxo de autorizacao mesmo quando o usuario ja havia
+     linkado o conector.
 2. Clientes DCR tambem ficam em memoria.
    - Consequencia: um `client_id` DCR antigo pode nao sobreviver a restart.
    - Mitigacao parcial: o ChatGPT pode usar CIMD; ainda assim, DCR persistente melhora estabilidade.
-3. CORS estava completo para `/mcp`, mas nao era aplicado uniformemente em `/health`, `/.well-known/*` e `/oauth/*`.
-   - Consequencia: navegadores, MCP Inspector e smoke web podem observar comportamento diferente por rota.
+3. CORS estava completo para `/mcp`, mas nao era aplicado uniformemente em `/health`,
+   `/.well-known/*` e `/oauth/*`.
+   - Consequencia: navegadores, MCP Inspector e smoke web podem observar comportamento diferente por
+     rota.
 4. `mcp_oauth_friction_audit` ainda descrevia refresh-token como "in-memory one-time rotation".
    - Consequencia: diagnostico ficaria incorreto apos a correcao de persistencia.
 5. Cloudflare smoke ainda nao explicita preflight/CORS como dimensao de readiness.
@@ -2726,7 +2797,8 @@ Propriedades desejadas:
 
 1. O ChatGPT usa sempre `https://mcp.aurelin.org/mcp` no formulario de connector.
 2. A autenticacao padrao no formulario e `OAuth`.
-3. O protected resource metadata aponta para `https://mcp.aurelin.org/.well-known/oauth-protected-resource`.
+3. O protected resource metadata aponta para
+   `https://mcp.aurelin.org/.well-known/oauth-protected-resource`.
 4. O authorization server metadata aponta para endpoints do proprio `https://mcp.aurelin.org`.
 5. `authorization_code + PKCE S256` funciona para o primeiro link.
 6. `refresh_token` funciona apos restart do MCP dentro da janela de TTL.
@@ -2777,10 +2849,11 @@ Estado: parcialmente implementada nesta rodada.
 Subfases:
 
 1. [x] Reforcar doctor/status com origem local, URL publica, hostname permanente e fallback.
-2. [x] Detectar/avisar quando origin remoto estiver configurado como `localhost` em vez de `127.0.0.1`, quando isso
-       aparecer em logs.
+2. [x] Detectar/avisar quando origin remoto estiver configurado como `localhost` em vez de
+       `127.0.0.1`, quando isso aparecer em logs.
 3. [x] Confirmar que `--token-file` segue como caminho canonico.
-4. [x] Atualizar `.env.example`, `.env.local.example`, schema, package e Makefile com variaveis novas.
+4. [x] Atualizar `.env.example`, `.env.local.example`, schema, package e Makefile com variaveis
+       novas.
 5. [ ] Manter comandos temporarios separados e marcados como fallback.
 
 #### Faixa I — Validacao e publicacao
@@ -2841,17 +2914,18 @@ Subfases:
    - `x-requested-with`.
 10. `Access-Control-Expose-Headers` passou a incluir `WWW-Authenticate`.
 11. `copilot:mcp:oauth:smoke` passou a validar preflight CORS dos endpoints OAuth principais.
-12. `mcp_tunnel_status` e `mcp_post_restart_readiness` passaram a ler sinais recentes do log do `cloudflared`.
-    - Quando o log indicar `localhost:3333` ou `::1:3333`, a recomendacao e configurar o servico Cloudflare como
-      `http://127.0.0.1:3333`.
+12. `mcp_tunnel_status` e `mcp_post_restart_readiness` passaram a ler sinais recentes do log do
+    `cloudflared`.
+    - Quando o log indicar `localhost:3333` ou `::1:3333`, a recomendacao e configurar o servico
+      Cloudflare como `http://127.0.0.1:3333`.
 13. `.env.example`, `.env.local.example` e `.env.schema.json` passaram a declarar
     `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE`.
 14. `src/copilot/mcp/README.md` documenta a persistencia de refresh tokens por hash.
 15. `package.json` ganhou `copilot:mcp:oauth:smoke:persistent`.
-16. `Makefile` injeta explicitamente `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE` nos fluxos canonicos de `up`,
-    `restart` e `oauth-smoke`.
-17. `.gitignore` passou a ignorar `src/copilot/.ai/mcp/*`, preservando apenas `.gitkeep`, para impedir commit de
-    chave OAuth dev e refresh-token hashes.
+16. `Makefile` injeta explicitamente `COPILOT_MCP_DEV_OAUTH_REFRESH_TOKEN_FILE` nos fluxos canonicos
+    de `up`, `restart` e `oauth-smoke`.
+17. `.gitignore` passou a ignorar `src/copilot/.ai/mcp/*`, preservando apenas `.gitkeep`, para
+    impedir commit de chave OAuth dev e refresh-token hashes.
 
 ### 16.6. Validacao parcial ja executada
 
@@ -2869,12 +2943,13 @@ Subfases:
 6. `make copilot-mcp-restart`
    - passou, reiniciando `mcp-http` e `cloudflared` para carregar o novo issuer OAuth persistente.
 7. `make copilot-mcp-oauth-smoke`
-   - passou com protected resource, CORS preflight, OAuth metadata, JWKS, DCR, CIMD, refresh-token, id-token,
-     userinfo e chamada autenticada `mcp_runtime_health`.
+   - passou com protected resource, CORS preflight, OAuth metadata, JWKS, DCR, CIMD, refresh-token,
+     id-token, userinfo e chamada autenticada `mcp_runtime_health`.
 8. `make copilot-mcp-smoke-refresh`
    - passou com 75/75 tools remotas, OAuth readiness ok e smoke persistido atualizado.
 9. `make copilot-mcp-status`
-   - passou com `ready=true`, tunnel permanente vivo, `authentication=OAuth` e `recommendedAction=use`.
+   - passou com `ready=true`, tunnel permanente vivo, `authentication=OAuth` e
+     `recommendedAction=use`.
 10. Checagem local do store `src/copilot/.ai/mcp/oauth-refresh-tokens.json`:
     - permissao `0600`;
     - `storesOnlyTokenHashes=true`;
@@ -2883,13 +2958,14 @@ Subfases:
 
 ### 16.7. Continuidade pos-push — clientes DCR persistentes
 
-Apos o commit `b4c9863e`, a proxima lacuna natural da mesma frente foi iniciada: clientes DCR tambem eram estado em
-memoria. Embora o ChatGPT possa usar CIMD, DCR persistente reduz risco de relinking quando o conector reutiliza um
-`client_id` emitido antes do restart.
+Apos o commit `b4c9863e`, a proxima lacuna natural da mesma frente foi iniciada: clientes DCR tambem
+eram estado em memoria. Embora o ChatGPT possa usar CIMD, DCR persistente reduz risco de relinking
+quando o conector reutiliza um `client_id` emitido antes do restart.
 
 Mudancas em implementacao nesta continuidade:
 
-1. `dev-oauth.js` passa a persistir clientes DCR publicos em `src/copilot/.ai/mcp/oauth-clients.json`.
+1. `dev-oauth.js` passa a persistir clientes DCR publicos em
+   `src/copilot/.ai/mcp/oauth-clients.json`.
 2. O arquivo armazena apenas metadados publicos:
    - `clientId`;
    - `clientName`;
@@ -2907,10 +2983,10 @@ Mudancas em implementacao nesta continuidade:
    - `clientStore.lastPersistedAt`;
    - `clientStore.lastPersistenceError`.
 6. `mcp_oauth_friction_audit` expõe tambem o status do client store.
-7. `.env.example`, `.env.local.example`, `.env.schema.json`, `package.json`, `Makefile` e `README.md` passam a declarar
-   `COPILOT_MCP_DEV_OAUTH_CLIENT_FILE`.
-8. O teste de persistencia OAuth agora registra um cliente DCR, reseta o runtime logico, e so entao executa
-   `authorize -> token -> refresh`, provando que o client store sobreviveu ao reset.
+7. `.env.example`, `.env.local.example`, `.env.schema.json`, `package.json`, `Makefile` e
+   `README.md` passam a declarar `COPILOT_MCP_DEV_OAUTH_CLIENT_FILE`.
+8. O teste de persistencia OAuth agora registra um cliente DCR, reseta o runtime logico, e so entao
+   executa `authorize -> token -> refresh`, provando que o client store sobreviveu ao reset.
 
 Subfases adicionais:
 
@@ -2950,9 +3026,9 @@ Validacao da continuidade DCR:
 
 ### 17.1. Situacao lida na auditoria externa
 
-O arquivo `src/copilot/docs/# Auditoria Cloudflare — MCP externo.md` foi lido integralmente. O ponto central
-validado localmente foi que a arquitetura local ja estava correta, mas a fonte remota de verdade do Cloudflare
-precisava virar objeto auditavel pelo proprio repo.
+O arquivo `src/copilot/docs/# Auditoria Cloudflare — MCP externo.md` foi lido integralmente. O ponto
+central validado localmente foi que a arquitetura local ja estava correta, mas a fonte remota de
+verdade do Cloudflare precisava virar objeto auditavel pelo proprio repo.
 
 Achados confirmados:
 
@@ -2960,10 +3036,11 @@ Achados confirmados:
 2. A URL publica canonica permanece `https://mcp.aurelin.org/mcp`.
 3. O tunnel remoto chama `workspace-mcp-dev`.
 4. O servico de origem remoto do Cloudflare nao deve apontar para `/mcp`.
-5. O servico de origem remoto nao deve ser `http://localhost:3333`, porque `localhost` pode resolver para IPv6
-   `::1` em alguns contextos e gerar `connection refused`.
+5. O servico de origem remoto nao deve ser `http://localhost:3333`, porque `localhost` pode resolver
+   para IPv6 `::1` em alguns contextos e gerar `connection refused`.
 6. O servico de origem remoto correto e `http://127.0.0.1:3333`.
-7. A auditoria anterior recomendou uma tool ou comando de auditoria remota via API oficial Cloudflare.
+7. A auditoria anterior recomendou uma tool ou comando de auditoria remota via API oficial
+   Cloudflare.
 8. Tambem recomendou metricas locais do `cloudflared` e `loglevel` explicito.
 
 ### 17.2. Pesquisa oficial consolidada
@@ -2972,27 +3049,30 @@ Fontes oficiais usadas nesta faixa:
 
 1. Cloudflare Tunnel — setup e operacao de tunnels.
    - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/`
-   - Conclusao operacional: `cloudflared` cria conexoes outbound para a edge Cloudflare; nao precisamos abrir porta
-     inbound no Dev Container.
+   - Conclusao operacional: `cloudflared` cria conexoes outbound para a edge Cloudflare; nao
+     precisamos abrir porta inbound no Dev Container.
 2. Cloudflare Tunnel — tokens e run parameters.
    - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/tunnel-run-parameters/`
-   - Conclusao operacional: tunnel remoto pode rodar por `--token` ou `--token-file`; o token deve ficar fora do git.
+   - Conclusao operacional: tunnel remoto pode rodar por `--token` ou `--token-file`; o token deve
+     ficar fora do git.
 3. Cloudflare Tunnel — metricas.
    - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/monitor-tunnels/metrics/`
    - Conclusao operacional: `cloudflared` pode expor endpoint local de metricas via `--metrics`.
 4. Cloudflare API / Node SDK.
    - `https://developers.cloudflare.com/api/node/`
-   - Conclusao operacional: o pacote oficial `cloudflare` permite listar tunnel, buscar configuracao remota e auditar
-     DNS sem shelling para `curl`.
+   - Conclusao operacional: o pacote oficial `cloudflare` permite listar tunnel, buscar configuracao
+     remota e auditar DNS sem shelling para `curl`.
 5. Claude custom connectors / remote MCP.
    - `https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp`
    - `https://support.claude.com/en/articles/11176164-use-connectors-to-extend-claude-s-capabilities`
-   - Conclusao operacional: Claude custom connectors aceitam um servidor MCP remoto e campos opcionais de OAuth
-     client id/client secret; nosso caminho preferencial e deixar esses campos vazios e usar DCR/CIMD publico.
+   - Conclusao operacional: Claude custom connectors aceitam um servidor MCP remoto e campos
+     opcionais de OAuth client id/client secret; nosso caminho preferencial e deixar esses campos
+     vazios e usar DCR/CIMD publico.
 6. MCP Authorization.
    - `https://modelcontextprotocol.io/specification/draft/basic/authorization`
-   - Conclusao operacional: clientes MCP remotos podem preferir metadata de protected resource mais especifica por
-     caminho. Por isso o servidor deve publicar tanto o well-known raiz quanto `/.well-known/oauth-protected-resource/mcp`.
+   - Conclusao operacional: clientes MCP remotos podem preferir metadata de protected resource mais
+     especifica por caminho. Por isso o servidor deve publicar tanto o well-known raiz quanto
+     `/.well-known/oauth-protected-resource/mcp`.
 
 ### 17.3. Estado real verificado antes dos patches
 
@@ -3001,8 +3081,10 @@ Fontes oficiais usadas nesta faixa:
    - o tunnel `workspace-mcp-dev` foi encontrado;
    - status remoto: `healthy`;
    - conexoes remotas: 4.
-3. `client.user.tokens.verify()` retornou `401` na checagem generica, mas a mesma credencial leu tunnel e config.
-   - Interpretacao: o verify generico nao foi tratado como autoridade final para este token escopado.
+3. `client.user.tokens.verify()` retornou `401` na checagem generica, mas a mesma credencial leu
+   tunnel e config.
+   - Interpretacao: o verify generico nao foi tratado como autoridade final para este token
+     escopado.
    - A autoridade pratica e a capacidade de ler o recurso-alvo Zero Trust Tunnel.
 4. A config remota estava em drift:
    - antes: `mcp.aurelin.org -> http://localhost:3333`;
@@ -3048,7 +3130,8 @@ Subfaixa 17-C — Claude custom connector:
 
 1. [x] Adicionar CORS default para `https://claude.ai` e `https://www.claude.ai`.
 2. [x] Publicar `/.well-known/oauth-protected-resource/mcp`.
-3. [x] Aceitar resource OAuth tanto como `https://mcp.aurelin.org` quanto como `https://mcp.aurelin.org/mcp`.
+3. [x] Aceitar resource OAuth tanto como `https://mcp.aurelin.org` quanto como
+       `https://mcp.aurelin.org/mcp`.
 4. [x] Emitir access token com audience igual ao resource solicitado no authorize/token flow.
 5. [x] Validar bearer com audiences aceitas base e `/mcp`.
 6. [x] Criar `claude_connector_profile`.
@@ -3062,7 +3145,8 @@ Subfaixa 17-D — documentacao e governanca:
 3. [x] Atualizar `package.json` e `Makefile`.
 4. [x] Atualizar este plano canonico.
 5. [ ] Criar runbook dedicado Claude se o teste real mostrar passos especificos da UI.
-6. [ ] Incorporar o relatorio externo `# Auditoria Cloudflare — MCP externo.md` ao commit se o usuario quiser que ele vire artefato versionado.
+6. [ ] Incorporar o relatorio externo `# Auditoria Cloudflare — MCP externo.md` ao commit se o
+       usuario quiser que ele vire artefato versionado.
 
 ### 17.5. Dados para a caixa da Claude
 
@@ -3079,7 +3163,8 @@ Campos recomendados agora:
    - Claude descobre metadata OAuth;
    - usa DCR ou metadata publica de client quando aplicavel;
    - pede autorizacao OAuth;
-   - recebe token com audience compativel com `https://mcp.aurelin.org` ou `https://mcp.aurelin.org/mcp`;
+   - recebe token com audience compativel com `https://mcp.aurelin.org` ou
+     `https://mcp.aurelin.org/mcp`;
    - chama tools MCP normalmente.
 
 ### 17.6. Roadmap imediato pos-patch
@@ -3149,14 +3234,17 @@ Campos recomendados agora:
 
 1. O token Cloudflare atual le Zero Trust Tunnel, mas nao conseguiu auditar DNS record:
    - erro observado: `403 Authentication error` ao chamar DNS/Zone API.
-   - impacto: a auditoria ainda valida tunnel/config/ingress/conexoes; apenas DNS CNAME fica como warning.
-   - upgrade: fornecer `CLOUDFLARE_ZONE_ID` e token com permissoes Zone Read + DNS Read para fechar o ciclo DNS.
+   - impacto: a auditoria ainda valida tunnel/config/ingress/conexoes; apenas DNS CNAME fica como
+     warning.
+   - upgrade: fornecer `CLOUDFLARE_ZONE_ID` e token com permissoes Zone Read + DNS Read para fechar
+     o ciclo DNS.
 2. Teste real no Claude ainda precisa ser executado na UI.
    - os dados da caixa ja estao no runbook e na tool `claude_connector_profile`.
 
 ### 17.9. Continuidade pos-push — metricas Cloudflare como tool MCP
 
-Apos o commit `2a55b004`, a continuidade imediata fechou o gap de observabilidade local do `cloudflared`.
+Apos o commit `2a55b004`, a continuidade imediata fechou o gap de observabilidade local do
+`cloudflared`.
 
 Mudancas:
 
@@ -3201,7 +3289,8 @@ Motivo da faixa:
 
 1. O tunnel permanente ja esta saudavel.
 2. O endpoint publico canonico ja e `https://mcp.aurelin.org/mcp`.
-3. A proxima camada de risco nao e apenas conectividade do tunnel, mas interferencia da edge Cloudflare:
+3. A proxima camada de risco nao e apenas conectividade do tunnel, mas interferencia da edge
+   Cloudflare:
    - cache indevido em `/mcp`, `/.well-known/*`, `/oauth/*` ou `/health`;
    - WAF/challenge interativo em cliente MCP nao-browser;
    - rate limit baixo para sessoes autenticadas longas;
@@ -3212,13 +3301,16 @@ Investigacao oficial usada nesta faixa:
 
 1. Cloudflare Codex + Cloudflare:
    - `https://developers.cloudflare.com/agent-setup/codex/`
-   - conclusao: o MCP oficial da Cloudflare e complemento operacional util para administrar DNS/WAF/Rulesets/Tunnel, mas nao substitui nosso MCP local do repo.
+   - conclusao: o MCP oficial da Cloudflare e complemento operacional util para administrar
+     DNS/WAF/Rulesets/Tunnel, mas nao substitui nosso MCP local do repo.
 2. Cloudflare MCP servers:
    - `https://developers.cloudflare.com/agents/model-context-protocol/mcp-servers-for-cloudflare/`
-   - conclusao: `https://mcp.cloudflare.com/mcp` expoe a API Cloudflare via Code Mode e pode ajudar em operacoes profundas quando conectado/autorizado.
+   - conclusao: `https://mcp.cloudflare.com/mcp` expoe a API Cloudflare via Code Mode e pode ajudar
+     em operacoes profundas quando conectado/autorizado.
 3. Cloudflare Tunnel configuration:
    - `https://developers.cloudflare.com/tunnel/configuration/`
-   - conclusao: nosso uso de tunnel permanente com `cloudflared` outbound e metricas locais esta alinhado ao modelo oficial.
+   - conclusao: nosso uso de tunnel permanente com `cloudflared` outbound e metricas locais esta
+     alinhado ao modelo oficial.
 4. Cloudflare Tunnel metrics:
    - `https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/monitor-tunnels/metrics/`
    - conclusao: `--metrics 127.0.0.1:60123` e o caminho correto para observabilidade local.
@@ -3270,11 +3362,14 @@ Resultado da primeira execucao real:
 
 Interpretacao:
 
-1. O token atual conseguiu auditar a zona/rulesets nesta faixa, apesar do warning anterior de DNS API.
+1. O token atual conseguiu auditar a zona/rulesets nesta faixa, apesar do warning anterior de DNS
+   API.
 2. A zona aparentemente ainda nao tem rulesets relevantes para o hostname MCP.
 3. Isso e bom para evitar interferencia acidental imediata.
-4. Tambem deixa oportunidade clara: criar regras explicitas e cuidadosamente testadas para cache bypass e anti-abuse.
-5. A proxima fase segura e manter auditoria read-only por alguns ciclos antes de aplicar rulesets automaticamente.
+4. Tambem deixa oportunidade clara: criar regras explicitas e cuidadosamente testadas para cache
+   bypass e anti-abuse.
+5. A proxima fase segura e manter auditoria read-only por alguns ciclos antes de aplicar rulesets
+   automaticamente.
 
 Validacao focada ja executada:
 
@@ -3292,13 +3387,15 @@ Roadmap atualizado desta faixa:
 7. [x] Rodar lint.
 8. [x] Rodar unit tests completos.
 9. [x] Rodar `make copilot-mcp-edge-audit`.
-10. [x] Rodar `make copilot-mcp-smoke-refresh` apos restart para confirmar a nova tool no endpoint publico.
+10. [x] Rodar `make copilot-mcp-smoke-refresh` apos restart para confirmar a nova tool no endpoint
+        publico.
 11. [ ] Commit/push da faixa Cloudflare Edge.
 
 Proximo passo tecnico:
 
 1. Commit/push da faixa Cloudflare Edge.
-2. Planejar faixa posterior de desired edge policy e diff seguro antes de qualquer mutacao de rulesets.
+2. Planejar faixa posterior de desired edge policy e diff seguro antes de qualquer mutacao de
+   rulesets.
 
 Validacao final da faixa:
 
@@ -3330,7 +3427,8 @@ Validacao final da faixa:
 Correcao adicional descoberta pelos validadores:
 
 1. A suite completa expôs flake de tempo em `tests/unit/copilot/conversation-hub/test_hub.spec.js`.
-2. Causa: teste de `ConversationHub` usava o `conversationStore` singleton real, competindo com outros testes paralelos.
+2. Causa: teste de `ConversationHub` usava o `conversationStore` singleton real, competindo com
+   outros testes paralelos.
 3. Correcao estrutural:
    - `ConversationHub` agora aceita `ConversationStore` injetavel.
    - o singleton de producao continua usando o store padrao.
@@ -3339,8 +3437,8 @@ Correcao adicional descoberta pelos validadores:
 
 ### 18.1. Continuidade pos-push — desired edge policy plan-only
 
-Apos o commit `c755986d`, a continuidade imediata adicionou uma segunda tool Cloudflare focada em planejamento seguro,
-sem aplicar nenhuma mudanca na conta.
+Apos o commit `c755986d`, a continuidade imediata adicionou uma segunda tool Cloudflare focada em
+planejamento seguro, sem aplicar nenhuma mudanca na conta.
 
 Mudancas:
 
@@ -3472,8 +3570,8 @@ Validacao final da continuidade:
 
 ### 18.3. Continuidade — snapshot read-only para backup operacional
 
-Apos publicar `mcp_cloudflare_edge_policy_diff`, a proxima camada adicionada foi snapshot consolidado, ainda sem
-mutacao.
+Apos publicar `mcp_cloudflare_edge_policy_diff`, a proxima camada adicionada foi snapshot
+consolidado, ainda sem mutacao.
 
 Mudancas:
 
@@ -3495,7 +3593,8 @@ Contrato da snapshot:
    - findings;
    - diff desired vs actual;
    - guidance de backup.
-4. Sugere um `suggestedFileName` para persistencia externa do JSON antes de qualquer mudanca Cloudflare.
+4. Sugere um `suggestedFileName` para persistencia externa do JSON antes de qualquer mudanca
+   Cloudflare.
 
 Validacao final da continuidade:
 
@@ -3522,14 +3621,16 @@ Validacao final da continuidade:
 
 Proximo passo tecnico:
 
-1. Criar uma camada de backup/restore ou instrucao operacional manual antes da primeira mutacao Cloudflare real.
-2. Depois disso, aplicar em ordem: cache bypass explicito, rate limit anonimo de `/mcp`, rate limit de `/oauth/token`.
+1. Criar uma camada de backup/restore ou instrucao operacional manual antes da primeira mutacao
+   Cloudflare real.
+2. Depois disso, aplicar em ordem: cache bypass explicito, rate limit anonimo de `/mcp`, rate limit
+   de `/oauth/token`.
 
 ### 18.4. Continuidade — backup persistido antes de mutacao Cloudflare
 
-Apos publicar a snapshot read-only, a proxima camada transforma a recomendacao de backup em operacao canonica
-do proprio MCP/CLI. O objetivo e permitir que ChatGPT/Claude criem um ponto local de restauracao antes de qualquer
-mudanca de cache, WAF, transform ou rate-limit.
+Apos publicar a snapshot read-only, a proxima camada transforma a recomendacao de backup em operacao
+canonica do proprio MCP/CLI. O objetivo e permitir que ChatGPT/Claude criem um ponto local de
+restauracao antes de qualquer mudanca de cache, WAF, transform ou rate-limit.
 
 Mudancas em andamento:
 
@@ -3555,14 +3656,15 @@ Contrato de backup:
    - label normalizado opcional;
    - SHA-256 do snapshot;
    - snapshot completo.
-6. A resposta da tool retorna resumo, caminho local e hashes, mas nao precisa devolver o snapshot completo salvo,
-   salvo quando `includeSnapshot=true`.
+6. A resposta da tool retorna resumo, caminho local e hashes, mas nao precisa devolver o snapshot
+   completo salvo, salvo quando `includeSnapshot=true`.
 
 Racional:
 
 1. Antes de aplicar regras reais na Cloudflare, precisamos de um artefato local reproduzivel.
 2. O backup reduz risco de mudanca irreversivel feita por dashboard ou API.
-3. A lista de backups permite ao ChatGPT escolher o ultimo ponto conhecido antes de comparar diffs posteriores.
+3. A lista de backups permite ao ChatGPT escolher o ultimo ponto conhecido antes de comparar diffs
+   posteriores.
 4. Mutacao automatica segue bloqueada ate existir aplicador com diff, smoke e rollback documentado.
 
 Proxima validacao:
@@ -3583,28 +3685,31 @@ Proxima validacao:
    - primeiro smoke imediato pos-restart recebeu 502 transiente da Cloudflare durante warm-up.
    - segundo smoke passou com 84/84 tools remotas e `toolsMatchLocalRegistry=true`.
 8. Corrigir a fragilidade operacional encontrada.
-   - `smoke` agora usa retry para falhas transientes 502/503/504 e erros de rede nos probes de health, metadata OAuth e `tools/list`.
+   - `smoke` agora usa retry para falhas transientes 502/503/504 e erros de rede nos probes de
+     health, metadata OAuth e `tools/list`.
    - a resposta do smoke passa a expor `attempts` em health/toolsList para diagnostico.
 
 Status da faixa:
 
 1. Backup persistido esta operacional.
 2. O endpoint publico esta pronto com 84/84 tools.
-3. A criacao automatica de regras Cloudflare reais ainda nao foi liberada; a proxima faixa deve criar aplicador com
-   guardrails, diff pos-mutacao e rollback documentado.
+3. A criacao automatica de regras Cloudflare reais ainda nao foi liberada; a proxima faixa deve
+   criar aplicador com guardrails, diff pos-mutacao e rollback documentado.
 
 ### 18.5. Continuidade — aplicador Cloudflare com guardrails
 
-Apos a camada de backup persistido, foi iniciada a faixa de aplicador. A implementacao segue a documentacao oficial
-da Cloudflare Rulesets API: cache rules usam `http_request_cache_settings` com `set_cache_settings` e
-`action_parameters.cache=false`; rate limiting usa `http_ratelimit` com objeto `ratelimit`, e regras de rate limit
-devem ficar ao fim da lista de regras do ruleset.
+Apos a camada de backup persistido, foi iniciada a faixa de aplicador. A implementacao segue a
+documentacao oficial da Cloudflare Rulesets API: cache rules usam `http_request_cache_settings` com
+`set_cache_settings` e `action_parameters.cache=false`; rate limiting usa `http_ratelimit` com
+objeto `ratelimit`, e regras de rate limit devem ficar ao fim da lista de regras do ruleset.
 
 Fontes oficiais consultadas:
 
-1. Cloudflare Cache Rules API: `https://developers.cloudflare.com/cache/how-to/cache-rules/create-api/`
+1. Cloudflare Cache Rules API:
+   `https://developers.cloudflare.com/cache/how-to/cache-rules/create-api/`
 2. Cloudflare Rulesets Node SDK: `https://developers.cloudflare.com/api/node/resources/rulesets/`
-3. Cloudflare Rate Limiting Rules API: `https://developers.cloudflare.com/waf/rate-limiting-rules/create-api/`
+3. Cloudflare Rate Limiting Rules API:
+   `https://developers.cloudflare.com/waf/rate-limiting-rules/create-api/`
 
 Mudancas em andamento:
 
@@ -3655,8 +3760,8 @@ Proxima validacao:
 
 Observacao de qualidade:
 
-1. O primeiro dry-run expôs uma imprecisao no plano: duas regras na mesma fase ausente apareciam como duas criacoes
-   de entrypoint.
-2. O planejador foi corrigido para marcar a primeira regra da fase como `create-entrypoint-ruleset` e as demais como
-   `append-rule-after-entrypoint-create`.
+1. O primeiro dry-run expôs uma imprecisao no plano: duas regras na mesma fase ausente apareciam
+   como duas criacoes de entrypoint.
+2. O planejador foi corrigido para marcar a primeira regra da fase como `create-entrypoint-ruleset`
+   e as demais como `append-rule-after-entrypoint-create`.
 3. Esse ajuste evita confusao operacional antes de uma futura aplicacao real.

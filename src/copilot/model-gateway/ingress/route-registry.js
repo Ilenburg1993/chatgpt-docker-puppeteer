@@ -14,10 +14,7 @@
 
 import { createHash } from 'node:crypto';
 
-import {
-    createModelGatewayIngressRoute,
-    redactModelGatewayIngressRoute,
-} from './openai-compatible-ingress.js';
+import { createModelGatewayIngressRoute, redactModelGatewayIngressRoute } from './openai-compatible-ingress.js';
 
 /**
  * @param {unknown} value
@@ -86,24 +83,24 @@ function targetFingerprint(ingressRoute) {
 
 /**
  * @typedef {{
- *   ingressRoute: ReturnType<typeof createModelGatewayIngressRoute>;
- *   localApiKey: string;
- *   upstreamAuthHeaders: Record<string, string>;
- *   metadata: Record<string, unknown>;
- *   revision: number;
- *   targetFingerprint: string;
- *   registeredAt: string;
- *   updatedAt: string;
+ *     ingressRoute: ReturnType<typeof createModelGatewayIngressRoute>;
+ *     localApiKey: string;
+ *     upstreamAuthHeaders: Record<string, string>;
+ *     metadata: Record<string, unknown>;
+ *     revision: number;
+ *     targetFingerprint: string;
+ *     registeredAt: string;
+ *     updatedAt: string;
  * }} ModelGatewayIngressRouteEntry
  */
 
 /**
  * @typedef {{
- *   schemaVersion: 'model-gateway.ingress-route-snapshot.v1';
- *   routeId: string;
- *   revision: number;
- *   capturedAt: string;
- *   entry: ModelGatewayIngressRouteEntry;
+ *     schemaVersion: 'model-gateway.ingress-route-snapshot.v1';
+ *     routeId: string;
+ *     revision: number;
+ *     capturedAt: string;
+ *     entry: ModelGatewayIngressRouteEntry;
  * }} ModelGatewayIngressRouteSnapshot
  */
 
@@ -131,10 +128,20 @@ function cloneEntry(entry) {
  * @param {string} routeId
  * @param {number | null} expectedRevision
  * @param {number | null} actualRevision
- * @returns {Error & { code?: string; routeId?: string; expectedRevision?: number | null; actualRevision?: number | null }}
+ * @returns {Error & {
+ *     code?: string;
+ *     routeId?: string;
+ *     expectedRevision?: number | null;
+ *     actualRevision?: number | null;
+ * }}
  */
 function revisionConflict(routeId, expectedRevision, actualRevision) {
-    const error = /** @type {Error & { code?: string; routeId?: string; expectedRevision?: number | null; actualRevision?: number | null }} */ (
+    const error = /** @type {Error & {
+    code?: string;
+    routeId?: string;
+    expectedRevision?: number | null;
+    actualRevision?: number | null;
+}} */ (
         new Error(
             `MODEL_GATEWAY_INGRESS_ROUTE_REVISION_CONFLICT: routeId=${routeId} expected=${String(expectedRevision)} actual=${String(actualRevision)}`,
         )
@@ -184,7 +191,8 @@ export class ModelGatewayIngressRouteRegistry {
      * @returns {ModelGatewayIngressRouteEntry}
      */
     register(input) {
-        const ingressRoute = input.ingressRoute ?? (input.routeInput ? createModelGatewayIngressRoute(input.routeInput) : null);
+        const ingressRoute =
+            input.ingressRoute ?? (input.routeInput ? createModelGatewayIngressRoute(input.routeInput) : null);
         if (!ingressRoute) throw new Error('MODEL_GATEWAY_INGRESS_ROUTE_REQUIRED');
         const localApiKey = optionalString(input.localApiKey);
         if (!localApiKey) throw new Error('MODEL_GATEWAY_INGRESS_LOCAL_API_KEY_REQUIRED');
@@ -192,7 +200,7 @@ export class ModelGatewayIngressRouteRegistry {
         const current = this.#current(ingressRoute.routeId, now);
         const actualRevision = current?.revision ?? null;
         const expectedProvided = Object.prototype.hasOwnProperty.call(input, 'expectedRevision');
-        const expectedRevision = expectedProvided ? input.expectedRevision ?? null : null;
+        const expectedRevision = expectedProvided ? (input.expectedRevision ?? null) : null;
         if (current) {
             if (!expectedProvided || expectedRevision !== actualRevision) {
                 throw revisionConflict(ingressRoute.routeId, expectedRevision, actualRevision);
@@ -275,10 +283,7 @@ export class ModelGatewayIngressRouteRegistry {
         if (!snapshot || snapshot.schemaVersion !== 'model-gateway.ingress-route-snapshot.v1') {
             throw new Error('MODEL_GATEWAY_INGRESS_ROUTE_SNAPSHOT_INVALID');
         }
-        const current = this.get(
-            snapshot.routeId,
-            typeof options.now === 'number' ? { now: options.now } : {},
-        );
+        const current = this.get(snapshot.routeId, typeof options.now === 'number' ? { now: options.now } : {});
         if (!current || current.revision !== options.expectedRevision) {
             throw revisionConflict(snapshot.routeId, options.expectedRevision, current?.revision ?? null);
         }
@@ -329,7 +334,7 @@ export class ModelGatewayIngressRouteRegistry {
 
     /**
      * @param {{ now?: number }} [options]
-     * @returns {Array<Record<string, unknown>>}
+     * @returns {Record<string, unknown>[]}
      */
     listRedacted(options = {}) {
         this.pruneExpired(options);

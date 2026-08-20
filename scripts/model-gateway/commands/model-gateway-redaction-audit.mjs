@@ -23,7 +23,8 @@ if (json) {
 }
 
 if (args.has('--help') || args.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-redaction-audit.mjs [--json] [--fail] [--repair]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-redaction-audit.mjs [--json] [--fail] [--repair]
 
 Audit persisted model-gateway JSON and SQLite payload surfaces for unredacted secret-looking strings.
 Default mode does not fetch providers, run models, mutate stores or print raw secret values.
@@ -51,16 +52,17 @@ if (repair) {
 }
 
 /**
- * @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['auditStoredPayloadRedaction']>> | {
- *   schema: string,
- *   ok: boolean,
- *   tableCount: number,
- *   leakCount: number,
- *   scannedStringCount: number,
- *   sampleCount: number,
- *   error: string,
- *   tables: Record<string, { samples: { path: string, redactedSnippet: string }[] }>
- * }}
+ * @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['auditStoredPayloadRedaction']>>
+ *     | {
+ *           schema: string;
+ *           ok: boolean;
+ *           tableCount: number;
+ *           leakCount: number;
+ *           scannedStringCount: number;
+ *           sampleCount: number;
+ *           error: string;
+ *           tables: Record<string, { samples: { path: string; redactedSnippet: string }[] }>;
+ *       }}
  */
 let sqliteAudit;
 try {
@@ -117,10 +119,10 @@ if (json) {
     process.stdout.write(
         `  sqlite: ok=${report.surfaces.sqlite.ok ? 'yes' : 'no'} leaks=${report.surfaces.sqlite.leakCount} tables=${report.surfaces.sqlite.tableCount}\n`,
     );
-    for (const sample of [...report.surfaces.catalog.samples, ...Object.values(report.surfaces.sqlite.tables).flatMap((table) => table.samples)].slice(
-        0,
-        12,
-    )) {
+    for (const sample of [
+        ...report.surfaces.catalog.samples,
+        ...Object.values(report.surfaces.sqlite.tables).flatMap((table) => table.samples),
+    ].slice(0, 12)) {
         process.stdout.write(`  leak ${sample.path}: ${sample.redactedSnippet}\n`);
     }
 }

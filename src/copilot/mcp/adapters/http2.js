@@ -11,9 +11,9 @@
  * @module copilot/mcp/adapters/http2
  */
 
+import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
 import { logMcp } from '#copilot/mcp/control-plane';
 import { createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto';
-import { readFile, stat } from 'node:fs/promises';
 import { createSecureServer, constants as http2Constants } from 'node:http2';
 import { isIP } from 'node:net';
 import { createMcpHttpProtocolState, recordMcpHttpProtocolRequest } from './http-protocol.js';
@@ -78,7 +78,7 @@ const ENCRYPTED_PRIVATE_KEY_PATTERN = /^-----BEGIN ENCRYPTED PRIVATE KEY-----/u;
  * @property {number} certificateExpiryWarnDays
  * @property {boolean} allowNonLoopbackBind
  * @property {boolean} allowNonLoopbackClients
-     * @property {import('node:tls').SecureVersion} minVersion
+ * @property {import('node:tls').SecureVersion} minVersion
  */
 
 /**
@@ -511,22 +511,26 @@ function listenHttp2Server(server, host, port) {
  * @returns {Promise<{
  *     cert: string;
  *     key: string;
- *     certStats: import('node:fs').Stats;
- *     keyStats: import('node:fs').Stats;
+ *     certStats: { size: number; mode: number };
+ *     keyStats: { size: number; mode: number };
  * }>}
  */
 async function readTlsMaterial(policy) {
     try {
-        const [certStats, keyStats] = await Promise.all([stat(policy.certFile), stat(policy.keyFile)]);
-        if (!certStats.isFile() || certStats.size <= 0 || certStats.size > MAX_TLS_FILE_BYTES) {
+        const [certSnapshot, keySnapshot] = await Promise.all([
+            readTextFreshTrusted(policy.certFile, { caller: 'mcp.adapters.http2' }),
+            readTextFreshTrusted(policy.keyFile, { caller: 'mcp.adapters.http2' }),
+        ]);
+        if (!certSnapshot.isFile || certSnapshot.sizeBytes <= 0 || certSnapshot.sizeBytes > MAX_TLS_FILE_BYTES) {
             throw new Error(`certificate file must be a non-empty regular file <= ${MAX_TLS_FILE_BYTES} bytes`);
         }
-        if (!keyStats.isFile() || keyStats.size <= 0 || keyStats.size > MAX_TLS_FILE_BYTES) {
+        if (!keySnapshot.isFile || keySnapshot.sizeBytes <= 0 || keySnapshot.sizeBytes > MAX_TLS_FILE_BYTES) {
             throw new Error(`key file must be a non-empty regular file <= ${MAX_TLS_FILE_BYTES} bytes`);
         }
+        const certStats = { size: certSnapshot.sizeBytes, mode: certSnapshot.mode };
+        const keyStats = { size: keySnapshot.sizeBytes, mode: keySnapshot.mode };
         warnIfPrivateKeyFileModeIsLoose(policy.keyFile, keyStats);
-        const [cert, key] = await Promise.all([readFile(policy.certFile, 'utf8'), readFile(policy.keyFile, 'utf8')]);
-        return { cert, key, certStats, keyStats };
+        return { cert: certSnapshot.content, key: keySnapshot.content, certStats, keyStats };
     } catch (error) {
         throw new Error(
             `Cannot start MCP HTTP/2 server without TLS material. Set COPILOT_MCP_HTTP2_CERT_FILE and COPILOT_MCP_HTTP2_KEY_FILE or create ${DEFAULT_HTTP2_CERT_FILE} and ${DEFAULT_HTTP2_KEY_FILE}. Cause: ${error instanceof Error ? error.message : String(error)}`,
@@ -537,7 +541,7 @@ async function readTlsMaterial(policy) {
 
 /**
  * @param {string} keyFile
- * @param {import('node:fs').Stats} keyStats
+ * @param {{ mode: number }} keyStats
  * @returns {void}
  */
 function warnIfPrivateKeyFileModeIsLoose(keyFile, keyStats) {

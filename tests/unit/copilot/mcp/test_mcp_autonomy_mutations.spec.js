@@ -4,10 +4,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import { gitWriteTools, isAccidentalExecutableModeDrift } from '../../../../src/copilot/mcp/tools/git-write.js';
-import {
-    llmBLiveTools,
-    reapCompletedDetachedLiveRuns,
-} from '../../../../src/copilot/mcp/tools/llm-b-live.js';
+import { llmBLiveTools, reapCompletedDetachedLiveRuns } from '../../../../src/copilot/mcp/tools/llm-b-live.js';
 import { mcpReloadTools } from '../../../../src/copilot/mcp/tools/restart-control.js';
 
 /**
@@ -24,10 +21,22 @@ function tool(definitions, name) {
 
 describe('MCP governed autonomy mutations', () => {
     it('repairs only the narrow HEAD-executable + shebang + missing-x-bit regression class', () => {
-        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o644, hasShebang: true }), true);
-        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o755, hasShebang: true }), false);
-        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100644', currentMode: 0o644, hasShebang: true }), false);
-        assert.equal(isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o644, hasShebang: false }), false);
+        assert.equal(
+            isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o644, hasShebang: true }),
+            true,
+        );
+        assert.equal(
+            isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o755, hasShebang: true }),
+            false,
+        );
+        assert.equal(
+            isAccidentalExecutableModeDrift({ headMode: '100644', currentMode: 0o644, hasShebang: true }),
+            false,
+        );
+        assert.equal(
+            isAccidentalExecutableModeDrift({ headMode: '100755', currentMode: 0o644, hasShebang: false }),
+            false,
+        );
     });
 
     it('rejects implicit/pathspec Git staging and exposes no arbitrary Git command surface', async () => {
@@ -71,7 +80,12 @@ describe('MCP governed autonomy mutations', () => {
             allowedProfiles: ['quic', 'h2', 'auto'],
             responseBeforeRestart: true,
         });
-        assert.deepEqual(Object.keys(scheduleTool.inputSchema).sort(), ['confirmRestart', 'delayMs', 'profile', 'reason']);
+        assert.deepEqual(Object.keys(scheduleTool.inputSchema).sort(), [
+            'confirmRestart',
+            'delayMs',
+            'profile',
+            'reason',
+        ]);
         assert.equal('command' in scheduleTool.inputSchema, false);
         assert.equal('path' in scheduleTool.inputSchema, false);
         assert.equal('env' in scheduleTool.inputSchema, false);

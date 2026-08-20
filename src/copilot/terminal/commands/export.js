@@ -48,7 +48,10 @@ export async function cmdExport({ println }, arg) {
     );
     if (projection.turns.length === 0) {
         lines.push('Nenhuma mensagem foi materializada neste transcript.', '');
-        lines.push('Este arquivo preserva o diagnóstico mínimo do terminal para cenários de timeout, provider sem resposta ou turno vazio antes de transcript público.', '');
+        lines.push(
+            'Este arquivo preserva o diagnóstico mínimo do terminal para cenários de timeout, provider sem resposta ou turno vazio antes de transcript público.',
+            '',
+        );
     }
 
     for (const turn of projection.turns) {
@@ -120,7 +123,11 @@ export async function cmdExport({ println }, arg) {
  * @returns {string}
  */
 function sanitizeExportInline(value) {
-    return escapeMarkdownHtml(redactSecretText(sanitizeTerminalExternalToolText(value)).replace(/[\r\n]+/gu, ' ').trim());
+    return escapeMarkdownHtml(
+        redactSecretText(sanitizeTerminalExternalToolText(value))
+            .replace(/[\r\n]+/gu, ' ')
+            .trim(),
+    );
 }
 
 /**
@@ -136,7 +143,10 @@ function sanitizeExportBlock(value) {
  * @returns {string}
  */
 function escapeMarkdownHtml(value) {
-    return String(value ?? '').replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
+    return String(value ?? '')
+        .replace(/&/gu, '&amp;')
+        .replace(/</gu, '&lt;')
+        .replace(/>/gu, '&gt;');
 }
 
 /**

@@ -7,8 +7,8 @@
  *   persistência, métricas e chamada a `start()`.
  */
 
-import { EventEmitter } from 'node:events';
 import { RESUME_QUESTION_WAIT_MS } from '#copilot/config/agent';
+import { EventEmitter } from 'node:events';
 import { waitForAgentSdkEvent } from '../../facades/agent-sdk-runtime.js';
 
 /**
@@ -36,8 +36,8 @@ function isEventEmitterTarget(candidate) {
 /**
  * Decide a estratégia de resume do dialog loop.
  *
- * Estratégia A tenta preservar `ask_user` sem nova chamada de modelo; Estratégia B reinicia o boot prompt e inicia
- * uma nova chamada de modelo, sem inferir a unidade de billing do provider.
+ * Estratégia A tenta preservar `ask_user` sem nova chamada de modelo; Estratégia B reinicia o boot prompt e inicia uma
+ * nova chamada de modelo, sem inferir a unidade de billing do provider.
  *
  * @param {{
  *     host: AgentHost | null;

@@ -29,14 +29,14 @@ function text(value) {
 /**
  * @param {unknown} value
  * @returns {{
- *   status: 'ready' | 'exhausted' | 'pending';
- *   terminal: boolean;
- *   winner: boolean;
- *   providerId: string | null;
- *   providerModel: string | null;
- *   decision: 'use_current' | 'switch_recommended' | null;
- *   reason: string | null;
- *   marker: string | null;
+ *     status: 'ready' | 'exhausted' | 'pending';
+ *     terminal: boolean;
+ *     winner: boolean;
+ *     providerId: string | null;
+ *     providerModel: string | null;
+ *     decision: 'use_current' | 'switch_recommended' | null;
+ *     reason: string | null;
+ *     marker: string | null;
  * }}
  */
 export function parseModelGatewayAdaptiveSelectionOutcome(value) {

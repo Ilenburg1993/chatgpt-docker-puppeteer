@@ -21,15 +21,9 @@ describe('model gateway dynamic ingress', () => {
 
         expect(localApiKey).toMatch(/^mgw-local-[A-Za-z0-9_-]{43}$/u);
         expect(localApiKey).not.toBe('model-gateway-ingress-local');
-        expect(buildModelGatewayIngressPublicBaseUrl({ host: '0.0.0.0', port: 3009 })).toBe(
-            'http://127.0.0.1:3009',
-        );
-        expect(buildModelGatewayIngressPublicBaseUrl({ host: '::', port: 3009 })).toBe(
-            'http://127.0.0.1:3009',
-        );
-        expect(buildModelGatewayIngressPublicBaseUrl({ host: '::1', port: 3009 })).toBe(
-            'http://[::1]:3009',
-        );
+        expect(buildModelGatewayIngressPublicBaseUrl({ host: '0.0.0.0', port: 3009 })).toBe('http://127.0.0.1:3009');
+        expect(buildModelGatewayIngressPublicBaseUrl({ host: '::', port: 3009 })).toBe('http://127.0.0.1:3009');
+        expect(buildModelGatewayIngressPublicBaseUrl({ host: '::1', port: 3009 })).toBe('http://[::1]:3009');
         expect(() => buildModelGatewayIngressPublicBaseUrl({ host: '127.0.0.1', port: 0 })).toThrow(
             /PUBLIC_PORT_INVALID/u,
         );
@@ -127,9 +121,9 @@ describe('model gateway dynamic ingress', () => {
             expectedRevision: null,
             now: Date.parse('2026-06-16T12:00:00.000Z'),
         });
-        expect(() =>
-            registry.register({ ingressRoute: second, localApiKey: 'stale-writer-key' }),
-        ).toThrow(/REVISION_CONFLICT/u);
+        expect(() => registry.register({ ingressRoute: second, localApiKey: 'stale-writer-key' })).toThrow(
+            /REVISION_CONFLICT/u,
+        );
         const secondEntry = registry.register({
             ingressRoute: second,
             localApiKey: 'local-route-key-v2',
@@ -139,9 +133,9 @@ describe('model gateway dynamic ingress', () => {
 
         expect(second.routeId).toBe(first.routeId);
         expect(second.sdkBaseUrl).toBe(first.sdkBaseUrl);
-        expect(
-            buildModelGatewayIngressSessionOverrides(second, { localApiKey: 'local-route-key-v2' }).model,
-        ).toBe('model-gateway-live');
+        expect(buildModelGatewayIngressSessionOverrides(second, { localApiKey: 'local-route-key-v2' }).model).toBe(
+            'model-gateway-live',
+        );
         expect(secondEntry).toMatchObject({
             revision: 2,
             registeredAt: '2026-06-16T12:00:00.000Z',

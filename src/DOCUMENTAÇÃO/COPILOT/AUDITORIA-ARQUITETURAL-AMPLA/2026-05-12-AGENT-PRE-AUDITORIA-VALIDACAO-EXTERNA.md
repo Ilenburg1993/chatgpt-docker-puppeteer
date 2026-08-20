@@ -378,8 +378,8 @@ Classificação atual dos achados externos reavaliados:
 
 Retomada adicional da ONDA 2, antes de continuar a decomposição de `AlwaysAliveAgent`:
 
-- `typecheck:strict:src.copilot` foi executado primeiro e falhou por barrels auto-referenciais criados na migração
-  parcial anterior:
+- `typecheck:strict:src.copilot` foi executado primeiro e falhou por barrels auto-referenciais
+  criados na migração parcial anterior:
   - `agent/error/index.js`;
   - `agent/runtime/contracts/index.js`;
   - `agent/event-bridge/index.js`.
@@ -387,7 +387,8 @@ Retomada adicional da ONDA 2, antes de continuar a decomposição de `AlwaysAliv
   - `agent/error/index.js` reexporta `error-policy.js`;
   - `agent/runtime/contracts/index.js` reexporta `runtime-contracts.js`;
   - `agent/event-bridge/index.js` reexporta `event-bridge-wiring.js` e `event-bridge-map.js`.
-- Migração concluída de imports operacionais cross-folder em `agent` para barrels/superfícies públicas:
+- Migração concluída de imports operacionais cross-folder em `agent` para barrels/superfícies
+  públicas:
   - `#copilot/config` e `#copilot/config/agent`;
   - `#copilot/core`;
   - `#copilot/dialog`;
@@ -400,11 +401,11 @@ Retomada adicional da ONDA 2, antes de continuar a decomposição de `AlwaysAliv
   - `#copilot/dialog` adicionado ao import map e ao `tsconfig.base.json`;
   - `#copilot/bridges` exporta `createMcpToolBridge`;
   - `#copilot/observability` exporta `buildStatusSnapshot`;
-  - `#copilot/config/agent` foi formalizado como sub-barrel público das constantes operacionais de `config/agent.js`,
-    preservando o root `#copilot/config` mais estreito.
+  - `#copilot/config/agent` foi formalizado como sub-barrel público das constantes operacionais de
+    `config/agent.js`, preservando o root `#copilot/config` mais estreito.
 - Novo guardrail:
-  - `tests/unit/copilot/contracts/test_agent_barrel_governance.spec.js` valida que todo `index.js` de `agent` é barrel
-    puro e que imports internos cross-folder passam por barrels.
+  - `tests/unit/copilot/contracts/test_agent_barrel_governance.spec.js` valida que todo `index.js`
+    de `agent` é barrel puro e que imports internos cross-folder passam por barrels.
 
 Métrica pós-ONDA 2:
 
@@ -420,9 +421,10 @@ Gates:
 Status reavaliado:
 
 - ONDA 2 barrel-first operacional: **concluída**;
-- Padrão `terminal`/`presentation` aplicado ao `agent` no escopo de imports cross-folder operacionais;
-- wildcard `#copilot/agent/*` permanece como compatibilidade white-box/testes, ainda rastreado como dívida de surface
-  pública futura, não como bloqueio da ONDA 2.
+- Padrão `terminal`/`presentation` aplicado ao `agent` no escopo de imports cross-folder
+  operacionais;
+- wildcard `#copilot/agent/*` permanece como compatibilidade white-box/testes, ainda rastreado como
+  dívida de surface pública futura, não como bloqueio da ONDA 2.
 
 ### Síntese objetiva
 
@@ -482,8 +484,8 @@ Leitura revisada:
 
 Bug arquitetural encontrado e sanado:
 
-- `runtime-selection` importava `presentation/routing/index.js` e puxava `presentation/state/ui-store`
-  por side-effect;
+- `runtime-selection` importava `presentation/routing/index.js` e puxava
+  `presentation/state/ui-store` por side-effect;
 - a correção foi estreitar o import para `presentation/routing/targeting.js`.
 
 Gates desta rodada:

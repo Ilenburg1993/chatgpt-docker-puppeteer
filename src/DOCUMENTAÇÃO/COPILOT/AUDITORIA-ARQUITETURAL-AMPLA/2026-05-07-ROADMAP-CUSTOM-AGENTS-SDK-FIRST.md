@@ -1,9 +1,8 @@
 # Roteiro de agentes customizados com prioridade ao SDK — auditoria viva e implementação
 
-Data-base: 2026-05-07
-Status: implementado nesta rodada para o caminho crítico de carregamento, validação, perfis, RPC e
-registro pleno de ferramentas
-Origem: revisão crítica do documento externo `CUSTOM-AGENTS-ARCHITECTURE-AUDIT.md`
+Data-base: 2026-05-07 Status: implementado nesta rodada para o caminho crítico de carregamento,
+validação, perfis, RPC e registro pleno de ferramentas Origem: revisão crítica do documento externo
+`CUSTOM-AGENTS-ARCHITECTURE-AUDIT.md`
 
 ## Leitura corrigida do AS-IS
 
@@ -251,8 +250,8 @@ Fechamento dos gaps remanescentes de UX identificados na rodada anterior:
 - Quando `external_tool.requested` é emitido, marca a ferramenta em voo.
 - Em `agent-runtime-events.js`, `onToolStart()` e `onToolComplete()` agora verificam se a ferramenta
   está marcada como externa; se sim, pulam a narração para evitar duplicidade.
-- Resultado: eventos `external_tool.requested` → `external_tool.completed` são únicos na timeline; não
-  há duplicidade com `EMITTER_TOOL_EXECUTION_START/COMPLETE` para a mesma ferramenta.
+- Resultado: eventos `external_tool.requested` → `external_tool.completed` são únicos na timeline;
+  não há duplicidade com `EMITTER_TOOL_EXECUTION_START/COMPLETE` para a mesma ferramenta.
 
 **Problema 2: Autoaprovação em permissões não era explícita**
 
@@ -284,5 +283,5 @@ Fechamento dos gaps remanescentes de UX identificados na rodada anterior:
 
 - Nenhum novo gap identificado durante validação local. Mantém-se aberto: se há outros tipos de
   negação não cobertos em `classifyPermissionDecision()`, adicionar quando forem observados ao vivo.
-- Timeline consolidada funciona bem; a narrativa de autofechamento de permissões melhora a legibilidade
-  e evita a falsa suspeita de que "a permissão foi pedida e ignorada silenciosamente".
+- Timeline consolidada funciona bem; a narrativa de autofechamento de permissões melhora a
+  legibilidade e evita a falsa suspeita de que "a permissão foi pedida e ignorada silenciosamente".

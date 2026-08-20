@@ -62,7 +62,6 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
             await fs.unlink(tempLockFile).catch(() => {});
             return true;
         } catch (/** @type {any} */ linkErr) {
-
             // Link falhou: lock já existe (outro processo venceu)
             await fs.unlink(tempLockFile).catch(() => {});
 
@@ -128,7 +127,6 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
                 // Tenta adquirir novamente após limpeza
                 return acquireLock(taskId, target, attempt + 1);
             } catch (/** @type {any} */ _) {
-
                 return false;
             }
         }
@@ -136,7 +134,6 @@ async function acquireLock(taskId, target = 'global', attempt = 0) {
         // Caso C: Lock válido (processo ativo)
         return false;
     } catch (/** @type {any} */ _) {
-
         // Falha na fase 1: cleanup e abort
         await fs.unlink(tempLockFile).catch(() => {});
         return false;
@@ -168,7 +165,6 @@ async function releaseLock(target = 'global', taskId = null) {
             await fs.unlink(lockFile).catch(() => {});
         }
     } catch (/** @type {any} */ _) {
-
         // Falha na deleção de lock inexistente é ignorada (Best-effort)
     }
 }

@@ -1,5 +1,6 @@
 // @ts-check
 import js from '@eslint/js';
+import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -18,10 +19,10 @@ import tseslint from 'typescript-eslint';
  * 7. scripts — automação / configs (warnings, type-check desabilitado)
  * 8. cjs — configs CommonJS (ex.: pm2/ecosystem)
  *
- * ─── typescript-eslint (projeto TS explícito) ──────────────────────────────────────────────────────
- * O lint type-aware usa `parserOptions.project: ['./tsconfig.node.json']`. Um projeto único e explícito evita que o
- * Project Service reclassifique arquivos entre projetos configurados/inferidos durante uma varredura ampla. O parser
- * continua usando a dependência TS6 localizada exigida pelo typescript-eslint; compilação e editor usam TS7 nativo.
+ * ─── typescript-eslint (projeto TS explícito) ────────────────────────────────────────────────────── O lint type-aware
+ * usa `parserOptions.project: ['./tsconfig.node.json']`. Um projeto único e explícito evita que o Project Service
+ * reclassifique arquivos entre projetos configurados/inferidos durante uma varredura ampla. O parser continua usando a
+ * dependência TS6 localizada exigida pelo typescript-eslint; compilação e editor usam TS7 nativo.
  *
  * Os consumidores TypeScript no projeto: A) VS Code TS7 nativo — editor, IntelliSense e hover; B) `tsc` TS7 nativo —
  * validação estrutural; C) ESLint + tseslint + TS6 compatível — análise type-aware em CI e pre-commit.
@@ -839,4 +840,9 @@ export default tseslint.config(
             ],
         },
     },
+
+    // Prettier owns formatting. Keep this last so stylistic rules that conflict
+    // with canonical Prettier output cannot make `format` and `lint` disagree.
+    // Architecture, security and type-aware rules above are unaffected.
+    prettierConfig,
 );

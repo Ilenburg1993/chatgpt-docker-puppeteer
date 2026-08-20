@@ -36,15 +36,7 @@ export function createModelGatewayModelIdentity(input) {
     const routeProfile = optionalString(input.routeProfile) ?? 'default';
     const providerProfile = optionalString(input.providerProfile);
     const snapshotId = optionalString(input.snapshotId);
-    const identityKey = [
-        providerId,
-        providerModel,
-        routeProfile,
-        providerProfile,
-        snapshotId,
-    ]
-        .map(keyPart)
-        .join('|');
+    const identityKey = [providerId, providerModel, routeProfile, providerProfile, snapshotId].map(keyPart).join('|');
     return Object.freeze({
         schemaVersion: MODEL_GATEWAY_MODEL_IDENTITY_SCHEMA_VERSION,
         identityKey,

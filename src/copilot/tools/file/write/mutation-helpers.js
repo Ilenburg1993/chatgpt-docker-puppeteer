@@ -5,6 +5,7 @@
  * @module copilot/tools/file/write/mutation-helpers
  */
 
+import { toError } from '#copilot/core';
 import {
     abortIoChangeSet,
     appendIoChangeSetEntry,
@@ -17,7 +18,6 @@ import {
     recordIoMutationAudit,
     serializeIoRollbackToken,
 } from '#copilot/infra/public/runtime';
-import { toError } from '#copilot/core';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
 import {
     buildPatchFailureTerminalSummary,
@@ -129,10 +129,10 @@ export function buildMutationChangeSet(input) {
      *     action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
      *     targets: string[];
      *     rollback: {
- *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
- *         target: string;
- *         source?: string | null;
- *         destination?: string | null;
+     *         action: 'write' | 'patch' | 'delete' | 'copy' | 'move';
+     *         target: string;
+     *         source?: string | null;
+     *         destination?: string | null;
      *         previousHash?: string | null;
      *         contentHash?: string | null;
      *         bytes?: number | null;
@@ -148,14 +148,14 @@ export function buildMutationChangeSet(input) {
         entries.push(
             ...input.entries.map((entry) => ({
                 ...entry,
-                rollback: rollbackPolicy.enabled ? entry.rollback ?? null : null,
+                rollback: rollbackPolicy.enabled ? (entry.rollback ?? null) : null,
             })),
         );
     } else if (input.action && Array.isArray(input.targets) && input.targets.length > 0) {
         entries.push({
             action: input.action,
             targets: input.targets,
-            rollback: rollbackPolicy.enabled ? input.rollback ?? null : null,
+            rollback: rollbackPolicy.enabled ? (input.rollback ?? null) : null,
             evidence: { ...(input.evidence ?? {}) },
         });
     }
@@ -213,9 +213,7 @@ export function buildMutationChangeSet(input) {
  * @returns {import('../../infra/tool-feedback.js').ToolFailureCategory}
  */
 function classifyPathFailure(reason) {
-    return /vazio|byte nulo|null byte|inválid|invalid|malformad/i.test(reason)
-        ? 'invalid-parameters'
-        : 'policy-denied';
+    return /vazio|byte nulo|null byte|inválid|invalid|malformad/i.test(reason) ? 'invalid-parameters' : 'policy-denied';
 }
 
 /**
@@ -253,7 +251,9 @@ export function mutationFailureResult(toolName, error, receivedParameters, extra
         ...extraDetails,
     };
     const patchTerminalSummary =
-        toolName === 'patch_file' ? buildPatchFailureTerminalSummary(code, e.message, details, receivedParameters) : null;
+        toolName === 'patch_file'
+            ? buildPatchFailureTerminalSummary(code, e.message, details, receivedParameters)
+            : null;
     return createToolFailureResult({
         toolName,
         error,

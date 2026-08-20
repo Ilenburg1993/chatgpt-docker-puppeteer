@@ -14,12 +14,15 @@
  * @see EventBus
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '../config/env.js';
 import { toError } from '../core/error-handlers.js';
 import { redactSecretRecord, redactSecretText } from '../core/security/redaction.js';
+import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
+import { registerShutdownHandler } from '../core/shutdown.js';
+import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
+import { deleteFileTrusted, listDirectoryNamesFreshTrusted, lstatPathTrusted } from '../infra/public/trusted-io.js';
 
 /** @type {boolean} */
 let _stdoutUnavailable = false;
@@ -58,46 +61,109 @@ const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_AUDIT_SIZE = 2 * 1024 * 1024; // 2 MB
 const MAX_ARCHIVES = COPILOT_LOG_MAX_ARCHIVES;
 
-// ─── Inicialização síncrona (evita race conditions na carga do módulo) ─────────
+// ─── Gestão assíncrona de arquivos ───────────────────────────────────────────
 
-try {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-} catch (_) {
-    // Ignorar: pode já existir ou não ter permissão (fallback para console)
+/** @param {unknown} error */
+function isMissingPathError(error) {
+    const code = /** @type {{ code?: unknown }} */ (error)?.code;
+    return code === 'ENOENT' || code === 'ENOTDIR';
 }
 
-// ─── Gestão de arquivos ───────────────────────────────────────────────────────
-
 /**
- * Remove arquivos antigos de log para economizar espaço em disco.
+ * Remove archives antigos fora do hot path. Deletions passam pelo trusted IO para preservar lock, invalidation e
+ * namespace durability mesmo quando COPILOT_LOG_DIR aponta para fora do workspace.
  *
- * @param {string} prefix - Prefixo dos arquivos a limpar.
- * @returns {void}
+ * @param {string} prefix
+ * @returns {Promise<void>}
  */
-function cleanOldFiles(prefix) {
+async function cleanOldFiles(prefix) {
     try {
-        const files = fs
-            .readdirSync(LOG_DIR)
-            .filter((f) => f.startsWith(prefix) && (f.endsWith('.log') || f.endsWith('.bak') || f.endsWith('.json')))
-            .map((f) => ({ name: f, time: fs.statSync(path.join(LOG_DIR, f)).mtime.getTime() }))
-            .sort((a, b) => b.time - a.time);
-
-        if (files.length > MAX_ARCHIVES) {
-            files.slice(MAX_ARCHIVES).forEach((f) => {
-                try {
-                    fs.unlinkSync(path.join(LOG_DIR, f.name));
-                } catch (_) {
-                    // Ignorar erros de limpeza
-                }
+        const entries = (await listDirectoryNamesFreshTrusted(LOG_DIR, { caller: 'observability.logger.retention' }))
+            .entries;
+        const candidates = entries.filter(
+            (entryName) => entryName.startsWith(prefix) && (entryName.endsWith('.log') || entryName.includes('.bak.')),
+        );
+        const files = (
+            await Promise.all(
+                candidates.map(async (entryName) => {
+                    const filePath = path.join(LOG_DIR, entryName);
+                    const stats = await lstatPathTrusted(filePath, { caller: 'observability.logger.retention' })
+                        .then((result) => result.stats)
+                        .catch(() => null);
+                    return stats?.isFile() && !stats.isSymbolicLink() ? { name: entryName, time: stats.mtimeMs } : null;
+                }),
+            )
+        )
+            .filter((entry) => entry !== null)
+            .sort((left, right) => right.time - left.time);
+        for (const entry of files.slice(MAX_ARCHIVES)) {
+            await deleteFileTrusted(path.join(LOG_DIR, entry.name), {
+                caller: 'observability.logger.retention',
+                ignoreMissing: true,
             });
         }
-    } catch (e) {
+    } catch (error) {
+        if (isMissingPathError(error)) return;
         safeEmergencyConsoleWrite(
             'stderr',
-            `[copilot/logger] Erro na limpeza (${prefix}): ${e instanceof Error ? toError(e).message : String(e)}`,
+            `[copilot/logger] Erro na limpeza (${prefix}): ${error instanceof Error ? toError(error).message : String(error)}`,
         );
     }
 }
+
+/** @param {string} prefix @param {string} filePath */
+function archivePath(prefix, filePath) {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const ext = path.extname(filePath) || '.log';
+    return path.join(LOG_DIR, `${prefix}${ts}.bak${ext}`);
+}
+
+/**
+ * @param {string} filePath
+ * @param {string} prefix
+ * @param {number} maxBytes
+ * @param {import('../infra/io/fs/durability.js').IoDurabilityMode} durability
+ */
+function createLogWriter(filePath, prefix, maxBytes, durability) {
+    return createJsonlFileWriter({
+        filePath,
+        maxBytes,
+        batchLines: 256,
+        maxQueueLines: 50_000,
+        softQueueLines: 40_000,
+        durability,
+        resolveRotatedPath: (activePath) => archivePath(prefix, activePath),
+        onPhase: async (phase) => {
+            if (phase === 'after-rotate') await cleanOldFiles(prefix);
+        },
+        onError: (error) => {
+            safeEmergencyConsoleWrite(
+                'stderr',
+                `[copilot/logger] persistência falhou (${prefix}): ${error instanceof Error ? toError(error).message : String(error)}`,
+            );
+        },
+    });
+}
+
+const agentLogWriter = createLogWriter(LOG_FILE, 'copilot_agent_', MAX_LOG_SIZE, 'none');
+const metricsLogWriter = createLogWriter(METRICS_FILE, 'copilot_metrics_', MAX_LOG_SIZE, 'none');
+const auditLogWriter = createLogWriter(AUDIT_FILE, 'copilot_audit_', MAX_AUDIT_SIZE, 'file-and-directory');
+
+export async function flushObservabilityLogs() {
+    const results = await Promise.allSettled([
+        agentLogWriter.flush(),
+        metricsLogWriter.flush(),
+        auditLogWriter.flush(),
+    ]);
+    const rejected = results.find((result) => result.status === 'rejected');
+    if (rejected?.status === 'rejected') throw rejected.reason;
+}
+
+registerShutdownHandler('observability.logger.flush', flushObservabilityLogs, SHUTDOWN_PRIORITY.AUDIT_FINALIZER, {
+    timeoutMs: 10_000,
+});
+
+void Promise.all([cleanOldFiles('copilot_agent_'), cleanOldFiles('copilot_metrics_'), cleanOldFiles('copilot_audit_')]);
 
 /**
  * @param {unknown} error
@@ -138,19 +204,6 @@ function safeEmergencyConsoleWrite(channel, line) {
 }
 
 /**
- * @param {string} filePath
- * @param {string} content
- * @returns {void}
- */
-function safeAppendFileSync(filePath, content) {
-    try {
-        fs.appendFileSync(filePath, content, 'utf-8');
-    } catch {
-        // Silencioso: logging nunca deve derrubar o runtime.
-    }
-}
-
-/**
  * @param {string | Error | Record<string, unknown>} msg
  * @returns {string}
  */
@@ -167,33 +220,6 @@ function formatRedactedLogMessage(msg) {
         }
     }
     return redactSecretText(msg);
-}
-
-/**
- * Rotaciona um arquivo se ele exceder o limite de tamanho.
- *
- * @param {string} filePath - Caminho do arquivo.
- * @param {string} prefix - Prefixo para arquivos de backup.
- * @param {number} maxSize - Tamanho máximo em bytes.
- * @returns {void}
- */
-function rotateFile(filePath, prefix, maxSize) {
-    try {
-        if (!fs.existsSync(filePath)) return;
-        const stats = fs.statSync(filePath);
-        if (stats.size > maxSize) {
-            const ts = new Date().toISOString().replace(/[:.]/g, '-');
-            const ext = path.extname(filePath) || '.log';
-            const archivePath = path.join(LOG_DIR, `${prefix}${ts}.bak${ext}`);
-            fs.renameSync(filePath, archivePath);
-            cleanOldFiles(prefix);
-        }
-    } catch (e) {
-        safeEmergencyConsoleWrite(
-            'stderr',
-            `[copilot/logger] Erro ao rotacionar ${prefix}: ${e instanceof Error ? toError(e).message : String(e)}`,
-        );
-    }
 }
 
 // ─── Nível de log ──────────────────────────────────────────────────────────────
@@ -248,9 +274,6 @@ export function getRecentLogs(n = 50, level) {
 /** Detecta modo produção para output JSON-line. */
 const _isProduction = process.env['NODE_ENV'] === 'production';
 
-/** FIX OBS-001: throttle de rotação — checagem a cada 5 segundos para não bloquear o event loop em hot path. */
-let _lastRotateCheck = 0;
-
 /**
  * Log operacional isolado do copilot. Mesma assinatura de `#core/logger → log`.
  *
@@ -265,12 +288,6 @@ function log(level, msg, metaOrTaskId = '-') {
     const levelValue = LOG_LEVELS[level.toUpperCase()] ?? LOG_LEVELS['INFO'] ?? 1;
     const _minLevel = minLevel ?? LOG_LEVELS['INFO'] ?? 1;
     if (levelValue < _minLevel) return;
-
-    const _nowMs = Date.now();
-    if (_nowMs - _lastRotateCheck > 5000) {
-        _lastRotateCheck = _nowMs;
-        rotateFile(LOG_FILE, 'copilot_agent_', MAX_LOG_SIZE);
-    }
 
     const ts = new Date().toISOString();
 
@@ -301,7 +318,7 @@ function log(level, msg, metaOrTaskId = '-') {
         const jsonLine = JSON.stringify(jsonEntry);
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
-        safeAppendFileSync(LOG_FILE, `${jsonLine}\n`);
+        agentLogWriter.enqueueLine(jsonLine);
         if (levelValue >= (consoleMinLevel ?? LOG_LEVELS['INFO'] ?? 1)) {
             safeEmergencyConsoleWrite(levelValue >= (LOG_LEVELS['ERROR'] ?? 3) ? 'stderr' : 'stdout', jsonLine);
         }
@@ -315,7 +332,7 @@ function log(level, msg, metaOrTaskId = '-') {
         const line = `${colorCode}[${ts}] ${level.padEnd(5)} [${taskId}]${sidTag} [copilot] ${content}${resetCode}`;
         _logRingBuffer.push({ ts, level, taskId, msg: String(content) });
         if (_logRingBuffer.length > RING_BUFFER_SIZE) _logRingBuffer.shift();
-        safeAppendFileSync(LOG_FILE, `${line}\n`);
+        agentLogWriter.enqueueLine(line);
         if (levelValue >= (consoleMinLevel ?? LOG_LEVELS['INFO'] ?? 1)) {
             safeEmergencyConsoleWrite(isError ? 'stderr' : 'stdout', line);
         }
@@ -391,14 +408,9 @@ log.fatal = (/** @type {string | Error | Record<string, unknown>} */ msg, /** @t
  * @returns {void}
  */
 function audit(action, details) {
-    rotateFile(AUDIT_FILE, 'copilot_audit_', MAX_AUDIT_SIZE);
     const ts = new Date().toISOString();
-    const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(redactSecretRecord(details))}\n`;
-    try {
-        fs.appendFileSync(AUDIT_FILE, entry, 'utf-8');
-    } catch {
-        safeEmergencyConsoleWrite('stderr', `[copilot/logger] [CRITICAL_AUDIT_FAIL] ${entry.trimEnd()}`);
-    }
+    const entry = `[${ts}] [AUDIT] ${action} | ${JSON.stringify(redactSecretRecord(details))}`;
+    auditLogWriter.enqueueLine(entry);
 }
 
 // ─── API pública — metric ──────────────────────────────────────────────────────
@@ -411,24 +423,17 @@ function audit(action, details) {
  * @returns {void}
  */
 function metric(name, payload) {
-    rotateFile(METRICS_FILE, 'copilot_metrics_', MAX_LOG_SIZE);
     try {
         const entry = JSON.stringify({
             ts: new Date().toISOString(),
             metric: name,
             ...(payload ? redactSecretRecord(payload) : {}),
         });
-        fs.appendFileSync(METRICS_FILE, `${entry}\n`, 'utf-8');
+        metricsLogWriter.enqueueLine(entry);
     } catch (_) {
         // Silencioso — métricas não são críticas
     }
 }
-
-// ─── Inicialização (hygiene) ──────────────────────────────────────────────────
-
-cleanOldFiles('copilot_agent_');
-cleanOldFiles('copilot_metrics_');
-cleanOldFiles('copilot_audit_');
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
 

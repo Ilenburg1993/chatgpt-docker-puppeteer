@@ -7,8 +7,8 @@ import { log } from '../infra/logger.js';
 import { getSummary as getMetricsSummary, getToolStats } from '../infra/metrics-proxy.js';
 import { buildTool, withSkipPermission } from '../infra/tool-factory.js';
 import { summarizeToolParameterSchema } from '../infra/tool-feedback.js';
-import { buildToolDefinitionMetadata } from './tool-metadata.js';
 import { createEmptyToolContractReport } from './tool-contract-verifier.js';
+import { buildToolDefinitionMetadata } from './tool-metadata.js';
 /**
  * src/copilot/tools/introspection/introspection-tools.js
  *
@@ -314,9 +314,13 @@ function getToolMetadataEnvelope(tool) {
         legacy: getToolMetadata(tool.name),
         metadata:
             _toolContractReport.metadataByName?.[tool.name] ??
-            buildToolDefinitionMetadata(tool.name, { tool, category: 'unknown', tags: [], readOnly: false }, {
-                permissionMode: _toolContractReport.permissionMode ?? 'selective',
-            }),
+            buildToolDefinitionMetadata(
+                tool.name,
+                { tool, category: 'unknown', tags: [], readOnly: false },
+                {
+                    permissionMode: _toolContractReport.permissionMode ?? 'selective',
+                },
+            ),
     };
 }
 
@@ -515,50 +519,9 @@ const listToolsTool = buildTool({
     description:
         'Lista todas as ferramentas (Custom Tools) disponíveis nesta sessão. ' +
         'Retorna nome, descrição e parâmetros de cada ferramenta.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{
-     *     category?: string;
-     *     search?: string;
-     *     operation?: string;
-     *     risk?: string;
-     *     sideEffect?: string;
-     *     capability?: string;
-     *     detailed?: boolean;
-     *     includeSchema?: boolean;
-     *     includeInstructions?: boolean;
-     * }>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                category: z
-                    .string()
-                    .optional()['describe']('Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")'),
-                search: z.string().optional()['describe']('Filtrar por termo no nome ou descrição da tool'),
-                operation: z
-                    .string()
-                    .optional()['describe']('Filtrar por operação canônica: read, patch, write, delete, search, shell, web etc.'),
-                risk: z.string().optional()['describe']('Filtrar por risco canônico: low, medium, high, destructive.'),
-                sideEffect: z
-                    .string()
-                    .optional()['describe']('Filtrar por efeito colateral: none, filesystem, process, network, session etc.'),
-                capability: z
-                    .string()
-                    .optional()['describe']('Filtrar por capability booleana: dryRun, rollback, hashPrecondition, pagination, streaming, diff, preview.'),
-                detailed: z
-                    .boolean()
-                    .optional()
-                    .default(false)['describe']('Se true, inclui metadata canônica, schema resumido e instructions quando solicitado.'),
-                includeSchema: z
-                    .boolean()
-                    .optional()
-                    .default(false)['describe']('Se true, inclui resumo sanitizado de parameters. Implica detailed=true.'),
-                includeInstructions: z
-                    .boolean()
-                    .optional()
-                    .default(false)['describe']('Se true, inclui instructions sanitizadas. Implica detailed=true.'),
-            })
-        )
-    ),
-    handler: async (
-        /** @type {{
+    parameters:
+        /**
+         * @type {import('#copilot/sdk/types').ZodSchema<{
          *     category?: string;
          *     search?: string;
          *     operation?: string;
@@ -568,17 +531,71 @@ const listToolsTool = buildTool({
          *     detailed?: boolean;
          *     includeSchema?: boolean;
          *     includeInstructions?: boolean;
-         * }} */ {
-            category,
-            search,
-            operation,
-            risk,
-            sideEffect,
-            capability,
-            detailed,
-            includeSchema,
-            includeInstructions,
-        },
+         * }>}
+         */ (
+            /** @type {unknown} */ (
+                z.object({
+                    category: z
+                        .string()
+                        .optional()
+                        ['describe'](
+                            'Filtrar por categoria (ex: "code", "git", "session", "task", "hook", "introspection")',
+                        ),
+                    search: z.string().optional()['describe']('Filtrar por termo no nome ou descrição da tool'),
+                    operation: z
+                        .string()
+                        .optional()
+                        ['describe'](
+                            'Filtrar por operação canônica: read, patch, write, delete, search, shell, web etc.',
+                        ),
+                    risk: z
+                        .string()
+                        .optional()
+                        ['describe']('Filtrar por risco canônico: low, medium, high, destructive.'),
+                    sideEffect: z
+                        .string()
+                        .optional()
+                        ['describe']('Filtrar por efeito colateral: none, filesystem, process, network, session etc.'),
+                    capability: z
+                        .string()
+                        .optional()
+                        ['describe'](
+                            'Filtrar por capability booleana: dryRun, rollback, hashPrecondition, pagination, streaming, diff, preview.',
+                        ),
+                    detailed: z
+                        .boolean()
+                        .optional()
+                        .default(false)
+                        ['describe'](
+                            'Se true, inclui metadata canônica, schema resumido e instructions quando solicitado.',
+                        ),
+                    includeSchema: z
+                        .boolean()
+                        .optional()
+                        .default(false)
+                        ['describe']('Se true, inclui resumo sanitizado de parameters. Implica detailed=true.'),
+                    includeInstructions: z
+                        .boolean()
+                        .optional()
+                        .default(false)
+                        ['describe']('Se true, inclui instructions sanitizadas. Implica detailed=true.'),
+                })
+            )
+        ),
+    handler: async (
+        /**
+         * @type {{
+         *     category?: string;
+         *     search?: string;
+         *     operation?: string;
+         *     risk?: string;
+         *     sideEffect?: string;
+         *     capability?: string;
+         *     detailed?: boolean;
+         *     includeSchema?: boolean;
+         *     includeInstructions?: boolean;
+         * }}
+         */ { category, search, operation, risk, sideEffect, capability, detailed, includeSchema, includeInstructions },
     ) => {
         log(
             'INFO',
@@ -649,7 +666,11 @@ const listToolsTool = buildTool({
                     metadata: envelope.metadata,
                     ...(includeSchema ? { parameters: summarizeToolParameterSchema(t.parameters) } : {}),
                     ...(includeInstructions
-                        ? { instructions: summarizeToolInstructionText(/** @type {{ instructions?: unknown }} */ (t).instructions) }
+                        ? {
+                              instructions: summarizeToolInstructionText(
+                                  /** @type {{ instructions?: unknown }} */ (t).instructions,
+                              ),
+                          }
                         : {}),
                 };
             }),
@@ -756,7 +777,8 @@ const getTelemetryTool = buildTool({
                     .int()
                     .min(1)
                     .optional()
-                    .default(10)['describe']('Número sugerido de chamadas recentes a incluir no resultado'),
+                    .default(10)
+                    ['describe']('Número sugerido de chamadas recentes a incluir no resultado'),
                 toolName: z.string().optional()['describe']('Filtrar histórico por nome específico de tool'),
             })
         )
@@ -870,18 +892,22 @@ const toggleToolTool = buildTool({
         'Desabilita ou habilita uma tool em runtime. Tools desabilitadas são bloqueadas e não aparecem em list_tools. ' +
         'Use para restringir temporariamente o acesso a tools durante operações sensíveis. ' +
         'As tools de introspecção não podem ser desabilitadas.',
-    parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ toolName: string; enabled: boolean; reason?: string }>} */ (
-        /** @type {unknown} */ (
-            z.object({
-                toolName: z.string()['describe']('Nome da tool a habilitar/desabilitar'),
-                enabled: z.boolean()['describe']('true para habilitar, false para desabilitar'),
-                reason: z
-                    .string()
-                    .optional()['describe']('Motivo operacional curto para auditoria quando enabled=false.'),
-            })
-        )
-    ),
-    handler: async (/** @type {{ toolName: string; enabled: boolean; reason?: string }} */ { toolName, enabled, reason }) => {
+    parameters:
+        /** @type {import('#copilot/sdk/types').ZodSchema<{ toolName: string; enabled: boolean; reason?: string }>} */ (
+            /** @type {unknown} */ (
+                z.object({
+                    toolName: z.string()['describe']('Nome da tool a habilitar/desabilitar'),
+                    enabled: z.boolean()['describe']('true para habilitar, false para desabilitar'),
+                    reason: z
+                        .string()
+                        .optional()
+                        ['describe']('Motivo operacional curto para auditoria quando enabled=false.'),
+                })
+            )
+        ),
+    handler: async (
+        /** @type {{ toolName: string; enabled: boolean; reason?: string }} */ { toolName, enabled, reason },
+    ) => {
         const normalized = toolName.toLowerCase();
 
         if (PROTECTED_TOOLS.has(normalized)) {
@@ -939,22 +965,30 @@ const getToolHealthTool = buildTool({
         'Retorna métricas de saúde por ferramenta: total de chamadas, taxa de erro, latência média e última execução. ' +
         'Útil para identificar tools com alta taxa de falha ou lentidão. ' +
         'Filtre por nome específico ou receba todas com sort por chamadas.',
-    parameters: /**
-     * @type {import('zod').ZodType<{
-     *     tool_name?: string;
-     *     sort_by?: 'calls' | 'errors' | 'latency' | 'error_rate';
-     *     limit?: number;
-     * }>}
-     */ (
-        z.object({
-            tool_name: z.string().optional()['describe']('Nome da tool para detalhar (omitir = todas)'),
-            sort_by: z
-                .enum(['calls', 'errors', 'latency', 'error_rate'])
-                .optional()
-                .default('calls')['describe']('Campo para ordenação descendente'),
-            limit: z.number().int().min(1).optional().default(20)['describe']('Número sugerido de tools no resultado'),
-        })
-    ),
+    parameters:
+        /**
+         * @type {import('zod').ZodType<{
+         *     tool_name?: string;
+         *     sort_by?: 'calls' | 'errors' | 'latency' | 'error_rate';
+         *     limit?: number;
+         * }>}
+         */ (
+            z.object({
+                tool_name: z.string().optional()['describe']('Nome da tool para detalhar (omitir = todas)'),
+                sort_by: z
+                    .enum(['calls', 'errors', 'latency', 'error_rate'])
+                    .optional()
+                    .default('calls')
+                    ['describe']('Campo para ordenação descendente'),
+                limit: z
+                    .number()
+                    .int()
+                    .min(1)
+                    .optional()
+                    .default(20)
+                    ['describe']('Número sugerido de tools no resultado'),
+            })
+        ),
     handler: async (
         /** @type {{ tool_name?: string; sort_by?: 'calls' | 'errors' | 'latency' | 'error_rate'; limit?: number }} */ {
             tool_name,
@@ -1016,7 +1050,8 @@ const getToolContractReportTool = buildTool({
                     .min(1)
                     .max(200)
                     .optional()
-                    .default(50)['describe']('Quantidade máxima de issues retornadas'),
+                    .default(50)
+                    ['describe']('Quantidade máxima de issues retornadas'),
             })
         )
     ),

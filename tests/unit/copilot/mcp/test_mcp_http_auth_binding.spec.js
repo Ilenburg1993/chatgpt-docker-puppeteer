@@ -10,13 +10,11 @@ import { handleStatefulMcpHttpRequest } from '#copilot/mcp/adapters';
 import { createMcpHttpSessionRuntime } from '#copilot/mcp/control-plane';
 import {
     createMcpTransportErrorCollector,
+    fakeMcpTransport,
     fakeMcpRequest as fakeReq,
     fakeMcpResponse as fakeRes,
-    fakeMcpTransport,
     readFakeMcpHeader as readHeader,
 } from './helpers/http-fakes.js';
-
-
 
 const initializeBody = {
     jsonrpc: '2.0',

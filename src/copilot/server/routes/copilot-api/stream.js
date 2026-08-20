@@ -21,8 +21,7 @@ import {
     SseConnectionTracker,
     standardizeSsePayload,
 } from '../../../infra/sse/utils.js';
-import { buildRuntimeRouteMetaPayload } from '../../../presentation/routing/index.js';
-import { resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
+import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import { buildAgentConnectedSsePayloadFromRoute } from '../../../presentation/runtime/index.js';
 import {
     deleteCopilotApiStreamState,

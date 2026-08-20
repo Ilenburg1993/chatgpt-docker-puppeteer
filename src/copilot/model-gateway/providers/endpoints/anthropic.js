@@ -18,8 +18,6 @@ export const ANTHROPIC_PROVIDER_ENDPOINTS = Object.freeze({
             richness: 'identity_pricing_limits_capabilities_lifecycle_routing_docs',
         }),
     ]),
-    runtimeEndpoints: Object.freeze([
-        Object.freeze({ kind: 'messages', method: 'POST', path: '/v1/messages' }),
-    ]),
+    runtimeEndpoints: Object.freeze([Object.freeze({ kind: 'messages', method: 'POST', path: '/v1/messages' })]),
     routeSelectors: Object.freeze(['exact_model', 'alias']),
 });

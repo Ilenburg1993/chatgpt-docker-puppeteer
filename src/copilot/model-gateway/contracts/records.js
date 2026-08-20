@@ -2,8 +2,8 @@
 /**
  * Canonical records for the Copilot model gateway.
  *
- * The gateway stores provider/model facts without provider secrets. Runtime bridges may later resolve a selected
- * record into SDK `ProviderConfig`, but records themselves stay serializable, auditable and safe to expose.
+ * The gateway stores provider/model facts without provider secrets. Runtime bridges may later resolve a selected record
+ * into SDK `ProviderConfig`, but records themselves stay serializable, auditable and safe to expose.
  *
  * @module copilot/model-gateway/contracts/records
  */
@@ -108,8 +108,12 @@ export function normalizeCapabilityProfile(input = {}) {
  * @returns {{ input: string[]; output: string[] }}
  */
 export function normalizeModalities(input = {}) {
-    const inputModalities = Array.isArray(input.input) ? input.input.filter((item) => typeof item === 'string') : DEFAULT_MODALITIES.input;
-    const outputModalities = Array.isArray(input.output) ? input.output.filter((item) => typeof item === 'string') : DEFAULT_MODALITIES.output;
+    const inputModalities = Array.isArray(input.input)
+        ? input.input.filter((item) => typeof item === 'string')
+        : DEFAULT_MODALITIES.input;
+    const outputModalities = Array.isArray(input.output)
+        ? input.output.filter((item) => typeof item === 'string')
+        : DEFAULT_MODALITIES.output;
     return {
         input: [...new Set(inputModalities.length > 0 ? inputModalities : DEFAULT_MODALITIES.input)],
         output: [...new Set(outputModalities.length > 0 ? outputModalities : DEFAULT_MODALITIES.output)],
@@ -162,9 +166,13 @@ export function createProviderRecord(input) {
         wireApi: optionalString(input.wireApi),
         enabled: input.enabled !== false,
         configured: input.configured === true,
-        secretRefs: Array.isArray(input.secretRefs) ? [...new Set(input.secretRefs.map(optionalString).filter((item) => item !== null))] : [],
+        secretRefs: Array.isArray(input.secretRefs)
+            ? [...new Set(input.secretRefs.map(optionalString).filter((item) => item !== null))]
+            : [],
         auth: isRecord(input.auth) ? { ...input.auth } : {},
-        headers: isRecord(input.headers) ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, '[redacted]'])) : {},
+        headers: isRecord(input.headers)
+            ? Object.fromEntries(Object.keys(input.headers).map((key) => [key, '[redacted]']))
+            : {},
         createdAt: now,
         updatedAt: now,
         provenance: isRecord(input.provenance) ? { ...input.provenance } : { source: 'unknown' },
@@ -219,8 +227,9 @@ export function createModelRecord(input) {
                 .filter(([, value]) => value !== null),
         ),
         pricing: Object.fromEntries(
-            Object.entries(input.pricing ?? {})
-                .filter(([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0),
+            Object.entries(input.pricing ?? {}).filter(
+                ([, value]) => typeof value === 'number' && Number.isFinite(value) && value >= 0,
+            ),
         ),
         routing: isRecord(input.routing)
             ? {

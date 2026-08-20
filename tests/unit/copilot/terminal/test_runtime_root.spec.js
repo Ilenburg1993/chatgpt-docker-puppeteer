@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import assert from 'node:assert/strict';
 import { describe, it, vi } from 'vitest';
@@ -16,7 +15,9 @@ import {
  */
 function makeBootContext(wireRuntime, broadcastSse, bootPreflight) {
     return createTerminalBootContext({
-        startCopilotServer: async () => { throw new Error('servidor não usado neste teste'); },
+        startCopilotServer: async () => {
+            throw new Error('servidor não usado neste teste');
+        },
         wireRuntime,
         broadcastSse,
         startTodoCleanupJob: () => /** @type {NodeJS.Timeout} */ ({ unref() {} }),
@@ -42,7 +43,13 @@ describe('terminal/runtime-root', () => {
     it('emite terminal.runtime.wired após wireRuntime concluir', async () => {
         const broadcastSse = vi.fn();
 
-        await runTerminalRuntimeConfigPhase(makeBootContext(vi.fn(async () => {}), broadcastSse, { ok: true }));
+        await runTerminalRuntimeConfigPhase(
+            makeBootContext(
+                vi.fn(async () => {}),
+                broadcastSse,
+                { ok: true },
+            ),
+        );
 
         assert.equal(broadcastSse.mock.calls[0]?.[0], 'terminal.runtime.wired');
         assert.equal(broadcastSse.mock.calls[0]?.[1]?.phase, 'runtime-config');
@@ -55,7 +62,15 @@ describe('terminal/runtime-root', () => {
 
         await assert.rejects(
             () =>
-                runTerminalRuntimeConfigPhase(makeBootContext(vi.fn(async () => { throw error; }), broadcastSse, null)),
+                runTerminalRuntimeConfigPhase(
+                    makeBootContext(
+                        vi.fn(async () => {
+                            throw error;
+                        }),
+                        broadcastSse,
+                        null,
+                    ),
+                ),
             /runtime down/,
         );
 

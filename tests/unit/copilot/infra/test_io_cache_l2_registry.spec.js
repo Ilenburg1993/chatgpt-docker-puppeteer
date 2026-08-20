@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { listShutdownHandlers, SHUTDOWN_PRIORITY } from '../../../../src/copilot/core/index.js';
 import {
     getIoL2Cache,
     getIoL2CacheConfiguration,
@@ -8,10 +9,6 @@ import {
     resetIoL2CacheForTest,
 } from '../../../../src/copilot/infra/io-cache-l2-registry.js';
 import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
-import {
-    listShutdownHandlers,
-    SHUTDOWN_PRIORITY,
-} from '../../../../src/copilot/core/index.js';
 
 describe('io-cache-l2-registry', () => {
     afterEach(() => {

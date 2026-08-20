@@ -38,24 +38,6 @@ vi.mock('#copilot/core', async (importOriginal) => {
     };
 });
 
-/**
- * @type {{
- *     readFile: import('vitest').Mock;
- *     writeFile: import('vitest').Mock;
- *     mkdir: import('vitest').Mock;
- *     stat: import('vitest').Mock;
- *     readdir: import('vitest').Mock;
- * }}
- */
-const fsMock = {
-    readFile: vi.fn(),
-    writeFile: vi.fn(),
-    mkdir: vi.fn(),
-    stat: vi.fn(),
-    readdir: vi.fn(),
-};
-vi.mock('node:fs/promises', () => fsMock);
-
 const ioMock = {
     readText: vi.fn(),
     mkdirPathLocked: vi.fn(),
@@ -64,6 +46,9 @@ const ioMock = {
 vi.mock('#copilot/infra/public/workspace-io', () => ({
     createWorkspaceIo: () => ioMock,
 }));
+
+const readConfiguredSkillCatalog = vi.fn();
+vi.mock('#copilot/infra/public/skill-io', () => ({ readConfiguredSkillCatalog }));
 
 const mockExecFileSync = vi.fn();
 vi.mock('node:child_process', () => ({
@@ -271,44 +256,48 @@ describe('F36 — invoke_skill (F195)', () => {
     const handler = /** @type {Function} */ (invokeSkillTool.handler);
 
     it('lista skills disponíveis quando name omitido', async () => {
-        fsMock.stat.mockResolvedValue({});
-        fsMock.readdir.mockResolvedValue([
-            { name: 'code-audit', isDirectory: () => true },
-            { name: 'jsdoc-authoring', isDirectory: () => true },
-            { name: 'README.md', isDirectory: () => false },
-        ]);
-
+        readConfiguredSkillCatalog.mockResolvedValue({
+            readableDirectoryCount: 1,
+            names: ['code-audit', 'jsdoc-authoring'],
+            selected: null,
+        });
         const result = await callTool(handler, {});
-
         expect(result.available).toEqual(['code-audit', 'jsdoc-authoring']);
     });
 
     it('carrega conteúdo de uma skill existente', async () => {
-        fsMock.stat.mockResolvedValue({});
-        fsMock.readdir.mockResolvedValue([{ name: 'code-audit', isDirectory: () => true }]);
-        ioMock.readText.mockResolvedValue({ content: '# Code Audit Skill\nInstruções...', io: { operation: 'read' } });
-
+        readConfiguredSkillCatalog.mockResolvedValue({
+            readableDirectoryCount: 1,
+            names: ['code-audit'],
+            selected: {
+                name: 'code-audit',
+                directory: '/workspace/.github/skills',
+                skillPath: '/workspace/.github/skills/code-audit/SKILL.md',
+                content: '# Code Audit Skill\nInstruções...',
+            },
+        });
         const result = await callTool(handler, { name: 'code-audit' });
-
         expect(result.name).toBe('code-audit');
         expect(result.content).toContain('Code Audit Skill');
     });
 
     it('retorna erro se skill não encontrada', async () => {
-        fsMock.stat.mockResolvedValue({});
-        fsMock.readdir.mockResolvedValue([]);
-        ioMock.readText.mockRejectedValue(new Error('ENOENT'));
-
+        readConfiguredSkillCatalog.mockResolvedValue({
+            readableDirectoryCount: 1,
+            names: [],
+            selected: null,
+        });
         const result = await callTool(handler, { name: 'nonexistent' });
-
         expect(result.error).toContain("'nonexistent'");
     });
 
     it('retorna erro se diretório skills/ não existe', async () => {
-        fsMock.stat.mockRejectedValue(new Error('ENOENT'));
-
+        readConfiguredSkillCatalog.mockResolvedValue({
+            readableDirectoryCount: 0,
+            names: [],
+            selected: null,
+        });
         const result = await callTool(handler, { name: 'test' });
-
         expect(result.error).toContain('.github/skills/');
     });
 

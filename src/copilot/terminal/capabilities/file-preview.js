@@ -37,7 +37,7 @@ function countLabel(count, singular, plural) {
 
 /**
  * @param {string} text
- * @param {number} [max=MAX_PREVIEW_CHARS]
+ * @param {number} [max=MAX_PREVIEW_CHARS] Default is `MAX_PREVIEW_CHARS`
  * @returns {{ output: string; truncated: boolean }}
  */
 function truncatePreviewText(text, max = MAX_PREVIEW_CHARS) {
@@ -58,7 +58,9 @@ function renderJsPreview(text, lineLimit) {
     const limited = lines.slice(0, lineLimit);
     const output = limited.map((line, index) => `${String(index + 1).padStart(4, ' ')} │ ${line}`).join('\n');
     const truncated = lines.length > lineLimit;
-    const suffix = truncated ? `\n... (${countLabel(lines.length - lineLimit, 'linha omitida', 'linhas omitidas')})` : '';
+    const suffix = truncated
+        ? `\n... (${countLabel(lines.length - lineLimit, 'linha omitida', 'linhas omitidas')})`
+        : '';
     return truncatePreviewText(`${output}${suffix}`);
 }
 
@@ -139,16 +141,12 @@ export function renderTerminalFilePreview(path, content, options = {}) {
     if (!bat?.command) return jsFallback('bat/batcat ausente');
 
     const colorMode = options.color ?? (process.stdout.isTTY ? 'always' : 'never');
-    const result = spawnSync(
-        bat.command,
-        buildBatPreviewArgs(colorMode, lineLimit, filePath),
-        {
-            encoding: 'utf8',
-            maxBuffer: MAX_PREVIEW_BYTES,
-            timeout: 2_000,
-            windowsHide: true,
-        },
-    );
+    const result = spawnSync(bat.command, buildBatPreviewArgs(colorMode, lineLimit, filePath), {
+        encoding: 'utf8',
+        maxBuffer: MAX_PREVIEW_BYTES,
+        timeout: 2_000,
+        windowsHide: true,
+    });
 
     if (result.status !== 0 || result.error) {
         const reason = result.error?.message || String(result.stderr || '').trim() || 'bat falhou';

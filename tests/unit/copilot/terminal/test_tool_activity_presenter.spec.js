@@ -169,7 +169,7 @@ describe('terminal/tool-activity-presenter', () => {
         const presentation = buildTerminalToolActivityPresentation({
             toolName: 'exec_command',
             args: {
-                command: "node -e \"console.log('ok')\"",
+                command: 'node -e "console.log(\'ok\')"',
                 cwd: '/workspaces/chatgpt-docker-puppeteer',
             },
         });
@@ -177,8 +177,8 @@ describe('terminal/tool-activity-presenter', () => {
         expect(presentation.displayToolName).toBe('Executar comando');
         expect(presentation.operation).toBe('run');
         expect(presentation.detail).toContain('executando comando');
-        expect(presentation.detail).toContain("node -e \"console.log('ok')\"");
-        expect(presentation.target).toBe("node -e \"console.log('ok')\"");
+        expect(presentation.detail).toContain('node -e "console.log(\'ok\')"');
+        expect(presentation.target).toBe('node -e "console.log(\'ok\')"');
         expect(presentation.path).toBeNull();
         expect(presentation.fileTargets).toEqual([]);
         expect(presentation.directoryTargets).toEqual(['/workspaces/chatgpt-docker-puppeteer']);

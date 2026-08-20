@@ -5,6 +5,7 @@
  * @module copilot/infra/io/invalidation/bus
  */
 
+import { invalidateIoPathPolicyCache } from '#copilot/core';
 import {
     getCrossProcessInvalidationStats,
     publishCrossProcessInvalidation,
@@ -29,6 +30,13 @@ const _pendingInvalidations = new Map();
 /** @type {Map<string, { source: string; atMs: number }>} */
 const _recentInvalidations = new Map();
 const MAX_RECENT_INVALIDATIONS = 2048;
+const _stats = {
+    localDispatches: 0,
+    replicationQueued: 0,
+    replicationCoalesced: 0,
+    replicationFlushes: 0,
+    replicationPublished: 0,
+};
 
 /** @type {NodeJS.Timeout | null} */
 let _debounceTimer = null;
@@ -49,11 +57,20 @@ function mergeInvalidationEvent(previous, next) {
 }
 
 /**
+ * Despacha coerência no processo atual imediatamente. O journal cross-process é deliberadamente separado deste plano:
+ * consumidores locais (parser, scopes, line offsets, índice) não devem observar uma janela stale depois que uma mutação
+ * canônica já retornou, enquanto a replicação SQLite pode ser coalescida fora do caminho crítico.
+ *
  * @param {string} filePath
  * @param {ReturnType<typeof normalizeIoInvalidationEvent>} normalized
- * @param {{ replicate?: boolean }} [options]
  */
-function dispatchInvalidation(filePath, normalized, options = {}) {
+function dispatchLocalInvalidation(filePath, normalized) {
+    _stats.localDispatches += 1;
+    try {
+        invalidateIoPathPolicyCache(filePath, { recursive: normalized.recursive });
+    } catch {
+        /* policy-cache invalidation também é best-effort */
+    }
     _recentInvalidations.delete(filePath);
     _recentInvalidations.set(filePath, { source: normalized.source, atMs: Date.now() });
     while (_recentInvalidations.size > MAX_RECENT_INVALIDATIONS) {
@@ -68,21 +85,28 @@ function dispatchInvalidation(filePath, normalized, options = {}) {
             /* hooks de invalidação não devem derrubar a mutação canônica */
         }
     }
-    if (options.replicate === true) {
-        publishCrossProcessInvalidation(filePath, normalized);
-    }
+}
+
+/**
+ * @param {string} filePath
+ * @param {ReturnType<typeof normalizeIoInvalidationEvent>} normalized
+ */
+function publishReplication(filePath, normalized) {
+    if (publishCrossProcessInvalidation(filePath, normalized)) _stats.replicationPublished += 1;
 }
 
 function ensureCrossProcessConsumer() {
     if (_crossProcessConsumerStarted) return;
     _crossProcessConsumerStarted = true;
     startCrossProcessInvalidationConsumer((filePath, event) => {
-        dispatchInvalidation(filePath, normalizeIoInvalidationEvent(event), { replicate: false });
+        dispatchLocalInvalidation(filePath, normalizeIoInvalidationEvent(event));
     });
 }
 
 /**
- * Força flush da fila de invalidação em memória.
+ * Força flush apenas da fila de replicação cross-process. A invalidação local já ocorreu de forma síncrona em
+ * `publishIoInvalidation`; portanto este flush nunca repete hooks nem reabre uma janela de trabalho derivado
+ * duplicado.
  *
  * @returns {void}
  */
@@ -94,9 +118,8 @@ export function flushIoInvalidationQueue() {
     if (_pendingInvalidations.size === 0) return;
     const batch = [..._pendingInvalidations.entries()];
     _pendingInvalidations.clear();
-    for (const [filePath, normalized] of batch) {
-        dispatchInvalidation(filePath, normalized, { replicate: true });
-    }
+    _stats.replicationFlushes += 1;
+    for (const [filePath, normalized] of batch) publishReplication(filePath, normalized);
 }
 
 function ensureShutdownFlushHook() {
@@ -128,12 +151,17 @@ export function publishIoInvalidation(filePath, event = {}) {
     ensureShutdownFlushHook();
     ensureCrossProcessConsumer();
     const normalized = normalizeIoInvalidationEvent(event);
+
+    // Local coherence is synchronous by design; only cross-process replication is debounced.
+    dispatchLocalInvalidation(filePath, normalized);
     if (!(INVALIDATION_DEBOUNCE_MS > 0)) {
-        dispatchInvalidation(filePath, normalized, { replicate: true });
+        publishReplication(filePath, normalized);
         return;
     }
 
     const previous = _pendingInvalidations.get(filePath);
+    if (previous) _stats.replicationCoalesced += 1;
+    else _stats.replicationQueued += 1;
     _pendingInvalidations.set(filePath, mergeInvalidationEvent(previous, normalized));
 
     if (_debounceTimer) return;
@@ -160,7 +188,9 @@ export function getIoInvalidationBusStats() {
     return {
         hooks: _hooks.length,
         pending: _pendingInvalidations.size,
+        pendingReplications: _pendingInvalidations.size,
         debounceMs: INVALIDATION_DEBOUNCE_MS,
+        ..._stats,
         crossProcess: getCrossProcessInvalidationStats(),
     };
 }
@@ -174,6 +204,13 @@ export function resetIoInvalidationBusForTest() {
     _hooks.length = 0;
     _pendingInvalidations.clear();
     _recentInvalidations.clear();
+    Object.assign(_stats, {
+        localDispatches: 0,
+        replicationQueued: 0,
+        replicationCoalesced: 0,
+        replicationFlushes: 0,
+        replicationPublished: 0,
+    });
     if (_debounceTimer) {
         clearTimeout(_debounceTimer);
         _debounceTimer = null;

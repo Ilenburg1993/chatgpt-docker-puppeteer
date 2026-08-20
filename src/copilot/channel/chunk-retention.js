@@ -14,11 +14,11 @@ export const MAX_CAPTURED_CHUNK_MAX_ITEMS = 16384;
 
 /**
  * @typedef {{
- *   chunks: string[];
- *   observedChunks: number;
- *   observedChunkBytes: number;
- *   capturedChunkBytes: number;
- *   chunksTruncated: boolean;
+ *     chunks: string[];
+ *     observedChunks: number;
+ *     observedChunkBytes: number;
+ *     capturedChunkBytes: number;
+ *     chunksTruncated: boolean;
  * }} ChunkRetentionSnapshot
  */
 
@@ -39,16 +39,8 @@ function normalizeLimit(value, fallback, hardMax) {
  */
 export function createChunkRetention(options = {}) {
     const enabled = options.enabled ?? true;
-    const maxBytes = normalizeLimit(
-        options.maxBytes,
-        DEFAULT_CAPTURED_CHUNK_MAX_BYTES,
-        MAX_CAPTURED_CHUNK_MAX_BYTES,
-    );
-    const maxItems = normalizeLimit(
-        options.maxItems,
-        DEFAULT_CAPTURED_CHUNK_MAX_ITEMS,
-        MAX_CAPTURED_CHUNK_MAX_ITEMS,
-    );
+    const maxBytes = normalizeLimit(options.maxBytes, DEFAULT_CAPTURED_CHUNK_MAX_BYTES, MAX_CAPTURED_CHUNK_MAX_BYTES);
+    const maxItems = normalizeLimit(options.maxItems, DEFAULT_CAPTURED_CHUNK_MAX_ITEMS, MAX_CAPTURED_CHUNK_MAX_ITEMS);
     /** @type {string[]} */
     const chunks = [];
     let observedChunks = 0;
@@ -122,7 +114,6 @@ export function mergeChunkRetentions(values, options = {}) {
         ...captured,
         observedChunks: normalized.reduce((sum, value) => sum + value.observedChunks, 0),
         observedChunkBytes: normalized.reduce((sum, value) => sum + value.observedChunkBytes, 0),
-        chunksTruncated:
-            captured.chunksTruncated || normalized.some((value) => value.chunksTruncated),
+        chunksTruncated: captured.chunksTruncated || normalized.some((value) => value.chunksTruncated),
     };
 }

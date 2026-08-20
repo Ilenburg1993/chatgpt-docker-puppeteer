@@ -1,21 +1,25 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { describe, expect, it, vi } from 'vitest';
 
-/** @typedef {Awaited<ReturnType<typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail>>} TerminalArchiveResult */
+/** @typedef {Awaited<
+    ReturnType<
+        typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail
+    >
+>} TerminalArchiveResult */
 /** @typedef {TerminalArchiveResult['entries'][number]} TerminalArchiveEntry */
-/** @typedef {Partial<TerminalArchiveEntry> & Pick<TerminalArchiveEntry, 'timestamp' | 'eventId' | 'event' | 'payload'>} TerminalArchiveEntryFixture */
+/** @typedef {Partial<TerminalArchiveEntry> &
+    Pick<TerminalArchiveEntry, 'timestamp' | 'eventId' | 'event' | 'payload'>} TerminalArchiveEntryFixture */
 
 /**
- * Builds the real archive result shape while keeping scenarios focused on event-specific fields.
- * Archive-generated metadata is supplied here instead of being duplicated across fixtures.
+ * Builds the real archive result shape while keeping scenarios focused on event-specific fields. Archive-generated
+ * metadata is supplied here instead of being duplicated across fixtures.
  *
  * @param {{
- *   state?: Partial<TerminalArchiveResult['state']>;
- *   filters?: Partial<TerminalArchiveResult['filters']>;
- *   entries?: TerminalArchiveEntryFixture[];
- *   tailRead?: Partial<TerminalArchiveResult['tailRead']>;
+ *     state?: Partial<TerminalArchiveResult['state']>;
+ *     filters?: Partial<TerminalArchiveResult['filters']>;
+ *     entries?: TerminalArchiveEntryFixture[];
+ *     tailRead?: Partial<TerminalArchiveResult['tailRead']>;
  * }} [input]
  * @returns {TerminalArchiveResult}
  */
@@ -65,42 +69,46 @@ function archiveFixture(input = {}) {
     };
 }
 
-
-const readTerminalSseEventArchiveTail = vi.fn(/** @type {typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail} */ (async () => archiveFixture({
-    state: {
-        path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-        events: 2,
-        queueDepth: 0,
-        error: null,
-    },
-    filters: {
-        limit: 5,
-        event: 'delta',
-        traceId: 'turn:abc',
-        turnId: null,
-        source: null,
-        toolCallId: null,
-        requestId: null,
-        hubSessionId: null,
-    },
-    entries: [
-        {
-            timestamp: 1710000000000,
-            eventId: 42,
-            event: 'delta',
-            source: 'terminal-dialog/delta',
-            eventSource: null,
-            traceId: 'turn:abc',
-            turnId: 'turn-1',
-            hubSessionId: 'hub-1',
-            payload: {
-                toolCallId: 'call_123',
-                requestId: 'req-123',
-                content: 'DELTA-CANONICAL-1',
-            },
-        },
-    ],
-})));
+const readTerminalSseEventArchiveTail = vi.fn(
+    /** @type {typeof import('../../../../src/copilot/terminal/state/sse-event-archive.js').readTerminalSseEventArchiveTail} */ (
+        async () =>
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 5,
+                    event: 'delta',
+                    traceId: 'turn:abc',
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 42,
+                        event: 'delta',
+                        source: 'terminal-dialog/delta',
+                        eventSource: null,
+                        traceId: 'turn:abc',
+                        turnId: 'turn-1',
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            toolCallId: 'call_123',
+                            requestId: 'req-123',
+                            content: 'DELTA-CANONICAL-1',
+                        },
+                    },
+                ],
+            })
+    ),
+);
 
 vi.mock('../../../../src/copilot/terminal/state/index.js', () => ({
     formatTerminalIsoTimestamp: vi.fn((/** @type {unknown} */ value) =>
@@ -167,7 +175,9 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('MCP App concluído');
         expect(ctx.output()).toContain('Objetivo autopiloto + Contexto de extensão');
         expect(ctx.output()).toContain('Agentes customizados');
-        expect(ctx.output()).toContain('ver Objetivo autopiloto + Contexto de extensão + Agentes customizados +6: /events 50');
+        expect(ctx.output()).toContain(
+            'ver Objetivo autopiloto + Contexto de extensão + Agentes customizados +6: /events 50',
+        );
         expect(ctx.output()).toContain('Objetivo autopiloto, Contexto de extensão, Agentes customizados +6');
         expect(ctx.output()).not.toContain(
             'Objetivo autopiloto, Contexto de extensão, Agentes customizados, Notificação customizada, Anexos de extensão',
@@ -245,87 +255,89 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza eventos de conversa e boot no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 3,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 10,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 1,
-                    event: 'dialog.loop.changed',
-                    source: 'terminal-agent-wiring/dialog.loop.changed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: { active: true },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 3,
+                    queueDepth: 0,
+                    error: null,
                 },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 2,
-                    event: 'terminal.runtime.wired',
-                    source: 'terminal/runtime-root.runtime-config',
-                    eventSource: null,
+                filters: {
+                    limit: 10,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: { phase: 'runtime-config' },
                 },
-                {
-                    timestamp: 1710000001500,
-                    eventId: 5,
-                    event: 'terminal.started',
-                    source: 'terminal-boot/terminal.started',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        operationMode: 'standalone',
-                        model: 'auto',
-                        mcpToolCount: 0,
-                        dialogLoopActive: false,
-                        bootPreflight: { ok: true },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 1,
+                        event: 'dialog.loop.changed',
+                        source: 'terminal-agent-wiring/dialog.loop.changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: { active: true },
                     },
-                },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 3,
-                    event: 'quota.warning',
-                    source: 'agent/passthrough/quota.warning',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { quotaId: 'premium_interactions' },
-                },
-                {
-                    timestamp: 1710000003000,
-                    eventId: 4,
-                    event: 'session.model_changed',
-                    source: 'sdk/session.model_changed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { previousModel: 'auto', newModel: 'gpt-4.1-mini', reasoningEffort: 'high' },
-                },
-            ],
-        }));
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 2,
+                        event: 'terminal.runtime.wired',
+                        source: 'terminal/runtime-root.runtime-config',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { phase: 'runtime-config' },
+                    },
+                    {
+                        timestamp: 1710000001500,
+                        eventId: 5,
+                        event: 'terminal.started',
+                        source: 'terminal-boot/terminal.started',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            operationMode: 'standalone',
+                            model: 'auto',
+                            mcpToolCount: 0,
+                            dialogLoopActive: false,
+                            bootPreflight: { ok: true },
+                        },
+                    },
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 3,
+                        event: 'quota.warning',
+                        source: 'agent/passthrough/quota.warning',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { quotaId: 'premium_interactions' },
+                    },
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 4,
+                        event: 'session.model_changed',
+                        source: 'sdk/session.model_changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { previousModel: 'auto', newModel: 'gpt-4.1-mini', reasoningEffort: 'high' },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '10');
@@ -346,130 +358,132 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza eventos SDK 1.0 novos no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 4,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 10,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 1,
-                    event: 'model.call_failure',
-                    source: 'sdk/model.call_failure',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 4,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 10,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: {
-                        data: {
-                            source: 'top_level',
-                            model: 'gpt-5.4',
-                            statusCode: 429,
-                            durationMs: 1200,
-                            errorMessage: 'rate limited',
-                            serviceRequestId: 'svc-request-123456',
+                },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 1,
+                        event: 'model.call_failure',
+                        source: 'sdk/model.call_failure',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            data: {
+                                source: 'top_level',
+                                model: 'gpt-5.4',
+                                statusCode: 429,
+                                durationMs: 1200,
+                                errorMessage: 'rate limited',
+                                serviceRequestId: 'svc-request-123456',
+                            },
                         },
                     },
-                },
-                {
-                    timestamp: 1710000000500,
-                    eventId: 5,
-                    event: 'model.call_failure',
-                    source: 'sdk/model.call_failure',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: {
-                        data: {
-                            source: 'top_level',
-                            model: 'gpt-5.4-legacy',
-                            statusCode: 400,
-                            durationMs: 300,
-                            errorMessage: 'model not supported by provider',
-                            serviceRequestId: 'svc-request-legacy',
+                    {
+                        timestamp: 1710000000500,
+                        eventId: 5,
+                        event: 'model.call_failure',
+                        source: 'sdk/model.call_failure',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            data: {
+                                source: 'top_level',
+                                model: 'gpt-5.4-legacy',
+                                statusCode: 400,
+                                durationMs: 300,
+                                errorMessage: 'model not supported by provider',
+                                serviceRequestId: 'svc-request-legacy',
+                            },
                         },
                     },
-                },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 2,
-                    event: 'session.permissions_changed',
-                    source: 'sdk/session.permissions_changed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: {
-                        data: {
-                            previousAllowAllPermissions: false,
-                            allowAllPermissions: true,
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 2,
+                        event: 'session.permissions_changed',
+                        source: 'sdk/session.permissions_changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            data: {
+                                previousAllowAllPermissions: false,
+                                allowAllPermissions: true,
+                            },
                         },
                     },
-                },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 3,
-                    event: 'session.canvas.opened',
-                    source: 'sdk/session.canvas.opened',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: {
-                        data: {
-                            title: 'Preview',
-                            extensionName: 'Demo',
-                            availability: 'ready',
-                            reopen: true,
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 3,
+                        event: 'session.canvas.opened',
+                        source: 'sdk/session.canvas.opened',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            data: {
+                                title: 'Preview',
+                                extensionName: 'Demo',
+                                availability: 'ready',
+                                reopen: true,
+                            },
                         },
                     },
-                },
-                {
-                    timestamp: 1710000003000,
-                    eventId: 4,
-                    event: 'hook.progress',
-                    source: 'sdk/hook.progress',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { data: { message: 'rodando hook de segurança' } },
-                },
-                {
-                    timestamp: 1710000004000,
-                    eventId: 6,
-                    event: 'mcp_app.tool_call_complete',
-                    source: 'sdk/mcp_app.tool_call_complete',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: {
-                        data: {
-                            appName: 'Demo App',
-                            toolName: 'show_panel',
-                            status: 'completed',
-                            title: 'Preview de painel',
-                            uri: 'mcp://demo/panel',
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 4,
+                        event: 'hook.progress',
+                        source: 'sdk/hook.progress',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { data: { message: 'rodando hook de segurança' } },
+                    },
+                    {
+                        timestamp: 1710000004000,
+                        eventId: 6,
+                        event: 'mcp_app.tool_call_complete',
+                        source: 'sdk/mcp_app.tool_call_complete',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            data: {
+                                appName: 'Demo App',
+                                toolName: 'show_panel',
+                                status: 'completed',
+                                title: 'Preview de painel',
+                                uri: 'mcp://demo/panel',
+                            },
                         },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '10');
@@ -500,79 +514,91 @@ describe('terminal/commands/events', () => {
     });
 
     it('resume anexos e conteúdos multimodais SDK 1.0 sem objetos crus', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 2,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 10,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 1,
-                    event: 'tool.execution_complete',
-                    source: 'sdk/tool.execution_complete',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 10,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: {
-                        toolName: 'render_preview',
-                        result: {
-                            content: 'preview ready',
-                            contents: [
-                                { type: 'image', mimeType: 'image/png', data: 'BASE64_IMAGE_SHOULD_NOT_RENDER' },
-                                { type: 'terminal', text: 'ok', exitCode: 0, cwd: '/repo' },
+                },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 1,
+                        event: 'tool.execution_complete',
+                        source: 'sdk/tool.execution_complete',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            toolName: 'render_preview',
+                            result: {
+                                content: 'preview ready',
+                                contents: [
+                                    { type: 'image', mimeType: 'image/png', data: 'BASE64_IMAGE_SHOULD_NOT_RENDER' },
+                                    { type: 'terminal', text: 'ok', exitCode: 0, cwd: '/repo' },
+                                    {
+                                        type: 'resource_link',
+                                        title: 'Relatório',
+                                        name: 'report',
+                                        uri: 'ui://report',
+                                        mimeType: 'text/html',
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 2,
+                        event: 'user.message',
+                        source: 'sdk/user.message',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            content: 'analise isso',
+                            attachments: [
+                                { type: 'file', displayName: 'app.js', path: '/repo/app.js' },
                                 {
-                                    type: 'resource_link',
-                                    title: 'Relatório',
-                                    name: 'report',
-                                    uri: 'ui://report',
-                                    mimeType: 'text/html',
+                                    type: 'selection',
+                                    displayName: 'trecho crítico',
+                                    filePath: '/repo/app.js',
+                                    text: 'secret-ish',
+                                },
+                                {
+                                    type: 'github_reference',
+                                    referenceType: 'pr',
+                                    number: 42,
+                                    title: 'Upgrade SDK',
+                                    url: 'https://github.example/pull/42',
+                                    state: 'open',
+                                },
+                                {
+                                    type: 'blob',
+                                    displayName: 'payload.pdf',
+                                    mimeType: 'application/pdf',
+                                    data: 'BASE64_PDF_SHOULD_NOT_RENDER',
                                 },
                             ],
                         },
                     },
-                },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 2,
-                    event: 'user.message',
-                    source: 'sdk/user.message',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: {
-                        content: 'analise isso',
-                        attachments: [
-                            { type: 'file', displayName: 'app.js', path: '/repo/app.js' },
-                            { type: 'selection', displayName: 'trecho crítico', filePath: '/repo/app.js', text: 'secret-ish' },
-                            {
-                                type: 'github_reference',
-                                referenceType: 'pr',
-                                number: 42,
-                                title: 'Upgrade SDK',
-                                url: 'https://github.example/pull/42',
-                                state: 'open',
-                            },
-                            { type: 'blob', displayName: 'payload.pdf', mimeType: 'application/pdf', data: 'BASE64_PDF_SHOULD_NOT_RENDER' },
-                        ],
-                    },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '10');
@@ -595,125 +621,127 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza sinais long-tail SDK 1.0 de extensões e sessão no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 9,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 1,
-                    event: 'session.autopilot_objective_changed',
-                    source: 'sdk/session.autopilot_objective_changed',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 9,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: { objective: 'Investigar falha de CI' },
                 },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 2,
-                    event: 'extension_context',
-                    source: 'sdk/extension_context',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { extensionName: 'GitHub', contextType: 'pull_request' },
-                },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 3,
-                    event: 'session.custom_agents_updated',
-                    source: 'sdk/session.custom_agents_updated',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { agents: [{ name: 'Reviewer' }] },
-                },
-                {
-                    timestamp: 1710000003000,
-                    eventId: 4,
-                    event: 'session.custom_notification',
-                    source: 'sdk/session.custom_notification',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { title: 'Aviso', message: 'Ação necessária', severity: 'warn' },
-                },
-                {
-                    timestamp: 1710000004000,
-                    eventId: 5,
-                    event: 'session.extensions.attachments_pushed',
-                    source: 'sdk/session.extensions.attachments_pushed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { extensionName: 'GitHub', attachments: [{ id: 'att-1' }] },
-                },
-                {
-                    timestamp: 1710000005000,
-                    eventId: 6,
-                    event: 'session.remote_steerable_changed',
-                    source: 'sdk/session.remote_steerable_changed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { enabled: true },
-                },
-                {
-                    timestamp: 1710000006000,
-                    eventId: 7,
-                    event: 'session.schedule_created',
-                    source: 'sdk/session.schedule_created',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { scheduleId: 'sched-1', title: 'Revisão diária', cadence: 'daily' },
-                },
-                {
-                    timestamp: 1710000007000,
-                    eventId: 8,
-                    event: 'session.schedule_cancelled',
-                    source: 'sdk/session.schedule_cancelled',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { scheduleId: 'sched-1', title: 'Revisão diária' },
-                },
-                {
-                    timestamp: 1710000008000,
-                    eventId: 9,
-                    event: 'new_inbox_message',
-                    source: 'sdk/new_inbox_message',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { from: 'GitHub', subject: 'Nova solicitação' },
-                },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 1,
+                        event: 'session.autopilot_objective_changed',
+                        source: 'sdk/session.autopilot_objective_changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { objective: 'Investigar falha de CI' },
+                    },
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 2,
+                        event: 'extension_context',
+                        source: 'sdk/extension_context',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { extensionName: 'GitHub', contextType: 'pull_request' },
+                    },
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 3,
+                        event: 'session.custom_agents_updated',
+                        source: 'sdk/session.custom_agents_updated',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { agents: [{ name: 'Reviewer' }] },
+                    },
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 4,
+                        event: 'session.custom_notification',
+                        source: 'sdk/session.custom_notification',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { title: 'Aviso', message: 'Ação necessária', severity: 'warn' },
+                    },
+                    {
+                        timestamp: 1710000004000,
+                        eventId: 5,
+                        event: 'session.extensions.attachments_pushed',
+                        source: 'sdk/session.extensions.attachments_pushed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { extensionName: 'GitHub', attachments: [{ id: 'att-1' }] },
+                    },
+                    {
+                        timestamp: 1710000005000,
+                        eventId: 6,
+                        event: 'session.remote_steerable_changed',
+                        source: 'sdk/session.remote_steerable_changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { enabled: true },
+                    },
+                    {
+                        timestamp: 1710000006000,
+                        eventId: 7,
+                        event: 'session.schedule_created',
+                        source: 'sdk/session.schedule_created',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { scheduleId: 'sched-1', title: 'Revisão diária', cadence: 'daily' },
+                    },
+                    {
+                        timestamp: 1710000007000,
+                        eventId: 8,
+                        event: 'session.schedule_cancelled',
+                        source: 'sdk/session.schedule_cancelled',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { scheduleId: 'sched-1', title: 'Revisão diária' },
+                    },
+                    {
+                        timestamp: 1710000008000,
+                        eventId: 9,
+                        event: 'new_inbox_message',
+                        source: 'sdk/new_inbox_message',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { from: 'GitHub', subject: 'Nova solicitação' },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -741,116 +769,123 @@ describe('terminal/commands/events', () => {
     });
 
     it('usa operatorSummary para reconfirmação de modelo sem chamar de alteração', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 5,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000003000,
-                    eventId: 4,
-                    event: 'session.model_changed',
-                    source: 'sdk/session.model_changed',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 5,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: {
-                        previousModel: 'auto',
-                        newModel: 'auto',
-                        operatorSummary: 'confirmado sem troca: auto (sem troca) · origem SDK · 2026-06-04T23:29:37.513Z',
-                    },
                 },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 4,
+                        event: 'session.model_changed',
+                        source: 'sdk/session.model_changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            previousModel: 'auto',
+                            newModel: 'auto',
+                            operatorSummary:
+                                'confirmado sem troca: auto (sem troca) · origem SDK · 2026-06-04T23:29:37.513Z',
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '5');
 
         expect(ctx.output()).toContain('Modelo confirmado');
-        expect(ctx.output()).toContain('confirmado sem troca: auto (sem troca) · origem SDK · 2026-06-04T23:29:37.513Z');
+        expect(ctx.output()).toContain(
+            'confirmado sem troca: auto (sem troca) · origem SDK · 2026-06-04T23:29:37.513Z',
+        );
         expect(ctx.output()).not.toContain('Modelo alterado');
         expect(ctx.output()).not.toContain('modelo auto → auto');
     });
 
     it('humaniza perguntas, raciocínio e tarefas em segundo plano no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 4,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 10,
-                    event: 'assistant.reasoning_complete',
-                    source: 'sdk/assistant.reasoning_complete',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: 'hub-1',
-                    payload: { contentLength: 840 },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 4,
+                    queueDepth: 0,
+                    error: null,
                 },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 11,
-                    event: 'question.answered',
-                    source: 'agent/passthrough/question.answered',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: 'hub-1',
-                    payload: { questionId: 'q-1', answer: 'SIM' },
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
                 },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 12,
-                    event: 'agent.background.completed',
-                    source: 'agent/background.completed',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: 'hub-1',
-                    payload: { status: 'completed' },
-                },
-                {
-                    timestamp: 1710000003000,
-                    eventId: 13,
-                    event: 'agent.background.idle',
-                    source: 'agent/background.idle',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: 'hub-1',
-                    payload: {},
-                },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 10,
+                        event: 'assistant.reasoning_complete',
+                        source: 'sdk/assistant.reasoning_complete',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: 'hub-1',
+                        payload: { contentLength: 840 },
+                    },
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 11,
+                        event: 'question.answered',
+                        source: 'agent/passthrough/question.answered',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: 'hub-1',
+                        payload: { questionId: 'q-1', answer: 'SIM' },
+                    },
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 12,
+                        event: 'agent.background.completed',
+                        source: 'agent/background.completed',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: 'hub-1',
+                        payload: { status: 'completed' },
+                    },
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 13,
+                        event: 'agent.background.idle',
+                        source: 'agent/background.idle',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: 'hub-1',
+                        payload: {},
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -871,40 +906,42 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza eventos de I/O local sem tratar type como estado', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 12,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 31,
-                    event: 'tool.lifecycle',
-                    source: 'io',
-                    eventSource: 'io',
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 12,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: {
-                        type: 'io_op',
-                        toolName: 'io.search',
-                    },
                 },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 31,
+                        event: 'tool.lifecycle',
+                        source: 'io',
+                        eventSource: 'io',
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            type: 'io_op',
+                            toolName: 'io.search',
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '12');
@@ -917,48 +954,50 @@ describe('terminal/commands/events', () => {
     });
 
     it('preserva tipos e classificações internas em consultas explícitas', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 2,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: 'agent/sdk.lifecycle',
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 51,
-                    event: 'sdk.lifecycle',
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
                     source: 'agent/sdk.lifecycle',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: { type: 'session.updated' },
                 },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 52,
-                    event: 'llm.usage',
-                    source: 'agent/llm.usage',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { classification: 'ask_user_continuation' },
-                },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 51,
+                        event: 'sdk.lifecycle',
+                        source: 'agent/sdk.lifecycle',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { type: 'session.updated' },
+                    },
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 52,
+                        event: 'llm.usage',
+                        source: 'agent/llm.usage',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { classification: 'ask_user_continuation' },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 source=agent/sdk.lifecycle');
@@ -1075,25 +1114,27 @@ describe('terminal/commands/events', () => {
                 payload: { answer: 'SIM' },
             },
         ];
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: routineEntries.length,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: routineEntries,
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: routineEntries.length,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: routineEntries,
+            }),
+        );
         const defaultCtx = mockCtx();
 
         await cmdEvents({ println: defaultCtx.println }, '20');
@@ -1109,25 +1150,27 @@ describe('terminal/commands/events', () => {
         expect(defaultCtx.output()).not.toContain('Streaming');
         expect(defaultCtx.output()).not.toContain('Turno concluído');
 
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: 'sdk.lifecycle',
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [requireEventFixtureValue(routineEntries[2], 'sdk.lifecycle routine entry')],
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: 'sdk.lifecycle',
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [requireEventFixtureValue(routineEntries[2], 'sdk.lifecycle routine entry')],
+            }),
+        );
         const filteredCtx = mockCtx();
 
         await cmdEvents({ println: filteredCtx.println }, '20 event=sdk.lifecycle');
@@ -1135,25 +1178,27 @@ describe('terminal/commands/events', () => {
         expect(filteredCtx.output()).toContain('Sessão atualizada');
         expect(filteredCtx.output()).toContain('controle da sessão');
 
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: 'assistant.turn_end',
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [requireEventFixtureValue(routineEntries[7], 'assistant.turn_end routine entry')],
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: 'assistant.turn_end',
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [requireEventFixtureValue(routineEntries[7], 'assistant.turn_end routine entry')],
+            }),
+        );
         const turnCtx = mockCtx();
 
         await cmdEvents({ println: turnCtx.println }, '20 event=assistant.turn_end');
@@ -1162,184 +1207,186 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza erros BYOK, cancelamentos e turnos vazios no resumo default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 4,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 61,
-                    event: 'agent.error',
-                    source: 'agent/error',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 4,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
                     traceId: null,
                     turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        hookType: 'errorOccurred',
-                        errorContext: 'model_call',
-                        recoverable: true,
-                        message: 'Erro do SDK sem mensagem estruturada.',
-                        byokEnabled: true,
-                        byokProviderType: 'openai',
-                        byokProfile: 'kilo',
-                        byokModel: 'kilo-auto/free',
-                        operatorMeaning:
-                            'erro de provider BYOK; troque provider/modelo via /byok use ou /byok model',
-                        handledAs: 'recoverable_model_call',
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 61,
+                        event: 'agent.error',
+                        source: 'agent/error',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            hookType: 'errorOccurred',
+                            errorContext: 'model_call',
+                            recoverable: true,
+                            message: 'Erro do SDK sem mensagem estruturada.',
+                            byokEnabled: true,
+                            byokProviderType: 'openai',
+                            byokProfile: 'kilo',
+                            byokModel: 'kilo-auto/free',
+                            operatorMeaning:
+                                'erro de provider BYOK; troque provider/modelo via /byok use ou /byok model',
+                            handledAs: 'recoverable_model_call',
+                        },
                     },
-                },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 62,
-                    event: 'session.info',
-                    source: 'sdk/session.info',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: { infoType: 'cancellation', message: 'Operation cancelled by user' },
-                },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 63,
-                    event: 'terminal.turn.empty_recovery',
-                    source: 'terminal-dialog/empty-recovery',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        actor: 'user',
-                        attempt: 1,
-                        maxAttempts: 1,
-                        reason: 'pre_action_empty_output',
-                        firstOutcome: 'empty',
-                        firstReplySource: 'direct_dispatch',
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 62,
+                        event: 'session.info',
+                        source: 'sdk/session.info',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: { infoType: 'cancellation', message: 'Operation cancelled by user' },
                     },
-                },
-                {
-                    timestamp: 1710000002500,
-                    eventId: 66,
-                    event: 'terminal.turn.empty_output',
-                    source: 'terminal-dialog/empty-output',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        actor: 'agent',
-                        sourceDetail: 'empty',
-                        assistantMessageCount: 0,
-                        deltaSlices: 0,
-                        deltaChars: 0,
-                        pendingQuestionKind: null,
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 63,
+                        event: 'terminal.turn.empty_recovery',
+                        source: 'terminal-dialog/empty-recovery',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            actor: 'user',
+                            attempt: 1,
+                            maxAttempts: 1,
+                            reason: 'pre_action_empty_output',
+                            firstOutcome: 'empty',
+                            firstReplySource: 'direct_dispatch',
+                        },
                     },
-                },
-                {
-                    timestamp: 1710000003000,
-                    eventId: 64,
-                    event: 'dialog.empty_after_user_input',
-                    source: 'terminal-agent-wiring/dialog.empty_after_user_input',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        turnId: 'turn:ask',
-                        detail: 'continuação após resposta humana sem texto público · resposta SIM',
-                        requestId: 'ask-request-1234567890',
+                    {
+                        timestamp: 1710000002500,
+                        eventId: 66,
+                        event: 'terminal.turn.empty_output',
+                        source: 'terminal-dialog/empty-output',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            actor: 'agent',
+                            sourceDetail: 'empty',
+                            assistantMessageCount: 0,
+                            deltaSlices: 0,
+                            deltaChars: 0,
+                            pendingQuestionKind: null,
+                        },
                     },
-                },
-                {
-                    timestamp: 1710000003500,
-                    eventId: 67,
-                    event: 'dialog.empty_after_user_input.auto_recovery',
-                    source: 'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        turnId: 'turn:ask',
-                        detail: 'continuação após resposta humana sem texto público · resposta SIM',
-                        requestId: 'ask-request-1234567890',
-                        recoveryKey: 'request:ask-request-1234567890',
-                        resumeMessage:
-                            'Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 64,
+                        event: 'dialog.empty_after_user_input',
+                        source: 'terminal-agent-wiring/dialog.empty_after_user_input',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            turnId: 'turn:ask',
+                            detail: 'continuação após resposta humana sem texto público · resposta SIM',
+                            requestId: 'ask-request-1234567890',
+                        },
                     },
-                },
-                {
-                    timestamp: 1710000004000,
-                    eventId: 65,
-                    event: 'llm.usage',
-                    source: 'agent/llm.usage',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: { classification: 'non_user_initiated' },
-                },
-                {
-                    timestamp: 1710000004100,
-                    eventId: 68,
-                    event: 'task.started',
-                    source: 'agent',
-                    eventSource: null,
-                    traceId: 'turn:3',
-                    turnId: '3',
-                    hubSessionId: 'hub-1',
-                    payload: { description: 'Continue a partir da ultima resposta humana.' },
-                },
-                {
-                    timestamp: 1710000004200,
-                    eventId: 69,
-                    event: 'task.queued',
-                    source: 'agent',
-                    eventSource: null,
-                    traceId: 'turn:3',
-                    turnId: '3',
-                    hubSessionId: 'hub-1',
-                    payload: { description: 'Continue a partir da ultima resposta humana.' },
-                },
-                {
-                    timestamp: 1710000004300,
-                    eventId: 70,
-                    event: 'pending_messages.modified',
-                    source: 'sdk/pending_messages.modified',
-                    eventSource: null,
-                    traceId: 'turn:3',
-                    turnId: '3',
-                    hubSessionId: 'hub-1',
-                    payload: { count: 2 },
-                },
-                {
-                    timestamp: 1710000004400,
-                    eventId: 71,
-                    event: 'session.tools_updated',
-                    source: 'sdk/session.tools_updated',
-                    eventSource: null,
-                    traceId: 'turn:3',
-                    turnId: '3',
-                    hubSessionId: 'hub-1',
-                    payload: { count: 105 },
-                },
-            ],
-        }));
+                    {
+                        timestamp: 1710000003500,
+                        eventId: 67,
+                        event: 'dialog.empty_after_user_input.auto_recovery',
+                        source: 'terminal-agent-wiring/dialog.empty_after_user_input.auto_recovery',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            turnId: 'turn:ask',
+                            detail: 'continuação após resposta humana sem texto público · resposta SIM',
+                            requestId: 'ask-request-1234567890',
+                            recoveryKey: 'request:ask-request-1234567890',
+                            resumeMessage:
+                                'Continue a partir da ultima resposta humana e entregue a resposta final em texto publico.',
+                        },
+                    },
+                    {
+                        timestamp: 1710000004000,
+                        eventId: 65,
+                        event: 'llm.usage',
+                        source: 'agent/llm.usage',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: { classification: 'non_user_initiated' },
+                    },
+                    {
+                        timestamp: 1710000004100,
+                        eventId: 68,
+                        event: 'task.started',
+                        source: 'agent',
+                        eventSource: null,
+                        traceId: 'turn:3',
+                        turnId: '3',
+                        hubSessionId: 'hub-1',
+                        payload: { description: 'Continue a partir da ultima resposta humana.' },
+                    },
+                    {
+                        timestamp: 1710000004200,
+                        eventId: 69,
+                        event: 'task.queued',
+                        source: 'agent',
+                        eventSource: null,
+                        traceId: 'turn:3',
+                        turnId: '3',
+                        hubSessionId: 'hub-1',
+                        payload: { description: 'Continue a partir da ultima resposta humana.' },
+                    },
+                    {
+                        timestamp: 1710000004300,
+                        eventId: 70,
+                        event: 'pending_messages.modified',
+                        source: 'sdk/pending_messages.modified',
+                        eventSource: null,
+                        traceId: 'turn:3',
+                        turnId: '3',
+                        hubSessionId: 'hub-1',
+                        payload: { count: 2 },
+                    },
+                    {
+                        timestamp: 1710000004400,
+                        eventId: 71,
+                        event: 'session.tools_updated',
+                        source: 'sdk/session.tools_updated',
+                        eventSource: null,
+                        traceId: 'turn:3',
+                        turnId: '3',
+                        hubSessionId: 'hub-1',
+                        payload: { count: 105 },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1411,31 +1458,33 @@ describe('terminal/commands/events', () => {
                 toolName: 'io.read',
             },
         }));
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: repeated.length,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 12,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: repeated,
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: repeated.length,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 12,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: repeated,
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '12');
 
         expect(ctx.output()).toContain('×3');
-        expect((ctx.output().match(/Ferramenta/g) ?? [])).toHaveLength(1);
+        expect(ctx.output().match(/Ferramenta/g) ?? []).toHaveLength(1);
         expect(ctx.output()).toContain('ferramenta Leitura local');
     });
 
@@ -1456,38 +1505,40 @@ describe('terminal/commands/events', () => {
                 visible: false,
             },
         };
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 2,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                internalAck,
-                {
-                    timestamp: 1710000001000,
-                    eventId: 82,
-                    event: 'user_input.completed',
-                    source: 'sdk/user_input.completed',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: 'hub-1',
-                    payload: { answer: 'SIM' },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
                 },
-            ],
-        }));
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    internalAck,
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 82,
+                        event: 'user_input.completed',
+                        source: 'sdk/user_input.completed',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: 'hub-1',
+                        payload: { answer: 'SIM' },
+                    },
+                ],
+            }),
+        );
         const defaultCtx = mockCtx();
 
         await cmdEvents({ println: defaultCtx.println }, '20');
@@ -1497,25 +1548,27 @@ describe('terminal/commands/events', () => {
         expect(defaultCtx.output()).not.toContain('Tarefa em segundo plano concluída');
         expect(defaultCtx.output()).not.toContain('Clear persisted pendingQuestion');
 
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: 'agent.background.completed',
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [internalAck],
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: 'agent.background.completed',
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [internalAck],
+            }),
+        );
         const filteredCtx = mockCtx();
 
         await cmdEvents({ println: filteredCtx.println }, '20 event=agent.background.completed');
@@ -1525,41 +1578,43 @@ describe('terminal/commands/events', () => {
     });
 
     it('consulta por tool call, request e hub session', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 2,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 12,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: 'sdk',
-                toolCallId: 'call_123',
-                requestId: 'req-123',
-                hubSessionId: 'hub-1',
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 42,
-                    event: 'tool.lifecycle',
-                    source: 'sdk',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 12,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: 'sdk',
+                    toolCallId: 'call_123',
+                    requestId: 'req-123',
                     hubSessionId: 'hub-1',
-                    payload: {
-                        toolCallId: 'call_123',
-                        requestId: 'req-123',
-                        toolName: 'read_file_content',
-                    },
                 },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 42,
+                        event: 'tool.lifecycle',
+                        source: 'sdk',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            toolCallId: 'call_123',
+                            requestId: 'req-123',
+                            toolName: 'read_file_content',
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '12 tool=call_123 request=req-123 hub=hub-1 source=sdk');
@@ -1586,67 +1641,69 @@ describe('terminal/commands/events', () => {
     });
 
     it('mostra vínculo compacto entre eventos canônicos e transcript/export', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 3,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 187,
-                    event: 'assistant.message',
-                    source: 'sdk/assistant.message',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: null,
-                    payload: {
-                        content: 'DELTA-CANONICAL-8',
-                    },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 3,
+                    queueDepth: 0,
+                    error: null,
                 },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 204,
-                    event: 'user_input.requested',
-                    source: 'sdk/user_input.requested',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: {
-                        requestId: 'ask-1',
-                        question: 'ASK-CANONICAL: responda SIM para fechar o teste',
-                    },
                 },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 213,
-                    event: 'user_input.completed',
-                    source: 'sdk/user_input.completed',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: null,
-                    payload: {
-                        requestId: 'ask-1',
-                        content: 'SIM',
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 187,
+                        event: 'assistant.message',
+                        source: 'sdk/assistant.message',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: {
+                            content: 'DELTA-CANONICAL-8',
+                        },
                     },
-                },
-            ],
-        }));
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 204,
+                        event: 'user_input.requested',
+                        source: 'sdk/user_input.requested',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: {
+                            requestId: 'ask-1',
+                            question: 'ASK-CANONICAL: responda SIM para fechar o teste',
+                        },
+                    },
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 213,
+                        event: 'user_input.completed',
+                        source: 'sdk/user_input.completed',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: {
+                            requestId: 'ask-1',
+                            content: 'SIM',
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1655,7 +1712,9 @@ describe('terminal/commands/events', () => {
         expect(ctx.output()).toContain('Pergunta ao operador');
         expect(ctx.output()).toContain('Resposta do operador');
         expect(ctx.output()).toContain('transcript LLM-B · registro export LLM-B via SDK');
-        expect(ctx.output()).toContain('transcript Sistema/pergunta ao operador · registro export pergunta ao operador');
+        expect(ctx.output()).toContain(
+            'transcript Sistema/pergunta ao operador · registro export pergunta ao operador',
+        );
         expect(ctx.output()).toContain('transcript Operador/resposta · registro export pergunta ao operador');
         expect(ctx.output()).not.toContain('rastreamento turn:1');
         expect(ctx.output()).not.toContain('turno 1');
@@ -1675,60 +1734,62 @@ describe('terminal/commands/events', () => {
             hubSessionId: null,
             payload: { type: 'session.updated', label: 'Sessão SDK atualizada' },
         }));
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 23,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 100,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 187,
-                    event: 'assistant.message',
-                    source: 'sdk/assistant.message',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: null,
-                    payload: { content: 'DELTA-CANONICAL-8' },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 23,
+                    queueDepth: 0,
+                    error: null,
                 },
-                ...hiddenRoutineEvents,
-                {
-                    timestamp: 1710000002000,
-                    eventId: 204,
-                    event: 'user_input.requested',
-                    source: 'sdk/user_input.requested',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
+                filters: {
+                    limit: 100,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: { requestId: 'ask-1', question: 'ASK-CANONICAL: responda SIM' },
                 },
-                {
-                    timestamp: 1710000003000,
-                    eventId: 213,
-                    event: 'user_input.completed',
-                    source: 'sdk/user_input.completed',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: null,
-                    payload: { requestId: 'ask-1', content: 'SIM' },
-                },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 187,
+                        event: 'assistant.message',
+                        source: 'sdk/assistant.message',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: { content: 'DELTA-CANONICAL-8' },
+                    },
+                    ...hiddenRoutineEvents,
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 204,
+                        event: 'user_input.requested',
+                        source: 'sdk/user_input.requested',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: { requestId: 'ask-1', question: 'ASK-CANONICAL: responda SIM' },
+                    },
+                    {
+                        timestamp: 1710000003000,
+                        eventId: 213,
+                        event: 'user_input.completed',
+                        source: 'sdk/user_input.completed',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: { requestId: 'ask-1', content: 'SIM' },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '2');
@@ -1742,59 +1803,61 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza labels e detalhes de sessão/intenção no default', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 3,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 100,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 20,
-                    event: 'session.info',
-                    source: 'sdk/session.info',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 3,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 100,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: { infoType: 'configuration', message: 'Disabled tools: bash, glob' },
                 },
-                {
-                    timestamp: 1710000001000,
-                    eventId: 21,
-                    event: 'session.title_changed',
-                    source: 'sdk/session.title_changed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { title: 'Terminal live' },
-                },
-                {
-                    timestamp: 1710000002000,
-                    eventId: 22,
-                    event: 'assistant.intent',
-                    source: 'terminal-intent/assistant.intent',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: null,
-                    payload: { intent: 'testar fluxo' },
-                },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 20,
+                        event: 'session.info',
+                        source: 'sdk/session.info',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { infoType: 'configuration', message: 'Disabled tools: bash, glob' },
+                    },
+                    {
+                        timestamp: 1710000001000,
+                        eventId: 21,
+                        event: 'session.title_changed',
+                        source: 'sdk/session.title_changed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { title: 'Terminal live' },
+                    },
+                    {
+                        timestamp: 1710000002000,
+                        eventId: 22,
+                        event: 'assistant.intent',
+                        source: 'terminal-intent/assistant.intent',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { intent: 'testar fluxo' },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1811,39 +1874,41 @@ describe('terminal/commands/events', () => {
     });
 
     it('normaliza quebras internas no resumo humano sem afetar raw/json', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 301,
-                    event: 'assistant.message',
-                    source: 'sdk/assistant.message',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: null,
-                    payload: {
-                        content: 'linha 1\nlinha 2\r\nlinha 3',
-                    },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
                 },
-            ],
-        }));
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 301,
+                        event: 'assistant.message',
+                        source: 'sdk/assistant.message',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: null,
+                        payload: {
+                            content: 'linha 1\nlinha 2\r\nlinha 3',
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20');
@@ -1884,40 +1949,42 @@ describe('terminal/commands/events', () => {
     });
 
     it('usa publicChunk seguro no preview de JSON compacto de delta', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 5,
-                event: 'delta',
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 43,
-                    event: 'delta',
-                    source: 'terminal-dialog/delta',
-                    eventSource: null,
-                    traceId: 'turn:abc',
-                    turnId: 'turn-1',
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        chunk: '<thinking>segredo</thinking>\nDELTA-CANONICAL-1',
-                        publicChunk: 'DELTA-CANONICAL-1',
-                    },
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
                 },
-            ],
-        }));
+                filters: {
+                    limit: 5,
+                    event: 'delta',
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 43,
+                        event: 'delta',
+                        source: 'terminal-dialog/delta',
+                        eventSource: null,
+                        traceId: 'turn:abc',
+                        turnId: 'turn-1',
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            chunk: '<thinking>segredo</thinking>\nDELTA-CANONICAL-1',
+                            publicChunk: 'DELTA-CANONICAL-1',
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '3 --json compact event=delta');
@@ -1974,40 +2041,41 @@ describe('terminal/commands/events', () => {
     });
 
     it('redige segredos em /events --json, --raw full e preview raw sem perder o formato técnico', async () => {
-        const secretProjection = () => (archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 1,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 5,
-                event: 'tool.execution_complete',
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    timestamp: 1710000000000,
-                    eventId: 77,
+        const secretProjection = () =>
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 1,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 5,
                     event: 'tool.execution_complete',
-                    source: 'sdk/tool.execution_complete',
-                    eventSource: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: {
-                        headers: { Authorization: 'Bearer abcdefghijklmnopqrstuvwxyz' },
-                        content: 'api_key=sk-testsecret123456789',
-                    },
                 },
-            ],
-        }));
+                entries: [
+                    {
+                        timestamp: 1710000000000,
+                        eventId: 77,
+                        event: 'tool.execution_complete',
+                        source: 'sdk/tool.execution_complete',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: {
+                            headers: { Authorization: 'Bearer abcdefghijklmnopqrstuvwxyz' },
+                            content: 'api_key=sk-testsecret123456789',
+                        },
+                    },
+                ],
+            });
 
         readTerminalSseEventArchiveTail.mockResolvedValueOnce(secretProjection());
         const jsonCtx = mockCtx();
@@ -2036,64 +2104,66 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza payloadPreview de activity e hooks no preview raw', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 2,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000001000,
-                    eventId: 50,
-                    event: 'activity.changed',
-                    source: 'terminal',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
                     traceId: null,
                     turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        current: {
-                            phase: 'tool',
-                            label: 'Integração externa concluída',
-                            detail: 'lendo arquivo concluído · arquivo: package.json',
-                            toolName: 'read_file_content',
-                            progress: 100,
-                        },
-                        previous: {
-                            label: 'Ferramenta em uso',
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000001000,
+                        eventId: 50,
+                        event: 'activity.changed',
+                        source: 'terminal',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            current: {
+                                phase: 'tool',
+                                label: 'Integração externa concluída',
+                                detail: 'lendo arquivo concluído · arquivo: package.json',
+                                toolName: 'read_file_content',
+                                progress: 100,
+                            },
+                            previous: {
+                                label: 'Ferramenta em uso',
+                            },
                         },
                     },
-                },
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000002000,
-                    eventId: 51,
-                    event: 'hook.start',
-                    source: 'sdk/hook.start',
-                    eventSource: null,
-                    traceId: 'turn:1',
-                    turnId: '1',
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        hookType: 'postToolUse',
-                        input: { toolName: 'read_file_content' },
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000002000,
+                        eventId: 51,
+                        event: 'hook.start',
+                        source: 'sdk/hook.start',
+                        eventSource: null,
+                        traceId: 'turn:1',
+                        turnId: '1',
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            hookType: 'postToolUse',
+                            input: { toolName: 'read_file_content' },
+                        },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 --raw');
@@ -2113,65 +2183,67 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza conclusão interna de turno no payloadPreview raw sem sugerir fim final', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 2,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000001000,
-                    eventId: 86,
-                    event: 'activity.changed',
-                    source: 'terminal',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 2,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
                     traceId: null,
                     turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        current: {
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000001000,
+                        eventId: 86,
+                        event: 'activity.changed',
+                        source: 'terminal',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            current: {
+                                phase: 'turn',
+                                label: 'Turno do assistente concluído',
+                                detail: 'turno 0',
+                            },
+                            previous: {
+                                phase: 'tool',
+                                label: 'Leitura concluída',
+                                detail: 'package.json',
+                            },
+                        },
+                    },
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000002000,
+                        eventId: 87,
+                        event: 'terminal.activity',
+                        source: 'sdk',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
                             phase: 'turn',
                             label: 'Turno do assistente concluído',
                             detail: 'turno 0',
                         },
-                        previous: {
-                            phase: 'tool',
-                            label: 'Leitura concluída',
-                            detail: 'package.json',
-                        },
                     },
-                },
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000002000,
-                    eventId: 87,
-                    event: 'terminal.activity',
-                    source: 'sdk',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        phase: 'turn',
-                        label: 'Turno do assistente concluído',
-                        detail: 'turno 0',
-                    },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 --raw');
@@ -2189,88 +2261,94 @@ describe('terminal/commands/events', () => {
     });
 
     it('humaniza payloadPreview de boot, quota e background no preview raw', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: {
-                path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
-                events: 4,
-                queueDepth: 0,
-                error: null,
-            },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000001000,
-                    eventId: 60,
-                    event: 'terminal.runtime.wired',
-                    source: 'terminal/runtime-root.runtime-config',
-                    eventSource: null,
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: {
+                    path: 'data/copilot-terminal/sse-events/terminal-sse-events-2026-05-20.jsonl',
+                    events: 4,
+                    queueDepth: 0,
+                    error: null,
+                },
+                filters: {
+                    limit: 20,
+                    event: null,
                     traceId: null,
                     turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
                     hubSessionId: null,
-                    payload: { phase: 'runtime-config', durationMs: 7, preflightOk: true },
                 },
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000002000,
-                    eventId: 61,
-                    event: 'terminal.started',
-                    source: 'terminal-boot/terminal.started',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        operationMode: 'standalone',
-                        model: 'auto',
-                        mcpToolCount: 0,
-                        dialogLoopActive: false,
-                        bootPreflight: { ok: true },
+                entries: [
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000001000,
+                        eventId: 60,
+                        event: 'terminal.runtime.wired',
+                        source: 'terminal/runtime-root.runtime-config',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: null,
+                        payload: { phase: 'runtime-config', durationMs: 7, preflightOk: true },
                     },
-                },
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000003000,
-                    eventId: 62,
-                    event: 'quota.warning',
-                    source: 'agent/passthrough/quota.warning',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        quotaId: 'premium_interactions',
-                        snapshot: { hasQuota: false, remainingPercentage: 0, resetDate: '2026-06-08T11:10:36.070Z' },
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000002000,
+                        eventId: 61,
+                        event: 'terminal.started',
+                        source: 'terminal-boot/terminal.started',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            operationMode: 'standalone',
+                            model: 'auto',
+                            mcpToolCount: 0,
+                            dialogLoopActive: false,
+                            bootPreflight: { ok: true },
+                        },
                     },
-                },
-                {
-                    schemaVersion: 1,
-                    timestamp: 1710000004000,
-                    eventId: 63,
-                    event: 'agent.background.completed',
-                    source: 'agent/background.completed',
-                    eventSource: null,
-                    traceId: null,
-                    turnId: null,
-                    hubSessionId: 'hub-1',
-                    payload: {
-                        status: 'success',
-                        label: 'session.cleanup.stale',
-                        durationMs: 42,
-                        pendingCount: 0,
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000003000,
+                        eventId: 62,
+                        event: 'quota.warning',
+                        source: 'agent/passthrough/quota.warning',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            quotaId: 'premium_interactions',
+                            snapshot: {
+                                hasQuota: false,
+                                remainingPercentage: 0,
+                                resetDate: '2026-06-08T11:10:36.070Z',
+                            },
+                        },
                     },
-                },
-            ],
-        }));
+                    {
+                        schemaVersion: 1,
+                        timestamp: 1710000004000,
+                        eventId: 63,
+                        event: 'agent.background.completed',
+                        source: 'agent/background.completed',
+                        eventSource: null,
+                        traceId: null,
+                        turnId: null,
+                        hubSessionId: 'hub-1',
+                        payload: {
+                            status: 'success',
+                            label: 'session.cleanup.stale',
+                            durationMs: 42,
+                            pendingCount: 0,
+                        },
+                    },
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '20 --raw');
@@ -2298,20 +2376,22 @@ describe('terminal/commands/events', () => {
     });
 
     it('mostra vazio quando archive nao tem entradas', async () => {
-        readTerminalSseEventArchiveTail.mockResolvedValueOnce(archiveFixture({
-            state: { path: null, events: 0, queueDepth: 0, error: null },
-            filters: {
-                limit: 20,
-                event: null,
-                traceId: null,
-                turnId: null,
-                source: null,
-                toolCallId: null,
-                requestId: null,
-                hubSessionId: null,
-            },
-            entries: [],
-        }));
+        readTerminalSseEventArchiveTail.mockResolvedValueOnce(
+            archiveFixture({
+                state: { path: null, events: 0, queueDepth: 0, error: null },
+                filters: {
+                    limit: 20,
+                    event: null,
+                    traceId: null,
+                    turnId: null,
+                    source: null,
+                    toolCallId: null,
+                    requestId: null,
+                    hubSessionId: null,
+                },
+                entries: [],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdEvents({ println: ctx.println }, '');

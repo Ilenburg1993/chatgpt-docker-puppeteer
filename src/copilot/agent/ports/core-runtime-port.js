@@ -10,11 +10,11 @@
 export {
     EVENT_BUS,
     SessionError,
+    container,
     getHubSessionId,
     isShuttingDown,
+    logSwallowed,
     setSharedSdkSessionId,
     toError,
 } from '#copilot/core';
-export { container } from '#copilot/core';
-export { logSwallowed } from '#copilot/core';
 export { setSessionModel } from '#copilot/sdk/session-runtime';

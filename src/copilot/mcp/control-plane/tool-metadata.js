@@ -80,7 +80,11 @@ function sanitizeInvocationStatusText(value) {
  * @returns {string}
  */
 function humanizeToolName(value) {
-    const normalized = value.replace(/^mcp_/u, '').replace(/^repo_/u, '').replace(/_/gu, ' ').trim();
+    const normalized = value
+        .replace(/^mcp_/u, '')
+        .replace(/^repo_/u, '')
+        .replace(/_/gu, ' ')
+        .trim();
     return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Tool';
 }
 

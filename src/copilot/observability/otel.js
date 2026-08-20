@@ -137,8 +137,8 @@ export const DEFAULT_OTEL_FILE = DEFAULT_TRACES_FILE;
 let _tracer = null;
 
 /**
- * Importa um módulo opcional sem transformar sua ausência em erro estático. A fronteira dinâmica é `unknown` até que
- * o shape mínimo necessário seja validado em runtime.
+ * Importa um módulo opcional sem transformar sua ausência em erro estático. A fronteira dinâmica é `unknown` até que o
+ * shape mínimo necessário seja validado em runtime.
  *
  * @param {string} specifier
  * @returns {Promise<unknown>}
@@ -156,7 +156,6 @@ function isOtelTraceNodeModule(value) {
     const candidate = /** @type {Record<string, unknown>} */ (value);
     return typeof candidate['NodeTracerProvider'] === 'function';
 }
-
 
 /**
  * Projects an arbitrary runtime failure into the exact OpenTelemetry Exception contract. Optional fields are omitted

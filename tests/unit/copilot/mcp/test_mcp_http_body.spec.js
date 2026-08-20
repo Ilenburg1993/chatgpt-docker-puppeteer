@@ -42,7 +42,9 @@ describe('MCP HTTP JSON body helpers', () => {
             },
         });
 
-        const result = await readMcpHttpJsonBody(requestWithBody(body, { 'content-length': String(Buffer.byteLength(body)) }));
+        const result = await readMcpHttpJsonBody(
+            requestWithBody(body, { 'content-length': String(Buffer.byteLength(body)) }),
+        );
 
         assert.equal(result.ok, true);
         assert.equal(result.ok ? result.initializeRequest : false, true);
@@ -54,7 +56,10 @@ describe('MCP HTTP JSON body helpers', () => {
 
         assert.equal(result.ok, false);
         assert.equal(result.ok ? null : result.statusCode, 400);
-        assert.equal(result.ok ? null : result.error.error_description, 'MCP POST requests must include a JSON request body.');
+        assert.equal(
+            result.ok ? null : result.error.error_description,
+            'MCP POST requests must include a JSON request body.',
+        );
     });
 
     it('rejects invalid JSON without echoing payload content', async () => {
@@ -77,10 +82,9 @@ describe('MCP HTTP JSON body helpers', () => {
     });
 
     it('rejects Content-Length above the configured limit before reading', async () => {
-        const result = await readMcpHttpJsonBody(
-            requestWithBody('{"jsonrpc":"2.0"}', { 'content-length': '100' }),
-            { maxBytes: 10 },
-        );
+        const result = await readMcpHttpJsonBody(requestWithBody('{"jsonrpc":"2.0"}', { 'content-length': '100' }), {
+            maxBytes: 10,
+        });
 
         assert.equal(result.ok, false);
         assert.equal(result.ok ? null : result.statusCode, 413);

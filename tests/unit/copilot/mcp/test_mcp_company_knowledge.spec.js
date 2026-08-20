@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it, beforeEach } from 'vitest';
+import { beforeEach, describe, it } from 'vitest';
 
 import {
     COMPANY_KNOWLEDGE_FETCH_TOOL_NAME,
@@ -98,7 +98,10 @@ describe('MCP Company Knowledge tools', () => {
         assert.equal(resource.uri, COMPANY_KNOWLEDGE_WIDGET_URI);
         assert.equal(COMPANY_KNOWLEDGE_WIDGET_URI, 'ui://copilot/company-knowledge/v2.html');
         assert.equal(resource.mimeType, 'text/html;profile=mcp-app');
-        assert.equal(meta['openai/widgetDescription'], 'Renders read-only Company Knowledge search and fetch results from the current workspace corpus.');
+        assert.equal(
+            meta['openai/widgetDescription'],
+            'Renders read-only Company Knowledge search and fetch results from the current workspace corpus.',
+        );
         assert.equal(ui['domain'], 'https://workspace-widget.example.com');
         assert.equal(meta['openai/widgetDomain'], ui['domain']);
         assert.deepEqual(csp['connectDomains'], []);

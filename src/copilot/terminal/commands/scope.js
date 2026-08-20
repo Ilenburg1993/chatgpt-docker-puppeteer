@@ -17,7 +17,7 @@ import {
     listScopes,
     refreshScope,
 } from '#copilot/infra/public/session';
-import { stat } from 'node:fs/promises';
+import { statPathTrusted } from '#copilot/infra/public/trusted-io';
 import { relative } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
@@ -217,7 +217,7 @@ function parseScopeArgs(parts) {
 async function looksLikeExistingPath(value) {
     if (!value) return false;
     try {
-        await stat(value);
+        await statPathTrusted(value, { caller: 'terminal.commands.scope' });
         return true;
     } catch {
         return value.includes('/') || value.includes('\\') || value.startsWith('.') || value.startsWith('~');
@@ -280,7 +280,9 @@ function printScopeStats(ctx, stats) {
         ),
     );
     if (stats.lastError) {
-        ctx.println(terminalThemeRow('Atenção', `${stats.lastError.summary} · ${stats.lastError.code}`, { role: 'warn' }));
+        ctx.println(
+            terminalThemeRow('Atenção', `${stats.lastError.summary} · ${stats.lastError.code}`, { role: 'warn' }),
+        );
     }
 }
 
@@ -327,7 +329,12 @@ async function runDeclare(ctx, parts) {
         const stats = await handle.awaitReady();
         printScopeStats(ctx, stats);
     } else {
-        ctx.println(terminalThemeRow('Próximo', 'aquecimento em segundo plano; use /scope context ou /scope list para acompanhar'));
+        ctx.println(
+            terminalThemeRow(
+                'Próximo',
+                'aquecimento em segundo plano; use /scope context ou /scope list para acompanhar',
+            ),
+        );
     }
     ctx.println('');
 }
@@ -367,10 +374,21 @@ function runContext(ctx, parts) {
     ctx.println('');
     ctx.println(terminalThemeHeadline('assistant', 'Contexto de escopo'));
     ctx.println(terminalThemeRow('Escopo', `${scope.sessionId} · ${statusLabel}`));
-    ctx.println(terminalThemeRow('Arquivos', `${scope.files} · símbolos ${scope.symbols} · exportações ${scope.topExports.length}`));
-    for (const item of scope.topExports.slice(0, 30)) ctx.println(terminalThemeRow('Exportação', renderScopeExportLabel(item)));
+    ctx.println(
+        terminalThemeRow(
+            'Arquivos',
+            `${scope.files} · símbolos ${scope.symbols} · exportações ${scope.topExports.length}`,
+        ),
+    );
+    for (const item of scope.topExports.slice(0, 30))
+        ctx.println(terminalThemeRow('Exportação', renderScopeExportLabel(item)));
     if (scope.topExports.length > 30)
-        ctx.println(terminalThemeRow('Mais', countLabel(scope.topExports.length - 30, 'exportação adicional', 'exportações adicionais')));
+        ctx.println(
+            terminalThemeRow(
+                'Mais',
+                countLabel(scope.topExports.length - 30, 'exportação adicional', 'exportações adicionais'),
+            ),
+        );
     ctx.println('');
 }
 
@@ -399,7 +417,9 @@ function runFind(ctx, parts) {
         );
     }
     if (results.length > 80)
-        ctx.println(terminalThemeRow('Mais', countLabel(results.length - 80, 'resultado adicional', 'resultados adicionais')));
+        ctx.println(
+            terminalThemeRow('Mais', countLabel(results.length - 80, 'resultado adicional', 'resultados adicionais')),
+        );
     ctx.println('');
 }
 
@@ -433,7 +453,11 @@ function runClose(ctx, parts) {
         ctx.println(terminalThemeRow('Escopo', `não encontrado: ${sessionId}`, { role: 'warn' }));
         return;
     }
-    ctx.println(terminalThemeRow('Escopo fechado', `${sessionId} · arquivos ${stats.pathCount} · analisados ${stats.parsed}`, { role: 'success' }));
+    ctx.println(
+        terminalThemeRow('Escopo fechado', `${sessionId} · arquivos ${stats.pathCount} · analisados ${stats.parsed}`, {
+            role: 'success',
+        }),
+    );
 }
 
 /**

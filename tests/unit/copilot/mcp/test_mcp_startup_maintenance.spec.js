@@ -1,16 +1,16 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { afterEach, describe, it } from 'vitest';
 import { cleanupStaleQuickTunnelState } from '#copilot/mcp/cloudflare';
 import {
     readMcpStartupMaintenanceState,
     resetMcpStartupMaintenanceForTests,
     scheduleMcpStartupMaintenance,
 } from '#copilot/mcp/control-plane/startup-maintenance.js';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, it } from 'vitest';
 
 /** @type {string[]} */
 const tempDirs = [];
@@ -22,7 +22,7 @@ afterEach(async () => {
 
 describe('MCP startup maintenance', () => {
     it('schedules once and records the smoke result without blocking startup', async () => {
-        /** @type {Array<() => void>} */
+        /** @type {(() => void)[]} */
         const callbacks = [];
         const setTimeoutFn = /** @type {typeof setTimeout} */ (
             (/** @type {() => void} */ fn) => {
@@ -56,7 +56,7 @@ describe('MCP startup maintenance', () => {
     });
 
     it('keeps workspace smoke successful when detached live reaping fails non-fatally', async () => {
-        /** @type {Array<() => void>} */
+        /** @type {(() => void)[]} */
         const callbacks = [];
         const setTimeoutFn = /** @type {typeof setTimeout} */ (
             (/** @type {() => void} */ fn) => {

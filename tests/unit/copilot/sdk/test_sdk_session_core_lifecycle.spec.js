@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SdkOperationError } from '#copilot/sdk/errors';
@@ -51,9 +49,11 @@ function fakeClient(overrides = {}) {
         start: vi.fn().mockResolvedValue(undefined),
         createSession: vi.fn().mockResolvedValue({ sessionId: 's1' }),
         resumeSession: vi.fn().mockResolvedValue({ sessionId: 's2' }),
-        listSessions: vi.fn().mockResolvedValue([
-            { sessionId: 's1', startTime: new Date(0), modifiedTime: new Date(0), isRemote: false },
-        ]),
+        listSessions: vi
+            .fn()
+            .mockResolvedValue([
+                { sessionId: 's1', startTime: new Date(0), modifiedTime: new Date(0), isRemote: false },
+            ]),
         deleteSession: vi.fn().mockResolvedValue(undefined),
         ...overrides,
     };

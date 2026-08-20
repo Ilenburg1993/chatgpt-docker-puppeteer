@@ -20,7 +20,9 @@ describe('MCP stateful env manager', () => {
         const first = await ensureStatefulEnvFile(testEnvPath);
         const second = await ensureStatefulEnvFile(testEnvPath);
         const text = readFileSync(absoluteTestEnvPath, 'utf8');
-        const secretLine = text.split(/\r?\n/u).find((line) => line.startsWith('COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET='));
+        const secretLine = text
+            .split(/\r?\n/u)
+            .find((line) => line.startsWith('COPILOT_MCP_HTTP_SESSION_ID_HASH_SECRET='));
 
         assert.equal(existsSync(absoluteTestEnvPath), true);
         assert.equal(first.created, true);

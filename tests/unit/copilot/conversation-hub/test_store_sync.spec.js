@@ -6,8 +6,8 @@
  * copilot.
  */
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 
 import { syncFromSdkHistory } from '../../../../src/copilot/conversation-hub/store-sync.js';

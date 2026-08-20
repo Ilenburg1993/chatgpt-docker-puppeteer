@@ -22,7 +22,9 @@ Inspect the current model-gateway SQLite store without mirroring JSON, fetching 
 const diagnostics = await new SqliteModelGatewayCatalogStore().readStorageDiagnostics();
 
 if (args.has('--json')) {
-    process.stdout.write(`${JSON.stringify({ schema: 'model-gateway-sqlite-diagnostics', ...diagnostics }, null, 2)}\n`);
+    process.stdout.write(
+        `${JSON.stringify({ schema: 'model-gateway-sqlite-diagnostics', ...diagnostics }, null, 2)}\n`,
+    );
 } else {
     process.stdout.write(`model-gateway SQLite diagnostics\n`);
     process.stdout.write(

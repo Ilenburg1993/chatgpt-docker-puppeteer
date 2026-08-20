@@ -2,8 +2,8 @@
 /**
  * JSON-backed store for the model gateway registry.
  *
- * The store persists only redacted provider/model records. It intentionally does not resolve or store API keys,
- * bearer tokens or provider headers.
+ * The store persists only redacted provider/model records. It intentionally does not resolve or store API keys, bearer
+ * tokens or provider headers.
  *
  * @module copilot/model-gateway/registry/json-registry-store
  */
@@ -40,7 +40,13 @@ function readRecordArray(value) {
 
 /**
  * @param {unknown} snapshot
- * @returns {{ schemaVersion: number; generatedAt: string | null; source: string; providers: Record<string, unknown>[]; models: Record<string, unknown>[] }}
+ * @returns {{
+ *     schemaVersion: number;
+ *     generatedAt: string | null;
+ *     source: string;
+ *     providers: Record<string, unknown>[];
+ *     models: Record<string, unknown>[];
+ * }}
  */
 export function normalizeStoredRegistrySnapshot(snapshot) {
     if (!isRecord(snapshot) || snapshot['schemaVersion'] !== MODEL_GATEWAY_SCHEMA_VERSION) {
@@ -78,7 +84,13 @@ export class JsonModelGatewayRegistryStore {
     }
 
     /**
-     * @returns {Promise<{ schemaVersion: number; generatedAt: string | null; source: string; providers: Record<string, unknown>[]; models: Record<string, unknown>[] }>}
+     * @returns {Promise<{
+     *     schemaVersion: number;
+     *     generatedAt: string | null;
+     *     source: string;
+     *     providers: Record<string, unknown>[];
+     *     models: Record<string, unknown>[];
+     * }>}
      */
     async readSnapshot() {
         const raw = await readJson(this.#filePath, null);
@@ -122,4 +134,3 @@ export class JsonModelGatewayRegistryStore {
         });
     }
 }
-

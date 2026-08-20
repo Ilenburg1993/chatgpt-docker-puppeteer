@@ -2,12 +2,14 @@
 /**
  * Cross-process invalidation journal for the shared Copilot workspace.
  *
- * MCP and the local LLM-B process keep independent in-memory caches while sharing the same filesystem and copilot.sqlite.
- * This bounded SQLite journal propagates *change information* between those processes; it never stores file contents and
- * it is not the sole freshness guarantee. Rich filesystem fingerprints remain the safety net for missed/external writes.
+ * MCP and the local LLM-B process keep independent in-memory caches while sharing the same filesystem and
+ * copilot.sqlite. This bounded SQLite journal propagates _change information_ between those processes; it never stores
+ * file contents and it is not the sole freshness guarantee. Rich filesystem fingerprints remain the safety net for
+ * missed/external writes.
  *
  * Runtime writes happen after the in-process invalidation debounce, outside the canonical file mutation critical path.
- * Consumers poll a primary-key cursor at a short interval; WAL mode keeps empty reads cheap and concurrent with writers.
+ * Consumers poll a primary-key cursor at a short interval; WAL mode keeps empty reads cheap and concurrent with
+ * writers.
  *
  * @module copilot/infra/io/invalidation/cross-process-journal
  */
@@ -29,6 +31,7 @@ const TABLE = 'copilot_io_invalidation_journal';
 
 /**
  * @typedef {{ recursive?: boolean; source?: string }} CrossProcessInvalidationEvent
+ *
  * @typedef {{
  *     sequence: number;
  *     processInstance: string;
@@ -37,6 +40,7 @@ const TABLE = 'copilot_io_invalidation_journal';
  *     source: string;
  *     createdAtMs: number;
  * }} CrossProcessInvalidationRow
+ *
  * @typedef {{
  *     enabled: boolean;
  *     pollMs: number;
@@ -165,7 +169,10 @@ export function createCrossProcessInvalidationJournal(options) {
         },
 
         /**
-         * @param {(filePath: string, event: { recursive: boolean; source: string; sequence: number; createdAtMs: number }) => void} onInvalidation
+         * @param {(
+         *     filePath: string,
+         *     event: { recursive: boolean; source: string; sequence: number; createdAtMs: number },
+         * ) => void} onInvalidation
          */
         poll(onInvalidation) {
             const operationStartedAt = monotonicMs();
@@ -287,25 +294,25 @@ export function readCrossProcessInvalidationReplay(options = {}) {
         const readSnapshot = db.transaction(() => {
             const bounds = /** @type {{ earliestSequence?: unknown; latestRowSequence?: unknown }} */ (
                 db
-                    .prepare(`
+                    .prepare(
+                        `
                         SELECT
                             COALESCE(MIN(sequence), 0) AS earliestSequence,
                             COALESCE(MAX(sequence), 0) AS latestRowSequence
                         FROM ${TABLE}
-                    `)
+                    `,
+                    )
                     .get()
             );
             const issued = /** @type {{ sequence?: unknown } | undefined} */ (
                 db.prepare('SELECT seq AS sequence FROM sqlite_sequence WHERE name = ?').get(TABLE)
             );
             const earliestSequence = readSequenceValue(bounds.earliestSequence);
-            const highWatermark = Math.max(
-                readSequenceValue(bounds.latestRowSequence),
-                readSequence(issued),
-            );
+            const highWatermark = Math.max(readSequenceValue(bounds.latestRowSequence), readSequence(issued));
             const rows = /** @type {CrossProcessInvalidationRow[]} */ (
                 db
-                    .prepare(`
+                    .prepare(
+                        `
                         SELECT
                             sequence,
                             process_instance AS processInstance,
@@ -317,7 +324,8 @@ export function readCrossProcessInvalidationReplay(options = {}) {
                         WHERE sequence > ? AND sequence <= ?
                         ORDER BY sequence ASC
                         LIMIT ?
-                    `)
+                    `,
+                    )
                     .all(afterSequence, highWatermark, maxRows + 1)
             );
             const truncated = rows.length > maxRows;
@@ -366,7 +374,11 @@ export function readCrossProcessInvalidationReplay(options = {}) {
 let runtimeJournal = null;
 /** @type {NodeJS.Timeout | null} */
 let runtimePollTimer = null;
-/** @type {((filePath: string, event: { recursive: boolean; source: string; sequence: number; createdAtMs: number }) => void) | null} */
+/** @type {((
+          filePath: string,
+          event: { recursive: boolean; source: string; sequence: number; createdAtMs: number },
+      ) => void)
+    | null} */
 let runtimeConsumer = null;
 let runtimeInitializationErrors = 0;
 let runtimeWriteErrors = 0;
@@ -411,7 +423,10 @@ export function publishCrossProcessInvalidation(filePath, event = {}) {
 /**
  * Start the singleton consumer. The timer is unref'ed so it never keeps a process alive.
  *
- * @param {(filePath: string, event: { recursive: boolean; source: string; sequence: number; createdAtMs: number }) => void} onInvalidation
+ * @param {(
+ *     filePath: string,
+ *     event: { recursive: boolean; source: string; sequence: number; createdAtMs: number },
+ * ) => void} onInvalidation
  * @returns {() => void}
  */
 export function startCrossProcessInvalidationConsumer(onInvalidation) {

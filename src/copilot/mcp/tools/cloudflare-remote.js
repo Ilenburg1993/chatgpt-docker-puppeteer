@@ -74,7 +74,9 @@ export function compactCloudflareRemoteAudit(audit) {
             connections: {
                 total: connections.length,
                 active: connections.filter((row) => row['isPendingReconnect'] !== true).length,
-                colos: [...new Set(connections.map((row) => row['coloName']).filter((value) => typeof value === 'string'))],
+                colos: [
+                    ...new Set(connections.map((row) => row['coloName']).filter((value) => typeof value === 'string')),
+                ],
                 clientVersions: [
                     ...new Set(
                         connections.map((row) => row['clientVersion']).filter((value) => typeof value === 'string'),

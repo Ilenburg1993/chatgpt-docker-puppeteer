@@ -119,8 +119,14 @@ export async function buildToolPayloadAudit(options) {
         totalToolsBytes: totals.totalBytes,
         fieldTotals: totals,
         averageToolBytes: tools.length > 0 ? Math.round(totals.totalBytes / tools.length) : 0,
-        p50ToolBytes: percentile(toolRows.map((row) => row.totalBytes), 0.5),
-        p95ToolBytes: percentile(toolRows.map((row) => row.totalBytes), 0.95),
+        p50ToolBytes: percentile(
+            toolRows.map((row) => row.totalBytes),
+            0.5,
+        ),
+        p95ToolBytes: percentile(
+            toolRows.map((row) => row.totalBytes),
+            0.95,
+        ),
         topTools: toolRows.slice(0, top),
         recommendations: buildRecommendations(totals, totalEnvelopeBytes),
     };

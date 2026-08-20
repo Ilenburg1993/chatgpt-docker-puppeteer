@@ -4,7 +4,7 @@ import { log } from '#core/logger';
 import * as stabilizer from '#shared/page_stability/stabilizer';
 import { Triage } from '../modules/triage.js';
 
-/** @import BaseDriver from "#driver/core/BaseDriver" */
+/** @import BaseDriver from '#driver/core/BaseDriver' */
 
 /**
  * Check types para readiness validation.

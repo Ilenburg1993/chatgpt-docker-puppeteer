@@ -1,14 +1,15 @@
 # 2026-05-13 — Transformações Amplas e Profundas: Status Consolidado
 
-**Data**: 2026-05-13
-**Sessão**: Investigação e Transformações Profundas do `agent`
-**Status**: ✅ Correções críticas validadas · ⚠️ Consolidação arquitetural/fluxo ainda em aberto
+**Data**: 2026-05-13 **Sessão**: Investigação e Transformações Profundas do `agent` **Status**: ✅
+Correções críticas validadas · ⚠️ Consolidação arquitetural/fluxo ainda em aberto
 
 ---
 
 ## 1. Resumo Executivo
 
-Nesta sessão foram validadas correções críticas P0/P1 e, em seguida, foi executada uma investigação ampliada do fluxo e da arquitetura de `src/copilot/agent` na relação com todo o restante de `src/copilot`.
+Nesta sessão foram validadas correções críticas P0/P1 e, em seguida, foi executada uma investigação
+ampliada do fluxo e da arquitetura de `src/copilot/agent` na relação com todo o restante de
+`src/copilot`.
 
 O resultado muda a leitura estratégica do trabalho:
 
@@ -16,12 +17,13 @@ O resultado muda a leitura estratégica do trabalho:
 - **a modularização barrel-first avançou de verdade**;
 - **mas ainda não existe arquitetura única e fluxo único na operação do runtime**.
 
-O ponto de confusão atual não é mais “monólito puro”; é **pluralidade de superfícies e de ingressos operacionais** sobre o mesmo runtime.
+O ponto de confusão atual não é mais “monólito puro”; é **pluralidade de superfícies e de ingressos
+operacionais** sobre o mesmo runtime.
 
 ### Métricas de Impacto
 
-| Métrica                     | Status             |
-| --------------------------- | ------------------ |
+| Métrica                     | Status              |
+| --------------------------- | ------------------- |
 | **Typecheck (strict)**      | ✅ Verde (0 erros)  |
 | **Testes Unitários**        | ✅ 2607/2607 PASSOU |
 | **Suites de Teste**         | ✅ 874/874 PASSOU   |
@@ -38,11 +40,13 @@ O ponto de confusão atual não é mais “monólito puro”; é **pluralidade d
 **Arquivo**: `src/copilot/agent/dialog/seams/turn-result-persistence.js`
 
 **Problema**:
+
 - Quando protocolo pendente sinalizava `stopped`, o sistema emitia `authorized: false`
 - Isso causava travamento indefinido em `waitForRestartAndReplyFn()`
 - O loop nunca era encerrado graciosamente
 
 **Solução Aplicada**:
+
 ```javascript
 // ANTES:
 onStopOuter({ authorized: false, reason: 'pending_protocol_stopped' });
@@ -54,10 +58,12 @@ onStopOuter({ authorized: true, reason: 'pending_protocol_stopped' });
 ```
 
 **Locais Corrigidos**:
+
 - Linha ~215: Shortcut com pergunta pendente
 - Linha ~238: Shortcut após question.pending
 
 **Impacto**:
+
 - ✅ Encerramento gracioso garantido
 - ✅ Sem turnos bloqueados indefinidamente
 - ✅ Semântica clara de autorização
@@ -69,11 +75,13 @@ onStopOuter({ authorized: true, reason: 'pending_protocol_stopped' });
 **Arquivo**: `src/copilot/agent/lifecycle/state/state-io.js`
 
 **Problema**:
+
 - Race condition entre `clearState()` e `writeStateAsync()`
 - `writeStateFileJson()` poderia executar após `clearState()` começar
 - Estado stale poderia ser restaurado em disco
 
 **Solução Aplicada**:
+
 ```javascript
 // Adicionado validação LOGO ANTES de escrever em disco:
 if (_clearGen !== genAtStart) {
@@ -84,6 +92,7 @@ await writeStateFileJson(next);
 ```
 
 **Camadas de Proteção**:
+
 1. **Antes de readStateAsync()**: Captura `genAtStart`
 2. **Após readStateAsync()**: Valida geração
 3. **Antes de buildState()**: Valida geração
@@ -91,6 +100,7 @@ await writeStateFileJson(next);
 5. **Após writeStateFileJson()**: Restaura cache condicionalmente
 
 **Impacto**:
+
 - ✅ Atomicidade garantida
 - ✅ Zero chance de state fantasma
 - ✅ Múltiplas camadas de proteção defensiva
@@ -153,7 +163,8 @@ Foram confirmados, ao mesmo tempo, estes ingressos:
 - `conversation-hub/send-pipeline.js` para hub-send;
 - `channel/client.js` para bridge em-processo.
 
-Conclusão: existem capacidades legítimas diferentes, porém ainda não há **um único owner de policy** para a escolha/fallback entre elas.
+Conclusão: existem capacidades legítimas diferentes, porém ainda não há **um único owner de policy**
+para a escolha/fallback entre elas.
 
 ---
 
@@ -162,33 +173,40 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 ### Próximas Prioridades (Ordem Recomendada)
 
 #### **Faixa C0** — Arquitetura única / fluxo único (**nova prioridade real**)
+
 - Declarar taxonomia única de interação (`queue/send`, `dialog-turn`, `intervention`, `hub-send`)
 - Extrair um owner único da policy de interação/fallback
 - Reduzir superfícies concorrentes do runtime
 - **DoD**: um runtime owner, uma gramática de fluxo e uma surface pública nítida
 
 #### **Faixa C0.4** — Root-clean do `agent/`
+
 - Remover arquivos soltos de implementação do root de `src/copilot/agent`
 - Manter no root apenas entrypoints/contratos deliberados
 - **DoD**: root mínimo, sem “área cinzenta” de implementação
 
 #### **Faixa C3.2** — Refatoração de `AlwaysAliveAgent` (reposicionada)
+
 - Continuar extraindo delegações em subfachadas temáticas
 - Reduzir `always-alive.js` como super-hub operacional, não apenas em linhas
-- **DoD**: classe mais previsível, menos imports da root surface interna, menor acoplamento cross-domain
+- **DoD**: classe mais previsível, menos imports da root surface interna, menor acoplamento
+  cross-domain
 
 #### **Faixa C3.3** — Decomposição de `DialogLoopManager` (em pausa estratégica)
+
 - Extrair State Machine + lifecycle handler
 - Extrair Watchdog + stall detection
 - Extrair Cost Ledger + PR tracking
 - **DoD**: `loop-manager.js` < 500 linhas
 
 #### **Faixa C4** — Rebalanceamento `agent` ↔ `presentation`
+
 - Tirar policy operacional pesada de `presentation/agent/control/handlers.js`
 - Reforçar `presentation/` como projection/access layer e não pseudo-orquestrador
 - **DoD**: bordas consomem projeções; policy central volta ao owner correto
 
 #### **Faixa D1.1** — Guardrails arquiteturais
+
 - Adicionar regras para barrar root barrel largo, imports proibidos e drift de fluxo
 - **DoD**: regressão de superfície e regressão de fluxo detectadas cedo
 
@@ -223,6 +241,7 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 ## 6. Próximos Passos Recomendados
 
 ### Curto Prazo (Este turno)
+
 - [x] Atualizar auditoria principal com arquitetura/fluxo ampliados
 - [x] Atualizar pré-auditoria factual
 - [x] Atualizar status consolidado
@@ -230,6 +249,7 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 - [ ] Iniciar desenho da unificação C0 (surface + fluxo)
 
 ### Médio Prazo (Próximos turnos)
+
 - [ ] Faixa C0: owner único de policy de interação
 - [ ] Faixa C0.4: limpeza do root do `agent/`
 - [ ] Faixa C3.2: continuação da decomposição do `AlwaysAliveAgent`
@@ -237,6 +257,7 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 - [ ] Faixa C4/D1: rebalanceamento `agent`↔`presentation` + guardrails
 
 ### Longo Prazo
+
 - [ ] Feature flags para padrões legados/deprecados
 - [ ] Documentação de migração para consumidores
 - [ ] Certificação de estabilidade em produção
@@ -258,24 +279,29 @@ Conclusão: existem capacidades legítimas diferentes, porém ainda não há **u
 
 ## 8. Conclusão
 
-A sessão executou investigação profunda da arquitetura e aplicou **transformações críticas P0/P1** que estabilizam o runtime do agente. As correções foram validadas com sucesso através de:
+A sessão executou investigação profunda da arquitetura e aplicou **transformações críticas P0/P1**
+que estabilizam o runtime do agente. As correções foram validadas com sucesso através de:
 
 - ✅ Typecheck strict em verde
 - ✅ 2614 testes unitários passando
 - ✅ Sem regressões detectadas
 - ✅ Boot 2.1 confirmado operacional
 
-O módulo `agent` está em ponto de maturidade elevado, mas a investigação ampliada mostrou que o próximo problema dominante já mudou de natureza: agora a dívida principal é **unificação arquitetural e unificação de fluxo**.
+O módulo `agent` está em ponto de maturidade elevado, mas a investigação ampliada mostrou que o
+próximo problema dominante já mudou de natureza: agora a dívida principal é **unificação
+arquitetural e unificação de fluxo**.
 
-**Status**: 🟡 **estável nas correções críticas, porém ainda não pronto para considerar a consolidação arquitetural encerrada**
+**Status**: 🟡 **estável nas correções críticas, porém ainda não pronto para considerar a
+consolidação arquitetural encerrada**
 
 ### Atualização ONDA 2 — 2026-05-13
 
 - `crossFolderLeafNonIndex(agent)`: **0**.
 - `agent` agora tem guardrail próprio equivalente ao padrão de `terminal`/`presentation`:
   `tests/unit/copilot/contracts/test_agent_barrel_governance.spec.js`.
-- `#copilot/dialog`, `#copilot/bridges`, `#copilot/observability` e `#copilot/config/agent` foram ajustados como superfícies
-  públicas para remover deep imports/bypasses descobertos pelo strict e pelo contrato FI-7.
+- `#copilot/dialog`, `#copilot/bridges`, `#copilot/observability` e `#copilot/config/agent` foram
+  ajustados como superfícies públicas para remover deep imports/bypasses descobertos pelo strict e
+  pelo contrato FI-7.
 - Gates desta retomada:
   - `npm run typecheck:strict:src.copilot`: **verde**;
   - `npm run typecheck:strict:tests.unit`: **verde**;
@@ -290,8 +316,8 @@ entre `agent` e o restante de `src/copilot`:
 - migração de `channel/client-dialog.js`, `channel/client.js`,
   `conversation-hub/call-strategies.js`, `terminal/frontend/gateways/agent-runtime.js` e
   `runtime-wiring.js` para esse seam;
-- criação de `src/copilot/event-handlers/contracts.js` para retirar os handlers do acoplamento tipado
-  com `agent/session/wiring/event-wirer.js`.
+- criação de `src/copilot/event-handlers/contracts.js` para retirar os handlers do acoplamento
+  tipado com `agent/session/wiring/event-wirer.js`.
 
 Impacto:
 
@@ -310,7 +336,7 @@ Bug arquitetural encontrado e corrigido:
   reabria `presentation/agent/index.js` e puxava `presentation/state/ui-store` por side-effect;
 - o import foi estreitado para `presentation/routing/targeting.js`.
 
-
 ---
 
-**Próximo**: desenhar e executar a Faixa C0 — arquitetura única, fluxo único, root-clean e policy única de interação
+**Próximo**: desenhar e executar a Faixa C0 — arquitetura única, fluxo único, root-clean e policy
+única de interação

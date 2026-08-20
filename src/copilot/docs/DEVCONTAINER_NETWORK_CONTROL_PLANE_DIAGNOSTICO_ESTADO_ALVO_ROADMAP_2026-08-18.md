@@ -2,25 +2,39 @@
 
 ## Diagnóstico causal, estado atual, estado-alvo e roadmap — 2026-08-18
 
-> **Status:** documento canônico especializado para latência de interação ChatGPT ↔ MCP, Network Control Plane, DevContainer, Cloudflare Tunnel e superfícies OpenAI/ChatGPT.
+> **Status:** documento canônico especializado para latência de interação ChatGPT ↔ MCP, Network
+> Control Plane, DevContainer, Cloudflare Tunnel e superfícies OpenAI/ChatGPT.
 >
-> **Escopo:** `/workspaces/chatgpt-docker-puppeteer`, com foco em `.devcontainer/**`, `src/copilot/**`, MCP HTTP/OAuth/stateful runtime, Cloudflare Tunnel, rede do DevContainer e circuitos externos relevantes.
+> **Escopo:** `/workspaces/chatgpt-docker-puppeteer`, com foco em `.devcontainer/**`,
+> `src/copilot/**`, MCP HTTP/OAuth/stateful runtime, Cloudflare Tunnel, rede do DevContainer e
+> circuitos externos relevantes.
 >
 > **Branch observada:** `main`.
 >
 > **HEAD observado nesta revisão:** `b4c4feb53`.
 >
-> **Relação com o roadmap mestre:** este documento aprofunda a dimensão de conectividade/latência do projeto e deve permanecer coerente com `src/copilot/docs/WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md`.
+> **Relação com o roadmap mestre:** este documento aprofunda a dimensão de conectividade/latência do
+> projeto e deve permanecer coerente com
+> `src/copilot/docs/WORKSPACE_MCP_IO_LATENCIA_LIBERDADE_DIAGNOSTICO_ESTADO_ALVO_ROADMAP_2026-08-17.md`.
 >
-> **Mudança de tese desta revisão:** o objeto arquitetural não é mais apenas um *Network Control Plane*. As medições demonstraram que o principal problema percebido ocorre, na maior parte das janelas observadas, **fora da execução do MCP e fora do round-trip ordinário do Cloudflare Tunnel**. O estado-alvo passa a ser um **Interaction Latency Control Plane (ILCP)**, do qual o Network Control Plane (NCP) é um subsistema.
+> **Mudança de tese desta revisão:** o objeto arquitetural não é mais apenas um _Network Control
+> Plane_. As medições demonstraram que o principal problema percebido ocorre, na maior parte das
+> janelas observadas, **fora da execução do MCP e fora do round-trip ordinário do Cloudflare
+> Tunnel**. O estado-alvo passa a ser um **Interaction Latency Control Plane (ILCP)**, do qual o
+> Network Control Plane (NCP) é um subsistema.
 
 ---
 
 # 1. Síntese executiva
 
-A investigação de 18 de agosto de 2026 alterou materialmente a compreensão do problema de desempenho.
+A investigação de 18 de agosto de 2026 alterou materialmente a compreensão do problema de
+desempenho.
 
-O sintoma central relatado é uma demora muito grande **entre tools**: depois que uma tool termina e antes que a próxima tool seja efetivamente despachada ao MCP. A observação subjetiva de que o sistema pode ficar muito mais rápido em certos horários também foi corroborada por histórico persistido: o p50 de gaps reconstruídos varia de aproximadamente **5,5 s em janelas rápidas** para aproximadamente **14–15 s em janelas lentas**, sem mudança proporcional no custo local das tools.
+O sintoma central relatado é uma demora muito grande **entre tools**: depois que uma tool termina e
+antes que a próxima tool seja efetivamente despachada ao MCP. A observação subjetiva de que o
+sistema pode ficar muito mais rápido em certos horários também foi corroborada por histórico
+persistido: o p50 de gaps reconstruídos varia de aproximadamente **5,5 s em janelas rápidas** para
+aproximadamente **14–15 s em janelas lentas**, sem mudança proporcional no custo local das tools.
 
 A instrumentação nova permite decompor o circuito de forma muito mais rigorosa:
 
@@ -52,31 +66,31 @@ T4  handler da próxima tool
 
 Os resultados mais importantes da janela controlada mais recente foram:
 
-| dimensão | valor representativo | leitura causal |
-|---|---:|---|
-| `mcp_latency_pulse` handler | ~0–1 ms | workload da tool não explica a demora |
-| handler médio MCP na attribution | dezenas de ms | origin local saudável |
-| `preHandler` | ~4–8 ms | parsing/SDK/dispatch local não explicam segundos |
-| `postHandler` | ~4–19 ms | serialização/finalização local não explicam segundos |
-| gap externo p50 | ~5–10 s em séries controladas; ~9,8 s no histórico natural 24h | atraso dominante fora do origin |
-| gap externo p95 | frequentemente 8–30+ s conforme workload/janela | cauda muito alta fora do origin |
-| **gap silencioso p50** | **~5–8 s em janelas controladas recentes** | quase todo o tempo não contém trabalho discreto observável no MCP |
-| cobertura auxiliar | **~0,2–2%** | initialize/OAuth/etc. são secundários |
-| **tempo até o primeiro trabalho discreto p50** | **~6,87 s em amostra madura recente** | ~97% do gap ocorre antes do próximo `initialize` |
-| cauda após o trabalho discreto p50 | **~83 ms** | handshake/notifications→`tools/call` são rápidos |
-| primeiro RPC discreto | **`initialize`** | atraso dominante antecede a própria negociação da nova sessão |
-| pulse `thinking=medium` | **p50 5,59 s; média 5,47 s; n=7 estabilizados** | multi-segundo persiste em medium |
-| pulse `thinking=high` | **p50 6,43 s; média 5,93 s; n=7 estabilizados** | ~15% pior na mediana; sinal contributivo, não explicação suficiente |
-| `chatgpt.com` endpoint TTFB | **p50 83 ms; p95 121 ms** | rota DevContainer→endpoint muito menor que pre-dispatch silence |
-| `ws.chatgpt.com` endpoint TTFB | **p50 240 ms; p95 614 ms** | endpoint apresenta alguma variabilidade, ainda subsegundo na amostra |
-| `api.openai.com` endpoint TTFB | **p50 274 ms; p95 414 ms** | também muito abaixo do atraso de vários segundos |
-| public MCP self-loop p50 | ~0,16–0,30 s | caminho ordinário Cloudflare é dezenas de vezes menor |
-| razão gap/self-loop | ~30–60× em amostras recentes | tunnel/origin ordinário insuficiente para explicar o gap |
-| edge colo | quase sempre `GRU` | troca de colo não explica variação observada |
-| QUIC RTT | dezenas de ms | muito abaixo do atraso percebido |
-| HA cloudflared | 4 | tunnel operacional |
-| connector smoke | verde | OAuth/tools-list/SSE/health funcionais |
-| tools | 123 projetadas; default server 250 | contagem não é evidência da causa local |
+| dimensão                                       |                                           valor representativo | leitura causal                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------: | -------------------------------------------------------------------- |
+| `mcp_latency_pulse` handler                    |                                                        ~0–1 ms | workload da tool não explica a demora                                |
+| handler médio MCP na attribution               |                                                  dezenas de ms | origin local saudável                                                |
+| `preHandler`                                   |                                                        ~4–8 ms | parsing/SDK/dispatch local não explicam segundos                     |
+| `postHandler`                                  |                                                       ~4–19 ms | serialização/finalização local não explicam segundos                 |
+| gap externo p50                                | ~5–10 s em séries controladas; ~9,8 s no histórico natural 24h | atraso dominante fora do origin                                      |
+| gap externo p95                                |                frequentemente 8–30+ s conforme workload/janela | cauda muito alta fora do origin                                      |
+| **gap silencioso p50**                         |                     **~5–8 s em janelas controladas recentes** | quase todo o tempo não contém trabalho discreto observável no MCP    |
+| cobertura auxiliar                             |                                                    **~0,2–2%** | initialize/OAuth/etc. são secundários                                |
+| **tempo até o primeiro trabalho discreto p50** |                          **~6,87 s em amostra madura recente** | ~97% do gap ocorre antes do próximo `initialize`                     |
+| cauda após o trabalho discreto p50             |                                                     **~83 ms** | handshake/notifications→`tools/call` são rápidos                     |
+| primeiro RPC discreto                          |                                               **`initialize`** | atraso dominante antecede a própria negociação da nova sessão        |
+| pulse `thinking=medium`                        |                **p50 5,59 s; média 5,47 s; n=7 estabilizados** | multi-segundo persiste em medium                                     |
+| pulse `thinking=high`                          |                **p50 6,43 s; média 5,93 s; n=7 estabilizados** | ~15% pior na mediana; sinal contributivo, não explicação suficiente  |
+| `chatgpt.com` endpoint TTFB                    |                                      **p50 83 ms; p95 121 ms** | rota DevContainer→endpoint muito menor que pre-dispatch silence      |
+| `ws.chatgpt.com` endpoint TTFB                 |                                     **p50 240 ms; p95 614 ms** | endpoint apresenta alguma variabilidade, ainda subsegundo na amostra |
+| `api.openai.com` endpoint TTFB                 |                                     **p50 274 ms; p95 414 ms** | também muito abaixo do atraso de vários segundos                     |
+| public MCP self-loop p50                       |                                                   ~0,16–0,30 s | caminho ordinário Cloudflare é dezenas de vezes menor                |
+| razão gap/self-loop                            |                                   ~30–60× em amostras recentes | tunnel/origin ordinário insuficiente para explicar o gap             |
+| edge colo                                      |                                             quase sempre `GRU` | troca de colo não explica variação observada                         |
+| QUIC RTT                                       |                                                  dezenas de ms | muito abaixo do atraso percebido                                     |
+| HA cloudflared                                 |                                                              4 | tunnel operacional                                                   |
+| connector smoke                                |                                                          verde | OAuth/tools-list/SSE/health funcionais                               |
+| tools                                          |                             123 projetadas; default server 250 | contagem não é evidência da causa local                              |
 
 A classificação causal atual do `mcp_latency_attribution` permanece:
 
@@ -84,7 +98,10 @@ A classificação causal atual do `mcp_latency_attribution` permanece:
 likely-pre-mcp-or-upstream-chatgpt
 ```
 
-A confiança chega a **high** quando há amostra suficiente após o restart; imediatamente depois de um novo epoch ela pode cair temporariamente para `medium` até acumular ≥3 transições silenciosas. A classe causal, porém, tem permanecido estável porque handler/origin/tunnel continuam muito menores que o atraso pré-dispatch.
+A confiança chega a **high** quando há amostra suficiente após o restart; imediatamente depois de um
+novo epoch ela pode cair temporariamente para `medium` até acumular ≥3 transições silenciosas. A
+classe causal, porém, tem permanecido estável porque handler/origin/tunnel continuam muito menores
+que o atraso pré-dispatch.
 
 com razões observadas como:
 
@@ -98,7 +115,8 @@ com razões observadas como:
 
 A tese operacional passa a ser:
 
-> **O principal imposto temporal atualmente observado é um imposto por round-trip modelo/host → tool, não um imposto de execução da tool.**
+> **O principal imposto temporal atualmente observado é um imposto por round-trip modelo/host →
+> tool, não um imposto de execução da tool.**
 
 Isso não significa que “rede não importa”. Significa que a arquitetura deve distinguir:
 
@@ -110,7 +128,9 @@ Isso não significa que “rede não importa”. Significa que a arquitetura dev
 
 Consequência de engenharia:
 
-> Quando um novo round-trip custa tipicamente vários segundos de silêncio externo, uma tool que executa 5–20 operações seguras em lote pode produzir ganhos de ordem de grandeza maiores do que reduzir um handler local de 30 ms para 10 ms.
+> Quando um novo round-trip custa tipicamente vários segundos de silêncio externo, uma tool que
+> executa 5–20 operações seguras em lote pode produzir ganhos de ordem de grandeza maiores do que
+> reduzir um handler local de 30 ms para 10 ms.
 
 Logo, o roadmap agora tem duas grandes linhas simultâneas:
 
@@ -121,7 +141,9 @@ Logo, o roadmap agora tem duas grandes linhas simultâneas:
 
 # 2. O que mudou em relação à arquitetura anterior
 
-A versão anterior deste documento era correta ao tratar o DevContainer Network Control Plane como infraestrutura crítica, mas implicitamente dava peso excessivo à hipótese de que a lentidão percebida estivesse no caminho DNS/proxy/Cloudflare/MCP.
+A versão anterior deste documento era correta ao tratar o DevContainer Network Control Plane como
+infraestrutura crítica, mas implicitamente dava peso excessivo à hipótese de que a lentidão
+percebida estivesse no caminho DNS/proxy/Cloudflare/MCP.
 
 A nova instrumentação falsificou grande parte dessa hipótese.
 
@@ -163,7 +185,8 @@ Interaction Latency Control Plane (ILCP)
     └── client ↔ OpenAI WebSocket path
 ```
 
-O ILCP não tenta “observar o invisível”. Seu objetivo é reduzir progressivamente a região não observada por exclusão causal, produzindo uma fronteira explícita de autoridade.
+O ILCP não tenta “observar o invisível”. Seu objetivo é reduzir progressivamente a região não
+observada por exclusão causal, produzindo uma fronteira explícita de autoridade.
 
 ---
 
@@ -391,7 +414,8 @@ Série adicional:
 
 Conclusão:
 
-> A variação de vários segundos sobrevive quando a tool executada é praticamente constante e trivial.
+> A variação de vários segundos sobrevive quando a tool executada é praticamente constante e
+> trivial.
 
 Isso enfraquece fortemente as hipóteses de:
 
@@ -406,7 +430,8 @@ Isso enfraquece fortemente as hipóteses de:
 
 # 7. Histórico longitudinal e efeito horário
 
-O audit append-only já existente (`src/copilot/.ai/audit/mcp-tool-calls.jsonl`) permite reconstrução retroativa de gaps.
+O audit append-only já existente (`src/copilot/.ai/audit/mcp-tool-calls.jsonl`) permite reconstrução
+retroativa de gaps.
 
 A análise bounded:
 
@@ -443,7 +468,7 @@ O `mcp_latency_pulse` é, daqui em diante, o controle para remover esse confound
 
 # 8. Hipótese de degradação por conversa/sessão longa
 
-Foi criada uma heurística limitada de *active work cluster*:
+Foi criada uma heurística limitada de _active work cluster_:
 
 - um cluster termina após >30 min sem tool burst;
 - gaps são classificados por idade do cluster:
@@ -455,19 +480,20 @@ Foi criada uma heurística limitada de *active work cluster*:
 
 Resultado representativo:
 
-| idade heurística | p50 |
-|---|---:|
-| 0–30m | ~9,9 s |
-| 30–60m | ~12,7 s |
-| 1–2h | ~13,5 s |
-| 2–4h | ~11,5 s |
-| 4h+ | ~8,7 s |
+| idade heurística |     p50 |
+| ---------------- | ------: |
+| 0–30m            |  ~9,9 s |
+| 30–60m           | ~12,7 s |
+| 1–2h             | ~13,5 s |
+| 2–4h             | ~11,5 s |
+| 4h+              |  ~8,7 s |
 
 `late/early ≈ 0,93`.
 
 Conclusão:
 
-> O audit MCP **não sustenta uma degradação monotônica simples em função da duração contínua de trabalho**.
+> O audit MCP **não sustenta uma degradação monotônica simples em função da duração contínua de
+> trabalho**.
 
 Isso **não** falsifica a hipótese de contexto de conversa longa, porque o workspace não observa:
 
@@ -478,7 +504,9 @@ Isso **não** falsifica a hipótese de contexto de conversa longa, porque o work
 - cache de contexto do modelo;
 - tempo de inferência/model scheduling.
 
-A OpenAI atualmente recomenda, para ChatGPT lento ou preso, testar **novo chat** quando a conversa é longa, além de rede/browser/VPN. Essa recomendação torna o A/B “conversa nova vs conversa longa” um experimento legítimo do lado cliente.
+A OpenAI atualmente recomenda, para ChatGPT lento ou preso, testar **novo chat** quando a conversa é
+longa, além de rede/browser/VPN. Essa recomendação torna o A/B “conversa nova vs conversa longa” um
+experimento legítimo do lado cliente.
 
 ---
 
@@ -552,7 +580,8 @@ Conclusão:
 
 ## 9.4 Por que isso não explica a latência principal
 
-O initialize/notifications/SSE observado consome normalmente da ordem de **centenas de milissegundos**, enquanto o `silentExternalGap` consome vários segundos.
+O initialize/notifications/SSE observado consome normalmente da ordem de **centenas de
+milissegundos**, enquanto o `silentExternalGap` consome vários segundos.
 
 Logo:
 
@@ -565,7 +594,8 @@ Logo:
 
 Não reduzir TTL cegamente.
 
-O runtime faz sweep de expirados em novos initializes, portanto não existe leak ilimitado; existe uma janela deslizante definida pelo TTL.
+O runtime faz sweep de expirados em novos initializes, portanto não existe leak ilimitado; existe
+uma janela deslizante definida pelo TTL.
 
 O ILCP agora projeta:
 
@@ -586,7 +616,8 @@ projectedCapacityRatio   ≈ 0,40
 projectionStatus         = headroom-ok
 ```
 
-Logo, **não existe evidência atual para baixar TTL ou elevar `maxSessions` como remediação**. O churn deve continuar monitorado, mas o headroom projetado é suficiente na taxa observada.
+Logo, **não existe evidência atual para baixar TTL ou elevar `maxSessions` como remediação**. O
+churn deve continuar monitorado, mas o headroom projetado é suficiente na taxa observada.
 
 Essas projeções devem ser usadas antes de decidir:
 
@@ -617,7 +648,8 @@ Estado observado:
 - sem evidência de resolução quebrada para o circuito MCP;
 - proxy global off.
 
-O NCP agregado ainda pode aparecer degradado quando artifacts antigos de GitHub/Copilot são stale. Isso deve ser corrigido semanticamente: artifact stale não pode governar runtime atual.
+O NCP agregado ainda pode aparecer degradado quando artifacts antigos de GitHub/Copilot são stale.
+Isso deve ser corrigido semanticamente: artifact stale não pode governar runtime atual.
 
 ## 10.2 Cloudflare Tunnel
 
@@ -673,7 +705,8 @@ Isso enfraquece:
 
 ## 10.5 Cloudflare rules
 
-Auditorias confirmaram regra específica do hostname MCP que desliga ou neutraliza features inadequadas para uma API dinâmica:
+Auditorias confirmaram regra específica do hostname MCP que desliga ou neutraliza features
+inadequadas para uma API dinâmica:
 
 - Browser Integrity Check;
 - Rocket Loader;
@@ -681,19 +714,21 @@ Auditorias confirmaram regra específica do hostname MCP que desliga ou neutrali
 - buffering de response;
 - cache em paths dinâmicos.
 
-WAF/rulesets atuais não exibiram bloqueio/challenge capaz de explicar o padrão de silêncio observado.
+WAF/rulesets atuais não exibiram bloqueio/challenge capaz de explicar o padrão de silêncio
+observado.
 
 ## 10.6 Benchmark controlado QUIC ↔ AUTO ↔ HTTP/2
 
-O runner fixo executou cinco smokes canônicos idênticos por perfil e restaurou automaticamente o controle QUIC.
+O runner fixo executou cinco smokes canônicos idênticos por perfil e restaurou automaticamente o
+controle QUIC.
 
 Resultados:
 
-| perfil | p50 smoke | p95 smoke | HA | smokes |
-|---|---:|---:|---:|---|
-| QUIC | 7765 ms | 8042 ms | 4 | 5/5 verdes |
-| AUTO | 7860 ms | 7949 ms | 4 | 5/5 verdes |
-| HTTP/2 | 7591 ms | 8016 ms | 4 | 5/5 verdes |
+| perfil | p50 smoke | p95 smoke |  HA | smokes     |
+| ------ | --------: | --------: | --: | ---------- |
+| QUIC   |   7765 ms |   8042 ms |   4 | 5/5 verdes |
+| AUTO   |   7860 ms |   7949 ms |   4 | 5/5 verdes |
+| HTTP/2 |   7591 ms |   8016 ms |   4 | 5/5 verdes |
 
 Diferença p95 em relação ao controle QUIC:
 
@@ -702,19 +737,25 @@ AUTO   ≈ -1,16%
 HTTP/2 ≈ -0,32%
 ```
 
-Todos os perfis foram comparáveis e passaram os hard gates. Os deltas brutos de `cloudflared requestErrors` permaneceram `review-required`, não veto, porque smokes, response codes e HA ficaram saudáveis.
+Todos os perfis foram comparáveis e passaram os hard gates. Os deltas brutos de
+`cloudflared requestErrors` permaneceram `review-required`, não veto, porque smokes, response codes
+e HA ficaram saudáveis.
 
 Conclusão:
 
-> **QUIC vs TCP/HTTP2 não produz diferença de ordem de grandeza compatível com os gaps silenciosos de múltiplos segundos.**
+> **QUIC vs TCP/HTTP2 não produz diferença de ordem de grandeza compatível com os gaps silenciosos
+> de múltiplos segundos.**
 
-Isso enfraquece fortemente hipóteses de UDP/QUIC/MTU como causa central do fenômeno atual. QUIC permanece o controle porque está saudável; HTTP/2 permanece rollback/baseline TCP, não “correção de latência”.
+Isso enfraquece fortemente hipóteses de UDP/QUIC/MTU como causa central do fenômeno atual. QUIC
+permanece o controle porque está saudável; HTTP/2 permanece rollback/baseline TCP, não “correção de
+latência”.
 
 ## 10.7 GraphQL analytics
 
 Foi criada uma capability read-only para consultar Cloudflare HTTP Analytics.
 
-O plano/token atual não expõe os timing fields desejados (`EdgeTimeToFirstByteMs` etc.) na superfície consultada.
+O plano/token atual não expõe os timing fields desejados (`EdgeTimeToFirstByteMs` etc.) na
+superfície consultada.
 
 Isso deve ser tratado como:
 
@@ -734,7 +775,8 @@ Melhoria futura opcional: introspecção de schema e escolha dinâmica de campos
 
 # 11. OpenAI/ChatGPT: fatos de rede que importam
 
-A documentação atual da OpenAI explicita que ChatGPT utiliza WebSocket seguro além de HTTPS em algumas superfícies.
+A documentação atual da OpenAI explicita que ChatGPT utiliza WebSocket seguro além de HTTPS em
+algumas superfícies.
 
 Destinos documentados incluem:
 
@@ -759,7 +801,8 @@ A OpenAI recomenda verificar:
 - conversa nova quando a conversa longa apresenta lentidão;
 - HAR/console com timestamps em casos persistentes.
 
-Esses fatos geram experimentos legítimos do lado cliente, mas não devem ser confundidos com telemetria do origin MCP.
+Esses fatos geram experimentos legítimos do lado cliente, mas não devem ser confundidos com
+telemetria do origin MCP.
 
 ## 11.1 Três relógios que não podem mais ser confundidos
 
@@ -807,13 +850,15 @@ Esse TTFB é um **canary de caminho/rede/edge**, não inferência de modelo e n�
 
 Primeiro baseline live no modo thinking high:
 
-| target | DNS p50 | TCP p50 | TLS p50 | TTFB p50 | TTFB p95 | edge |
-|---|---:|---:|---:|---:|---:|---|
-| `chatgpt.com` | 5 ms | 25 ms | 28 ms | **83 ms** | 121 ms | GRU |
-| `ws.chatgpt.com` | 4 ms | 24 ms | 25 ms | **240 ms** | 614 ms | GRU |
-| `api.openai.com` | 3 ms | 29 ms | 27 ms | **274 ms** | 414 ms | GRU |
+| target           | DNS p50 | TCP p50 | TLS p50 |   TTFB p50 | TTFB p95 | edge |
+| ---------------- | ------: | ------: | ------: | ---------: | -------: | ---- |
+| `chatgpt.com`    |    5 ms |   25 ms |   28 ms |  **83 ms** |   121 ms | GRU  |
+| `ws.chatgpt.com` |    4 ms |   24 ms |   25 ms | **240 ms** |   614 ms | GRU  |
+| `api.openai.com` |    3 ms |   29 ms |   27 ms | **274 ms** |   414 ms | GRU  |
 
-Os status HTTP `403/404/401` observados são semanticamente aceitáveis como prova de reachability não autenticada dos endpoints correspondentes; o observador mede o caminho até a primeira resposta, não sucesso de produto/autorização.
+Os status HTTP `403/404/401` observados são semanticamente aceitáveis como prova de reachability não
+autenticada dos endpoints correspondentes; o observador mede o caminho até a primeira resposta, não
+sucesso de produto/autorização.
 
 ### C. MCP pre-dispatch / pre-session delay
 
@@ -833,9 +878,11 @@ tail após trabalho discreto p50     ≈ 83 ms
 
 Logo:
 
-> **o atraso dominante medido no tool loop surge antes até mesmo de o próximo `initialize` alcançar o MCP.**
+> **o atraso dominante medido no tool loop surge antes até mesmo de o próximo `initialize` alcançar
+> o MCP.**
 
-Essa métrica não é TTFT, mas é hoje o melhor relógio server-side para localizar o imposto entre tools.
+Essa métrica não é TTFT, mas é hoje o melhor relógio server-side para localizar o imposto entre
+tools.
 
 ## 11.2 Persistência e baseline dos endpoints OpenAI
 
@@ -854,7 +901,8 @@ Propriedades:
 - até 1000 snapshots por default;
 - tail de leitura bounded;
 - baseline de 24h;
-- regressão TTFB somente quando simultaneamente `>=2x` e `>=150 ms` sobre baseline, evitando alarmes por ruído pequeno.
+- regressão TTFB somente quando simultaneamente `>=2x` e `>=150 ms` sobre baseline, evitando alarmes
+  por ruído pequeno.
 
 ## 11.3 Evidência TTFT de cliente
 
@@ -873,7 +921,8 @@ Amostras podem carregar somente:
 - `thinkingMode`;
 - labels sanitizados de modelo/rede/conversa/client/VPN/série.
 
-O resumo produz p25/p50/p95 e comparação high↔medium, mas só marca a comparação como direcionalmente suficiente quando há pelo menos cinco amostras em cada grupo.
+O resumo produz p25/p50/p95 e comparação high↔medium, mas só marca a comparação como direcionalmente
+suficiente quando há pelo menos cinco amostras em cada grupo.
 
 ## 11.4 API streaming TTFT
 
@@ -947,7 +996,8 @@ Legenda:
 
 - **status:** ENFRAQUECIDA.
 - **evidência:** runtime local e pulse não dependem da listagem total durante cada call.
-- **ressalva:** o host/model pode pagar custo interno de tool selection sobre o schema; isso é NÃO OBSERVÁVEL do workspace.
+- **ressalva:** o host/model pode pagar custo interno de tool selection sobre o schema; isso é NÃO
+  OBSERVÁVEL do workspace.
 - **ação:** manter default 250 como headroom; não usar redução de tools como “cura” sem A/B.
 
 ### HYP-008 — tamanho do payload de `tools/list` domina cada call
@@ -973,7 +1023,8 @@ Legenda:
 ### HYP-011 — `tools/list` é repetido entre cada tool
 
 - **status:** FORTEMENTE ENFRAQUECIDA.
-- **evidência:** pulse chain registrou `initialize` e `notifications/initialized`, não `tools/list` por call.
+- **evidência:** pulse chain registrou `initialize` e `notifications/initialized`, não `tools/list`
+  por call.
 
 ### HYP-012 — OAuth refresh domina
 
@@ -1019,8 +1070,11 @@ Legenda:
 ### HYP-019 — UDP/QUIC/MTU causa stalls
 
 - **status:** FORTEMENTE ENFRAQUECIDA como causa central.
-- **evidência:** packet-too-big drops não aparecem; tunnel permanece 4 HA; benchmark com 5 smokes por perfil produziu p95 8042 ms (QUIC), 7949 ms (AUTO) e 8016 ms (HTTP/2), diferenças de ~1% ou menos.
-- **conclusão:** a troca de protocolo não altera a ordem de grandeza do workload e não explica silent gaps de 6–17 s.
+- **evidência:** packet-too-big drops não aparecem; tunnel permanece 4 HA; benchmark com 5 smokes
+  por perfil produziu p95 8042 ms (QUIC), 7949 ms (AUTO) e 8016 ms (HTTP/2), diferenças de ~1% ou
+  menos.
+- **conclusão:** a troca de protocolo não altera a ordem de grandeza do workload e não explica
+  silent gaps de 6–17 s.
 - **ação:** manter QUIC enquanto saudável e H2 como rollback/baseline.
 
 ### HYP-020 — troca de edge colo causa variação
@@ -1067,7 +1121,8 @@ Legenda:
 
 ### HYP-028 — WSL/Docker queda parcial causa o sintoma
 
-- **status:** PLAUSÍVEL para “aguardando conexão” abrupto, não para gap persistente com health verde.
+- **status:** PLAUSÍVEL para “aguardando conexão” abrupto, não para gap persistente com health
+  verde.
 - **assinatura:** origin/tunnel indisponível, recovery epoch, smoke falhando.
 
 ## 12.6 ChatGPT/OpenAI host/model plane
@@ -1076,42 +1131,56 @@ Legenda:
 
 - **status:** PLAUSÍVEL, PRIORIDADE MÁXIMA ENTRE AS CAUSAS NÃO OBSERVÁVEIS.
 - **autoridade:** NÃO OBSERVÁVEL diretamente.
-- **evidência de localização:** em amostra recente, `externalGap p50≈7,08 s`, `first discrete auxiliary delay p50≈6,87 s`, razão ≈97%; o primeiro RPC discreto foi `initialize` e a cauda posterior ficou ≈83 ms p50.
-- **interpretação:** o atraso acontece majoritariamente **antes de o host iniciar a próxima negociação MCP**, portanto reasoning/scheduling/planning ganham peso relativo.
+- **evidência de localização:** em amostra recente, `externalGap p50≈7,08 s`,
+  `first discrete auxiliary delay p50≈6,87 s`, razão ≈97%; o primeiro RPC discreto foi `initialize`
+  e a cauda posterior ficou ≈83 ms p50.
+- **interpretação:** o atraso acontece majoritariamente **antes de o host iniciar a próxima
+  negociação MCP**, portanto reasoning/scheduling/planning ganham peso relativo.
 - **mitigação:** menos round-trips; modelo/configuração A/B quando possível.
 
 ### HYP-030 — scheduler/queue da OpenAI varia por carga
 
 - **status:** PLAUSÍVEL, PRIORIDADE MÁXIMA ENTRE AS CAUSAS NÃO OBSERVÁVEIS.
-- **evidência indireta:** forte variação horária + pulses triviais que continuam variando vários segundos antes do primeiro `initialize`.
-- **experimento:** pulses recorrentes por horário/modelo, com labels experimentais persistidos no audit.
+- **evidência indireta:** forte variação horária + pulses triviais que continuam variando vários
+  segundos antes do primeiro `initialize`.
+- **experimento:** pulses recorrentes por horário/modelo, com labels experimentais persistidos no
+  audit.
 
 ### HYP-031 — tool planner/policy evaluation do host é caro
 
 - **status:** PLAUSÍVEL, ALTA PRIORIDADE.
-- **evidência de localização:** ~94–97% do gap recente precede o primeiro `initialize`, compatível com deliberação/tool-selection anterior à abertura da sessão MCP.
-- **experimento:** A/B com superfície reduzida vs completa, sem assumir causalidade antes da medição.
-- **nota:** isso é diferente de dizer que “250 tools são o problema”; count/schema só podem ser promovidos causalmente por A/B controlado.
+- **evidência de localização:** ~94–97% do gap recente precede o primeiro `initialize`, compatível
+  com deliberação/tool-selection anterior à abertura da sessão MCP.
+- **experimento:** A/B com superfície reduzida vs completa, sem assumir causalidade antes da
+  medição.
+- **nota:** isso é diferente de dizer que “250 tools são o problema”; count/schema só podem ser
+  promovidos causalmente por A/B controlado.
 
 ### HYP-032 — schema complexity pesa mais que contagem
 
 - **status:** PLAUSÍVEL.
-- **experimento:** mesma quantidade de tools com descriptors compactos vs ricos, se houver harness isolado.
+- **experimento:** mesma quantidade de tools com descriptors compactos vs ricos, se houver harness
+  isolado.
 
 ### HYP-033 — contexto de conversa longa aumenta reasoning/selection
 
 - **status:** PLAUSÍVEL.
-- **evidência:** OpenAI recomenda novo chat em cenários de lentidão; heurística MCP não mede tokens reais.
+- **evidência:** OpenAI recomenda novo chat em cenários de lentidão; heurística MCP não mede tokens
+  reais.
 - **experimento:** pulse em conversa nova vs conversa longa, mesmo modelo/horário/rede.
 
 ### HYP-034 — modelo/configuração de thinking possui maior inter-tool latency
 
 - **status:** PLAUSÍVEL, com primeiro sinal quantitativo.
-- **experimento executado:** `thinking-medium-20260818` vs `thinking-high-20260818`, pulse trivial, n=7 estabilizados por condição.
+- **experimento executado:** `thinking-medium-20260818` vs `thinking-high-20260818`, pulse trivial,
+  n=7 estabilizados por condição.
 - **medium:** média ≈5,47 s; p50≈5,59 s; p95≈7,33 s.
 - **high:** média ≈5,93 s; p50≈6,43 s; p95≈7,17 s.
-- **leitura:** high foi ≈15% pior na mediana e ≈8% pior na média, mas o p95 foi praticamente igual e a amostra é pequena. Portanto thinking high pode contribuir, porém **não é suficiente para explicar o piso multissegundo**, que persiste nos dois modos.
-- **próximo experimento:** séries intercaladas ABAB, maior n, mesma janela/rede/conversa, descartando explicitamente o primeiro pulse de warmup após troca de modo.
+- **leitura:** high foi ≈15% pior na mediana e ≈8% pior na média, mas o p95 foi praticamente igual e
+  a amostra é pequena. Portanto thinking high pode contribuir, porém **não é suficiente para
+  explicar o piso multissegundo**, que persiste nos dois modos.
+- **próximo experimento:** séries intercaladas ABAB, maior n, mesma janela/rede/conversa,
+  descartando explicitamente o primeiro pulse de warmup após troca de modo.
 
 ### HYP-035 — tier/account/load balancing altera scheduling
 
@@ -1127,7 +1196,8 @@ Legenda:
 
 ### HYP-037 — WebSocket cliente está instável
 
-- **status:** PLAUSÍVEL para spinner/stall/turn-level; menos convincente para silêncio server→MCP dentro de um turno.
+- **status:** PLAUSÍVEL para spinner/stall/turn-level; menos convincente para silêncio server→MCP
+  dentro de um turno.
 - **fonte:** OpenAI documenta `ws.chatgpt.com` e problemas de proxies/TLS inspection.
 - **experimento:** HAR/console + hotspot.
 
@@ -1156,8 +1226,10 @@ Legenda:
 ### HYP-042 — trocar IP público do origin melhora muito
 
 - **status:** ENFRAQUECIDA como ação primária.
-- **razão:** self-loop atual já é subsegundo; origin IP não é o endpoint público do usuário, pois o tunnel é outbound.
-- **experimento permitido:** reconectar WAN/ISP somente em janela A/B, medir self-loop/HA/colo/pulse.
+- **razão:** self-loop atual já é subsegundo; origin IP não é o endpoint público do usuário, pois o
+  tunnel é outbound.
+- **experimento permitido:** reconectar WAN/ISP somente em janela A/B, medir
+  self-loop/HA/colo/pulse.
 
 ### HYP-043 — trocar IP/rede do cliente melhora ChatGPT
 
@@ -1200,40 +1272,48 @@ Legenda:
 ### HYP-050 — pressão de memória/WSL provoca jitter indireto
 
 - **status:** PLAUSÍVEL para tools locais pesadas; ENFRAQUECIDA para pulse com origin quiet.
-- **experimento:** correlacionar host/WSL health com gaps; distinguir crash/recovery de silêncio upstream.
+- **experimento:** correlacionar host/WSL health com gaps; distinguir crash/recovery de silêncio
+  upstream.
 
 ## 12.10 TTFT / endpoint path / warmup
 
 ### HYP-051 — a rota DevContainer → `chatgpt.com` é a causa do gap de 5–10 s
 
 - **status:** FORTEMENTE ENFRAQUECIDA na amostra atual.
-- **evidência:** `chatgpt.com` TTFB p50≈83 ms, enquanto pre-session silence chega a vários segundos; `ws.chatgpt.com`≈240 ms e `api.openai.com`≈274 ms também ficaram subsegundo.
+- **evidência:** `chatgpt.com` TTFB p50≈83 ms, enquanto pre-session silence chega a vários segundos;
+  `ws.chatgpt.com`≈240 ms e `api.openai.com`≈274 ms também ficaram subsegundo.
 - **limite:** isso não mede o caminho de rede do cliente ChatGPT nem o tráfego interno da OpenAI.
 
 ### HYP-052 — degradação de endpoint TTFB acompanha janelas lentas
 
 - **status:** A TESTAR LONGITUDINALMENTE.
-- **instrumentação:** histórico `openai-endpoint-latency.jsonl`, baseline 24h e regressão `>=2x && >=150ms`.
+- **instrumentação:** histórico `openai-endpoint-latency.jsonl`, baseline 24h e regressão
+  `>=2x && >=150ms`.
 - **assinatura:** TTFB/TLS sobe ao mesmo tempo que pulse/pre-dispatch.
-- **mitigação se confirmada:** A/B rede/IP/ISP/IPv4-vs-IPv6 e investigação de edge/peering antes de qualquer tuning do MCP.
+- **mitigação se confirmada:** A/B rede/IP/ISP/IPv4-vs-IPv6 e investigação de edge/peering antes de
+  qualquer tuning do MCP.
 
 ### HYP-053 — TTFT da UI sobe enquanto endpoint TTFB fica normal
 
 - **status:** PLAUSÍVEL e altamente discriminante.
-- **interpretação:** favorece client/app/model scheduling/context/tool planning sobre caminho básico DevContainer→endpoint.
+- **interpretação:** favorece client/app/model scheduling/context/tool planning sobre caminho básico
+  DevContainer→endpoint.
 - **instrumentação:** `mcp_client_latency_evidence` + endpoint observer + pulse rotulado.
 
 ### HYP-054 — primeiro call após restart/reconnect/troca de thinking sofre warmup/transição
 
 - **status:** CONFIRMADA-SECUNDÁRIA como padrão experimental.
-- **evidência:** primeiro pulse após mudança para high apresentou ~52,5 s e foi excluído do baseline estabilizado; transições pós-reload também produzem outliers.
+- **evidência:** primeiro pulse após mudança para high apresentou ~52,5 s e foi excluído do baseline
+  estabilizado; transições pós-reload também produzem outliers.
 - **regra:** sempre separar `warmup sample` da distribuição estacionária.
 
 ### HYP-055 — rota/IP do cliente e rota do DevContainer divergem materialmente
 
 - **status:** PLAUSÍVEL.
-- **razão:** o endpoint observer prova apenas `DevContainer→OpenAI`; o cliente ChatGPT pode usar outro ISP/ASN, DNS, proxy, VPN, TLS inspection e WebSocket path.
-- **experimento:** combinar TTFT de cliente + networkLabel + hotspot/VPN A/B com endpoint TTFB simultâneo.
+- **razão:** o endpoint observer prova apenas `DevContainer→OpenAI`; o cliente ChatGPT pode usar
+  outro ISP/ASN, DNS, proxy, VPN, TLS inspection e WebSocket path.
+- **experimento:** combinar TTFT de cliente + networkLabel + hotspot/VPN A/B com endpoint TTFB
+  simultâneo.
 
 ---
 
@@ -1277,7 +1357,8 @@ Pode influenciar:
 - NAT/idle timeout;
 - geolocalização/região de serviço.
 
-A OpenAI recomenda explicitamente comparar Wi-Fi com hotspot celular para determinar se o problema é de rede.
+A OpenAI recomenda explicitamente comparar Wi-Fi com hotspot celular para determinar se o problema é
+de rede.
 
 Este A/B é prioritário porque mede uma região hoje `not-observable-from-workspace`.
 
@@ -1375,7 +1456,8 @@ silent p95 warn = 8000 ms
 min external samples = 3
 ```
 
-Esses valores são thresholds operacionais iniciais, não “leis naturais”. Devem ser calibrados com baseline controlado por modelo/horário.
+Esses valores são thresholds operacionais iniciais, não “leis naturais”. Devem ser calibrados com
+baseline controlado por modelo/horário.
 
 ---
 
@@ -1391,7 +1473,8 @@ Quando:
 silent p50 ≈ 8 s
 ```
 
-uma sequência de cinco chamadas independentes pode pagar ~40 s de imposto externo mesmo se os handlers somados levarem <100 ms.
+uma sequência de cinco chamadas independentes pode pagar ~40 s de imposto externo mesmo se os
+handlers somados levarem <100 ms.
 
 Portanto:
 
@@ -1415,20 +1498,21 @@ A regra é:
 
 O audit de 24 h agora agrega pares sequenciais por `totalGapMs`. A janela mais recente mostrou:
 
-| transição | ocorrências | gap acumulado | p50 |
-|---|---:|---:|---:|
-| `repo_read_file → repo_apply_patch_batch` | 110 | ~2247 s | ~19,36 s |
-| `repo_apply_patch → repo_apply_patch` | 136 | ~1694 s | ~11,86 s |
-| `repo_read_file → repo_apply_patch` | 96 | ~1562 s | ~13,65 s |
-| `repo_apply_patch_batch → repo_apply_patch_batch` | 69 | ~1501 s | ~21,09 s |
-| `repo_read_file → repo_search_text` | 91 | ~1210 s | ~10,53 s |
-| `repo_search_text → repo_read_file` | 149 | ~1133 s | ~6,64 s |
-| `repo_read_file → repo_read_file` | 106 | ~954 s | ~7,03 s |
-| `repo_apply_patch → run_copilot_validator` | 77 | ~874 s | ~10,08 s |
-| `repo_apply_patch_batch → run_copilot_validator` | 68 | ~826 s | ~11,41 s |
-| `repo_file_stats → repo_apply_patch` | 25 | ~523 s | ~20,12 s |
+| transição                                         | ocorrências | gap acumulado |      p50 |
+| ------------------------------------------------- | ----------: | ------------: | -------: |
+| `repo_read_file → repo_apply_patch_batch`         |         110 |       ~2247 s | ~19,36 s |
+| `repo_apply_patch → repo_apply_patch`             |         136 |       ~1694 s | ~11,86 s |
+| `repo_read_file → repo_apply_patch`               |          96 |       ~1562 s | ~13,65 s |
+| `repo_apply_patch_batch → repo_apply_patch_batch` |          69 |       ~1501 s | ~21,09 s |
+| `repo_read_file → repo_search_text`               |          91 |       ~1210 s | ~10,53 s |
+| `repo_search_text → repo_read_file`               |         149 |       ~1133 s |  ~6,64 s |
+| `repo_read_file → repo_read_file`                 |         106 |        ~954 s |  ~7,03 s |
+| `repo_apply_patch → run_copilot_validator`        |          77 |        ~874 s | ~10,08 s |
+| `repo_apply_patch_batch → run_copilot_validator`  |          68 |        ~826 s | ~11,41 s |
+| `repo_file_stats → repo_apply_patch`              |          25 |        ~523 s | ~20,12 s |
 
-Isso prova que o ganho local de maior ROI está em **reduzir ciclos inspeção→nova inspeção e fragmentação patch→patch**, não apenas tornar cada handler mais rápido.
+Isso prova que o ganho local de maior ROI está em **reduzir ciclos inspeção→nova inspeção e
+fragmentação patch→patch**, não apenas tornar cada handler mais rápido.
 
 ### 15.1.2 Transformações de I/O já aplicadas a partir desse ranking
 
@@ -1442,7 +1526,8 @@ hard result budget       1.5 MiB → 3 MiB
 search context max       10 → 48 linhas
 ```
 
-Além disso, `repo_search_text` dirigido a **um único arquivo ≤5 MiB** passa a retornar metadata patch-ready:
+Além disso, `repo_search_text` dirigido a **um único arquivo ≤5 MiB** passa a retornar metadata
+patch-ready:
 
 ```text
 searchTargetMetadata.type
@@ -1462,7 +1547,9 @@ patch batch targets      32 → 64
 patch batch input max    1.5 MiB → 3 MiB
 ```
 
-Esses limites continuam bounded. A mudança **não** assume que payload maior é mais rápido; ela aceita um pouco mais de trabalho local quando isso evita devolver o controle ao host/modelo e pagar outro silent gap de vários segundos.
+Esses limites continuam bounded. A mudança **não** assume que payload maior é mais rápido; ela
+aceita um pouco mais de trabalho local quando isso evita devolver o controle ao host/modelo e pagar
+outro silent gap de vários segundos.
 
 ## 15.2 Nível 2 — reduzir output desnecessário
 
@@ -1597,7 +1684,8 @@ Se houver evidência para proxy genérico:
 - política explícita por host/provider;
 - compatibility aliases somente quando necessários.
 
-OpenAI não deve receber `/etc/hosts` pinning ou proxy routing específico sem evidência oficial/provider-specific.
+OpenAI não deve receber `/etc/hosts` pinning ou proxy routing específico sem evidência
+oficial/provider-specific.
 
 ---
 
@@ -1631,7 +1719,8 @@ Adicionar/fortalecer:
 
 # 20. Bugs atuais e dívida — B-001 a B-044
 
-Os bugs B-001..B-025 históricos continuam válidos quando ainda não corrigidos. Os mais importantes eram:
+Os bugs B-001..B-025 históricos continuam válidos quando ainda não corrigidos. Os mais importantes
+eram:
 
 - registry consumido antes de validação completa;
 - defaults DNS divergentes;
@@ -1690,7 +1779,9 @@ Nova dívida desta investigação:
 
 ### B-036 — NCP stale GitHub artifacts podem degradar aggregate health
 
-- **estado:** `[x]` o refresh atual publica `status=advisory`, `warnings=[]`, `critical=[]` e marca artifact antigo como `stale-summary-not-authoritative`; evidência histórica permanece visível sem governar runtime atual.
+- **estado:** `[x]` o refresh atual publica `status=advisory`, `warnings=[]`, `critical=[]` e marca
+  artifact antigo como `stale-summary-not-authoritative`; evidência histórica permanece visível sem
+  governar runtime atual.
 
 ### B-037 — batching value não considerava external round-trip tax
 
@@ -1706,31 +1797,43 @@ Nova dívida desta investigação:
 
 ### B-040 — falta correlation ID end-to-end fornecido pelo host
 
-- **estado:** `[!]` impossível resolver integralmente sem suporte upstream; manter boundary evidence.
+- **estado:** `[!]` impossível resolver integralmente sem suporte upstream; manter boundary
+  evidence.
 
 ### B-041 — OpenAI/ChatGPT endpoint path não possuía baseline permanente por fase
 
-- **estado:** `[~]` corrigido localmente com `openai-endpoint-latency.js` + histórico bounded + tool especializada.
+- **estado:** `[~]` corrigido localmente com `openai-endpoint-latency.js` + histórico bounded + tool
+  especializada.
 
 ### B-042 — TTFT, endpoint TTFB e MCP pre-dispatch eram semanticamente misturáveis
 
-- **estado:** `[x]` taxonomia e authorities separadas; client TTFT agora possui evidence store próprio.
+- **estado:** `[x]` taxonomia e authorities separadas; client TTFT agora possui evidence store
+  próprio.
 
 ### B-043 — endpoint latency dependia de chamada manual
 
-- **estado:** `[~]` monitor periódico non-blocking implementado: startup delay, ciclo 5 min, sem overlap, readiness-independent.
+- **estado:** `[~]` monitor periódico non-blocking implementado: startup delay, ciclo 5 min, sem
+  overlap, readiness-independent.
 
 ### B-044 — primeiro sample pós-restart/reconnect/thinking-change contaminava baseline estacionário
 
-- **estado:** `[x]` warmup/outlier passa a ser explicitamente separado nos protocolos; exemplo high inicial ≈52,5 s não foi usado na comparação estabilizada.
+- **estado:** `[x]` warmup/outlier passa a ser explicitamente separado nos protocolos; exemplo high
+  inicial ≈52,5 s não foi usado na comparação estabilizada.
 
 ### B-045 — WSL caiu abruptamente durante janela com validators concorrentes
 
-- **evento:** por volta de `2026-08-18T22:08Z` (`19:08` BRT), o WSL desapareceu e derrubou Docker/DevContainer/MCP/cloudflared em conjunto;
-- **evidência preservada:** jobs `2130fc2d-08ed-486a-96d9-fd4fab69b22b` (`test_mcp_tools.spec.js`) e `3fcf74b6-e7b3-4878-9ccb-29c46ada6d93` (`test_mcp_metrics.spec.js`) ficaram com `status=running`, `runtimeAttached=false`, `endedAt=null`, `exitCode=null`, `signal=null` após o reboot;
-- **log:** ambos foram interrompidos antes de término normal; `test_mcp_tools` sequer chegou a imprimir o início normal da suite, portanto não há evidência de que o novo teste `postValidate` tenha alcançado o ponto de spawn interno;
-- **causalidade:** **INDETERMINADA**. Concorrência/fan-out de validators é amplificador plausível, mas não há prova de OOM nem de que o composite causou diretamente a queda;
-- **limitação:** logs de kernel/Windows anteriores ao reboot não estão disponíveis via workspace atual, portanto a causa raiz de WSL não pode ser reconstruída com autoridade suficiente.
+- **evento:** por volta de `2026-08-18T22:08Z` (`19:08` BRT), o WSL desapareceu e derrubou
+  Docker/DevContainer/MCP/cloudflared em conjunto;
+- **evidência preservada:** jobs `2130fc2d-08ed-486a-96d9-fd4fab69b22b` (`test_mcp_tools.spec.js`) e
+  `3fcf74b6-e7b3-4878-9ccb-29c46ada6d93` (`test_mcp_metrics.spec.js`) ficaram com `status=running`,
+  `runtimeAttached=false`, `endedAt=null`, `exitCode=null`, `signal=null` após o reboot;
+- **log:** ambos foram interrompidos antes de término normal; `test_mcp_tools` sequer chegou a
+  imprimir o início normal da suite, portanto não há evidência de que o novo teste `postValidate`
+  tenha alcançado o ponto de spawn interno;
+- **causalidade:** **INDETERMINADA**. Concorrência/fan-out de validators é amplificador plausível,
+  mas não há prova de OOM nem de que o composite causou diretamente a queda;
+- **limitação:** logs de kernel/Windows anteriores ao reboot não estão disponíveis via workspace
+  atual, portanto a causa raiz de WSL não pode ser reconstruída com autoridade suficiente.
 
 ### B-046 — harness permitia fan-out de validators pesados e nesting dentro de Vitest
 
@@ -1740,7 +1843,8 @@ Nova dívida desta investigação:
 - reserva atômica de spawn evita corrida entre requests simultâneos;
 - subprocess validator é bloqueado quando `VITEST`/`NODE_ENV=test` está ativo;
 - `repo_apply_patch_batch.postValidate` falha antes do write em test runner;
-- Vitest iniciado pelo job manager recebe `VITEST_MAX_WORKERS=2` por padrão, com override explícito bounded;
+- Vitest iniciado pelo job manager recebe `VITEST_MAX_WORKERS=2` por padrão, com override explícito
+  bounded;
 - dashboard passa a expor `validatorCapacity`.
 
 ---
@@ -1783,7 +1887,9 @@ Criar série persistida.
 
 ### G-020 — client network evidence ingestion era inexistente
 
-Parcialmente fechado: `mcp_client_latency_evidence` aceita TTFT e labels sanitizados de rede/modelo/conversa/client/VPN. Captura automática do timestamp no cliente continua dependente de observer/HAR externo.
+Parcialmente fechado: `mcp_client_latency_evidence` aceita TTFT e labels sanitizados de
+rede/modelo/conversa/client/VPN. Captura automática do timestamp no cliente continua dependente de
+observer/HAR externo.
 
 ### G-021 — sem A/B model/context runner no ChatGPT host
 
@@ -1811,23 +1917,32 @@ Propagar a nova semântica.
 
 ### G-027 — MCP não observa automaticamente o ChatGPT UI TTFT
 
-O gap só fecha com client observer/HAR/manual evidence; é proibido inferir UI TTFT a partir de endpoint TTFB ou pre-dispatch.
+O gap só fecha com client observer/HAR/manual evidence; é proibido inferir UI TTFT a partir de
+endpoint TTFB ou pre-dispatch.
 
 ### G-028 — correlação endpoint-TTFB ↔ pre-dispatch ainda não possui série histórica suficiente
 
-O monitor resolve coleta futura; o correlation score só deve ganhar autoridade após número mínimo de pares temporalmente próximos.
+O monitor resolve coleta futura; o correlation score só deve ganhar autoridade após número mínimo de
+pares temporalmente próximos.
 
 ### G-029 — API streaming TTFT canary ainda não implementado
 
-Deve ser explicitamente opt-in, fixed model/prompt, allowlisted e cost-aware; nunca parte automática de health/readiness.
+Deve ser explicitamente opt-in, fixed model/prompt, allowlisted e cost-aware; nunca parte automática
+de health/readiness.
 
 ### G-030 — causa raiz de crash WSL não possui evidence channel first-class
 
-Hoje o workspace consegue observar consequência (`runtimeAttached=false`, tunnel/origin desaparecem), mas não possui ingestão de eventos Windows/WSL como `LxssManager`, `Hyper-V`, WSL kernel OOM, Docker Desktop VM reset ou host memory pressure. Criar um canal sanitizado de evidence do host é desejável; sem ele, crash comum-causa continua parcialmente não observável.
+Hoje o workspace consegue observar consequência (`runtimeAttached=false`, tunnel/origin
+desaparecem), mas não possui ingestão de eventos Windows/WSL como `LxssManager`, `Hyper-V`, WSL
+kernel OOM, Docker Desktop VM reset ou host memory pressure. Criar um canal sanitizado de evidence
+do host é desejável; sem ele, crash comum-causa continua parcialmente não observável.
 
 ### G-031 — validator resource budget não era first-class
 
-Majoritariamente fechado no runtime MCP: max active, spawn reservation, Vitest worker cap, `runtimeEpoch` e snapshots before/after de memória/load/cgroup agora existem e são persistidos no manifest. Continua pendente correlacionar essa evidência com eventos externos Windows/WSL/Docker para distinguir definitivamente OOM/VM reset/crash externo.
+Majoritariamente fechado no runtime MCP: max active, spawn reservation, Vitest worker cap,
+`runtimeEpoch` e snapshots before/after de memória/load/cgroup agora existem e são persistidos no
+manifest. Continua pendente correlacionar essa evidência com eventos externos Windows/WSL/Docker
+para distinguir definitivamente OOM/VM reset/crash externo.
 
 ---
 
@@ -1895,15 +2010,18 @@ Só reiniciar quando evidence aponta origin/tunnel lifecycle.
 
 ### ADR-ILCP-016 — TTFT, endpoint TTFB e pre-dispatch são clocks independentes
 
-Nenhum pode ser usado como proxy automático do outro. A causalidade vem da convergência/divergência longitudinal entre eles.
+Nenhum pode ser usado como proxy automático do outro. A causalidade vem da convergência/divergência
+longitudinal entre eles.
 
 ### ADR-ILCP-017 — Endpoint monitor é permanente, barato e não bloqueante
 
-Um sample por target a cada 5 min, após delay de startup, sem overlap e sem tornar readiness dependente da internet externa.
+Um sample por target a cada 5 min, após delay de startup, sem overlap e sem tornar readiness
+dependente da internet externa.
 
 ### ADR-ILCP-018 — Client TTFT evidence é sanitizada
 
-Persistir apenas tempos e labels fechados; nunca prompt, completion, HAR body, cookies, tokens, URLs de navegação ou IP bruto.
+Persistir apenas tempos e labels fechados; nunca prompt, completion, HAR body, cookies, tokens, URLs
+de navegação ou IP bruto.
 
 ### ADR-ILCP-019 — Paid model TTFT canary exige opt-in explícito
 
@@ -1911,11 +2029,14 @@ Nenhum health check pode consumir quota de modelo silenciosamente.
 
 ### ADR-ILCP-020 — validators são serializados por segurança de host
 
-O runtime MCP permite no máximo um subprocess validator ativo. Solicitações concorrentes recebem feedback de capacidade em vez de competir silenciosamente por CPU/memória.
+O runtime MCP permite no máximo um subprocess validator ativo. Solicitações concorrentes recebem
+feedback de capacidade em vez de competir silenciosamente por CPU/memória.
 
 ### ADR-ILCP-021 — test runner nunca inicia outro validator subprocess
 
-`VITEST`/`NODE_ENV=test` é uma fronteira explícita: configuração/path ainda podem ser testados, mas criação de `npx vitest`, `tsc`, `eslint` ou suites filhas é bloqueada. Integração real deve ser provada a partir do MCP runtime normal, não de dentro da suite que o está testando.
+`VITEST`/`NODE_ENV=test` é uma fronteira explícita: configuração/path ainda podem ser testados, mas
+criação de `npx vitest`, `tsc`, `eslint` ou suites filhas é bloqueada. Integração real deve ser
+provada a partir do MCP runtime normal, não de dentro da suite que o está testando.
 
 ---
 
@@ -1986,7 +2107,8 @@ Legenda:
 - [x] authority `observed-from-container`;
 - [x] client leg explicitamente `not-observable-from-workspace`;
 - [x] WebSocket facts oficiais registrados;
-- [x] observer por fases DNS/TCP/TLS/TTFB/total para `chatgpt.com`, `ws.chatgpt.com`, `api.openai.com`;
+- [x] observer por fases DNS/TCP/TLS/TTFB/total para `chatgpt.com`, `ws.chatgpt.com`,
+      `api.openai.com`;
 - [x] baseline histórico bounded de endpoint implementado;
 - [x] attribution consome medição atual + baseline quando disponível;
 - [x] contrato de client TTFT evidence implementado;
@@ -2016,7 +2138,8 @@ Legenda:
 - [x] `mcp_latency_attribution`;
 - [x] `mcp_latency_pulse`;
 - [~] schema host cache/reconnect semantics;
-- [ ] usar descriptor version/epoch para diagnosticar projection stale automaticamente quando possível.
+- [ ] usar descriptor version/epoch para diagnosticar projection stale automaticamente quando
+      possível.
 
 ## FAIXA J — fault injection
 
@@ -2070,7 +2193,8 @@ Legenda:
 - [x] pulse tool registrada;
 - [x] primeiras séries controladas;
 - [x] histórico reconhece pulse→pulse;
-- [x] audit suporta labels sanitizados `seriesId/network/model/conversation/client/vpn` sem IP bruto;
+- [x] audit suporta labels sanitizados `seriesId/network/model/conversation/client/vpn` sem IP
+      bruto;
 - [x] histórico agrupa `controlledPulseSeries24h` somente dentro da mesma série/condição;
 - [ ] baseline por hora durante vários dias;
 - [ ] baseline por modelo;
@@ -2101,7 +2225,9 @@ Legenda:
 - [x] search em arquivo pequeno retorna SHA-256 patch-ready para reduzir `stats→patch`;
 - [x] read/search/bulk batches ampliados 32→64 e budget até 3 MiB;
 - [x] patch batches ampliados até 128 operações/64 targets/3 MiB;
-- [~] `repo_apply_patch_batch + postValidate` implementado localmente como composite bounded; guards anti-nesting/capacity adicionados após incidente WSL; projeção do host desta conversa ainda anuncia schema antigo e impede prova externa do novo argumento até refresh/reconnect;
+- [~] `repo_apply_patch_batch + postValidate` implementado localmente como composite bounded; guards
+  anti-nesting/capacity adicionados após incidente WSL; projeção do host desta conversa ainda
+  anuncia schema antigo e impede prova externa do novo argumento até refresh/reconnect;
 - [x] partial failure feedback preservado nas surfaces batch existentes;
 - [x] result budgets permanecem bounded;
 - [ ] benchmark antes/depois usando número de tool calls e wall-clock percebido em workflow real.
@@ -2156,7 +2282,8 @@ Legenda:
 - [x] history JSONL bounded;
 - [x] baseline 24h e regression rule implementados;
 - [x] primeiro baseline live: TTFB p50 83/240/274 ms respectivamente;
-- [x] persistência automática provada: monitor executou sozinho (`runs=1`, `failures=0`) e attribution leu `snapshotsRead=1` sem chamada manual à tool de endpoint;
+- [x] persistência automática provada: monitor executou sozinho (`runs=1`, `failures=0`) e
+      attribution leu `snapshotsRead=1` sem chamada manual à tool de endpoint;
 - [ ] baseline ≥24h com dezenas de snapshots;
 - [ ] correlação temporal endpoint-TTFB ↔ pulse/pre-dispatch;
 - [ ] A/B por `networkLabel` do cliente sem confundir rotas.
@@ -2183,13 +2310,19 @@ Legenda:
 - [x] validator subprocess proibido dentro de Vitest/test runner;
 - [x] `postValidate` possui recursion guard pré-write;
 - [x] Vitest de validator limitado a 2 workers por default;
-- [x] `validatorCapacity` provado live: `runtimeEpoch=c9d1c7f9-1814-4912-9a7c-ab0675da2e10`, owner PID `26558`, `maxActive=1`, `vitestMaxWorkers=2`, `activeCount=0`;
+- [x] `validatorCapacity` provado live: `runtimeEpoch=c9d1c7f9-1814-4912-9a7c-ab0675da2e10`, owner
+      PID `26558`, `maxActive=1`, `vitestMaxWorkers=2`, `activeCount=0`;
 - [x] snapshot de memória/load/cgroup persistido imediatamente antes e depois de cada validator;
-- [x] runtime epoch first-class: jobs novos carregam `ownerRuntimeEpoch` e `runtimeSameEpoch`; manifests antigos permanecem legíveis e não são reclassificados artificialmente;
-- [x] canary focado pós-reload provou telemetria: job `a08006c2-3ffe-46a4-8531-ff5f3350ac72`, child PID `26917`, `oom=0`, `oom_kill=0`, RSS MCP estável ≈456 MB e delta cgroup ≈+0,5 MB durante ~2,1 s;
-- [x] ausência de `resourceAfter` passa a ser evidência explícita de interrupção abrupta quando `resourceBefore` existe;
+- [x] runtime epoch first-class: jobs novos carregam `ownerRuntimeEpoch` e `runtimeSameEpoch`;
+      manifests antigos permanecem legíveis e não são reclassificados artificialmente;
+- [x] canary focado pós-reload provou telemetria: job `a08006c2-3ffe-46a4-8531-ff5f3350ac72`, child
+      PID `26917`, `oom=0`, `oom_kill=0`, RSS MCP estável ≈456 MB e delta cgroup ≈+0,5 MB durante
+      ~2,1 s;
+- [x] ausência de `resourceAfter` passa a ser evidência explícita de interrupção abrupta quando
+      `resourceBefore` existe;
 - [ ] estudar ingestão sanitizada de eventos Windows/WSL/Docker para OOM/crash/reset;
-- [ ] executar stress canary controlado somente após evidence channel do host; nunca reproduzir queda por força bruta.
+- [ ] executar stress canary controlado somente após evidence channel do host; nunca reproduzir
+      queda por força bruta.
 
 ---
 
@@ -2272,7 +2405,8 @@ ws.chatgpt.com
 api.openai.com
 ```
 
-Usar DNS/TCP/TLS/TTFB/server-wait/total. Só promover `endpoint-path-regression` se houver baseline suficiente e regressão material.
+Usar DNS/TCP/TLS/TTFB/server-wait/total. Só promover `endpoint-path-regression` se houver baseline
+suficiente e regressão material.
 
 ## EXP-09 — thinking mode ABAB
 
@@ -2283,7 +2417,8 @@ A2 = medium, repetir
 B2 = high,   repetir
 ```
 
-Fixar conversa, modelo, rede, client e VPN. Descartar o primeiro pulse após cada troca como transição/warmup. Comparar p50/p95 e bootstrap/intervalo quando n permitir.
+Fixar conversa, modelo, rede, client e VPN. Descartar o primeiro pulse após cada troca como
+transição/warmup. Comparar p50/p95 e bootstrap/intervalo quando n permitir.
 
 ## EXP-10 — TTFT de cliente
 
@@ -2295,7 +2430,8 @@ T1 = primeiro token renderizado/streamed
 TTFT = T1 - T0
 ```
 
-Registrar somente `ttftMs`, source e labels sanitizados em `mcp_client_latency_evidence`. Coletar endpoint TTFB e pulse/pre-dispatch na mesma janela para evidence fusion.
+Registrar somente `ttftMs`, source e labels sanitizados em `mcp_client_latency_evidence`. Coletar
+endpoint TTFB e pulse/pre-dispatch na mesma janela para evidence fusion.
 
 ## EXP-11 — Wi-Fi ↔ hotspot com clocks separados
 
@@ -2312,7 +2448,8 @@ Isso permite distinguir mudança na rota do cliente de mudança no backend/model
 
 ## EXP-12 — validator resource canary
 
-Resource telemetry básica já existe e foi provada. Qualquer canary adicional deve permanecer conservador até existir evidence channel do host. Sequência segura:
+Resource telemetry básica já existe e foi provada. Qualquer canary adicional deve permanecer
+conservador até existir evidence channel do host. Sequência segura:
 
 ```text
 1 validator focused
@@ -2321,7 +2458,8 @@ Resource telemetry básica já existe e foi provada. Qualquer canary adicional d
 → verificar MCP/tunnel/WSL health
 ```
 
-Não executar dois validators pesados em paralelo. Não executar validator dentro de Vitest. O objetivo é provar headroom, não procurar o limite de crash.
+Não executar dois validators pesados em paralelo. Não executar validator dentro de Vitest. O
+objetivo é provar headroom, não procurar o limite de crash.
 
 ---
 
@@ -2383,7 +2521,8 @@ A compile cache Node 24 já está ativa e não aparece como gargalo relevante ne
 
 Esta frente só pode ser considerada madura quando:
 
-- [ ] uma percepção de lentidão é automaticamente decomposta em origin vs auxiliary vs silent external;
+- [ ] uma percepção de lentidão é automaticamente decomposta em origin vs auxiliary vs silent
+      external;
 - [ ] dashboard não produz falso `ok` quando interaction SLO está ruim;
 - [ ] pulse baseline possui histórico por horário/modelo;
 - [ ] endpoint OpenAI/ChatGPT monitor possui baseline ≥24h e dezenas de snapshots;
@@ -2399,7 +2538,8 @@ Esta frente só pode ser considerada madura quando:
 - [ ] documentos e tool descriptions refletem authority corretamente;
 - [ ] full focused validation fica verde;
 - [x] validator harness não cria nested subprocesses em test runner e mantém `maxActive=1`;
-- [~] resource telemetry distingue pressão no runtime/cgroup e preserva `oom/oom_kill` before/after; distinguir crash externo/WSL reset com alta autoridade ainda requer evidence channel do host;
+- [~] resource telemetry distingue pressão no runtime/cgroup e preserva `oom/oom_kill` before/after;
+  distinguir crash externo/WSL reset com alta autoridade ainda requer evidence channel do host;
 - [ ] worktree publicável sem secrets/generated state;
 - [ ] `main == origin/main` após publicação.
 
@@ -2409,9 +2549,13 @@ Esta frente só pode ser considerada madura quando:
 
 A descoberta central desta revisão é simples, mas altera profundamente a prioridade do projeto:
 
-> **A maior parte do tempo perdido entre tools não está atualmente dentro das tools, dentro do origin MCP, nem dentro de uma viagem ordinária pelo Cloudflare Tunnel.**
+> **A maior parte do tempo perdido entre tools não está atualmente dentro das tools, dentro do
+> origin MCP, nem dentro de uma viagem ordinária pelo Cloudflare Tunnel.**
 
-A série controlada, o boundary HTTP e a nova coverage timeline mostram que o origin pode permanecer silencioso por **vários segundos** entre uma resposta terminada e a próxima `tools/call` chegar. Requests auxiliares de initialize/session existem e constituem uma ineficiência real, mas explicam apenas uma pequena fração do tempo.
+A série controlada, o boundary HTTP e a nova coverage timeline mostram que o origin pode permanecer
+silencioso por **vários segundos** entre uma resposta terminada e a próxima `tools/call` chegar.
+Requests auxiliares de initialize/session existem e constituem uma ineficiência real, mas explicam
+apenas uma pequena fração do tempo.
 
 Por isso, o projeto deve abandonar duas tentações:
 
@@ -2430,13 +2574,17 @@ medir
 → preservar evidência do que permanece externo
 ```
 
-A vantagem estratégica do workspace é que, mesmo sem acesso à telemetria interna da OpenAI, podemos tornar a região de incerteza cada vez menor.
+A vantagem estratégica do workspace é que, mesmo sem acesso à telemetria interna da OpenAI, podemos
+tornar a região de incerteza cada vez menor.
 
-A partir desta revisão, toda transformação de desempenho deve responder explicitamente a uma pergunta:
+A partir desta revisão, toda transformação de desempenho deve responder explicitamente a uma
+pergunta:
 
-> **ela reduz tempo dentro do origin, reduz número de round-trips, melhora uma rota comprovadamente degradada, ou apenas move complexidade sem atacar o silent external gap?**
+> **ela reduz tempo dentro do origin, reduz número de round-trips, melhora uma rota comprovadamente
+> degradada, ou apenas move complexidade sem atacar o silent external gap?**
 
-Se não houver resposta mensurável, a transformação não deve ser promovida como otimização de latência.
+Se não houver resposta mensurável, a transformação não deve ser promovida como otimização de
+latência.
 
 ---
 
@@ -2465,4 +2613,5 @@ Nesta revisão foram incorporados ao estado arquitetural:
 - round-trip amortization framing;
 - protocolo de experimentos client/IP/network/model/context.
 
-O documento deve ser atualizado sempre que uma das hipóteses HYP-001..HYP-050 mudar de estado por nova evidência.
+O documento deve ser atualizado sempre que uma das hipóteses HYP-001..HYP-050 mudar de estado por
+nova evidência.

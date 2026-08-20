@@ -220,6 +220,11 @@ export {
 } from './session/session-events.js';
 export { createToolSessionContext, ToolSessionContext } from './session/tool-session-context.js';
 export {
+    normalizeUserInputChoices,
+    resolveEffectiveUserInputAllowFreeform,
+    USER_INPUT_FREEFORM_POLICY,
+} from './session/user-input-policy.js';
+export {
     cancelAllPendingStructuredUserInput,
     classifyUserInputQuestionKind,
     configureDefaultUserInputContext,
@@ -237,19 +242,14 @@ export {
     registerPendingStructuredUserInputResolver,
     resolvePendingStructuredUserInput,
 } from './session/user-input.js';
-export {
-    USER_INPUT_FREEFORM_POLICY,
-    normalizeUserInputChoices,
-    resolveEffectiveUserInputAllowFreeform,
-} from './session/user-input-policy.js';
 export { AgentToolPolicy } from './tools/agent-policy.js';
 export {
     BuiltInTools,
-    ToolSet,
     convertMcpCallToolResult,
     defineTool,
     normalizeToolParametersSchema,
     normalizeToolTelemetry,
+    ToolSet,
 } from './tools/core.js';
 
 /**
@@ -459,18 +459,18 @@ export {
 // ─── Faixa 12: Provider/BYOK Support ─────────────────────────────────────────
 
 export {
-    BYOK_ENV_KEYS,
-    BYOK_SECRET_ENV_KEYS,
     anthropicProvider,
     azureProvider,
     buildConfiguredByokModelListHandler,
+    BYOK_ENV_KEYS,
+    BYOK_SECRET_ENV_KEYS,
     discoverConfiguredByokModelsFromEnv,
     isValidProviderType,
     openaiProvider,
     readConfiguredByokModelDiscoveryCacheFromEnv,
     readConfiguredByokModelsFromEnv,
-    readConfiguredByokProfileSummaries,
     readConfiguredByokProfilesFromEnv,
+    readConfiguredByokProfileSummaries,
     readConfiguredByokState,
     readConfiguredByokSummary,
     redactProviderConfig,

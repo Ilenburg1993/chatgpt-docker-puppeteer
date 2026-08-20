@@ -7,8 +7,8 @@
 
 /**
  * @param {{
- *     symbols: Array<{ kind: string; name: string; exported: boolean; line: number }>;
- *     imports: Array<{ source: string; specifiers: string[] }>;
+ *     symbols: { kind: string; name: string; exported: boolean; line: number }[];
+ *     imports: { source: string; specifiers: string[] }[];
  *     exports?: string[];
  *     parseError: string | null;
  * }} symbols

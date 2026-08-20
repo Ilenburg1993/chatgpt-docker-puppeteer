@@ -144,9 +144,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
             userInputAnswerCount: 0,
             sessionId: null,
             errors:
-                byokState.errors.length > 0
-                    ? [...byokState.errors]
-                    : ['BYOK não está ativo/pronto para probe agente.'],
+                byokState.errors.length > 0 ? [...byokState.errors] : ['BYOK não está ativo/pronto para probe agente.'],
             warnings: [...byokState.warnings],
             providerFailure: null,
         };
@@ -224,7 +222,9 @@ export async function runConfiguredByokAgentProbe(options = {}) {
         handler: async (/** @type {unknown} */ args) => {
             markerToolCallCount += 1;
             const marker =
-                args && typeof args === 'object' && typeof /** @type {{ marker?: unknown }} */ (args).marker === 'string'
+                args &&
+                typeof args === 'object' &&
+                typeof (/** @type {{ marker?: unknown }} */ (args).marker) === 'string'
                     ? /** @type {{ marker: string }} */ (args).marker
                     : '';
             return marker.includes('BYOK_AGENT_PROBE_TOOL_OK')
@@ -250,7 +250,7 @@ export async function runConfiguredByokAgentProbe(options = {}) {
         handler: async (/** @type {unknown} */ args) => {
             readToolCallCount += 1;
             const path =
-                args && typeof args === 'object' && typeof /** @type {{ path?: unknown }} */ (args).path === 'string'
+                args && typeof args === 'object' && typeof (/** @type {{ path?: unknown }} */ (args).path) === 'string'
                     ? /** @type {{ path: string }} */ (args).path
                     : '';
             return path === BYOK_AGENT_PROBE_READ_PATH

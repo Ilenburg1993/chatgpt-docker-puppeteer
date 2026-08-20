@@ -12,7 +12,9 @@ import { getCopilotDb } from '#copilot/db';
 
 /**
  * @typedef {'active' | 'terminated' | 'expired'} McpHttpStoredSessionStatus
+ *
  * @typedef {'client_delete' | 'ttl_expired' | 'server_shutdown' | 'auth_mismatch' | 'runtime_error' | 'replaced'} McpHttpSessionTerminateReason
+ *
  *
  * @typedef {object} McpHttpStoredSessionRecord
  * @property {string} sessionIdHash
@@ -28,11 +30,11 @@ import { getCopilotDb } from '#copilot/db';
  * @property {Record<string, unknown>} transport
  *
  * @typedef {{
- *   recordSession(record: McpHttpStoredSessionRecord): void;
- *   touchSession(sessionIdHash: string, lastSeenAtMs: number, expiresAtMs: number): void;
- *   terminateSession(sessionIdHash: string, terminatedAtMs: number, reason: McpHttpSessionTerminateReason): void;
- *   readSession(sessionIdHash: string): McpHttpStoredSessionRecord | null;
- *   sweepExpired(nowMs: number): number;
+ *     recordSession(record: McpHttpStoredSessionRecord): void;
+ *     touchSession(sessionIdHash: string, lastSeenAtMs: number, expiresAtMs: number): void;
+ *     terminateSession(sessionIdHash: string, terminatedAtMs: number, reason: McpHttpSessionTerminateReason): void;
+ *     readSession(sessionIdHash: string): McpHttpStoredSessionRecord | null;
+ *     sweepExpired(nowMs: number): number;
  * }} McpHttpSessionStore
  */
 
@@ -107,15 +109,19 @@ export function createSqliteMcpHttpSessionStoreForDb(db) {
             ).run(reason, terminatedAtMs, reason, sessionIdHash);
         },
         readSession(sessionIdHash) {
-            const row = db.prepare('SELECT * FROM copilot_mcp_http_sessions WHERE session_id_hash = ?').get(sessionIdHash);
+            const row = db
+                .prepare('SELECT * FROM copilot_mcp_http_sessions WHERE session_id_hash = ?')
+                .get(sessionIdHash);
             return row ? rowToStoredSession(/** @type {Record<string, unknown>} */ (row)) : null;
         },
         sweepExpired(nowMs) {
-            const result = db.prepare(
-                `UPDATE copilot_mcp_http_sessions
+            const result = db
+                .prepare(
+                    `UPDATE copilot_mcp_http_sessions
                  SET status = 'expired', terminated_at_ms = ?, terminate_reason = 'ttl_expired'
                  WHERE status = 'active' AND expires_at_ms <= ?`,
-            ).run(nowMs, nowMs);
+                )
+                .run(nowMs, nowMs);
             return Number(result.changes ?? 0);
         },
     };

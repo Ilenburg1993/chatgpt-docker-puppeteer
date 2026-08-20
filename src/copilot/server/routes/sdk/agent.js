@@ -93,9 +93,10 @@ function buildAgentRuntimeMeta(routeDeps) {
  * @returns {() => void}
  */
 function subscribeClientLifecycle(client, handler) {
-    const lifecycleClient = /** @type {{ onLifecycle?: (handler: (event: { type?: string }) => void) => () => void }} */ (
-        /** @type {unknown} */ (client)
-    );
+    const lifecycleClient =
+        /** @type {{ onLifecycle?: (handler: (event: { type?: string }) => void) => () => void }} */ (
+            /** @type {unknown} */ (client)
+        );
     if (typeof lifecycleClient.onLifecycle === 'function') {
         return lifecycleClient.onLifecycle(handler);
     }

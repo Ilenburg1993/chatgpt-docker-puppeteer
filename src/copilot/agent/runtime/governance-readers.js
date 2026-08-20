@@ -11,8 +11,7 @@
  *     getPermissionModeSnapshot?: (() => 'approve_all' | 'audit_only' | 'selective') | undefined;
  *     getPermissionMode?: (() => 'approve_all' | 'audit_only' | 'selective') | undefined;
  *     getPermissionCapabilitySnapshot?:
- *         | (() => { mode: 'approve_all' | 'audit_only' | 'selective'; handlerAvailable: boolean })
- *         | undefined;
+ *         (() => { mode: 'approve_all' | 'audit_only' | 'selective'; handlerAvailable: boolean }) | undefined;
  *     getPermissionPolicySnapshot?: (() => unknown) | undefined;
  *     getContextFactoryCapabilitiesSnapshot?: (() => Record<string, Record<string, unknown>>) | undefined;
  *     getToolRegistrySnapshot?: (() => import('#copilot/sdk/types').ToolRegistry) | undefined;

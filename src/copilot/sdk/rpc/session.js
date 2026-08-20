@@ -75,13 +75,14 @@ function getWorkspaceRpc(session) {
         throw new TypeError('[sdk/rpc/workspace] namespace não expõe createFile().');
     }
 
-    const workspaceRpc = /**
-     * @type {{
-     *     listFiles: () => Promise<WorkspaceListResult>;
-     *     readFile: (params: { path: string }) => Promise<WorkspaceReadResult>;
-     *     createFile: (params: { path: string; content: string }) => Promise<unknown>;
-     * }}
-     */ (candidate);
+    const workspaceRpc =
+        /**
+         * @type {{
+         *     listFiles: () => Promise<WorkspaceListResult>;
+         *     readFile: (params: { path: string }) => Promise<WorkspaceReadResult>;
+         *     createFile: (params: { path: string; content: string }) => Promise<unknown>;
+         * }}
+         */ (candidate);
 
     return workspaceRpc;
 }
@@ -130,13 +131,15 @@ export async function modelSwitchTo(session, modelId, options) {
     }
     appLog('INFO', `[sdk/rpc] model.switchTo: modelId='${modelId}', sessionId='${session.sessionId}'`);
     const params =
-        /** @type {{
+        /**
+         * @type {{
          *     modelId: string;
          *     reasoningEffort?: string;
          *     reasoningSummary?: import('@github/copilot-sdk').ReasoningSummary;
          *     contextTier?: import('@github/copilot-sdk').ContextTier;
          *     modelCapabilities?: import('@github/copilot-sdk').ModelCapabilitiesOverride;
-         * }} */ ({
+         * }}
+         */ ({
             modelId,
         });
     if (options?.reasoningEffort) {
@@ -156,13 +159,13 @@ export async function modelSwitchTo(session, modelId, options) {
         operation: 'rpc.model.switchTo',
         status: 'started',
         sessionId: session.sessionId,
-            attributes: {
-                modelId,
-                ...(options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
-                ...(options?.reasoningSummary ? { reasoningSummary: options.reasoningSummary } : {}),
-                ...(options?.contextTier ? { contextTier: options.contextTier } : {}),
-                ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
-            },
+        attributes: {
+            modelId,
+            ...(options?.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
+            ...(options?.reasoningSummary ? { reasoningSummary: options.reasoningSummary } : {}),
+            ...(options?.contextTier ? { contextTier: options.contextTier } : {}),
+            ...(options?.modelCapabilities ? { modelCapabilities: true } : {}),
+        },
     });
     try {
         const result = /** @type {ModelSwitchResult} */ (await session.rpc.model.switchTo(params));

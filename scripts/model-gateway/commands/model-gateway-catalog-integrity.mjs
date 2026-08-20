@@ -33,7 +33,9 @@ if (json) {
     if (summary.redactedIdentitySamples.length > 0) {
         process.stdout.write('  redacted identity samples:\n');
         for (const sample of summary.redactedIdentitySamples.slice(0, 8)) {
-            process.stdout.write(`    ${sample.field}: ${sample.id ?? sample.providerModel ?? sample.providerId ?? '-'}\n`);
+            process.stdout.write(
+                `    ${sample.field}: ${sample.id ?? sample.providerModel ?? sample.providerId ?? '-'}\n`,
+            );
         }
     }
 }

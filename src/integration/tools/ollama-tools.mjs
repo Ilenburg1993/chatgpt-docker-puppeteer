@@ -18,7 +18,8 @@ const OllamaGenerateSchema = z.object({
         .min(1, 'Prompt cannot be empty')
         .max(10000, 'Prompt too long (max 10000 chars) - potential DoS attack'),
     model: z
-        .string()['regex'](/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .string()
+        ['regex'](/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
         .optional(),
     runtime: z.enum(['auto', 'cloud', 'local']).optional(),
     temperature: z.number().min(0, 'Temperature must be >= 0').max(2, 'Temperature must be <= 2').optional(),
@@ -33,7 +34,8 @@ const OllamaGenerateSchema = z.object({
 const OllamaEmbedSchema = z.object({
     text: z.string().min(1, 'Text cannot be empty').max(8000, 'Text too long (max 8000 chars) - potential DoS attack'),
     model: z
-        .string()['regex'](/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
+        .string()
+        ['regex'](/^[a-zA-Z0-9._:-]+$/, 'Invalid model name format')
         .optional(),
 });
 

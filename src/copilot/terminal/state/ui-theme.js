@@ -205,18 +205,20 @@ export function terminalThemeDivider(width = 70) {
 }
 
 /**
- * @param {Array<string | null | undefined | false>} parts
+ * @param {(string | null | undefined | false)[]} parts
  * @param {string} [separator=' · '] Default is `' · '`
  * @returns {string}
  */
 export function terminalThemeJoin(parts, separator = ' · ') {
-    return parts.filter((part) => typeof part === 'string' && part.length > 0).join(terminalThemeText('muted', separator));
+    return parts
+        .filter((part) => typeof part === 'string' && part.length > 0)
+        .join(terminalThemeText('muted', separator));
 }
 
 /**
  * @param {TerminalThemeRole} role
  * @param {string} title
- * @param {Array<string | null | undefined | false>} [details=[]] Default is `[]`
+ * @param {(string | null | undefined | false)[]} [details=[]] Default is `[]`
  * @returns {string}
  */
 export function terminalThemeHeadline(role, title, details = []) {
@@ -242,7 +244,7 @@ export function terminalThemeRow(label, value, options = {}) {
 
 /**
  * @param {string} label
- * @param {Array<string | null | undefined | false>} values
+ * @param {(string | null | undefined | false)[]} values
  * @param {{ width?: number; role?: TerminalThemeRole; empty?: string }} [options]
  * @returns {string}
  */

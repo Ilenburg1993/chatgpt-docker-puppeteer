@@ -1,7 +1,7 @@
 // @ts-check
 /**
- * Canonical execution envelopes shared by MCP tool schemas, runtime guards and capability guidance.
- * Keep these values free of tool-module imports so every consumer can depend on one direction only.
+ * Canonical execution envelopes shared by MCP tool schemas, runtime guards and capability guidance. Keep these values
+ * free of tool-module imports so every consumer can depend on one direction only.
  *
  * @module copilot/mcp/control-plane/tool-capabilities
  */

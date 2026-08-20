@@ -36,8 +36,7 @@ const sizeArg = args.find((a) => a.startsWith('--size='))?.split('=')[1] ?? 'all
 const outPathArg = args.find((a) => a.startsWith('--out='))?.slice('--out='.length) ?? null;
 
 /**
- * @type {(new (...args: any[]) => { set: (k: string, v: Buffer) => void; get: (k: string) => Buffer | undefined })
- *     | null}
+ * @type {(new (...args: any[]) => { set: (k: string, v: Buffer) => void; get: (k: string) => Buffer | undefined }) | null}
  */
 let lruCacheCtor = null;
 

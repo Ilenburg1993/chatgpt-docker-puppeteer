@@ -5,13 +5,13 @@
  * @module copilot/mcp/tools/cloudflare-passthrough
  */
 
-import { z } from 'zod';
 import {
     applyCloudflareMcpPassthroughPlan,
     buildCloudflareMcpPassthroughPlan,
     diffCloudflareMcpPassthroughPlan,
 } from '#copilot/mcp/cloudflare';
 import { boundedWriteAnnotations, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 /** @type {import('../registry.js').McpToolDefinition} */
 export const mcpCloudflareMcpPassthroughPlanTool = {
@@ -45,7 +45,8 @@ export const mcpCloudflareMcpPassthroughApplyTool = {
         dryRun: z.boolean().optional()['describe']('Plan only. Default: true.'),
         confirmApply: z
             .boolean()
-            .optional()['describe']('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
+            .optional()
+            ['describe']('Required together with dryRun=false to mutate Cloudflare rulesets. Default: false.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async ({ dryRun, confirmApply }) =>

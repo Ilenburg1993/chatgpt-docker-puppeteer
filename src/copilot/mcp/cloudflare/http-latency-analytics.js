@@ -2,9 +2,8 @@
 /**
  * Read-only Cloudflare GraphQL HTTP latency analytics for the published MCP route.
  *
- * This module is deliberately aggregate-only. It never requests client IPs, Ray IDs,
- * headers or user agents. Adaptive Analytics can be sampled, so the result is supporting
- * transport evidence rather than per-request ground truth.
+ * This module is deliberately aggregate-only. It never requests client IPs, Ray IDs, headers or user agents. Adaptive
+ * Analytics can be sampled, so the result is supporting transport evidence rather than per-request ground truth.
  *
  * @module copilot/mcp/cloudflare/http-latency-analytics
  */
@@ -18,7 +17,9 @@ const DEFAULT_CACHE_TTL_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 8_000;
 const MAX_WINDOW_MINUTES = 24 * 60;
 
-/** @type {import('#copilot/mcp/control-plane').TtlCache<Record<string, unknown> & { ok: boolean; available: boolean }>} */
+/** @type {import('#copilot/mcp/control-plane').TtlCache<
+    Record<string, unknown> & { ok: boolean; available: boolean }
+>} */
 const analyticsCache = createTtlCache({
     name: 'cloudflare-http-latency-analytics',
     ttlMs: DEFAULT_CACHE_TTL_MS,
@@ -46,11 +47,11 @@ query McpHttpLatency($zoneTag: string, $filter: ZoneHttpRequestsAdaptiveGroupsFi
 
 /**
  * @typedef {{
- *   edgeColo: string;
- *   count: number;
- *   sampleInterval: number | null;
- *   edgeTimeToFirstByteMs: number | null;
- *   originResponseDurationMs: number | null;
+ *     edgeColo: string;
+ *     count: number;
+ *     sampleInterval: number | null;
+ *     edgeTimeToFirstByteMs: number | null;
+ *     originResponseDurationMs: number | null;
  * }} CloudflareLatencyRow
  */
 
@@ -77,7 +78,8 @@ export async function readCloudflareHttpLatencyAnalytics(options = {}) {
 async function readCloudflareHttpLatencyAnalyticsUncached(config, options) {
     if (!config.apiToken) return unavailable('missing-api-token', 'Cloudflare API token is not configured.');
     const zoneResolution = await resolveZoneId(config);
-    if (!zoneResolution.zoneId) return unavailable('zone-id-unavailable', zoneResolution.error ?? 'Cloudflare zone ID unavailable.');
+    if (!zoneResolution.zoneId)
+        return unavailable('zone-id-unavailable', zoneResolution.error ?? 'Cloudflare zone ID unavailable.');
 
     const observedAt = Date.now();
     const from = new Date(observedAt - options.windowMinutes * 60 * 1000).toISOString();
@@ -114,8 +116,7 @@ async function readCloudflareHttpLatencyAnalyticsUncached(config, options) {
                 hostname: config.publicHostname,
                 path: '/mcp',
                 graphqlErrors,
-                note:
-                    'The configured plan/token may not expose the requested timing fields. This is a capability gap, not an MCP health failure.',
+                note: 'The configured plan/token may not expose the requested timing fields. This is a capability gap, not an MCP health failure.',
             };
         }
         const rows = parseRows(payload);
@@ -157,7 +158,9 @@ async function resolveZoneId(config) {
     if (config.zoneId) return { zoneId: config.zoneId, source: 'configured:CLOUDFLARE_ZONE_ID', error: null };
     try {
         const client = getCloudflareClient(config.apiToken ?? '');
-        const query = config.accountId ? { name: config.zone, account: { id: config.accountId } } : { name: config.zone };
+        const query = config.accountId
+            ? { name: config.zone, account: { id: config.accountId } }
+            : { name: config.zone };
         for await (const zone of client.zones.list(query)) {
             const record = asRecord(zone);
             if (record?.['name'] === config.zone && typeof record['id'] === 'string') {
@@ -236,7 +239,8 @@ function summarizeRows(rows) {
     };
 }
 
-/** @param {CloudflareLatencyRow[]} rows @param {'edgeTimeToFirstByteMs' | 'originResponseDurationMs' | 'sampleInterval'} field */
+/** @param {CloudflareLatencyRow[]} rows @param {'edgeTimeToFirstByteMs' | 'originResponseDurationMs' | 'sampleInterval'}
+  field */
 function weightedAverage(rows, field) {
     let weighted = 0;
     let weight = 0;
@@ -274,7 +278,9 @@ function unavailable(reason, message) {
 
 /** @param {unknown} value @returns {Record<string, unknown> | null} */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /** @param {unknown} value @returns {number | null} */

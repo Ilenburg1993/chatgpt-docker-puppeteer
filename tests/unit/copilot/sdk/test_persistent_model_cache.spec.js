@@ -5,14 +5,19 @@
  * Unit tests para persistent-cache.js e integração em helpers.js
  */
 
-import { promises as fs } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ioMocks = vi.hoisted(() => ({
+    deleteFileTrusted: vi.fn(),
+    readTextFreshTrusted: vi.fn(),
+    statPathTrusted: vi.fn(),
     writeFileAtomicTrusted: vi.fn(),
 }));
 
 vi.mock('#copilot/infra/public/trusted-io', () => ({
+    deleteFileTrusted: ioMocks.deleteFileTrusted,
+    readTextFreshTrusted: ioMocks.readTextFreshTrusted,
+    statPathTrusted: ioMocks.statPathTrusted,
     writeFileAtomicTrusted: ioMocks.writeFileAtomicTrusted,
 }));
 
@@ -30,6 +35,12 @@ describe('persistent-model-cache', () => {
 
     beforeEach(async () => {
         vi.restoreAllMocks();
+        ioMocks.deleteFileTrusted.mockReset();
+        ioMocks.deleteFileTrusted.mockResolvedValue(null);
+        ioMocks.readTextFreshTrusted.mockReset();
+        ioMocks.readTextFreshTrusted.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+        ioMocks.statPathTrusted.mockReset();
+        ioMocks.statPathTrusted.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
         ioMocks.writeFileAtomicTrusted.mockReset();
         ioMocks.writeFileAtomicTrusted.mockResolvedValue(undefined);
         originalPersistentCacheFile = process.env['COPILOT_MODEL_PERSISTENT_CACHE_FILE'];
@@ -62,8 +73,7 @@ describe('persistent-model-cache', () => {
         });
 
         it('retorna null para JSON invalido', async () => {
-            // Mock readFile para retornar JSON inválido
-            vi.spyOn(fs, 'readFile').mockResolvedValueOnce('{ invalid json }');
+            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: '{ invalid json }' });
 
             const result = await readPersistentModelCache();
             expect(result).toBeNull();
@@ -76,7 +86,7 @@ describe('persistent-model-cache', () => {
                 fetchedAt: Date.now(),
                 models: [],
             };
-            vi.spyOn(fs, 'readFile').mockResolvedValueOnce(JSON.stringify(invalidCache));
+            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: JSON.stringify(invalidCache) });
 
             const result = await readPersistentModelCache();
             expect(result).toBeNull();
@@ -89,7 +99,7 @@ describe('persistent-model-cache', () => {
                 fetchedAt: Date.now(),
                 models: 'not-an-array',
             };
-            vi.spyOn(fs, 'readFile').mockResolvedValueOnce(JSON.stringify(invalidCache));
+            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: JSON.stringify(invalidCache) });
 
             const result = await readPersistentModelCache();
             expect(result).toBeNull();
@@ -110,7 +120,7 @@ describe('persistent-model-cache', () => {
                     },
                 ],
             };
-            vi.spyOn(fs, 'readFile').mockResolvedValueOnce(JSON.stringify(validCache));
+            ioMocks.readTextFreshTrusted.mockResolvedValueOnce({ content: JSON.stringify(validCache) });
 
             const result = await readPersistentModelCache();
             expect(result).not.toBeNull();
@@ -185,33 +195,31 @@ describe('persistent-model-cache', () => {
                         releaseWrite = resolve;
                     }),
             );
-            const unlink = vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
-
             writePersistentModelCacheAsync([/** @type {any} */ ({ modelId: 'pending' })]);
             const clear = clearPersistentModelCache();
             await Promise.resolve();
-            expect(unlink).not.toHaveBeenCalled();
+            expect(ioMocks.deleteFileTrusted).not.toHaveBeenCalled();
 
             releaseWrite?.();
             await clear;
-            expect(unlink).toHaveBeenCalled();
+            expect(ioMocks.deleteFileTrusted).toHaveBeenCalled();
         });
     });
 
     describe('clearPersistentModelCache', () => {
         it('não re-lança erro se arquivo não existe', async () => {
-            const spyUnlink = vi.spyOn(fs, 'unlink').mockRejectedValue(new Error('ENOENT'));
+            ioMocks.deleteFileTrusted.mockResolvedValue(null);
 
             await expect(clearPersistentModelCache()).resolves.toBeUndefined();
-            expect(spyUnlink).toHaveBeenCalled();
+            expect(ioMocks.deleteFileTrusted).toHaveBeenCalled();
         });
 
         it('deleta arquivo se existe', async () => {
-            const spyUnlink = vi.spyOn(fs, 'unlink').mockResolvedValue(undefined);
+            ioMocks.deleteFileTrusted.mockResolvedValue({ removed: true });
 
             await clearPersistentModelCache();
 
-            expect(spyUnlink).toHaveBeenCalled();
+            expect(ioMocks.deleteFileTrusted).toHaveBeenCalled();
         });
     });
 
@@ -262,7 +270,7 @@ describe('persistent-model-cache', () => {
                 size: 5000,
                 mtime: new Date(Date.now() - 60 * 60 * 1000), // 1h ago
             };
-            vi.spyOn(fs, 'stat').mockResolvedValue(/** @type {any} */ (mockStat));
+            ioMocks.statPathTrusted.mockResolvedValue({ stats: mockStat });
 
             const result = await getPersistentCacheDiagnostics();
 

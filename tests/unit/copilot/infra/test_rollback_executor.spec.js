@@ -4,12 +4,9 @@ import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { persistRollbackSidecar, listRollbackSidecars } from '../../../../src/copilot/infra/io/fs/rollback-sidecar.js';
+import { listRollbackSidecars, persistRollbackSidecar } from '../../../../src/copilot/infra/io/fs/rollback-sidecar.js';
 import { executeIoRollbackToken } from '../../../../src/copilot/infra/runtime/rollback-executor.js';
-import {
-    createIoRollbackToken,
-    serializeIoRollbackToken,
-} from '../../../../src/copilot/infra/runtime/rollback.js';
+import { createIoRollbackToken, serializeIoRollbackToken } from '../../../../src/copilot/infra/runtime/rollback.js';
 import {
     appendIoChangeSetEntry,
     applyIoChangeSet,
@@ -156,6 +153,41 @@ describe('infra/runtime/rollback-executor', () => {
         });
 
         expect(applied).toMatchObject({ success: true, appliedCount: 1 });
+        await expect(access(filePath)).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+
+    it('reporta rollback fisicamente aplicado mas não confirmado quando falha após unlink', async () => {
+        const directory = await tempDirectory();
+        const filePath = join(directory, 'created-unconfirmed.txt');
+        const current = Buffer.from('created');
+        await writeFile(filePath, current);
+        const token = tokenFromHints([
+            {
+                action: 'delete',
+                target: filePath,
+                previousHash: null,
+                contentHash: sha256(current),
+                bytes: current.byteLength,
+            },
+        ]);
+
+        const result = await executeIoRollbackToken(token, {
+            dryRun: false,
+            allowedPaths: new Set([filePath]),
+            onPhase: (phase) => {
+                if (phase === 'after-unlink') throw new Error('fault:rollback-after-unlink');
+            },
+        });
+
+        expect(result).toMatchObject({
+            success: false,
+            status: 'partially-applied',
+            appliedCount: 1,
+            mutationApplied: true,
+            mutationPhase: 'after-unlink',
+            mutationPaths: [filePath],
+            steps: [{ status: 'applied-but-unconfirmed' }],
+        });
         await expect(access(filePath)).rejects.toMatchObject({ code: 'ENOENT' });
     });
 

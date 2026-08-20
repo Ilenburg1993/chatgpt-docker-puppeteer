@@ -92,23 +92,29 @@ function quotaSnapshotMap(value) {
 /**
  * @param {unknown} input
  * @returns {{
- *   rows: Array<{
- *     quotaId: string;
- *     status: string;
- *     remainingFraction: number | null;
- *     remainingPercentage: number | null;
- *     entitlementRequests: number | null;
- *     usedRequests: number | null;
- *     overage: number | null;
- *     resetAt: string | null;
- *     isUnlimitedEntitlement: boolean;
- *     usageAllowedWithExhaustedQuota: boolean;
- *     overageAllowedWithExhaustedQuota: boolean;
- *     canBlockSdkNativeRoute: boolean;
- *     appliesToByokProviderRuntime: false;
- *     scope: 'copilot_sdk_entitlement';
- *   }>;
- *   summary: { total: number; status: string; worstRemainingFraction: number | null; blocked: number; appliesToByokProviderRuntime: false };
+ *     rows: {
+ *         quotaId: string;
+ *         status: string;
+ *         remainingFraction: number | null;
+ *         remainingPercentage: number | null;
+ *         entitlementRequests: number | null;
+ *         usedRequests: number | null;
+ *         overage: number | null;
+ *         resetAt: string | null;
+ *         isUnlimitedEntitlement: boolean;
+ *         usageAllowedWithExhaustedQuota: boolean;
+ *         overageAllowedWithExhaustedQuota: boolean;
+ *         canBlockSdkNativeRoute: boolean;
+ *         appliesToByokProviderRuntime: false;
+ *         scope: 'copilot_sdk_entitlement';
+ *     }[];
+ *     summary: {
+ *         total: number;
+ *         status: string;
+ *         worstRemainingFraction: number | null;
+ *         blocked: number;
+ *         appliesToByokProviderRuntime: false;
+ *     };
  * }}
  */
 export function summarizeModelGatewaySdkQuotaSnapshots(input) {
@@ -132,7 +138,11 @@ export function summarizeModelGatewaySdkQuotaSnapshots(input) {
             isUnlimitedEntitlement,
             usageAllowedWithExhaustedQuota,
             overageAllowedWithExhaustedQuota,
-            canBlockSdkNativeRoute: exhausted && !usageAllowedWithExhaustedQuota && !overageAllowedWithExhaustedQuota && !isUnlimitedEntitlement,
+            canBlockSdkNativeRoute:
+                exhausted &&
+                !usageAllowedWithExhaustedQuota &&
+                !overageAllowedWithExhaustedQuota &&
+                !isUnlimitedEntitlement,
             appliesToByokProviderRuntime: /** @type {false} */ (false),
             scope: /** @type {'copilot_sdk_entitlement'} */ ('copilot_sdk_entitlement'),
         };
@@ -141,17 +151,18 @@ export function summarizeModelGatewaySdkQuotaSnapshots(input) {
     const worstRemainingFraction = finiteRemaining.length > 0 ? Math.min(...finiteRemaining) : null;
     const blocked = rows.filter((row) => row.canBlockSdkNativeRoute).length;
     const statuses = rows.map((row) => row.status);
-    const status = blocked > 0
-        ? MODEL_GATEWAY_SDK_QUOTA_STATUS.EXHAUSTED
-        : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.EXHAUSTED)
-          ? MODEL_GATEWAY_SDK_QUOTA_STATUS.EXHAUSTED
-        : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.CRITICAL)
-          ? MODEL_GATEWAY_SDK_QUOTA_STATUS.CRITICAL
-          : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.WARN)
-            ? MODEL_GATEWAY_SDK_QUOTA_STATUS.WARN
-            : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.UNKNOWN)
-              ? MODEL_GATEWAY_SDK_QUOTA_STATUS.UNKNOWN
-              : MODEL_GATEWAY_SDK_QUOTA_STATUS.OK;
+    const status =
+        blocked > 0
+            ? MODEL_GATEWAY_SDK_QUOTA_STATUS.EXHAUSTED
+            : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.EXHAUSTED)
+              ? MODEL_GATEWAY_SDK_QUOTA_STATUS.EXHAUSTED
+              : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.CRITICAL)
+                ? MODEL_GATEWAY_SDK_QUOTA_STATUS.CRITICAL
+                : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.WARN)
+                  ? MODEL_GATEWAY_SDK_QUOTA_STATUS.WARN
+                  : statuses.includes(MODEL_GATEWAY_SDK_QUOTA_STATUS.UNKNOWN)
+                    ? MODEL_GATEWAY_SDK_QUOTA_STATUS.UNKNOWN
+                    : MODEL_GATEWAY_SDK_QUOTA_STATUS.OK;
     return {
         rows,
         summary: {

@@ -173,7 +173,7 @@ describe('sdk/session-lifecycle', () => {
             });
             expect(mockLog).toHaveBeenCalledWith(
                 'INFO',
-                expect.stringContaining("reasoningEffort omitido para modelo provider-literal"),
+                expect.stringContaining('reasoningEffort omitido para modelo provider-literal'),
             );
         });
 

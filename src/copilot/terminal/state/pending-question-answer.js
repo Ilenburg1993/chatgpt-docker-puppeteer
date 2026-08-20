@@ -136,8 +136,8 @@ export function tryAnswerTerminalPendingQuestionInput(rawAnswer, runtimeId, opti
 }
 
 /**
- * Indica se uma linha humana ja pertenceu ao canal de pergunta pendente e, portanto, nao deve seguir para fila,
- * mailbox ou novo turno. Respostas invalidas tambem sao consumidas para manter a pergunta viva e dar feedback claro.
+ * Indica se uma linha humana ja pertenceu ao canal de pergunta pendente e, portanto, nao deve seguir para fila, mailbox
+ * ou novo turno. Respostas invalidas tambem sao consumidas para manter a pergunta viva e dar feedback claro.
  *
  * @param {TerminalPendingAnswerResult} result
  * @returns {boolean}

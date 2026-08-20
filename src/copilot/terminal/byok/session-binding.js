@@ -90,7 +90,14 @@ export function isSameTerminalByokProviderBoundary(summary, binding) {
  * @param {string | null | undefined} currentSessionId
  * @param {string | null | undefined} [currentRuntimeModel]
  * @returns {{
- *     state: 'no-live-session' | 'selection-incomplete' | 'aligned-sdk' | 'aligned-byok' | 'live-model-confirmed' | 'live-model-drift' | 'same-session-reattach-required';
+ *     state:
+ *         | 'no-live-session'
+ *         | 'selection-incomplete'
+ *         | 'aligned-sdk'
+ *         | 'aligned-byok'
+ *         | 'live-model-confirmed'
+ *         | 'live-model-drift'
+ *         | 'same-session-reattach-required';
  *     preparedLabel: string;
  *     liveLabel: string;
  *     headline: string;

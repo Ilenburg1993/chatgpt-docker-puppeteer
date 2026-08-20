@@ -234,12 +234,14 @@ guard para overlap de `#tick()` assíncrono.
 
 Com base no repositório de memória e análise do código:
 
-| Contrato          | Descrição                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------ | ------ | --------- |
-| `onErrorOccurred` | Recebe `{error: string, errorContext: string, recoverable: boolean}`, retorna `{errorHandling: 'retry' | 'skip' | 'abort'}` |
-| `client.stop()`   | Retorna `Promise<Error[]>`                                                                             |
-| Erros do SDK      | NÃO são typed — sempre `Error` genérico com `message: string`                                          |
-| Sessão            | Tem `send()`, pode expirar por idle (keepalive necessário)                                             |
+| Contrato | Descrição | | ----------------- |
+------------------------------------------------------------------------------------------------------
+
+| ------ | --------- | | `onErrorOccurred` | Recebe
+`{error: string, errorContext: string, recoverable: boolean}`, retorna
+`{errorHandling: 'retry' | 'skip' | 'abort'}` | | `client.stop()` | Retorna `Promise<Error[]>` | |
+Erros do SDK | NÃO são typed — sempre `Error` genérico com `message: string` | | Sessão | Tem
+`send()`, pode expirar por idle (keepalive necessário) |
 
 ### 6.2 Gaps de conformidade identificados
 

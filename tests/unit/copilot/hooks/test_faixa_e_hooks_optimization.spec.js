@@ -24,45 +24,42 @@ vi.mock('#copilot/audit/pipeline', () => ({
     },
 }));
 
-vi.mock(
-    '#copilot/config/env',
-    async (importOriginal) => {
-        const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
-        return new Proxy(
-            {
-                ...actual,
-                COPILOT_MCP_SERVERS: '',
-                COPILOT_CUSTOM_AGENTS: '',
-                COPILOT_DISABLED_AGENTS: '',
-                COPILOT_OPERATIONAL_PROFILE: 'production',
-                COPILOT_MODEL: 'gpt-4o',
-                COPILOT_REASONING_EFFORT: '',
-                COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,
-                DASHBOARD_SOCKET_AUTH_REQUIRED: false,
-                AGENT_MAX_LISTENERS: 100,
-                CONTEXT_UTIL_WARN_THRESHOLD: 0.9,
-                WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
-                BRIDGE_ADMIN_TOKEN: 'test',
-                SSE_REPLAY_BUFFER_SIZE: 100,
-                SSE_MAX_CONCURRENT: 10,
-                LLM_B_DIALOG_QUEUE_MAX: 50,
-                LLM_B_BOOT_TIMEOUT_MS: 1000,
-                LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK: false,
-                TERMINAL_MAX_INJECT_HISTORY: 20,
-                TERMINAL_MAX_LISTENERS: 50,
-                TERMINAL_MAX_ATTACHMENTS: 10,
-                TERMINAL_SHOW_STREAMING: true,
-                TERMINAL_SHOW_THINKING: true,
-                getCopilotFallbackModel: vi.fn(() => null),
+vi.mock('#copilot/config/env', async (importOriginal) => {
+    const actual = /** @type {Record<string, unknown>} */ (await importOriginal());
+    return new Proxy(
+        {
+            ...actual,
+            COPILOT_MCP_SERVERS: '',
+            COPILOT_CUSTOM_AGENTS: '',
+            COPILOT_DISABLED_AGENTS: '',
+            COPILOT_OPERATIONAL_PROFILE: 'production',
+            COPILOT_MODEL: 'gpt-4o',
+            COPILOT_REASONING_EFFORT: '',
+            COPILOT_HUB_SOCKET_AUTH_REQUIRED: false,
+            DASHBOARD_SOCKET_AUTH_REQUIRED: false,
+            AGENT_MAX_LISTENERS: 100,
+            CONTEXT_UTIL_WARN_THRESHOLD: 0.9,
+            WEBHOOK_ALLOW_PRIVATE_HOSTS: false,
+            BRIDGE_ADMIN_TOKEN: 'test',
+            SSE_REPLAY_BUFFER_SIZE: 100,
+            SSE_MAX_CONCURRENT: 10,
+            LLM_B_DIALOG_QUEUE_MAX: 50,
+            LLM_B_BOOT_TIMEOUT_MS: 1000,
+            LLM_B_DIALOG_BOOT_RECOVERY_ALLOW_PR_FALLBACK: false,
+            TERMINAL_MAX_INJECT_HISTORY: 20,
+            TERMINAL_MAX_LISTENERS: 50,
+            TERMINAL_MAX_ATTACHMENTS: 10,
+            TERMINAL_SHOW_STREAMING: true,
+            TERMINAL_SHOW_THINKING: true,
+            getCopilotFallbackModel: vi.fn(() => null),
+        },
+        {
+            get(target, prop) {
+                return Reflect.get(target, prop);
             },
-            {
-                get(target, prop) {
-                    return Reflect.get(target, prop);
-                },
-            },
-        );
-    },
-);
+        },
+    );
+});
 
 vi.mock('#copilot/sdk/models', () => ({
     modelSelector: {
@@ -218,7 +215,10 @@ describe('E1 — mergeStaticFilters', () => {
 describe('E1.2 — createHooks dynamic-only path', () => {
     it('permite todas as tools quando sem listas estáticas', async () => {
         const hooks = createHooks({ auditLog: true });
-        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'any_tool', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
+        const result = await hooks.onPreToolUse?.(
+            { sessionId: 's1', toolName: 'any_tool', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
+            INV,
+        );
         expect(result).toEqual({ permissionDecision: 'allow' });
     });
 
@@ -226,7 +226,10 @@ describe('E1.2 — createHooks dynamic-only path', () => {
         const hooks = createHooks({
             onPermissionAsk: async () => false,
         });
-        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'shell', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
+        const result = await hooks.onPreToolUse?.(
+            { sessionId: 's1', toolName: 'shell', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
+            INV,
+        );
         expect(result?.permissionDecision).toBe('deny');
     });
 
@@ -244,13 +247,19 @@ describe('E1.2 — createHooks dynamic-only path', () => {
 
     it('static path: denyTools nega tool listada', async () => {
         const hooks = createHooks({ denyTools: ['rm_rf'] });
-        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'rm_rf', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
+        const result = await hooks.onPreToolUse?.(
+            { sessionId: 's1', toolName: 'rm_rf', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
+            INV,
+        );
         expect(result?.permissionDecision).toBe('deny');
     });
 
     it('static path: allowTools nega tool não listada', async () => {
         const hooks = createHooks({ allowTools: ['read_file'] });
-        const result = await hooks.onPreToolUse?.({ sessionId: 's1', toolName: 'shell', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' }, INV);
+        const result = await hooks.onPreToolUse?.(
+            { sessionId: 's1', toolName: 'shell', toolArgs: {}, timestamp: new Date(0), workingDirectory: '/' },
+            INV,
+        );
         expect(result?.permissionDecision).toBe('deny');
     });
 });

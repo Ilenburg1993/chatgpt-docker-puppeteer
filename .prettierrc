@@ -17,14 +17,8 @@
   "plugins": [
     "prettier-plugin-packagejson",
     "prettier-plugin-sh",
-    "prettier-plugin-organize-imports",
-    "prettier-plugin-jsdoc"
+    "prettier-plugin-organize-imports"
   ],
-  "jsdocCapitalizeDescription": false,
-  "jsdocCommentLineStrategy": "keep",
-  "jsdocVerticalAlignment": false,
-  "jsdocSeparateTagGroups": false,
-  "jsdocPrintWidth": 120,
   "overrides": [
     {
       "files": ["*.json", "*.jsonc", ".prettierrc", ".eslintrc"],
@@ -45,7 +39,8 @@
       "options": {
         "tabWidth": 2,
         "proseWrap": "always",
-        "printWidth": 100
+        "printWidth": 100,
+        "embeddedLanguageFormatting": "off"
       }
     },
     {

@@ -25,22 +25,17 @@ export {
     isGatewayModelProbeFreshlyVerified,
     isGatewayModelProbeVerified,
     listGatewayModelVerifiedProbeKinds,
-    summarizeGatewayRuntimeProofFreshness,
     readGatewayModelHealth,
     readGatewayModelHealthFromIndex,
     readGatewayModelHealthFromRecords,
     readGatewayModelProbeHealth,
+    summarizeGatewayRuntimeProofFreshness,
 } from './health-routing.js';
 export {
     MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
     renderModelGatewayLocalProviderOptInGuidance,
     summarizeModelGatewayLocalProviderOptInBlocks,
 } from './local-provider-opt-in.js';
-export {
-    MODEL_GATEWAY_TASK_PROFILES,
-    listModelGatewayTaskProfiles,
-    resolveModelGatewayTaskProfile,
-} from './task-profiles.js';
 export {
     DEFAULT_MODEL_GATEWAY_RUNTIME_PROOF_WEIGHTS,
     routeGatewayModels,
@@ -49,12 +44,12 @@ export {
 } from './policy-engine.js';
 export {
     buildModelGatewayControlPlaneHostEnv,
+    buildModelGatewayRuntimeProofCommands,
+    buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewayRuntimeSelectorProbeEnv,
     buildModelGatewayRuntimeSelectorProbeRun,
-    buildModelGatewayRuntimeProofCommands,
     buildModelGatewayRuntimeStandbyPlan,
     buildModelGatewayRuntimeStandbyRoutes,
-    buildModelGatewayRuntimeSelectorPlan,
     evaluateModelGatewayRuntimeSelectorRouteEnv,
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
@@ -62,19 +57,24 @@ export {
     selectModelGatewayRuntimeRoute,
 } from './runtime-selector.js';
 export {
+    MODEL_GATEWAY_SELECTION_POLICY_MODE,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     compareModelGatewaySelectionAudits,
     explainModelGatewaySelectionComparison,
-    MODEL_GATEWAY_SELECTION_POLICY_MODE,
     resolveModelGatewaySelectionPolicy,
 } from './selection-audit.js';
 export {
+    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     applyModelGatewaySelectionTraceRetention,
     buildModelGatewaySelectionDecisionTrace,
     compareModelGatewaySelectionDecisionTraces,
-    DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
     listModelGatewaySelectionDecisionTraceFiles,
     persistModelGatewaySelectionDecisionTrace,
     readModelGatewaySelectionDecisionTrace,
 } from './selection-trace.js';
+export {
+    MODEL_GATEWAY_TASK_PROFILES,
+    listModelGatewayTaskProfiles,
+    resolveModelGatewayTaskProfile,
+} from './task-profiles.js';

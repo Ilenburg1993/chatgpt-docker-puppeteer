@@ -98,7 +98,7 @@ function normalizeMistralCapabilities(capabilities) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const capabilities = isRecord(row['capabilities']) ? row['capabilities'] : {};
@@ -144,8 +144,14 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.mistral.job', value: stringValue(row['job']) },
         { fieldPath: 'providerMetadata.mistral.type', value: stringValue(row['TYPE']) ?? stringValue(row['type']) },
         { fieldPath: 'providerMetadata.mistral.archived', value: row['archived'] },
-        { fieldPath: 'providerMetadata.mistral.defaultTemperature', value: finiteNumber(row['default_model_temperature']) },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        {
+            fieldPath: 'providerMetadata.mistral.defaultTemperature',
+            value: finiteNumber(row['default_model_temperature']),
+        },
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.created', value: unixSecondsToIso(row['created']) },
         { fieldPath: 'openai.owned_by', value: stringValue(row['owned_by']) },
     ];
@@ -233,7 +239,9 @@ export function createMistralModelsImporter(options = {}) {
         },
         toAccountOverlays(rows, context) {
             const sourceId = stringValue(context.source['id']) ?? 'mistral-models';
-            const enabledModels = rows.map((row) => stringValue(isRecord(row) ? row['id'] : null)).filter((id) => id !== null);
+            const enabledModels = rows
+                .map((row) => stringValue(isRecord(row) ? row['id'] : null))
+                .filter((id) => id !== null);
             const controls = normalizeAccountOverlayControls({
                 enabledModels,
                 providerMetadata: {

@@ -2,8 +2,8 @@
 /**
  * tests/unit/copilot/tools/search/test_search_tools.spec.js
  *
- * Testes unitários para src/copilot/tools/search/ — domínio canônico de search.
- * Cobre: searchInFilesTool, workspaceSymbolSearchTool, findSymbolUsagesTool, searchTools barrel.
+ * Testes unitários para src/copilot/tools/search/ — domínio canônico de search. Cobre: searchInFilesTool,
+ * workspaceSymbolSearchTool, findSymbolUsagesTool, searchTools barrel.
  */
 
 import * as fs from 'node:fs';
@@ -73,7 +73,7 @@ describe('search barrel — estrutura', () => {
 describe('searchInFilesTool (search_in_files)', () => {
     it('tem nome e descrição canônicos', () => {
         expect(/** @type {any} */ (searchInFilesTool).name).toBe('search_in_files');
-        expect(typeof /** @type {any} */ (searchInFilesTool).description).toBe('string');
+        expect(typeof (/** @type {any} */ (searchInFilesTool).description)).toBe('string');
     });
 
     it('encontra texto em arquivo dentro do workspace', async () => {

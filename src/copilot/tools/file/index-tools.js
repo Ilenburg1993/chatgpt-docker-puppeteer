@@ -348,7 +348,9 @@ export const workspaceParseFileTool = buildTool({
             return { path: filePath, error: toError(err).message, success: false };
         }
 
-        const parsed = await parseFileForContext(pathCheck.resolved, content, { contentHash });
+        const parsed = await parseFileForContext(pathCheck.resolved, content, {
+            ...(typeof contentHash === 'string' ? { contentHash } : {}),
+        });
         const windowed = windowFileContext(parsed, {
             maxItems,
             maxBytes,

@@ -2,8 +2,8 @@
 /**
  * Read-only readiness audit for OpenAI Secure MCP Tunnel.
  *
- * This module does not create tunnels, run tunnel-client, call OpenAI APIs, or return secret values.
- * It only reports local readiness signals and a migration checklist.
+ * This module does not create tunnels, run tunnel-client, call OpenAI APIs, or return secret values. It only reports
+ * local readiness signals and a migration checklist.
  *
  * @module copilot/mcp/openai/secure-tunnel-readiness
  */
@@ -32,7 +32,10 @@ export function auditOpenAiSecureMcpTunnelReadiness(options = {}) {
     if (!tunnelIdPresent.present) blockers.push('Missing tunnel_id for the OpenAI-hosted MCP tunnel endpoint.');
     if (!runtimeKeyPresent.present) blockers.push('Missing tunnel-client runtime credential with Tunnels Read + Use.');
     if (!tunnelClient.found) warnings.push('tunnel-client binary was not found on PATH.');
-    if (!isLikelyLocalOrPrivateMcpUrl(mcpUrl)) warnings.push('Configured MCP URL does not look private/local; Secure MCP Tunnel is most useful for private origins.');
+    if (!isLikelyLocalOrPrivateMcpUrl(mcpUrl))
+        warnings.push(
+            'Configured MCP URL does not look private/local; Secure MCP Tunnel is most useful for private origins.',
+        );
 
     return {
         ok: blockers.length === 0,
@@ -43,13 +46,18 @@ export function auditOpenAiSecureMcpTunnelReadiness(options = {}) {
             purpose: 'Connect a private MCP server to supported OpenAI products without public inbound ingress.',
             networkInitiation: 'outbound-only HTTPS from tunnel-client to OpenAI',
             localForwarding: 'stdio command or HTTP MCP server reachable from inside the same trust boundary',
-            oauthCaveat: 'OAuth discovery can travel through the tunnel, but the authorization server is not automatically tunneled.',
+            oauthCaveat:
+                'OAuth discovery can travel through the tunnel, but the authorization server is not automatically tunneled.',
         },
         costPosture: {
             pricingKnownFromLocalAudit: false,
             policy: 'do-not-proceed-if-paid-or-plan-upgrade-required',
-            currentDecision: blockers.length > 0 || !tunnelClient.found ? 'stay-on-current-cloudflare-mode' : 'eligible-for-manual-no-cost-confirmation-before-staging',
-            rationale: 'This audit cannot prove the Platform tunnel feature is free for the current account, so paid or plan-upgrade-dependent actions are intentionally out of scope.',
+            currentDecision:
+                blockers.length > 0 || !tunnelClient.found
+                    ? 'stay-on-current-cloudflare-mode'
+                    : 'eligible-for-manual-no-cost-confirmation-before-staging',
+            rationale:
+                'This audit cannot prove the Platform tunnel feature is free for the current account, so paid or plan-upgrade-dependent actions are intentionally out of scope.',
         },
         observed: {
             tunnelClientBinary: tunnelClient,
@@ -78,11 +86,19 @@ export function auditOpenAiSecureMcpTunnelReadiness(options = {}) {
  */
 function buildNextActions(credentialsReady, tunnelClientFound) {
     const actions = [];
-    if (!tunnelClientFound) actions.push('Install tunnel-client from Platform tunnel settings or latest release guidance.');
-    if (!credentialsReady) actions.push('Provision tunnel_id and a runtime key with Tunnels Read + Use, then re-run this audit.');
-    actions.push('Do not create or activate a Secure MCP Tunnel if the current account requires payment or a plan upgrade.');
-    actions.push('Run tunnel-client doctor before ChatGPT connector discovery only after no-cost eligibility is confirmed.');
-    actions.push('Stage Secure MCP Tunnel in parallel with the existing Cloudflare connector, then compare discovery, OAuth, latency, streaming and failure modes.');
+    if (!tunnelClientFound)
+        actions.push('Install tunnel-client from Platform tunnel settings or latest release guidance.');
+    if (!credentialsReady)
+        actions.push('Provision tunnel_id and a runtime key with Tunnels Read + Use, then re-run this audit.');
+    actions.push(
+        'Do not create or activate a Secure MCP Tunnel if the current account requires payment or a plan upgrade.',
+    );
+    actions.push(
+        'Run tunnel-client doctor before ChatGPT connector discovery only after no-cost eligibility is confirmed.',
+    );
+    actions.push(
+        'Stage Secure MCP Tunnel in parallel with the existing Cloudflare connector, then compare discovery, OAuth, latency, streaming and failure modes.',
+    );
     return actions;
 }
 
@@ -146,5 +162,13 @@ function findExecutable(binaryName, pathEnv) {
  */
 function isLikelyLocalOrPrivateMcpUrl(url) {
     const text = String(url).toLowerCase();
-    return text.includes('127.0.0.1') || text.includes('localhost') || text.includes('10.') || text.includes('192.168.') || /172\.(1[6-9]|2\d|3[01])\./u.test(text) || text.includes('.internal') || text.includes('.local');
+    return (
+        text.includes('127.0.0.1') ||
+        text.includes('localhost') ||
+        text.includes('10.') ||
+        text.includes('192.168.') ||
+        /172\.(1[6-9]|2\d|3[01])\./u.test(text) ||
+        text.includes('.internal') ||
+        text.includes('.local')
+    );
 }

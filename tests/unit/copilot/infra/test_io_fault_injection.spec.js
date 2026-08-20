@@ -4,10 +4,11 @@ import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createJsonlFileWriter } from '../../../../src/copilot/infra/io/jsonl-file-writer.js';
 import { copyFileUnlocked } from '../../../../src/copilot/infra/io/fs/copy.js';
 import { moveFileUnlocked } from '../../../../src/copilot/infra/io/fs/move.js';
+import { deleteFileUnlocked } from '../../../../src/copilot/infra/io/fs/remove.js';
 import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/write-atomic.js';
+import { createJsonlFileWriter } from '../../../../src/copilot/infra/io/jsonl-file-writer.js';
 import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 /** @type {string[]} */
@@ -43,14 +44,53 @@ describe('infra/io deterministic fault injection', () => {
         expect(await readdir(dir)).toEqual(['write.txt']);
     });
 
+    it.skipIf(process.platform === 'win32')(
+        'remove staging inode quando falha antes ou depois de aplicar o modo final',
+        async () => {
+            for (const phase of ['before-mode-apply', 'after-mode-apply']) {
+                const dir = await createTempDir();
+                const target = path.join(dir, `write-${phase}.txt`);
+                await writeFile(target, 'old');
+                await stat(target);
+
+                await expect(
+                    writeAtomicFileUnlocked(target, 'new', { mode: 0o640, onPhase: throwAt(phase) }),
+                ).rejects.toThrow(`fault:${phase}`);
+
+                expect(await readFile(target, 'utf8')).toBe('old');
+                expect(await readdir(dir)).toEqual([path.basename(target)]);
+            }
+        },
+    );
+
+    it('remove staging inode quando falha imediatamente antes ou depois do file fsync', async () => {
+        for (const phase of ['before-file-sync', 'after-file-sync']) {
+            const dir = await createTempDir();
+            const target = path.join(dir, `write-${phase}.txt`);
+            await writeFile(target, 'old');
+
+            await expect(writeAtomicFileUnlocked(target, 'new', { onPhase: throwAt(phase) })).rejects.toThrow(
+                `fault:${phase}`,
+            );
+
+            expect(await readFile(target, 'utf8')).toBe('old');
+            expect(await readdir(dir)).toEqual([path.basename(target)]);
+        }
+    });
+
     it('expõe estado aplicado quando write falha depois de publish', async () => {
         const dir = await createTempDir();
         const target = path.join(dir, 'write.txt');
         await writeFile(target, 'old');
 
-        await expect(writeAtomicFileUnlocked(target, 'new', { onPhase: throwAt('after-publish') })).rejects.toThrow(
-            'fault:after-publish',
-        );
+        await expect(
+            writeAtomicFileUnlocked(target, 'new', { onPhase: throwAt('after-publish') }),
+        ).rejects.toMatchObject({
+            message: 'fault:after-publish',
+            mutationApplied: true,
+            mutationPhase: 'post-publish',
+            mutationPath: target,
+        });
 
         expect(await readFile(target, 'utf8')).toBe('new');
         expect(await readdir(dir)).toEqual(['write.txt']);
@@ -86,7 +126,13 @@ describe('infra/io deterministic fault injection', () => {
             writeAtomicFileUnlocked(target, 'new', {
                 syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 }),
             }),
-        ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
+        ).rejects.toMatchObject({
+            code: 'EDIRECTORYSYNC',
+            cause: 'EIO',
+            mutationApplied: true,
+            mutationPhase: 'post-publish',
+            mutationPath: target,
+        });
 
         expect(await readFile(target, 'utf8')).toBe('new');
     });
@@ -97,9 +143,9 @@ describe('infra/io deterministic fault injection', () => {
         const destination = path.join(dir, 'destination.txt');
         await Promise.all([writeFile(source, 'new'), writeFile(destination, 'old')]);
 
-        await expect(
-            copyFileUnlocked(source, destination, { onPhase: throwAt('before-publish') }),
-        ).rejects.toThrow('fault:before-publish');
+        await expect(copyFileUnlocked(source, destination, { onPhase: throwAt('before-publish') })).rejects.toThrow(
+            'fault:before-publish',
+        );
 
         expect(await readFile(destination, 'utf8')).toBe('old');
         expect((await readdir(dir)).sort()).toEqual(['destination.txt', 'source.txt']);
@@ -115,10 +161,35 @@ describe('infra/io deterministic fault injection', () => {
             copyFileUnlocked(source, destination, {
                 syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 }),
             }),
-        ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
+        ).rejects.toMatchObject({
+            code: 'EDIRECTORYSYNC',
+            cause: 'EIO',
+            mutationApplied: true,
+            mutationPhase: 'post-publish',
+            mutationPath: destination,
+        });
 
         expect(await readFile(source, 'utf8')).toBe('new');
         expect(await readFile(destination, 'utf8')).toBe('new');
+    });
+
+    it('marca delete como aplicado quando apenas a confirmação de directory sync falha', async () => {
+        const dir = await createTempDir();
+        const target = path.join(dir, 'delete-applied.txt');
+        await writeFile(target, 'content');
+
+        await expect(
+            deleteFileUnlocked(target, {
+                syncDirectory: async () => ({ attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 }),
+            }),
+        ).rejects.toMatchObject({
+            code: 'EDIRECTORYSYNC',
+            cause: 'EIO',
+            mutationApplied: true,
+            mutationPhase: 'parent-directory-sync',
+            mutationPath: target,
+        });
+        await expect(access(target)).rejects.toMatchObject({ code: 'ENOENT' });
     });
 
     it('reporta duplicação quando move publica mas falha antes de remover origem', async () => {
@@ -174,7 +245,13 @@ describe('infra/io deterministic fault injection', () => {
                         : { attempted: true, ok: false, errorCode: 'EIO', durationMs: 0 };
                 },
             }),
-        ).rejects.toMatchObject({ code: 'EDIRECTORYSYNC', cause: 'EIO' });
+        ).rejects.toMatchObject({
+            code: 'EDIRECTORYSYNC',
+            cause: 'EIO',
+            mutationApplied: true,
+            mutationPhase: 'source-removed',
+            mutationPaths: [source, destination],
+        });
 
         await expect(access(source)).rejects.toMatchObject({ code: 'ENOENT' });
         expect(await readFile(destination, 'utf8')).toBe('content');
@@ -261,6 +338,88 @@ describe('infra/io deterministic fault injection', () => {
         await writer.flush();
         expect(await readFile(filePath, 'utf8')).toBe('{"new":true}\n');
         expect(writer.getState().queueDepth).toBe(0);
+    });
+
+    it('recupera retry após rotação com size-cache já quente sem tentar rotacionar pathname ausente', async () => {
+        const dir = await createTempDir();
+        const filePath = path.join(dir, 'cached-rotation.jsonl');
+        let failAfterRotation = true;
+        const writer = createJsonlFileWriter({
+            filePath,
+            autoFlush: false,
+            maxBytes: 20,
+            onPhase: (phase) => {
+                if (phase === 'before-append' && failAfterRotation && writer.getState().rotations > 0) {
+                    failAfterRotation = false;
+                    throw new Error('fault:cached-rotation-before-append');
+                }
+            },
+        });
+
+        writer.enqueueLine('{"first":1}');
+        await writer.flush();
+        expect(writer.getState().trackedFiles).toBe(1);
+
+        writer.enqueueLine('{"second":2}');
+        await expect(writer.flush()).rejects.toThrow('fault:cached-rotation-before-append');
+        expect(writer.getState().queueDepth).toBe(1);
+        expect(await readFile(`${filePath}.1`, 'utf8')).toBe('{"first":1}\n');
+
+        await writer.flush();
+        expect(await readFile(filePath, 'utf8')).toBe('{"second":2}\n');
+        expect(writer.getState().queueDepth).toBe(0);
+    });
+
+    it('não duplica lote JSONL quando falha depois de o append já ter sido aplicado', async () => {
+        const dir = await createTempDir();
+        const filePath = path.join(dir, 'applied-before-error.jsonl');
+        let fail = true;
+        const writer = createJsonlFileWriter({
+            filePath,
+            autoFlush: false,
+            onPhase: (phase) => {
+                if (phase === 'after-append' && fail) {
+                    fail = false;
+                    throw new Error('fault:after-append');
+                }
+            },
+        });
+        writer.enqueueLine('{"id":1}');
+
+        await expect(writer.flush()).rejects.toThrow('fault:after-append');
+        expect(writer.getState()).toMatchObject({
+            queueDepth: 0,
+            appliedButUnconfirmedBatches: 1,
+            appliedButUnconfirmedLines: 1,
+        });
+        expect(await readFile(filePath, 'utf8')).toBe('{"id":1}\n');
+
+        await writer.flush();
+        expect(await readFile(filePath, 'utf8')).toBe('{"id":1}\n');
+    });
+
+    it('sincroniza rotação e novo append sob durability file-and-directory', async () => {
+        const dir = await createTempDir();
+        const filePath = path.join(dir, 'durable-rotation.jsonl');
+        await writeFile(filePath, '{"old":true}\n');
+        /** @type {string[]} */
+        const syncedTargets = [];
+        const writer = createJsonlFileWriter({
+            filePath,
+            autoFlush: false,
+            maxBytes: 1,
+            durability: 'file-and-directory',
+            syncDirectory: async (targetPath) => {
+                syncedTargets.push(targetPath);
+                return { attempted: true, ok: true, durationMs: 0 };
+            },
+        });
+        writer.enqueueLine('{"new":true}');
+        await writer.flush();
+
+        expect(await readFile(`${filePath}.1`, 'utf8')).toBe('{"old":true}\n');
+        expect(await readFile(filePath, 'utf8')).toBe('{"new":true}\n');
+        expect(syncedTargets).toEqual([filePath, filePath]);
     });
 
     it('limita paths rastreados pelo writer JSONL dinâmico', async () => {

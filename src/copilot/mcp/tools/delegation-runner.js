@@ -5,14 +5,7 @@
  * @module copilot/mcp/tools/delegation-runner
  */
 
-import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import process from 'node:process';
-import { z } from 'zod';
-import {
-    TRANSPORT_BENCHMARK_STATE_PATH,
-    readCloudflareTunnelConfig,
-} from '#copilot/mcp/cloudflare';
+import { TRANSPORT_BENCHMARK_STATE_PATH, readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare';
 import {
     IO_CACHE_BENCHMARK_STATE_PATH,
     appendMcpAuditEvent,
@@ -24,6 +17,10 @@ import {
     readMcpMetricsSnapshot,
     spawnValidatorJob,
 } from '#copilot/mcp/control-plane';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import process from 'node:process';
+import { z } from 'zod';
 import { buildMcpCapabilitiesSummary } from './meta.js';
 import { repoStatusHandler } from './repo-status.js';
 import { mcpSmokeWorkspaceTool } from './smoke-workspace.js';
@@ -54,27 +51,48 @@ function buildMissionPlan(mission) {
     }
     if (mission === 'validate-focused') {
         return [
-            { step: 'run_copilot_validator', effect: 'Start one unit-focused validator job for an explicit Copilot test file.' },
+            {
+                step: 'run_copilot_validator',
+                effect: 'Start one unit-focused validator job for an explicit Copilot test file.',
+            },
             { step: 'job_get_summary', effect: 'Caller reads compact focused-job status.' },
         ];
     }
     if (mission === 'benchmark-io-cache') {
         return [
-            { step: 'mcp_runtime_health', effect: 'Read current IO-cache posture and last persisted representative benchmark.' },
-            { step: 'scheduled_io_cache_benchmark_runner', effect: 'Detached runner measures cold/L1/L2 in isolated child processes and temporary SQLite.' },
+            {
+                step: 'mcp_runtime_health',
+                effect: 'Read current IO-cache posture and last persisted representative benchmark.',
+            },
+            {
+                step: 'scheduled_io_cache_benchmark_runner',
+                effect: 'Detached runner measures cold/L1/L2 in isolated child processes and temporary SQLite.',
+            },
             { step: 'mcp_runtime_health', effect: 'Read persisted benchmark evidence and evidence-aware cache plan.' },
         ];
     }
     if (mission === 'benchmark-transport') {
         return [
-            { step: 'mcp_cloudflare_transport_benchmark_plan', effect: 'Read the fixed benchmark design and last persisted run.' },
-            { step: 'scheduled_transport_benchmark_runner', effect: 'Detached runner measures quic/auto/http2 and restores the initial control.' },
-            { step: 'mcp_cloudflare_transport_benchmark_plan', effect: 'Read persisted comparison after the runner completes.' },
+            {
+                step: 'mcp_cloudflare_transport_benchmark_plan',
+                effect: 'Read the fixed benchmark design and last persisted run.',
+            },
+            {
+                step: 'scheduled_transport_benchmark_runner',
+                effect: 'Detached runner measures quic/auto/http2 and restores the initial control.',
+            },
+            {
+                step: 'mcp_cloudflare_transport_benchmark_plan',
+                effect: 'Read persisted comparison after the runner completes.',
+            },
         ];
     }
     if (mission === 'validate-mcp-full') {
         return [
-            { step: 'mcp_run_safe_validation_suite', effect: 'Start suite-mcp-full only as explicit broad escalation.' },
+            {
+                step: 'mcp_run_safe_validation_suite',
+                effect: 'Start suite-mcp-full only as explicit broad escalation.',
+            },
             {
                 step: 'mcp_validation_dashboard',
                 effect: 'Caller reads compact validation status after the suite starts.',
@@ -102,7 +120,8 @@ export const delegateToRepoAutonomyRunnerTool = {
             .string()
             .min(1)
             .max(1024)
-            .optional()['describe']('Explicit Copilot .spec.js path for validate-focused.'),
+            .optional()
+            ['describe']('Explicit Copilot .spec.js path for validate-focused.'),
         dryRun: z.boolean().optional()['describe']('Plan only. Default: true.'),
         timeoutMs: z.number().int().min(1000).max(3600000).optional()['describe']('Validator timeout ms.'),
     },
@@ -219,7 +238,8 @@ export const delegateToRepoAutonomyRunnerTool = {
                 runnerPid: child.pid ?? null,
                 autoEnable: false,
                 isolatedDb: true,
-                nextStep: 'Use mcp_runtime_health to read persisted benchmark evidence; do not enable L2 automatically.',
+                nextStep:
+                    'Use mcp_runtime_health to read persisted benchmark evidence; do not enable L2 automatically.',
             });
         }
 
@@ -229,13 +249,7 @@ export const delegateToRepoAutonomyRunnerTool = {
             const requestId = `mcp-transport-benchmark-${randomUUID()}`;
             const child = spawn(
                 process.execPath,
-                [
-                    TRANSPORT_BENCHMARK_RUNNER,
-                    '--request-id',
-                    requestId,
-                    '--control-profile',
-                    controlProfile,
-                ],
+                [TRANSPORT_BENCHMARK_RUNNER, '--request-id', requestId, '--control-profile', controlProfile],
                 {
                     cwd: getMcpWorkspaceRoot(),
                     env: process.env,
@@ -264,7 +278,8 @@ export const delegateToRepoAutonomyRunnerTool = {
                 runnerPid: child.pid ?? null,
                 autoPromotion: false,
                 note: 'The detached runner may cause transient connector interruptions while switching profiles; it always attempts to restore the initial control.',
-                nextStep: 'After the runner settles, call mcp_cloudflare_transport_benchmark_plan to read the persisted run and comparison.',
+                nextStep:
+                    'After the runner settles, call mcp_cloudflare_transport_benchmark_plan to read the persisted run and comparison.',
             });
         }
 

@@ -1,12 +1,6 @@
 // @ts-check
 
-import {
-    cancelTimer,
-    registerInterval,
-    registerShutdownHandler,
-    SHUTDOWN_PRIORITY,
-    toError,
-} from '#copilot/core';
+import { cancelTimer, registerInterval, registerShutdownHandler, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
 import { getCopilotDb } from '#copilot/db';
 import { publishIoLifecycleEvent } from './io-observability.js';
 
@@ -133,22 +127,26 @@ function startPruneTimer(configuration) {
     if (_pruneTimer) return;
     const pruneCycleMs = configuration.pruneMs;
     _pruneTimerId = `io-cache-l2.prune:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-    _pruneTimer = registerInterval(_pruneTimerId, () => {
-        try {
-            const cache = _ioL2Cache;
-            if (!cache) return;
-            const removed = cache.pruneExpired();
-            if (removed > 0 && process.env['DEBUG_IO_L2'] === '1') {
-                console.debug(`[io-cache-l2] Pruned ${removed} expired entries.`);
+    _pruneTimer = registerInterval(
+        _pruneTimerId,
+        () => {
+            try {
+                const cache = _ioL2Cache;
+                if (!cache) return;
+                const removed = cache.pruneExpired();
+                if (removed > 0 && process.env['DEBUG_IO_L2'] === '1') {
+                    console.debug(`[io-cache-l2] Pruned ${removed} expired entries.`);
+                }
+            } catch (err) {
+                _lastPruneError = toError(err ?? 'unknown-prune-error').message;
+                _lastPruneErrorAtMs = Date.now();
+                if (process.env['DEBUG_IO_L2'] === '1') {
+                    console.error('[io-cache-l2] Prune error:', err);
+                }
             }
-        } catch (err) {
-            _lastPruneError = toError(err ?? 'unknown-prune-error').message;
-            _lastPruneErrorAtMs = Date.now();
-            if (process.env['DEBUG_IO_L2'] === '1') {
-                console.error('[io-cache-l2] Prune error:', err);
-            }
-        }
-    }, pruneCycleMs);
+        },
+        pruneCycleMs,
+    );
     _pruneTimer.unref();
 }
 

@@ -8,7 +8,7 @@
  * @module copilot/tools/file/write/patch-files-batch
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra';
+import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
@@ -69,7 +69,10 @@ export const patchFilesBatchTool = buildTool({
         targetConcurrency: z.number().int().min(1).max(MAX_PATCH_CONCURRENCY).optional().default(4),
         durability: z
             .enum(['file-and-directory', 'file', 'none'])
-            .optional()['describe']('Perfil de persistência após crash; default file-and-directory. Atomicidade e preconditions permanecem ativas.'),
+            .optional()
+            ['describe'](
+                'Perfil de persistência após crash; default file-and-directory. Atomicidade e preconditions permanecem ativas.',
+            ),
     }),
     handler: async ({ operations, dryRun, failureMode, targetConcurrency, durability }) => {
         const inputBytes = estimatePatchInputBytes(operations);
@@ -82,9 +85,12 @@ export const patchFilesBatchTool = buildTool({
             };
         }
 
-        /** @type {{ path: string; entries: { operation: ReturnType<typeof patchOperationSchema.parse>; index: number }[] }[]} */
+        /** @type {{
+    path: string;
+    entries: { operation: ReturnType<typeof patchOperationSchema.parse>; index: number }[];
+}[]} */
         const groups = [];
-        /** @type {Map<string, typeof groups[number]>} */
+        /** @type {Map<string, (typeof groups)[number]>} */
         const byPath = new Map();
         for (const [index, operation] of operations.entries()) {
             const parsed = patchOperationSchema.safeParse(operation);

@@ -2,23 +2,20 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { executeModelGatewayProbe } from '../../../../src/copilot/model-gateway/control-plane/probe-execution.js';
+import { classifyByokProviderFailure } from '../../../../src/copilot/model-gateway/health/provider-failure.js';
 import {
     classifyConfiguredByokProbeFailureScope,
     didConfiguredByokProbeAttemptProvider,
     runConfiguredByokAgentProbe,
     runConfiguredByokChatProbe,
 } from '../../../../src/copilot/model-gateway/probes/index.js';
-import { executeModelGatewayProbe } from '../../../../src/copilot/model-gateway/control-plane/probe-execution.js';
-import { classifyByokProviderFailure } from '../../../../src/copilot/model-gateway/health/provider-failure.js';
 import {
     executeModelGatewayRuntimeSelectorPlan,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     resolveModelGatewayRuntimeRetryDecision,
 } from '../../../../src/copilot/model-gateway/routing/runtime-selector.js';
-import {
-    createProbeSessionRuntime,
-    createReadyByokProbeFixture,
-} from './helpers/probe-fixtures.js';
+import { createProbeSessionRuntime, createReadyByokProbeFixture } from './helpers/probe-fixtures.js';
 
 const TEST_MODEL = 'unit/model';
 
@@ -47,7 +44,11 @@ function commonProbeDeps(overrides = {}) {
     return { ...base, ...overrides };
 }
 
-function selectorRoute(/** @type {string} */ profileId, /** @type {string} */ providerId, /** @type {string} */ providerModel) {
+function selectorRoute(
+    /** @type {string} */ profileId,
+    /** @type {string} */ providerId,
+    /** @type {string} */ providerModel,
+) {
     const selected = {
         id: `${providerId}:${providerModel}`,
         providerId,

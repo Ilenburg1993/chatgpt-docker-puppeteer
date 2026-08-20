@@ -1,19 +1,25 @@
 # Auditoria completa — Terminal Streaming Delta (src/copilot)
 
 Data: 2026-03-20  
-Escopo primario: `src/copilot/terminal`, `src/copilot/event-handlers/streaming.js`, `src/copilot/channel/client-dialog.js`, SSE server routes.  
-Documento de partida: `DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/TERMINAL-STREAMING-DELTA-ARCHITECTURE.md`.
+Escopo primario: `src/copilot/terminal`, `src/copilot/event-handlers/streaming.js`,
+`src/copilot/channel/client-dialog.js`, SSE server routes.  
+Documento de partida:
+`DOCUMENTAÇÃO/AUDITORIAS/COPILOT-AUDIT-REPORTS/TERMINAL-STREAMING-DELTA-ARCHITECTURE.md`.
 
 ## 1) Sumario executivo
 
-O pipeline de streaming do terminal esta funcional e mais robusto do que fases anteriores (delta publico incremental, separacao de reasoning, replay SSE e fallback por `assistant.message`), mas ainda existe **divergencia entre contrato documental e comportamento real**, alem de acoplamentos implicitos entre `busy-state`, dedupe cross-channel e persistencia de transcript.
+O pipeline de streaming do terminal esta funcional e mais robusto do que fases anteriores (delta
+publico incremental, separacao de reasoning, replay SSE e fallback por `assistant.message`), mas
+ainda existe **divergencia entre contrato documental e comportamento real**, alem de acoplamentos
+implicitos entre `busy-state`, dedupe cross-channel e persistencia de transcript.
 
 Estado geral:
 
 - **Confiabilidade operacional**: boa, com alguns riscos medium.
 - **Integridade semantica do texto streamado**: boa no caminho principal; com riscos em bordas.
 - **Convergencia arquitetural (SSOT unico)**: parcial.
-- **Observabilidade e SLOs de streaming**: intermediaria; faltam contracts e pain points testados ponta-a-ponta.
+- **Observabilidade e SLOs de streaming**: intermediaria; faltam contracts e pain points testados
+  ponta-a-ponta.
 
 ## 2) Analise da situacao atual (AS-IS)
 
@@ -24,70 +30,79 @@ Estado geral:
    - `dialog.delta` se `dialogLoopActive()`;
    - `task.delta` se fora do loop e `!isProcessing()`;
    - `task.reasoning` para reasoning.
-3. `src/copilot/channel/client-dialog.js` registra listeners temporarios de `task.delta` e `dialog.delta` e alimenta `onDelta`.
-4. `src/copilot/terminal/dialog/turn-display.js` renderiza stream publico (stdout + SSE `delta`) e reasoning separado (SSE `reasoning` + history `/thinking`).
-5. Fora de turno explicito, `src/copilot/terminal/events/task-stream-events.js` + `public-assistant-stream.js` cuidam do live/public stream e fechamento.
+3. `src/copilot/channel/client-dialog.js` registra listeners temporarios de `task.delta` e
+   `dialog.delta` e alimenta `onDelta`.
+4. `src/copilot/terminal/dialog/turn-display.js` renderiza stream publico (stdout + SSE `delta`) e
+   reasoning separado (SSE `reasoning` + history `/thinking`).
+5. Fora de turno explicito, `src/copilot/terminal/events/task-stream-events.js` +
+   `public-assistant-stream.js` cuidam do live/public stream e fechamento.
 6. `sdk-session-events.js` materializa `assistant.message` como fallback/transcript fora de turno.
 
 ### 2.2 Pontos fortes confirmados
 
-- Dedupe por identidade de evento no handler SDK (`WeakSet` + `eventId`) em `event-handlers/streaming.js`.
+- Dedupe por identidade de evento no handler SDK (`WeakSet` + `eventId`) em
+  `event-handlers/streaming.js`.
 - `turn-display` preserva repeticoes legitimas de chunk no display live (testado).
 - Reasoning separado do transcript publico (`turn-display.js`, `task-stream-events.js`).
 - Suppressao de mensagens internas de background `Persist ...` no runtime-events (testado).
-- SSE com replay buffer e filtros em rotas server (`server/routes/sse.js`, `server/routes/copilot-api/stream.js`).
+- SSE com replay buffer e filtros em rotas server (`server/routes/sse.js`,
+  `server/routes/copilot-api/stream.js`).
 
 ## 3) Situacao ideal (TO-BE)
 
 Arquitetura alvo:
 
-- Um contrato unico e versionado para streaming (`assistant.message_delta`, `assistant.message`, `assistant.reasoning_delta`, `task.delta`, `dialog.delta`) com invariantes explicitas.
+- Um contrato unico e versionado para streaming (`assistant.message_delta`, `assistant.message`,
+  `assistant.reasoning_delta`, `task.delta`, `dialog.delta`) com invariantes explicitas.
 - Dedupe apenas por identidade causal de evento (nunca por igualdade textual opportunistica).
-- Transcript integrity orientada por estado explicito (live-rendered, persisted, fallback-rendered), sem acoplamento implicito a `busy`.
-- SSE com semantica uniforme de replay/event-id entre terminal e server, com metricas de perda, lag, replay-depth e drop-rate.
-- Conjunto de testes de regressao para todos os caminhos de borda (turno ativo, turno ocioso, stall, reconnect, duplicate wiring, fallback, aborted turn, mailbox interactions).
+- Transcript integrity orientada por estado explicito (live-rendered, persisted, fallback-rendered),
+  sem acoplamento implicito a `busy`.
+- SSE com semantica uniforme de replay/event-id entre terminal e server, com metricas de perda, lag,
+  replay-depth e drop-rate.
+- Conjunto de testes de regressao para todos os caminhos de borda (turno ativo, turno ocioso, stall,
+  reconnect, duplicate wiring, fallback, aborted turn, mailbox interactions).
 
 ## 4) Parte I — Issues (bugs, gaps, riscos)
 
-| ID | Severidade | Categoria | Evidencia | Impacto |
-|---|---|---|---|---|
-| BUG-STR-001 | high | contract drift | Doc afirma remocao da supressao no bridge (`TERMINAL-STREAMING-DELTA-ARCHITECTURE.md`) mas `client-dialog.js` ainda tem `CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS=75` e filtro por chunk/source/tempo (`src/copilot/channel/client-dialog.js:28,156-161`) | Arquitetura documentada diverge do comportamento real; risco de decisao errada em manutencao e incidentes |
-| BUG-STR-002 | high | semantic loss | Teste oficial valida supressao imediata entre `task.delta` e `dialog.delta` (`tests/unit/copilot/test_client_dialog.spec.js:269-283`) | Repeticoes legitimas cross-channel em janela curta podem ser descartadas |
-| GAP-STR-003 | medium | hidden coupling | `task-transcript-accumulator` suprime flush se `seenWhileBusy` (`src/copilot/terminal/events/task-transcript-accumulator.js:73,107`) e `task-stream-events` marca busy-state (`src/copilot/terminal/events/task-stream-events.js:132-148`) | Integridade do transcript depende de acoplamento indireto com estado de busy e renderizacao live |
-| GAP-STR-004 | medium | test coverage | Nao ha teste dedicado para `assistant.turn_end` + `flushAll` em task transcript | Borda de encerramento de turno pode regredir sem sinal imediato |
-| GAP-STR-005 | medium | observability contract | `turn-display.js` publica SSE `delta` sem metadados de causalidade (turnId/chunkSeq/source) (`src/copilot/terminal/dialog/turn-display.js:318`) | Dificulta debug de duplicidade e correlacao com fallback final |
-| GAP-STR-006 | medium | replay semantics | Duas superficies SSE coexistem (raw terminal `terminal/dialog/sse.js` e pools `server/routes/sse.js`) com responsabilidades sobrepostas | Aumenta complexidade de troubleshooting e risco de inconsistencias sutis de replay |
-| GAP-STR-007 | low | documentation governance | Documento-base descreve estado ideal como se ja estivesse fechado, sem status de pendencias residuais | Leitura operacional pode induzir falsa sensacao de convergencia completa |
-| GAP-STR-008 | medium | safety/integrity | `onAssistantMessage` ignora mensagens com `agentId` (`sdk-session-events.js:311-314`) | Fluxos multi-agente podem ocultar texto relevante para operadores |
-| GAP-STR-009 | medium | lifecycle edge | Fechamento de stream publico depende de `task.completed/error` e `assistant.turn_end` (`task-stream-events.js:216-259`) | Abort/stall fora desses eventos pode deixar stream sem fechamento semantico no tempo esperado |
-| GAP-STR-010 | low | narrative hygiene | Supressao de ruido interno por regex (`agent-runtime-events.js:65-68`) e nao por taxonomia formal de evento | Fragilidade a variacoes textuais de descricao |
-| GAP-STR-011 | medium | SLO gap | Nao existe SLO formal versionado para TTFT/jitter/drop-rate no dominio terminal streaming | Operacao fica reativa, sem thresholds canonicamente governados |
-| GAP-STR-012 | low | replay capacity | Buffer task SSE em `/stream/tasks` usa 64 eventos (`server/routes/copilot-api/stream.js:112-114`) | Reconexoes apos burst podem perder historico curto sem alerta claro |
-| GAP-STR-013 | low | error transparency | `writeSseEvent` engole erro de write e apenas remove client (`terminal/dialog/sse.js:88-92`) | Sem telemetria rica de causa-raiz de desconexao |
-| GAP-STR-014 | medium | contract tests | Nao ha teste que compare explicitamente documento de arquitetura vs comportamento implementado | Drift documental volta a ocorrer com facilidade |
+| ID          | Severidade | Categoria                | Evidencia                                                                                                                                                                                                                                                  | Impacto                                                                                                   |
+| ----------- | ---------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| BUG-STR-001 | high       | contract drift           | Doc afirma remocao da supressao no bridge (`TERMINAL-STREAMING-DELTA-ARCHITECTURE.md`) mas `client-dialog.js` ainda tem `CROSS_CHANNEL_DELTA_SUPPRESSION_WINDOW_MS=75` e filtro por chunk/source/tempo (`src/copilot/channel/client-dialog.js:28,156-161`) | Arquitetura documentada diverge do comportamento real; risco de decisao errada em manutencao e incidentes |
+| BUG-STR-002 | high       | semantic loss            | Teste oficial valida supressao imediata entre `task.delta` e `dialog.delta` (`tests/unit/copilot/test_client_dialog.spec.js:269-283`)                                                                                                                      | Repeticoes legitimas cross-channel em janela curta podem ser descartadas                                  |
+| GAP-STR-003 | medium     | hidden coupling          | `task-transcript-accumulator` suprime flush se `seenWhileBusy` (`src/copilot/terminal/events/task-transcript-accumulator.js:73,107`) e `task-stream-events` marca busy-state (`src/copilot/terminal/events/task-stream-events.js:132-148`)                 | Integridade do transcript depende de acoplamento indireto com estado de busy e renderizacao live          |
+| GAP-STR-004 | medium     | test coverage            | Nao ha teste dedicado para `assistant.turn_end` + `flushAll` em task transcript                                                                                                                                                                            | Borda de encerramento de turno pode regredir sem sinal imediato                                           |
+| GAP-STR-005 | medium     | observability contract   | `turn-display.js` publica SSE `delta` sem metadados de causalidade (turnId/chunkSeq/source) (`src/copilot/terminal/dialog/turn-display.js:318`)                                                                                                            | Dificulta debug de duplicidade e correlacao com fallback final                                            |
+| GAP-STR-006 | medium     | replay semantics         | Duas superficies SSE coexistem (raw terminal `terminal/dialog/sse.js` e pools `server/routes/sse.js`) com responsabilidades sobrepostas                                                                                                                    | Aumenta complexidade de troubleshooting e risco de inconsistencias sutis de replay                        |
+| GAP-STR-007 | low        | documentation governance | Documento-base descreve estado ideal como se ja estivesse fechado, sem status de pendencias residuais                                                                                                                                                      | Leitura operacional pode induzir falsa sensacao de convergencia completa                                  |
+| GAP-STR-008 | medium     | safety/integrity         | `onAssistantMessage` ignora mensagens com `agentId` (`sdk-session-events.js:311-314`)                                                                                                                                                                      | Fluxos multi-agente podem ocultar texto relevante para operadores                                         |
+| GAP-STR-009 | medium     | lifecycle edge           | Fechamento de stream publico depende de `task.completed/error` e `assistant.turn_end` (`task-stream-events.js:216-259`)                                                                                                                                    | Abort/stall fora desses eventos pode deixar stream sem fechamento semantico no tempo esperado             |
+| GAP-STR-010 | low        | narrative hygiene        | Supressao de ruido interno por regex (`agent-runtime-events.js:65-68`) e nao por taxonomia formal de evento                                                                                                                                                | Fragilidade a variacoes textuais de descricao                                                             |
+| GAP-STR-011 | medium     | SLO gap                  | Nao existe SLO formal versionado para TTFT/jitter/drop-rate no dominio terminal streaming                                                                                                                                                                  | Operacao fica reativa, sem thresholds canonicamente governados                                            |
+| GAP-STR-012 | low        | replay capacity          | Buffer task SSE em `/stream/tasks` usa 64 eventos (`server/routes/copilot-api/stream.js:112-114`)                                                                                                                                                          | Reconexoes apos burst podem perder historico curto sem alerta claro                                       |
+| GAP-STR-013 | low        | error transparency       | `writeSseEvent` engole erro de write e apenas remove client (`terminal/dialog/sse.js:88-92`)                                                                                                                                                               | Sem telemetria rica de causa-raiz de desconexao                                                           |
+| GAP-STR-014 | medium     | contract tests           | Nao ha teste que compare explicitamente documento de arquitetura vs comportamento implementado                                                                                                                                                             | Drift documental volta a ocorrer com facilidade                                                           |
 
 ## 5) Parte II — Upgrades recomendados
 
-| ID | Prioridade | Upgrade | Proposta |
-|---|---|---|---|
-| UPG-STR-001 | P0 | Alinhar doc e runtime | Corrigir imediatamente doc ou remover supressao cross-channel de `client-dialog.js`; manter apenas dedupe por identidade de evento |
-| UPG-STR-002 | P0 | Delta envelope canonico | Incluir `turnId`, `streamId`, `chunkSeq`, `source`, `eventId` no payload SSE `delta` |
-| UPG-STR-003 | P0 | Contrato versionado | Criar `streaming-contract-v1` com invariantes obrigatorias e matriz de ownership |
-| UPG-STR-004 | P1 | Remover acoplamento com busy | Trocar `seenWhileBusy` por estado causal explicito (`renderedByExplicitTurn`, `renderedByPublicStream`) |
-| UPG-STR-005 | P1 | Fechamento robusto de stream | Adicionar fechamento por timeout/abort/stall com reason codes |
-| UPG-STR-006 | P1 | Testes de regressao cruzada | Suite para `task.delta + dialog.delta + assistant.message` em cenarios de corrida |
-| UPG-STR-007 | P1 | SLO formal | Definir SLOs: TTFT p95, delta jitter p95, replay miss rate, transcript mismatch rate |
-| UPG-STR-008 | P1 | Telemetria de dedupe | Contadores: `dedupe_identity_hits`, `dedupe_text_hits` (ate extincao), `dedupe_false_positive_suspected` |
-| UPG-STR-009 | P1 | Diagnostico ativo | Endpoint/command de inspeccao de streams vivos e estado de replay buffers |
-| UPG-STR-010 | P2 | Taxonomia de eventos internos | Substituir regex textual de supressao por flag estruturada (`internal=true`) |
-| UPG-STR-011 | P2 | Unificacao SSE terminal/server | Clarificar owner unico de replay-id e empacotamento de evento por canal |
-| UPG-STR-012 | P2 | Guardrails de payload | Budget por evento + metrica de truncamento por tipo |
-| UPG-STR-013 | P2 | Hardening multi-agente | Revisar politica de descarte em `onAssistantMessage` quando `agentId` presente |
-| UPG-STR-014 | P2 | Diff detector doc-codigo | Check automatizado de invariantes de arquitetura em CI |
-| UPG-STR-015 | P2 | Chaos streaming | Testes de reconexao, reorder, duplicated delivery, delayed turn_end |
-| UPG-STR-016 | P3 | Playback local | Ferramenta de replay de eventos capturados para reproduzir bugs de streaming |
-| UPG-STR-017 | P3 | Dashboard de streaming health | Painel com TTFT, throughput, mismatches, fallback-rate, replay depth |
-| UPG-STR-018 | P3 | Scorecard de convergencia | Indicadores por owner (terminal/dialog/events/server) com metas por faixa |
+| ID          | Prioridade | Upgrade                        | Proposta                                                                                                                           |
+| ----------- | ---------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| UPG-STR-001 | P0         | Alinhar doc e runtime          | Corrigir imediatamente doc ou remover supressao cross-channel de `client-dialog.js`; manter apenas dedupe por identidade de evento |
+| UPG-STR-002 | P0         | Delta envelope canonico        | Incluir `turnId`, `streamId`, `chunkSeq`, `source`, `eventId` no payload SSE `delta`                                               |
+| UPG-STR-003 | P0         | Contrato versionado            | Criar `streaming-contract-v1` com invariantes obrigatorias e matriz de ownership                                                   |
+| UPG-STR-004 | P1         | Remover acoplamento com busy   | Trocar `seenWhileBusy` por estado causal explicito (`renderedByExplicitTurn`, `renderedByPublicStream`)                            |
+| UPG-STR-005 | P1         | Fechamento robusto de stream   | Adicionar fechamento por timeout/abort/stall com reason codes                                                                      |
+| UPG-STR-006 | P1         | Testes de regressao cruzada    | Suite para `task.delta + dialog.delta + assistant.message` em cenarios de corrida                                                  |
+| UPG-STR-007 | P1         | SLO formal                     | Definir SLOs: TTFT p95, delta jitter p95, replay miss rate, transcript mismatch rate                                               |
+| UPG-STR-008 | P1         | Telemetria de dedupe           | Contadores: `dedupe_identity_hits`, `dedupe_text_hits` (ate extincao), `dedupe_false_positive_suspected`                           |
+| UPG-STR-009 | P1         | Diagnostico ativo              | Endpoint/command de inspeccao de streams vivos e estado de replay buffers                                                          |
+| UPG-STR-010 | P2         | Taxonomia de eventos internos  | Substituir regex textual de supressao por flag estruturada (`internal=true`)                                                       |
+| UPG-STR-011 | P2         | Unificacao SSE terminal/server | Clarificar owner unico de replay-id e empacotamento de evento por canal                                                            |
+| UPG-STR-012 | P2         | Guardrails de payload          | Budget por evento + metrica de truncamento por tipo                                                                                |
+| UPG-STR-013 | P2         | Hardening multi-agente         | Revisar politica de descarte em `onAssistantMessage` quando `agentId` presente                                                     |
+| UPG-STR-014 | P2         | Diff detector doc-codigo       | Check automatizado de invariantes de arquitetura em CI                                                                             |
+| UPG-STR-015 | P2         | Chaos streaming                | Testes de reconexao, reorder, duplicated delivery, delayed turn_end                                                                |
+| UPG-STR-016 | P3         | Playback local                 | Ferramenta de replay de eventos capturados para reproduzir bugs de streaming                                                       |
+| UPG-STR-017 | P3         | Dashboard de streaming health  | Painel com TTFT, throughput, mismatches, fallback-rate, replay depth                                                               |
+| UPG-STR-018 | P3         | Scorecard de convergencia      | Indicadores por owner (terminal/dialog/events/server) com metas por faixa                                                          |
 
 ## 6) Roadmap amplo (132 itens) — faixas, fases e subfases
 
@@ -286,11 +301,15 @@ Arquitetura alvo:
 
 ## 7) Priorizacao recomendada (ordem de execucao)
 
-1. **P0 imediato**: BUG-STR-001, BUG-STR-002, UPG-STR-001, UPG-STR-002, UPG-STR-003.  
-2. **P1 curto ciclo**: GAP-STR-003/004/005/009/011 + UPG-STR-004..009.  
-3. **P2/P3**: consolidacao SSE/fanout, hardening multi-runtime, observabilidade de maturidade e governanca continua.
+1. **P0 imediato**: BUG-STR-001, BUG-STR-002, UPG-STR-001, UPG-STR-002, UPG-STR-003.
+2. **P1 curto ciclo**: GAP-STR-003/004/005/009/011 + UPG-STR-004..009.
+3. **P2/P3**: consolidacao SSE/fanout, hardening multi-runtime, observabilidade de maturidade e
+   governanca continua.
 
 ## 8) Conclusao
 
-O sistema evoluiu corretamente na direcao de streaming incremental publico, mas ainda nao esta em convergencia canonica completa porque persiste uma deduplicacao temporal no bridge que conflita com o contrato declarado, e porque a integridade de transcript ainda depende de acoplamentos implicitos entre estado de busy e fechamento de fluxo. O roadmap acima (132 itens) fecha esse gap de forma governada por owners, contrato explicito, observabilidade e testes de regressao/chaos.
-
+O sistema evoluiu corretamente na direcao de streaming incremental publico, mas ainda nao esta em
+convergencia canonica completa porque persiste uma deduplicacao temporal no bridge que conflita com
+o contrato declarado, e porque a integridade de transcript ainda depende de acoplamentos implicitos
+entre estado de busy e fechamento de fluxo. O roadmap acima (132 itens) fecha esse gap de forma
+governada por owners, contrato explicito, observabilidade e testes de regressao/chaos.

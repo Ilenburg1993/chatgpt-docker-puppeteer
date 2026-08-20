@@ -1471,7 +1471,7 @@ Itens verificados e implementados durante revisão de AUDIT_SRC_COPILOT_4.md:
 | ARCH-N05           | ✅ DOCUMENTADO  | Arquivo tem `@deprecated` JSDoc; é re-export legítimo, sem ação necessária                                                                                              |
 | ARCH-N06           | ✅ IMPLEMENTADO | commit Batch-9 — importa de `constants.js`                                                                                                                              |
 | QUAL-N02           | ✅ IMPLEMENTADO | commit Batch-9 — env var `AGENT_MAX_LISTENERS`                                                                                                                          |
-| QUAL-N03           | ⏭ POSTERGADO   | Comentários de audit ID são documentação inline rastreável; limpeza cosmética sem impacto funcional                                                                     |
+| QUAL-N03           | ⏭ POSTERGADO    | Comentários de audit ID são documentação inline rastreável; limpeza cosmética sem impacto funcional                                                                     |
 
 ---
 

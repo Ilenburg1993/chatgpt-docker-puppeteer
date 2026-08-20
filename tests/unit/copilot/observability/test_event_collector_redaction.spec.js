@@ -1,24 +1,43 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { afterEach, describe, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, vi } from 'vitest';
 
-const fsMocks = vi.hoisted(() => ({
-    appendFile: vi.fn(async () => {}),
-    mkdir: vi.fn(async () => {}),
-    rename: vi.fn(async () => {}),
-    stat: vi.fn(async () => ({ size: 0 })),
+const writerMocks = vi.hoisted(() => {
+    /** @type {{
+    options: Record<string, unknown>;
+    enqueueLine: import('vitest').Mock;
+    flush: import('vitest').Mock;
+}[]} */
+    const instances = [];
+    const createJsonlFileWriter = vi.fn((options) => {
+        const instance = {
+            options,
+            enqueueLine: vi.fn(),
+            flush: vi.fn(async () => undefined),
+            getState: vi.fn(() => ({ queueDepth: 0 })),
+        };
+        instances.push(instance);
+        return instance;
+    });
+    return { createJsonlFileWriter, instances };
+});
+
+vi.mock('../../../../src/copilot/infra/io/jsonl-file-writer.js', () => ({
+    createJsonlFileWriter: writerMocks.createJsonlFileWriter,
 }));
-
-vi.mock('node:fs/promises', () => fsMocks);
 
 vi.mock('#copilot/observability/logger', () => ({
     log: vi.fn(),
 }));
 
 describe('observability/event-collector redaction', () => {
-    afterEach(() => {
+    beforeEach(() => {
+        writerMocks.instances.length = 0;
         vi.clearAllMocks();
+    });
+
+    afterEach(() => {
         vi.resetModules();
     });
 
@@ -51,24 +70,19 @@ describe('observability/event-collector redaction', () => {
             },
         });
 
-        await new Promise((resolve) => setImmediate(resolve));
-
-        assert.equal(fsMocks.appendFile.mock.calls.length, 1);
-        const persisted = String(/** @type {unknown[]} */ (fsMocks.appendFile.mock.calls[0] ?? [])[1] ?? '');
+        const writer = writerMocks.instances.find((instance) =>
+            String(instance.options['filePath'] ?? '').endsWith('/events.jsonl'),
+        );
+        assert.ok(writer, 'event collector must construct the canonical JSONL writer');
+        assert.equal(writer.enqueueLine.mock.calls.length, 1);
+        const persisted = String(writer.enqueueLine.mock.calls[0]?.[0] ?? '');
         assert.equal(persisted.includes(githubToken), false);
         assert.equal(persisted.includes(byokToken), false);
         assert.match(persisted, /\[redacted\]/);
         assert.match(persisted, /"type":"session.error"/);
     });
 
-    it('não sobrepõe ciclos de flush enquanto um append está em voo', async () => {
-        let releaseFirst = () => {};
-        fsMocks.appendFile.mockImplementationOnce(
-            () =>
-                new Promise((resolve) => {
-                    releaseFirst = resolve;
-                }),
-        );
+    it('encaminha eventos sucessivos para a mesma fila sem recriar a primitive de persistência', async () => {
         const { createEventCollector } = await import('../../../../src/copilot/observability/event-collector.js');
         /** @type {Record<string, ((event: any) => void)[]>} */
         const handlers = {};
@@ -84,12 +98,16 @@ describe('observability/event-collector redaction', () => {
         );
 
         handlers['session.error']?.[0]?.({ type: 'session.error', data: { message: 'first' } });
-        await vi.waitFor(() => assert.equal(fsMocks.appendFile.mock.calls.length, 1));
         handlers['session.error']?.[0]?.({ type: 'session.error', data: { message: 'second' } });
-        await new Promise((resolve) => setImmediate(resolve));
-        assert.equal(fsMocks.appendFile.mock.calls.length, 1);
 
-        releaseFirst();
-        await vi.waitFor(() => assert.equal(fsMocks.appendFile.mock.calls.length, 2));
+        const eventWriters = writerMocks.instances.filter((instance) =>
+            String(instance.options['filePath'] ?? '').endsWith('/events.jsonl'),
+        );
+        assert.equal(eventWriters.length, 1);
+        const writer = eventWriters[0];
+        assert.ok(writer);
+        assert.equal(writer.enqueueLine.mock.calls.length, 2);
+        assert.match(String(writer.enqueueLine.mock.calls[0]?.[0] ?? ''), /first/);
+        assert.match(String(writer.enqueueLine.mock.calls[1]?.[0] ?? ''), /second/);
     });
 });

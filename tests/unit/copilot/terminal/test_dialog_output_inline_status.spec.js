@@ -36,7 +36,9 @@ const mocks = vi.hoisted(() => ({
         pendingQuestionShadowRemainingMs: null,
         lastPrInfo: null,
     },
-    activitySnapshot: /** @type {ReturnType<typeof import('../../../../src/copilot/terminal/state/activity-state.js').readTerminalActivitySnapshot>} */ ({
+    activitySnapshot: /** @type {ReturnType<
+    typeof import('../../../../src/copilot/terminal/state/activity-state.js').readTerminalActivitySnapshot
+>} */ ({
         phase: 'tool',
         label: 'Executando tool',
         detail: 'lendo arquivo',
@@ -168,9 +170,7 @@ describe('terminal/dialog/output inline status', () => {
     });
 
     it('normaliza ids e tools internas antes de reservar a linha viva', () => {
-        writeInlineStatus(
-            'request_user_input ainda executando · report_intent_local · chatcmpl-tool-80d5a00b25801fef',
-        );
+        writeInlineStatus('request_user_input ainda executando · report_intent_local · chatcmpl-tool-80d5a00b25801fef');
 
         const output = writeSpy.mock.calls.map(([chunk]) => String(chunk)).join('');
         expect(output).toContain('Pergunta ao operador aguardando resposta');

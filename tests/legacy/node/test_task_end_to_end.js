@@ -17,10 +17,11 @@ const RESPONSES_DIR = path.join(TEST_DIR, 'respostas');
 // Test state
 let testsPassed = 0;
 let testsFailed = 0;
-/** @type {Array<{ name: string; error: string }>} */
+/** @type {{ name: string; error: string }[]} */
 const failedTests = [];
 
-/** @typedef {{
+/**
+ * @typedef {{
  *     storage?: { text_file?: string; markdown_file?: string; json_file?: string; html_file?: string };
  *     generation?: unknown;
  *     preview?: unknown;
@@ -28,14 +29,17 @@ const failedTests = [];
  *     file_path?: string;
  *     raw_output_preview?: string;
  *     finish_reason?: string;
- * }} MockTaskResult */
+ * }} MockTaskResult
+ */
 
-/** @typedef {{
+/**
+ * @typedef {{
  *     meta?: Record<string, unknown>;
- *     spec?: ({ payload?: Record<string, unknown> } & Record<string, unknown>);
+ *     spec?: { payload?: Record<string, unknown> } & Record<string, unknown>;
  *     state?: Record<string, unknown>;
  *     result?: MockTaskResult;
- * }} MockTaskOverrides */
+ * }} MockTaskOverrides
+ */
 
 // Helpers
 function setupTestDirs() {
@@ -153,10 +157,7 @@ async function testSchemaV5Validation() {
             throw new Error('Should have thrown validation error for empty user_message');
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            if (
-                !message.includes('String must contain at least 1 character') &&
-                !message.includes('Falha crítica')
-            ) {
+            if (!message.includes('String must contain at least 1 character') && !message.includes('Falha crítica')) {
                 throw error;
             }
         }
@@ -201,11 +202,7 @@ async function testIDSanitization() {
             throw new Error('Should have thrown validation error for invalid ID chars');
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            if (
-                !message.includes('Invalid') &&
-                !message.includes('inválido') &&
-                !message.includes('Falha crítica')
-            ) {
+            if (!message.includes('Invalid') && !message.includes('inválido') && !message.includes('Falha crítica')) {
                 throw error;
             }
         }

@@ -10,7 +10,7 @@
 
 const DEFAULT_ROUTE_DECISION_LEDGER_LIMIT = 200;
 
-/** @type {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>} */
+/** @type {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>[]} */
 const ROUTE_DECISION_LEDGER = [];
 
 /**
@@ -41,7 +41,7 @@ export function recordModelGatewayRouteDecision(event) {
 
 /**
  * @param {{ limit?: number }} [options]
- * @returns {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>}
+ * @returns {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>[]}
  */
 export function listModelGatewayRouteDecisions(options = {}) {
     const limit =
@@ -56,8 +56,8 @@ export function listModelGatewayRouteDecisions(options = {}) {
  * payload for each id. This is useful for scripts that capture pre-decision and runtime outcome events before writing
  * them to SQLite in one batch.
  *
- * @param {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent> | null | undefined>} events
- * @returns {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>}
+ * @param {(ReturnType<typeof import('./events.js').buildRouteDecisionEvent> | null | undefined)[]} events
+ * @returns {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>[]}
  */
 export function dedupeModelGatewayRouteDecisionEvents(events) {
     const validEvents = events.filter(
@@ -65,27 +65,25 @@ export function dedupeModelGatewayRouteDecisionEvents(events) {
         (event) => event !== null && event !== undefined && typeof event.decisionId === 'string',
     );
     return [
-        ...new Map(
-            validEvents.map((event) => [String(event.decisionId), cloneRouteDecisionEvent(event)]),
-        ).values(),
+        ...new Map(validEvents.map((event) => [String(event.decisionId), cloneRouteDecisionEvent(event)])).values(),
     ];
 }
 
 /**
- * Creates a bounded-to-the-current-operation route-decision recorder. The returned `record` function has the same
- * shape as `recordModelGatewayRouteDecision`, so it can be injected into runtime selector execution and later flushed
- * to an operational store.
+ * Creates a bounded-to-the-current-operation route-decision recorder. The returned `record` function has the same shape
+ * as `recordModelGatewayRouteDecision`, so it can be injected into runtime selector execution and later flushed to an
+ * operational store.
  *
  * @param {{ delegate?: typeof recordModelGatewayRouteDecision }} [options]
  * @returns {{
- *   record: typeof recordModelGatewayRouteDecision;
- *   list: () => Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>;
- *   listUnique: () => Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>;
- *   count: () => number;
+ *     record: typeof recordModelGatewayRouteDecision;
+ *     list: () => ReturnType<typeof import('./events.js').buildRouteDecisionEvent>[];
+ *     listUnique: () => ReturnType<typeof import('./events.js').buildRouteDecisionEvent>[];
+ *     count: () => number;
  * }}
  */
 export function createModelGatewayRouteDecisionCapture(options = {}) {
-    /** @type {Array<ReturnType<typeof import('./events.js').buildRouteDecisionEvent>>} */
+    /** @type {ReturnType<typeof import('./events.js').buildRouteDecisionEvent>[]} */
     const events = [];
     const delegate = typeof options.delegate === 'function' ? options.delegate : null;
     return Object.freeze({

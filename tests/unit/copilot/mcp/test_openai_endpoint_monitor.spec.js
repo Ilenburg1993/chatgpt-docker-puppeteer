@@ -1,12 +1,12 @@
 // @ts-check
 
-import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'vitest';
 import {
     readOpenAiEndpointLatencyMonitorState,
     resetOpenAiEndpointLatencyMonitorForTests,
     scheduleOpenAiEndpointLatencyMonitor,
 } from '#copilot/mcp/control-plane';
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'vitest';
 
 afterEach(() => resetOpenAiEndpointLatencyMonitorForTests());
 
@@ -23,15 +23,27 @@ function snapshot(ttfbMs = 100) {
         timeoutMs: 2500,
         targets: [
             {
-                id: 'chatgpt-web', hostname: 'chatgpt.com', samples: 1, successful: 1, successRate: 1,
-                statuses: [403], edgeColos: { GRU: 1 },
+                id: 'chatgpt-web',
+                hostname: 'chatgpt.com',
+                samples: 1,
+                successful: 1,
+                successRate: 1,
+                statuses: [403],
+                edgeColos: { GRU: 1 },
                 timings: {
                     dns: { count: 1, averageMs: 3, p50Ms: 3, p95Ms: 3, minMs: 3, maxMs: 3 },
                     tcp: { count: 1, averageMs: 20, p50Ms: 20, p95Ms: 20, minMs: 20, maxMs: 20 },
                     tls: { count: 1, averageMs: 25, p50Ms: 25, p95Ms: 25, minMs: 25, maxMs: 25 },
                     ttfb: { count: 1, averageMs: ttfbMs, p50Ms: ttfbMs, p95Ms: ttfbMs, minMs: ttfbMs, maxMs: ttfbMs },
                     serverWait: { count: 1, averageMs: 50, p50Ms: 50, p95Ms: 50, minMs: 50, maxMs: 50 },
-                    total: { count: 1, averageMs: ttfbMs + 1, p50Ms: ttfbMs + 1, p95Ms: ttfbMs + 1, minMs: ttfbMs + 1, maxMs: ttfbMs + 1 },
+                    total: {
+                        count: 1,
+                        averageMs: ttfbMs + 1,
+                        p50Ms: ttfbMs + 1,
+                        p95Ms: ttfbMs + 1,
+                        minMs: ttfbMs + 1,
+                        maxMs: ttfbMs + 1,
+                    },
                 },
             },
         ],
@@ -40,28 +52,33 @@ function snapshot(ttfbMs = 100) {
 
 describe('OpenAI endpoint latency monitor', () => {
     it('schedules once, runs non-blocking and reschedules after a successful cycle', async () => {
-        /** @type {Array<() => void>} */
+        /** @type {(() => void)[]} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
-            callbacks.push(fn);
-            return /** @type {NodeJS.Timeout} */ ({ unref() {} });
-        });
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
         let measured = 0;
         let persisted = 0;
-        assert.equal(scheduleOpenAiEndpointLatencyMonitor({
-            enabled: true,
-            initialDelayMs: 0,
-            intervalMs: 60_000,
-            setTimeoutFn,
-            measureFn: async () => {
-                measured += 1;
-                return { snapshot: snapshot(), samples: [] };
-            },
-            persistFn: async () => {
-                persisted += 1;
-                return { persisted: true, path: 'test.jsonl', maxSnapshots: 10_000, retainedSnapshots: 1 };
-            },
-        }), true);
+        assert.equal(
+            scheduleOpenAiEndpointLatencyMonitor({
+                enabled: true,
+                initialDelayMs: 0,
+                intervalMs: 60_000,
+                setTimeoutFn,
+                measureFn: async () => {
+                    measured += 1;
+                    return { snapshot: snapshot(), samples: [] };
+                },
+                persistFn: async () => {
+                    persisted += 1;
+                    return { persisted: true, path: 'test.jsonl', maxSnapshots: 10_000, retainedSnapshots: 1 };
+                },
+            }),
+            true,
+        );
         assert.equal(scheduleOpenAiEndpointLatencyMonitor({ enabled: true, setTimeoutFn }), false);
         assert.equal(callbacks.length, 1);
         callbacks.shift()?.();
@@ -78,18 +95,22 @@ describe('OpenAI endpoint latency monitor', () => {
     });
 
     it('records failure without throwing and still schedules the next cycle', async () => {
-        /** @type {Array<() => void>} */
+        /** @type {(() => void)[]} */
         const callbacks = [];
-        const setTimeoutFn = /** @type {typeof setTimeout} */ ((/** @type {() => void} */ fn) => {
-            callbacks.push(fn);
-            return /** @type {NodeJS.Timeout} */ ({ unref() {} });
-        });
+        const setTimeoutFn = /** @type {typeof setTimeout} */ (
+            (/** @type {() => void} */ fn) => {
+                callbacks.push(fn);
+                return /** @type {NodeJS.Timeout} */ ({ unref() {} });
+            }
+        );
         scheduleOpenAiEndpointLatencyMonitor({
             enabled: true,
             initialDelayMs: 0,
             intervalMs: 60_000,
             setTimeoutFn,
-            measureFn: async () => { throw new Error('simulated endpoint failure'); },
+            measureFn: async () => {
+                throw new Error('simulated endpoint failure');
+            },
         });
         callbacks.shift()?.();
         await new Promise((resolve) => setImmediate(resolve));

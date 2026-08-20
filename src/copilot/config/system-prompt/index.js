@@ -26,6 +26,7 @@ export {
     buildHookContextMessage,
     buildReplaceSystemMessage,
     buildSystemMessage,
+    buildSystemMessageFromResolvedConfig,
 } from './builders.js';
 
 export { SYSTEM_MESSAGE_SECTIONS, SYSTEM_PROMPT_SECTIONS };
@@ -56,6 +57,7 @@ export {
     readResolvedSystemPromptUserConfigSync,
     readUserAppendContent,
     readUserAppendContentSync,
+    refreshSystemPromptUserConfigSnapshot,
     SYSTEM_PROMPT_CONFIG_PATH,
     SYSTEM_PROMPT_DEFAULT_MODE,
     SYSTEM_PROMPT_DEFAULT_RELOAD_STRATEGY,

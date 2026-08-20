@@ -39,9 +39,7 @@ const client = new CopilotClient({
   },
 
   // Custom model listing para BYOK (v0.2.0)
-  onListModels: async () => [
-    /* modelos customizados */
-  ],
+  onListModels: async () => [/* modelos customizados */],
 });
 
 await client.start();

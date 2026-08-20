@@ -26,6 +26,7 @@ import {
     bootstrapTools,
     cancelAllUserInputRequests,
     configureHookTools,
+    hydrateCustomTools,
     isToolDisabled,
     readStore,
     resolveUserInput,
@@ -49,6 +50,11 @@ import {
  */
 export function bootstrapAgentTools(registry, mcpTools) {
     return bootstrapTools(registry, mcpTools);
+}
+
+/** Hydrate declarative custom tools before the synchronous tool registry is composed. */
+export async function hydrateAgentCustomTools() {
+    await hydrateCustomTools();
 }
 
 /**
@@ -144,6 +150,7 @@ export {
     AgentToolPolicy,
     configureHookTools,
     createToolSessionContext,
+    hydrateCustomTools,
     setExperimentalSession,
     setHub,
     setPermissionAgent,

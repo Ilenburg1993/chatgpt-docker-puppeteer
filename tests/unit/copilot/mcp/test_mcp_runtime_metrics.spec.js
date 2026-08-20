@@ -144,26 +144,29 @@ describe('copilot MCP runtime metrics', () => {
             detachedLiveRunReaperFailures: 0,
         });
         assert.ok(result.structuredContent['indexStats']);
-        const metrics = /** @type {{
-            totals: { calls: number };
-            phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
-            slowestTool: { name: string; calls: number; averageMs: number | null } | null;
-            slowestPhase: { tool: string; phase: string; calls: number; averageMs: number | null } | null;
-            ioCache?: {
-                l1?: Record<string, unknown>;
-                coherence?: Record<string, unknown>;
-                validatedReadPath?: Record<string, unknown>;
-                validatedMutablePath?: Record<string, unknown>;
-            };
-            ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
-            ioParser?: {
-                fileContextSize?: number;
-                fileContextHashComputations?: number;
-                fileContextHashReuses?: number;
-                workerFailures?: number;
-            };
-            aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
-        }} */ (result.structuredContent['metrics']);
+        const metrics =
+            /**
+             * @type {{
+             *     totals: { calls: number };
+             *     phaseTotals: Record<string, { calls: number; totalDurationMs: number; averageMs: number | null }>;
+             *     slowestTool: { name: string; calls: number; averageMs: number | null } | null;
+             *     slowestPhase: { tool: string; phase: string; calls: number; averageMs: number | null } | null;
+             *     ioCache?: {
+             *         l1?: Record<string, unknown>;
+             *         coherence?: Record<string, unknown>;
+             *         validatedReadPath?: Record<string, unknown>;
+             *         validatedMutablePath?: Record<string, unknown>;
+             *     };
+             *     ioCachePlan?: { l2Decision?: string; recommendationCount?: number };
+             *     ioParser?: {
+             *         fileContextSize?: number;
+             *         fileContextHashComputations?: number;
+             *         fileContextHashReuses?: number;
+             *         workerFailures?: number;
+             *     };
+             *     aiArtifacts?: { jobs?: Record<string, unknown>; rollback?: Record<string, unknown> };
+             * }}
+             */ (result.structuredContent['metrics']);
         assert.equal(metrics.totals.calls, 2);
         assert.equal(typeof metrics.ioCache?.l1?.['size'], 'number');
         assert.equal(typeof metrics.ioCache?.coherence?.['gapDetections'], 'number');

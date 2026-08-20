@@ -147,76 +147,72 @@ async function moveTemps(directory) {
 }
 
 describe('move EXDEV real crash states', () => {
-    it(
-        'preserves recoverable physical states across internal EXDEV crash phases',
-        async () => {
-            if (!(await hasDistinctSharedMemoryDevice())) return;
-            const sourceRoot = await mkdtemp(path.join(tmpdir(), 'copilot-move-crash-source-'));
-            const destinationRoot = await mkdtemp('/dev/shm/copilot-move-crash-destination-');
-            tempDirs.push(sourceRoot, destinationRoot);
-            const payload = Buffer.alloc(256 * 1024, 0x5a);
+    it('preserves recoverable physical states across internal EXDEV crash phases', async () => {
+        if (!(await hasDistinctSharedMemoryDevice())) return;
+        const sourceRoot = await mkdtemp(path.join(tmpdir(), 'copilot-move-crash-source-'));
+        const destinationRoot = await mkdtemp('/dev/shm/copilot-move-crash-destination-');
+        tempDirs.push(sourceRoot, destinationRoot);
+        const payload = Buffer.alloc(256 * 1024, 0x5a);
 
-            const cases = [
-                {
-                    id: 'temp-written',
-                    sourceExpected: true,
-                    destinationExpected: false,
-                    tempExpected: true,
-                },
-                {
-                    id: 'before-destination-directory-sync',
-                    sourceExpected: true,
-                    destinationExpected: true,
-                    tempExpected: false,
-                },
-                {
-                    id: 'inside-destination-directory-sync',
-                    sourceExpected: true,
-                    destinationExpected: true,
-                    tempExpected: false,
-                },
-                {
-                    id: 'after-source-unlink',
-                    sourceExpected: false,
-                    destinationExpected: true,
-                    tempExpected: false,
-                },
-            ];
+        const cases = [
+            {
+                id: 'temp-written',
+                sourceExpected: true,
+                destinationExpected: false,
+                tempExpected: true,
+            },
+            {
+                id: 'before-destination-directory-sync',
+                sourceExpected: true,
+                destinationExpected: true,
+                tempExpected: false,
+            },
+            {
+                id: 'inside-destination-directory-sync',
+                sourceExpected: true,
+                destinationExpected: true,
+                tempExpected: false,
+            },
+            {
+                id: 'after-source-unlink',
+                sourceExpected: false,
+                destinationExpected: true,
+                tempExpected: false,
+            },
+        ];
 
-            for (const scenario of cases) {
-                const source = path.join(sourceRoot, `${scenario.id}.bin`);
-                const destinationDir = path.join(destinationRoot, scenario.id);
-                const destination = path.join(destinationDir, 'destination.bin');
-                await import('node:fs/promises').then(({ mkdir }) => mkdir(destinationDir, { recursive: true }));
-                await writeFile(source, payload);
+        for (const scenario of cases) {
+            const source = path.join(sourceRoot, `${scenario.id}.bin`);
+            const destinationDir = path.join(destinationRoot, scenario.id);
+            const destination = path.join(destinationDir, 'destination.bin');
+            await import('node:fs/promises').then(({ mkdir }) => mkdir(destinationDir, { recursive: true }));
+            await writeFile(source, payload);
 
-                const child = startCrashCase({ source, destination, targetPhase: scenario.id });
-                const reached = /** @type {{ details?: { tmpDestination?: string } }} */ (
-                    await waitForPhase(child, scenario.id)
-                );
-                await killAndWait(child);
+            const child = startCrashCase({ source, destination, targetPhase: scenario.id });
+            const reached = /** @type {{ details?: { tmpDestination?: string } }} */ (
+                await waitForPhase(child, scenario.id)
+            );
+            await killAndWait(child);
 
-                if (scenario.sourceExpected) expect(await readFile(source)).toEqual(payload);
-                else await expectMissing(source);
-                if (scenario.destinationExpected) expect(await readFile(destination)).toEqual(payload);
-                else await expectMissing(destination);
+            if (scenario.sourceExpected) expect(await readFile(source)).toEqual(payload);
+            else await expectMissing(source);
+            if (scenario.destinationExpected) expect(await readFile(destination)).toEqual(payload);
+            else await expectMissing(destination);
 
-                const temps = await moveTemps(destinationDir);
-                expect(temps).toHaveLength(scenario.tempExpected ? 1 : 0);
-                if (scenario.tempExpected) {
-                    const tempName = temps[0];
-                    expect(tempName).toBeDefined();
-                    if (!tempName) throw new Error(`Arquivo temporário ausente para a fase ${scenario.id}.`);
-                    const tempPath = path.join(destinationDir, tempName);
-                    expect(reached.details?.tmpDestination).toBe(tempPath);
-                    expect(await readFile(tempPath)).toEqual(payload);
-                    const handle = await open(destinationDir, 'r');
-                    await handle.sync();
-                    await handle.close();
-                    await rm(tempPath, { force: true });
-                }
+            const temps = await moveTemps(destinationDir);
+            expect(temps).toHaveLength(scenario.tempExpected ? 1 : 0);
+            if (scenario.tempExpected) {
+                const tempName = temps[0];
+                expect(tempName).toBeDefined();
+                if (!tempName) throw new Error(`Arquivo temporário ausente para a fase ${scenario.id}.`);
+                const tempPath = path.join(destinationDir, tempName);
+                expect(reached.details?.tmpDestination).toBe(tempPath);
+                expect(await readFile(tempPath)).toEqual(payload);
+                const handle = await open(destinationDir, 'r');
+                await handle.sync();
+                await handle.close();
+                await rm(tempPath, { force: true });
             }
-        },
-        30_000,
-    );
+        }
+    }, 30_000);
 });

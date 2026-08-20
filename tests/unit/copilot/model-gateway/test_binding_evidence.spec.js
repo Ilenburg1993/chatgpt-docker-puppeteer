@@ -122,12 +122,14 @@ describe('model gateway direct rebind evidence', () => {
                 payload_json     TEXT NOT NULL
             ) STRICT;
         `);
-        db.prepare(`
+        db.prepare(
+            `
             INSERT INTO copilot_model_gateway_sdk_session_confirmations
                 (confirmation_id, handoff_id, decision_id, session_id, previous_model, confirmed_model,
                  reasoning_effort, status, observed_at_ms, payload_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
+        `,
+        ).run(
             'legacy-confirmation',
             'legacy-handoff',
             null,
@@ -160,12 +162,14 @@ describe('model gateway direct rebind evidence', () => {
             .all()
             .map((row) => /** @type {{ name: string }} */ (row).name);
         const relational = db
-            .prepare(`
+            .prepare(
+                `
                 SELECT previous_provider_id, provider_id, binding_strategy, wire_api,
                        selected_route_key, operation_state
                 FROM copilot_model_gateway_sdk_session_confirmations
                 WHERE confirmation_id = ?
-            `)
+            `,
+            )
             .get('legacy-confirmation');
         const evidence = await store.readSdkSessionBindingEvidenceRecords({
             providerId: 'openrouter',
@@ -262,10 +266,7 @@ describe('model gateway direct rebind evidence', () => {
             now: Date.parse('2026-06-17T12:00:00.000Z'),
         });
 
-        expect(rows.map((row) => row['confirmationId'])).toEqual([
-            'direct-failure-new',
-            'direct-success-old',
-        ]);
+        expect(rows.map((row) => row['confirmationId'])).toEqual(['direct-failure-new', 'direct-success-old']);
         expect(evidence).toMatchObject({
             directRebindReliability: 'unreliable',
             directRebindOk: false,
@@ -274,12 +275,14 @@ describe('model gateway direct rebind evidence', () => {
         });
 
         const relational = db
-            .prepare(`
+            .prepare(
+                `
                 SELECT previous_provider_id, provider_id, binding_strategy, wire_api,
                        selected_route_key, operation_state, status
                 FROM copilot_model_gateway_sdk_session_confirmations
                 WHERE confirmation_id = ?
-            `)
+            `,
+            )
             .get('direct-failure-new');
         expect(relational).toMatchObject({
             previous_provider_id: 'github-copilot-sdk',

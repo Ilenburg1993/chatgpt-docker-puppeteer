@@ -66,13 +66,7 @@ function isRecord(value) {
  */
 function stringArray(value) {
     if (!Array.isArray(value)) return [];
-    return [
-        ...new Set(
-            value
-                .map((item) => scalarString(item))
-                .filter((item) => item !== null),
-        ),
-    ];
+    return [...new Set(value.map((item) => scalarString(item)).filter((item) => item !== null))];
 }
 
 /**
@@ -92,10 +86,12 @@ function booleanValue(value) {
  * @returns {string[]}
  */
 export function normalizeCatalogModalities(values) {
-    const input = Array.isArray(values) ? values : scalarString(values)?.split(/[,+/ ]/u) ?? [];
+    const input = Array.isArray(values) ? values : (scalarString(values)?.split(/[,+/ ]/u) ?? []);
     const normalized = input
         .map((value) => scalarString(value)?.toLowerCase().replace(/\s+/gu, '_') ?? null)
-        .map((value) => (value ? MODALITY_ALIASES[/** @type {keyof typeof MODALITY_ALIASES} */ (value)] ?? value : null))
+        .map((value) =>
+            value ? (MODALITY_ALIASES[/** @type {keyof typeof MODALITY_ALIASES} */ (value)] ?? value) : null,
+        )
         .filter((value) => value !== null);
     return [...new Set(normalized)];
 }
@@ -127,7 +123,12 @@ export function normalizeModelModalities(input = {}) {
     const outputModalities = normalizeCatalogModalities(input.output);
     return {
         input: inputModalities.length > 0 ? inputModalities : expression.input.length > 0 ? expression.input : ['text'],
-        output: outputModalities.length > 0 ? outputModalities : expression.output.length > 0 ? expression.output : ['text'],
+        output:
+            outputModalities.length > 0
+                ? outputModalities
+                : expression.output.length > 0
+                  ? expression.output
+                  : ['text'],
     };
 }
 
@@ -139,7 +140,9 @@ export function normalizeModelModalities(input = {}) {
  * @returns {Record<string, boolean>}
  */
 export function normalizeOpenAICompatibleModelCapabilities(input = {}) {
-    const parameters = new Set(normalizeCatalogModalities(input.supportedParameters).map((value) => value.replace(/-/gu, '_')));
+    const parameters = new Set(
+        normalizeCatalogModalities(input.supportedParameters).map((value) => value.replace(/-/gu, '_')),
+    );
     const rawParameters = new Set(
         (Array.isArray(input.supportedParameters) ? input.supportedParameters : [])
             .map((value) => scalarString(value)?.toLowerCase() ?? null)
@@ -153,8 +156,13 @@ export function normalizeOpenAICompatibleModelCapabilities(input = {}) {
     if (rawParameters.has('tool_choice')) capabilities['forcedToolChoice'] = true;
     if (rawParameters.has('parallel_tool_calls')) capabilities['parallelToolCalls'] = true;
     if (rawParameters.has('response_format')) capabilities['jsonMode'] = true;
-    if (rawParameters.has('structured_outputs') || rawParameters.has('json_schema')) capabilities['structuredOutputs'] = true;
-    if (rawParameters.has('reasoning') || rawParameters.has('reasoning_effort') || rawParameters.has('include_reasoning')) {
+    if (rawParameters.has('structured_outputs') || rawParameters.has('json_schema'))
+        capabilities['structuredOutputs'] = true;
+    if (
+        rawParameters.has('reasoning') ||
+        rawParameters.has('reasoning_effort') ||
+        rawParameters.has('include_reasoning')
+    ) {
         capabilities['reasoningEffort'] = true;
     }
     if (rawParameters.has('stream') || rawParameters.has('streaming')) capabilities['streaming'] = true;
@@ -241,7 +249,8 @@ export function normalizeUsdPricing(input = {}) {
  */
 function isoDate(value) {
     const number = finiteNumber(value);
-    const date = number !== null ? new Date(number > 10_000_000_000 ? number : number * 1000) : new Date(String(value ?? ''));
+    const date =
+        number !== null ? new Date(number > 10_000_000_000 ? number : number * 1000) : new Date(String(value ?? ''));
     return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
@@ -304,7 +313,8 @@ export function normalizeModelLifecycle(input = {}) {
     if (expiresAt) lifecycle['expiresAt'] = expiresAt;
     if (knowledgeCutoff) lifecycle['knowledgeCutoff'] = knowledgeCutoff;
     if (providerLifecycle) lifecycle['providerStatus'] = providerLifecycle;
-    if (providerModel && /(?:preview|beta|experimental|exp)(?:$|[-_/])/iu.test(providerModel)) lifecycle['channel'] = 'preview';
+    if (providerModel && /(?:preview|beta|experimental|exp)(?:$|[-_/])/iu.test(providerModel))
+        lifecycle['channel'] = 'preview';
     if (expiresAt && Date.parse(expiresAt) <= nowMs) lifecycle['status'] = 'retired';
     else if (expiresAt) lifecycle['status'] = 'scheduled_retirement';
     else lifecycle['status'] = 'active';
@@ -331,7 +341,12 @@ function nonNegativeNumberRecord(fields) {
  */
 function normalizedIdentityToken(value) {
     const text = scalarString(value);
-    return text ? text.toLowerCase().replace(/[_\s]+/gu, '-').replace(/-+/gu, '-') : null;
+    return text
+        ? text
+              .toLowerCase()
+              .replace(/[_\s]+/gu, '-')
+              .replace(/-+/gu, '-')
+        : null;
 }
 
 /**
@@ -449,18 +464,35 @@ function inferModelTier(text) {
  * @returns {string | null}
  */
 function inferModelSeries(text, family, generation) {
-    const special = text.match(/(?:^|-)(gpt-oss|qwen\d+(?:\.\d+)?|llama-\d+(?:\.\d+)?|gemini-\d+(?:\.\d+)?|glm-\d+(?:\.\d+)?v?|grok-\d+(?:\.\d+)?)(?:-|$)/u);
+    const special = text.match(
+        /(?:^|-)(gpt-oss|qwen\d+(?:\.\d+)?|llama-\d+(?:\.\d+)?|gemini-\d+(?:\.\d+)?|glm-\d+(?:\.\d+)?v?|grok-\d+(?:\.\d+)?)(?:-|$)/u,
+    );
     if (special?.[1]) return special[1];
     return family && generation ? `${family}-${generation}` : family;
 }
 
 /**
  * @param {unknown} value
- * @returns {{ label: string | null; parameterCountBillions: number | null; expertCount: number | null; expertParameterCountBillions: number | null; activeParameterCountBillions: number | null }}
+ * @returns {{
+ *     label: string | null;
+ *     parameterCountBillions: number | null;
+ *     expertCount: number | null;
+ *     expertParameterCountBillions: number | null;
+ *     activeParameterCountBillions: number | null;
+ * }}
  */
 function parseParameterScale(value) {
-    const text = scalarString(value)?.toLowerCase().replace(/[_\s]+/gu, '-') ?? '';
-    /** @type {{ label: string | null; parameterCountBillions: number | null; expertCount: number | null; expertParameterCountBillions: number | null; activeParameterCountBillions: number | null }} */
+    const text =
+        scalarString(value)
+            ?.toLowerCase()
+            .replace(/[_\s]+/gu, '-') ?? '';
+    /** @type {{
+    label: string | null;
+    parameterCountBillions: number | null;
+    expertCount: number | null;
+    expertParameterCountBillions: number | null;
+    activeParameterCountBillions: number | null;
+}} */
     const result = {
         label: null,
         parameterCountBillions: null,
@@ -472,7 +504,8 @@ function parseParameterScale(value) {
     if (expert?.[1] && expert[2]) {
         result.expertCount = Number(expert[1]);
         result.expertParameterCountBillions = Number(expert[2]);
-        result.parameterCountBillions = Math.round(result.expertCount * result.expertParameterCountBillions * 1000) / 1000;
+        result.parameterCountBillions =
+            Math.round(result.expertCount * result.expertParameterCountBillions * 1000) / 1000;
         result.label = `${expert[1]}x${expert[2]}b`;
     }
     const active = text.match(/(?:^|-)a(\d+(?:\.\d+)?)b(?:-|$)/u);
@@ -525,7 +558,8 @@ function inferArchitectureHints(text) {
     if (/(?:^|-)(?:r1|reasoning|thinking)(?:-|$)/u.test(text)) hints.push('reasoning_family');
     if (/(?:^|-)(?:instruct|chat)(?:-|$)/u.test(text)) hints.push('instruction_tuned');
     if (/(?:^|-)(?:distill|distilled)(?:-|$)/u.test(text)) hints.push('distilled');
-    if (/(?:^|-)(?:moe)(?:-|$)/u.test(text) || /(?:^|-)\d+x\d+(?:\.\d+)?b(?:-|$)/u.test(text)) hints.push('mixture_of_experts');
+    if (/(?:^|-)(?:moe)(?:-|$)/u.test(text) || /(?:^|-)\d+x\d+(?:\.\d+)?b(?:-|$)/u.test(text))
+        hints.push('mixture_of_experts');
     if (/(?:^|-)(?:tee|confidential-compute)(?:-|$)/u.test(text)) hints.push('confidential_compute');
     return [...new Set(hints)];
 }
@@ -564,7 +598,10 @@ export function normalizeModelIdentityTraits(input = {}) {
     const series = normalizedIdentityToken(input.series) ?? inferModelSeries(text, family, generation);
     const scaleFromExplicit = parseParameterScale(input.parameterSize);
     const scaleFromText = parseParameterScale(text);
-    const parameterCountBillions = finiteNumber(input.parameterCountBillions) ?? scaleFromExplicit.parameterCountBillions ?? scaleFromText.parameterCountBillions;
+    const parameterCountBillions =
+        finiteNumber(input.parameterCountBillions) ??
+        scaleFromExplicit.parameterCountBillions ??
+        scaleFromText.parameterCountBillions;
     const activeParameterCountBillions =
         finiteNumber(input.activeParameterCountBillions) ??
         scaleFromExplicit.activeParameterCountBillions ??
@@ -583,7 +620,8 @@ export function normalizeModelIdentityTraits(input = {}) {
     if (generation) traits['generation'] = generation;
     if (tier) traits['tier'] = tier;
     if (sizeLabel) traits['sizeLabel'] = sizeLabel;
-    if (parameterCountBillions !== null && parameterCountBillions >= 0) traits['parameterCountBillions'] = parameterCountBillions;
+    if (parameterCountBillions !== null && parameterCountBillions >= 0)
+        traits['parameterCountBillions'] = parameterCountBillions;
     if (activeParameterCountBillions !== null && activeParameterCountBillions >= 0) {
         traits['activeParameterCountBillions'] = activeParameterCountBillions;
     }
@@ -661,7 +699,11 @@ export function normalizeModelRoutePolicyTraits(input = {}) {
     if (routeLayer) traits['routeLayer'] = routeLayer;
     if (endpointKind) traits['endpointKind'] = endpointKind;
     if (wireApi) traits['wireApi'] = wireApi;
-    if (policy['openAICompatibleBaseUrl'] || endpointKind === 'openai_compatible' || routeLayer === 'openai-compatible-aggregator') {
+    if (
+        policy['openAICompatibleBaseUrl'] ||
+        endpointKind === 'openai_compatible' ||
+        routeLayer === 'openai-compatible-aggregator'
+    ) {
         traits['openAICompatible'] = true;
     }
     if (policy['autoSelection'] === true || selectionMode !== 'exact') traits['autoSelection'] = true;
@@ -692,7 +734,12 @@ export function normalizeRuntimeAgenticCapabilityTaxonomy(input = {}) {
      * @returns {boolean}
      */
     const bool = (fieldNames) =>
-        fieldNames.some((fieldName) => capabilities[fieldName] === true || routeTraits[fieldName] === true || supportedParameters.has(fieldName));
+        fieldNames.some(
+            (fieldName) =>
+                capabilities[fieldName] === true ||
+                routeTraits[fieldName] === true ||
+                supportedParameters.has(fieldName),
+        );
     const taxonomy = {
         tools: bool(['tools', 'tool_use', 'function_calling']),
         forcedToolChoice: bool(['forcedToolChoice', 'forced_tool_choice', 'tool_choice']),
@@ -704,9 +751,14 @@ export function normalizeRuntimeAgenticCapabilityTaxonomy(input = {}) {
         webSearch: bool(['webSearch', 'web_search', 'search']),
         codeExecution: bool(['codeExecution', 'code_execution']),
         vision: capabilities['vision'] === true || inputModalities.includes('image'),
-        audio: capabilities['audio'] === true || inputModalities.includes('audio') || outputModalities.includes('audio'),
-        embeddings: capabilities['embeddings'] === true || capabilities['embedding'] === true || outputModalities.includes('embedding'),
-        rerank: capabilities['rerank'] === true || capabilities['reranker'] === true || outputModalities.includes('rerank'),
+        audio:
+            capabilities['audio'] === true || inputModalities.includes('audio') || outputModalities.includes('audio'),
+        embeddings:
+            capabilities['embeddings'] === true ||
+            capabilities['embedding'] === true ||
+            outputModalities.includes('embedding'),
+        rerank:
+            capabilities['rerank'] === true || capabilities['reranker'] === true || outputModalities.includes('rerank'),
         asr: capabilities['asr'] === true || capabilities['transcription'] === true || outputModalities.includes('asr'),
         tts: capabilities['tts'] === true || outputModalities.includes('tts'),
         imageGeneration: capabilities['imageGeneration'] === true || outputModalities.includes('image-generation'),
@@ -779,8 +831,14 @@ export function normalizeModelPricingTaxonomy(input = {}) {
     const fields = {
         inputPerMillion: moneyPerMillion(input.inputPerToken, input.inputPerMillion ?? input.inputUsdPerMillion),
         outputPerMillion: moneyPerMillion(input.outputPerToken, input.outputPerMillion ?? input.outputUsdPerMillion),
-        cacheReadPerMillion: moneyPerMillion(input.cacheReadPerToken, input.cacheReadPerMillion ?? input.cacheReadUsdPerMillion),
-        cacheWritePerMillion: moneyPerMillion(input.cacheWritePerToken, input.cacheWritePerMillion ?? input.cacheWriteUsdPerMillion),
+        cacheReadPerMillion: moneyPerMillion(
+            input.cacheReadPerToken,
+            input.cacheReadPerMillion ?? input.cacheReadUsdPerMillion,
+        ),
+        cacheWritePerMillion: moneyPerMillion(
+            input.cacheWritePerToken,
+            input.cacheWritePerMillion ?? input.cacheWriteUsdPerMillion,
+        ),
         request: finiteNumber(input.request ?? input.requestUsd),
         webSearchPerRequest: finiteNumber(input.webSearchPerRequest ?? input.webSearchUsdPerRequest),
     };
@@ -806,11 +864,16 @@ export function normalizeModelPricingTaxonomy(input = {}) {
               ? Object.fromEntries(
                     Object.entries(money)
                         .filter(([, value]) => typeof value === 'number')
-                        .map(([key, value]) => [`${key}Usd`, Math.round(Number(value) * exchangeRateToUsd * 1_000_000) / 1_000_000]),
+                        .map(([key, value]) => [
+                            `${key}Usd`,
+                            Math.round(Number(value) * exchangeRateToUsd * 1_000_000) / 1_000_000,
+                        ]),
                 )
               : {};
     return {
-        ...(Object.keys(money).length > 0 ? { currency, tokenUnit: 'per_million_tokens', requestUnit: 'per_request', ...money } : {}),
+        ...(Object.keys(money).length > 0
+            ? { currency, tokenUnit: 'per_million_tokens', requestUnit: 'per_request', ...money }
+            : {}),
         ...(exchangeRateToUsd !== null ? { exchangeRateToUsd } : {}),
         ...(Object.keys(usd).length > 0 ? { usd } : {}),
     };
@@ -890,8 +953,13 @@ export function resolveModelDeprecationAlias(input = {}) {
     const providerStatus = scalarString(lifecycle['providerStatus'] ?? lifecycle['status'] ?? input['status']);
     const explicitDeprecated = booleanValue(input['deprecated']);
     const explicitRetired = booleanValue(input['retired']);
-    const inferredDeprecated = /(?:deprecated|deprecat)/iu.test(providerStatus ?? '') || (expiresAt ? Date.parse(expiresAt) > Date.now() : false);
-    const inferredRetired = providerStatus === 'retired' || providerStatus === 'removed' || (expiresAt ? Date.parse(expiresAt) <= Date.now() : false);
+    const inferredDeprecated =
+        /(?:deprecated|deprecat)/iu.test(providerStatus ?? '') ||
+        (expiresAt ? Date.parse(expiresAt) > Date.now() : false);
+    const inferredRetired =
+        providerStatus === 'retired' ||
+        providerStatus === 'removed' ||
+        (expiresAt ? Date.parse(expiresAt) <= Date.now() : false);
     const deprecated = explicitDeprecated ?? inferredDeprecated;
     const retired = explicitRetired ?? inferredRetired;
     return {
@@ -931,13 +999,13 @@ export function resolveModelDeprecationAlias(input = {}) {
  * @param {unknown} [input.freeTier]
  * @param {unknown} [input.providerMetadata]
  * @returns {{
- *   enabledModels?: string[];
- *   blockedModels?: string[];
- *   byokProviderKeys?: string[];
- *   quota: Record<string, number>;
- *   rateLimits: Record<string, number>;
- *   spendingLimits: Record<string, string | number>;
- *   providerMetadata: Record<string, unknown>;
+ *     enabledModels?: string[];
+ *     blockedModels?: string[];
+ *     byokProviderKeys?: string[];
+ *     quota: Record<string, number>;
+ *     rateLimits: Record<string, number>;
+ *     spendingLimits: Record<string, string | number>;
+ *     providerMetadata: Record<string, unknown>;
  * }}
  */
 export function normalizeAccountOverlayControls(input = {}) {

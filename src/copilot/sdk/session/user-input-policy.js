@@ -28,6 +28,8 @@ export function resolveEffectiveUserInputAllowFreeform(_) {
  */
 export function normalizeUserInputChoices(choices) {
     return Array.isArray(choices)
-        ? choices.map((choice) => (typeof choice === 'string' ? choice.trim() : '')).filter((choice) => choice.length > 0)
+        ? choices
+              .map((choice) => (typeof choice === 'string' ? choice.trim() : ''))
+              .filter((choice) => choice.length > 0)
         : [];
 }

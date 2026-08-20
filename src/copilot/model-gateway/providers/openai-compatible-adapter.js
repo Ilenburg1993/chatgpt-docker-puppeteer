@@ -20,15 +20,16 @@
  * @property {string} model
  * @property {import('#copilot/sdk/types').ProviderConfig} provider
  * @property {{
- *   supports: { reasoningEffort: boolean; vision: boolean };
- *   limits: { max_context_window_tokens?: number };
+ *     supports: { reasoningEffort: boolean; vision: boolean };
+ *     limits: { max_context_window_tokens?: number };
  * }} modelCapabilities
  * @property {(Record<string, unknown> & {
- *   providerFamily: string;
- *   openAiCompatibleEndpoint?: boolean;
- *   runtimeKind?: string;
- *   localPrivate?: boolean;
- * }) | undefined} [gateway]
+ *           providerFamily: string;
+ *           openAiCompatibleEndpoint?: boolean;
+ *           runtimeKind?: string;
+ *           localPrivate?: boolean;
+ *       })
+ *     | undefined} [gateway]
  */
 
 /**

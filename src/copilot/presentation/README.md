@@ -42,11 +42,12 @@ Em resumo:
 >
 > A primeira grande onda barrel-first de `presentation/` já foi aplicada:
 >
-> - `agent/`, `routing/`, `state/`, `system/`, `conversation/`, `contracts/`, `runtime/`, `files/` e `sdk/`
->   já são subdomínios físicos reais;
-> - `agent/runtime/index.js` foi introduzido como surface estreita para seleção/lookup de runtime, evitando ciclos com
->   `agent/control.js`;
-> - `server/` e `terminal/` já consomem `presentation/` via sub-barrels em vez de leaf files dos novos subdomínios;
+> - `agent/`, `routing/`, `state/`, `system/`, `conversation/`, `contracts/`, `runtime/`, `files/` e
+>   `sdk/` já são subdomínios físicos reais;
+> - `agent/runtime/index.js` foi introduzido como surface estreita para seleção/lookup de runtime,
+>   evitando ciclos com `agent/control.js`;
+> - `server/` e `terminal/` já consomem `presentation/` via sub-barrels em vez de leaf files dos
+>   novos subdomínios;
 > - o próximo foco passa a ser minimizar ainda mais a surface pública e decompor hotspots internos.
 
 ```text
@@ -208,7 +209,8 @@ Com isso, tanto o parsing HTTP (`runtime-request.js`) quanto o parser do REPL
 (`terminal/commands/runtime-target.js`) e os accessors do runtime compartilham a mesma política de
 trim/empty/fallback.
 
-`agent/runtime/index.js` também já expõe `resolveAgentRuntimeSelection()` para distinguir com clareza:
+`agent/runtime/index.js` também já expõe `resolveAgentRuntimeSelection()` para distinguir com
+clareza:
 
 - `requestedRuntimeId`
 - `runtimeId` efetivamente resolvido
@@ -250,13 +252,12 @@ participar do caminho multi-agent sem reinventar parsing local de `query/header/
 - `sdkSessionId`
 - `hubSessionId`
 
-`runtime-file-context.js` e `state/ui-store.js` agora carregam a implementação compartilhada
-que antes vivia no terminal.
+`runtime-file-context.js` e `state/ui-store.js` agora carregam a implementação compartilhada que
+antes vivia no terminal.
 
 Com isso:
 
-- `presentation/files/context.js` e `presentation/state/ui-store/index.js` são os owners
-  canônicos;
+- `presentation/files/context.js` e `presentation/state/ui-store/index.js` são os owners canônicos;
 - `presentation/` não importa mais `terminal/*` diretamente;
 - `state/ui-state.js` e `runtime-dialog.js` passaram a ser apenas fachadas sobre primitivas já
   centralizadas.
@@ -268,5 +269,5 @@ Com isso:
 - Se o código começa a abrir `AgentContext` ou a reinterpretar `SessionEvent` cru aqui dentro, a
   fronteira está errada.
 - Se um módulo de `presentation/` voltar a importar `terminal/*` diretamente, isso tende a ser smell
-  arquitetural e regressão de bypass — preferir usar `runtime-file-context.js`,
-  `state/ui-store.js`, `state/ui-state.js` ou `runtime-dialog.js`.
+  arquitetural e regressão de bypass — preferir usar `runtime-file-context.js`, `state/ui-store.js`,
+  `state/ui-state.js` ou `runtime-dialog.js`.

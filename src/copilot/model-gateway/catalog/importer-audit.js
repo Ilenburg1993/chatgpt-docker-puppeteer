@@ -8,7 +8,10 @@
  * @module copilot/model-gateway/catalog/importer-audit
  */
 
-import { MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY, auditProviderEndpointImporterCoverage } from '../providers/index.js';
+import {
+    MODEL_GATEWAY_PROVIDER_ENDPOINT_INVENTORY,
+    auditProviderEndpointImporterCoverage,
+} from '../providers/index.js';
 
 /**
  * @param {unknown} value
@@ -28,7 +31,18 @@ function optionalString(value) {
 
 /**
  * @param {Record<string, unknown>} importer
- * @returns {{ id: string; providerId: string; sourceKind: string; requiresAuth: boolean; url: string | null; command: string | null; envRequirements: string[]; refreshPolicy: string | null; ttlSeconds: number | null; hooks: Record<string, boolean> }}
+ * @returns {{
+ *     id: string;
+ *     providerId: string;
+ *     sourceKind: string;
+ *     requiresAuth: boolean;
+ *     url: string | null;
+ *     command: string | null;
+ *     envRequirements: string[];
+ *     refreshPolicy: string | null;
+ *     ttlSeconds: number | null;
+ *     hooks: Record<string, boolean>;
+ * }}
  */
 export function describeCatalogImporter(importer) {
     return {
@@ -42,7 +56,10 @@ export function describeCatalogImporter(importer) {
             ? importer['envRequirements'].map(optionalString).filter((item) => item !== null)
             : [],
         refreshPolicy: optionalString(importer['refreshPolicy']),
-        ttlSeconds: typeof importer['ttlSeconds'] === 'number' && Number.isFinite(importer['ttlSeconds']) ? importer['ttlSeconds'] : null,
+        ttlSeconds:
+            typeof importer['ttlSeconds'] === 'number' && Number.isFinite(importer['ttlSeconds'])
+                ? importer['ttlSeconds']
+                : null,
         hooks: {
             fetchRaw: typeof importer['fetchRaw'] === 'function',
             parseRows: typeof importer['parseRows'] === 'function',
@@ -58,18 +75,18 @@ export function describeCatalogImporter(importer) {
  * @param {Record<string, unknown>[]} importers
  * @param {{ inventories?: readonly Record<string, unknown>[] }} [options]
  * @returns {{
- *   importerCount: number;
- *   providerCount: number;
- *   publicImporterCount: number;
- *   authenticatedImporterCount: number;
- *   routeOptionImporterCount: number;
- *   accountOverlayImporterCount: number;
- *   providerEvidenceImporterCount: number;
- *   descriptors: ReturnType<typeof describeCatalogImporter>[];
- *   endpointCoverage: ReturnType<typeof auditProviderEndpointImporterCoverage>;
- *   providersWithoutImporters: string[];
- *   uncoveredCatalogSourceIds: string[];
- *   missingRequiredHooks: string[];
+ *     importerCount: number;
+ *     providerCount: number;
+ *     publicImporterCount: number;
+ *     authenticatedImporterCount: number;
+ *     routeOptionImporterCount: number;
+ *     accountOverlayImporterCount: number;
+ *     providerEvidenceImporterCount: number;
+ *     descriptors: ReturnType<typeof describeCatalogImporter>[];
+ *     endpointCoverage: ReturnType<typeof auditProviderEndpointImporterCoverage>;
+ *     providersWithoutImporters: string[];
+ *     uncoveredCatalogSourceIds: string[];
+ *     missingRequiredHooks: string[];
  * }}
  */
 export function auditCatalogImporterSet(importers, options = {}) {
@@ -86,7 +103,10 @@ export function auditCatalogImporterSet(importers, options = {}) {
         .sort();
     const uncoveredCatalogSourceIds = endpointCoverage.flatMap((row) => row.uncoveredCatalogSourceIds).sort();
     const missingRequiredHooks = descriptors
-        .filter((descriptor) => !descriptor.hooks['fetchRaw'] || !descriptor.hooks['parseRows'] || !descriptor.hooks['toEvidenceFacts'])
+        .filter(
+            (descriptor) =>
+                !descriptor.hooks['fetchRaw'] || !descriptor.hooks['parseRows'] || !descriptor.hooks['toEvidenceFacts'],
+        )
         .map((descriptor) => descriptor.id)
         .sort();
     return {
@@ -96,7 +116,8 @@ export function auditCatalogImporterSet(importers, options = {}) {
         authenticatedImporterCount: descriptors.filter((descriptor) => descriptor.requiresAuth).length,
         routeOptionImporterCount: descriptors.filter((descriptor) => descriptor.hooks['toRouteOptions']).length,
         accountOverlayImporterCount: descriptors.filter((descriptor) => descriptor.hooks['toAccountOverlays']).length,
-        providerEvidenceImporterCount: descriptors.filter((descriptor) => descriptor.hooks['toProviderEvidenceFacts']).length,
+        providerEvidenceImporterCount: descriptors.filter((descriptor) => descriptor.hooks['toProviderEvidenceFacts'])
+            .length,
         descriptors,
         endpointCoverage,
         providersWithoutImporters,

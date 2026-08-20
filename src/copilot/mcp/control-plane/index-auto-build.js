@@ -5,7 +5,6 @@
  * @module copilot/mcp/control-plane/index-auto-build
  */
 
-import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/io';
 import {
     buildIoIndexForDirectory,
     filterIoIndexRefreshDomainPaths,
@@ -13,6 +12,7 @@ import {
     reconcileIoIndexAutoRefreshDomain,
     refreshIoIndexPaths,
 } from '#copilot/infra/public/indexing';
+import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { isAbsolute, relative, resolve } from 'node:path';
 import {
@@ -423,7 +423,15 @@ async function runIndexAutoBuild(config) {
  * @param {Record<string, unknown>} evidence
  * @param {number | undefined} journalSequence
  */
-async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion, startupStartedAt, evidence, journalSequence) {
+async function runFullReconcile(
+    config,
+    resolvedPath,
+    gitSnapshot,
+    schemaVersion,
+    startupStartedAt,
+    evidence,
+    journalSequence,
+) {
     const result = await buildIoIndexForDirectory(resolvedPath, {
         workspaceRoot: WORKSPACE_ROOT,
         recursive: true,
@@ -458,10 +466,10 @@ async function runFullReconcile(config, resolvedPath, gitSnapshot, schemaVersion
 }
 
 /**
- * Convert Git evidence into validated repo-absolute paths. Git output is internally generated and already scoped, but we
- * still enforce scope containment before handing paths to the index refresh primitive.
+ * Convert Git evidence into validated repo-absolute paths. Git output is internally generated and already scoped, but
+ * we still enforce scope containment before handing paths to the index refresh primitive.
  *
- * @param {Array<{ path: string }>} changes
+ * @param {{ path: string }[]} changes
  * @param {string} scopePath
  */
 function normalizeGitChangePaths(changes, scopePath) {

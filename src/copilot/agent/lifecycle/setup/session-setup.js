@@ -38,6 +38,7 @@ import {
     bindAgentSessionTools,
     bootstrapAgentTools,
     buildAgentBusHooks,
+    hydrateAgentCustomTools,
     isAgentToolDisabled,
     log,
     METRICS_STORE,
@@ -226,6 +227,7 @@ export async function buildSessionTools(ctx) {
     if (mcpTools.length > 0) {
         log('INFO', `[AlwaysAlive] ${mcpTools.length} MCP tools carregadas via bridge.`);
     }
+    await hydrateAgentCustomTools();
     const toolsRegistry = resetToolsRegistry(ctx);
     const tools = bootstrapAgentTools(toolsRegistry, mcpTools);
     log('INFO', `[AlwaysAlive] ${tools.length} tools registradas (registry + introspection).`);

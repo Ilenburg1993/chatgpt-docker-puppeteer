@@ -96,9 +96,10 @@ function assertClient(client) {
  * @returns {() => void}
  */
 function subscribeLifecycleEvent(client, eventType, handler) {
-    const lifecycleClient = /** @type {{ onLifecycle?: (eventType: string, handler: LifecycleHandler) => () => void }} */ (
-        /** @type {unknown} */ (client)
-    );
+    const lifecycleClient =
+        /** @type {{ onLifecycle?: (eventType: string, handler: LifecycleHandler) => () => void }} */ (
+            /** @type {unknown} */ (client)
+        );
     if (typeof lifecycleClient.onLifecycle === 'function') {
         return lifecycleClient.onLifecycle(eventType, handler);
     }

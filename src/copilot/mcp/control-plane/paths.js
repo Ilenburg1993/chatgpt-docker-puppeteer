@@ -10,19 +10,20 @@ import path from 'node:path';
 
 /**
  * @typedef {{
- *   ok: true;
- *   resolved: string;
- *   relative: string;
- *   validatedReadPath?: unknown;
- *   validatedWritePath?: unknown;
+ *     ok: true;
+ *     resolved: string;
+ *     relative: string;
+ *     validatedReadPath?: unknown;
+ *     validatedWritePath?: unknown;
  * }} McpPathOk
+ *
  * @typedef {{
- *   ok: false;
- *   reason: string;
- *   code: 'ERR_EMPTY_PATH' | 'ERR_NULL_BYTE_PATH' | 'ERR_PATH_DENIED' | 'ERR_INVALID_PATH';
- *   hint: string;
- *   inputPath: string;
- *   mode: 'read' | 'write';
+ *     ok: false;
+ *     reason: string;
+ *     code: 'ERR_EMPTY_PATH' | 'ERR_NULL_BYTE_PATH' | 'ERR_PATH_DENIED' | 'ERR_INVALID_PATH';
+ *     hint: string;
+ *     inputPath: string;
+ *     mode: 'read' | 'write';
  * }} McpPathError
  */
 

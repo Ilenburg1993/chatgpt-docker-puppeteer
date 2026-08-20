@@ -10,12 +10,11 @@
 
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
-import { attachSseReplayEventId, eventFanout } from '../../infra/sse/index.js';
-import { log } from '../../observability/index.js';
-import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
-import { CRITICAL_EVENTS } from '../../presentation/state/index.js';
-import { getHubSessionId } from '../../presentation/state/index.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
+import { attachSseReplayEventId, eventFanout } from '../../infra/sse/index.js';
+import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
+import { log } from '../../observability/index.js';
+import { CRITICAL_EVENTS, getHubSessionId } from '../../presentation/state/index.js';
 import { recordTerminalSseEventArchive } from '../state/events/index.js';
 
 export { CRITICAL_EVENTS } from '../../presentation/state/index.js';
@@ -38,7 +37,9 @@ const MAX_SSE_ARRAY_ITEMS = 200;
 function normalizeSseValue(value, ctx) {
     if (typeof value === 'bigint') return value.toString();
     if (typeof value === 'string') {
-        return value.length > MAX_SSE_CONTENT_CHARS ? `${value.slice(0, MAX_SSE_CONTENT_CHARS)} [\u2026truncado]` : value;
+        return value.length > MAX_SSE_CONTENT_CHARS
+            ? `${value.slice(0, MAX_SSE_CONTENT_CHARS)} [\u2026truncado]`
+            : value;
     }
     if (value === null || typeof value !== 'object') return value;
     if (ctx.seen.has(value)) return '[Circular]';
@@ -48,7 +49,8 @@ function normalizeSseValue(value, ctx) {
         const items = value
             .slice(0, MAX_SSE_ARRAY_ITEMS)
             .map((item) => normalizeSseValue(item, { depth: ctx.depth + 1, seen: ctx.seen }));
-        if (value.length > MAX_SSE_ARRAY_ITEMS) items.push(`[\u2026${value.length - MAX_SSE_ARRAY_ITEMS} itens truncados]`);
+        if (value.length > MAX_SSE_ARRAY_ITEMS)
+            items.push(`[\u2026${value.length - MAX_SSE_ARRAY_ITEMS} itens truncados]`);
         return items;
     }
     /** @type {Record<string, unknown>} */
@@ -120,7 +122,10 @@ export function broadcastSse(event, data) {
             data: enrichedData,
         });
     } catch (error) {
-        log('WARN', `[terminal:sse] falha ao arquivar evento ${safeEvent}: ${error instanceof Error ? error.message : String(error)}`);
+        log(
+            'WARN',
+            `[terminal:sse] falha ao arquivar evento ${safeEvent}: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
 
     emitSse(_sseClients, _sseCriticalClients, safeEvent, enrichedData, eventId);
@@ -129,7 +134,10 @@ export function broadcastSse(event, data) {
     try {
         eventFanout.publish('terminal', safeEvent, attachSseReplayEventId(enrichedData, eventId));
     } catch (error) {
-        log('WARN', `[terminal:sse] falha no fanout do evento ${safeEvent}: ${error instanceof Error ? error.message : String(error)}`);
+        log(
+            'WARN',
+            `[terminal:sse] falha no fanout do evento ${safeEvent}: ${error instanceof Error ? error.message : String(error)}`,
+        );
     }
 }
 

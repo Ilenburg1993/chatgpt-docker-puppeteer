@@ -5,7 +5,6 @@
  * @module copilot/mcp/tools/host-blocks
  */
 
-import { z } from 'zod';
 import {
     MCP_TOOL_EXECUTION_LIMITS,
     MCP_TOOL_EXECUTION_LIMITS_VERSION,
@@ -13,6 +12,7 @@ import {
     readMcpSchemaConvergenceState,
     readOnlyAnnotations,
 } from '#copilot/mcp/control-plane';
+import { z } from 'zod';
 
 const HOST_BLOCK_TEMPLATE = {
     timestamp: '<ISO timestamp>',
@@ -48,15 +48,22 @@ function optionalHttpStatus(value) {
 
 /**
  * @param {{
- *   mcpReachedServer?: boolean;
- *   httpStatus?: number;
- *   wwwAuthenticatePresent?: boolean;
- *   cloudflareRayIdPresent?: boolean;
- *   mcpAuditEventPresent?: boolean;
- *   schemaErrorPresent?: boolean;
- *   toolResultIsError?: boolean;
+ *     mcpReachedServer?: boolean;
+ *     httpStatus?: number;
+ *     wwwAuthenticatePresent?: boolean;
+ *     cloudflareRayIdPresent?: boolean;
+ *     mcpAuditEventPresent?: boolean;
+ *     schemaErrorPresent?: boolean;
+ *     toolResultIsError?: boolean;
  * }} input
- * @returns {{ code: string; layer: string; confidence: 'low' | 'medium' | 'high'; severity: 'low' | 'medium' | 'high'; reason: string; recommendedAlternatives: string[] } | null}
+ * @returns {{
+ *     code: string;
+ *     layer: string;
+ *     confidence: 'low' | 'medium' | 'high';
+ *     severity: 'low' | 'medium' | 'high';
+ *     reason: string;
+ *     recommendedAlternatives: string[];
+ * } | null}
  */
 function classifyByEvidence(input) {
     const mcpReachedServer = optionalBoolean(input.mcpReachedServer);
@@ -78,8 +85,7 @@ function classifyByEvidence(input) {
             layer: 'chatgpt-host-schema',
             confidence: 'high',
             severity: 'medium',
-            reason:
-                'The host rejected the input before MCP while this server generation has not observed a fresh tools/list. The client-visible schema is likely stale relative to server capability truth.',
+            reason: 'The host rejected the input before MCP while this server generation has not observed a fresh tools/list. The client-visible schema is likely stale relative to server capability truth.',
             recommendedAlternatives: ['mcp_tools_status', 'mcp_capabilities_summary'],
         };
     }
@@ -149,7 +155,14 @@ function classifyByEvidence(input) {
 
 /**
  * @param {{ toolName?: string; hostMessage?: string; operationKind?: string; argsShape?: string }} input
- * @returns {{ code: string; layer: string; confidence: 'low' | 'medium' | 'high'; severity: 'low' | 'medium' | 'high'; reason: string; recommendedAlternatives: string[] }}
+ * @returns {{
+ *     code: string;
+ *     layer: string;
+ *     confidence: 'low' | 'medium' | 'high';
+ *     severity: 'low' | 'medium' | 'high';
+ *     reason: string;
+ *     recommendedAlternatives: string[];
+ * }}
  */
 function classifyHostBlock(input) {
     const toolName = String(input.toolName ?? '').toLowerCase();
@@ -240,16 +253,33 @@ export const mcpHostBlockDiagnosticsTool = {
         hostMessage: z.string().optional()['describe']('Host/UI error text shown by ChatGPT.'),
         operationKind: z
             .string()
-            .optional()['describe']('Optional coarse kind: read, plan-read, bounded-write, destructive, validation, url-input.'),
+            .optional()
+            ['describe']('Optional coarse kind: read, plan-read, bounded-write, destructive, validation, url-input.'),
         argsShape: z
             .string()
-            .optional()['describe']('Short non-sensitive description of attempted args, not raw secrets or full file content.'),
-        mcpReachedServer: z.boolean().optional()['describe']('Whether MCP server logs/metrics/audit show that the call reached MCP.'),
+            .optional()
+            ['describe']('Short non-sensitive description of attempted args, not raw secrets or full file content.'),
+        mcpReachedServer: z
+            .boolean()
+            .optional()
+            ['describe']('Whether MCP server logs/metrics/audit show that the call reached MCP.'),
         httpStatus: z.number().int().min(100).max(599).optional()['describe']('Observed HTTP status, if any.'),
-        wwwAuthenticatePresent: z.boolean().optional()['describe']('Whether a WWW-Authenticate challenge was observed.'),
-        cloudflareRayIdPresent: z.boolean().optional()['describe']('Whether Cloudflare response metadata, such as a Ray ID, was observed.'),
-        mcpAuditEventPresent: z.boolean().optional()['describe']('Whether MCP audit/log/metrics recorded the attempted tool call.'),
-        schemaErrorPresent: z.boolean().optional()['describe']('Whether the error was an input schema or argument validation failure.'),
+        wwwAuthenticatePresent: z
+            .boolean()
+            .optional()
+            ['describe']('Whether a WWW-Authenticate challenge was observed.'),
+        cloudflareRayIdPresent: z
+            .boolean()
+            .optional()
+            ['describe']('Whether Cloudflare response metadata, such as a Ray ID, was observed.'),
+        mcpAuditEventPresent: z
+            .boolean()
+            .optional()
+            ['describe']('Whether MCP audit/log/metrics recorded the attempted tool call.'),
+        schemaErrorPresent: z
+            .boolean()
+            .optional()
+            ['describe']('Whether the error was an input schema or argument validation failure.'),
         toolResultIsError: z.boolean().optional()['describe']('Whether MCP returned a tool result with isError=true.'),
     },
     annotations: readOnlyAnnotations(),
@@ -275,7 +305,8 @@ export const mcpHostBlockDiagnosticsTool = {
             schemaErrorPresent,
             toolResultIsError,
         });
-        const classification = evidenceClassification ?? classifyHostBlock({ toolName, hostMessage, operationKind, argsShape });
+        const classification =
+            evidenceClassification ?? classifyHostBlock({ toolName, hostMessage, operationKind, argsShape });
         const schemaConvergence = readMcpSchemaConvergenceState();
         const projectionDiagnosis = {
             status:

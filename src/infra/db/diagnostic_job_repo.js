@@ -14,7 +14,7 @@
  * - diagnostic_reports: Relatórios gerados
  */
 
-import { getDb } from '#infra/db/sqlite.js';
+import { getDb } from '#infra/db/sqlite';
 
 /**
  * Gera timestamp atual em ms

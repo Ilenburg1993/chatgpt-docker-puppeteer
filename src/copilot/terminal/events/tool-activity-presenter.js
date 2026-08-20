@@ -9,8 +9,8 @@
  */
 
 import { resolveToolName } from '#copilot/config';
-import { introspectToolTargets } from '../../core/tool-target-introspection.js';
 import path from 'node:path';
+import { introspectToolTargets } from '../../core/tool-target-introspection.js';
 
 const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
     { match: /\b(read|view|open|cat|show)\b/i, operation: 'read', label: 'lendo arquivo' },
@@ -23,7 +23,10 @@ const FILE_OPERATION_PATTERNS = /** @type {const} */ ([
 ]);
 
 const INSPECTION_TOOL_PATTERNS = /** @type {const} */ ([
-    { match: /\b(get|read|show)\s+(workspace|agent|system|session)\s+(info|state|context)\b/i, label: 'inspecionando contexto' },
+    {
+        match: /\b(get|read|show)\s+(workspace|agent|system|session)\s+(info|state|context)\b/i,
+        label: 'inspecionando contexto',
+    },
     { match: /\b(get|show)\s+(telemetry|metrics|health|status|capabilities)\b/i, label: 'inspecionando diagnóstico' },
     { match: /\b(list|show)\s+(available\s+)?tools\b/i, label: 'inspecionando tools' },
     { match: /\b(skill|invoke\s+skill|task|todo)\b/i, label: 'inspecionando recurso do agente' },
@@ -168,7 +171,19 @@ const ABSOLUTE_POSIX_PATH_PATTERN = /(^|[\s(["'`:=])((?:\/[^\s"'`)]+){2,})/gu;
 const ABSOLUTE_WINDOWS_PATH_PATTERN = /(^|[\s(["'`:=])([A-Za-z]:\\[^\s"'`)]+)/gu;
 
 /**
- * @typedef {'read' | 'write' | 'edit' | 'copy' | 'move' | 'delete' | 'list' | 'run' | 'inspect' | 'ask' | 'intent' | 'unknown'} TerminalToolOperation
+ * @typedef {'read'
+ *     | 'write'
+ *     | 'edit'
+ *     | 'copy'
+ *     | 'move'
+ *     | 'delete'
+ *     | 'list'
+ *     | 'run'
+ *     | 'inspect'
+ *     | 'ask'
+ *     | 'intent'
+ *     | 'unknown'} TerminalToolOperation
+ *
  *
  * @typedef {{
  *     toolName: string;
@@ -365,8 +380,8 @@ function readFirstSpecificToolName(record, keys) {
 
 /**
  * Eventos de tool do SDK podem chegar como `external_tool`, `tool` ou `unknown` no topo, enquanto a identidade real
- * vive dentro de `data`, `payload`, `input`, `args` ou `arguments` serializado. A UX inteira depende deste ponto central
- * para não espalhar casos especiais nos renderers.
+ * vive dentro de `data`, `payload`, `input`, `args` ou `arguments` serializado. A UX inteira depende deste ponto
+ * central para não espalhar casos especiais nos renderers.
  *
  * @param {Record<string, unknown>} evt
  * @returns {string | null}
@@ -565,7 +580,12 @@ function buildTargetSummary(meta) {
         chunks.push(`linhas ${start}-${end}`);
     }
     if (meta.filters.length > 0) {
-        chunks.push(meta.filters.slice(0, 2).map((filter) => compactTerminalToolText(filter, 48)).join(' · '));
+        chunks.push(
+            meta.filters
+                .slice(0, 2)
+                .map((filter) => compactTerminalToolText(filter, 48))
+                .join(' · '),
+        );
     }
     if (chunks.length === 0 && meta.directoryTargets.length > 0) {
         chunks.push(`diretório: ${formatTerminalToolPathForOperator(meta.directoryTargets[0] ?? '')}`);
@@ -638,7 +658,10 @@ function buildOperationCountSummary(meta) {
  * @returns {{ operation: TerminalToolOperation; label: string } | null}
  */
 function normalizeExplicitOperation(value) {
-    const operation = stringOrNull(value)?.toLowerCase().replace(/[_:-]+/g, ' ') ?? null;
+    const operation =
+        stringOrNull(value)
+            ?.toLowerCase()
+            .replace(/[_:-]+/g, ' ') ?? null;
     if (!operation) return null;
     if (/\b(read|view|fetch|open)\b/u.test(operation)) return { operation: 'read', label: 'lendo arquivo' };
     if (/\b(write|create|append|mkdir|save)\b/u.test(operation)) {
@@ -651,7 +674,8 @@ function normalizeExplicitOperation(value) {
     if (/\b(list|scan|search|stat|glob|find)\b/u.test(operation)) {
         return { operation: 'list', label: 'inspecionando arquivos' };
     }
-    if (/\b(run|exec|shell|command|terminal)\b/u.test(operation)) return { operation: 'run', label: 'executando comando' };
+    if (/\b(run|exec|shell|command|terminal)\b/u.test(operation))
+        return { operation: 'run', label: 'executando comando' };
     if (/\b(inspect|status|health|diagnostic|telemetry|metrics)\b/u.test(operation)) {
         return { operation: 'inspect', label: 'inspecionando diagnóstico' };
     }
@@ -777,11 +801,11 @@ export function formatTerminalToolPathForOperator(value) {
 }
 
 /**
- * Compacta texto operacional e troca ocorrências de paths absolutos por paths humanos. Útil para detalhes já
- * compostos como `arquivo: /workspaces/projeto/package.json · linhas 1-3`.
+ * Compacta texto operacional e troca ocorrências de paths absolutos por paths humanos. Útil para detalhes já compostos
+ * como `arquivo: /workspaces/projeto/package.json · linhas 1-3`.
  *
  * @param {string | null | undefined} value
- * @param {number} [max=140]
+ * @param {number} [max=140] Default is `140`
  * @returns {string}
  */
 export function compactTerminalOperatorToolText(value, max = 140) {
@@ -796,8 +820,8 @@ export function compactTerminalOperatorToolText(value, max = 140) {
 }
 
 /**
- * Humaniza texto operacional de superfícies default do terminal sem destruir o envelope técnico preservado em
- * `/events --raw`, `/tools raw`, export estruturado e diagnósticos detalhados.
+ * Humaniza texto operacional de superfícies default do terminal sem destruir o envelope técnico preservado em `/events
+ * --raw`, `/tools raw`, export estruturado e diagnósticos detalhados.
  *
  * @param {unknown} value
  * @param {{ preserveProtocolNames?: boolean }} [opts]
@@ -844,7 +868,7 @@ export function humanizeTerminalToolSurfaceText(value, opts = {}) {
 
 /**
  * @param {string | null | undefined} value
- * @param {number} [size=12]
+ * @param {number} [size=12] Default is `12`
  * @returns {string | null}
  */
 export function compactTerminalDiagnosticId(value, size = 12) {

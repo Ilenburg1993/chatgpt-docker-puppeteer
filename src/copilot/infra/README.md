@@ -8,11 +8,13 @@
 ## O que esta pasta contém
 
 - Facades públicas em `public/` para consumidores fora de `infra/`.
-- Engine canônica de I/O local em `io-engine.js`, ainda mantida como facade de compatibilidade durante a migração 2.0/2.1.
+- Engine canônica de I/O local em `io-engine.js`, ainda mantida como facade de compatibilidade
+  durante a migração 2.0/2.1.
 - Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
 - Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
-- Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `index-store/`, `storage/`, `queue/`,
-  `locks/`, `runtime/`, `cache/`, `io/fs/`, `io/patch/`, `io/search/` e `io/invalidation/`.
+- Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `index-store/`,
+  `storage/`, `queue/`, `locks/`, `runtime/`, `cache/`, `io/fs/`, `io/patch/`, `io/search/` e
+  `io/invalidation/`.
 - Locks, storage, queue, webhooks e infraestrutura SSE.
 
 ## O que não deve ficar aqui
@@ -31,7 +33,8 @@
 - `public/cache.js`: facade pública para inspeção/invalidação de cache.
 - `public/policy.js`: facade pública para budgets compartilhados de subprocesso/search.
 - `public/testing.js`: facade pública deliberada para resets em testes.
-- `io-engine.js`: engine de leitura/escrita local com locks, metadados e invalidação; ainda é compatibilidade interna larga.
+- `io-engine.js`: engine de leitura/escrita local com locks, metadados e invalidação; ainda é
+  compatibilidade interna larga.
 - `io-cache.js`: L1 quente do processo, TTL/fingerprint e invalidação ativa.
 - `io-cache-l2-sqlite.js`: L2 blob cache persistente para payloads de leitura.
 - `io-index-sqlite.js`: L2 índice persistente com arquivos, FTS, símbolos e imports.
@@ -42,21 +45,23 @@
 - `io-scanner.js`: enumeração canônica de diretórios com ignore/fingerprint.
 - `io-parser.js`: parsing JS/TS/JSON/Markdown e cache simbólico.
 - `io-health.js`: snapshot agregado de L1/L2/índice/scope para observability.
-- `module-map.js`: inventário executável da raiz de `infra/`, com papel, tier, risco e exposição pública.
+- `module-map.js`: inventário executável da raiz de `infra/`, com papel, tier, risco e exposição
+  pública.
 
 ## Subdomínios internos
 
 - `shared/`: helpers sem dependência de domínio, como leitura tipada de ambiente.
-- `policy/`: policies reutilizáveis, incluindo capabilities, risco, janela de saída, budgets de buffer/timeout,
-  path-resource e precondições.
+- `policy/`: policies reutilizáveis, incluindo capabilities, risco, janela de saída, budgets de
+  buffer/timeout, path-resource e precondições.
 - `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
 - `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
 - `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.
 - `cache/l1/`: chaves canônicas de L1 e base para modularização futura do cache em memória.
-- `io/fs/`: portas baixas de filesystem para bytes, texto, linhas, chunks, stat, mkdir, append, remove, copy, move e
-  escrita atômica.
+- `io/fs/`: portas baixas de filesystem para bytes, texto, linhas, chunks, stat, mkdir, append,
+  remove, copy, move e escrita atômica.
 - `io/patch/`: cálculo puro de patch e diff textual.
-- `io/search/`: adapters puros de busca textual, índice FTS, grep fallback, busca simbólica e paginação de resultados.
+- `io/search/`: adapters puros de busca textual, índice FTS, grep fallback, busca simbólica e
+  paginação de resultados.
 - `io/invalidation/`: bus best-effort e helper de invalidação coordenada de tiers L1/L2.
 - `storage/`: JSON store baixo sem dependência de `io-engine.js`.
 - `queue/`: implementação modular da fila assíncrona.
@@ -66,20 +71,21 @@
 
 ## Regras de manutenção
 
-- Consumidores fora de `src/copilot/infra/**` devem importar por `#copilot/infra/public/*` ou pelo barrel raiz de
-  compatibilidade quando a API ainda não tiver facade dedicada.
+- Consumidores fora de `src/copilot/infra/**` devem importar por `#copilot/infra/public/*` ou pelo
+  barrel raiz de compatibilidade quando a API ainda não tiver facade dedicada.
 - Tools não importam arquivos folha de `infra/`.
-- Toda leitura ou escrita nova em tools/bordas deve partir de uma facade pública; não use `fs.readFile`/`fs.writeFile`
-  diretamente em tools ou adapters.
-- Conversões de bytes devem usar `shared/buffer.js` ou `public/buffer.js`: preserve `byteOffset`/`byteLength` de views,
-  copie payloads de escrita e valide base64/limites antes de chamar portas de IO.
-- Módulos baixos (`shared/`, `policy/`, `scan/`, `io/fs/`) não importam `public/`, `io-engine.js`, registry, tools ou
-  sessão.
+- Toda leitura ou escrita nova em tools/bordas deve partir de uma facade pública; não use
+  `fs.readFile`/`fs.writeFile` diretamente em tools ou adapters.
+- Conversões de bytes devem usar `shared/buffer.js` ou `public/buffer.js`: preserve
+  `byteOffset`/`byteLength` de views, copie payloads de escrita e valide base64/limites antes de
+  chamar portas de IO.
+- Módulos baixos (`shared/`, `policy/`, `scan/`, `io/fs/`) não importam `public/`, `io-engine.js`,
+  registry, tools ou sessão.
 - `parse/` permanece puro: sem `io/`, cache, índice, prefetch ou sessão.
 - `storage.js` é apenas facade de compatibilidade; implementação vive em `storage/`.
 - L1, L2 blob e L2 índice devem ser invalidados pelo mesmo evento de escrita.
-- Mutações textuais devem aceitar precondição por `expectedHash` e simulação `dryRun` quando houver risco de snapshot
-  obsoleto.
+- Mutações textuais devem aceitar precondição por `expectedHash` e simulação `dryRun` quando houver
+  risco de snapshot obsoleto.
 - Prefetch pode aquecer dados, mas não vira fonte de verdade; a verdade segue no filesystem via
   `io-engine`.
 - Índice responde descoberta, busca e símbolos; quando estiver vazio ou inadequado, a tool deve cair
@@ -87,16 +93,16 @@
 - Fingerprints de scan usam `realpath + mtimeMs + size`; hashes mais caros entram apenas quando o
   roadmap/benchmark justificar.
 - Chunks persistidos pertencem ao índice L2; o cache L2 blob não deve virar catálogo semântico.
-- Limites de volume para a LLM-B devem ser explícitos e observáveis. Quando a operação for potencialmente grande,
-  use janela de saída (`maxResults`, `maxBytes`, `cursor`) e retorne `nextCursor`, offset e metadados de truncamento
-  sempre que possível.
+- Limites de volume para a LLM-B devem ser explícitos e observáveis. Quando a operação for
+  potencialmente grande, use janela de saída (`maxResults`, `maxBytes`, `cursor`) e retorne
+  `nextCursor`, offset e metadados de truncamento sempre que possível.
 
 ## Gates arquiteturais
 
-- `tests/unit/copilot/contracts/test_infra_barrel_governance.spec.js`: garante que `module-map.js` cobre todas as
-  entradas raiz de `infra/` e que as facades públicas existem.
-- `tests/unit/copilot/contracts/test_io_tools_boundary_contracts.spec.js`: impede tools de importarem internals de
-  `infra/` fora de `#copilot/infra/public/*`.
+- `tests/unit/copilot/contracts/test_infra_barrel_governance.spec.js`: garante que `module-map.js`
+  cobre todas as entradas raiz de `infra/` e que as facades públicas existem.
+- `tests/unit/copilot/contracts/test_io_tools_boundary_contracts.spec.js`: impede tools de
+  importarem internals de `infra/` fora de `#copilot/infra/public/*`.
 - A análise local de ciclos de `src/copilot/infra` deve permanecer em `cycles 0`.
 
 ## Operação do índice
@@ -124,20 +130,20 @@ materializada.
 
 Os valores inválidos voltam ao default seguro. Limites em bytes usam inteiros decimais.
 
-| Variável | Default | Contrato |
-| --- | ---: | --- |
-| `IO_L1_CACHE_TTL_MS` | `60000` | TTL positivo das entradas L1. |
-| `IO_L1_CACHE_MAX_ENTRIES` | `2000` | Máximo positivo de entradas L1. |
-| `IO_L1_CACHE_MAX_BYTES` | `134217728` | Budget positivo de memória L1. |
-| `IO_L1_STALE_PROBE_INTERVAL_MS` | `2000` | `-1` desativa fingerprint, `0` valida sempre, `>0` define o intervalo. |
-| `IO_CAPACITY_PREFLIGHT_MIN_BYTES` | `67108864` | `0` desativa; payloads menores não executam `statfs`. |
-| `IO_CAPACITY_PREFLIGHT_RESERVE_BYTES` | `67108864` | Reserva advisory exigida além do payload. |
-| `IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS` | `1000` | Janela curta de reuso de `statfs`; `0` desativa o cache. |
-| `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` | `131072` | Teto para fallback síncrono após falha do worker. |
-| `IO_ADVISORY_BUDGET_WINDOW_MS` | `60000` | Janela rolante do budget observável de mutações/builds. |
-| `IO_ADVISORY_BUDGET_MAX_OPERATIONS` | `120` | Pressão advisory por quantidade de operações na janela. |
-| `IO_ADVISORY_BUDGET_MAX_BYTES` | `67108864` | Pressão advisory por bytes estimados na janela. |
-| `IO_ADVISORY_BUDGET_MAX_ACTIVE` | `12` | Pressão advisory por concorrência ativa. |
+| Variável                                   |     Default | Contrato                                                               |
+| ------------------------------------------ | ----------: | ---------------------------------------------------------------------- |
+| `IO_L1_CACHE_TTL_MS`                       |     `60000` | TTL positivo das entradas L1.                                          |
+| `IO_L1_CACHE_MAX_ENTRIES`                  |      `2000` | Máximo positivo de entradas L1.                                        |
+| `IO_L1_CACHE_MAX_BYTES`                    | `134217728` | Budget positivo de memória L1.                                         |
+| `IO_L1_STALE_PROBE_INTERVAL_MS`            |      `2000` | `-1` desativa fingerprint, `0` valida sempre, `>0` define o intervalo. |
+| `IO_CAPACITY_PREFLIGHT_MIN_BYTES`          |  `67108864` | `0` desativa; payloads menores não executam `statfs`.                  |
+| `IO_CAPACITY_PREFLIGHT_RESERVE_BYTES`      |  `67108864` | Reserva advisory exigida além do payload.                              |
+| `IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS`       |      `1000` | Janela curta de reuso de `statfs`; `0` desativa o cache.               |
+| `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` |    `131072` | Teto para fallback síncrono após falha do worker.                      |
+| `IO_ADVISORY_BUDGET_WINDOW_MS`             |     `60000` | Janela rolante do budget observável de mutações/builds.                |
+| `IO_ADVISORY_BUDGET_MAX_OPERATIONS`        |       `120` | Pressão advisory por quantidade de operações na janela.                |
+| `IO_ADVISORY_BUDGET_MAX_BYTES`             |  `67108864` | Pressão advisory por bytes estimados na janela.                        |
+| `IO_ADVISORY_BUDGET_MAX_ACTIVE`            |        `12` | Pressão advisory por concorrência ativa.                               |
 
 ## Links relacionados
 

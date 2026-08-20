@@ -1,11 +1,15 @@
 # Investigação de compatibilidade Claude × MCP/OAuth/Cloudflare/stdio
 
-Data: 2026-06-11
-Escopo: compatibilidade do MCP deste workspace com Claude custom connectors remotos, OAuth, Cloudflare Tunnel permanente e conexões locais por stdio/stdin.
+Data: 2026-06-11 Escopo: compatibilidade do MCP deste workspace com Claude custom connectors
+remotos, OAuth, Cloudflare Tunnel permanente e conexões locais por stdio/stdin.
 
 ## 0. Atualização pós-teste real no Claude
 
-Após o teste real na UI do Claude, apareceu `{"error":"invalid_request"}` no navegador. O log local identificou a causa concreta como rejeição de autorização por `unknown_client`: o Claude hospedado usa CIMD com `client_id` em `https://claude.ai/oauth/mcp-oauth-client-metadata` e callback `https://claude.ai/api/mcp/auth_callback`. O issuer dev agora tem fallback/fast-path estrito para esse par estável do Claude, além do fallback já existente para ChatGPT.
+Após o teste real na UI do Claude, apareceu `{"error":"invalid_request"}` no navegador. O log local
+identificou a causa concreta como rejeição de autorização por `unknown_client`: o Claude hospedado
+usa CIMD com `client_id` em `https://claude.ai/oauth/mcp-oauth-client-metadata` e callback
+`https://claude.ai/api/mcp/auth_callback`. O issuer dev agora tem fallback/fast-path estrito para
+esse par estável do Claude, além do fallback já existente para ChatGPT.
 
 Esse fix fica em:
 
@@ -13,11 +17,13 @@ Esse fix fica em:
 src/copilot/mcp/control-plane/dev-oauth.js
 ```
 
-Depois de aplicar esse fix é obrigatório reiniciar o MCP antes de tentar conectar no Claude novamente.
+Depois de aplicar esse fix é obrigatório reiniciar o MCP antes de tentar conectar no Claude
+novamente.
 
 ## 1. Sumário executivo
 
-O servidor MCP do workspace está **compatível com Claude custom connectors remotos** no desenho atual:
+O servidor MCP do workspace está **compatível com Claude custom connectors remotos** no desenho
+atual:
 
 ```text
 Claude cloud -> HTTPS público -> Cloudflare Tunnel -> origin MCP local -> /mcp
@@ -53,7 +59,8 @@ DEFAULT_RESOURCE_DOCUMENTATION:
   agora: https://mcp.aurelin.org/oauth/status
 ```
 
-Motivo: o endpoint é usado por Claude e ChatGPT; a metadata OAuth do resource não deve apontar por default para documentação específica da OpenAI.
+Motivo: o endpoint é usado por Claude e ChatGPT; a metadata OAuth do resource não deve apontar por
+default para documentação específica da OpenAI.
 
 ## 2. Fontes oficiais consultadas
 
@@ -109,18 +116,21 @@ Client Secret OAuth (opcional):
 
 Tabela equivalente:
 
-| Campo na UI do Claude | Valor exato |
-|---|---|
-| Nome | `Repo DevContainer MCP` |
-| URL do servidor MCP remoto | `https://mcp.aurelin.org/mcp` |
-| ID do Cliente OAuth (opcional) | deixar vazio |
-| Client Secret OAuth (opcional) | deixar vazio |
+| Campo na UI do Claude          | Valor exato                   |
+| ------------------------------ | ----------------------------- |
+| Nome                           | `Repo DevContainer MCP`       |
+| URL do servidor MCP remoto     | `https://mcp.aurelin.org/mcp` |
+| ID do Cliente OAuth (opcional) | deixar vazio                  |
+| Client Secret OAuth (opcional) | deixar vazio                  |
 
 ### Por que deixar Client ID/Secret vazios?
 
-O servidor publica metadata OAuth e suporta o fluxo de cliente público com registro/metadata dinâmicos. O Claude consegue descobrir o authorization server e concluir o fluxo sem você colar um client secreto manual.
+O servidor publica metadata OAuth e suporta o fluxo de cliente público com registro/metadata
+dinâmicos. O Claude consegue descobrir o authorization server e concluir o fluxo sem você colar um
+client secreto manual.
 
-Use Client ID/Secret apenas se, no futuro, você migrar para um authorization server de produção que exija cliente confidencial estático. Esse não é o modo atual.
+Use Client ID/Secret apenas se, no futuro, você migrar para um authorization server de produção que
+exija cliente confidencial estático. Esse não é o modo atual.
 
 ## 4. Resultado dos checks locais do servidor atual
 
@@ -176,7 +186,8 @@ Conclusão: o endpoint está operacionalmente pronto para cadastro no Claude com
 
 ### 5.1 Endpoint público
 
-Claude custom connectors remotos são acessados a partir da infraestrutura Anthropic, não do computador local do usuário. Portanto, o endpoint precisa ser acessível pela internet pública.
+Claude custom connectors remotos são acessados a partir da infraestrutura Anthropic, não do
+computador local do usuário. Portanto, o endpoint precisa ser acessível pela internet pública.
 
 Nosso endpoint cumpre isso via Cloudflare Tunnel permanente:
 
@@ -186,9 +197,11 @@ https://mcp.aurelin.org/mcp
 
 ### 5.2 Transporte MCP remoto
 
-Claude suporta Streamable HTTP e ainda aceita HTTP+SSE legado. O transporte remoto moderno recomendado é Streamable HTTP.
+Claude suporta Streamable HTTP e ainda aceita HTTP+SSE legado. O transporte remoto moderno
+recomendado é Streamable HTTP.
 
-Nosso smoke mostra `protocolVersion: 2025-06-18`, e o endpoint `/mcp` responde como MCP remoto autenticado, com tools/list protegido por OAuth.
+Nosso smoke mostra `protocolVersion: 2025-06-18`, e o endpoint `/mcp` responde como MCP remoto
+autenticado, com tools/list protegido por OAuth.
 
 ### 5.3 OAuth
 
@@ -217,7 +230,9 @@ JWKS:
 https://mcp.aurelin.org/oauth/jwks.json
 ```
 
-A metadata path-specific é importante porque a URL que você cola no Claude inclui `/mcp`. A documentação de autenticação do Claude enfatiza que o `resource` da Protected Resource Metadata deve bater com a URL exata usada pelo cliente, incluindo path.
+A metadata path-specific é importante porque a URL que você cola no Claude inclui `/mcp`. A
+documentação de autenticação do Claude enfatiza que o `resource` da Protected Resource Metadata deve
+bater com a URL exata usada pelo cliente, incluindo path.
 
 ### 5.4 Callback OAuth do Claude
 
@@ -227,23 +242,29 @@ Para conectores hospedados no Claude, o callback esperado é:
 https://claude.ai/api/mcp/auth_callback
 ```
 
-O nosso fluxo atual usa metadata dinâmica e cliente público; se algum dia for necessário criar cliente estático dedicado para Claude, esse callback deve ser incluído na allowlist de redirect URIs.
+O nosso fluxo atual usa metadata dinâmica e cliente público; se algum dia for necessário criar
+cliente estático dedicado para Claude, esse callback deve ser incluído na allowlist de redirect
+URIs.
 
 ### 5.5 Tamanho de resultados
 
-Claude documenta limite de resultado de tool em torno de 150.000 caracteres para Claude.ai/Desktop. Nosso registry MCP tem limite default maior:
+Claude documenta limite de resultado de tool em torno de 150.000 caracteres para Claude.ai/Desktop.
+Nosso registry MCP tem limite default maior:
 
 ```text
 COPILOT_MCP_REGISTRY_MAX_TOOL_RESULT_BYTES default: 2 MiB
 ```
 
-Isso **não bloqueia a conexão**, mas é uma diferença operacional. Para um serviço dedicado a Claude, considere:
+Isso **não bloqueia a conexão**, mas é uma diferença operacional. Para um serviço dedicado a Claude,
+considere:
 
 ```bash
 COPILOT_MCP_REGISTRY_MAX_TOOL_RESULT_BYTES=140000
 ```
 
-Não recomendo alterar o serviço compartilhado ChatGPT+Claude sem testar, porque isso pode tornar mais agressivas rejeições de resultados que hoje funcionam bem no ChatGPT. Para Claude, prefira também chamadas com janela:
+Não recomendo alterar o serviço compartilhado ChatGPT+Claude sem testar, porque isso pode tornar
+mais agressivas rejeições de resultados que hoje funcionam bem no ChatGPT. Para Claude, prefira
+também chamadas com janela:
 
 ```text
 repo_read_file startLine/endLine
@@ -260,7 +281,9 @@ O repo já tem modo de superfície para Claude:
 COPILOT_MCP_TOOL_SURFACE=claude
 ```
 
-Esse modo reduz a superfície para ferramentas read/research/safe úteis. Para o endpoint remoto compartilhado, o modo atual pode permanecer `full` se você quer liberdade máxima. Para uma instância dedicada ao Claude, eu recomendaria testar:
+Esse modo reduz a superfície para ferramentas read/research/safe úteis. Para o endpoint remoto
+compartilhado, o modo atual pode permanecer `full` se você quer liberdade máxima. Para uma instância
+dedicada ao Claude, eu recomendaria testar:
 
 ```bash
 COPILOT_MCP_TOOL_SURFACE=claude
@@ -291,9 +314,11 @@ Pontos importantes:
 
 1. Claude precisa alcançar o endpoint público; Cloudflare Tunnel cumpre isso.
 2. `/mcp` não deve ser cacheado na edge.
-3. Rotas OAuth `/.well-known/*`, `/oauth/*` e `/mcp` não devem sofrer transform rules que alterem headers críticos.
+3. Rotas OAuth `/.well-known/*`, `/oauth/*` e `/mcp` não devem sofrer transform rules que alterem
+   headers críticos.
 4. O serviço remoto do tunnel deve continuar sincronizado com o origin local configurado.
-5. Se houver firewall/allowlist adicional, considere permitir tráfego outbound da Anthropic conforme a documentação oficial.
+5. Se houver firewall/allowlist adicional, considere permitir tráfego outbound da Anthropic conforme
+   a documentação oficial.
 
 Preflight recomendado antes de conectar/reconectar no Claude:
 
@@ -363,7 +388,8 @@ Chame mcp_runtime_health e verifique metrics.repoReadFileCache, metrics.ioCache.
 
 ### 9.1 O que é diferente no modo local
 
-O modo local não usa o conector remoto do Claude web. Ele é para clientes locais compatíveis com MCP stdio, principalmente Claude Desktop ou Claude Code, conforme disponibilidade do cliente.
+O modo local não usa o conector remoto do Claude web. Ele é para clientes locais compatíveis com MCP
+stdio, principalmente Claude Desktop ou Claude Code, conforme disponibilidade do cliente.
 
 No transporte stdio:
 
@@ -388,9 +414,11 @@ Ele redireciona ruído de bootstrap de stdout para stderr antes de iniciar o tra
 
 ### 9.2 Importante: auth em stdio
 
-A especificação MCP recomenda que stdio **não** use o mesmo fluxo HTTP OAuth. Em vez disso, credenciais locais devem vir do ambiente quando necessárias.
+A especificação MCP recomenda que stdio **não** use o mesmo fluxo HTTP OAuth. Em vez disso,
+credenciais locais devem vir do ambiente quando necessárias.
 
-Para uso local com Claude Desktop, a configuração mais simples e funcional é desativar OAuth HTTP no subprocesso local:
+Para uso local com Claude Desktop, a configuração mais simples e funcional é desativar OAuth HTTP no
+subprocesso local:
 
 ```text
 COPILOT_MCP_AUTH_MODE=none-dev
@@ -431,7 +459,8 @@ Exemplo para este workspace no DevContainer:
 }
 ```
 
-Se o Claude Desktop local estiver fora do container, ele precisa conseguir executar `node` e acessar o path real do projeto. Nesse caso, substitua o path `/workspaces/...` pelo path absoluto no host.
+Se o Claude Desktop local estiver fora do container, ele precisa conseguir executar `node` e acessar
+o path real do projeto. Nesse caso, substitua o path `/workspaces/...` pelo path absoluto no host.
 
 ### 9.4 Config Claude Desktop — Windows
 
@@ -467,7 +496,8 @@ Exemplo:
 
 ### 9.5 Alternativa local com proxy remoto `mcp-remote`
 
-Se o cliente local suportar stdio mas não suportar bem OAuth remoto, pode-se usar proxy local para o endpoint remoto:
+Se o cliente local suportar stdio mas não suportar bem OAuth remoto, pode-se usar proxy local para o
+endpoint remoto:
 
 ```json
 {
@@ -484,7 +514,9 @@ Se o cliente local suportar stdio mas não suportar bem OAuth remoto, pode-se us
 }
 ```
 
-Esse modo depende do pacote externo `mcp-remote`, recomendado em guias Cloudflare/MCP para clientes locais que precisam falar com servidor remoto autenticado. Para Claude web, prefira o conector remoto nativo.
+Esse modo depende do pacote externo `mcp-remote`, recomendado em guias Cloudflare/MCP para clientes
+locais que precisam falar com servidor remoto autenticado. Para Claude web, prefira o conector
+remoto nativo.
 
 ### 9.6 Smoke local stdio
 
@@ -557,7 +589,8 @@ COPILOT_MCP_REGISTRY_MAX_TOOL_RESULT_BYTES=140000
 
 ### Permissões/approvals no Claude
 
-Claude pode pedir aprovação de tools. A documentação alerta para riscos de prompt injection em conectores. Mantenha:
+Claude pode pedir aprovação de tools. A documentação alerta para riscos de prompt injection em
+conectores. Mantenha:
 
 - tools com descrições claras;
 - tool surface reduzida quando possível;
@@ -589,7 +622,8 @@ Windows:
 5. rode manualmente o comando do config;
 6. garanta que nenhum `console.log`/stdout humano seja emitido pelo bootstrap.
 
-Nosso `cli.js` já mitiga o risco de stdout sujo redirecionando bootstrap stdout para stderr no modo stdio.
+Nosso `cli.js` já mitiga o risco de stdout sujo redirecionando bootstrap stdout para stderr no modo
+stdio.
 
 ## 12. Upgrades recomendados futuros
 
@@ -603,7 +637,8 @@ COPILOT_MCP_REGISTRY_MAX_TOOL_RESULT_BYTES=140000
 COPILOT_MCP_SERVER_TITLE="Repo DevContainer MCP for Claude"
 ```
 
-Isso reduz tools/list, reduz risco de resultado grande e aproxima o comportamento dos limites do Claude.
+Isso reduz tools/list, reduz risco de resultado grande e aproxima o comportamento dos limites do
+Claude.
 
 ### U2 — OAuth de produção
 
@@ -669,4 +704,7 @@ COPILOT_MCP_AUTH_ENFORCEMENT=off
 COPILOT_MCP_TOOL_SURFACE=claude
 ```
 
-A compatibilidade geral é boa. O único upgrade aplicado nesta rodada foi tornar a metadata OAuth neutra e própria do nosso resource, substituindo o default de documentação OpenAI por `https://mcp.aurelin.org/oauth/status`. O próximo passo operacional é restartar o MCP para carregar essa alteração e então adicionar/reconectar o conector no Claude.
+A compatibilidade geral é boa. O único upgrade aplicado nesta rodada foi tornar a metadata OAuth
+neutra e própria do nosso resource, substituindo o default de documentação OpenAI por
+`https://mcp.aurelin.org/oauth/status`. O próximo passo operacional é restartar o MCP para carregar
+essa alteração e então adicionar/reconectar o conector no Claude.

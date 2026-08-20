@@ -123,6 +123,21 @@ export function extractBabelFileSymbols(ast) {
             for (const specifier of node.specifiers ?? []) {
                 exports.push(specifier.exported?.name ?? specifier.exported?.value ?? '<unknown>');
             }
+            if (typeof node.source?.value === 'string') {
+                imports.push({
+                    source: node.source.value,
+                    specifiers: (node.specifiers ?? []).map(
+                        (/** @type {any} */ specifier) =>
+                            specifier.local?.name ??
+                            specifier.local?.value ??
+                            specifier.exported?.name ??
+                            specifier.exported?.value ??
+                            '*',
+                    ),
+                    isDynamic: false,
+                    line,
+                });
+            }
             continue;
         }
         if (node.type === 'ExportDefaultDeclaration') {
@@ -139,7 +154,11 @@ export function extractBabelFileSymbols(ast) {
             continue;
         }
         if (node.type === 'ExportAllDeclaration') {
-            exports.push(`* from ${node.source?.value ?? '?'}`);
+            const source = node.source?.value;
+            exports.push(`* from ${source ?? '?'}`);
+            if (typeof source === 'string') {
+                imports.push({ source, specifiers: ['*'], isDynamic: false, line });
+            }
             continue;
         }
         if (node.type === 'TSExportAssignment') {
@@ -185,7 +204,8 @@ function collectRuntimeImports(root, imports) {
         }
 
         for (const [key, value] of Object.entries(node)) {
-            if (key === 'loc' || key === 'start' || key === 'end' || key === 'extra' || key.endsWith('Comments')) continue;
+            if (key === 'loc' || key === 'start' || key === 'end' || key === 'extra' || key.endsWith('Comments'))
+                continue;
             if (Array.isArray(value)) stack.push(...value);
             else if (value && typeof value === 'object') stack.push(value);
         }

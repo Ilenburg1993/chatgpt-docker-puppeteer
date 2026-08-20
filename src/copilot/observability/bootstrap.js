@@ -17,6 +17,9 @@ import { AUDIT_LOGGER } from '#copilot/audit';
 import { DB_LOGGER, EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
 import { defaultHookBus, setHooksLogger } from '#copilot/sdk';
 import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
+import { setSdkMetricEmitter } from '#copilot/sdk/telemetry';
+import { setCustomToolsBuilder } from '#copilot/sdk/tools';
+import { setToolsLogger, setToolsMetrics, TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools/observability';
 import { channel } from 'node:diagnostics_channel';
 import { setAuditLogger } from '../audit/logger.js';
 import { container } from '../core/di-container.js';
@@ -27,8 +30,6 @@ import { registerShutdownHandler, setShutdownEventEmitter, setShutdownLogger } f
 import { setDbLogger } from '../db/sqlite.js';
 import { registerBuiltinMiddleware } from '../events/middleware/index.js';
 import { setSdkLogger } from '../sdk/logger.js';
-import { setSdkMetricEmitter } from '#copilot/sdk/telemetry';
-import { setCustomToolsBuilder } from '#copilot/sdk/tools';
 import { defaultConvergenceTraceStore, initConvergenceTracePersistence } from './convergence-trace-store.js';
 import { CONVERGENCE_TRACE_STORE, ERROR_TRACKER, EVENT_COLLECTOR, METRICS_STORE } from './di-tokens.js';
 import { defaultErrorTracker } from './error-tracker.js';
@@ -38,7 +39,6 @@ import { log, LOG_DIR } from './logger.js';
 import { defaultMetrics } from './metrics.js';
 import { projectSdkOperationMetric } from './sdk-metric-bridge.js';
 import { getToolStats, recordBlockedToolCall, recordToolCall } from './tool-stats.js';
-import { TOOLS_LOGGER, TOOLS_METRICS, setToolsLogger, setToolsMetrics } from '#copilot/tools/observability';
 
 /** @type {boolean} */
 let _obsBooted = false;

@@ -164,9 +164,12 @@ describe('terminal/repl-lifecycle', () => {
 
         expect(mocks.parkTerminalPromptForContinuation).toHaveBeenCalled();
         expect(fakeRl.setPrompt).toHaveBeenCalledWith('LLM-B pensando ');
-        expect(mocks.println).toHaveBeenCalledWith(expect.stringContaining('modelo ocioso; encaminhada como novo turno'), {
-            redrawPrompt: false,
-        });
+        expect(mocks.println).toHaveBeenCalledWith(
+            expect.stringContaining('modelo ocioso; encaminhada como novo turno'),
+            {
+                redrawPrompt: false,
+            },
+        );
         expect(mocks.sendTurn).toHaveBeenCalledWith('teste canônico', 'user');
         expect(mocks.scheduleTerminalPromptRedraw).not.toHaveBeenCalledWith(fakeRl, 'você› ');
     });

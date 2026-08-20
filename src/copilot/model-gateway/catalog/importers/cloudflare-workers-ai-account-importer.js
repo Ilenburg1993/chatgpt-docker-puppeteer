@@ -6,6 +6,7 @@
  * learn which models and gateway controls are visible to the configured key, without executing a model.
  *
  * Sources checked 2026-05-26:
+ *
  * - https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/
  * - https://developers.cloudflare.com/api/resources/ai_gateway/
  *
@@ -24,7 +25,8 @@ export const CLOUDFLARE_API_BASE_URL = 'https://api.cloudflare.com/client/v4';
 export const CLOUDFLARE_WORKERS_AI_MODELS_SEARCH_PATH = '/accounts/{account_id}/ai/models/search';
 export const CLOUDFLARE_AI_GATEWAY_GATEWAYS_PATH = '/accounts/{account_id}/ai-gateway/gateways';
 export const CLOUDFLARE_AI_GATEWAY_GATEWAY_PATH = '/accounts/{account_id}/ai-gateway/gateways/{gateway_id}';
-export const CLOUDFLARE_AI_GATEWAY_PROVIDER_CONFIGS_PATH = '/accounts/{account_id}/ai-gateway/gateways/{gateway_id}/provider_configs';
+export const CLOUDFLARE_AI_GATEWAY_PROVIDER_CONFIGS_PATH =
+    '/accounts/{account_id}/ai-gateway/gateways/{gateway_id}/provider_configs';
 export const CLOUDFLARE_AI_GATEWAY_CREDIT_BALANCE_PATH = '/accounts/{account_id}/ai-gateway/billing/credit-balance';
 export const CLOUDFLARE_AI_GATEWAY_SPENDING_LIMIT_PATH = '/accounts/{account_id}/ai-gateway/billing/spending-limit';
 
@@ -124,7 +126,9 @@ function providerModel(row) {
  * @returns {string | null}
  */
 function gatewayId(row) {
-    return stringValue(row['id']) ?? stringValue(row['gateway_id']) ?? stringValue(row['slug']) ?? stringValue(row['name']);
+    return (
+        stringValue(row['id']) ?? stringValue(row['gateway_id']) ?? stringValue(row['slug']) ?? stringValue(row['name'])
+    );
 }
 
 /**
@@ -252,9 +256,10 @@ async function fetchCloudflareEndpoint(name, url, fetchImpl, apiToken) {
     let body;
     const contentType = response.headers?.get?.('content-type') ?? '';
     try {
-        body = contentType.includes('application/json') || (!response.body && typeof response.json === 'function')
-            ? await readCatalogResponseJson(response, { label: `Cloudflare account ${name}` })
-            : await readCatalogResponseText(response, { label: `Cloudflare account ${name}` });
+        body =
+            contentType.includes('application/json') || (!response.body && typeof response.json === 'function')
+                ? await readCatalogResponseJson(response, { label: `Cloudflare account ${name}` })
+                : await readCatalogResponseText(response, { label: `Cloudflare account ${name}` });
     } catch (error) {
         body = { parseError: error instanceof Error ? error.message : 'unknown response parse error' };
     }
@@ -332,7 +337,7 @@ function selectedGateway(raw) {
 
 /**
  * @param {Record<string, unknown>} raw
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function providerEvidenceValues(raw) {
     const modelRows = accountModels(raw);
@@ -343,17 +348,29 @@ function providerEvidenceValues(raw) {
     const spendingLimit = resultRecord(endpointBody(endpoint(raw, 'spendingLimit')));
     const endpointRows = Object.values(isRecord(raw['endpoints']) ? raw['endpoints'] : {}).filter(isRecord);
     const statusByEndpoint = Object.fromEntries(
-        endpointRows.map((item) => [stringValue(item['name']) ?? 'unknown', { ok: item['ok'] === true, status: finiteNumber(item['status']) }]),
+        endpointRows.map((item) => [
+            stringValue(item['name']) ?? 'unknown',
+            { ok: item['ok'] === true, status: finiteNumber(item['status']) },
+        ]),
     );
     return [
         { fieldPath: 'providerMetadata.cloudflare.accountApi.endpointStatuses', value: statusByEndpoint },
         { fieldPath: 'providerMetadata.cloudflare.accountApi.visibleModelCount', value: modelRows.length },
-        { fieldPath: 'providerMetadata.cloudflare.accountApi.visibleModels', value: modelRows.map(providerModel).filter(Boolean) },
+        {
+            fieldPath: 'providerMetadata.cloudflare.accountApi.visibleModels',
+            value: modelRows.map(providerModel).filter(Boolean),
+        },
         { fieldPath: 'providerMetadata.cloudflare.accountApi.gatewayCount', value: gatewayRows.length },
-        { fieldPath: 'providerMetadata.cloudflare.accountApi.gatewayIds', value: gatewayRows.map(gatewayId).filter(Boolean) },
+        {
+            fieldPath: 'providerMetadata.cloudflare.accountApi.gatewayIds',
+            value: gatewayRows.map(gatewayId).filter(Boolean),
+        },
         { fieldPath: 'providerMetadata.cloudflare.accountApi.selectedGatewayFound', value: Boolean(selected) },
         { fieldPath: 'providerMetadata.cloudflare.accountApi.providerConfigCount', value: configs.length },
-        { fieldPath: 'providerMetadata.cloudflare.accountApi.providerConfigProviders', value: configs.map(providerConfigSlug).filter(Boolean) },
+        {
+            fieldPath: 'providerMetadata.cloudflare.accountApi.providerConfigProviders',
+            value: configs.map(providerConfigSlug).filter(Boolean),
+        },
         { fieldPath: 'providerMetadata.cloudflare.accountApi.creditBalance', value: creditBalance },
         { fieldPath: 'providerMetadata.cloudflare.accountApi.spendingLimit', value: spendingLimit },
     ].filter((item) => {
@@ -414,10 +431,14 @@ export function createCloudflareWorkersAiAccountImporter(options = {}) {
                 spendingLimit: `${baseUrl}${fillPath(CLOUDFLARE_AI_GATEWAY_SPENDING_LIMIT_PATH, accountId, gatewayIdValue)}`,
             };
             const entries = await Promise.all(
-                Object.entries(endpoints).map(([name, url]) => fetchCloudflareEndpoint(name, url, fetchImpl, options.apiToken ?? '')),
+                Object.entries(endpoints).map(([name, url]) =>
+                    fetchCloudflareEndpoint(name, url, fetchImpl, options.apiToken ?? ''),
+                ),
             );
             const endpointMap = Object.fromEntries(entries.map((item) => [String(item['name']), item]));
-            const accountCoreSucceeded = Boolean(endpointMap['modelsSearch']?.['ok'] || endpointMap['gateways']?.['ok']);
+            const accountCoreSucceeded = Boolean(
+                endpointMap['modelsSearch']?.['ok'] || endpointMap['gateways']?.['ok'],
+            );
             if (!accountCoreSucceeded) {
                 const statuses = entries.map((item) => `${item['name']}:${item['status']}`).join(', ');
                 throw new Error(`Cloudflare account import failed for all core endpoints (${statuses})`);

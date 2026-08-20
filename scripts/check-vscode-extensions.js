@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // @ts-check
-import fs from 'node:fs';
 import { parse, printParseErrorCode } from 'jsonc-parser';
+import fs from 'node:fs';
 import {
     VSCODE_DEVCONTAINER_EXTENSIONS,
     VSCODE_HOST_ONLY_EXTENSIONS,
     VSCODE_OPTIONAL_EXTENSIONS,
+    VSCODE_PRUNABLE_EXTENSIONS,
+    VSCODE_RECOMMENDED_EXTENSIONS,
     VSCODE_UNWANTED_EXTENSIONS,
 } from '../config/vscode/extensions.mjs';
 import {
@@ -48,7 +50,7 @@ const unwanted = /** @type {string[]} */ (recommendations?.unwantedRecommendatio
 
 const projectionChecks = [
     ['DevContainer auto-install', setDiff(configured, VSCODE_DEVCONTAINER_EXTENSIONS)],
-    ['Workspace recommendations', setDiff(recommended, VSCODE_DEVCONTAINER_EXTENSIONS)],
+    ['Workspace recommendations', setDiff(recommended, VSCODE_RECOMMENDED_EXTENSIONS)],
     ['Workspace unwanted', setDiff(unwanted, VSCODE_UNWANTED_EXTENSIONS)],
 ];
 let failed = false;
@@ -74,14 +76,16 @@ if (installed) {
     const installedLower = new Set(installed.map((value) => value.toLowerCase()));
     const missingCore = VSCODE_DEVCONTAINER_EXTENSIONS.filter((value) => !availableLower.has(value.toLowerCase()));
     const installedUnwanted = VSCODE_UNWANTED_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
+    const installedPrunable = VSCODE_PRUNABLE_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
     const installedHostOnly = VSCODE_HOST_ONLY_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
     console.log(
-        `Runtime: ${installed.length} instaladas pelo usuário; ${builtIn.length} builtins; ${missingCore.length} core ausentes; ${installedUnwanted.length} unwanted ainda presentes; ${installedHostOnly.length} host-only no remoto.`,
+        `Runtime: ${installed.length} instaladas pelo usuário; ${builtIn.length} builtins; ${missingCore.length} core ausentes; ${installedUnwanted.length} unwanted advisory; ${installedPrunable.length} prunable ainda presentes; ${installedHostOnly.length} host-only no remoto.`,
     );
     if (missingCore.length) console.warn(`  core ausentes: ${missingCore.join(', ')}`);
-    if (installedUnwanted.length) console.warn(`  unwanted presentes: ${installedUnwanted.join(', ')}`);
+    if (installedUnwanted.length) console.warn(`  unwanted advisory presentes: ${installedUnwanted.join(', ')}`);
+    if (installedPrunable.length) console.warn(`  prunable presentes: ${installedPrunable.join(', ')}`);
     if (installedHostOnly.length) console.warn(`  host-only presentes no remoto: ${installedHostOnly.join(', ')}`);
-    if (strictRuntime && (missingCore.length || installedUnwanted.length || installedHostOnly.length)) failed = true;
+    if (strictRuntime && (missingCore.length || installedPrunable.length || installedHostOnly.length)) failed = true;
 } else {
     console.warn('Runtime: VS Code CLI indisponível; verificação de instalação foi omitida.');
 }

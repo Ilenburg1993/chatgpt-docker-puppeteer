@@ -37,7 +37,13 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
  * @property {(durationMs: number, success: boolean) => void} recordDialogTurn
  * @property {(
  *     reason: string,
- *     opts?: { strategy?: string; additionalModelCall?: boolean; prConsumed?: boolean; success?: boolean; durationMs?: number },
+ *     opts?: {
+ *         strategy?: string;
+ *         additionalModelCall?: boolean;
+ *         prConsumed?: boolean;
+ *         success?: boolean;
+ *         durationMs?: number;
+ *     },
  * ) => void} recordDialogRecovery
  * @property {(durationMs: number, success: boolean) => void} recordSdkDialogTurn
  * @property {(durationMs: number, success: boolean, outcome?: 'completed' | 'timeout' | 'error') => void} recordInjectTurn
@@ -226,7 +232,13 @@ export function createMetricsStore(options = {}) {
      * Registra uma recuperação semântica do dialog loop.
      *
      * @param {string} reason
-     * @param {{ strategy?: string; additionalModelCall?: boolean; prConsumed?: boolean; success?: boolean; durationMs?: number }} [opts]
+     * @param {{
+     *     strategy?: string;
+     *     additionalModelCall?: boolean;
+     *     prConsumed?: boolean;
+     *     success?: boolean;
+     *     durationMs?: number;
+     * }} [opts]
      * @returns {void}
      */
     function recordDialogRecovery(reason, opts = {}) {

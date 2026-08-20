@@ -16,10 +16,10 @@ import {
     renderTerminalStructuredPreview,
     terminalPreviewSummaryRole,
 } from '../capabilities/index.js';
+import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import { requireTerminalFileTool } from '../frontend/gateways/index.js';
 import { buildActivityAwareGuidance, buildFailureRecoveryLines } from '../frontend/operational-guidance/index.js';
-import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
 import { terminalThemeRow } from '../state/ui/index.js';
 
 /**
@@ -198,8 +198,16 @@ function parseListFlags(parts) {
 
 /**
  * @param {string[]} parts
- * @param {boolean} [previewDefault=false]
- * @returns {{ preview: boolean; forceJs: boolean; markdown: boolean; structured: 'json' | 'yaml' | null; query: string; lineLimit: number; rest: string[] }}
+ * @param {boolean} [previewDefault=false] Default is `false`
+ * @returns {{
+ *     preview: boolean;
+ *     forceJs: boolean;
+ *     markdown: boolean;
+ *     structured: 'json' | 'yaml' | null;
+ *     query: string;
+ *     lineLimit: number;
+ *     rest: string[];
+ * }}
  */
 function parseReadFlags(parts, previewDefault = false) {
     let preview = previewDefault;
@@ -266,7 +274,12 @@ async function runList(ctx, parts) {
     }
     const entries = Array.isArray(result['entries']) ? result['entries'] : [];
     ctx.println('');
-    ctx.println(terminalThemeRow('FS local', `${countLabel(entries.length, 'entrada', 'entradas')} · ${operatorPath(result['path'] ?? path)}`));
+    ctx.println(
+        terminalThemeRow(
+            'FS local',
+            `${countLabel(entries.length, 'entrada', 'entradas')} · ${operatorPath(result['path'] ?? path)}`,
+        ),
+    );
     for (const entry of entries.slice(0, 120)) {
         const item = entry && typeof entry === 'object' ? /** @type {Record<string, unknown>} */ (entry) : {};
         ctx.println(
@@ -291,7 +304,13 @@ async function runRead(ctx, parts, previewDefault = false) {
     const flags = parseReadFlags(parts, previewDefault);
     const path = flags.rest.join(' ').trim();
     if (!path) {
-        ctx.println(terminalThemeRow('Uso', '/fs read <path> [--preview] [--markdown|--json|--yaml] [--query filtro] [--lines n]', { role: 'warn' }));
+        ctx.println(
+            terminalThemeRow(
+                'Uso',
+                '/fs read <path> [--preview] [--markdown|--json|--yaml] [--query filtro] [--lines n]',
+                { role: 'warn' },
+            ),
+        );
         return;
     }
     const result = await invokeFileTool(readFileContentTool, { path, encoding: 'utf8', quietLog: true });

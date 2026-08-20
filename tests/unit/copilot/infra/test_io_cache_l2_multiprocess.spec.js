@@ -158,7 +158,10 @@ function waitForJson(child, predicate, timeoutMs = 5_000) {
         let settled = false;
         const timer = setTimeout(() => finish(new Error(`child output timeout: ${stderr || stdout}`)), timeoutMs);
 
-        function finish(/** @type {Error | null} */ error, /** @type {Record<string, unknown> | undefined} */ value = undefined) {
+        function finish(
+            /** @type {Error | null} */ error,
+            /** @type {Record<string, unknown> | undefined} */ value = undefined,
+        ) {
             if (settled) return;
             settled = true;
             clearTimeout(timer);
@@ -208,13 +211,15 @@ function waitForJson(child, predicate, timeoutMs = 5_000) {
  * @param {number} [timeoutMs]
  */
 function waitForClose(child, timeoutMs = 5_000) {
-    return new Promise((/** @type {(value: { code: number | null; signal: NodeJS.Signals | null }) => void} */ resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('child close timeout')), timeoutMs);
-        child.once('close', (code, signal) => {
-            clearTimeout(timer);
-            resolve({ code, signal });
-        });
-    });
+    return new Promise(
+        (/** @type {(value: { code: number | null; signal: NodeJS.Signals | null }) => void} */ resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('child close timeout')), timeoutMs);
+            child.once('close', (code, signal) => {
+                clearTimeout(timer);
+                resolve({ code, signal });
+            });
+        },
+    );
 }
 
 /**
@@ -231,120 +236,100 @@ async function runCase(options, timeoutMs = 5_000) {
 }
 
 describe('io-cache-l2 write-behind multiprocess proofs', () => {
-    it(
-        'limits SIGKILL loss to the unconfirmed pending batch',
-        async () => {
-            const dir = await createTempDir();
-            const dbPath = path.join(dir, 'crash.sqlite');
-            const key = 'pending-crash';
-            const child = spawnCase({ operation: 'pending-crash', dbPath, key });
+    it('limits SIGKILL loss to the unconfirmed pending batch', async () => {
+        const dir = await createTempDir();
+        const dbPath = path.join(dir, 'crash.sqlite');
+        const key = 'pending-crash';
+        const child = spawnCase({ operation: 'pending-crash', dbPath, key });
 
-            await waitForJson(child, (value) => value['ready'] === true);
-            child.kill('SIGKILL');
-            await new Promise((resolve) => child.once('close', resolve));
-            expect(child.signalCode).toBe('SIGKILL');
+        await waitForJson(child, (value) => value['ready'] === true);
+        child.kill('SIGKILL');
+        await new Promise((resolve) => child.once('close', resolve));
+        expect(child.signalCode).toBe('SIGKILL');
 
-            const db = new Database(dbPath);
-            expect(
-                db.prepare('SELECT COUNT(*) AS total FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key),
-            ).toMatchObject({ total: 0 });
-            expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
-            db.close();
-        },
-        15_000,
-    );
+        const db = new Database(dbPath);
+        expect(
+            db.prepare('SELECT COUNT(*) AS total FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key),
+        ).toMatchObject({ total: 0 });
+        expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
+        db.close();
+    }, 15_000);
 
-    it(
-        'flushes the pending batch before the database closes on coordinated shutdown',
-        async () => {
-            const dir = await createTempDir();
-            const dbPath = path.join(dir, 'graceful.sqlite');
-            const key = 'graceful';
+    it('flushes the pending batch before the database closes on coordinated shutdown', async () => {
+        const dir = await createTempDir();
+        const dbPath = path.join(dir, 'graceful.sqlite');
+        const key = 'graceful';
 
-            const result = await runCase({ operation: 'graceful', dbPath, key }, 10_000);
-            expect(result).toMatchObject({ ok: true, persistedBeforeShutdown: 0 });
+        const result = await runCase({ operation: 'graceful', dbPath, key }, 10_000);
+        expect(result).toMatchObject({ ok: true, persistedBeforeShutdown: 0 });
 
-            const db = new Database(dbPath);
-            const row = /** @type {{ payload: Buffer }} */ (
-                db.prepare('SELECT payload FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key)
-            );
-            expect(row.payload.toString('utf8')).toBe('graceful');
-            expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
-            db.close();
-        },
-        15_000,
-    );
+        const db = new Database(dbPath);
+        const row = /** @type {{ payload: Buffer }} */ (
+            db.prepare('SELECT payload FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key)
+        );
+        expect(row.payload.toString('utf8')).toBe('graceful');
+        expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
+        db.close();
+    }, 15_000);
 
-    it(
-        'routes SIGTERM through cache flush before database close',
-        async () => {
-            const dir = await createTempDir();
-            const dbPath = path.join(dir, 'signal-graceful.sqlite');
-            const key = 'signal-graceful';
-            const child = spawnCase({ operation: 'signal-graceful', dbPath, key });
-            const closed = waitForClose(child, 10_000);
+    it('routes SIGTERM through cache flush before database close', async () => {
+        const dir = await createTempDir();
+        const dbPath = path.join(dir, 'signal-graceful.sqlite');
+        const key = 'signal-graceful';
+        const child = spawnCase({ operation: 'signal-graceful', dbPath, key });
+        const closed = waitForClose(child, 10_000);
 
-            const ready = await waitForJson(child, (value) => value['ready'] === true);
-            expect(ready).toMatchObject({ persistedBeforeShutdown: 0 });
-            child.kill('SIGTERM');
-            await expect(closed).resolves.toEqual({ code: 0, signal: null });
+        const ready = await waitForJson(child, (value) => value['ready'] === true);
+        expect(ready).toMatchObject({ persistedBeforeShutdown: 0 });
+        child.kill('SIGTERM');
+        await expect(closed).resolves.toEqual({ code: 0, signal: null });
 
-            const db = new Database(dbPath);
-            const row = /** @type {{ payload: Buffer }} */ (
-                db.prepare('SELECT payload FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key)
-            );
-            expect(row.payload.toString('utf8')).toBe('signal-graceful');
-            expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
-            db.close();
-        },
-        15_000,
-    );
+        const db = new Database(dbPath);
+        const row = /** @type {{ payload: Buffer }} */ (
+            db.prepare('SELECT payload FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key)
+        );
+        expect(row.payload.toString('utf8')).toBe('signal-graceful');
+        expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
+        db.close();
+    }, 15_000);
 
-    it(
-        'keeps a failed batch readable and persists it after external SQLite contention clears',
-        async () => {
-            const dir = await createTempDir();
-            const dbPath = path.join(dir, 'contention.sqlite');
-            const key = 'contention';
+    it('keeps a failed batch readable and persists it after external SQLite contention clears', async () => {
+        const dir = await createTempDir();
+        const dbPath = path.join(dir, 'contention.sqlite');
+        const key = 'contention';
 
-            const setup = new Database(dbPath);
-            const { createIoL2SqliteCache } =
-                await import('../../../../src/copilot/infra/io-cache-l2-sqlite.js');
-            createIoL2SqliteCache({ db: setup }).clearAll();
-            setup.close();
+        const setup = new Database(dbPath);
+        const { createIoL2SqliteCache } = await import('../../../../src/copilot/infra/io-cache-l2-sqlite.js');
+        createIoL2SqliteCache({ db: setup }).clearAll();
+        setup.close();
 
-            const holder = spawnCase({ operation: 'lock-holder', dbPath, holdMs: 700 });
-            const holderClosed = new Promise((resolve) => holder.once('close', resolve));
-            await waitForJson(holder, (value) => value['locked'] === true);
-            const writerResult = await runCase(
-                { operation: 'contention-writer', dbPath, key, retryAfterMs: 850 },
-                10_000,
-            );
-            await holderClosed;
-            expect(holder.exitCode).toBe(0);
+        const holder = spawnCase({ operation: 'lock-holder', dbPath, holdMs: 700 });
+        const holderClosed = new Promise((resolve) => holder.once('close', resolve));
+        await waitForJson(holder, (value) => value['locked'] === true);
+        const writerResult = await runCase({ operation: 'contention-writer', dbPath, key, retryAfterMs: 850 }, 10_000);
+        await holderClosed;
+        expect(holder.exitCode).toBe(0);
 
-            expect(writerResult).toMatchObject({
-                ok: true,
-                firstFlush: 0,
-                secondFlush: 1,
-                readableAfterFailure: true,
-                stats: {
-                    errors: 1,
-                    batchFailures: 1,
-                    batchFlushes: 1,
-                    batchedRows: 1,
-                    pendingSets: 0,
-                },
-            });
+        expect(writerResult).toMatchObject({
+            ok: true,
+            firstFlush: 0,
+            secondFlush: 1,
+            readableAfterFailure: true,
+            stats: {
+                errors: 1,
+                batchFailures: 1,
+                batchFlushes: 1,
+                batchedRows: 1,
+                pendingSets: 0,
+            },
+        });
 
-            const db = new Database(dbPath);
-            const row = /** @type {{ payload: Buffer }} */ (
-                db.prepare('SELECT payload FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key)
-            );
-            expect(row.payload.toString('utf8')).toBe('contention');
-            expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
-            db.close();
-        },
-        20_000,
-    );
+        const db = new Database(dbPath);
+        const row = /** @type {{ payload: Buffer }} */ (
+            db.prepare('SELECT payload FROM copilot_io_cache_l2 WHERE cache_key = ?').get(key)
+        );
+        expect(row.payload.toString('utf8')).toBe('contention');
+        expect(db.pragma('integrity_check', { simple: true })).toBe('ok');
+        db.close();
+    }, 20_000);
 });

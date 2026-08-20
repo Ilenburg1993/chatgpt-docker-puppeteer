@@ -1,8 +1,8 @@
 // @ts-check
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {

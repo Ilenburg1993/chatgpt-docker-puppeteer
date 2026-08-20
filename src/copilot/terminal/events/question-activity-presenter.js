@@ -2,9 +2,9 @@
 /**
  * Presenter compartilhado para subestados de atividades `question`.
  *
- * A fase interna `question` cobre mais do que uma pergunta humana direta: resposta registrada,
- * permissões/formulários, mailbox de intervenção, OAuth e sampling MCP. Este módulo mantém a
- * classificação em uma única fonte de verdade para evitar drift entre linha viva e comandos.
+ * A fase interna `question` cobre mais do que uma pergunta humana direta: resposta registrada, permissões/formulários,
+ * mailbox de intervenção, OAuth e sampling MCP. Este módulo mantém a classificação em uma única fonte de verdade para
+ * evitar drift entre linha viva e comandos.
  *
  * @module copilot/terminal/question-activity-presenter
  */

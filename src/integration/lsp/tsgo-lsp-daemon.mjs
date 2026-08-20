@@ -36,52 +36,62 @@ const SUPPORTED_OPERATIONS = new Set([
 /** @typedef {{ rootDir?: string; timeoutMs?: number; idleTtlMs?: number }} NativeDaemonOptions */
 /** @typedef {{ line?: number; character?: number }} LspPosition */
 /** @typedef {{ start?: LspPosition; end?: LspPosition }} LspRange */
-/** @typedef {{
-    uri?: string;
-    targetUri?: string;
-    range?: LspRange;
-    targetSelectionRange?: LspRange;
-    targetRange?: LspRange;
-}} LspLocation */
+/**
+ * @typedef {{
+ *     uri?: string;
+ *     targetUri?: string;
+ *     range?: LspRange;
+ *     targetSelectionRange?: LspRange;
+ *     targetRange?: LspRange;
+ * }} LspLocation
+ */
 /** @typedef {{ filePath: string; start: number; length: number; newText: string }} OffsetEdit */
 /** @typedef {{ edits?: OffsetEdit[] }} GovernedAction */
-/** @typedef {{
-    filePath?: string;
-    line?: number;
-    character?: number;
-    endLine?: number;
-    endCharacter?: number;
-    maxResults?: number;
-    query?: string;
-    content?: string;
-    mode?: string;
-    action?: GovernedAction;
-    confirmationToken?: string;
-}} OperationParams */
+/**
+ * @typedef {{
+ *     filePath?: string;
+ *     line?: number;
+ *     character?: number;
+ *     endLine?: number;
+ *     endCharacter?: number;
+ *     maxResults?: number;
+ *     query?: string;
+ *     content?: string;
+ *     mode?: string;
+ *     action?: GovernedAction;
+ *     confirmationToken?: string;
+ * }} OperationParams
+ */
 /** @typedef {{ label?: string; kind?: number; sortText?: string }} CompletionItem */
-/** @typedef {{
-    name?: string;
-    kind?: number;
-    children?: LspSymbol[];
-    selectionRange?: LspRange;
-    range?: LspRange;
-    location?: LspLocation;
-    containerName?: string;
-}} LspSymbol */
+/**
+ * @typedef {{
+ *     name?: string;
+ *     kind?: number;
+ *     children?: LspSymbol[];
+ *     selectionRange?: LspRange;
+ *     range?: LspRange;
+ *     location?: LspLocation;
+ *     containerName?: string;
+ * }} LspSymbol
+ */
 /** @typedef {{ range?: LspRange; code?: string | number; severity?: number; message?: string }} LspDiagnostic */
 /** @typedef {{ title?: string; kind?: string; edit?: WorkspaceEdit; command?: { command?: string } }} LspCodeAction */
-/** @typedef {{
-    changes?: Record<string, OffsetTextEdit[]>;
-    documentChanges?: { textDocument?: { uri?: string }; edits?: OffsetTextEdit[] }[];
-}} WorkspaceEdit */
+/**
+ * @typedef {{
+ *     changes?: Record<string, OffsetTextEdit[]>;
+ *     documentChanges?: { textDocument?: { uri?: string }; edits?: OffsetTextEdit[] }[];
+ * }} WorkspaceEdit
+ */
 /** @typedef {{ range?: LspRange; newText?: string }} OffsetTextEdit */
-/** @typedef {{
-    method?: string;
-    id?: number | string;
-    params?: { items?: unknown[]; uri?: string; diagnostics?: unknown[] };
-    result?: unknown;
-    error?: { code?: number; message?: string; data?: unknown };
-}} JsonRpcMessage */
+/**
+ * @typedef {{
+ *     method?: string;
+ *     id?: number | string;
+ *     params?: { items?: unknown[]; uri?: string; diagnostics?: unknown[] };
+ *     result?: unknown;
+ *     error?: { code?: number; message?: string; data?: unknown };
+ * }} JsonRpcMessage
+ */
 
 function normalizePath(/** @type {unknown} */ value) {
     return path.resolve(String(value || '')).replace(/\\/gu, '/');
@@ -183,15 +193,17 @@ export class NativeTypeScriptLspDaemon {
         this.child = null;
         this.idleTimer = null;
         this.stopPromise = null;
-        /** @type {Map<
-    number,
-    {
-        resolve: (value: unknown) => void;
-        reject: (reason?: unknown) => void;
-        timer: NodeJS.Timeout;
-        cleanup: () => void;
-    }
->} */
+        /**
+         * @type {Map<
+         *     number,
+         *     {
+         *         resolve: (value: unknown) => void;
+         *         reject: (reason?: unknown) => void;
+         *         timer: NodeJS.Timeout;
+         *         cleanup: () => void;
+         *     }
+         * >}
+         */
         this.pending = new Map();
         /** @type {Map<string, { version: number; text: string }>} */
         this.documents = new Map();
@@ -575,13 +587,15 @@ export class NativeTypeScriptLspDaemon {
         throw new Error(`LSP_UNKNOWN_OPERATION: ${operation}`);
     }
 
-    /** @returns {{
-    name: string;
-    kind: number | null;
-    parent: string | null;
-    filePath: string;
-    range: LspRange | null;
-}[]} */
+    /**
+     * @returns {{
+     *     name: string;
+     *     kind: number | null;
+     *     parent: string | null;
+     *     filePath: string;
+     *     range: LspRange | null;
+     * }[]}
+     */
     _flattenDocumentSymbols(
         /** @type {LspSymbol[]} */ symbols,
         /** @type {string} */ filePath,

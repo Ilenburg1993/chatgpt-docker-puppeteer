@@ -152,7 +152,8 @@ const sessionModeSetTool = buildTool({
         /** @type {unknown} */ (
             z.object({
                 mode: z
-                    .enum(['interactive', 'plan', 'autopilot'])['describe']('Novo modo: "interactive" | "plan" | "autopilot"'),
+                    .enum(['interactive', 'plan', 'autopilot'])
+                    ['describe']('Novo modo: "interactive" | "plan" | "autopilot"'),
             })
         )
     ),
@@ -362,8 +363,8 @@ const sessionCompactTool = buildTool({
 /**
  * Tool: reload_agent_process — encerra o processo graciosamente para que o supervisor reinicie com ESM fresco.
  *
- * Fluxo: graceful shutdown via `runShutdown(reason)` → `process.exit(0)` → PM2 / VS Code / node --watch respawna.
- * O reload é a única forma confiável de ativar novas tools ou mudanças de módulos em um processo ESM vivo.
+ * Fluxo: graceful shutdown via `runShutdown(reason)` → `process.exit(0)` → PM2 / VS Code / node --watch respawna. O
+ * reload é a única forma confiável de ativar novas tools ou mudanças de módulos em um processo ESM vivo.
  */
 /** @type {import('#copilot/sdk/types').Tool<any>} */
 const reloadAgentProcessTool = buildTool({
@@ -376,24 +377,23 @@ const reloadAgentProcessTool = buildTool({
     parameters: /** @type {import('#copilot/sdk/types').ZodSchema<{ reason?: string; delay_ms?: number }>} */ (
         /** @type {unknown} */ (
             z.object({
-                reason: z
-                    .string()
-                    .optional()['describe']('Motivo do reload, para logging (padrão: "agent_reload")'),
+                reason: z.string().optional()['describe']('Motivo do reload, para logging (padrão: "agent_reload")'),
                 delay_ms: z
                     .number()
                     .int()
                     .min(0)
                     .max(5000)
-                    .optional()['describe']('Delay em ms antes de process.exit(0) para garantir entrega da resposta (padrão: 500ms)'),
+                    .optional()
+                    ['describe'](
+                        'Delay em ms antes de process.exit(0) para garantir entrega da resposta (padrão: 500ms)',
+                    ),
             })
         )
     ),
     handler: async (/** @type {{ reason?: string; delay_ms?: number }} */ { reason, delay_ms } = {}) => {
         const delayMs = delay_ms ?? 500;
         const reasonStr = reason ?? 'agent_reload';
-        const supervisor = process.env['pm_id']
-            ? 'pm2'
-            : (process.env['COPILOT_SUPERVISOR'] ?? 'bare-node');
+        const supervisor = process.env['pm_id'] ? 'pm2' : (process.env['COPILOT_SUPERVISOR'] ?? 'bare-node');
         log(
             'INFO',
             `[reload_agent_process] Graceful shutdown agendado. reason=${reasonStr} supervisor=${supervisor} delay=${delayMs}ms`,

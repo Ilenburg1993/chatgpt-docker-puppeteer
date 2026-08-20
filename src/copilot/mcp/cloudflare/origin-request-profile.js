@@ -237,7 +237,12 @@ export function buildRecommendedOriginRequestPatch(options = {}) {
 
 /**
  * @param {Record<string, unknown>} originRequest
- * @param {{ hostnameRulePresent?: boolean; originServiceUrl?: string; originServerName?: string; enableHttp2Origin?: boolean }} [options]
+ * @param {{
+ *     hostnameRulePresent?: boolean;
+ *     originServiceUrl?: string;
+ *     originServerName?: string;
+ *     enableHttp2Origin?: boolean;
+ * }} [options]
  * @returns {{
  *     actual: Record<string, unknown>;
  *     desired: Record<string, unknown>;
@@ -301,7 +306,9 @@ export function auditOriginRequestProfile(originRequest, options = {}) {
     }
 
     if (actual['http2Origin'] === true && applyPlan['http2Origin'] !== true) {
-        critical.push('originRequest.http2Origin=true is incompatible unless the origin service is HTTPS and HTTP/2 origin rollout is explicit.');
+        critical.push(
+            'originRequest.http2Origin=true is incompatible unless the origin service is HTTPS and HTTP/2 origin rollout is explicit.',
+        );
     }
     if (actual['disableChunkedEncoding'] === true) {
         critical.push('originRequest.disableChunkedEncoding=true may break MCP streaming/SSE behavior.');
@@ -382,7 +389,8 @@ function buildResolvedOriginRequestFieldSpecs(options) {
         if (httpsOrigin && field.key === 'tlsTimeout') {
             return {
                 ...field,
-                rationale: 'TLS is active on the canonical origin; keep the Cloudflare default timeout unless measurements justify pinning it.',
+                rationale:
+                    'TLS is active on the canonical origin; keep the Cloudflare default timeout unless measurements justify pinning it.',
             };
         }
         if (field.key !== 'http2Origin') return field;
@@ -444,7 +452,14 @@ function normalizeCloudflareDurationNanos(value) {
     for (const match of matches) {
         const amount = Number(match[1]);
         const unit = match[2];
-        const factor = unit === 'ms' ? 1_000_000 : unit === 's' ? 1_000_000_000 : unit === 'm' ? 60_000_000_000 : 3_600_000_000_000;
+        const factor =
+            unit === 'ms'
+                ? 1_000_000
+                : unit === 's'
+                  ? 1_000_000_000
+                  : unit === 'm'
+                    ? 60_000_000_000
+                    : 3_600_000_000_000;
         total += amount * factor;
     }
     return total;

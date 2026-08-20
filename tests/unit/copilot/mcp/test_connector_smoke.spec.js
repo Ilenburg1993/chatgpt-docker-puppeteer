@@ -3,10 +3,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { runCanonicalConnectorSmoke } from '#copilot/mcp/cloudflare/connector-smoke.js';
 import { readCloudflareTunnelConfig } from '#copilot/mcp/cloudflare/config.js';
+import { runCanonicalConnectorSmoke } from '#copilot/mcp/cloudflare/connector-smoke.js';
 
-/** @returns {Awaited<ReturnType<typeof import('../../../../src/copilot/mcp/cloudflare/cli-smoke.js').runCloudflareSmoke>>} */
+/** @returns {Awaited<
+    ReturnType<typeof import('../../../../src/copilot/mcp/cloudflare/cli-smoke.js').runCloudflareSmoke>
+>} */
 function healthyUnauthenticatedSmoke() {
     return {
         ok: true,
@@ -81,7 +83,10 @@ function requireFixtureIndex(values, index, label) {
 
 describe('canonical connector smoke', () => {
     it('fails the canonical gate when authenticated OAuth fails even if the public challenge is healthy', async () => {
-        /** @type {Array<{ path: string; state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }>} */
+        /** @type {{
+    path: string;
+    state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState;
+}[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
@@ -96,7 +101,9 @@ describe('canonical connector smoke', () => {
                         authenticatedSse: { ok: false, status: 500 },
                     },
                 }),
-                writeState: async (path, state) => { persisted.push({ path, state }); },
+                writeState: async (path, state) => {
+                    persisted.push({ path, state });
+                },
             },
         });
 
@@ -109,14 +116,19 @@ describe('canonical connector smoke', () => {
     });
 
     it('persists authenticated tool-registry evidence instead of the expected unauthenticated 401 tools response', async () => {
-        /** @type {Array<{ path: string; state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState }>} */
+        /** @type {{
+    path: string;
+    state: import('../../../../src/copilot/mcp/cloudflare/state.js').ConnectorSmokeState;
+}[]} */
         const persisted = [];
         const report = await runCanonicalConnectorSmoke({
             config: testConfig(),
             deps: {
                 runUnauthenticatedSmoke: async () => healthyUnauthenticatedSmoke(),
                 runOauthSmoke: async () => healthyOauthSmoke(),
-                writeState: async (path, state) => { persisted.push({ path, state }); },
+                writeState: async (path, state) => {
+                    persisted.push({ path, state });
+                },
             },
         });
 

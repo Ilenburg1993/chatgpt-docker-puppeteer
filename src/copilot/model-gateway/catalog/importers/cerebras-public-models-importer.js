@@ -8,11 +8,7 @@
  * @module copilot/model-gateway/catalog/importers/cerebras-public-models-importer
  */
 
-import {
-    MODEL_GATEWAY_CATALOG_CONFIDENCE,
-    createModelMetadataEvidence,
-    createModelRouteOption,
-} from '../contracts.js';
+import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createModelRouteOption } from '../contracts.js';
 import {
     normalizeModelAliases,
     normalizeModelIdentityTraits,
@@ -97,7 +93,7 @@ function supportedParameterList(supportedParameters) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const architecture = readRecordField(row, 'architecture');
@@ -152,7 +148,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.cerebras.deprecated', value: row['deprecated'] },
         { fieldPath: 'providerMetadata.cerebras.preview', value: row['preview'] },
         { fieldPath: 'providerMetadata.cerebras.quantization', value: stringValue(row['quantization']) },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;
@@ -180,7 +179,8 @@ export function createCerebrasPublicModelsImporter(options = {}) {
         refreshPolicy: 'scheduled',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Cerebras public catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Cerebras public catalog import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Cerebras public catalog fetch failed with HTTP ${response.status}`);
             return readCatalogResponseJson(response, { label: 'Cerebras public models' });

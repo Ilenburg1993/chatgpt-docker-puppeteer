@@ -12,7 +12,12 @@ import { buildCustomAgentsConfig } from '#copilot/config';
 import { SESSION_LIFECYCLE_EVENTS } from '#copilot/sdk/constants';
 import { raceEvents } from '#copilot/sdk/event-helpers';
 import { modelsList, skillsConfigSetDisabledSkills, skillsDiscover, toolsList } from '#copilot/sdk/rpc';
-import { createTerminalCopilotClient, disconnectSessionSafe, LIFECYCLE_EVENTS, onLifecycleEvents } from '#copilot/sdk/session';
+import {
+    createTerminalCopilotClient,
+    disconnectSessionSafe,
+    LIFECYCLE_EVENTS,
+    onLifecycleEvents,
+} from '#copilot/sdk/session';
 import { getAuthStatus as checkAuthStatus } from '#copilot/sdk/telemetry';
 import {
     getClientRef,
@@ -167,8 +172,8 @@ export function onAgentSdkLifecycleEvents(handlers, client) {
 }
 
 /**
- * Alguns handles do SDK 1.0 são getters vivos: `client.rpc`, por exemplo, lança enquanto o client está entre
- * stop/start durante reattach. Snapshots de health devem degradar, não derrubar o processo.
+ * Alguns handles do SDK 1.0 são getters vivos: `client.rpc`, por exemplo, lança enquanto o client está entre stop/start
+ * durante reattach. Snapshots de health devem degradar, não derrubar o processo.
  *
  * @template T
  * @param {unknown} target

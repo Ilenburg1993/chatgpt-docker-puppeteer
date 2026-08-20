@@ -16,8 +16,9 @@ import {
     getNextTurnRequestHeaders,
     setNextTurnRequestHeaders,
 } from '../../presentation/state/index.js';
-import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import { printTerminalHumanQuestionCard } from '../events/presenters/human-question/index.js';
+import { compactTerminalDiagnosticId, formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
+import { readTerminalIoActivityProjection } from '../events/projections/index.js';
 import {
     compactTerminalSdkSession,
     confirmTerminalSdkSessionUi,
@@ -80,10 +81,6 @@ import {
     terminalThemeText,
     terminalThemeWrappedRow,
 } from '../state/ui/index.js';
-import {
-    compactTerminalDiagnosticId,
-    formatTerminalToolPathForOperator,
-} from '../events/presenters/tools/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget, renderRuntimeTargetLabel } from './runtime-target.js';
 
 /**
@@ -150,8 +147,16 @@ function renderPermissionModeLabel(value) {
  * @returns {'approve_all' | 'audit_only' | 'selective' | null}
  */
 function parsePermissionModeInput(value) {
-    const mode = String(value ?? '').trim().toLowerCase();
-    if (mode === 'approve_all' || mode === 'automatico' || mode === 'automático' || mode === 'auto' || mode === 'tudo') {
+    const mode = String(value ?? '')
+        .trim()
+        .toLowerCase();
+    if (
+        mode === 'approve_all' ||
+        mode === 'automatico' ||
+        mode === 'automático' ||
+        mode === 'auto' ||
+        mode === 'tudo'
+    ) {
         return 'approve_all';
     }
     if (mode === 'audit_only' || mode === 'auditoria' || mode === 'audit') return 'audit_only';
@@ -255,7 +260,9 @@ function renderSdkHandle(value) {
  * @returns {boolean}
  */
 function isSdkDiagnosticDetailToken(value) {
-    const token = String(value ?? '').trim().toLowerCase();
+    const token = String(value ?? '')
+        .trim()
+        .toLowerCase();
     return (
         token === 'detail' ||
         token === 'details' ||
@@ -285,7 +292,8 @@ function parseSdkShowArgs(rest) {
  */
 function renderSdkQuotaResetLabel(value) {
     if (value == null || value === '') return '-';
-    const parsed = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(String(value));
+    const parsed =
+        value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(String(value));
     if (!Number.isFinite(parsed)) return String(value);
     const now = Date.now();
     const relative = formatTerminalRelativeAge(parsed, now);
@@ -473,7 +481,10 @@ function renderOperatorPath(value) {
  * @returns {string}
  */
 function renderAuditTrace(value) {
-    return compactTerminalDiagnosticId(typeof value === 'string' ? value : value == null ? '' : String(value), 12) ?? 'sem id';
+    return (
+        compactTerminalDiagnosticId(typeof value === 'string' ? value : value == null ? '' : String(value), 12) ??
+        'sem id'
+    );
 }
 
 /**
@@ -999,9 +1010,13 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
     println(terminalThemeHeadline('question', 'Esperas humanas'));
     println(terminalThemeDivider(37));
     println(
-        terminalThemeRow('Estado', totalPending > 0 ? pluralPt(totalPending, 'pendência', 'pendências') : 'nenhuma pendência', {
-            role: totalPending > 0 ? 'question' : 'success',
-        }),
+        terminalThemeRow(
+            'Estado',
+            totalPending > 0 ? pluralPt(totalPending, 'pendência', 'pendências') : 'nenhuma pendência',
+            {
+                role: totalPending > 0 ? 'question' : 'success',
+            },
+        ),
     );
     println(
         detail
@@ -1070,7 +1085,12 @@ function renderSdkWaitsSummary({ println }, runtimeId, options = {}) {
         }
     }
     if (totalPending === 0) {
-        println(terminalThemeRow('Status', 'sem espera humana viva agora; normal após resume silencioso ou sem ask_user/elicitation/permission'));
+        println(
+            terminalThemeRow(
+                'Status',
+                'sem espera humana viva agora; normal após resume silencioso ou sem ask_user/elicitation/permission',
+            ),
+        );
         println(terminalThemeRow('Histórico', '/session sdk waits · auditoria bruta em /events --raw'));
     }
     println(terminalThemeDivider(37));
@@ -1143,7 +1163,11 @@ function renderSdkSimulate({ println }, rest) {
                 role: 'command',
             }),
         );
-        println(terminalThemeRow('Compatível', '/sdk simulate request-user-input continua aceito para automações legadas', { role: 'muted' }));
+        println(
+            terminalThemeRow('Compatível', '/sdk simulate request-user-input continua aceito para automações legadas', {
+                role: 'muted',
+            }),
+        );
         println('');
         return;
     }
@@ -1207,7 +1231,11 @@ function renderSdkCapabilitiesSummary({ println }, runtimeId, options = {}) {
     if (options.detail) {
         println(terminalThemeRow('Retorno', pretty(capabilities, 1200)));
     } else {
-        println(terminalThemeRow('Mais detalhes', '/sdk capabilities detail · /sdk doctor · /sdk waits', { role: 'command' }));
+        println(
+            terminalThemeRow('Mais detalhes', '/sdk capabilities detail · /sdk doctor · /sdk waits', {
+                role: 'command',
+            }),
+        );
     }
     println('');
 }
@@ -1269,7 +1297,11 @@ export async function cmdSdk({ println }, arg = '') {
             await renderSdkDoctor({ println }, runtimeId);
         } else if (sub === 'capabilities' || sub === 'caps') {
             renderSdkCapabilitiesSummary({ println }, runtimeId, {
-                detail: rest.includes('detail') || rest.includes('--detail') || rest.includes('raw') || rest.includes('--raw'),
+                detail:
+                    rest.includes('detail') ||
+                    rest.includes('--detail') ||
+                    rest.includes('raw') ||
+                    rest.includes('--raw'),
             });
         } else if (sub === 'headers') {
             renderSdkRequestHeadersSummary({ println }, rest);
@@ -1422,7 +1454,11 @@ async function renderSdkModels({ println }, runtimeId) {
     const result = await callWithRuntimeTarget(listTerminalSdkModels, runtimeId);
     const models = arrayFromSdkList(result);
     println('');
-    println(terminalThemeHeadline('accent', 'Modelos SDK', [`${models.length} ${models.length === 1 ? 'modelo' : 'modelos'}`]));
+    println(
+        terminalThemeHeadline('accent', 'Modelos SDK', [
+            `${models.length} ${models.length === 1 ? 'modelo' : 'modelos'}`,
+        ]),
+    );
     for (const model of models.slice(0, 30)) {
         const m = objectOrNull(model) ?? {};
         const id = String(m['id'] ?? m['name'] ?? model);
@@ -1430,7 +1466,9 @@ async function renderSdkModels({ println }, runtimeId) {
         println(terminalThemeRow('Modelo', options ? `${id} · ${options}` : id, { role: 'command' }));
     }
     if (models.length > 30)
-        println(terminalThemeRow('Omitidos', `${models.length - 30} ${models.length - 30 === 1 ? 'modelo' : 'modelos'}`));
+        println(
+            terminalThemeRow('Omitidos', `${models.length - 30} ${models.length - 30 === 1 ? 'modelo' : 'modelos'}`),
+        );
     println('');
 }
 
@@ -1579,13 +1617,10 @@ async function renderSdkSkillsConfig({ println }, runtimeId) {
     println(terminalThemeRow('Subagente', String(semantics['subagentRuntime'] ?? '-')));
     println(terminalThemeRow('Mutação', String(semantics['disabledSkillsMutationScope'] ?? '-')));
     println(
-        terminalThemeRows(
-            'Observação',
-            [
-                'disable/enable ajusta disabledSkills na sessão/CLI atual',
-                'não reescreve automaticamente o env do processo',
-            ],
-        ),
+        terminalThemeRows('Observação', [
+            'disable/enable ajusta disabledSkills na sessão/CLI atual',
+            'não reescreve automaticamente o env do processo',
+        ]),
     );
     println(
         terminalThemeRows(
@@ -1618,7 +1653,9 @@ async function renderSdkSkillsAgents({ println }, runtimeId) {
     });
 
     println('');
-    println(terminalThemeHeadline('accent', 'Custom Agents e Skills', [pluralPt(customAgents.length, 'agent', 'agents')]));
+    println(
+        terminalThemeHeadline('accent', 'Custom Agents e Skills', [pluralPt(customAgents.length, 'agent', 'agents')]),
+    );
     println(
         terminalThemeRow(
             'Resumo',
@@ -1762,7 +1799,8 @@ async function renderSdkTools({ println }, model, runtimeId) {
             println(terminalThemeRow('instruções', instructions, { role: 'muted' }));
         }
     }
-    if (tools.length > 50) println(terminalThemeRow('Omitidas', pluralPt(tools.length - 50, 'ferramenta', 'ferramentas')));
+    if (tools.length > 50)
+        println(terminalThemeRow('Omitidas', pluralPt(tools.length - 50, 'ferramenta', 'ferramentas')));
     println('');
     println(terminalThemeHeadline('tool', 'Registry local canônico'));
     println(terminalThemeRow('Total', String(registrySnapshot.total), { role: 'info' }));
@@ -1943,7 +1981,8 @@ async function renderSdkSystemPrompt({ println }, runtimeId) {
 export async function cmdWorkspace({ println }, arg = '') {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const [sub = 'list', ...rest] = cleanArg.trim().split(/\s+/).filter(Boolean);
-    const rawOutput = rest.includes('--raw') || rest.includes('raw') || rest.includes('--json') || rest.includes('json');
+    const rawOutput =
+        rest.includes('--raw') || rest.includes('raw') || rest.includes('--json') || rest.includes('json');
     try {
         if (sub === 'read') {
             const path = rest.join(' ').trim();
@@ -2054,7 +2093,11 @@ export async function cmdWorkspace({ println }, arg = '') {
                 const content = workspaceReadContent(readResult);
                 if (content === null) {
                     fail += 1;
-                    println(terminalThemeRow('Ignorado', `${renderOperatorPath(sourcePath)} · conteúdo não textual`, { role: 'warn' }));
+                    println(
+                        terminalThemeRow('Ignorado', `${renderOperatorPath(sourcePath)} · conteúdo não textual`, {
+                            role: 'warn',
+                        }),
+                    );
                     continue;
                 }
                 const destinationPath = `${targetRoot.replace(/\/$/u, '')}/${sourcePath}`;
@@ -2087,9 +2130,13 @@ export async function cmdWorkspace({ println }, arg = '') {
 
             println('');
             println(
-                terminalThemeRow('Mirror SDK', `concluído · ok ${ok} · falhas ${fail} · destino ${renderOperatorPath(targetRoot)}`, {
-                    role: fail > 0 ? 'warn' : 'success',
-                }),
+                terminalThemeRow(
+                    'Mirror SDK',
+                    `concluído · ok ${ok} · falhas ${fail} · destino ${renderOperatorPath(targetRoot)}`,
+                    {
+                        role: fail > 0 ? 'warn' : 'success',
+                    },
+                ),
             );
             println('');
         } else if (sub === 'promote' || sub === 'push' || sub === 'import') {
@@ -2154,7 +2201,11 @@ export async function cmdWorkspace({ println }, arg = '') {
             if (files.length > 0) {
                 for (const file of files.slice(0, 80)) {
                     const f = objectOrNull(file) ?? {};
-                    println(terminalThemeRow('Arquivo', renderOperatorPath(f['path'] ?? f['name'] ?? file), { role: 'fileRead' }));
+                    println(
+                        terminalThemeRow('Arquivo', renderOperatorPath(f['path'] ?? f['name'] ?? file), {
+                            role: 'fileRead',
+                        }),
+                    );
                 }
                 if (files.length > 80)
                     println(
@@ -2167,7 +2218,9 @@ export async function cmdWorkspace({ println }, arg = '') {
                 println(terminalThemeRow('Retorno', pretty(result, 1500)));
             } else {
                 println(terminalThemeRow('Estado', 'nenhum arquivo no workspace SDK virtual', { role: 'muted' }));
-                println(terminalThemeRow('Escopo', 'SDK virtual separado do FS local; use /fs list para o repositório'));
+                println(
+                    terminalThemeRow('Escopo', 'SDK virtual separado do FS local; use /fs list para o repositório'),
+                );
             }
             println(terminalThemeWrappedRow('Listar', '/workspace list', { role: 'command', columns: 76 }));
             println(
@@ -2221,7 +2274,9 @@ export async function cmdElicitation({ println }, arg = '') {
             const result = await callWithRuntimeTarget(confirmTerminalSdkSessionUi, runtimeId, message);
             println('');
             println(
-                terminalThemeRow('Confirmação', `session.ui.confirm concluído · ${String(result)}`, { role: 'success' }),
+                terminalThemeRow('Confirmação', `session.ui.confirm concluído · ${String(result)}`, {
+                    role: 'success',
+                }),
             );
             println('');
         } else if (sub === 'select') {
@@ -2242,7 +2297,9 @@ export async function cmdElicitation({ println }, arg = '') {
             }
             const result = await callWithRuntimeTarget(selectTerminalSdkSessionUi, runtimeId, message, options);
             println('');
-            println(terminalThemeRow('Seleção', `session.ui.select concluído · ${String(result)}`, { role: 'success' }));
+            println(
+                terminalThemeRow('Seleção', `session.ui.select concluído · ${String(result)}`, { role: 'success' }),
+            );
             println('');
         } else if (sub === 'input') {
             const { left, right } = splitAtDoubleDash(rest);
@@ -2278,11 +2335,9 @@ export async function cmdElicitation({ println }, arg = '') {
             println('');
         } else if (sub === 'show') {
             const showArgs = parseSdkShowArgs(rest);
-            renderElicitationEntry(
-                { println },
-                getTerminalElicitation(showArgs.id, { runtimeId }),
-                { detail: showArgs.detail },
-            );
+            renderElicitationEntry({ println }, getTerminalElicitation(showArgs.id, { runtimeId }), {
+                detail: showArgs.detail,
+            });
         } else if (sub === 'clear') {
             const ok = clearTerminalElicitation(rest[0] || 'latest');
             println(
@@ -2411,9 +2466,7 @@ export async function cmdPermission({ println }, arg = '') {
                     `${sdkPromptsSkipped ? 'ignorados' : 'seletivos'} · ${sdkPromptsSkipped ? 'sem janelas SDK por padrão' : 'pode solicitar autorização conforme política'}`,
                 ),
             );
-            println(
-                terminalThemeRow('Uso', '/permission mode <automatico|auditoria|seletivo>', { role: 'command' }),
-            );
+            println(terminalThemeRow('Uso', '/permission mode <automatico|auditoria|seletivo>', { role: 'command' }));
             println(terminalThemeDivider(37));
             println('');
             return;
@@ -2430,7 +2483,11 @@ export async function cmdPermission({ println }, arg = '') {
         const updated = setTerminalRuntimePermissionMode(nextMode, runtimeId);
         const sdkPromptsSkipped = terminalPermissionModeSkipsSdkPrompts(updated);
         println('');
-        println(terminalThemeRow('Modo', `permissões atualizadas: ${renderPermissionModeLabel(updated)}`, { role: 'success' }));
+        println(
+            terminalThemeRow('Modo', `permissões atualizadas: ${renderPermissionModeLabel(updated)}`, {
+                role: 'success',
+            }),
+        );
         println(
             terminalThemeRow(
                 'Prompts SDK',
@@ -2442,11 +2499,9 @@ export async function cmdPermission({ println }, arg = '') {
     }
     if (sub === 'show') {
         const showArgs = parseSdkShowArgs(rest);
-        renderPermissionEntry(
-            { println },
-            getTerminalPermission(showArgs.id, { runtimeId }),
-            { detail: showArgs.detail },
-        );
+        renderPermissionEntry({ println }, getTerminalPermission(showArgs.id, { runtimeId }), {
+            detail: showArgs.detail,
+        });
         return;
     }
     if (sub === 'respond' || sub === 'resolve') {
@@ -2558,7 +2613,11 @@ export async function cmdPermission({ println }, arg = '') {
                     runtimeId: resolvedRuntimeId,
                     ts: Date.now(),
                 });
-                println(terminalThemeRow('Permissão', `alça ${requestId} · ${renderPermissionTypeLabel(permissionType)}`, { role: 'question' }));
+                println(
+                    terminalThemeRow('Permissão', `alça ${requestId} · ${renderPermissionTypeLabel(permissionType)}`, {
+                        role: 'question',
+                    }),
+                );
             }
             println(terminalThemeDivider(37));
             println('');
@@ -2651,7 +2710,9 @@ function renderElicitationEntry({ println }, entry, options = {}) {
     if (detail && entry.requestId) println(terminalThemeRow('Alça', renderSdkHandle(entry.requestId)));
     if (entry.actionable) println(terminalThemeRow('Ação', 'respondível pela sessão', { role: 'success' }));
     if (entry.resultAction)
-        println(terminalThemeRow('Resultado', renderElicitationResultActionLabel(entry.resultAction), { role: 'warn' }));
+        println(
+            terminalThemeRow('Resultado', renderElicitationResultActionLabel(entry.resultAction), { role: 'warn' }),
+        );
     println(terminalThemeRow('Criado', formatTerminalRelativeAge(entry.createdAt)));
     if (entry.completedAt) println(terminalThemeRow('Concluído', formatTerminalRelativeAge(entry.completedAt)));
     println(terminalThemeDivider(37));
@@ -2702,8 +2763,13 @@ function renderPermissionEntry({ println }, entry, options = {}) {
     println(terminalThemeRow('Tipo', renderPermissionTypeLabel(entry.permissionType), { role: 'warn' }));
     if (detail && entry.requestId) println(terminalThemeRow('Alça', renderSdkHandle(entry.requestId)));
     if (entry.granted !== null)
-        println(terminalThemeRow('Aprovação', entry.granted ? 'aprovada' : 'não aprovada', { role: entry.granted ? 'success' : 'warn' }));
-    if (entry.result) println(terminalThemeRow('Resultado', renderPermissionDecisionLabel(entry.result), { role: 'warn' }));
+        println(
+            terminalThemeRow('Aprovação', entry.granted ? 'aprovada' : 'não aprovada', {
+                role: entry.granted ? 'success' : 'warn',
+            }),
+        );
+    if (entry.result)
+        println(terminalThemeRow('Resultado', renderPermissionDecisionLabel(entry.result), { role: 'warn' }));
     println(terminalThemeRow('Criada', formatTerminalRelativeAge(entry.createdAt)));
     if (entry.completedAt) println(terminalThemeRow('Concluída', formatTerminalRelativeAge(entry.completedAt)));
     if (entry.status === 'pending' && entry.requestId) {
@@ -2749,7 +2815,9 @@ function renderPermissionCockpit({ println }, runtimeId) {
     );
     if (latest) {
         const request = latest.requestId ? ` · alça ${latest.requestId}` : '';
-        println(terminalThemeRow('Recente', `${latest.id} · ${renderPermissionTypeLabel(latest.permissionType)}${request}`));
+        println(
+            terminalThemeRow('Recente', `${latest.id} · ${renderPermissionTypeLabel(latest.permissionType)}${request}`),
+        );
     } else {
         println(terminalThemeRow('Recente', '(nenhuma permissão observada)'));
     }
@@ -2763,7 +2831,12 @@ function renderPermissionCockpit({ println }, runtimeId) {
     if (modeChanges.length > 0) {
         println(terminalThemeHeadline('question', 'Mudanças de modo'));
         for (const item of modeChanges) {
-            println(terminalThemeRow('Mudança', `${formatTerminalRelativeAge(item.ts)} · ${renderPermissionModeLabel(item.mode)}`));
+            println(
+                terminalThemeRow(
+                    'Mudança',
+                    `${formatTerminalRelativeAge(item.ts)} · ${renderPermissionModeLabel(item.mode)}`,
+                ),
+            );
         }
     } else {
         println(terminalThemeRow('Mudanças', '(sem mudanças recentes no runtime local)'));

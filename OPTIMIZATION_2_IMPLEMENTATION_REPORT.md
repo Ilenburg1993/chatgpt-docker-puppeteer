@@ -2,22 +2,22 @@
 
 ## Persistent Model Cache (L2 Disk Layer)
 
-**Status**: ✅ COMPLETE
-**Phases**: A (Core I/O), B (Integration), C (Testing)
-**Test Coverage**: 13 new unit tests (all passing)
-**Validation**: 2616/2616 tests pass, typecheck strict, ESLint clean
+**Status**: ✅ COMPLETE **Phases**: A (Core I/O), B (Integration), C (Testing) **Test Coverage**: 13
+new unit tests (all passing) **Validation**: 2616/2616 tests pass, typecheck strict, ESLint clean
 
 ---
 
 ## Executive Summary
 
 Optimization #2 implements a 2-tier caching strategy for model listing:
+
 - **L1 (Memory)**: 5-minute TTL, existing behavior preserved
 - **L2 (Disk)**: 24-hour TTL, persistent cache at `~/.copilot/sdk/modellist-cache.json`
 - **Network Fallback**: Graceful degrade on disk I/O errors
 - **Stale Fallback**: Use stale cache if network fails
 
-This optimization reduces network latency by ~95% on cache hits and eliminates repeated API calls across session restarts.
+This optimization reduces network latency by ~95% on cache hits and eliminates repeated API calls
+across session restarts.
 
 ---
 
@@ -48,6 +48,7 @@ Fallback to L1 or error
 Core I/O layer for persistent disk cache.
 
 **Public API**:
+
 ```javascript
 /**
  * Read persistent cache from disk (~/.copilot/sdk/modellist-cache.json)
@@ -83,6 +84,7 @@ export async function getPersistentCacheDiagnostics()
 ```
 
 **Key Patterns**:
+
 - Defensive JSON parsing (returns null on parse error)
 - Schema version validation (v2 required)
 - Type validation for models array
@@ -96,6 +98,7 @@ export async function getPersistentCacheDiagnostics()
 Integration of persistent cache into listModels().
 
 **Changes**:
+
 ```javascript
 // Line ~45: Import persistent cache functions
 import {
@@ -187,9 +190,11 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
 
 **Path**: `~/.copilot/sdk/modellist-cache.json`
 
-**Directory Creation**: Automatic via `resolvePersistentConfigFile()` (cross-platform via `node:path`)
+**Directory Creation**: Automatic via `resolvePersistentConfigFile()` (cross-platform via
+`node:path`)
 
 **Schema**:
+
 ```json
 {
   "schema": "ModelInfo[]",
@@ -212,17 +217,20 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
 ## Performance Metrics
 
 ### Before (without Optimization #2)
+
 - First request: ~500ms (network)
 - Cache hit (L1 warm): ~1ms
 - Session restart: ~500ms (cold, no L1)
 
 ### After (with Optimization #2)
+
 - First request: ~500ms (network)
 - Cache hit (L1 warm): ~1ms
 - Session restart (L2 hit): ~5-10ms (disk I/O) vs 500ms (network)
 - **Improvement**: ~98% faster on cross-session restarts
 
 ### Overhead
+
 - Write time: ~2ms (fire-and-forget, non-blocking)
 - Read time: ~3-5ms (includes JSON parse + validation)
 - Disk space: ~2-5KB per cache file
@@ -232,9 +240,11 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
 ## Error Handling Strategy
 
 ### L1 (Memory)
+
 - No errors possible (always available)
 
 ### L2 (Disk)
+
 - **File not found**: Continue to network (normal flow)
 - **JSON parse error**: Return null, continue to network
 - **Version mismatch**: Return null, continue to network
@@ -243,11 +253,13 @@ export async function listModels(clientOverrides = {}, forceRefresh = false) {
 - **Write failure**: Fire-and-forget void, doesn't block response
 
 ### Network
+
 - **Success**: Update both L1 and L2, return
 - **Failure with L2 stale**: Use stale L2 cache (opt-in via stale fallback)
 - **Failure without L2**: Re-throw error
 
 ### Graceful Degrade Examples
+
 ```javascript
 // Scenario 1: Disk cache exists but corrupt
 readPersistentModelCache() // → null
@@ -271,8 +283,8 @@ readPersistentModelCache() // → valid but stale
 
 ## Code Quality Metrics
 
-| Metric            | Status                                    |
-| ----------------- | ----------------------------------------- |
+| Metric            | Status                                     |
+| ----------------- | ------------------------------------------ |
 | TypeScript Strict | ✅ PASS (0 errors)                         |
 | ESLint            | ✅ PASS (0 violations)                     |
 | Unit Tests        | ✅ 2616/2616 pass                          |
@@ -286,6 +298,7 @@ readPersistentModelCache() // → valid but stale
 ## Dependencies
 
 **Imports Used**:
+
 - `node:fs` → `promises` API (fs.readFile, fs.writeFile, fs.unlink, fs.stat)
 - `node:path` → `dirname`, `resolve` (cross-platform paths)
 - `node:os` → `homedir()` (for ~/.copilot/sdk)
@@ -300,6 +313,7 @@ readPersistentModelCache() // → valid but stale
 ## Integration Points
 
 ### helpers.js Changes
+
 1. ✅ Import persistent-cache functions
 2. ✅ clearModelsCache() now async (returns Promise<void>)
 3. ✅ listModels() reads L2 on L1 miss
@@ -307,11 +321,13 @@ readPersistentModelCache() // → valid but stale
 5. ✅ listModels() has stale fallback on network error
 
 ### Constants
+
 - ✅ MODELS_CACHE_TTL_MS (5min L1)
 - ✅ Cache version (v2)
 - ✅ Stale threshold (24h)
 
 ### API Changes
+
 - `clearModelsCache()` signature changed (now async)
 - All callers in SDK already handle async (Promise-based)
 
@@ -350,6 +366,8 @@ readPersistentModelCache() // → valid but stale
 
 ## Conclusion
 
-**Optimization #2 is production-ready** with maximum TypeScript rigor, comprehensive error handling, and full test coverage. The persistent cache layer reduces network latency by 98% on session restarts while maintaining full transparency and backward compatibility.
+**Optimization #2 is production-ready** with maximum TypeScript rigor, comprehensive error handling,
+and full test coverage. The persistent cache layer reduces network latency by 98% on session
+restarts while maintaining full transparency and backward compatibility.
 
 Next: Optimization #3 (Structured logging) or Optimization #4 (Concurrency stress tests).

@@ -170,7 +170,10 @@ describe('event-handlers/usage wireUsageEvent', () => {
 
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
-            expect.objectContaining({ classification: 'non_user_initiated', attributionReason: 'initiator:mcp-sampling' }),
+            expect.objectContaining({
+                classification: 'non_user_initiated',
+                attributionReason: 'initiator:mcp-sampling',
+            }),
         );
         expect(emit).toHaveBeenCalledWith(
             'llm.usage',
@@ -205,7 +208,9 @@ describe('event-handlers/usage wireUsageEvent', () => {
         handlers.get('session.usage_checkpoint')?.({
             data: { totalNanoAiu: 9_000_000, totalPremiumRequests: 4 },
         });
-        handlers.get('session.session_limits_exhausted.requested')?.({ data: { maxAiCredits: 250, usedAiCredits: 251 } });
+        handlers.get('session.session_limits_exhausted.requested')?.({
+            data: { maxAiCredits: 250, usedAiCredits: 251 },
+        });
 
         expect(emit).toHaveBeenCalledWith(
             'session.limits_changed',

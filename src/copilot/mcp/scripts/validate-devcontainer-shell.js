@@ -2,11 +2,10 @@
 /**
  * Bounded syntax validator for the canonical DevContainer Bash surface.
  *
- * Each file is parsed independently by ShellCheck in Bash mode at severity=error.
- * This validates syntax/high-confidence shell errors without executing lifecycle
- * code and avoids the observed pathological non-termination of `bash -n` on some
- * production monoliths. The runner still owns a dedicated POSIX process group per
- * parse so a pathological parser cannot pin the validator job indefinitely.
+ * Each file is parsed independently by ShellCheck in Bash mode at severity=error. This validates syntax/high-confidence
+ * shell errors without executing lifecycle code and avoids the observed pathological non-termination of `bash -n` on
+ * some production monoliths. The runner still owns a dedicated POSIX process group per parse so a pathological parser
+ * cannot pin the validator job indefinitely.
  *
  * @module copilot/mcp/scripts/validate-devcontainer-shell
  */
@@ -65,9 +64,10 @@ function killValidationProcessGroup(child) {
  * @param {{ timeoutMs?: number }} [options]
  */
 export async function validateDevcontainerBashFile(file, options = {}) {
-    const timeoutMs = Number.isInteger(options.timeoutMs) && Number(options.timeoutMs) > 0
-        ? Number(options.timeoutMs)
-        : PER_FILE_TIMEOUT_MS;
+    const timeoutMs =
+        Number.isInteger(options.timeoutMs) && Number(options.timeoutMs) > 0
+            ? Number(options.timeoutMs)
+            : PER_FILE_TIMEOUT_MS;
     const startedAt = performance.now();
 
     return new Promise((resolve) => {
@@ -132,7 +132,11 @@ export async function validateDevcontainerBashFile(file, options = {}) {
 
 /**
  * @param {readonly string[]} files
- * @param {{ concurrency?: number; timeoutMs?: number; onResult?: (row: Awaited<ReturnType<typeof validateDevcontainerBashFile>>) => void }} [options]
+ * @param {{
+ *     concurrency?: number;
+ *     timeoutMs?: number;
+ *     onResult?: (row: Awaited<ReturnType<typeof validateDevcontainerBashFile>>) => void;
+ * }} [options]
  */
 export async function validateDevcontainerBashFiles(files, options = {}) {
     const concurrency = Number.isInteger(options.concurrency)

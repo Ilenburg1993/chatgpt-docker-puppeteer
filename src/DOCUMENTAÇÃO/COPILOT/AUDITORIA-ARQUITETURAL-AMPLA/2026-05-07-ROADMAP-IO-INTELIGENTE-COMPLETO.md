@@ -1,7 +1,7 @@
 # Roadmap completo 2026-05-07 — I/O inteligente, cache, scope e indexação
 
-Escopo: `src/copilot/**`
-Regra: este roadmap deve ser executado antes de novas expansões paralelas de read/write/search/scan.
+Escopo: `src/copilot/**` Regra: este roadmap deve ser executado antes de novas expansões paralelas
+de read/write/search/scan.
 
 ## Ordem executiva
 
@@ -158,8 +158,7 @@ continua otimizando payloads; o índice materializa consulta, navegação e deco
 
 ### A.16 — Fechamento do corte atual
 
-Prioridade: P0
-Objetivo: estabilizar os componentes já criados antes de adicionar complexidade.
+Prioridade: P0 Objetivo: estabilizar os componentes já criados antes de adicionar complexidade.
 
 Tarefas:
 
@@ -187,8 +186,7 @@ Critério de pronto:
 
 ### A.17 — Scanner canônico 2.0
 
-Prioridade: P0/P1
-Objetivo: criar base confiável para indexação incremental.
+Prioridade: P0/P1 Objetivo: criar base confiável para indexação incremental.
 
 Tarefas:
 
@@ -214,8 +212,7 @@ Critério de pronto:
 
 ### A.18 — Observability de cache, scanner e índice
 
-Prioridade: P1
-Objetivo: tornar performance auditável.
+Prioridade: P1 Objetivo: tornar performance auditável.
 
 Tarefas:
 
@@ -243,8 +240,7 @@ Critério de pronto:
 
 ### A.19 — L2 soak e separação cache vs índice
 
-Prioridade: P1
-Objetivo: decidir ativação real de L2 por evidência.
+Prioridade: P1 Objetivo: decidir ativação real de L2 por evidência.
 
 Tarefas:
 
@@ -266,8 +262,7 @@ Critério de pronto:
 
 ### A.20 — Índice FTS5 de arquivos
 
-Prioridade: P1/P2
-Objetivo: acelerar busca textual comum sem perder fallback `rg`.
+Prioridade: P1/P2 Objetivo: acelerar busca textual comum sem perder fallback `rg`.
 
 Tarefas:
 
@@ -297,8 +292,7 @@ Critério de pronto:
 
 ### A.21 — Índice simbólico persistente e scope LLM-B
 
-Prioridade: P1
-Objetivo: transformar scope em ferramenta cotidiana da LLM-B.
+Prioridade: P1 Objetivo: transformar scope em ferramenta cotidiana da LLM-B.
 
 Tarefas:
 
@@ -324,8 +318,7 @@ Critério de pronto:
 
 ### A.22 — Grandes arquivos, buffer e parsing streaming
 
-Prioridade: P1/P2
-Objetivo: manter o loop responsivo com payloads grandes.
+Prioridade: P1/P2 Objetivo: manter o loop responsivo com payloads grandes.
 
 Tarefas:
 
@@ -351,8 +344,7 @@ Critério de pronto:
 
 ### A.23 — Watcher strategy
 
-Prioridade: P2
-Objetivo: manter cache/índice fresco com baixo custo.
+Prioridade: P2 Objetivo: manter cache/índice fresco com baixo custo.
 
 Tarefas:
 
@@ -370,8 +362,7 @@ Critério de pronto:
 
 ### A.24 — Web cache e provider search robusto
 
-Prioridade: P2
-Objetivo: alinhar web read/search ao mesmo padrão.
+Prioridade: P2 Objetivo: alinhar web read/search ao mesmo padrão.
 
 Tarefas:
 
@@ -496,7 +487,8 @@ Transformações aplicadas nesta rodada:
   - `invalidateIoCacheTiers()` e `invalidateIoCacheTierSubtrees()` agora tratam falha de L1 e L2
     como **best-effort** isolado por camada;
   - erro de cache não interrompe `write/append/delete/move/copy/patch/removePath`.
-- Testes de integração em `test_io_engine.spec.js` foram ampliados para travar dois contratos críticos:
+- Testes de integração em `test_io_engine.spec.js` foram ampliados para travar dois contratos
+  críticos:
   - read-through de L2 para `readBytes` com reaqueciemento de L1 na leitura subsequente;
   - mutação canônica (`writeFileAtomic`) continua concluindo mesmo quando `invalidatePath` do L2
     lança erro.

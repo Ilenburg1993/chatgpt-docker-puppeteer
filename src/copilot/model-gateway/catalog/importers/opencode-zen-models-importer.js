@@ -2,9 +2,9 @@
 /**
  * OpenCode Zen catalog importer.
  *
- * OpenCode Zen publishes an OpenAI-shaped `/models` list, but runtime endpoints differ by model family
- * (`responses`, Anthropic `messages`, Google `models/{model}`, or OpenAI-compatible `chat/completions`). This importer
- * keeps those routing facts as catalog metadata while account/runtime access remains a later probe.
+ * OpenCode Zen publishes an OpenAI-shaped `/models` list, but runtime endpoints differ by model family (`responses`,
+ * Anthropic `messages`, Google `models/{model}`, or OpenAI-compatible `chat/completions`). This importer keeps those
+ * routing facts as catalog metadata while account/runtime access remains a later probe.
  *
  * @module copilot/model-gateway/catalog/importers/opencode-zen-models-importer
  */
@@ -48,40 +48,149 @@ const OPENCODE_PRICING_SEED = Object.freeze({
     'nemotron-3-super-free': Object.freeze({ free: true }),
     'qwen3.6-plus-free': Object.freeze({ free: true }),
     'minimax-m2.5-free': Object.freeze({ free: true }),
-    'minimax-m2.7': Object.freeze({ inputUsdPerMillion: 0.3, outputUsdPerMillion: 1.2, cacheReadUsdPerMillion: 0.06, cacheWriteUsdPerMillion: 0.375 }),
-    'minimax-m2.5': Object.freeze({ inputUsdPerMillion: 0.3, outputUsdPerMillion: 1.2, cacheReadUsdPerMillion: 0.06, cacheWriteUsdPerMillion: 0.375 }),
+    'minimax-m2.7': Object.freeze({
+        inputUsdPerMillion: 0.3,
+        outputUsdPerMillion: 1.2,
+        cacheReadUsdPerMillion: 0.06,
+        cacheWriteUsdPerMillion: 0.375,
+    }),
+    'minimax-m2.5': Object.freeze({
+        inputUsdPerMillion: 0.3,
+        outputUsdPerMillion: 1.2,
+        cacheReadUsdPerMillion: 0.06,
+        cacheWriteUsdPerMillion: 0.375,
+    }),
     'glm-5.1': Object.freeze({ inputUsdPerMillion: 1.4, outputUsdPerMillion: 4.4, cacheReadUsdPerMillion: 0.26 }),
     'glm-5': Object.freeze({ inputUsdPerMillion: 1, outputUsdPerMillion: 3.2, cacheReadUsdPerMillion: 0.2 }),
     'kimi-k2.5': Object.freeze({ inputUsdPerMillion: 0.6, outputUsdPerMillion: 3, cacheReadUsdPerMillion: 0.1 }),
     'kimi-k2.6': Object.freeze({ inputUsdPerMillion: 0.95, outputUsdPerMillion: 4, cacheReadUsdPerMillion: 0.16 }),
-    'qwen3.6-plus': Object.freeze({ inputUsdPerMillion: 0.5, outputUsdPerMillion: 3, cacheReadUsdPerMillion: 0.05, cacheWriteUsdPerMillion: 0.625 }),
-    'qwen3.5-plus': Object.freeze({ inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.2, cacheReadUsdPerMillion: 0.02, cacheWriteUsdPerMillion: 0.25 }),
+    'qwen3.6-plus': Object.freeze({
+        inputUsdPerMillion: 0.5,
+        outputUsdPerMillion: 3,
+        cacheReadUsdPerMillion: 0.05,
+        cacheWriteUsdPerMillion: 0.625,
+    }),
+    'qwen3.5-plus': Object.freeze({
+        inputUsdPerMillion: 0.2,
+        outputUsdPerMillion: 1.2,
+        cacheReadUsdPerMillion: 0.02,
+        cacheWriteUsdPerMillion: 0.25,
+    }),
     'grok-build-0.1': Object.freeze({ inputUsdPerMillion: 1, outputUsdPerMillion: 2, cacheReadUsdPerMillion: 0.2 }),
-    'claude-opus-4-7': Object.freeze({ inputUsdPerMillion: 5, outputUsdPerMillion: 25, cacheReadUsdPerMillion: 0.5, cacheWriteUsdPerMillion: 6.25 }),
-    'claude-opus-4-6': Object.freeze({ inputUsdPerMillion: 5, outputUsdPerMillion: 25, cacheReadUsdPerMillion: 0.5, cacheWriteUsdPerMillion: 6.25 }),
-    'claude-opus-4-5': Object.freeze({ inputUsdPerMillion: 5, outputUsdPerMillion: 25, cacheReadUsdPerMillion: 0.5, cacheWriteUsdPerMillion: 6.25 }),
-    'claude-opus-4-1': Object.freeze({ inputUsdPerMillion: 15, outputUsdPerMillion: 75, cacheReadUsdPerMillion: 1.5, cacheWriteUsdPerMillion: 18.75 }),
-    'claude-sonnet-4-6': Object.freeze({ inputUsdPerMillion: 3, outputUsdPerMillion: 15, cacheReadUsdPerMillion: 0.3, cacheWriteUsdPerMillion: 3.75 }),
-    'claude-sonnet-4-5': Object.freeze({ inputUsdPerMillion: 3, outputUsdPerMillion: 15, cacheReadUsdPerMillion: 0.3, cacheWriteUsdPerMillion: 3.75, priceTierNote: 'higher tier above 200K tokens' }),
-    'claude-sonnet-4': Object.freeze({ inputUsdPerMillion: 3, outputUsdPerMillion: 15, cacheReadUsdPerMillion: 0.3, cacheWriteUsdPerMillion: 3.75, priceTierNote: 'higher tier above 200K tokens' }),
-    'claude-haiku-4-5': Object.freeze({ inputUsdPerMillion: 1, outputUsdPerMillion: 5, cacheReadUsdPerMillion: 0.1, cacheWriteUsdPerMillion: 1.25 }),
-    'gemini-3.5-flash': Object.freeze({ inputUsdPerMillion: 1.5, outputUsdPerMillion: 9, cacheReadUsdPerMillion: 0.15 }),
-    'gemini-3.1-pro': Object.freeze({ inputUsdPerMillion: 2, outputUsdPerMillion: 12, cacheReadUsdPerMillion: 0.2, priceTierNote: 'higher tier above 200K tokens' }),
+    'claude-opus-4-7': Object.freeze({
+        inputUsdPerMillion: 5,
+        outputUsdPerMillion: 25,
+        cacheReadUsdPerMillion: 0.5,
+        cacheWriteUsdPerMillion: 6.25,
+    }),
+    'claude-opus-4-6': Object.freeze({
+        inputUsdPerMillion: 5,
+        outputUsdPerMillion: 25,
+        cacheReadUsdPerMillion: 0.5,
+        cacheWriteUsdPerMillion: 6.25,
+    }),
+    'claude-opus-4-5': Object.freeze({
+        inputUsdPerMillion: 5,
+        outputUsdPerMillion: 25,
+        cacheReadUsdPerMillion: 0.5,
+        cacheWriteUsdPerMillion: 6.25,
+    }),
+    'claude-opus-4-1': Object.freeze({
+        inputUsdPerMillion: 15,
+        outputUsdPerMillion: 75,
+        cacheReadUsdPerMillion: 1.5,
+        cacheWriteUsdPerMillion: 18.75,
+    }),
+    'claude-sonnet-4-6': Object.freeze({
+        inputUsdPerMillion: 3,
+        outputUsdPerMillion: 15,
+        cacheReadUsdPerMillion: 0.3,
+        cacheWriteUsdPerMillion: 3.75,
+    }),
+    'claude-sonnet-4-5': Object.freeze({
+        inputUsdPerMillion: 3,
+        outputUsdPerMillion: 15,
+        cacheReadUsdPerMillion: 0.3,
+        cacheWriteUsdPerMillion: 3.75,
+        priceTierNote: 'higher tier above 200K tokens',
+    }),
+    'claude-sonnet-4': Object.freeze({
+        inputUsdPerMillion: 3,
+        outputUsdPerMillion: 15,
+        cacheReadUsdPerMillion: 0.3,
+        cacheWriteUsdPerMillion: 3.75,
+        priceTierNote: 'higher tier above 200K tokens',
+    }),
+    'claude-haiku-4-5': Object.freeze({
+        inputUsdPerMillion: 1,
+        outputUsdPerMillion: 5,
+        cacheReadUsdPerMillion: 0.1,
+        cacheWriteUsdPerMillion: 1.25,
+    }),
+    'gemini-3.5-flash': Object.freeze({
+        inputUsdPerMillion: 1.5,
+        outputUsdPerMillion: 9,
+        cacheReadUsdPerMillion: 0.15,
+    }),
+    'gemini-3.1-pro': Object.freeze({
+        inputUsdPerMillion: 2,
+        outputUsdPerMillion: 12,
+        cacheReadUsdPerMillion: 0.2,
+        priceTierNote: 'higher tier above 200K tokens',
+    }),
     'gemini-3-flash': Object.freeze({ inputUsdPerMillion: 0.5, outputUsdPerMillion: 3, cacheReadUsdPerMillion: 0.05 }),
-    'gpt-5.5': Object.freeze({ inputUsdPerMillion: 5, outputUsdPerMillion: 30, cacheReadUsdPerMillion: 0.5, priceTierNote: 'higher tier above 272K tokens' }),
+    'gpt-5.5': Object.freeze({
+        inputUsdPerMillion: 5,
+        outputUsdPerMillion: 30,
+        cacheReadUsdPerMillion: 0.5,
+        priceTierNote: 'higher tier above 272K tokens',
+    }),
     'gpt-5.5-pro': Object.freeze({ inputUsdPerMillion: 30, outputUsdPerMillion: 180, cacheReadUsdPerMillion: 30 }),
-    'gpt-5.4': Object.freeze({ inputUsdPerMillion: 2.5, outputUsdPerMillion: 15, cacheReadUsdPerMillion: 0.25, priceTierNote: 'higher tier above 272K tokens' }),
+    'gpt-5.4': Object.freeze({
+        inputUsdPerMillion: 2.5,
+        outputUsdPerMillion: 15,
+        cacheReadUsdPerMillion: 0.25,
+        priceTierNote: 'higher tier above 272K tokens',
+    }),
     'gpt-5.4-pro': Object.freeze({ inputUsdPerMillion: 30, outputUsdPerMillion: 180, cacheReadUsdPerMillion: 30 }),
-    'gpt-5.4-mini': Object.freeze({ inputUsdPerMillion: 0.75, outputUsdPerMillion: 4.5, cacheReadUsdPerMillion: 0.075 }),
+    'gpt-5.4-mini': Object.freeze({
+        inputUsdPerMillion: 0.75,
+        outputUsdPerMillion: 4.5,
+        cacheReadUsdPerMillion: 0.075,
+    }),
     'gpt-5.4-nano': Object.freeze({ inputUsdPerMillion: 0.2, outputUsdPerMillion: 1.25, cacheReadUsdPerMillion: 0.02 }),
-    'gpt-5.3-codex-spark': Object.freeze({ inputUsdPerMillion: 1.75, outputUsdPerMillion: 14, cacheReadUsdPerMillion: 0.175 }),
-    'gpt-5.3-codex': Object.freeze({ inputUsdPerMillion: 1.75, outputUsdPerMillion: 14, cacheReadUsdPerMillion: 0.175 }),
+    'gpt-5.3-codex-spark': Object.freeze({
+        inputUsdPerMillion: 1.75,
+        outputUsdPerMillion: 14,
+        cacheReadUsdPerMillion: 0.175,
+    }),
+    'gpt-5.3-codex': Object.freeze({
+        inputUsdPerMillion: 1.75,
+        outputUsdPerMillion: 14,
+        cacheReadUsdPerMillion: 0.175,
+    }),
     'gpt-5.2': Object.freeze({ inputUsdPerMillion: 1.75, outputUsdPerMillion: 14, cacheReadUsdPerMillion: 0.175 }),
-    'gpt-5.2-codex': Object.freeze({ inputUsdPerMillion: 1.75, outputUsdPerMillion: 14, cacheReadUsdPerMillion: 0.175 }),
+    'gpt-5.2-codex': Object.freeze({
+        inputUsdPerMillion: 1.75,
+        outputUsdPerMillion: 14,
+        cacheReadUsdPerMillion: 0.175,
+    }),
     'gpt-5.1': Object.freeze({ inputUsdPerMillion: 1.07, outputUsdPerMillion: 8.5, cacheReadUsdPerMillion: 0.107 }),
-    'gpt-5.1-codex': Object.freeze({ inputUsdPerMillion: 1.07, outputUsdPerMillion: 8.5, cacheReadUsdPerMillion: 0.107 }),
-    'gpt-5.1-codex-max': Object.freeze({ inputUsdPerMillion: 1.25, outputUsdPerMillion: 10, cacheReadUsdPerMillion: 0.125 }),
-    'gpt-5.1-codex-mini': Object.freeze({ inputUsdPerMillion: 0.25, outputUsdPerMillion: 2, cacheReadUsdPerMillion: 0.025 }),
+    'gpt-5.1-codex': Object.freeze({
+        inputUsdPerMillion: 1.07,
+        outputUsdPerMillion: 8.5,
+        cacheReadUsdPerMillion: 0.107,
+    }),
+    'gpt-5.1-codex-max': Object.freeze({
+        inputUsdPerMillion: 1.25,
+        outputUsdPerMillion: 10,
+        cacheReadUsdPerMillion: 0.125,
+    }),
+    'gpt-5.1-codex-mini': Object.freeze({
+        inputUsdPerMillion: 0.25,
+        outputUsdPerMillion: 2,
+        cacheReadUsdPerMillion: 0.025,
+    }),
     'gpt-5': Object.freeze({ inputUsdPerMillion: 1.07, outputUsdPerMillion: 8.5, cacheReadUsdPerMillion: 0.107 }),
     'gpt-5-codex': Object.freeze({ inputUsdPerMillion: 1.07, outputUsdPerMillion: 8.5, cacheReadUsdPerMillion: 0.107 }),
     'gpt-5-nano': Object.freeze({ inputUsdPerMillion: 0.05, outputUsdPerMillion: 0.4, cacheReadUsdPerMillion: 0.005 }),
@@ -129,15 +238,35 @@ function parseOpenCodeRows(raw) {
  */
 function endpointForModel(providerModel) {
     if (providerModel.startsWith('gpt-')) {
-        return { endpoint: OPENCODE_ZEN_RESPONSES_URL, wireApi: 'openai_responses', aiSdkPackage: '@ai-sdk/openai', family: 'openai' };
+        return {
+            endpoint: OPENCODE_ZEN_RESPONSES_URL,
+            wireApi: 'openai_responses',
+            aiSdkPackage: '@ai-sdk/openai',
+            family: 'openai',
+        };
     }
     if (providerModel.startsWith('claude-') || providerModel.startsWith('qwen3.')) {
-        return { endpoint: OPENCODE_ZEN_MESSAGES_URL, wireApi: 'anthropic_messages', aiSdkPackage: '@ai-sdk/anthropic', family: 'anthropic_compatible' };
+        return {
+            endpoint: OPENCODE_ZEN_MESSAGES_URL,
+            wireApi: 'anthropic_messages',
+            aiSdkPackage: '@ai-sdk/anthropic',
+            family: 'anthropic_compatible',
+        };
     }
     if (providerModel.startsWith('gemini-')) {
-        return { endpoint: `${OPENCODE_ZEN_BASE_URL}/models/${providerModel}`, wireApi: 'google_generative_model', aiSdkPackage: '@ai-sdk/google', family: 'google' };
+        return {
+            endpoint: `${OPENCODE_ZEN_BASE_URL}/models/${providerModel}`,
+            wireApi: 'google_generative_model',
+            aiSdkPackage: '@ai-sdk/google',
+            family: 'google',
+        };
     }
-    return { endpoint: OPENCODE_ZEN_CHAT_COMPLETIONS_URL, wireApi: 'openai_chat_completions', aiSdkPackage: '@ai-sdk/openai-compatible', family: 'openai_compatible' };
+    return {
+        endpoint: OPENCODE_ZEN_CHAT_COMPLETIONS_URL,
+        wireApi: 'openai_chat_completions',
+        aiSdkPackage: '@ai-sdk/openai-compatible',
+        family: 'openai_compatible',
+    };
 }
 
 /**
@@ -158,7 +287,7 @@ function capabilitiesForModel(providerModel) {
 /**
  * @param {Record<string, unknown>} row
  * @param {number} nowMs
- * @returns {Array<{ fieldPath: string; value: unknown; confidence?: string }>}
+ * @returns {{ fieldPath: string; value: unknown; confidence?: string }[]}
  */
 function modelEvidenceValues(row, nowMs) {
     const providerModel = stringValue(row['id']);
@@ -169,10 +298,22 @@ function modelEvidenceValues(row, nowMs) {
     const pricing = free
         ? { currency: 'USD', tokenUnit: 'per_million_tokens', inputUsdPerMillion: 0, outputUsdPerMillion: 0 }
         : normalizeUsdPricing({
-              inputPerTokenUsd: typeof pricingSeed['inputUsdPerMillion'] === 'number' ? pricingSeed['inputUsdPerMillion'] / 1_000_000 : null,
-              outputPerTokenUsd: typeof pricingSeed['outputUsdPerMillion'] === 'number' ? pricingSeed['outputUsdPerMillion'] / 1_000_000 : null,
-              cacheReadPerTokenUsd: typeof pricingSeed['cacheReadUsdPerMillion'] === 'number' ? pricingSeed['cacheReadUsdPerMillion'] / 1_000_000 : null,
-              cacheWritePerTokenUsd: typeof pricingSeed['cacheWriteUsdPerMillion'] === 'number' ? pricingSeed['cacheWriteUsdPerMillion'] / 1_000_000 : null,
+              inputPerTokenUsd:
+                  typeof pricingSeed['inputUsdPerMillion'] === 'number'
+                      ? pricingSeed['inputUsdPerMillion'] / 1_000_000
+                      : null,
+              outputPerTokenUsd:
+                  typeof pricingSeed['outputUsdPerMillion'] === 'number'
+                      ? pricingSeed['outputUsdPerMillion'] / 1_000_000
+                      : null,
+              cacheReadPerTokenUsd:
+                  typeof pricingSeed['cacheReadUsdPerMillion'] === 'number'
+                      ? pricingSeed['cacheReadUsdPerMillion'] / 1_000_000
+                      : null,
+              cacheWritePerTokenUsd:
+                  typeof pricingSeed['cacheWriteUsdPerMillion'] === 'number'
+                      ? pricingSeed['cacheWriteUsdPerMillion'] / 1_000_000
+                      : null,
           });
     const aliases = normalizeModelAliases({ providerModel, canonicalSlug: `opencode/${providerModel}` });
     const identityTraits = normalizeModelIdentityTraits({
@@ -194,7 +335,8 @@ function modelEvidenceValues(row, nowMs) {
             fieldPath: `lifecycle.${key}`,
             value,
             confidence:
-                OPENCODE_DEPRECATION_SEED[/** @type {keyof typeof OPENCODE_DEPRECATION_SEED} */ (providerModel)] && key !== 'createdAt'
+                OPENCODE_DEPRECATION_SEED[/** @type {keyof typeof OPENCODE_DEPRECATION_SEED} */ (providerModel)] &&
+                key !== 'createdAt'
                     ? MODEL_GATEWAY_CATALOG_CONFIDENCE.STATIC_SEED
                     : undefined,
         })),
@@ -210,7 +352,10 @@ function modelEvidenceValues(row, nowMs) {
         { fieldPath: 'providerMetadata.opencode.wireApi', value: endpoint.wireApi },
         { fieldPath: 'providerMetadata.opencode.aiSdkPackage', value: endpoint.aiSdkPackage },
         { fieldPath: 'providerMetadata.opencode.family', value: endpoint.family },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         {
             fieldPath: 'providerMetadata.opencode.free',
             value: free || null,
@@ -251,7 +396,8 @@ export function createOpenCodeZenModelsImporter(options = {}) {
         refreshPolicy: 'scheduled',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for OpenCode Zen catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for OpenCode Zen catalog import');
             const headers = options.apiKey
                 ? { accept: 'application/json', authorization: `Bearer ${options.apiKey}` }
                 : { accept: 'application/json' };
@@ -305,7 +451,10 @@ export function createOpenCodeZenModelsImporter(options = {}) {
                             ? MODEL_GATEWAY_CATALOG_CONFIDENCE.AUTHENTICATED_CATALOG
                             : MODEL_GATEWAY_CATALOG_CONFIDENCE.CATALOG,
                         normalizedPolicy: {
-                            routeLayer: endpoint.wireApi === 'openai_chat_completions' ? 'openai_compatible' : 'direct_provider',
+                            routeLayer:
+                                endpoint.wireApi === 'openai_chat_completions'
+                                    ? 'openai_compatible'
+                                    : 'direct_provider',
                             baseUrl: OPENCODE_ZEN_BASE_URL,
                             endpoint: endpoint.endpoint,
                             wireApi: endpoint.wireApi,

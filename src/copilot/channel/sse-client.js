@@ -9,8 +9,8 @@
  * @see EventBus
  */
 
-import { log } from '#copilot/observability';
 import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { log } from '#copilot/observability';
 import http from 'node:http';
 import { logSwallowed } from '../core/error-handlers.js';
 

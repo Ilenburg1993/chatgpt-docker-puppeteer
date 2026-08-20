@@ -3,7 +3,8 @@
  * Gemini authenticated Models API catalog importer.
  *
  * Gemini exposes richer static metadata than many account-scoped `/models` endpoints. This importer uses `models.list`
- * plus per-model `models.get` enrichment, while still treating the output as catalog evidence rather than runtime proof.
+ * plus per-model `models.get` enrichment, while still treating the output as catalog evidence rather than runtime
+ * proof.
  *
  * @module copilot/model-gateway/catalog/importers/gemini-models-importer
  */
@@ -198,7 +199,7 @@ function capabilitiesFromMethods(methods, thinking) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = rowProviderModel(row);
@@ -235,7 +236,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.gemini.maxTemperature', value: finiteNumber(row['maxTemperature']) },
         { fieldPath: 'providerMetadata.gemini.topP', value: finiteNumber(row['topP']) },
         { fieldPath: 'providerMetadata.gemini.topK', value: finiteNumber(row['topK']) },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'google' },
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
@@ -285,7 +289,7 @@ export function createGeminiModelsImporter(options = {}) {
                 if (!pageToken) break;
             }
             if (!includeModelDetails) return { models };
-            /** @type {Array<{ name: string; status: number; message?: string }>} */
+            /** @type {{ name: string; status: number; message?: string }[]} */
             const detailErrors = [];
             /** @type {Record<string, unknown>[]} */
             const detailedModels = [];
@@ -309,9 +313,7 @@ export function createGeminiModelsImporter(options = {}) {
                 });
                 detailedModels.push(isRecord(detail) ? { ...model, ...detail } : model);
             }
-            return detailErrors.length > 0
-                ? { models: detailedModels, detailErrors }
-                : { models: detailedModels };
+            return detailErrors.length > 0 ? { models: detailedModels, detailErrors } : { models: detailedModels };
         },
         parseRows: parseGeminiRows,
         toEvidenceFacts(rows, context) {
@@ -363,7 +365,9 @@ export function createGeminiModelsImporter(options = {}) {
         },
         toAccountOverlays(rows, context) {
             const sourceId = stringValue(context.source['id']) ?? 'gemini-models';
-            const enabledModels = rows.map((row) => rowProviderModel(isRecord(row) ? row : {})).filter((id) => id !== null);
+            const enabledModels = rows
+                .map((row) => rowProviderModel(isRecord(row) ? row : {}))
+                .filter((id) => id !== null);
             const controls = normalizeAccountOverlayControls({
                 enabledModels,
                 providerMetadata: {

@@ -5,7 +5,12 @@
  * @module copilot/infra/io/search/result-paginator
  */
 
-import { normalizeCursorOffset, normalizeMaxResults, windowItems, windowTextLines } from '../../policy/output-window.js';
+import {
+    normalizeCursorOffset,
+    normalizeMaxResults,
+    windowItems,
+    windowTextLines,
+} from '../../policy/output-window.js';
 
 /**
  * @typedef {{

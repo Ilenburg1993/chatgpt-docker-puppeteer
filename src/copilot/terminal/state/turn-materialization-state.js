@@ -18,8 +18,14 @@ const RECENT_COMPLETED_TURN_TTL_MS = 5 * 60_000;
 const DEFAULT_EMPTY_TURN_QUIESCENCE_MS = 160;
 
 /**
- * @typedef {'terminal/explicit-turn' | 'sdk/assistant.turn_start' | 'sdk/assistant.message' | 'dialog/onDelta' | 'public-assistant-stream'} TerminalTurnMaterializationSource
+ * @typedef {'terminal/explicit-turn'
+ *     | 'sdk/assistant.turn_start'
+ *     | 'sdk/assistant.message'
+ *     | 'dialog/onDelta'
+ *     | 'public-assistant-stream'} TerminalTurnMaterializationSource
+ *
  * @typedef {'active' | 'completed' | 'failed' | 'interrupted'} TerminalTurnMaterializationStatus
+ *
  * @typedef {'direct_reply' | 'assistant_message' | 'stream_delta' | 'empty'} TerminalTurnMaterializedSource
  *
  * @typedef {{
@@ -28,6 +34,7 @@ const DEFAULT_EMPTY_TURN_QUIESCENCE_MS = 160;
  *     source: string;
  *     timestamp: number;
  * }} TerminalTurnMaterializedAssistantMessage
+ *
  *
  * @typedef {{
  *     chunk: string;
@@ -39,6 +46,7 @@ const DEFAULT_EMPTY_TURN_QUIESCENCE_MS = 160;
  *     causationId: string | null;
  *     timestamp: number;
  * }} TerminalTurnMaterializedDelta
+ *
  *
  * @typedef {{
  *     turnKey: string;
@@ -55,12 +63,14 @@ const DEFAULT_EMPTY_TURN_QUIESCENCE_MS = 160;
  *     droppedDeltaChars: number;
  * }} TerminalTurnMaterializationSnapshot
  *
+ *
  * @typedef {TerminalTurnMaterializationSnapshot & {
  *     deltaText: string;
  *     normalizedDeltaText: string;
  *     deltaNormalizationPendingWhitespace: boolean;
  *     hasDialogDelta: boolean;
  * }} InternalTerminalTurnMaterialization
+ *
  *
  * @typedef {{
  *     reply: string | null;
@@ -85,7 +95,14 @@ let _currentTurnMaterialization = null;
 const _materializationEmitter = new EventEmitter();
 _materializationEmitter.setMaxListeners(25);
 
-/** @type {{ turnKey: string; turnId: string | null; deltaText: string; normalizedReply: string; normalizedDeltaText: string; completedAt: number }[]} */
+/** @type {{
+    turnKey: string;
+    turnId: string | null;
+    deltaText: string;
+    normalizedReply: string;
+    normalizedDeltaText: string;
+    completedAt: number;
+}[]} */
 const _recentCompletedTurnMaterializations = [];
 
 /**
@@ -538,11 +555,7 @@ export function completeTerminalTurnMaterialization({
  *     matchedTurnKey: string | null;
  * }}
  */
-export function getTerminalAssistantMessageMaterializationDecision({
-    content,
-    turnId = null,
-    now = Date.now(),
-}) {
+export function getTerminalAssistantMessageMaterializationDecision({ content, turnId = null, now = Date.now() }) {
     const finalContent = typeof content === 'string' ? content : '';
     const normalizedContent = normalizeComparableTranscript(finalContent);
     if (!normalizedContent) {
@@ -551,7 +564,13 @@ export function getTerminalAssistantMessageMaterializationDecision({
     const normalizedTurnId = normalizeTurnId(turnId);
 
     const decideFromEntry = (
-        /** @type {{ turnKey: string; turnId: string | null; deltaText?: string; normalizedReply: string; normalizedDeltaText: string }} */ entry,
+        /** @type {{
+    turnKey: string;
+    turnId: string | null;
+    deltaText?: string;
+    normalizedReply: string;
+    normalizedDeltaText: string;
+}} */ entry,
     ) => {
         if (normalizedTurnId && entry.turnId && normalizedTurnId !== entry.turnId) return null;
         if (entry.normalizedReply && entry.normalizedReply === normalizedContent) {
@@ -584,7 +603,10 @@ export function getTerminalAssistantMessageMaterializationDecision({
         }
         if (entry.normalizedDeltaText && normalizedContent.startsWith(entry.normalizedDeltaText)) {
             const suffix = findRawSuffixAfterRenderedPrefix(finalContent, entry.deltaText ?? entry.normalizedDeltaText);
-            const renderableSuffix = (suffix ?? finalContent.slice(entry.normalizedDeltaText.length)).replace(/^\s+/, '');
+            const renderableSuffix = (suffix ?? finalContent.slice(entry.normalizedDeltaText.length)).replace(
+                /^\s+/,
+                '',
+            );
             if (!normalizeComparableTranscript(renderableSuffix)) {
                 return {
                     action: /** @type {'suppress'} */ ('suppress'),
@@ -652,14 +674,8 @@ export function getTerminalAssistantMessageMaterializationDecision({
  * @param {{ content?: string | null | undefined; turnId?: string | number | null; now?: number }} input
  * @returns {boolean}
  */
-export function shouldSuppressTerminalAssistantMessageAsMaterializedTurn({
-    content,
-    turnId = null,
-    now = Date.now(),
-}) {
-    return (
-        getTerminalAssistantMessageMaterializationDecision({ content, turnId, now }).action === 'suppress'
-    );
+export function shouldSuppressTerminalAssistantMessageAsMaterializedTurn({ content, turnId = null, now = Date.now() }) {
+    return getTerminalAssistantMessageMaterializationDecision({ content, turnId, now }).action === 'suppress';
 }
 
 /**

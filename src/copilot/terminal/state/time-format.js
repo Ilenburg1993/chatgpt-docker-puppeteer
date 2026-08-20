@@ -2,8 +2,8 @@
 /**
  * Formatação de tempo para superfícies humanas do terminal.
  *
- * A UX v2 usa um contrato configurável: superfícies operacionais podem mostrar ISO 8601 local completo, tempo
- * relativo, ou ambos. A linha viva continua livre para usar duração compacta quando isso evita poluir o input.
+ * A UX v2 usa um contrato configurável: superfícies operacionais podem mostrar ISO 8601 local completo, tempo relativo,
+ * ou ambos. A linha viva continua livre para usar duração compacta quando isso evita poluir o input.
  *
  * @module copilot/terminal/time-format
  */
@@ -46,7 +46,7 @@ function pad(value, width = 2) {
 
 /**
  * @param {Date} date
- * @param {TerminalIsoPrecision} [precision='milliseconds']
+ * @param {TerminalIsoPrecision} [precision='milliseconds'] Default is `'milliseconds'`
  * @returns {string}
  */
 function formatIsoLocalDateTime(date, precision = 'milliseconds') {
@@ -174,8 +174,8 @@ function formatDualTerminalTimeLabel(iso, relative, options) {
 }
 
 /**
- * Gera todas as partes temporais canônicas de uma vez. Use quando a superfície precisa montar layout próprio
- * sem reparsear o timestamp ou quando precisa exibir ISO e relativo em campos separados.
+ * Gera todas as partes temporais canônicas de uma vez. Use quando a superfície precisa montar layout próprio sem
+ * reparsear o timestamp ou quando precisa exibir ISO e relativo em campos separados.
  *
  * @param {number | string | Date | null | undefined} value
  * @param {TerminalTimeFormatOptions} [options]

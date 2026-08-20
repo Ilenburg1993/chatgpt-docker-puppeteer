@@ -8,7 +8,8 @@ import { z } from 'zod';
  * ocultos e garante compatibilidade absoluta com sistemas de arquivos Windows/Linux.
  */
 const ID_SCHEMA = z
-    .string()['regex'](
+    .string()
+    ['regex'](
         /^[a-zA-Z0-9_-][a-zA-Z0-9._-]*$/,
         'ID inválido: Não pode ser vazio, começar com ponto ou conter caracteres especiais.',
     )
@@ -21,7 +22,8 @@ const ID_SCHEMA = z
  * malformadas sejam mascaradas como 'agora'.
  */
 const TIMESTAMP_SCHEMA = z
-    .string()['datetime']({ message: 'Data inválida: Deve seguir o padrão ISO-8601.' })
+    .string()
+    ['datetime']({ message: 'Data inválida: Deve seguir o padrão ISO-8601.' })
     .default(() => new Date().toISOString());
 
 /**

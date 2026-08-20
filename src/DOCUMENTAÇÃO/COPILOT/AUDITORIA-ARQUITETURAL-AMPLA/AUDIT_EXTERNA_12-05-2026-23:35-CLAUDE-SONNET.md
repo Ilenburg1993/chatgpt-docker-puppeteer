@@ -1,19 +1,30 @@
 # Auditoria Arquitetural — `src/copilot/agent/`
-**Data:** 2026-05-12
-**Escopo:** `src/copilot/agent/**` (107 arquivos, ~18 000 linhas)
-**SDK de referência:** `@github/copilot-sdk` 0.3.0
-**Contexto arquitetural:** migração barrel-first 2.1 (em andamento em `presentation/`, ainda não iniciada em `agent/`)
-**Projeto:** `Ilenburg1993/chatgpt-docker-puppeteer`
+
+**Data:** 2026-05-12 **Escopo:** `src/copilot/agent/**` (107 arquivos, ~18 000 linhas) **SDK de
+referência:** `@github/copilot-sdk` 0.3.0 **Contexto arquitetural:** migração barrel-first 2.1 (em
+andamento em `presentation/`, ainda não iniciada em `agent/`) **Projeto:**
+`Ilenburg1993/chatgpt-docker-puppeteer`
 
 ---
 
 ## 0) Síntese Executiva
 
-O módulo `agent/` é o domínio operacional central do projeto: mantém sessão SDK, loop de diálogo, fila de mensagens, lifecycle do `AlwaysAliveAgent` e todas as suas dependências externas. Após múltiplas ondas de decomposição (F35–F70+), o módulo apresenta arquitetura fisicamente madura em suas subpastas (`dialog/`, `lifecycle/`, `session/`, `facades/`, `ports/`, `runtime/`), mas conserva **três classes de problemas de natureza distinta**:
+O módulo `agent/` é o domínio operacional central do projeto: mantém sessão SDK, loop de diálogo,
+fila de mensagens, lifecycle do `AlwaysAliveAgent` e todas as suas dependências externas. Após
+múltiplas ondas de decomposição (F35–F70+), o módulo apresenta arquitetura fisicamente madura em
+suas subpastas (`dialog/`, `lifecycle/`, `session/`, `facades/`, `ports/`, `runtime/`), mas conserva
+**três classes de problemas de natureza distinta**:
 
-1. **Bugs operacionais** — falhas concretas de comportamento em runtime, algumas críticas (P0/P1), localizadas principalmente no pipeline de boot, no shutdown do dialog loop e na gestão de estado persistido.
-2. **Gaps de compatibilidade com SDK 0.3.0** — uso de APIs depreciadas ou ausência de APIs obrigatórias introduzidas na versão 0.3.0, detectados em `session-setup.js`, `always-alive.js` e `runtime-contracts.js`.
-3. **Déficit arquitetural vs. estratégia 2.1** — o módulo ainda opera sob o modelo de barrel plano que a estratégia 2.1 já eliminou em `presentation/`. O `index.js` raiz usa `export *` irrestrito, não existe governança de superfície pública e os imports cruzados entre subdomínios não passam por barrels.
+1. **Bugs operacionais** — falhas concretas de comportamento em runtime, algumas críticas (P0/P1),
+   localizadas principalmente no pipeline de boot, no shutdown do dialog loop e na gestão de estado
+   persistido.
+2. **Gaps de compatibilidade com SDK 0.3.0** — uso de APIs depreciadas ou ausência de APIs
+   obrigatórias introduzidas na versão 0.3.0, detectados em `session-setup.js`, `always-alive.js` e
+   `runtime-contracts.js`.
+3. **Déficit arquitetural vs. estratégia 2.1** — o módulo ainda opera sob o modelo de barrel plano
+   que a estratégia 2.1 já eliminou em `presentation/`. O `index.js` raiz usa `export *` irrestrito,
+   não existe governança de superfície pública e os imports cruzados entre subdomínios não passam
+   por barrels.
 
 A seção §7 propõe um roadmap de 5 ondas para alinhar `agent/` à estratégia 2.1.
 
@@ -36,9 +47,15 @@ forceDeactivate() {
 }
 ```
 
-**Problema:** `TurnQueue.reset()` redefine o mutex interno e incrementa `#gen`, mas as Promises já enfileiradas por `sendTurn()` continuam esperando `EMITTER_LOOP_REPLY`, `EMITTER_LOOP_READY` ou `EMITTER_LOOP_STOPPED`. O evento `'stopped'` emitido a seguir é recebido pelo `onStopOuter` em `turn-result-persistence.js`, que por sua vez chama `waitForRestartAndReplyFn(msg, timeout, reason)` — mas como o loop está desativado, o `EMITTER_LOOP_READY` nunca chega. Se `timeout` for `null` (padrão), o turn fica suspenso indefinidamente até o processo ser encerrado.
+**Problema:** `TurnQueue.reset()` redefine o mutex interno e incrementa `#gen`, mas as Promises já
+enfileiradas por `sendTurn()` continuam esperando `EMITTER_LOOP_REPLY`, `EMITTER_LOOP_READY` ou
+`EMITTER_LOOP_STOPPED`. O evento `'stopped'` emitido a seguir é recebido pelo `onStopOuter` em
+`turn-result-persistence.js`, que por sua vez chama `waitForRestartAndReplyFn(msg, timeout, reason)`
+— mas como o loop está desativado, o `EMITTER_LOOP_READY` nunca chega. Se `timeout` for `null`
+(padrão), o turn fica suspenso indefinidamente até o processo ser encerrado.
 
 **Correção:**
+
 ```js
 forceDeactivate() {
     this.#state.deactivate();
@@ -55,7 +72,8 @@ forceDeactivate() {
 }
 ```
 
-Alternativamente, introduzir um canal de rejeição direto em `TurnQueue.reset()` que rejeite todas as Promises em voo com `SessionError('DIALOG_FORCE_DEACTIVATE')`.
+Alternativamente, introduzir um canal de rejeição direto em `TurnQueue.reset()` que rejeite todas as
+Promises em voo com `SessionError('DIALOG_FORCE_DEACTIVATE')`.
 
 ---
 
@@ -77,9 +95,13 @@ export class AgentContext {
 }
 ```
 
-**Problema:** Dois contextos de ferramenta são criados e o primeiro é imediatamente descartado. Se `createToolSessionContext()` alocar recursos (handles, listeners, subscriptions), há vazamento. O SDK 0.3.0 pode registrar o `ToolSessionContext` em estruturas globais na criação, tornando o leak observável.
+**Problema:** Dois contextos de ferramenta são criados e o primeiro é imediatamente descartado. Se
+`createToolSessionContext()` alocar recursos (handles, listeners, subscriptions), há vazamento. O
+SDK 0.3.0 pode registrar o `ToolSessionContext` em estruturas globais na criação, tornando o leak
+observável.
 
 **Correção:** Remover o field initializer ou o assignment no construtor (manter apenas um):
+
 ```js
 toolSessionContext; // sem initializer
 constructor(emitter, options = {}) {
@@ -99,9 +121,14 @@ constructor(emitter, options = {}) {
 await loadAgentSdkToolsConfigAsync();
 ```
 
-**Problema:** Este `await` no nível de módulo ES faz com que **qualquer importador** de `initializer.js` (inclusive `session/index.js`, `agent/index.js`, e qualquer rota HTTP que importe `#copilot/agent`) precise aguardar a carga da configuração de ferramentas antes de executar qualquer código. Se `loadAgentSdkToolsConfigAsync()` falhar ou demorar (timeout de rede, arquivo corrompido), toda a inicialização do servidor trava sem possibilidade de recuperação parcial.
+**Problema:** Este `await` no nível de módulo ES faz com que **qualquer importador** de
+`initializer.js` (inclusive `session/index.js`, `agent/index.js`, e qualquer rota HTTP que importe
+`#copilot/agent`) precise aguardar a carga da configuração de ferramentas antes de executar qualquer
+código. Se `loadAgentSdkToolsConfigAsync()` falhar ou demorar (timeout de rede, arquivo corrompido),
+toda a inicialização do servidor trava sem possibilidade de recuperação parcial.
 
 **Correção:** Mover a carga para dentro de `initOrResumeSession()` com cache de módulo:
+
 ```js
 let _toolsConfigLoaded = false;
 
@@ -120,7 +147,12 @@ export async function initOrResumeSession(client, sessionOptions) {
 
 **Arquivo:** `src/copilot/agent/lifecycle/state/state-io.js`
 
-O comentário do código reconhece o Bug 1 com o `_clearGen` counter. O problema persiste: `_doWriteState` faz `await readStateAsync()` e depois `await writeStateFileJson(next)`. Se `clearState()` for chamado entre esses dois awaits, `_clearGen` incrementa, e o guard final `if (_clearGen === genAtStart)` impede a atualização do cache — mas a escrita em disco (`writeStateFileJson`) **já foi executada**. O arquivo `sdk-always-alive.json` conterá dados do estado anterior ao clear.
+O comentário do código reconhece o Bug 1 com o `_clearGen` counter. O problema persiste:
+`_doWriteState` faz `await readStateAsync()` e depois `await writeStateFileJson(next)`. Se
+`clearState()` for chamado entre esses dois awaits, `_clearGen` incrementa, e o guard final
+`if (_clearGen === genAtStart)` impede a atualização do cache — mas a escrita em disco
+(`writeStateFileJson`) **já foi executada**. O arquivo `sdk-always-alive.json` conterá dados do
+estado anterior ao clear.
 
 ```js
 async function _doWriteState(updates) {
@@ -136,6 +168,7 @@ async function _doWriteState(updates) {
 ```
 
 **Correção:** Verificar `_clearGen` antes da escrita em disco:
+
 ```js
 async function _doWriteState(updates) {
     const genAtStart = _clearGen;
@@ -169,9 +202,14 @@ set client(value) {
 }
 ```
 
-O mesmo padrão ocorre nos setters `session`, `pendingQuestion`, `metricsTimer`, `mcpReconnectCancel`, `agentObserver` e `quotaMonitor`. Quando algum caller passa `undefined` inadvertidamente (erro de tipagem JS, resultado de função opcional), o valor `undefined` é escrito no estado interno e pode causar `TypeError` em checagens posteriores do tipo `if (this.ioState.client !== null)`.
+O mesmo padrão ocorre nos setters `session`, `pendingQuestion`, `metricsTimer`,
+`mcpReconnectCancel`, `agentObserver` e `quotaMonitor`. Quando algum caller passa `undefined`
+inadvertidamente (erro de tipagem JS, resultado de função opcional), o valor `undefined` é escrito
+no estado interno e pode causar `TypeError` em checagens posteriores do tipo
+`if (this.ioState.client !== null)`.
 
 **Correção:** Tratar `undefined` como `null` nos setters:
+
 ```js
 set client(value) {
     if (value == null) {  // == captura null e undefined
@@ -193,9 +231,13 @@ startKeepalive(options = {}) {
     if (this.status === 'stopped' || !this.hasActiveSession()) {  // ← this.status diretamente
 ```
 
-Toda a API de `AgentContext` foi projetada para encapsular o estado via métodos semânticos (`isStopped()`, `isIdle()`, etc.), mas esta checagem acessa `this.status` — que dispara o getter que acessa `this.runtimeState.status`. Além da inconsistência estilística, se o FSM for refatorado para um objeto separado, esta linha não será coberta pela busca `this.isStopped()`.
+Toda a API de `AgentContext` foi projetada para encapsular o estado via métodos semânticos
+(`isStopped()`, `isIdle()`, etc.), mas esta checagem acessa `this.status` — que dispara o getter que
+acessa `this.runtimeState.status`. Além da inconsistência estilística, se o FSM for refatorado para
+um objeto separado, esta linha não será coberta pela busca `this.isStopped()`.
 
 **Correção:**
+
 ```js
 if (this.isStopped() || !this.hasActiveSession()) {
 ```
@@ -207,11 +249,13 @@ if (this.isStopped() || !this.hasActiveSession()) {
 **Arquivo:** `src/copilot/agent/dialog/boot/loop-boot-runner.js` e `loop-manager.js`
 
 Em `runDialogLoopBoot()`:
+
 ```js
 input.bootCircuit.recordSuccess();  // ← chamado corretamente aqui
 ```
 
 Em `DialogLoopManager.start()`:
+
 ```js
 try {
     await runDialogLoopBoot({ …, bootCircuit: this.#bootCircuit, … });
@@ -225,9 +269,13 @@ try {
 }
 ```
 
-`runDialogLoopBoot` já chama `bootCircuit.recordFailure()` internamente via `markBootFailed()` antes de lançar. Depois, `loop-manager.js` chama `recordFailure()` novamente no catch externo. Isso **dobra o contador de falhas**, fazendo o circuit breaker disparar com metade das falhas configuradas.
+`runDialogLoopBoot` já chama `bootCircuit.recordFailure()` internamente via `markBootFailed()` antes
+de lançar. Depois, `loop-manager.js` chama `recordFailure()` novamente no catch externo. Isso
+**dobra o contador de falhas**, fazendo o circuit breaker disparar com metade das falhas
+configuradas.
 
-**Correção:** Remover o `this.#bootCircuit.recordFailure()` do `catch` externo em `loop-manager.js`, pois já foi registrado em `runDialogLoopBoot`.
+**Correção:** Remover o `this.#bootCircuit.recordFailure()` do `catch` externo em `loop-manager.js`,
+pois já foi registrado em `runDialogLoopBoot`.
 
 ---
 
@@ -245,9 +293,13 @@ const onRetryStopped = (rawEvt) => {
 };
 ```
 
-O listener `onRetryReply` é registrado com `emitter.once(EMITTER_LOOP_REPLY, onRetryReply)`, mas `onRetryStopped` não remove `onRetryReply` antes de rejeitar. Se ambos `EMITTER_LOOP_REPLY` e `EMITTER_LOOP_STOPPED` forem emitidos (cenário de race entre `stop()` e reply), o `onRetryReply` ficará registrado como listener órfão até que o EventEmitter seja GC'd ou o processo encerre.
+O listener `onRetryReply` é registrado com `emitter.once(EMITTER_LOOP_REPLY, onRetryReply)`, mas
+`onRetryStopped` não remove `onRetryReply` antes de rejeitar. Se ambos `EMITTER_LOOP_REPLY` e
+`EMITTER_LOOP_STOPPED` forem emitidos (cenário de race entre `stop()` e reply), o `onRetryReply`
+ficará registrado como listener órfão até que o EventEmitter seja GC'd ou o processo encerre.
 
 **Correção:** Adicionar cleanup explícito no `onRetryStopped`:
+
 ```js
 const onRetryStopped = (rawEvt) => {
     if (onRetryReply) emitter.off(EMITTER_LOOP_REPLY, onRetryReply);
@@ -272,9 +324,13 @@ setStatus(status, emitter) {
     this.status = status;  // ← transição aplicada mesmo sendo inválida
 ```
 
-O FSM registrado em `STATUS_TRANSITIONS` não é enforced — serve apenas para logging. Transições inválidas como `stopped → processing` ou `waiting_for_input → starting` são aplicadas silenciosamente após o log. Em produção, isso pode corromper o estado do agente sem nenhuma exceção observável.
+O FSM registrado em `STATUS_TRANSITIONS` não é enforced — serve apenas para logging. Transições
+inválidas como `stopped → processing` ou `waiting_for_input → starting` são aplicadas
+silenciosamente após o log. Em produção, isso pode corromper o estado do agente sem nenhuma exceção
+observável.
 
 **Correção proposta:** Lançar em ambiente de desenvolvimento, ou pelo menos impedir a transição:
+
 ```js
 setStatus(status, emitter) {
     if (this.status === status) return;
@@ -312,6 +368,7 @@ export async function agentTryReconnect(ctx, host, originalError, opts = {}) {
 ```
 
 O `finally` garante o reset, mas dentro de `tryReconnect` (em `reconnect-policy.js`) há:
+
 ```js
 if (shouldAbort?.()) {
     log('INFO', '[AlwaysAlive] Reconexão abortada: host em shutdown.');
@@ -319,9 +376,15 @@ if (shouldAbort?.()) {
 }
 ```
 
-Quando `shouldAbort()` retorna `true` e `tryReconnect` retorna `false`, o `finally` de `agentTryReconnect` corretamente reseta `isReconnecting`. Isso está **correto**. Porém, o problema surge se a função `tryReconnect` for chamada diretamente sem o wrapper (por testes ou módulos internos), sem o `finally` envoltório — nesse caso, `isReconnecting` ficará como `true` permanentemente.
+Quando `shouldAbort()` retorna `true` e `tryReconnect` retorna `false`, o `finally` de
+`agentTryReconnect` corretamente reseta `isReconnecting`. Isso está **correto**. Porém, o problema
+surge se a função `tryReconnect` for chamada diretamente sem o wrapper (por testes ou módulos
+internos), sem o `finally` envoltório — nesse caso, `isReconnecting` ficará como `true`
+permanentemente.
 
-**Recomendação:** Adicionar documentação explícita que `tryReconnect` não gerencia `isReconnecting` e que o caller é responsável pelo cleanup. Ou mover o gerenciamento de `isReconnecting` para dentro de `tryReconnect` para encapsulamento completo.
+**Recomendação:** Adicionar documentação explícita que `tryReconnect` não gerencia `isReconnecting`
+e que o caller é responsável pelo cleanup. Ou mover o gerenciamento de `isReconnecting` para dentro
+de `tryReconnect` para encapsulamento completo.
 
 ---
 
@@ -343,9 +406,15 @@ async #tick(callbacks) {
 }
 ```
 
-`withAgentErrorPolicy` captura erros internamente e retorna `{ ok: false }`, então exceções de `performKeepalive` estão cobertas. Porém, as checagens anteriores (e.g., `isDialogLoopActive()`, `isIdle()`) **não estão** dentro de `withAgentErrorPolicy`. Se `callbacks.isDialogLoopActive()` ou `callbacks.isIdle()` lançarem (TypeErrors por runtime inesperado), a exceção escapa do `try/finally`, mas o `finally` garante `#tickInFlight = false`. O `setInterval` continuará chamando `#tick` normalmente. **Isso está correto** — mas falta log do erro inesperado para diagnóstico.
+`withAgentErrorPolicy` captura erros internamente e retorna `{ ok: false }`, então exceções de
+`performKeepalive` estão cobertas. Porém, as checagens anteriores (e.g., `isDialogLoopActive()`,
+`isIdle()`) **não estão** dentro de `withAgentErrorPolicy`. Se `callbacks.isDialogLoopActive()` ou
+`callbacks.isIdle()` lançarem (TypeErrors por runtime inesperado), a exceção escapa do
+`try/finally`, mas o `finally` garante `#tickInFlight = false`. O `setInterval` continuará chamando
+`#tick` normalmente. **Isso está correto** — mas falta log do erro inesperado para diagnóstico.
 
 **Recomendação:** Envolver o body completo do `#tick` em try/catch para logar exceções inesperadas:
+
 ```js
 async #tick(callbacks) {
     if (this.#tickInFlight) return;
@@ -377,9 +446,14 @@ export function scheduleDialogBootRecovery(ctx) {
 }
 ```
 
-O timer é registrado em `registerTimer` (o que permite cancelamento), mas o cancel não é chamado em `agentStop()` ou `teardownRuntimeSidecars()`. Se o agente for parado dentro da janela de `BOOT_RECOVERY_DELAY_MS`, o timer dispara, o guarda `ctx.getStatus() === 'stopped'` é verificado antes de `trackBackgroundTask`, mas a checagem posterior dentro de `runDialogBootRecovery` também existe. O problema real é que o timer retém uma referência ao `ctx`, impedindo GC mesmo após stop.
+O timer é registrado em `registerTimer` (o que permite cancelamento), mas o cancel não é chamado em
+`agentStop()` ou `teardownRuntimeSidecars()`. Se o agente for parado dentro da janela de
+`BOOT_RECOVERY_DELAY_MS`, o timer dispara, o guarda `ctx.getStatus() === 'stopped'` é verificado
+antes de `trackBackgroundTask`, mas a checagem posterior dentro de `runDialogBootRecovery` também
+existe. O problema real é que o timer retém uma referência ao `ctx`, impedindo GC mesmo após stop.
 
 **Correção:** Retornar o cancel function e incorporá-la no teardown:
+
 ```js
 export function scheduleDialogBootRecovery(ctx) {
     const timer = setTimeout(…, BOOT_RECOVERY_DELAY_MS);
@@ -405,9 +479,11 @@ export function isBootTimeoutError(error) {
 }
 ```
 
-`'Boot timeout'` é uma substring que pode colidir com mensagens de outros sistemas. Se a mensagem for internacionalizada futuramente ou o texto mudar, silencia falhas reais de boot.
+`'Boot timeout'` é uma substring que pode colidir com mensagens de outros sistemas. Se a mensagem
+for internacionalizada futuramente ou o texto mudar, silencia falhas reais de boot.
 
 **Correção:** Usar apenas o código de erro canônico:
+
 ```js
 return candidate?.code === 'DIALOG_TIMEOUT'
     || candidate?.code === 'DIALOG_BOOT_TIMEOUT'; // adicionar código específico
@@ -425,9 +501,13 @@ if (err instanceof Error && tasks.length > 1) {
 }
 ```
 
-A condição `tasks.length > 1` é avaliada **fora** do loop — não cresce nem diminui. Para um array de 5 elementos, **todos** os 5 recebem cópias do erro, inclusive o último, que poderia receber a instância original. O comentário sugere que a intenção era copiar para todos exceto o último, mas o resultado é copiar para todos. Isso é correto defensivamente, mas ineficiente e a lógica é confusa.
+A condição `tasks.length > 1` é avaliada **fora** do loop — não cresce nem diminui. Para um array de
+5 elementos, **todos** os 5 recebem cópias do erro, inclusive o último, que poderia receber a
+instância original. O comentário sugere que a intenção era copiar para todos exceto o último, mas o
+resultado é copiar para todos. Isso é correto defensivamente, mas ineficiente e a lógica é confusa.
 
 **Correção com semântica mais clara:**
+
 ```js
 for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
@@ -445,12 +525,18 @@ for (let i = 0; i < tasks.length; i++) {
 **Arquivo:** `src/copilot/agent/agent-context.js`
 
 Existem dois métodos:
+
 - `setRuntimeStatus(status)` — atualiza estado sem emitir evento
 - `setStatus(status, emitter)` — atualiza estado E emite `EMITTER_STATUS`
 
-O setter `set status(value)` chama `setRuntimeStatus` (sem evento). Isso significa que qualquer código que faça `ctx.status = 'idle'` nunca emite `EMITTER_STATUS`. A API pública do `AlwaysAliveAgent` usa `setStatus(status, emitter)` corretamente, mas módulos internos que usam o setter diretamente (como tests ou código legado) silenciam eventos.
+O setter `set status(value)` chama `setRuntimeStatus` (sem evento). Isso significa que qualquer
+código que faça `ctx.status = 'idle'` nunca emite `EMITTER_STATUS`. A API pública do
+`AlwaysAliveAgent` usa `setStatus(status, emitter)` corretamente, mas módulos internos que usam o
+setter diretamente (como tests ou código legado) silenciam eventos.
 
-**Recomendação:** Deprecar o setter `set status(value)` e tornar `setRuntimeStatus` privado (`#setRuntimeStatus`), forçando uso de `setStatus(status, emitter)` ou `setRuntimeStatus` apenas para atualizações que deliberadamente não emitem eventos (uso interno do FSM).
+**Recomendação:** Deprecar o setter `set status(value)` e tornar `setRuntimeStatus` privado
+(`#setRuntimeStatus`), forçando uso de `setStatus(status, emitter)` ou `setRuntimeStatus` apenas
+para atualizações que deliberadamente não emitem eventos (uso interno do FSM).
 
 ---
 
@@ -472,9 +558,12 @@ if (fileStat.size > SEC02_READ_LIMIT) {
 }
 ```
 
-Se `buildHookSystemContextSafe()` for chamada concorrentemente (múltiplos boots simultâneos, testes de carga), múltiplos file handles serão abertos para o mesmo arquivo. Em ambientes com limite de descritores (Docker com `ulimit`), isso pode causar `EMFILE`.
+Se `buildHookSystemContextSafe()` for chamada concorrentemente (múltiplos boots simultâneos, testes
+de carga), múltiplos file handles serão abertos para o mesmo arquivo. Em ambientes com limite de
+descritores (Docker com `ulimit`), isso pode causar `EMFILE`.
 
 **Correção:** Implementar mutex simples para `buildHookSystemContext`:
+
 ```js
 let _buildContextPromise = null;
 export async function buildHookSystemContextSafe() {
@@ -495,13 +584,16 @@ export async function buildHookSystemContextSafe() {
 ```
 
 Esta regex cobre sequences `CSI` padrão (`ESC[`), mas não cobre:
+
 - Sequences `OSC` (`ESC]`): usadas em hyperlinks de terminal
 - Sequences `DCS` (`ESC P`): Device Control Strings
 - Sequences `ST` (`ESC \`)
 
-Um `session-briefing.md` malicioso ou corrompido que contenha essas sequences poderia fazer o modelo ver artefatos ou delimitadores inesperados.
+Um `session-briefing.md` malicioso ou corrompido que contenha essas sequences poderia fazer o modelo
+ver artefatos ou delimitadores inesperados.
 
 **Correção:**
+
 ```js
 // Remover todos os escape sequences ANSI/VT100 de forma abrangente
 .replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))/g, '')
@@ -522,9 +614,13 @@ getQueueSnapshot() {
 }
 ```
 
-`AgentTask` contém `resolve` e `reject` (callbacks de Promise). Expor por referência permite que consumers externos resolvam ou rejeitem tasks da fila, violando o encapsulamento. `buildStatusSnapshot` usa `queueOldest` para calcular `oldestTaskWaitMs` — só precisa de `enqueuedAt`.
+`AgentTask` contém `resolve` e `reject` (callbacks de Promise). Expor por referência permite que
+consumers externos resolvam ou rejeitem tasks da fila, violando o encapsulamento.
+`buildStatusSnapshot` usa `queueOldest` para calcular `oldestTaskWaitMs` — só precisa de
+`enqueuedAt`.
 
 **Correção:**
+
 ```js
 getQueueSnapshot() {
     const oldest = this.messageQueue.oldest;
@@ -550,9 +646,12 @@ export async function pruneSnapshotFilesAsync(keep = MAX_SNAPSHOTS) {
 }
 ```
 
-Em ambiente com múltiplos workers (PM2 com `instances > 1`), dois processos podem listar, ver `length > keep`, e ambos tentarem remover os mesmos arquivos. `rm({ force: true })` torna isso idempotente, mas a contagem retornada `removed` será incorreta (ambos contarão o mesmo arquivo).
+Em ambiente com múltiplos workers (PM2 com `instances > 1`), dois processos podem listar, ver
+`length > keep`, e ambos tentarem remover os mesmos arquivos. `rm({ force: true })` torna isso
+idempotente, mas a contagem retornada `removed` será incorreta (ambos contarão o mesmo arquivo).
 
-**Recomendação:** Usar arquivo de lock (`snapshots/.prune.lock`) ou tolerar a imprecisão documentando a limitação.
+**Recomendação:** Usar arquivo de lock (`snapshots/.prune.lock`) ou tolerar a imprecisão
+documentando a limitação.
 
 ---
 
@@ -579,9 +678,14 @@ try {
 }
 ```
 
-Se `drainPromise` já estava resolvida (fila estava vazia), `drainPromise.finally()` dispara **antes** de `shutdownTimer` ser criado (pois a criação do timer está dentro do `new Promise(...)` do race). `drainPromise.finally` então tenta `clearTimeout(null)` — inofensivo mas inútil. O `Promise.race` resolve imediatamente com o drain. O `finally` externo limpa `shutdownTimer` se não-null. **Não há bug real aqui**, mas a lógica é complexa e difícil de auditar.
+Se `drainPromise` já estava resolvida (fila estava vazia), `drainPromise.finally()` dispara
+**antes** de `shutdownTimer` ser criado (pois a criação do timer está dentro do `new Promise(...)`
+do race). `drainPromise.finally` então tenta `clearTimeout(null)` — inofensivo mas inútil. O
+`Promise.race` resolve imediatamente com o drain. O `finally` externo limpa `shutdownTimer` se
+não-null. **Não há bug real aqui**, mas a lógica é complexa e difícil de auditar.
 
 **Recomendação:** Simplificar usando AbortController:
+
 ```js
 const ac = new AbortController();
 const timeoutHandle = setTimeout(() => { timedOut = true; this.forceDeactivate(); ac.abort(); }, shutdownTimeoutMs);
@@ -598,13 +702,16 @@ try {
 
 ### P3-1 · `BackgroundTasks.#maxPending = 1000` pode acumular silenciosamente
 
-O limite de 1000 tarefas em background é extremamente alto para um único agente. O log de warning é emitido ao ultrapassar, mas não há telemetria diferenciada. Recomenda-se reduzir para 200 e adicionar métricas de nível de backlog.
+O limite de 1000 tarefas em background é extremamente alto para um único agente. O log de warning é
+emitido ao ultrapassar, mas não há telemetria diferenciada. Recomenda-se reduzir para 200 e
+adicionar métricas de nível de backlog.
 
 ---
 
 ### P3-2 · `agent/index.js` reexporta `export * from './dialog/index.js'` sem restrição
 
-Qualquer símbolo adicionado a `dialog/index.js` torna-se automaticamente parte da API pública do módulo `agent`. Isso viola o princípio de superfície explícita da estratégia 2.1.
+Qualquer símbolo adicionado a `dialog/index.js` torna-se automaticamente parte da API pública do
+módulo `agent`. Isso viola o princípio de superfície explícita da estratégia 2.1.
 
 ---
 
@@ -620,9 +727,12 @@ export const alwaysAliveAgent = new Proxy({}, {
 });
 ```
 
-`getAgent()` chama `registerAgentRuntime` e `ensureAgentEventBusBridge` em toda operação de get de propriedade. Ambas têm guards de idempotência, mas ainda executam verificações e chamadas de função em cada acesso. Em hot paths como `agent.status` chamado em loop de polling, isso acumula overhead.
+`getAgent()` chama `registerAgentRuntime` e `ensureAgentEventBusBridge` em toda operação de get de
+propriedade. Ambas têm guards de idempotência, mas ainda executam verificações e chamadas de função
+em cada acesso. Em hot paths como `agent.status` chamado em loop de polling, isso acumula overhead.
 
 **Correção:** Cachear a instância no Proxy após a primeira resolução:
+
 ```js
 let _cachedAgentForProxy = null;
 export const alwaysAliveAgent = new Proxy({}, {
@@ -641,7 +751,9 @@ E `resetAgent()` deve zerar `_cachedAgentForProxy = null`.
 
 ### P3-4 · `hook-context.js` lê `BRIEFING_FILE` e `SESSION_JSON_FILE` a cada chamada
 
-Ambos os arquivos são lidos em todo `buildHookSystemContext()` sem cache. Para cada boot de sessão e cada reconexão, há 2–4 operações de I/O de filesystem. Em containers com volume NFS (comum em DevContainers WSL2), isso pode ser lento.
+Ambos os arquivos são lidos em todo `buildHookSystemContext()` sem cache. Para cada boot de sessão e
+cada reconexão, há 2–4 operações de I/O de filesystem. Em containers com volume NFS (comum em
+DevContainers WSL2), isso pode ser lento.
 
 **Recomendação:** Adicionar cache com TTL de 30s para o conteúdo do briefing.
 
@@ -653,7 +765,8 @@ Ambos os arquivos são lidos em todo `buildHookSystemContext()` sem cache. Para 
 this.#cache = messages.length > this.#maxItems ? messages.slice(-this.#maxItems) : messages;
 ```
 
-O limite é em número de mensagens (padrão 1000), mas cada mensagem pode ser grande (especialmente em sessões com attachments ou código gerado). 1000 mensagens de 10KB = 10MB de cache em memória.
+O limite é em número de mensagens (padrão 1000), mas cada mensagem pode ser grande (especialmente em
+sessões com attachments ou código gerado). 1000 mensagens de 10KB = 10MB de cache em memória.
 
 **Recomendação:** Adicionar limite em bytes além do limite em contagem.
 
@@ -661,7 +774,9 @@ O limite é em número de mensagens (padrão 1000), mas cada mensagem pode ser g
 
 ### P3-6 · `AgentPermissionController` sem snapshot de auditoria quando `mode = 'audit_only'`
 
-O modo `'audit_only'` aprova tudo mas deveria logar cada decisão. A implementação atual delega ao `PermissionController` do SDK, mas não há log observável no `agent/` layer para modo `audit_only`. O audit trail está em `#copilot/audit` mas não há ponte explícita.
+O modo `'audit_only'` aprova tudo mas deveria logar cada decisão. A implementação atual delega ao
+`PermissionController` do SDK, mas não há log observável no `agent/` layer para modo `audit_only`. O
+audit trail está em `#copilot/audit` mas não há ponte explícita.
 
 ---
 
@@ -674,7 +789,8 @@ function normalizeAgentError(error) {
 }
 ```
 
-`if (typeof toError === 'function')` sempre será verdadeiro após o import — essa guarda é desnecessária e confusa. Provavelmente um remanescente de refatoração.
+`if (typeof toError === 'function')` sempre será verdadeiro após o import — essa guarda é
+desnecessária e confusa. Provavelmente um remanescente de refatoração.
 
 ---
 
@@ -690,9 +806,14 @@ if (typeof maybeSetModel !== 'function') return false;
 const maybeResult = setSessionModel(session, modelId, …);
 ```
 
-O SDK 0.3.0 introduziu `session.switchModel()` como substituto de `session.setModel()`. A API `setModel` pode estar depreciada ou ausente em 0.3.0. A função `setSessionModel` em `#copilot/sdk` presumivelmente já faz o fallback correto, mas o Reflect.get verificando `'setModel'` pode falhar se a propriedade foi removida do tipo público.
+O SDK 0.3.0 introduziu `session.switchModel()` como substituto de `session.setModel()`. A API
+`setModel` pode estar depreciada ou ausente em 0.3.0. A função `setSessionModel` em `#copilot/sdk`
+presumivelmente já faz o fallback correto, mas o Reflect.get verificando `'setModel'` pode falhar se
+a propriedade foi removida do tipo público.
 
-**Verificação necessária:** Confirmar se `setSessionModel` do barrel `#copilot/sdk` já usa `switchModel` internamente. Se não, atualizar:
+**Verificação necessária:** Confirmar se `setSessionModel` do barrel `#copilot/sdk` já usa
+`switchModel` internamente. Se não, atualizar:
+
 ```js
 // SDK 0.3.0: preferir switchModel
 const switchFn = Reflect.get(session, 'switchModel') ?? Reflect.get(session, 'setModel');
@@ -705,9 +826,14 @@ if (typeof switchFn !== 'function') return false;
 
 **Arquivo:** `src/copilot/agent/session/initializers/initializer.js`
 
-O código usa `buildLiveSystemMessage()` da `config/system-prompt/`. O SDK 0.3.0 introduziu `systemMessage.mode: "customize"` para injeção de contexto sem substituir o system prompt base do Copilot. A implementação atual pode estar usando o modo padrão (`"override"` ou equivalente), o que sobrescreveria o system prompt do Copilot ao invés de complementá-lo.
+O código usa `buildLiveSystemMessage()` da `config/system-prompt/`. O SDK 0.3.0 introduziu
+`systemMessage.mode: "customize"` para injeção de contexto sem substituir o system prompt base do
+Copilot. A implementação atual pode estar usando o modo padrão (`"override"` ou equivalente), o que
+sobrescreveria o system prompt do Copilot ao invés de complementá-lo.
 
-**Verificação necessária:** Confirmar que `SessionConfigBuilder.systemMessage()` usa `mode: "customize"` em 0.3.0:
+**Verificação necessária:** Confirmar que `SessionConfigBuilder.systemMessage()` usa
+`mode: "customize"` em 0.3.0:
+
 ```js
 builder.systemMessage({
     mode: 'customize',   // SDK 0.3.0
@@ -730,9 +856,12 @@ async [Symbol.asyncDispose]() {
 }
 ```
 
-`Symbol.asyncDispose` é Stage 4 e está disponível nativa no Node.js 22+. Em Node.js 20 (LTS), pode não estar disponível sem flag. O `devcontainer.json` do projeto deve especificar `node >= 22` se este padrão for usado sem polyfill.
+`Symbol.asyncDispose` é Stage 4 e está disponível nativa no Node.js 22+. Em Node.js 20 (LTS), pode
+não estar disponível sem flag. O `devcontainer.json` do projeto deve especificar `node >= 22` se
+este padrão for usado sem polyfill.
 
 **Recomendação:** Adicionar guarda:
+
 ```js
 if (Symbol.asyncDispose) {
     AlwaysAliveAgent.prototype[Symbol.asyncDispose] = async function() { await this.stop(); };
@@ -749,7 +878,9 @@ if (Symbol.asyncDispose) {
 builder.onPermissionRequest(getPermissionHandler(ctx))
 ```
 
-O SDK 0.2.0 tornou `onPermissionRequest` obrigatório. Em 0.3.0, verificar se a assinatura mudou para aceitar também `onPermissionRequest: async (req) => ({ kind: 'approve', message: '...' })` no formato estendido.
+O SDK 0.2.0 tornou `onPermissionRequest` obrigatório. Em 0.3.0, verificar se a assinatura mudou para
+aceitar também `onPermissionRequest: async (req) => ({ kind: 'approve', message: '...' })` no
+formato estendido.
 
 ---
 
@@ -757,7 +888,9 @@ O SDK 0.2.0 tornou `onPermissionRequest` obrigatório. Em 0.3.0, verificar se a 
 
 **Arquivo:** `src/copilot/agent/ports/hook-port.js` / `context-factories.js`
 
-O handler de elicitation criado não implementa timeout automático. Em SDK 0.3.0, elicitations pendentes sem resposta após um período podem causar memory leak (entradas acumuladas em `listPending`). Adicionar cleanup periódico:
+O handler de elicitation criado não implementa timeout automático. Em SDK 0.3.0, elicitations
+pendentes sem resposta após um período podem causar memory leak (entradas acumuladas em
+`listPending`). Adicionar cleanup periódico:
 
 ```js
 const MAX_ELICITATION_AGE_MS = 5 * 60 * 1000;
@@ -772,7 +905,10 @@ const MAX_ELICITATION_AGE_MS = 5 * 60 * 1000;
 
 **Arquivo:** `src/copilot/agent/session/wiring/event-wirer.js`
 
-O README de `agent/` menciona que eventos vanilla como `session.plan_changed` devem ser consumidos via `sdk/`. Nenhum dos handlers em `event-handlers/` ou em `event-wirer.js` registra listener para `session.plan_changed`. Se o SDK 0.3.0 emitir este evento, ele cairá no `wireCatchAll` sem processamento semântico.
+O README de `agent/` menciona que eventos vanilla como `session.plan_changed` devem ser consumidos
+via `sdk/`. Nenhum dos handlers em `event-handlers/` ou em `event-wirer.js` registra listener para
+`session.plan_changed`. Se o SDK 0.3.0 emitir este evento, ele cairá no `wireCatchAll` sem
+processamento semântico.
 
 ---
 
@@ -782,11 +918,13 @@ A estratégia barrel-first 2.1, já aplicada em `presentation/`, define:
 
 > "módulos de fora **podem** depender, mas **somente via superfícies públicas explícitas**"
 
-O módulo `agent/` ainda não implementa esta estratégia. O diagnóstico abaixo mapeia o estado atual vs. o target.
+O módulo `agent/` ainda não implementa esta estratégia. O diagnóstico abaixo mapeia o estado atual
+vs. o target.
 
 ### 6.1 Barrel Raiz Plano (`agent/index.js`)
 
 **Estado atual:**
+
 ```js
 export * from './dialog/index.js';        // ← reexporta TUDO de dialog/
 export * from './health-check.js';
@@ -797,9 +935,11 @@ export * from './session/index.js';
 export * from './state/index.js';
 ```
 
-Qualquer símbolo adicionado a qualquer subdomínio vira automaticamente API pública de `#copilot/agent`. Não há como distinguir API pública de detalhe interno.
+Qualquer símbolo adicionado a qualquer subdomínio vira automaticamente API pública de
+`#copilot/agent`. Não há como distinguir API pública de detalhe interno.
 
 **Target 2.1:**
+
 ```js
 // agent/index.js — barrel puro com exports explícitos
 export { AlwaysAliveAgent, alwaysAliveAgent, getAgent, resetAgent } from './always-alive.js';
@@ -813,15 +953,19 @@ export type { AgentStatus, AgentStatusSnapshot, IAlwaysAliveAgent } from './type
 ### 6.2 Ausência de Superfícies Explícitas no `package.json`
 
 Em `presentation/`, o `package.json` declara:
+
 ```json
 "#copilot/presentation": "src/copilot/presentation/index.js",
 "#copilot/presentation/agent": "src/copilot/presentation/agent/index.js",
 "#copilot/presentation/routing": "…"
 ```
 
-Para `agent/`, não existe equivalente para sub-domínios. Imports externos que precisam de `dialog/` ou `lifecycle/` são forçados a importar pelo barrel raiz ou fazer deep imports diretos — nenhum dos dois é governado.
+Para `agent/`, não existe equivalente para sub-domínios. Imports externos que precisam de `dialog/`
+ou `lifecycle/` são forçados a importar pelo barrel raiz ou fazer deep imports diretos — nenhum dos
+dois é governado.
 
 **Target:**
+
 ```json
 "#copilot/agent": "src/copilot/agent/index.js",
 "#copilot/agent/dialog": "src/copilot/agent/dialog/index.js",
@@ -832,9 +976,14 @@ Para `agent/`, não existe equivalente para sub-domínios. Imports externos que 
 
 ### 6.3 Deep Imports em `always-alive.js` e `agent-runtime-surface.js`
 
-`always-alive.js` importa de `agent-runtime-surface.js`, que por sua vez reexporta de ~12 módulos diferentes em subdomínios distintos. Isso cria um hub de importação que é semanticamente opaco: o reader de `always-alive.js` precisa seguir dois níveis de indireção para entender de onde vem cada função.
+`always-alive.js` importa de `agent-runtime-surface.js`, que por sua vez reexporta de ~12 módulos
+diferentes em subdomínios distintos. Isso cria um hub de importação que é semanticamente opaco: o
+reader de `always-alive.js` precisa seguir dois níveis de indireção para entender de onde vem cada
+função.
 
-**Target 2.1:** `always-alive.js` deveria importar exclusivamente de `facades/index.js` (que já existe) e de arquivos raiz (`agent-context.js`, `agent-runtime-surface.js`). O `agent-runtime-surface.js` deveria ser eliminado ou transformado em alias barrel de `facades/`.
+**Target 2.1:** `always-alive.js` deveria importar exclusivamente de `facades/index.js` (que já
+existe) e de arquivos raiz (`agent-context.js`, `agent-runtime-surface.js`). O
+`agent-runtime-surface.js` deveria ser eliminado ou transformado em alias barrel de `facades/`.
 
 ### 6.4 Hotspots que Justificam Decomposição Própria
 
@@ -849,6 +998,7 @@ Análogos ao `agent-control.js` em `presentation/` (1663 linhas), o `agent/` tem
 | `agent-messaging.js` | ~480   | Bem estruturado, `executeTask` pode ser extraído                     |
 
 **Decomposição recomendada para `AgentContext`:**
+
 ```
 agent/context/
   index.js              # barrel
@@ -873,7 +1023,8 @@ session/boot/boot-wiring.js
   → ports/logging-port.js                ✓
 ```
 
-`error-policy.js` é importado diretamente por módulos de `session/`, `dialog/`, `lifecycle/` e `messaging/`. Deveria estar em `ports/` ou ser exposto via um barrel de `agent/core/` próprio.
+`error-policy.js` é importado diretamente por módulos de `session/`, `dialog/`, `lifecycle/` e
+`messaging/`. Deveria estar em `ports/` ou ser exposto via um barrel de `agent/core/` próprio.
 
 ---
 
@@ -947,10 +1098,10 @@ agent/
 
 ### Onda AG-5 — Decomposição dos Hotspots
 
-**`AgentContext`** → decomposição por responsabilidade (ver §6.4)
-**`agent-lifecycle.js`** → extrair `wireAgentSessionRuntime` para `session/boot/session-runtime-wiring.js`
-**`agent-messaging.js`** → extrair `executeTask` para `messaging/task-executor.js`
-**`loop-manager.js`** → extrair `resume()` e `stop()` para `dialog/orchestrators/loop-lifecycle.js`
+**`AgentContext`** → decomposição por responsabilidade (ver §6.4) **`agent-lifecycle.js`** → extrair
+`wireAgentSessionRuntime` para `session/boot/session-runtime-wiring.js` **`agent-messaging.js`** →
+extrair `executeTask` para `messaging/task-executor.js` **`loop-manager.js`** → extrair `resume()` e
+`stop()` para `dialog/orchestrators/loop-lifecycle.js`
 
 ---
 
@@ -988,4 +1139,5 @@ Com base no padrão aplicado em `presentation/` e adaptado ao `agent/`:
 
 ---
 
-*Relatório gerado a partir de análise manual de 107 arquivos (~18 000 linhas). Nenhuma ferramenta de lint automatizada foi utilizada conforme contrato de auditoria do projeto.*
+_Relatório gerado a partir de análise manual de 107 arquivos (~18 000 linhas). Nenhuma ferramenta de
+lint automatizada foi utilizada conforme contrato de auditoria do projeto._

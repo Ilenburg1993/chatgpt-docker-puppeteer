@@ -19,109 +19,43 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "maxNodeModuleJsDepth": 0,
+    "disableReferencedProjectLoad": true,
+    "disableSolutionSearching": true,
     "paths": {
-      "#core/*": [
-        "./src/core/*"
-      ],
-      "#shared/*": [
-        "./src/shared/*"
-      ],
-      "#nerv/*": [
-        "./src/nerv/*"
-      ],
-      "#kernel/*": [
-        "./src/kernel/*"
-      ],
-      "#driver/*": [
-        "./src/driver/*"
-      ],
-      "#agent/*": [
-        "./src/agent/*"
-      ],
-      "#copilot/observability": [
-        "./src/copilot/observability/index.js"
-      ],
-      "#copilot/dialog": [
-        "./src/copilot/dialog/index.js"
-      ],
-      "#copilot/config/agent": [
-        "./src/copilot/config/agent/index.js"
-      ],
-      "#copilot/runtime": [
-        "./src/copilot/runtime/index.js"
-      ],
-      "#copilot/types": [
-        "./src/copilot/types/index.js"
-      ],
-      "#copilot/types/*": [
-        "./src/copilot/types/*"
-      ],
-      "#copilot/observability/logger": [
-        "./src/copilot/observability/logger.js"
-      ],
-      "#copilot/observability/audit-log": [
-        "./src/copilot/observability/audit-log.js"
-      ],
-      "#copilot/observability/telemetry-store": [
-        "./src/copilot/observability/telemetry-store.js"
-      ],
-      "#copilot/observability/error-registry": [
-        "./src/copilot/observability/error-registry.js"
-      ],
-      "#copilot/observability/event-collector": [
-        "./src/copilot/observability/event-collector.js"
-      ],
-      "#copilot/observability/metrics": [
-        "./src/copilot/observability/metrics.js"
-      ],
-      "#copilot/observability/otel": [
-        "./src/copilot/observability/otel.js"
-      ],
-      "#copilot/observability/*": [
-        "./src/copilot/observability/*"
-      ],
-      "#copilot/services": [
-        "./src/copilot/services/index.js"
-      ],
-      "#copilot/services/*": [
-        "./src/copilot/services/*"
-      ],
-      "#copilot/plugins": [
-        "./src/copilot/plugins/index.js"
-      ],
-      "#copilot/plugins/*": [
-        "./src/copilot/plugins/*"
-      ],
-      "#copilot/*": [
-        "./src/copilot/*"
-      ],
-      "#infra/*": [
-        "./src/infra/*"
-      ],
-      "#integration/*": [
-        "./src/integration/*"
-      ],
-      "#types/*": [
-        "./src/types/*"
-      ],
-      "#main": [
-        "./src/main.js"
-      ],
-      "#server/*": [
-        "./src/server/*"
-      ],
-      "#logic/*": [
-        "./src/logic/*"
-      ],
-      "#orchestrator/*": [
-        "./src/orchestrator/*"
-      ],
-      "#missions/*": [
-        "./src/missions/*"
-      ],
-      "#validation/*": [
-        "./src/validation/*"
-      ]
+      "#core/*": ["./src/core/*"],
+      "#shared/*": ["./src/shared/*"],
+      "#nerv/*": ["./src/nerv/*"],
+      "#kernel/*": ["./src/kernel/*"],
+      "#driver/*": ["./src/driver/*"],
+      "#agent/*": ["./src/agent/*"],
+      "#copilot/observability": ["./src/copilot/observability/index.js"],
+      "#copilot/dialog": ["./src/copilot/dialog/index.js"],
+      "#copilot/config/agent": ["./src/copilot/config/agent/index.js"],
+      "#copilot/runtime": ["./src/copilot/runtime/index.js"],
+      "#copilot/types": ["./src/copilot/types/index.js"],
+      "#copilot/types/*": ["./src/copilot/types/*"],
+      "#copilot/observability/logger": ["./src/copilot/observability/logger.js"],
+      "#copilot/observability/audit-log": ["./src/copilot/observability/audit-log.js"],
+      "#copilot/observability/telemetry-store": ["./src/copilot/observability/telemetry-store.js"],
+      "#copilot/observability/error-registry": ["./src/copilot/observability/error-registry.js"],
+      "#copilot/observability/event-collector": ["./src/copilot/observability/event-collector.js"],
+      "#copilot/observability/metrics": ["./src/copilot/observability/metrics.js"],
+      "#copilot/observability/otel": ["./src/copilot/observability/otel.js"],
+      "#copilot/observability/*": ["./src/copilot/observability/*"],
+      "#copilot/services": ["./src/copilot/services/index.js"],
+      "#copilot/services/*": ["./src/copilot/services/*"],
+      "#copilot/plugins": ["./src/copilot/plugins/index.js"],
+      "#copilot/plugins/*": ["./src/copilot/plugins/*"],
+      "#copilot/*": ["./src/copilot/*"],
+      "#infra/*": ["./src/infra/*"],
+      "#integration/*": ["./src/integration/*"],
+      "#types/*": ["./src/types/*"],
+      "#main": ["./src/main.js"],
+      "#server/*": ["./src/server/*"],
+      "#logic/*": ["./src/logic/*"],
+      "#orchestrator/*": ["./src/orchestrator/*"],
+      "#missions/*": ["./src/missions/*"],
+      "#validation/*": ["./src/validation/*"]
     },
     "alwaysStrict": true,
     "noImplicitAny": true,

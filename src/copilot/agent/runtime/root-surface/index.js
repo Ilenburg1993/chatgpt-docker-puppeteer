@@ -19,8 +19,8 @@ export {
     dialogStop,
 } from '../../dialog/controllers/agent-dialog-controller.js';
 export { getAgentHealthSnapshot as healthSnapshot } from '../../health-check.js';
-export { agentStart, agentStop, agentTryReconnect } from '../../lifecycle/orchestrators/agent-lifecycle.js';
 export { wireAgentModelGatewayTurnBoundaryPromotion } from '../../lifecycle/model-gateway-turn-boundary.js';
+export { agentStart, agentStop, agentTryReconnect } from '../../lifecycle/orchestrators/agent-lifecycle.js';
 export {
     answerPendingQuestion as msgAnswer,
     processQueue as msgProcessQueue,

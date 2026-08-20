@@ -160,7 +160,9 @@ describe('F46 — code-tools', () => {
     }, 30_000);
 
     it('quality_gate rejeita gate não allowlisted em chamada direta defensiva', async () => {
-        const qualityGate = /** @type {any} */ (mod.codeTools.find((/** @type {any} */ t) => t.name === 'quality_gate'));
+        const qualityGate = /** @type {any} */ (
+            mod.codeTools.find((/** @type {any} */ t) => t.name === 'quality_gate')
+        );
         const result = await qualityGate.handler({ gate: 'npm-run-anything', scope: 'src/copilot' });
         expect(result).toMatchObject({
             success: false,

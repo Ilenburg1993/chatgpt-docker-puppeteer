@@ -7,39 +7,33 @@
  * @module copilot/model-gateway/control-plane/read-model
  */
 
-import { importConfiguredByokFromEnv } from '../registry/env-byok-compat-importer.js';
-import { buildModelGatewayOperatorProjection } from '../registry/projection.js';
-import { applyModelGatewayBindingStrategy } from '../ingress/binding-strategy.js';
-import { createModelGatewayModelIdentity } from '../contracts/model-identity.js';
-import { evaluateModelGatewayModelLifecycle } from '../contracts/model-lifecycle.js';
-import { searchModelGatewayCatalogEntries } from '../catalog/search.js';
-import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.js';
-import { listByokProviderModelHealth } from '../health/provider-health.js';
-import { planModelGatewayProbeBackoff } from '../probes/backoff-planner.js';
-import { planCostBoundedCatalogProbes } from '../probes/planner.js';
-import { recommendCatalogDiffProbes } from '../probes/recommendations.js';
-import { buildModelGatewayRouteCandidates } from '../routing/candidate-builder.js';
-import { explainGatewayRouteDecision } from '../routing/explain.js';
-import {
-    routeModelGatewayCatalogSnapshot,
-    scoreGatewayModelCandidate,
-} from '../routing/policy-engine.js';
-import { resolveModelGatewayTaskProfile } from '../routing/task-profiles.js';
-import { diagnoseModelGatewayProviderSecretRefs } from '../secrets/diagnostics.js';
-import { createModelGatewayEnvProfileStore } from '../profiles/env-profile-store.js';
 import {
     listModelGatewayRuntimeAutomationPolicyPresets,
     mergeModelGatewayRuntimeAutomationPolicy,
     readModelGatewayRuntimeAutomationEffectivePolicy,
     validateModelGatewayRuntimeAutomationPolicy,
 } from '../automation/policy.js';
+import { searchModelGatewayCatalogEntries } from '../catalog/search.js';
+import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.js';
+import { createModelGatewayModelIdentity } from '../contracts/model-identity.js';
+import { evaluateModelGatewayModelLifecycle } from '../contracts/model-lifecycle.js';
+import { listByokProviderModelHealth } from '../health/provider-health.js';
+import { applyModelGatewayBindingStrategy } from '../ingress/binding-strategy.js';
+import { planModelGatewayProbeBackoff } from '../probes/backoff-planner.js';
+import { planCostBoundedCatalogProbes } from '../probes/planner.js';
+import { recommendCatalogDiffProbes } from '../probes/recommendations.js';
+import { createModelGatewayEnvProfileStore } from '../profiles/env-profile-store.js';
+import { importConfiguredByokFromEnv } from '../registry/env-byok-compat-importer.js';
+import { buildModelGatewayOperatorProjection } from '../registry/projection.js';
+import { buildModelGatewayRouteCandidates } from '../routing/candidate-builder.js';
+import { explainGatewayRouteDecision } from '../routing/explain.js';
+import { routeModelGatewayCatalogSnapshot, scoreGatewayModelCandidate } from '../routing/policy-engine.js';
+import { resolveModelGatewayTaskProfile } from '../routing/task-profiles.js';
+import { diagnoseModelGatewayProviderSecretRefs } from '../secrets/diagnostics.js';
 import { readModelGatewayDirectRebindEvidence } from './binding-evidence.js';
 import { classifyModelGatewayDeferredRouteOperation } from './deferred-route-operation.js';
+import { assertModelGatewayCatalogReadPort, assertModelGatewayProviderProfileStorePort } from './ports.js';
 import { createModelGatewayControlPlaneResult } from './result-envelope.js';
-import {
-    assertModelGatewayCatalogReadPort,
-    assertModelGatewayProviderProfileStorePort,
-} from './ports.js';
 
 export const MODEL_GATEWAY_READ_LATENCY_BUDGET_MS = Object.freeze({
     overview: 1_000,
@@ -90,7 +84,7 @@ function projectionKey(projection) {
 
 /**
  * @param {unknown} value
- * @returns {{ added: string[]; removed: string[]; changed: Array<{ key: string; changedKinds: string[] }> }}
+ * @returns {{ added: string[]; removed: string[]; changed: { key: string; changedKinds: string[] }[] }}
  */
 function normalizeCatalogDiff(value) {
     const diff = isRecord(value) ? value : {};
@@ -188,14 +182,21 @@ function buildPolicyProposalPatch(objective, taskProfile) {
                 policy: 'require_runtime_proof',
                 allowLocalPrivate: true,
             },
-            rationale: ['allow_explicit_local_private_routing', 'require_runtime_proof', 'keep_runtime_mutations_manual'],
+            rationale: [
+                'allow_explicit_local_private_routing',
+                'require_runtime_proof',
+                'keep_runtime_mutations_manual',
+            ],
             risks: ['local_private_boundary_change_requires_operator_review'],
         };
     }
     if (objective === 'balanced') {
         return {
             patch: { ...guarded, preset: 'operator_manual', policy: 'prefer_runtime_proved' },
-            rationale: ['prefer_runtime_proof_without_excluding_metadata_only_candidates', 'keep_runtime_mutations_manual'],
+            rationale: [
+                'prefer_runtime_proof_without_excluding_metadata_only_candidates',
+                'keep_runtime_mutations_manual',
+            ],
             risks: ['metadata_only_candidates_can_still_be_selected_for_review'],
         };
     }
@@ -404,15 +405,17 @@ function buildReadiness(diagnostics, maxSnapshotAgeHours, now) {
     if (!standbyReady) operationalReasons.push('standby_plan_missing_or_invalid');
     if (!liveReady) liveReasons.push(live['runId'] ? 'latest_live_scenario_failed' : 'live_scenario_missing');
     const reasons = [...structuralReasons, ...operationalReasons, ...liveReasons];
-    const recommendedActions = [...new Set(
-        reasons.map((reason) => {
-            if (reason === 'active_snapshot_missing' || reason === 'catalog_empty') return 'refresh_catalog';
-            if (reason === 'snapshot_age_unknown' || reason === 'snapshot_stale') return 'plan_catalog_refresh';
-            if (reason === 'runtime_model_mismatch') return 'reconcile_runtime_model';
-            if (reason === 'standby_plan_missing_or_invalid') return 'build_and_persist_standby_plan';
-            return 'run_controlled_live_scenario';
-        }),
-    )];
+    const recommendedActions = [
+        ...new Set(
+            reasons.map((reason) => {
+                if (reason === 'active_snapshot_missing' || reason === 'catalog_empty') return 'refresh_catalog';
+                if (reason === 'snapshot_age_unknown' || reason === 'snapshot_stale') return 'plan_catalog_refresh';
+                if (reason === 'runtime_model_mismatch') return 'reconcile_runtime_model';
+                if (reason === 'standby_plan_missing_or_invalid') return 'build_and_persist_standby_plan';
+                return 'run_controlled_live_scenario';
+            }),
+        ),
+    ];
     const structuralReady = structuralReasons.length === 0;
     const operationalReady = operationalReasons.length === 0;
     return {
@@ -452,18 +455,20 @@ export class ModelGatewayReadControlPlane {
 
     /**
      * @param {{
-     *   catalogStore?: import('../catalog/json-catalog-store.js').JsonModelGatewayCatalogStore | SqliteModelGatewayCatalogStore;
-     *   sqliteStore?: SqliteModelGatewayCatalogStore;
-     *   profileStore?: ReturnType<typeof createModelGatewayEnvProfileStore>;
-     *   env?: Record<string, string | undefined>;
-     *   now?: () => number;
+     *     catalogStore?:
+     *         import('../catalog/json-catalog-store.js').JsonModelGatewayCatalogStore | SqliteModelGatewayCatalogStore;
+     *     sqliteStore?: SqliteModelGatewayCatalogStore;
+     *     profileStore?: ReturnType<typeof createModelGatewayEnvProfileStore>;
+     *     env?: Record<string, string | undefined>;
+     *     now?: () => number;
      * }} [options]
      */
     constructor(options = {}) {
         this.#sqliteStore = options.sqliteStore ?? new SqliteModelGatewayCatalogStore();
-        this.#catalogStore = /** @type {import('../catalog/json-catalog-store.js').JsonModelGatewayCatalogStore | SqliteModelGatewayCatalogStore} */ (
-            assertModelGatewayCatalogReadPort(options.catalogStore ?? this.#sqliteStore)
-        );
+        this.#catalogStore =
+            /** @type {import('../catalog/json-catalog-store.js').JsonModelGatewayCatalogStore | SqliteModelGatewayCatalogStore} */ (
+                assertModelGatewayCatalogReadPort(options.catalogStore ?? this.#sqliteStore)
+            );
         this.#env = options.env ?? process.env;
         this.#profileStore = /** @type {ReturnType<typeof createModelGatewayEnvProfileStore>} */ (
             assertModelGatewayProviderProfileStorePort(
@@ -514,9 +519,7 @@ export class ModelGatewayReadControlPlane {
         const secretDiagnostics = activeProvider
             ? diagnoseModelGatewayProviderSecretRefs(String(activeByok.providerId ?? activeProvider.id ?? ''), {
                   env: this.#env,
-                  configuredRefs: Array.isArray(activeProvider.secretRefs)
-                      ? activeProvider.secretRefs.map(String)
-                      : [],
+                  configuredRefs: Array.isArray(activeProvider.secretRefs) ? activeProvider.secretRefs.map(String) : [],
               })
             : null;
         const readiness = buildReadiness(
@@ -586,13 +589,13 @@ export class ModelGatewayReadControlPlane {
 
     /**
      * @param {{
-     *   query: string | null;
-     *   providerId: string | null;
-     *   onlyEligible: boolean;
-     *   requireTools: boolean;
-     *   requireStreaming: boolean;
-     *   requireReasoning: boolean;
-     *   limit: number;
+     *     query: string | null;
+     *     providerId: string | null;
+     *     onlyEligible: boolean;
+     *     requireTools: boolean;
+     *     requireStreaming: boolean;
+     *     requireReasoning: boolean;
+     *     limit: number;
      * }} input
      */
     async searchCatalog(input) {
@@ -631,7 +634,21 @@ export class ModelGatewayReadControlPlane {
     }
 
     /**
-     * @param {{ taskProfile: string; maxCandidates: number; evaluateEligibility: boolean; requireAgentProbeOk?: boolean; requireRuntimeProof?: boolean; maxRuntimeProofAgeMs?: number; ignoreRuntimeHealth?: boolean; pricePenaltyWeight?: number; latencyPenaltyWeight?: number; runtimeProofWeights?: Record<string, number>; preferredProbeKinds?: string[]; blockFailedProbeKinds?: string[]; temporaryFailureCooldownMs?: number }} input
+     * @param {{
+     *     taskProfile: string;
+     *     maxCandidates: number;
+     *     evaluateEligibility: boolean;
+     *     requireAgentProbeOk?: boolean;
+     *     requireRuntimeProof?: boolean;
+     *     maxRuntimeProofAgeMs?: number;
+     *     ignoreRuntimeHealth?: boolean;
+     *     pricePenaltyWeight?: number;
+     *     latencyPenaltyWeight?: number;
+     *     runtimeProofWeights?: Record<string, number>;
+     *     preferredProbeKinds?: string[];
+     *     blockFailedProbeKinds?: string[];
+     *     temporaryFailureCooldownMs?: number;
+     * }} input
      */
     async planRoute(input) {
         const startedAtMs = this.#now();
@@ -640,13 +657,19 @@ export class ModelGatewayReadControlPlane {
             evaluateEligibility: input.evaluateEligibility,
             ...(input.requireAgentProbeOk === undefined ? {} : { requireAgentProbeOk: input.requireAgentProbeOk }),
             ...(input.requireRuntimeProof === undefined ? {} : { requireRuntimeProof: input.requireRuntimeProof }),
-            ...(typeof input.maxRuntimeProofAgeMs === 'number' ? { maxRuntimeProofAgeMs: input.maxRuntimeProofAgeMs } : {}),
+            ...(typeof input.maxRuntimeProofAgeMs === 'number'
+                ? { maxRuntimeProofAgeMs: input.maxRuntimeProofAgeMs }
+                : {}),
             ...(input.ignoreRuntimeHealth === undefined ? {} : { ignoreRuntimeHealth: input.ignoreRuntimeHealth }),
             ...(typeof input.pricePenaltyWeight === 'number' ? { pricePenaltyWeight: input.pricePenaltyWeight } : {}),
-            ...(typeof input.latencyPenaltyWeight === 'number' ? { latencyPenaltyWeight: input.latencyPenaltyWeight } : {}),
+            ...(typeof input.latencyPenaltyWeight === 'number'
+                ? { latencyPenaltyWeight: input.latencyPenaltyWeight }
+                : {}),
             ...(input.runtimeProofWeights ? { runtimeProofWeights: input.runtimeProofWeights } : {}),
             ...(Array.isArray(input.preferredProbeKinds) ? { preferredProbeKinds: input.preferredProbeKinds } : {}),
-            ...(Array.isArray(input.blockFailedProbeKinds) ? { blockFailedProbeKinds: input.blockFailedProbeKinds } : {}),
+            ...(Array.isArray(input.blockFailedProbeKinds)
+                ? { blockFailedProbeKinds: input.blockFailedProbeKinds }
+                : {}),
             ...(typeof input.temporaryFailureCooldownMs === 'number'
                 ? { temporaryFailureCooldownMs: input.temporaryFailureCooldownMs }
                 : {}),
@@ -697,11 +720,7 @@ export class ModelGatewayReadControlPlane {
             : null;
         const bindingDecision = isRecord(selectedRoute?.['bindingDecision']) ? selectedRoute['bindingDecision'] : null;
         const bindingBlocked = bindingDecision?.['strategy'] === 'blocked';
-        const sessionTransition = buildSessionTransitionPlan(
-            byok,
-            route.selected?.model ?? null,
-            bindingDecision,
-        );
+        const sessionTransition = buildSessionTransitionPlan(byok, route.selected?.model ?? null, bindingDecision);
         const latency = latencyObservation(startedAtMs, this.#now(), MODEL_GATEWAY_READ_LATENCY_BUDGET_MS.routePlan);
         return createModelGatewayControlPlaneResult({
             operation: 'route.plan',
@@ -797,7 +816,10 @@ export class ModelGatewayReadControlPlane {
                 eligibility: item.eligibility,
             }));
         const resolvedIds = new Set(
-            evaluated.flatMap((item) => [item.id, item.canonicalModelId, item.providerModel]).filter(Boolean).map(String),
+            evaluated
+                .flatMap((item) => [item.id, item.canonicalModelId, item.providerModel])
+                .filter(Boolean)
+                .map(String),
         );
         const unresolvedModelIds = input.modelIds.filter(
             (modelId) => ![...resolvedIds].some((resolved) => resolved.toLowerCase() === modelId.toLowerCase()),
@@ -821,10 +843,10 @@ export class ModelGatewayReadControlPlane {
 
     /**
      * @param {{
-     *   objective: string;
-     *   taskProfile: string;
-     *   candidateModelIds: string[];
-     *   maxCandidates: number;
+     *     objective: string;
+     *     taskProfile: string;
+     *     candidateModelIds: string[];
+     *     maxCandidates: number;
      * }} input
      */
     async proposePolicy(input) {
@@ -895,15 +917,15 @@ export class ModelGatewayReadControlPlane {
 
     /**
      * @param {{
-     *   modelIds: string[];
-     *   providerId: string | null;
-     *   routeProfile?: string | null;
-     *   allowedProbeKinds: string[];
-     *   maxProbeCount: number;
-     *   maxEstimatedCostUsd: number;
-     *   unknownCostPolicy: 'allow' | 'skip';
-     *   recommendationLimit: number;
-     *   probeFailureCooldownSeconds: number;
+     *     modelIds: string[];
+     *     providerId: string | null;
+     *     routeProfile?: string | null;
+     *     allowedProbeKinds: string[];
+     *     maxProbeCount: number;
+     *     maxEstimatedCostUsd: number;
+     *     unknownCostPolicy: 'allow' | 'skip';
+     *     recommendationLimit: number;
+     *     probeFailureCooldownSeconds: number;
      * }} input
      */
     async planProbes(input) {
@@ -967,8 +989,7 @@ export class ModelGatewayReadControlPlane {
                 source: input.modelIds.length > 0 ? 'explicit_model_shortlist' : 'latest_catalog_refresh_diff',
                 latestCatalogRefreshRunId: optionalString(latestRun?.['runId']),
                 requestedModelIds: input.modelIds,
-                unresolvedModelIds:
-                    input.modelIds.length > 0 && requestedKeys.length === 0 ? [...input.modelIds] : [],
+                unresolvedModelIds: input.modelIds.length > 0 && requestedKeys.length === 0 ? [...input.modelIds] : [],
                 providerId: input.providerId,
                 routeProfile: requestedRouteProfile,
                 constraints: {
@@ -1044,7 +1065,10 @@ export class ModelGatewayReadControlPlane {
             },
         };
         const matchCount =
-            data.routeDecisions.length + data.handoffs.length + data.confirmations.length + data.runtimeProbeRuns.length;
+            data.routeDecisions.length +
+            data.handoffs.length +
+            data.confirmations.length +
+            data.runtimeProbeRuns.length;
         return createModelGatewayControlPlaneResult({
             operation: 'operation.inspect',
             ok: input.operationId === null || matchCount > 0,

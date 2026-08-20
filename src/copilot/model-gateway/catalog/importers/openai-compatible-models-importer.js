@@ -3,7 +3,8 @@
  * Generic OpenAI-compatible `/models` importer.
  *
  * Many providers and local daemons expose an OpenAI-like model list. This importer intentionally treats that endpoint
- * as identity/account-visibility metadata only; rich capabilities still need provider catalogs, docs and runtime probes.
+ * as identity/account-visibility metadata only; rich capabilities still need provider catalogs, docs and runtime
+ * probes.
  *
  * @module copilot/model-gateway/catalog/importers/openai-compatible-models-importer
  */
@@ -57,7 +58,7 @@ function parseOpenAICompatibleRows(raw) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const providerModel = stringValue(row['id']);
@@ -73,7 +74,10 @@ function modelEvidenceValues(row) {
         ...Object.entries(lifecycle).map(([key, value]) => ({ fieldPath: `lifecycle.${key}`, value })),
         { fieldPath: 'providerMetadata.ownedBy', value: stringValue(row['owned_by']) ?? stringValue(row['ownedBy']) },
         { fieldPath: 'providerMetadata.object', value: stringValue(row['object']) },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
     ];
     return values.filter((item) => item.value !== null && item.value !== undefined);
 }
@@ -94,7 +98,8 @@ function modelEvidenceValues(row) {
  */
 export function createOpenAICompatibleModelsImporter(options = {}) {
     const providerId = stringValue(options.providerId);
-    if (!providerId) throw new Error('[model-gateway/catalog] providerId is required for generic OpenAI-compatible importer');
+    if (!providerId)
+        throw new Error('[model-gateway/catalog] providerId is required for generic OpenAI-compatible importer');
     if (!options.url && !options.baseUrl) {
         throw new Error('[model-gateway/catalog] url or baseUrl is required for generic OpenAI-compatible importer');
     }
@@ -112,12 +117,14 @@ export function createOpenAICompatibleModelsImporter(options = {}) {
         refreshPolicy: 'manual',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for OpenAI-compatible catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for OpenAI-compatible catalog import');
             const headers = options.apiKey
                 ? { accept: 'application/json', authorization: `Bearer ${options.apiKey}` }
                 : { accept: 'application/json' };
             const response = await fetchImpl(url, { headers });
-            if (!response.ok) throw new Error(`${providerId} OpenAI-compatible models fetch failed with HTTP ${response.status}`);
+            if (!response.ok)
+                throw new Error(`${providerId} OpenAI-compatible models fetch failed with HTTP ${response.status}`);
             return readCatalogResponseJson(response, { label: `${providerId} OpenAI-compatible models` });
         },
         parseRows: parseOpenAICompatibleRows,

@@ -1,7 +1,7 @@
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
+import * as logger from '#core/logger';
 import fs from 'fs/promises';
 import path from 'node:path';
-import * as logger from '#core/logger';
 
 /**
  * Diretório de templates.
@@ -46,7 +46,10 @@ class WorkflowGenerator {
             logger.log('INFO', `[WorkflowGenerator] Template carregado: ${templateId}`);
             return template;
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[WorkflowGenerator] Erro ao carregar template ${templateId}: ${(/** @type {any} */ (error)).message}`);
+            logger.log(
+                'ERROR',
+                `[WorkflowGenerator] Erro ao carregar template ${templateId}: ${/** @type {any} */ (error).message}`,
+            );
             throw error;
         }
     }
@@ -85,8 +88,8 @@ class WorkflowGenerator {
                 total_steps: finalSteps.length,
                 estimated_cost: template.cost_estimate,
                 estimated_time: template.execution_estimate,
-                success_criteria: template.success_criteria
-            }
+                success_criteria: template.success_criteria,
+            },
         };
 
         logger.log('INFO', `[WorkflowGenerator] Workflow gerado: ${templateId} → ${finalSteps.length} steps`);
@@ -157,15 +160,15 @@ class WorkflowGenerator {
             ...params,
             // Computed values podem ser adicionados aqui
             template_id: template.id,
-            template_name: template.name
+            template_name: template.name,
         };
     }
 
     /**
      * Expande steps que têm repeat_for_each.
      *
-     * NOTA: Por ora, implementação simplificada que expande baseado em num_chapters.
-     * Versão completa integraria com outline gerado.
+     * NOTA: Por ora, implementação simplificada que expande baseado em num_chapters. Versão completa integraria com
+     * outline gerado.
      */
     async _expandSteps(/** @type {any} */ steps, /** @type {any} */ context) {
         const expanded = [];
@@ -182,7 +185,9 @@ class WorkflowGenerator {
                     try {
                         expandedStep = structuredClone(step);
                     } catch (/** @type {any} */ cloneErr) {
-                        logger.error(`[WorkflowGenerator] structuredClone failed for step ${step.id}: ${(/** @type {any} */ (cloneErr))?.message}`);
+                        logger.error(
+                            `[WorkflowGenerator] structuredClone failed for step ${step.id}: ${/** @type {any} */ (cloneErr)?.message}`,
+                        );
                         expandedStep = JSON.parse(JSON.stringify(step)); // Fallback to JSON clone
                     }
                     delete expandedStep.repeat_for_each;
@@ -193,7 +198,7 @@ class WorkflowGenerator {
                     // Adiciona chapter_num ao context local deste step
                     expandedStep._context = {
                         chapter_num: i,
-                        chapter_title: `Chapter ${i}` // Placeholder, seria do outline real
+                        chapter_title: `Chapter ${i}`, // Placeholder, seria do outline real
                     };
 
                     expanded.push(expandedStep);
@@ -216,7 +221,7 @@ class WorkflowGenerator {
         for (const step of steps) {
             const stepContext = {
                 ...context,
-                ...(step._context || {}) // Merge context local do step
+                ...(step._context || {}), // Merge context local do step
             };
 
             const replacedStep = this._recursiveReplace(step, stepContext);
@@ -242,7 +247,7 @@ class WorkflowGenerator {
         }
 
         if (Array.isArray(obj)) {
-            return obj.map(item => this._recursiveReplace(item, context));
+            return obj.map((item) => this._recursiveReplace(item, context));
         }
 
         if (obj !== null && typeof obj === 'object') {
@@ -257,8 +262,7 @@ class WorkflowGenerator {
     }
 
     /**
-     * Substitui placeholders em uma string.
-     * Ex: "Write chapter {{chapter_num}}" → "Write chapter 5"
+     * Substitui placeholders em uma string. Ex: "Write chapter {{chapter_num}}" → "Write chapter 5"
      */
     _replacePlaceholdersInString(/** @type {any} */ str, /** @type {any} */ context) {
         const result = str.replace(/\{\{(\w+)\}\}/g, (/** @type {any} */ match, /** @type {any} */ key) => {
@@ -280,13 +284,11 @@ class WorkflowGenerator {
     async listTemplates() {
         try {
             const files = await fs.readdir(this.templatesDir);
-            const templates = files
-                .filter(f => f.endsWith('.json'))
-                .map(f => f.replace('.json', ''));
+            const templates = files.filter((f) => f.endsWith('.json')).map((f) => f.replace('.json', ''));
 
             return templates;
         } catch (/** @type {any} */ error) {
-            logger.log('ERROR', `[WorkflowGenerator] Erro ao listar templates: ${(/** @type {any} */ (error)).message}`);
+            logger.log('ERROR', `[WorkflowGenerator] Erro ao listar templates: ${/** @type {any} */ (error).message}`);
             throw error;
         }
     }

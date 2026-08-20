@@ -28,7 +28,9 @@ async function _runControl(
             payload: {
                 ...payload,
                 reason:
-                    payload['reason'] || req.body?.reason || `${String(command).toLowerCase()} via /api/dashboard/audit`,
+                    payload['reason'] ||
+                    req.body?.reason ||
+                    `${String(command).toLowerCase()} via /api/dashboard/audit`,
                 idempotency_key:
                     payload['idempotency_key'] ||
                     req.body?.idempotency_key ||
@@ -292,7 +294,9 @@ router.get('/audit/runtime', authenticate, async (req, res) => {
     try {
         const appLocals = req.app?.locals || {};
         const runtimeSummary =
-            typeof appLocals['getRuntimeResourcesStatus'] === 'function' ? appLocals['getRuntimeResourcesStatus']() : null;
+            typeof appLocals['getRuntimeResourcesStatus'] === 'function'
+                ? appLocals['getRuntimeResourcesStatus']()
+                : null;
         const baseUrl = getAuditAgentBaseUrl();
         const [health, metrics] = await Promise.all([
             safeFetchJson(`${baseUrl}/health`, 1500),

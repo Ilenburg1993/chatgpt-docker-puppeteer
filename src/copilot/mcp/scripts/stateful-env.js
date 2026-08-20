@@ -1,12 +1,12 @@
 // @ts-check
 /** @module copilot/mcp/scripts/stateful-env */
 
+import { chmodFileTrusted, mkdirPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(__filename), '../../../..');
@@ -35,9 +35,15 @@ const RUN_TARGETS = new Set([
  * @param {string} [relativePath]
  * @returns {Promise<EnsureResult>}
  */
-export async function ensureStatefulEnvFile(relativePath = process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] || DEFAULT_STATEFUL_ENV_FILE) {
+export async function ensureStatefulEnvFile(
+    relativePath = process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] || DEFAULT_STATEFUL_ENV_FILE,
+) {
     const envFile = resolve(repoRoot, relativePath);
-    mkdirSync(dirname(envFile), { recursive: true, mode: 0o700 });
+    await mkdirPathTrusted(dirname(envFile), {
+        caller: 'mcp.scripts.stateful-env',
+        recursive: true,
+        mode: 0o700,
+    });
     const warnings = [];
     let created = false;
 
@@ -47,14 +53,13 @@ export async function ensureStatefulEnvFile(relativePath = process.env['COPILOT_
             caller: 'mcp.scripts.stateful-env',
             mode: 0o600,
         });
-        chmodSync(envFile, 0o600);
         created = true;
     }
 
     const fileStat = statSync(envFile);
     const mode = fileStat.mode & 0o777;
     if ((mode & 0o077) !== 0) {
-        chmodSync(envFile, 0o600);
+        await chmodFileTrusted(envFile, 0o600, { caller: 'mcp.scripts.stateful-env' });
         warnings.push('env-file-permissions-tightened-to-0600');
     }
 
@@ -68,7 +73,6 @@ export async function ensureStatefulEnvFile(relativePath = process.env['COPILOT_
             caller: 'mcp.scripts.stateful-env',
             mode: 0o600,
         });
-        chmodSync(envFile, 0o600);
         warnings.push('env-file-upgraded');
     }
 
@@ -97,7 +101,9 @@ export async function runWithStatefulEnv(scriptName) {
  * @param {string} relativePath
  * @returns {NodeJS.ProcessEnv}
  */
-export function buildStatefulProcessEnv(relativePath = process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] || DEFAULT_STATEFUL_ENV_FILE) {
+export function buildStatefulProcessEnv(
+    relativePath = process.env['COPILOT_MCP_STATEFUL_ENV_FILE'] || DEFAULT_STATEFUL_ENV_FILE,
+) {
     const envFile = resolve(repoRoot, relativePath);
     const fileEnv = parseEnvFile(readFileSync(envFile, 'utf8'));
     const secret = normalizeSecret(fileEnv[secretKey]);
@@ -108,8 +114,14 @@ export function buildStatefulProcessEnv(relativePath = process.env['COPILOT_MCP_
         COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true',
         COPILOT_MCP_HTTP_STATELESS_COMPAT: 'false',
         COPILOT_MCP_HTTP_ENFORCE_POST_SESSION_CONTRACT: 'true',
-        COPILOT_MCP_HTTP_SESSION_TTL_MS: process.env['COPILOT_MCP_HTTP_SESSION_TTL_MS'] || fileEnv['COPILOT_MCP_HTTP_SESSION_TTL_MS'] || DEFAULT_SESSION_TTL_MS,
-        COPILOT_MCP_HTTP_MAX_SESSIONS: process.env['COPILOT_MCP_HTTP_MAX_SESSIONS'] || fileEnv['COPILOT_MCP_HTTP_MAX_SESSIONS'] || DEFAULT_MAX_SESSIONS,
+        COPILOT_MCP_HTTP_SESSION_TTL_MS:
+            process.env['COPILOT_MCP_HTTP_SESSION_TTL_MS'] ||
+            fileEnv['COPILOT_MCP_HTTP_SESSION_TTL_MS'] ||
+            DEFAULT_SESSION_TTL_MS,
+        COPILOT_MCP_HTTP_MAX_SESSIONS:
+            process.env['COPILOT_MCP_HTTP_MAX_SESSIONS'] ||
+            fileEnv['COPILOT_MCP_HTTP_MAX_SESSIONS'] ||
+            DEFAULT_MAX_SESSIONS,
         [secretKey]: secret,
     };
 }
@@ -166,7 +178,10 @@ function upgradeStatefulEnvFileContent(text, env) {
     const currentMaxSessions = Number(env['COPILOT_MCP_HTTP_MAX_SESSIONS'] ?? 0);
     if (currentMaxSessions >= Number(DEFAULT_MAX_SESSIONS)) return text;
     if (/^COPILOT_MCP_HTTP_MAX_SESSIONS=/mu.test(text)) {
-        return text.replace(/^COPILOT_MCP_HTTP_MAX_SESSIONS=.*$/mu, `COPILOT_MCP_HTTP_MAX_SESSIONS=${DEFAULT_MAX_SESSIONS}`);
+        return text.replace(
+            /^COPILOT_MCP_HTTP_MAX_SESSIONS=.*$/mu,
+            `COPILOT_MCP_HTTP_MAX_SESSIONS=${DEFAULT_MAX_SESSIONS}`,
+        );
     }
     return `${text.trimEnd()}\nCOPILOT_MCP_HTTP_MAX_SESSIONS=${DEFAULT_MAX_SESSIONS}\n`;
 }

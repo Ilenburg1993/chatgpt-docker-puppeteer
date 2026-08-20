@@ -5,12 +5,24 @@
 
 import fs from 'node:fs';
 
-/** @typedef {{ code: number, file: string, line: number, column?: number, message: string }} DiagnosticEntry */
+/** @typedef {{ code: number; file: string; line: number; column?: number; message: string }} DiagnosticEntry */
 /** @type {{ errors: DiagnosticEntry[] }} */
 const data = JSON.parse(fs.readFileSync('typescript-diagnostics.json', 'utf8'));
 
 // Categorização de erros por tipo
-/** @type {Record<string, DiagnosticEntry[]> & { TS2554: DiagnosticEntry[], TS2339: DiagnosticEntry[], TS2345: DiagnosticEntry[], TS2322: DiagnosticEntry[], TS2351: DiagnosticEntry[], TS1064: DiagnosticEntry[], TS2694: DiagnosticEntry[], TS2300: DiagnosticEntry[], OTHER: DiagnosticEntry[] }} */
+/**
+ * @type {Record<string, DiagnosticEntry[]> & {
+ *     TS2554: DiagnosticEntry[];
+ *     TS2339: DiagnosticEntry[];
+ *     TS2345: DiagnosticEntry[];
+ *     TS2322: DiagnosticEntry[];
+ *     TS2351: DiagnosticEntry[];
+ *     TS1064: DiagnosticEntry[];
+ *     TS2694: DiagnosticEntry[];
+ *     TS2300: DiagnosticEntry[];
+ *     OTHER: DiagnosticEntry[];
+ * }}
+ */
 const categories = {
     TS2554: [], // Expected X arguments, but got Y
     TS2339: [], // Property does not exist
@@ -43,7 +55,7 @@ if (categories.TS2554.length > 0) {
     console.log(`\n🔧 CATEGORIA 1: TS2554 - Argument Count Mismatch (${categories.TS2554.length} erros)`);
     console.log('─'.repeat(80));
 
-    /** @type {Record<string, { line: number, message: string }[]>} */
+    /** @type {Record<string, { line: number; message: string }[]>} */
     const byFile = {};
     categories.TS2554.forEach((err) => {
         const file = err.file.replace('/workspaces/chatgpt-docker-puppeteer/', '');

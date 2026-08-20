@@ -3,8 +3,8 @@
  * Durable runtime evidence for same-session direct provider rebinds.
  *
  * A provider being configurable through ProviderConfig does not prove that changing to it during resumeSession is
- * reliable. This module turns the relational confirmation ledger into bounded, pair- and wire-specific evidence for
- * the binding strategy resolver.
+ * reliable. This module turns the relational confirmation ledger into bounded, pair- and wire-specific evidence for the
+ * binding strategy resolver.
  *
  * @module copilot/model-gateway/control-plane/binding-evidence
  */
@@ -14,10 +14,7 @@ import { SqliteModelGatewayCatalogStore } from '../catalog/sqlite-catalog-store.
 export const MODEL_GATEWAY_DIRECT_REBIND_EVIDENCE_DEFAULT_MAX_AGE_MS = 30 * 24 * 60 * 60_000;
 
 const SUCCESS_STATUSES = new Set(['route_confirmed_same_session']);
-const FAILURE_STATUSES = new Set([
-    'route_switch_failed_same_session',
-    'route_rollback_confirmed_same_session',
-]);
+const FAILURE_STATUSES = new Set(['route_switch_failed_same_session', 'route_rollback_confirmed_same_session']);
 
 /**
  * @param {unknown} value
@@ -51,10 +48,10 @@ function observedAtMs(value) {
 /**
  * @param {Record<string, unknown>[]} records
  * @param {{
- *   providerId?: string | null;
- *   previousProviderId?: string | null;
- *   wireApi?: string | null;
- *   now?: number;
+ *     providerId?: string | null;
+ *     previousProviderId?: string | null;
+ *     wireApi?: string | null;
+ *     now?: number;
  * }} [options]
  */
 export function classifyModelGatewayDirectRebindEvidence(records, options = {}) {
@@ -72,10 +69,11 @@ export function classifyModelGatewayDirectRebindEvidence(records, options = {}) 
 
     const successes = relevant.filter((item) => SUCCESS_STATUSES.has(text(item['status']) ?? ''));
     const failures = relevant.filter((item) => FAILURE_STATUSES.has(text(item['status']) ?? ''));
-    const latest = relevant.find((item) => {
-        const status = text(item['status']) ?? '';
-        return SUCCESS_STATUSES.has(status) || FAILURE_STATUSES.has(status);
-    }) ?? null;
+    const latest =
+        relevant.find((item) => {
+            const status = text(item['status']) ?? '';
+            return SUCCESS_STATUSES.has(status) || FAILURE_STATUSES.has(status);
+        }) ?? null;
     const latestStatus = text(latest?.['status']);
     const latestObservedAtMs = latest ? observedAtMs(latest) : null;
 
@@ -119,14 +117,14 @@ export function classifyModelGatewayDirectRebindEvidence(records, options = {}) 
 
 /**
  * @param {{
- *   providerId: string;
- *   previousProviderId?: string | null;
- *   wireApi?: string | null;
- *   selectedRouteKey?: string | null;
- *   limit?: number;
- *   maxAgeMs?: number;
- *   now?: number;
- *   store?: SqliteModelGatewayCatalogStore;
+ *     providerId: string;
+ *     previousProviderId?: string | null;
+ *     wireApi?: string | null;
+ *     selectedRouteKey?: string | null;
+ *     limit?: number;
+ *     maxAgeMs?: number;
+ *     now?: number;
+ *     store?: SqliteModelGatewayCatalogStore;
  * }} input
  */
 export async function readModelGatewayDirectRebindEvidence(input) {

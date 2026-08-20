@@ -10,13 +10,7 @@
  *
  * @typedef {'off' | 'warn' | 'p1' | 'p0'} EnforcementState
  *
- * @typedef {'observability'
- *     | 'reactive_bug'
- *     | 'exploratory_bug'
- *     | 'contracts'
- *     | 'security'
- *     | 'performance'
- *     | 'architecture'} AuditMode
+ * @typedef {'observability' | 'reactive_bug' | 'exploratory_bug' | 'contracts' | 'security' | 'performance' | 'architecture'} AuditMode
  *
  *
  * @typedef {{

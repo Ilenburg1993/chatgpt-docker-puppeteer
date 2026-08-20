@@ -10,10 +10,14 @@
  * @module copilot/sdk/models/persistent-cache
  */
 
-import { toError } from '#copilot/core/error-handlers';
 import { resolveBootWorkspaceRoot } from '#copilot/boot';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { promises as fs } from 'node:fs';
+import { toError } from '#copilot/core/error-handlers';
+import {
+    deleteFileTrusted,
+    readTextFreshTrusted,
+    statPathTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/trusted-io';
 import { isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
@@ -110,7 +114,7 @@ function parsePersistentModelCachePayload(data) {
  */
 async function readPersistentModelCachePath(cachePath) {
     try {
-        const content = await fs.readFile(cachePath, 'utf8');
+        const content = (await readTextFreshTrusted(cachePath, { caller: 'sdk.models.persistent-cache' })).content;
         let data;
         try {
             data = JSON.parse(content);
@@ -211,8 +215,11 @@ export async function clearPersistentModelCache() {
     await enqueuePersistentModelCacheMutation(async () => {
         for (const cachePath of resolvePersistentModelCacheReadPaths()) {
             try {
-                await fs.unlink(cachePath);
-                log('DEBUG', '[model-cache] Cache persistido deletado');
+                const removed = await deleteFileTrusted(cachePath, {
+                    caller: 'sdk.models.persistent-cache',
+                    ignoreMissing: true,
+                });
+                if (removed) log('DEBUG', '[model-cache] Cache persistido deletado');
             } catch (error) {
                 const err = /** @type {NodeJS.ErrnoException} */ (error);
                 if (!(err && typeof err === 'object' && err.code === 'ENOENT')) {
@@ -250,7 +257,7 @@ export function evaluatePersistentCache(cache) {
 export async function getPersistentCacheDiagnostics() {
     try {
         const cachePath = resolvePersistentModelCacheFile();
-        const stat = await fs.stat(cachePath);
+        const stat = (await statPathTrusted(cachePath, { caller: 'sdk.models.persistent-cache' })).stats;
         const ageMs = Date.now() - stat.mtime.getTime();
         const ageHours = Math.floor(ageMs / (60 * 60 * 1000));
 

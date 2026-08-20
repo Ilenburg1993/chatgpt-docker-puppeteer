@@ -7,8 +7,8 @@
 
 import { CONTEXT_UTIL_WARN_THRESHOLD } from '#copilot/config';
 import { SESSION_EVENTS } from '#copilot/events';
-import { log } from '#copilot/observability';
 import { onSessionEvent } from '#copilot/events/sdk-events';
+import { log } from '#copilot/observability';
 
 /**
  * @param {{ currentTokens: number; tokenLimit: number }} usageData
@@ -36,10 +36,7 @@ function checkAndEmitTokenBudgetWarning({ currentTokens, tokenLimit }, isResumed
 /**
  * @param {import('./contracts.js').CopilotSessionLike} session
  * @param {boolean} isResumed
- * @param {Pick<
- *     import('./contracts.js').SessionWirerCallbacks,
- *     'emit' | 'onContextState'
- * >} cb
+ * @param {Pick<import('./contracts.js').SessionWirerCallbacks, 'emit' | 'onContextState'>} cb
  * @returns {(() => void)[]}
  */
 export function wireTokenBudgetEvents(session, isResumed, { emit, onContextState }) {

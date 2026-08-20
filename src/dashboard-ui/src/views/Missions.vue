@@ -205,9 +205,15 @@ onUnmounted(() => {
                         <Badge size="sm" class="text-[10px]">{{ m.autonomy_mode }}</Badge>
                         <Badge v-if="(m.counts?.proposed ?? 0) > 0" size="sm">prop: {{ m.counts?.proposed }}</Badge>
                         <Badge v-if="(m.counts?.pending ?? 0) > 0" size="sm">pend: {{ m.counts?.pending }}</Badge>
-                        <Badge v-if="(m.counts?.running ?? 0) > 0" size="sm" variant="info">run: {{ m.counts?.running }}</Badge>
-                        <Badge v-if="(m.counts?.done ?? 0) > 0" size="sm" variant="success">done: {{ m.counts?.done }}</Badge>
-                        <Badge v-if="(m.counts?.failed ?? 0) > 0" size="sm" variant="error">fail: {{ m.counts?.failed }}</Badge>
+                        <Badge v-if="(m.counts?.running ?? 0) > 0" size="sm" variant="info"
+                            >run: {{ m.counts?.running }}</Badge
+                        >
+                        <Badge v-if="(m.counts?.done ?? 0) > 0" size="sm" variant="success"
+                            >done: {{ m.counts?.done }}</Badge
+                        >
+                        <Badge v-if="(m.counts?.failed ?? 0) > 0" size="sm" variant="error"
+                            >fail: {{ m.counts?.failed }}</Badge
+                        >
                         <Badge v-if="(m.counts?.blocked ?? 0) > 0" size="sm" variant="warning"
                             >blk: {{ m.counts?.blocked }}</Badge
                         >

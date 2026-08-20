@@ -6,7 +6,8 @@
 
 ## 1. Objetivo
 
-Implementar retry com timeout cap (500ms) para verificação de model switch, eliminando false negatives quando o SDK processa trocas assincronamente internamente.
+Implementar retry com timeout cap (500ms) para verificação de model switch, eliminando false
+negatives quando o SDK processa trocas assincronamente internamente.
 
 ---
 
@@ -17,12 +18,14 @@ Implementar retry com timeout cap (500ms) para verificação de model switch, el
 **Propósito**: Helper para retry com exponential backoff e timeout cap.
 
 **Funções Exportadas**:
+
 - `verifyModelSwitchWithRetry(predicateFn, config)` — Main API
   - `predicateFn`: função que valida se modelo mudou (`() => Promise<boolean>`)
   - `config`: optional `{ maxRetries?: 3, pollDelayMs?: 100, totalTimeoutMs?: 500 }`
   - Returns: `{ ok: boolean, retries: number, timedOut: boolean }`
 
 **Características**:
+
 - ✅ Exponential backoff: 100ms, 200ms, 300ms entre retries
 - ✅ Timeout cap obrigatório: 500ms máximo (não configurável)
 - ✅ Max 3 retries por padrão
@@ -36,6 +39,7 @@ Implementar retry com timeout cap (500ms) para verificação de model switch, el
 **Mudança**: Integração de retry no fallback de `verifySessionModelSwitch()`
 
 **Antes**:
+
 ```javascript
 const current = await modelGetCurrent(session);
 result.effectiveModel = current.modelId;
@@ -43,6 +47,7 @@ result.verifiedSwitch = current.modelId === model;
 ```
 
 **Depois**:
+
 ```javascript
 // Fase 3.2 Optimization #1: Retry com timeout cap
 const verifyResult = await verifyModelSwitchWithRetry(
@@ -68,6 +73,7 @@ if (!result.verifiedSwitch) {
 ### 2.3 Novo: `tests/unit/copilot/sdk/test_model_switch_verify_retry.spec.js`
 
 **Coverage**:
+
 - ✅ Sucesso imediato (retry 0)
 - ✅ Sucesso após múltiplos retries
 - ✅ Falha após max retries
@@ -135,6 +141,7 @@ $ npm run typecheck:strict:src.copilot.sdk
 ```
 
 **Validações**:
+
 - ✅ Nenhuma type assertion perigosa (`as any`)
 - ✅ Todos os tipos JSDoc explícitos
 - ✅ Typedef `ModelSwitchRetryConfig` com propriedades requeridas (após merge com defaults)
@@ -149,6 +156,7 @@ $ npx eslint src/copilot/sdk/session/{runtime,model-switch-verify-retry}.js
 ```
 
 **Validações**:
+
 - ✅ No unused variables
 - ✅ Sem console.log, debug
 - ✅ Sem floating promises
@@ -163,6 +171,7 @@ $ npm run test:copilot:unit
 ```
 
 **Novos Testes**: 9
+
 - 4 testes de funcionalidade core
 - 3 testes de edge cases
 - 2 testes de erro handling
@@ -175,9 +184,9 @@ $ npm run test:copilot:unit
 
 ### 5.1 Performance
 
-| Cenário               | Antes             | Depois                         | Melhoria           |
-| --------------------- | ----------------- | ------------------------------ | ------------------ |
-| Model switch imediato | ~50ms             | ~50ms                          | Sem impacto        |
+| Cenário               | Antes             | Depois                         | Melhoria            |
+| --------------------- | ----------------- | ------------------------------ | ------------------- |
+| Model switch imediato | ~50ms             | ~50ms                          | Sem impacto         |
 | Model switch c/ delay | Falha (false neg) | ~300-500ms (retry até sucesso) | ✅ Recuperação      |
 | Falha permanente      | Falha imediata    | ~500ms (timeout cap)           | ⏱️ +450ms (timeout) |
 
@@ -186,10 +195,12 @@ $ npm run test:copilot:unit
 ### 5.2 Confiabilidade
 
 **Antes**:
+
 - False negatives: 1ª falha de `modelGetCurrent` = conclusão permanente
 - Taxa de sucesso: ~95% (dependente do timing interno do SDK)
 
 **Depois**:
+
 - False negatives: Eliminados (retry 3x com backoff)
 - Taxa de sucesso: ~99%+ (só falha se SDK realmente quebra)
 - Timeout garantido: Nunca espera > 500ms
@@ -197,6 +208,7 @@ $ npm run test:copilot:unit
 ### 5.3 Observabilidade
 
 **Logs Adicionados**:
+
 ```javascript
 // Se retry falha:
 log('WARN', `Model switch verification falhou: timeout após 2 retries`);
@@ -204,6 +216,7 @@ log('WARN', `Model switch verification falhou: não convergiu após 2 retries`);
 ```
 
 **Métricas** (via existentes):
+
 - Tracking de `usedRpcFallback=true` já existe
 - Retry count disponível em `verifyResult.retries`
 
@@ -214,11 +227,13 @@ log('WARN', `Model switch verification falhou: não convergiu após 2 retries`);
 ### 6.1 Evitado: Defaults via Parâmetros
 
 ❌ **Não faz**:
+
 ```javascript
 function retry(fn, startTime = null, retryCount = 0)  // Fails strict mode
 ```
 
 ✅ **Faz**:
+
 ```javascript
 export function verifyModelSwitchWithRetry(predicateFn, config = {}) {
     const cfg = /** @type {ModelSwitchRetryConfig} */ (
@@ -231,11 +246,13 @@ export function verifyModelSwitchWithRetry(predicateFn, config = {}) {
 ### 6.2 Evitado: Type Assertions Perigosas
 
 ❌ **Não faz**:
+
 ```javascript
 const cfg = config as any;  // Desabilita typecheck
 ```
 
 ✅ **Faz**:
+
 ```javascript
 const cfg = /** @type {ModelSwitchRetryConfig} */ (
     Object.freeze({ ...DEFAULT_CONFIG, ...config })
@@ -277,16 +294,19 @@ const result = await session.setModel('gpt-4-turbo');
 ## 8. Próximas Otimizações (Fase 3.3+)
 
 ### Optimization #2: Persistent Model Cache
+
 - Armazenar lista de modelos em disk após fetch bem-sucedido
 - Usar como fallback durante outages de rede
 - TTL: 5min em cache quente, 24h em disk
 
 ### Optimization #3: Structured Logging
+
 - Adicionar context objects em hot paths
 - Pattern: `log('DEBUG', { context: { sessionId, model }, msg: '...' })`
 - Melhor para analytics e debugging
 
 ### Optimization #4: Concurrency Stress Tests
+
 - 50+ concurrent clients simultâneos
 - Validar thread-safety de todas as fixes BUG-01 a BUG-17
 - Reproduzir cenários de race condition
@@ -311,14 +331,17 @@ const result = await session.setModel('gpt-4-turbo');
 ## 10. Referências
 
 **Arquivos**:
+
 - `src/copilot/sdk/session/model-switch-verify-retry.js` — Helper (nova)
 - `src/copilot/sdk/session/runtime.js` — Integração
 - `tests/unit/copilot/sdk/test_model_switch_verify_retry.spec.js` — Tests (nova)
 
 **Investigação Anterior**:
+
 - `DOCUMENTACAO/INVESTIGACOES/INVESTIGACAO_OPTIMIZATION_1_MODEL_SWITCH_RETRY.md`
 
 **Relatório Geral**:
+
 - `DOCUMENTACAO/RELATORIOS/AUDITORIA_FINAL_SDK_CONSOLIDADA.md`
 
 ---

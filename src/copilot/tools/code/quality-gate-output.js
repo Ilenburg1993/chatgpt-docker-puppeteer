@@ -44,9 +44,12 @@ function byteLength(text) {
  */
 export function summarizeQualityGateText(value, maxChars = DEFAULT_QUALITY_GATE_OUTPUT_MAX_CHARS) {
     const text = asText(value);
-    const safeMaxChars = Number.isFinite(maxChars) && maxChars > 0 ? Math.floor(maxChars) : DEFAULT_QUALITY_GATE_OUTPUT_MAX_CHARS;
+    const safeMaxChars =
+        Number.isFinite(maxChars) && maxChars > 0 ? Math.floor(maxChars) : DEFAULT_QUALITY_GATE_OUTPUT_MAX_CHARS;
     const truncated = text.length > safeMaxChars;
-    const returned = truncated ? `${text.slice(0, Math.max(0, safeMaxChars - 120))}\n…[truncated by quality_gate]…` : text;
+    const returned = truncated
+        ? `${text.slice(0, Math.max(0, safeMaxChars - 120))}\n…[truncated by quality_gate]…`
+        : text;
     return {
         text: returned,
         truncated,
@@ -67,7 +70,8 @@ const FILE_TOKEN_RE = /(?:^|\s|['"(])([\w./\\-]+\.(?:cjs|cts|js|json|jsx|mjs|mts
  */
 export function extractQualityGateFailingFiles(output, error, maxFiles = DEFAULT_QUALITY_GATE_MAX_FAILING_FILES) {
     const text = `${asText(output)}\n${asText(error)}`;
-    const limit = Number.isFinite(maxFiles) && maxFiles > 0 ? Math.floor(maxFiles) : DEFAULT_QUALITY_GATE_MAX_FAILING_FILES;
+    const limit =
+        Number.isFinite(maxFiles) && maxFiles > 0 ? Math.floor(maxFiles) : DEFAULT_QUALITY_GATE_MAX_FAILING_FILES;
     /** @type {string[]} */
     const files = [];
     const seen = new Set();

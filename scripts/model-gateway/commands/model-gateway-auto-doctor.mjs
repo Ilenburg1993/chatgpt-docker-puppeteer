@@ -16,7 +16,8 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-doctor.mjs [--json] [--fail] [--profile ID] [--require-enabled]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-auto-doctor.mjs [--json] [--fail] [--profile ID] [--require-enabled]
 
 Read-only model-gateway automation doctor. It explains whether terminal auto mode is operational, which policy gates are
 closed, and which persisted operational ledgers are visible. It does not call providers, run models or mutate terminal
@@ -25,10 +26,11 @@ state.
     process.exit(0);
 }
 
-
 /** @returns {Record<string, unknown> | null} */
 function optionalRecord(/** @type {unknown} */ value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? Object.fromEntries(Object.entries(value))
+        : null;
 }
 
 function optionalNumber(/** @type {unknown} */ value) {
@@ -112,15 +114,27 @@ const requireEnabled = argSet.has('--require-enabled');
 
 const checks = [
     createCheck('auto_ready_command_ok', ready.ok, ready.error ?? `ok=${readyJson?.['ok'] === true}`),
-    createCheck('auto_ready_gate_ok', readyJson?.['ok'] === true, `blockers=${Array.isArray(readyJson?.['blockers']) ? readyJson['blockers'].length : '-'}`),
+    createCheck(
+        'auto_ready_gate_ok',
+        readyJson?.['ok'] === true,
+        `blockers=${Array.isArray(readyJson?.['blockers']) ? readyJson['blockers'].length : '-'}`,
+    ),
     createCheck('auto_status_command_ok', status.ok, status.error ?? `ok=${statusJson?.['ok'] === true}`),
-    createCheck('sqlite_diagnostics_command_ok', diagnostics.ok, diagnostics.error ?? `schema=${diagnosticsJson?.['schemaVersion'] ?? '-'}`),
+    createCheck(
+        'sqlite_diagnostics_command_ok',
+        diagnostics.ok,
+        diagnostics.error ?? `schema=${diagnosticsJson?.['schemaVersion'] ?? '-'}`,
+    ),
     createCheck('canonical_commands_command_ok', commands.ok, commands.error ?? `commands=${commandRows.length}`),
-    createCheck('active_catalog_snapshot', activeSnapshot?.['exists'] === true, `source=${activeSnapshot?.['source'] ?? '-'}`),
+    createCheck(
+        'active_catalog_snapshot',
+        activeSnapshot?.['exists'] === true,
+        `source=${activeSnapshot?.['source'] ?? '-'}`,
+    ),
     createCheck(
         'automation_effect_ledger_visible',
         optionalNumber(diagnosticsJson?.['automationPolicySnapshotRows']) !== null &&
-        optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']) !== null,
+            optionalNumber(diagnosticsJson?.['automationEffectApplicationRows']) !== null,
         `policySnapshots=${diagnosticsJson?.['automationPolicySnapshotRows'] ?? '-'} effects=${diagnosticsJson?.['automationEffectApplicationRows'] ?? '-'}`,
     ),
     createCheck(
@@ -141,17 +155,27 @@ const checks = [
     ),
     createCheck('policy_loaded', policy !== null, `source=${policy?.['source'] ?? '-'}`),
     createCheck('policy_valid', policyValidation.ok, policyValidation.issues.join(',') || 'policy valid'),
-    createCheck('policy_enabled', policy?.['enabled'] === true, `enabled=${policy?.['enabled'] === true}`, requireEnabled ? 'error' : 'warn'),
+    createCheck(
+        'policy_enabled',
+        policy?.['enabled'] === true,
+        `enabled=${policy?.['enabled'] === true}`,
+        requireEnabled ? 'error' : 'warn',
+    ),
     createCheck(
         'policy_can_apply_effects',
         policy?.['allowLiveSetModel'] === true || policy?.['allowNewSession'] === true,
         `allowLiveSetModel=${policy?.['allowLiveSetModel'] === true} allowNewSession=${policy?.['allowNewSession'] === true}`,
         requireEnabled ? 'error' : 'warn',
     ),
-    createCheck('automation_decision_has_action', optionalString(decision?.['action']) !== null, `action=${decision?.['action'] ?? '-'}`),
+    createCheck(
+        'automation_decision_has_action',
+        optionalString(decision?.['action']) !== null,
+        `action=${decision?.['action'] ?? '-'}`,
+    ),
     createCheck(
         'automation_decision_has_route_or_manual_blocker',
-        optionalString(decision?.['selectedRouteKey']) !== null || optionalString(decision?.['action']) === 'manual_intervention',
+        optionalString(decision?.['selectedRouteKey']) !== null ||
+            optionalString(decision?.['action']) === 'manual_intervention',
         `route=${decision?.['selectedRouteKey'] ?? '-'} action=${decision?.['action'] ?? '-'}`,
     ),
 ];

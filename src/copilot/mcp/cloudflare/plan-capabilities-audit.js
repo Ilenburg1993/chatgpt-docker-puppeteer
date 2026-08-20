@@ -22,14 +22,8 @@ export async function auditCloudflarePlanCapabilities(options = {}) {
     ]);
     const edgeFindings = asRecord(edgeAudit['findings']);
     const configFindings = asRecord(configAudit['findings']);
-    const warnings = [
-        ...stringArray(edgeAudit['warnings']),
-        ...stringArray(configAudit['warnings']),
-    ];
-    const permissionGaps = [
-        ...stringArray(edgeAudit['permissionGaps']),
-        ...stringArray(configAudit['permissionGaps']),
-    ];
+    const warnings = [...stringArray(edgeAudit['warnings']), ...stringArray(configAudit['warnings'])];
+    const permissionGaps = [...stringArray(edgeAudit['permissionGaps']), ...stringArray(configAudit['permissionGaps'])];
     const mcpRateLimitCount = Number(edgeFindings['mcpRateLimitCount'] ?? 0);
     const oauthTokenRateLimitCount = Number(edgeFindings['oauthTokenRateLimitCount'] ?? 0);
     const rateLimitRulesObserved = oauthTokenRateLimitCount + mcpRateLimitCount;
@@ -65,8 +59,11 @@ export async function auditCloudflarePlanCapabilities(options = {}) {
         capabilities: {
             individualRuleRefApply,
             rateLimitRuleCapacity,
-            headerExpressionSupport: headerExpressionNeeded ? 'must-confirm-before-anonymous-mcp-rate-limit' : 'not-required',
-            httpConfigSettingsSupport: Number(configFindings['dynamicMcpConfigRules'] ?? 0) > 0 ? 'observed' : 'not-yet-observed',
+            headerExpressionSupport: headerExpressionNeeded
+                ? 'must-confirm-before-anonymous-mcp-rate-limit'
+                : 'not-required',
+            httpConfigSettingsSupport:
+                Number(configFindings['dynamicMcpConfigRules'] ?? 0) > 0 ? 'observed' : 'not-yet-observed',
             rollbackAutomation: 'required-before-broad-changes',
         },
         recommendations: [
@@ -86,7 +83,9 @@ export async function auditCloudflarePlanCapabilities(options = {}) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**

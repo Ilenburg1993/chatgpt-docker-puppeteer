@@ -17,6 +17,7 @@
 /**
  * @typedef {'full' | 'latency' | 'minimal' | 'cloudflare' | 'readonly' | 'claude' | 'safe' | 'research'} McpToolSurfaceMode
  *
+ *
  * @typedef {object} McpToolSurfacePolicy
  * @property {McpToolSurfaceMode} mode
  * @property {Set<string>} include
@@ -265,7 +266,8 @@ function matchesToolSurfaceMode(tool, mode) {
     if (mode === 'latency') return LATENCY_SURFACE_TOOL_NAMES.has(tool.name);
     if (mode === 'minimal') return MINIMAL_SURFACE_TOOL_NAMES.has(tool.name);
     if (mode === 'cloudflare') return CLOUDFLARE_SURFACE_TOOL_NAMES.has(tool.name);
-    if (mode === 'claude' || mode === 'safe' || mode === 'research') return SAFE_RESEARCH_SURFACE_TOOL_NAMES.has(tool.name);
+    if (mode === 'claude' || mode === 'safe' || mode === 'research')
+        return SAFE_RESEARCH_SURFACE_TOOL_NAMES.has(tool.name);
     if (mode === 'readonly') return tool.annotations?.readOnlyHint === true;
     return true;
 }

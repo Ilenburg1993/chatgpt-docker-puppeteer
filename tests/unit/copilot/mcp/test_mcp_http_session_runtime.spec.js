@@ -3,8 +3,8 @@
  * Tests for MCP Streamable HTTP process-local session runtime and redacted SQLite metadata store.
  */
 
-import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
+import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
 import {
@@ -18,9 +18,25 @@ import {
 describe('MCP HTTP stateful session runtime', () => {
     it('keeps raw session IDs process-local and exposes only redacted metadata', () => {
         let now = 1_000;
-        const runtime = createMcpHttpSessionRuntime({ now: () => now, ttlMs: 10_000, maxSessions: 2, store: null, sessionIdSecret: 'unit-secret' });
-        const transport = { closed: 0, close() { this.closed += 1; } };
-        const server = { closed: 0, close() { this.closed += 1; } };
+        const runtime = createMcpHttpSessionRuntime({
+            now: () => now,
+            ttlMs: 10_000,
+            maxSessions: 2,
+            store: null,
+            sessionIdSecret: 'unit-secret',
+        });
+        const transport = {
+            closed: 0,
+            close() {
+                this.closed += 1;
+            },
+        };
+        const server = {
+            closed: 0,
+            close() {
+                this.closed += 1;
+            },
+        };
 
         const entry = runtime.register({
             sessionId: 'session-abc-123',
@@ -75,7 +91,13 @@ describe('MCP HTTP stateful session runtime', () => {
         try {
             const store = createSqliteMcpHttpSessionStoreForDb(db);
             let now = 100;
-            const runtime = createMcpHttpSessionRuntime({ now: () => now, ttlMs: 10_000, maxSessions: 2, store, sessionIdSecret: 'unit-secret' });
+            const runtime = createMcpHttpSessionRuntime({
+                now: () => now,
+                ttlMs: 10_000,
+                maxSessions: 2,
+                store,
+                sessionIdSecret: 'unit-secret',
+            });
             runtime.register({
                 sessionId: 'raw-session-secret',
                 transport: {},
@@ -100,17 +122,14 @@ describe('MCP HTTP stateful session runtime', () => {
     });
 
     it('enables stateful policy when explicitly requested or required by OAuth-all, unless stateless fallback is explicit', () => {
-        assert.deepEqual(
-            readMcpHttpStatefulSessionPolicy({ COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true' }),
-            {
-                enabled: true,
-                requested: true,
-                statelessCompat: false,
-                ttlMs: 600_000,
-                maxSessions: 256,
-                reason: 'stateful-session-runtime-enabled-by-policy',
-            },
-        );
+        assert.deepEqual(readMcpHttpStatefulSessionPolicy({ COPILOT_MCP_HTTP_STATEFUL_SESSIONS: 'true' }), {
+            enabled: true,
+            requested: true,
+            statelessCompat: false,
+            ttlMs: 600_000,
+            maxSessions: 256,
+            reason: 'stateful-session-runtime-enabled-by-policy',
+        });
         assert.deepEqual(
             readMcpHttpStatefulSessionPolicy({
                 COPILOT_MCP_AUTH_MODE: 'oauth',

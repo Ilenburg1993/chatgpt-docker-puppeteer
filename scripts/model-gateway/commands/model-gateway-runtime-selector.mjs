@@ -1,29 +1,29 @@
 #!/usr/bin/env node
+import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     JsonModelGatewayCatalogStore,
+    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     SqliteModelGatewayCatalogStore,
     auditModelGatewayCatalogSnapshotIntegrity,
     auditModelGatewayPostRuntimeSelection,
     auditModelGatewayPreRuntimeSelection,
     buildModelGatewayRuntimeSelectorPlan,
     buildModelGatewayRuntimeSelectorProbeRun,
-    createGatewayRuntimeHealthIndex,
     compareModelGatewaySelectionAudits,
-    createModelGatewayRouteDecisionCapture,
     createEnvSecretRegistry,
+    createGatewayRuntimeHealthIndex,
+    createModelGatewayRouteDecisionCapture,
     deriveModelGatewayRuntimeAccountOverlaysFromHealth,
     evaluateModelGatewayCatalogEligibility,
     executeModelGatewayRuntimeSelectorPlanWithFallbacks,
     filterModelGatewayRuntimeEligibilityOverlayDecisions,
     flushAndMirrorByokProviderHealthToSqlite,
     listByokProviderModelHealth,
-    MODEL_GATEWAY_LIVE_PROTOCOL_PROBE_KINDS,
     mergeByokProviderHealthRecords,
     resolveModelGatewaySelectionPolicy,
     summarizeModelGatewayRuntimeAccountOverlays,
 } from '../../../src/copilot/model-gateway/index.js';
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { shutdownClient } from '../../../src/copilot/sdk/session/index.js';
 import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
@@ -37,12 +37,15 @@ const argSet = new Set(args);
 
 /**
  * @typedef {{ name: string; durationMs: number }} Timing
+ *
  * @typedef {ReturnType<typeof auditModelGatewayPreRuntimeSelection>} SelectionAudit
+ *
  * @typedef {ReturnType<typeof buildModelGatewayRuntimeSelectorPlan>} RuntimeSelectorPlan
  */
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-selector.mjs [--json] [--full-json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--require-agent-probe-profiles a,b] [--runtime-health-limit N] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-runtime-selector.mjs [--json] [--full-json] [--execute] [--fail] [--profile ID] [--fallback-profiles a,b] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--allow-probe] [--allow-env-missing] [--prefer-provider-diversity] [--preferred-probes a,b] [--block-failed-probes a,b] [--require-agent-probe-profiles a,b] [--runtime-health-limit N] [--temporary-failure-cooldown-ms N] [--max-attempts N] [--max-attempts-per-provider N] [--attempts-per-route N] [--retry-delay-ms N] [--max-retry-delay-ms N] [--timeout-ms N]
 
 Build the final model-gateway runtime selector plan. By default this is dry-run only: it reads metadata plus already
 observed health, validates route-aware BYOK env readiness, and does not execute providers. Provider calls require the
@@ -50,7 +53,6 @@ explicit --execute flag.
 `);
     process.exit(0);
 }
-
 
 function readProfiles() {
     /** @type {string[]} */
@@ -128,9 +130,11 @@ function selectionPolicyArg(/** @type {boolean} */ requireRuntimeProof) {
 }
 
 function formatCountMap(/** @type {Record<string, number> | null | undefined} */ counts) {
-    return Object.entries(counts ?? {})
-        .map(([key, count]) => `${key}:${count}`)
-        .join(',') || '-';
+    return (
+        Object.entries(counts ?? {})
+            .map(([key, count]) => `${key}:${count}`)
+            .join(',') || '-'
+    );
 }
 
 /**
@@ -166,7 +170,8 @@ function measuredSync(timings, name, callback) {
 }
 
 async function buildRuntimeSelectorContext(
-    /** @type {{
+    /**
+     * @type {{
      *     strict: boolean;
      *     requireRuntimeProof: boolean;
      *     requireRuntimeEnvReady: boolean;
@@ -179,26 +184,29 @@ async function buildRuntimeSelectorContext(
      *     temporaryFailureCooldownMs?: number | null;
      *     preferProviderDiversity?: boolean;
      *     runtimeProofWeights?: Record<string, number> | null;
-     * }} */ {
-    strict,
-    requireRuntimeProof,
-    requireRuntimeEnvReady,
-    selectionPolicy,
-    runtimeSource,
-    runtimeHealthLimit,
-    preferredProbeKinds = [],
-    blockFailedProbeKinds = [],
-    requireAgentProbeProfiles = [],
-    temporaryFailureCooldownMs = null,
-    preferProviderDiversity = false,
-    runtimeProofWeights = null,
+     * }}
+     */ {
+        strict,
+        requireRuntimeProof,
+        requireRuntimeEnvReady,
+        selectionPolicy,
+        runtimeSource,
+        runtimeHealthLimit,
+        preferredProbeKinds = [],
+        blockFailedProbeKinds = [],
+        requireAgentProbeProfiles = [],
+        temporaryFailureCooldownMs = null,
+        preferProviderDiversity = false,
+        runtimeProofWeights = null,
     },
 ) {
     /** @type {Timing[]} */
     const timings = [];
     const store = new JsonModelGatewayCatalogStore({ filePath: DEFAULT_MODEL_GATEWAY_CATALOG_PATH });
     const snapshot = await measured(timings, 'catalog.read_json_snapshot', () => store.readSnapshot());
-    const integrity = measuredSync(timings, 'catalog.integrity_audit', () => auditModelGatewayCatalogSnapshotIntegrity(snapshot));
+    const integrity = measuredSync(timings, 'catalog.integrity_audit', () =>
+        auditModelGatewayCatalogSnapshotIntegrity(snapshot),
+    );
     const secretRegistry = measuredSync(timings, 'env.secret_registry', () => createEnvSecretRegistry());
     const fileHealthRecords = measuredSync(timings, 'health.read_file_store', () => listByokProviderModelHealth());
     /** @type {Awaited<ReturnType<SqliteModelGatewayCatalogStore['listLatestRuntimeHealthRecords']>>} */
@@ -381,7 +389,18 @@ let routeDecisionPersistence = {
     written: 0,
     error: null,
 };
-/** @type {{ attempted: boolean; ok: boolean; records: number; healthObservations: number; probeResults: number; skippedRecords: number; runId: string | null; error: string | null }} */
+/**
+ * @type {{
+ *     attempted: boolean;
+ *     ok: boolean;
+ *     records: number;
+ *     healthObservations: number;
+ *     probeResults: number;
+ *     skippedRecords: number;
+ *     runId: string | null;
+ *     error: string | null;
+ * }}
+ */
 let runtimeHealthPersistence = {
     attempted: false,
     ok: true,
@@ -392,7 +411,18 @@ let runtimeHealthPersistence = {
     runId: null,
     error: null,
 };
-/** @type {{ attempted: boolean; ok: boolean; runId: string | null; probeResults: number; skippedResults: number; successCount: number; failureCount: number; error: string | null }} */
+/**
+ * @type {{
+ *     attempted: boolean;
+ *     ok: boolean;
+ *     runId: string | null;
+ *     probeResults: number;
+ *     skippedResults: number;
+ *     successCount: number;
+ *     failureCount: number;
+ *     error: string | null;
+ * }}
+ */
 let runtimeProbePersistence = {
     attempted: false,
     ok: true,
@@ -607,9 +637,11 @@ const summary = {
 };
 
 function compactHealthDecision(/** @type {unknown} */ value) {
-    const row = value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
+    const row =
+        value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
     if (!row) return null;
-    const health = row['health'] && typeof row['health'] === 'object' && !Array.isArray(row['health']) ? row['health'] : null;
+    const health =
+        row['health'] && typeof row['health'] === 'object' && !Array.isArray(row['health']) ? row['health'] : null;
     return {
         include: row['include'] === true,
         reason: typeof row['reason'] === 'string' ? row['reason'] : null,
@@ -623,7 +655,8 @@ function compactHealthDecision(/** @type {unknown} */ value) {
 }
 
 function compactProviderCooldown(/** @type {unknown} */ value) {
-    const row = value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
+    const row =
+        value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value)) : null;
     if (!row) return null;
     return {
         include: row['include'] === true,
@@ -637,7 +670,10 @@ function compactProviderCooldown(/** @type {unknown} */ value) {
 }
 
 function compactSelectedRoute(/** @type {unknown} */ selected) {
-    const row = selected && typeof selected === 'object' && !Array.isArray(selected) ? Object.fromEntries(Object.entries(selected)) : null;
+    const row =
+        selected && typeof selected === 'object' && !Array.isArray(selected)
+            ? Object.fromEntries(Object.entries(selected))
+            : null;
     if (!row) return null;
     return {
         id: typeof row['id'] === 'string' ? row['id'] : null,
@@ -658,7 +694,8 @@ function compactSelectedRoute(/** @type {unknown} */ selected) {
 }
 
 function compactDecisionEvent(/** @type {unknown} */ event) {
-    const row = event && typeof event === 'object' && !Array.isArray(event) ? Object.fromEntries(Object.entries(event)) : null;
+    const row =
+        event && typeof event === 'object' && !Array.isArray(event) ? Object.fromEntries(Object.entries(event)) : null;
     if (!row) return null;
     return {
         type: typeof row['type'] === 'string' ? row['type'] : null,
@@ -713,7 +750,9 @@ function compactRuntimeSelectorPlan(/** @type {RuntimeSelectorPlan} */ plan) {
     };
 }
 
-function compactPolicyResolution(/** @type {ReturnType<typeof resolveModelGatewaySelectionPolicy>} */ policyResolution) {
+function compactPolicyResolution(
+    /** @type {ReturnType<typeof resolveModelGatewaySelectionPolicy>} */ policyResolution,
+) {
     return {
         schema: policyResolution.schema,
         ok: policyResolution.ok,

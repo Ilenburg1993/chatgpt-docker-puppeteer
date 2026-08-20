@@ -14,8 +14,7 @@ const TEMP_TOKEN_BYTES = 16;
 const MAX_TEMP_ENTRY_BYTES = 240;
 const TEMP_ROLE_PATTERN = /^[a-z][a-z0-9-]{0,31}$/;
 const MANAGED_TEMP_ROLE_PATTERN = /^(copy|move|write)$/;
-const MANAGED_TEMP_ENTRY_PATTERN =
-    /^\.(.+)\.([a-f0-9]{12})\.(\d+)\.([a-f0-9]{32})\.(copy|move|write)\.tmp$/;
+const MANAGED_TEMP_ENTRY_PATTERN = /^\.(.+)\.([a-f0-9]{12})\.(\d+)\.([a-f0-9]{32})\.(copy|move|write)\.tmp$/;
 const DEFAULT_CLEANUP_MIN_AGE_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CLEANUP_MAX_SCANNED = 10_000;
 const MAX_PREPARED_DIRECTORIES = 1_024;
@@ -44,8 +43,8 @@ function truncateUtf8Prefix(value, maxBytes) {
 }
 
 /**
- * Cria um nome oculto no diretório do destino. A criação exclusiva continua
- * sendo a autoridade final para detectar uma colisão.
+ * Cria um nome oculto no diretório do destino. A criação exclusiva continua sendo a autoridade final para detectar uma
+ * colisão.
  *
  * @param {string} targetPath
  * @param {string} role

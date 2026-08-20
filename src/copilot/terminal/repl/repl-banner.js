@@ -4,7 +4,12 @@
  * @file Banner operacional do REPL LLM-B.
  */
 
-import { terminalThemeDivider, terminalThemeHeadline, terminalThemeJoin, terminalThemeText } from '../state/repl/index.js';
+import {
+    terminalThemeDivider,
+    terminalThemeHeadline,
+    terminalThemeJoin,
+    terminalThemeText,
+} from '../state/repl/index.js';
 
 /**
  * @param {string} command

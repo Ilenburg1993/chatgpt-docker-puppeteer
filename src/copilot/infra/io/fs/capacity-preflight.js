@@ -2,8 +2,8 @@
 /**
  * Preflight advisory de capacidade para mutações que precisam materializar um payload no destino.
  *
- * `statfs` não reserva espaço e portanto não elimina corridas externas. A checagem falha aberta quando a plataforma
- * não oferece informação confiável, mas falha cedo com ENOSPC quando a insuficiência já é observável.
+ * `statfs` não reserva espaço e portanto não elimina corridas externas. A checagem falha aberta quando a plataforma não
+ * oferece informação confiável, mas falha cedo com ENOSPC quando a insuficiência já é observável.
  *
  * @module copilot/infra/io/fs/capacity-preflight
  */

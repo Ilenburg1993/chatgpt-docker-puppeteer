@@ -6,7 +6,7 @@
  *   Esta camada retira de `terminal/` a propriedade semântica sobre leitura, embedding e cache de arquivos.
  */
 
-import { extname, sep, resolve as pathResolve } from 'node:path';
+import { extname, resolve as pathResolve, sep } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
 import { decodeBase64ToOwnedBuffer } from '../../infra/public/buffer.js';
@@ -287,11 +287,7 @@ export function extractAtReferences(message) {
             const nextChar = fullText[offset + match.length] ?? '';
             const isEmailFragment = /[\w.-]/u.test(previousChar) || previousChar === '@' || nextChar === '@';
             const isPathLike =
-                quoted !== undefined ||
-                p.startsWith('.') ||
-                p.startsWith('/') ||
-                p.includes('/') ||
-                p.includes('.');
+                quoted !== undefined || p.startsWith('.') || p.startsWith('/') || p.includes('/') || p.includes('.');
             if (isEmailFragment || !isPathLike) return match;
             paths.push(p);
         }

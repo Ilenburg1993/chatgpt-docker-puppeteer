@@ -2,8 +2,8 @@
 /**
  * Presenter puro para intenções explícitas da LLM-B.
  *
- * Mantém uma única gramática visual para `assistant.intent`, `report_intent` e o alias local,
- * separando a superfície humana do envelope técnico preservado em SSE/export.
+ * Mantém uma única gramática visual para `assistant.intent`, `report_intent` e o alias local, separando a superfície
+ * humana do envelope técnico preservado em SSE/export.
  *
  * @module copilot/terminal/events/intent-presenter
  */
@@ -80,8 +80,9 @@ function formatIntentDiagnosticReference(value) {
 export function formatTerminalIntentTechnicalEnvelope(entry) {
     const source = `origem ${humanTerminalIntentSource(entry.source)}`;
     const tool = entry.tool ? `ferramenta ${getTerminalHumanToolName(entry.tool)}` : null;
-    const call = entry.toolCallId ? `chamada ${formatIntentDiagnosticReference(entry.toolCallId) ?? 'id interno'}` : null;
+    const call = entry.toolCallId
+        ? `chamada ${formatIntentDiagnosticReference(entry.toolCallId) ?? 'id interno'}`
+        : null;
     const record = `registro ${formatIntentDiagnosticReference(entry.id) ?? 'local'}`;
     return [source, tool, call, record].filter(Boolean).join(' · ');
 }
-

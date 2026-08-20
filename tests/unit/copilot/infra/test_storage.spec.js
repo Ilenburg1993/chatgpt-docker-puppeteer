@@ -40,7 +40,7 @@ describe('infra/storage', () => {
 
         await writeJson(target, { ok: true, count: 2 });
 
-        expect(fileExists(target)).toBe(true);
+        await expect(fileExists(target)).resolves.toBe(true);
         await expect(readJson(target, null)).resolves.toEqual({ ok: true, count: 2 });
         await expect(readFile(target, 'utf8')).resolves.toBe('{\n  "ok": true,\n  "count": 2\n}\n');
     });

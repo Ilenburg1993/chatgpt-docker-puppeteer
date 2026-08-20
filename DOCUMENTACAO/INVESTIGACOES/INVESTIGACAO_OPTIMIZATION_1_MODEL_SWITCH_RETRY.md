@@ -25,6 +25,7 @@ setSessionModel(session, model, options)
 ### 1.2 Tipos Envolvidos
 
 **Em runtime.js**:
+
 ```typescript
 async function verifySessionModelSwitch(
     session: CopilotSession,
@@ -39,6 +40,7 @@ async function verifySessionModelSwitch(
 ```
 
 **Em rpc/session.js**:
+
 ```typescript
 export async function modelGetCurrent(session: CopilotSession): Promise<{ modelId: string }>
 
@@ -134,6 +136,7 @@ function verifyWithRetry(predicateFn, config) {
 ### 3.3 Timeout Cap (Critical)
 
 **Por que 500ms é crítico**:
+
 - Sem cap: retry indefinido (50ms × 3 = 150ms, mais esperas = ∞)
 - Com cap 500ms: Pior caso = ~500ms por verificação
 - 500ms é aceitável em UX (meio segundo de delay)
@@ -205,11 +208,13 @@ async function verifyModelWithRetry(predicateFn, config = {}) {
 ### 5.1 Problemas a Evitar
 
 ❌ **Defaults via `= null`** (não passa typecheck strict)
+
 ```typescript
 function retry(fn, startTime = null, retryCount = 0) // ❌ null type error
 ```
 
 ✅ **Usar separação de concerns**:
+
 ```typescript
 function retry(fn, config) {
     const startTime = Date.now(); // Não é parâmetro
@@ -255,6 +260,7 @@ if (typeof session.rpc?.model?.getCurrent !== 'function') {
 ### 6.1 Estrutura Recomendada
 
 **Opção A**: Helper em arquivo separado `model-switch-retry.js`
+
 ```
 src/copilot/sdk/session/
 ├── model-switch-retry.js    ← Nova função de retry
@@ -263,6 +269,7 @@ src/copilot/sdk/session/
 ```
 
 **Opção B**: Helper inline em `runtime.js`
+
 ```javascript
 // No topo de runtime.js (após imports)
 
@@ -385,15 +392,18 @@ Depois de implementar:
 ## 10. Referências
 
 **Arquivos Principais**:
+
 - `src/copilot/sdk/session/runtime.js` — verifySessionModelSwitch()
 - `src/copilot/sdk/rpc/session.js` — modelGetCurrent, modelSwitchTo
 
 **Padrões JSDoc**:
+
 - `@param {CopilotSession}`
 - `@returns {Promise<...>}`
 - `@typedef {object}`
 
 **TypeScript Strict Config**:
+
 - `config/typing/strict/tsconfig.strict.src.copilot.sdk.json`
 
 ---

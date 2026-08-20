@@ -77,15 +77,7 @@ export const MODEL_GATEWAY_OVERVIEW_INPUT_SCHEMA = Object.freeze({
 export const MODEL_GATEWAY_CATALOG_SEARCH_INPUT_SCHEMA = Object.freeze({
     type: 'object',
     additionalProperties: false,
-    required: [
-        'query',
-        'providerId',
-        'onlyEligible',
-        'requireTools',
-        'requireStreaming',
-        'requireReasoning',
-        'limit',
-    ],
+    required: ['query', 'providerId', 'onlyEligible', 'requireTools', 'requireStreaming', 'requireReasoning', 'limit'],
     properties: {
         query: nullableString('Texto de busca; use null para não filtrar por texto.'),
         providerId: nullableString('Provider id exato; use null para todos.'),
@@ -124,12 +116,14 @@ export const MODEL_GATEWAY_ROUTE_PLAN_INPUT_SCHEMA = Object.freeze({
         selectionGoal: {
             type: 'string',
             enum: ['quality_first', 'balanced', 'reliability_first', 'latency_first', 'cost_first'],
-            description: 'Define pesos de ranking. quality_first não penaliza preço e reduz fortemente a penalidade de latência.',
+            description:
+                'Define pesos de ranking. quality_first não penaliza preço e reduz fortemente a penalidade de latência.',
         },
         proofPolicy: {
             type: 'string',
             enum: ['metadata_only', 'task_default', 'fresh_runtime_required'],
-            description: 'Separa descoberta de candidatos de certificação runtime. task_default usa o contrato do taskProfile.',
+            description:
+                'Separa descoberta de candidatos de certificação runtime. task_default usa o contrato do taskProfile.',
         },
         maxRuntimeProofAgeHours: {
             type: 'integer',
@@ -464,7 +458,8 @@ export const MODEL_GATEWAY_WORKFLOW_PLAN_INPUT_SCHEMA = Object.freeze({
         },
         includeDetailedEvidence: {
             type: 'boolean',
-            description: 'Opt-in diagnóstico. Default false mantém a resposta compacta; true inclui snapshots/route plans completos.',
+            description:
+                'Opt-in diagnóstico. Default false mantém a resposta compacta; true inclui snapshots/route plans completos.',
         },
     },
 });
@@ -491,7 +486,8 @@ export const MODEL_GATEWAY_CONTROL_PLANE_GUIDE_INPUT_SCHEMA = Object.freeze({
         },
         includeTerminalCommands: {
             type: 'boolean',
-            description: 'Inclui comandos de cockpit terminal úteis para observar o mesmo estado fora das tools locais.',
+            description:
+                'Inclui comandos de cockpit terminal úteis para observar o mesmo estado fora das tools locais.',
         },
         includeApplyExamples: {
             type: 'boolean',

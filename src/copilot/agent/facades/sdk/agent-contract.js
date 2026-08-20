@@ -37,11 +37,11 @@ import { SdkCustomAgentConfigSchema } from '#copilot/core';
  *
  * @example
  *     const result = validateAgentContracts([
- *         { name: 'explore', tools: ['read_file_content', 'grep'] },
- *         { name: 'task', tools: ['bash'] },
+ *     { name: 'explore', tools: ['read_file_content', 'grep'] },
+ *     { name: 'task', tools: ['bash'] },
  *     ]);
  *     if (result.errors.length > 0) {
- *         throw new Error(`Validação de contrato de agente falhou: ${result.errors.join('; ')}`);
+ *     throw new Error(`Validação de contrato de agente falhou: ${result.errors.join('; ')}`);
  *     }
  *
  * @param {{

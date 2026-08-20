@@ -84,9 +84,7 @@ function isSuppressed(line) {
  * @returns {boolean}
  */
 function isAllowlisted(file, kind, line) {
-    return ALLOWLIST.some(
-        (entry) => entry.file === file && entry.kind === kind && entry.regex.test(line),
-    );
+    return ALLOWLIST.some((entry) => entry.file === file && entry.kind === kind && entry.regex.test(line));
 }
 
 /** @type {Finding[]} */

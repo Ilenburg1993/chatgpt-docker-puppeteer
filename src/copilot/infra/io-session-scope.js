@@ -28,9 +28,9 @@ import * as nodePath from 'node:path';
 import pLimit from 'p-limit';
 import { invalidateIoCachePath, registerInvalidationHook } from './io-cache.js';
 import { findIoIndexSymbol, refreshIoIndexPaths } from './io-index-registry.js';
-import { invalidateParserCache, parseAndCacheSymbols } from './io-parser.js';
-import { endSessionScope, startSessionScope, warmCacheForPaths, warmFromDirectory } from './io-prefetch.js';
 import { publishIoLifecycleEvent } from './io-observability.js';
+import { parseAndCacheSymbols } from './io-parser.js';
+import { endSessionScope, startSessionScope, warmCacheForPaths, warmFromDirectory } from './io-prefetch.js';
 import { readEnvPositiveInt } from './shared/env.js';
 
 // ---------------------------------------------------------------------------
@@ -42,12 +42,14 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {string} sessionId - ID único da sessão LLM-B.
  * @property {string[]} [paths] - Lista explícita de paths a incluir no escopo.
  * @property {string} [directory] - Diretório raiz a escanear (alternativo a paths).
- * @property {string} [workspaceRoot] - Raiz canônica usada pelo índice compartilhado; obrigatória para auto-index seguro.
+ * @property {string} [workspaceRoot] - Raiz canônica usada pelo índice compartilhado; obrigatória para auto-index
+ *   seguro.
  * @property {string[]} [extensions] - Extensões a incluir no scan de diretório.
  * @property {number} [maxFiles=500] - Limite efetivo de arquivos selecionados no scan de diretório. Default is `500`
  * @property {string[]} [include] - Padrões glob simples para incluir arquivos no escopo.
  * @property {string[]} [exclude] - Padrões glob simples para excluir arquivos do escopo.
  * @property {'coverage' | 'lexical'} [selectionMode='coverage'] - Política bounded de seleção em directory scopes.
+ *   Default is `'coverage'`
  * @property {string[]} [preferredPaths] - Candidatos elegíveis a priorizar dentro do mesmo hard maxFiles cap.
  * @property {string[]} [seedSymbols] - Símbolos exatos resolvidos pelo índice local para preferred paths dentro do cap.
  * @property {boolean} [recursive=true] - Se false, declara apenas arquivos imediatos do diretório. Default is `true`
@@ -82,7 +84,19 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {number} parsed - Arquivos parseados.
  * @property {number} failed - Arquivos com falha.
  * @property {number} invalidated - Arquivos do escopo invalidados desde o último refresh.
- * @property {{ available: boolean; requested: number; indexed: number; unchanged: number; invalidated: number; snapshotReuses: number; parsedSymbolReuses: number; failed: number; durationMs: number; mode: 'selected-path-refresh' } | null} index
+ * @property {{
+ *     available: boolean;
+ *     requested: number;
+ *     indexed: number;
+ *     unchanged: number;
+ *     invalidated: number;
+ *     snapshotReuses: number;
+ *     parsedSymbolReuses: number;
+ *     parsedSymbolPolicyRejects: number;
+ *     failed: number;
+ *     durationMs: number;
+ *     mode: 'selected-path-refresh';
+ * } | null} index
  * @property {number} symbolBytes - Estimativa UTF-8 do estado simbólico mantido pelo escopo.
  * @property {number} warmDurationMs - Duração do warm-up em ms.
  * @property {boolean} ready - Se o escopo está pronto (prefetch completo).
@@ -128,7 +142,19 @@ import { readEnvPositiveInt } from './shared/env.js';
  * @property {number} preloaded
  * @property {number} failed
  * @property {Set<string>} invalidatedPaths
- * @property {{ available: boolean; requested: number; indexed: number; unchanged: number; invalidated: number; snapshotReuses: number; parsedSymbolReuses: number; failed: number; durationMs: number; mode: 'selected-path-refresh' } | null} index
+ * @property {{
+ *     available: boolean;
+ *     requested: number;
+ *     indexed: number;
+ *     unchanged: number;
+ *     invalidated: number;
+ *     snapshotReuses: number;
+ *     parsedSymbolReuses: number;
+ *     parsedSymbolPolicyRejects: number;
+ *     failed: number;
+ *     durationMs: number;
+ *     mode: 'selected-path-refresh';
+ * } | null} index
  * @property {number} warmDurationMs
  * @property {boolean} ready
  * @property {boolean} degraded
@@ -505,9 +531,10 @@ export function declareScope(opts) {
                 scope.candidateFiles = Number(scanResult.advisoryLimits['candidateFiles'] ?? scanResult.paths.length);
                 scope.selectedFiles = Number(scanResult.advisoryLimits['selectedFiles'] ?? scanResult.paths.length);
                 scope.hardLimitReached = Boolean(scanResult.advisoryLimits['hardLimitReached']);
-                const selection = /** @type {Omit<ScopeSelectionStats, 'seedSymbolsRequested' | 'seedSymbolPathsResolved'> | undefined} */ (
-                    scanResult.advisoryLimits['selection']
-                );
+                const selection =
+                    /** @type {Omit<ScopeSelectionStats, 'seedSymbolsRequested' | 'seedSymbolPathsResolved'> | undefined} */ (
+                        scanResult.advisoryLimits['selection']
+                    );
                 if (selection) {
                     scope.selection = {
                         ...selection,
@@ -556,13 +583,20 @@ export function declareScope(opts) {
                         } catch (parseErr) {
                             if (!silent) throw parseErr;
                             scope.failed++;
-                            recordScopeFailure(scope, parseErr, 'parse', 'análise de símbolos falhou durante aquecimento');
+                            recordScopeFailure(
+                                scope,
+                                parseErr,
+                                'parse',
+                                'análise de símbolos falhou durante aquecimento',
+                            );
                         }
                     }
                 };
 
                 await Promise.all(
-                    Array.from({ length: Math.min(scope.refreshConcurrency, parseTargets.length || 1) }, () => parseWorker()),
+                    Array.from({ length: Math.min(scope.refreshConcurrency, parseTargets.length || 1) }, () =>
+                        parseWorker(),
+                    ),
                 );
             }
 
@@ -585,13 +619,19 @@ export function declareScope(opts) {
                     invalidated: Number(indexResult.invalidated ?? 0),
                     snapshotReuses: Number(indexResult.snapshotReuses ?? 0),
                     parsedSymbolReuses: Number(indexResult.parsedSymbolReuses ?? 0),
+                    parsedSymbolPolicyRejects: Number(indexResult.parsedSymbolPolicyRejects ?? 0),
                     failed: Number(indexResult.failed ?? 0),
                     durationMs: Number(indexResult.durationMs ?? 0),
                     mode: 'selected-path-refresh',
                 };
                 if (scope.index.failed > 0) {
                     scope.failed += scope.index.failed;
-                    recordScopeFailure(scope, { code: 'EINDEXPARTIAL', name: 'ScopeIndexError' }, 'index', 'índice do working set terminou com falhas');
+                    recordScopeFailure(
+                        scope,
+                        { code: 'EINDEXPARTIAL', name: 'ScopeIndexError' },
+                        'index',
+                        'índice do working set terminou com falhas',
+                    );
                 }
             }
 
@@ -710,12 +750,29 @@ export function getScopeSymbolIndex(sessionId) {
 }
 
 /**
- * Retorna uma decision surface bounded do working set: contagens, exports e um manifest compacto por arquivo com imports.
- * Conteúdo integral nunca é duplicado no contexto.
+ * Retorna uma decision surface bounded do working set: contagens, exports e um manifest compacto por arquivo com
+ * imports. Conteúdo integral nunca é duplicado no contexto.
  *
  * @param {string} sessionId
  * @param {{ maxFiles?: number; maxBytes?: number }} [options]
- * @returns {{ sessionId: string; files: number; candidateFiles: number; selectedFiles: number; hardLimitReached: boolean; symbols: number; symbolBytes: number; invalidated: number; topExports: string[]; manifest: Array<{ path: string; symbolCount: number; exports: string[]; imports: string[]; stale: boolean }>; manifestTruncated: boolean; contextBytes: number; ready: boolean; degraded: boolean; status: ScopeStats['status']; lastError: ScopeFailureSummary | null } | null}
+ * @returns {{
+ *     sessionId: string;
+ *     files: number;
+ *     candidateFiles: number;
+ *     selectedFiles: number;
+ *     hardLimitReached: boolean;
+ *     symbols: number;
+ *     symbolBytes: number;
+ *     invalidated: number;
+ *     topExports: string[];
+ *     manifest: { path: string; symbolCount: number; exports: string[]; imports: string[]; stale: boolean }[];
+ *     manifestTruncated: boolean;
+ *     contextBytes: number;
+ *     ready: boolean;
+ *     degraded: boolean;
+ *     status: ScopeStats['status'];
+ *     lastError: ScopeFailureSummary | null;
+ * } | null}
  */
 export function getScopeContext(sessionId, options = {}) {
     const scope = _registry.get(sessionId);
@@ -730,7 +787,7 @@ export function getScopeContext(sessionId, options = {}) {
         : 16 * 1024;
     let totalSymbols = 0;
     const allExports = /** @type {string[]} */ ([]);
-    /** @type {Array<{ path: string; symbolCount: number; exports: string[]; imports: string[]; stale: boolean }>} */
+    /** @type {{ path: string; symbolCount: number; exports: string[]; imports: string[]; stale: boolean }[]} */
     const manifest = [];
     let manifestBytes = 0;
     let manifestTruncated = false;
@@ -753,7 +810,10 @@ export function getScopeContext(sessionId, options = {}) {
                 ? nodePath.relative(scope.workspaceRoot, filePath).replace(/\\/gu, '/')
                 : filePath,
             symbolCount: symbols?.symbols.length ?? 0,
-            exports: (symbols?.symbols ?? []).filter((symbol) => symbol.exported).slice(0, 12).map((symbol) => symbol.name),
+            exports: (symbols?.symbols ?? [])
+                .filter((symbol) => symbol.exported)
+                .slice(0, 12)
+                .map((symbol) => symbol.name),
             imports: [...new Set((symbols?.imports ?? []).map((entry) => entry.source))].slice(0, 12),
             stale: scope.invalidatedPaths.has(filePath),
         };
@@ -832,14 +892,10 @@ export function findSymbol(sessionId, name, opts = {}) {
  * @returns {void}
  */
 export function invalidateScopePath(sessionId, filePath) {
-    const scope = _registry.get(sessionId);
-    // Invalida L1 global (independente do escopo)
+    // O bus é o SSOT de coerência local: invalidar L1 publica sincronicamente para parser, todos os scopes e índice.
+    // `sessionId` permanece na API por compatibilidade/semântica do caller; o path físico é compartilhado entre sessões.
+    void sessionId;
     invalidateIoCachePath(filePath);
-    invalidateParserCache(filePath);
-    // Remove do índice simbólico da sessão para forçar re-parse no próximo acesso
-    if (scope) {
-        markScopePathInvalidated(scope, filePath);
-    }
 }
 
 /**
@@ -878,7 +934,7 @@ export async function refreshScope(sessionId, modifiedPaths) {
                 }
                 const refreshPromise = (async () => {
                     try {
-                        invalidateParserCache(p);
+                        // Um único evento canônico limpa L1 e todo estado derivado (parser/scopes/index) no processo atual.
                         invalidateIoCachePath(p);
                         const warm = await warmCacheForPaths([p], {
                             concurrency: 1,
@@ -907,7 +963,9 @@ export async function refreshScope(sessionId, modifiedPaths) {
                             let indexFailed = false;
                             if (scope.indexMode !== 'off' && scope.workspaceRoot) {
                                 try {
-                                    const indexResult = await refreshIoIndexPaths([p], { workspaceRoot: scope.workspaceRoot });
+                                    const indexResult = await refreshIoIndexPaths([p], {
+                                        workspaceRoot: scope.workspaceRoot,
+                                    });
                                     if (Number(indexResult.failed ?? 0) > 0) {
                                         indexFailed = true;
                                         recordScopeFailure(

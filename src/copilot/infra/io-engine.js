@@ -18,14 +18,20 @@ import {
 } from './io/fs/locked-mutations.js';
 import {
     appendTextLocked as appendTextLockedInFsWrites,
+    chmodFileLocked as chmodFileLockedInFsWrites,
     createOrReplaceFileAtomic as createOrReplaceFileAtomicInFsWrites,
     mkdirPathLocked as mkdirPathLockedInFsWrites,
+    openDetachedAppendSinkLocked as openDetachedAppendSinkLockedInFsWrites,
     writeFileAtomic as writeFileAtomicInFsWrites,
 } from './io/fs/locked-writes.js';
 import {
+    listDirectoryNamesFresh as listDirectoryNamesFreshInReadServices,
+    lstatPath as lstatPathInReadServices,
+    readBytesFresh as readBytesFreshInReadServices,
     readBytes as readBytesInReadServices,
     readLines as readLinesInReadServices,
     readTextChunks as readTextChunksInReadServices,
+    readTextFresh as readTextFreshInReadServices,
     readText as readTextInReadServices,
     statPath as statPathInReadServices,
 } from './io/fs/read-services.js';
@@ -35,9 +41,14 @@ import {
     searchWorkspaceSymbols as searchWorkspaceSymbolsInSearchModule,
 } from './io/search/text-search.js';
 
+export const listDirectoryNamesFresh = listDirectoryNamesFreshInReadServices;
+export const lstatPath = lstatPathInReadServices;
+
 export const readBytes = readBytesInReadServices;
+export const readBytesFresh = readBytesFreshInReadServices;
 
 export const readText = readTextInReadServices;
+export const readTextFresh = readTextFreshInReadServices;
 
 export const readLines = readLinesInReadServices;
 
@@ -48,6 +59,8 @@ export const writeFileAtomic = writeFileAtomicInFsWrites;
 export const createOrReplaceFileAtomic = createOrReplaceFileAtomicInFsWrites;
 
 export const appendTextLocked = appendTextLockedInFsWrites;
+
+export const chmodFileLocked = chmodFileLockedInFsWrites;
 
 /**
  * Stat canônico com observabilidade. Leitura metadata-only, sem bloqueio por tamanho.
@@ -67,14 +80,10 @@ export const statPath = statPathInReadServices;
  *
  * @param {string} dirPath
  * @param {{ recursive?: boolean; mode?: number; traceId?: string; advisoryLimits?: Record<string, unknown> }} [options]
- * @returns {Promise<{
- *     path: string;
- *     created: true;
- *     io: import('#copilot/core/io-contracts').IoMeta;
- *     lockWaitMs: number;
- * }>}
+ * @returns {ReturnType<typeof mkdirPathLockedInFsWrites>}
  */
 export const mkdirPathLocked = mkdirPathLockedInFsWrites;
+export const openDetachedAppendSinkLocked = openDetachedAppendSinkLockedInFsWrites;
 
 export const deleteFileLocked = deleteFileLockedInFsMutations;
 

@@ -40,7 +40,11 @@ export const CLOUDFLARE_WORKERS_AI_PROVIDER_ENDPOINTS = Object.freeze({
         }),
     ]),
     runtimeEndpoints: Object.freeze([
-        Object.freeze({ kind: 'workers_ai_run', method: 'POST', path: '/client/v4/accounts/{account_id}/ai/run/{model}' }),
+        Object.freeze({
+            kind: 'workers_ai_run',
+            method: 'POST',
+            path: '/client/v4/accounts/{account_id}/ai/run/{model}',
+        }),
         Object.freeze({ kind: 'ai_gateway_universal', method: 'POST', path: '/v1/{account_id}/{gateway_id}' }),
     ]),
     routeSelectors: Object.freeze(['exact_model', 'gateway_fallback', 'gateway_retry', 'gateway_cache']),

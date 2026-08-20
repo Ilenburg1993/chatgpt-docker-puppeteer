@@ -1,7 +1,7 @@
 // @ts-check
 
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
@@ -46,7 +46,10 @@ describe('HTTP response consumption guard', () => {
         });
 
         const findings = checkHttpResponseConsumption({ root, target: root, allowedFiles: [] });
-        assert.deepEqual(findings.map((finding) => finding.method), ['json', 'text', 'arrayBuffer', 'blob']);
+        assert.deepEqual(
+            findings.map((finding) => finding.method),
+            ['json', 'text', 'arrayBuffer', 'blob'],
+        );
     });
 
     it('ignores Express output and bounded facade calls', async () => {

@@ -19,20 +19,20 @@ maio de 2026.
 
 ## Entradas principais
 
-| Arquivo/Pasta                  | Descrição                                         |
-| ------------------------------ | ------------------------------------------------- |
-| `devcontainer.json`            | Configuração principal do DevContainer            |
-| `Dockerfile`                   | Imagem de desenvolvimento (BuildKit cache mounts) |
-| `scripts/`                     | Scripts de lifecycle do container                 |
-| `config/`                      | Configurações adicionais do container             |
-| `nss-gatekeeper.sh`            | Script NSS para resolução de usuário em container |
+| Arquivo/Pasta                  | Descrição                                          |
+| ------------------------------ | -------------------------------------------------- |
+| `devcontainer.json`            | Configuração principal do DevContainer             |
+| `Dockerfile`                   | Imagem de desenvolvimento (BuildKit cache mounts)  |
+| `scripts/`                     | Scripts de lifecycle do container                  |
+| `config/`                      | Configurações adicionais do container              |
+| `nss-gatekeeper.sh`            | Script NSS para resolução de usuário em container  |
 | `DEVCONTAINER_ARCHITECTURE.md` | **Referência canônica completa da arquitetura** ⭐ |
-| `ENV_VARIABLE_REFERENCE.md`    | Referência de variáveis de ambiente do container  |
-| `PORTS_TOPOLOGY.md`            | Topologia de portas do ambiente                   |
-| `CONNECTION_CONFIG.md`         | Configuração de conexão (Chrome proxy, DevTools)  |
-| `SANDBOX_DEPENDENCIES.md`      | Dependências e requisitos do sandbox              |
-| `SCRIPTS_REVIEW.md`            | Revisão e documentação dos scripts de lifecycle   |
-| `TROUBLESHOOTING_SSH.md`       | Guia de troubleshooting SSH                       |
+| `ENV_VARIABLE_REFERENCE.md`    | Referência de variáveis de ambiente do container   |
+| `PORTS_TOPOLOGY.md`            | Topologia de portas do ambiente                    |
+| `CONNECTION_CONFIG.md`         | Configuração de conexão (Chrome proxy, DevTools)   |
+| `SANDBOX_DEPENDENCIES.md`      | Dependências e requisitos do sandbox               |
+| `SCRIPTS_REVIEW.md`            | Revisão e documentação dos scripts de lifecycle    |
+| `TROUBLESHOOTING_SSH.md`       | Guia de troubleshooting SSH                        |
 
 ## Regras de manutenção
 

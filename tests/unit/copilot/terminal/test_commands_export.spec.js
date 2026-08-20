@@ -1,11 +1,15 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-/** @typedef {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/projections/timeline.js').readTerminalTimelineProjection>} TimelineProjection */
+/** @typedef {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/timeline.js').readTerminalTimelineProjection
+>} TimelineProjection */
 /** @typedef {TimelineProjection['turns'][number]} TimelineTurn */
-/** @typedef {Omit<Partial<TimelineProjection>, 'sync' | 'turns'> & { sync?: Partial<TimelineProjection['sync']>; turns?: Array<Partial<TimelineTurn>> }} TimelineProjectionOverrides */
+/** @typedef {Omit<Partial<TimelineProjection>, 'sync' | 'turns'> & {
+    sync?: Partial<TimelineProjection['sync']>;
+    turns?: Partial<TimelineTurn>[];
+}} TimelineProjectionOverrides */
 
 /**
  * @param {Partial<TimelineTurn>} [overrides]
@@ -69,57 +73,63 @@ function timelineProjectionFixture(overrides = {}) {
     };
 }
 
-const readTerminalTimelineProjection = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/terminal/frontend/projections/timeline.js').readTerminalTimelineProjection>} */ (
-    vi.fn(() => timelineProjectionFixture({
-    timelineSource: 'hub',
-    reconciliationStatus: 'aligned',
-    sync: {
-        status: 'not_needed',
-    },
-    turns: [
-        {
-            role: 'user',
-            rawRole: 'user',
-            origin: 'hub',
-            persisted: true,
-            content: 'olá',
-            timestamp: 1710000000000,
-        },
-        {
-            role: 'assistant',
-            rawRole: 'llm_b',
-            origin: 'hub',
-            persisted: true,
-            content: 'oi',
-            timestamp: 1710000001000,
-            metadata: {
-                assistantMessageEnvelope: {
-                    source: 'sdk/assistant.message',
-                    traceId: 'trace-export-1',
-                    turnId: 'turn-export-1',
-                    eventId: 'evt-export-1',
-                },
-                terminalStreamingDiagnostics: {
-                    materialization: {
-                        source: 'stream_delta',
-                        deltaSlices: 3,
-                        deltaChars: 12,
-                    },
-                    finalReconciliation: {
-                        mode: 'suffix',
-                        reason: 'stream_suffix',
-                    },
-                    publicStream: {
-                        visibleChars: 8,
-                    },
-                },
+const readTerminalTimelineProjection = /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/terminal/frontend/projections/timeline.js').readTerminalTimelineProjection
+>} */ (
+    vi.fn(() =>
+        timelineProjectionFixture({
+            timelineSource: 'hub',
+            reconciliationStatus: 'aligned',
+            sync: {
+                status: 'not_needed',
             },
-        },
-    ],
-}))
-)
+            turns: [
+                {
+                    role: 'user',
+                    rawRole: 'user',
+                    origin: 'hub',
+                    persisted: true,
+                    content: 'olá',
+                    timestamp: 1710000000000,
+                },
+                {
+                    role: 'assistant',
+                    rawRole: 'llm_b',
+                    origin: 'hub',
+                    persisted: true,
+                    content: 'oi',
+                    timestamp: 1710000001000,
+                    metadata: {
+                        assistantMessageEnvelope: {
+                            source: 'sdk/assistant.message',
+                            traceId: 'trace-export-1',
+                            turnId: 'turn-export-1',
+                            eventId: 'evt-export-1',
+                        },
+                        terminalStreamingDiagnostics: {
+                            materialization: {
+                                source: 'stream_delta',
+                                deltaSlices: 3,
+                                deltaChars: 12,
+                            },
+                            finalReconciliation: {
+                                mode: 'suffix',
+                                reason: 'stream_suffix',
+                            },
+                            publicStream: {
+                                visibleChars: 8,
+                            },
+                        },
+                    },
+                },
+            ],
+        }),
+    )
+);
 
-const writeFileAtomicTrusted = /** @type {import('vitest').Mock<typeof import('../../../../src/copilot/infra/public/trusted-io.js').writeFileAtomicTrusted>} */ (vi.fn(async () => undefined));
+const writeFileAtomicTrusted = /** @type {import('vitest').Mock<
+    typeof import('../../../../src/copilot/infra/public/trusted-io.js').writeFileAtomicTrusted
+>} */ (vi.fn(async () => undefined));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,
@@ -165,29 +175,31 @@ describe('terminal/commands/export', () => {
     });
 
     it('escapa HTML bruto da LLM-B ao exportar Markdown', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
-            timelineSource: 'hub',
-            reconciliationStatus: 'aligned',
-            sync: { status: 'not_needed' },
-            turns: [
-                {
-                    role: 'assistant',
-                    rawRole: 'llm_b',
-                    origin: 'hub',
-                    persisted: true,
-                    content: '<a href="https://x.example"><img src=x>oie</a>',
-                    timestamp: 1710000001000,
-                    metadata: {
-                        assistantMessageEnvelope: {
-                            source: 'sdk/assistant.message',
-                            traceId: 'trace-html',
-                            turnId: 'turn-html',
-                            eventId: 'evt-html',
+        readTerminalTimelineProjection.mockReturnValueOnce(
+            timelineProjectionFixture({
+                timelineSource: 'hub',
+                reconciliationStatus: 'aligned',
+                sync: { status: 'not_needed' },
+                turns: [
+                    {
+                        role: 'assistant',
+                        rawRole: 'llm_b',
+                        origin: 'hub',
+                        persisted: true,
+                        content: '<a href="https://x.example"><img src=x>oie</a>',
+                        timestamp: 1710000001000,
+                        metadata: {
+                            assistantMessageEnvelope: {
+                                source: 'sdk/assistant.message',
+                                traceId: 'trace-html',
+                                turnId: 'turn-html',
+                                eventId: 'evt-html',
+                            },
                         },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
@@ -201,29 +213,31 @@ describe('terminal/commands/export', () => {
     it('remove ANSI/OSC e controles antes de exportar Markdown', async () => {
         const esc = String.fromCharCode(27);
         const bel = String.fromCharCode(7);
-        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
-            timelineSource: 'hub',
-            reconciliationStatus: 'aligned',
-            sync: { status: 'not_needed' },
-            turns: [
-                {
-                    role: 'assistant',
-                    rawRole: 'llm_b',
-                    origin: 'hub',
-                    persisted: true,
-                    content: `${esc}[31mvermelho${esc}[0m\n${esc}]8;;https://example.com${bel}link${esc}]8;;${bel}\u0001fim`,
-                    timestamp: 1710000001000,
-                    metadata: {
-                        assistantMessageEnvelope: {
-                            source: `${esc}[32msdk/assistant.message${esc}[0m`,
-                            traceId: 'trace-ansi',
-                            turnId: 'turn-ansi',
-                            eventId: 'evt-ansi',
+        readTerminalTimelineProjection.mockReturnValueOnce(
+            timelineProjectionFixture({
+                timelineSource: 'hub',
+                reconciliationStatus: 'aligned',
+                sync: { status: 'not_needed' },
+                turns: [
+                    {
+                        role: 'assistant',
+                        rawRole: 'llm_b',
+                        origin: 'hub',
+                        persisted: true,
+                        content: `${esc}[31mvermelho${esc}[0m\n${esc}]8;;https://example.com${bel}link${esc}]8;;${bel}\u0001fim`,
+                        timestamp: 1710000001000,
+                        metadata: {
+                            assistantMessageEnvelope: {
+                                source: `${esc}[32msdk/assistant.message${esc}[0m`,
+                                traceId: 'trace-ansi',
+                                turnId: 'turn-ansi',
+                                eventId: 'evt-ansi',
+                            },
                         },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
@@ -253,42 +267,44 @@ describe('terminal/commands/export', () => {
     });
 
     it('usa terminalStreamingDiagnostics como envelope quando não há assistantMessageEnvelope', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
-            timelineSource: 'hub',
-            reconciliationStatus: 'aligned',
-            sync: {
-                status: 'not_needed',
-            },
-            turns: [
-                {
-                    role: 'assistant',
-                    rawRole: 'llm_b',
-                    origin: 'hub',
-                    persisted: true,
-                    content: 'resposta via delta canônico',
-                    timestamp: 1710000001000,
-                    metadata: {
-                        terminalStreamingDiagnostics: {
-                            source: 'terminal.dialog.engine',
-                            turnKey: 'terminal-turn-key-1',
-                            turnId: 42,
-                            materialization: {
-                                source: 'stream_delta',
-                                deltaSlices: 4,
-                                deltaChars: 24,
-                            },
-                            finalReconciliation: {
-                                mode: 'none',
-                                reason: 'already_streamed',
-                            },
-                            publicStream: {
-                                visibleChars: 24,
+        readTerminalTimelineProjection.mockReturnValueOnce(
+            timelineProjectionFixture({
+                timelineSource: 'hub',
+                reconciliationStatus: 'aligned',
+                sync: {
+                    status: 'not_needed',
+                },
+                turns: [
+                    {
+                        role: 'assistant',
+                        rawRole: 'llm_b',
+                        origin: 'hub',
+                        persisted: true,
+                        content: 'resposta via delta canônico',
+                        timestamp: 1710000001000,
+                        metadata: {
+                            terminalStreamingDiagnostics: {
+                                source: 'terminal.dialog.engine',
+                                turnKey: 'terminal-turn-key-1',
+                                turnId: 42,
+                                materialization: {
+                                    source: 'stream_delta',
+                                    deltaSlices: 4,
+                                    deltaChars: 24,
+                                },
+                                finalReconciliation: {
+                                    mode: 'none',
+                                    reason: 'already_streamed',
+                                },
+                                publicStream: {
+                                    visibleChars: 24,
+                                },
                             },
                         },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
@@ -301,64 +317,67 @@ describe('terminal/commands/export', () => {
     });
 
     it('preserva ask_user, resposta humana e continuação pós-ask com autoria correta', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
-            timelineSource: 'mixed',
-            reconciliationStatus: 'diverged',
-            sync: {
-                status: 'blocked',
-            },
-            syncBlockedReason: 'diverged-no-overlap',
-            turns: [
-                {
-                    role: 'system',
-                    rawRole: 'ask_user',
-                    origin: 'terminal',
-                    persisted: false,
-                    content: 'ask_user solicitou resposta humana:\nASK-CANONICAL: responda SIM para fechar o teste\nOpcoes: SIM',
-                    timestamp: 1710000002000,
-                    metadata: {
-                        envelope: {
-                            source: 'sdk/user_input.requested',
-                            traceId: 'turn:1',
-                            turnId: '1',
-                            eventId: 253,
+        readTerminalTimelineProjection.mockReturnValueOnce(
+            timelineProjectionFixture({
+                timelineSource: 'mixed',
+                reconciliationStatus: 'diverged',
+                sync: {
+                    status: 'blocked',
+                },
+                syncBlockedReason: 'diverged-no-overlap',
+                turns: [
+                    {
+                        role: 'system',
+                        rawRole: 'ask_user',
+                        origin: 'terminal',
+                        persisted: false,
+                        content:
+                            'ask_user solicitou resposta humana:\nASK-CANONICAL: responda SIM para fechar o teste\nOpcoes: SIM',
+                        timestamp: 1710000002000,
+                        metadata: {
+                            envelope: {
+                                source: 'sdk/user_input.requested',
+                                traceId: 'turn:1',
+                                turnId: '1',
+                                eventId: 253,
+                            },
                         },
                     },
-                },
-                {
-                    role: 'user',
-                    rawRole: 'ask_user_answer',
-                    origin: 'terminal',
-                    persisted: false,
-                    content: 'Resposta ao ask_user:\nSIM',
-                    timestamp: 1710000002500,
-                    metadata: {
-                        envelope: {
-                            source: 'sdk/user_input.completed',
-                            traceId: 'turn:1',
-                            turnId: '1',
-                            eventId: 262,
+                    {
+                        role: 'user',
+                        rawRole: 'ask_user_answer',
+                        origin: 'terminal',
+                        persisted: false,
+                        content: 'Resposta ao ask_user:\nSIM',
+                        timestamp: 1710000002500,
+                        metadata: {
+                            envelope: {
+                                source: 'sdk/user_input.completed',
+                                traceId: 'turn:1',
+                                turnId: '1',
+                                eventId: 262,
+                            },
                         },
                     },
-                },
-                {
-                    role: 'assistant',
-                    rawRole: 'llm_b',
-                    origin: 'terminal',
-                    persisted: false,
-                    content: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
-                    timestamp: 1710000003000,
-                    metadata: {
-                        assistantMessageEnvelope: {
-                            source: 'sdk/assistant.message',
-                            traceId: 'turn:2',
-                            turnId: '2',
-                            eventId: 280,
+                    {
+                        role: 'assistant',
+                        rawRole: 'llm_b',
+                        origin: 'terminal',
+                        persisted: false,
+                        content: 'POST-ASK-CANONICAL-FINAL: usuário confirmou SIM',
+                        timestamp: 1710000003000,
+                        metadata: {
+                            assistantMessageEnvelope: {
+                                source: 'sdk/assistant.message',
+                                traceId: 'turn:2',
+                                turnId: '2',
+                                eventId: 280,
+                            },
                         },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
@@ -377,46 +396,48 @@ describe('terminal/commands/export', () => {
     });
 
     it('redige segredos em conteúdo e envelope antes de escrever Markdown', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
-            timelineSource: 'hub',
-            reconciliationStatus: 'aligned',
-            sync: {
-                status: 'not_needed',
-            },
-            turns: [
-                {
-                    role: 'assistant',
-                    rawRole: 'llm_b',
-                    origin: 'terminal',
-                    persisted: false,
-                    content:
-                        'tool args: Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 api_key=sk-testsecret123456789 ghp_exampletoken1234567890',
-                    timestamp: 1710000003000,
-                    metadata: {
-                        assistantMessageEnvelope: {
-                            source: 'sdk/assistant.message',
-                            traceId: 'trace\nAuthorization: Bearer tokenvalue1234567890',
-                            turnId: 'turn-export-secret',
-                            eventId: 'evt-export-secret',
-                        },
-                        terminalStreamingDiagnostics: {
-                            materialization: {
-                                source: 'stream_delta',
-                                deltaSlices: 1,
-                                deltaChars: 12,
+        readTerminalTimelineProjection.mockReturnValueOnce(
+            timelineProjectionFixture({
+                timelineSource: 'hub',
+                reconciliationStatus: 'aligned',
+                sync: {
+                    status: 'not_needed',
+                },
+                turns: [
+                    {
+                        role: 'assistant',
+                        rawRole: 'llm_b',
+                        origin: 'terminal',
+                        persisted: false,
+                        content:
+                            'tool args: Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 api_key=sk-testsecret123456789 ghp_exampletoken1234567890',
+                        timestamp: 1710000003000,
+                        metadata: {
+                            assistantMessageEnvelope: {
+                                source: 'sdk/assistant.message',
+                                traceId: 'trace\nAuthorization: Bearer tokenvalue1234567890',
+                                turnId: 'turn-export-secret',
+                                eventId: 'evt-export-secret',
                             },
-                            finalReconciliation: {
-                                mode: 'suffix',
-                                reason: 'secret=supersecretvalue',
-                            },
-                            publicStream: {
-                                visibleChars: 12,
+                            terminalStreamingDiagnostics: {
+                                materialization: {
+                                    source: 'stream_delta',
+                                    deltaSlices: 1,
+                                    deltaChars: 12,
+                                },
+                                finalReconciliation: {
+                                    mode: 'suffix',
+                                    reason: 'secret=supersecretvalue',
+                                },
+                                publicStream: {
+                                    visibleChars: 12,
+                                },
                             },
                         },
                     },
-                },
-            ],
-        }));
+                ],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');
@@ -435,14 +456,16 @@ describe('terminal/commands/export', () => {
     });
 
     it('cria Markdown diagnóstico mínimo quando o frontend runtime não tem feed', async () => {
-        readTerminalTimelineProjection.mockReturnValueOnce(timelineProjectionFixture({
-            timelineSource: 'empty',
-            reconciliationStatus: 'empty',
-            sync: {
-                status: 'not_needed',
-            },
-            turns: [],
-        }));
+        readTerminalTimelineProjection.mockReturnValueOnce(
+            timelineProjectionFixture({
+                timelineSource: 'empty',
+                reconciliationStatus: 'empty',
+                sync: {
+                    status: 'not_needed',
+                },
+                turns: [],
+            }),
+        );
         const ctx = mockCtx();
 
         await cmdExport({ println: ctx.println }, '/tmp/conversa.md');

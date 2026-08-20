@@ -24,7 +24,8 @@ function getMutationAuditWriter(filePath) {
         writer = createJsonlFileWriter({
             filePath,
             autoFlush: false,
-            flushToDisk: true,
+            // Audit de mutações é evidência de segurança: persistimos conteúdo e a entrada de diretório antes de confirmar.
+            durability: 'file-and-directory',
             maxQueueLines: 10_000,
             softQueueLines: 8_000,
         });

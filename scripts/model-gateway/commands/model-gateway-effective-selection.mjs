@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import {
     DEFAULT_MODEL_GATEWAY_CATALOG_PATH,
     DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR,
@@ -19,10 +20,9 @@ import {
     persistModelGatewaySelectionDecisionTrace,
     renderModelGatewayLocalProviderOptInGuidance,
     resolveModelGatewaySelectionPolicy,
-    summarizeModelGatewayRuntimeAccountOverlays,
     summarizeModelGatewayLocalProviderOptInBlocks,
+    summarizeModelGatewayRuntimeAccountOverlays,
 } from '../../../src/copilot/model-gateway/index.js';
-import { setDbLogger } from '../../../src/copilot/db/sqlite.js';
 import { loadModelGatewayDotenv } from '../lib/env.mjs';
 
 loadModelGatewayDotenv();
@@ -34,14 +34,14 @@ const readArg = createArgReader(args);
 const argSet = new Set(args);
 
 if (argSet.has('--help') || argSet.has('-h')) {
-    process.stdout.write(`Usage: node scripts/model-gateway/commands/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
+    process.stdout
+        .write(`Usage: node scripts/model-gateway/commands/model-gateway-effective-selection.mjs [--json] [--strict] [--runtime-source file|sqlite|merged] [--selection-policy metadata_first|prefer_runtime_proved|require_runtime_proof] [--profile <id>|--profile=<id>] [--profiles a,b|--profiles=a,b] [--require-runtime-proof] [--runtime-proof-weights key=value,...] [--write-trace] [--trace-dir <path>] [--prune-traces] [--trace-retention-apply] [--trace-retention-max <n>] [--fail] [--fail-on-supply-warning]
 
 Build a non-mutating effective selection view from the persisted metadata catalog plus already-observed account/runtime
 health. This does not fetch providers, execute models, run probes or persist eligibility decisions.
 `);
     process.exit(0);
 }
-
 
 function readProfiles() {
     /** @type {string[]} */
@@ -84,9 +84,11 @@ function selectedDispositions(selection) {
 
 /** @param {Record<string, unknown> | null | undefined} counts */
 function formatCountMap(counts) {
-    return Object.entries(counts ?? {})
-        .map(([key, count]) => `${key}:${count}`)
-        .join(',') || '-';
+    return (
+        Object.entries(counts ?? {})
+            .map(([key, count]) => `${key}:${count}`)
+            .join(',') || '-'
+    );
 }
 
 const json = argSet.has('--json');
@@ -98,7 +100,8 @@ const selectionPolicy = requireRuntimeProof ? 'require_runtime_proof' : readArg(
 const writeTrace = argSet.has('--write-trace') || argSet.has('--persist-trace');
 const traceDir = readArg('--trace-dir', DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
 const traceId = readArg('--trace-id');
-const pruneTraces = argSet.has('--prune-traces') || argSet.has('--trace-retention-preview') || argSet.has('--trace-retention-apply');
+const pruneTraces =
+    argSet.has('--prune-traces') || argSet.has('--trace-retention-preview') || argSet.has('--trace-retention-apply');
 const traceRetentionApply = argSet.has('--trace-retention-apply');
 const traceRetentionMax = Number.parseInt(readArg('--trace-retention-max', '100'), 10);
 const runtimeProofWeights = readRuntimeProofWeights();
@@ -287,11 +290,15 @@ if (json) {
         `observed: health=${healthRecords.length} runtimeOverlays=${runtimeAccountOverlays.length} eligibility=${evaluated.decisions.length}\n`,
     );
     process.stdout.write(
-        `volatile overlays: active=${runtimeAccountOverlaySummary.activeCount} expired=${runtimeAccountOverlaySummary.expiredCount} providers=${Object.entries(runtimeAccountOverlaySummary.byProvider)
-            .map(([providerId, count]) => `${providerId}:${count}`)
-            .join(',') || '-'} failures=${Object.entries(runtimeAccountOverlaySummary.byFailureKind)
-            .map(([failureKind, count]) => `${failureKind}:${count}`)
-            .join(',') || '-'}\n`,
+        `volatile overlays: active=${runtimeAccountOverlaySummary.activeCount} expired=${runtimeAccountOverlaySummary.expiredCount} providers=${
+            Object.entries(runtimeAccountOverlaySummary.byProvider)
+                .map(([providerId, count]) => `${providerId}:${count}`)
+                .join(',') || '-'
+        } failures=${
+            Object.entries(runtimeAccountOverlaySummary.byFailureKind)
+                .map(([failureKind, count]) => `${failureKind}:${count}`)
+                .join(',') || '-'
+        }\n`,
     );
     process.stdout.write(
         `profiles: selected=${selection.summary.selectedProfileCount}/${selection.summary.profileCount} dispositions=${dispositions.join(',') || '-'}\n`,
@@ -335,11 +342,17 @@ if (json) {
     }
     for (const row of selectionComparison.rows.filter((item) => item.changed).slice(0, 12)) {
         const pre = row.preSelected ? `${row.preSelected['providerId']}:${row.preSelected['providerModel']}` : 'none';
-        const post = row.postSelected ? `${row.postSelected['providerId']}:${row.postSelected['providerModel']}` : 'none';
-        process.stdout.write(`  changed ${row.profileId}: ${pre} -> ${post} proof=${row.postSelectedHasRuntimeProof ? 'yes' : 'no'}\n`);
+        const post = row.postSelected
+            ? `${row.postSelected['providerId']}:${row.postSelected['providerModel']}`
+            : 'none';
+        process.stdout.write(
+            `  changed ${row.profileId}: ${pre} -> ${post} proof=${row.postSelectedHasRuntimeProof ? 'yes' : 'no'}\n`,
+        );
     }
     if (localProviderOptIn.hasBlocks) {
-        process.stdout.write(`\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`);
+        process.stdout.write(
+            `\n${renderModelGatewayLocalProviderOptInGuidance({ profileIds: localProviderOptIn.blockedProfileIds })}\n`,
+        );
     }
 }
 

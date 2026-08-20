@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BABEL_PARSER_POLICY_VERSION } from '../../../../src/copilot/infra/parse/babel-policy.js';
 
 const mocks = vi.hoisted(() => ({
     indexDirectory: vi.fn(),
@@ -11,7 +12,9 @@ const mocks = vi.hoisted(() => ({
     findSymbol: vi.fn(() => []),
     findImports: vi.fn(() => []),
     matchesFileFingerprint: vi.fn(() => false),
-    listIndexedFiles: vi.fn(/** @returns {{ filePath: string; extension: string; metadataJson: string | null }[]} */ () => []),
+    listIndexedFiles: vi.fn(
+        /** @returns {{ filePath: string; extension: string; metadataJson: string | null }[]} */ () => [],
+    ),
     indexTextFile: vi.fn(),
     statPathSnapshot: vi.fn(),
     readTextFileSnapshot: vi.fn(),
@@ -268,6 +271,45 @@ describe('io-index-registry build coalescing', () => {
         expect(mocks.indexTextFile).not.toHaveBeenCalled();
     });
 
+    it('limita concorrência de stat/read no refresh incremental explícito', async () => {
+        const workspaceRoot = '/tmp/ws-refresh-concurrency';
+        const paths = Array.from({ length: 6 }, (_, index) => `${workspaceRoot}/src/file-${index}.js`);
+        let active = 0;
+        let highWater = 0;
+        mocks.statPathSnapshot.mockImplementation(async () => {
+            active += 1;
+            highWater = Math.max(highWater, active);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            active -= 1;
+            return { isFile: () => true, size: 12, mtimeMs: 10, ctimeMs: 11, dev: 1, ino: 2 };
+        });
+
+        const result = await refreshIoIndexPaths(paths, { workspaceRoot, concurrency: 2 });
+
+        expect(result).toMatchObject({ requested: 6, indexed: 6, failed: 0, concurrency: 2 });
+        expect(highWater).toBe(2);
+        expect(mocks.indexTextFile).toHaveBeenCalledTimes(6);
+    });
+
+    it('refresh explícito consome pending já coberto e cancela o segundo refresh debounced', async () => {
+        const workspaceRoot = '/tmp/ws-explicit-convergence';
+        const filePath = `${workspaceRoot}/src/changed.js`;
+        mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
+        await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
+        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        assert.equal(typeof hook, 'function');
+
+        hook(filePath, { recursive: false, source: 'canonical-write' });
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 1 });
+
+        const result = await refreshIoIndexPaths([filePath], { workspaceRoot });
+
+        expect(result).toMatchObject({ requested: 1, indexed: 1, failed: 0 });
+        expect(getIoIndexStats().autoRefresh).toMatchObject({ pending: 0, explicitConvergences: 1 });
+        expect(await flushIoIndexAutoRefresh()).toBeNull();
+        expect(mocks.indexTextFile).toHaveBeenCalledTimes(1);
+    });
+
     it('reutiliza snapshot e símbolos fornecidos sem reread/reparse no refresh explícito', async () => {
         const workspaceRoot = '/tmp/ws-snapshot-reuse';
         const filePath = `${workspaceRoot}/src/reused.js`;
@@ -285,6 +327,7 @@ describe('io-index-registry build coalescing', () => {
         };
         const parsedSymbols = {
             filePath,
+            parserPolicyVersion: BABEL_PARSER_POLICY_VERSION,
             symbols: [],
             imports: [],
             exports: [],
@@ -302,6 +345,7 @@ describe('io-index-registry build coalescing', () => {
             indexed: 1,
             snapshotReuses: 1,
             parsedSymbolReuses: 1,
+            parsedSymbolPolicyRejects: 0,
             failed: 0,
         });
         expect(mocks.readTextFileSnapshot).not.toHaveBeenCalled();

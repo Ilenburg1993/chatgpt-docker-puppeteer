@@ -6,17 +6,24 @@
  */
 
 import Cloudflare from 'cloudflare';
-import { createCloudflareEdgeBackup } from './edge-backup.js';
 import { auditCloudflareEdgeRulesets } from './edge-audit.js';
+import { createCloudflareEdgeBackup } from './edge-backup.js';
 import { diffCloudflareEdgePolicy } from './edge-policy-diff.js';
-import { buildCloudflareOAuthTokenOrAnonymousMcpExpression } from './routes.js';
 import { readCloudflareRemoteApiConfig } from './remote-api.js';
+import { buildCloudflareOAuthTokenOrAnonymousMcpExpression } from './routes.js';
 
 const CACHE_PHASE = 'http_request_cache_settings';
 const RATE_LIMIT_PHASE = 'http_ratelimit';
 
 /**
- * @param {{ env?: NodeJS.ProcessEnv; dryRun?: boolean; confirmApply?: boolean; phases?: string[]; ruleRefs?: string[]; now?: Date }} [options]
+ * @param {{
+ *     env?: NodeJS.ProcessEnv;
+ *     dryRun?: boolean;
+ *     confirmApply?: boolean;
+ *     phases?: string[];
+ *     ruleRefs?: string[];
+ *     now?: Date;
+ * }} [options]
  * @returns {Promise<Record<string, unknown> & { ok: boolean }>}
  */
 export async function applyCloudflareEdgePolicy(options = {}) {
@@ -37,7 +44,11 @@ export async function applyCloudflareEdgePolicy(options = {}) {
     const plan = buildCloudflareEdgeApplyPlan(asRulesets(actual['rulesets']), desiredRules, planOptions);
     const rateLimitApplyNeedsRefs = phases.includes(RATE_LIMIT_PHASE) && ruleRefs.length === 0;
     const preflightOk =
-        backup.ok === true && actual.ok === true && diff.ok === true && diff['mutationReady'] === true && !rateLimitApplyNeedsRefs;
+        backup.ok === true &&
+        actual.ok === true &&
+        diff.ok === true &&
+        diff['mutationReady'] === true &&
+        !rateLimitApplyNeedsRefs;
     const canApply = preflightOk && confirmApply && !dryRun;
 
     if (dryRun || !confirmApply) {
@@ -85,7 +96,11 @@ export async function applyCloudflareEdgePolicy(options = {}) {
         if (!phase) continue;
         const rule = desiredRules.find((item) => item.phase === phase && item.ref === record['ref']);
         if (!rule || record['status'] === 'present') {
-            applied.push({ ...record, applied: false, reason: record['status'] === 'present' ? 'already-present' : 'no-rule' });
+            applied.push({
+                ...record,
+                applied: false,
+                reason: record['status'] === 'present' ? 'already-present' : 'no-rule',
+            });
             continue;
         }
         const result = await applyDesiredRule(client, zoneId, rule);
@@ -166,14 +181,17 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
     const optionRecord = asRecord(options);
     const phases = normalizePhases(Array.isArray(optionRecord['phases']) ? optionRecord['phases'] : undefined);
     const ruleRefs = normalizeRefs(optionRecord['ruleRefs']);
-    const scopedDesiredRules = ruleRefs.length > 0 ? desiredRules.filter((rule) => ruleRefs.includes(rule.ref)) : desiredRules;
+    const scopedDesiredRules =
+        ruleRefs.length > 0 ? desiredRules.filter((rule) => ruleRefs.includes(rule.ref)) : desiredRules;
     const actions = [];
     const plannedCreatedPhases = new Set();
     for (const desired of scopedDesiredRules.filter((rule) => phases.includes(rule.phase))) {
         const ruleset = actualRulesets.find((item) => asString(item['phase']) === desired.phase) ?? null;
         const rules = Array.isArray(ruleset?.['rules']) ? /** @type {unknown[]} */ (ruleset['rules']) : [];
         const existing = rules.find((rule) => asRecord(rule)['ref'] === desired.ref);
-        const existingMatchesDesired = existing ? cloudflareRuleMatchesDesired(asRecord(existing), desired.rule) : false;
+        const existingMatchesDesired = existing
+            ? cloudflareRuleMatchesDesired(asRecord(existing), desired.rule)
+            : false;
         const missingRulesetStatus = plannedCreatedPhases.has(desired.phase)
             ? 'append-rule-after-entrypoint-create'
             : 'create-entrypoint-ruleset';
@@ -182,7 +200,13 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
             phase: desired.phase,
             ref: desired.ref,
             name: desired.name,
-            status: existing ? (existingMatchesDesired ? 'present' : 'update-rule') : ruleset ? 'append-rule' : missingRulesetStatus,
+            status: existing
+                ? existingMatchesDesired
+                    ? 'present'
+                    : 'update-rule'
+                : ruleset
+                  ? 'append-rule'
+                  : missingRulesetStatus,
             rulesetId: asString(ruleset?.['id']) || null,
             preservesExistingRules: true,
             rateLimitRuleMustRemainLast: desired.phase === RATE_LIMIT_PHASE,
@@ -194,9 +218,11 @@ export function buildCloudflareEdgeApplyPlan(actualRulesets, desiredRules, optio
         summary: {
             phases,
             actionCount: actions.length,
-            createEntrypointRulesets: actions.filter((action) => action['status'] === 'create-entrypoint-ruleset').length,
+            createEntrypointRulesets: actions.filter((action) => action['status'] === 'create-entrypoint-ruleset')
+                .length,
             appendRules: actions.filter(
-                (action) => action['status'] === 'append-rule' || action['status'] === 'append-rule-after-entrypoint-create',
+                (action) =>
+                    action['status'] === 'append-rule' || action['status'] === 'append-rule-after-entrypoint-create',
             ).length,
             updateRules: actions.filter((action) => action['status'] === 'update-rule').length,
             alreadyPresent: actions.filter((action) => action['status'] === 'present').length,
@@ -244,7 +270,9 @@ async function applyDesiredRule(client, zoneId, desired) {
         return { operation: 'create-entrypoint-ruleset', ruleset: summarizeRuleset(created) };
     }
     const entrypointRecord = asRecord(entrypoint);
-    const rules = Array.isArray(entrypointRecord['rules']) ? [.../** @type {unknown[]} */ (entrypointRecord['rules'])] : [];
+    const rules = Array.isArray(entrypointRecord['rules'])
+        ? [.../** @type {unknown[]} */ (entrypointRecord['rules'])]
+        : [];
     const existingIndex = rules.findIndex((rule) => asRecord(rule)['ref'] === desired.ref);
     if (existingIndex >= 0) rules[existingIndex] = desired.rule;
     else rules.push(desired.rule);
@@ -299,9 +327,7 @@ async function resolveZoneId(client, config) {
  * @returns {string[]}
  */
 function normalizeRefs(refs) {
-    return Array.isArray(refs)
-        ? [...new Set(refs.filter((item) => typeof item === 'string' && item.length > 0))]
-        : [];
+    return Array.isArray(refs) ? [...new Set(refs.filter((item) => typeof item === 'string' && item.length > 0))] : [];
 }
 
 /**

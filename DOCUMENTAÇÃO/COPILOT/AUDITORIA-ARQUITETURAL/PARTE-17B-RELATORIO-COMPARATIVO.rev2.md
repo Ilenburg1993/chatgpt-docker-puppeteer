@@ -175,17 +175,24 @@ api express não têm cobertura unitária isolada.
 
 ## 7. Fixes Aplicados nesta Sessão (fora das faixas)
 
-| Arquivo                                                              | Tipo de Fix | Descrição                                                                       |
-| -------------------------------------------------------------------- | :---------: | ------------------------------------------------------------------------------- | -------------------------------------------- |
-| `src/copilot/sdk/tools.js`                                           |   Typedef   | `parameters` mudou de `ZodTypeAny                                               | Record<...>`para`any`para aceitar`ZodSchema` |
-| `src/copilot/sdk/tools.js`                                           |   Typedef   | `handler` aceita agora `ToolHandler<T> \| ((...args: any[]) => any)`            |
-| `src/copilot/observability/metrics.js`                               |   Typedef   | Adicionado `recordQuotaPoll?: () => void` ao `MetricsStore`                     |
-| `src/copilot/tools/shell/index.js`                                   | Annotation  | Casts JSDoc nos parâmetros dos 3 handlers                                       |
-| `tests/unit/copilot/test_session_config.spec.js`                     |    Mock     | Aceita `'#copilot/sdk'` como origem do import de `approveAll`                   |
-| `tests/unit/copilot/observability/test_dialog_task_handlers.spec.js` |    Mock     | Adicionado `CopilotError` ao mock de `#copilot/core/errors`                     |
-| `tests/unit/copilot/tools/test_session_rpc_tools.spec.js`            |    Mock     | Migrado de `@github/copilot-sdk` para `#copilot/sdk`; adicionado `CopilotError` |
-| `tests/unit/copilot/tools/test_introspection_tools.spec.js`          |    Mock     | Migrado de `@github/copilot-sdk` para `#copilot/sdk`; adicionado `createTool`   |
-| `tests/unit/copilot/tools/test_git_tools.spec.js`                    |    Mock     | Migrado de `@github/copilot-sdk` para `#copilot/sdk`; adicionado `createTool`   |
+| Arquivo | Tipo de Fix | Descrição | |
+-------------------------------------------------------------------- | :---------: |
+------------------------------------------------------------------------------- |
+-------------------------------------------- | | `src/copilot/sdk/tools.js` | Typedef | `parameters`
+mudou de `ZodTypeAny                                               | Record<...>`para`any`para
+aceitar`ZodSchema` | | `src/copilot/sdk/tools.js` | Typedef | `handler` aceita agora
+`ToolHandler<T> \| ((...args: any[]) => any)` | | `src/copilot/observability/metrics.js` | Typedef |
+Adicionado `recordQuotaPoll?: () => void` ao `MetricsStore` | | `src/copilot/tools/shell/index.js` |
+Annotation | Casts JSDoc nos parâmetros dos 3 handlers | |
+`tests/unit/copilot/test_session_config.spec.js` | Mock | Aceita `'#copilot/sdk'` como origem do
+import de `approveAll` | | `tests/unit/copilot/observability/test_dialog_task_handlers.spec.js` |
+Mock | Adicionado `CopilotError` ao mock de `#copilot/core/errors` | |
+`tests/unit/copilot/tools/test_session_rpc_tools.spec.js` | Mock | Migrado de `@github/copilot-sdk`
+para `#copilot/sdk`; adicionado `CopilotError` | |
+`tests/unit/copilot/tools/test_introspection_tools.spec.js` | Mock | Migrado de
+`@github/copilot-sdk` para `#copilot/sdk`; adicionado `createTool` | |
+`tests/unit/copilot/tools/test_git_tools.spec.js` | Mock | Migrado de `@github/copilot-sdk` para
+`#copilot/sdk`; adicionado `createTool` |
 
 ---
 

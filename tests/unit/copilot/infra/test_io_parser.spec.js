@@ -11,9 +11,6 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
-import { readTextFileSnapshot } from '../../../../src/copilot/infra/io/fs/read-text.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
-import { resolveBabelParserOptions } from '../../../../src/copilot/infra/parse/babel-policy.js';
 import {
     buildOutline,
     extractJsonSchema,
@@ -29,6 +26,12 @@ import {
     resolveParserWorkerQueuePolicy,
     windowFileContext,
 } from '../../../../src/copilot/infra/io-parser.js';
+import { readTextFileSnapshot } from '../../../../src/copilot/infra/io/fs/read-text.js';
+import {
+    BABEL_PARSER_POLICY_VERSION,
+    resolveBabelParserOptions,
+} from '../../../../src/copilot/infra/parse/babel-policy.js';
+import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
 let tmpDir = '';
 const IO_PARSER_MODULE_URL = pathToFileURL(path.resolve('src/copilot/infra/io-parser.js')).href;
@@ -101,6 +104,7 @@ describe('parseFileSymbols - JavaScript', () => {
     it('extrai funções, classes e constantes exportadas', async () => {
         const result = await parseFileSymbols(path.join(tmpDir, 'module.js'), JS_CONTENT);
         assert.ok(result !== null);
+        assert.equal(result.parserPolicyVersion, BABEL_PARSER_POLICY_VERSION);
         assert.ok(Array.isArray(result.symbols));
         const names = result.symbols.map(/** @param {any} s */ (s) => s.name);
         assert.ok(names.includes('greet'), `symbols=${JSON.stringify(names)}`);
@@ -108,11 +112,16 @@ describe('parseFileSymbols - JavaScript', () => {
         assert.ok(names.includes('MyClass'), `symbols=${JSON.stringify(names)}`);
     });
 
-    it('detecta imports', async () => {
-        const result = await parseFileSymbols(path.join(tmpDir, 'module.js'), JS_CONTENT);
+    it('detecta imports e reexports na mesma projeção canônica', async () => {
+        const result = await parseFileSymbols(
+            path.join(tmpDir, 'module.js'),
+            `${JS_CONTENT}\nexport { helper as publicHelper } from './reexport.js';\nexport * from './all.js';\n`,
+        );
         assert.ok(result.imports.length > 0, 'deve detectar imports');
         const sources = result.imports.map(/** @param {any} i */ (i) => i.source);
         assert.ok(sources.includes('./foo.js'), `imports=${JSON.stringify(sources)}`);
+        assert.ok(sources.includes('./reexport.js'), `imports=${JSON.stringify(sources)}`);
+        assert.ok(sources.includes('./all.js'), `imports=${JSON.stringify(sources)}`);
     });
 
     it('detecta require estático e import() no formato Babel 8', async () => {
@@ -312,14 +321,28 @@ describe('parseFileSymbols - TypeScript', () => {
 
         assert.match(result.parseError ?? '', /ReservedTypeAssertion|BABEL_PARSER_SYNTAX_ERROR/);
     });
+
+    it('aceita decorators padrão e auto-accessors compatíveis com TypeScript moderno', async () => {
+        const result = await parseFileSymbols(
+            path.join(tmpDir, 'decorated.ts'),
+            'export class Decorated { @dec accessor value: number = 1; }',
+        );
+
+        assert.equal(result.parseError, null);
+        assert.ok(result.symbols.some((symbol) => symbol.name === 'Decorated'));
+    });
 });
 
 describe('Babel parser policy', () => {
     it('resolve sourceType e plugins por extensão sem opções permissivas globais', () => {
         const cjs = resolveBabelParserOptions('/tmp/entry.cjs', 'js');
+        const plainJs = resolveBabelParserOptions('/tmp/plain.js', 'js');
+        const jsx = resolveBabelParserOptions('/tmp/view.jsx', 'js');
         const mts = resolveBabelParserOptions('/tmp/types.mts', 'ts');
         const dts = resolveBabelParserOptions('/tmp/index.d.ts', 'ts');
         const tsx = resolveBabelParserOptions('/tmp/view.tsx', 'ts');
+        const structure = resolveBabelParserOptions('/tmp/structure.js', 'js', { profile: 'structure' });
+        const documentation = resolveBabelParserOptions('/tmp/docs.js', 'js', { profile: 'documentation' });
 
         assert.equal(cjs['sourceType'], 'commonjs');
         assert.equal(mts['sourceType'], 'module');
@@ -335,7 +358,15 @@ describe('Babel parser policy', () => {
             { dts: true, disallowAmbiguousJSXLike: false },
         ]);
         assert.ok(/** @type {any[]} */ (tsx['plugins']).includes('jsx'));
-        assert.ok(!/** @type {any[]} */ (mts['plugins']).includes('jsx'));
+        assert.ok(/** @type {any[]} */ (jsx['plugins']).includes('jsx'));
+        assert.ok(!(/** @type {any[]} */ (plainJs['plugins']).includes('jsx')));
+        assert.ok(!(/** @type {any[]} */ (mts['plugins']).includes('jsx')));
+        assert.ok(/** @type {any[]} */ (plainJs['plugins']).includes('decorators'));
+        assert.ok(/** @type {any[]} */ (plainJs['plugins']).includes('decoratorAutoAccessors'));
+        assert.ok(!(/** @type {any[]} */ (plainJs['plugins']).includes('decorators-legacy')));
+        assert.equal(structure['attachComment'], false);
+        assert.equal(documentation['attachComment'], true);
+        assert.match(BABEL_PARSER_POLICY_VERSION, /^2026-08-20\.babel8-ts7\./u);
     });
 
     it('mantém paridade entre worker e fallback síncrono', async () => {
@@ -488,6 +519,8 @@ describe('parseAndCacheSymbols', () => {
         assert.equal(stats.symbolSuppliedSnapshots, 1);
         assert.equal(stats.symbolSnapshotReads, 0);
         assert.equal(stats.symbolCacheMisses, 1);
+        assert.equal(stats.symbolFreshnessChecks, 1);
+        assert.equal(stats.symbolSnapshotPrechecksAvoided, 1);
     });
 
     it('recusa cache antigo após replace atômico externo sem invalidação', async () => {
@@ -526,6 +559,8 @@ describe('parseAndCacheSymbols', () => {
         assert.equal(typeof stats.workerPoolRestarting, 'number');
         assert.equal(typeof stats.workerRestarts, 'number');
         assert.equal(typeof stats.workerRestartFailures, 'number');
+        assert.equal(typeof stats.symbolFreshnessChecks, 'number');
+        assert.equal(typeof stats.symbolSnapshotPrechecksAvoided, 'number');
         assert.ok(stats.workerQueueMax >= 0);
         assert.ok(stats.workerQueueLength >= 0);
     });
@@ -607,7 +642,7 @@ describe('parseAndCacheSymbols', () => {
             timeout: 10_000,
             maxBuffer: 1024 * 1024,
         });
-        /** @type {{ parseErrors: Array<string | null>; workerQueueRejected: number; workerQueueMax: number }} */
+        /** @type {{ parseErrors: (string | null)[]; workerQueueRejected: number; workerQueueMax: number }} */
         const result = JSON.parse(stdout);
 
         assert.ok(
@@ -647,13 +682,25 @@ describe('parseAndCacheSymbols', () => {
             timeout: 10_000,
             maxBuffer: 1024 * 1024,
         });
-        /** @type {{ parseErrors: Array<string | null>; symbolCounts: number[]; workerFallbacks: number; workerQueueRejected: number; mainThreadFallbackMaxBytes: number }} */
+        /** @type {{
+    parseErrors: (string | null)[];
+    symbolCounts: number[];
+    workerFallbacks: number;
+    workerQueueRejected: number;
+    mainThreadFallbackMaxBytes: number;
+}} */
         const result = JSON.parse(stdout);
 
         assert.ok(result.workerQueueRejected > 0, `result=${stdout}`);
         assert.ok(result.workerFallbacks > 0, `result=${stdout}`);
-        assert.ok(result.parseErrors.every((parseError) => parseError === null), `result=${stdout}`);
-        assert.ok(result.symbolCounts.every((count) => count > 0), `result=${stdout}`);
+        assert.ok(
+            result.parseErrors.every((parseError) => parseError === null),
+            `result=${stdout}`,
+        );
+        assert.ok(
+            result.symbolCounts.every((count) => count > 0),
+            `result=${stdout}`,
+        );
         assert.equal(result.mainThreadFallbackMaxBytes, 131_072);
     });
 

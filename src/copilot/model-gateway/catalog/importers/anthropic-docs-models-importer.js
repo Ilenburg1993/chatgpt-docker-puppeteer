@@ -6,6 +6,7 @@
  * cross-cloud aliases, context/output limits, pricing and capability hints that should be collected before runtime.
  *
  * Sources checked 2026-05-26:
+ *
  * - https://docs.anthropic.com/en/docs/about-claude/models/overview
  * - https://docs.anthropic.com/en/docs/about-claude/pricing
  * - https://docs.anthropic.com/en/api/models-list
@@ -63,7 +64,11 @@ function normalizeDocsText(text) {
  * @returns {string[]}
  */
 function modelIdsFromText(text) {
-    return [...new Set([...text.matchAll(CLAUDE_MODEL_ID_PATTERN)].map((match) => match[0].toLowerCase().replace(/-v\d+$/u, '')))].sort();
+    return [
+        ...new Set(
+            [...text.matchAll(CLAUDE_MODEL_ID_PATTERN)].map((match) => match[0].toLowerCase().replace(/-v\d+$/u, '')),
+        ),
+    ].sort();
 }
 
 /**
@@ -97,7 +102,9 @@ function compactTokenLimit(value) {
  * @returns {number[]}
  */
 function pricesFromText(value) {
-    return [...value.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)].map((match) => Number(match[1])).filter(Number.isFinite);
+    return [...value.matchAll(/\$+\s*([0-9]+(?:\.[0-9]+)?)/gu)]
+        .map((match) => Number(match[1]))
+        .filter(Number.isFinite);
 }
 
 /**
@@ -108,7 +115,16 @@ function anthropicModelTraits(providerModel) {
     const lower = providerModel.toLowerCase();
     const direct = lower.match(/claude-(opus|sonnet|haiku)-(\d(?:-\d)?)(?:-\d{8}|-latest)?$/u);
     const legacy = lower.match(/claude-(\d+)-(\d+)-(sonnet|haiku)(?:-\d{8}|-latest)?$/u);
-    const tier = direct?.[1] ?? legacy?.[3] ?? (lower.includes('opus') ? 'opus' : lower.includes('sonnet') ? 'sonnet' : lower.includes('haiku') ? 'haiku' : null);
+    const tier =
+        direct?.[1] ??
+        legacy?.[3] ??
+        (lower.includes('opus')
+            ? 'opus'
+            : lower.includes('sonnet')
+              ? 'sonnet'
+              : lower.includes('haiku')
+                ? 'haiku'
+                : null);
     const generation = direct?.[2]?.replace('-', '.') ?? (legacy ? `${legacy[1]}.${legacy[2]}` : null);
     const titleTier = tier ? `${tier.charAt(0).toUpperCase()}${tier.slice(1)}` : 'Model';
     const displayName = generation ? `Claude ${titleTier} ${generation}` : `Claude ${titleTier}`;
@@ -155,10 +171,22 @@ function capabilitiesForModel(providerModel, docsWindow) {
  */
 function tokenLimitsForModel(providerModel, docsWindow) {
     const lower = providerModel.toLowerCase();
-    const contextFromDocs = docsWindow.match(/context window\s+([0-9.,]+\s*[kmb]?)/iu)?.[1] ?? docsWindow.match(/([0-9.,]+\s*[kmb]?)\s*context window/iu)?.[1];
+    const contextFromDocs =
+        docsWindow.match(/context window\s+([0-9.,]+\s*[kmb]?)/iu)?.[1] ??
+        docsWindow.match(/([0-9.,]+\s*[kmb]?)\s*context window/iu)?.[1];
     const maxOutputFromDocs = docsWindow.match(/max output\s+([0-9.,]+\s*(?:tokens?)?)/iu)?.[1];
     const inferredContext = lower.includes('sonnet-4') && /1M|1 million/iu.test(docsWindow) ? 1_000_000 : 200_000;
-    const maxOutputTokens = compactTokenLimit(maxOutputFromDocs ?? '') ?? (lower.includes('sonnet-4') || lower.includes('3-7-sonnet') ? 64_000 : lower.includes('opus-4') ? 32_000 : lower.includes('3-5-haiku') ? 8_192 : lower.includes('3-haiku') ? 4_096 : null);
+    const maxOutputTokens =
+        compactTokenLimit(maxOutputFromDocs ?? '') ??
+        (lower.includes('sonnet-4') || lower.includes('3-7-sonnet')
+            ? 64_000
+            : lower.includes('opus-4')
+              ? 32_000
+              : lower.includes('3-5-haiku')
+                ? 8_192
+                : lower.includes('3-haiku')
+                  ? 4_096
+                  : null);
     return normalizeModelTokenLimits({
         contextWindowTokens: compactTokenLimit(contextFromDocs ?? '') ?? inferredContext,
         maxOutputTokens,
@@ -195,12 +223,18 @@ function pricingForDisplayName(displayName, pricingText) {
  */
 function cloudAliases(providerModel, docsText) {
     const docsWindow = textWindow(docsText, providerModel, 700);
-    return [...new Set([...docsWindow.matchAll(/\b(?:anthropic\.)?claude[-@.:a-z0-9_]+(?:v1:0|@\d{8})?\b/giu)].map((match) => match[0]))].sort();
+    return [
+        ...new Set(
+            [...docsWindow.matchAll(/\b(?:anthropic\.)?claude[-@.:a-z0-9_]+(?:v1:0|@\d{8})?\b/giu)].map(
+                (match) => match[0],
+            ),
+        ),
+    ].sort();
 }
 
 /**
  * @param {AnthropicDocsModelRow} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function evidenceValues(row) {
     const traits = anthropicModelTraits(row.id);
@@ -210,7 +244,9 @@ function evidenceValues(row) {
     const aliases = normalizeModelAliases({ providerModel: row.id, canonicalSlug: row.id });
     const lifecycle = normalizeModelLifecycle({
         providerModel: row.id,
-        lifecycle: /deprecated/iu.test(`${docsWindow} ${textWindow(row.pricingText, traits.displayName, 500)}`) ? 'deprecated' : 'active',
+        lifecycle: /deprecated/iu.test(`${docsWindow} ${textWindow(row.pricingText, traits.displayName, 500)}`)
+            ? 'deprecated'
+            : 'active',
     });
     const identityTraits = normalizeModelIdentityTraits({
         providerModel: row.id,
@@ -238,7 +274,10 @@ function evidenceValues(row) {
         ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `capabilities.${key}`, value })),
         ...Object.entries(tokenLimits).map(([key, value]) => ({ fieldPath: `limits.${key}`, value })),
         ...Object.entries(pricing).map(([key, value]) => ({ fieldPath: `pricing.${key}`, value })),
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
     ];
     return values.filter((item) => {
         if (item.value === null || item.value === undefined) return false;
@@ -257,7 +296,9 @@ export function parseAnthropicDocsRows(raw) {
     const docsText = normalizeDocsText(String(record['models'] ?? ''));
     const pricingText = normalizeDocsText(String(record['pricing'] ?? ''));
     const apiText = normalizeDocsText(String(record['api'] ?? ''));
-    const ids = [...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(pricingText), ...modelIdsFromText(apiText)])].sort();
+    const ids = [
+        ...new Set([...modelIdsFromText(docsText), ...modelIdsFromText(pricingText), ...modelIdsFromText(apiText)]),
+    ].sort();
     return ids.map((id) => ({ id, docsText, pricingText, apiText }));
 }
 
@@ -283,14 +324,22 @@ export function createAnthropicDocsModelsImporter(options = {}) {
         refreshPolicy: 'scheduled',
         ttlSeconds: 86_400,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Anthropic docs catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Anthropic docs catalog import');
             /** @param {string} url */
             const fetchText = async (url) => {
-                const response = await fetchImpl(url, { headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' } });
-                if (!response.ok) throw new Error(`Anthropic docs fetch failed for ${url} with HTTP ${response.status}`);
+                const response = await fetchImpl(url, {
+                    headers: { accept: 'text/html, text/plain;q=0.9, */*;q=0.1' },
+                });
+                if (!response.ok)
+                    throw new Error(`Anthropic docs fetch failed for ${url} with HTTP ${response.status}`);
                 return readCatalogResponseText(response, { label: `Anthropic docs ${url}` });
             };
-            const [models, pricing, api] = await Promise.all([fetchText(modelsUrl), fetchText(pricingUrl), fetchText(apiDocsUrl)]);
+            const [models, pricing, api] = await Promise.all([
+                fetchText(modelsUrl),
+                fetchText(pricingUrl),
+                fetchText(apiDocsUrl),
+            ]);
             return { models, pricing, api };
         },
         parseRows: parseAnthropicDocsRows,

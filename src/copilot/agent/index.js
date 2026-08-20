@@ -34,8 +34,8 @@ export {
     PR_CONSUMING_EVENTS,
 } from '../events/agent-events.js';
 export { alwaysAliveAgent, getAgent, resetAgent } from './always-alive-singleton.js';
-export { AlwaysAliveAgent } from './runtime/always-alive/index.js';
 export { classifyAgentError } from './error-policy.js';
+export { AlwaysAliveAgent } from './runtime/always-alive/index.js';
 export {
     DEFAULT_AGENT_RUNTIME_ID,
     clearAgentRuntimeRegistry,

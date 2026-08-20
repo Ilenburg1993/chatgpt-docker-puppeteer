@@ -17,7 +17,6 @@ import {
     registerShutdownHandler,
     toError,
 } from '#copilot/core';
-import fs from 'node:fs';
 import { join } from 'node:path';
 import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import { readJsonlTail } from '../infra/io/jsonl-reader.js';
@@ -251,9 +250,7 @@ export function createAuditLog(opts = {}) {
      */
     async function getAuditSummary(sessionId, limit = 50) {
         try {
-            if (!fs.existsSync(toolAuditFile)) return [];
-            const safeLimit =
-                Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 50;
+            const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(500, Math.trunc(limit)) : 50;
             const fetchCount = sessionId ? safeLimit * 10 : safeLimit;
             const { records, truncatedByByteLimit, bytesRead, maxBytes } = await readJsonlTail(toolAuditFile, {
                 maxLines: fetchCount,

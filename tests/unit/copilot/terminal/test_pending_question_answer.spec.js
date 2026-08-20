@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +10,9 @@ const runtimeMocks = vi.hoisted(() => ({
 const hookToolMocks = vi.hoisted(() => ({
     hasTerminalPendingStructuredUserInputRequests: vi.fn(() => false),
     listTerminalPendingStructuredUserInputs: vi.fn(
-        /** @returns {ReturnType<typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalPendingStructuredUserInputs>} */
+        /** @returns {ReturnType<
+    typeof import('../../../../src/copilot/terminal/frontend/gateways/sdk-session.js').listTerminalPendingStructuredUserInputs
+>} */
         () => [],
     ),
 }));

@@ -19,9 +19,9 @@ import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
  * @property {string} defaultBaseUrl
  * @property {Record<string, string>} [headers]
  * @property {{
- *   configRepresentability?: 'full' | 'lossy' | 'unsupported' | 'unknown';
- *   requiredHeaders?: readonly string[];
- *   reason?: string;
+ *     configRepresentability?: 'full' | 'lossy' | 'unsupported' | 'unknown';
+ *     requiredHeaders?: readonly string[];
+ *     reason?: string;
  * }} [directBinding]
  * @property {Record<string, unknown>} [gateway]
  */
@@ -32,11 +32,7 @@ import { OPENAI_PROVIDER_FAMILY_SPECS } from './specs/index.js';
  */
 function providerIdentityParts(provider) {
     const provenance = providerRecord(provider['provenance']);
-    return [
-        provider['id'],
-        provenance['preset'],
-        provenance['profile'],
-    ]
+    return [provider['id'], provenance['preset'], provenance['profile']]
         .filter((item) => typeof item === 'string' && item.trim().length > 0)
         .map((item) => String(item));
 }
@@ -63,7 +59,9 @@ export class OpenAIProviderFamilyAdapter extends OpenAICompatibleAdapter {
         const identities = providerIdentityParts(provider);
         if (identities.some((part) => this.spec.providerIds.includes(part))) return true;
         const baseUrl = String(provider['baseUrl'] ?? '');
-        return Boolean(baseUrl && (this.spec.baseUrls ?? [this.spec.defaultBaseUrl]).some((candidate) => baseUrl === candidate));
+        return Boolean(
+            baseUrl && (this.spec.baseUrls ?? [this.spec.defaultBaseUrl]).some((candidate) => baseUrl === candidate),
+        );
     }
 
     /**

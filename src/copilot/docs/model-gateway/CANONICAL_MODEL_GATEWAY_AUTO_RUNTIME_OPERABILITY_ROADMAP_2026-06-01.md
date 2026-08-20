@@ -2,21 +2,25 @@
 
 Data: 2026-06-01
 
-Status: guia operacional ativo para transformar o model-gateway em sistema funcional, didatico e automatizado no terminal.
+Status: guia operacional ativo para transformar o model-gateway em sistema funcional, didatico e
+automatizado no terminal.
 
 Escopo primario: `src/copilot/model-gateway/`
 
-Escopo de integracao: `src/copilot/terminal/`, `src/copilot/config/`, `src/copilot/presentation/sdk/`, `scripts/model-gateway/`, `package.json`, `Makefile`.
+Escopo de integracao: `src/copilot/terminal/`, `src/copilot/config/`,
+`src/copilot/presentation/sdk/`, `scripts/model-gateway/`, `package.json`, `Makefile`.
 
-Roadmaps anteriores continuam como historico. Este arquivo concentra a linha atual: fazer o banco de metadados, a selecao
-pre-runtime e o runtime selector virarem uma experiencia operacional real, com modo auto do terminal, fallback entre
-modelos e troca controlada quando um modelo se esgota, falha ou quando o operador pede.
+Roadmaps anteriores continuam como historico. Este arquivo concentra a linha atual: fazer o banco de
+metadados, a selecao pre-runtime e o runtime selector virarem uma experiencia operacional real, com
+modo auto do terminal, fallback entre modelos e troca controlada quando um modelo se esgota, falha
+ou quando o operador pede.
 
 ---
 
 ## 1. Objetivo
 
-Queremos que o operador consiga trabalhar no terminal com uma politica declarada e simples, por exemplo:
+Queremos que o operador consiga trabalhar no terminal com uma politica declarada e simples, por
+exemplo:
 
 ```text
 /byok auto on profile:repo_agent allow-live-set-model allow-new-session
@@ -26,7 +30,8 @@ A partir disso, o sistema deve:
 
 - [x] Saber quais modelos existem no catalogo canonico.
 - [x] Saber quais rotas sao candidatas para cada perfil de tarefa.
-- [x] Saber que dados pertencem ao catalogo estavel e que dados pertencem ao estado operacional volatil.
+- [x] Saber que dados pertencem ao catalogo estavel e que dados pertencem ao estado operacional
+      volatil.
 - [x] Excluir Ollama/local por padrao, salvo pedido explicito.
 - [x] Fazer selecao pre-runtime sem chamar provider.
 - [x] Aplicar health/overlays operacionais sem corromper metadados canonicos.
@@ -43,7 +48,8 @@ A partir disso, o sistema deve:
 
 ### 2.1 Metadado canonico nao e estado operacional
 
-O catalogo canonico responde: "o que se sabe sobre providers, modelos, endpoints, capacidades e precos".
+O catalogo canonico responde: "o que se sabe sobre providers, modelos, endpoints, capacidades e
+precos".
 
 Ele nao deve responder sozinho: "a key atual pode rodar este modelo agora?".
 
@@ -62,13 +68,14 @@ O fluxo correto e:
 
 ### 2.3 Runtime health nao reescreve catalogo
 
-Falhas como `rate-limit`, `credits`, `auth`, `timeout`, `network`, `model-or-route` e `upstream` devem ser gravadas como
-estado operacional. Elas podem excluir ou rebaixar rotas temporariamente, mas nao devem apagar ou adulterar a ficha do
-modelo no catalogo.
+Falhas como `rate-limit`, `credits`, `auth`, `timeout`, `network`, `model-or-route` e `upstream`
+devem ser gravadas como estado operacional. Elas podem excluir ou rebaixar rotas temporariamente,
+mas nao devem apagar ou adulterar a ficha do modelo no catalogo.
 
 ### 2.4 Troca live so dentro da mesma boundary
 
-`setModel` vivo so e permitido quando a sessao SDK atual ja nasceu no mesmo provider/perfil/base URL compativel.
+`setModel` vivo so e permitido quando a sessao SDK atual ja nasceu no mesmo provider/perfil/base URL
+compativel.
 
 Trocar provider, tipo de wire, base URL, segredo ou perfil exige novo boot SDK.
 
@@ -97,8 +104,8 @@ Por default:
 - [x] `allowProviderProbes=false`.
 - [x] `allowLocalPrivate=false`.
 
-O operador pode ligar explicitamente. Quando ligado, o sistema deve aplicar efeitos sem janelas manuais internas,
-mas mantendo rastreabilidade e sem vazar segredo.
+O operador pode ligar explicitamente. Quando ligado, o sistema deve aplicar efeitos sem janelas
+manuais internas, mas mantendo rastreabilidade e sem vazar segredo.
 
 ---
 
@@ -106,14 +113,16 @@ mas mantendo rastreabilidade e sem vazar segredo.
 
 ### 3.1 Catalogo e metadados
 
-- [x] `src/copilot/model-gateway/catalog/` possui contratos, normalizadores, stores JSON/SQLite e refresh.
-- [x] Importers existem para OpenRouter, OpenAI, Anthropic, Groq, Gemini, Mistral, Cerebras, Chutes, Cloudflare Workers AI,
-  HuggingFace, Kilo, Nvidia NIM, Ollama, OpenCode Zen e Z.ai.
+- [x] `src/copilot/model-gateway/catalog/` possui contratos, normalizadores, stores JSON/SQLite e
+      refresh.
+- [x] Importers existem para OpenRouter, OpenAI, Anthropic, Groq, Gemini, Mistral, Cerebras, Chutes,
+      Cloudflare Workers AI, HuggingFace, Kilo, Nvidia NIM, Ollama, OpenCode Zen e Z.ai.
 - [x] Cada provider relevante possui arquivos de endpoints/specs/adapters.
 - [x] `openai-schema.js` projeta catalogo para formato OpenAI.
 - [x] SQLite possui schema operacional e diagnosticos.
 - [x] Refresh incremental por provider existe.
-- [ ] Falta consolidar comando unico de "catalog health" com status de freshness por source/importer/provider.
+- [ ] Falta consolidar comando unico de "catalog health" com status de freshness por
+      source/importer/provider.
 - [ ] Falta maior cobertura de importers que distinguem "modelo existe" de "key tem acesso".
 - [ ] Falta cockpit de payload bruto sanitizado por provider/source.
 
@@ -125,7 +134,8 @@ mas mantendo rastreabilidade e sem vazar segredo.
 - [x] Env requirements entram na avaliacao.
 - [x] Runtime health influencia selecao sem alterar catalogo.
 - [ ] Falta uma explicacao unificada "por que este modelo foi excluido antes de runtime".
-- [ ] Falta classificar explicitamente "sem acesso pela key" como blocker distinto de "modelo indisponivel".
+- [ ] Falta classificar explicitamente "sem acesso pela key" como blocker distinto de "modelo
+      indisponivel".
 - [ ] Falta freshness de overlays aparecer claramente no seletor.
 
 ### 3.3 Runtime selector

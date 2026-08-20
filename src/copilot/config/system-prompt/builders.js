@@ -12,8 +12,8 @@ import {
     appendSystemMessage,
     customizeSystemMessage,
     replaceSystemMessage,
-    sectionOverride,
     SYSTEM_PROMPT_SECTIONS as SDK_SECTIONS,
+    sectionOverride,
 } from '../sdk-config-port.js';
 import { getMode } from './mode.js';
 import { buildSystemPromptProfile, renderSystemPromptProfileBlock } from './profile.js';
@@ -78,17 +78,24 @@ export const SYSTEM_PROMPT_SECTIONS = /** @type {Record<string, { description: s
  */
 export function buildSystemMessage(opts = {}) {
     const userConfig = readResolvedSystemPromptUserConfigSync();
+    return buildSystemMessageFromResolvedConfig(userConfig, readUserAppendContentSync(userConfig), opts);
+}
+
+/**
+ * Pure builder over an already-hydrated user-config snapshot. This is the canonical bridge used by async lifecycle
+ * paths when live transforms are disabled, so they never fall back to synchronous filesystem access.
+ *
+ * @param {import('./user-config.js').ResolvedSystemPromptUserConfig} userConfig
+ * @param {string} userAppendContent
+ * @param {{ extraContext?: string; mode?: SystemPromptMode }} [opts]
+ * @returns {SystemMessageConfig}
+ */
+export function buildSystemMessageFromResolvedConfig(userConfig, userAppendContent, opts = {}) {
     const mode = opts.mode ?? getMode();
-    const userAppendContent = readUserAppendContentSync(userConfig);
     const profileBlock = renderSystemPromptProfileBlock(buildSystemPromptProfile(userConfig));
     const modeOptions = { ...buildModeOptions(opts.extraContext, userAppendContent), profileBlock };
-
-    if (mode === 'replace') {
-        return buildReplaceMode(modeOptions);
-    }
-    if (mode === 'customize') {
-        return buildCustomizeMode(modeOptions);
-    }
+    if (mode === 'replace') return buildReplaceMode(modeOptions);
+    if (mode === 'customize') return buildCustomizeMode(modeOptions);
     return buildAppendMode(modeOptions);
 }
 

@@ -3,8 +3,8 @@
  * Opaque read-only workspace-path capability.
  *
  * The capability is issued only after the canonical async path policy has already resolved symlinks and verified
- * containment. Workspace-bound read/search/stat adapters can consume it without repeating the same realpath walk.
- * Plain objects cannot forge the module-private brand. Mutable modes never accept this capability.
+ * containment. Workspace-bound read/search/stat adapters can consume it without repeating the same realpath walk. Plain
+ * objects cannot forge the module-private brand. Mutable modes never accept this capability.
  *
  * @module copilot/infra/io/policy/validated-path
  */
@@ -17,7 +17,7 @@ const VALIDATED_MUTABLE_PATH_BRAND = Symbol('copilot.validated-mutable-workspace
 const READ_ONLY_MODES = new Set(['read', 'search', 'stat', 'scan']);
 // Initial mutable fast path is intentionally narrower than the current core write-policy equivalence class.
 // Pair/destructive operations keep full policy evaluation until their additional invariants are migrated explicitly.
-const VALIDATED_MUTABLE_MODES = new Set(['write', 'patch']);
+const VALIDATED_MUTABLE_MODES = new Set(['write', 'patch', 'metadata']);
 
 const readStats = {
     issued: 0,
@@ -37,21 +37,24 @@ const mutableStats = {
 
 /**
  * @typedef {{
- *   readonly realPath: string;
- *   readonly workspaceRoot: string;
- *   readonly policyVersion: string;
- *   readonly access: 'read-only';
+ *     readonly realPath: string;
+ *     readonly workspaceRoot: string;
+ *     readonly policyVersion: string;
+ *     readonly access: 'read-only';
  * }} ValidatedReadWorkspacePathPublic
+ *
  *
  * @typedef {ValidatedReadWorkspacePathPublic & { readonly [VALIDATED_READ_PATH_BRAND]: true }} ValidatedReadWorkspacePath
  *
+ *
  * @typedef {{
- *   readonly realPath: string;
- *   readonly workspaceRoot: string;
- *   readonly policyVersion: string;
- *   readonly access: 'mutable';
- *   readonly policyClass: 'write';
+ *     readonly realPath: string;
+ *     readonly workspaceRoot: string;
+ *     readonly policyVersion: string;
+ *     readonly access: 'mutable';
+ *     readonly policyClass: 'write';
  * }} ValidatedMutableWorkspacePathPublic
+ *
  *
  * @typedef {ValidatedMutableWorkspacePathPublic & { readonly [VALIDATED_MUTABLE_PATH_BRAND]: true }} ValidatedMutableWorkspacePath
  */
@@ -76,8 +79,8 @@ export function createValidatedReadWorkspacePath(input) {
 }
 
 /**
- * Issue a mutable capability only after canonical async `write` policy validation has resolved the target.
- * The initial consumer set is intentionally limited to single-target write/patch operations.
+ * Issue a mutable capability only after canonical async `write` policy validation has resolved the target. The initial
+ * consumer set is intentionally limited to single-target write/patch operations.
  *
  * @param {{ realPath: string; workspaceRoot: string }} input
  * @returns {ValidatedMutableWorkspacePath}
@@ -127,15 +130,18 @@ export function resolveValidatedReadWorkspacePath(value, context) {
     }
     if (capability.policyVersion !== IO_PATH_POLICY_VERSION || capability.access !== 'read-only') {
         readStats.rejectedUnbranded += 1;
-        throw capabilityError('Validated read capability policy version/access is stale or invalid.', 'EINVALIDVALIDATEDPATH');
+        throw capabilityError(
+            'Validated read capability policy version/access is stale or invalid.',
+            'EINVALIDVALIDATEDPATH',
+        );
     }
     readStats.accepted += 1;
     return capability.realPath;
 }
 
 /**
- * Resolve a branded mutable capability for a compatible single-target mutation.
- * Strings return null so legacy callers can continue through the full canonical policy path.
+ * Resolve a branded mutable capability for a compatible single-target mutation. Strings return null so legacy callers
+ * can continue through the full canonical policy path.
  *
  * @param {unknown} value
  * @param {{ workspaceRoot: string; mode: string }} context
@@ -146,7 +152,10 @@ export function resolveValidatedMutableWorkspacePath(value, context) {
     const candidate = value && typeof value === 'object' ? /** @type {Record<PropertyKey, unknown>} */ (value) : null;
     if (!candidate || candidate[VALIDATED_MUTABLE_PATH_BRAND] !== true) {
         mutableStats.rejectedUnbranded += 1;
-        throw capabilityError('Workspace IO received an unbranded mutable validated-path object.', 'EINVALIDVALIDATEDMUTABLEPATH');
+        throw capabilityError(
+            'Workspace IO received an unbranded mutable validated-path object.',
+            'EINVALIDVALIDATEDMUTABLEPATH',
+        );
     }
     const capability = /** @type {ValidatedMutableWorkspacePath} */ (value);
     if (!VALIDATED_MUTABLE_MODES.has(context.mode)) {

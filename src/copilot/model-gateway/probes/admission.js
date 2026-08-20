@@ -19,7 +19,6 @@ function estimateMessageTokens(message) {
     return Math.ceil(utf8ByteLength(message, 'model gateway probe budget estimate') / 4);
 }
 
-
 /**
  * @param {ReturnType<typeof import('#copilot/sdk/session/provider').readConfiguredByokState>['summary']} byok
  * @param {'chat' | 'agent'} mode

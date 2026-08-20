@@ -53,8 +53,7 @@ function objectOrNull(value) {
  *     pendingQuestionShadow: boolean;
  *     pendingQuestionShadowKind: import('../../../presentation/contracts/index.js').RuntimePendingQuestionKind | null;
  *     pendingQuestionShadowState:
- *         | import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState
- *         | null;
+ *         import('../../../presentation/contracts/index.js').RuntimePendingQuestionShadowState | null;
  *     pendingQuestionShadowText: string | null;
  *     pendingQuestionShadowExpired: boolean;
  *     pendingQuestionShadowAgeMs: number | null;
@@ -170,7 +169,10 @@ export function readTerminalStatusProjection({ hubSessionId = null, injectPort, 
             typeof base.health?.['recommendedAction'] === 'string' ? base.health['recommendedAction'] : null
         );
     const lifecycle = readRuntimeLifecycleSnapshot();
-    const modelBilling = normalizeTerminalModelBillingProjection(base.lastPrInfo, String(base.model ?? base.snap['model'] ?? ''));
+    const modelBilling = normalizeTerminalModelBillingProjection(
+        base.lastPrInfo,
+        String(base.model ?? base.snap['model'] ?? ''),
+    );
     const elicitationSummary = readTerminalElicitationSummary();
     const permissionSummary = readTerminalPermissionSummary();
     const userInputSummary = readTerminalUserInputSummary();

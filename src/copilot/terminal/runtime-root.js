@@ -32,7 +32,6 @@ import { loadAliasesAsync } from './stores/index.js';
  * @property {ReturnType<typeof import('#copilot/boot').readCopilotBootConfig>} [bootConfig]
  * @property {Record<string, unknown> | null} [bootPreflight]
  *
- *
  * @typedef {object} TerminalBootContext
  * @property {TerminalServerStartDeps['startCopilotServer']} startCopilotServer
  * @property {() => void | Promise<void>} wireRuntime

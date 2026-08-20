@@ -4,9 +4,9 @@
  * Classify startup failures that make an LLM-B live scenario impossible before its prompt is dispatched.
  *
  * The terminal intentionally remains alive after SDK boot failures so a human can inspect local diagnostics. The
- * automated live harness has a different contract: once the terminal itself has declared the conversation boot
- * blocked, waiting for the full scenario timeout adds no evidence. This classifier lets the harness collect local
- * diagnostics and exit early without conflating an upstream outage with invalid credentials.
+ * automated live harness has a different contract: once the terminal itself has declared the conversation boot blocked,
+ * waiting for the full scenario timeout adds no evidence. This classifier lets the harness collect local diagnostics
+ * and exit early without conflating an upstream outage with invalid credentials.
  *
  * @param {string} plain
  * @returns {{ id: string; detail: string } | null}

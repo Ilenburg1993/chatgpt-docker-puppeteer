@@ -44,7 +44,14 @@ export {
 
 /**
  * @param {ReturnType<typeof import('../registry/snapshot.js').buildEnvByokModelGatewaySnapshot>} snapshot
- * @returns {{ type: string; timestamp: number; providerCount: number; modelCount: number; enabledModelCount: number; source: string }}
+ * @returns {{
+ *     type: string;
+ *     timestamp: number;
+ *     providerCount: number;
+ *     modelCount: number;
+ *     enabledModelCount: number;
+ *     source: string;
+ * }}
  */
 export function buildRegistrySnapshotEvent(snapshot) {
     return {
@@ -189,7 +196,9 @@ function finiteNumber(value) {
  * @returns {Record<string, unknown> | null}
  */
 function optionalRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -198,16 +207,33 @@ function optionalRecord(value) {
  * @returns {string[]}
  */
 function safeStringList(values, limit) {
-    return values.map(optionalString).filter((item) => item !== null).slice(0, limit);
+    return values
+        .map(optionalString)
+        .filter((item) => item !== null)
+        .slice(0, limit);
 }
 
 /**
  * @param {Record<string, unknown> | null | undefined} selected
- * @returns {{ gatewayModelId: string | null; providerId: string | null; modelId: string | null; score: number | null; scoreBreakdown: Record<string, unknown> | null; reasons: string[] }}
+ * @returns {{
+ *     gatewayModelId: string | null;
+ *     providerId: string | null;
+ *     modelId: string | null;
+ *     score: number | null;
+ *     scoreBreakdown: Record<string, unknown> | null;
+ *     reasons: string[];
+ * }}
  */
 function summarizeSelectedRouteCandidate(selected) {
     if (!selected) {
-        return { gatewayModelId: null, providerId: null, modelId: null, score: null, scoreBreakdown: null, reasons: [] };
+        return {
+            gatewayModelId: null,
+            providerId: null,
+            modelId: null,
+            score: null,
+            scoreBreakdown: null,
+            reasons: [],
+        };
     }
     const model = optionalRecord(selected['model']) ?? {};
     return {
@@ -483,7 +509,11 @@ function incrementReason(counts, reason) {
 
 /**
  * @param {unknown} decisions
- * @returns {{ hardReasonCounts: Record<string, number>; softReasonCounts: Record<string, number>; dispositionCounts: Record<string, number> }}
+ * @returns {{
+ *     hardReasonCounts: Record<string, number>;
+ *     softReasonCounts: Record<string, number>;
+ *     dispositionCounts: Record<string, number>;
+ * }}
  */
 function summarizeEligibilityDecisionReasons(decisions) {
     /** @type {Record<string, number>} */
@@ -492,7 +522,9 @@ function summarizeEligibilityDecisionReasons(decisions) {
     const softReasonCounts = {};
     /** @type {Record<string, number>} */
     const dispositionCounts = {};
-    for (const decision of Array.isArray(decisions) ? decisions.map(asRecord).filter((record) => Object.keys(record).length > 0) : []) {
+    for (const decision of Array.isArray(decisions)
+        ? decisions.map(asRecord).filter((record) => Object.keys(record).length > 0)
+        : []) {
         incrementReason(dispositionCounts, decision['disposition']);
         for (const reason of uniqueStringList(decision['hardExclusions'])) incrementReason(hardReasonCounts, reason);
         for (const reason of uniqueStringList(decision['softPenalties'])) incrementReason(softReasonCounts, reason);
@@ -545,7 +577,9 @@ function uniqueStringList(value) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**
@@ -571,7 +605,12 @@ export function buildCatalogRefreshStartedEvent(input) {
  *     source?: string;
  *     storePath?: string | null;
  *     importerIds?: string[];
- *     snapshot: { projections?: unknown[]; providerProjections?: unknown[]; importRuns?: unknown[]; conflicts?: unknown[] };
+ *     snapshot: {
+ *         projections?: unknown[];
+ *         providerProjections?: unknown[];
+ *         importRuns?: unknown[];
+ *         conflicts?: unknown[];
+ *     };
  *     diff: ReturnType<typeof import('../catalog/import-runs.js').diffCanonicalModelProjections>;
  *     openai?: ReturnType<typeof import('../catalog/openai-schema.js').toOpenAIModelCatalogList>;
  * }} input
@@ -602,7 +641,9 @@ export function buildCatalogRefreshCompletedEvent(input) {
         storePath: optionalString(input.storePath),
         importerIds: uniqueStringList(input.importerIds),
         projectionCount: Array.isArray(input.snapshot.projections) ? input.snapshot.projections.length : 0,
-        providerProjectionCount: Array.isArray(input.snapshot.providerProjections) ? input.snapshot.providerProjections.length : 0,
+        providerProjectionCount: Array.isArray(input.snapshot.providerProjections)
+            ? input.snapshot.providerProjections.length
+            : 0,
         openaiModelCount: Array.isArray(input.openai?.data) ? input.openai.data.length : 0,
         importRunCount: Array.isArray(input.snapshot.importRuns) ? input.snapshot.importRuns.length : 0,
         conflictCount: Array.isArray(input.snapshot.conflicts) ? input.snapshot.conflicts.length : 0,
@@ -645,9 +686,21 @@ export function projectCatalogRefreshCompletedMetrics(event) {
  * @param {{
  *     source?: string;
  *     storePath?: string | null;
- *     diff: { added?: string[]; removed?: string[]; changed?: Array<{ key?: string; changedFields?: string[]; changedKinds?: string[] }> };
+ *     diff: {
+ *         added?: string[];
+ *         removed?: string[];
+ *         changed?: { key?: string; changedFields?: string[]; changedKinds?: string[] }[];
+ *     };
  * }} input
- * @returns {Array<{ type: string; timestamp: number; source: string; storePath: string | null; key: string; changedFields?: string[]; changedKinds?: string[] }>}
+ * @returns {{
+ *     type: string;
+ *     timestamp: number;
+ *     source: string;
+ *     storePath: string | null;
+ *     key: string;
+ *     changedFields?: string[];
+ *     changedKinds?: string[];
+ * }[]}
  */
 export function buildCatalogRefreshModelEvents(input) {
     const timestamp = Date.now();
@@ -682,7 +735,16 @@ export function buildCatalogRefreshModelEvents(input) {
  *     storePath?: string | null;
  *     snapshot: { conflicts?: unknown[] };
  * }} input
- * @returns {Array<{ type: string; timestamp: number; source: string; storePath: string | null; projectionKey: string | null; fieldPath: string | null; selectedEvidenceId: string | null; conflictingEvidenceIds: string[] }>}
+ * @returns {{
+ *     type: string;
+ *     timestamp: number;
+ *     source: string;
+ *     storePath: string | null;
+ *     projectionKey: string | null;
+ *     fieldPath: string | null;
+ *     selectedEvidenceId: string | null;
+ *     conflictingEvidenceIds: string[];
+ * }[]}
  */
 export function buildCatalogConflictDetectedEvents(input) {
     const timestamp = Date.now();
@@ -709,7 +771,7 @@ export function buildCatalogConflictDetectedEvents(input) {
  *     completedEvent: ReturnType<typeof buildCatalogRefreshCompletedEvent>;
  *     modelEvents: ReturnType<typeof buildCatalogRefreshModelEvents>;
  *     conflictEvents: ReturnType<typeof buildCatalogConflictDetectedEvents>;
- *     events: Array<{ type: string; [key: string]: unknown }>;
+ *     events: { type: string; [key: string]: unknown }[];
  * }}
  */
 export function buildCatalogRefreshEventBatch(input) {

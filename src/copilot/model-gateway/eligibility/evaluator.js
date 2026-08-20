@@ -8,6 +8,11 @@
  * @module copilot/model-gateway/eligibility/evaluator
  */
 
+import { resolveModelGatewayAccountAccess } from '../account-access/index.js';
+import {
+    MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS,
+    evaluateModelGatewayModelLifecycle,
+} from '../contracts/model-lifecycle.js';
 import {
     MODEL_GATEWAY_ELIGIBILITY_DISPOSITION,
     MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS,
@@ -15,11 +20,6 @@ import {
     createModelEligibilityDecision,
 } from './contracts.js';
 import { resolveModelGatewayEligibilityPolicy } from './policy-presets.js';
-import { resolveModelGatewayAccountAccess } from '../account-access/index.js';
-import {
-    MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS,
-    evaluateModelGatewayModelLifecycle,
-} from '../contracts/model-lifecycle.js';
 
 const BUDGET_PRICE_FIELDS = Object.freeze([
     Object.freeze({
@@ -117,7 +117,9 @@ function truthy(value) {
  * @returns {string}
  */
 function keyToken(value) {
-    return String(value ?? '').trim().toLowerCase();
+    return String(value ?? '')
+        .trim()
+        .toLowerCase();
 }
 
 /**
@@ -172,10 +174,12 @@ function evaluateBudgetPolicy(pricing, policy) {
         if (preferred !== null) checkedPreference = true;
 
         if (price === null) {
-            if (policy['requireKnownPricing'] === true && (max !== null || preferred !== null)) missingRequiredPrice = true;
+            if (policy['requireKnownPricing'] === true && (max !== null || preferred !== null))
+                missingRequiredPrice = true;
             continue;
         }
-        if (max !== null && price > max) hard.push(`${MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.BUDGET_EXCEEDED}:${spec.field}`);
+        if (max !== null && price > max)
+            hard.push(`${MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.BUDGET_EXCEEDED}:${spec.field}`);
         if (preferred !== null && price > preferred) {
             soft.push(`${MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PRICE_ABOVE_PREFERENCE}:${spec.field}`);
         }
@@ -184,10 +188,16 @@ function evaluateBudgetPolicy(pricing, policy) {
     if (policy['requireKnownPricing'] === true && (Object.keys(pricing).length === 0 || missingRequiredPrice)) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PRICE_UNKNOWN);
     }
-    if (checkedHardLimit && hard.every((reason) => !reason.startsWith(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.BUDGET_EXCEEDED))) {
+    if (
+        checkedHardLimit &&
+        hard.every((reason) => !reason.startsWith(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.BUDGET_EXCEEDED))
+    ) {
         reasons.push('budget_within_hard_limits');
     }
-    if (checkedPreference && soft.every((reason) => !reason.startsWith(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PRICE_ABOVE_PREFERENCE))) {
+    if (
+        checkedPreference &&
+        soft.every((reason) => !reason.startsWith(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.PRICE_ABOVE_PREFERENCE))
+    ) {
         reasons.push('budget_within_preferences');
     }
     return { hard, soft, reasons, observed };
@@ -331,9 +341,15 @@ function errorContextText(value) {
  */
 function isFatalHealth(health, nowMs) {
     const status = optionalString(health['lastStatus']);
-    const failureContext = [errorContextText(health['lastErrorContext']), errorContextText(health['lastMessage'])].filter(Boolean).join(' ');
+    const failureContext = [errorContextText(health['lastErrorContext']), errorContextText(health['lastMessage'])]
+        .filter(Boolean)
+        .join(' ');
     if (status !== 'failed') return false;
-    if (!/(?:auth|unauthori[sz]ed|permission|forbidden|not[_ -]?found|quota|billing|rate[_ -]?limit)/iu.test(failureContext)) {
+    if (
+        !/(?:auth|unauthori[sz]ed|permission|forbidden|not[_ -]?found|quota|billing|rate[_ -]?limit)/iu.test(
+            failureContext,
+        )
+    ) {
         return false;
     }
     const resetAtMs = dateMs(health['lastResetAt']);
@@ -367,7 +383,8 @@ export function evaluateModelGatewayEligibility(input) {
     const nowMs = dateMs(input.now) ?? Date.now();
     const providerId = readProviderId(routeOption, projection);
     const providerModel = readProviderModel(routeOption, projection);
-    const selectorSyntax = optionalString(routeOption['selectorSyntax']) ?? optionalString(projection['selectorSyntax']) ?? providerModel;
+    const selectorSyntax =
+        optionalString(routeOption['selectorSyntax']) ?? optionalString(projection['selectorSyntax']) ?? providerModel;
     const policy = /** @type {Record<string, unknown>} */ (resolveModelGatewayEligibilityPolicy(input.policy));
     const accountScope = optionalString(policy['accountScope']);
     const hard = [];
@@ -411,7 +428,8 @@ export function evaluateModelGatewayEligibility(input) {
     const blockWireApis = new Set(stringList(policy['blockWireApis']).map(keyToken));
     const routeContext = routeEligibilityContext(routeOption, routePolicyRecord);
 
-    if (allowProviders.size > 0 && !allowProviders.has(providerId)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_NOT_ALLOWED);
+    if (allowProviders.size > 0 && !allowProviders.has(providerId))
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_NOT_ALLOWED);
     if (blockProviders.has(providerId)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.PROVIDER_BLOCKED);
     if (!allowedByOptionalSet(allowUpstreamProviders, routeContext.upstreamProvider)) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.UPSTREAM_PROVIDER_NOT_ALLOWED);
@@ -428,12 +446,14 @@ export function evaluateModelGatewayEligibility(input) {
     if (!allowedByOptionalSet(allowWireApis, routeContext.wireApi)) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.WIRE_API_NOT_ALLOWED);
     }
-    if (blockedBySet(blockWireApis, routeContext.wireApi)) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.WIRE_API_BLOCKED);
+    if (blockedBySet(blockWireApis, routeContext.wireApi))
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.WIRE_API_BLOCKED);
     const routeIdentityTokens = [providerModel, selectorSyntax].map(keyToken);
     if (allowModels.size > 0 && routeIdentityTokens.every((token) => !allowModels.has(token))) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_NOT_ALLOWED);
     }
-    if (routeIdentityTokens.some((token) => blockModels.has(token))) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_BLOCKED);
+    if (routeIdentityTokens.some((token) => blockModels.has(token)))
+        hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_BLOCKED);
     if (projection['enabled'] === false) hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_DISABLED);
 
     const lifecycleRecord = lifecycle(projection);
@@ -442,10 +462,7 @@ export function evaluateModelGatewayEligibility(input) {
         lifecycleStatus ? { ...projection, lifecycle: { ...lifecycleRecord, status: lifecycleStatus } } : projection,
         { now: nowMs },
     );
-    if (
-        canonicalLifecycle.status === MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.RETIRED &&
-        policy['allowRetired'] !== true
-    ) {
+    if (canonicalLifecycle.status === MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.RETIRED && policy['allowRetired'] !== true) {
         hard.push(MODEL_GATEWAY_ELIGIBILITY_HARD_REASONS.MODEL_RETIRED);
     }
     if (canonicalLifecycle.status === MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.EXPIRED) {
@@ -494,7 +511,8 @@ export function evaluateModelGatewayEligibility(input) {
     if (Object.values(confidenceByField).some((value) => value === 'heuristic' || value === 'unknown')) {
         soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.LOW_CONFIDENCE);
     }
-    if (routeTraitsRecord['autoSelection'] === true) soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.ROUTE_AUTO_SELECTS_UPSTREAM);
+    if (routeTraitsRecord['autoSelection'] === true)
+        soft.push(MODEL_GATEWAY_ELIGIBILITY_SOFT_REASONS.ROUTE_AUTO_SELECTS_UPSTREAM);
 
     const uniqueHard = [...new Set(hard)];
     const uniqueSoft = [...new Set(soft)];
@@ -515,7 +533,8 @@ export function evaluateModelGatewayEligibility(input) {
     return createModelEligibilityDecision({
         providerId,
         providerModel,
-        routeProfile: optionalString(routeOption['routeProfile']) ?? optionalString(projection['routeProfile']) ?? undefined,
+        routeProfile:
+            optionalString(routeOption['routeProfile']) ?? optionalString(projection['routeProfile']) ?? undefined,
         selectorKind: optionalString(routeOption['selectorKind']) ?? 'exact_model',
         selectorSyntax,
         accountScope: accountScope ?? 'default',

@@ -1,9 +1,9 @@
 # Canonical Model Gateway Runtime Operator Automation Guide - 2026-06-02
 
-Este documento passa a guiar a fase operacional do `src/copilot/model-gateway/` e sua integracao com o terminal BYOK.
-Os guias anteriores continuam como historico e contexto, mas este arquivo organiza o trabalho atual: deixar o sistema
-pronto para uso por operador humano ou LLM, com fluxos claros, comandos canonicos, standby, fallback, selecao
-pre-runtime, selecao runtime e testes live LLM-B.
+Este documento passa a guiar a fase operacional do `src/copilot/model-gateway/` e sua integracao com
+o terminal BYOK. Os guias anteriores continuam como historico e contexto, mas este arquivo organiza
+o trabalho atual: deixar o sistema pronto para uso por operador humano ou LLM, com fluxos claros,
+comandos canonicos, standby, fallback, selecao pre-runtime, selecao runtime e testes live LLM-B.
 
 Referencia canonica transversal atual:
 
@@ -15,7 +15,8 @@ Referencia canonica transversal atual:
 - Ponte terminal: `src/copilot/terminal/byok/` e `src/copilot/terminal/commands/byok.js`.
 - Scripts operacionais: `scripts/model-gateway/`.
 - Banco canonico: catalogo JSON e SQLite de model-gateway.
-- Camada volatil: runtime health, account/key overlays, route decisions, automation decisions e live runs.
+- Camada volatil: runtime health, account/key overlays, route decisions, automation decisions e live
+  runs.
 - Live testing: `npm run model-gateway:live:llm-b` via runner canonico.
 
 ## 2. Principios Arquiteturais
@@ -43,10 +44,14 @@ Referencia canonica transversal atual:
 - [x] Terminal possui `/byok auto status`, `apply`, `standby`, `proof-plan`, `doctor`, `recoveries`.
 - [x] Post-turn recovery grava falha em health operacional e SQLite.
 - [x] Falha da rota selecionada pode promover fallback standby no decision core.
-- [x] `operator-ready` agrega SQLite diagnostics, auto-ready, selector, standby, health diff e live artifacts.
-- [x] Standby plans podem ser persistidos no SQLite operacional por perfil sem tocar no catalogo canonico.
-- [x] Standby persistido pode ser inspecionado sem recalcular selector por `--read-sqlite`/`persisted`.
-- [x] `auto:scenarios` inclui cockpit operator-ready, standby gerado, standby persistido e snapshot persistivel.
+- [x] `operator-ready` agrega SQLite diagnostics, auto-ready, selector, standby, health diff e live
+      artifacts.
+- [x] Standby plans podem ser persistidos no SQLite operacional por perfil sem tocar no catalogo
+      canonico.
+- [x] Standby persistido pode ser inspecionado sem recalcular selector por
+      `--read-sqlite`/`persisted`.
+- [x] `auto:scenarios` inclui cockpit operator-ready, standby gerado, standby persistido e snapshot
+      persistivel.
 - [x] Scripts foram movidos para `scripts/model-gateway/commands/`.
 - [x] Runner/barrel vive em `scripts/model-gateway/run.mjs` e `scripts/model-gateway/index.mjs`.
 - [x] Manifesto JSON do runner existe em `npm run model-gateway:scripts`.
@@ -54,13 +59,18 @@ Referencia canonica transversal atual:
 
 ### 3.2 Gaps Atuais De Maior Retorno
 
-- [x] O cockpit `operator-ready` esta exposto diretamente no terminal por `/byok gateway operator-ready`.
+- [x] O cockpit `operator-ready` esta exposto diretamente no terminal por
+      `/byok gateway operator-ready`.
 - [x] O standby virou contrato de dados reutilizavel por `model-gateway-runtime-standby-plan`.
-- [x] O standby virou contrato persistivel com snapshot por perfil em `copilot_model_gateway_standby_plans`.
+- [x] O standby virou contrato persistivel com snapshot por perfil em
+      `copilot_model_gateway_standby_plans`.
 - [ ] O terminal ainda nao mostra `fallbackFromSelectedRouteKey` e `fallbackReason` em auto status.
-- [x] A policy default continua conservadora em repouso, mas `/byok auto on` agora tem preset operacional claro.
-- [x] Presets `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e `auto_prepare_new_session` existem como contrato do gateway.
-- [ ] Falta um comando terminal unico que diga: modelo vivo, modelo preparado, melhor rota, standby e proximo passo.
+- [x] A policy default continua conservadora em repouso, mas `/byok auto on` agora tem preset
+      operacional claro.
+- [x] Presets `operator_manual`, `llm_operator_guarded`, `auto_same_boundary` e
+      `auto_prepare_new_session` existem como contrato do gateway.
+- [ ] Falta um comando terminal unico que diga: modelo vivo, modelo preparado, melhor rota, standby
+      e proximo passo.
 - [ ] Falta live fixture especifica para post-turn fallback real sem provider call.
 - [ ] Falta live test LLM-B em escada apos consolidar o cockpit.
 - [ ] Falta acoplar confirmacao de novo boot SDK ao fluxo automatico de troca de provider.
@@ -94,7 +104,8 @@ Referencia canonica transversal atual:
 ### 4.3 Fluxo De Quota E Falhas
 
 1. Provider responde erro ou terminal observa falha.
-2. Falha e classificada como auth, credits, quota, rate-limit, model-inaccessible, timeout ou unknown.
+2. Falha e classificada como auth, credits, quota, rate-limit, model-inaccessible, timeout ou
+   unknown.
 3. Health operacional recebe scope provider/model/profile.
 4. SQLite espelha health sem tocar no catalogo.
 5. Selector exclui rota bloqueada enquanto cooldown/reset estiver ativo.
@@ -149,19 +160,28 @@ Referencia canonica transversal atual:
 
 #### Presets Implementados Em 2026-06-02
 
-`operator_manual` deixa a automacao ligada apenas para orientar e registrar decisoes, sem trocar modelo vivo e sem preparar novo boot.
+`operator_manual` deixa a automacao ligada apenas para orientar e registrar decisoes, sem trocar
+modelo vivo e sem preparar novo boot.
 
-`llm_operator_guarded` exige prova runtime antes de recomendar rota e tambem nao aplica efeitos automaticamente.
+`llm_operator_guarded` exige prova runtime antes de recomendar rota e tambem nao aplica efeitos
+automaticamente.
 
-`auto_same_boundary` e o default de `/byok auto on`: autoriza troca de modelo vivo apenas quando a fronteira SDK/provider continua compativel, sem iniciar nova sessao.
+`auto_same_boundary` e o default de `/byok auto on`: autoriza troca de modelo vivo apenas quando a
+fronteira SDK/provider continua compativel, sem iniciar nova sessao.
 
-`auto_prepare_new_session` autoriza troca dentro da mesma fronteira e preparacao de novo boot SDK quando a rota exige outro provider/boundary.
+`auto_prepare_new_session` autoriza troca dentro da mesma fronteira e preparacao de novo boot SDK
+quando a rota exige outro provider/boundary.
 
-Todos os presets mantem provider probes e local/Ollama desligados por default. Local/private continua exigindo opt-in explicito do operador.
+Todos os presets mantem provider probes e local/Ollama desligados por default. Local/private
+continua exigindo opt-in explicito do operador.
 
-`npm run model-gateway:operator-ready -- --json` expoe `policyPresets[]`, com comando terminal, env sugerido e efeitos permitidos por preset. O cockpit terminal mostra tambem o `preset` efetivo na linha de policy.
+`npm run model-gateway:operator-ready -- --json` expoe `policyPresets[]`, com comando terminal, env
+sugerido e efeitos permitidos por preset. O cockpit terminal mostra tambem o `preset` efetivo na
+linha de policy.
 
-Os effects do controller agora carregam `authorization`, `policyGate` e `blockedReason`. `/byok auto status` e `/byok auto apply` mostram esses motivos quando um efeito fica em dry-run ou e negado pela policy.
+Os effects do controller agora carregam `authorization`, `policyGate` e `blockedReason`.
+`/byok auto status` e `/byok auto apply` mostram esses motivos quando um efeito fica em dry-run ou e
+negado pela policy.
 
 ### Faixa D - Standby Contract
 
@@ -225,7 +245,8 @@ Os effects do controller agora carregam `authorization`, `policyGate` e `blocked
 - [x] H.7 Rodar live real no-PR com runtime selector.
 - [ ] H.8 Rodar live fallback fixture com post-turn recovery.
 - [x] H.9 Registrar artifact paths no guia e no ledger.
-- [x] H.10 Reduzir latencia de `auto:scenarios` se o caminho agregado passar de 60s no ambiente do operador.
+- [x] H.10 Reduzir latencia de `auto:scenarios` se o caminho agregado passar de 60s no ambiente do
+      operador.
 - [ ] H.11 Corrigir bugs encontrados e repetir readiness.
 
 ### Faixa I - Integracao Ao Runtime Automatizado
@@ -314,22 +335,26 @@ npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000
 
 ## 9. Evidencias Live Recentes
 
-- [x] 2026-06-02T01:58:35.575Z - `npm run model-gateway:live:auto-probe` passou sem abrir turno de modelo e sem provider call.
+- [x] 2026-06-02T01:58:35.575Z - `npm run model-gateway:live:auto-probe` passou sem abrir turno de
+      modelo e sem provider call.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T01-58-35-568Z/summary.md`.
 - [x] Check `gateway-operator-ready-visible` confirmou `/byok gateway operator-ready`.
 - [x] Check `auto-recovery-fixture-visible` confirmou recovery sintético com health persistida.
 - [x] Check `no-terminal-errors` confirmou error tracker limpo.
-- [x] 2026-06-02T02:44:38.197Z - `npm run model-gateway:live:auto-probe` passou em escada completa de cockpit,
-  standby, recovery fixture, SSE e ledger.
+- [x] 2026-06-02T02:44:38.197Z - `npm run model-gateway:live:auto-probe` passou em escada completa
+      de cockpit, standby, recovery fixture, SSE e ledger.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-44-38-191Z/summary.md`.
 - [x] 2026-06-02T02:45:10.607Z - `npm run model-gateway:live:llm-b -- --no-pr --timeout-ms=180000`
-  passou como controle terminal.
+      passou como controle terminal.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-10-607Z/summary.md`.
-- [x] 2026-06-02T02:45:29.927Z - `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
-  passou com fixture, troca de perfil/modelo, catalogo e redacao.
+- [x] 2026-06-02T02:45:29.927Z -
+      `npm run model-gateway:live:llm-b -- --byok-probe --byok-fixture --no-pr --timeout-ms=240000`
+      passou com fixture, troca de perfil/modelo, catalogo e redacao.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-29-920Z/summary.md`.
-- [x] 2026-06-02T02:45:55.246Z - live real no-PR com runtime selector passou com `repo_agent -> kilo-code:kilo-auto/free`,
-  chat, streaming, JSON, agent e shortlist agent OK.
+- [x] 2026-06-02T02:45:55.246Z - live real no-PR com runtime selector passou com
+      `repo_agent -> kilo-code:kilo-auto/free`, chat, streaming, JSON, agent e shortlist agent OK.
 - [x] Artifact: `artifacts/terminal-live/2026-06-02T02-45-55-239Z/summary.md`.
-- [x] Vision real falhou com HTTP 400, mas foi gravado como capability nao provada sem degradar chat/agent.
-- [x] Side-channel `quota.warning` GitHub Copilot apareceu, mas a UI classificou BYOK como provider/model ativo separado.
+- [x] Vision real falhou com HTTP 400, mas foi gravado como capability nao provada sem degradar
+      chat/agent.
+- [x] Side-channel `quota.warning` GitHub Copilot apareceu, mas a UI classificou BYOK como
+      provider/model ativo separado.

@@ -77,8 +77,8 @@ export function collectPhysicalLineStarts(content) {
 }
 
 /**
- * Recorta uma janela 1-based em uma única varredura e memória O(1).
- * Delimitadores internos são preservados; o delimitador final da janela é excluído.
+ * Recorta uma janela 1-based em uma única varredura e memória O(1). Delimitadores internos são preservados; o
+ * delimitador final da janela é excluído.
  *
  * @param {string} content
  * @param {{ startLine?: number | undefined; endLine?: number | undefined }} [window]
@@ -127,8 +127,8 @@ export function countPhysicalTextLines(content) {
 }
 
 /**
- * Retorna a linha física 1-based de um offset UTF-16, sem criar substring.
- * CRLF conta somente depois que ambos os code units ficaram antes do offset.
+ * Retorna a linha física 1-based de um offset UTF-16, sem criar substring. CRLF conta somente depois que ambos os code
+ * units ficaram antes do offset.
  *
  * @param {string} content
  * @param {number} offset

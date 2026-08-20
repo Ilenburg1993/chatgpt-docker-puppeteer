@@ -621,12 +621,10 @@ class ConnectionOrchestrator {
             }
             try {
                 const parsed = new URL(url);
-                return this.config.allowedDomains.some(
-                    (/** @type {string} */ d) => {
-                        // Match exact hostname or subdomain
-                        return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
-                    },
-                );
+                return this.config.allowedDomains.some((/** @type {string} */ d) => {
+                    // Match exact hostname or subdomain
+                    return parsed.hostname === d || parsed.hostname.endsWith(`.${d}`);
+                });
             } catch {
                 return false; // Invalid URL
             }

@@ -60,12 +60,8 @@ export async function chatStructured(deps, input, opts = {}) {
             log('INFO', '[LlmBridgeClient] chatStructured: segunda tentativa bem-sucedida.');
             structured = retryStructured;
             const mergedChunks = mergeChunkRetentions([chatResult, retryResult], {
-                ...(chatOpts.maxCapturedChunkBytes !== undefined
-                    ? { maxBytes: chatOpts.maxCapturedChunkBytes }
-                    : {}),
-                ...(chatOpts.maxCapturedChunks !== undefined
-                    ? { maxItems: chatOpts.maxCapturedChunks }
-                    : {}),
+                ...(chatOpts.maxCapturedChunkBytes !== undefined ? { maxBytes: chatOpts.maxCapturedChunkBytes } : {}),
+                ...(chatOpts.maxCapturedChunks !== undefined ? { maxItems: chatOpts.maxCapturedChunks } : {}),
             });
             Object.assign(chatResult, {
                 response: retryResult.response,

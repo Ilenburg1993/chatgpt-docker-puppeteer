@@ -80,8 +80,8 @@ import {
     sessionLog,
     setModel,
     setReasoningEffort,
-    switchModelTransactional,
     switchAgentRouteTransactional,
+    switchModelTransactional,
     updateSdkPlan,
     wireAgentModelGatewayTurnBoundaryPromotion,
 } from './runtime/root-surface/index.js';

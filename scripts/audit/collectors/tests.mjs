@@ -1,7 +1,7 @@
 // @ts-check
 import { runCommand } from '../lib/exec.mjs';
 
-/** @import {RawFinding} from "../normalize/findings.mjs" */
+/** @import {RawFinding} from '../normalize/findings.mjs' */
 
 /**
  * @param {string} sourceTool

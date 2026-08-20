@@ -44,36 +44,33 @@ function formatRetryAfter(seconds) {
 
 /**
  * @param {{
- *   message: string;
- *   errorContext: string;
- *   provider: string | null;
- *   profile: string | null;
- *   model: string | null;
- *   failure: {
- *      kind: string;
- *      operatorLabel: string;
- *      operatorAction: string;
- *      statusCode: number | null;
- *      retryAfterSeconds?: number | null;
- *      resetAt?: string | null;
- *   };
+ *     message: string;
+ *     errorContext: string;
+ *     provider: string | null;
+ *     profile: string | null;
+ *     model: string | null;
+ *     failure: {
+ *         kind: string;
+ *         operatorLabel: string;
+ *         operatorAction: string;
+ *         statusCode: number | null;
+ *         retryAfterSeconds?: number | null;
+ *         resetAt?: string | null;
+ *     };
  * }} descriptor
  * @returns {{
- *   title: string;
- *   summary: string;
- *   destination: string;
- *   action: string;
- *   window: string | null;
- *   technicalDetail: string;
+ *     title: string;
+ *     summary: string;
+ *     destination: string;
+ *     action: string;
+ *     window: string | null;
+ *     technicalDetail: string;
  * }}
  */
 export function presentByokTurnFailure(descriptor) {
     const retry = formatRetryAfter(descriptor.failure.retryAfterSeconds);
     const resetAt = optionalPart(descriptor.failure.resetAt);
-    const windowParts = [
-        retry ? `retry-after ${retry}` : null,
-        resetAt ? `reset ${resetAt}` : null,
-    ].filter(Boolean);
+    const windowParts = [retry ? `retry-after ${retry}` : null, resetAt ? `reset ${resetAt}` : null].filter(Boolean);
     const destination = [
         descriptor.profile ? `perfil ${descriptor.profile}` : null,
         descriptor.provider ? `provedor ${descriptor.provider}` : null,

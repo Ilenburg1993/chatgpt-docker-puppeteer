@@ -2,8 +2,8 @@
 /**
  * Presenter compartilhado para estados de recuperacao do dialogo terminal.
  *
- * Esses textos aparecem em stdout humano e em comandos como `/events`. O payload bruto continua
- * preservado em SSE/raw/export; aqui mantemos uma camada curta, acionavel e sem IDs longos.
+ * Esses textos aparecem em stdout humano e em comandos como `/events`. O payload bruto continua preservado em
+ * SSE/raw/export; aqui mantemos uma camada curta, acionavel e sem IDs longos.
  *
  * @module copilot/terminal/events/dialog-recovery-presenter
  */
@@ -59,13 +59,13 @@ export function buildEmptyAfterUserInputResumeMessage(input = {}) {
  *     turnId?: unknown;
  *     includeModelSwitch?: boolean;
  * }} [input]
- * @returns {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>}
+ * @returns {{ label: string; value: string; role: 'muted' | 'warn' | 'command' }[]}
  */
 export function buildEmptyAfterUserInputRecoveryRows(input = {}) {
     const detail = compactTerminalRecoveryText(input.detail, 132);
     const answerPreview = compactTerminalRecoveryText(input.answerPreview, 80);
     const turnId = compactTerminalRecoveryText(input.turnId, 40);
-    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' } | null>} */
+    /** @type {({ label: string; value: string; role: 'muted' | 'warn' | 'command' } | null)[]} */
     const rows = [
         {
             label: 'Estado',
@@ -78,10 +78,14 @@ export function buildEmptyAfterUserInputRecoveryRows(input = {}) {
         { label: 'Retomar', value: EMPTY_AFTER_USER_INPUT_RESUME_COMMAND, role: 'command' },
         { label: 'Diagnóstico', value: EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS, role: 'command' },
         input.includeModelSwitch
-            ? { label: 'Alternativa', value: `${EMPTY_AFTER_USER_INPUT_MODEL_COMMAND} para trocar modelo`, role: 'command' }
+            ? {
+                  label: 'Alternativa',
+                  value: `${EMPTY_AFTER_USER_INPUT_MODEL_COMMAND} para trocar modelo`,
+                  role: 'command',
+              }
             : null,
     ];
-    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>} */
+    /** @type {{ label: string; value: string; role: 'muted' | 'warn' | 'command' }[]} */
     const visibleRows = [];
     for (const row of rows) {
         if (row && row.value.length > 0) visibleRows.push(row);
@@ -114,13 +118,13 @@ export function summarizeAfterUserInputContinuation(input = {}) {
  *     answerPreview?: unknown;
  *     turnId?: unknown;
  * }} [input]
- * @returns {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>}
+ * @returns {{ label: string; value: string; role: 'muted' | 'warn' | 'command' }[]}
  */
 export function buildEmptyAfterUserInputAutoRecoveryRows(input = {}) {
     const detail = compactTerminalRecoveryText(input.detail, 132);
     const answerPreview = compactTerminalRecoveryText(input.answerPreview, 80);
     const turnId = compactTerminalRecoveryText(input.turnId, 40);
-    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' } | null>} */
+    /** @type {({ label: string; value: string; role: 'muted' | 'warn' | 'command' } | null)[]} */
     const rows = [
         {
             label: 'Estado',
@@ -135,7 +139,7 @@ export function buildEmptyAfterUserInputAutoRecoveryRows(input = {}) {
         { label: 'Diagnóstico', value: EMPTY_AFTER_USER_INPUT_DIAGNOSTIC_COMMANDS, role: 'command' },
         { label: 'Se repetir', value: `${EMPTY_AFTER_USER_INPUT_MODEL_COMMAND} para trocar modelo`, role: 'command' },
     ];
-    /** @type {Array<{ label: string; value: string; role: 'muted' | 'warn' | 'command' }>} */
+    /** @type {{ label: string; value: string; role: 'muted' | 'warn' | 'command' }[]} */
     const visibleRows = [];
     for (const row of rows) {
         if (row && row.value.length > 0) visibleRows.push(row);

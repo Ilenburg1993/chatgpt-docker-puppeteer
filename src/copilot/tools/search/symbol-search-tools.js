@@ -2,8 +2,8 @@
 /**
  * Search tools de símbolos: `workspace_symbol_search`.
  *
- * Owner canônico da tool de busca simbólica (funções, classes, exports, tipos).
- * Extraído de `file/read-tools.js` para separar domain search do domain file-read.
+ * Owner canônico da tool de busca simbólica (funções, classes, exports, tipos). Extraído de `file/read-tools.js` para
+ * separar domain search do domain file-read.
  *
  * @module copilot/tools/search/symbol-search-tools
  */
@@ -11,6 +11,7 @@
 import { toError, withIoMeta } from '#copilot/core';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { z } from 'zod';
+import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
 import {
@@ -19,7 +20,6 @@ import {
     extractToolFailureTraceId,
     normalizeToolFailure,
 } from '../infra/tool-operation-result.js';
-import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 
 const { searchWorkspaceSymbols } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
@@ -34,20 +34,27 @@ export const workspaceSymbolSearchTool = buildTool({
     parameters: z.object({
         name: z
             .string()
-            .min(1)['describe']('Nome ou prefixo/substring do símbolo a buscar (ex: "validatePath", "MyClass")'),
+            .min(1)
+            ['describe']('Nome ou prefixo/substring do símbolo a buscar (ex: "validatePath", "MyClass")'),
         kind: z
             .enum(['function', 'class', 'variable', 'export', 'type', 'all'])
             .optional()
-            .default('all')['describe']('Tipo de símbolo: function, class, variable, export, type ou all (qualquer declaração).'),
+            .default('all')
+            ['describe']('Tipo de símbolo: function, class, variable, export, type ou all (qualquer declaração).'),
         path: z
             .string()
             .optional()
-            .default('.')['describe']('Diretório onde buscar (relativo ao workspace). Default: raiz do workspace'),
+            .default('.')
+            ['describe']('Diretório onde buscar (relativo ao workspace). Default: raiz do workspace'),
         includePattern: z.string().optional()['describe']('Glob de arquivos a incluir (ex: "*.ts", "src/**/*.js")'),
         caseSensitive: z.boolean().optional().default(false)['describe']('Busca sensível a maiúsculas. Default: false'),
         maxResults: z.number().int().min(1).optional()['describe']('Número máximo sugerido de declarações a retornar.'),
         cursor: z.string().optional()['describe']('Cursor numérico retornado por chamada anterior.'),
-        exactMatch: z.boolean().optional().default(false)['describe']('Se true, busca apenas símbolos com nome exato (sem substring match). Default: false.'),
+        exactMatch: z
+            .boolean()
+            .optional()
+            .default(false)
+            ['describe']('Se true, busca apenas símbolos com nome exato (sem substring match). Default: false.'),
     }),
     handler: async ({
         name: symbolName,
@@ -140,7 +147,8 @@ export const workspaceSymbolSearchTool = buildTool({
                 ...(code === 'ERR_INVALID_CURSOR'
                     ? {
                           blockedReason: 'invalid_cursor',
-                          suggestedNextAction: 'Use o nextCursor retornado anteriormente ou omita cursor para reiniciar a paginação.',
+                          suggestedNextAction:
+                              'Use o nextCursor retornado anteriormente ou omita cursor para reiniciar a paginação.',
                       }
                     : {}),
             });

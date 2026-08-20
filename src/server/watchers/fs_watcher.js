@@ -38,7 +38,6 @@ function init() {
         try {
             await fsp.access(queuePath);
         } catch (/** @type {any} */ e) {
-
             log('WARN', `[FS_WATCHER] Alvo ausente: ${queuePath}. Tentando restauração...`);
             try {
                 await fsp.mkdir(queuePath, { recursive: true });

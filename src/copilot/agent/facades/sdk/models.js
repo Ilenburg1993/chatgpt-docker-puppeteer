@@ -7,8 +7,8 @@
  * @module copilot/agent/facades/sdk/models
  */
 
-import { isExperimentalEnabled } from '#copilot/sdk/feature-flags';
 import { DEFAULT_MODEL } from '#copilot/sdk/constants';
+import { isExperimentalEnabled } from '#copilot/sdk/feature-flags';
 import { listModels, modelRegistry, modelStatsTracker } from '#copilot/sdk/models';
 
 /** @type {string} */

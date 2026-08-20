@@ -2,7 +2,8 @@
 
 ## Why
 
-The latest benchmark shows `public.mcp_tools_list` latency is materially affected by the transfer/download phase, not only origin CPU or Cloudflare time-to-first-byte.
+The latest benchmark shows `public.mcp_tools_list` latency is materially affected by the
+transfer/download phase, not only origin CPU or Cloudflare time-to-first-byte.
 
 Observed pattern:
 
@@ -12,7 +13,9 @@ Observed pattern:
 - public `tools/list` download p50: about 169 ms
 - decoded payload: about 101 KB
 
-`/mcp` must not be Cloudflare-cached because it is POST JSON-RPC and may be authenticated or request-specific. The safe path is to measure transport/framing effects, then compact tool descriptors without reducing tool count.
+`/mcp` must not be Cloudflare-cached because it is POST JSON-RPC and may be authenticated or
+request-specific. The safe path is to measure transport/framing effects, then compact tool
+descriptors without reducing tool count.
 
 ## Changes
 
@@ -47,5 +50,6 @@ npm run copilot:mcp:latency:benchmark
 ## How to interpret
 
 - If `json_accept` is faster, the `Accept: text/event-stream` path is adding framing/proxy overhead.
-- If `identity_encoding` is faster, Brotli compression/decompression is not worth it for this response path.
+- If `identity_encoding` is faster, Brotli compression/decompression is not worth it for this
+  response path.
 - If both are similar, prioritize compact descriptors and Cloudflare/tunnel transport stability.

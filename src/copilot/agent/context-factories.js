@@ -53,9 +53,7 @@ import { SessionKeepalive } from './session/lifecycle/index.js';
  *     createSdkElicitation: (host: AgentContextFactoryHost) => {
  *         handler: import('#copilot/sdk/types').ElicitationHandler;
  *         resolvePending: (id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean;
- *         listPending: (opts?: {
- *             sessionId?: string;
- *         }) => import('#copilot/sdk/types').QueuedElicitationEntry[];
+ *         listPending: (opts?: { sessionId?: string }) => import('#copilot/sdk/types').QueuedElicitationEntry[];
  *         getPending: (id: string) => import('#copilot/sdk/types').QueuedElicitationEntry | null;
  *         clearPending: (id: string, result?: import('#copilot/sdk/types').ElicitationResult) => boolean;
  *         pendingCount: () => number;

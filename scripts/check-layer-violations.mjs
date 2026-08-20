@@ -72,7 +72,9 @@ function isAllowedBoundaryImport(relFile, targetModule, spec) {
     }
 
     if (relFile.startsWith('boot/')) {
-        return ['agent', 'audit', 'config', 'observability', 'sdk', 'server', 'terminal', 'tools'].includes(targetModule);
+        return ['agent', 'audit', 'config', 'observability', 'sdk', 'server', 'terminal', 'tools'].includes(
+            targetModule,
+        );
     }
 
     if (relFile.startsWith('audit/') && targetModule === 'events') {

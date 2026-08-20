@@ -3,8 +3,13 @@
  * Non-mutating selection decision trace helpers.
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import {
+    deleteFileTrusted,
+    listDirectoryNamesFreshTrusted,
+    lstatPathTrusted,
+    readTextFreshTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/trusted-io';
 import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR = 'data/copilot/model-gateway/selection-traces';
@@ -351,8 +356,62 @@ export async function persistModelGatewaySelectionDecisionTrace(trace, options =
  * @returns {Promise<Record<string, unknown>>}
  */
 export async function readModelGatewaySelectionDecisionTrace(filePath) {
-    const payload = JSON.parse(await readFile(resolve(filePath), 'utf8'));
+    const snapshot = await readTextFreshTrusted(resolve(filePath), {
+        caller: 'model-gateway.routing.selection-trace',
+    });
+    const payload = JSON.parse(snapshot.content);
     return optionalRecord(payload) ?? {};
+}
+
+/** @param {unknown} error */
+function isMissingTracePathError(error) {
+    const code = error && typeof error === 'object' ? /** @type {{ code?: unknown }} */ (error).code : undefined;
+    return code === 'ENOENT' || code === 'ENOTDIR';
+}
+
+/**
+ * Build a fresh, symlink-safe metadata projection for persisted trace files.
+ *
+ * `readdir(..., { withFileTypes: true }).isFile()` previously excluded symlinks. The canonical IO migration preserves
+ * that property explicitly with lstat instead of accidentally following a symlink through stat.
+ *
+ * @param {string} directory
+ * @returns {Promise<{ name: string; filePath: string; mtimeMs: number; size: number }[]>}
+ */
+async function listSelectionTraceMetadata(directory) {
+    /** @type {string[]} */
+    let names;
+    try {
+        const listing = await listDirectoryNamesFreshTrusted(directory, {
+            caller: 'model-gateway.routing.selection-trace',
+        });
+        names = listing.entries;
+    } catch (error) {
+        if (isMissingTracePathError(error)) return [];
+        throw error;
+    }
+
+    const candidates = names.filter((name) => name.endsWith('.json') && name !== 'latest.json');
+    const rows = await Promise.all(
+        candidates.map(async (name) => {
+            const filePath = resolve(directory, name);
+            try {
+                const { stats } = await lstatPathTrusted(filePath, {
+                    caller: 'model-gateway.routing.selection-trace',
+                });
+                if (!stats.isFile() || stats.isSymbolicLink()) return null;
+                return { name, filePath, mtimeMs: stats.mtimeMs, size: stats.size };
+            } catch (error) {
+                // A concurrent retention/write may remove one name after readdir. That race is a missing candidate,
+                // not a failure of the entire projection.
+                if (isMissingTracePathError(error)) return null;
+                throw error;
+            }
+        }),
+    );
+    return rows
+        .filter((row) => row !== null)
+        .sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name));
 }
 
 /**
@@ -445,27 +504,7 @@ export function compareModelGatewaySelectionDecisionTraces(leftTrace, rightTrace
 export async function listModelGatewaySelectionDecisionTraceFiles(options = {}) {
     const directory = resolve(optionalString(options.directory) ?? DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR);
     const limit = normalizePositiveInteger(options.limit, 50);
-    const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return [];
-        throw error;
-    });
-    const files = await Promise.all(
-        entries
-            .filter((entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'latest.json')
-            .map(async (entry) => {
-                const filePath = resolve(directory, entry.name);
-                const stats = await stat(filePath);
-                return {
-                    name: entry.name,
-                    filePath,
-                    mtimeMs: stats.mtimeMs,
-                    size: stats.size,
-                };
-            }),
-    );
-    return files
-        .sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name))
-        .slice(0, limit);
+    return (await listSelectionTraceMetadata(directory)).slice(0, limit);
 }
 
 /**
@@ -490,33 +529,17 @@ export async function applyModelGatewaySelectionTraceRetention(options = {}) {
     const maxFiles = normalizePositiveInteger(options.maxFiles, 100);
     const dryRun = options.dryRun !== false;
     try {
-        const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
-            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return [];
-            throw error;
-        });
-        const candidates = entries.filter(
-            (entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'latest.json',
-        );
-        const files = await Promise.all(
-            candidates.map(async (entry) => {
-                const filePath = resolve(directory, entry.name);
-                const stats = await stat(filePath);
-                return {
-                    name: entry.name,
-                    filePath,
-                    mtimeMs: stats.mtimeMs,
-                    size: stats.size,
-                };
-            }),
-        );
-        files.sort((left, right) => right.mtimeMs - left.mtimeMs || right.name.localeCompare(left.name));
+        const files = await listSelectionTraceMetadata(directory);
         const retained = files.slice(0, maxFiles);
         const pruned = files.slice(maxFiles);
         let deletedCount = 0;
         if (!dryRun) {
             for (const file of pruned) {
-                await rm(file.filePath, { force: true });
-                deletedCount += 1;
+                const removed = await deleteFileTrusted(file.filePath, {
+                    caller: 'model-gateway.routing.selection-trace',
+                    ignoreMissing: true,
+                });
+                if (removed) deletedCount += 1;
             }
         }
         return {

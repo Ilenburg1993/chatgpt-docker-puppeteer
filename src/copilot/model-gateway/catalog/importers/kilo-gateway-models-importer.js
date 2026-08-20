@@ -9,11 +9,7 @@
  * @module copilot/model-gateway/catalog/importers/kilo-gateway-models-importer
  */
 
-import {
-    MODEL_GATEWAY_CATALOG_CONFIDENCE,
-    createModelMetadataEvidence,
-    createModelRouteOption,
-} from '../contracts.js';
+import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createModelMetadataEvidence, createModelRouteOption } from '../contracts.js';
 import {
     normalizeModelAliases,
     normalizeModelIdentityTraits,
@@ -117,7 +113,7 @@ function selectorKindForKiloModel(providerModel) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const architecture = readArchitecture(row);
@@ -174,7 +170,10 @@ function modelEvidenceValues(row) {
         { fieldPath: 'providerMetadata.kilo.tokenizer', value: architecture['tokenizer'] },
         { fieldPath: 'providerMetadata.kilo.opencode', value: row['opencode'] },
         { fieldPath: 'providerMetadata.kilo.rawPricing', value: pricing },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'routingHints.kiloTopProvider', value: topProvider },
     ];
     return values.filter((item) => {
@@ -203,7 +202,8 @@ export function createKiloGatewayModelsImporter(options = {}) {
         refreshPolicy: 'scheduled',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Kilo Gateway catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Kilo Gateway catalog import');
             const response = await fetchImpl(url, { headers: { accept: 'application/json' } });
             if (!response.ok) throw new Error(`Kilo Gateway catalog fetch failed with HTTP ${response.status}`);
             return readCatalogResponseJson(response, { label: 'Kilo Gateway models' });
@@ -249,11 +249,7 @@ export function createKiloGatewayModelsImporter(options = {}) {
                         providerSpecific: {
                             upstreamProvider: upstreamProviderFromModel(providerModel),
                             requiresKiloCodeModeHeader: selectorKind === 'gateway_auto',
-                            acceptedHeaders: [
-                                'x-kilocode-mode',
-                                'X-KiloCode-OrganizationId',
-                                'X-KiloCode-TaskId',
-                            ],
+                            acceptedHeaders: ['x-kilocode-mode', 'X-KiloCode-OrganizationId', 'X-KiloCode-TaskId'],
                             supportsInternalByok: true,
                         },
                         normalizedPolicy: {

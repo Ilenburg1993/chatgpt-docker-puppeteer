@@ -6,13 +6,13 @@
  */
 
 import { MODEL_GATEWAY_SCHEMA_VERSION } from '../contracts/records.js';
-import { ModelGatewayRegistry } from './model-registry.js';
 import { importConfiguredByokFromEnv } from './env-byok-compat-importer.js';
 import { JsonModelGatewayRegistryStore } from './json-registry-store.js';
+import { ModelGatewayRegistry } from './model-registry.js';
 
 /**
  * @param {Record<string, string | undefined>} [env]
- */export function buildEnvByokModelGatewaySnapshot(env = process.env) {
+ */ export function buildEnvByokModelGatewaySnapshot(env = process.env) {
     const registry = new ModelGatewayRegistry();
     const imported = importConfiguredByokFromEnv(env);
     if (imported.provider) registry.upsertProvider(imported.provider);

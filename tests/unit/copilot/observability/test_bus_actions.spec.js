@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'vitest';
 
@@ -122,13 +121,18 @@ describe('bus-actions (FAIXA-L15)', () => {
         });
 
         it('registra eventos de erro no ErrorTracker quando disponível', () => {
-            /** @type {Array<{ err: unknown; opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined }>} */
+            /** @type {{
+    err: unknown;
+    opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined;
+}[]} */
             const tracked = [];
             const ea = createErrorAlerterAction({
                 bus,
                 onAlert: () => {},
                 errorTracker: {
-                    trackError: (err, opts) => { tracked.push({ err, opts }); },
+                    trackError: (err, opts) => {
+                        tracked.push({ err, opts });
+                    },
                 },
             });
 
@@ -144,13 +148,18 @@ describe('bus-actions (FAIXA-L15)', () => {
         });
 
         it('não polui ErrorTracker com hook model_call recuperável', () => {
-            /** @type {Array<{ err: unknown; opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined }>} */
+            /** @type {{
+    err: unknown;
+    opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined;
+}[]} */
             const tracked = [];
             const ea = createErrorAlerterAction({
                 bus,
                 onAlert: () => {},
                 errorTracker: {
-                    trackError: (err, opts) => { tracked.push({ err, opts }); },
+                    trackError: (err, opts) => {
+                        tracked.push({ err, opts });
+                    },
                 },
             });
 
@@ -167,13 +176,18 @@ describe('bus-actions (FAIXA-L15)', () => {
         });
 
         it('não cria erro sintético event-bus para agent:task:error', () => {
-            /** @type {Array<{ err: unknown; opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined }>} */
+            /** @type {{
+    err: unknown;
+    opts: import('../../../../src/copilot/observability/error-tracker.js').TrackErrorOptions | undefined;
+}[]} */
             const tracked = [];
             const ea = createErrorAlerterAction({
                 bus,
                 onAlert: () => {},
                 errorTracker: {
-                    trackError: (err, opts) => { tracked.push({ err, opts }); },
+                    trackError: (err, opts) => {
+                        tracked.push({ err, opts });
+                    },
                 },
             });
 

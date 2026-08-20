@@ -5,7 +5,7 @@ import path from 'node:path';
 const IGNORED_DIRS = new Set(['node_modules', '.git', 'backups', 'tests', 'artifacts', 'coverage', 'dist']);
 
 /**
- * @import {ContractDefinitionV1} from "./load_registry.mjs"
+ * @import {ContractDefinitionV1} from './load_registry.mjs'
  */
 
 /**
@@ -139,7 +139,7 @@ function buildIgnoredRanges(content) {
     /** @type {{ braceDepth: number }[]} */
     const templateExprStack = [];
 
-    for (let idx = 0; idx < content.length; ) {
+    for (let idx = 0; idx < content.length;) {
         const ch = content[idx];
         const next = idx + 1 < content.length ? content[idx + 1] : '';
 

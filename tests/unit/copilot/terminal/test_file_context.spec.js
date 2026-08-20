@@ -5,12 +5,13 @@
  * F183: Testes para file-context.js — funções puras de detecção, extração e embedding.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { invalidateIoCachePath } from '../../../../src/copilot/infra/public/cache.js';
 import {
+    attachmentToEmbed,
     clearFileCache,
     detectLang,
     embedContextBlock,
@@ -19,7 +20,6 @@ import {
     getFileCacheStats,
     readDirectoryContextDetailed,
     readFileContext,
-    attachmentToEmbed,
 } from '../../../../src/copilot/presentation/files/context.js';
 
 describe('file-context detectLang', () => {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseJsonFromMixedOutput, runCommand } from '../lib/exec.mjs';
 import { buildQualityExecutionPlan } from '../lib/impact_classifier.mjs';
 
-/** @import {RawFinding} from "../normalize/findings.mjs" */
+/** @import {RawFinding} from '../normalize/findings.mjs' */
 
 const QUALITY_CONTRACTS = Object.freeze({
     NODE_SYNTAX: 'CONTRACT-QUALITY-NODE-SYNTAX',

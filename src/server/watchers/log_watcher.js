@@ -30,7 +30,6 @@ async function init() {
     try {
         await fsp.access(LOG_FILE);
     } catch (/** @type {any} */ e) {
-
         log('WARN', '[LOG_WATCHER] Arquivo de log ausente. Aguardando criação pelo Maestro...');
         _scheduleReconnect(5000); // Tenta novamente em 5s
         return;

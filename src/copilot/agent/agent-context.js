@@ -9,8 +9,8 @@
  * @internal
  */
 
-import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { COPILOT_MODEL, COPILOT_REASONING_EFFORT } from '#copilot/config/agent';
+import { EMITTER_PROCESS_QUEUE } from '#copilot/events';
 import { createAgentContextFactories } from './context/factories/index.js';
 import { dialogOps, fsmOps, metricsOps, runtimeOps, sessionOps, toolOps } from './context/ops/index.js';
 import { performKeepaliveSdkTick } from './facades/agent-session-ops.js';
@@ -301,9 +301,7 @@ export class AgentContext {
         return this.runtimeState.agentObserver;
     }
     /**
-     * @param {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void }
-     *     | null
-     *     | undefined} value
+     * @param {{ attach: (agent: import('node:events').EventEmitter) => void; detach: () => void } | null | undefined} value
      */
     set agentObserver(value) {
         if (value == null) this.clearAgentObserver();

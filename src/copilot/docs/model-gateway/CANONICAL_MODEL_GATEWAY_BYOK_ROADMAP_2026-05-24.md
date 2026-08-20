@@ -1,60 +1,67 @@
 # Canonical Model Gateway / BYOK Roadmap
 
-Data: 2026-05-24
-Escopo: `src/copilot`, GitHub Copilot SDK 0.3.0, BYOK universal, seleção de modelos, probes, sessões e observability.
+Data: 2026-05-24 Escopo: `src/copilot`, GitHub Copilot SDK 0.3.0, BYOK universal, seleção de
+modelos, probes, sessões e observability.
 
-> Nota de continuidade 2026-05-25: este arquivo permanece como histórico completo de investigação e cortes já realizados.
-> O guia operacional canônico entre 2026-05-25 e 2026-05-26 foi
-> `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`.
-> O guia canônico vivo a partir de 2026-05-26 é
+> Nota de continuidade 2026-05-25: este arquivo permanece como histórico completo de investigação e
+> cortes já realizados. O guia operacional canônico entre 2026-05-25 e 2026-05-26 foi
+> `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_UNIVERSAL_GUIDE_2026-05-25.md`. O
+> guia canônico vivo a partir de 2026-05-26 é
 > `src/copilot/docs/model-gateway/CANONICAL_MODEL_GATEWAY_BYOK_NEXT_GUIDE_2026-05-26.md`.
 
 ## 1. Diagnóstico
 
-O relatório `src/copilot/docs/LLM_ROUTER_BYOK_ARCHITECTURE_AUDIT_2026-05-24.md` acerta o ponto central: o BYOK atual
-tem partes valiosas, mas elas estão distribuídas em camadas que não devem ser a fonte de verdade de roteamento.
+O relatório `src/copilot/docs/LLM_ROUTER_BYOK_ARCHITECTURE_AUDIT_2026-05-24.md` acerta o ponto
+central: o BYOK atual tem partes valiosas, mas elas estão distribuídas em camadas que não devem ser
+a fonte de verdade de roteamento.
 
 Hoje há quatro focos diferentes:
 
-- `sdk/session/provider.js`: sabe resolver env, presets, `ProviderConfig`, discovery de modelos e `ModelInfo`.
+- `sdk/session/provider.js`: sabe resolver env, presets, `ProviderConfig`, discovery de modelos e
+  `ModelInfo`.
 - `sdk/models/*`: possui registry/selector/stats por `modelId`, ainda sem identidade provider-model.
 - `terminal/byok/*`: classifica falhas e aplica admissão/orçamento terminal.
 - `model-gateway/health/*`: classifica falhas externas e persiste health operacional provider/model.
-- `model-gateway/probes/*`: roda probes descartáveis chat/agent/streaming/JSON/vision, incluindo delta, tools,
-  `ask_user` e attachment de imagem hermético.
+- `model-gateway/probes/*`: roda probes descartáveis chat/agent/streaming/JSON/vision, incluindo
+  delta, tools, `ask_user` e attachment de imagem hermético.
 
-Isso funciona, mas cria uma ambiguidade arquitetural: terminal e SDK começam a possuir fatos de provider/model que deveriam
-pertencer a um domínio próprio.
+Isso funciona, mas cria uma ambiguidade arquitetural: terminal e SDK começam a possuir fatos de
+provider/model que deveriam pertencer a um domínio próprio.
 
 ## 2. Validação crítica da auditoria base
 
 ### Validado
 
-- O SDK deve permanecer a fronteira vanilla: criar sessão, retomar sessão, operar `ProviderConfig`, eventos, tools,
-  handlers e `ModelInfo`.
+- O SDK deve permanecer a fronteira vanilla: criar sessão, retomar sessão, operar `ProviderConfig`,
+  eventos, tools, handlers e `ModelInfo`.
 - OpenRouter deve ser um adapter comum, não a fundação do sistema.
 - A identidade canônica deve ser `providerId + providerModel`, não apenas `modelId`.
-- `onListModels()` deve ser uma projection do registry, não um discovery avulso amarrado ao env ativo.
-- Capabilities precisam carregar provenance e confiança: `static_seed`, `catalog`, `manual`, `probe_verified`,
-  `probe_failed`.
+- `onListModels()` deve ser uma projection do registry, não um discovery avulso amarrado ao env
+  ativo.
+- Capabilities precisam carregar provenance e confiança: `static_seed`, `catalog`, `manual`,
+  `probe_verified`, `probe_failed`.
 - Probes devem alterar health/capabilities com rastreabilidade.
 - Secrets não podem entrar em registry, logs, docs gerados, health ou traces.
 
 ### Refinado
 
-- A migração não deve mover tudo de uma vez. O caminho correto é criar `model-gateway` como domínio canônico, importar o
-  BYOK atual via compat layer e só então trocar consumidores.
-- `VaultSecretRegistry` é desejável, mas não é fase inicial. Primeiro vem `EnvSecretRegistry` e redaction única.
-- `OpenAICompatibleAdapter` deve ser base de transporte, não uma classificação suficiente de capability.
-- Catálogos remotos não são verdade: eles são evidência. Probe real e override manual têm precedência.
+- A migração não deve mover tudo de uma vez. O caminho correto é criar `model-gateway` como domínio
+  canônico, importar o BYOK atual via compat layer e só então trocar consumidores.
+- `VaultSecretRegistry` é desejável, mas não é fase inicial. Primeiro vem `EnvSecretRegistry` e
+  redaction única.
+- `OpenAICompatibleAdapter` deve ser base de transporte, não uma classificação suficiente de
+  capability.
+- Catálogos remotos não são verdade: eles são evidência. Probe real e override manual têm
+  precedência.
 
 ### Rejeitado ou adiado
 
-- Observability não deve inferir capability nem decidir roteamento. Ela deve receber eventos estabilizados do gateway.
-- Terminal não deve manter health permanentemente como source of truth; durante migração ele pode renderizar o health
-  legado, mas o destino é `model-gateway/health`.
-- `sdk/session/provider.js` não deve importar `model-gateway`, pois isso inverteria a fronteira. A ponte deve ficar acima
-  do SDK, em `config`, `agent` ou `model-gateway/session`.
+- Observability não deve inferir capability nem decidir roteamento. Ela deve receber eventos
+  estabilizados do gateway.
+- Terminal não deve manter health permanentemente como source of truth; durante migração ele pode
+  renderizar o health legado, mas o destino é `model-gateway/health`.
+- `sdk/session/provider.js` não deve importar `model-gateway`, pois isso inverteria a fronteira. A
+  ponte deve ficar acima do SDK, em `config`, `agent` ou `model-gateway/session`.
 
 ## 3. Situação ideal
 
@@ -143,36 +150,46 @@ src/copilot/model-gateway/
 
 ### 4.1. Catálogo universal normalizado
 
-A investigação de 2026-05-24 mostrou que o registry atual é bom como **projection operacional**, mas ainda não é forte
-o bastante como banco universal de modelos. O problema não é só “listar modelos”: cada provider expõe um subconjunto
-diferente de fatos.
+A investigação de 2026-05-24 mostrou que o registry atual é bom como **projection operacional**, mas
+ainda não é forte o bastante como banco universal de modelos. O problema não é só “listar modelos”:
+cada provider expõe um subconjunto diferente de fatos.
 
 Exemplos confirmados em documentação oficial:
 
-- OpenAI expõe `GET /v1/models`, mas esse endpoint é essencialmente identidade/listagem; a documentação de modelos e
-  pricing precisa complementar capabilities e custo.
+- OpenAI expõe `GET /v1/models`, mas esse endpoint é essencialmente identidade/listagem; a
+  documentação de modelos e pricing precisa complementar capabilities e custo.
 - OpenRouter expõe `/api/v1/models` com metadata rica: `architecture`, `pricing`, `top_provider`,
-  `per_request_limits`, `supported_parameters`, `default_parameters` e datas de expiração/depreciação.
+  `per_request_limits`, `supported_parameters`, `default_parameters` e datas de
+  expiração/depreciação.
 - Anthropic expõe API de lista de modelos, mas capability fina ainda precisa vir de docs/probes.
-- Gemini `models.list`/`models.get` retorna `inputTokenLimit`, `outputTokenLimit`, `supportedGenerationMethods`,
-  `thinking`, defaults e limites de parâmetros como temperature/topP/topK.
-- Mistral `GET /v1/models` retorna `capabilities`, `max_context_length`, aliases, deprecation e replacement model.
-- Groq usa endpoint OpenAI-compatible `/openai/v1/models` para modelos ativos; a página de modelos complementa limites.
-- Ollama local usa `/api/tags` para modelos instalados e `/api/show` deve enriquecer detalhes de template/parameters.
-- Hugging Face Inference Providers e Cloudflare Workers AI expõem catálogos públicos ricos em tabelas/docs, incluindo
-  provider real, preço, contexto, latency/throughput, tools/structured outputs e task type.
-- Kilo AI Gateway expõe um gateway OpenAI-compatible em `https://api.kilo.ai/api/gateway`, lista pública de modelos em
-  `/models`, metadata de preço/contexto/features, BYOK interno por provider, headers próprios de organização/tarefa/modo
-  e rotas `provider/model` parecidas com agregadores.
-- Cerebras tem `/v1/models` mínimo e catálogo/documentação pública mais rica para parâmetros/speed/depreciação.
+- Gemini `models.list`/`models.get` retorna `inputTokenLimit`, `outputTokenLimit`,
+  `supportedGenerationMethods`, `thinking`, defaults e limites de parâmetros como
+  temperature/topP/topK.
+- Mistral `GET /v1/models` retorna `capabilities`, `max_context_length`, aliases, deprecation e
+  replacement model.
+- Groq usa endpoint OpenAI-compatible `/openai/v1/models` para modelos ativos; a página de modelos
+  complementa limites.
+- Ollama local usa `/api/tags` para modelos instalados e `/api/show` deve enriquecer detalhes de
+  template/parameters.
+- Hugging Face Inference Providers e Cloudflare Workers AI expõem catálogos públicos ricos em
+  tabelas/docs, incluindo provider real, preço, contexto, latency/throughput, tools/structured
+  outputs e task type.
+- Kilo AI Gateway expõe um gateway OpenAI-compatible em `https://api.kilo.ai/api/gateway`, lista
+  pública de modelos em `/models`, metadata de preço/contexto/features, BYOK interno por provider,
+  headers próprios de organização/tarefa/modo e rotas `provider/model` parecidas com agregadores.
+- Cerebras tem `/v1/models` mínimo e catálogo/documentação pública mais rica para
+  parâmetros/speed/depreciação.
 
-Conclusão: o banco canônico não deve armazenar apenas `ModelRecord` achatado. Ele precisa de duas camadas:
+Conclusão: o banco canônico não deve armazenar apenas `ModelRecord` achatado. Ele precisa de duas
+camadas:
 
-1. **Evidence ledger imutável ou append-only**: fatos por campo, fonte, provider, modelo, confiança, timestamps e payload
-   bruto sanitizado. Essa camada aceita conflito: OpenRouter pode dizer que um modelo tem tools, Hugging Face pode dizer
-   que uma rota específica não tem, e o probe local pode provar o contrário para nossa key.
-2. **Canonical projection**: visão atual normalizada por `providerId + providerModel + routeProfile`, usada como primeiro
-   filtro do roteador antes de probes/runtime.
+1. **Evidence ledger imutável ou append-only**: fatos por campo, fonte, provider, modelo, confiança,
+   timestamps e payload bruto sanitizado. Essa camada aceita conflito: OpenRouter pode dizer que um
+   modelo tem tools, Hugging Face pode dizer que uma rota específica não tem, e o probe local pode
+   provar o contrário para nossa key.
+2. **Canonical projection**: visão atual normalizada por
+   `providerId + providerModel + routeProfile`, usada como primeiro filtro do roteador antes de
+   probes/runtime.
 
 Esse desenho evita três erros clássicos:
 
@@ -295,7 +312,8 @@ CanonicalModelProjection
   accountOverlayRefs
 ```
 
-Para listas imensas de providers, a projection deve ir para SQLite em vez de depender apenas de JSON:
+Para listas imensas de providers, a projection deve ir para SQLite em vez de depender apenas de
+JSON:
 
 ```txt
 data/copilot/model-gateway/catalog.sqlite
@@ -318,8 +336,8 @@ data/copilot/model-gateway/catalog.sqlite
   canonical_model_projection
 ```
 
-`registry.json` continua útil como export/snapshot redigido para debug e operador, mas o banco completo e normalizado
-deve ser SQLite.
+`registry.json` continua útil como export/snapshot redigido para debug e operador, mas o banco
+completo e normalizado deve ser SQLite.
 
 ### 4.3. Precedência de fontes
 
@@ -337,35 +355,42 @@ manual override
 
 Regras importantes:
 
-- Capability agentic (`tools`, streaming delta, JSON schema, forced tool choice, parallel tool calls, vision) só vira
-  `probe_verified` depois de probe real naquele `providerId|providerModel|routeProfile`.
-- Catálogo remoto pode habilitar o candidato como "provável", mas não deve promovê-lo sozinho para `repo_agent` ou
-  `tool_agent` se `requireAgentProbeOk=true`.
-- Falha de probe não apaga o fato de catálogo; ela cria evidência concorrente com maior precedência operacional.
+- Capability agentic (`tools`, streaming delta, JSON schema, forced tool choice, parallel tool
+  calls, vision) só vira `probe_verified` depois de probe real naquele
+  `providerId|providerModel|routeProfile`.
+- Catálogo remoto pode habilitar o candidato como "provável", mas não deve promovê-lo sozinho para
+  `repo_agent` ou `tool_agent` se `requireAgentProbeOk=true`.
+- Falha de probe não apaga o fato de catálogo; ela cria evidência concorrente com maior precedência
+  operacional.
 - Dados caros/instáveis como preço e depreciação precisam de `expiresAt` curto.
-- Account/organization overlays, como allow lists, BYOK interno e spending limits de Kilo ou Cloudflare AI Gateway, têm
-  precedência operacional sobre catálogo público, mas nunca viram capability global do modelo.
-- Nomes como `:free`, `vision`, `instruct`, `coder`, `thinking`, `reasoning`, `latest` podem gerar heurísticas, mas
-  sempre com confidence baixa.
+- Account/organization overlays, como allow lists, BYOK interno e spending limits de Kilo ou
+  Cloudflare AI Gateway, têm precedência operacional sobre catálogo público, mas nunca viram
+  capability global do modelo.
+- Nomes como `:free`, `vision`, `instruct`, `coder`, `thinking`, `reasoning`, `latest` podem gerar
+  heurísticas, mas sempre com confidence baixa.
 
 ### 4.4. Extração criativa de metadata
 
 O gateway deve combinar importers especializados:
 
-1. **API importers autenticados**: OpenAI, Anthropic, Gemini, Mistral, Groq, Cerebras, Ollama local/cloud, etc.
-2. **Rich aggregator importers**: OpenRouter, Hugging Face Inference Providers, Cloudflare unified catalog. Eles ajudam
-   a preencher preço/contexto/capabilities, mas a provenance deve deixar claro que são agregadores.
-3. **Gateway importers**: Kilo AI Gateway, Cloudflare AI Gateway e LiteLLM/Kilo-like gateways. Eles expõem modelos e
-   políticas de rota próprias; o import precisa preservar `gatewayId`, provider upstream, headers aceitos, políticas de
-   organização e o fato de que BYOK pode ocorrer dentro do gateway.
-4. **Docs/Markdown table importers**: para páginas oficiais que expõem capabilities melhor que API, como Cloudflare
-   Workers AI e páginas de overview de provider.
-5. **Local daemon importers**: Ollama `/api/tags` + `/api/show`, vLLM/LiteLLM/OpenAI-compatible `/v1/models`,
-   containers NIM self-hosted.
-6. **Probe importers**: probes de chat, streaming, tools, JSON schema, vision, context-window, parameter fuzzing e
-   error taxonomy.
-7. **Heuristic enrichers**: parser de nomes e famílias para inferir versão, tamanho, quantização, free tier, preview,
-   deprecation provável e especialização (`coder`, `rerank`, `embed`, `image`, `tts`, `asr`).
+1. **API importers autenticados**: OpenAI, Anthropic, Gemini, Mistral, Groq, Cerebras, Ollama
+   local/cloud, etc.
+2. **Rich aggregator importers**: OpenRouter, Hugging Face Inference Providers, Cloudflare unified
+   catalog. Eles ajudam a preencher preço/contexto/capabilities, mas a provenance deve deixar claro
+   que são agregadores.
+3. **Gateway importers**: Kilo AI Gateway, Cloudflare AI Gateway e LiteLLM/Kilo-like gateways. Eles
+   expõem modelos e políticas de rota próprias; o import precisa preservar `gatewayId`, provider
+   upstream, headers aceitos, políticas de organização e o fato de que BYOK pode ocorrer dentro do
+   gateway.
+4. **Docs/Markdown table importers**: para páginas oficiais que expõem capabilities melhor que API,
+   como Cloudflare Workers AI e páginas de overview de provider.
+5. **Local daemon importers**: Ollama `/api/tags` + `/api/show`, vLLM/LiteLLM/OpenAI-compatible
+   `/v1/models`, containers NIM self-hosted.
+6. **Probe importers**: probes de chat, streaming, tools, JSON schema, vision, context-window,
+   parameter fuzzing e error taxonomy.
+7. **Heuristic enrichers**: parser de nomes e famílias para inferir versão, tamanho, quantização,
+   free tier, preview, deprecation provável e especialização (`coder`, `rerank`, `embed`, `image`,
+   `tts`, `asr`).
 
 O pipeline recomendado:
 
@@ -376,22 +401,24 @@ fetch source -> sanitize raw payload -> parse source rows -> emit evidence facts
 
 ### 4.5. Seleção automática dos providers
 
-Vários providers já têm seleção automática própria. O nosso roteador não deve lutar contra isso; ele deve modelar essa
-capacidade explicitamente:
+Vários providers já têm seleção automática própria. O nosso roteador não deve lutar contra isso; ele
+deve modelar essa capacidade explicitamente:
 
 - **Exact model**: `providerModel` concreto, sem auto routing.
-- **Provider alias**: `latest`, `default`, `-latest`, aliases de família ou modelos versionados sem data.
-- **Aggregator auto**: OpenRouter pode escolher upstream/provider para um mesmo model id; Hugging Face permite sufixos
-  de provider e rotas como `:fastest`, `:cheapest` ou provider preferido; Cloudflare AI Gateway pode aplicar caching,
-  retries e fallback em uma camada acima do provider.
-- **Gateway auto**: Kilo Gateway pode rotear `provider/model`, aplicar BYOK interno, políticas de organização, limites de
-  gasto e hints como `x-kilocode-mode`; isso precisa ser representado como rota de gateway, não como provider direto
-  puro.
-- **Local auto**: Ollama/vLLM/LiteLLM podem ter tags locais que apontam para pesos diferentes ao longo do tempo.
+- **Provider alias**: `latest`, `default`, `-latest`, aliases de família ou modelos versionados sem
+  data.
+- **Aggregator auto**: OpenRouter pode escolher upstream/provider para um mesmo model id; Hugging
+  Face permite sufixos de provider e rotas como `:fastest`, `:cheapest` ou provider preferido;
+  Cloudflare AI Gateway pode aplicar caching, retries e fallback em uma camada acima do provider.
+- **Gateway auto**: Kilo Gateway pode rotear `provider/model`, aplicar BYOK interno, políticas de
+  organização, limites de gasto e hints como `x-kilocode-mode`; isso precisa ser representado como
+  rota de gateway, não como provider direto puro.
+- **Local auto**: Ollama/vLLM/LiteLLM podem ter tags locais que apontam para pesos diferentes ao
+  longo do tempo.
 - **Fallback chain nosso**: sequência auditável escolhida pelo `PolicyEngine`.
 
-Cada opção precisa virar `ModelRouteOption`, com `selectorKind`, `selectorSyntax`, riscos e custo esperado. Assim, o
-roteador consegue decidir se usa:
+Cada opção precisa virar `ModelRouteOption`, com `selectorKind`, `selectorSyntax`, riscos e custo
+esperado. Assim, o roteador consegue decidir se usa:
 
 - `openrouter:model` com roteamento automático;
 - `kilo:provider/model` com gateway BYOK ou conta Kilo;
@@ -400,8 +427,8 @@ roteador consegue decidir se usa:
 - fallback próprio multi-provider;
 - ou modelo exato sem intermediário.
 
-Essa é a peça que transforma "lista imensa de modelos" em banco útil: cada linha deixa de ser só um modelo e passa a ser
-um **candidato de rota** com metadados, proveniência, risco e provas.
+Essa é a peça que transforma "lista imensa de modelos" em banco útil: cada linha deixa de ser só um
+modelo e passa a ser um **candidato de rota** com metadados, proveniência, risco e provas.
 
 ## 5. Roadmap
 
@@ -433,7 +460,8 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Criar `EnvSecretRegistry`.
 - [x] Criar redaction canônica do gateway para textos e records aninhados.
 - [x] Fazer `EnvByokCompatImporter` publicar apenas refs configuradas, nunca valores.
-- [x] Classificar refs de autenticação em `apiKeyRefs` e `bearerTokenRefs` no record seguro de provider.
+- [x] Classificar refs de autenticação em `apiKeyRefs` e `bearerTokenRefs` no record seguro de
+      provider.
 - [x] Centralizar redaction hoje duplicada entre `provider.js` e terminal health.
 - [x] Garantir que snapshots e events nunca carreguem `apiKey`, `bearerToken` ou headers sensíveis.
 - [x] Criar teste de regressão que falha se uma key aparece serializada.
@@ -447,9 +475,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Extrair `GeminiAdapter`.
 - [x] Extrair `AnthropicAdapter`.
 - [x] Criar registry de adapters do gateway.
-- [x] Cobrir adapters de Kilo, Groq, Mistral, Hugging Face, Cloudflare Workers AI, NVIDIA NIM, Cerebras, Chutes e Z.AI.
-- [x] Separar specs OpenAI-compatible em um arquivo por provider, para endpoint metadata/importers evoluírem por família
-  sem reencher o adapter de conhecimento específico.
+- [x] Cobrir adapters de Kilo, Groq, Mistral, Hugging Face, Cloudflare Workers AI, NVIDIA NIM,
+      Cerebras, Chutes e Z.AI.
+- [x] Separar specs OpenAI-compatible em um arquivo por provider, para endpoint metadata/importers
+      evoluírem por família sem reencher o adapter de conhecimento específico.
 - [x] Fazer novo provider ser adicionável sem editar `sdk/session/provider.js`.
 - [x] Manter presets antigos como compat layer durante transição.
 
@@ -471,39 +500,41 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 
 - [x] Migrar `terminal/state/byok-provider-health.js` para `model-gateway/health`.
 - [x] Migrar `terminal/byok/provider-failure.js` para classifier compartilhado.
-- [x] Separar falhas `auth`, `credits`, `rate-limit`, `model-or-route`, `timeout`, `network`, `upstream`, `unknown`.
+- [x] Separar falhas `auth`, `credits`, `rate-limit`, `model-or-route`, `timeout`, `network`,
+      `upstream`, `unknown`.
 - [x] Persistir health por `providerId|providerModel|routeProfile`.
 - [x] Usar health no roteamento.
 
 ### Faixa G — Policy engine
 
-- [x] Definir task profiles: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`, `vision`,
-   `deep_reasoning`, `local_private`.
+- [x] Definir task profiles: `cheap_chat`, `code`, `repo_agent`, `tool_agent`, `json_extraction`,
+      `vision`, `deep_reasoning`, `local_private`.
 - [x] Criar scoring por capability obrigatória.
 - [x] Incluir custo, latência, contexto, confidence, health, allow/block provider.
 - [x] Criar fallback auditável.
 - [x] Explicar decisão ao operador com candidatos recusados e razão.
-- [x] Tratar `vision` como requisito suave/preferência de rota, não como exclusão automática. Um modelo text-only que
-  responde, streama e tem contexto mínimo continua elegível para o perfil `vision`; modelos com vision comprovável sobem
-  no ranking e devem ser priorizados para probes multimodais.
+- [x] Tratar `vision` como requisito suave/preferência de rota, não como exclusão automática. Um
+      modelo text-only que responde, streama e tem contexto mínimo continua elegível para o perfil
+      `vision`; modelos com vision comprovável sobem no ranking e devem ser priorizados para probes
+      multimodais.
 
 ### Faixa H — Terminal UX
 
 - [x] Comandos:
-   - `/providers list` via alias direto para `/byok providers`;
-   - `/providers health` via alias direto para health operacional BYOK;
-   - `/models list` via alias direto para `/byok models`;
-   - `/models route <profile>` via `routeGatewayModels()` com modo `pre-probe` e `strict`;
-   - `/byok probe <model>` com chat/agent/streaming/JSON/vision;
-   - `/byok recommend <profile>` via filtros de catálogo e health/probe agent.
+  - `/providers list` via alias direto para `/byok providers`;
+  - `/providers health` via alias direto para health operacional BYOK;
+  - `/models list` via alias direto para `/byok models`;
+  - `/models route <profile>` via `routeGatewayModels()` com modo `pre-probe` e `strict`;
+  - `/byok probe <model>` com chat/agent/streaming/JSON/vision;
+  - `/byok recommend <profile>` via filtros de catálogo e health/probe agent.
 - [x] Filtros por:
-   - free/paid/unknown;
-   - vision;
-   - tools;
-   - streaming;
-   - context window;
-   - probe status;
-   - provider.
+  - free/paid/unknown;
+  - vision;
+  - tools;
+  - streaming;
+  - context window;
+  - probe status;
+  - provider.
 - [x] Mostrar origem dos metadados e confiança.
 - [x] Mostrar por que um modelo foi rejeitado.
 
@@ -512,46 +543,53 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [x] Gateway emite eventos estabilizados.
 - [x] Event catalog inclui `model-gateway-events`.
 - [x] Metrics collector registra counters/gauges de snapshot, route, probe e failure.
-- [x] Usage ledger registra `sessionId`, `providerId`, `modelId`, `routeProfile`, tokens, custo estimado, fallback e failure
-  para decisões de rota, sem prompt, headers, raw payload ou secrets.
+- [x] Usage ledger registra `sessionId`, `providerId`, `modelId`, `routeProfile`, tokens, custo
+      estimado, fallback e failure para decisões de rota, sem prompt, headers, raw payload ou
+      secrets.
 - [x] Traces incluem `llm.provider`, `llm.model`, `llm.gateway.model_id`, `llm.route.decision_id`.
 - [x] Observability não lê secrets nem raw provider payload para inferir decisão.
 
 ### Faixa J — Depreciação controlada
 
 - [x] `sdk/session/provider.js` mantém `ProviderConfig`, validação e compat exports.
-- [x] Presets atuais migram para o gateway via `EnvByokCompatImporter` sem remover a compat layer do SDK/config.
-- [x] Discovery legado fica encapsulado no config port até os importers universais da Faixa L assumirem a descoberta
-  profunda.
-- [x] `terminal/byok/*` fica restrito a admissão de orçamento, binding de sessão e renderização; provider/model truth
-  vem de `model-gateway`.
-- [x] Antigos exports não são removidos nem marcados como deprecated antes de consumidores e importers K/L estarem
-  migrados.
-- [x] Gate booleano pré-K formalizado em `buildModelGatewayPreKCompatibilityReport()` e exposto no terminal por
-  `/byok gateway`.
-- [x] Gate pré-K definido: nenhuma depreciação remove ou quebra exports SDK/config atuais; terminal usa gateway para
-  rota/probes/health quando disponível, mas mantém compat de env/presets até os importers universais existirem.
-- [x] Critério de live `llm-b`: antes de promover modelo vivo, rodar `/models route <profile>`, `/byok probe chat`,
-  `/byok probe streaming`, `/byok probe json`, `/byok probe vision` quando multimodal, e `/byok probe agent` para
-  perfis agentic; promoção só via `/byok use` + `/byok model` + nova sessão SDK.
+- [x] Presets atuais migram para o gateway via `EnvByokCompatImporter` sem remover a compat layer do
+      SDK/config.
+- [x] Discovery legado fica encapsulado no config port até os importers universais da Faixa L
+      assumirem a descoberta profunda.
+- [x] `terminal/byok/*` fica restrito a admissão de orçamento, binding de sessão e renderização;
+      provider/model truth vem de `model-gateway`.
+- [x] Antigos exports não são removidos nem marcados como deprecated antes de consumidores e
+      importers K/L estarem migrados.
+- [x] Gate booleano pré-K formalizado em `buildModelGatewayPreKCompatibilityReport()` e exposto no
+      terminal por `/byok gateway`.
+- [x] Gate pré-K definido: nenhuma depreciação remove ou quebra exports SDK/config atuais; terminal
+      usa gateway para rota/probes/health quando disponível, mas mantém compat de env/presets até os
+      importers universais existirem.
+- [x] Critério de live `llm-b`: antes de promover modelo vivo, rodar `/models route <profile>`,
+      `/byok probe chat`, `/byok probe streaming`, `/byok probe json`, `/byok probe vision` quando
+      multimodal, e `/byok probe agent` para perfis agentic; promoção só via `/byok use` +
+      `/byok model` + nova sessão SDK.
 
 ### Faixa K — Banco universal de catálogo e evidências
 
-- [x] Criar `catalog/contracts` com `ProviderCatalogSource`, `ModelMetadataEvidence`, `ModelRouteOption` e
-  `CanonicalModelProjection`.
+- [x] Criar `catalog/contracts` com `ProviderCatalogSource`, `ModelMetadataEvidence`,
+      `ModelRouteOption` e `CanonicalModelProjection`.
 - [ ] Criar store SQLite `data/copilot/model-gateway/catalog.sqlite`.
 - [ ] Manter `registry.json` como export/snapshot redigido, não como banco completo.
-- [x] Criar contratos storage-neutral para import runs, raw payload refs sanitizados e diff de projections antes do store.
-- [ ] Persistir import runs com status, duração, fonte, quantidade de rows, erros sanitizados e diff gerado.
+- [x] Criar contratos storage-neutral para import runs, raw payload refs sanitizados e diff de
+      projections antes do store.
+- [ ] Persistir import runs com status, duração, fonte, quantidade de rows, erros sanitizados e diff
+      gerado.
 - [ ] Persistir raw payload sanitizado por hash/ref, sem segredos nem headers sensíveis.
 - [x] Criar merge field-wise com `provenanceByField` e `confidenceByField`.
-- [x] Implementar precedência por campo: manual > probe > authenticated catalog > official docs > aggregator >
-  static_seed > heuristic.
-- [x] Criar testes que provem que fonte mais pobre e mais recente não apaga metadata rica de fonte anterior.
+- [x] Implementar precedência por campo: manual > probe > authenticated catalog > official docs >
+      aggregator > static_seed > heuristic.
+- [x] Criar testes que provem que fonte mais pobre e mais recente não apaga metadata rica de fonte
+      anterior.
 - [x] Criar teste de regressão para nunca serializar segredo no snapshot JSON inicial de catálogo.
 - [ ] Criar teste de regressão para nunca serializar segredo no catalog DB ou evento.
-- [x] Criar store inicial redigido e storage-neutral antes do SQLite, para validar contrato, migração e diffs sem decidir
-  prematuramente o backend permanente.
+- [x] Criar store inicial redigido e storage-neutral antes do SQLite, para validar contrato,
+      migração e diffs sem decidir prematuramente o backend permanente.
 - [x] Persistir import runs e raw payload refs sanitizados no snapshot JSON inicial.
 
 ### Faixa L — Importers de catálogos oficiais e agregadores
@@ -564,110 +602,127 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   - `fetchRaw()`;
   - `parseRows()`;
   - `toEvidenceFacts()`.
-- [x] Criar runner storage-neutral de importers que monta `ProviderCatalogSource`, `rawPayloadRef`, evidências,
-  `CatalogImportRun` e snapshot JSON secret-safe antes dos importers específicos.
+- [x] Criar runner storage-neutral de importers que monta `ProviderCatalogSource`, `rawPayloadRef`,
+      evidências, `CatalogImportRun` e snapshot JSON secret-safe antes dos importers específicos.
 - [x] Implementar `OpenAIModelsImporter` para `/v1/models` account-scoped.
-- [x] Emitir route options e hints de família/capabilities para `OpenAIModelsImporter` sem depender de docs hardcoded
-  voláteis.
+- [x] Emitir route options e hints de família/capabilities para `OpenAIModelsImporter` sem depender
+      de docs hardcoded voláteis.
 - [ ] Complementar `OpenAIModelsImporter` com seeds/docs oficiais de capabilities e famílias.
-- [x] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando `supported_parameters`, pricing,
-  context, top provider e per-request limits.
+- [x] Implementar `OpenRouterModelsImporter` para `/api/v1/models`, preservando
+      `supported_parameters`, pricing, context, top provider e per-request limits.
 - [x] Implementar `AnthropicModelsImporter` para lista oficial de modelos account-scoped.
-- [x] Complementar `AnthropicModelsImporter` com `GET /v1/models/{model_id}`, aliases resolvidos e hints de família.
+- [x] Complementar `AnthropicModelsImporter` com `GET /v1/models/{model_id}`, aliases resolvidos e
+      hints de família.
 - [ ] Complementar `AnthropicModelsImporter` com docs oficiais de limites/capabilities por família.
 - [x] Implementar `GeminiModelsImporter` para `models.list`/`models.get`, capturando token limits,
-  `supportedGenerationMethods`, `thinking` e parâmetros.
-- [ ] Complementar `GeminiModelsImporter` com seeds/docs oficiais de modalidades, capabilities de família e
-  diferenças entre Gemini API direta, Vertex AI e endpoint OpenAI-compatible.
+      `supportedGenerationMethods`, `thinking` e parâmetros.
+- [ ] Complementar `GeminiModelsImporter` com seeds/docs oficiais de modalidades, capabilities de
+      família e diferenças entre Gemini API direta, Vertex AI e endpoint OpenAI-compatible.
 - [x] Implementar `MistralModelsImporter` para `/v1/models`, capturando capabilities, aliases,
-  `max_context_length`, deprecation e replacement.
-- [x] Implementar `GroqModelsImporter` para `/openai/v1/models` e `retrieve model`, capturando `context_window`,
-  `active` e metadata account-scoped.
-- [x] Complementar `GroqModelsImporter` com `max_completion_tokens`, batch endpoint e hints de tools/JSON/streaming.
-- [ ] Complementar `GroqModelsImporter` com seeds/docs oficiais de pricing, model cards, built-in tools e limites de
-  rate por tier/modelo.
+      `max_context_length`, deprecation e replacement.
+- [x] Implementar `GroqModelsImporter` para `/openai/v1/models` e `retrieve model`, capturando
+      `context_window`, `active` e metadata account-scoped.
+- [x] Complementar `GroqModelsImporter` com `max_completion_tokens`, batch endpoint e hints de
+      tools/JSON/streaming.
+- [ ] Complementar `GroqModelsImporter` com seeds/docs oficiais de pricing, model cards, built-in
+      tools e limites de rate por tier/modelo.
 - [x] Implementar `OllamaCatalogImporter` para `/api/tags` + `/api/show`.
 - [x] Implementar `HuggingFaceInferenceProvidersImporter` para catálogo de providers/modelos/rotas.
-- [x] Implementar `OpenCodeZenModelsImporter` para `https://opencode.ai/zen/v1/models`, preservando endpoints por
-  família, pricing/lifecycle de docs e overlay por `OPENCODE_API_KEY`.
-- [x] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs, separando Workers AI direto
-  de AI Gateway universal/cache/retry/fallback.
-- [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`, capturando ids
-  `provider/model`, provider upstream, pricing, context window, features, rotas gratuitas e endpoints auxiliares.
-- [x] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando provider upstream e
-  diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
+- [x] Implementar `OpenCodeZenModelsImporter` para `https://opencode.ai/zen/v1/models`, preservando
+      endpoints por família, pricing/lifecycle de docs e overlay por `OPENCODE_API_KEY`.
+- [x] Implementar `CloudflareWorkersAiCatalogImporter` para unified catalog/Workers AI docs,
+      separando Workers AI direto de AI Gateway universal/cache/retry/fallback.
+- [x] Implementar `KiloGatewayCatalogImporter` para `https://api.kilo.ai/api/gateway/models`,
+      capturando ids `provider/model`, provider upstream, pricing, context window, features, rotas
+      gratuitas e endpoints auxiliares.
+- [x] Implementar `KiloGatewayProvidersImporter` para `/providers` quando disponível, preservando
+      provider upstream e diferença entre Kilo Gateway, Kilo Code e providers BYOK internos.
 - [x] Implementar `CerebrasModelsImporter` para `/v1/models` + catálogo público.
-- [x] Implementar `NvidiaNimModelsImporter` para `/v1/models`, preservando hosted/self-hosted e endpoints de gestão
-  NIM.
-- [x] Implementar `ChutesModelsImporter` para `/v1/models`, capturando pricing, modalidades, features, limites,
-  quantização e confidential compute.
+- [x] Implementar `NvidiaNimModelsImporter` para `/v1/models`, preservando hosted/self-hosted e
+      endpoints de gestão NIM.
+- [x] Implementar `ChutesModelsImporter` para `/v1/models`, capturando pricing, modalidades,
+      features, limites, quantização e confidential compute.
 - [x] Implementar `ZaiModelsImporter` para docs/pricing oficiais, normalizando famílias GLM em rotas
-  OpenAI-compatible e preservando OpenAPI como fonte de runtime schema.
-- [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM e endpoints locais/privados sem importer
-  especializado.
-- [x] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por plano, organização,
-  quota ou BYOK interno, sem serializar segredo.
+      OpenAI-compatible e preservando OpenAPI como fonte de runtime schema.
+- [x] Permitir importers `OpenAICompatibleGenericImporter` para vLLM, LiteLLM e endpoints
+      locais/privados sem importer especializado.
+- [x] Criar modo `accountScoped` para importers autenticados que retornam modelos habilitados por
+      plano, organização, quota ou BYOK interno, sem serializar segredo.
 
 ### Faixa M — Normalização, enriquecimento e heurísticas controladas
 
-- [x] Criar projeção OpenAI-compatible de catálogo (`id`, `object`, `created`, `owned_by`) com extensão
-  `x_model_gateway` para metadados universais ricos.
-- [x] Preservar no merge/projection metadados ricos essenciais para o schema OpenAI estendido: `description`,
-  `aliases.*`, `lifecycle.*` e `providerMetadata.*`.
-- [x] Criar normalizador de modalidades: text, image, audio, video, pdf, embedding, rerank, asr, tts, image-generation.
+- [x] Criar projeção OpenAI-compatible de catálogo (`id`, `object`, `created`, `owned_by`) com
+      extensão `x_model_gateway` para metadados universais ricos.
+- [x] Preservar no merge/projection metadados ricos essenciais para o schema OpenAI estendido:
+      `description`, `aliases.*`, `lifecycle.*` e `providerMetadata.*`.
+- [x] Criar normalizador de modalidades: text, image, audio, video, pdf, embedding, rerank, asr,
+      tts, image-generation.
 - [x] Criar normalizador de capability hints OpenAI-compatible vindos de catálogo: streaming, tools,
-  forcedToolChoice, parallelToolCalls, JSON mode, JSON schema/structured outputs, reasoning, multimodal e search/code.
-- [ ] Criar normalizador de capabilities agentic runtime: streaming, tools, forcedToolChoice, parallelToolCalls, JSON mode,
-  JSON schema, structured outputs, reasoning effort, reasoning budget, code execution, web/search grounding.
-- [x] Criar normalizador de limites: context window, max output, max request, TPM, RPM e daily requests.
-- [x] Criar normalizador de pricing USD para input/output/cache/read/write/request/search com moeda e unidade
-  explícitas.
-- [ ] Expandir normalizador de pricing para image/audio e moedas não-USD quando providers oferecerem esses campos.
-- [ ] Expandir normalizador de limites para burst/concurrency/account quotas quando providers oferecerem esses campos.
-- [x] Criar normalizador de lifecycle: active, preview, scheduled_retirement/retired, createdAt, expiresAt e
-  knowledgeCutoff.
-- [x] Criar parser inicial de aliases/versionamento (`latest`, data compacta `YYYYMMDD` e data `YYYY-MM-DD`).
-- [x] Criar normalizador transversal de identidade técnica do modelo para família, série, geração, tier, tamanho,
-  parâmetros, MoE, quantização, modalidade e hints arquiteturais leves em `providerMetadata.modelTraits.*`.
-- [ ] Expandir parser de aliases/versionamento para variants provider-specific, datas de release complexas e aliases
-  comerciais que não aparecem no id técnico.
-- [x] Criar normalizador de route/policy traits para `ModelRouteOption.normalizedPolicy.routeTraits`, separando modo de
-  seleção, camada de rota, compatibilidade OpenAI, wire API e hints de fallback/retry/cache/headers sem provar runtime.
-- [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`, `gateway`,
-  `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
-- [x] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending limits, quotas, free
-  tiers e BYOK interno por provider.
-- [ ] Criar heuristics engine com confidence baixa e sempre sobrescrevível por catálogo/probe/manual.
+      forcedToolChoice, parallelToolCalls, JSON mode, JSON schema/structured outputs, reasoning,
+      multimodal e search/code.
+- [ ] Criar normalizador de capabilities agentic runtime: streaming, tools, forcedToolChoice,
+      parallelToolCalls, JSON mode, JSON schema, structured outputs, reasoning effort, reasoning
+      budget, code execution, web/search grounding.
+- [x] Criar normalizador de limites: context window, max output, max request, TPM, RPM e daily
+      requests.
+- [x] Criar normalizador de pricing USD para input/output/cache/read/write/request/search com moeda
+      e unidade explícitas.
+- [ ] Expandir normalizador de pricing para image/audio e moedas não-USD quando providers oferecerem
+      esses campos.
+- [ ] Expandir normalizador de limites para burst/concurrency/account quotas quando providers
+      oferecerem esses campos.
+- [x] Criar normalizador de lifecycle: active, preview, scheduled_retirement/retired, createdAt,
+      expiresAt e knowledgeCutoff.
+- [x] Criar parser inicial de aliases/versionamento (`latest`, data compacta `YYYYMMDD` e data
+      `YYYY-MM-DD`).
+- [x] Criar normalizador transversal de identidade técnica do modelo para família, série, geração,
+      tier, tamanho, parâmetros, MoE, quantização, modalidade e hints arquiteturais leves em
+      `providerMetadata.modelTraits.*`.
+- [ ] Expandir parser de aliases/versionamento para variants provider-specific, datas de release
+      complexas e aliases comerciais que não aparecem no id técnico.
+- [x] Criar normalizador de route/policy traits para
+      `ModelRouteOption.normalizedPolicy.routeTraits`, separando modo de seleção, camada de rota,
+      compatibilidade OpenAI, wire API e hints de fallback/retry/cache/headers sem provar runtime.
+- [ ] Criar normalizador de providers/gateways que separe `direct_provider`, `aggregator`,
+      `gateway`, `openai_compatible_proxy`, `local_daemon` e `sdk_native`.
+- [x] Criar normalizador de overlays de conta: allow/block lists, organization headers, spending
+      limits, quotas, free tiers e BYOK interno por provider.
+- [ ] Criar heuristics engine com confidence baixa e sempre sobrescrevível por
+      catálogo/probe/manual.
 - [ ] Criar detector de conflitos por campo e comando de operador para listar conflitos de metadata.
 
 ### Faixa N — Modelagem de auto-seleção e rotas
 
-- [x] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto, cheapest, fastest,
-  preferred-provider e fallback-chain.
-- [x] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream quando conhecido.
-- [x] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo `provider/model`,
-  `x-kilocode-mode`, `X-KiloCode-OrganizationId`, `X-KiloCode-TaskId`, BYOK interno e falha sem fallback quando a key
-  BYOK interna falhar.
-- [ ] Representar sufixos/seletores de Hugging Face Inference Providers, incluindo provider explícito e políticas de
-  `fastest`/`cheapest` quando publicadas.
-- [ ] Representar Cloudflare AI Gateway/Workers AI como camada de rota com cache, retry, rate-limit e fallback quando
-  configurado.
-- [ ] Representar tags locais de Ollama/vLLM/LiteLLM como aliases instáveis com digest/hash quando disponível.
-- [ ] Fazer `PolicyEngine` escolher entre rota exata, auto-provider e fallback próprio com justificativa auditável.
+- [x] Criar `ModelRouteOption` para modelar rotas exatas, aliases, provider-auto, aggregator-auto,
+      cheapest, fastest, preferred-provider e fallback-chain.
+- [x] Representar seleção automática de OpenRouter como rota própria, sem apagar provider upstream
+      quando conhecido.
+- [x] Representar Kilo Gateway como rota própria `gateway_auto`/`exact_model`, incluindo
+      `provider/model`, `x-kilocode-mode`, `X-KiloCode-OrganizationId`, `X-KiloCode-TaskId`, BYOK
+      interno e falha sem fallback quando a key BYOK interna falhar.
+- [ ] Representar sufixos/seletores de Hugging Face Inference Providers, incluindo provider
+      explícito e políticas de `fastest`/`cheapest` quando publicadas.
+- [ ] Representar Cloudflare AI Gateway/Workers AI como camada de rota com cache, retry, rate-limit
+      e fallback quando configurado.
+- [ ] Representar tags locais de Ollama/vLLM/LiteLLM como aliases instáveis com digest/hash quando
+      disponível.
+- [ ] Fazer `PolicyEngine` escolher entre rota exata, auto-provider e fallback próprio com
+      justificativa auditável.
 - [ ] Expor no terminal por que uma rota automática foi aceita ou rejeitada.
 
 ### Faixa O — Refresh, diffs e governança operacional
 
-- [x] Criar refresh programático de catálogo com importers, replacement de evidências por fonte, rebuild de projections,
-  diff e resposta OpenAI-compatible.
-- [x] Criar composição padrão de importers públicos/autenticados para refresh programático sem vazar segredo.
+- [x] Criar refresh programático de catálogo com importers, replacement de evidências por fonte,
+      rebuild de projections, diff e resposta OpenAI-compatible.
+- [x] Criar composição padrão de importers públicos/autenticados para refresh programático sem vazar
+      segredo.
 - [x] Criar comando terminal correspondente para `model-gateway catalog refresh`.
 - [ ] Criar refresh incremental por provider, com cache TTL por fonte.
-- [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo snapshot público e
-  snapshot account-scoped separados.
+- [ ] Criar refresh por overlay de conta/organização quando houver secretRef configurado, mantendo
+      snapshot público e snapshot account-scoped separados.
 - [x] Criar diff entre snapshots: modelos novos, removidos e campos alterados.
-- [x] Expandir diff entre snapshots para depreciação explícita, preço alterado, limits alterados, capabilities
-  alteradas.
+- [x] Expandir diff entre snapshots para depreciação explícita, preço alterado, limits alterados,
+      capabilities alteradas.
 - [x] Emitir eventos:
   - `model_gateway:catalog:import_started`;
   - `model_gateway:catalog:import_completed`;
@@ -675,8 +730,10 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
   - `model_gateway:catalog:model_changed`;
   - `model_gateway:catalog:model_removed`;
   - `model_gateway:catalog:conflict_detected`.
-- [x] Sugerir probes automaticamente para modelos novos de alto valor ou com capability agentic provável.
-- [ ] Nunca trocar modelo ativo automaticamente por causa de catálogo novo; gerar recomendação auditável.
+- [x] Sugerir probes automaticamente para modelos novos de alto valor ou com capability agentic
+      provável.
+- [ ] Nunca trocar modelo ativo automaticamente por causa de catálogo novo; gerar recomendação
+      auditável.
 
 ### Faixa P — UX de exploração do catálogo universal
 
@@ -686,10 +743,12 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - [ ] `/models explain <provider:model>`.
 - [x] `/models conflicts`.
 - [x] `/models route <profile> --show-rejected`.
-- [ ] `/models gateways` com Kilo, OpenRouter, Cloudflare AI Gateway, LiteLLM e outros gateways/proxies configurados.
-- [ ] `/models account-overlays` para mostrar modelos habilitados/bloqueados por conta ou organização sem expor secrets.
-- [ ] Filtros por preço, contexto, tools, JSON schema, vision, local/private, free tier, provider, confidence,
-  probe status e lifecycle.
+- [ ] `/models gateways` com Kilo, OpenRouter, Cloudflare AI Gateway, LiteLLM e outros
+      gateways/proxies configurados.
+- [ ] `/models account-overlays` para mostrar modelos habilitados/bloqueados por conta ou
+      organização sem expor secrets.
+- [ ] Filtros por preço, contexto, tools, JSON schema, vision, local/private, free tier, provider,
+      confidence, probe status e lifecycle.
 - [ ] Mostrar `catalog says`, `probe proved`, `manual override` e `health says` lado a lado.
 
 ## 6. Critérios de aceite
@@ -698,18 +757,23 @@ um **candidato de rota** com metadados, proveniência, risco e provas.
 - `ModelInfo.id` enviado ao SDK continua provider-local.
 - Registry e snapshots não serializam segredo.
 - `onListModels()` vem do gateway ou de fallback legado explicitamente documentado.
-- Operador consegue ver providers disponíveis, modelos disponíveis, capabilities, limites e confidence.
+- Operador consegue ver providers disponíveis, modelos disponíveis, capabilities, limites e
+  confidence.
 - Probes descartáveis validam delta, final, tools e `ask_user`.
 - Health e failures influenciam roteamento.
 - Toda decisão de rota é explicável e observável.
-- O banco completo de catálogo preserva fatos por campo com provenance/confidence, não apenas records achatados.
-- Catálogos remotos, docs, agregadores, heurísticas e probes podem coexistir sem sobrescrever evidência mais forte.
-- Rotas automáticas de provider/agregador são modeladas explicitamente e nunca confundidas com modelo exato.
-- Gateways como Kilo/OpenRouter/Cloudflare podem ser escolhidos como rota própria sem apagar o provider upstream nem as
-  políticas de conta/organização.
-- Overlays autenticados de conta/plano/BYOK interno afetam elegibilidade operacional sem contaminar o catálogo público.
-- O roteador usa a projection canônica como primeiro filtro antes de probes/runtime, mas probes podem rebaixar ou
-  promover capabilities com rastreabilidade.
+- O banco completo de catálogo preserva fatos por campo com provenance/confidence, não apenas
+  records achatados.
+- Catálogos remotos, docs, agregadores, heurísticas e probes podem coexistir sem sobrescrever
+  evidência mais forte.
+- Rotas automáticas de provider/agregador são modeladas explicitamente e nunca confundidas com
+  modelo exato.
+- Gateways como Kilo/OpenRouter/Cloudflare podem ser escolhidos como rota própria sem apagar o
+  provider upstream nem as políticas de conta/organização.
+- Overlays autenticados de conta/plano/BYOK interno afetam elegibilidade operacional sem contaminar
+  o catálogo público.
+- O roteador usa a projection canônica como primeiro filtro antes de probes/runtime, mas probes
+  podem rebaixar ou promover capabilities com rastreabilidade.
 
 ## 7. Primeiro corte implementado
 
@@ -724,53 +788,59 @@ Esta rodada iniciou a Faixa A:
 - `src/copilot/events/model-gateway-events.js`
 - integração inicial do catálogo/metrics da observability.
 
-O próximo corte deve trocar a primeira projection de terminal para ler o snapshot do gateway em paralelo auditável ao BYOK
-legado, com teste garantindo paridade.
+O próximo corte deve trocar a primeira projection de terminal para ler o snapshot do gateway em
+paralelo auditável ao BYOK legado, com teste garantindo paridade.
 
 ## 8. Continuidade 2026-05-24 — investigação de metadata universal
 
-Pedido novo: criar formas criativas e robustas de extrair todos os metadados de providers/modelos para um banco completo,
-normalizado e atualizável, usado como primeiro elemento de seleção antes de testes em runtime.
+Pedido novo: criar formas criativas e robustas de extrair todos os metadados de providers/modelos
+para um banco completo, normalizado e atualizável, usado como primeiro elemento de seleção antes de
+testes em runtime.
 
 Fontes oficiais consultadas nesta continuidade:
 
 - OpenAI API Reference — `GET /v1/models`.
-- OpenRouter docs — `/api/v1/models` com `architecture`, `pricing`, `top_provider`, `per_request_limits`,
-  `supported_parameters`, `default_parameters` e `expiration_date`.
+- OpenRouter docs — `/api/v1/models` com `architecture`, `pricing`, `top_provider`,
+  `per_request_limits`, `supported_parameters`, `default_parameters` e `expiration_date`.
 - Anthropic API Reference — models list.
-- Gemini API — `models.list`/`models.get` com token limits, generation methods, thinking e parâmetros.
-- Mistral API — `/v1/models` com `capabilities`, aliases, `max_context_length`, deprecation e replacement.
+- Gemini API — `models.list`/`models.get` com token limits, generation methods, thinking e
+  parâmetros.
+- Mistral API — `/v1/models` com `capabilities`, aliases, `max_context_length`, deprecation e
+  replacement.
 - Groq docs — modelos ativos via endpoint OpenAI-compatible `/openai/v1/models`.
 - Ollama docs — `/api/tags` para modelos locais e detalhes via APIs locais complementares.
-- Hugging Face Inference Providers — catálogo com provider real, preço, contexto, latency, throughput, tools e
-  structured outputs.
-- Cloudflare Workers AI — catálogo/unified catalog com task types, capabilities e modelos hosted/partner.
-- Kilo AI Gateway — gateway OpenAI-compatible, `/models`, `/providers`, BYOK interno, headers de organização/tarefa/modo
-  e rotas `provider/model`.
+- Hugging Face Inference Providers — catálogo com provider real, preço, contexto, latency,
+  throughput, tools e structured outputs.
+- Cloudflare Workers AI — catálogo/unified catalog com task types, capabilities e modelos
+  hosted/partner.
+- Kilo AI Gateway — gateway OpenAI-compatible, `/models`, `/providers`, BYOK interno, headers de
+  organização/tarefa/modo e rotas `provider/model`.
 - Cerebras Inference — `/v1/models` e catálogo público.
 - NVIDIA NIM docs — APIs OpenAI-compatible e catálogo/docs de modelos.
 
 Reflexão consolidada:
 
-1. Não existe um schema comum suficientemente rico entre providers. Alguns endpoints são mínimos; outros são ricos; docs
-   públicos às vezes carregam mais fatos que a API autenticada.
-2. Um mesmo `providerModel` pode ter capacidades diferentes por rota, upstream, plano, região, conta, sufixo de
-   provider ou agregador.
-3. Portanto, `providerId + providerModel` continua sendo identidade mínima, mas o roteador precisa também de
-   `routeProfile`/`ModelRouteOption`.
-4. O banco deve guardar evidências conflitantes e fazer merge por campo; apagar tudo com o último catálogo baixado seria
-   arquitetura frágil.
-5. O primeiro filtro de seleção deve usar a projection canônica de metadata, mas perfis agentic continuam exigindo prova
-   runtime para capabilities críticas.
-6. Gateways como Kilo não são apenas "mais um preset": eles combinam catálogo público, roteamento `provider/model`,
-   BYOK interno, limites de organização, modos operacionais e erro/fallback próprios.
-7. A auditoria completa reforça que `sdk/session/provider.js` deve perder responsabilidade progressivamente, mas sem
-   inversão de dependência: `onListModels()` recebe projection segura, e adapters/importers vivem no gateway.
+1. Não existe um schema comum suficientemente rico entre providers. Alguns endpoints são mínimos;
+   outros são ricos; docs públicos às vezes carregam mais fatos que a API autenticada.
+2. Um mesmo `providerModel` pode ter capacidades diferentes por rota, upstream, plano, região,
+   conta, sufixo de provider ou agregador.
+3. Portanto, `providerId + providerModel` continua sendo identidade mínima, mas o roteador precisa
+   também de `routeProfile`/`ModelRouteOption`.
+4. O banco deve guardar evidências conflitantes e fazer merge por campo; apagar tudo com o último
+   catálogo baixado seria arquitetura frágil.
+5. O primeiro filtro de seleção deve usar a projection canônica de metadata, mas perfis agentic
+   continuam exigindo prova runtime para capabilities críticas.
+6. Gateways como Kilo não são apenas "mais um preset": eles combinam catálogo público, roteamento
+   `provider/model`, BYOK interno, limites de organização, modos operacionais e erro/fallback
+   próprios.
+7. A auditoria completa reforça que `sdk/session/provider.js` deve perder responsabilidade
+   progressivamente, mas sem inversão de dependência: `onListModels()` recebe projection segura, e
+   adapters/importers vivem no gateway.
 
 Decisão incorporada ao roadmap:
 
-- Adicionadas as seções 4.1 a 4.5 sobre catálogo universal, evidence ledger, merge por campo, extração criativa e
-  seleção automática dos providers.
+- Adicionadas as seções 4.1 a 4.5 sobre catálogo universal, evidence ledger, merge por campo,
+  extração criativa e seleção automática dos providers.
 - Adicionadas as Faixas K, L, M, N, O e P:
   - K: banco universal e evidence ledger;
   - L: importers oficiais/agregadores;
@@ -778,86 +848,102 @@ Decisão incorporada ao roadmap:
   - N: modelagem de auto-seleção e rotas;
   - O: refresh/diffs/governança;
   - P: UX de exploração do catálogo.
-- Refinadas as Faixas K-P para incluir Kilo/Kilo Gateway como gateway de primeira classe, overlays account-scoped,
-  importers próprios, headers/políticas operacionais e rotas `gateway_auto`.
+- Refinadas as Faixas K-P para incluir Kilo/Kilo Gateway como gateway de primeira classe, overlays
+  account-scoped, importers próprios, headers/políticas operacionais e rotas `gateway_auto`.
 
 Próximo corte recomendado:
 
-1. Criar contratos `CatalogSource`, `ModelMetadataEvidence`, `ModelRouteOption` e `CanonicalModelProjection`.
+1. Criar contratos `CatalogSource`, `ModelMetadataEvidence`, `ModelRouteOption` e
+   `CanonicalModelProjection`.
 2. Criar `ProviderAccountOverlay` para separar catálogo público de plano/organização/BYOK interno.
 3. Criar store SQLite `catalog.sqlite` com migrations e testes de redaction.
 4. Implementar primeiro importer rico (`OpenRouterModelsImporter`), primeiro gateway importer
-   (`KiloGatewayCatalogImporter`) e primeiro importer mínimo (`OpenAIModelsImporter`) para provar merge por campo.
-5. Criar projection canônica que enriquece `ModelRecord` atual sem quebrar `/byok models` nem `onListModels()`.
-6. Adicionar comando/serviço interno de refresh em dry-run, mostrando diff sem alterar seleção ativa.
+   (`KiloGatewayCatalogImporter`) e primeiro importer mínimo (`OpenAIModelsImporter`) para provar
+   merge por campo.
+5. Criar projection canônica que enriquece `ModelRecord` atual sem quebrar `/byok models` nem
+   `onListModels()`.
+6. Adicionar comando/serviço interno de refresh em dry-run, mostrando diff sem alterar seleção
+   ativa.
 
 ## 9. Continuidade 2026-05-24 — fechamento da camada E-G antes de K
 
-Pedido novo: antes de avançar para Faixa K e catálogo profundo, concluir a camada atual até J e deixar o caminho
-funcional para lives com `llm-b` usando probes.
+Pedido novo: antes de avançar para Faixa K e catálogo profundo, concluir a camada atual até J e
+deixar o caminho funcional para lives com `llm-b` usando probes.
 
 Implementado neste corte:
 
 - Faixa E concluída com `runConfiguredByokVisionProbe`.
-- O probe vision usa fixture PNG inline, hermética e redigível, enviada como `blobAttachment` pelo mesmo caminho
-  `sendSessionAndWait` usado pelo runtime.
-- `/byok probe vision` foi exposto no terminal, registra health genérico por `probeKind=vision` e emite
-  `model_gateway:probe:completed`.
-- Faixa G ganhou `scoreGatewayModelCandidate()` e `routeGatewayModels()`, com scoring determinístico por capabilities
-  obrigatórias, contexto, preço, confidence, health, allow/block provider, latência opcional, fallbackChain e razões de
-  rejeição.
-- Faixa H ganhou aliases diretos `/models` e `/providers`, incluindo `/providers health`, para reduzir atrito operacional
-  no terminal.
-- `/models route <profile>` agora converte o catálogo terminal (`RuntimeModelInfo`) para candidatos do model-gateway e
-  chama `routeGatewayModels()` com explicação de admissão, score, fallback chain e rejeições via `--show-rejected`.
-- Os filtros de catálogo/roteamento agora cobrem `tools`, `streaming` e `probe-ok`, além de free/paid/unknown, vision,
-  reasoning, contexto, request budget e provider.
-- `renderModelTags()` passou a expor `source=` e `confidence=` quando o catálogo fornece esses metadados.
-- Faixa I ganhou `buildRouteDecisionEvent()`, `projectRouteDecisionMetrics()` e um ledger bounded em processo para
-  decisões de rota, persistindo apenas metadados sanitizados de decisão/fallback/tokens estimados/custo estimado.
-- `/models route <profile>` agora emite `model_gateway:route:decision`, grava o ledger e mostra `decisionId` no terminal.
-- Metrics collector passou a registrar seleção/não seleção e gauges de candidatos, rejeitados e fallback para decisões
-  de rota.
-- Faixa J ganhou o gate pré-K: manter compatibilidade SDK/config, não quebrar presets/env legados antes dos importers
-  universais, e exigir matriz de probes antes de promoção em lives `llm-b`.
-- `terminal:llm-b:live-test -- --byok-real` passou a exercitar `/models route repo_agent --show-rejected` e probes
-  descartáveis chat, streaming, JSON, vision, agent e shortlist antes de qualquer live/promote.
+- O probe vision usa fixture PNG inline, hermética e redigível, enviada como `blobAttachment` pelo
+  mesmo caminho `sendSessionAndWait` usado pelo runtime.
+- `/byok probe vision` foi exposto no terminal, registra health genérico por `probeKind=vision` e
+  emite `model_gateway:probe:completed`.
+- Faixa G ganhou `scoreGatewayModelCandidate()` e `routeGatewayModels()`, com scoring determinístico
+  por capabilities obrigatórias, contexto, preço, confidence, health, allow/block provider, latência
+  opcional, fallbackChain e razões de rejeição.
+- Faixa H ganhou aliases diretos `/models` e `/providers`, incluindo `/providers health`, para
+  reduzir atrito operacional no terminal.
+- `/models route <profile>` agora converte o catálogo terminal (`RuntimeModelInfo`) para candidatos
+  do model-gateway e chama `routeGatewayModels()` com explicação de admissão, score, fallback chain
+  e rejeições via `--show-rejected`.
+- Os filtros de catálogo/roteamento agora cobrem `tools`, `streaming` e `probe-ok`, além de
+  free/paid/unknown, vision, reasoning, contexto, request budget e provider.
+- `renderModelTags()` passou a expor `source=` e `confidence=` quando o catálogo fornece esses
+  metadados.
+- Faixa I ganhou `buildRouteDecisionEvent()`, `projectRouteDecisionMetrics()` e um ledger bounded em
+  processo para decisões de rota, persistindo apenas metadados sanitizados de
+  decisão/fallback/tokens estimados/custo estimado.
+- `/models route <profile>` agora emite `model_gateway:route:decision`, grava o ledger e mostra
+  `decisionId` no terminal.
+- Metrics collector passou a registrar seleção/não seleção e gauges de candidatos, rejeitados e
+  fallback para decisões de rota.
+- Faixa J ganhou o gate pré-K: manter compatibilidade SDK/config, não quebrar presets/env legados
+  antes dos importers universais, e exigir matriz de probes antes de promoção em lives `llm-b`.
+- `terminal:llm-b:live-test -- --byok-real` passou a exercitar
+  `/models route repo_agent --show-rejected` e probes descartáveis chat, streaming, JSON, vision,
+  agent e shortlist antes de qualquer live/promote.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
 - PASS `npm run typecheck:strict:src.copilot`
 - PASS `npm run lint:copilot`
-- PASS `npm run test:copilot` após estabilizar contratos globais de lifecycle/hooks/event adapters/mocks
-  (`5596` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed` registrado pelo runner compacto).
-- PASS `npm run test:copilot` após Faixa H
-  (`5597` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T00-06-10-929Z/summary.md`).
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS `npm run test:copilot` após estabilizar contratos globais de lifecycle/hooks/event
+  adapters/mocks (`5596` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`
+  registrado pelo runner compacto).
+- PASS `npm run test:copilot` após Faixa H (`5597` testes, `0` falhas; warning remanescente:
+  `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T00-06-10-929Z/summary.md`).
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   após ledger de rota (`75` testes).
 - PASS `npm run typecheck:strict:src.copilot` após ledger de rota.
 - PASS `npm run lint:copilot` após ledger de rota.
-- PASS `npm run test:copilot` após ledger/contrato J
-  (`5598` testes, `0` falhas; warning remanescente: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T00-13-42-683Z/summary.md`).
+- PASS `npm run test:copilot` após ledger/contrato J (`5598` testes, `0` falhas; warning
+  remanescente: `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T00-13-42-683Z/summary.md`).
 - PASS `node --check scripts/copilot/run-terminal-llm-b-live-test.mjs`.
 - PASS `npm run terminal:llm-b:live-test`
-  (`artifacts/terminal-live/2026-05-25T00-16-15-956Z/summary.md`; canonical deltas/tools/ask_user/usage).
+  (`artifacts/terminal-live/2026-05-25T00-16-15-956Z/summary.md`; canonical
+  deltas/tools/ask_user/usage).
 - PASS `npm run terminal:llm-b:live-test -- --byok-real --no-pr --timeout-ms 600000`
-  (`artifacts/terminal-live/2026-05-25T00-20-33-489Z/summary.md`; route decision, chat, streaming, JSON, vision,
-  agent, shortlist, model switch e no-secret-leak). Observação: vision probe registrou explicitamente falha provider
-  HTTP 404 para o modelo ativo, mas o critério passou porque o caminho de attachment/capability ficou exercitado e
-  auditável sem promover o modelo.
+  (`artifacts/terminal-live/2026-05-25T00-20-33-489Z/summary.md`; route decision, chat, streaming,
+  JSON, vision, agent, shortlist, model switch e no-secret-leak). Observação: vision probe registrou
+  explicitamente falha provider HTTP 404 para o modelo ativo, mas o critério passou porque o caminho
+  de attachment/capability ficou exercitado e auditável sem promover o modelo.
 
 Fechamento antes de K:
 
-1. A seleção `vision` foi rebaixada para requisito suave/preferência de rota, sem exclusão automática.
-2. O gate pré-K passa a ser booleano e auditável; K começa apenas depois de A-J permanecerem verdes nos validadores.
+1. A seleção `vision` foi rebaixada para requisito suave/preferência de rota, sem exclusão
+   automática.
+2. O gate pré-K passa a ser booleano e auditável; K começa apenas depois de A-J permanecerem verdes
+   nos validadores.
 
 ## 10. Continuidade 2026-05-25 — seleção por acesso básico antes de capability fina
 
-Pedido novo: continuar a camada atual sem tratar `vision` como característica automaticamente excludente, garantir um
-arquivo por provider e preparar a investigação de endpoints como primeira etapa do banco universal.
+Pedido novo: continuar a camada atual sem tratar `vision` como característica automaticamente
+excludente, garantir um arquivo por provider e preparar a investigação de endpoints como primeira
+etapa do banco universal.
 
 Decisões consolidadas:
 
@@ -868,16 +954,19 @@ Decisões consolidadas:
    - streaming básico funciona quando o perfil exige streaming;
    - há orçamento/context window razoável;
    - falhas de auth, rota, quota ou modelo inexistente são classificadas com precisão.
-2. Capabilities finas (`vision`, `tools`, JSON schema, forced tool choice, parallel tool calls, reasoning budget) entram
-   como ranking, recomendação de probe e promoção progressiva de confiança. Elas só devem virar gate duro quando o
-   usuário ou o workflow explicitamente exige aquela capacidade para completar a tarefa.
-3. O perfil `vision` agora mantém `text` e `streaming` como requisitos duros e move `vision` para `softRequires` +
-   `prefers`. Assim, um modelo que ainda não tem metadata multimodal não desaparece do roteador; ele apenas perde pontos
-   e carrega razão auditável `missing_soft_capability:vision`.
-4. Todo provider OpenAI-compatible passa a ter spec próprio em `src/copilot/model-gateway/providers/specs/<provider>.js`.
-   Isso prepara importers por família, endpoints próprios, overlays de conta e quirks sem acoplar tudo ao adapter.
-5. O inventário de endpoints fica separado dos adapters em `src/copilot/model-gateway/providers/endpoints/<provider>.js`.
-   Ele não decide capability; ele só diz onde coletar catálogo, overlay e runtime evidence.
+2. Capabilities finas (`vision`, `tools`, JSON schema, forced tool choice, parallel tool calls,
+   reasoning budget) entram como ranking, recomendação de probe e promoção progressiva de confiança.
+   Elas só devem virar gate duro quando o usuário ou o workflow explicitamente exige aquela
+   capacidade para completar a tarefa.
+3. O perfil `vision` agora mantém `text` e `streaming` como requisitos duros e move `vision` para
+   `softRequires` + `prefers`. Assim, um modelo que ainda não tem metadata multimodal não desaparece
+   do roteador; ele apenas perde pontos e carrega razão auditável `missing_soft_capability:vision`.
+4. Todo provider OpenAI-compatible passa a ter spec próprio em
+   `src/copilot/model-gateway/providers/specs/<provider>.js`. Isso prepara importers por família,
+   endpoints próprios, overlays de conta e quirks sem acoplar tudo ao adapter.
+5. O inventário de endpoints fica separado dos adapters em
+   `src/copilot/model-gateway/providers/endpoints/<provider>.js`. Ele não decide capability; ele só
+   diz onde coletar catálogo, overlay e runtime evidence.
 6. A seleção final continuará em três camadas:
    - metadata coletada/projetada;
    - prova runtime básica;
@@ -885,94 +974,110 @@ Decisões consolidadas:
 
 Fontes oficiais reconsultadas nesta continuidade:
 
-- OpenAI API Reference: `GET /v1/models` lista modelos disponíveis com metadados básicos de identidade/owner.
-- OpenRouter Models API: `/api/v1/models` expõe metadata rica, filtros por modalidade/parâmetros e campos como pricing,
-  architecture, supported parameters e expiração.
-- Anthropic Models API: `GET /v1/models` lista modelos disponíveis para a key, com paginação e identificação.
-- Gemini API: `models.list`/`models.get` retorna limits e métodos suportados, útil para acesso por conta/API version.
-- Mistral Models API: `GET /v1/models` traz `capabilities`, `max_context_length`, aliases e deprecation/replacement.
-- Groq API Reference: endpoint OpenAI-compatible em `https://api.groq.com/openai/v1`, incluindo `/models`.
-- Ollama API: `/api/tags` lista modelos locais com digest, formato, família, tamanho e quantização; `/api/show` deve
-  enriquecer detalhes por modelo.
-- Hugging Face Inference Providers: roteamento OpenAI-compatible em `https://router.huggingface.co/v1`, com seleção
-  `:fastest`, `:cheapest`, `:preferred` ou provider explícito.
-- Cloudflare Workers AI/AI Gateway: Workers AI tem catálogo público de modelos; AI Gateway tem endpoints por provider e
-  Universal Endpoint `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}` com retry/fallback/headers.
+- OpenAI API Reference: `GET /v1/models` lista modelos disponíveis com metadados básicos de
+  identidade/owner.
+- OpenRouter Models API: `/api/v1/models` expõe metadata rica, filtros por modalidade/parâmetros e
+  campos como pricing, architecture, supported parameters e expiração.
+- Anthropic Models API: `GET /v1/models` lista modelos disponíveis para a key, com paginação e
+  identificação.
+- Gemini API: `models.list`/`models.get` retorna limits e métodos suportados, útil para acesso por
+  conta/API version.
+- Mistral Models API: `GET /v1/models` traz `capabilities`, `max_context_length`, aliases e
+  deprecation/replacement.
+- Groq API Reference: endpoint OpenAI-compatible em `https://api.groq.com/openai/v1`, incluindo
+  `/models`.
+- Ollama API: `/api/tags` lista modelos locais com digest, formato, família, tamanho e quantização;
+  `/api/show` deve enriquecer detalhes por modelo.
+- Hugging Face Inference Providers: roteamento OpenAI-compatible em
+  `https://router.huggingface.co/v1`, com seleção `:fastest`, `:cheapest`, `:preferred` ou provider
+  explícito.
+- Cloudflare Workers AI/AI Gateway: Workers AI tem catálogo público de modelos; AI Gateway tem
+  endpoints por provider e Universal Endpoint
+  `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}` com retry/fallback/headers.
 - Kilo AI Gateway: endpoint OpenAI-compatible `https://api.kilo.ai/api/gateway`, catálogo público
-  `/api/gateway/models`, providers, modelo `provider/model`, BYOK interno e controles de organização.
+  `/api/gateway/models`, providers, modelo `provider/model`, BYOK interno e controles de
+  organização.
 - Cerebras Inference: `GET /v1/models` lista modelos disponíveis com identidade/owner.
-- NVIDIA NIM: catálogo NIM e endpoints OpenAI-compatible exigem importer híbrido docs/API porque a riqueza depende do
-  microserviço/modelo.
-- Chutes e Z.AI: tratados inicialmente como OpenAI-compatible/gateway specs próprios; precisam de investigação dedicada
-  de catálogo/endpoints antes de virarem importers especializados.
+- NVIDIA NIM: catálogo NIM e endpoints OpenAI-compatible exigem importer híbrido docs/API porque a
+  riqueza depende do microserviço/modelo.
+- Chutes e Z.AI: tratados inicialmente como OpenAI-compatible/gateway specs próprios; precisam de
+  investigação dedicada de catálogo/endpoints antes de virarem importers especializados.
 
 Matriz de investigação por provider, antes da Faixa K:
 
-| Provider | Arquivo spec | Endpoint/catálogo primário | Próxima pergunta de importer |
-| --- | --- | --- | --- |
-| OpenAI | `providers/specs/openai.js` | `GET /v1/models` + docs/pricing | Como enriquecer capabilities/preço sem confiar só no endpoint mínimo? |
-| Kilo | `providers/specs/kilo.js` | `/api/gateway/models` e `/api/gateway/providers` | Como modelar BYOK interno, org allow lists, headers e `provider/model`? |
-| Groq | `providers/specs/groq.js` | `/openai/v1/models` + docs de modelos | Quais limites/capabilities precisam vir de docs/probe? |
-| Mistral | `providers/specs/mistral.js` | `/v1/models` | Como mapear `capabilities` para tools/vision/FIM/classification? |
-| Hugging Face | `providers/specs/huggingface.js` | `router.huggingface.co/v1` + catálogo Inference Providers | Como preservar `:fastest`, `:cheapest`, `:preferred` e provider explícito? |
-| Cloudflare | `providers/specs/cloudflare-workers-ai.js` | Workers AI catalog + AI Gateway universal/provider endpoints | Como separar Workers AI direto de AI Gateway com fallback/cache? |
-| NVIDIA NIM | `providers/specs/nvidia-nim.js` | `integrate.api.nvidia.com/v1` + NIM catalog | Como descobrir modelos habilitados por conta e por microserviço? |
-| Cerebras | `providers/specs/cerebras.js` | `/v1/models` + public model docs | Quais campos ricos só existem em docs públicas? |
-| Chutes | `providers/specs/chutes.js` | OpenAI-compatible atual + docs Chutes | Existe endpoint público de modelos estável ou a fonte inicial é docs/API auth? |
-| Z.AI | `providers/specs/zai.js` | OpenAI-compatible `api/paas/v4` + docs GLM | Quais endpoints separam chat, coding plan, vision e Anthropic-compatible? |
+| Provider     | Arquivo spec                               | Endpoint/catálogo primário                                   | Próxima pergunta de importer                                                   |
+| ------------ | ------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| OpenAI       | `providers/specs/openai.js`                | `GET /v1/models` + docs/pricing                              | Como enriquecer capabilities/preço sem confiar só no endpoint mínimo?          |
+| Kilo         | `providers/specs/kilo.js`                  | `/api/gateway/models` e `/api/gateway/providers`             | Como modelar BYOK interno, org allow lists, headers e `provider/model`?        |
+| Groq         | `providers/specs/groq.js`                  | `/openai/v1/models` + docs de modelos                        | Quais limites/capabilities precisam vir de docs/probe?                         |
+| Mistral      | `providers/specs/mistral.js`               | `/v1/models`                                                 | Como mapear `capabilities` para tools/vision/FIM/classification?               |
+| Hugging Face | `providers/specs/huggingface.js`           | `router.huggingface.co/v1` + catálogo Inference Providers    | Como preservar `:fastest`, `:cheapest`, `:preferred` e provider explícito?     |
+| Cloudflare   | `providers/specs/cloudflare-workers-ai.js` | Workers AI catalog + AI Gateway universal/provider endpoints | Como separar Workers AI direto de AI Gateway com fallback/cache?               |
+| NVIDIA NIM   | `providers/specs/nvidia-nim.js`            | `integrate.api.nvidia.com/v1` + NIM catalog                  | Como descobrir modelos habilitados por conta e por microserviço?               |
+| Cerebras     | `providers/specs/cerebras.js`              | `/v1/models` + public model docs                             | Quais campos ricos só existem em docs públicas?                                |
+| Chutes       | `providers/specs/chutes.js`                | OpenAI-compatible atual + docs Chutes                        | Existe endpoint público de modelos estável ou a fonte inicial é docs/API auth? |
+| Z.AI         | `providers/specs/zai.js`                   | OpenAI-compatible `api/paas/v4` + docs GLM                   | Quais endpoints separam chat, coding plan, vision e Anthropic-compatible?      |
 
 Alterações implementadas neste corte:
 
 - `MODEL_GATEWAY_TASK_PROFILES.vision` passou a usar `softRequires: ['vision']`.
 - `scoreGatewayModelCandidate()` pontua `softRequires` com razão auditável sem rejeitar candidato.
-- Teste de contrato garante que modelo text-only continua candidato para perfil `vision`, enquanto multimodal ranqueia
-  acima.
-- Specs OpenAI-compatible foram extraídos para um arquivo por provider e reexportados pelo índice de specs.
-- Inventário de endpoints por provider foi criado em `providers/endpoints/*`, cobrindo OpenAI, OpenRouter, Anthropic,
-  Gemini, Ollama, Kilo, Groq, Mistral, Hugging Face, Cloudflare, NVIDIA NIM, Cerebras, Chutes e Z.AI.
-- O barrel do `model-gateway` exporta `listProviderEndpointInventory()` e `resolveProviderEndpointInventory()`, para a
-  futura Faixa K/L começar pelos endpoints oficiais sem depender de dispatch de adapter.
-- `/byok providers endpoints [provider]` expõe esse inventário no terminal, sem chamar rede e sem confundir mapa de
-  coleta com prova de acesso/capability.
+- Teste de contrato garante que modelo text-only continua candidato para perfil `vision`, enquanto
+  multimodal ranqueia acima.
+- Specs OpenAI-compatible foram extraídos para um arquivo por provider e reexportados pelo índice de
+  specs.
+- Inventário de endpoints por provider foi criado em `providers/endpoints/*`, cobrindo OpenAI,
+  OpenRouter, Anthropic, Gemini, Ollama, Kilo, Groq, Mistral, Hugging Face, Cloudflare, NVIDIA NIM,
+  Cerebras, Chutes e Z.AI.
+- O barrel do `model-gateway` exporta `listProviderEndpointInventory()` e
+  `resolveProviderEndpointInventory()`, para a futura Faixa K/L começar pelos endpoints oficiais sem
+  depender de dispatch de adapter.
+- `/byok providers endpoints [provider]` expõe esse inventário no terminal, sem chamar rede e sem
+  confundir mapa de coleta com prova de acesso/capability.
 
 Validação:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
 - PASS `npm run typecheck:strict:src.copilot`
 - PASS `npm run lint:copilot`
-- PASS `npm run test:copilot`
-  (`5599` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T13-54-07-233Z/summary.md`).
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS `npm run test:copilot` (`5599` testes, `0` falhas; warning remanescente conhecido:
+  `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T13-54-07-233Z/summary.md`).
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   após inventário de endpoints (`30` testes).
 - PASS `npm run typecheck:strict:src.copilot` após inventário de endpoints.
 - PASS `npm run lint:copilot` após inventário de endpoints.
-- PASS `npm run test:copilot` após inventário de endpoints
-  (`5600` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-00-03-450Z/summary.md`).
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS `npm run test:copilot` após inventário de endpoints (`5600` testes, `0` falhas; warning
+  remanescente conhecido: `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-00-03-450Z/summary.md`).
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
   após `/byok providers endpoints` (`48` testes).
 - PASS `npm run typecheck:strict:src.copilot` após `/byok providers endpoints`.
 - PASS `npm run lint:copilot` após `/byok providers endpoints`.
-- PASS `npm run test:copilot` após `/byok providers endpoints`
-  (`5601` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-05-35-227Z/summary.md`).
+- PASS `npm run test:copilot` após `/byok providers endpoints` (`5601` testes, `0` falhas; warning
+  remanescente conhecido: `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-05-35-227Z/summary.md`).
 
 ## 11. Continuidade 2026-05-25 — fechamento coerente das Faixas A-J
 
-Pedido novo: revisar o roadmap, garantir checkboxes booleanos, fechar tudo até J antes de avançar para K e seguir o
-modelo de barrels para imports/exports.
+Pedido novo: revisar o roadmap, garantir checkboxes booleanos, fechar tudo até J antes de avançar
+para K e seguir o modelo de barrels para imports/exports.
 
 Visão organizada:
 
-1. **A-D** agora formam a fundação estável: records, registry, secrets, adapters, specs por provider, endpoint inventory e
-   barrels por subdomínio.
-2. **E-G** formam a camada de prova e decisão: probes descartáveis, health/failure taxonomy, task profiles e policy
-   engine com hard requirements separados de soft requirements.
-3. **H-I** formam a camada operacional: terminal renderiza providers/modelos/rotas/probes/endpoints/gate, eventos
-   estabilizados e ledger sanitizado de decisões.
-4. **J** fecha a migração controlada: SDK/config continuam compatíveis; terminal não vira fonte de verdade; discovery
-   legado fica encapsulado até importers universais; depreciação só acontece depois de K/L.
+1. **A-D** agora formam a fundação estável: records, registry, secrets, adapters, specs por
+   provider, endpoint inventory e barrels por subdomínio.
+2. **E-G** formam a camada de prova e decisão: probes descartáveis, health/failure taxonomy, task
+   profiles e policy engine com hard requirements separados de soft requirements.
+3. **H-I** formam a camada operacional: terminal renderiza
+   providers/modelos/rotas/probes/endpoints/gate, eventos estabilizados e ledger sanitizado de
+   decisões.
+4. **J** fecha a migração controlada: SDK/config continuam compatíveis; terminal não vira fonte de
+   verdade; discovery legado fica encapsulado até importers universais; depreciação só acontece
+   depois de K/L.
 
 Alterações implementadas neste corte:
 
@@ -993,20 +1098,22 @@ Alterações implementadas neste corte:
 - Criado `buildRouteDecisionTraceAttributes()` para reutilização por qualquer span/telemetry writer.
 - Criado `buildModelGatewayPreKCompatibilityReport()` com checks booleanos para o gate A-J.
 - `/byok gateway` agora renderiza o gate pré-K no terminal.
-- Checklist das Faixas I-J foi reorganizada para não conter estados parciais: cada checkbox descreve uma condição
-  verificável e booleana.
+- Checklist das Faixas I-J foi reorganizada para não conter estados parciais: cada checkbox descreve
+  uma condição verificável e booleana.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`31` testes).
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`49` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5603` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-17-40-699Z/summary.md`).
+- PASS `npm run test:copilot` (`5603` testes, `0` falhas; warning remanescente conhecido:
+  `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-17-40-699Z/summary.md`).
 
 Próxima direção:
 
@@ -1014,8 +1121,8 @@ Próxima direção:
 
 ## 12. Continuidade 2026-05-25 — início da Faixa K por contratos puros
 
-Pedido permanente: após fechar A-J, avançar para K com transformações estruturais, mantendo barrels e checkboxes
-booleanos.
+Pedido permanente: após fechar A-J, avançar para K com transformações estruturais, mantendo barrels
+e checkboxes booleanos.
 
 Implementado neste corte:
 
@@ -1029,18 +1136,19 @@ Implementado neste corte:
   - `ProviderAccountOverlay`;
   - `CanonicalModelProjection`.
 - As factories normalizam `providerId`, timestamps, listas, seletor de rota e defaults seguros.
-- Evidências, route options, overlays e projections sanitizam valores antes de serialização; payload bruto continua fora
-  do contrato e deve entrar depois apenas por `rawPayloadRef` redigido.
+- Evidências, route options, overlays e projections sanitizam valores antes de serialização; payload
+  bruto continua fora do contrato e deve entrar depois apenas por `rawPayloadRef` redigido.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`32` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5604` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-22-10-569Z/summary.md`).
+- PASS `npm run test:copilot` (`5604` testes, `0` falhas; warning remanescente conhecido:
+  `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-22-10-569Z/summary.md`).
 
 Próxima direção:
 
@@ -1052,25 +1160,26 @@ Próxima direção:
 Implementado neste corte:
 
 - Criado `src/copilot/model-gateway/catalog/merge.js`.
-- Exportados `mergeModelMetadataEvidence()` e `rankCatalogEvidenceConfidence()` pelo barrel de catálogo e pelo barrel
-  raiz do gateway.
-- `mergeModelMetadataEvidence()` agrupa evidências por `fieldPath`, escolhe vencedor por precedência de confiança,
-  desempata por `observedAt`, aplica o valor em uma `CanonicalModelProjection`, registra `provenanceByField` e
-  `confidenceByField`, e preserva conflitos em lista auditável.
-- A sanitização de valores de catálogo foi refinada para não redigir metadados legítimos como `contextWindowTokens`,
-  mantendo redaction para headers, tokens, secrets e API keys.
-- Teste cobre o caso crítico: evidência `catalog` mais antiga mantém `limits.contextWindowTokens=131072` contra uma
-  heurística mais recente e pobre.
+- Exportados `mergeModelMetadataEvidence()` e `rankCatalogEvidenceConfidence()` pelo barrel de
+  catálogo e pelo barrel raiz do gateway.
+- `mergeModelMetadataEvidence()` agrupa evidências por `fieldPath`, escolhe vencedor por precedência
+  de confiança, desempata por `observedAt`, aplica o valor em uma `CanonicalModelProjection`,
+  registra `provenanceByField` e `confidenceByField`, e preserva conflitos em lista auditável.
+- A sanitização de valores de catálogo foi refinada para não redigir metadados legítimos como
+  `contextWindowTokens`, mantendo redaction para headers, tokens, secrets e API keys.
+- Teste cobre o caso crítico: evidência `catalog` mais antiga mantém
+  `limits.contextWindowTokens=131072` contra uma heurística mais recente e pobre.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`33` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5605` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-27-41-329Z/summary.md`).
+- PASS `npm run test:copilot` (`5605` testes, `0` falhas; warning remanescente conhecido:
+  `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-27-41-329Z/summary.md`).
 
 Próxima direção:
 
@@ -1086,59 +1195,65 @@ Implementado neste corte:
   - `createSanitizedRawPayloadRef()`;
   - `createCatalogImportRun()`;
   - `diffCanonicalModelProjections()`.
-- `createSanitizedRawPayloadRef()` sanitiza payload, calcula `sha256:<hash>`, registra `byteLength`, `mediaType` e
-  `redactionStatus`, sem exigir persistência ainda.
-- `createCatalogImportRun()` cria registro seguro de execução com status, provider/source, contagem de rows, erros
-  sanitizados e diff sanitizado.
+- `createSanitizedRawPayloadRef()` sanitiza payload, calcula `sha256:<hash>`, registra `byteLength`,
+  `mediaType` e `redactionStatus`, sem exigir persistência ainda.
+- `createCatalogImportRun()` cria registro seguro de execução com status, provider/source, contagem
+  de rows, erros sanitizados e diff sanitizado.
 - `diffCanonicalModelProjections()` calcula adicionados, removidos e campos alterados por chave
   `providerId:providerModel:routeProfile`.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`34` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5606` testes, `0` falhas; warning remanescente conhecido: `[erro] sdk stream failed`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-32-20-372Z/summary.md`).
+- PASS `npm run test:copilot` (`5606` testes, `0` falhas; warning remanescente conhecido:
+  `[erro] sdk stream failed`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-32-20-372Z/summary.md`).
 
 Próxima direção:
 
 1. Commit/push deste corte storage-neutral.
-2. Avançar K para um store JSON/SQLite mínimo ou para importers dry-run, dependendo do menor risco arquitetural.
+2. Avançar K para um store JSON/SQLite mínimo ou para importers dry-run, dependendo do menor risco
+   arquitetural.
 
 ## 15. Continuidade 2026-05-25 — limpeza do warning `sdk stream failed`
 
 Investigação:
 
-- O warning recorrente `[erro] sdk stream failed` não era falha real do SDK nem regressão do model-gateway.
+- O warning recorrente `[erro] sdk stream failed` não era falha real do SDK nem regressão do
+  model-gateway.
 - A origem era `tests/unit/copilot/test_terminal_dialog_engine.spec.js`: o teste simulava
-  `runTerminalDialogTurnDetailed` rejeitando com `Error('sdk stream failed')`, mas importava o output real do terminal.
-- O engine se comportava corretamente ao capturar a exceção e liberar display state; o problema era o spec vazar
-  `println()` para `process.stdout`, fazendo o runner compacto classificar uma falha esperada como warning global.
+  `runTerminalDialogTurnDetailed` rejeitando com `Error('sdk stream failed')`, mas importava o
+  output real do terminal.
+- O engine se comportava corretamente ao capturar a exceção e liberar display state; o problema era
+  o spec vazar `println()` para `process.stdout`, fazendo o runner compacto classificar uma falha
+  esperada como warning global.
 
 Correção:
 
-- O spec do engine agora captura `process.stdout.write` durante a execução do arquivo e restaura no `afterAll`.
-- Isso preserva o engine real, mantém o teste de falha esperado, não silencia warnings de outros specs e remove o ruído
-  falso do relatório global.
+- O spec do engine agora captura `process.stdout.write` durante a execução do arquivo e restaura no
+  `afterAll`.
+- Isso preserva o engine real, mantém o teste de falha esperado, não silencia warnings de outros
+  specs e remove o ruído falso do relatório global.
 
 Validação:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/test_terminal_dialog_engine.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/test_terminal_dialog_engine.spec.js`
   (`22` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5606` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-40-55-032Z/summary.md`).
+- PASS `npm run test:copilot` (`5606` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-40-55-032Z/summary.md`).
 
 Decisão de roadmap:
 
-- O próximo avanço de K deve criar um store inicial redigido/storage-neutral antes de SQLite. Isso reduz risco: primeiro
-  validamos serialização, redaction, import runs, raw refs, diffs e merge em arquivo simples; depois migramos a mesma
-  interface para SQLite sem trocar contrato.
+- O próximo avanço de K deve criar um store inicial redigido/storage-neutral antes de SQLite. Isso
+  reduz risco: primeiro validamos serialização, redaction, import runs, raw refs, diffs e merge em
+  arquivo simples; depois migramos a mesma interface para SQLite sem trocar contrato.
 
 ## 16. Continuidade 2026-05-25 — store JSON redigido do catálogo
 
@@ -1149,34 +1264,36 @@ Implementado neste corte:
   - `DEFAULT_MODEL_GATEWAY_CATALOG_PATH`;
   - `JsonModelGatewayCatalogStore`;
   - `normalizeStoredCatalogSnapshot()`.
-- O store grava snapshot versionado em `data/copilot/model-gateway/catalog.json` por padrão, com os arrays canônicos
-  `sources`, `evidences`, `routeOptions`, `accountOverlays`, `projections`, `importRuns`, `rawPayloadRefs` e
-  `conflicts`.
-- A normalização rejeita schema version incompatível e sempre devolve shape completo, reduzindo risco para importers e
-  migração futura para SQLite.
-- A sanitização do store usa chaves sensíveis exatas (`authorization`, `apiKey`, `secret`, `token`, bearer/access token)
-  e redação de texto, preservando metadados legítimos com nomes como `contextWindowTokens`.
-- O teste de regressão cobre persistência de source/evidence/projection/raw ref/import run, ausência de segredo no
-  arquivo bruto e preservação de `limits.contextWindowTokens`.
+- O store grava snapshot versionado em `data/copilot/model-gateway/catalog.json` por padrão, com os
+  arrays canônicos `sources`, `evidences`, `routeOptions`, `accountOverlays`, `projections`,
+  `importRuns`, `rawPayloadRefs` e `conflicts`.
+- A normalização rejeita schema version incompatível e sempre devolve shape completo, reduzindo
+  risco para importers e migração futura para SQLite.
+- A sanitização do store usa chaves sensíveis exatas (`authorization`, `apiKey`, `secret`, `token`,
+  bearer/access token) e redação de texto, preservando metadados legítimos com nomes como
+  `contextWindowTokens`.
+- O teste de regressão cobre persistência de source/evidence/projection/raw ref/import run, ausência
+  de segredo no arquivo bruto e preservação de `limits.contextWindowTokens`.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`35` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5607` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-47-41-535Z/summary.md`).
+- PASS `npm run test:copilot` (`5607` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-47-41-535Z/summary.md`).
 
 Decisão de roadmap:
 
-- O JSON store fecha a primeira persistência storage-neutral da Faixa K sem congelar backend. A próxima etapa robusta
-  deve ser escolher entre dois caminhos complementares:
+- O JSON store fecha a primeira persistência storage-neutral da Faixa K sem congelar backend. A
+  próxima etapa robusta deve ser escolher entre dois caminhos complementares:
   1. criar importers dry-run por provider que escrevam este snapshot;
   2. criar o store SQLite com a mesma semântica e migrar o teste secret-safe para DB.
-- `registry.json` continua snapshot operacional legado; o catálogo JSON/SQLite passa a ser a camada de fatos,
-  evidências e runs. Nenhum importer deve escrever segredo bruto em projection, raw payload ou run.
+- `registry.json` continua snapshot operacional legado; o catálogo JSON/SQLite passa a ser a camada
+  de fatos, evidências e runs. Nenhum importer deve escrever segredo bruto em projection, raw
+  payload ou run.
 
 ## 17. Continuidade 2026-05-25 — interface e runner de importers
 
@@ -1192,40 +1309,43 @@ Implementado neste corte:
   - `fetchRaw()`;
   - `parseRows()`;
   - `toEvidenceFacts()`.
-- O runner executa importers sem assumir rede: cada provider específico continua livre para implementar fetch real,
-  fetch autenticado, parser HTML/docs, API pública, daemon local ou fixture dry-run.
-- Para cada importer, o runner cria `ProviderCatalogSource`, sanitiza raw payload em `rawPayloadRef`, converte rows em
-  evidências, registra `CatalogImportRun` concluído ou falho e pode persistir tudo no `JsonModelGatewayCatalogStore`.
-- Erros de import são capturados como import run falho e sanitizados pelo contrato de run; segredo em mensagem de erro
-  não vaza para snapshot.
+- O runner executa importers sem assumir rede: cada provider específico continua livre para
+  implementar fetch real, fetch autenticado, parser HTML/docs, API pública, daemon local ou fixture
+  dry-run.
+- Para cada importer, o runner cria `ProviderCatalogSource`, sanitiza raw payload em
+  `rawPayloadRef`, converte rows em evidências, registra `CatalogImportRun` concluído ou falho e
+  pode persistir tudo no `JsonModelGatewayCatalogStore`.
+- Erros de import são capturados como import run falho e sanitizados pelo contrato de run; segredo
+  em mensagem de erro não vaza para snapshot.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`36` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5608` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-53-54-304Z/summary.md`).
+- PASS `npm run test:copilot` (`5608` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-53-54-304Z/summary.md`).
 
 Decisão de roadmap:
 
-- Faixa L agora tem a espinha dorsal para importers reais. O próximo passo deve ser `OpenAIModelsImporter` ou
-  `OpenRouterModelsImporter`; OpenRouter tende a entregar mais metadados por payload e é bom para provar parsing rico,
-  enquanto OpenAI é o menor importer autenticado para provar `/v1/models`.
+- Faixa L agora tem a espinha dorsal para importers reais. O próximo passo deve ser
+  `OpenAIModelsImporter` ou `OpenRouterModelsImporter`; OpenRouter tende a entregar mais metadados
+  por payload e é bom para provar parsing rico, enquanto OpenAI é o menor importer autenticado para
+  provar `/v1/models`.
 
 ## 18. Continuidade 2026-05-25 — primeiro importer real: OpenRouter
 
 Investigação:
 
-- O endpoint público `https://openrouter.ai/api/v1/models` respondeu com payload `{ data: [...] }` e, na amostra local,
-  `357` modelos.
-- Cada row pode trazer `id`, `canonical_slug`, `name`, `description`, `context_length`, `architecture`,
-  `pricing`, `top_provider`, `per_request_limits`, `supported_parameters`, `default_parameters`, `knowledge_cutoff`,
-  `expiration_date` e links de endpoints.
-- Este é um bom primeiro importer real porque combina identidade, preço, contexto, modalidades, parâmetros suportados e
-  hints de provedor superior sem exigir segredo.
+- O endpoint público `https://openrouter.ai/api/v1/models` respondeu com payload `{ data: [...] }`
+  e, na amostra local, `357` modelos.
+- Cada row pode trazer `id`, `canonical_slug`, `name`, `description`, `context_length`,
+  `architecture`, `pricing`, `top_provider`, `per_request_limits`, `supported_parameters`,
+  `default_parameters`, `knowledge_cutoff`, `expiration_date` e links de endpoints.
+- Este é um bom primeiro importer real porque combina identidade, preço, contexto, modalidades,
+  parâmetros suportados e hints de provedor superior sem exigir segredo.
 
 Implementado neste corte:
 
@@ -1234,8 +1354,8 @@ Implementado neste corte:
 - Exportados pelo barrel de catálogo e pelo barrel raiz:
   - `OPENROUTER_MODELS_CATALOG_URL`;
   - `createOpenRouterModelsImporter()`.
-- O importer usa `fetch` injetável, mantém `requiresAuth=false`, `sourceKind=public_api`, TTL de uma hora e a URL
-  pública oficial.
+- O importer usa `fetch` injetável, mantém `requiresAuth=false`, `sourceKind=public_api`, TTL de uma
+  hora e a URL pública oficial.
 - `parseRows()` extrai rows de `data`.
 - `toEvidenceFacts()` emite evidências field-wise para:
   - `displayName`;
@@ -1247,24 +1367,25 @@ Implementado neste corte:
   - `supportedParameters`;
   - preços por milhão de tokens de input/output/cache e web search por request;
   - `routingHints.openrouterTopProvider`.
-- Importante: suporte a `tools`, `tool_choice` ou `structured_outputs` vindo do catálogo segue como evidência
-  `catalog`, não como `probe_verified`; promoção agentic ainda depende dos probes da camada de runtime.
+- Importante: suporte a `tools`, `tool_choice` ou `structured_outputs` vindo do catálogo segue como
+  evidência `catalog`, não como `probe_verified`; promoção agentic ainda depende dos probes da
+  camada de runtime.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`37` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5609` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T14-58-58-311Z/summary.md`).
+- PASS `npm run test:copilot` (`5609` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T14-58-58-311Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Depois, implementar `OpenAIModelsImporter` como o menor importer autenticado e/ou criar um comando programático de
-  refresh que permita rodar `OpenRouterModelsImporter` em snapshot JSON com diff.
+- Depois, implementar `OpenAIModelsImporter` como o menor importer autenticado e/ou criar um comando
+  programático de refresh que permita rodar `OpenRouterModelsImporter` em snapshot JSON com diff.
 
 ## 19. Continuidade 2026-05-25 — importer autenticado OpenAI
 
@@ -1274,10 +1395,11 @@ Implementado neste corte:
 - Exportados pelo barrel de importers, barrel de catálogo e barrel raiz:
   - `OPENAI_MODELS_CATALOG_URL`;
   - `createOpenAIModelsImporter()`.
-- O importer aponta para `https://api.openai.com/v1/models`, exige `OPENAI_API_KEY`, usa `requiresAuth=true`,
-  `sourceKind=authenticated_api` e registra `envRequirements=['OPENAI_API_KEY']`.
-- O fetch real recebe a API key apenas no header `Authorization`; a key não entra em source, raw payload, evidence,
-  import run ou snapshot.
+- O importer aponta para `https://api.openai.com/v1/models`, exige `OPENAI_API_KEY`, usa
+  `requiresAuth=true`, `sourceKind=authenticated_api` e registra
+  `envRequirements=['OPENAI_API_KEY']`.
+- O fetch real recebe a API key apenas no header `Authorization`; a key não entra em source, raw
+  payload, evidence, import run ou snapshot.
 - `parseRows()` extrai rows de `data`.
 - `toEvidenceFacts()` emite evidências `authenticated_catalog` para:
   - `displayName`;
@@ -1287,34 +1409,37 @@ Implementado neste corte:
 
 Decisão arquitetural:
 
-- `/v1/models` é fonte de disponibilidade/identidade account-scoped, não de capabilities completas. Por isso o checkbox
-  de OpenAI foi dividido: importer account-scoped está fechado; seeds/docs oficiais de capacidades, famílias,
-  reasoning/tools/modalidades e depreciações seguem como tarefa separada.
+- `/v1/models` é fonte de disponibilidade/identidade account-scoped, não de capabilities completas.
+  Por isso o checkbox de OpenAI foi dividido: importer account-scoped está fechado; seeds/docs
+  oficiais de capacidades, famílias, reasoning/tools/modalidades e depreciações seguem como tarefa
+  separada.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`38` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5610` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-03-50-067Z/summary.md`).
+- PASS `npm run test:copilot` (`5610` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-03-50-067Z/summary.md`).
 
 ## 20. Continuidade 2026-05-25 — normalização para schema OpenAI com extensão rica
 
 Investigação/ajuste conceitual:
 
-- O gateway deve ser universal na ingestão e rico na metadata, mas a superfície interoperável deve falar primeiro a
-  linguagem OpenAI-compatible.
+- O gateway deve ser universal na ingestão e rico na metadata, mas a superfície interoperável deve
+  falar primeiro a linguagem OpenAI-compatible.
 - O schema público mínimo passa a ser o equivalente ao Models API:
   - `id`;
   - `object`;
   - `created`;
   - `owned_by`.
-- Tudo que é nosso, rico ou provider-specific fica em `x_model_gateway`, sem poluir o contrato OpenAI básico.
-- Também foi identificado um gap: evidências `aliases.*`, `lifecycle.*`, `description` e `providerMetadata.*` eram
-  produzidas, mas a projection descartava parte delas por normalizar `aliases` e `lifecycle` de modo estreito demais.
+- Tudo que é nosso, rico ou provider-specific fica em `x_model_gateway`, sem poluir o contrato
+  OpenAI básico.
+- Também foi identificado um gap: evidências `aliases.*`, `lifecycle.*`, `description` e
+  `providerMetadata.*` eram produzidas, mas a projection descartava parte delas por normalizar
+  `aliases` e `lifecycle` de modo estreito demais.
 
 Implementado neste corte:
 
@@ -1346,18 +1471,19 @@ Implementado neste corte:
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`39` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5611` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-14-46-640Z/summary.md`).
+- PASS `npm run test:copilot` (`5611` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-14-46-640Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Em seguida, conectar refresh/diff programático para gerar snapshots OpenAI-compatible a partir dos importers reais.
+- Em seguida, conectar refresh/diff programático para gerar snapshots OpenAI-compatible a partir dos
+  importers reais.
 
 ## 21. Continuidade 2026-05-25 — refresh programático com diff e saída OpenAI
 
@@ -1365,8 +1491,9 @@ Implementado neste corte:
 
 - Criado `src/copilot/model-gateway/catalog/refresh.js`.
 - Exportado `refreshModelGatewayCatalog()` pelo barrel de catálogo e pelo barrel raiz.
-- O refresh aceita importers e store/snapshot, roda os importers via `runCatalogImporters()`, substitui evidências das
-  fontes reexecutadas e preserva evidências de fontes não tocadas, como overrides manuais ou outros providers.
+- O refresh aceita importers e store/snapshot, roda os importers via `runCatalogImporters()`,
+  substitui evidências das fontes reexecutadas e preserva evidências de fontes não tocadas, como
+  overrides manuais ou outros providers.
 - Depois do refresh, o pipeline:
   1. reagrupa evidências por `providerId/providerModel/routeProfile`;
   2. chama `mergeModelMetadataEvidence()` por grupo;
@@ -1375,52 +1502,57 @@ Implementado neste corte:
   5. calcula diff contra `previous.projections`;
   6. persiste snapshot atualizado quando há store;
   7. retorna também `openai: { object: "list", data: [...] }`.
-- A decisão de substituir evidências por fonte no refresh é importante para detectar remoções: se uma fonte pública não
-  retorna mais um modelo, a projection daquele modelo desaparece, mas evidências manuais/de outras fontes permanecem.
+- A decisão de substituir evidências por fonte no refresh é importante para detectar remoções: se
+  uma fonte pública não retorna mais um modelo, a projection daquele modelo desaparece, mas
+  evidências manuais/de outras fontes permanecem.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`40` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5612` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-19-13-644Z/summary.md`).
+- PASS `npm run test:copilot` (`5612` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-19-13-644Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Depois, criar comando terminal ou script programático fino para acionar refresh OpenRouter/OpenAI e inspecionar diff.
+- Depois, criar comando terminal ou script programático fino para acionar refresh OpenRouter/OpenAI
+  e inspecionar diff.
 
 ## 22. Continuidade 2026-05-25 — composição padrão de importers
 
 Implementado neste corte:
 
 - Criado `src/copilot/model-gateway/catalog/default-importers.js`.
-- Exportado `createDefaultModelGatewayCatalogImporters()` pelo barrel de catálogo e pelo barrel raiz.
+- Exportado `createDefaultModelGatewayCatalogImporters()` pelo barrel de catálogo e pelo barrel
+  raiz.
 - A composição padrão inclui:
   - `OpenRouterModelsImporter`, público, sempre que `includePublic=true`;
-  - `OpenAIModelsImporter`, autenticado, apenas quando `OPENAI_API_KEY` ou `COPILOT_OPENAI_API_KEY` existe e
-    `includeAuthenticated=true`.
-- A API aceita `fetchImpl` injetável, permitindo terminal, scripts e testes usarem o mesmo pipeline sem rede implícita.
-- A API key fica fechada no importer e não aparece em JSON/stringificação de importers, snapshot, evidence ou output.
+  - `OpenAIModelsImporter`, autenticado, apenas quando `OPENAI_API_KEY` ou `COPILOT_OPENAI_API_KEY`
+    existe e `includeAuthenticated=true`.
+- A API aceita `fetchImpl` injetável, permitindo terminal, scripts e testes usarem o mesmo pipeline
+  sem rede implícita.
+- A API key fica fechada no importer e não aparece em JSON/stringificação de importers, snapshot,
+  evidence ou output.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`41` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5613` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-23-21-473Z/summary.md`).
+- PASS `npm run test:copilot` (`5613` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-23-21-473Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Depois, expor o refresh em comando/superfície operacional, começando por uma saída resumida de diff e contagem
-  OpenAI-compatible.
+- Depois, expor o refresh em comando/superfície operacional, começando por uma saída resumida de
+  diff e contagem OpenAI-compatible.
 
 ## 23. Continuidade 2026-05-25 — comando terminal de refresh do catálogo
 
@@ -1437,24 +1569,24 @@ Implementado neste corte:
   - schema `OpenAI+x_model_gateway`;
   - contagem de projections, itens OpenAI e runs;
   - diff resumido com até 5 adicionados/removidos/alterados.
-- O comando não imprime raw payload, headers, API keys nem corpo de catálogo. A API key da OpenAI permanece fechada no
-  importer e o snapshot continua passando pela sanitização do store.
+- O comando não imprime raw payload, headers, API keys nem corpo de catálogo. A API key da OpenAI
+  permanece fechada no importer e o snapshot continua passando pela sanitização do store.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`50` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5614` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-28-45-902Z/summary.md`).
+- PASS `npm run test:copilot` (`5614` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-28-45-902Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Depois, avançar normalizadores finos de Faixa M: modalidades/capabilities/limits/pricing com vocabulário OpenAI
-  estendido e evidências sempre rastreáveis.
+- Depois, avançar normalizadores finos de Faixa M: modalidades/capabilities/limits/pricing com
+  vocabulário OpenAI estendido e evidências sempre rastreáveis.
 
 ## 24. Continuidade 2026-05-25 — normalizadores de modalidades e capability hints
 
@@ -1466,11 +1598,11 @@ Implementado neste corte:
   - `parseModelModalityExpression()`;
   - `normalizeModelModalities()`;
   - `normalizeOpenAICompatibleModelCapabilities()`.
-- O normalizador de modalidades converte vocabulários variados para o conjunto canônico:
-  `text`, `image`, `audio`, `video`, `pdf`, `embedding`, `rerank`, `asr`, `tts`, `image-generation`.
+- O normalizador de modalidades converte vocabulários variados para o conjunto canônico: `text`,
+  `image`, `audio`, `video`, `pdf`, `embedding`, `rerank`, `asr`, `tts`, `image-generation`.
 - `parseModelModalityExpression()` entende expressões estilo OpenRouter, como `text+image->text`.
-- `normalizeOpenAICompatibleModelCapabilities()` extrai hints de catálogo a partir de `supported_parameters` e
-  modalidades:
+- `normalizeOpenAICompatibleModelCapabilities()` extrai hints de catálogo a partir de
+  `supported_parameters` e modalidades:
   - `tools`;
   - `forcedToolChoice`;
   - `parallelToolCalls`;
@@ -1483,23 +1615,24 @@ Implementado neste corte:
   - `video`;
   - `codeExecution`;
   - `webSearch`.
-- O `OpenRouterModelsImporter` agora usa esses normalizers e emite evidências `capabilities.*` como confidence
-  `catalog`. Isso melhora seleção pré-probe sem confundir catálogo com `probe_verified`.
+- O `OpenRouterModelsImporter` agora usa esses normalizers e emite evidências `capabilities.*` como
+  confidence `catalog`. Isso melhora seleção pré-probe sem confundir catálogo com `probe_verified`.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`42` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5615` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-34-20-304Z/summary.md`).
+- PASS `npm run test:copilot` (`5615` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-34-20-304Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Depois, continuar Faixa M em limites/pricing normalizados com unidade/currency explícitas no `x_model_gateway`.
+- Depois, continuar Faixa M em limites/pricing normalizados com unidade/currency explícitas no
+  `x_model_gateway`.
 
 ## 25. Continuidade 2026-05-25 — normalizadores de limits/pricing com unidades explícitas
 
@@ -1525,31 +1658,33 @@ Implementado neste corte:
   - `cacheWriteUsdPerMillion`;
   - `requestUsd`;
   - `webSearchUsdPerRequest`.
-- O `OpenRouterModelsImporter` agora usa esses normalizers para emitir evidências `limits.*` e `pricing.*`, incluindo
-  moeda/unidade. Isso evita que o banco misture preço por token, por milhão de tokens e por request sem contexto.
-- Preços por token são arredondados em escala de 6 casas após conversão para milhão de tokens, evitando ruído binário
-  como `0.19999999999999998`.
+- O `OpenRouterModelsImporter` agora usa esses normalizers para emitir evidências `limits.*` e
+  `pricing.*`, incluindo moeda/unidade. Isso evita que o banco misture preço por token, por milhão
+  de tokens e por request sem contexto.
+- Preços por token são arredondados em escala de 6 casas após conversão para milhão de tokens,
+  evitando ruído binário como `0.19999999999999998`.
 
 Separação arquitetural reafirmada:
 
 - `limits.*` e `pricing.*` vindos de catálogo são fatos de metadado/proveniência.
-- Acesso real, cota efetiva do token do operador, quota por organização, rate-limit dinâmico e sucesso de chamada seguem
-  na fase runtime/overlay/health, não na normalização base.
+- Acesso real, cota efetiva do token do operador, quota por organização, rate-limit dinâmico e
+  sucesso de chamada seguem na fase runtime/overlay/health, não na normalização base.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`43` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5616` testes, `0` falhas, `warnings/errors unique=0 total=0`;
-  resumo `artifacts/test-runs/copilot/2026-05-25T15-47-33-052Z/summary.md`).
+- PASS `npm run test:copilot` (`5616` testes, `0` falhas, `warnings/errors unique=0 total=0`; resumo
+  `artifacts/test-runs/copilot/2026-05-25T15-47-33-052Z/summary.md`).
 
 Próxima direção:
 
 - Commitar/pushar este corte.
-- Depois, avançar lifecycle/aliases e começar a modelar explicitamente overlays account-scoped para acesso efetivo.
+- Depois, avançar lifecycle/aliases e começar a modelar explicitamente overlays account-scoped para
+  acesso efetivo.
 
 ## 26. Continuidade 2026-05-25 — lifecycle, aliases e preservação ampla do payload útil
 
@@ -1587,29 +1722,33 @@ Implementado neste corte:
 Separação arquitetural reafirmada:
 
 - Alias instável, preview, expiração e parâmetros default são metadados de catálogo.
-- Eles podem afetar seleção e ordem de preferência depois, mas não provam acesso, execução, tool calling nem streaming.
-- Acesso efetivo por token/conta, modelo pago liberado, cota real e sucesso de chamada entram em overlay/runtime.
+- Eles podem afetar seleção e ordem de preferência depois, mas não provam acesso, execução, tool
+  calling nem streaming.
+- Acesso efetivo por token/conta, modelo pago liberado, cota real e sucesso de chamada entram em
+  overlay/runtime.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`44` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5617` testes totais, `5584` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T15-53-37-408Z/summary.md`).
+- PASS `npm run test:copilot` (`5617` testes totais, `5584` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T15-53-37-408Z/summary.md`).
 
 Próxima direção:
 
-- Depois, avançar `accountScoped`/overlays: diferenciar catálogo público, modelos disponíveis para a key do operador,
-  quotas efetivas e provas runtime.
+- Depois, avançar `accountScoped`/overlays: diferenciar catálogo público, modelos disponíveis para a
+  key do operador, quotas efetivas e provas runtime.
 
 ## 27. Continuidade 2026-05-25 — overlays account-scoped como camada separada de acesso
 
 Implementado neste corte:
 
-- `CatalogImporter` agora pode retornar `toAccountOverlays(rows, context)` além de `toEvidenceFacts(rows, context)`.
+- `CatalogImporter` agora pode retornar `toAccountOverlays(rows, context)` além de
+  `toEvidenceFacts(rows, context)`.
 - `runCatalogImporters()` persiste `accountOverlays` no snapshot com upsert próprio, mantendo:
   - `sources` como origem do endpoint/importer;
   - `evidences` como fatos de metadata por modelo;
@@ -1623,83 +1762,93 @@ Implementado neste corte:
   - `providerMetadata`.
 - `OpenAIModelsImporter` agora interpreta `/v1/models` também como overlay autenticado:
   - `enabledModels` recebe os modelos que a key atual consegue listar;
-  - `secretRef` guarda somente o nome lógico da chave (`OPENAI_API_KEY`, `COPILOT_OPENAI_API_KEY` etc.);
-  - `providerMetadata.semantics=account_visible_models` deixa explícito que isso não prova chamada runtime.
-- `createDefaultModelGatewayCatalogImporters()` preserva qual variável de ambiente originou a key OpenAI e passa essa
-  referência ao overlay sem serializar o valor secreto.
+  - `secretRef` guarda somente o nome lógico da chave (`OPENAI_API_KEY`, `COPILOT_OPENAI_API_KEY`
+    etc.);
+  - `providerMetadata.semantics=account_visible_models` deixa explícito que isso não prova chamada
+    runtime.
+- `createDefaultModelGatewayCatalogImporters()` preserva qual variável de ambiente originou a key
+  OpenAI e passa essa referência ao overlay sem serializar o valor secreto.
 
 Separação arquitetural reafirmada:
 
 - Catálogo público responde “o provider anuncia o modelo?”.
 - Overlay account-scoped responde “esta conta/key lista ou habilita este modelo?”.
-- Runtime probes continuam sendo a etapa posterior que responde “o modelo realmente executa chat, stream, tools,
-  JSON/structured output, reasoning, visão etc. com esta configuração?”.
-- Seleção final deve combinar as três camadas depois, junto com preferências do operador, custo, risco e saúde.
+- Runtime probes continuam sendo a etapa posterior que responde “o modelo realmente executa chat,
+  stream, tools, JSON/structured output, reasoning, visão etc. com esta configuração?”.
+- Seleção final deve combinar as três camadas depois, junto com preferências do operador, custo,
+  risco e saúde.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`44` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5617` testes totais, `5584` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T15-59-21-749Z/summary.md`).
+- PASS `npm run test:copilot` (`5617` testes totais, `5584` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T15-59-21-749Z/summary.md`).
 
 Próxima direção:
 
-- Começar a estruturar overlays account-scoped para outros providers e um contrato normalizado para quotas,
-  rate limits, billing/free-tier e allow/block lists quando os endpoints oferecerem esses campos.
+- Começar a estruturar overlays account-scoped para outros providers e um contrato normalizado para
+  quotas, rate limits, billing/free-tier e allow/block lists quando os endpoints oferecerem esses
+  campos.
 
 ## 28. Continuidade 2026-05-25 — normalização de controles de overlay
 
 Implementado neste corte:
 
-- `normalizeAccountOverlayControls()` cria uma camada comum para informações autenticadas por conta/key:
+- `normalizeAccountOverlayControls()` cria uma camada comum para informações autenticadas por
+  conta/key:
   - `enabledModels`;
   - `blockedModels`;
   - `byokProviderKeys`;
-  - `quota.dailyRequests`, `quota.dailyTokens`, `quota.monthlyBudgetUsd`, `quota.remainingCreditsUsd`,
-    `quota.maxConcurrentRequests`;
+  - `quota.dailyRequests`, `quota.dailyTokens`, `quota.monthlyBudgetUsd`,
+    `quota.remainingCreditsUsd`, `quota.maxConcurrentRequests`;
   - `rateLimits.requestsPerMinute`, `rateLimits.tokensPerMinute`, `rateLimits.requestsPerDay`,
     `rateLimits.tokensPerDay`, `rateLimits.concurrentRequests`;
   - `spendingLimits.currency`, `spendingLimits.hardLimitUsd`, `spendingLimits.softLimitUsd`,
     `spendingLimits.remainingUsd`;
-  - `providerMetadata.billingStatus`, `providerMetadata.plan`, `providerMetadata.freeTier` e metadados nativos.
+  - `providerMetadata.billingStatus`, `providerMetadata.plan`, `providerMetadata.freeTier` e
+    metadados nativos.
 - `OpenAIModelsImporter` já usa esse normalizador para montar o overlay de `/v1/models`.
 - O normalizador fica exportado pelos barrels do catálogo e de `src/copilot/model-gateway`.
 
 Separação arquitetural reafirmada:
 
 - Quotas, billing, plano e listas allow/block são controles de conta.
-- Esses controles podem restringir a seleção inicial, mas ainda não provam que um modelo responde uma chamada real.
+- Esses controles podem restringir a seleção inicial, mas ainda não provam que um modelo responde
+  uma chamada real.
 - Provas de chat/stream/tools/JSON/visão/reasoning continuam reservadas para probes runtime.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`45` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5618` testes totais, `5585` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-04-12-369Z/summary.md`).
+- PASS `npm run test:copilot` (`5618` testes totais, `5585` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-04-12-369Z/summary.md`).
 
 Próxima direção:
 
-- Expandir providers/importers para preencher esse contrato quando endpoints autenticados oferecerem quotas,
-  saldo, plano, allow/block lists ou BYOK interno.
+- Expandir providers/importers para preencher esse contrato quando endpoints autenticados oferecerem
+  quotas, saldo, plano, allow/block lists ou BYOK interno.
 
 ## 29. Continuidade 2026-05-25 — primeiro gateway catalog importer: Kilo `/models`
 
 Investigação consolidada neste corte:
 
 - Documentação oficial Kilo confirma `https://api.kilo.ai/api/gateway` como base OpenAI-compatible.
-- `GET https://api.kilo.ai/api/gateway/models` é público e retorna modelos com formato `provider/model-name`,
-  pricing, context window e supported features.
-- `GET /providers` também é público e deve virar uma segunda fonte para metadados de provider upstream, data policy,
-  datacenters, ícones e políticas.
-- O runtime Kilo continua separado em `/chat/completions` e FIM; nada deste corte promove capacidade runtime.
+- `GET https://api.kilo.ai/api/gateway/models` é público e retorna modelos com formato
+  `provider/model-name`, pricing, context window e supported features.
+- `GET /providers` também é público e deve virar uma segunda fonte para metadados de provider
+  upstream, data policy, datacenters, ícones e políticas.
+- O runtime Kilo continua separado em `/chat/completions` e FIM; nada deste corte promove capacidade
+  runtime.
 
 Implementado neste corte:
 
@@ -1708,45 +1857,50 @@ Implementado neste corte:
   - preserva `displayName`, `description`, aliases, lifecycle e modalidades;
   - normaliza limits (`contextWindowTokens`, `maxOutputTokens`);
   - normaliza pricing USD por milhão/request/search quando o catálogo oferece esses campos;
-  - infere capability hints de `supported_parameters`, inclusive `tools`, `vision`, `pdf` e `reasoningEffort`;
-  - preserva `providerMetadata.kilo.upstreamProvider`, `isFree`, `preferredIndex`, `tokenizer`, `opencode` e
-    `rawPricing`;
+  - infere capability hints de `supported_parameters`, inclusive `tools`, `vision`, `pdf` e
+    `reasoningEffort`;
+  - preserva `providerMetadata.kilo.upstreamProvider`, `isFree`, `preferredIndex`, `tokenizer`,
+    `opencode` e `rawPricing`;
   - preserva `routingHints.kiloTopProvider`.
-- `createDefaultModelGatewayCatalogImporters()` agora inclui Kilo junto com OpenRouter nas fontes públicas padrão.
+- `createDefaultModelGatewayCatalogImporters()` agora inclui Kilo junto com OpenRouter nas fontes
+  públicas padrão.
 - Barrels do catálogo e de `src/copilot/model-gateway` exportam o importer e a URL canônica.
 
 Separação arquitetural reafirmada:
 
-- Kilo `/models` alimenta o banco universal de metadata normalizada para OpenAI schema + `x_model_gateway`.
-- Rotas `kilo-auto/*`, modelos free e provider/model são metadata/route candidates, não provas de chamada.
-- `x-kilocode-mode`, organização, BYOK interno, allow/block lists e saldo entram em overlays; chat/stream/tools entram
-  nos probes runtime posteriores.
+- Kilo `/models` alimenta o banco universal de metadata normalizada para OpenAI schema +
+  `x_model_gateway`.
+- Rotas `kilo-auto/*`, modelos free e provider/model são metadata/route candidates, não provas de
+  chamada.
+- `x-kilocode-mode`, organização, BYOK interno, allow/block lists e saldo entram em overlays;
+  chat/stream/tools entram nos probes runtime posteriores.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`46` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5619` testes totais, `5586` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-10-25-239Z/summary.md`).
+- PASS `npm run test:copilot` (`5619` testes totais, `5586` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-10-25-239Z/summary.md`).
 
 Próxima direção:
 
-- Implementar `KiloGatewayProvidersImporter` para `/providers` e criar o primeiro contrato de metadata de
-  provider/gateway, sem forçar tudo dentro de evidence por modelo.
+- Implementar `KiloGatewayProvidersImporter` para `/providers` e criar o primeiro contrato de
+  metadata de provider/gateway, sem forçar tudo dentro de evidence por modelo.
 
 ## 30. Continuidade 2026-05-25 — provider metadata evidence e Kilo `/providers`
 
 Implementado neste corte:
 
-- Novo contrato `createProviderMetadataEvidence()` para fatos de provider/gateway que não pertencem a um modelo
-  específico.
-- O snapshot JSON ganhou `providerEvidences`, preservado pelo store com a mesma sanitização/redaction das outras
-  coleções.
-- `CatalogImporter` agora pode retornar `toProviderEvidenceFacts(rows, context)`, além de model evidences e
-  account overlays.
+- Novo contrato `createProviderMetadataEvidence()` para fatos de provider/gateway que não pertencem
+  a um modelo específico.
+- O snapshot JSON ganhou `providerEvidences`, preservado pelo store com a mesma
+  sanitização/redaction das outras coleções.
+- `CatalogImporter` agora pode retornar `toProviderEvidenceFacts(rows, context)`, além de model
+  evidences e account overlays.
 - Novo `KiloGatewayProvidersImporter` para `https://api.kilo.ai/api/gateway/providers`:
   - preserva `displayName`;
   - preserva `providerMetadata.kilo.name`;
@@ -1770,13 +1924,14 @@ Separação arquitetural reafirmada:
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`47` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5620` testes totais, `5587` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-15-51-069Z/summary.md`).
+- PASS `npm run test:copilot` (`5620` testes totais, `5587` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-15-51-069Z/summary.md`).
 
 Próxima direção:
 
@@ -1787,9 +1942,10 @@ Próxima direção:
 
 Implementado neste corte:
 
-- Novo contrato `createCanonicalProviderProjection()` para a visão atual por `providerId + subjectProviderId`.
-- `mergeProviderMetadataEvidence()` faz merge field-wise de provider metadata com a mesma política de confiança,
-  recência, proveniência e conflito usada em model metadata.
+- Novo contrato `createCanonicalProviderProjection()` para a visão atual por
+  `providerId + subjectProviderId`.
+- `mergeProviderMetadataEvidence()` faz merge field-wise de provider metadata com a mesma política
+  de confiança, recência, proveniência e conflito usada em model metadata.
 - O snapshot JSON ganhou `providerProjections`.
 - `refreshModelGatewayCatalog()` agora:
   - retém provider evidences de fontes não atualizadas;
@@ -1800,24 +1956,26 @@ Implementado neste corte:
 Separação arquitetural reafirmada:
 
 - `providerEvidences` são o ledger de fatos de provider.
-- `providerProjections` são a visão atual consolidada, rápida para consulta e futura junção com modelos.
+- `providerProjections` são a visão atual consolidada, rápida para consulta e futura junção com
+  modelos.
 - `projections` continuam sendo modelos/rotas normalizados para OpenAI schema + `x_model_gateway`.
 - Runtime permanece uma etapa posterior e não contamina provider/model catalog.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`48` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-20-39-389Z/summary.md`).
+- PASS `npm run test:copilot` (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-20-39-389Z/summary.md`).
 
 Próxima direção:
 
-- Decidir a junção entre `providerProjections` e model `x_model_gateway`: leitura rápida no refresh, projection
-  materializada, ou join tardio no seletor/OpenAI list.
+- Decidir a junção entre `providerProjections` e model `x_model_gateway`: leitura rápida no refresh,
+  projection materializada, ou join tardio no seletor/OpenAI list.
 
 ## 32. Continuidade 2026-05-25 — join tardio de provider projection no schema OpenAI
 
@@ -1825,13 +1983,14 @@ Decisão arquitetural:
 
 - A junção entre modelos e providers fica tardia, no momento de criar o schema OpenAI-compatible.
 - `projections` de modelo não duplicam `providerProjections`.
-- `toOpenAIModelCatalogList(projections, { providerProjections })` pode enriquecer cada `x_model_gateway` com
-  `provider_projection` quando houver match.
+- `toOpenAIModelCatalogList(projections, { providerProjections })` pode enriquecer cada
+  `x_model_gateway` com `provider_projection` quando houver match.
 - `refreshModelGatewayCatalog()` passa `providerProjections` para `toOpenAIModelCatalogList()`.
 
 Implementado neste corte:
 
-- `toOpenAIModelCatalogEntry()` e `toOpenAIModelCatalogList()` aceitam `providerProjections` opcionais.
+- `toOpenAIModelCatalogEntry()` e `toOpenAIModelCatalogList()` aceitam `providerProjections`
+  opcionais.
 - `x_model_gateway.provider_projection` inclui:
   - `provider_id`;
   - `subject_provider_id`;
@@ -1849,22 +2008,24 @@ Separação arquitetural reafirmada:
 
 - Banco persistido segue normalizado: model projection e provider projection separados.
 - API OpenAI-compatible pode entregar uma visão enriquecida pronta para consumo.
-- Seleção e runtime ainda podem escolher se usam o join materializado na resposta ou se fazem consulta própria.
+- Seleção e runtime ainda podem escolher se usam o join materializado na resposta ou se fazem
+  consulta própria.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`48` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-25-07-653Z/summary.md`).
+- PASS `npm run test:copilot` (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-25-07-653Z/summary.md`).
 
 Próxima direção:
 
-- Avaliar `ModelRouteOption`/route candidates para representar `kilo-auto/*`, provider/model, aggregator auto e
-  fallback-chain como metadata de rota, não runtime.
+- Avaliar `ModelRouteOption`/route candidates para representar `kilo-auto/*`, provider/model,
+  aggregator auto e fallback-chain como metadata de rota, não runtime.
 
 ## 33. Continuidade 2026-05-25 — route options no pipeline de catálogo
 
@@ -1873,7 +2034,8 @@ Implementado neste corte:
 - `createModelRouteOption()` ganhou `sourceId`, `sourceKind` e `confidence`.
 - `CatalogImporter` agora pode retornar `toRouteOptions(rows, context)`.
 - `runCatalogImporters()` coleta e faz upsert de `routeOptions`.
-- `refreshModelGatewayCatalog()` retém/substitui route options por fonte atualizada, como já faz com evidências.
+- `refreshModelGatewayCatalog()` retém/substitui route options por fonte atualizada, como já faz com
+  evidências.
 - `KiloGatewayModelsImporter` emite route options:
   - `provider_model` para ids `provider/model`;
   - `gateway_auto` para ids `kilo-auto/*`;
@@ -1888,17 +2050,19 @@ Separação arquitetural reafirmada:
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`48` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-30-33-137Z/summary.md`).
+- PASS `npm run test:copilot` (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-30-33-137Z/summary.md`).
 
 Próxima direção:
 
-- Expandir route options para OpenRouter aggregator auto/provider order e Hugging Face cheapest/fastest/preferred.
+- Expandir route options para OpenRouter aggregator auto/provider order e Hugging Face
+  cheapest/fastest/preferred.
 
 ## 34. Continuidade 2026-05-25 — OpenRouter aggregator route options
 
@@ -1921,13 +2085,14 @@ Separação arquitetural reafirmada:
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`48` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-33-36-452Z/summary.md`).
+- PASS `npm run test:copilot` (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-33-36-452Z/summary.md`).
 
 Próxima direção:
 
@@ -1937,8 +2102,10 @@ Próxima direção:
 
 Implementado neste corte:
 
-- `KiloGatewayModelsImporter` passou a enriquecer `routeOptions` com políticas específicas do gateway:
-  - `providerSpecific.acceptedHeaders` com `x-kilocode-mode`, `X-KiloCode-OrganizationId` e `X-KiloCode-TaskId`;
+- `KiloGatewayModelsImporter` passou a enriquecer `routeOptions` com políticas específicas do
+  gateway:
+  - `providerSpecific.acceptedHeaders` com `x-kilocode-mode`, `X-KiloCode-OrganizationId` e
+    `X-KiloCode-TaskId`;
   - `providerSpecific.supportsInternalByok=true`;
   - `normalizedPolicy.supportsOrganizationOverlay=true`;
   - `normalizedPolicy.supportsTaskId=true`;
@@ -1948,17 +2115,19 @@ Separação arquitetural reafirmada:
 
 - Esses campos dizem como a rota deve ser montada/selecionada.
 - Eles não autorizam runtime nem provam sucesso de chamada.
-- A falha sem fallback de BYOK interno fica registrada como política de rota para o seletor respeitar depois.
+- A falha sem fallback de BYOK interno fica registrada como política de rota para o seletor
+  respeitar depois.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`48` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-36-46-683Z/summary.md`).
+- PASS `npm run test:copilot` (`5621` testes totais, `5588` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-36-46-683Z/summary.md`).
 
 Próxima direção:
 
@@ -1990,13 +2159,14 @@ Uso previsto:
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`49` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5622` testes totais, `5589` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-41-32-578Z/summary.md`).
+- PASS `npm run test:copilot` (`5622` testes totais, `5589` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-41-32-578Z/summary.md`).
 
 Próxima direção:
 
@@ -2006,24 +2176,26 @@ Próxima direção:
 
 Implementado neste corte:
 
-- `createDefaultModelGatewayCatalogImporters()` usa o generic importer quando encontra keys conhecidas:
+- `createDefaultModelGatewayCatalogImporters()` usa o generic importer quando encontra keys
+  conhecidas:
   - Groq: `GROQ_API_KEY`/`GROQ_KEY`;
   - Cerebras: `CEREBRAS_API_KEY`/`CEREBRAS_KEY`;
   - Chutes: `CHUTES_API_KEY`/`CHUTES_AI`;
   - Z.AI: `ZAI_API_KEY`/`Z_AI_KEY`.
 - O valor secreto continua preso em closure e não aparece em JSON/stringify.
-- Cada importer gerado coleta `/models` como visão account-scoped identity-only, com `accountOverlays` e
-  `routeOptions`, sem promover capabilities ricas.
+- Cada importer gerado coleta `/models` como visão account-scoped identity-only, com
+  `accountOverlays` e `routeOptions`, sem promover capabilities ricas.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`49` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5622` testes totais, `5589` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T16-45-06-288Z/summary.md`).
+- PASS `npm run test:copilot` (`5622` testes totais, `5589` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T16-45-06-288Z/summary.md`).
 
 Próxima direção:
 
@@ -2033,15 +2205,17 @@ Próxima direção:
 
 Investigação feita neste corte:
 
-- Este roadmap foi relido integralmente, incluindo diagnóstico, arquitetura, Faixas A-P e todos os capítulos de
-  continuidade 8-37.
+- Este roadmap foi relido integralmente, incluindo diagnóstico, arquitetura, Faixas A-P e todos os
+  capítulos de continuidade 8-37.
 - Estado git inicial: `main` limpo e sincronizado com `origin/main`.
 - Situação arquitetural atual:
   - A-J estão fechadas e continuam sendo o contrato de compatibilidade operacional;
-  - K-L já têm ledger JSON, import runs, raw refs, importers reais, provider evidences, provider projections,
-    account overlays e route options;
-  - M já cobre normalizadores de modalidades, capabilities de catálogo, limits, pricing, lifecycle, aliases e overlays;
-  - N já cobre route options de Kilo e OpenRouter, mas ainda falta Hugging Face, Cloudflare e aliases locais;
+  - K-L já têm ledger JSON, import runs, raw refs, importers reais, provider evidences, provider
+    projections, account overlays e route options;
+  - M já cobre normalizadores de modalidades, capabilities de catálogo, limits, pricing, lifecycle,
+    aliases e overlays;
+  - N já cobre route options de Kilo e OpenRouter, mas ainda falta Hugging Face, Cloudflare e
+    aliases locais;
   - O ainda precisa de SQLite, refresh incremental, eventos de catálogo e diff semântico;
   - P ainda precisa UX de exploração do catálogo universal.
 - O metamodelo de 4.2 foi atualizado para refletir o que já existe no código:
@@ -2053,11 +2227,11 @@ Investigação feita neste corte:
 - O plano SQLite de 4.2 foi atualizado para incluir `provider_evidences` e `provider_projections`.
 - Investigação online/oficial:
   - Cerebras documenta endpoint público de modelos em `https://api.cerebras.ai/public/v1/models`.
-  - O endpoint real respondeu `200 application/json` e retornou payload `object=list` com rows ricas contendo `pricing`,
-    `capabilities`, `supported_parameters`, `architecture`, `limits`, lifecycle (`deprecated`, `preview`),
-    `hugging_face_id`, `owned_by`, datacenters e quantization.
-  - Isso confirma que Cerebras não precisa depender apenas do `/v1/models` autenticado identity-only: o catálogo público
-    pode alimentar metadata rica antes de runtime.
+  - O endpoint real respondeu `200 application/json` e retornou payload `object=list` com rows ricas
+    contendo `pricing`, `capabilities`, `supported_parameters`, `architecture`, `limits`, lifecycle
+    (`deprecated`, `preview`), `hugging_face_id`, `owned_by`, datacenters e quantization.
+  - Isso confirma que Cerebras não precisa depender apenas do `/v1/models` autenticado
+    identity-only: o catálogo público pode alimentar metadata rica antes de runtime.
 
 Implementado neste corte:
 
@@ -2074,13 +2248,17 @@ Implementado neste corte:
     `structuredOutputs`, `reasoningEffort`, `vision`);
   - pricing USD por milhão;
   - `providerMetadata.ownedBy`;
-  - `providerMetadata.cerebras.*` para object, tokenizer, instruct type, datacenters, deprecated, preview e quantization.
-- O importer também emite `routeOptions` `exact_model` com `normalizedPolicy.routeLayer=direct_provider`.
+  - `providerMetadata.cerebras.*` para object, tokenizer, instruct type, datacenters, deprecated,
+    preview e quantization.
+- O importer também emite `routeOptions` `exact_model` com
+  `normalizedPolicy.routeLayer=direct_provider`.
 - Barrels de importers, catálogo e root exportam `CEREBRAS_PUBLIC_MODELS_CATALOG_URL` e
   `createCerebrasPublicModelsImporter()`.
-- `createDefaultModelGatewayCatalogImporters()` inclui Cerebras public catalog quando `includePublic=true`.
+- `createDefaultModelGatewayCatalogImporters()` inclui Cerebras public catalog quando
+  `includePublic=true`.
 - A checkbox de Cerebras na Faixa L foi marcada como concluída porque:
-  - `/v1/models` autenticado já fica coberto pelo generic OpenAI-compatible importer quando há `CEREBRAS_API_KEY`;
+  - `/v1/models` autenticado já fica coberto pelo generic OpenAI-compatible importer quando há
+    `CEREBRAS_API_KEY`;
   - o catálogo público rico agora é coberto por importer dedicado.
 
 Separação arquitetural reafirmada:
@@ -2091,18 +2269,19 @@ Separação arquitetural reafirmada:
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`50` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5623` testes totais, `5590` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-00-16-920Z/summary.md`).
+- PASS `npm run test:copilot` (`5623` testes totais, `5590` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-00-16-920Z/summary.md`).
 
 Próxima direção:
 
-- Avançar para Groq docs/model card enrichment ou para diff semântico de catálogo (`price/limits/capabilities`
-  alterados).
+- Avançar para Groq docs/model card enrichment ou para diff semântico de catálogo
+  (`price/limits/capabilities` alterados).
 
 ## 39. Continuidade 2026-05-25 — diff semântico de catálogo
 
@@ -2132,35 +2311,39 @@ Implementado neste corte:
   - `model_gateway:catalog:model_changed`;
   - `model_gateway:catalog:model_removed`;
   - `model_gateway:catalog:conflict_detected`.
-- `buildCatalogRefreshCompletedEvent()` e `projectCatalogRefreshCompletedMetrics()` projetam refresh/diff em evento e
-  métricas sem raw payload.
+- `buildCatalogRefreshCompletedEvent()` e `projectCatalogRefreshCompletedMetrics()` projetam
+  refresh/diff em evento e métricas sem raw payload.
 - `summarizeCanonicalModelProjectionDiff()` virou helper canônico para resumir diff:
   - `addedCount`;
   - `removedCount`;
   - `changedCount`;
   - `changedKinds`;
   - `changedKindCounts`, contando quantos modelos mudaram por tipo semântico.
-- `/byok gateway catalog refresh` agora mostra `diff kinds` e inclui `changedKinds` por item alterado.
+- `/byok gateway catalog refresh` agora mostra `diff kinds` e inclui `changedKinds` por item
+  alterado.
 
 Separação arquitetural reafirmada:
 
 - Diff semântico não troca modelo ativo automaticamente.
 - Ele gera sinal auditável para operador, terminal e eventos futuros.
-- Runtime probes continuam sendo etapa posterior quando uma mudança de capability ou lifecycle exigir reprovação.
+- Runtime probes continuam sendo etapa posterior quando uma mudança de capability ou lifecycle
+  exigir reprovação.
 
 Validação deste corte:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`102` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5625` testes totais, `5592` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-16-08-564Z/summary.md`).
+- PASS `npm run test:copilot` (`5625` testes totais, `5592` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-16-08-564Z/summary.md`).
 
 Próxima direção:
 
-- Validar, commitar/pushar e depois evoluir emissão real de eventos por run/model/conflict ou diff UX dedicado.
+- Validar, commitar/pushar e depois evoluir emissão real de eventos por run/model/conflict ou diff
+  UX dedicado.
 
 ## 40. Continuidade 2026-05-25 — emissão real de eventos de catálogo
 
@@ -2185,18 +2368,20 @@ Separação arquitetural reafirmada:
 
 - `refreshModelGatewayCatalog()` permanece storage-neutral e não conhece `eventBus`.
 - A camada de observabilidade transforma resultado de refresh em eventos estáveis.
-- O terminal apenas emite eventos quando recebe um bus; sem bus, a experiência CLI continua determinística.
+- O terminal apenas emite eventos quando recebe um bus; sem bus, a experiência CLI continua
+  determinística.
 - Eventos de catálogo não executam probes, não promovem modelo e não alteram seleção ativa.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`103` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5626` testes totais, `5593` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-22-13-918Z/summary.md`).
+- PASS `npm run test:copilot` (`5626` testes totais, `5593` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-22-13-918Z/summary.md`).
 
 Próxima direção:
 
@@ -2217,11 +2402,12 @@ Implementado neste corte:
   - `reasons`;
   - `commands`.
 - Regras atuais:
-  - modelos novos de alto valor sugerem `chat` e probes específicas para `streaming`, `json`, `agent` e `vision`
-    quando a projeção de metadata indica essas superfícies;
+  - modelos novos de alto valor sugerem `chat` e probes específicas para `streaming`, `json`,
+    `agent` e `vision` quando a projeção de metadata indica essas superfícies;
   - mudanças em capabilities/limits/modalidades também podem sugerir reprova runtime;
   - mudanças só de preço/lifecycle não executam probes por si mesmas.
-- `/byok gateway catalog refresh` agora mostra `probe suggestions` após o diff quando houver recomendações.
+- `/byok gateway catalog refresh` agora mostra `probe suggestions` após o diff quando houver
+  recomendações.
 - A checkbox da Faixa O para sugestão de probes foi marcada como concluída para o contrato inicial.
 
 Separação arquitetural reafirmada:
@@ -2229,17 +2415,19 @@ Separação arquitetural reafirmada:
 - Metadata continua sendo fase anterior.
 - `recommendCatalogDiffProbes()` não executa runtime, não chama SDK e não altera health.
 - Os comandos sugeridos apontam para `/byok probe ...`, mantendo execução explícita pelo operador.
-- Vision é tratada como superfície a validar quando metadata indicar suporte; ela não exclui automaticamente modelos.
+- Vision é tratada como superfície a validar quando metadata indicar suporte; ela não exclui
+  automaticamente modelos.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`104` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5627` testes totais, `5594` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-28-07-810Z/summary.md`).
+- PASS `npm run test:copilot` (`5627` testes totais, `5594` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-28-07-810Z/summary.md`).
 
 Próxima direção:
 
@@ -2273,13 +2461,14 @@ Separação arquitetural reafirmada:
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`106` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5629` testes totais, `5596` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-34-38-974Z/summary.md`).
+- PASS `npm run test:copilot` (`5629` testes totais, `5596` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-34-38-974Z/summary.md`).
 
 Próxima direção:
 
@@ -2304,17 +2493,19 @@ Separação arquitetural reafirmada:
 
 - Conflito de evidência não é falha runtime.
 - A tela não chama importers, não executa probes e não altera seleção ativa.
-- O objetivo é orientar normalização/manual override futuro e explicar por que um campo foi escolhido.
+- O objetivo é orientar normalização/manual override futuro e explicar por que um campo foi
+  escolhido.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`107` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5630` testes totais, `5597` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-39-10-309Z/summary.md`).
+- PASS `npm run test:copilot` (`5630` testes totais, `5597` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-39-10-309Z/summary.md`).
 
 Próxima direção:
 
@@ -2326,42 +2517,46 @@ Implementado neste corte:
 
 - `/models catalog refresh [provider]` foi encaminhado para o refresh universal.
 - `/byok gateway catalog refresh [provider]` também aceita o mesmo seletor.
-- O seletor filtra importers por `id` ou `providerId`, permitindo refresh focado por provider/importer antes do TTL/cache
-  incremental completo.
+- O seletor filtra importers por `id` ou `providerId`, permitindo refresh focado por
+  provider/importer antes do TTL/cache incremental completo.
 - A saída do refresh agora mostra `selector=<valor>` para deixar claro quando a coleta foi filtrada.
 - A checkbox `/models catalog refresh [provider]` da Faixa P foi marcada como concluída.
 
 Separação arquitetural reafirmada:
 
 - O filtro escolhe quais importers coletar; ele não altera critérios de seleção runtime.
-- O refresh focado continua gerando diff, eventos e sugestões de probes da mesma forma que o refresh completo.
+- O refresh focado continua gerando diff, eventos e sugestões de probes da mesma forma que o refresh
+  completo.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js tests/unit/copilot/terminal/test_commands_byok.spec.js`
   (`108` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5631` testes totais, `5598` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T17-43-17-128Z/summary.md`).
+- PASS `npm run test:copilot` (`5631` testes totais, `5598` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T17-43-17-128Z/summary.md`).
 
 ## 45. Continuidade 2026-05-25 — importer autenticado Mistral
 
 Investigação oficial:
 
-- A documentação da Mistral confirma `GET /v1/models` como listagem de modelos disponíveis para o usuário.
+- A documentação da Mistral confirma `GET /v1/models` como listagem de modelos disponíveis para o
+  usuário.
 - O endpoint usa `Authorization: Bearer <key>`.
 - A resposta documentada inclui `id`, `capabilities`, `created`, `owned_by`, `name`, `description`,
-  `max_context_length`, `aliases`, `deprecation`, `deprecation_replacement_model`, `default_model_temperature`,
-  `TYPE` e `archived`.
-- Também há `GET /v1/models/{model_id}` para detalhe por modelo, reservado para uma fase posterior de enriquecimento
-  incremental por modelo.
+  `max_context_length`, `aliases`, `deprecation`, `deprecation_replacement_model`,
+  `default_model_temperature`, `TYPE` e `archived`.
+- Também há `GET /v1/models/{model_id}` para detalhe por modelo, reservado para uma fase posterior
+  de enriquecimento incremental por modelo.
 
 Implementado neste corte:
 
 - Novo `MistralModelsImporter` para `https://api.mistral.ai/v1/models`.
-- O importer é account-scoped/autenticado e usa `MISTRAL_API_KEY` ou `MISTRAL_KEY` na composição padrão.
+- O importer é account-scoped/autenticado e usa `MISTRAL_API_KEY` ou `MISTRAL_KEY` na composição
+  padrão.
 - O payload vira evidências para:
   - `displayName`;
   - `description`;
@@ -2375,7 +2570,8 @@ Implementado neste corte:
 - O importer também emite:
   - `ModelRouteOption` `exact_model`;
   - `ProviderAccountOverlay` com modelos habilitados pela key, sem serializar segredo.
-- Barrels de importers, catálogo e root exportam `MISTRAL_MODELS_CATALOG_URL` e `createMistralModelsImporter()`.
+- Barrels de importers, catálogo e root exportam `MISTRAL_MODELS_CATALOG_URL` e
+  `createMistralModelsImporter()`.
 
 Separação arquitetural reafirmada:
 
@@ -2385,13 +2581,14 @@ Separação arquitetural reafirmada:
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`55` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5632` testes totais, `5599` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T19-14-56-748Z/summary.md`).
+- PASS `npm run test:copilot` (`5632` testes totais, `5599` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T19-14-56-748Z/summary.md`).
 
 Próxima direção:
 
@@ -2401,22 +2598,23 @@ Próxima direção:
 
 Investigação oficial:
 
-- A documentação oficial da Anthropic confirma `GET /v1/models` como API para listar os modelos disponíveis para uma
-  key/workspace.
-- A chamada usa headers `x-api-key` e `anthropic-version`; mantemos `2023-06-01` como default explícito.
+- A documentação oficial da Anthropic confirma `GET /v1/models` como API para listar os modelos
+  disponíveis para uma key/workspace.
+- A chamada usa headers `x-api-key` e `anthropic-version`; mantemos `2023-06-01` como default
+  explícito.
 - A listagem é paginada por `before_id`, `after_id` e `limit`; `limit` aceita até `1000`.
 - Cada item expõe `id`, `display_name`, `created_at` e `type`.
-- A documentação também confirma `GET /v1/models/{model_id}` para resolver um modelo/alias específico. Esse detalhe
-  fica reservado para enriquecimento incremental posterior, porque a listagem já resolve a camada de visibilidade da
-  conta.
+- A documentação também confirma `GET /v1/models/{model_id}` para resolver um modelo/alias
+  específico. Esse detalhe fica reservado para enriquecimento incremental posterior, porque a
+  listagem já resolve a camada de visibilidade da conta.
 
 Implementado neste corte:
 
 - Novo `AnthropicModelsImporter` para `https://api.anthropic.com/v1/models`.
-- O importer pagina automaticamente com `limit=1000` e cursor `after_id`, até encerrar `has_more` ou atingir um teto
-  defensivo de páginas.
-- O importer é account-scoped/autenticado e entra na composição padrão quando `ANTHROPIC_API_KEY` ou `ANTHROPIC_KEY`
-  estão presentes.
+- O importer pagina automaticamente com `limit=1000` e cursor `after_id`, até encerrar `has_more` ou
+  atingir um teto defensivo de páginas.
+- O importer é account-scoped/autenticado e entra na composição padrão quando `ANTHROPIC_API_KEY` ou
+  `ANTHROPIC_KEY` estão presentes.
 - O payload vira evidências para:
   - `displayName`;
   - aliases normalizados;
@@ -2427,63 +2625,71 @@ Implementado neste corte:
 - O importer também emite:
   - `ModelRouteOption` `exact_model`;
   - política normalizada `routeLayer=direct_provider` e `wireApi=anthropic_messages`;
-  - `ProviderAccountOverlay` com modelos visíveis pela key, endpoint e versão Anthropic, sem serializar segredo.
+  - `ProviderAccountOverlay` com modelos visíveis pela key, endpoint e versão Anthropic, sem
+    serializar segredo.
 - Barrels de importers, catálogo e root exportam `ANTHROPIC_MODELS_CATALOG_URL`,
   `ANTHROPIC_MODELS_API_VERSION` e `createAnthropicModelsImporter()`.
 
 Separação arquitetural reafirmada:
 
-- A listagem Anthropic prova visibilidade account-scoped, não sucesso de chamada Messages, tools, thinking, vision ou
-  context window efetivo.
-- Capabilities finas da Anthropic permanecem dependentes de docs/seeds por família e probes runtime posteriores.
-- A rota normalizada continua OpenAI-schema-first no catálogo, mas preserva `wireApi=anthropic_messages` para o adapter
-  não confundir schema catalogado com protocolo de transporte.
+- A listagem Anthropic prova visibilidade account-scoped, não sucesso de chamada Messages, tools,
+  thinking, vision ou context window efetivo.
+- Capabilities finas da Anthropic permanecem dependentes de docs/seeds por família e probes runtime
+  posteriores.
+- A rota normalizada continua OpenAI-schema-first no catálogo, mas preserva
+  `wireApi=anthropic_messages` para o adapter não confundir schema catalogado com protocolo de
+  transporte.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`56` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5633` testes totais, `5600` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T19-22-14-066Z/summary.md`).
+- PASS `npm run test:copilot` (`5633` testes totais, `5600` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T19-22-14-066Z/summary.md`).
 
 Próxima direção:
 
-- Depois da validação/push de Anthropic, seguir para Gemini `models.list`/`models.get`, porque ele oferece metadata rica
-  de métodos suportados, input/output token limits e parâmetros diretamente na API oficial.
+- Depois da validação/push de Anthropic, seguir para Gemini `models.list`/`models.get`, porque ele
+  oferece metadata rica de métodos suportados, input/output token limits e parâmetros diretamente na
+  API oficial.
 
 ## 47. Continuidade 2026-05-25 — importer autenticado Gemini list/get
 
 Investigação oficial:
 
-- A documentação oficial do Google AI confirma que o endpoint Models permite listar modelos disponíveis e obter
-  metadata estendida como funcionalidades suportadas e tamanho de contexto.
-- `models.get` usa `GET https://generativelanguage.googleapis.com/v1beta/{name=models/*}` e exige que o nome corresponda
-  a um item retornado por `models.list`.
-- `models.list` usa `GET https://generativelanguage.googleapis.com/v1beta/models`, pagina por `pageSize`/`pageToken`,
-  retorna no máximo `1000` modelos por página e expõe `nextPageToken`.
+- A documentação oficial do Google AI confirma que o endpoint Models permite listar modelos
+  disponíveis e obter metadata estendida como funcionalidades suportadas e tamanho de contexto.
+- `models.get` usa `GET https://generativelanguage.googleapis.com/v1beta/{name=models/*}` e exige
+  que o nome corresponda a um item retornado por `models.list`.
+- `models.list` usa `GET https://generativelanguage.googleapis.com/v1beta/models`, pagina por
+  `pageSize`/`pageToken`, retorna no máximo `1000` modelos por página e expõe `nextPageToken`.
 - A autenticação REST documentada para shell usa `?key=$GEMINI_API_KEY`.
-- O recurso `Model` inclui `name`, `baseModelId`, `version`, `displayName`, `description`, `inputTokenLimit`,
-  `outputTokenLimit`, `supportedGenerationMethods`, `thinking`, `temperature`, `maxTemperature`, `topP` e `topK`.
+- O recurso `Model` inclui `name`, `baseModelId`, `version`, `displayName`, `description`,
+  `inputTokenLimit`, `outputTokenLimit`, `supportedGenerationMethods`, `thinking`, `temperature`,
+  `maxTemperature`, `topP` e `topK`.
 
 Implementado neste corte:
 
 - Novo `GeminiModelsImporter` para `https://generativelanguage.googleapis.com/v1beta/models`.
 - O importer pagina `models.list` com `pageSize=1000` e `pageToken`.
-- Por padrão, cada item listado é enriquecido por `models.get`, com fallback sem falhar a importação se um detalhe
-  individual retornar erro; erros de detalhe ficam no raw payload sanitizado como `detailErrors`.
+- Por padrão, cada item listado é enriquecido por `models.get`, com fallback sem falhar a importação
+  se um detalhe individual retornar erro; erros de detalhe ficam no raw payload sanitizado como
+  `detailErrors`.
 - O importer entra na composição padrão quando `GEMINI_API_KEY` ou `GOOGLE_API_KEY` estão presentes.
 - O payload vira evidências para:
   - `displayName`;
   - `description`;
   - aliases normalizados por `providerModel`, `baseModelId` e versão inferida quando houver;
   - `limits.contextWindowTokens` e `limits.maxOutputTokens`;
-  - capabilities derivadas apenas de métodos declarados pelo endpoint: `chat`, `streaming`, `tokenCounting`,
-    `embeddings`, `batch`, `prediction` e `reasoning` quando `thinking=true`;
+  - capabilities derivadas apenas de métodos declarados pelo endpoint: `chat`, `streaming`,
+    `tokenCounting`, `embeddings`, `batch`, `prediction` e `reasoning` quando `thinking=true`;
   - `providerMetadata.ownedBy=google`;
-  - `providerMetadata.gemini.*` com resource name, base model, version, métodos, thinking e parâmetros;
+  - `providerMetadata.gemini.*` com resource name, base model, version, métodos, thinking e
+    parâmetros;
   - `openai.owned_by=google`.
 - O importer também emite:
   - `ModelRouteOption` `exact_model`;
@@ -2491,44 +2697,50 @@ Implementado neste corte:
   - `directWireApi=gemini_generate_content`;
   - `openAICompatibleBaseUrl=https://generativelanguage.googleapis.com/v1beta/openai`;
   - `resourceName=models/{model}`;
-  - `ProviderAccountOverlay` com modelos visíveis pela key, versão da API e `authPlacement=query_key`, sem serializar
-    segredo.
-- Barrels de importers, catálogo e root exportam `GEMINI_MODELS_CATALOG_URL`, `GEMINI_MODELS_API_VERSION`,
-  `GEMINI_OPENAI_COMPATIBLE_BASE_URL` e `createGeminiModelsImporter()`.
+  - `ProviderAccountOverlay` com modelos visíveis pela key, versão da API e
+    `authPlacement=query_key`, sem serializar segredo.
+- Barrels de importers, catálogo e root exportam `GEMINI_MODELS_CATALOG_URL`,
+  `GEMINI_MODELS_API_VERSION`, `GEMINI_OPENAI_COMPATIBLE_BASE_URL` e `createGeminiModelsImporter()`.
 
 Separação arquitetural reafirmada:
 
 - `models.list`/`models.get` oferecem metadata mais rica, mas ainda não provam runtime.
-- Métodos como `generateContent`, `streamGenerateContent`, `countTokens` e `embedContent` viram capability hints
-  autenticados; sucesso de chat/tools/vision/structured outputs continua dependendo de probes posteriores.
-- Modalidades/capabilities de família vindas da página pública de modelos permanecem como próxima camada de seeds/docs,
-  separada da camada de endpoint account-scoped.
+- Métodos como `generateContent`, `streamGenerateContent`, `countTokens` e `embedContent` viram
+  capability hints autenticados; sucesso de chat/tools/vision/structured outputs continua dependendo
+  de probes posteriores.
+- Modalidades/capabilities de família vindas da página pública de modelos permanecem como próxima
+  camada de seeds/docs, separada da camada de endpoint account-scoped.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`57` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5634` testes totais, `5601` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T19-28-42-394Z/summary.md`).
+- PASS `npm run test:copilot` (`5634` testes totais, `5601` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T19-28-42-394Z/summary.md`).
 
 Próxima direção:
 
-- Depois da suíte completa e push, seguir para Groq especializado ou Ollama. Groq fecha o caminho account-scoped
-  OpenAI-compatible com docs de limite; Ollama fecha o caminho local com `/api/tags` + `/api/show`.
+- Depois da suíte completa e push, seguir para Groq especializado ou Ollama. Groq fecha o caminho
+  account-scoped OpenAI-compatible com docs de limite; Ollama fecha o caminho local com
+  `/api/tags` + `/api/show`.
 
 ## 48. Continuidade 2026-05-25 — importer local Ollama tags/show
 
 Investigação oficial:
 
-- A documentação oficial do Ollama confirma `GET /api/tags` para listar modelos locais e seus detalhes.
-- A resposta de `/api/tags` inclui `name`, `model`, `modified_at`, `size`, `digest` e `details` com `format`, `family`,
-  `families`, `parameter_size` e `quantization_level`.
-- A documentação oficial também confirma `POST /api/show` com body `{ "model": "..." }` e opção `verbose`.
-- A resposta de `/api/show` inclui `parameters`, `license`, `capabilities`, `modified_at`, `details`, `template` e
-  `model_info`, incluindo chaves como `*.context_length`, arquitetura, quantização e tokenizer.
+- A documentação oficial do Ollama confirma `GET /api/tags` para listar modelos locais e seus
+  detalhes.
+- A resposta de `/api/tags` inclui `name`, `model`, `modified_at`, `size`, `digest` e `details` com
+  `format`, `family`, `families`, `parameter_size` e `quantization_level`.
+- A documentação oficial também confirma `POST /api/show` com body `{ "model": "..." }` e opção
+  `verbose`.
+- A resposta de `/api/show` inclui `parameters`, `license`, `capabilities`, `modified_at`,
+  `details`, `template` e `model_info`, incluindo chaves como `*.context_length`, arquitetura,
+  quantização e tokenizer.
 
 Implementado neste corte:
 
@@ -2537,10 +2749,13 @@ Implementado neste corte:
   - `OLLAMA_LOCAL_TAGS_URL=http://localhost:11434/api/tags`;
   - `OLLAMA_LOCAL_SHOW_URL=http://localhost:11434/api/show`;
   - `OLLAMA_LOCAL_OPENAI_BASE_URL=http://localhost:11434/v1`.
-- O importer busca `/api/tags` e, para cada modelo local, chama `/api/show` com `verbose=false` por default.
-- `baseUrl` aceita `http://host:11434`, `.../api` ou `.../v1`; o importer normaliza para APIs nativa e OpenAI-compatible.
-- A composição padrão só inclui Ollama quando `OLLAMA_BASE_URL`, `OLLAMA_HOST` ou `COPILOT_OLLAMA_BASE_URL` estão
-  presentes, evitando tentativas implícitas contra localhost em refresh genérico.
+- O importer busca `/api/tags` e, para cada modelo local, chama `/api/show` com `verbose=false` por
+  default.
+- `baseUrl` aceita `http://host:11434`, `.../api` ou `.../v1`; o importer normaliza para APIs nativa
+  e OpenAI-compatible.
+- A composição padrão só inclui Ollama quando `OLLAMA_BASE_URL`, `OLLAMA_HOST` ou
+  `COPILOT_OLLAMA_BASE_URL` estão presentes, evitando tentativas implícitas contra localhost em
+  refresh genérico.
 - O payload vira evidências para:
   - `displayName`;
   - aliases normalizados;
@@ -2548,7 +2763,8 @@ Implementado neste corte:
   - capabilities declaradas por Ollama: `chat`, `vision`, `embeddings`, `tools` quando presentes;
   - modalidades text/image quando `vision` aparece;
   - `providerMetadata.ownedBy=local`;
-  - digest, size bytes, modifiedAt, formato, família, famílias, parâmetro, quantização, parent model;
+  - digest, size bytes, modifiedAt, formato, família, famílias, parâmetro, quantização, parent
+    model;
   - parâmetros parseados e texto bruto de parâmetros;
   - template, licença e `model_info` completo;
   - `openai.owned_by=local`.
@@ -2557,28 +2773,33 @@ Implementado neste corte:
   - política `routeLayer=openai_compatible`, `runtimeKind=local`, `localPrivate=true`;
   - `nativeApiBaseUrl`, `openAICompatibleBaseUrl` e digest;
   - `ProviderAccountOverlay` sem segredo, com semântica `locally_installed_models`.
-- Barrels de importers, catálogo e root exportam as constantes Ollama e `createOllamaCatalogImporter()`.
+- Barrels de importers, catálogo e root exportam as constantes Ollama e
+  `createOllamaCatalogImporter()`.
 
 Separação arquitetural reafirmada:
 
-- `/api/tags` + `/api/show` provam instalação local e metadata do daemon, não sucesso de chat/tools/vision em runtime.
+- `/api/tags` + `/api/show` provam instalação local e metadata do daemon, não sucesso de
+  chat/tools/vision em runtime.
 - Tags locais são aliases instáveis; digest/hash é preservado como metadado de identidade forte.
-- Ollama local entra como provider `ollama-local`, compatível com o adapter existente e marcado como rota privada/local.
+- Ollama local entra como provider `ollama-local`, compatível com o adapter existente e marcado como
+  rota privada/local.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`58` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5635` testes totais, `5602` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T19-34-39-605Z/summary.md`).
+- PASS `npm run test:copilot` (`5635` testes totais, `5602` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T19-34-39-605Z/summary.md`).
 
 Próxima direção:
 
-- Seguir para Groq especializado ou Hugging Face. Groq deve combinar `/openai/v1/models` account-scoped com docs de
-  limites; Hugging Face exige preservar estratégias de provider/rota do Inference Providers Router.
+- Seguir para Groq especializado ou Hugging Face. Groq deve combinar `/openai/v1/models`
+  account-scoped com docs de limites; Hugging Face exige preservar estratégias de provider/rota do
+  Inference Providers Router.
 
 ## 49. Continuidade 2026-05-25 — importer autenticado Groq list/retrieve
 
@@ -2587,26 +2808,28 @@ Investigação oficial:
 - A API Reference oficial da Groq expõe a seção Models com `List models` e `Retrieve model`.
 - A base documentada é `https://api.groq.com/openai/v1`.
 - O endpoint de chat referencia os modelos disponíveis e usa `Authorization: Bearer $GROQ_API_KEY`.
-- A documentação de request confirma parâmetros OpenAI-compatible importantes como `tools`, `tool_choice`,
-  `parallel_tool_calls`, `response_format`, `reasoning_effort`, `reasoning_format`, `max_completion_tokens`,
-  `service_tier` e streaming.
-- A documentação de modelo/API mostra campos de modelo como `context_window`, além de `active` e `public_apps`.
+- A documentação de request confirma parâmetros OpenAI-compatible importantes como `tools`,
+  `tool_choice`, `parallel_tool_calls`, `response_format`, `reasoning_effort`, `reasoning_format`,
+  `max_completion_tokens`, `service_tier` e streaming.
+- A documentação de modelo/API mostra campos de modelo como `context_window`, além de `active` e
+  `public_apps`.
 
 Implementado neste corte:
 
 - Novo `GroqModelsImporter` para `https://api.groq.com/openai/v1/models`.
-- O importer busca a lista account-scoped e, por padrão, enriquece cada item com `GET /models/{model}`.
-- IDs com slash, como `openai/gpt-oss-120b`, são codificados como segmento (`openai%2Fgpt-oss-120b`) na chamada de
-  retrieve.
-- A composição padrão passa a usar `GroqModelsImporter` para `GROQ_API_KEY`/`GROQ_KEY`; Groq sai da lista genérica
-  OpenAI-compatible para evitar duplicação.
+- O importer busca a lista account-scoped e, por padrão, enriquece cada item com
+  `GET /models/{model}`.
+- IDs com slash, como `openai/gpt-oss-120b`, são codificados como segmento (`openai%2Fgpt-oss-120b`)
+  na chamada de retrieve.
+- A composição padrão passa a usar `GroqModelsImporter` para `GROQ_API_KEY`/`GROQ_KEY`; Groq sai da
+  lista genérica OpenAI-compatible para evitar duplicação.
 - O payload vira evidências para:
   - `displayName`;
   - aliases normalizados;
   - lifecycle por `created` e status provider `active/inactive`;
   - `limits.contextWindowTokens`;
-  - hints conservadores de capabilities: chat por default, ASR para modelos Whisper, reasoning para famílias
-    explicitamente nomeadas como GPT-OSS/Qwen3/DeepSeek-R1;
+  - hints conservadores de capabilities: chat por default, ASR para modelos Whisper, reasoning para
+    famílias explicitamente nomeadas como GPT-OSS/Qwen3/DeepSeek-R1;
   - modalidades text/text ou audio/text para Whisper;
   - `providerMetadata.ownedBy`;
   - `providerMetadata.groq.object`, `active`, `contextWindow`, `publicApps`;
@@ -2614,31 +2837,34 @@ Implementado neste corte:
 - O importer também emite:
   - `ModelRouteOption` `exact_model`;
   - política `routeLayer=openai_compatible` e `openAICompatibleBaseUrl`;
-  - `ProviderAccountOverlay` com `enabledModels` para ativos e `blockedModels` para `active=false`, sem serializar
-    segredo.
+  - `ProviderAccountOverlay` com `enabledModels` para ativos e `blockedModels` para `active=false`,
+    sem serializar segredo.
 - Barrels de importers, catálogo e root exportam `GROQ_MODELS_CATALOG_URL`, `GROQ_OPENAI_BASE_URL` e
   `createGroqModelsImporter()`.
 
 Separação arquitetural reafirmada:
 
 - `context_window` e `active` são metadata account-scoped de catálogo, não prova runtime.
-- Tool use, built-in tools, JSON/structured outputs e reasoning continuam como enriquecimento por docs/seeds e probes
-  posteriores; o importer só infere hints mínimos a partir de famílias de modelo explícitas.
+- Tool use, built-in tools, JSON/structured outputs e reasoning continuam como enriquecimento por
+  docs/seeds e probes posteriores; o importer só infere hints mínimos a partir de famílias de modelo
+  explícitas.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`59` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5636` testes totais, `5603` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T19-41-49-502Z/summary.md`).
+- PASS `npm run test:copilot` (`5636` testes totais, `5603` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T19-41-49-502Z/summary.md`).
 
 Próxima direção:
 
-- Continuar para Hugging Face ou Cloudflare. Hugging Face exige preservar rotas `:fastest`, `:cheapest`,
-  `:preferred` e provider explícito; Cloudflare exige separar Workers AI direto de AI Gateway.
+- Continuar para Hugging Face ou Cloudflare. Hugging Face exige preservar rotas `:fastest`,
+  `:cheapest`, `:preferred` e provider explícito; Cloudflare exige separar Workers AI direto de AI
+  Gateway.
 
 ## 50. Continuidade 2026-05-25 — importer Hugging Face Inference Providers
 
@@ -2650,8 +2876,8 @@ Investigação oficial:
 - O operador pode escolher política via sufixo no model id: `:fastest`, `:cheapest` ou `:preferred`.
 - O operador também pode escolher provider explícito anexando o provider ao model id, por exemplo
   `openai/gpt-oss-120b:sambanova`.
-- A documentação pública descreve `GET /v1/models` como listagem de modelos com metadados por provider, incluindo
-  preço, contexto, latência e throughput quando disponíveis.
+- A documentação pública descreve `GET /v1/models` como listagem de modelos com metadados por
+  provider, incluindo preço, contexto, latência e throughput quando disponíveis.
 
 Implementado neste corte:
 
@@ -2666,8 +2892,8 @@ Implementado neste corte:
   - `limits.contextWindowTokens` como máximo entre providers;
   - capabilities `chat`, `tools` e `structuredOutputs` quando qualquer provider declara suporte;
   - `providerMetadata.ownedBy=huggingface`;
-  - `providerMetadata.huggingface.providers` com provider, routing badges, preço, contexto, latência, throughput,
-    tools e structured outputs;
+  - `providerMetadata.huggingface.providers` com provider, routing badges, preço, contexto,
+    latência, throughput, tools e structured outputs;
   - `providerMetadata.huggingface.fastestProvider` e `cheapestProvider`;
   - `openai.owned_by=huggingface`.
 - O importer também emite `ModelRouteOption` para:
@@ -2675,10 +2901,11 @@ Implementado neste corte:
   - `model:cheapest`;
   - `model:preferred`;
   - `model:{provider}` para cada provider explícito do catálogo.
-- Rotas preservam `routeLayer=openai_compatible_aggregator`, `openAICompatibleBaseUrl`, política de seleção e hints de
-  provider; rotas explícitas preservam provider e pricing normalizado em `providerSpecific`.
-- Quando autenticado, o importer emite `ProviderAccountOverlay` com modelos visíveis e `routePolicySuffixes`, sem
-  serializar token.
+- Rotas preservam `routeLayer=openai_compatible_aggregator`, `openAICompatibleBaseUrl`, política de
+  seleção e hints de provider; rotas explícitas preservam provider e pricing normalizado em
+  `providerSpecific`.
+- Quando autenticado, o importer emite `ProviderAccountOverlay` com modelos visíveis e
+  `routePolicySuffixes`, sem serializar token.
 - Barrels de importers, catálogo e root exportam `HUGGINGFACE_ROUTER_BASE_URL`,
   `HUGGINGFACE_ROUTER_MODELS_URL`, `HUGGINGFACE_ROUTE_POLICY_SUFFIXES` e
   `createHuggingFaceInferenceProvidersImporter()`.
@@ -2686,42 +2913,45 @@ Implementado neste corte:
 Separação arquitetural reafirmada:
 
 - O catálogo Hugging Face modela seleção por provider/política, não prova runtime.
-- `:fastest` e `:cheapest` são políticas dinâmicas do router; os providers sugeridos são hints observados no catálogo,
-  não garantias absolutas de execução futura.
-- A camada runtime/probes ainda deve validar disponibilidade real do token, 404 por modelo/região, tool calling e
-  structured outputs.
+- `:fastest` e `:cheapest` são políticas dinâmicas do router; os providers sugeridos são hints
+  observados no catálogo, não garantias absolutas de execução futura.
+- A camada runtime/probes ainda deve validar disponibilidade real do token, 404 por modelo/região,
+  tool calling e structured outputs.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`60` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5637` testes totais, `5604` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T19-47-23-006Z/summary.md`).
+- PASS `npm run test:copilot` (`5637` testes totais, `5604` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T19-47-23-006Z/summary.md`).
 
 Próxima direção:
 
-- Continuar para Cloudflare Workers AI/AI Gateway, separando catálogo público Workers AI, gateway universal e possíveis
-  overlays de conta/gateway.
+- Continuar para Cloudflare Workers AI/AI Gateway, separando catálogo público Workers AI, gateway
+  universal e possíveis overlays de conta/gateway.
 
 ## 51. Continuidade 2026-05-25 — importer OpenCode Zen e `OPENCODE_API_KEY`
 
 Investigação oficial:
 
-- A documentação oficial do OpenCode Zen descreve Zen como uma lista curada/testada de modelos fornecida pela equipe
-  OpenCode.
+- A documentação oficial do OpenCode Zen descreve Zen como uma lista curada/testada de modelos
+  fornecida pela equipe OpenCode.
 - A documentação confirma que a lista completa de modelos e metadata pode ser obtida em
   `https://opencode.ai/zen/v1/models`.
-- O endpoint real retorna schema OpenAI-like: `object=list` e `data[]` com `id`, `object`, `created` e `owned_by`.
+- O endpoint real retorna schema OpenAI-like: `object=list` e `data[]` com `id`, `object`, `created`
+  e `owned_by`.
 - A mesma página oficial documenta endpoints diferentes por família:
   - OpenAI/GPT via `https://opencode.ai/zen/v1/responses`;
   - Claude/Qwen via `https://opencode.ai/zen/v1/messages`;
   - Gemini via `https://opencode.ai/zen/v1/models/{model}`;
-  - GLM/Kimi/MiniMax/Grok/DeepSeek/Nemotron/Big Pickle via `https://opencode.ai/zen/v1/chat/completions`.
-- A documentação também traz preço por 1M tokens, modelos gratuitos temporários, deprecações, privacidade e a regra de
-  uso em config OpenCode como `opencode/{model-id}`.
+  - GLM/Kimi/MiniMax/Grok/DeepSeek/Nemotron/Big Pickle via
+    `https://opencode.ai/zen/v1/chat/completions`.
+- A documentação também traz preço por 1M tokens, modelos gratuitos temporários, deprecações,
+  privacidade e a regra de uso em config OpenCode como `opencode/{model-id}`.
 - O novo segredo local relevante é `OPENCODE_API_KEY`.
 
 Implementado neste corte:
@@ -2738,36 +2968,43 @@ Implementado neste corte:
   - `displayName`;
   - aliases normalizados e `aliases.opencodeConfigModel=opencode/{model}`;
   - lifecycle por `created` e depreciações conhecidas;
-  - capabilities conservadoras `chat`, `tools`, `reasoning` e `code` quando inferível por família/nome;
+  - capabilities conservadoras `chat`, `tools`, `reasoning` e `code` quando inferível por
+    família/nome;
   - pricing normalizado por milhão de tokens, incluindo modelos gratuitos;
   - `providerMetadata.ownedBy=opencode`;
-  - `providerMetadata.opencode.endpoint`, `wireApi`, `aiSdkPackage`, `family`, `free` e `priceTierNote`;
+  - `providerMetadata.opencode.endpoint`, `wireApi`, `aiSdkPackage`, `family`, `free` e
+    `priceTierNote`;
   - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
 - O importer emite `ModelRouteOption` `exact_model` por modelo, com política que preserva:
   - endpoint efetivo;
   - `wireApi`;
   - família;
   - pacote AI SDK documentado;
-  - `routeLayer` `openai_compatible` apenas para `chat/completions`, e `direct_provider` para Responses/Messages/Google.
-- O overlay autenticado preserva modelos visíveis e `secretRef=OPENCODE_API_KEY`, sem serializar o token.
-- Barrels de importers, catálogo e root exportam as constantes OpenCode e `createOpenCodeZenModelsImporter()`.
+  - `routeLayer` `openai_compatible` apenas para `chat/completions`, e `direct_provider` para
+    Responses/Messages/Google.
+- O overlay autenticado preserva modelos visíveis e `secretRef=OPENCODE_API_KEY`, sem serializar o
+  token.
+- Barrels de importers, catálogo e root exportam as constantes OpenCode e
+  `createOpenCodeZenModelsImporter()`.
 
 Separação arquitetural reafirmada:
 
 - `/zen/v1/models` prova catálogo/visibilidade do gateway, não sucesso runtime.
-- Endpoints por família são metadata de roteamento; adaptação fina para Responses, Messages e Google deve ocorrer no
-  runtime/adapter posterior.
-- Pricing/lifecycle vindo de docs oficiais é `catalog/static docs`, não medição de cobrança real da conta.
+- Endpoints por família são metadata de roteamento; adaptação fina para Responses, Messages e Google
+  deve ocorrer no runtime/adapter posterior.
+- Pricing/lifecycle vindo de docs oficiais é `catalog/static docs`, não medição de cobrança real da
+  conta.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`61` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5638` testes totais, `5605` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T20-07-21-787Z/summary.md`).
+- PASS `npm run test:copilot` (`5638` testes totais, `5605` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T20-07-21-787Z/summary.md`).
 
 Próxima direção:
 
@@ -2777,65 +3014,72 @@ Próxima direção:
 
 Investigação oficial:
 
-- A documentação oficial do Cloudflare AI lista modelos Workers AI em `https://developers.cloudflare.com/ai/models/`.
+- A documentação oficial do Cloudflare AI lista modelos Workers AI em
+  `https://developers.cloudflare.com/ai/models/`.
 - A documentação Workers AI REST mostra execução direta por conta em
   `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/{model}`.
 - A documentação AI Gateway mostra endpoint universal em
   `https://gateway.ai.cloudflare.com/v1/{account_id}/{gateway_id}`.
-- O endpoint universal aceita itens com `provider`, `endpoint` e `authorization`, permitindo fallback/retry entre
-  providers/modelos.
+- O endpoint universal aceita itens com `provider`, `endpoint` e `authorization`, permitindo
+  fallback/retry entre providers/modelos.
 - A documentação REST/AI Gateway também expõe superfície OpenAI-compatible em
-  `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1` e endpoints por provider/gateway.
+  `https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1` e endpoints por
+  provider/gateway.
 
 Implementado neste corte:
 
 - Novo `CloudflareWorkersAiCatalogImporter`.
-- O importer aceita catálogo em JSON (`data[]`, `models[]`, `result[]`) e fallback HTML tolerante para ids `@cf/...`
-  extraídos da página pública de modelos.
+- O importer aceita catálogo em JSON (`data[]`, `models[]`, `result[]`) e fallback HTML tolerante
+  para ids `@cf/...` extraídos da página pública de modelos.
 - A composição padrão inclui Cloudflare como catálogo público; se `CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_API_KEY` ou `CLOUDFLARE_KEY` estiverem presentes, o mesmo importer vira authenticated catalog e recebe
-  `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_AI_GATEWAY_ID` para montar overlays/rotas.
+  `CLOUDFLARE_API_KEY` ou `CLOUDFLARE_KEY` estiverem presentes, o mesmo importer vira authenticated
+  catalog e recebe `CLOUDFLARE_ACCOUNT_ID`/`CLOUDFLARE_AI_GATEWAY_ID` para montar overlays/rotas.
 - O payload vira evidências para:
   - `displayName`;
   - `description`;
   - aliases normalizados e Hugging Face id quando houver;
   - `limits.contextWindowTokens`/`maxOutputTokens`;
-  - capabilities por task/campos declarados: `chat`, `embeddings`, `rerank`, `vision`, `audio`, `reasoning`, `tools`,
-    `batch`, `lora`, `realTime`;
+  - capabilities por task/campos declarados: `chat`, `embeddings`, `rerank`, `vision`, `audio`,
+    `reasoning`, `tools`, `batch`, `lora`, `realTime`;
   - modalidades derivadas de task/capabilities;
   - `providerMetadata.ownedBy=cloudflare`;
-  - task, author/provider, platform, hosting/availability, partner flag, docs URL e capabilities brutas;
+  - task, author/provider, platform, hosting/availability, partner flag, docs URL e capabilities
+    brutas;
   - `openai.owned_by=cloudflare`.
 - O importer emite duas rotas por modelo:
-  - `exact_model` para Workers AI direto, com `wireApi=workers_ai_run`, endpoint REST e base OpenAI-compatible;
-  - `gateway_fallback` para AI Gateway universal, com `wireApi=cloudflare_ai_gateway_universal`, provider
-    `workers-ai`, endpoint `@cf/...`, `supportsFallback`, `supportsRetry` e `supportsCache`.
-- O overlay de conta preserva `secretRef`, modelos habilitados, flags de account/gateway configurados e endpoints
-  documentados, sem serializar token.
+  - `exact_model` para Workers AI direto, com `wireApi=workers_ai_run`, endpoint REST e base
+    OpenAI-compatible;
+  - `gateway_fallback` para AI Gateway universal, com `wireApi=cloudflare_ai_gateway_universal`,
+    provider `workers-ai`, endpoint `@cf/...`, `supportsFallback`, `supportsRetry` e
+    `supportsCache`.
+- O overlay de conta preserva `secretRef`, modelos habilitados, flags de account/gateway
+  configurados e endpoints documentados, sem serializar token.
 - Barrels de importers, catálogo e root exportam as constantes Cloudflare e
   `createCloudflareWorkersAiCatalogImporter()`.
 
 Separação arquitetural reafirmada:
 
 - Catálogo público/HTML prova existência/documentação do modelo, não acesso pela conta.
-- Token/account/gateway configurados provam apenas a capacidade de montar rota account-scoped; runtime/probes ainda
-  precisam validar permissões reais, quotas, fallback, cache e streaming.
-- Workers AI direto e AI Gateway universal são rotas diferentes e devem continuar modeladas separadamente.
+- Token/account/gateway configurados provam apenas a capacidade de montar rota account-scoped;
+  runtime/probes ainda precisam validar permissões reais, quotas, fallback, cache e streaming.
+- Workers AI direto e AI Gateway universal são rotas diferentes e devem continuar modeladas
+  separadamente.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`62` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5639` testes totais, `5606` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T20-13-58-681Z/summary.md`).
+- PASS `npm run test:copilot` (`5639` testes totais, `5606` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T20-13-58-681Z/summary.md`).
 
 Próxima direção:
 
-- Continuar para NVIDIA NIM, ou refinar importers especializados de Chutes/Z.AI se a estratégia for fechar primeiro
-  todos os OpenAI-compatible especializados.
+- Continuar para NVIDIA NIM, ou refinar importers especializados de Chutes/Z.AI se a estratégia for
+  fechar primeiro todos os OpenAI-compatible especializados.
 
 ## 53. Continuidade 2026-05-25 — importer NVIDIA NIM hosted/self-hosted
 
@@ -2843,11 +3087,13 @@ Investigação oficial:
 
 - A documentação NVIDIA NIM LLM hospedada em `docs.api.nvidia.com` confirma base
   `https://integrate.api.nvidia.com` e endpoint `POST /v1/chat/completions`.
-- A documentação de NIM LLM self-hosted confirma OpenAI-compatible `/v1/models`, `/v1/chat/completions`,
-  `/v1/completions` e, em versões recentes, `/v1/responses` e `/v1/messages`.
-- A mesma referência lista endpoints de gestão/observabilidade self-hosted:
-  `/v1/health/ready`, `/v1/metadata`, `/v1/version`, `/v1/metrics`, `/v1/license` e `/v1/manifest`.
-- O serviço hospedado `https://integrate.api.nvidia.com/v1/models` é account-scoped e usa Bearer token.
+- A documentação de NIM LLM self-hosted confirma OpenAI-compatible `/v1/models`,
+  `/v1/chat/completions`, `/v1/completions` e, em versões recentes, `/v1/responses` e
+  `/v1/messages`.
+- A mesma referência lista endpoints de gestão/observabilidade self-hosted: `/v1/health/ready`,
+  `/v1/metadata`, `/v1/version`, `/v1/metrics`, `/v1/license` e `/v1/manifest`.
+- O serviço hospedado `https://integrate.api.nvidia.com/v1/models` é account-scoped e usa Bearer
+  token.
 
 Implementado neste corte:
 
@@ -2857,7 +3103,8 @@ Implementado neste corte:
   - `displayName`;
   - aliases normalizados;
   - lifecycle por `created`;
-  - capabilities conservadoras por id: `chat`, `streaming`, `embeddings`, `rerank`, `vision`, `reasoning`;
+  - capabilities conservadoras por id: `chat`, `streaming`, `embeddings`, `rerank`, `vision`,
+    `reasoning`;
   - `providerMetadata.ownedBy`;
   - `providerMetadata.nvidia.object`;
   - `providerMetadata.nvidia.managementEndpoints`;
@@ -2868,56 +3115,60 @@ Implementado neste corte:
   - política `routeLayer=openai_compatible`;
   - `openAICompatibleBaseUrl`;
   - `managementEndpoints`;
-  - `hostedOrSelfHosted=hosted` para `integrate.api.nvidia.com`, ou `self_hosted` quando `baseUrl` customizado for
-    fornecido.
-- O overlay account-scoped preserva modelos visíveis, endpoint `/v1/models`, hosted/self-hosted e endpoints de gestão,
-  sem serializar segredo.
-- Barrels de importers, catálogo e root exportam `NVIDIA_NIM_BASE_URL`, `NVIDIA_NIM_MODELS_CATALOG_URL`,
-  `NVIDIA_NIM_MANAGEMENT_ENDPOINTS` e `createNvidiaNimModelsImporter()`.
+  - `hostedOrSelfHosted=hosted` para `integrate.api.nvidia.com`, ou `self_hosted` quando `baseUrl`
+    customizado for fornecido.
+- O overlay account-scoped preserva modelos visíveis, endpoint `/v1/models`, hosted/self-hosted e
+  endpoints de gestão, sem serializar segredo.
+- Barrels de importers, catálogo e root exportam `NVIDIA_NIM_BASE_URL`,
+  `NVIDIA_NIM_MODELS_CATALOG_URL`, `NVIDIA_NIM_MANAGEMENT_ENDPOINTS` e
+  `createNvidiaNimModelsImporter()`.
 
 Separação arquitetural reafirmada:
 
 - `/v1/models` prova visibilidade account-scoped, não sucesso de chat/responses/messages.
-- Endpoints de gestão self-hosted são metadata de capacidade operacional; probes posteriores devem validar quais deles
-  existem no deployment real.
+- Endpoints de gestão self-hosted são metadata de capacidade operacional; probes posteriores devem
+  validar quais deles existem no deployment real.
 - O mesmo contrato cobre hosted NVIDIA e microserviço NIM self-hosted via `baseUrl` customizado.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest --config vitest.copilot.config.js run tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`63` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5640` testes totais, `5607` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T20-19-16-292Z/summary.md`).
+- PASS `npm run test:copilot` (`5640` testes totais, `5607` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T20-19-16-292Z/summary.md`).
 
 Próxima direção:
 
-- Continuar para Chutes/Z.AI especializados ou para enriquecimento de seeds oficiais de OpenAI/Anthropic/Gemini/Groq.
+- Continuar para Chutes/Z.AI especializados ou para enriquecimento de seeds oficiais de
+  OpenAI/Anthropic/Gemini/Groq.
 
 ## 54. Continuidade 2026-05-25 — importers especializados Chutes e Z.AI
 
 Investigação oficial/operacional:
 
 - Chutes expõe um catálogo público OpenAI-compatible em `https://llm.chutes.ai/v1/models`.
-- Esse catálogo contém `id`, `root`, `owned_by`, `pricing`, `price`, `context_length`, `max_model_len`,
-  `max_output_length`, `input_modalities`, `output_modalities`, `supported_features`,
-  `supported_sampling_parameters`, `quantization`, `chute_id` e `confidential_compute`.
-- Chutes reporta pricing como USD por milhão de tokens; o normalizador interno continua usando entrada por token e
-  armazena projeção final em `pricing.*UsdPerMillion`.
+- Esse catálogo contém `id`, `root`, `owned_by`, `pricing`, `price`, `context_length`,
+  `max_model_len`, `max_output_length`, `input_modalities`, `output_modalities`,
+  `supported_features`, `supported_sampling_parameters`, `quantization`, `chute_id` e
+  `confidential_compute`.
+- Chutes reporta pricing como USD por milhão de tokens; o normalizador interno continua usando
+  entrada por token e armazena projeção final em `pricing.*UsdPerMillion`.
 - Z.AI publica pricing oficial em `https://docs.z.ai/guides/overview/pricing.md` e OpenAPI em
   `https://docs.z.ai/openapi.json`.
-- O OpenAPI Z.AI descreve `POST /paas/v4/chat/completions`; a base runtime OpenAI-compatible do gateway permanece
-  `https://api.z.ai/api/paas/v4`.
-- A tabela pública de Z.AI separa modelos textuais e vision, com preços de input, cached input, cache write e output;
-  acesso efetivo por key/plano continua sendo propriedade de runtime/probe.
+- O OpenAPI Z.AI descreve `POST /paas/v4/chat/completions`; a base runtime OpenAI-compatible do
+  gateway permanece `https://api.z.ai/api/paas/v4`.
+- A tabela pública de Z.AI separa modelos textuais e vision, com preços de input, cached input,
+  cache write e output; acesso efetivo por key/plano continua sendo propriedade de runtime/probe.
 
 Implementado neste corte:
 
 - Novo `ChutesModelsImporter` para `https://llm.chutes.ai/v1/models`.
-- O importer funciona público ou autenticado; quando `CHUTES_API_KEY` ou `CHUTES_AI` está presente, envia Bearer token
-  e emite overlay account-scoped sem serializar segredo.
+- O importer funciona público ou autenticado; quando `CHUTES_API_KEY` ou `CHUTES_AI` está presente,
+  envia Bearer token e emite overlay account-scoped sem serializar segredo.
 - O payload Chutes vira evidências para:
   - aliases por `id`/`root`;
   - lifecycle por `created`;
@@ -2927,25 +3178,26 @@ Implementado neste corte:
   - capabilities `chat`, `streaming`, `tools`, `jsonMode`, `structuredOutputs`, `reasoning`,
     `confidentialCompute`, `vision`, `audio` e `video` quando declaradas;
   - pricing por input/output/cache read/cache write;
-  - metadata Chutes: `root`, `parent`, `chuteId`, `quantization`, `maxModelLen`, `confidentialCompute`,
-    `supportedFeatures`, `supportedSamplingParameters` e `permission`;
+  - metadata Chutes: `root`, `parent`, `chuteId`, `quantization`, `maxModelLen`,
+    `confidentialCompute`, `supportedFeatures`, `supportedSamplingParameters` e `permission`;
   - campos OpenAI-compatible `openai.created` e `openai.owned_by`.
 - O importer Chutes emite rota `exact_model` com `routeLayer=openai_compatible`,
   `openAICompatibleBaseUrl=https://llm.chutes.ai/v1` e flag `confidentialCompute`.
 - Novo `ZaiModelsImporter` para `https://docs.z.ai/guides/overview/pricing.md`.
-- O importer parseia tabelas Markdown de text/vision models e normaliza ids como `GLM-5.1 -> glm-5.1` e
-  `GLM-5V-Turbo -> glm-5v-turbo`.
+- O importer parseia tabelas Markdown de text/vision models e normaliza ids como
+  `GLM-5.1 -> glm-5.1` e `GLM-5V-Turbo -> glm-5v-turbo`.
 - O payload Z.AI vira evidências para:
   - display name;
   - aliases normalizados;
   - modalidades text/vision;
-  - capabilities `chat`, `streaming`, `tools`, `jsonMode`, `forcedToolChoice`, `reasoning` e `vision` quando aplicável;
+  - capabilities `chat`, `streaming`, `tools`, `jsonMode`, `forcedToolChoice`, `reasoning` e
+    `vision` quando aplicável;
   - pricing de input/output/cache read e preço do built-in web search;
-  - metadata Z.AI: seção de docs, pricing source, OpenAPI URL, base OpenAI-compatible, nota de cache write e linha
-    original sanitizada.
+  - metadata Z.AI: seção de docs, pricing source, OpenAPI URL, base OpenAI-compatible, nota de cache
+    write e linha original sanitizada.
 - O importer Z.AI emite rota `exact_model` com `routeLayer=openai_compatible`,
-  `openAICompatibleBaseUrl=https://api.z.ai/api/paas/v4`, endpoint `/chat/completions`, `acceptLanguage=en-US,en`,
-  `supportsTools`, `supportsThinking` e `visionFamily`.
+  `openAICompatibleBaseUrl=https://api.z.ai/api/paas/v4`, endpoint `/chat/completions`,
+  `acceptLanguage=en-US,en`, `supportsTools`, `supportsThinking` e `visionFamily`.
 - A composição padrão deixou de usar o generic importer para Chutes/Z.AI e agora usa:
   - `CHUTES_API_KEY`/`CHUTES_AI` -> `ChutesModelsImporter`;
   - `ZAI_API_KEY`/`Z_AI_KEY` -> `ZaiModelsImporter`.
@@ -2958,46 +3210,52 @@ Separação arquitetural reafirmada:
 
 - Metadados de catálogo respondem “o que o provider declara existir e como selecionar inicialmente”.
 - Overlay account-scoped responde “temos uma key/configuração para montar rota por conta”.
-- Runtime probes respondem “esta key realmente tem acesso ao modelo, responde chat básico, faz tools, stream, JSON,
-  reasoning e demais capacidades sob as condições atuais”.
+- Runtime probes respondem “esta key realmente tem acesso ao modelo, responde chat básico, faz
+  tools, stream, JSON, reasoning e demais capacidades sob as condições atuais”.
 - Vision continua sendo metadata/soft preference, nunca gate excludente automático.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`65` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T20-35-14-097Z/summary.md`).
+- PASS `npm run test:copilot` (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T20-35-14-097Z/summary.md`).
 
 Próxima direção:
 
-- Commitar/pushar este bloco maior e continuar para os próximos importers/enriquecimentos de metadata de providers.
+- Commitar/pushar este bloco maior e continuar para os próximos importers/enriquecimentos de
+  metadata de providers.
 
 ## 55. Continuidade 2026-05-25 — enriquecimento oficial Anthropic/OpenAI sem hardcode volátil
 
 Investigação oficial:
 
-- A documentação Anthropic de Models API declara `GET /v1/models` para listar modelos disponíveis por conta e
-  `GET /v1/models/{model_id}` para obter informação de um modelo específico ou resolver alias para id concreto.
-- A documentação OpenAI Models API declara `GET /v1/models` e `GET /v1/models/{model}` como superfície de identidade;
-  ela não entrega, sozinha, todo o mapa de capabilities/runtime.
-- Portanto, o caminho seguro agora é enriquecer com campos que vêm da própria API e com heurísticas controladas por id,
-  deixando seeds oficiais de preço/limite/capability para um importer/docs seed dedicado posterior.
+- A documentação Anthropic de Models API declara `GET /v1/models` para listar modelos disponíveis
+  por conta e `GET /v1/models/{model_id}` para obter informação de um modelo específico ou resolver
+  alias para id concreto.
+- A documentação OpenAI Models API declara `GET /v1/models` e `GET /v1/models/{model}` como
+  superfície de identidade; ela não entrega, sozinha, todo o mapa de capabilities/runtime.
+- Portanto, o caminho seguro agora é enriquecer com campos que vêm da própria API e com heurísticas
+  controladas por id, deixando seeds oficiais de preço/limite/capability para um importer/docs seed
+  dedicado posterior.
 
 Implementado neste corte:
 
 - `AnthropicModelsImporter` agora aceita `includeModelDetails` com default `true`.
-- Depois de paginar `/v1/models`, o importer chama `GET /v1/models/{model_id}` para cada modelo visível.
-- O detalhe por modelo é mesclado preservando `requested_id`, permitindo detectar/resolver alias quando o provider
-  retornar um id diferente do solicitado.
+- Depois de paginar `/v1/models`, o importer chama `GET /v1/models/{model_id}` para cada modelo
+  visível.
+- O detalhe por modelo é mesclado preservando `requested_id`, permitindo detectar/resolver alias
+  quando o provider retornar um id diferente do solicitado.
 - O importer Anthropic passa a emitir evidências adicionais:
   - `aliases.anthropicModelId`;
   - `aliases.anthropicRequestedModel` quando houver resolução de alias;
   - capability hints `chat`, `streaming`, `tools`, `reasoning`, `batch` e `promptCaching`;
-  - metadata `providerMetadata.anthropic.family`, `tier`, `generation`, `supportsBatch` e `supportsPromptCaching`.
+  - metadata `providerMetadata.anthropic.family`, `tier`, `generation`, `supportsBatch` e
+    `supportsPromptCaching`.
 - Rotas Anthropic agora preservam `family`, `tier`, `supportsStreaming` e `supportsTools` dentro de
   `normalizedPolicy`, além de `wireApi=anthropic_messages`.
 - `OpenAIModelsImporter` agora usa normalizadores compartilhados para aliases/lifecycle.
@@ -3009,8 +3267,8 @@ Implementado neste corte:
   - reasoning.
 - O importer OpenAI agora emite `ModelRouteOption` `exact_model` por modelo com:
   - `routeLayer=direct_provider`;
-  - `wireApi` (`openai_responses`, `openai_embeddings`, `openai_images`, `openai_audio_transcriptions`,
-    `openai_audio_speech`);
+  - `wireApi` (`openai_responses`, `openai_embeddings`, `openai_images`,
+    `openai_audio_transcriptions`, `openai_audio_speech`);
   - `family`;
   - `supportsResponses`, `supportsTools` e `supportsStreaming`.
 - Os testes de contratos cobrem:
@@ -3022,20 +3280,21 @@ Implementado neste corte:
 Separação arquitetural reafirmada:
 
 - `GET /v1/models` e retrieve de modelo continuam sendo catálogo/identidade/availability por conta.
-- Capability hints por id são úteis para seleção inicial e explicabilidade, mas probes continuam obrigatórios para
-  provar chat, tools, streaming, JSON, reasoning, vision e limites efetivos.
-- Seeds/docs oficiais de preço/limite/capability devem entrar como fonte separada, com confidence de docs/static seed,
-  para não misturar conta com documentação global.
+- Capability hints por id são úteis para seleção inicial e explicabilidade, mas probes continuam
+  obrigatórios para provar chat, tools, streaming, JSON, reasoning, vision e limites efetivos.
+- Seeds/docs oficiais de preço/limite/capability devem entrar como fonte separada, com confidence de
+  docs/static seed, para não misturar conta com documentação global.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`65` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T20-42-09-260Z/summary.md`).
+- PASS `npm run test:copilot` (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T20-42-09-260Z/summary.md`).
 
 Próxima direção:
 
@@ -3047,9 +3306,10 @@ Investigação oficial:
 
 - A referência oficial Groq API expõe `GET /openai/v1/models/{model}` com `context_window`,
   `max_completion_tokens`, `active` e `public_apps`.
-- A mesma referência documenta `POST /openai/v1/batches` para batch jobs sobre `/v1/chat/completions`.
-- A página oficial de pricing/modelos do Groq é rica, mas HTML/docs-pricing deve entrar como fonte separada posterior
-  para preços, model cards, velocidades, rate limits e built-in tools.
+- A mesma referência documenta `POST /openai/v1/batches` para batch jobs sobre
+  `/v1/chat/completions`.
+- A página oficial de pricing/modelos do Groq é rica, mas HTML/docs-pricing deve entrar como fonte
+  separada posterior para preços, model cards, velocidades, rate limits e built-in tools.
 
 Implementado neste corte:
 
@@ -3066,40 +3326,45 @@ Implementado neste corte:
   - `supportsTools`;
   - `supportsStreaming`;
   - `batchEndpoint`.
-- O overlay Groq também preserva `batchEndpoint`, mantendo a informação account-scoped sem serializar segredo.
+- O overlay Groq também preserva `batchEndpoint`, mantendo a informação account-scoped sem
+  serializar segredo.
 
 Separação arquitetural reafirmada:
 
 - `max_completion_tokens` e batch endpoint vêm da API/referência e são metadados de catálogo/rota.
-- Pricing, TPS e rate limits da página oficial do Groq exigem importer docs próprio, porque são globais e não provam
-  acesso real pela key do operador.
-- Runtime probes continuam responsáveis por provar chamadas reais de chat, streaming, JSON, tools, compound systems e
-  limites práticos.
+- Pricing, TPS e rate limits da página oficial do Groq exigem importer docs próprio, porque são
+  globais e não provam acesso real pela key do operador.
+- Runtime probes continuam responsáveis por provar chamadas reais de chat, streaming, JSON, tools,
+  compound systems e limites práticos.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`65` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0` warnings/errors únicos;
-  summary `artifacts/test-runs/copilot/2026-05-25T20-46-17-626Z/summary.md`).
+- PASS `npm run test:copilot` (`5642` testes totais, `5609` passed, `33` pending, `0` failed, `0`
+  warnings/errors únicos; summary
+  `artifacts/test-runs/copilot/2026-05-25T20-46-17-626Z/summary.md`).
 
 Próxima direção:
 
-- Commitar/pushar este pacote e continuar para parser docs-pricing Groq ou seeds oficiais de provider.
+- Commitar/pushar este pacote e continuar para parser docs-pricing Groq ou seeds oficiais de
+  provider.
 
 ## 57. Continuidade 2026-05-25 — importer público Groq docs/pricing como camada de metadados globais
 
 Investigação oficial:
 
-- A página pública `https://console.groq.com/docs/models` expõe uma tabela rica de modelos com `MODEL ID`, velocidade
-  em tokens/segundo, preço por 1M tokens, rate limits, context window, max output e limite de arquivo quando aplicável.
-- A página pública `https://groq.com/pricing` expõe preços de prompt caching para famílias como `openai/gpt-oss-*` e
-  custos de built-in tools como web search, visit website, code execution e browser automation.
-- Essas páginas são docs globais: são excelentes para preencher o banco normalizado, mas não provam que a key do
-  operador tem acesso efetivo, quota atual ou comportamento runtime.
+- A página pública `https://console.groq.com/docs/models` expõe uma tabela rica de modelos com
+  `MODEL ID`, velocidade em tokens/segundo, preço por 1M tokens, rate limits, context window, max
+  output e limite de arquivo quando aplicável.
+- A página pública `https://groq.com/pricing` expõe preços de prompt caching para famílias como
+  `openai/gpt-oss-*` e custos de built-in tools como web search, visit website, code execution e
+  browser automation.
+- Essas páginas são docs globais: são excelentes para preencher o banco normalizado, mas não provam
+  que a key do operador tem acesso efetivo, quota atual ou comportamento runtime.
 
 Implementado neste corte:
 
@@ -3117,12 +3382,14 @@ Implementado neste corte:
   - modalidades text/audio conforme família;
   - capabilities de chat/streaming/tools/json/reasoning/ASR/TTS/compound por hint de família;
   - pricing input/output por 1M tokens;
-  - metadata Groq Docs: docs URL, velocidade em tokens/segundo, file-size limit, pricing bruto normalizado e rate limits.
+  - metadata Groq Docs: docs URL, velocidade em tokens/segundo, file-size limit, pricing bruto
+    normalizado e rate limits.
 - A página de pricing complementa:
   - `pricing.cacheReadUsdPerMillion` quando o modelo tem cached input declarado;
-  - provider evidence `providerMetadata.groqDocs.builtInToolPricing` para Basic Search, Advanced Search, Visit Website,
-    Code Execution e Browser Automation.
-- `createDefaultModelGatewayCatalogImporters()` agora inclui `groq-docs-models` quando `includePublic=true`.
+  - provider evidence `providerMetadata.groqDocs.builtInToolPricing` para Basic Search, Advanced
+    Search, Visit Website, Code Execution e Browser Automation.
+- `createDefaultModelGatewayCatalogImporters()` agora inclui `groq-docs-models` quando
+  `includePublic=true`.
 - Os barrels de importers, catálogo e root exportam `GROQ_DOCS_MODELS_URL`, `GROQ_PRICING_URL` e
   `createGroqDocsModelsImporter()`.
 - O inventário de endpoints Groq agora declara explicitamente as duas fontes públicas:
@@ -3142,12 +3409,14 @@ Separação arquitetural reafirmada:
 - Fonte pública de docs responde “o que o provider declara publicamente”.
 - Fonte autenticada responde “o que esta conta enxerga pelo endpoint”.
 - Runtime probes respondem “o que a key realmente consegue executar agora”.
-- A seleção inicial pode usar docs + authenticated catalog + overlays, mas promoção para perfis críticos deve continuar
-  dependente de probes de chat básico, stream, JSON, tools, reasoning e limites práticos.
+- A seleção inicial pode usar docs + authenticated catalog + overlays, mas promoção para perfis
+  críticos deve continuar dependente de probes de chat básico, stream, JSON, tools, reasoning e
+  limites práticos.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`66` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
@@ -3160,15 +3429,16 @@ Validação deste corte até agora:
 
 Próxima direção:
 
-- Rodar `npm run test:copilot`, corrigir qualquer falha, commit/push deste bloco e continuar para o próximo provider ou
-  para seeds oficiais complementares de preço/limite sem misturar metadados com runtime.
+- Rodar `npm run test:copilot`, corrigir qualquer falha, commit/push deste bloco e continuar para o
+  próximo provider ou para seeds oficiais complementares de preço/limite sem misturar metadados com
+  runtime.
 
 ## 58. Continuidade 2026-05-25 — OpenCode Zen docs importer e rebaixamento de seeds estáticos
 
 Investigação oficial:
 
-- `https://opencode.ai/zen/v1/models` retorna atualmente um payload OpenAI-shaped identity-only: `id`, `object`,
-  `created` e `owned_by`.
+- `https://opencode.ai/zen/v1/models` retorna atualmente um payload OpenAI-shaped identity-only:
+  `id`, `object`, `created` e `owned_by`.
 - `https://opencode.ai/docs/zen/` contém a superfície rica:
   - tabela de modelos com `Model`, `Model ID`, endpoint runtime e pacote AI SDK;
   - tabela de preços por 1M tokens com input, output, cached read e cached write;
@@ -3192,10 +3462,13 @@ Implementado neste corte:
   - família;
   - pacote AI SDK;
   - `docsDerived=true`.
-- `OpenCodeZenModelsImporter` continua como importer API/account-scoped, mas seeds antigos de preço/free/depreciação
-  agora são marcados como `static_seed`, para que docs oficiais (`docs`) vençam no merge quando disponíveis.
-- `createDefaultModelGatewayCatalogImporters()` agora inclui `opencode-zen-docs` quando `includePublic=true`.
-- Os barrels de importers, catálogo e root exportam `OPENCODE_ZEN_DOCS_URL` e `createOpenCodeZenDocsImporter()`.
+- `OpenCodeZenModelsImporter` continua como importer API/account-scoped, mas seeds antigos de
+  preço/free/depreciação agora são marcados como `static_seed`, para que docs oficiais (`docs`)
+  vençam no merge quando disponíveis.
+- `createDefaultModelGatewayCatalogImporters()` agora inclui `opencode-zen-docs` quando
+  `includePublic=true`.
+- Os barrels de importers, catálogo e root exportam `OPENCODE_ZEN_DOCS_URL` e
+  `createOpenCodeZenDocsImporter()`.
 - O inventário de endpoints OpenCode declara a fonte docs como
   `global_endpoint_pricing_tiers_deprecation_privacy`.
 - Teste contratual novo cobre:
@@ -3211,12 +3484,14 @@ Separação arquitetural reafirmada:
 - API `/zen/v1/models` responde identidade/visibilidade de modelos.
 - Docs oficiais respondem endpoint, pricing e depreciação globais.
 - Account overlay com `OPENCODE_API_KEY` responde existência de key/configuração do operador.
-- Runtime probes continuam responsáveis por provar que a key realmente consegue chamar cada endpoint/família.
+- Runtime probes continuam responsáveis por provar que a key realmente consegue chamar cada
+  endpoint/família.
 
 Validação deste corte até agora:
 
 - PASS `npm run typecheck:strict:src.copilot`.
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`67` testes).
 - Smoke live com `https://opencode.ai/docs/zen/`:
   - `41` linhas docs parseadas;
@@ -3227,8 +3502,8 @@ Validação deste corte até agora:
 
 Próxima direção:
 
-- Rodar lint e suíte completa, corrigir regressões, commit/push, e continuar para outro enriquecimento de provider ou para
-  normalizadores globais de pricing/limites/aliases.
+- Rodar lint e suíte completa, corrigir regressões, commit/push, e continuar para outro
+  enriquecimento de provider ou para normalizadores globais de pricing/limites/aliases.
 
 ## 59. Continuidade 2026-05-25 — parser HTML compartilhado para importers docs
 
@@ -3238,9 +3513,10 @@ Problema identificado:
   - decode de entidades HTML;
   - extração de texto de HTML;
   - extração de linhas/células de tabela;
-  - preservação especial de texto dentro de scripts quando páginas Next/RSC embutem dados em payloads.
-- Essa duplicação aumenta o risco de bugs divergentes em docs importers futuros, especialmente Cloudflare, NVIDIA,
-  OpenAI/Anthropic/Gemini docs e outros catálogos HTML.
+  - preservação especial de texto dentro de scripts quando páginas Next/RSC embutem dados em
+    payloads.
+- Essa duplicação aumenta o risco de bugs divergentes em docs importers futuros, especialmente
+  Cloudflare, NVIDIA, OpenAI/Anthropic/Gemini docs e outros catálogos HTML.
 
 Implementado neste corte:
 
@@ -3255,13 +3531,15 @@ Implementado neste corte:
   - preservar scripts quando a fonte usa payloads RSC/Next;
   - controlar ordem decode/strip;
   - desescapar strings JS embutidas.
-- `GroqDocsModelsImporter` passou a usar o helper compartilhado para tabela de modelos e pricing page com scripts.
+- `GroqDocsModelsImporter` passou a usar o helper compartilhado para tabela de modelos e pricing
+  page com scripts.
 - `OpenCodeZenDocsImporter` passou a usar `htmlTables()` para endpoint/pricing/deprecation tables.
 
 Validação deste corte até agora:
 
 - PASS `npm run typecheck:strict:src.copilot`.
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`67` testes).
 - Smoke live pós-refactor:
   - Groq docs: `15` linhas, `openai/gpt-oss-120b` presente;
@@ -3269,15 +3547,15 @@ Validação deste corte até agora:
 
 Próxima direção:
 
-- Rodar lint e suíte completa, commitar/pushar este refactor estrutural e continuar para Cloudflare/NVIDIA/docs oficiais
-  ou para normalizadores globais de pricing/limites.
+- Rodar lint e suíte completa, commitar/pushar este refactor estrutural e continuar para
+  Cloudflare/NVIDIA/docs oficiais ou para normalizadores globais de pricing/limites.
 
 ## 60. Continuidade 2026-05-25 — Cloudflare Workers AI markdown catalog rico
 
 Investigação oficial:
 
-- A página `https://developers.cloudflare.com/ai/models/` declara explicitamente que agentes devem consumir a versão
-  Markdown, via `Accept: text/markdown` ou `index.md`.
+- A página `https://developers.cloudflare.com/ai/models/` declara explicitamente que agentes devem
+  consumir a versão Markdown, via `Accept: text/markdown` ou `index.md`.
 - A versão Markdown lista atualmente `137` modelos com cartões que incluem:
   - id/path do modelo;
   - task type;
@@ -3317,12 +3595,13 @@ Separação arquitetural reafirmada:
 
 - O catálogo Markdown é uma fonte pública oficial de metadados globais.
 - Configuração de conta/API token/AI Gateway continua sendo overlay de operador.
-- O fato de um modelo ser `Proxied` ou `Hosted` ajuda a selecionar rota, mas runtime probes continuam necessários para
-  provar acesso e comportamento por conta.
+- O fato de um modelo ser `Proxied` ou `Hosted` ajuda a selecionar rota, mas runtime probes
+  continuam necessários para provar acesso e comportamento por conta.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`68` testes).
 - Smoke live:
   - `137` rows parseadas da página oficial Markdown;
@@ -3331,22 +3610,25 @@ Validação deste corte até agora:
 
 Próxima direção:
 
-- Rodar strict/lint/test completo, commitar/pushar e continuar para próximo enriquecimento Cloudflare/NVIDIA/docs oficiais.
+- Rodar strict/lint/test completo, commitar/pushar e continuar para próximo enriquecimento
+  Cloudflare/NVIDIA/docs oficiais.
 
 ## 61. Continuidade 2026-05-25 — normalizador transversal de traits técnicos
 
 Problema identificado:
 
-- Vários importers já inferiam, cada um de um jeito, família, tier, geração, tamanho de parâmetros, quantização e pistas
-  de modalidade a partir de ids como `claude-sonnet-4.6`, `Qwen/Qwen3-32B-TEE`, `@cf/openai/gpt-oss-120b` e tags
-  Ollama.
+- Vários importers já inferiam, cada um de um jeito, família, tier, geração, tamanho de parâmetros,
+  quantização e pistas de modalidade a partir de ids como `claude-sonnet-4.6`, `Qwen/Qwen3-32B-TEE`,
+  `@cf/openai/gpt-oss-120b` e tags Ollama.
 - Esses fatos pertencem à camada de metadados normalizados, não à camada de probes runtime.
-- Repetir heurísticas por provider dificultaria usar o catálogo como primeiro filtro universal antes da seleção runtime.
+- Repetir heurísticas por provider dificultaria usar o catálogo como primeiro filtro universal antes
+  da seleção runtime.
 
 Implementado neste corte:
 
 - Criado `normalizeModelIdentityTraits()` em `catalog/normalizers.js`.
-- O normalizador emite evidências leves e sobrescrevíveis em `providerMetadata.modelTraits.*`, incluindo:
+- O normalizador emite evidências leves e sobrescrevíveis em `providerMetadata.modelTraits.*`,
+  incluindo:
   - `family`;
   - `series`;
   - `generation`;
@@ -3371,8 +3653,8 @@ Implementado neste corte:
   - Groq docs/pricing.
 - O normalizador separa metadados técnicos de capabilities provadas:
   - `vision`, `tts`, `asr`, `embedding` entram como `modalityHints`, não como filtro excludente;
-  - `reasoning_family`, `instruction_tuned`, `distilled`, `mixture_of_experts` e `confidential_compute` entram como
-    hints arquiteturais, não como prova de sucesso agentic;
+  - `reasoning_family`, `instruction_tuned`, `distilled`, `mixture_of_experts` e
+    `confidential_compute` entram como hints arquiteturais, não como prova de sucesso agentic;
   - acesso por key, plano pago e funcionamento básico continuam sendo overlay/probe runtime.
 
 Testes adicionados:
@@ -3389,28 +3671,30 @@ Testes adicionados:
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`69` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5646` total, `5613` passed, `33` pending, `0` failed, `0` warnings/errors;
-  summary `artifacts/test-runs/copilot/2026-05-25T21-28-53-459Z/summary.md`).
+- PASS `npm run test:copilot` (`5646` total, `5613` passed, `33` pending, `0` failed, `0`
+  warnings/errors; summary `artifacts/test-runs/copilot/2026-05-25T21-28-53-459Z/summary.md`).
 
 Próxima direção:
 
-- Rodar suíte completa, commitar/pushar e continuar expandindo a aplicação dos traits para outros importers e para
-  normalizadores de pricing/limites/provider-route quando novas fontes trouxerem dados mais ricos.
+- Rodar suíte completa, commitar/pushar e continuar expandindo a aplicação dos traits para outros
+  importers e para normalizadores de pricing/limites/provider-route quando novas fontes trouxerem
+  dados mais ricos.
 
 ## 62. Continuidade 2026-05-25 — aplicação ampla dos traits aos importers restantes
 
 Problema identificado após o corte 61:
 
 - A API transversal existia, mas ainda estava aplicada primeiro aos importers mais ricos/recentes.
-- Importers centrais, como OpenAI, Anthropic, Gemini, Mistral, NVIDIA NIM, Hugging Face, OpenCode, Z.AI e o genérico
-  OpenAI-compatible, ainda emitiam apenas metadata provider-specific para família/tier/tamanho.
-- Isso criava assimetria no banco universal: fontes diferentes podiam ter o mesmo fato técnico, mas em caminhos
-  diferentes, exigindo lógica especial na seleção por metadados.
+- Importers centrais, como OpenAI, Anthropic, Gemini, Mistral, NVIDIA NIM, Hugging Face, OpenCode,
+  Z.AI e o genérico OpenAI-compatible, ainda emitiam apenas metadata provider-specific para
+  família/tier/tamanho.
+- Isso criava assimetria no banco universal: fontes diferentes podiam ter o mesmo fato técnico, mas
+  em caminhos diferentes, exigindo lógica especial na seleção por metadados.
 
 Implementado neste corte:
 
@@ -3436,7 +3720,8 @@ Implementado neste corte:
   - `providerMetadata.zai.*`.
 - Ajuste importante em Gemini:
   - `providerMetadata.gemini.version` continua preservado como versão interna do provider;
-  - `modelTraits.generation` passa a vir do id/base model (`gemini-2.5-flash` -> `2.5`), não do campo `version=002`.
+  - `modelTraits.generation` passa a vir do id/base model (`gemini-2.5-flash` -> `2.5`), não do
+    campo `version=002`.
 
 Testes ampliados:
 
@@ -3452,24 +3737,26 @@ Testes ampliados:
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`69` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5646` total, `5613` passed, `33` pending, `0` failed, `0` warnings/errors;
-  summary `artifacts/test-runs/copilot/2026-05-25T21-34-41-524Z/summary.md`).
+- PASS `npm run test:copilot` (`5646` total, `5613` passed, `33` pending, `0` failed, `0`
+  warnings/errors; summary `artifacts/test-runs/copilot/2026-05-25T21-34-41-524Z/summary.md`).
 
 Próxima direção:
 
-- Rodar suíte completa, commitar/pushar e continuar para normalização de route/provider traits, começando por campos que
-  ainda ficam espalhados entre `normalizedPolicy`, `providerSpecific` e provider metadata.
+- Rodar suíte completa, commitar/pushar e continuar para normalização de route/provider traits,
+  começando por campos que ainda ficam espalhados entre `normalizedPolicy`, `providerSpecific` e
+  provider metadata.
 
 ## 63. Continuidade 2026-05-25 — route/policy traits normalizados
 
 Problema identificado:
 
-- A identidade técnica do modelo agora está normalizada, mas a identidade da rota ainda ficava espalhada entre:
+- A identidade técnica do modelo agora está normalizada, mas a identidade da rota ainda ficava
+  espalhada entre:
   - `selectorKind`;
   - `normalizedPolicy.routeLayer`;
   - `normalizedPolicy.wireApi`;
@@ -3481,7 +3768,8 @@ Problema identificado:
 Implementado neste corte:
 
 - Criado `normalizeModelRoutePolicyTraits()` em `catalog/normalizers.js`.
-- `createModelRouteOption()` agora injeta `normalizedPolicy.routeTraits` quando o importer ainda não forneceu essa visão.
+- `createModelRouteOption()` agora injeta `normalizedPolicy.routeTraits` quando o importer ainda não
+  forneceu essa visão.
 - O normalizador resume, sem substituir a política original:
   - `selectorKind`;
   - `selectionMode`;
@@ -3509,27 +3797,30 @@ Separação arquitetural:
 
 - `routeTraits` é metadata de roteamento/seleção inicial.
 - Ele não prova que fallback, tools, cache, streaming ou provider explícito funcionam em runtime.
-- A política original continua preservada em `normalizedPolicy` e `providerSpecific`, para não perder detalhes de cada
-  provider/gateway.
+- A política original continua preservada em `normalizedPolicy` e `providerSpecific`, para não
+  perder detalhes de cada provider/gateway.
 
 Testes adicionados:
 
-- `createModelRouteOption()` agora prova que uma rota `gateway_auto` recebe `routeTraits` secret-safe.
+- `createModelRouteOption()` agora prova que uma rota `gateway_auto` recebe `routeTraits`
+  secret-safe.
 - Teste direto de `normalizeModelRoutePolicyTraits()` cobre:
-  - Cloudflare-like `gateway_fallback` com fallback/retry/cache, upstream provider e headers customizados;
-  - Hugging Face-like `fastest` com route layer `openai_compatible_aggregator`, provider policy e provider explícito.
+  - Cloudflare-like `gateway_fallback` com fallback/retry/cache, upstream provider e headers
+    customizados;
+  - Hugging Face-like `fastest` com route layer `openai_compatible_aggregator`, provider policy e
+    provider explícito.
 
 Validação deste corte até agora:
 
-- PASS `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
+- PASS
+  `npx vitest run --config vitest.copilot.config.js tests/unit/copilot/model-gateway/test_model_gateway_contracts.spec.js`
   (`70` testes).
 - PASS `npm run typecheck:strict:src.copilot`.
 - PASS `npm run lint:copilot`.
-- PASS `npm run test:copilot`
-  (`5647` total, `5614` passed, `33` pending, `0` failed, `0` warnings/errors;
-  summary `artifacts/test-runs/copilot/2026-05-25T21-39-48-652Z/summary.md`).
+- PASS `npm run test:copilot` (`5647` total, `5614` passed, `33` pending, `0` failed, `0`
+  warnings/errors; summary `artifacts/test-runs/copilot/2026-05-25T21-39-48-652Z/summary.md`).
 
 Próxima direção:
 
-- Rodar suíte completa, commitar/pushar e continuar para normalização de provider/gateway traits ou para enriquecer
-  projeções OpenAI-schema-first com atalhos derivados desses traits.
+- Rodar suíte completa, commitar/pushar e continuar para normalização de provider/gateway traits ou
+  para enriquecer projeções OpenAI-schema-first com atalhos derivados desses traits.

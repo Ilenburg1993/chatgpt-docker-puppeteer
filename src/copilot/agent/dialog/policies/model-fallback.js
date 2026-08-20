@@ -19,13 +19,13 @@ import { log } from '../../ports/logging/index.js';
 
 /**
  * @typedef {{
- *   getModel: () => string;
- *   getSessionId?: () => string | null;
- *   setModel?: (model: string) => void;
- *   switchModel?: (
- *     model: string,
- *     options?: { idempotencyKey?: string; source?: string },
- *   ) => Promise<Record<string, unknown>>;
+ *     getModel: () => string;
+ *     getSessionId?: () => string | null;
+ *     setModel?: (model: string) => void;
+ *     switchModel?: (
+ *         model: string,
+ *         options?: { idempotencyKey?: string; source?: string },
+ *     ) => Promise<Record<string, unknown>>;
  * }} AgentHostForFallback
  */
 
@@ -83,10 +83,11 @@ export class ModelFallbackState {
      * @param {AgentHostForFallback} host
      * @param {(event: string, payload: Record<string, unknown>) => void} emitFn
      * @returns {{
-     *   applied: boolean;
-     *   previousModel?: string;
-     *   newModel?: string;
-     * } | Promise<{ applied: boolean; previousModel?: string; newModel?: string }>}
+     *           applied: boolean;
+     *           previousModel?: string;
+     *           newModel?: string;
+     *       }
+     *     | Promise<{ applied: boolean; previousModel?: string; newModel?: string }>}
      */
     applyIfPending(host, emitFn) {
         if (!this.#pending || !this.#model) {
@@ -104,8 +105,7 @@ export class ModelFallbackState {
             const sessionId = host.getSessionId?.() ?? 'no-session';
             return host
                 .switchModel(target, {
-                    idempotencyKey:
-                        `dialog-model-fallback:${sessionId}:${target}:${this.#operationNonce}:${this.#generation}`,
+                    idempotencyKey: `dialog-model-fallback:${sessionId}:${target}:${this.#operationNonce}:${this.#generation}`,
                     source: 'agent.dialog.model-fallback',
                 })
                 .then((operation) => {

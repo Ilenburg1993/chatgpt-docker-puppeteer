@@ -47,7 +47,7 @@ function mapSeverity(severityHint, sourceTool) {
     if (String(sourceTool).includes('typecheck')) return 'P1';
     if (String(sourceTool).includes('lint')) return 'P2';
     if (String(sourceTool).includes('jscpd')) return 'P2';
-    if (String(sourceTool).includes('madge')) return 'P2';
+    if (String(sourceTool).includes('dependency-graph')) return 'P1';
     if (String(sourceTool).includes('semgrep')) return 'P1';
 
     return 'P2';

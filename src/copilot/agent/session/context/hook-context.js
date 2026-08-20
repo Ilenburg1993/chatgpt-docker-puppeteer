@@ -14,13 +14,13 @@
  * @see module:copilot/agent/session/initializer
  */
 
-import { readBootSkillConfig, resolveHooksStateFile } from '#copilot/boot';
-import { container, logSwallowed, toError } from '#copilot/core';
-import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/buffer';
-import { access, open, readdir, readFile, stat } from 'node:fs/promises';
-import { z } from 'zod';
+import { readBootSkillConfig, resolveHooksStateFile, resolveWorkspacePath } from '#copilot/boot';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
-import { safeJsonParse } from '#copilot/core';
+import { container, logSwallowed, safeJsonParse, toError } from '#copilot/core';
+import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/buffer';
+import { readConfiguredSkillCatalog } from '#copilot/infra/public/skill-io';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { z } from 'zod';
 import { log } from '../../ports/logging/index.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';
 import { readAgentTodoStore } from '../../ports/tool-port.js';
@@ -29,6 +29,7 @@ import { readAgentTodoStore } from '../../ports/tool-port.js';
 
 export const BRIEFING_FILE = resolveHooksStateFile('session-briefing.md');
 export const SESSION_JSON_FILE = resolveHooksStateFile('session.json');
+const hookContextWorkspaceIo = createWorkspaceIo({ workspaceRoot: resolveWorkspacePath() });
 
 /**
  * Envelope defensivo para conteudo local controlavel por ferramentas.
@@ -66,20 +67,24 @@ export function sanitizeBriefingContent(raw) {
 export const SessionJsonSchema = z
     .object({
         close_key: z
-            .string()['regex'](/^[a-zA-Z0-9_-]{1,64}$/)
+            .string()
+            ['regex'](/^[a-zA-Z0-9_-]{1,64}$/)
             .optional(),
         strict_turn_close: z.boolean().optional(),
         current_turn: z
             .object({
                 number: z.number().int().min(0),
-            })['passthrough']()
+            })
+            ['passthrough']()
             .optional(),
         compliance: z
             .object({
                 consecutive_unauthorized: z.number().int().min(0).max(9999),
-            })['passthrough']()
+            })
+            ['passthrough']()
             .optional(),
-    })['passthrough']();
+    })
+    ['passthrough']();
 
 // ─── buildHookSystemContext ──────────────────────────────────────────────────
 
@@ -95,26 +100,20 @@ export async function buildHookSystemContext() {
     const parts = [];
 
     try {
-        await access(BRIEFING_FILE);
-        // G2-SEC-02: verificar tamanho antes de readFile para evitar consumo de memória excessivo.
-        // Limite: 16KB máximo antes de truncar na leitura.
+        // G2-SEC-02: a primitive range/tail aplica o limite antes da alocação e mantém snapshot físico consistente.
         const SEC02_READ_LIMIT = 16 * 1024;
-        const fileStat = await stat(BRIEFING_FILE);
-        let content;
-        if (fileStat.size > SEC02_READ_LIMIT) {
+        const snapshot = await hookContextWorkspaceIo.readBytesRangeFresh(BRIEFING_FILE, {
+            start: 0,
+            maxBytes: SEC02_READ_LIMIT,
+            rejectSymlink: true,
+        });
+        let content = new TextDecoder('utf-8', { fatal: false }).decode(snapshot.content).replace(/\uFFFD+$/, '');
+        if (snapshot.truncatedAfter) {
             log(
                 'WARN',
-                `[session-initializer] session-briefing.md excede limite (${fileStat.size} bytes > ${SEC02_READ_LIMIT}) — lendo apenas os primeiros ${SEC02_READ_LIMIT} bytes.`,
+                `[session-initializer] session-briefing.md excede limite (${snapshot.sizeBytes} bytes > ${SEC02_READ_LIMIT}) — lendo apenas os primeiros ${SEC02_READ_LIMIT} bytes.`,
             );
-            const fh = await open(BRIEFING_FILE, 'r');
-            const buf = Buffer.alloc(SEC02_READ_LIMIT);
-            await fh.read(buf, 0, SEC02_READ_LIMIT, 0);
-            await fh.close();
-            content =
-                new TextDecoder('utf-8', { fatal: false }).decode(buf).replace(/\uFFFD+$/, '') +
-                '\n\n⚠️ [briefing truncado: arquivo excede 16KB]';
-        } else {
-            content = await readFile(BRIEFING_FILE, 'utf8');
+            content += '\n\n⚠️ [briefing truncado: arquivo excede 16KB]';
         }
         parts.push('## Contexto da Sessão (Hook System)\n\n' + sanitizeBriefingContent(content));
     } catch (e) {
@@ -122,8 +121,7 @@ export async function buildHookSystemContext() {
     }
 
     try {
-        await access(SESSION_JSON_FILE);
-        const raw = await readFile(SESSION_JSON_FILE, 'utf8');
+        const raw = (await hookContextWorkspaceIo.readTextFresh(SESSION_JSON_FILE, { includeHash: false })).content;
         // F5.1 (ARCH-01): valida session.json com schema Zod para detectar corrupcao precocemente
         const jsonResult = safeJsonParse(raw, '[hook-context/session.json]');
         if (!jsonResult.ok) {
@@ -135,14 +133,15 @@ export async function buildHookSystemContext() {
         if (jsonResult.ok && !parseResult.success) {
             log('WARN', `[session-manager] session.json com estrutura inválida: ${parseResult.error?.message}`);
         }
-        const state = /**
-         * @type {{
-         *     compliance?: { consecutive_unauthorized?: number };
-         *     current_turn?: { number?: number };
-         *     close_key?: string;
-         *     strict_turn_close?: boolean;
-         * }}
-         */ (parseResult.success ? parseResult.data : jsonResult.ok ? jsonResult.data : {});
+        const state =
+            /**
+             * @type {{
+             *     compliance?: { consecutive_unauthorized?: number };
+             *     current_turn?: { number?: number };
+             *     close_key?: string;
+             *     strict_turn_close?: boolean;
+             * }}
+             */ (parseResult.success ? parseResult.data : jsonResult.ok ? jsonResult.data : {});
         // SEC-VULN-03 (fix): validar e sanitizar todos os valores de session.json
         // antes de usá-los no system prompt para prevenir prompt injection
         const rawConsecutive = state?.compliance?.consecutive_unauthorized;
@@ -180,20 +179,11 @@ export async function buildHookSystemContext() {
     // F5.3: skills disponiveis nos diretorios canonicos de boot.
     try {
         const bootSkills = readBootSkillConfig();
-        const disabled = new Set(bootSkills.disabledSkills);
-        /** @type {Set<string>} */
-        const skillNames = new Set();
-        for (const skillsDir of bootSkills.skillDirectories) {
-            try {
-                const entries = await readdir(skillsDir, { withFileTypes: true });
-                for (const entry of entries) {
-                    if (entry.isDirectory() && !disabled.has(entry.name)) skillNames.add(entry.name);
-                }
-            } catch (e) {
-                log('DEBUG', `[hook-context] skills indisponiveis em ${skillsDir}: ${toError(e).message}`);
-            }
-        }
-        const names = [...skillNames].sort();
+        const skillCatalog = await readConfiguredSkillCatalog({
+            skillDirectories: bootSkills.skillDirectories,
+            disabledSkills: bootSkills.disabledSkills,
+        });
+        const names = skillCatalog.names;
         if (names.length > 0) {
             parts.push('\n## Skills Disponíveis\n\n' + names.map((s) => `- \`${s}\``).join('\n'));
         }

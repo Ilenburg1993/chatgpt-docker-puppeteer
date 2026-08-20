@@ -107,7 +107,9 @@ export function readTerminalMetricsProjection(runtimeId) {
 }
 
 /**
- * @returns {ReturnType<typeof readToolStatsProjection> & { lifecycle: ReturnType<typeof readTerminalToolLifecycleProjection> }}
+ * @returns {ReturnType<typeof readToolStatsProjection> & {
+ *     lifecycle: ReturnType<typeof readTerminalToolLifecycleProjection>;
+ * }}
  */
 export function readTerminalToolStatsProjection() {
     const stats = readToolStatsProjection();

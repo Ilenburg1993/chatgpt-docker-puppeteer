@@ -34,4 +34,3 @@ describe('terminal/state/assistant-message-buffer-state', () => {
         expect(takeLatestTerminalBufferedAssistantMessage()).toBeNull();
     });
 });
-

@@ -115,10 +115,7 @@ describe('F175 — Barrel exporta exports críticos de tools-registry', () => {
 // ─── F176: Exports críticos de tools/config runtime ───────────────────────
 
 describe('F176 — Barrel exporta exports críticos de tools runtime', () => {
-    const CONFIG_EXPORTS = [
-        'getToolsConfig',
-        'loadToolsConfigAsync',
-    ];
+    const CONFIG_EXPORTS = ['getToolsConfig', 'loadToolsConfigAsync'];
 
     for (const name of CONFIG_EXPORTS) {
         it(`exporta '${name}'`, () => {

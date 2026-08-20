@@ -8,13 +8,19 @@
  * @module copilot/model-gateway/session/on-list-models
  */
 
-import { buildEnvByokModelGatewaySnapshot } from '../registry/snapshot.js';
 import { JsonModelGatewayCatalogStore } from '../catalog/json-catalog-store.js';
+import { buildEnvByokModelGatewaySnapshot } from '../registry/snapshot.js';
 import { toCopilotRouteModelInfoList } from './copilot-model-projection.js';
 
 /**
  * @param {Record<string, string | undefined>} [env]
- * @param {{ catalogStore?: { readSnapshot(): Promise<ReturnType<typeof import('../catalog/json-catalog-store.js').normalizeStoredCatalogSnapshot>> } }} [options]
+ * @param {{
+ *     catalogStore?: {
+ *         readSnapshot(): Promise<
+ *             ReturnType<typeof import('../catalog/json-catalog-store.js').normalizeStoredCatalogSnapshot>
+ *         >;
+ *     };
+ * }} [options]
  * @returns {(() => Promise<ReturnType<typeof toCopilotRouteModelInfoList>>) | undefined}
  */
 export function buildModelGatewayOnListModelsHandler(env = process.env, options = {}) {
@@ -29,22 +35,18 @@ export function buildModelGatewayOnListModelsHandler(env = process.env, options 
             catalogSnapshot.modelEligibilityDecisions
                 .filter((decision) => decision['include'] === true)
                 .map((decision) =>
-                    [
-                        decision['providerId'],
-                        decision['providerModel'],
-                        decision['routeProfile'] ?? 'default',
-                    ].join(':'),
+                    [decision['providerId'], decision['providerModel'], decision['routeProfile'] ?? 'default'].join(
+                        ':',
+                    ),
                 ),
         );
         const projections = catalogSnapshot.projections.filter((projection) => {
             if (providerId && projection['providerId'] !== providerId) return false;
             if (eligibleKeys.size === 0) return true;
             return eligibleKeys.has(
-                [
-                    projection['providerId'],
-                    projection['providerModel'],
-                    projection['routeProfile'] ?? 'default',
-                ].join(':'),
+                [projection['providerId'], projection['providerModel'], projection['routeProfile'] ?? 'default'].join(
+                    ':',
+                ),
             );
         });
         const routeOptions = catalogSnapshot.routeOptions.filter(

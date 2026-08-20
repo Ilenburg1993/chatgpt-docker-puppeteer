@@ -120,8 +120,8 @@ passadas como build args, `remoteEnv` e mounts source
 # Dockerfile
 ARG REMOTE_USER=node
 ENV USER_NAME=${REMOTE_USER} \
- HOME_DIR=/home/${REMOTE_USER} \
- APP_DIR=/workspaces/${PROJECT_NAME}
+  HOME_DIR=/home/${REMOTE_USER} \
+  APP_DIR=/workspaces/${PROJECT_NAME}
 
 # Result in container:
 # USER_NAME=node
@@ -249,7 +249,7 @@ USER_NAME=node
 # Dockerfile
 ARG REMOTE_USER=node
 ENV USER_NAME=${REMOTE_USER} \
- HOME_DIR=/home/${REMOTE_USER}
+  HOME_DIR=/home/${REMOTE_USER}
 
 # Build with different user
 ```
@@ -295,12 +295,12 @@ ENV USER_NAME=${REMOTE_USER} \
 ```dockerfile
 # ❌ AVOID
 ENV USER_NAME=node \
- HOME_DIR=/home/node
+  HOME_DIR=/home/node
 
 # ✅ PREFER
 ARG REMOTE_USER=node
 ENV USER_NAME=${REMOTE_USER} \
- HOME_DIR=/home/${REMOTE_USER}
+  HOME_DIR=/home/${REMOTE_USER}
 ```
 
 ---

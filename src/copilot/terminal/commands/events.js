@@ -7,21 +7,22 @@
 
 import { redactSecretRecord } from '../../core/security/redaction.js';
 import {
-    compactTerminalDiagnosticId,
-    compactTerminalOperatorToolText,
-    formatTerminalToolPathForOperator,
-    getTerminalHumanToolName,
-} from '../events/presenters/tools/index.js';
-import {
-    renderTerminalLlmUsageClassification,
-    renderTerminalLlmUsageReason,
-} from '../events/presenters/index.js';
+    classifyRuntimeSdkRateLimitScope,
+    describeSdkRecoveryPolicy,
+    getSdkRecoveryPolicy,
+} from '../../presentation/sdk/index.js';
 import {
     EMPTY_AFTER_USER_INPUT_DEFAULT_DETAIL,
     listTerminalPublicStreamSourcePolicies,
     summarizeEmptyAfterUserInputRecovery,
 } from '../events/index.js';
-import { classifyRuntimeSdkRateLimitScope, describeSdkRecoveryPolicy, getSdkRecoveryPolicy } from '../../presentation/sdk/index.js';
+import { renderTerminalLlmUsageClassification, renderTerminalLlmUsageReason } from '../events/presenters/index.js';
+import {
+    compactTerminalDiagnosticId,
+    compactTerminalOperatorToolText,
+    formatTerminalToolPathForOperator,
+    getTerminalHumanToolName,
+} from '../events/presenters/tools/index.js';
 import {
     formatTerminalTimeLabel,
     readTerminalSseEventArchiveTail,
@@ -543,7 +544,12 @@ function humanPayloadKind(value) {
     if (text === 'github_reference') return 'referência GitHub';
     if (text === 'background' || text === 'background_task') return 'tarefa em segundo plano';
     if (text === 'runtime' || text === 'runtime_root') return 'ambiente';
-    if (text === 'runtime_config' || text === 'runtime.config' || text === 'runtime config' || text === 'runtime-config') {
+    if (
+        text === 'runtime_config' ||
+        text === 'runtime.config' ||
+        text === 'runtime config' ||
+        text === 'runtime-config'
+    ) {
         return 'configuração do ambiente';
     }
     if (text === 'preflight') return 'checagem';
@@ -591,7 +597,8 @@ function humanEventMessage(value) {
  */
 function summarizeAgentErrorPayload(payload) {
     const isByok = payload['byokEnabled'] === true || typeof payload['byokProviderType'] === 'string';
-    const provider = typeof payload['byokProviderType'] === 'string' ? `provedor ${compact(payload['byokProviderType'], 28)}` : null;
+    const provider =
+        typeof payload['byokProviderType'] === 'string' ? `provedor ${compact(payload['byokProviderType'], 28)}` : null;
     const profile = typeof payload['byokProfile'] === 'string' ? `perfil ${compact(payload['byokProfile'], 28)}` : null;
     const model = typeof payload['byokModel'] === 'string' ? `modelo ${compact(payload['byokModel'], 42)}` : null;
     const recoverable = payload['recoverable'] === true ? 'recuperável' : null;
@@ -619,7 +626,8 @@ function summarizeAgentErrorPayload(payload) {
 function summarizeEmptyTurnPayload(payload) {
     const actor = humanPayloadKind(payload['actor']);
     const sourceDetail = humanPayloadKind(payload['sourceDetail']);
-    const assistantMessages = typeof payload['assistantMessageCount'] === 'number' ? payload['assistantMessageCount'] : null;
+    const assistantMessages =
+        typeof payload['assistantMessageCount'] === 'number' ? payload['assistantMessageCount'] : null;
     const deltaCount =
         typeof payload['deltaCount'] === 'number'
             ? payload['deltaCount']
@@ -634,9 +642,7 @@ function summarizeEmptyTurnPayload(payload) {
         actor ? `autor ${actor}` : null,
         sourceDetail ? `origem ${sourceDetail}` : null,
         assistantMessages != null ? `mensagens LLM-B ${assistantMessages}` : null,
-        deltaCount != null
-            ? `deltas ${deltaCount}${deltaChars != null ? `/${deltaChars} caracteres` : ''}`
-            : null,
+        deltaCount != null ? `deltas ${deltaCount}${deltaChars != null ? `/${deltaChars} caracteres` : ''}` : null,
         pendingQuestion,
     ]
         .filter(Boolean)
@@ -800,7 +806,11 @@ function summarizeSdkLifecyclePayload(payload) {
     const type = humanPayloadKind(payload['type']);
     const label = humanEventMessage(payload['label']);
     const detail = humanEventMessage(payload['detail']);
-    return [type ? `tipo ${compact(type, 48)}` : null, label ? compact(label, 72) : null, detail ? compact(detail, 96) : null]
+    return [
+        type ? `tipo ${compact(type, 48)}` : null,
+        label ? compact(label, 72) : null,
+        detail ? compact(detail, 96) : null,
+    ]
         .filter(Boolean)
         .join(' · ');
 }
@@ -812,7 +822,8 @@ function summarizeSdkLifecyclePayload(payload) {
 function summarizeTerminalRuntimePayload(payload) {
     const phase = humanPayloadKind(payload['phase']);
     const duration = typeof payload['durationMs'] === 'number' ? `${Math.round(payload['durationMs'])}ms` : '';
-    const ok = payload['preflightOk'] === true ? 'checagem ok' : payload['preflightOk'] === false ? 'checagem falhou' : '';
+    const ok =
+        payload['preflightOk'] === true ? 'checagem ok' : payload['preflightOk'] === false ? 'checagem falhou' : '';
     return [phase ? `fase ${compact(phase, 48)}` : null, ok || null, duration || null].filter(Boolean).join(' · ');
 }
 
@@ -824,7 +835,12 @@ function summarizeTerminalStartedPayload(payload) {
     const mode = humanPayloadKind(payload['operationMode']);
     const model = humanEventMessage(payload['model']);
     const tools = typeof payload['mcpToolCount'] === 'number' ? `${payload['mcpToolCount']} MCP` : '';
-    const dialog = payload['dialogLoopActive'] === true ? 'diálogo ativo' : payload['dialogLoopActive'] === false ? 'diálogo inativo' : '';
+    const dialog =
+        payload['dialogLoopActive'] === true
+            ? 'diálogo ativo'
+            : payload['dialogLoopActive'] === false
+              ? 'diálogo inativo'
+              : '';
     const preflight = isRecord(payload['bootPreflight']) ? payload['bootPreflight'] : null;
     const preflightLabel = humanPayloadKind('preflight');
     const preflightStatus =
@@ -941,7 +957,11 @@ function summarizeStructuredContentList(value) {
 function summarizeAttachmentItem(attachment) {
     const type = humanPayloadKind(attachment['type']) || 'anexo';
     const title = humanEventMessage(
-        attachment['displayName'] ?? attachment['title'] ?? attachment['path'] ?? attachment['filePath'] ?? attachment['url'],
+        attachment['displayName'] ??
+            attachment['title'] ??
+            attachment['path'] ??
+            attachment['filePath'] ??
+            attachment['url'],
     );
     const mime = humanMime(attachment['mimeType']);
     const referenceType = humanPayloadKind(attachment['referenceType']);
@@ -972,7 +992,9 @@ function summarizeAttachmentList(value) {
 function summarizeMultimodalPayload(payload) {
     const data = payloadDataOrSelf(payload);
     const result = isRecord(data['result']) ? /** @type {Record<string, unknown>} */ (data['result']) : data;
-    const contentBlocks = summarizeStructuredContentList(result['contents'] ?? result['contentBlocks'] ?? data['contents']);
+    const contentBlocks = summarizeStructuredContentList(
+        result['contents'] ?? result['contentBlocks'] ?? data['contents'],
+    );
     const attachments = summarizeAttachmentList(data['attachments']);
     const uiResource = isRecord(result['uiResource']) ? summarizeStructuredContentItem(result['uiResource']) : '';
     return [contentBlocks, attachments, uiResource ? `UI ${uiResource}` : null].filter(Boolean).join(' · ');
@@ -1104,7 +1126,10 @@ function summarizeCanvasRegistryChangedPayload(payload) {
         .filter(Boolean)
         .slice(0, 3);
     const suffix = canvases.length > names.length ? ` +${canvases.length - names.length}` : '';
-    return [`${countLabel(canvases.length, 'canvas disponível', 'canvas disponíveis')}`, names.length ? `${names.join(', ')}${suffix}` : null]
+    return [
+        `${countLabel(canvases.length, 'canvas disponível', 'canvas disponíveis')}`,
+        names.length ? `${names.join(', ')}${suffix}` : null,
+    ]
         .filter(Boolean)
         .join(' · ');
 }
@@ -1151,13 +1176,22 @@ function summarizeSdkExtensionSignalPayload(payload, event) {
             .join(' · ');
     }
     if (event === 'session.custom_agents_updated') {
-        const agents = Array.isArray(data['agents']) ? data['agents'] : Array.isArray(data['customAgents']) ? data['customAgents'] : [];
+        const agents = Array.isArray(data['agents'])
+            ? data['agents']
+            : Array.isArray(data['customAgents'])
+              ? data['customAgents']
+              : [];
         const count = typeof data['count'] === 'number' ? data['count'] : agents.length;
         const names = agents
-            .map((agent) => (isRecord(agent) ? humanEventMessage(agent['name'] ?? agent['displayName'] ?? agent['id']) : ''))
+            .map((agent) =>
+                isRecord(agent) ? humanEventMessage(agent['name'] ?? agent['displayName'] ?? agent['id']) : '',
+            )
             .filter(Boolean)
             .slice(0, 3);
-        return [`${countLabel(count, 'agente', 'agentes')}`, names.length ? names.map((name) => compact(name, 32)).join(', ') : null]
+        return [
+            `${countLabel(count, 'agente', 'agentes')}`,
+            names.length ? names.map((name) => compact(name, 32)).join(', ') : null,
+        ]
             .filter(Boolean)
             .join(' · ');
     }
@@ -1165,7 +1199,11 @@ function summarizeSdkExtensionSignalPayload(payload, event) {
         const title = humanEventMessage(data['title']);
         const message = humanEventMessage(data['message']);
         const level = humanStatus(data['level'] ?? data['severity']);
-        return [title ? compact(title, 48) : null, message ? compact(message, 96) : null, level ? `nível ${level}` : null]
+        return [
+            title ? compact(title, 48) : null,
+            message ? compact(message, 96) : null,
+            level ? `nível ${level}` : null,
+        ]
             .filter(Boolean)
             .join(' · ');
     }
@@ -1191,7 +1229,11 @@ function summarizeSdkExtensionSignalPayload(payload, event) {
         const scheduleId = humanEventMessage(data['scheduleId'] ?? data['id']);
         const cadence = humanEventMessage(data['cadence'] ?? data['cron'] ?? data['when']);
         return [
-            title ? compact(title, 64) : event === 'session.schedule_created' ? 'agendamento criado' : 'agendamento cancelado',
+            title
+                ? compact(title, 64)
+                : event === 'session.schedule_created'
+                  ? 'agendamento criado'
+                  : 'agendamento cancelado',
             scheduleId ? `id ${compact(scheduleId, 24)}` : null,
             cadence ? compact(cadence, 48) : null,
         ]
@@ -1314,10 +1356,14 @@ function summarizePayload(payload, opts = {}) {
         if (typeof payload['operatorSummary'] === 'string' && payload['operatorSummary'].trim().length > 0) {
             return compact(payload['operatorSummary'], 140);
         }
-        const previous = typeof previousModel === 'string' && previousModel.trim().length > 0 ? previousModel.trim() : 'modelo anterior n/d';
-        const effort = typeof payload['reasoningEffort'] === 'string' && payload['reasoningEffort'].trim().length > 0
-            ? ` · raciocínio ${payload['reasoningEffort'].trim()}`
-            : '';
+        const previous =
+            typeof previousModel === 'string' && previousModel.trim().length > 0
+                ? previousModel.trim()
+                : 'modelo anterior n/d';
+        const effort =
+            typeof payload['reasoningEffort'] === 'string' && payload['reasoningEffort'].trim().length > 0
+                ? ` · raciocínio ${payload['reasoningEffort'].trim()}`
+                : '';
         return `modelo ${compact(previous, 42)} → ${compact(newModel.trim(), 42)}${effort}`;
     }
     const toolName = payload['toolName'] ?? payload['tool'];
@@ -1353,7 +1399,9 @@ function summarizePayload(payload, opts = {}) {
         showIds && requestId ? `req ${compactTerminalDiagnosticId(String(requestId), 14)}` : null,
         renderedStatus ? `estado ${compact(renderedStatus)}` : null,
         renderedType && !typeIsRedundant ? `tipo ${compact(renderedType)}` : null,
-        renderedClassification && !classificationIsRedundant ? `${classificationLabel} ${compact(renderedClassification)}` : null,
+        renderedClassification && !classificationIsRedundant
+            ? `${classificationLabel} ${compact(renderedClassification)}`
+            : null,
         content ? compact(humanEventMessage(content)) : null,
     ]
         .filter(Boolean)
@@ -1393,7 +1441,7 @@ function redactRawEventEntry(entry) {
 /**
  * @param {unknown} value
  * @param {string[]} fieldNames
- * @param {number} [depth=0]
+ * @param {number} [depth=0] Default is `0`
  * @returns {string | null}
  */
 function findCompactPayloadString(value, fieldNames, depth = 0) {
@@ -1472,12 +1520,12 @@ function buildTranscriptExportHint(entry, opts = {}) {
 function hasActiveEventFilters(filters) {
     return Boolean(
         filters['event'] ||
-            filters['traceId'] ||
-            filters['turnId'] ||
-            filters['source'] ||
-            filters['toolCallId'] ||
-            filters['requestId'] ||
-            filters['hubSessionId'],
+        filters['traceId'] ||
+        filters['turnId'] ||
+        filters['source'] ||
+        filters['toolCallId'] ||
+        filters['requestId'] ||
+        filters['hubSessionId'],
     );
 }
 
@@ -1490,8 +1538,8 @@ function isInternalDefaultEvent(entry) {
 }
 
 /**
- * O resumo default de `/events` e uma trilha operacional para o operador humano.
- * Eventos de manutencao continuam no archive, em `--raw`/`--json` e em filtros explicitos.
+ * O resumo default de `/events` e uma trilha operacional para o operador humano. Eventos de manutencao continuam no
+ * archive, em `--raw`/`--json` e em filtros explicitos.
  *
  * @param {{ event: string; payload?: Record<string, unknown> | null }} entry
  * @returns {boolean}
@@ -1575,9 +1623,7 @@ export async function cmdEvents({ println }, arg = '') {
             const policyCount = policy.publicEvents.reduce((sum, event) => sum + (counts.get(event) ?? 0), 0);
             const humanEvents = uniqueHumanEventLabels(policy.publicEvents);
             const events = renderEventsSourcePolicyEventList(policy.publicEvents, { detailMode });
-            const title = detailMode
-                ? policy.id
-                : humanEvents.slice(0, 2).join(' + ');
+            const title = detailMode ? policy.id : humanEvents.slice(0, 2).join(' + ');
             println(terminalThemeText('accent', `  ${title || policy.id}`));
             println(terminalThemeRow('Responsável', humanPolicyOwnerSummary(policy), { role: 'muted' }));
             println(
@@ -1586,9 +1632,13 @@ export async function cmdEvents({ println }, arg = '') {
                 }),
             );
             println(
-                terminalThemeRow('Investigar', detailMode ? buildPolicyQueryHints(policy) || '/events 50' : buildHumanPolicyQueryHint(policy), {
-                    role: 'command',
-                }),
+                terminalThemeRow(
+                    'Investigar',
+                    detailMode ? buildPolicyQueryHints(policy) || '/events 50' : buildHumanPolicyQueryHint(policy),
+                    {
+                        role: 'command',
+                    },
+                ),
             );
             if (detailMode) {
                 println(terminalThemeRow('ID', policy.id, { role: 'muted' }));
@@ -1606,9 +1656,7 @@ export async function cmdEvents({ println }, arg = '') {
 
     const { query, format, jsonMode, rawMode } = parseEventsArg(arg);
     const defaultHumanTail = format === 'text' && !hasActiveEventFilters(query);
-    const archiveQuery = defaultHumanTail
-        ? { ...query, limit: Math.min(500, Math.max(100, query.limit * 5)) }
-        : query;
+    const archiveQuery = defaultHumanTail ? { ...query, limit: Math.min(500, Math.max(100, query.limit * 5)) } : query;
     const projection = await readTerminalSseEventArchiveTail(archiveQuery);
     const { state, entries } = projection;
     const filters = defaultHumanTail ? { ...projection.filters, limit: query.limit } : projection.filters;
@@ -1679,9 +1727,13 @@ export async function cmdEvents({ println }, arg = '') {
     );
     println(terminalThemeRow('Filtro', filterParts.join(' · ') || 'nenhum', { role: 'muted' }));
     println(
-        terminalThemeRow('Mais detalhes', '/events --raw preview · /events --raw full · /events --json compact · /events sources', {
-            role: 'command',
-        }),
+        terminalThemeRow(
+            'Mais detalhes',
+            '/events --raw preview · /events --raw full · /events --json compact · /events sources',
+            {
+                role: 'command',
+            },
+        ),
     );
     if (state.error) {
         println(terminalThemeRow('Erro', state.error, { role: 'error' }));
@@ -1696,7 +1748,8 @@ export async function cmdEvents({ println }, arg = '') {
         filters.traceId || filters.turnId || filters.toolCallId || filters.requestId || filters.hubSessionId,
     );
     const now = Date.now();
-    const shouldAggregateDefaultEvents = !showDiagnosticIds && !hasActiveEventFilters(/** @type {Record<string, unknown>} */ (filters));
+    const shouldAggregateDefaultEvents =
+        !showDiagnosticIds && !hasActiveEventFilters(/** @type {Record<string, unknown>} */ (filters));
     const visibleEntriesRaw = shouldAggregateDefaultEvents
         ? entries.filter((entry) => !isInternalDefaultEvent(entry) && !isRoutineDefaultEvent(entry))
         : entries;
@@ -1706,9 +1759,13 @@ export async function cmdEvents({ println }, arg = '') {
             : visibleEntriesRaw;
     if (visibleEntries.length === 0) {
         println(
-            terminalThemeRow('Resultado', 'Nenhum evento operacional visível; use /events --raw para auditoria completa.', {
-                role: 'muted',
-            }),
+            terminalThemeRow(
+                'Resultado',
+                'Nenhum evento operacional visível; use /events --raw para auditoria completa.',
+                {
+                    role: 'muted',
+                },
+            ),
         );
         println('');
         return;

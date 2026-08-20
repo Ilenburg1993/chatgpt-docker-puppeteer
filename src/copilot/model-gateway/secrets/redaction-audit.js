@@ -86,7 +86,13 @@ function escapeRegexLiteral(value) {
 function createAuditTextLeakCandidateDetector(additionalSecrets) {
     const literalSecretPattern =
         additionalSecrets.length > 0
-            ? new RegExp(additionalSecrets.map(escapeRegexLiteral).sort((left, right) => right.length - left.length).join('|'), 'u')
+            ? new RegExp(
+                  additionalSecrets
+                      .map(escapeRegexLiteral)
+                      .sort((left, right) => right.length - left.length)
+                      .join('|'),
+                  'u',
+              )
             : null;
     return (text) => {
         if (literalSecretPattern?.test(text)) return true;
@@ -123,7 +129,9 @@ function redactAuditText(text, additionalSecrets, options = {}) {
  * @returns {unknown}
  */
 export function redactModelGatewayAuditedValue(value, options = {}) {
-    const additionalSecrets = [...new Set((options.additionalSecrets ?? []).map(optionalString).filter((item) => item !== null))];
+    const additionalSecrets = [
+        ...new Set((options.additionalSecrets ?? []).map(optionalString).filter((item) => item !== null)),
+    ];
     if (typeof value === 'string') {
         return redactAuditText(value, additionalSecrets, {
             ...(options.includeAssignments === undefined ? {} : { includeAssignments: options.includeAssignments }),
@@ -143,7 +151,9 @@ export function redactModelGatewayAuditedValue(value, options = {}) {
                 key,
                 redactModelGatewayAuditedValue(item, {
                     additionalSecrets,
-                    ...(options.includeAssignments === undefined ? {} : { includeAssignments: options.includeAssignments }),
+                    ...(options.includeAssignments === undefined
+                        ? {}
+                        : { includeAssignments: options.includeAssignments }),
                 }),
             ]),
         );
@@ -173,15 +183,25 @@ export function collectModelGatewaySecretAuditEnvValues(env = process.env) {
  *     additionalSecrets?: readonly string[];
  *     maxSamples?: number;
  * }} [options]
- * @returns {{ schema: 'model-gateway-redaction-value-audit'; surface: string; ok: boolean; scannedStringCount: number; leakCount: number; sampleCount: number; samples: Array<{ path: string; redactedSnippet: string }> }}
+ * @returns {{
+ *     schema: 'model-gateway-redaction-value-audit';
+ *     surface: string;
+ *     ok: boolean;
+ *     scannedStringCount: number;
+ *     leakCount: number;
+ *     sampleCount: number;
+ *     samples: { path: string; redactedSnippet: string }[];
+ * }}
  */
 export function auditModelGatewayValueRedaction(value, options = {}) {
     const surface = optionalString(options.surface) ?? 'value';
     const rootPath = optionalString(options.rootPath) ?? '$';
     const maxSamples = positiveInteger(options.maxSamples, DEFAULT_MAX_SAMPLES);
-    const additionalSecrets = [...new Set((options.additionalSecrets ?? []).map(optionalString).filter((item) => item !== null))];
+    const additionalSecrets = [
+        ...new Set((options.additionalSecrets ?? []).map(optionalString).filter((item) => item !== null)),
+    ];
     const isLeakCandidate = createAuditTextLeakCandidateDetector(additionalSecrets);
-    /** @type {Array<{ path: string; redactedSnippet: string }>} */
+    /** @type {{ path: string; redactedSnippet: string }[]} */
     const samples = [];
     let scannedStringCount = 0;
     let leakCount = 0;
@@ -226,7 +246,7 @@ export function auditModelGatewayValueRedaction(value, options = {}) {
 }
 
 /**
- * @param {Array<{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }>} audits
+ * @param {{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }[]} audits
  * @returns {{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }}
  */
 export function summarizeModelGatewayRedactionAudits(audits) {

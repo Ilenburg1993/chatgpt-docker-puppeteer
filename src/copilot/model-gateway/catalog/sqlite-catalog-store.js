@@ -24,7 +24,11 @@ import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 import { normalizeStoredCatalogSnapshot } from './json-catalog-store.js';
 import { toOpenAIModelCatalogList } from './openai-schema.js';
 import { parseModelGatewayRefreshLogText, summarizeModelGatewayRefreshLogEvents } from './refresh-logs.js';
-import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL, MODEL_GATEWAY_SQLITE_SCHEMA_VERSION, MODEL_GATEWAY_SQLITE_TABLES } from './sqlite-schema.js';
+import {
+    MODEL_GATEWAY_SQLITE_SCHEMA_SQL,
+    MODEL_GATEWAY_SQLITE_SCHEMA_VERSION,
+    MODEL_GATEWAY_SQLITE_TABLES,
+} from './sqlite-schema.js';
 
 const ACTIVE_SNAPSHOT_ID = 'active';
 const DEFAULT_ROUTE_PROFILE = 'default';
@@ -152,7 +156,7 @@ function sqliteTableHasColumn(db, table, column) {
  * @returns {void}
  */
 function migrateModelGatewaySqliteSchema(db) {
-    const handoffColumns = /** @type {Array<[string, string]>} */ ([
+    const handoffColumns = /** @type {[string, string][]} */ ([
         ['operation_kind', "TEXT NOT NULL DEFAULT 'unknown'"],
         ['idempotency_key', 'TEXT'],
         ['provider_id', 'TEXT'],
@@ -166,7 +170,7 @@ function migrateModelGatewaySqliteSchema(db) {
         if (sqliteTableHasColumn(db, 'copilot_model_gateway_sdk_session_handoffs', column)) continue;
         db.exec(`ALTER TABLE copilot_model_gateway_sdk_session_handoffs ADD COLUMN ${column} ${definition};`);
     }
-    const confirmationColumns = /** @type {Array<[string, string]>} */ ([
+    const confirmationColumns = /** @type {[string, string][]} */ ([
         ['previous_provider_id', 'TEXT'],
         ['provider_id', 'TEXT'],
         ['binding_strategy', "TEXT NOT NULL DEFAULT 'unknown'"],
@@ -255,13 +259,7 @@ function migrateModelGatewaySqliteSchema(db) {
                 observed_at_ms DESC
             );
     `);
-    if (
-        !sqliteTableHasColumn(
-            db,
-            'copilot_model_gateway_eligibility_decisions',
-            'selector_syntax',
-        )
-    ) {
+    if (!sqliteTableHasColumn(db, 'copilot_model_gateway_eligibility_decisions', 'selector_syntax')) {
         db.exec(`
             ALTER TABLE copilot_model_gateway_eligibility_decisions
                 ADD COLUMN selector_syntax TEXT NOT NULL DEFAULT '';
@@ -492,8 +490,9 @@ function runtimeProbeRecords(row) {
  */
 function latestRuntimeProbe(row) {
     return (
-        runtimeProbeRecords(row).sort((left, right) => (dateMs(right['lastAt']) ?? 0) - (dateMs(left['lastAt']) ?? 0))[0] ??
-        null
+        runtimeProbeRecords(row).sort(
+            (left, right) => (dateMs(right['lastAt']) ?? 0) - (dateMs(left['lastAt']) ?? 0),
+        )[0] ?? null
     );
 }
 
@@ -518,7 +517,8 @@ function latestRuntimeAt(row) {
 function runtimeHealthStatus(record) {
     const lastStatus = optionalString(record['lastStatus']);
     const agentStatus = optionalString(record['agentProbeStatus']);
-    const chatFailed = lastStatus === 'failed' && (dateMs(record['lastFailureAt']) ?? 0) >= (dateMs(record['lastSuccessAt']) ?? 0);
+    const chatFailed =
+        lastStatus === 'failed' && (dateMs(record['lastFailureAt']) ?? 0) >= (dateMs(record['lastSuccessAt']) ?? 0);
     const agentFailed =
         agentStatus === 'failed' &&
         (dateMs(record['lastAgentProbeFailureAt']) ?? 0) >= (dateMs(record['lastAgentProbeSuccessAt']) ?? 0);
@@ -706,9 +706,9 @@ function runtimeProbeRouteProfile(result) {
 function isWritableRuntimeProbeResult(result) {
     return Boolean(
         runtimeProbeProviderId(result) &&
-            runtimeProbeProviderModel(result) &&
-            runtimeProbeKind(result) &&
-            optionalString(result['status']),
+        runtimeProbeProviderModel(result) &&
+        runtimeProbeKind(result) &&
+        optionalString(result['status']),
     );
 }
 
@@ -728,7 +728,16 @@ function latestProbePerKind(probes) {
 }
 
 /**
- * @param {{ payload_json: string; status?: string | null; classified_failure?: string | null; observed_at_ms?: number | null; expires_at_ms?: number | null; route_profile?: string | null; provider_id?: string | null; provider_model?: string | null }} row
+ * @param {{
+ *     payload_json: string;
+ *     status?: string | null;
+ *     classified_failure?: string | null;
+ *     observed_at_ms?: number | null;
+ *     expires_at_ms?: number | null;
+ *     route_profile?: string | null;
+ *     provider_id?: string | null;
+ *     provider_model?: string | null;
+ * }} row
  * @returns {Record<string, unknown>}
  */
 function parseRuntimeHealthRow(row) {
@@ -737,7 +746,8 @@ function parseRuntimeHealthRow(row) {
         ...payload,
         providerId: optionalString(payload['providerId']) ?? optionalString(row.provider_id),
         providerModel: optionalString(payload['providerModel']) ?? optionalString(row.provider_model),
-        routeProfile: optionalString(payload['routeProfile']) ?? optionalString(row.route_profile) ?? DEFAULT_ROUTE_PROFILE,
+        routeProfile:
+            optionalString(payload['routeProfile']) ?? optionalString(row.route_profile) ?? DEFAULT_ROUTE_PROFILE,
         runtimeHealthStatus: optionalString(row.status),
         runtimeClassifiedFailure: optionalString(row.classified_failure),
         runtimeObservedAtMs: optionalInteger(row.observed_at_ms),
@@ -746,7 +756,18 @@ function parseRuntimeHealthRow(row) {
 }
 
 /**
- * @param {{ payload_json: string; probe_kind?: string | null; wire_api?: string | null; ok?: number | null; status?: string | null; observed_at_ms?: number | null; expires_at_ms?: number | null; route_profile?: string | null; provider_id?: string | null; provider_model?: string | null }} row
+ * @param {{
+ *     payload_json: string;
+ *     probe_kind?: string | null;
+ *     wire_api?: string | null;
+ *     ok?: number | null;
+ *     status?: string | null;
+ *     observed_at_ms?: number | null;
+ *     expires_at_ms?: number | null;
+ *     route_profile?: string | null;
+ *     provider_id?: string | null;
+ *     provider_model?: string | null;
+ * }} row
  * @returns {Record<string, unknown>}
  */
 function parseRuntimeProbeRow(row) {
@@ -755,7 +776,8 @@ function parseRuntimeProbeRow(row) {
         ...payload,
         providerId: optionalString(payload['providerId']) ?? optionalString(row.provider_id),
         providerModel: optionalString(payload['providerModel']) ?? optionalString(row.provider_model),
-        routeProfile: optionalString(payload['routeProfile']) ?? optionalString(row.route_profile) ?? DEFAULT_ROUTE_PROFILE,
+        routeProfile:
+            optionalString(payload['routeProfile']) ?? optionalString(row.route_profile) ?? DEFAULT_ROUTE_PROFILE,
         kind: optionalString(payload['kind']) ?? optionalString(row.probe_kind),
         wireApi: optionalString(payload['wireApi']) ?? optionalString(row.wire_api),
         ok: typeof payload['ok'] === 'boolean' ? payload['ok'] : row.ok === 1,
@@ -957,7 +979,11 @@ export class SqliteModelGatewayCatalogStore {
             evidences: readPayloadRows(this.#db, 'copilot_model_gateway_model_evidence', 'evidence_id'),
             routeOptions: readPayloadRows(this.#db, 'copilot_model_gateway_route_options', 'route_key'),
             accountOverlays: readPayloadRows(this.#db, 'copilot_model_gateway_account_overlays', 'account_overlay_id'),
-            providerProjections: readPayloadRows(this.#db, 'copilot_model_gateway_provider_projections', 'projection_key'),
+            providerProjections: readPayloadRows(
+                this.#db,
+                'copilot_model_gateway_provider_projections',
+                'projection_key',
+            ),
             projections: readPayloadRows(this.#db, 'copilot_model_gateway_model_projections', 'projection_key'),
             importRuns: readPayloadRows(this.#db, 'copilot_model_gateway_import_runs', 'run_id'),
             rawPayloadRefs: readPayloadRows(this.#db, 'copilot_model_gateway_raw_payload_refs', 'raw_payload_ref'),
@@ -1035,14 +1061,14 @@ export class SqliteModelGatewayCatalogStore {
      *     accountHistoryRows: number;
      *     runtimeRows: number;
      *     runtime: {
-     *       probeRuns: number;
-     *       probeResults: number;
-     *       healthObservations: number;
-     *       latestProbeRunCompletedAtMs: number | null;
-     *       latestProbeResultObservedAtMs: number | null;
-     *       latestHealthObservedAtMs: number | null;
-     *       healthStatusCounts: Record<string, number>;
-     *       probeStatusCounts: Record<string, number>;
+     *         probeRuns: number;
+     *         probeResults: number;
+     *         healthObservations: number;
+     *         latestProbeRunCompletedAtMs: number | null;
+     *         latestProbeResultObservedAtMs: number | null;
+     *         latestHealthObservedAtMs: number | null;
+     *         healthStatusCounts: Record<string, number>;
+     *         probeStatusCounts: Record<string, number>;
      *     };
      *     routeDecisionRows: number;
      *     automationDecisionRows: number;
@@ -1054,15 +1080,92 @@ export class SqliteModelGatewayCatalogStore {
      *     sdkSessionConfirmationRows: number;
      *     standbyPlanRows: number;
      *     liveScenarioRunRows: number;
-     *     latestAutomationDecision: { action: string | null; status: string | null; ok: boolean | null; selectedRouteKey: string | null; decidedAtMs: number | null };
-     *     latestAutomationPolicySnapshot: { enabled: boolean | null; policy: string | null; routeProfile: string | null; observedAtMs: number | null };
-     *     latestAutomationEffectApplication: { effectKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
-     *     latestRecoveryAttempt: { recoveryAttemptId: string | null; decisionId: string | null; routeProfile: string | null; selectedRouteKey: string | null; recoveryScope: string | null; failureKind: string | null; status: string | null; applied: boolean | null; observedAtMs: number | null };
-     *     latestSdkSessionHandoff: { handoffId: string | null; status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; providerId: string | null; providerModel: string | null; promotionAuthorized: boolean | null; expiresAtMs: number | null; requestedAtMs: number | null; confirmedAtMs: number | null };
-     *     latestDeferredSdkSessionHandoff: { handoffId: string | null; status: string | null; routeProfile: string | null; selectedRouteKey: string | null; sessionId: string | null; targetModel: string | null; providerId: string | null; providerModel: string | null; promotionAuthorized: boolean | null; expiresAtMs: number | null; requestedAtMs: number | null; confirmedAtMs: number | null } | null;
-     *     latestSdkSessionConfirmation: { status: string | null; handoffId: string | null; decisionId: string | null; sessionId: string | null; previousModel: string | null; confirmedModel: string | null; observedAtMs: number | null };
-     *     latestStandbyPlan: { standbyPlanId: string | null; status: string | null; routeProfile: string | null; routeCount: number | null; providerCount: number | null; runtimeProofCount: number | null; selectedRouteKey: string | null; source: string | null; generatedAtMs: number | null };
-     *     latestLiveScenarioRun: { runId: string | null; scenarioKind: string | null; status: string | null; ok: boolean | null; completedAtMs: number | null; summaryPath: string | null };
+     *     latestAutomationDecision: {
+     *         action: string | null;
+     *         status: string | null;
+     *         ok: boolean | null;
+     *         selectedRouteKey: string | null;
+     *         decidedAtMs: number | null;
+     *     };
+     *     latestAutomationPolicySnapshot: {
+     *         enabled: boolean | null;
+     *         policy: string | null;
+     *         routeProfile: string | null;
+     *         observedAtMs: number | null;
+     *     };
+     *     latestAutomationEffectApplication: {
+     *         effectKind: string | null;
+     *         status: string | null;
+     *         applied: boolean | null;
+     *         observedAtMs: number | null;
+     *     };
+     *     latestRecoveryAttempt: {
+     *         recoveryAttemptId: string | null;
+     *         decisionId: string | null;
+     *         routeProfile: string | null;
+     *         selectedRouteKey: string | null;
+     *         recoveryScope: string | null;
+     *         failureKind: string | null;
+     *         status: string | null;
+     *         applied: boolean | null;
+     *         observedAtMs: number | null;
+     *     };
+     *     latestSdkSessionHandoff: {
+     *         handoffId: string | null;
+     *         status: string | null;
+     *         routeProfile: string | null;
+     *         selectedRouteKey: string | null;
+     *         sessionId: string | null;
+     *         targetModel: string | null;
+     *         providerId: string | null;
+     *         providerModel: string | null;
+     *         promotionAuthorized: boolean | null;
+     *         expiresAtMs: number | null;
+     *         requestedAtMs: number | null;
+     *         confirmedAtMs: number | null;
+     *     };
+     *     latestDeferredSdkSessionHandoff: {
+     *         handoffId: string | null;
+     *         status: string | null;
+     *         routeProfile: string | null;
+     *         selectedRouteKey: string | null;
+     *         sessionId: string | null;
+     *         targetModel: string | null;
+     *         providerId: string | null;
+     *         providerModel: string | null;
+     *         promotionAuthorized: boolean | null;
+     *         expiresAtMs: number | null;
+     *         requestedAtMs: number | null;
+     *         confirmedAtMs: number | null;
+     *     } | null;
+     *     latestSdkSessionConfirmation: {
+     *         status: string | null;
+     *         handoffId: string | null;
+     *         decisionId: string | null;
+     *         sessionId: string | null;
+     *         previousModel: string | null;
+     *         confirmedModel: string | null;
+     *         observedAtMs: number | null;
+     *     };
+     *     latestStandbyPlan: {
+     *         standbyPlanId: string | null;
+     *         status: string | null;
+     *         routeProfile: string | null;
+     *         routeCount: number | null;
+     *         providerCount: number | null;
+     *         runtimeProofCount: number | null;
+     *         selectedRouteKey: string | null;
+     *         source: string | null;
+     *         generatedAtMs: number | null;
+     *     };
+     *     latestLiveScenarioRun: {
+     *         runId: string | null;
+     *         scenarioKind: string | null;
+     *         status: string | null;
+     *         ok: boolean | null;
+     *         completedAtMs: number | null;
+     *         summaryPath: string | null;
+     *     };
      *     refreshLogRows: number;
      * }>}
      */
@@ -1112,7 +1215,12 @@ export class SqliteModelGatewayCatalogStore {
             'copilot_model_gateway_runtime_probe_results',
             'copilot_model_gateway_health_observations',
         ];
-        const latestRuntime = /** @type {{ latest_probe_run_completed_at_ms: number | null; latest_probe_result_observed_at_ms: number | null; latest_health_observed_at_ms: number | null } | undefined} */ (
+        const latestRuntime = /** @type {{
+          latest_probe_run_completed_at_ms: number | null;
+          latest_probe_result_observed_at_ms: number | null;
+          latest_health_observed_at_ms: number | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1126,7 +1234,9 @@ export class SqliteModelGatewayCatalogStore {
         );
         const healthStatusCounts = Object.fromEntries(
             this.#db
-                .prepare('SELECT status, COUNT(*) AS count FROM copilot_model_gateway_health_observations GROUP BY status')
+                .prepare(
+                    'SELECT status, COUNT(*) AS count FROM copilot_model_gateway_health_observations GROUP BY status',
+                )
                 .all()
                 .map((row) => {
                     const item = /** @type {{ status: string; count: number }} */ (row);
@@ -1135,14 +1245,23 @@ export class SqliteModelGatewayCatalogStore {
         );
         const probeStatusCounts = Object.fromEntries(
             this.#db
-                .prepare('SELECT status, COUNT(*) AS count FROM copilot_model_gateway_runtime_probe_results GROUP BY status')
+                .prepare(
+                    'SELECT status, COUNT(*) AS count FROM copilot_model_gateway_runtime_probe_results GROUP BY status',
+                )
                 .all()
                 .map((row) => {
                     const item = /** @type {{ status: string; count: number }} */ (row);
                     return [item.status, optionalInteger(item.count) ?? 0];
                 }),
         );
-        const latestAutomationDecision = /** @type {{ action: string | null; status: string | null; ok: number | null; selected_route_key: string | null; decided_at_ms: number | null } | undefined} */ (
+        const latestAutomationDecision = /** @type {{
+          action: string | null;
+          status: string | null;
+          ok: number | null;
+          selected_route_key: string | null;
+          decided_at_ms: number | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1154,31 +1273,46 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
-        const latestAutomationPolicySnapshot = /** @type {{ enabled: number | null; policy: string | null; route_profile: string | null; observed_at_ms: number | null } | undefined} */ (
-            this.#db
-                .prepare(
-                    `
+        const latestAutomationPolicySnapshot =
+            /** @type {{ enabled: number | null; policy: string | null; route_profile: string | null; observed_at_ms: number | null }
+    | undefined} */ (
+                this.#db
+                    .prepare(
+                        `
                         SELECT enabled, policy, route_profile, observed_at_ms
                         FROM copilot_model_gateway_automation_policy_snapshots
                         ORDER BY observed_at_ms DESC
                         LIMIT 1
                     `,
-                )
-                .get()
-        );
-        const latestAutomationEffectApplication = /** @type {{ effect_kind: string | null; status: string | null; applied: number | null; observed_at_ms: number | null } | undefined} */ (
-            this.#db
-                .prepare(
-                    `
+                    )
+                    .get()
+            );
+        const latestAutomationEffectApplication =
+            /** @type {{ effect_kind: string | null; status: string | null; applied: number | null; observed_at_ms: number | null }
+    | undefined} */ (
+                this.#db
+                    .prepare(
+                        `
                         SELECT effect_kind, status, applied, observed_at_ms
                         FROM copilot_model_gateway_automation_effect_applications
                         ORDER BY observed_at_ms DESC
                         LIMIT 1
                     `,
-                )
-                .get()
-        );
-        const latestRecoveryAttempt = /** @type {{ recovery_attempt_id: string | null; decision_id: string | null; route_profile: string | null; selected_route_key: string | null; recovery_scope: string | null; failure_kind: string | null; status: string | null; applied: number | null; observed_at_ms: number | null } | undefined} */ (
+                    )
+                    .get()
+            );
+        const latestRecoveryAttempt = /** @type {{
+          recovery_attempt_id: string | null;
+          decision_id: string | null;
+          route_profile: string | null;
+          selected_route_key: string | null;
+          recovery_scope: string | null;
+          failure_kind: string | null;
+          status: string | null;
+          applied: number | null;
+          observed_at_ms: number | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1191,7 +1325,21 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
-        const latestSdkSessionHandoff = /** @type {{ handoff_id: string | null; status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; provider_id: string | null; provider_model: string | null; promotion_authorized: number | null; expires_at_ms: number | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
+        const latestSdkSessionHandoff = /** @type {{
+          handoff_id: string | null;
+          status: string | null;
+          route_profile: string | null;
+          selected_route_key: string | null;
+          session_id: string | null;
+          target_model: string | null;
+          provider_id: string | null;
+          provider_model: string | null;
+          promotion_authorized: number | null;
+          expires_at_ms: number | null;
+          requested_at_ms: number | null;
+          confirmed_at_ms: number | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1217,7 +1365,21 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get(nowMs)
         );
-        const latestDeferredSdkSessionHandoff = /** @type {{ handoff_id: string | null; status: string | null; route_profile: string | null; selected_route_key: string | null; session_id: string | null; target_model: string | null; provider_id: string | null; provider_model: string | null; promotion_authorized: number | null; expires_at_ms: number | null; requested_at_ms: number | null; confirmed_at_ms: number | null } | undefined} */ (
+        const latestDeferredSdkSessionHandoff = /** @type {{
+          handoff_id: string | null;
+          status: string | null;
+          route_profile: string | null;
+          selected_route_key: string | null;
+          session_id: string | null;
+          target_model: string | null;
+          provider_id: string | null;
+          provider_model: string | null;
+          promotion_authorized: number | null;
+          expires_at_ms: number | null;
+          requested_at_ms: number | null;
+          confirmed_at_ms: number | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1233,7 +1395,16 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get(nowMs)
         );
-        const latestSdkSessionConfirmation = /** @type {{ status: string | null; handoff_id: string | null; decision_id: string | null; session_id: string | null; previous_model: string | null; confirmed_model: string | null; observed_at_ms: number | null } | undefined} */ (
+        const latestSdkSessionConfirmation = /** @type {{
+          status: string | null;
+          handoff_id: string | null;
+          decision_id: string | null;
+          session_id: string | null;
+          previous_model: string | null;
+          confirmed_model: string | null;
+          observed_at_ms: number | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1245,7 +1416,18 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
-        const latestStandbyPlan = /** @type {{ standby_plan_id: string | null; route_profile: string | null; status: string | null; route_count: number | null; provider_count: number | null; runtime_proof_count: number | null; selected_route_key: string | null; generated_at_ms: number | null; source: string | null } | undefined} */ (
+        const latestStandbyPlan = /** @type {{
+          standby_plan_id: string | null;
+          route_profile: string | null;
+          status: string | null;
+          route_count: number | null;
+          provider_count: number | null;
+          runtime_proof_count: number | null;
+          selected_route_key: string | null;
+          generated_at_ms: number | null;
+          source: string | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1258,7 +1440,15 @@ export class SqliteModelGatewayCatalogStore {
                 )
                 .get()
         );
-        const latestLiveScenarioRun = /** @type {{ run_id: string | null; scenario_kind: string | null; status: string | null; ok: number | null; completed_at_ms: number | null; summary_path: string | null } | undefined} */ (
+        const latestLiveScenarioRun = /** @type {{
+          run_id: string | null;
+          scenario_kind: string | null;
+          status: string | null;
+          ok: number | null;
+          completed_at_ms: number | null;
+          summary_path: string | null;
+      }
+    | undefined} */ (
             this.#db
                 .prepare(
                     `
@@ -1299,26 +1489,18 @@ export class SqliteModelGatewayCatalogStore {
             },
             routeDecisionRows: tableCounts['copilot_model_gateway_route_decisions'] ?? 0,
             automationDecisionRows: tableCounts['copilot_model_gateway_automation_decisions'] ?? 0,
-            automationPolicySnapshotRows:
-                tableCounts['copilot_model_gateway_automation_policy_snapshots'] ?? 0,
-            automationEffectApplicationRows:
-                tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
+            automationPolicySnapshotRows: tableCounts['copilot_model_gateway_automation_policy_snapshots'] ?? 0,
+            automationEffectApplicationRows: tableCounts['copilot_model_gateway_automation_effect_applications'] ?? 0,
             recoveryAttemptRows: tableCounts['copilot_model_gateway_recovery_attempts'] ?? 0,
             sdkSessionHandoffRows: tableCounts['copilot_model_gateway_sdk_session_handoffs'] ?? 0,
             sdkSessionDeferredHandoffRows: optionalInteger(sdkSessionDeferredHandoffRows?.count) ?? 0,
-            sdkSessionConfirmationRows:
-                tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
+            sdkSessionConfirmationRows: tableCounts['copilot_model_gateway_sdk_session_confirmations'] ?? 0,
             standbyPlanRows: tableCounts['copilot_model_gateway_standby_plans'] ?? 0,
             liveScenarioRunRows: tableCounts['copilot_model_gateway_live_scenario_runs'] ?? 0,
             latestAutomationDecision: {
                 action: optionalString(latestAutomationDecision?.action),
                 status: optionalString(latestAutomationDecision?.status),
-                ok:
-                    latestAutomationDecision?.ok === 1
-                        ? true
-                        : latestAutomationDecision?.ok === 0
-                          ? false
-                          : null,
+                ok: latestAutomationDecision?.ok === 1 ? true : latestAutomationDecision?.ok === 0 ? false : null,
                 selectedRouteKey: optionalString(latestAutomationDecision?.selected_route_key),
                 decidedAtMs: optionalInteger(latestAutomationDecision?.decided_at_ms),
             },
@@ -1353,11 +1535,7 @@ export class SqliteModelGatewayCatalogStore {
                 failureKind: optionalString(latestRecoveryAttempt?.failure_kind),
                 status: optionalString(latestRecoveryAttempt?.status),
                 applied:
-                    latestRecoveryAttempt?.applied === 1
-                        ? true
-                        : latestRecoveryAttempt?.applied === 0
-                          ? false
-                          : null,
+                    latestRecoveryAttempt?.applied === 1 ? true : latestRecoveryAttempt?.applied === 0 ? false : null,
                 observedAtMs: optionalInteger(latestRecoveryAttempt?.observed_at_ms),
             },
             latestSdkSessionHandoff: {
@@ -1424,12 +1602,7 @@ export class SqliteModelGatewayCatalogStore {
                 runId: optionalString(latestLiveScenarioRun?.run_id),
                 scenarioKind: optionalString(latestLiveScenarioRun?.scenario_kind),
                 status: optionalString(latestLiveScenarioRun?.status),
-                ok:
-                    latestLiveScenarioRun?.ok === 1
-                        ? true
-                        : latestLiveScenarioRun?.ok === 0
-                          ? false
-                          : null,
+                ok: latestLiveScenarioRun?.ok === 1 ? true : latestLiveScenarioRun?.ok === 0 ? false : null,
                 completedAtMs: optionalInteger(latestLiveScenarioRun?.completed_at_ms),
                 summaryPath: optionalString(latestLiveScenarioRun?.summary_path),
             },
@@ -1446,28 +1619,48 @@ export class SqliteModelGatewayCatalogStore {
      *     leakCount: number;
      *     scannedStringCount: number;
      *     sampleCount: number;
-     *     tables: Record<string, { ok: boolean; rowCount: number; scannedStringCount: number; leakCount: number; sampleCount: number; samples: Array<{ path: string; redactedSnippet: string }> }>;
+     *     tables: Record<
+     *         string,
+     *         {
+     *             ok: boolean;
+     *             rowCount: number;
+     *             scannedStringCount: number;
+     *             leakCount: number;
+     *             sampleCount: number;
+     *             samples: { path: string; redactedSnippet: string }[];
+     *         }
+     *     >;
      * }>}
      */
     async auditStoredPayloadRedaction(options = {}) {
         const maxRowsPerTable = Math.max(1, Math.min(optionalInteger(options.maxRowsPerTable) ?? 100_000, 1_000_000));
-        /** @type {Record<string, { ok: boolean; rowCount: number; scannedStringCount: number; leakCount: number; sampleCount: number; samples: Array<{ path: string; redactedSnippet: string }> }>} */
+        /** @type {Record<
+    string,
+    {
+        ok: boolean;
+        rowCount: number;
+        scannedStringCount: number;
+        leakCount: number;
+        sampleCount: number;
+        samples: { path: string; redactedSnippet: string }[];
+    }
+>} */
         const tables = {};
-        /** @type {Array<{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }>} */
+        /** @type {{ ok: boolean; leakCount: number; scannedStringCount: number; sampleCount: number }[]} */
         const audits = [];
         for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
             if (!sqliteTableHasColumn(this.#db, table, 'payload_json')) continue;
-            const rows = /** @type {Array<{ payload_json: string }>} */ (
-                this.#db
-                    .prepare(`SELECT payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`)
-                    .all(maxRowsPerTable)
+            const rows = /** @type {{ payload_json: string }[]} */ (
+                this.#db.prepare(`SELECT payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`).all(maxRowsPerTable)
             );
             const audit = auditModelGatewayValueRedaction(
                 rows.map((row) => parsePayload(row.payload_json)),
                 {
                     surface: `sqlite:${table}`,
                     rootPath: table,
-                    ...(options.additionalSecrets === undefined ? {} : { additionalSecrets: options.additionalSecrets }),
+                    ...(options.additionalSecrets === undefined
+                        ? {}
+                        : { additionalSecrets: options.additionalSecrets }),
                     ...(options.maxSamples === undefined ? {} : { maxSamples: options.maxSamples }),
                 },
             );
@@ -1495,7 +1688,11 @@ export class SqliteModelGatewayCatalogStore {
 
     /**
      * @param {{ additionalSecrets?: readonly string[]; maxRowsPerTable?: number }} [options]
-     * @returns {Promise<{ schema: 'model-gateway-sqlite-redaction-repair'; updatedRows: number; tables: Record<string, { scannedRows: number; updatedRows: number }> }>}
+     * @returns {Promise<{
+     *     schema: 'model-gateway-sqlite-redaction-repair';
+     *     updatedRows: number;
+     *     tables: Record<string, { scannedRows: number; updatedRows: number }>;
+     * }>}
      */
     async redactStoredPayloadLeaks(options = {}) {
         const maxRowsPerTable = Math.max(1, Math.min(optionalInteger(options.maxRowsPerTable) ?? 100_000, 1_000_000));
@@ -1505,7 +1702,7 @@ export class SqliteModelGatewayCatalogStore {
         const tx = this.#db.transaction(() => {
             for (const table of MODEL_GATEWAY_SQLITE_TABLES) {
                 if (!sqliteTableHasColumn(this.#db, table, 'payload_json')) continue;
-                const rows = /** @type {Array<{ rowid: number; payload_json: string }>} */ (
+                const rows = /** @type {{ rowid: number; payload_json: string }[]} */ (
                     this.#db
                         .prepare(`SELECT rowid, payload_json FROM ${table} ORDER BY rowid DESC LIMIT ?`)
                         .all(maxRowsPerTable)
@@ -1514,7 +1711,9 @@ export class SqliteModelGatewayCatalogStore {
                 let tableUpdatedRows = 0;
                 for (const row of rows) {
                     const redactedValue = redactModelGatewayAuditedValue(parsePayload(row.payload_json), {
-                        ...(options.additionalSecrets === undefined ? {} : { additionalSecrets: options.additionalSecrets }),
+                        ...(options.additionalSecrets === undefined
+                            ? {}
+                            : { additionalSecrets: options.additionalSecrets }),
                     });
                     const nextPayload = JSON.stringify(redactedValue);
                     if (nextPayload === row.payload_json) continue;
@@ -1583,7 +1782,9 @@ export class SqliteModelGatewayCatalogStore {
     /**
      * @param {string} text
      * @param {{ runId?: string; logPath?: string }} [options]
-     * @returns {Promise<ReturnType<typeof summarizeModelGatewayRefreshLogEvents> & { runId: string; refreshLogEvents: number }>}
+     * @returns {Promise<
+     *     ReturnType<typeof summarizeModelGatewayRefreshLogEvents> & { runId: string; refreshLogEvents: number }
+     * >}
      */
     async writeRefreshLogText(text, options = {}) {
         const parsed = parseModelGatewayRefreshLogText(text);
@@ -1666,7 +1867,8 @@ export class SqliteModelGatewayCatalogStore {
         );
         const accountRateLimitSnapshotMaxRows = retentionLimit(
             policy.accountRateLimitSnapshotMaxRows,
-            accountHistoryFallback ?? DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountRateLimitSnapshotMaxRows,
+            accountHistoryFallback ??
+                DEFAULT_MODEL_GATEWAY_SQLITE_OPERATIONAL_RETENTION.accountRateLimitSnapshotMaxRows,
         );
         const accountSpendingSnapshotMaxRows = retentionLimit(
             policy.accountSpendingSnapshotMaxRows,
@@ -1727,7 +1929,7 @@ export class SqliteModelGatewayCatalogStore {
         /** @type {Record<string, { deletedRows: number; maxRows: number }>} */
         const tables = {};
         const tx = this.#db.transaction(() => {
-            const accountRetentionTables = /** @type {Array<[string, number]>} */ ([
+            const accountRetentionTables = /** @type {[string, number][]} */ ([
                 ['copilot_model_gateway_account_quota_snapshots', accountQuotaSnapshotMaxRows],
                 ['copilot_model_gateway_account_rate_limit_snapshots', accountRateLimitSnapshotMaxRows],
                 ['copilot_model_gateway_account_spending_snapshots', accountSpendingSnapshotMaxRows],
@@ -1806,12 +2008,14 @@ export class SqliteModelGatewayCatalogStore {
             };
             const sdkSessionHandoffTransitionMaxRows = Math.max(1, sdkSessionHandoffMaxRows * 5);
             const orphanTransitionRows = this.#db
-                .prepare(`
+                .prepare(
+                    `
                     DELETE FROM copilot_model_gateway_sdk_session_handoff_transitions
                     WHERE handoff_id NOT IN (
                         SELECT handoff_id FROM copilot_model_gateway_sdk_session_handoffs
                     )
-                `)
+                `,
+                )
                 .run().changes;
             tables['copilot_model_gateway_sdk_session_handoff_transitions'] = {
                 deletedRows:
@@ -1966,12 +2170,18 @@ export class SqliteModelGatewayCatalogStore {
                 0,
                 0,
                 skippedRecords,
-                operationalPayloadJson({ source: 'byok-provider-health', records: writableRecords.length, skippedRecords }),
+                operationalPayloadJson({
+                    source: 'byok-provider-health',
+                    records: writableRecords.length,
+                    skippedRecords,
+                }),
             );
             for (const record of writableRecords) {
                 const observed = latestRuntimeAt(record) || observedAtMs;
                 const status = runtimeHealthStatus(record);
-                const healthKey = optionalString(record['key']) ?? `${routeProfile(record)}|${providerId(record)}|${providerModel(record)}`;
+                const healthKey =
+                    optionalString(record['key']) ??
+                    `${routeProfile(record)}|${providerId(record)}|${providerModel(record)}`;
                 insertHealth.run(
                     runtimeObservationKey(runId, healthKey),
                     providerId(record),
@@ -2044,7 +2254,12 @@ export class SqliteModelGatewayCatalogStore {
      * operational facts read by selectors, so scoped clears must remove them from SQLite as well as from the JSON
      * provider-health ledger.
      *
-     * @param {{ providerId?: string | null; providerModel?: string | null; routeProfile?: string | null; all?: boolean }} scope
+     * @param {{
+     *     providerId?: string | null;
+     *     providerModel?: string | null;
+     *     routeProfile?: string | null;
+     *     all?: boolean;
+     * }} scope
      * @returns {Promise<{ healthObservations: number; probeResults: number }>}
      */
     async deleteRuntimeHealthRecords(scope) {
@@ -2075,12 +2290,18 @@ export class SqliteModelGatewayCatalogStore {
         /** @type {{ healthObservations: number; probeResults: number }} */
         const deleted = { healthObservations: 0, probeResults: 0 };
         const tx = this.#db.transaction(() => {
-            deleted.healthObservations = optionalInteger(
-                this.#db.prepare(`DELETE FROM copilot_model_gateway_health_observations WHERE ${where}`).run(...params).changes,
-            ) ?? 0;
-            deleted.probeResults = optionalInteger(
-                this.#db.prepare(`DELETE FROM copilot_model_gateway_runtime_probe_results WHERE ${where}`).run(...params).changes,
-            ) ?? 0;
+            deleted.healthObservations =
+                optionalInteger(
+                    this.#db
+                        .prepare(`DELETE FROM copilot_model_gateway_health_observations WHERE ${where}`)
+                        .run(...params).changes,
+                ) ?? 0;
+            deleted.probeResults =
+                optionalInteger(
+                    this.#db
+                        .prepare(`DELETE FROM copilot_model_gateway_runtime_probe_results WHERE ${where}`)
+                        .run(...params).changes,
+                ) ?? 0;
         });
         tx();
         return deleted;
@@ -2089,8 +2310,8 @@ export class SqliteModelGatewayCatalogStore {
     /**
      * Persist a direct runtime probe run without relying on the operational health mirror.
      *
-     * This is the append-only runtime proof lane for explicit probe executors. It intentionally writes only the
-     * runtime probe tables and leaves catalog projections, account overlays and health observations untouched.
+     * This is the append-only runtime proof lane for explicit probe executors. It intentionally writes only the runtime
+     * probe tables and leaves catalog projections, account overlays and health observations untouched.
      *
      * @param {{
      *     runId?: string;
@@ -2103,7 +2324,13 @@ export class SqliteModelGatewayCatalogStore {
      *     payload?: Record<string, unknown>;
      *     results?: Record<string, unknown>[];
      * }} input
-     * @returns {Promise<{ runId: string; probeResults: number; skippedResults: number; successCount: number; failureCount: number }>}
+     * @returns {Promise<{
+     *     runId: string;
+     *     probeResults: number;
+     *     skippedResults: number;
+     *     successCount: number;
+     *     failureCount: number;
+     * }>}
      */
     async writeRuntimeProbeRun(input) {
         const completedAtMs = dateMs(input.completedAt) ?? Date.now();
@@ -2176,7 +2403,8 @@ export class SqliteModelGatewayCatalogStore {
                 const model = runtimeProbeProviderModel(result) ?? 'unknown-model';
                 const route = runtimeProbeRouteProfile(result);
                 const ok = result['ok'] === true;
-                const observedAtMs = dateMs(result['observedAt']) ?? optionalInteger(result['observedAtMs']) ?? completedAtMs;
+                const observedAtMs =
+                    dateMs(result['observedAt']) ?? optionalInteger(result['observedAtMs']) ?? completedAtMs;
                 if (ok) successCount += 1;
                 else failureCount += 1;
                 modelKeys.add(`${provider}:${model}:${route}`);
@@ -2302,7 +2530,16 @@ export class SqliteModelGatewayCatalogStore {
             .all(provider, model, route, route, DEFAULT_ROUTE_PROFILE)
             .map((row) =>
                 parseRuntimeHealthRow(
-                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; status: string; classified_failure: string | null; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                    /** @type {{
+    provider_id: string;
+    provider_model: string;
+    route_profile: string;
+    status: string;
+    classified_failure: string | null;
+    observed_at_ms: number;
+    expires_at_ms: number | null;
+    payload_json: string;
+}} */ (row),
                 ),
             );
         const probes = this.#db
@@ -2320,7 +2557,18 @@ export class SqliteModelGatewayCatalogStore {
             .all(provider, model, route, route, DEFAULT_ROUTE_PROFILE)
             .map((row) =>
                 parseRuntimeProbeRow(
-                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; probe_kind: string; wire_api: string | null; ok: number; status: string; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                    /** @type {{
+    provider_id: string;
+    provider_model: string;
+    route_profile: string;
+    probe_kind: string;
+    wire_api: string | null;
+    ok: number;
+    status: string;
+    observed_at_ms: number;
+    expires_at_ms: number | null;
+    payload_json: string;
+}} */ (row),
                 ),
             );
         return {
@@ -2348,7 +2596,16 @@ export class SqliteModelGatewayCatalogStore {
             .all(limit)
             .map((row) =>
                 parseRuntimeHealthRow(
-                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; status: string; classified_failure: string | null; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                    /** @type {{
+    provider_id: string;
+    provider_model: string;
+    route_profile: string;
+    status: string;
+    classified_failure: string | null;
+    observed_at_ms: number;
+    expires_at_ms: number | null;
+    payload_json: string;
+}} */ (row),
                 ),
             )
             .filter(isRecord);
@@ -2382,7 +2639,16 @@ export class SqliteModelGatewayCatalogStore {
             .all(limit)
             .map((row) =>
                 parseRuntimeHealthRow(
-                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; status: string; classified_failure: string | null; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                    /** @type {{
+    provider_id: string;
+    provider_model: string;
+    route_profile: string;
+    status: string;
+    classified_failure: string | null;
+    observed_at_ms: number;
+    expires_at_ms: number | null;
+    payload_json: string;
+}} */ (row),
                 ),
             )
             .filter(isRecord);
@@ -2408,7 +2674,18 @@ export class SqliteModelGatewayCatalogStore {
             .all(limit * 8)
             .map((row) =>
                 parseRuntimeProbeRow(
-                    /** @type {{ provider_id: string; provider_model: string; route_profile: string; probe_kind: string; wire_api: string | null; ok: number; status: string; observed_at_ms: number; expires_at_ms: number | null; payload_json: string }} */ (row),
+                    /** @type {{
+    provider_id: string;
+    provider_model: string;
+    route_profile: string;
+    probe_kind: string;
+    wire_api: string | null;
+    ok: number;
+    status: string;
+    observed_at_ms: number;
+    expires_at_ms: number | null;
+    payload_json: string;
+}} */ (row),
                 ),
             )
             .filter(isRecord);
@@ -2421,15 +2698,13 @@ export class SqliteModelGatewayCatalogStore {
         for (const probe of latestProbes) {
             const key = runtimeRecordKey(probe);
             if (!key) continue;
-            const current =
-                byKey.get(key) ??
-                {
-                    key,
-                    providerId: optionalString(probe['providerId']),
-                    providerModel: optionalString(probe['providerModel']),
-                    routeProfile: optionalString(probe['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
-                    runtimeHealthStatus: 'probe-only',
-                };
+            const current = byKey.get(key) ?? {
+                key,
+                providerId: optionalString(probe['providerId']),
+                providerModel: optionalString(probe['providerModel']),
+                routeProfile: optionalString(probe['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
+                runtimeHealthStatus: 'probe-only',
+            };
             byKey.set(key, mergeRuntimeProbeIntoHealthRecord(current, probe));
         }
         return [...byKey.values()]
@@ -2630,13 +2905,16 @@ export class SqliteModelGatewayCatalogStore {
         const writable = applications.filter(isRecord);
         const tx = this.#db.transaction(() => {
             for (const application of writable) {
-                const observedAtMs = dateMs(application['timestamp']) ?? dateMs(application['observedAt']) ?? Date.now();
+                const observedAtMs =
+                    dateMs(application['timestamp']) ?? dateMs(application['observedAt']) ?? Date.now();
                 insert.run(
                     optionalString(application['effectId']) ?? createAutomationEffectId(observedAtMs),
                     optionalString(application['decisionId']),
                     optionalString(application['routeProfile']) ?? DEFAULT_ROUTE_PROFILE,
                     optionalString(application['selectedRouteKey']) ?? optionalString(application['routeKey']),
-                    optionalString(application['effectKind']) ?? optionalString(application['kind']) ?? 'unknown_effect',
+                    optionalString(application['effectKind']) ??
+                        optionalString(application['kind']) ??
+                        'unknown_effect',
                     optionalString(application['status']) ?? (application['applied'] === true ? 'applied' : 'skipped'),
                     application['applied'] === true ? 1 : 0,
                     observedAtMs,
@@ -2893,7 +3171,7 @@ export class SqliteModelGatewayCatalogStore {
         if (!sessionId || !exceptHandoffId || !supersededBy) return { superseded: 0 };
         const observedAt = optionalInteger(input.observedAt) ?? Date.now();
         const observedAtIso = new Date(observedAt).toISOString();
-        const rows = /** @type {Array<{ handoff_id: string; payload_json: string }>} */ (
+        const rows = /** @type {{ handoff_id: string; payload_json: string }[]} */ (
             this.#db
                 .prepare(
                     `
@@ -3032,7 +3310,8 @@ export class SqliteModelGatewayCatalogStore {
         const writable = confirmations.filter(isRecord);
         const tx = this.#db.transaction(() => {
             for (const confirmation of writable) {
-                const observedAtMs = dateMs(confirmation['observedAt']) ?? dateMs(confirmation['timestamp']) ?? Date.now();
+                const observedAtMs =
+                    dateMs(confirmation['observedAt']) ?? dateMs(confirmation['timestamp']) ?? Date.now();
                 insert.run(
                     optionalString(confirmation['confirmationId']) ?? createSdkSessionConfirmationId(observedAtMs),
                     optionalString(confirmation['handoffId']),
@@ -3043,7 +3322,9 @@ export class SqliteModelGatewayCatalogStore {
                         optionalString(confirmation['targetProviderId']) ??
                         optionalString(confirmation['confirmedProviderId']),
                     optionalString(confirmation['previousModel']),
-                    optionalString(confirmation['confirmedModel']) ?? optionalString(confirmation['newModel']) ?? 'unknown',
+                    optionalString(confirmation['confirmedModel']) ??
+                        optionalString(confirmation['newModel']) ??
+                        'unknown',
                     optionalString(confirmation['bindingStrategy']) ?? 'unknown',
                     optionalString(confirmation['wireApi']),
                     optionalString(confirmation['selectedRouteKey']),
@@ -3082,14 +3363,14 @@ export class SqliteModelGatewayCatalogStore {
      * Reads bounded same-session binding evidence without scanning JSON payloads in application memory.
      *
      * @param {{
-     *   providerId: string;
-     *   previousProviderId?: string | null;
-     *   bindingStrategy?: string;
-     *   wireApi?: string | null;
-     *   selectedRouteKey?: string | null;
-     *   limit?: number;
-     *   maxAgeMs?: number;
-     *   now?: number;
+     *     providerId: string;
+     *     previousProviderId?: string | null;
+     *     bindingStrategy?: string;
+     *     wireApi?: string | null;
+     *     selectedRouteKey?: string | null;
+     *     limit?: number;
+     *     maxAgeMs?: number;
+     *     now?: number;
      * }} options
      * @returns {Promise<Record<string, unknown>[]>}
      */
@@ -3274,9 +3555,13 @@ export class SqliteModelGatewayCatalogStore {
                 const criteriaTotal = optionalInteger(run['criteriaTotal']) ?? criteria.length;
                 const criteriaFailed =
                     optionalInteger(run['criteriaFailed']) ??
-                    criteria.filter((criterion) => isRecord(criterion) && criterion['pass'] !== true && criterion['severity'] !== 'warning').length;
+                    criteria.filter(
+                        (criterion) =>
+                            isRecord(criterion) && criterion['pass'] !== true && criterion['severity'] !== 'warning',
+                    ).length;
                 const ok = run['ok'] === true || run['requiredOk'] === true;
-                const status = optionalString(run['status']) ?? (ok ? 'passed' : run['blocked'] === true ? 'blocked' : 'failed');
+                const status =
+                    optionalString(run['status']) ?? (ok ? 'passed' : run['blocked'] === true ? 'blocked' : 'failed');
                 insert.run(
                     optionalString(run['runId']) ?? createLiveScenarioRunId(completedAtMs),
                     optionalString(run['scenarioKind']) ?? optionalString(run['kind']) ?? 'unknown',
@@ -3588,7 +3873,10 @@ export class SqliteModelGatewayCatalogStore {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const row of rows) {
-            const overlayId = idOr(row, `${providerId(row)}:${optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE}`);
+            const overlayId = idOr(
+                row,
+                `${providerId(row)}:${optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE}`,
+            );
             const accountScope = optionalString(row['accountScope']) ?? DEFAULT_ACCOUNT_SCOPE;
             const secretRef = optionalString(row['secretRef']);
             const observedAtMs = dateMs(row['observedAt']) ?? generatedAtMs;

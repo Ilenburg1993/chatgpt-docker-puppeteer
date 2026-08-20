@@ -30,7 +30,8 @@ export function planReadThrough(input) {
         return { attempted: false, mode: input.mode, skippedReason: 'non_cached_read_strategy' };
     }
     if (input.mode === 'force') return { attempted: true, mode: input.mode, skippedReason: null };
-    if (input.fileSize < input.minBytes) return { attempted: false, mode: input.mode, skippedReason: 'file_below_threshold' };
+    if (input.fileSize < input.minBytes)
+        return { attempted: false, mode: input.mode, skippedReason: 'file_below_threshold' };
     return { attempted: true, mode: input.mode, skippedReason: null };
 }
 
@@ -72,7 +73,10 @@ export function buildSkippedReadThroughReport(input) {
  * @param {unknown} result
  */
 export function buildAttemptedReadThroughReport(mode, startedAt, result) {
-    const record = result && typeof result === 'object' && !Array.isArray(result) ? /** @type {Record<string, unknown>} */ (result) : {};
+    const record =
+        result && typeof result === 'object' && !Array.isArray(result)
+            ? /** @type {Record<string, unknown>} */ (result)
+            : {};
     const relatedPaths = Array.isArray(record['relatedPaths']) ? record['relatedPaths'].map(String) : [];
     return {
         ...record,

@@ -114,9 +114,7 @@ const CREATE_CHUNK_FTS_SQL = `
  */
 function tableExists(db, tableName) {
     return Boolean(
-        db
-            .prepare("SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ? LIMIT 1")
-            .get(tableName),
+        db.prepare("SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ? LIMIT 1").get(tableName),
     );
 }
 
@@ -186,7 +184,8 @@ function backfillLegacyChunks(db) {
     if (!ftsColumns.has('file_path')) return;
     const rows = /** @type {{ filePath: string; content: string }[]} */ (
         db
-            .prepare(`
+            .prepare(
+                `
                 SELECT fts.file_path AS filePath, fts.content AS content
                 FROM copilot_io_index_fts AS fts
                 WHERE NOT EXISTS (
@@ -194,7 +193,8 @@ function backfillLegacyChunks(db) {
                     FROM copilot_io_index_chunks AS chunks
                     WHERE chunks.file_path = fts.file_path
                 )
-            `)
+            `,
+            )
             .all()
     );
     const insertChunk = db.prepare(`

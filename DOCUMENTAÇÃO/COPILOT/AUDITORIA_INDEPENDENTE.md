@@ -60,8 +60,8 @@ e **múltiplos problemas arquiteturais** que comprometem a solidez de produção
 
 ### BUG-C-01 · `client.start()` ausente no caminho de boot principal
 
-**Severidade:** CRÍTICA · **Arquivo:** `lifecycle/agent-lifecycle.js` (L~90),
-`lifecycle/reconnect-policy.js` (L~100), `lifecycle/entry.js` (L~90)
+**Severidade:** CRÍTICA · **Arquivo:** `lifecycle/agent-lifecycle.js` (L~~90),
+`lifecycle/reconnect-policy.js` (L~~100), `lifecycle/entry.js` (L~90)
 
 **Evidência documentação oficial:**
 

@@ -550,9 +550,8 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
     it('seleciona ingress automaticamente quando o rebind direto foi marcado como não confiável', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
-        const { defaultModelGatewayIngressRouteRegistry } = await import(
-            '../../../src/copilot/model-gateway/ingress/index.js'
-        );
+        const { defaultModelGatewayIngressRouteRegistry } =
+            await import('../../../src/copilot/model-gateway/ingress/index.js');
         defaultModelGatewayIngressRouteRegistry.clear();
         process.env['OPENROUTER_API_KEY'] = 'upstream-secret';
         mocks.readState.mockResolvedValueOnce({
@@ -624,9 +623,8 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
     it('remove binding ingress preparado quando resume/create falha antes de aceitar a sessão', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
-        const { defaultModelGatewayIngressRouteRegistry } = await import(
-            '../../../src/copilot/model-gateway/ingress/index.js'
-        );
+        const { defaultModelGatewayIngressRouteRegistry } =
+            await import('../../../src/copilot/model-gateway/ingress/index.js');
         defaultModelGatewayIngressRouteRegistry.clear();
         process.env['OPENROUTER_API_KEY'] = 'upstream-secret';
         mocks.readState.mockResolvedValueOnce({
@@ -647,9 +645,7 @@ describe('agent/session/initializer — sessionFs wiring', () => {
         });
         mocks.resumeOrCreateAgentSdkSession.mockRejectedValueOnce(new Error('resume failed'));
 
-        await expect(initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' })).rejects.toThrow(
-            /resume failed/u,
-        );
+        await expect(initOrResumeSession(/** @type {any} */ ({}), { model: 'auto' })).rejects.toThrow(/resume failed/u);
 
         expect(defaultModelGatewayIngressRouteRegistry.listRedacted()).toHaveLength(0);
         expect(mocks.persistState).not.toHaveBeenCalledWith(
@@ -660,10 +656,8 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
     it('restaura binding ingress anterior quando a preparação substitutiva falha', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
-        const {
-            createModelGatewayIngressRoute,
-            defaultModelGatewayIngressRouteRegistry,
-        } = await import('../../../src/copilot/model-gateway/ingress/index.js');
+        const { createModelGatewayIngressRoute, defaultModelGatewayIngressRouteRegistry } =
+            await import('../../../src/copilot/model-gateway/ingress/index.js');
         defaultModelGatewayIngressRouteRegistry.clear();
         const previousRoute = createModelGatewayIngressRoute({
             sessionId: 'saved-sess',
@@ -751,9 +745,8 @@ describe('agent/session/initializer — sessionFs wiring', () => {
 
     it('projeta rota Model Gateway persistida por ingress local quando bindingStrategy=ingress', async () => {
         const { initOrResumeSession } = await import('../../../src/copilot/agent/session/initializers/initializer.js');
-        const { defaultModelGatewayIngressRouteRegistry } = await import(
-            '../../../src/copilot/model-gateway/ingress/index.js'
-        );
+        const { defaultModelGatewayIngressRouteRegistry } =
+            await import('../../../src/copilot/model-gateway/ingress/index.js');
         defaultModelGatewayIngressRouteRegistry.clear();
         process.env['OPENROUTER_API_KEY'] = 'upstream-secret';
         mocks.readState.mockResolvedValueOnce({

@@ -18,11 +18,7 @@ import {
 import { EVENT_BUS, SHUTDOWN_LOGGER } from '#copilot/core';
 import { buildModelGatewayOnListModelsHandler } from '#copilot/model-gateway';
 import { ERROR_TRACKER } from '#copilot/observability';
-import {
-    HOOKS_LOGGER,
-    SDK_LOGGER,
-    TOOLS_BUILDER,
-} from '#copilot/sdk/di';
+import { HOOKS_LOGGER, SDK_LOGGER, TOOLS_BUILDER } from '#copilot/sdk/di';
 import { createTerminalCopilotClient, defaultBus as defaultHookBus } from '#copilot/sdk/session';
 import { getAuthStatus as checkAuthStatus, runCopilotSdkBootPreflight } from '#copilot/sdk/telemetry';
 import { TOOLS_LOGGER, TOOLS_METRICS } from '#copilot/tools';
@@ -145,7 +141,8 @@ export async function bootCopilot(options) {
                 container.resolve(ERROR_TRACKER).registerGlobalHandlers();
 
                 try {
-                    const { getCopilotDb } = await import('../db/sqlite.js');
+                    const { ensureCopilotDbDir, getCopilotDb } = await import('../db/sqlite.js');
+                    await ensureCopilotDbDir();
                     bootstrapConvergencePersistence(getCopilotDb());
                 } catch {
                     // SQLite indisponível não deve bloquear o boot; ring-buffer in-memory continua.

@@ -24,7 +24,8 @@
  *     | 'delete'
  *     | 'copy'
  *     | 'move'
- *     | 'patch'} IoOperation
+ *     | 'patch'
+ *     | 'metadata'} IoOperation
  */
 
 /** @typedef {'file' | 'directory' | 'workspace' | 'url' | 'sqlite' | 'shell' | 'git' | 'rag' | 'unknown'} IoTargetKind */

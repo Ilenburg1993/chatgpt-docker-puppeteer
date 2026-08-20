@@ -16,9 +16,9 @@ import { defineStore } from 'pinia';
  * @typedef {object} SystemComponent
  * @property {string} status
  * @property {string} message
- * @property {Record<string, unknown>=} metrics
- * @property {number=} uptime
- * @property {string | number=} checked_at
+ * @property {Record<string, unknown>} [metrics]
+ * @property {number} [uptime]
+ * @property {string | number} [checked_at]
  */
 
 /** Constante/valor exportado: useSystemStore. */

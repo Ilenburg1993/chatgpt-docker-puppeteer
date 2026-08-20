@@ -2,15 +2,15 @@
 /**
  * Read-only Cloudflare configuration/product posture audit for the Copilot MCP hostname.
  *
- * This audit complements edge-audit.js. It focuses on Cloudflare products and configuration settings that are
- * harmless for ordinary websites but can interfere with remote MCP clients, OAuth discovery, JSON-RPC, SSE and
- * non-browser traffic.
+ * This audit complements edge-audit.js. It focuses on Cloudflare products and configuration settings that are harmless
+ * for ordinary websites but can interfere with remote MCP clients, OAuth discovery, JSON-RPC, SSE and non-browser
+ * traffic.
  *
  * @module copilot/mcp/cloudflare/config-audit
  */
 
-import { createTtlCache } from '#copilot/mcp/control-plane';
 import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
+import { createTtlCache } from '#copilot/mcp/control-plane';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';
 
@@ -215,7 +215,12 @@ async function auditCloudflareConfigPostureUncached(auditConfig, snapshotOptions
 
     const [zoneSettingsResult, configRulesetsResult] = await Promise.all([
         readZoneSettings(auditConfig.apiToken ?? '', zoneResolution.zoneId),
-        readConfigRulesets(auditConfig.apiToken ?? '', zoneResolution.zoneId, auditConfig.publicHostname, snapshotOptions),
+        readConfigRulesets(
+            auditConfig.apiToken ?? '',
+            zoneResolution.zoneId,
+            auditConfig.publicHostname,
+            snapshotOptions,
+        ),
     ]);
 
     const analysis = analyzeConfigPosture(zoneSettingsResult.settings, configRulesetsResult.rulesets, {
@@ -268,7 +273,9 @@ export function analyzeConfigPosture(zoneSettings, configRules, context) {
     const critical = [];
     /** @type {string[]} */
     const warnings = [];
-    const potentiallyInterferingSettings = zoneSettings.filter((setting) => setting.status === 'potentially-interfering');
+    const potentiallyInterferingSettings = zoneSettings.filter(
+        (setting) => setting.status === 'potentially-interfering',
+    );
     const needsExplicitOffSettings = zoneSettings.filter((setting) => setting.status === 'needs-explicit-off');
     const unknownSettings = zoneSettings.filter((setting) => setting.status === 'unknown');
     const dynamicConfigRules = configRules.filter((rule) => rule.dynamicMcpScoped);
@@ -280,24 +287,37 @@ export function analyzeConfigPosture(zoneSettings, configRules, context) {
     const requestBufferingNoneRules = mcpConfigRules.filter(
         (rule) => normalizeActionParameterValue(rule.actionParameters['request_body_buffering']) === 'none',
     );
-    const bicOffRules = dynamicConfigRules.filter((rule) => normalizeActionParameterValue(rule.actionParameters['bic']) === 'false');
+    const bicOffRules = dynamicConfigRules.filter(
+        (rule) => normalizeActionParameterValue(rule.actionParameters['bic']) === 'false',
+    );
 
     for (const setting of potentiallyInterferingSettings) {
-        warnings.push(`${setting.label} appears enabled or strict zone-wide; confirm MCP routes are explicitly exempt.`);
+        warnings.push(
+            `${setting.label} appears enabled or strict zone-wide; confirm MCP routes are explicitly exempt.`,
+        );
     }
     for (const setting of needsExplicitOffSettings) {
         warnings.push(`${setting.label} should be explicitly disabled or bypassed for MCP routes.`);
     }
     if (unknownSettings.length > 0) {
-        warnings.push(`Could not determine ${unknownSettings.length} Cloudflare product/setting value(s); treat as audit gaps.`);
+        warnings.push(
+            `Could not determine ${unknownSettings.length} Cloudflare product/setting value(s); treat as audit gaps.`,
+        );
     }
     if (responseBufferingRules.length === 0) {
-        warnings.push('No explicit response_body_buffering=none configuration rule was detected for /mcp streaming/SSE.');
+        warnings.push(
+            'No explicit response_body_buffering=none configuration rule was detected for /mcp streaming/SSE.',
+        );
     }
     if (requestBufferingNoneRules.length > 0) {
-        warnings.push('Detected request_body_buffering=none for /mcp; this may reduce WAF request inspection and should be justified.');
+        warnings.push(
+            'Detected request_body_buffering=none for /mcp; this may reduce WAF request inspection and should be justified.',
+        );
     }
-    if (bicOffRules.length === 0 && zoneSettings.some((setting) => setting.id === 'browser_check' && setting.status !== 'safe')) {
+    if (
+        bicOffRules.length === 0 &&
+        zoneSettings.some((setting) => setting.id === 'browser_check' && setting.status !== 'safe')
+    ) {
         warnings.push('Browser Integrity Check is not explicitly disabled for dynamic MCP/OAuth routes.');
     }
 
@@ -337,7 +357,7 @@ async function readZoneSettings(apiToken, zoneId) {
 /**
  * @param {string} apiToken
  * @param {string} zoneId
- * @param {typeof ZONE_SETTINGS[number]} setting
+ * @param {(typeof ZONE_SETTINGS)[number]} setting
  * @returns {Promise<{ summary: ZoneSettingSummary; warning: string | null; permissionGap: string | null }>}
  */
 async function readZoneSetting(apiToken, zoneId, setting) {
@@ -407,7 +427,13 @@ async function readConfigRulesets(apiToken, zoneId, publicHostname, snapshotOpti
             const rawRules = Array.isArray(record['rules']) ? record['rules'] : [];
             for (const rule of rawRules) rules.push(simplifyConfigRule(rule, publicHostname));
         }
-        return { rulesets: rules.sort((left, right) => String(left.description ?? '').localeCompare(String(right.description ?? ''))), warnings: [], permissionGaps: [] };
+        return {
+            rulesets: rules.sort((left, right) =>
+                String(left.description ?? '').localeCompare(String(right.description ?? '')),
+            ),
+            warnings: [],
+            permissionGaps: [],
+        };
     } catch (error) {
         const message = sanitizeError(error);
         return {
@@ -436,8 +462,11 @@ function simplifyConfigRule(rule, publicHostname) {
         action: typeof record['action'] === 'string' ? record['action'] : null,
         actionParameters: sanitizeActionParameters(actionParameters),
         actionParameterKeys: Object.keys(actionParameters).sort((left, right) => left.localeCompare(right)),
-        dynamicMcpScoped: expressionMentionsHost(expression, publicHostname) && expressionMentionsAnyPath(expression, DYNAMIC_MCP_PATHS),
-        mcpEndpointScoped: expressionMentionsHost(expression, publicHostname) && expressionMentionsAnyPath(expression, ['/mcp']),
+        dynamicMcpScoped:
+            expressionMentionsHost(expression, publicHostname) &&
+            expressionMentionsAnyPath(expression, DYNAMIC_MCP_PATHS),
+        mcpEndpointScoped:
+            expressionMentionsHost(expression, publicHostname) && expressionMentionsAnyPath(expression, ['/mcp']),
     };
 }
 
@@ -447,7 +476,9 @@ function simplifyConfigRule(rule, publicHostname) {
  */
 function readConfigAuditCacheTtlMs(value) {
     if (value === undefined) return DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
-    return Number.isFinite(value) && value >= 0 && value <= 300_000 ? Math.floor(value) : DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
+    return Number.isFinite(value) && value >= 0 && value <= 300_000
+        ? Math.floor(value)
+        : DEFAULT_CONFIG_AUDIT_CACHE_TTL_MS;
 }
 
 /**
@@ -467,7 +498,13 @@ function buildConfigAuditCacheKey(config) {
 /**
  * @param {CloudflareConfigAuditClient} client
  * @param {ConfigAuditConfig} config
- * @returns {Promise<{ zoneId: string | null; source: string | null; zoneName: string; zoneIdRedaction: string | null; warnings: string[] }>}
+ * @returns {Promise<{
+ *     zoneId: string | null;
+ *     source: string | null;
+ *     zoneName: string;
+ *     zoneIdRedaction: string | null;
+ *     warnings: string[];
+ * }>}
  */
 async function resolveZoneId(client, config) {
     const configuredZoneId = String(config.zoneId ?? '').trim();
@@ -481,7 +518,10 @@ async function resolveZoneId(client, config) {
         };
     }
     try {
-        const query = typeof config.accountId === 'string' && config.accountId ? { name: config.zone, account: { id: config.accountId } } : { name: config.zone };
+        const query =
+            typeof config.accountId === 'string' && config.accountId
+                ? { name: config.zone, account: { id: config.accountId } }
+                : { name: config.zone };
         for await (const zone of client.zones.list(query)) {
             const record = asRecord(zone);
             if (record['name'] === config.zone && typeof record['id'] === 'string') {
@@ -494,14 +534,26 @@ async function resolveZoneId(client, config) {
                 };
             }
         }
-        return { zoneId: null, source: null, zoneName: config.zone, zoneIdRedaction: null, warnings: [`Cloudflare zone ${config.zone} was not found by zones.list.`] };
+        return {
+            zoneId: null,
+            source: null,
+            zoneName: config.zone,
+            zoneIdRedaction: null,
+            warnings: [`Cloudflare zone ${config.zone} was not found by zones.list.`],
+        };
     } catch (error) {
-        return { zoneId: null, source: null, zoneName: config.zone, zoneIdRedaction: null, warnings: [`Could not resolve Cloudflare zone ID: ${sanitizeError(error)}`] };
+        return {
+            zoneId: null,
+            source: null,
+            zoneName: config.zone,
+            zoneIdRedaction: null,
+            warnings: [`Could not resolve Cloudflare zone ID: ${sanitizeError(error)}`],
+        };
     }
 }
 
 /**
- * @param {typeof ZONE_SETTINGS[number]} setting
+ * @param {(typeof ZONE_SETTINGS)[number]} setting
  * @param {string} error
  * @returns {ZoneSettingSummary}
  */
@@ -528,7 +580,14 @@ function classifyZoneSetting(id, value) {
     if (value === null || normalized === 'unknown') return 'unknown';
     if (['off', 'false', '0', 'essentially_off'].includes(normalized)) return 'safe';
     if (id === 'security_level' && ['low', 'medium'].includes(normalized)) return 'advisory';
-    if (id === 'polish' || id === 'hotlink_protection' || id === 'email_obfuscation' || id === 'rocket_loader' || id === 'zaraz' || id === 'rum') {
+    if (
+        id === 'polish' ||
+        id === 'hotlink_protection' ||
+        id === 'email_obfuscation' ||
+        id === 'rocket_loader' ||
+        id === 'zaraz' ||
+        id === 'rum'
+    ) {
         return 'needs-explicit-off';
     }
     return 'potentially-interfering';
@@ -573,7 +632,12 @@ function sanitizeActionParameters(actionParameters) {
 function sanitizeValue(value) {
     if (Array.isArray(value)) return value.map(sanitizeValue);
     if (value && typeof value === 'object') {
-        return Object.fromEntries(Object.entries(/** @type {Record<string, unknown>} */ (value)).map(([key, item]) => [key, sanitizeValue(item)]));
+        return Object.fromEntries(
+            Object.entries(/** @type {Record<string, unknown>} */ (value)).map(([key, item]) => [
+                key,
+                sanitizeValue(item),
+            ]),
+        );
     }
     return value;
 }
@@ -595,7 +659,9 @@ function firstCloudflareErrorMessage(body) {
  * @returns {boolean}
  */
 function expressionMentionsHost(expression, hostname) {
-    return String(expression ?? '').toLowerCase().includes(hostname.toLowerCase());
+    return String(expression ?? '')
+        .toLowerCase()
+        .includes(hostname.toLowerCase());
 }
 
 /**
@@ -624,7 +690,8 @@ function buildDesiredConfigPosture(config) {
             securityLevel: 'no Under Attack / interactive challenge behavior on MCP/OAuth routes',
             responseBodyBuffering: 'none for /mcp when supported, to preserve streamable HTTP/SSE',
             requestBodyBuffering: 'standard initially, not none unless justified',
-            siteFeatures: 'Rocket Loader, Zaraz, RUM, Email Obfuscation, Polish and similar browser features off/irrelevant for MCP routes',
+            siteFeatures:
+                'Rocket Loader, Zaraz, RUM, Email Obfuscation, Polish and similar browser features off/irrelevant for MCP routes',
         },
     };
 }
@@ -670,7 +737,9 @@ function summarizeCredentials(config) {
  * @returns {Record<string, unknown>}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : {};
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : {};
 }
 
 /**

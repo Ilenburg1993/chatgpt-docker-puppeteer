@@ -52,4 +52,4 @@ Checklist para novo handler:
 
 - **Pode importar**: `node:*`, `#copilot/config/env` (variáveis de ambiente)
 - **NÃO pode importar**: nenhum outro módulo de `src/copilot/`
-- Violações verificáveis via `madge`
+- Violações verificáveis via `npm run analyze:deps` e `dependency-cruiser`

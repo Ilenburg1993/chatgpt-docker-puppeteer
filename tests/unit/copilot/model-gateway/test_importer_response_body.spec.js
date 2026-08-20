@@ -24,10 +24,7 @@ describe('model-gateway importer response body', () => {
             readCatalogResponseText(new Response('abcdef'), { maxBytes: 4, label: 'models' }),
             /exceeds 4 bytes/u,
         );
-        await assert.rejects(
-            readCatalogResponseText(new Response(Buffer.from([0xff]))),
-            /invalid UTF-8/u,
-        );
+        await assert.rejects(readCatalogResponseText(new Response(Buffer.from([0xff]))), /invalid UTF-8/u);
     });
 
     it('preserves json-only test doubles without weakening real Response streams', async () => {

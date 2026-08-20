@@ -21,7 +21,7 @@ const DEFAULT_STALE_RATIO = 0.8;
 /** @type {Readonly<Record<string, number>>} */
 const PROVIDER_TTL_SECONDS = Object.freeze({
     'cloudflare-workers-ai': 900,
-    'kilo': 900,
+    kilo: 900,
     'kilo-code': 900,
     'kilo-gateway': 900,
     'ollama-local': 300,
@@ -79,18 +79,19 @@ function dateMs(value) {
  * @param {Record<string, number>} [options.providerTtlSeconds]
  * @param {Record<string, number>} [options.sourceKindTtlSeconds]
  * @returns {{
- *   providerId: string;
- *   sourceKind: string;
- *   ttlSeconds: number;
- *   staleAfterSeconds: number;
- *   policySource: 'provider' | 'source_kind' | 'default';
+ *     providerId: string;
+ *     sourceKind: string;
+ *     ttlSeconds: number;
+ *     staleAfterSeconds: number;
+ *     policySource: 'provider' | 'source_kind' | 'default';
  * }}
  */
 export function resolveModelGatewayAccountOverlayFreshnessPolicy(overlay, options = {}) {
     const providerId = optionalString(overlay['providerId']) ?? 'unknown-provider';
     const sourceKind = optionalString(overlay['sourceKind']) ?? 'unknown';
     const providerTtl = optionalNumber(options.providerTtlSeconds?.[providerId]) ?? PROVIDER_TTL_SECONDS[providerId];
-    const sourceKindTtl = optionalNumber(options.sourceKindTtlSeconds?.[sourceKind]) ?? SOURCE_KIND_TTL_SECONDS[sourceKind];
+    const sourceKindTtl =
+        optionalNumber(options.sourceKindTtlSeconds?.[sourceKind]) ?? SOURCE_KIND_TTL_SECONDS[sourceKind];
     const defaultTtl = optionalNumber(options.defaultTtlSeconds) ?? DEFAULT_ACCOUNT_OVERLAY_TTL_SECONDS;
     const ttlSeconds = Math.max(1, Math.floor(providerTtl ?? sourceKindTtl ?? defaultTtl));
     return {
@@ -110,17 +111,17 @@ export function resolveModelGatewayAccountOverlayFreshnessPolicy(overlay, option
  * @param {Record<string, number>} [options.providerTtlSeconds]
  * @param {Record<string, number>} [options.sourceKindTtlSeconds]
  * @returns {{
- *   status: string;
- *   fresh: boolean;
- *   stale: boolean;
- *   expired: boolean;
- *   observedAt: string | null;
- *   expiresAt: string | null;
- *   effectiveExpiresAt: string | null;
- *   ageSeconds: number | null;
- *   ttlSeconds: number;
- *   staleAfterSeconds: number;
- *   policySource: 'provider' | 'source_kind' | 'default';
+ *     status: string;
+ *     fresh: boolean;
+ *     stale: boolean;
+ *     expired: boolean;
+ *     observedAt: string | null;
+ *     expiresAt: string | null;
+ *     effectiveExpiresAt: string | null;
+ *     ageSeconds: number | null;
+ *     ttlSeconds: number;
+ *     staleAfterSeconds: number;
+ *     policySource: 'provider' | 'source_kind' | 'default';
  * }}
  */
 export function evaluateModelGatewayAccountOverlayFreshness(overlay, options = {}) {
@@ -128,7 +129,8 @@ export function evaluateModelGatewayAccountOverlayFreshness(overlay, options = {
     const nowMs = dateMs(options.now) ?? Date.now();
     const observedMs = dateMs(overlay['observedAt']);
     const explicitExpiresMs = dateMs(overlay['expiresAt']);
-    const effectiveExpiresMs = explicitExpiresMs ?? (observedMs === null ? null : observedMs + policy.ttlSeconds * 1000);
+    const effectiveExpiresMs =
+        explicitExpiresMs ?? (observedMs === null ? null : observedMs + policy.ttlSeconds * 1000);
     const ageSeconds = observedMs === null ? null : Math.max(0, Math.floor((nowMs - observedMs) / 1000));
     const expired = effectiveExpiresMs !== null && effectiveExpiresMs <= nowMs;
     const stale = !expired && ageSeconds !== null && ageSeconds >= policy.staleAfterSeconds;
@@ -158,8 +160,19 @@ export function evaluateModelGatewayAccountOverlayFreshness(overlay, options = {
  * @param {Record<string, unknown>[]} overlays
  * @param {Parameters<typeof evaluateModelGatewayAccountOverlayFreshness>[1]} [options]
  * @returns {{
- *   rows: Array<ReturnType<typeof evaluateModelGatewayAccountOverlayFreshness> & { providerId: string; accountOverlayId: string; sourceKind: string }>;
- *   summary: { total: number; fresh: number; stale: number; expired: number; unknown: number; byStatus: Record<string, number> };
+ *     rows: (ReturnType<typeof evaluateModelGatewayAccountOverlayFreshness> & {
+ *         providerId: string;
+ *         accountOverlayId: string;
+ *         sourceKind: string;
+ *     })[];
+ *     summary: {
+ *         total: number;
+ *         fresh: number;
+ *         stale: number;
+ *         expired: number;
+ *         unknown: number;
+ *         byStatus: Record<string, number>;
+ *     };
  * }}
  */
 export function summarizeModelGatewayAccountOverlayFreshness(overlays, options = {}) {

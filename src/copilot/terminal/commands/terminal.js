@@ -22,17 +22,8 @@ import { terminalThemeHeadline, terminalThemeRow, terminalThemeWrappedRow } from
  * }} TerminalLibsFilter
  */
 
-const TERMINAL_LIBS_MODE_TOKENS = new Set([
-    'detail',
-    'details',
-    '--detail',
-    'json',
-    '--json',
-    'refresh',
-    '--refresh',
-]);
-const TERMINAL_AUX_LIBS_GUIDE =
-    'src/copilot/docs/terminal/TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05.md';
+const TERMINAL_LIBS_MODE_TOKENS = new Set(['detail', 'details', '--detail', 'json', '--json', 'refresh', '--refresh']);
+const TERMINAL_AUX_LIBS_GUIDE = 'src/copilot/docs/terminal/TERMINAL_AUX_LIBS_UX_ARCHITECTURE_DECISION_2026-06-05.md';
 
 /**
  * @param {string} value
@@ -85,7 +76,7 @@ function countAvailableByUse(tools, use) {
 
 /**
  * @param {import('../capabilities/external-tools.js').TerminalExternalToolCapability[]} tools
- * @returns {Array<[string, string]>}
+ * @returns {[string, string][]}
  */
 function buildTerminalLibsCategoryRows(tools) {
     const previewCount =
@@ -96,18 +87,24 @@ function buildTerminalLibsCategoryRows(tools) {
     const pickerCount = countAvailableByUse(tools, 'picker');
     const deferredCount = tools.filter((tool) => tool.decision === 'deferred').length;
     return [
-        ['Preview', `${countLabel(previewCount, 'renderer disponível', 'renderers disponíveis')} · uso explícito · fallback JS`],
+        [
+            'Preview',
+            `${countLabel(previewCount, 'renderer disponível', 'renderers disponíveis')} · uso explícito · fallback JS`,
+        ],
         [
             'TUI',
             `${countLabel(pickerCount, 'picker detectado', 'pickers detectados')} · ${pickerCount === 1 ? 'bloqueado' : 'bloqueados'} até TTY exclusivo`,
         ],
-        ['Hist/nav', `${countLabel(deferredCount, 'integração adiada', 'integrações adiadas')} · sem histórico/cwd pessoal por default`],
+        [
+            'Hist/nav',
+            `${countLabel(deferredCount, 'integração adiada', 'integrações adiadas')} · sem histórico/cwd pessoal por default`,
+        ],
     ];
 }
 
 /**
  * @param {(text: string) => void} println
- * @param {Array<[string, string]>} rows
+ * @param {[string, string][]} rows
  * @param {{ width?: number }} [options]
  * @returns {void}
  */
@@ -132,10 +129,22 @@ function resolveTerminalLibsFilter(tokens, tools) {
         return { query: 'all', label: 'todos', active: false, matched: true, tools };
     }
     if (query === 'available' || query === 'disponiveis' || query === 'disponíveis') {
-        return { query, label: 'disponíveis', active: true, matched: true, tools: tools.filter((tool) => tool.available) };
+        return {
+            query,
+            label: 'disponíveis',
+            active: true,
+            matched: true,
+            tools: tools.filter((tool) => tool.available),
+        };
     }
     if (query === 'missing' || query === 'absent' || query === 'ausentes') {
-        return { query, label: 'ausentes', active: true, matched: true, tools: tools.filter((tool) => !tool.available) };
+        return {
+            query,
+            label: 'ausentes',
+            active: true,
+            matched: true,
+            tools: tools.filter((tool) => !tool.available),
+        };
     }
     if (query === 'accepted' || query === 'aceitas') {
         return {
@@ -270,8 +279,18 @@ function printTerminalLibsCompact(println, refresh, filterTokens = []) {
         println(terminalThemeRow('Resultado', 'nenhuma ferramenta para este filtro', { role: 'warn' }));
     }
     println('');
-    println(terminalThemeRow('Mais detalhes', '/terminal libs detail [filtro] · /terminal libs json [filtro] · /terminal libs refresh'));
-    println(terminalThemeRow('Smoke', 'npm run terminal:aux-libs:smoke · npm --silent run terminal:aux-libs:smoke -- --json'));
+    println(
+        terminalThemeRow(
+            'Mais detalhes',
+            '/terminal libs detail [filtro] · /terminal libs json [filtro] · /terminal libs refresh',
+        ),
+    );
+    println(
+        terminalThemeRow(
+            'Smoke',
+            'npm run terminal:aux-libs:smoke · npm --silent run terminal:aux-libs:smoke -- --json',
+        ),
+    );
     println(terminalThemeRow('Guia', TERMINAL_AUX_LIBS_GUIDE));
     println('');
 }
@@ -300,10 +319,14 @@ function printTerminalLibsDetail(println, refresh, filterTokens = []) {
     for (const tool of filter.tools) {
         println('');
         println(
-            terminalThemeRow(tool.label, `${renderAvailability(tool.available)} · ${renderDecisionLabel(tool.decision)}`, {
-                role: renderToolRole(tool),
-                width: 12,
-            }),
+            terminalThemeRow(
+                tool.label,
+                `${renderAvailability(tool.available)} · ${renderDecisionLabel(tool.decision)}`,
+                {
+                    role: renderToolRole(tool),
+                    width: 12,
+                },
+            ),
         );
         printRows(
             println,

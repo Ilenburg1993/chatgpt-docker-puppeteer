@@ -105,7 +105,8 @@ export const todoClearCompletedTool = buildTool({
         status_filter: z
             .enum(['done', 'cancelled', 'both'])
             .optional()
-            .default('both')['describe']('Quais status limpar: done | cancelled | both'),
+            .default('both')
+            ['describe']('Quais status limpar: done | cancelled | both'),
         dry_run: z.boolean().optional().default(false)['describe']('Se true, simula a remoção sem persistir'),
     }),
     handler: async (/** @type {{ status_filter?: 'done' | 'cancelled' | 'both'; dry_run?: boolean }} */ args) => {
@@ -199,10 +200,12 @@ export const todoImportTool = buildTool({
                     metadata: z.record(z.string(), z.unknown()).optional(),
                 }),
             )
-            .min(1)['describe']('Array de tarefas a importar'),
+            .min(1)
+            ['describe']('Array de tarefas a importar'),
         default_priority: zPriority
             .optional()
-            .default('medium')['describe']('Prioridade padrão para tarefas sem priority'),
+            .default('medium')
+            ['describe']('Prioridade padrão para tarefas sem priority'),
     }),
     handler: async (
         /**

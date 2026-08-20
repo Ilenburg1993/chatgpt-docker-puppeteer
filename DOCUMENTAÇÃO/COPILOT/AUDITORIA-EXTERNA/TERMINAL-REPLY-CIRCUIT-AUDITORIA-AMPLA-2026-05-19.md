@@ -19,7 +19,8 @@ Escopo principal:
 
 Esta auditoria responde a um problema operacional específico e crítico:
 
-> o operador envia uma mensagem no terminal, o turno consome uso/custo e conclui sem erro aparente, mas a resposta da LLM-B não aparece de forma confiável no terminal.
+> o operador envia uma mensagem no terminal, o turno consome uso/custo e conclui sem erro aparente,
+> mas a resposta da LLM-B não aparece de forma confiável no terminal.
 
 O objetivo aqui não é propor remendos locais; é mapear o circuito inteiro de:
 
@@ -30,7 +31,8 @@ e definir:
 1. a situação atual real;
 2. a situação ideal;
 3. um roadmap estrutural por faixas, fases e subfases;
-4. as transformações necessárias para que a resposta da LLM-B volte a aparecer no terminal de maneira canônica e durável.
+4. as transformações necessárias para que a resposta da LLM-B volte a aparecer no terminal de
+   maneira canônica e durável.
 
 ---
 
@@ -94,7 +96,8 @@ Owners principais:
 
 ### 2.6 `terminal out-of-band transcript`
 
-Owner das mensagens da LLM-B que chegam fora do turno explícito, ou como transcript persistente de eventos.
+Owner das mensagens da LLM-B que chegam fora do turno explícito, ou como transcript persistente de
+eventos.
 
 Owners principais:
 
@@ -161,7 +164,8 @@ Em sessão real com `npm run terminal:llm-b`, foram confirmados os seguintes sin
 
 Isso prova que o problema não está simplesmente em “falha total do SDK”.
 
-O problema está na **materialização do reply** e na **governança de owner** desse reply ao longo do circuito.
+O problema está na **materialização do reply** e na **governança de owner** desse reply ao longo do
+circuito.
 
 ---
 
@@ -219,7 +223,8 @@ Não há uma superfície única de “output incremental do turno explícito”.
 
 ### Situação ideal
 
-Haver uma **surface canônica de output do turno explícito**, e os adapters antigos se tornarem apenas compatibilidade.
+Haver uma **surface canônica de output do turno explícito**, e os adapters antigos se tornarem
+apenas compatibilidade.
 
 ---
 
@@ -227,13 +232,16 @@ Haver uma **surface canônica de output do turno explícito**, e os adapters ant
 
 ### Situação atual
 
-`terminal/dialog/engine.js` renderiza a resposta do turno explícito principalmente a partir do `reply` devolvido por `runTerminalDialogTurn(...)`.
+`terminal/dialog/engine.js` renderiza a resposta do turno explícito principalmente a partir do
+`reply` devolvido por `runTerminalDialogTurn(...)`.
 
-Enquanto o turno está ativo, `assistant.message` é deliberadamente suprimido em `sdk-session-events.js` quando `getBusy()` está true.
+Enquanto o turno está ativo, `assistant.message` é deliberadamente suprimido em
+`sdk-session-events.js` quando `getBusy()` está true.
 
 ### Problema
 
-Se o bridge retorna `reply=''`, o owner explícito do turno fica praticamente cego, mesmo que eventos do SDK já tenham conteúdo suficiente.
+Se o bridge retorna `reply=''`, o owner explícito do turno fica praticamente cego, mesmo que eventos
+do SDK já tenham conteúdo suficiente.
 
 ### Impacto
 
@@ -242,7 +250,8 @@ Se o bridge retorna `reply=''`, o owner explícito do turno fica praticamente ce
 
 ### Situação ideal
 
-O turno explícito deve fechar com um **reply canônico já materializado** vindo do runtime, e não depender de renderizadores paralelos para “salvá-lo”.
+O turno explícito deve fechar com um **reply canônico já materializado** vindo do runtime, e não
+depender de renderizadores paralelos para “salvá-lo”.
 
 ---
 
@@ -261,9 +270,8 @@ O mesmo conteúdo pode tentar entrar por:
 
 Há dedupe e suppressions locais, mas não há uma política única dizendo:
 
-> este sink é o owner do transcript do turno explícito;
-> aquele sink é apenas para mensagens fora de turno;
-> aquele outro é só persistência/linha do tempo.
+> este sink é o owner do transcript do turno explícito; aquele sink é apenas para mensagens fora de
+> turno; aquele outro é só persistência/linha do tempo.
 
 ### Impacto
 
@@ -290,14 +298,16 @@ No SDK 0.3.0, `assistant.turn_end` traz só `turnId`, não texto final.
 
 ### Problema
 
-Múltiplas camadas ainda tratam `turn_end` como se ele pudesse, sozinho, fechar semanticamente o reply.
+Múltiplas camadas ainda tratam `turn_end` como se ele pudesse, sozinho, fechar semanticamente o
+reply.
 
 ### Situação ideal
 
 `assistant.turn_end` deve ser tratado apenas como:
 
 - gatilho de fechamento;
-- momento de forçar a resolução a partir do **collector canônico de output** já alimentado por message/delta.
+- momento de forçar a resolução a partir do **collector canônico de output** já alimentado por
+  message/delta.
 
 ---
 
@@ -315,9 +325,11 @@ Isso é útil para diagnóstico, mas não gera projeção estruturada de drift d
 
 ### Situação ideal
 
-ter scorecard/telemetria de drift de eventos do SDK para evitar regressão silenciosa em upgrades do pacote.
+ter scorecard/telemetria de drift de eventos do SDK para evitar regressão silenciosa em upgrades do
+pacote.
 
-Esse gap não é a causa primária do reply invisível, mas entrou na investigação por aparecer durante sessões vivas.
+Esse gap não é a causa primária do reply invisível, mas entrou na investigação por aparecer durante
+sessões vivas.
 
 ---
 
@@ -337,7 +349,8 @@ Esse gap não é a causa primária do reply invisível, mas entrou na investiga�
 2. **um único collector canônico** para conteúdo final e incremental do turno explícito;
 3. `channel/client-dialog.js` reduzido a transporte/callbacks, não a parser semântico secundário;
 4. `terminal/dialog/engine.js` renderizando um reply já resolvido, não tentando reconstruí-lo;
-5. `assistant.message` fora do turno ativo continuando no renderer próprio, sem competir com o turno explícito;
+5. `assistant.message` fora do turno ativo continuando no renderer próprio, sem competir com o turno
+   explícito;
 6. `history/timeline` refletindo o reply canônico e não tentando compensar uma perda anterior.
 
 ---
@@ -434,7 +447,8 @@ sob um collector canônico no `agent/dialog`.
 
 ### 9.2 Bridge reduzido a transporte
 
-`src/copilot/channel/client-dialog.js` deixou de resolver semanticamente o reply por `assistant.message`/`task.delta`.
+`src/copilot/channel/client-dialog.js` deixou de resolver semanticamente o reply por
+`assistant.message`/`task.delta`.
 
 Agora:
 
@@ -463,9 +477,11 @@ Após essas transformações:
 
 - typecheck estrito do código Copilot: verde;
 - lint Copilot: verde;
-- suíte focal do circuito (`turn-executor`, `client-dialog`, `engine`, `frontend`, contratos): verde.
+- suíte focal do circuito (`turn-executor`, `client-dialog`, `engine`, `frontend`, contratos):
+  verde.
 
-O próximo passo natural é a revalidação completa e, então, uma nova sessão viva da LLM-B para medir o efeito no terminal real.
+O próximo passo natural é a revalidação completa e, então, uma nova sessão viva da LLM-B para medir
+o efeito no terminal real.
 
 Isso evita continuar “empilhando fallback” em camadas erradas.
 

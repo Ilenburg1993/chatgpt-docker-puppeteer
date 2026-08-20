@@ -20,19 +20,23 @@ export const mcpRoundTripAnalyticsTool = {
             .int()
             .min(1)
             .max(24 * 14)
-            .optional()['describe']('Analysis window in hours. Default: 24; maximum: 336 (14 days).'),
+            .optional()
+            ['describe']('Analysis window in hours. Default: 24; maximum: 336 (14 days).'),
         top: z
             .number()
             .int()
             .min(1)
             .max(100)
-            .optional()['describe']('Maximum transition/tool ranking rows. Default: 20.'),
+            .optional()
+            ['describe']('Maximum transition/tool ranking rows. Default: 20.'),
         includeSynthetic: z
             .boolean()
-            .optional()['describe']('Include events emitted by src/copilot/.ai/jobs test/validator fixtures. Default: false.'),
+            .optional()
+            ['describe']('Include events emitted by src/copilot/.ai/jobs test/validator fixtures. Default: false.'),
         sync: z
             .boolean()
-            .optional()['describe']('Refresh the derived SQLite index from new audit bytes before summarizing. Default: true.'),
+            .optional()
+            ['describe']('Refresh the derived SQLite index from new audit bytes before summarizing. Default: true.'),
     },
     annotations: boundedWriteAnnotations(),
     handler: async (input = {}) => {

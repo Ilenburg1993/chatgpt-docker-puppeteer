@@ -89,11 +89,10 @@ smoke.
 1. Tunnel permanente e o caminho principal deste projeto a partir de 2026-05-23.
 2. O tunnel remoto se chama `workspace-mcp-dev`.
 3. O hostname publico canonico e `mcp.aurelin.org`.
-3. A rota Cloudflare deve mapear o origin raiz `http://127.0.0.1:3333`.
-4. O campo ChatGPT deve receber o endpoint publico permanente
-   `https://mcp.aurelin.org/mcp`.
-5. Cloudflare Tunnel sozinho nao adiciona OAuth ao MCP.
-6. Quick Tunnel `trycloudflare.com` permanece como fallback operacional explicito, nao como padrao.
+4. A rota Cloudflare deve mapear o origin raiz `http://127.0.0.1:3333`.
+5. O campo ChatGPT deve receber o endpoint publico permanente `https://mcp.aurelin.org/mcp`.
+6. Cloudflare Tunnel sozinho nao adiciona OAuth ao MCP.
+7. Quick Tunnel `trycloudflare.com` permanece como fallback operacional explicito, nao como padrao.
 
 ---
 

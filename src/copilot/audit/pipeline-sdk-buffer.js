@@ -50,9 +50,12 @@ export const globalAuditBuffer = new AuditRingBuffer({
  * @returns {SdkAuditEntry[]}
  */
 export function getAuditTail(n = 20, buffer = globalAuditBuffer) {
-    return buffer.tail(n).map((entry) =>
-        /** @type {SdkAuditEntry} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (entry))),
-    );
+    return buffer
+        .tail(n)
+        .map(
+            (entry) =>
+                /** @type {SdkAuditEntry} */ (redactSecretRecord(/** @type {Record<string, unknown>} */ (entry))),
+        );
 }
 
 /**
@@ -72,12 +75,12 @@ export function createAuditPostToolHandler(logger, buffer = globalAuditBuffer) {
     return async (input, invocation) => {
         const entry = /** @type {SdkAuditEntry} */ (
             redactSecretRecord({
-            toolName: input.toolName,
-            toolArgs: input.toolArgs,
-            toolResult: input.toolResult,
-            sessionId: invocation.sessionId,
-            ts: input.timestamp ?? new Date().toISOString(),
-            durationMs: 0,
+                toolName: input.toolName,
+                toolArgs: input.toolArgs,
+                toolResult: input.toolResult,
+                sessionId: invocation.sessionId,
+                ts: input.timestamp ?? new Date().toISOString(),
+                durationMs: 0,
             })
         );
 

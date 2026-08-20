@@ -39,10 +39,10 @@ without inventing local semantics:
 - session inventory: `listSessions`, `getLastSessionId`, `deleteSession`, foreground get/set;
 - session lifecycle: create, resume, disconnect, abort, messages and SSE event stream;
 - messaging: `send`, `sendAndWait`, delivery `mode`, file/directory/selection/blob attachments;
-- configuration: `systemMessage`, `infiniteSessions`, `provider`, `reasoningEffort`, `modelCapabilities`,
-  `configDir`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`, `mcpServers`, `customAgents`,
-  `defaultAgent`, selected `agent`, `skillDirectories`, `disabledSkills`, `gitHubToken`, `availableTools`,
-  `excludedTools`;
+- configuration: `systemMessage`, `infiniteSessions`, `provider`, `reasoningEffort`,
+  `modelCapabilities`, `configDir`, `enableConfigDiscovery`, `includeSubAgentStreamingEvents`,
+  `mcpServers`, `customAgents`, `defaultAgent`, selected `agent`, `skillDirectories`,
+  `disabledSkills`, `gitHubToken`, `availableTools`, `excludedTools`;
 - session methods: `setModel(model, { reasoningEffort })` and `session.log()`.
 
 Function-valued SDK capabilities (`tools[].handler`, `onPermissionRequest`, `onUserInputRequest`,
@@ -60,8 +60,8 @@ must include runtime route metadata when a route is runtime-aware:
 - `usedDefaultRuntimeFallback`: whether the default runtime served the response.
 
 Public responses must also apply boundary redaction before `res.json` whenever a payload can contain
-provider credentials, request headers, tool arguments, audit entries or arbitrary metadata. Redaction
-is defense in depth; producers should still sanitize at write time.
+provider credentials, request headers, tool arguments, audit entries or arbitrary metadata.
+Redaction is defense in depth; producers should still sanitize at write time.
 
 ### Payload Classification
 

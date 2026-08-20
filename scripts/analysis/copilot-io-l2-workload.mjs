@@ -17,6 +17,7 @@ const DEFAULT_INCLUDE = '**/*.{js,ts,mjs,cjs}';
 
 /**
  * @typedef {{ path: string; relativePath: string; sizeBytes: number }} WorkloadFile
+ *
  * @typedef {{
  *     phase: string;
  *     profile: string;
@@ -248,9 +249,7 @@ async function executePhase(phase, manifestPath, concurrency) {
             } catch (error) {
                 errors += 1;
                 if (errorSamples.length < 5) {
-                    errorSamples.push(
-                        `${file.relativePath}: ${error instanceof Error ? error.name : 'Error'}`,
-                    );
+                    errorSamples.push(`${file.relativePath}: ${error instanceof Error ? error.name : 'Error'}`);
                 }
             } finally {
                 latencies.push(performance.now() - readStartedAt);
@@ -265,8 +264,7 @@ async function executePhase(phase, manifestPath, concurrency) {
         if (errors > 0) {
             throw new Error(`workload phase ${phase} had ${errors} read errors: ${errorSamples.join(', ')}`);
         }
-        const throughputMiBPerSecond =
-            wallMs > 0 ? (bytes / (1024 * 1024)) / (wallMs / 1000) : 0;
+        const throughputMiBPerSecond = wallMs > 0 ? bytes / (1024 * 1024) / (wallMs / 1000) : 0;
         const result = {
             phase,
             profile: l2.getIoL2CacheConfiguration().profile,
@@ -358,13 +356,9 @@ async function main() {
         const seedOverhead = baseline.wallMs > 0 ? seed.wallMs / baseline.wallMs : 0;
         const seedPremiumMs = Math.max(0, seed.wallMs - baseline.wallMs);
         const savingsPerReuseMs = baseline.wallMs - read.wallMs;
-        const breakEvenReusePasses =
-            savingsPerReuseMs > 0 ? Math.ceil(seedPremiumMs / savingsPerReuseMs) : null;
+        const breakEvenReusePasses = savingsPerReuseMs > 0 ? Math.ceil(seedPremiumMs / savingsPerReuseMs) : null;
         const recommendation =
-            hitRatio >= 0.95 &&
-            warmFsVsL2 >= 1.25 &&
-            breakEvenReusePasses !== null &&
-            breakEvenReusePasses <= 3
+            hitRatio >= 0.95 && warmFsVsL2 >= 1.25 && breakEvenReusePasses !== null && breakEvenReusePasses <= 3
                 ? 'collect-more-before-promotion'
                 : 'keep-default-off';
         const summary = {

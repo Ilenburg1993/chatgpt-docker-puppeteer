@@ -1,5 +1,4 @@
 // @ts-check
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { describe, expect, it, vi } from 'vitest';
 
 // ─── SDK mock ──────────────────────────────────────────────────────────────
@@ -373,7 +372,9 @@ describe('F72 — BYOK env configuration', () => {
 
         expect(models[0]?.id).toBe('deepseek/deepseek-v4-flash:free');
         expect(models[0]?.capabilities.supports.reasoningEffort).toBe(false);
-        expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (models[0]).byok?.supportsReasoning).toBe(true);
+        expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (models[0]).byok?.supportsReasoning).toBe(
+            true,
+        );
     });
 
     it('fornece onListModels com fallback estático para client.listModels em BYOK', async () => {
@@ -391,14 +392,13 @@ describe('F72 — BYOK env configuration', () => {
     });
 
     it('descobre modelos remotos OpenAI-compatible com timeout/cache e sem vazar segredo', async () => {
-        const fetchMock = vi.fn(async (
-            /** @type {string | URL | Request} */ _input,
-            /** @type {RequestInit} */ _init,
-        ) => ({
-            ok: true,
-            status: 200,
-            json: async () => ({ data: [{ id: 'remote-a' }, { id: 'remote-b' }, { id: 'remote-a' }] }),
-        }));
+        const fetchMock = vi.fn(
+            async (/** @type {string | URL | Request} */ _input, /** @type {RequestInit} */ _init) => ({
+                ok: true,
+                status: 200,
+                json: async () => ({ data: [{ id: 'remote-a' }, { id: 'remote-b' }, { id: 'remote-a' }] }),
+            }),
+        );
         vi.stubGlobal('fetch', fetchMock);
         try {
             const env = {
@@ -572,7 +572,9 @@ describe('F72 — BYOK env configuration', () => {
         expect(staticModels[0]?.id).toBe('meta/model:free');
         expect(staticModels[0]?.capabilities.supports.vision).toBe(true);
         expect(staticModels[0]?.capabilities.supports.reasoningEffort).toBe(false);
-        expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (staticModels[0]).byok?.supportsReasoning).toBe(true);
+        expect(
+            /** @type {{ byok?: { supportsReasoning?: boolean } }} */ (staticModels[0]).byok?.supportsReasoning,
+        ).toBe(true);
         expect(staticModels[0]?.capabilities.limits.max_context_window_tokens).toBe(65536);
         expect(staticModels[0]?.policy?.terms).toContain('byok:free');
 
@@ -608,7 +610,9 @@ describe('F72 — BYOK env configuration', () => {
             expect(remote.models[0]?.id).toBe('remote/reasoner:free');
             expect(remote.models[0]?.policy?.terms).toContain('byok:free');
             expect(remote.models[0]?.capabilities.supports.reasoningEffort).toBe(false);
-            expect(/** @type {{ byok?: { supportsReasoning?: boolean } }} */ (remote.models[0]).byok?.supportsReasoning).toBe(true);
+            expect(
+                /** @type {{ byok?: { supportsReasoning?: boolean } }} */ (remote.models[0]).byok?.supportsReasoning,
+            ).toBe(true);
             expect(remote.models[0]?.capabilities.limits.max_context_window_tokens).toBe(131072);
             expect(JSON.stringify(remote)).not.toContain('secret');
         } finally {
@@ -666,8 +670,16 @@ describe('F72 — BYOK env configuration', () => {
             COPILOT_BYOK_REQUESTS_PER_MINUTE: '30',
         });
 
-        expect(state.summary.limits).toMatchObject({ maxRequestTokens: 6000, tokensPerMinute: 6000, requestsPerMinute: 30 });
-        expect(models[0]?.byok?.rateLimits).toMatchObject({ maxRequestTokens: 6000, tokensPerMinute: 6000, requestsPerMinute: 30 });
+        expect(state.summary.limits).toMatchObject({
+            maxRequestTokens: 6000,
+            tokensPerMinute: 6000,
+            requestsPerMinute: 30,
+        });
+        expect(models[0]?.byok?.rateLimits).toMatchObject({
+            maxRequestTokens: 6000,
+            tokensPerMinute: 6000,
+            requestsPerMinute: 30,
+        });
     });
 
     it('resolve perfil ativo a partir de COPILOT_BYOK_PROFILES_JSON sem vazar segredo', () => {

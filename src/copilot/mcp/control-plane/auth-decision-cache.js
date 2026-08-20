@@ -2,8 +2,8 @@
 /**
  * Positive authorization decision cache for MCP OAuth hot paths.
  *
- * Only successful OAuth/JWKS decisions are retained. Failures are never cached.
- * DPoP-bound requests are bypassed to preserve replay checks.
+ * Only successful OAuth/JWKS decisions are retained. Failures are never cached. DPoP-bound requests are bypassed to
+ * preserve replay checks.
  *
  * @module copilot/mcp/control-plane/auth-decision-cache
  */
@@ -15,7 +15,10 @@ const MAX_TTL_MS = 5 * 60 * 1000;
 const MAX_ENTRIES = 4096;
 const EXPIRY_SKEW_MS = 5 * 1000;
 
-/** @type {Map<string, { decision: import('./auth.js').McpAuthorizationDecision; expiresAt: number; cachedAt: number }>} */
+/** @type {Map<
+    string,
+    { decision: import('./auth.js').McpAuthorizationDecision; expiresAt: number; cachedAt: number }
+>} */
 const cache = new Map();
 const stats = {
     hits: 0,

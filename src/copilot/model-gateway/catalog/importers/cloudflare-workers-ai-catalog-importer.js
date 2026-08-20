@@ -138,7 +138,8 @@ function parseRowsFromMarkdown(markdown) {
             'iu',
         );
         const taskMatch = text.match(taskPattern);
-        const displayName = (taskMatch?.index ? text.slice(0, taskMatch.index).trim() : '') || id.split('/').at(-1) || id;
+        const displayName =
+            (taskMatch?.index ? text.slice(0, taskMatch.index).trim() : '') || id.split('/').at(-1) || id;
         const task = taskMatch?.[1]?.trim() ?? null;
         const author = taskMatch?.[2]?.trim() ?? null;
         const hosting = taskMatch?.[3]?.trim() ?? null;
@@ -185,7 +186,9 @@ function parseRowsFromHtml(html) {
  */
 function parseCloudflareRows(raw) {
     if (typeof raw === 'string') {
-        return raw.includes('https://developers.cloudflare.com/ai/models/') ? parseRowsFromMarkdown(raw) : parseRowsFromHtml(raw);
+        return raw.includes('https://developers.cloudflare.com/ai/models/')
+            ? parseRowsFromMarkdown(raw)
+            : parseRowsFromHtml(raw);
     }
     const candidates = [
         isRecord(raw) ? raw['data'] : null,
@@ -217,13 +220,15 @@ function capabilitiesFromRow(row) {
     const task = (stringValue(row['task']) ?? stringValue(row['task_type']) ?? '').toLowerCase();
     /** @type {Record<string, boolean>} */
     const normalized = {};
-    if (task.includes('text generation') || task.includes('summarization') || task.includes('translation')) normalized['chat'] = true;
+    if (task.includes('text generation') || task.includes('summarization') || task.includes('translation'))
+        normalized['chat'] = true;
     if (task.includes('embedding')) normalized['embeddings'] = true;
     if (task.includes('rerank')) normalized['rerank'] = true;
     if (task.includes('image')) normalized['vision'] = true;
     if (task.includes('speech') || task.includes('audio')) normalized['audio'] = true;
     if (booleanValue(capabilities['reasoning'] ?? row['reasoning']) === true) normalized['reasoning'] = true;
-    if (booleanValue(capabilities['function_calling'] ?? capabilities['tools'] ?? row['function_calling']) === true) normalized['tools'] = true;
+    if (booleanValue(capabilities['function_calling'] ?? capabilities['tools'] ?? row['function_calling']) === true)
+        normalized['tools'] = true;
     if (booleanValue(capabilities['vision'] ?? row['vision']) === true) normalized['vision'] = true;
     if (booleanValue(capabilities['batch'] ?? row['batch']) === true) normalized['batch'] = true;
     if (booleanValue(capabilities['lora'] ?? row['lora']) === true) normalized['lora'] = true;
@@ -238,12 +243,18 @@ function capabilitiesFromRow(row) {
  */
 function modalitiesFromTask(task, capabilities) {
     const normalizedTask = (task ?? '').toLowerCase();
-    if (normalizedTask.includes('text-to-image')) return normalizeModelModalities({ input: ['text'], output: ['image'] });
-    if (normalizedTask.includes('text-to-speech')) return normalizeModelModalities({ input: ['text'], output: ['audio'] });
-    if (normalizedTask.includes('text-to-video')) return normalizeModelModalities({ input: ['text'], output: ['video'] });
-    if (normalizedTask.includes('image-to-video')) return normalizeModelModalities({ input: ['image'], output: ['video'] });
-    if (normalizedTask.includes('image-to-text')) return normalizeModelModalities({ input: ['image'], output: ['text'] });
-    if (normalizedTask.includes('speech') || normalizedTask.includes('audio')) return normalizeModelModalities({ input: ['audio'], output: ['text'] });
+    if (normalizedTask.includes('text-to-image'))
+        return normalizeModelModalities({ input: ['text'], output: ['image'] });
+    if (normalizedTask.includes('text-to-speech'))
+        return normalizeModelModalities({ input: ['text'], output: ['audio'] });
+    if (normalizedTask.includes('text-to-video'))
+        return normalizeModelModalities({ input: ['text'], output: ['video'] });
+    if (normalizedTask.includes('image-to-video'))
+        return normalizeModelModalities({ input: ['image'], output: ['video'] });
+    if (normalizedTask.includes('image-to-text'))
+        return normalizeModelModalities({ input: ['image'], output: ['text'] });
+    if (normalizedTask.includes('speech') || normalizedTask.includes('audio'))
+        return normalizeModelModalities({ input: ['audio'], output: ['text'] });
     if (capabilities['vision']) return normalizeModelModalities({ input: ['text', 'image'], output: ['text'] });
     return normalizeModelModalities({
         input: normalizeCatalogModalities(['text']),
@@ -265,7 +276,7 @@ function fillCloudflareTemplate(template, accountId, gatewayId) {
 
 /**
  * @param {Record<string, unknown>} row
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function modelEvidenceValues(row) {
     const id = providerModel(row);
@@ -292,13 +303,25 @@ function modelEvidenceValues(row) {
         { fieldPath: 'modalities.output', value: modalities.output },
         { fieldPath: 'providerMetadata.ownedBy', value: 'cloudflare' },
         { fieldPath: 'providerMetadata.cloudflare.task', value: task },
-        { fieldPath: 'providerMetadata.cloudflare.author', value: stringValue(row['author']) ?? stringValue(row['provider']) },
+        {
+            fieldPath: 'providerMetadata.cloudflare.author',
+            value: stringValue(row['author']) ?? stringValue(row['provider']),
+        },
         { fieldPath: 'providerMetadata.cloudflare.platform', value: stringValue(row['platform']) },
-        { fieldPath: 'providerMetadata.cloudflare.hosting', value: stringValue(row['hosting']) ?? stringValue(row['availability']) },
+        {
+            fieldPath: 'providerMetadata.cloudflare.hosting',
+            value: stringValue(row['hosting']) ?? stringValue(row['availability']),
+        },
         { fieldPath: 'providerMetadata.cloudflare.partner', value: booleanValue(row['partner']) },
-        { fieldPath: 'providerMetadata.cloudflare.docsUrl', value: stringValue(row['docs_url']) ?? stringValue(row['url']) },
+        {
+            fieldPath: 'providerMetadata.cloudflare.docsUrl',
+            value: stringValue(row['docs_url']) ?? stringValue(row['url']),
+        },
         { fieldPath: 'providerMetadata.cloudflare.rawCapabilities', value: row['capabilities'] },
-        ...Object.entries(identityTraits).map(([key, value]) => ({ fieldPath: `providerMetadata.modelTraits.${key}`, value })),
+        ...Object.entries(identityTraits).map(([key, value]) => ({
+            fieldPath: `providerMetadata.modelTraits.${key}`,
+            value,
+        })),
         { fieldPath: 'openai.owned_by', value: 'cloudflare' },
     ];
     return values.filter((item) => {
@@ -329,16 +352,23 @@ export function createCloudflareWorkersAiCatalogImporter(options = {}) {
         sourceKind,
         requiresAuth: Boolean(options.apiToken),
         url,
-        envRequirements: ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_KEY', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_AI_GATEWAY_ID'],
+        envRequirements: [
+            'CLOUDFLARE_API_TOKEN',
+            'CLOUDFLARE_KEY',
+            'CLOUDFLARE_ACCOUNT_ID',
+            'CLOUDFLARE_AI_GATEWAY_ID',
+        ],
         refreshPolicy: 'scheduled',
         ttlSeconds: 3600,
         async fetchRaw() {
-            if (typeof fetchImpl !== 'function') throw new Error('fetch is unavailable for Cloudflare Workers AI catalog import');
+            if (typeof fetchImpl !== 'function')
+                throw new Error('fetch is unavailable for Cloudflare Workers AI catalog import');
             const headers = options.apiToken
                 ? { accept: 'application/json,text/markdown,text/html', authorization: `Bearer ${options.apiToken}` }
                 : { accept: 'application/json,text/markdown,text/html' };
             const response = await fetchImpl(url, { headers });
-            if (!response.ok) throw new Error(`Cloudflare Workers AI catalog fetch failed with HTTP ${response.status}`);
+            if (!response.ok)
+                throw new Error(`Cloudflare Workers AI catalog fetch failed with HTTP ${response.status}`);
             const contentType = response.headers?.get?.('content-type') ?? '';
             return contentType.includes('application/json')
                 ? readCatalogResponseJson(response, { label: 'Cloudflare Workers AI catalog' })
@@ -370,9 +400,21 @@ export function createCloudflareWorkersAiCatalogImporter(options = {}) {
         },
         toRouteOptions(rows, context) {
             const sourceId = stringValue(context.source['id']) ?? 'cloudflare-workers-ai-catalog';
-            const restBaseUrl = fillCloudflareTemplate(CLOUDFLARE_WORKERS_AI_REST_BASE_URL, options.accountId, options.gatewayId);
-            const openAIBaseUrl = fillCloudflareTemplate(CLOUDFLARE_WORKERS_AI_OPENAI_BASE_URL, options.accountId, options.gatewayId);
-            const gatewayUrl = fillCloudflareTemplate(CLOUDFLARE_AI_GATEWAY_UNIVERSAL_URL, options.accountId, options.gatewayId);
+            const restBaseUrl = fillCloudflareTemplate(
+                CLOUDFLARE_WORKERS_AI_REST_BASE_URL,
+                options.accountId,
+                options.gatewayId,
+            );
+            const openAIBaseUrl = fillCloudflareTemplate(
+                CLOUDFLARE_WORKERS_AI_OPENAI_BASE_URL,
+                options.accountId,
+                options.gatewayId,
+            );
+            const gatewayUrl = fillCloudflareTemplate(
+                CLOUDFLARE_AI_GATEWAY_UNIVERSAL_URL,
+                options.accountId,
+                options.gatewayId,
+            );
             return rows.flatMap((row) => {
                 const record = isRecord(row) ? row : {};
                 const id = providerModel(record);

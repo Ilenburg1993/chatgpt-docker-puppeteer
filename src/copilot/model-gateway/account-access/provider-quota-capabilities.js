@@ -213,7 +213,7 @@ function matchesSelector(selector, row) {
 /**
  * @param {object} [options]
  * @param {string | null} [options.selector]
- * @returns {Array<(typeof CAPABILITY_ROWS)[number]>}
+ * @returns {(typeof CAPABILITY_ROWS)[number][]}
  */
 export function listModelGatewayProviderQuotaCapabilities(options = {}) {
     const selector = optionalString(options.selector);
@@ -224,17 +224,17 @@ export function listModelGatewayProviderQuotaCapabilities(options = {}) {
  * @param {object} [options]
  * @param {string | null} [options.selector]
  * @returns {{
- *   rows: ReturnType<typeof listModelGatewayProviderQuotaCapabilities>;
- *   summary: {
- *     total: number;
- *     matched: number;
- *     providerCount: number;
- *     accountVisibilityCount: number;
- *     quotaSnapshotCount: number;
- *     runtimeFailureOverlayCount: number;
- *     sdkQuotaByokTruthCount: number;
- *     byQuotaSnapshot: Record<string, number>;
- *   };
+ *     rows: ReturnType<typeof listModelGatewayProviderQuotaCapabilities>;
+ *     summary: {
+ *         total: number;
+ *         matched: number;
+ *         providerCount: number;
+ *         accountVisibilityCount: number;
+ *         quotaSnapshotCount: number;
+ *         runtimeFailureOverlayCount: number;
+ *         sdkQuotaByokTruthCount: number;
+ *         byQuotaSnapshot: Record<string, number>;
+ *     };
  * }}
  */
 export function summarizeModelGatewayProviderQuotaCapabilities(options = {}) {
@@ -249,7 +249,9 @@ export function summarizeModelGatewayProviderQuotaCapabilities(options = {}) {
             matched: rows.length,
             providerCount: new Set(rows.map((row) => row.providerId)).size,
             accountVisibilityCount: rows.filter((row) => row.accountVisibility !== 'none').length,
-            quotaSnapshotCount: rows.filter((row) => !['runtime_failure_only', 'not_applicable', 'unknown'].includes(row.quotaSnapshot)).length,
+            quotaSnapshotCount: rows.filter(
+                (row) => !['runtime_failure_only', 'not_applicable', 'unknown'].includes(row.quotaSnapshot),
+            ).length,
             runtimeFailureOverlayCount: rows.filter((row) => row.runtimeFailureOverlay).length,
             sdkQuotaByokTruthCount: rows.filter((row) => row.sdkQuotaAppliesToByok).length,
             byQuotaSnapshot,

@@ -1,4 +1,4 @@
-/** @import {IDriver} from "#types/driver/contracts" */
+/** @import {IDriver} from '#types/driver/contracts' */
 // @ts-check - Type checking rigoroso habilitado (arquivo core)
 import CONFIG from '#core/config';
 import { log } from '#core/logger';
@@ -1545,15 +1545,16 @@ class DriverFactory extends EventEmitter {
             // Este signal será substituído quando a task real assumir o driver (Hot Swap)
             const warmupController = new AbortController();
 
-            const attachableDriver = /**
-             * @type {TargetDriver & {
-             *     attachContext: (
-             *         page: import('puppeteer-core').Page,
-             *         signal?: AbortSignal | null,
-             *         taskId?: string | null,
-             *     ) => void;
-             * }}
-             */ (driver);
+            const attachableDriver =
+                /**
+                 * @type {TargetDriver & {
+                 *     attachContext: (
+                 *         page: import('puppeteer-core').Page,
+                 *         signal?: AbortSignal | null,
+                 *         taskId?: string | null,
+                 *     ) => void;
+                 * }}
+                 */ (driver);
             attachableDriver.attachContext(page, warmupController.signal, 'pool-warmup');
 
             // Marca driver como 'Hot' para métricas

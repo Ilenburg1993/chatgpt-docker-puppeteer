@@ -124,7 +124,9 @@
  *     ts: number;
  * } | null} lastPrInfo
  *   - Último snapshot de billing/quota.
+ *
  * @property {Record<string, unknown> | null} lastLlmUsage
+ *
  *   - Última telemetria LLM classificada (`llm.usage`), sem equivaler automaticamente a PR.
  */
 
@@ -643,8 +645,7 @@
  *   o agente graciosamente
  * @property {(() => Promise<import('#copilot/sdk/types').ModeResult>) | undefined} getSdkSessionMode - Retorna o modo
  *   vanilla atual da sessão SDK
- * @property {((mode: 'interactive' | 'plan' | 'autopilot') => Promise<import('#copilot/sdk/types').ModeResult>)
- *     | undefined} setSdkSessionMode
+ * @property {((mode: 'interactive' | 'plan' | 'autopilot') => Promise<import('#copilot/sdk/types').ModeResult>) | undefined} setSdkSessionMode
  *   - Altera o modo vanilla da sessão SDK
  *
  * @property {(() => Promise<import('#copilot/sdk/types').PlanReadResult>) | undefined} readSdkPlan - Lê o plan.md
@@ -653,15 +654,16 @@
  *   SDK
  * @property {(() => Promise<object>) | undefined} deleteSdkPlan - Remove o plan.md vanilla da sessão SDK
  * @property {((modelId: string, options?: { idempotencyKey?: string; source?: string }) => Promise<Record<string, unknown>>)
- *     | undefined} switchModel - Troca transacionalmente o modelo vivo e só commita após verificação.
- * @property {(
- *         (
- *             route: Record<string, unknown>,
- *             options?: { idempotencyKey?: string; timeoutMs?: number; source?: string },
- *         ) => Promise<Record<string, unknown>>
- *     )
+ *     | undefined} switchModel
+ *   - Troca transacionalmente o modelo vivo e só commita após verificação.
+ *
+ * @property {((
+ *           route: Record<string, unknown>,
+ *           options?: { idempotencyKey?: string; timeoutMs?: number; source?: string },
+ *       ) => Promise<Record<string, unknown>>)
  *     | undefined} switchRoute
  *   - Rebinda provider/model preservando o mesmo `sessionId`.
+ *
  * @property {(
  *     message: string,
  *     opts?: {
@@ -742,9 +744,9 @@
  *       ) => Promise<import('#copilot/sdk/types').SessionMetadata[]>)
  *     | undefined} listSdkSessions
  *   - Lista sessões conhecidas pelo SDK atual
+ *
  * @property {((sessionId: string) => Promise<void>) | undefined} deleteSdkSession - Remove permanentemente uma sessão
  *   persistida conhecida pelo SDK atual
- *
  * @property {(() => Promise<unknown>) | undefined} listSdkAgents - Lista agentes customizados disponíveis na sessão
  *   atual
  * @property {(() => Promise<unknown>) | undefined} getCurrentSdkAgent - Retorna o agente customizado ativo na sessão
@@ -769,12 +771,10 @@
  *   `session.ui.confirm()` ou fallback compatível
  * @property {((message: string, options: string[]) => Promise<string | null>) | undefined} selectSdkSessionUi -
  *   Solicita seleção via `session.ui.select()` ou fallback compatível
- * @property {((message: string, options?: import('#copilot/sdk/types').InputOptions) => Promise<string | null>)
- *     | undefined} inputSdkSessionUi
+ * @property {((message: string, options?: import('#copilot/sdk/types').InputOptions) => Promise<string | null>) | undefined} inputSdkSessionUi
  *   - Solicita entrada textual via `session.ui.input()` ou fallback compatível
  *
- * @property {((options?: { sessionId?: string }) => import('#copilot/sdk/types').QueuedElicitationEntry[])
- *     | undefined} listPendingSdkElicitations
+ * @property {((options?: { sessionId?: string }) => import('#copilot/sdk/types').QueuedElicitationEntry[]) | undefined} listPendingSdkElicitations
  *   - Lista solicitações de elicitation pendentes do SDK
  *
  * @property {((id: string) => import('#copilot/sdk/types').QueuedElicitationEntry | null) | undefined} getPendingSdkElicitation
@@ -783,8 +783,7 @@
  * @property {((id: string, result: import('#copilot/sdk/types').ElicitationResult) => boolean) | undefined} resolvePendingSdkElicitation
  *   - Resolve uma solicitação de elicitation pendente do SDK
  *
- * @property {((requestId: string, result: { kind: string } & Record<string, unknown>) => Promise<unknown>)
- *     | undefined} handleSdkPendingPermission
+ * @property {((requestId: string, result: { kind: string } & Record<string, unknown>) => Promise<unknown>) | undefined} handleSdkPendingPermission
  *   - Resolve permissão pendente do SDK
  *
  * @property {(() => Promise<{ available: boolean; source: string | null; requests: unknown[] }>) | undefined} listPendingSdkPermissions

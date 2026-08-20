@@ -1,35 +1,44 @@
 # Diagnóstico amplo do sistema MCP / OAuth / HTTP2-QUIC / Cloudflare
 
-Data: 2026-06-10
-Workspace: `/workspaces/chatgpt-docker-puppeteer`
-Conector público: `https://mcp.aurelin.org/mcp`
-Escopo: MCP Streamable HTTP, OAuth, Cloudflare Tunnel, HTTP/2 origin, QUIC edge transport, edge posture, runtime, validação, observabilidade e próximos passos.
+Data: 2026-06-10 Workspace: `/workspaces/chatgpt-docker-puppeteer` Conector público:
+`https://mcp.aurelin.org/mcp` Escopo: MCP Streamable HTTP, OAuth, Cloudflare Tunnel, HTTP/2 origin,
+QUIC edge transport, edge posture, runtime, validação, observabilidade e próximos passos.
 
 ---
 
 ## 1. Sumário executivo
 
-O sistema está **operacional e apto para uso**, com o conector permanente `https://mcp.aurelin.org/mcp` em modo OAuth, Cloudflare Tunnel permanente, transporte Cloudflare em **QUIC**, origin local em **HTTPS/HTTP2**, smoke público atualizado e post-change gates aprovados.
+O sistema está **operacional e apto para uso**, com o conector permanente
+`https://mcp.aurelin.org/mcp` em modo OAuth, Cloudflare Tunnel permanente, transporte Cloudflare em
+**QUIC**, origin local em **HTTPS/HTTP2**, smoke público atualizado e post-change gates aprovados.
 
 A situação atual é muito melhor que o estado inicial das rodadas anteriores:
 
 - readiness geral: `ready=true`, sem blockers;
-- OAuth: issuer, metadata, JWKS, PKCE S256, DCR/CIMD, resource parameter e scopes estão consistentes;
+- OAuth: issuer, metadata, JWKS, PKCE S256, DCR/CIMD, resource parameter e scopes estão
+  consistentes;
 - Cloudflare Tunnel: remoto saudável, 4 conexões HA, QUIC presente, erro de request zero;
-- latência QUIC: RTT normalizado corretamente como milissegundos, com `smoothedRttMs` na casa de dezenas de ms;
-- edge posture: cache bypass e passthrough de MCP/OAuth configurados; nenhuma regra crítica bloqueando `/mcp`;
-- runtime MCP: `status=ok` após refresh de smoke e `mcp_smoke_workspace`; sem erros de tools no snapshot recente;
+- latência QUIC: RTT normalizado corretamente como milissegundos, com `smoothedRttMs` na casa de
+  dezenas de ms;
+- edge posture: cache bypass e passthrough de MCP/OAuth configurados; nenhuma regra crítica
+  bloqueando `/mcp`;
+- runtime MCP: `status=ok` após refresh de smoke e `mcp_smoke_workspace`; sem erros de tools no
+  snapshot recente;
 - validação: typecheck e unit-mcp passaram.
 
 Principais pontos ainda a tratar:
 
 1. O workspace está sujo, com alterações não commitadas/untracked.
-2. Há settings Cloudflare zone-wide potencialmente interferentes, mas há regra scoped passthrough mitigando MCP/OAuth. Ainda convém manter auditoria periódica.
-3. Não há rate limit explícito para `/mcp` anônimo no edge; a mitigação atual está no origin fallback.
+2. Há settings Cloudflare zone-wide potencialmente interferentes, mas há regra scoped passthrough
+   mitigando MCP/OAuth. Ainda convém manter auditoria periódica.
+3. Não há rate limit explícito para `/mcp` anônimo no edge; a mitigação atual está no origin
+   fallback.
 4. As tools mais lentas são diagnósticos Cloudflare remotos, não o hot path normal de uso do MCP.
-5. Os logs antigos mostram erros de origin/TLS antes do smoke mais recente; após refresh, os gates dizem que não há origin errors acionáveis depois do último smoke.
+5. Os logs antigos mostram erros de origin/TLS antes do smoke mais recente; após refresh, os gates
+   dizem que não há origin errors acionáveis depois do último smoke.
 
-Conclusão: **não há blocker funcional; há melhorias recomendadas de higiene, hardening e observabilidade.**
+Conclusão: **não há blocker funcional; há melhorias recomendadas de higiene, hardening e
+observabilidade.**
 
 ---
 
@@ -37,38 +46,54 @@ Conclusão: **não há blocker funcional; há melhorias recomendadas de higiene,
 
 ### 2.1 MCP Streamable HTTP
 
-A especificação MCP 2025-06-18 define que Streamable HTTP usa JSON-RPC sobre HTTP, com endpoint MCP único que suporta POST e GET; cada mensagem JSON-RPC enviada ao servidor deve usar um novo HTTP POST. Também exige `Accept: application/json, text/event-stream` e recomenda autenticação adequada, validação de `Origin` e bind local seguro para servidores locais.
+A especificação MCP 2025-06-18 define que Streamable HTTP usa JSON-RPC sobre HTTP, com endpoint MCP
+único que suporta POST e GET; cada mensagem JSON-RPC enviada ao servidor deve usar um novo HTTP
+POST. Também exige `Accept: application/json, text/event-stream` e recomenda autenticação adequada,
+validação de `Origin` e bind local seguro para servidores locais.
 
 Referência oficial: `https://modelcontextprotocol.io/specification/2025-06-18/basic/transports`
 
-Implicação para este sistema: a otimização correta não é inventar transporte incompatível, mas reduzir overhead em volta de cada request: autenticação, validação, cache, I/O, auditoria, keep-alive, Cloudflare edge e origin HTTP2.
+Implicação para este sistema: a otimização correta não é inventar transporte incompatível, mas
+reduzir overhead em volta de cada request: autenticação, validação, cache, I/O, auditoria,
+keep-alive, Cloudflare edge e origin HTTP2.
 
 ### 2.2 MCP Authorization / OAuth
 
-A especificação MCP de autorização para HTTP-based transports é baseada em OAuth 2.x, Authorization Server Metadata, Dynamic Client Registration e Protected Resource Metadata. MCP clients devem usar Protected Resource Metadata para descobrir authorization servers; MCP servers devem usar `WWW-Authenticate` em 401 para indicar resource metadata.
+A especificação MCP de autorização para HTTP-based transports é baseada em OAuth 2.x, Authorization
+Server Metadata, Dynamic Client Registration e Protected Resource Metadata. MCP clients devem usar
+Protected Resource Metadata para descobrir authorization servers; MCP servers devem usar
+`WWW-Authenticate` em 401 para indicar resource metadata.
 
 Referência oficial: `https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization`
 
-Implicação para este sistema: manter OAuth forte é obrigatório para o modo público. Caches de metadata/JWKS são aceitáveis apenas quando preservam issuer, audience/resource, assinatura, expiração, scopes e challenge HTTP/MCP.
+Implicação para este sistema: manter OAuth forte é obrigatório para o modo público. Caches de
+metadata/JWKS são aceitáveis apenas quando preservam issuer, audience/resource, assinatura,
+expiração, scopes e challenge HTTP/MCP.
 
 ### 2.3 Cloudflare Tunnel QUIC/HTTP2
 
-Cloudflare Tunnel suporta protocolos `auto`, `http2` e `quic`. QUIC exige saída UDP para a porta 7844; HTTP/2 usa TCP. Em ambientes com firewall/SNI, os hosts relevantes incluem `quic.cftunnel.com` e `h2.cftunnel.com`.
+Cloudflare Tunnel suporta protocolos `auto`, `http2` e `quic`. QUIC exige saída UDP para a porta
+7844; HTTP/2 usa TCP. Em ambientes com firewall/SNI, os hosts relevantes incluem `quic.cftunnel.com`
+e `h2.cftunnel.com`.
 
 Referências oficiais:
 
 - `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/`
 - `https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/tunnel-with-firewall/`
 
-Implicação para este sistema: QUIC é uma escolha correta quando os gates mostram RTT baixo, 4 HA connections, erro zero e smoke fresco. Rollback HTTP/2 deve permanecer disponível.
+Implicação para este sistema: QUIC é uma escolha correta quando os gates mostram RTT baixo, 4 HA
+connections, erro zero e smoke fresco. Rollback HTTP/2 deve permanecer disponível.
 
 ### 2.4 OpenAI Apps SDK / OAuth
 
-A documentação oficial da OpenAI Apps SDK trata autenticação via schemes OAuth/security schemes e recomenda que tools protegidas indiquem desafios de autenticação de modo compatível com o cliente.
+A documentação oficial da OpenAI Apps SDK trata autenticação via schemes OAuth/security schemes e
+recomenda que tools protegidas indiquem desafios de autenticação de modo compatível com o cliente.
 
 Referência oficial: `https://developers.openai.com/apps-sdk/build/auth`
 
-Implicação para este sistema: o conector ChatGPT deve continuar recebendo OAuth metadata, WWW-Authenticate e scopes consistentes, sem Cloudflare Access/challenge interativo na frente de `/mcp`.
+Implicação para este sistema: o conector ChatGPT deve continuar recebendo OAuth metadata,
+WWW-Authenticate e scopes consistentes, sem Cloudflare Access/challenge interativo na frente de
+`/mcp`.
 
 ---
 
@@ -100,7 +125,8 @@ originServerName = mcp.aurelin.org
 
 Diagnóstico: **pronto para uso.**
 
-Observação: havia smoke antigo, mas foi executado `mcp_connector_smoke_refresh` e os gates posteriores passaram com smoke fresco.
+Observação: havia smoke antigo, mas foi executado `mcp_connector_smoke_refresh` e os gates
+posteriores passaram com smoke fresco.
 
 ---
 
@@ -181,9 +207,12 @@ Diagnóstico: **OAuth issuer/metadata está saudável e compatível com os requi
 
 ### 4.3 Pontos de atenção OAuth
 
-1. O modo `publicOauthDiagnosticsEnabled` aparece como parte do design anterior; isso é útil para diagnóstico, mas em janelas de hardening extremo pode ser reduzido se necessário.
-2. Manter `COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM=true` é correto, pois reduz risco de confused deputy.
-3. Não adicionar Cloudflare Access interativo na frente de `/mcp`, pois isso criaria uma segunda camada OAuth/browser que o conector MCP não necessariamente resolve.
+1. O modo `publicOauthDiagnosticsEnabled` aparece como parte do design anterior; isso é útil para
+   diagnóstico, mas em janelas de hardening extremo pode ser reduzido se necessário.
+2. Manter `COPILOT_MCP_OAUTH_REQUIRE_RESOURCE_CLAIM=true` é correto, pois reduz risco de confused
+   deputy.
+3. Não adicionar Cloudflare Access interativo na frente de `/mcp`, pois isso criaria uma segunda
+   camada OAuth/browser que o conector MCP não necessariamente resolve.
 
 ---
 
@@ -211,11 +240,13 @@ tokenPresent = false
 tokenFilePresent = true
 ```
 
-Diagnóstico: **modo permanente está correto; token por arquivo é aceitável e evita expor token no ambiente.**
+Diagnóstico: **modo permanente está correto; token por arquivo é aceitável e evita expor token no
+ambiente.**
 
 ### 5.2 HA connections e colos
 
-Remote audit mostrou túnel remoto `healthy`, com 4 conexões Cloudflare ativas, todas sem pending reconnect, clientVersion `2026.5.2`, em colos GRU.
+Remote audit mostrou túnel remoto `healthy`, com 4 conexões Cloudflare ativas, todas sem pending
+reconnect, clientVersion `2026.5.2`, em colos GRU.
 
 Exemplo de colos observados:
 
@@ -279,7 +310,8 @@ maxUdpPayload = 1360
 packetTooBigDropped = 0
 ```
 
-Diagnóstico: **QUIC está saudável.** O RTT está baixo, sem packet-too-big drops, sem request errors e com 4 conexões HA.
+Diagnóstico: **QUIC está saudável.** O RTT está baixo, sem packet-too-big drops, sem request errors
+e com 4 conexões HA.
 
 ### 5.5 Post-change gates
 
@@ -344,7 +376,8 @@ Rulesets encontrados:
 2. `MCP OAuth token endpoint protection`, phase `http_ratelimit`;
 3. `MCP dynamic routes cache bypass`, phase `http_request_cache_settings`.
 
-Diagnóstico: **edge posture é funcionalmente seguro para MCP, sem challenge/browser block em `/mcp`.**
+Diagnóstico: **edge posture é funcionalmente seguro para MCP, sem challenge/browser block em
+`/mcp`.**
 
 ### 6.2 Cache bypass
 
@@ -358,7 +391,9 @@ cacheEnabled = false
 
 Diagnóstico: **bom para evitar cache indevido em tráfego dinâmico MCP/OAuth.**
 
-Observação: o policy plan desejado fala em short-cache para metadata pública GET-only, mas o audit atual mostra bypass para `/.well-known/`. Isso é seguro, mas não maximiza performance em metadata pública. É uma otimização opcional, não blocker.
+Observação: o policy plan desejado fala em short-cache para metadata pública GET-only, mas o audit
+atual mostra bypass para `/.well-known/`. Isso é seguro, mas não maximiza performance em metadata
+pública. É uma otimização opcional, não blocker.
 
 ### 6.3 Config passthrough
 
@@ -397,7 +432,8 @@ Warnings:
 
 Mitigação já existente: regra scoped `MCP/OAuth passthrough config for non-browser API traffic`.
 
-Diagnóstico: **não há crítico, mas convém manter o passthrough como regra obrigatória e auditar drift periodicamente.**
+Diagnóstico: **não há crítico, mas convém manter o passthrough como regra obrigatória e auditar
+drift periodicamente.**
 
 ### 6.5 Rate limiting
 
@@ -407,7 +443,8 @@ Existe rate limit para:
 /oauth/token
 ```
 
-Não existe rate limit explícito para `/mcp` anônimo no edge. O policy diff aponta isso como informational/mitigated porque existe fallback no origin:
+Não existe rate limit explícito para `/mcp` anônimo no edge. O policy diff aponta isso como
+informational/mitigated porque existe fallback no origin:
 
 ```text
 originAnonymousRateLimit.enabled = true
@@ -416,7 +453,9 @@ requestsPerWindow = 40
 maxBuckets = 10000
 ```
 
-Diagnóstico: **aceitável no momento; recomendável adicionar edge rate-limit para `/mcp` anônimo se o plano Cloudflare e a expressão por header Authorization permitirem sem afetar sessões autenticadas.**
+Diagnóstico: **aceitável no momento; recomendável adicionar edge rate-limit para `/mcp` anônimo se o
+plano Cloudflare e a expressão por header Authorization permitirem sem afetar sessões
+autenticadas.**
 
 ---
 
@@ -442,7 +481,8 @@ reason = oauth-challenge-accepted
 criticalTools.missing = []
 ```
 
-Interpretação: tools/list sem bearer retornou 401, que é correto no modo OAuth. O smoke aceitou o challenge e verificou ausência de critical tool gaps.
+Interpretação: tools/list sem bearer retornou 401, que é correto no modo OAuth. O smoke aceitou o
+challenge e verificou ausência de critical tool gaps.
 
 Diagnóstico: **smoke público correto.**
 
@@ -515,7 +555,8 @@ recommendedNextAction = none
 
 Diagnóstico: **validação principal MCP está verde.**
 
-Observação: há `failingJobIds` antigos no dashboard, mas os effective checks atuais estão passed. Isso é histórico, não falha atual.
+Observação: há `failingJobIds` antigos no dashboard, mas os effective checks atuais estão passed.
+Isso é histórico, não falha atual.
 
 ---
 
@@ -562,7 +603,8 @@ mcp_validation_dashboard: ~1077ms média
 mcp_smoke_workspace: ~475ms
 ```
 
-Interpretação: **latência pesada está concentrada em diagnósticos Cloudflare remotos e não no uso normal das repo tools.**
+Interpretação: **latência pesada está concentrada em diagnósticos Cloudflare remotos e não no uso
+normal das repo tools.**
 
 ### 8.3 Repo tools e uso normal
 
@@ -578,7 +620,8 @@ repo_symbol_search = 15ms
 repo_file_outline = 17ms
 ```
 
-Diagnóstico: **hot path de repo está rápido.** A maior oportunidade horizontal remanescente é cache/parallelização em diagnósticos Cloudflare/edge, não leitura de arquivos ou auditoria local.
+Diagnóstico: **hot path de repo está rápido.** A maior oportunidade horizontal remanescente é
+cache/parallelização em diagnósticos Cloudflare/edge, não leitura de arquivos ou auditoria local.
 
 ---
 
@@ -601,31 +644,34 @@ Diagnóstico: **hot path de repo está rápido.** A maior oportunidade horizonta
 
 ### 9.2 Riscos residuais
 
-1. **Workspace dirty**: pode misturar diagnóstico de runtime com alterações locais ainda não versionadas.
-2. **No explicit anonymous `/mcp` edge rate limit**: mitigado no origin, mas edge seria mais cedo/barato.
+1. **Workspace dirty**: pode misturar diagnóstico de runtime com alterações locais ainda não
+   versionadas.
+2. **No explicit anonymous `/mcp` edge rate limit**: mitigado no origin, mas edge seria mais
+   cedo/barato.
 3. **Zone-wide browser settings**: mitigados por config rule, mas requerem auditoria de drift.
 4. **Audit gaps**: Bot Fight Mode/Zaraz não auditáveis via tool atual.
-5. **Old origin log errors**: não acionáveis depois do smoke, mas devem continuar sendo filtrados por timestamp do último smoke.
+5. **Old origin log errors**: não acionáveis depois do smoke, mas devem continuar sendo filtrados
+   por timestamp do último smoke.
 
 ---
 
 ## 10. Diagnóstico final por componente
 
-| Componente | Estado | Evidência | Ação |
-|---|---:|---|---|
-| MCP endpoint | Saudável | readiness ready, smoke ok, 401 correto sem bearer | manter |
-| OAuth resource server | Saudável | issuer/audience/JWKS/scopes ok | manter |
-| Authorization metadata | Saudável | PKCE S256, DCR/CIMD, resource parameter | manter |
-| Cloudflare Tunnel | Saudável | remote healthy, 4 HA connections | manter QUIC |
-| QUIC | Saudável | RTT 21/32ms, no drops, errors 0 | manter e monitorar |
-| Origin HTTP2 | Saudável | remote originRequest http2Origin=true, SNI correto | manter |
-| Edge cache | Seguro | bypass dinâmico presente | considerar short-cache metadata opcional |
-| Edge passthrough | Seguro | BIC/rocket/email/body buffering mitigados | manter |
-| Rate limit | Aceitável | `/oauth/token` edge + `/mcp` anônimo origin | considerar edge anon `/mcp` |
-| Runtime MCP | Saudável | status ok, warnings vazias após smoke | manter |
-| IO index | Saudável | 1322 arquivos, 9606 símbolos, 2472 chunks | manter |
-| Repo tools | Rápidas | read_file 3ms; status/tree/stats baixos | manter |
-| Validação | Verde | typecheck e unit-mcp passed | rodar full antes de release |
+| Componente             |    Estado | Evidência                                          | Ação                                     |
+| ---------------------- | --------: | -------------------------------------------------- | ---------------------------------------- |
+| MCP endpoint           |  Saudável | readiness ready, smoke ok, 401 correto sem bearer  | manter                                   |
+| OAuth resource server  |  Saudável | issuer/audience/JWKS/scopes ok                     | manter                                   |
+| Authorization metadata |  Saudável | PKCE S256, DCR/CIMD, resource parameter            | manter                                   |
+| Cloudflare Tunnel      |  Saudável | remote healthy, 4 HA connections                   | manter QUIC                              |
+| QUIC                   |  Saudável | RTT 21/32ms, no drops, errors 0                    | manter e monitorar                       |
+| Origin HTTP2           |  Saudável | remote originRequest http2Origin=true, SNI correto | manter                                   |
+| Edge cache             |    Seguro | bypass dinâmico presente                           | considerar short-cache metadata opcional |
+| Edge passthrough       |    Seguro | BIC/rocket/email/body buffering mitigados          | manter                                   |
+| Rate limit             | Aceitável | `/oauth/token` edge + `/mcp` anônimo origin        | considerar edge anon `/mcp`              |
+| Runtime MCP            |  Saudável | status ok, warnings vazias após smoke              | manter                                   |
+| IO index               |  Saudável | 1322 arquivos, 9606 símbolos, 2472 chunks          | manter                                   |
+| Repo tools             |   Rápidas | read_file 3ms; status/tree/stats baixos            | manter                                   |
+| Validação              |     Verde | typecheck e unit-mcp passed                        | rodar full antes de release              |
 
 ---
 
@@ -640,16 +686,20 @@ Diagnóstico: **hot path de repo está rápido.** A maior oportunidade horizonta
 
 ### P1 — Hardening de borda
 
-1. Avaliar regra Cloudflare edge para `/mcp` anônimo sem `Authorization`, preservando tráfego autenticado.
+1. Avaliar regra Cloudflare edge para `/mcp` anônimo sem `Authorization`, preservando tráfego
+   autenticado.
 2. Manter origin anonymous fallback enquanto edge não estiver cobrindo `/mcp` anônimo.
 3. Documentar que Cloudflare Access/challenge interativo não deve ser colocado diante de `/mcp`.
 4. Verificar periodicamente se o scoped config rule continua ativo.
 
 ### P2 — Performance
 
-1. Aplicar cache TTL/in-flight adicional para Cloudflare edge/config audits, se forem chamados em bursts.
-2. Consolidar edge audit + config audit + policy diff em uma chamada composta paralela para reduzir latência diagnóstica.
-3. Short-cache GET-only para `/.well-known/*` pode reduzir latência de metadata pública, mas só se a regra excluir `/oauth/token`, `/mcp`, `/health` e qualquer rota dinâmica.
+1. Aplicar cache TTL/in-flight adicional para Cloudflare edge/config audits, se forem chamados em
+   bursts.
+2. Consolidar edge audit + config audit + policy diff em uma chamada composta paralela para reduzir
+   latência diagnóstica.
+3. Short-cache GET-only para `/.well-known/*` pode reduzir latência de metadata pública, mas só se a
+   regra excluir `/oauth/token`, `/mcp`, `/health` e qualquer rota dinâmica.
 4. Evitar otimizar prematuramente OAuth validation: authorization média está baixa.
 
 ### P3 — Observabilidade
@@ -726,7 +776,10 @@ npx vitest --config vitest.copilot.config.js run tests/unit/copilot/mcp
 
 ## 13. Conclusão
 
-O sistema MCP atual está **funcional, autenticado, protegido e performático** para o uso normal. O caminho normal de repo tools é rápido; o custo de latência observado está concentrado nos diagnósticos Cloudflare remotos, que são naturalmente mais pesados por dependerem de API Cloudflare e inspeção de regras.
+O sistema MCP atual está **funcional, autenticado, protegido e performático** para o uso normal. O
+caminho normal de repo tools é rápido; o custo de latência observado está concentrado nos
+diagnósticos Cloudflare remotos, que são naturalmente mais pesados por dependerem de API Cloudflare
+e inspeção de regras.
 
 A arquitetura recomendada é manter:
 
@@ -749,17 +802,24 @@ O sistema não precisa de rollback. A próxima evolução estrutural deve focar 
 
 ## 14. Atualização P1/P2 pós-interrupção — 2026-06-10
 
-Após a retomada da conexão, foram aplicadas e validadas melhorias estruturais adicionais com foco em latência horizontal, estabilidade dos gates e observabilidade:
+Após a retomada da conexão, foram aplicadas e validadas melhorias estruturais adicionais com foco em
+latência horizontal, estabilidade dos gates e observabilidade:
 
 ### 14.1 P1 — correção de falso crítico nos post-change gates
 
 O diagnóstico de `mcp_tunnel_status` agora separa três classes de eventos em `cloudflared.log`:
 
-- `recentOriginErrors`: erros reais de origin/proxy/TLS, como `origin service`, `originService=`, `first record does not look like a TLS handshake`, `connection refused`, `502` e `1033`;
-- `recentTunnelTransportErrors`: eventos transitórios/recoverable de transporte QUIC/túnel, como `failed to accept QUIC stream`, `no recent network activity`, `Serve tunnel error`, `Connection terminated`;
-- `recentMetricsBindErrors`: colisões de porta do servidor de métricas, como `failed to bind to address`.
+- `recentOriginErrors`: erros reais de origin/proxy/TLS, como `origin service`, `originService=`,
+  `first record does not look like a TLS handshake`, `connection refused`, `502` e `1033`;
+- `recentTunnelTransportErrors`: eventos transitórios/recoverable de transporte QUIC/túnel, como
+  `failed to accept QUIC stream`, `no recent network activity`, `Serve tunnel error`,
+  `Connection terminated`;
+- `recentMetricsBindErrors`: colisões de porta do servidor de métricas, como
+  `failed to bind to address`.
 
-Com isso, `mcp_cloudflare_post_change_gates` continua falhando quando há erro real de origin após o último smoke, mas não reprova o gate por erro QUIC transitório já recuperado quando HA connections, smoke e métricas estão saudáveis. Esses eventos continuam visíveis como warnings.
+Com isso, `mcp_cloudflare_post_change_gates` continua falhando quando há erro real de origin após o
+último smoke, mas não reprova o gate por erro QUIC transitório já recuperado quando HA connections,
+smoke e métricas estão saudáveis. Esses eventos continuam visíveis como warnings.
 
 ### 14.2 P2 — cache TTL/in-flight para auditorias Cloudflare remotas
 
@@ -768,28 +828,35 @@ Foram adicionados caches curtos, process-local, com deduplicação in-flight par
 - `auditCloudflareEdgeRulesets` / `mcp_cloudflare_edge_audit`;
 - `auditCloudflareConfigPosture` / `mcp_cloudflare_config_audit`.
 
-O TTL padrão é 5 segundos e o limite é de 32 entradas. Isso reduz chamadas repetidas à API Cloudflare em rajadas de diagnóstico sem sacrificar funcionalidades, pois as tools agora aceitam:
+O TTL padrão é 5 segundos e o limite é de 32 entradas. Isso reduz chamadas repetidas à API
+Cloudflare em rajadas de diagnóstico sem sacrificar funcionalidades, pois as tools agora aceitam:
 
 ```text
 forceRefresh: true
 cacheTtlMs: 0..60000
 ```
 
-Assim, o caminho normal fica mais rápido, mas diagnósticos pós-mudança podem forçar leitura imediata.
+Assim, o caminho normal fica mais rápido, mas diagnósticos pós-mudança podem forçar leitura
+imediata.
 
 ### 14.3 P2 — reuso horizontal do Cloudflare SDK client
 
-O helper `getCloudflareClient(apiToken)` foi exportado de `remote-api.js` e reutilizado por auditorias edge/config. Isso reduz overhead de criação de cliente e mantém um ponto único para política de retries/timeouts do SDK Cloudflare.
+O helper `getCloudflareClient(apiToken)` foi exportado de `remote-api.js` e reutilizado por
+auditorias edge/config. Isso reduz overhead de criação de cliente e mantém um ponto único para
+política de retries/timeouts do SDK Cloudflare.
 
 ### 14.4 P2 — observabilidade dos caches no runtime
 
-`createTtlCache` agora registra caches em um registry process-local, e `getTtlCacheStats()` expõe estatísticas agregadas:
+`createTtlCache` agora registra caches em um registry process-local, e `getTtlCacheStats()` expõe
+estatísticas agregadas:
 
 ```text
 name, ttlMs, maxEntries, size, inFlight, hits, misses, inFlightHits, sets, evictions
 ```
 
-`mcp_runtime_health` passa a incluir `metrics.ttlCaches` tanto no modo compacto quanto no detalhado. Isso permite medir se a redução de latência veio de cache hit, deduplicação in-flight ou execução remota real.
+`mcp_runtime_health` passa a incluir `metrics.ttlCaches` tanto no modo compacto quanto no detalhado.
+Isso permite medir se a redução de latência veio de cache hit, deduplicação in-flight ou execução
+remota real.
 
 ### 14.5 Validação
 
@@ -803,4 +870,5 @@ Test Files = 36 passed
 Tests = 173 passed
 ```
 
-Observação operacional: como essas mudanças alteram módulos carregados pelo servidor MCP, é necessário reiniciar o MCP/Cloudflare para que o conector vivo passe a usar o novo código.
+Observação operacional: como essas mudanças alteram módulos carregados pelo servidor MCP, é
+necessário reiniciar o MCP/Cloudflare para que o conector vivo passe a usar o novo código.

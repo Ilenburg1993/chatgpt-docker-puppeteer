@@ -9,7 +9,7 @@
  * @module copilot/tools/file/read/read-files-batch
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra';
+import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
 import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
@@ -102,7 +102,11 @@ export const readFilesBatchTool = buildTool({
                         ...(input.endLine !== undefined ? { endLine: input.endLine } : {}),
                     });
                     const outputLimit = Math.min(input.maxBytes ?? DEFAULT_ITEM_OUTPUT_BYTES, perItemBudget);
-                    const bounded = truncateUtf8Text(snapshot.content, outputLimit, '\n\n[read_files_batch item truncated]');
+                    const bounded = truncateUtf8Text(
+                        snapshot.content,
+                        outputLimit,
+                        '\n\n[read_files_batch item truncated]',
+                    );
                     return {
                         success: true,
                         index,
@@ -159,8 +163,8 @@ export const readFilesBatchTool = buildTool({
                 index: row.index,
                 success: false,
                 status: 'failed',
-                code: row.status === 'failed' ? row.code ?? 'ERR_BATCH_READ_EXECUTION' : 'ERR_BATCH_READ_EXECUTION',
-                error: row.status === 'failed' ? row.error ?? 'Batch read failed.' : 'Batch read failed.',
+                code: row.status === 'failed' ? (row.code ?? 'ERR_BATCH_READ_EXECUTION') : 'ERR_BATCH_READ_EXECUTION',
+                error: row.status === 'failed' ? (row.error ?? 'Batch read failed.') : 'Batch read failed.',
                 durationMs: row.durationMs,
             };
         });

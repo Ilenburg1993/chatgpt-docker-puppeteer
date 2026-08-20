@@ -23,10 +23,10 @@ catalogados**: ~130 issues **Plano de auditoria**:
 
 ### P2 — Críticos
 
-| ID                 | Arquivo         | Título                                                                                                    |
-| ------------------ | --------------- | --------------------------------------------------------------------------------------------------------- |
-| ~~LEAK-AGENT-001~~ | always-alive.js | ~~Listeners EventEmitter não removidos em reconexão~~ **[FIXED — unsub() em stop/reconnect (L556-557)]**  |
-| ~~LEAK-AGENT-002~~ | always-alive.js | ~~Maps internos sem TTL/eviction~~ **[FIXED — TTL configurável via AGENT_*_TTL_MS (L217-221, L783-786)]** |
+| ID                 | Arquivo         | Título                                                                                                     |
+| ------------------ | --------------- | ---------------------------------------------------------------------------------------------------------- |
+| ~~LEAK-AGENT-001~~ | always-alive.js | ~~Listeners EventEmitter não removidos em reconexão~~ **[FIXED — unsub() em stop/reconnect (L556-557)]**   |
+| ~~LEAK-AGENT-002~~ | always-alive.js | ~~Maps internos sem TTL/eviction~~ **[FIXED — TTL configurável via AGENT\_*_TTL_MS (L217-221, L783-786)]** |
 
 ### P3 — Importantes
 
@@ -85,7 +85,7 @@ catalogados**: ~130 issues **Plano de auditoria**:
 | ~~GAP-TYPES-001~~ | types.js              | ~~`SessionHooks` typedef não inclui `onPermissionRequest`/`onUserInputRequest`~~ **[FIXED — typedef atualizada com campos]**                         |
 | ~~INC-HOOKS-001~~ | presets/              | ~~Inconsistência sistêmica: 3/5 presets divergem~~ **[FIXED — 5/5 presets retornam `{hooks, onPermissionRequest}` consistentemente]**                |
 | ~~SEC-HOOK-001~~  | factory.js            | ~~`onPermissionAsk` callback é dead code~~ **[N/A — v. BUG-HOOK-001; askHandler funcional]**                                                         |
-| ~~SEC-PT-001~~    | prompt-transformer.js | ~~SENSITIVE_PATTERN não detecta JWT, AWS, GitHub~~ **[FIXED — padrões JWT/AWS/ghp_/github_pat_ adicionados]**                                        |
+| ~~SEC-PT-001~~    | prompt-transformer.js | ~~SENSITIVE_PATTERN não detecta JWT, AWS, GitHub~~ **[FIXED — padrões JWT/AWS/ghp\_/github_pat\_ adicionados]**                                      |
 | ARCH-HOOK-002     | index.js              | Barrel importa diretamente de `observability/` (violação de layer) **[FIXED — hooks/presets/audit.js é a fonte canônica; obs/ re-exporta via stub]** |
 
 ### P4 — Informativos
@@ -392,7 +392,7 @@ catalogados**: ~130 issues **Plano de auditoria**:
 | ID                 | Módulo         | Arquivo                 | Severidade | Tipo | Título                                                                                                      |
 | ------------------ | -------------- | ----------------------- | ---------- | ---- | ----------------------------------------------------------------------------------------------------------- |
 | ~~LEAK-AGENT-001~~ | agent/         | always-alive.js         | ~~P2~~     | LEAK | ~~Listeners não removidos~~ **[FIXED — unsub() em stop/reconnect]**                                         |
-| ~~LEAK-AGENT-002~~ | agent/         | always-alive.js         | ~~P2~~     | LEAK | ~~Maps sem TTL~~ **[FIXED — TTL configurável via AGENT_*_TTL_MS env]**                                      |
+| ~~LEAK-AGENT-002~~ | agent/         | always-alive.js         | ~~P2~~     | LEAK | ~~Maps sem TTL~~ **[FIXED — TTL configurável via AGENT\_*_TTL_MS env]**                                     |
 | ~~BUG-TI-001~~     | hooks/         | tool-interceptor.js     | ~~P2~~     | BUG  | ~~Timer de timing nunca popula Map~~ **[N/A]**                                                              |
 | ~~BUG-DA-001~~     | hooks/         | deny-all.js             | ~~P2~~     | BUG  | ~~Preset deny-all aprova todas~~ **[N/A]**                                                                  |
 | ~~BUG-HOOK-001~~   | hooks/         | factory.js              | ~~P2~~     | BUG  | ~~`askHandler` dead code~~ **[N/A]**                                                                        |

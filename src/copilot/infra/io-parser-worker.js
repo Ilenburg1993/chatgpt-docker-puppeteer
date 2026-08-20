@@ -8,8 +8,8 @@
 import { parse as babelParse } from '@babel/parser';
 import { performance } from 'node:perf_hooks';
 import { parentPort } from 'node:worker_threads';
-import { extractBabelFileSymbols } from './parse/babel-symbols.js';
 import { formatBabelParserError } from './parse/babel-policy.js';
+import { extractBabelFileSymbols } from './parse/babel-symbols.js';
 
 const errorCtor = /** @type {{ isError?: (value: unknown) => boolean }} */ (Error);
 const isError =
@@ -79,9 +79,10 @@ if (!port) {
 
 port.on('message', (message) => {
     const id = Number(message?.id ?? 0);
-    const payload = /** @type {{ source: string; parserOptions: Record<string, unknown>; maxParseDurationMs: number }} */ (
-        message?.payload
-    );
+    const payload =
+        /** @type {{ source: string; parserOptions: Record<string, unknown>; maxParseDurationMs: number }} */ (
+            message?.payload
+        );
 
     try {
         const result = parseSymbols(payload);

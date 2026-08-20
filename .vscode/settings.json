@@ -30,7 +30,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
   },
   "[markdown]": {
-    "editor.defaultFormatter": "yzhang.markdown-all-in-one",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.inlineSuggest.enabled": true,
     "editor.quickSuggestions": {
       "comments": "off",
@@ -356,8 +356,10 @@
 
   // ===========================================================================
   // FASE 12) JS/TS — LANGUAGE FEATURES / TYPESCRIPT 7 NATIVO
-  // O DevContainer instala o cliente oficial TypeScript 7 (ID histórico `TypeScriptTeam.native-preview`) e ativa `js/ts.experimental.useTsgo`
-  // atomicamente no primeiro/rebuild. Esse caminho usa o servidor LSP nativo do TypeScript 7.
+  // TypeScript 7.0.x é GA. O DevContainer instala temporariamente o cliente LSP oficial cujo Marketplace ID histórico
+  // ainda é `TypeScriptTeam.native-preview`; no VS Code 1.134 o builtin JS/TS continua sendo o cliente legado de tsserver.
+  // `js/ts.experimental.useTsgo=true` desativa esse cliente legado e entrega JS/TS ao cliente LSP que executa `tsc --lsp`.
+  // Quando o VS Code incorporar esse cliente nativamente, a extensão externa deverá sair do baseline sem alterar o TS7.
   // As preferências `js/ts.*` abaixo configuram recursos editoriais suportados pelo cliente nativo;
   // não constituem autorização para iniciar o daemon MCP local.
   //
@@ -368,6 +370,9 @@
   // Opções históricas `tsserver.*` permanecem apenas como preferências inertes/compatíveis do
   // VS Code; o serviço selecionado e suportado neste workspace é o TypeScript 7 nativo.
   // ===========================================================================
+  // Explicit at workspace scope as well as in DevContainer customizations: this makes the active TS7 selection
+  // part of the repository state and ensures TypeScript 7 LSP client session restarts re-read the current server options.
+  "js/ts.experimental.useTsgo": true,
   "js/ts.implementationsCodeLens.enabled": false,
   "js/ts.referencesCodeLens.enabled": false,
   "js/ts.inlayHints.enumMemberValues.enabled": true,
@@ -380,11 +385,16 @@
   "js/ts.preferences.includePackageJsonAutoImports": "auto",
   "js/ts.preferences.preferTypeOnlyAutoImports": true,
   "js/ts.preferGoToSourceDefinition": true,
+  // O TS7 nativo é um processo Go (`tsc --lsp`): estas são as chaves efetivas para memória e tracing.
+  // O limite é soft (GOMEMLIMIT), preserva headroom fora do heap Go e evita crescimento descontrolado do servidor.
+  "js/ts.server.goMemLimit": "1024MiB",
+  "js/ts.trace.server": "off",
   "js/ts.suggest.completeFunctionCalls": true,
   "js/ts.updateImportsOnFileMove.enabled": "always",
   "js/ts.tsserver.automaticTypeAcquisition.enabled": false,
   "js/ts.tsserver.experimental.enableProjectDiagnostics": false,
-  "js/ts.tsserver.maxMemory": 3072,
+  // Fallback Node/tsserver apenas; não controla o servidor TS7 nativo.
+  "js/ts.tsserver.maxMemory": 2048,
   "js/ts.tsserver.useSyntaxServer": "never",
   "js/ts.tsserver.watchOptions": "vscode",
   "js/ts.tsserver.tracing.enabled": false,

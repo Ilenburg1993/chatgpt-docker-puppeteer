@@ -45,7 +45,7 @@ export function summarizeCloudflaredLatencyHistograms(samples) {
             (sample) => sample.name === target.bucket && ['+Inf', 'Inf'].includes(String(sample.labels['le'] ?? '')),
         );
         const total = count ?? infiniteBucket?.value ?? null;
-        const finiteBucketTotal = buckets.length > 0 ? buckets[buckets.length - 1]?.value ?? 0 : 0;
+        const finiteBucketTotal = buckets.length > 0 ? (buckets[buckets.length - 1]?.value ?? 0) : 0;
         const averageSeconds = count && sum !== null ? sum / count : null;
         summary[target.key] = {
             count,
@@ -122,7 +122,8 @@ function rateOrNull(numerator, denominator) {
  */
 function histogramQuantileMs(quantile, buckets, totalOverride = null) {
     const finiteBuckets = buckets.filter((bucket) => bucket.le !== null && Number.isFinite(bucket.le));
-    const total = totalOverride ?? (finiteBuckets.length > 0 ? finiteBuckets[finiteBuckets.length - 1]?.value ?? 0 : 0);
+    const total =
+        totalOverride ?? (finiteBuckets.length > 0 ? (finiteBuckets[finiteBuckets.length - 1]?.value ?? 0) : 0);
     if (total <= 0) return null;
     const threshold = total * quantile;
     let previousLe = 0;

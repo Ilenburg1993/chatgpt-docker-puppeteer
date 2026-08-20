@@ -71,9 +71,13 @@ export class SessionKeepalive {
         this.#lastActivityAt = Date.now();
         this.#timerId = `agent.session.keepalive:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 
-        this.#timer = registerInterval(this.#timerId, () => {
-            void this.#tick(callbacks);
-        }, this.#intervalMs);
+        this.#timer = registerInterval(
+            this.#timerId,
+            () => {
+                void this.#tick(callbacks);
+            },
+            this.#intervalMs,
+        );
         this.#timer.unref();
 
         log(

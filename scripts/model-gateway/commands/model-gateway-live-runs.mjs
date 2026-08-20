@@ -24,7 +24,6 @@ Read persisted model-gateway terminal live scenario run summaries. This command 
     process.exit(0);
 }
 
-
 const limit = Math.max(1, Math.min(Number(readArg('--limit', '20')) || 20, 100));
 const rows = await new SqliteModelGatewayCatalogStore().readLiveScenarioRunRecords({ limit });
 const summary = {

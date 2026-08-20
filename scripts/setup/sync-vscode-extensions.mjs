@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @ts-check
-import fs from 'node:fs';
 import { applyEdits, modify, parse, printParseErrorCode } from 'jsonc-parser';
+import fs from 'node:fs';
 import {
     VSCODE_DEVCONTAINER_EXTENSIONS,
     VSCODE_RECOMMENDED_EXTENSIONS,
@@ -36,12 +36,9 @@ function buildRecommendationsJsonc() {
 
 const originalDevcontainer = fs.readFileSync(DEVCONTAINER_PATH, 'utf8');
 assertJsonc(originalDevcontainer, DEVCONTAINER_PATH);
-const edits = modify(
-    originalDevcontainer,
-    ['customizations', 'vscode', 'extensions'],
-    VSCODE_DEVCONTAINER_EXTENSIONS,
-    { formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' } },
-);
+const edits = modify(originalDevcontainer, ['customizations', 'vscode', 'extensions'], VSCODE_DEVCONTAINER_EXTENSIONS, {
+    formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' },
+});
 const nextDevcontainer = applyEdits(originalDevcontainer, edits);
 assertJsonc(nextDevcontainer, DEVCONTAINER_PATH);
 
@@ -66,4 +63,6 @@ if (!write) {
 
 if (originalDevcontainer !== nextDevcontainer) fs.writeFileSync(DEVCONTAINER_PATH, nextDevcontainer);
 if (currentRecommendations !== nextRecommendations) fs.writeFileSync(RECOMMENDATIONS_PATH, nextRecommendations);
-console.log(`VS Code extension projections synchronized (${VSCODE_DEVCONTAINER_EXTENSIONS.length} auto-install extensions).`);
+console.log(
+    `VS Code extension projections synchronized (${VSCODE_DEVCONTAINER_EXTENSIONS.length} auto-install extensions).`,
+);

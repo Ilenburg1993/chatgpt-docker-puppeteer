@@ -85,7 +85,6 @@ declare module '#infra/io' {
     export function setCacheDirty(): void;
 
     // Constants
-    export const RESPONSE_DIR: string;
     export const QUEUE_DIR: string;
 }
 

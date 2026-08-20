@@ -118,7 +118,8 @@ export function buildEdgePolicyDiff(actual, desired, options = {}) {
             status: 'conflict',
             phase: 'http_request_transform/http_response_headers_transform',
             summary: 'A transform rule mentions sensitive MCP/OAuth headers.',
-            desired: 'Do not rewrite Authorization, WWW-Authenticate, Set-Cookie, Location, Content-Type, Cache-Control or CORS headers.',
+            desired:
+                'Do not rewrite Authorization, WWW-Authenticate, Set-Cookie, Location, Content-Type, Cache-Control or CORS headers.',
             actual: {
                 sensitiveHeaderTransformCount: numberValue(findings['sensitiveHeaderTransformCount']),
             },
@@ -234,7 +235,9 @@ function readPositiveIntegerEnv(env, name, fallback, minimum) {
  * @returns {boolean}
  */
 function readBooleanEnv(env, name, fallback) {
-    const raw = String(env[name] ?? '').trim().toLowerCase();
+    const raw = String(env[name] ?? '')
+        .trim()
+        .toLowerCase();
     if (!raw) return fallback;
     if (['1', 'true', 'yes', 'on'].includes(raw)) return true;
     if (['0', 'false', 'no', 'off'].includes(raw)) return false;

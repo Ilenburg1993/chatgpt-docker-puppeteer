@@ -1,9 +1,10 @@
 # Roadmap Cloudflare 2 para MCP/API de baixa cardinalidade e conexões longas
 
-**Data:** 2026-05-24
-**Escopo:** `mcp.aurelin.org` como camada Cloudflare/Tunnel para MCP Server externo usado por ChatGPT.com e automações controladas.
-**Fora de escopo:** arquitetura interna do `src/copilot` como runtime local/GitHub Copilot SDK do workspace, exceto quando ele aparece como origem HTTP local do túnel.
-**Princípio central:** configurar Cloudflare como borda de API privada/semiprivada, não como CDN/website público tradicional.
+**Data:** 2026-05-24 **Escopo:** `mcp.aurelin.org` como camada Cloudflare/Tunnel para MCP Server
+externo usado por ChatGPT.com e automações controladas. **Fora de escopo:** arquitetura interna do
+`src/copilot` como runtime local/GitHub Copilot SDK do workspace, exceto quando ele aparece como
+origem HTTP local do túnel. **Princípio central:** configurar Cloudflare como borda de API
+privada/semiprivada, não como CDN/website público tradicional.
 
 ---
 
@@ -43,7 +44,9 @@
 
 ## 1. Resumo executivo
 
-`mcp.aurelin.org` não deve ser tratado como um site público tradicional. Ele é uma ponte de API/MCP para poucos clientes esperados, com tráfego autenticado, endpoints OAuth, JSON-RPC/Streamable HTTP e conexões que podem durar mais que requisições web comuns.
+`mcp.aurelin.org` não deve ser tratado como um site público tradicional. Ele é uma ponte de API/MCP
+para poucos clientes esperados, com tráfego autenticado, endpoints OAuth, JSON-RPC/Streamable HTTP e
+conexões que podem durar mais que requisições web comuns.
 
 Em um website comum, Cloudflare é frequentemente usada para:
 
@@ -62,7 +65,9 @@ No nosso caso, isso pode ser contraproducente. O objetivo deve ser:
 - **preservar streaming, chunking, headers OAuth e reconexão**;
 - **observar antes de endurecer**.
 
-A tese operacional é: **limites devem ser orientados por identidade, não por volume bruto**. Para cliente autenticado e esperado, Cloudflare deve impor o mínimo necessário. Para tráfego anônimo/inválido, Cloudflare deve ser dura.
+A tese operacional é: **limites devem ser orientados por identidade, não por volume bruto**. Para
+cliente autenticado e esperado, Cloudflare deve impor o mínimo necessário. Para tráfego
+anônimo/inválido, Cloudflare deve ser dura.
 
 ---
 
@@ -72,7 +77,8 @@ Há duas esferas distintas:
 
 ### 2.1 Runtime local / `src/copilot`
 
-É o sistema local do workspace, ligado ao fluxo interno de desenvolvimento, automação, SDK, validações, ferramentas e runtime. Ele pode expor uma origem local HTTP, como:
+É o sistema local do workspace, ligado ao fluxo interno de desenvolvimento, automação, SDK,
+validações, ferramentas e runtime. Ele pode expor uma origem local HTTP, como:
 
 ```txt
 http://127.0.0.1:3333
@@ -102,13 +108,16 @@ Ela envolve:
 
 ### 2.3 Por que essa separação importa
 
-Um problema de `cloudflared` alcançando `localhost`/`::1` não é um bug do runtime local em si. É problema de **configuração de origem do túnel**. Um problema de WAF challenge ou cache também não é problema do SDK local. São camadas diferentes que devem ser auditadas separadamente.
+Um problema de `cloudflared` alcançando `localhost`/`::1` não é um bug do runtime local em si. É
+problema de **configuração de origem do túnel**. Um problema de WAF challenge ou cache também não é
+problema do SDK local. São camadas diferentes que devem ser auditadas separadamente.
 
 ---
 
 ## 3. Por que configuração de website é perigosa para MCP
 
-Muitas opções do painel Cloudflare partem do pressuposto de que o tráfego é de browser humano acessando site:
+Muitas opções do painel Cloudflare partem do pressuposto de que o tráfego é de browser humano
+acessando site:
 
 - HTML navegável;
 - assets estáticos;
@@ -173,7 +182,8 @@ Portanto, limite por volume bruto deve ser conservador para tráfego autenticado
 
 ### 4.2 Alto privilégio
 
-Mesmo com poucos clientes, o impacto de uma chamada MCP pode ser alto. A segurança principal deve residir em:
+Mesmo com poucos clientes, o impacto de uma chamada MCP pode ser alto. A segurança principal deve
+residir em:
 
 - OAuth/JWT;
 - escopos;
@@ -201,23 +211,17 @@ Isso implica heartbeat, timeout coerente, reconexão, idempotência e payloads p
 
 Este documento é baseado nas seguintes documentações oficiais:
 
-1. Cloudflare Node SDK
-   https://developers.cloudflare.com/api/node/
+1. Cloudflare Node SDK https://developers.cloudflare.com/api/node/
 
-2. Cloudflare Fundamentals / Get started
-   https://developers.cloudflare.com/fundamentals/get-started/
+2. Cloudflare Fundamentals / Get started https://developers.cloudflare.com/fundamentals/get-started/
 
-3. API tokens
-   https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
+3. API tokens https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
 
-4. API permissions
-   https://developers.cloudflare.com/fundamentals/api/reference/permissions/
+4. API permissions https://developers.cloudflare.com/fundamentals/api/reference/permissions/
 
-5. Make API calls
-   https://developers.cloudflare.com/fundamentals/api/how-to/make-api-calls/
+5. Make API calls https://developers.cloudflare.com/fundamentals/api/how-to/make-api-calls/
 
-6. Connection limits
-   https://developers.cloudflare.com/fundamentals/reference/connection-limits/
+6. Connection limits https://developers.cloudflare.com/fundamentals/reference/connection-limits/
 
 7. Cloudflare Tunnel
    https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/
@@ -231,32 +235,25 @@ Este documento é baseado nas seguintes documentações oficiais:
 10. Cloudflare Tunnel API
     https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/
 
-11. DNS records API
-    https://developers.cloudflare.com/api/resources/dns/subresources/records/
+11. DNS records API https://developers.cloudflare.com/api/resources/dns/subresources/records/
 
 12. DNS record management
     https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/
 
-13. Cache Rules
-    https://developers.cloudflare.com/cache/how-to/cache-rules/
+13. Cache Rules https://developers.cloudflare.com/cache/how-to/cache-rules/
 
 14. Create Cache Rules via API
     https://developers.cloudflare.com/cache/how-to/cache-rules/create-api/
 
-15. WAF Custom Rules
-    https://developers.cloudflare.com/waf/custom-rules/
+15. WAF Custom Rules https://developers.cloudflare.com/waf/custom-rules/
 
-16. Create WAF Custom Rules via API
-    https://developers.cloudflare.com/waf/custom-rules/create-api/
+16. Create WAF Custom Rules via API https://developers.cloudflare.com/waf/custom-rules/create-api/
 
-17. WAF Skip options
-    https://developers.cloudflare.com/waf/custom-rules/skip/options/
+17. WAF Skip options https://developers.cloudflare.com/waf/custom-rules/skip/options/
 
-18. WAF Skip API examples
-    https://developers.cloudflare.com/waf/custom-rules/skip/api-examples/
+18. WAF Skip API examples https://developers.cloudflare.com/waf/custom-rules/skip/api-examples/
 
-19. Rate Limiting Rules
-    https://developers.cloudflare.com/waf/rate-limiting-rules/
+19. Rate Limiting Rules https://developers.cloudflare.com/waf/rate-limiting-rules/
 
 20. Create Rate Limiting Rules via API
     https://developers.cloudflare.com/waf/rate-limiting-rules/create-api/
@@ -264,8 +261,7 @@ Este documento é baseado nas seguintes documentações oficiais:
 21. Cloudflare Access Service Tokens
     https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/
 
-22. API Shield JWT Validation
-    https://developers.cloudflare.com/api-shield/security/jwt-validation/
+22. API Shield JWT Validation https://developers.cloudflare.com/api-shield/security/jwt-validation/
 
 23. SSL/TLS Full Strict
     https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/
@@ -345,10 +341,11 @@ Cloudflare não deve, em `/mcp`:
 
 ## 8. O que significa “conexão ilimitada” neste caso
 
-Cloudflare e TCP nunca são literalmente ilimitados. A documentação oficial de limites de conexão cita, entre outros, `Proxy Read Timeout` de 120 segundos, `Proxy Idle Timeout` de 900 segundos, `Proxy Write Timeout` de 30 segundos e limite de headers de 128 KB.
+Cloudflare e TCP nunca são literalmente ilimitados. A documentação oficial de limites de conexão
+cita, entre outros, `Proxy Read Timeout` de 120 segundos, `Proxy Idle Timeout` de 900 segundos,
+`Proxy Write Timeout` de 30 segundos e limite de headers de 128 KB.
 
-**Origem oficial:**
-https://developers.cloudflare.com/fundamentals/reference/connection-limits/
+**Origem oficial:** https://developers.cloudflare.com/fundamentals/reference/connection-limits/
 
 Portanto, “ilimitado” deve ser traduzido como:
 
@@ -392,7 +389,8 @@ hostname apontando para o túnel/Cloudflare
 sem exposição direta de IP de origem
 ```
 
-A documentação oficial de DNS explica criação/edição de registros e uso de proxy status para A/AAAA/CNAME quando aplicável.
+A documentação oficial de DNS explica criação/edição de registros e uso de proxy status para
+A/AAAA/CNAME quando aplicável.
 
 **Origem oficial:**
 https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/
@@ -436,7 +434,9 @@ Nunca alterar DNS sem confirmar se o hostname está mesmo associado ao tunnel pu
 
 ## 10. Cloudflare Tunnel e parâmetros de origem
 
-Cloudflare Tunnel cria conexões outbound-only a partir do `cloudflared`, sem exigir IP público roteável para a origem. A documentação descreve o fluxo como tráfego passando por conexões estabelecidas entre `cloudflared` e a rede Cloudflare.
+Cloudflare Tunnel cria conexões outbound-only a partir do `cloudflared`, sem exigir IP público
+roteável para a origem. A documentação descreve o fluxo como tráfego passando por conexões
+estabelecidas entre `cloudflared` e a rede Cloudflare.
 
 **Origem oficial:**
 https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/
@@ -453,7 +453,8 @@ origin local: HTTP/1.1 aceitável
 
 ### 10.2 Por que `127.0.0.1`, não `localhost`
 
-`localhost` pode resolver para IPv6 `::1`. Se o servidor local escuta apenas `127.0.0.1`, `cloudflared` pode falhar com:
+`localhost` pode resolver para IPv6 `::1`. Se o servidor local escuta apenas `127.0.0.1`,
+`cloudflared` pode falhar com:
 
 ```txt
 dial tcp [::1]:3333: connect: connection refused
@@ -467,7 +468,8 @@ http://127.0.0.1:3333
 
 ### 10.3 Parâmetros de origem relevantes
 
-A documentação oficial de origin parameters diz que esses parâmetros determinam como `cloudflared` envia requisições à origem. Também documenta, por exemplo:
+A documentação oficial de origin parameters diz que esses parâmetros determinam como `cloudflared`
+envia requisições à origem. Também documenta, por exemplo:
 
 - `disableChunkedEncoding`: quando `false`, usa chunked transfer encoding em HTTP/1.1;
 - `http2Origin`: quando `true`, usa HTTP/2 para a origem e exige certificado SSL na origem;
@@ -492,14 +494,15 @@ Notas:
 - não ativar `disableChunkedEncoding` sem motivo;
 - não ativar `http2Origin` se a origem local não tiver HTTPS/certificado compatível;
 - não usar `localhost` no service remoto;
-- não tratar `keepAliveConnections` como limite total de concorrência: a documentação indica que ele controla conexões keep-alive ociosas, não total concorrente.
+- não tratar `keepAliveConnections` como limite total de concorrência: a documentação indica que ele
+  controla conexões keep-alive ociosas, não total concorrente.
 
 ### 10.5 Como checar via API
 
-A API oficial de Zero Trust/Tunnels possui endpoints para listar, obter, atualizar e deletar tunnels, bem como obter/atualizar configurações e listar conexões.
+A API oficial de Zero Trust/Tunnels possui endpoints para listar, obter, atualizar e deletar
+tunnels, bem como obter/atualizar configurações e listar conexões.
 
-**Origem oficial:**
-https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/
+**Origem oficial:** https://developers.cloudflare.com/api/resources/zero_trust/subresources/tunnels/
 
 ```bash
 # Listar túneis
@@ -540,21 +543,24 @@ curl -sS -X PUT "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/cfd_t
   --data @desired-tunnel-config.json
 ```
 
-**Atenção:** validar o schema exato aceito pela API antes de automatizar `PUT`. Não sobrescrever ingress rules existentes sem inventário.
+**Atenção:** validar o schema exato aceito pela API antes de automatizar `PUT`. Não sobrescrever
+ingress rules existentes sem inventário.
 
 ---
 
 ## 11. Cache Rules: bypass cirúrgico, não Development Mode
 
-Cloudflare Cache Rules permitem customizar elegibilidade e comportamento do cache via Dashboard, API ou Terraform. A documentação indica que o DNS deve estar proxied para que regras de cache funcionem e recomenda Cloudflare Trace para investigar se uma regra está disparando.
+Cloudflare Cache Rules permitem customizar elegibilidade e comportamento do cache via Dashboard, API
+ou Terraform. A documentação indica que o DNS deve estar proxied para que regras de cache funcionem
+e recomenda Cloudflare Trace para investigar se uma regra está disparando.
 
-**Origem oficial:**
-https://developers.cloudflare.com/cache/how-to/cache-rules/
+**Origem oficial:** https://developers.cloudflare.com/cache/how-to/cache-rules/
 https://developers.cloudflare.com/cache/how-to/cache-rules/create-api/
 
 ### 11.1 Por que Development Mode não é solução
 
-Development Mode é global/temporário e pensado para desenvolvimento de sites. Para MCP, precisamos de política permanente e cirúrgica por rota.
+Development Mode é global/temporário e pensado para desenvolvimento de sites. Para MCP, precisamos
+de política permanente e cirúrgica por rota.
 
 ### 11.2 Regra recomendada
 
@@ -610,16 +616,17 @@ curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/$
   }'
 ```
 
-**Cuidado:** a documentação alerta que exemplos de atualização podem deletar regras existentes se usados diretamente. Sempre obter ruleset atual e preservar regras.
+**Cuidado:** a documentação alerta que exemplos de atualização podem deletar regras existentes se
+usados diretamente. Sempre obter ruleset atual e preservar regras.
 
 ---
 
 ## 12. WAF Custom Rules: evitar desafios interativos em `/mcp`
 
-WAF Custom Rules filtram requisições com expressões e aplicam ações como Block, Managed Challenge, JS Challenge, Log, Skip etc. Elas são avaliadas em ordem.
+WAF Custom Rules filtram requisições com expressões e aplicam ações como Block, Managed Challenge,
+JS Challenge, Log, Skip etc. Elas são avaliadas em ordem.
 
-**Origem oficial:**
-https://developers.cloudflare.com/waf/custom-rules/
+**Origem oficial:** https://developers.cloudflare.com/waf/custom-rules/
 https://developers.cloudflare.com/waf/custom-rules/create-api/
 
 ### 12.1 Regra de ouro
@@ -637,7 +644,8 @@ O cliente ChatGPT/MCP não é um navegador humano que resolve desafios.
 
 ### 12.2 Quando usar Skip
 
-Se regras gerenciadas ou bot mitigations estiverem causando falso positivo, criar exceção cirúrgica para `/mcp`, sem desligar proteção global da zona.
+Se regras gerenciadas ou bot mitigations estiverem causando falso positivo, criar exceção cirúrgica
+para `/mcp`, sem desligar proteção global da zona.
 
 A documentação de Skip Rules permite pular fases/produtos, como:
 
@@ -646,8 +654,7 @@ A documentação de Skip Rules permite pular fases/produtos, como:
 - `http_request_sbfm`;
 - outros recursos conforme plano.
 
-**Origem oficial:**
-https://developers.cloudflare.com/waf/custom-rules/skip/options/
+**Origem oficial:** https://developers.cloudflare.com/waf/custom-rules/skip/options/
 https://developers.cloudflare.com/waf/custom-rules/skip/api-examples/
 
 Exemplo conceitual:
@@ -682,7 +689,8 @@ payloads muito grandes
 hosts incorretos
 ```
 
-Mas evitar bloquear por User-Agent ou ASN sem evidência, pois a origem do tráfego legítimo pode variar.
+Mas evitar bloquear por User-Agent ou ASN sem evidência, pois a origem do tráfego legítimo pode
+variar.
 
 ### 12.4 Como checar via API
 
@@ -710,13 +718,15 @@ curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/$
 
 ## 13. Rate Limiting: fusível antiabuso, não limite de uso legítimo
 
-Rate Limiting Rules definem limites para requisições que correspondem a uma expressão e têm parâmetros como características, período, quantidade e mitigation timeout.
+Rate Limiting Rules definem limites para requisições que correspondem a uma expressão e têm
+parâmetros como características, período, quantidade e mitigation timeout.
 
-**Origem oficial:**
-https://developers.cloudflare.com/waf/rate-limiting-rules/
+**Origem oficial:** https://developers.cloudflare.com/waf/rate-limiting-rules/
 https://developers.cloudflare.com/waf/rate-limiting-rules/create-api/
 
-A documentação também alerta que rate limiting não é perfeitamente preciso: há atrasos de atualização de contadores e algumas requisições excedentes podem alcançar a origem antes da mitigação.
+A documentação também alerta que rate limiting não é perfeitamente preciso: há atrasos de
+atualização de contadores e algumas requisições excedentes podem alcançar a origem antes da
+mitigação.
 
 ### 13.1 Modelo recomendado
 
@@ -796,7 +806,8 @@ curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/$
 
 ### 14.1 Access interativo
 
-Cloudflare Access é útil para aplicações privadas, mas se aplicado diretamente a `/mcp`, pode inserir login/cookie/desafio incompatível com ChatGPT.
+Cloudflare Access é útil para aplicações privadas, mas se aplicado diretamente a `/mcp`, pode
+inserir login/cookie/desafio incompatível com ChatGPT.
 
 Recomendação:
 
@@ -807,14 +818,16 @@ Aplicar em /admin, /metrics, /internal ou hostname separado.
 
 ### 14.2 Service Tokens
 
-Access Service Tokens são credenciais para sistemas automatizados. A documentação mostra uso de `Client ID` e `Client Secret`, normalmente enviados nos headers:
+Access Service Tokens são credenciais para sistemas automatizados. A documentação mostra uso de
+`Client ID` e `Client Secret`, normalmente enviados nos headers:
 
 ```txt
 CF-Access-Client-Id
 CF-Access-Client-Secret
 ```
 
-Também alerta que, após criar token, é necessário associá-lo a uma política `Service Auth`; caso contrário, Access pode pedir login de identidade.
+Também alerta que, após criar token, é necessário associá-lo a uma política `Service Auth`; caso
+contrário, Access pode pedir login de identidade.
 
 **Origem oficial:**
 https://developers.cloudflare.com/cloudflare-one/access-controls/service-credentials/service-tokens/
@@ -827,11 +840,13 @@ Uso recomendado:
 /internal/*
 ```
 
-Não usar em `/mcp` enquanto ChatGPT.com não puder enviar esses headers de modo controlado e compatível.
+Não usar em `/mcp` enquanto ChatGPT.com não puder enviar esses headers de modo controlado e
+compatível.
 
 ### 14.3 mTLS
 
-mTLS é forte para cliente controlado com certificado. Mas ChatGPT.com não apresentará nosso certificado cliente Cloudflare. Portanto:
+mTLS é forte para cliente controlado com certificado. Mas ChatGPT.com não apresentará nosso
+certificado cliente Cloudflare. Portanto:
 
 ```txt
 mTLS obrigatório em /mcp: não recomendado agora
@@ -844,10 +859,11 @@ Se usar mTLS, considerar tanto verificação quanto revogação de certificado.
 
 ## 15. API Shield / JWT Validation
 
-API Shield JWT Validation permite validar JWTs na borda antes da origem, usando JWKS e regras de validação. A documentação indica validação contra assinatura, expiração, `not before`, manipulação e também uso de header/cookie. Também menciona rate limiting por claim JWT em alguns cenários.
+API Shield JWT Validation permite validar JWTs na borda antes da origem, usando JWKS e regras de
+validação. A documentação indica validação contra assinatura, expiração, `not before`, manipulação e
+também uso de header/cookie. Também menciona rate limiting por claim JWT em alguns cenários.
 
-**Origem oficial:**
-https://developers.cloudflare.com/api-shield/security/jwt-validation/
+**Origem oficial:** https://developers.cloudflare.com/api-shield/security/jwt-validation/
 
 ### 15.1 Potencial para MCP
 
@@ -873,7 +889,9 @@ Fase 3: enforcement apenas depois de smoke OAuth/MCP completo
 
 ## 16. SSL/TLS: edge HTTPS vs origem local do Tunnel
 
-Full Strict exige que a origem aceite HTTPS com certificado válido, não expirado, emitido por CA confiável ou Cloudflare Origin CA e com CN/SAN correspondente; caso contrário, Cloudflare pode retornar 526.
+Full Strict exige que a origem aceite HTTPS com certificado válido, não expirado, emitido por CA
+confiável ou Cloudflare Origin CA e com CN/SAN correspondente; caso contrário, Cloudflare pode
+retornar 526.
 
 **Origem oficial:**
 https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/
@@ -888,7 +906,8 @@ Cloudflare Edge -> cloudflared: túnel Cloudflare
 cloudflared -> origem local: http://127.0.0.1:3333
 ```
 
-Full Strict não é a correção principal para a origem local do túnel. A prioridade é túnel saudável, service correto, OAuth saudável e rules compatíveis.
+Full Strict não é a correção principal para a origem local do túnel. A prioridade é túnel saudável,
+service correto, OAuth saudável e rules compatíveis.
 
 ### 16.2 Quando considerar HTTPS na origem local
 
@@ -898,16 +917,18 @@ Apenas se houver redesenho:
 cloudflared -> https://127.0.0.1:3333
 ```
 
-Isso exigiria certificado local compatível e provável ajuste de `http2Origin`/TLS. Não é prioridade imediata.
+Isso exigiria certificado local compatível e provável ajuste de `http2Origin`/TLS. Não é prioridade
+imediata.
 
 ---
 
 ## 17. Transform Rules e cabeçalhos sensíveis
 
-Response Header Transform Rules permitem set/add/remove headers em respostas. A documentação também alerta que modificar `Cache-Control` por Transform Rule não altera comportamento de cache; para isso, usar Cache Rules.
+Response Header Transform Rules permitem set/add/remove headers em respostas. A documentação também
+alerta que modificar `Cache-Control` por Transform Rule não altera comportamento de cache; para
+isso, usar Cache Rules.
 
-**Origem oficial:**
-https://developers.cloudflare.com/rules/transform/response-header-modification/
+**Origem oficial:** https://developers.cloudflare.com/rules/transform/response-header-modification/
 
 ### 17.1 Headers que não devem ser alterados em MCP/OAuth
 
@@ -945,7 +966,9 @@ curl -sS "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/rulesets/phases/ht
 
 ### 18.1 Métricas do tunnel
 
-A documentação oficial diz que `cloudflared` expõe métricas Prometheus; por padrão, em ambiente não-container ele tenta portas `127.0.0.1:20241` a `20245`, e em container usa `0.0.0.0`. Também permite endpoint customizado com `--metrics`.
+A documentação oficial diz que `cloudflared` expõe métricas Prometheus; por padrão, em ambiente
+não-container ele tenta portas `127.0.0.1:20241` a `20245`, e em container usa `0.0.0.0`. Também
+permite endpoint customizado com `--metrics`.
 
 **Origem oficial:**
 https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/monitor-tunnels/metrics/
@@ -999,10 +1022,10 @@ export TUNNEL_ID="..."
 
 ### 19.2 Verificar token
 
-A documentação de API tokens mostra endpoint de verify e recomenda permissões específicas por recurso.
+A documentação de API tokens mostra endpoint de verify e recomenda permissões específicas por
+recurso.
 
-**Origem oficial:**
-https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
+**Origem oficial:** https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
 https://developers.cloudflare.com/fundamentals/api/reference/permissions/
 
 ```bash
@@ -1093,10 +1116,10 @@ cloudflare-admin-change:
   Access Edit se necessário
 ```
 
-A documentação de API tokens recomenda permissões específicas, recursos específicos e alerta que o token secret só é exibido uma vez.
+A documentação de API tokens recomenda permissões específicas, recursos específicos e alerta que o
+token secret só é exibido uma vez.
 
-**Origem oficial:**
-https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
+**Origem oficial:** https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
 
 ### 20.3 Smoke obrigatório após alteração
 
@@ -1117,7 +1140,8 @@ curl -i https://mcp.aurelin.org/mcp \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-Quando OAuth exige bearer token, esse último smoke deve ser executado com token válido ou pelo fluxo de smoke interno apropriado.
+Quando OAuth exige bearer token, esse último smoke deve ser executado com token válido ou pelo fluxo
+de smoke interno apropriado.
 
 ---
 
@@ -1125,8 +1149,7 @@ Quando OAuth exige bearer token, esse último smoke deve ser executado com token
 
 Cloudflare mantém SDK oficial Node em TypeScript.
 
-**Origem oficial:**
-https://developers.cloudflare.com/api/node/
+**Origem oficial:** https://developers.cloudflare.com/api/node/
 
 ### 21.1 Instalação
 
@@ -1148,7 +1171,8 @@ const client = new Cloudflare({
 
 ### 21.3 Retries e paginação
 
-A documentação oficial informa que o SDK faz retry por padrão em erros de conexão, 408, 409, 429 e 5xx, e permite configurar `maxRetries`. Também suporta auto-pagination via async iterator.
+A documentação oficial informa que o SDK faz retry por padrão em erros de conexão, 408, 409, 429 e
+5xx, e permite configurar `maxRetries`. Também suporta auto-pagination via async iterator.
 
 Exemplo:
 
@@ -1165,7 +1189,8 @@ for await (const record of client.dns.records.list({ zone_id: zoneId })) {
 
 ### 21.4 Custom requests
 
-A documentação mostra uso de métodos customizados como `client.get`, útil quando o SDK tipado ainda não cobre algum endpoint específico.
+A documentação mostra uso de métodos customizados como `client.get`, útil quando o SDK tipado ainda
+não cobre algum endpoint específico.
 
 ```ts
 const result = await client.get(`/zones/${zoneId}/settings/ssl`);
@@ -1578,15 +1603,18 @@ Precisamos inventariar o que a conta/zone realmente suporta.
 
 ### 28.2 Identidade do cliente ChatGPT
 
-Não devemos presumir IPs fixos, certificados mTLS ou capacidade de enviar headers Access customizados sem confirmação. Por isso, `/mcp` deve permanecer compatível com OAuth próprio.
+Não devemos presumir IPs fixos, certificados mTLS ou capacidade de enviar headers Access
+customizados sem confirmação. Por isso, `/mcp` deve permanecer compatível com OAuth próprio.
 
 ### 28.3 API Shield
 
-Pode ser muito útil, mas só depois de confirmar forma exata dos tokens e JWKS. Aplicar cedo pode quebrar OAuth/MCP.
+Pode ser muito útil, mas só depois de confirmar forma exata dos tokens e JWKS. Aplicar cedo pode
+quebrar OAuth/MCP.
 
 ### 28.4 Conexões longas
 
-Cloudflare pode encerrar conexões por timeout, deploy, idle ou falha transitória. O sistema deve tolerar reconexão.
+Cloudflare pode encerrar conexões por timeout, deploy, idle ou falha transitória. O sistema deve
+tolerar reconexão.
 
 ### 28.5 Automação de alterações
 

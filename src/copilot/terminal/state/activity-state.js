@@ -6,8 +6,8 @@
  * compartilhem uma única semântica operacional.
  */
 
-import { EventEmitter } from 'node:events';
 import { redactSecretText } from '#copilot/core';
+import { EventEmitter } from 'node:events';
 
 const MAX_ACTIVITY_HISTORY = 100;
 const FOCUSED_ACTIVITY_MAX_AGE_MS = 10 * 60_000;

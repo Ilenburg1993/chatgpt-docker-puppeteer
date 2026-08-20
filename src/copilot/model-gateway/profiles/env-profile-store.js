@@ -47,13 +47,7 @@ function firstText(profile, keys) {
  * @returns {string | null}
  */
 function providerId(profile) {
-    return firstText(profile, [
-        'providerId',
-        'provider',
-        'preset',
-        'providerPreset',
-        'COPILOT_BYOK_PROVIDER_PRESET',
-    ]);
+    return firstText(profile, ['providerId', 'provider', 'preset', 'providerPreset', 'COPILOT_BYOK_PROVIDER_PRESET']);
 }
 
 /**
@@ -221,7 +215,9 @@ function defaultBaseUrl(providerIdValue, env) {
     if (!providerIdValue) return null;
     if (providerIdValue === 'ollama-local' || providerIdValue === 'ollama') {
         const configured = text(env['OLLAMA_LOCAL_BASE_URL']) ?? text(env['OLLAMA_BASE_URL']);
-        return configured ? `${configured.replace(/\/+$/u, '').replace(/\/api$/u, '')}/v1` : 'http://localhost:11434/v1';
+        return configured
+            ? `${configured.replace(/\/+$/u, '').replace(/\/api$/u, '')}/v1`
+            : 'http://localhost:11434/v1';
     }
     if (providerIdValue === 'ollama-cloud') {
         const configured = text(env['OLLAMA_CLOUD_BASE_URL']);
@@ -297,7 +293,7 @@ function profileDescriptor(name, profile) {
         secretRefs: secretRefs.refs,
         inlineSecretConfigured: Boolean(
             text(profile['apiKey'] ?? profile['COPILOT_BYOK_API_KEY']) ||
-                text(profile['bearerToken'] ?? profile['COPILOT_BYOK_BEARER_TOKEN']),
+            text(profile['bearerToken'] ?? profile['COPILOT_BYOK_BEARER_TOKEN']),
         ),
         headersConfigured: Object.keys(headers).length > 0 || headersJson !== null,
         metadataKeys: Object.keys(record(profile['metadata'])).sort(),
@@ -333,7 +329,7 @@ export class ModelGatewayEnvProfileStore {
     }
 
     /**
-     * @returns {Array<ReturnType<typeof profileDescriptor>>}
+     * @returns {ReturnType<typeof profileDescriptor>[]}
      */
     list() {
         const raw = this.#env['COPILOT_BYOK_PROFILES_JSON'];
@@ -442,7 +438,7 @@ export class ModelGatewayEnvProfileStore {
     }
 
     /**
-     * @returns {Array<{
+     * @returns {{
      *     name: string;
      *     preset: string | null;
      *     providerId: string | null;
@@ -457,7 +453,7 @@ export class ModelGatewayEnvProfileStore {
      *     profileCostDetail: string | null;
      *     warnings: string[];
      *     errors: string[];
-     * }>}
+     * }[]}
      */
     listTerminalSummaries() {
         return this.list().map((descriptor) => {
@@ -555,13 +551,17 @@ export class ModelGatewayEnvProfileStore {
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_PROVIDER_TYPE',
-            profileMatchesRoute ? descriptor.providerType ?? providerTypeForProviderId(effectiveProviderId) : providerTypeForProviderId(effectiveProviderId),
+            profileMatchesRoute
+                ? (descriptor.providerType ?? providerTypeForProviderId(effectiveProviderId))
+                : providerTypeForProviderId(effectiveProviderId),
             { preserveExisting: preserveGatewayRoute },
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_BASE_URL',
-            profileMatchesRoute ? descriptor.baseUrl ?? defaultBaseUrl(effectiveProviderId, env) : defaultBaseUrl(effectiveProviderId, env),
+            profileMatchesRoute
+                ? (descriptor.baseUrl ?? defaultBaseUrl(effectiveProviderId, env))
+                : defaultBaseUrl(effectiveProviderId, env),
             { preserveExisting: preserveGatewayRoute },
         );
         setMaterializedEnvValue(env, 'COPILOT_BYOK_MODEL', profileMatchesRoute ? descriptor.model : null, {
@@ -574,9 +574,16 @@ export class ModelGatewayEnvProfileStore {
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_MODELS_ENDPOINT',
-            firstText(rawProfile, ['modelsEndpoint', 'modelEndpoint', 'modelsUrl', 'modelsURL', 'COPILOT_BYOK_MODELS_ENDPOINT']),
+            firstText(rawProfile, [
+                'modelsEndpoint',
+                'modelEndpoint',
+                'modelsUrl',
+                'modelsURL',
+                'COPILOT_BYOK_MODELS_ENDPOINT',
+            ]),
         );
-        const modelsJson = rawProfile['modelsJson'] ?? rawProfile['modelsJSON'] ?? rawProfile['COPILOT_BYOK_MODELS_JSON'];
+        const modelsJson =
+            rawProfile['modelsJson'] ?? rawProfile['modelsJSON'] ?? rawProfile['COPILOT_BYOK_MODELS_JSON'];
         if (Array.isArray(modelsJson) || (modelsJson && typeof modelsJson === 'object')) {
             env['COPILOT_BYOK_MODELS_JSON'] = JSON.stringify(modelsJson);
         } else {
@@ -585,7 +592,11 @@ export class ModelGatewayEnvProfileStore {
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_MODEL_DISCOVERY_ENABLED',
-            booleanText(rawProfile['modelDiscoveryEnabled'] ?? rawProfile['discoverModels'] ?? rawProfile['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED']),
+            booleanText(
+                rawProfile['modelDiscoveryEnabled'] ??
+                    rawProfile['discoverModels'] ??
+                    rawProfile['COPILOT_BYOK_MODEL_DISCOVERY_ENABLED'],
+            ),
         );
         setMaterializedEnvValue(
             env,
@@ -600,37 +611,60 @@ export class ModelGatewayEnvProfileStore {
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_CONTEXT_WINDOW_TOKENS',
-            numberText(rawProfile['contextWindowTokens'] ?? rawProfile['contextWindow'] ?? rawProfile['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS']),
+            numberText(
+                rawProfile['contextWindowTokens'] ??
+                    rawProfile['contextWindow'] ??
+                    rawProfile['COPILOT_BYOK_CONTEXT_WINDOW_TOKENS'],
+            ),
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_MAX_REQUEST_TOKENS',
-            numberText(rawProfile['maxRequestTokens'] ?? rawProfile['maxInputTokens'] ?? rawProfile['COPILOT_BYOK_MAX_REQUEST_TOKENS']),
+            numberText(
+                rawProfile['maxRequestTokens'] ??
+                    rawProfile['maxInputTokens'] ??
+                    rawProfile['COPILOT_BYOK_MAX_REQUEST_TOKENS'],
+            ),
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_TOKENS_PER_MINUTE',
-            numberText(rawProfile['tokensPerMinute'] ?? rawProfile['tpm'] ?? rawProfile['COPILOT_BYOK_TOKENS_PER_MINUTE']),
+            numberText(
+                rawProfile['tokensPerMinute'] ?? rawProfile['tpm'] ?? rawProfile['COPILOT_BYOK_TOKENS_PER_MINUTE'],
+            ),
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_REQUESTS_PER_MINUTE',
-            numberText(rawProfile['requestsPerMinute'] ?? rawProfile['rpm'] ?? rawProfile['COPILOT_BYOK_REQUESTS_PER_MINUTE']),
+            numberText(
+                rawProfile['requestsPerMinute'] ?? rawProfile['rpm'] ?? rawProfile['COPILOT_BYOK_REQUESTS_PER_MINUTE'],
+            ),
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_DAILY_REQUESTS',
-            numberText(rawProfile['dailyRequests'] ?? rawProfile['requestsPerDay'] ?? rawProfile['rpd'] ?? rawProfile['COPILOT_BYOK_DAILY_REQUESTS']),
+            numberText(
+                rawProfile['dailyRequests'] ??
+                    rawProfile['requestsPerDay'] ??
+                    rawProfile['rpd'] ??
+                    rawProfile['COPILOT_BYOK_DAILY_REQUESTS'],
+            ),
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_SUPPORTS_REASONING',
-            booleanText(rawProfile['supportsReasoning'] ?? rawProfile['reasoning'] ?? rawProfile['COPILOT_BYOK_SUPPORTS_REASONING']),
+            booleanText(
+                rawProfile['supportsReasoning'] ??
+                    rawProfile['reasoning'] ??
+                    rawProfile['COPILOT_BYOK_SUPPORTS_REASONING'],
+            ),
         );
         setMaterializedEnvValue(
             env,
             'COPILOT_BYOK_SUPPORTS_VISION',
-            booleanText(rawProfile['supportsVision'] ?? rawProfile['vision'] ?? rawProfile['COPILOT_BYOK_SUPPORTS_VISION']),
+            booleanText(
+                rawProfile['supportsVision'] ?? rawProfile['vision'] ?? rawProfile['COPILOT_BYOK_SUPPORTS_VISION'],
+            ),
         );
         const secretRefs = profileSecretRefs(rawProfile);
         setMaterializedEnvValue(
@@ -651,7 +685,9 @@ export class ModelGatewayEnvProfileStore {
         const headersJson =
             Object.keys(headers).length > 0
                 ? JSON.stringify(headers)
-                : text(rawProfile['headersJson'] ?? rawProfile['headersJSON'] ?? rawProfile['COPILOT_BYOK_HEADERS_JSON']);
+                : text(
+                      rawProfile['headersJson'] ?? rawProfile['headersJSON'] ?? rawProfile['COPILOT_BYOK_HEADERS_JSON'],
+                  );
         setMaterializedEnvValue(env, 'COPILOT_BYOK_HEADERS_JSON', headersJson, { preserveExisting: true });
         return { materialized: true, profile: descriptor, env };
     }

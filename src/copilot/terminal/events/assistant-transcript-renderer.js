@@ -10,7 +10,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { sanitizeTerminalRenderText, SEPARATOR, printlnBlock } from '../dialog/io/index.js';
+import { printlnBlock, sanitizeTerminalRenderText, SEPARATOR } from '../dialog/io/index.js';
 import { appendTerminalTranscriptTurn, terminalThemeRow, terminalThemeText } from '../state/events/index.js';
 
 const RECENT_TRANSCRIPT_TTL_MS = 5 * 60_000;
@@ -74,8 +74,7 @@ export function claimTerminalAssistantTranscript(content, options = {}) {
     pruneRecentTranscriptHashes();
     const hash = createHash('sha256').update(normalized).digest('hex');
     if (recentTranscriptHashes.has(hash)) return false;
-    const coverageOptions =
-        typeof options.coverageMinChars === 'number' ? { minChars: options.coverageMinChars } : {};
+    const coverageOptions = typeof options.coverageMinChars === 'number' ? { minChars: options.coverageMinChars } : {};
     if (options.suppressIfCoveredByRecent && isTerminalAssistantTranscriptCovered(normalized, coverageOptions)) {
         return false;
     }

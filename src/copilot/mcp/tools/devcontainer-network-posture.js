@@ -5,12 +5,12 @@
  * @module copilot/mcp/tools/devcontainer-network-posture
  */
 
+import { readBytesRangeFreshTrusted, readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/trusted-io';
+import { boundedWriteAnnotations, errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { execFile } from 'node:child_process';
-import { readFile, stat } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { boundedWriteAnnotations, errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 
 const LOCAL_DNS_SUMMARY = '/tmp/devcontainer-local-dns-cache.summary';
 const LOCAL_DNS_ACTION_SUMMARY = '/tmp/devcontainer-local-dns-cache.action.summary';
@@ -18,7 +18,10 @@ const LOCAL_DNS_STATUS = '/tmp/devcontainer-local-dns-cache.status';
 const NETWORK_CONTROL_PLANE_SUMMARY = '/tmp/devcontainer-network-control-plane.summary';
 const NETWORK_CONTROL_PLANE_EVENTS = '/tmp/devcontainer-network-control-plane.events.tsv';
 const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
-const CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT = resolve(REPO_ROOT, '.devcontainer/scripts/network-control-plane-state.sh');
+const CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT = resolve(
+    REPO_ROOT,
+    '.devcontainer/scripts/network-control-plane-state.sh',
+);
 const execFileAsync = promisify(execFile);
 const NETWORK_CONTROL_PLANE_REFRESH_TIMEOUT_MS = 10_000;
 const NETWORK_CONTROL_PLANE_REFRESH_MAX_BUFFER = 64 * 1024;
@@ -167,9 +170,14 @@ export function buildDevcontainerNetworkFindings(dns, control, controlRuntime = 
     const critical = [];
     const warnings = [];
     const observations = [];
-    if (!dns['status']) warnings.push('local DNS runtime summary is missing; run the DevContainer network summary/doctor before DNS tuning.');
-    if (dns['status'] === 'failed' || dns['status'] === 'lock-failed') critical.push(`local DNS cache status is ${dns['status']}.`);
-    if (dns['resolv_conf_drift'] === 'true') warnings.push(`resolv.conf drift reported: ${dns['resolv_conf_drift_reason'] ?? 'unknown'}.`);
+    if (!dns['status'])
+        warnings.push(
+            'local DNS runtime summary is missing; run the DevContainer network summary/doctor before DNS tuning.',
+        );
+    if (dns['status'] === 'failed' || dns['status'] === 'lock-failed')
+        critical.push(`local DNS cache status is ${dns['status']}.`);
+    if (dns['resolv_conf_drift'] === 'true')
+        warnings.push(`resolv.conf drift reported: ${dns['resolv_conf_drift_reason'] ?? 'unknown'}.`);
     if (dns['resolv_conf_points_to_cache'] === 'true' && dns['local_probe_proven'] !== 'true') {
         critical.push('resolv.conf points to local DNS cache but local_probe_proven is not true.');
     }
@@ -178,9 +186,13 @@ export function buildDevcontainerNetworkFindings(dns, control, controlRuntime = 
     const processStatus = dns['dnsmasq_process_status'] ?? '';
     const portStatus = dns['dnsmasq_port_status'] ?? '';
     const managedOwnListener =
-        conflictStatus === 'in-use' && processStatus.startsWith('running-managed') && portStatus.startsWith('bound-managed');
+        conflictStatus === 'in-use' &&
+        processStatus.startsWith('running-managed') &&
+        portStatus.startsWith('bound-managed');
     if (managedOwnListener) {
-        observations.push('DNS target port is occupied by the managed dnsmasq as expected; legacy in-use status is not a conflict.');
+        observations.push(
+            'DNS target port is occupied by the managed dnsmasq as expected; legacy in-use status is not a conflict.',
+        );
     } else if (conflictStatus === 'free' && dns['runtime_effective'] === 'true') {
         warnings.push('local DNS runtime claims to be effective while the configured target port is reported free.');
     } else if (conflictStatus && !['none', 'free'].includes(conflictStatus)) {
@@ -206,9 +218,13 @@ export function buildDevcontainerNetworkFindings(dns, control, controlRuntime = 
     }
     if (controlEnabled && controlRuntime['configuredScriptReadable'] === false) {
         if (controlRuntime['fallbackActive'] === true) {
-            observations.push('configured DevContainer network control-plane path is stale/unreadable, but the canonical script is available and lifecycle hooks can self-heal to it.');
+            observations.push(
+                'configured DevContainer network control-plane path is stale/unreadable, but the canonical script is available and lifecycle hooks can self-heal to it.',
+            );
         } else {
-            warnings.push('configured DevContainer network control-plane script is not readable and no canonical fallback is available.');
+            warnings.push(
+                'configured DevContainer network control-plane script is not readable and no canonical fallback is available.',
+            );
         }
     }
     if (controlEnabled && controlRuntime['expectedVersionMismatch'] === true) {
@@ -233,15 +249,23 @@ export function buildDevcontainerNetworkFindings(dns, control, controlRuntime = 
  * @returns {string[]}
  */
 function buildNextActions(findings) {
-    if (findings.critical.length > 0) return ['Run npm run network:dns:doctor before Cloudflare transport/origin tuning.'];
-    if (findings.warnings.length > 0) return ['Resolve DevContainer network observability warnings before changing tunnel protocol or origin parameters.'];
-    return ['Current authoritative DevContainer network posture is healthy/advisory-only. Do not retune DNS or Cloudflare transport solely for inter-tool latency; use mcp_latency_attribution and controlled pulse evidence first.'];
+    if (findings.critical.length > 0)
+        return ['Run npm run network:dns:doctor before Cloudflare transport/origin tuning.'];
+    if (findings.warnings.length > 0)
+        return [
+            'Resolve DevContainer network observability warnings before changing tunnel protocol or origin parameters.',
+        ];
+    return [
+        'Current authoritative DevContainer network posture is healthy/advisory-only. Do not retune DNS or Cloudflare transport solely for inter-tool latency; use mcp_latency_attribution and controlled pulse evidence first.',
+    ];
 }
 
 /** @returns {Promise<Record<string, unknown>>} */
 async function inspectNetworkControlPlaneRuntime() {
     const enabled = !['0', 'false', 'off', 'disabled'].includes(
-        String(process.env['DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE'] ?? 'true').trim().toLowerCase(),
+        String(process.env['DEVCONTAINER_ENABLE_NETWORK_CONTROL_PLANE_STATE'] ?? 'true')
+            .trim()
+            .toLowerCase(),
     );
     const configuredRaw = String(process.env['DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT'] ?? '').trim();
     const expanded = configuredRaw.replaceAll('${containerWorkspaceFolder}', REPO_ROOT.replace(/\/$/u, ''));
@@ -257,8 +281,14 @@ async function inspectNetworkControlPlaneRuntime() {
         readScriptDeclaredVersion(CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT),
     ]);
     const configuredMatchesCanonical = configuredScript === CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT;
-    const fallbackActive = !configuredMatchesCanonical && !configured.readable && canonical.readable && canonical.isFile;
-    const effectiveScript = configured.readable && configured.isFile ? configuredScript : fallbackActive ? CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT : configuredScript;
+    const fallbackActive =
+        !configuredMatchesCanonical && !configured.readable && canonical.readable && canonical.isFile;
+    const effectiveScript =
+        configured.readable && configured.isFile
+            ? configuredScript
+            : fallbackActive
+              ? CANONICAL_NETWORK_CONTROL_PLANE_SCRIPT
+              : configuredScript;
     const expectedVersion = process.env['DEVCONTAINER_NETWORK_CONTROL_PLANE_SCRIPT_VERSION_EXPECTED'] ?? null;
     const expectedVersionMismatch =
         typeof expectedVersion === 'string' &&
@@ -285,16 +315,24 @@ async function inspectNetworkControlPlaneRuntime() {
 
 /** @param {string | null} value */
 function normalizeVersion(value) {
-    return String(value ?? '').trim().replace(/^v/u, '');
+    return String(value ?? '')
+        .trim()
+        .replace(/^v/u, '');
 }
 
 /** @param {string} path */
 async function readScriptDeclaredVersion(path) {
     try {
-        const content = await readFile(path, 'utf8');
+        const snapshot = await readBytesRangeFreshTrusted(path, {
+            caller: 'mcp.tools.devcontainer-network-posture',
+            start: 0,
+            maxBytes: 8 * 1024,
+            rejectSymlink: true,
+        });
+        const content = snapshot.content.toString('utf8');
         const assignment = content.match(/\bSCRIPT_VERSION=["']([^"']+)["']/u)?.[1];
         if (assignment) return normalizeVersion(assignment);
-        const header = content.slice(0, 8192).match(/^#\s*Version:\s*v?([^\s]+)\s*$/mu)?.[1];
+        const header = content.match(/^#\s*Version:\s*v?([^\s]+)\s*$/mu)?.[1];
         return header ? normalizeVersion(header) : null;
     } catch {
         return null;
@@ -304,7 +342,7 @@ async function readScriptDeclaredVersion(path) {
 /** @param {string} path */
 async function inspectFile(path) {
     try {
-        const info = await stat(path);
+        const info = (await statPathTrusted(path, { caller: 'mcp.tools.devcontainer-network-posture' })).stats;
         return { readable: true, isFile: info.isFile(), error: null };
     } catch (error) {
         return { readable: false, isFile: false, error: error instanceof Error ? error.message : String(error) };
@@ -317,7 +355,8 @@ async function inspectFile(path) {
  */
 async function readSingleLine(path) {
     try {
-        const content = await readFile(path, 'utf8');
+        const content = (await readTextFreshTrusted(path, { caller: 'mcp.tools.devcontainer-network-posture' }))
+            .content;
         return { path, readable: true, line: content.split(/\r?\n/u)[0] ?? '', error: null };
     } catch (error) {
         return { path, readable: false, line: null, error: error instanceof Error ? error.message : String(error) };
@@ -326,11 +365,15 @@ async function readSingleLine(path) {
 
 /**
  * @param {string} path
- * @returns {Promise<{ meta: { path: string; readable: boolean; error: string | null }; values: Record<string, string> }>}
+ * @returns {Promise<{
+ *     meta: { path: string; readable: boolean; error: string | null };
+ *     values: Record<string, string>;
+ * }>}
  */
 async function readKvFile(path) {
     try {
-        const content = await readFile(path, 'utf8');
+        const content = (await readTextFreshTrusted(path, { caller: 'mcp.tools.devcontainer-network-posture' }))
+            .content;
         const values = Object.fromEntries(
             content
                 .split(/\r?\n/u)
@@ -357,7 +400,17 @@ async function readKvFile(path) {
  */
 async function readTailLines(path, limit) {
     try {
-        const content = await readFile(path, 'utf8');
+        const snapshot = await readBytesRangeFreshTrusted(path, {
+            caller: 'mcp.tools.devcontainer-network-posture',
+            maxBytes: 256 * 1024,
+            fromEnd: true,
+            rejectSymlink: true,
+        });
+        let content = snapshot.content.toString('utf8');
+        if (snapshot.truncatedBefore) {
+            const firstNewline = content.indexOf('\n');
+            content = firstNewline >= 0 ? content.slice(firstNewline + 1) : '';
+        }
         return { readable: true, lines: content.trim().split(/\r?\n/u).slice(-limit), error: null };
     } catch (error) {
         return { readable: false, lines: [], error: error instanceof Error ? error.message : String(error) };

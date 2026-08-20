@@ -30,7 +30,8 @@ const sdkNamespace = /** @type {CopilotSdkNamespace} */ (CopilotSdk);
 
 // ─── Re-exports do SDK ────────────────────────────────────────────────────────
 
-export const SYSTEM_MESSAGE_SECTIONS = sdkNamespace.SYSTEM_MESSAGE_SECTIONS ?? sdkNamespace.SYSTEM_PROMPT_SECTIONS ?? {};
+export const SYSTEM_MESSAGE_SECTIONS =
+    sdkNamespace.SYSTEM_MESSAGE_SECTIONS ?? sdkNamespace.SYSTEM_PROMPT_SECTIONS ?? {};
 
 // Alias legado local: o SDK 1.0 renomeou "prompt sections" para "message sections".
 export const SYSTEM_PROMPT_SECTIONS = SYSTEM_MESSAGE_SECTIONS;

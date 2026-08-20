@@ -381,8 +381,7 @@ export function normalizeMcpUrl(url) {
 
 /**
  * @param {string} url
- * @returns {{ ok: true; normalizedUrl: string; resource: string }
- *     | { ok: false; reason: string; normalizedUrl: string }}
+ * @returns {{ ok: true; normalizedUrl: string; resource: string } | { ok: false; reason: string; normalizedUrl: string }}
  */
 export function validatePublicConnectorUrl(url) {
     const normalized = normalizeMcpUrl(url);

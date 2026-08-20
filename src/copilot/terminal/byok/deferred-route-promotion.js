@@ -46,7 +46,14 @@ function optionalString(value) {
  *     now?: number;
  *     source?: string;
  * }} [options]
- * @returns {Promise<{ sessionId: string | null; scanned: number; promoted: number; skipped: number; errors: number; records: Record<string, unknown>[] }>}
+ * @returns {Promise<{
+ *     sessionId: string | null;
+ *     scanned: number;
+ *     promoted: number;
+ *     skipped: number;
+ *     errors: number;
+ *     records: Record<string, unknown>[];
+ * }>}
  */
 export async function promoteTerminalDeferredByokRouteSwitchesAtTurnBoundary(options = {}) {
     const sessionId = optionalString(options.sessionId);

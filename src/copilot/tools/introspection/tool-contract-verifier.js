@@ -13,11 +13,7 @@
  * @typedef {import('#copilot/sdk/types').ToolRegistry} ToolRegistry
  */
 
-import {
-    buildToolDefinitionMetadata,
-    isHighImpactToolRisk,
-    permissionModeSkipsPrompts,
-} from './tool-metadata.js';
+import { buildToolDefinitionMetadata, isHighImpactToolRisk, permissionModeSkipsPrompts } from './tool-metadata.js';
 
 /**
  * @typedef {'error' | 'warning' | 'notice' | 'decision'} ToolContractIssueSeverity
@@ -127,7 +123,9 @@ const TOOL_OPERATION_RESULT_REQUIRED_FIELDS = Object.freeze({
  * @returns {Record<string, unknown> | null}
  */
 function asRecord(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -194,9 +192,10 @@ function findMutatingReadOnlyParameters(schema) {
                 found.push(normalized);
                 continue;
             }
-            const property = value && typeof value === 'object' && !Array.isArray(value)
-                ? /** @type {Record<string, unknown>} */ (value)
-                : {};
+            const property =
+                value && typeof value === 'object' && !Array.isArray(value)
+                    ? /** @type {Record<string, unknown>} */ (value)
+                    : {};
             const enumValues = Array.isArray(property['enum']) ? property['enum'].map(String) : [];
             if (enumValues.length === 0 || enumValues.some((entry) => MUTATING_MODE_VALUES.has(entry))) {
                 found.push(normalized);

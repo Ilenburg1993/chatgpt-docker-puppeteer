@@ -8,12 +8,9 @@
  * @module copilot/model-gateway/catalog/importers/zai-openapi-importer
  */
 
-import {
-    MODEL_GATEWAY_CATALOG_CONFIDENCE,
-    createProviderMetadataEvidence,
-} from '../contracts.js';
-import { ZAI_CHAT_COMPLETIONS_PATH, ZAI_OPENAPI_URL } from './zai-models-importer.js';
+import { MODEL_GATEWAY_CATALOG_CONFIDENCE, createProviderMetadataEvidence } from '../contracts.js';
 import { readCatalogResponseJson } from './response-body.js';
+import { ZAI_CHAT_COMPLETIONS_PATH, ZAI_OPENAPI_URL } from './zai-models-importer.js';
 
 /**
  * @param {unknown} value
@@ -100,7 +97,9 @@ function requestParameterNames(schema) {
  * @returns {Record<string, boolean>}
  */
 function capabilityHints(schema) {
-    const keys = new Set([...collectObjectKeys(schema), ...requestParameterNames(schema)].map((key) => key.toLowerCase()));
+    const keys = new Set(
+        [...collectObjectKeys(schema), ...requestParameterNames(schema)].map((key) => key.toLowerCase()),
+    );
     return {
         chat: true,
         streaming: keys.has('stream'),
@@ -121,7 +120,7 @@ function capabilityHints(schema) {
 
 /**
  * @param {Record<string, unknown>} openapi
- * @returns {Array<{ fieldPath: string; value: unknown }>}
+ * @returns {{ fieldPath: string; value: unknown }[]}
  */
 function providerEvidenceValues(openapi) {
     const paths = isRecord(openapi['paths']) ? openapi['paths'] : {};
@@ -132,14 +131,26 @@ function providerEvidenceValues(openapi) {
     const values = [
         { fieldPath: 'providerMetadata.zai.openapi.url', value: ZAI_OPENAPI_URL },
         { fieldPath: 'providerMetadata.zai.openapi.openapiVersion', value: stringValue(openapi['openapi']) },
-        { fieldPath: 'providerMetadata.zai.openapi.title', value: isRecord(openapi['info']) ? stringValue(openapi['info']['title']) : null },
-        { fieldPath: 'providerMetadata.zai.openapi.version', value: isRecord(openapi['info']) ? stringValue(openapi['info']['version']) : null },
+        {
+            fieldPath: 'providerMetadata.zai.openapi.title',
+            value: isRecord(openapi['info']) ? stringValue(openapi['info']['title']) : null,
+        },
+        {
+            fieldPath: 'providerMetadata.zai.openapi.version',
+            value: isRecord(openapi['info']) ? stringValue(openapi['info']['version']) : null,
+        },
         { fieldPath: 'providerMetadata.zai.openapi.paths', value: Object.keys(paths).sort() },
         { fieldPath: 'providerMetadata.zai.openapi.chatCompletionsPath', value: ZAI_CHAT_COMPLETIONS_PATH },
-        { fieldPath: 'providerMetadata.zai.openapi.chatCompletionsOperationId', value: stringValue(operation['operationId']) },
+        {
+            fieldPath: 'providerMetadata.zai.openapi.chatCompletionsOperationId',
+            value: stringValue(operation['operationId']),
+        },
         { fieldPath: 'providerMetadata.zai.openapi.chatCompletionsTags', value: stringList(operation['tags']) },
         { fieldPath: 'providerMetadata.zai.openapi.chatCompletionsParameters', value: parameters },
-        ...Object.entries(capabilities).map(([key, value]) => ({ fieldPath: `providerMetadata.zai.openapi.capabilities.${key}`, value })),
+        ...Object.entries(capabilities).map(([key, value]) => ({
+            fieldPath: `providerMetadata.zai.openapi.capabilities.${key}`,
+            value,
+        })),
         { fieldPath: 'providerMetadata.zai.openapi.requiredRequestFields', value: stringList(schema['required']) },
     ];
     return values.filter((item) => {

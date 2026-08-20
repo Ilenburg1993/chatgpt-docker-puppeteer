@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {Ref} from "vue" */
+/** @import {Ref} from 'vue' */
 import { ref } from 'vue';
 
 /**

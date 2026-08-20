@@ -28,17 +28,17 @@ function timestamp(value) {
  */
 export function evaluateModelGatewayModelLifecycle(model, options = {}) {
     const now = options.now ?? Date.now();
-    const lifecycle = model['lifecycle'] && typeof model['lifecycle'] === 'object'
-        ? /** @type {Record<string, unknown>} */ (model['lifecycle'])
-        : model;
+    const lifecycle =
+        model['lifecycle'] && typeof model['lifecycle'] === 'object'
+            ? /** @type {Record<string, unknown>} */ (model['lifecycle'])
+            : model;
     const deprecatedAtMs = timestamp(lifecycle['deprecatedAt']);
     const retiredAtMs = timestamp(lifecycle['retiredAt']);
     const expiresAtMs = timestamp(lifecycle['expiresAt']);
     const explicitStatus = typeof lifecycle['status'] === 'string' ? lifecycle['status'] : null;
     const retired = explicitStatus === 'retired' || (retiredAtMs !== null && retiredAtMs <= now);
     const expired = expiresAtMs !== null && expiresAtMs <= now;
-    const deprecated =
-        explicitStatus === 'deprecated' || (deprecatedAtMs !== null && deprecatedAtMs <= now);
+    const deprecated = explicitStatus === 'deprecated' || (deprecatedAtMs !== null && deprecatedAtMs <= now);
     const status = retired
         ? MODEL_GATEWAY_MODEL_LIFECYCLE_STATUS.RETIRED
         : expired

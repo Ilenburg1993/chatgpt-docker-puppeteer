@@ -25,13 +25,17 @@ implementações concretas.
 
 ### Melhorias Propostas
 
-| ID              | Tipo            | Descrição                                                                                                      |
-| --------------- | --------------- | -------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
-| **FLOW-UPG-01** | Observabilidade | Emitir evento `user.turn_injected_to_orchestrator` quando terminal sincroniza com o Orchestrator (fix FLOW-01) |
-| **FLOW-UPG-02** | Resiliência     | RF-PR-05: aplicar fallback model em `startDialogLoop()` (0-PR garantido) em vez de `#tryReconnect`             |
-| **FLOW-UPG-03** | Rastreabilidade | Adicionar `turnSource: 'terminal'                                                                              | 'api' | 'orchestrator'`no evento`dialog.turn_start` |
-| **FLOW-UPG-04** | Diagnóstico     | `bridge-dialog.js /dialog/turn` deve retornar `dialogLoopActive` no body de erro 409                           |
-| **FLOW-UPG-05** | Robustez        | `dialog.js`: timeout de `ensureDialogLoop()` deve emitir `Nerv` com severity=error para alertar monitoramento  |
+| ID | Tipo | Descrição | | --------------- | --------------- |
+--------------------------------------------------------------------------------------------------------------
+
+| ----- | ------------------------------------------- | | **FLOW-UPG-01** | Observabilidade | Emitir
+evento `user.turn_injected_to_orchestrator` quando terminal sincroniza com o Orchestrator (fix
+FLOW-01) | | **FLOW-UPG-02** | Resiliência | RF-PR-05: aplicar fallback model em `startDialogLoop()`
+(0-PR garantido) em vez de `#tryReconnect` | | **FLOW-UPG-03** | Rastreabilidade | Adicionar
+`turnSource: 'terminal'                                                                              | 'api' | 'orchestrator'`no
+evento`dialog.turn_start` | | **FLOW-UPG-04** | Diagnóstico | `bridge-dialog.js /dialog/turn` deve
+retornar `dialogLoopActive` no body de erro 409 | | **FLOW-UPG-05** | Robustez | `dialog.js`:
+timeout de `ensureDialogLoop()` deve emitir `Nerv` com severity=error para alertar monitoramento |
 
 ---
 

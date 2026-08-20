@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-check
+import { API as TypeScriptNativeAPI } from '@typescript/native/unstable/sync';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import ts from '../typescript-compat.mjs';
 import { analyzeJSDocCoverage, collectJsSourceFiles } from '../jsdoc_coverage_engine.mjs';
 import { runStrictLaneAudit } from './strict_lane_audit.mjs';
 
@@ -31,6 +31,7 @@ const PUBLIC_ROOTS = [
 ];
 
 const STRICT_LANES_DIR = path.join('config', 'typing', 'strict');
+const typeScriptNativeApi = new TypeScriptNativeAPI();
 
 /** Descobre dinamicamente todas as lanes strict presentes na pasta dedicada. */
 const STRICT_CONFIGS = fs
@@ -79,11 +80,7 @@ function summarizeTsCheck(files) {
  */
 function getStrictLaneFiles(configPath) {
     const absolutePath = path.resolve(configPath);
-    const readResult = ts.readConfigFile(absolutePath, ts.sys.readFile);
-    if (readResult.error) {
-        throw new Error(ts.flattenDiagnosticMessageText(readResult.error.messageText, '\n'));
-    }
-    const parsed = ts.parseJsonConfigFileContent(readResult.config, ts.sys, path.dirname(absolutePath));
+    const parsed = typeScriptNativeApi.parseConfigFile(absolutePath);
     return {
         files: parsed.fileNames.length,
         fileNames: parsed.fileNames.map((fileName) => path.relative(process.cwd(), fileName).replace(/\\/g, '/')),
@@ -145,6 +142,7 @@ const strictLanes = {};
 for (const config of STRICT_CONFIGS) {
     strictLanes[config] = getStrictLaneFiles(config);
 }
+typeScriptNativeApi.close();
 
 const publicAnyTagsTotal = jsdocReport.files.reduce(
     (total, fileReport) =>

@@ -12,12 +12,7 @@
  */
 
 import { readTerminalContextProjection, requestTerminalCompactionProjection } from '../frontend/index.js';
-import {
-    formatTerminalTimeLabel,
-    terminalThemeHeadline,
-    terminalThemeRow,
-    terminalThemeText,
-} from '../state/index.js';
+import { formatTerminalTimeLabel, terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
 
 /**
@@ -143,7 +138,11 @@ export function cmdContext({ println }, arg = '') {
     const projection = callWithRuntimeTarget(readTerminalContextProjection, runtimeId);
 
     if (!projection.isRealData && !projection.hasHistory) {
-        println(terminalThemeRow('Contexto', 'Nenhum histórico em memória ainda; envie um turno primeiro', { role: 'muted' }));
+        println(
+            terminalThemeRow('Contexto', 'Nenhum histórico em memória ainda; envie um turno primeiro', {
+                role: 'muted',
+            }),
+        );
         return;
     }
 
@@ -168,38 +167,58 @@ export function cmdContext({ println }, arg = '') {
         ),
     );
     if (projection.turnCount > 0) {
-        println(terminalThemeRow('Caracteres', projection.totalChars.toLocaleString('pt-BR'), { role: 'info', width: 17 }));
+        println(
+            terminalThemeRow('Caracteres', projection.totalChars.toLocaleString('pt-BR'), { role: 'info', width: 17 }),
+        );
         println(terminalThemeRow('Turnos em memória', String(projection.turnCount), { role: 'info', width: 17 }));
     }
 
     if (pct > 0.85) {
         println('');
-        println(terminalThemeRow('Atenção', 'janela de contexto acima de 85%; considere usar /compact', { role: 'error' }));
+        println(
+            terminalThemeRow('Atenção', 'janela de contexto acima de 85%; considere usar /compact', { role: 'error' }),
+        );
     } else if (pct > 0.65) {
         println('');
-        println(terminalThemeRow('Atenção', 'janela de contexto acima de 65%; monitore conversas longas', { role: 'warn' }));
+        println(
+            terminalThemeRow('Atenção', 'janela de contexto acima de 65%; monitore conversas longas', { role: 'warn' }),
+        );
     }
 
     if (!isRealData) {
-        println(terminalThemeText('muted', '  (estimativa heurística: 4 caracteres ~= 1 token; limite real depende do modelo)'));
+        println(
+            terminalThemeText(
+                'muted',
+                '  (estimativa heurística: 4 caracteres ~= 1 token; limite real depende do modelo)',
+            ),
+        );
     }
 
     // AG.5 — workspace SessionContext
     const ws = projection.workspace;
     println(terminalThemeHeadline('command', 'Workspace'));
     println(terminalThemeRow('Diretório', ws.cwd, { role: 'muted' }));
-    if (ws.gitRoot) println(terminalThemeRow('Git', `${ws.gitRoot} · branch ${ws.currentBranch ?? '?'}`, { role: 'muted' }));
+    if (ws.gitRoot)
+        println(terminalThemeRow('Git', `${ws.gitRoot} · branch ${ws.currentBranch ?? '?'}`, { role: 'muted' }));
 
     println(terminalThemeHeadline('command', 'Timeline canônica'));
     println(
-        terminalThemeRow('Fonte', `${renderTimelineSourceLabel(projection.timelineSource)} · ${renderTimelineAuthorityLabel(projection.timelineAuthority)} · ${renderReconciliationLabel(projection.reconciliationStatus)}`, {
-            role: 'muted',
-        }),
+        terminalThemeRow(
+            'Fonte',
+            `${renderTimelineSourceLabel(projection.timelineSource)} · ${renderTimelineAuthorityLabel(projection.timelineAuthority)} · ${renderReconciliationLabel(projection.reconciliationStatus)}`,
+            {
+                role: 'muted',
+            },
+        ),
     );
     println(
-        terminalThemeRow('Histórico', `${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} vivos · ${projection.liveBridgeTailCount} na cauda viva`, {
-            role: 'muted',
-        }),
+        terminalThemeRow(
+            'Histórico',
+            `${projection.persistedTurnCount} persistidos · ${projection.bridgeTurnCount} vivos · ${projection.liveBridgeTailCount} na cauda viva`,
+            {
+                role: 'muted',
+            },
+        ),
     );
     const syncDetails = [
         renderSyncStatusLabel(projection.syncStatus),
@@ -229,7 +248,13 @@ export function cmdContext({ println }, arg = '') {
             typeof projection.syncNextRetryAt === 'number'
                 ? ` próxima tentativa ${formatTerminalTimeLabel(projection.syncNextRetryAt, { mode: 'dual' })}`
                 : '';
-        println(terminalThemeRow('Sincronização', `falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}`, { role: 'warn' }));
+        println(
+            terminalThemeRow(
+                'Sincronização',
+                `falhou: ${projection.syncLastError ?? 'erro desconhecido'}${retryLabel}`,
+                { role: 'warn' },
+            ),
+        );
     }
 
     println('');

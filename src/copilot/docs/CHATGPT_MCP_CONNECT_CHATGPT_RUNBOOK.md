@@ -55,9 +55,9 @@ ChatGPT
    - Fonte: `https://developers.openai.com/apps-sdk/guides/security-privacy`
 
    Política local deste repo: o conector canônico do ChatGPT usa OAuth max-power por default
-   (`repo:read`, `repo:write`, `repo:validate`, `repo:admin`). A contenção fica em validação de inputs, annotations,
-   audit log, quarantine/plan tools e confirmação de host quando chatgpt.com decidir exibi-la, não na remoção desses
-   escopos do primeiro linking.
+   (`repo:read`, `repo:write`, `repo:validate`, `repo:admin`). A contenção fica em validação de
+   inputs, annotations, audit log, quarantine/plan tools e confirmação de host quando chatgpt.com
+   decidir exibi-la, não na remoção desses escopos do primeiro linking.
 
 5. `Set up Cloudflare Tunnel`
    - A pagina OpenAI de conexao cita Cloudflare Tunnel para expor um MCP local durante

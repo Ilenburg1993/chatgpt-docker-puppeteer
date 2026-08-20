@@ -427,17 +427,17 @@ src/main.js (boot sequence - 200 LOC)
    ```bash
    # Chrome Remote Debugging
    CHROME_WS_ENDPOINT=ws://localhost:9224
-   
+
    # Server
    PORT=3008
    NODE_ENV=development
-   
+
    # Logs
    LOG_LEVEL=info
-   
+
    # PM2
    DAEMON_MODE=false
-   
+
    # Docker
    TZ=America/Sao_Paulo
    ```

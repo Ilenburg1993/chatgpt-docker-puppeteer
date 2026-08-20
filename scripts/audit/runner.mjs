@@ -44,13 +44,7 @@ import { triageFindings } from './triage_llm.mjs';
 /** @typedef {'success' | 'partial' | 'aborted' | 'fatal'} RunOutcome */
 /** @typedef {'signal' | 'uncaught_exception' | 'unhandled_rejection' | 'manual' | 'none'} AbortReason */
 /**
- * @typedef {'observability'
- *     | 'reactive_bug'
- *     | 'exploratory_bug'
- *     | 'contracts'
- *     | 'security'
- *     | 'performance'
- *     | 'architecture'} AuditMode
+ * @typedef {'observability' | 'reactive_bug' | 'exploratory_bug' | 'contracts' | 'security' | 'performance' | 'architecture'} AuditMode
  */
 
 const MASTER_PATH = 'DOCUMENTAÇÃO/AUDITORIAS/BUGS/BUG_AUDIT_MASTER.md';
@@ -1295,7 +1289,7 @@ async function main() {
             'static.forbidden',
             'static.lint',
             'static.typecheck',
-            'static.madge',
+            'static.depgraph',
             'static.depcruise',
             'static.jscpd',
             'static.semgrep',

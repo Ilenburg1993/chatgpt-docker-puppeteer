@@ -6,9 +6,9 @@
  * assertion), e coerentes com o SDK.
  */
 
-import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock SDK (necessário para barrel import que carrega system-message.js)
 const mocks = vi.hoisted(() => ({
@@ -284,7 +284,9 @@ describe('SDK 1.0 type contracts', () => {
             'utf8',
         );
 
-        expect(typesDts).toMatch(/export type ToolBinaryResult = \{\s*data: string;\s*mimeType: string;\s*type: "image" \| "resource";/u);
+        expect(typesDts).toMatch(
+            /export type ToolBinaryResult = \{\s*data: string;\s*mimeType: string;\s*type: "image" \| "resource";/u,
+        );
     });
 });
 

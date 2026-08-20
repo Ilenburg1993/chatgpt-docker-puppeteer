@@ -2,8 +2,8 @@
 /**
  * Shared diagnostics for local/private provider opt-in.
  *
- * Local daemon providers are cataloged and routable, but default selection must
- * stay remote unless the operator explicitly asks for local execution.
+ * Local daemon providers are cataloged and routable, but default selection must stay remote unless the operator
+ * explicitly asks for local execution.
  *
  * @module copilot/model-gateway/routing/local-provider-opt-in
  */
@@ -36,12 +36,22 @@ function profileHasLocalProviderOptInBlock(profile) {
 }
 
 /**
- * @param {{ profiles?: Array<Record<string, unknown>>; summary?: { rejectedReasonCounts?: Record<string, number> } }} selection
- * @returns {{ reason: string; blockedProfileIds: string[]; blockedProfileCount: number; rejectedCount: number; hasBlocks: boolean }}
+ * @param {{ profiles?: Record<string, unknown>[]; summary?: { rejectedReasonCounts?: Record<string, number> } }} selection
+ * @returns {{
+ *     reason: string;
+ *     blockedProfileIds: string[];
+ *     blockedProfileCount: number;
+ *     rejectedCount: number;
+ *     hasBlocks: boolean;
+ * }}
  */
 export function summarizeModelGatewayLocalProviderOptInBlocks(selection) {
-    const blockedProfileIds = stringList(selection.profiles?.filter(profileHasLocalProviderOptInBlock).map((profile) => profile['profileId']));
-    const rejectedCount = Number(selection.summary?.rejectedReasonCounts?.[MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON] ?? 0);
+    const blockedProfileIds = stringList(
+        selection.profiles?.filter(profileHasLocalProviderOptInBlock).map((profile) => profile['profileId']),
+    );
+    const rejectedCount = Number(
+        selection.summary?.rejectedReasonCounts?.[MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON] ?? 0,
+    );
     return {
         reason: MODEL_GATEWAY_LOCAL_PROVIDER_EXPLICIT_REQUEST_REASON,
         blockedProfileIds,
@@ -58,7 +68,10 @@ export function summarizeModelGatewayLocalProviderOptInBlocks(selection) {
 export function renderModelGatewayLocalProviderOptInGuidance(options = {}) {
     const commandPrefix = options.commandPrefix ?? '/byok models route';
     const profileId = optionalString(options.profileId) ?? optionalString(options.profileIds?.[0]) ?? 'repo_agent';
-    const profileSuffix = stringList(options.profileIds).length > 0 ? ` nos perfis ${stringList(options.profileIds).slice(0, 6).join(',')}` : '';
+    const profileSuffix =
+        stringList(options.profileIds).length > 0
+            ? ` nos perfis ${stringList(options.profileIds).slice(0, 6).join(',')}`
+            : '';
     return [
         `Ollama/local foi bloqueado por padrão${profileSuffix}.`,
         `Para usar modelos locais, peça explicitamente: ${commandPrefix} ${profileId} provider:ollama, ${commandPrefix} local_private ou ${commandPrefix} local_private_strict.`,

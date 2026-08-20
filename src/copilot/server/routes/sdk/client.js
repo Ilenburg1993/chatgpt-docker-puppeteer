@@ -36,8 +36,8 @@ import { withErrorHandler as _withErrorHandler } from './middleware.js';
  *
  * @typedef {object} ClientRouterDeps
  * @property {import('#copilot/agent').AlwaysAliveAgent} agent - Instância do agente.
- * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['getClient']} getClient - Factory do SDK
- *   client.
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['getClient']} getClient - Factory do
+ *   SDK client.
  * @property {() => string} getClientState - Estado de conexão.
  * @property {() => Promise<void | Error[]>} stopClient - Para o client.
  * @property {() => Promise<void>} forceStopClient - Para o client forçadamente.

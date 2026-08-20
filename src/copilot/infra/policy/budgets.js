@@ -77,8 +77,12 @@ export function resolveProcessExecutionBudget(options = {}) {
                 : normalizePositiveIntegerBudget(options.timeoutMs ?? defaultTimeoutMs, defaultTimeoutMs, {
                       min: MIN_TIMEOUT_MS,
                   }),
-        maxBufferBytes: normalizePositiveIntegerBudget(options.maxBufferBytes ?? defaultMaxBufferBytes, defaultMaxBufferBytes, {
-            min: MIN_BUFFER_BYTES,
-        }),
+        maxBufferBytes: normalizePositiveIntegerBudget(
+            options.maxBufferBytes ?? defaultMaxBufferBytes,
+            defaultMaxBufferBytes,
+            {
+                min: MIN_BUFFER_BYTES,
+            },
+        ),
     };
 }

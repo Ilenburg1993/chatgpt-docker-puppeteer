@@ -222,12 +222,7 @@ function httpRequest(method, path, body, port, timeoutMs) {
                             body: capture.toString({ fatal: true, label: 'LLM-B response' }),
                         });
                     } catch {
-                        reject(
-                            new BridgeError(
-                                'Resposta da LLM-B contém UTF-8 inválido',
-                                'LLM_B_INVALID_RESPONSE',
-                            ),
-                        );
+                        reject(new BridgeError('Resposta da LLM-B contém UTF-8 inválido', 'LLM_B_INVALID_RESPONSE'));
                     }
                 });
             },

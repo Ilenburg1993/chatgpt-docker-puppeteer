@@ -1,240 +1,182 @@
-# Code Graph Analyzer (TypeScript Language Server)
+# Grafo Canônico de Dependências do Workspace
 
-Ferramenta de análise de grafos de código usando TypeScript Language Server para análise precisa de
-JavaScript.
+O grafo de dependências first-party do workspace é construído por
+`scripts/analysis/dependency-graph.mjs` e exposto pela CLI `scripts/analysis/analyze-code-graph.js`.
 
-## 🎯 Recursos
+Esta implementação é deliberadamente independente da API do compilador TypeScript. O parsing
+estrutural usa `@babel/parser` sob a policy compartilhada de
+`src/copilot/infra/parse/babel-policy.js`; imports são resolvidos com a semântica de módulos do
+Node; componentes fortemente conexos são calculados com Tarjan. Dessa forma, análise arquitetural
+não cria uma dependência first-party da ilha TS6 mantida somente por compatibilidade de peers
+upstream.
 
-- ✅ **Dependency Graph**: Mapeia todas as dependências entre módulos
-- ✅ **Circular Dependencies**: Detecta ciclos de importação
-- ✅ **Orphaned Modules**: Identifica módulos não referenciados
-- ✅ **NERV Event Flows**: Mapeia eventos pub/sub (`.emit()` e `.on()`)
-- ✅ **Architecture Stats**: Estatísticas por camada (NERV, KERNEL, DRIVER, etc.)
-- ✅ **Export Formats**: JSON para análise programática, DOT para Graphviz
+## Invariantes
 
-## 📊 Uso Rápido
+O analisador canônico deve manter as seguintes propriedades:
+
+- JavaScript e TypeScript first-party são analisados pela mesma policy Babel compartilhada com o
+  runtime.
+- Extensões cobertas: `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, `.cts` e `.tsx`; declarations
+  `.d.ts/.d.mts/.d.cts` não entram no grafo de runtime.
+- Imports estáticos, reexports e imports dinâmicos literais reconhecidos pela extração canônica
+  participam do grafo.
+- Resolução local usa `createRequire(...).resolve`, respeitando ESM/CJS, `package.json` e package
+  imports do Node.
+- Ciclos são detectados por SCC/Tarjan, inclusive self-loops.
+- Falha de parse é **fail-closed**: a CLI sai com código `2` e o audit collector produz finding P1.
+- Ciclo solicitado por `--circular` faz a CLI sair com código `1`.
+- Resultado limpo sai com código `0`.
+- O CI não aceita Madge como fallback. Madge foi retirado porque duplicava responsabilidade e
+  reintroduzia TypeScript 5 transitivo.
+
+## Comandos principais
 
 ```bash
-# Estatísticas de arquitetura (padrão)
+# Gate canônico do workspace: grafo de src + ciclos
+npm run analyze:deps
+
+# Estatísticas de fan-in/fan-out
 npm run analyze:graph
 
-# Encontrar dependências circulares
+# Ciclos
 npm run analyze:circular
 
-# Encontrar módulos órfãos
+# Candidatos a módulos órfãos
 npm run analyze:orphans
 
-# Mapear eventos NERV
+# Eventos NERV literais emit/listen
 npm run analyze:nerv
 
-# Análise completa
+# Visão humana completa
 npm run analyze:graph:full
 
-# Exportar para JSON e DOT
+# Exporta JSON e DOT
 npm run analyze:graph:export
+
+# Gera DOT e SVG do grafo de src
+npm run analyze:deps:graph
 ```
 
-## 🔍 Resultados da Última Análise
-
-### Estatísticas Gerais
-
-- **Total de módulos**: 177
-- **Arquivos analisados**: JavaScript + JSX via jsconfig.json
-
-### Distribuição por Camada
-
-```
-CORE       30 módulos (17%)
-INFRA      22 módulos (12%)
-NERV       22 módulos (12%)
-SERVER     20 módulos (11%)
-TESTS      20 módulos (11%)
-SCRIPTS    18 módulos (10%)
-DRIVER     17 módulos (10%)
-OTHER      15 módulos (8%)
-KERNEL     13 módulos (7%)
-```
-
-### Top Importers (mais dependências)
-
-1. `src/server/main.js` - 17 deps
-2. `src/main.js` - 15 deps
-3. `src/infra/io.js` - 12 deps
-4. `src/nerv/nerv.js` - 12 deps
-5. `src/server/engine/lifecycle.js` - 11 deps
-
-### Top Imported (mais referências)
-
-1. `fs` - 53 refs (Node.js core)
-2. `path` - 51 refs (Node.js core)
-3. `../../core/logger` - 28 refs ⭐
-4. `../../core/constants/tasks.js` - 17 refs ⭐
-5. `child_process` - 7 refs (Node.js core)
-
-### ⚠️ Dependência Circular Detectada
-
-```
-src/infra/queue/task_loader.js
-  → src/core/config.js
-  → src/infra/io.js
-  → src/infra/queue/task_loader.js
-```
-
-**Impacto**: Potencial deadlock durante inicialização se não houver lazy loading.
-
-**Solução sugerida**:
-
-- Mover cache de task_loader para módulo separado
-- Usar dependency injection no config.js
-- Lazy load io.js no task_loader
-
-## 📁 Arquivos Gerados
-
-### `analysis/code-graph.json`
-
-JSON completo com:
-
-- Grafo de dependências (arquivo → [deps])
-- Grafo reverso (arquivo → [dependents])
-- Eventos NERV (emitters, listeners)
-- Dependências circulares
-- Módulos órfãos
-- Estatísticas
-
-### `analysis/dependency-graph.dot`
-
-Graphviz DOT format para visualização:
+A CLI também aceita `--root <diretório>` para limitar o scope e `--json-stdout` para consumo
+programático:
 
 ```bash
-# Gerar imagem SVG
-dot -Tsvg analysis/dependency-graph.dot -o analysis/graph.svg
-
-# Gerar PNG
-dot -Tpng analysis/dependency-graph.dot -o analysis/graph.png
-
-# Filtrar apenas NERV
-grep -E "(NERV|nerv)" analysis/dependency-graph.dot > analysis/nerv-only.dot
-dot -Tsvg analysis/nerv-only.dot -o analysis/nerv.svg
+node scripts/analysis/analyze-code-graph.js --root src/copilot --circular --json-stdout
 ```
 
-## 🛠️ Opções do Script
+## Contrato de saída
+
+O payload JSON da CLI usa `schemaVersion: 2` e contém:
+
+- `scopeRoot`: raiz analisada relativa ao workspace;
+- `files`: quantidade de arquivos de runtime analisados;
+- `edges`: quantidade de arestas first-party resolvidas;
+- `cycles`: SCCs circulares;
+- `orphans`: candidatos sem fan-in dentro do scope;
+- `parseErrors`: arquivos que não puderam ser analisados integralmente;
+- `unresolvedLocalImports`: imports relativos ou `#...` que não puderam ser resolvidos;
+- `topFanOut` e `topFanIn`: módulos de maior acoplamento;
+- `nervEvents`: mapas de emitters/listeners para nomes de evento literais.
+
+Com `--export-json`, `analysis/code-graph.json` acrescenta `dependencies` e `reverseDependencies`.
+Com `--export-dot`, `analysis/dependency-graph.dot` contém o grafo Graphviz.
+
+## Semântica dos gates
+
+### Parse errors
+
+Parse error invalida a prova arquitetural. Não é warning. A CLI define exit code `2`;
+`scripts/audit/collectors/static.mjs` aceita somente `[0, 1]` como códigos interpretáveis do
+depgraph e transforma `parseErrors` em findings `dependency-graph-parse-error` P1. Há teste dedicado
+garantindo que exit `2` nunca seja aceito como sucesso.
+
+### Ciclos
+
+`--circular` faz qualquer SCC circular resultar em exit code `1`. O collector consegue interpretar
+esse resultado e produzir findings de ciclo sem confundir “ciclo encontrado” com “analisador
+quebrado”.
+
+### Imports locais não resolvidos
+
+`unresolvedLocalImports` deve ser auditado como integridade do grafo. Um import local não resolvido
+significa que a topologia pode estar incompleta mesmo quando não existe ciclo detectado. O gate
+operacional deve permanecer em zero.
+
+### Orphans
+
+`orphans` são **candidatos**, não erros automáticos. Entry points, scripts invocados por CLI,
+plugins descobertos por convenção e módulos carregados fora do grafo estático podem legitimamente
+não ter fan-in. O relatório serve para investigação; não se deve apagar ou mover um módulo apenas
+porque aparece nessa lista.
+
+## Estado verificado em 2026-08-20
+
+Na verificação integral de `src` realizada durante a migração TS7:
+
+- arquivos de runtime: **1.685**;
+- arestas first-party: **5.131**;
+- ciclos: **0**;
+- parse errors: **0**;
+- imports locais não resolvidos: **0**;
+- candidatos a orphan: **101**.
+
+Esses totais são fotografia de uma revisão, não thresholds permanentes. Os invariantes permanentes
+são zero parse errors, zero imports locais não resolvidos e zero ciclos no gate canônico.
+
+## Relação com dependency-cruiser
+
+`dependency-cruiser` continua útil como segunda camada de políticas declarativas de fronteira. Ele
+não substitui o grafo canônico e o grafo canônico não substitui suas regras de arquitetura.
+
+| Capacidade                          | Grafo canônico Babel/Node         | dependency-cruiser                 |
+| ----------------------------------- | --------------------------------- | ---------------------------------- |
+| Parser alinhado à policy do runtime | Sim                               | Não é a fonte canônica             |
+| Resolução Node/ESM/CJS              | Sim                               | Sim                                |
+| SCC/ciclos                          | Tarjan, gate primário             | Regra complementar `no-circular`   |
+| NERV emit/listen                    | Sim                               | Não                                |
+| Fan-in/fan-out                      | Sim                               | Sim                                |
+| Regras declarativas de camada       | Limitado                          | Forte                              |
+| Papel                               | Topologia e integridade canônicas | Política arquitetural complementar |
+
+A regra `no-circular` do dependency-cruiser permanece em severidade `error`, fornecendo uma segunda
+prova independente contra regressões.
+
+## TS7 e retirada de Madge
+
+A arquitetura atual separa três responsabilidades:
+
+1. `@typescript/native`/TS7 é o compilador e language service canônico;
+2. Babel é o parser estrutural first-party para análise de código e grafo;
+3. TS6 permanece instalado somente enquanto peers upstream, em especial `typescript-eslint`, ainda o
+   exigirem.
+
+Código first-party não pode importar `typescript`, `@typescript/typescript6` nem o antigo
+`scripts/analysis/typescript-compat.mjs`. `scripts/ci/check-typescript-baseline.mjs` verifica essa
+propriedade em CI. O mesmo gate impede a reintrodução de Madge enquanto sua árvore trouxer
+TypeScript 5.
+
+Documentos históricos podem mencionar Madge como evidência de auditorias passadas; isso não
+representa uma dependência ativa.
+
+## Limitações conhecidas
+
+- Imports cujo specifier é calculado em runtime não podem ser resolvidos estaticamente com
+  segurança.
+- O mapa NERV considera nomes literais em `.emit()` e `.on()`; eventos construídos dinamicamente não
+  são inferidos.
+- A classificação de orphan exige contexto de entry points e discovery dinâmico.
+- Pacotes externos não viram nós first-party; o objetivo deste grafo é a topologia interna do scope.
+
+## Fluxo recomendado para mudanças arquiteturais
+
+Antes de uma transformação ampla:
 
 ```bash
-node scripts/analyze-code-graph.js [options]
-
---stats          Mostra estatísticas de arquitetura (padrão)
---deps           Mostra grafo de dependências completo
---circular       Encontra dependências circulares
---nerv           Mapeia eventos NERV (emit/on)
---orphans        Encontra módulos órfãos
---export-json    Exporta para analysis/code-graph.json
---export-dot     Exporta para analysis/dependency-graph.dot
+npm run analyze:deps
+npx depcruise --config .dependency-cruiser.mjs src --output-type err
 ```
 
-## 🎯 Casos de Uso
-
-### 1. Validar Arquitetura Zero-Coupling
-
-```bash
-npm run analyze:graph:full > arch-report.txt
-# Verificar se componentes se comunicam apenas via NERV
-grep -E "(NERV|direct import)" arch-report.txt
-```
-
-### 2. Antes de Refatoração
-
-```bash
-# Mapear dependências do módulo a ser refatorado
-npm run analyze:graph:export
-node -e "
-const graph = require('./analysis/code-graph.json');
-const target = 'src/infra/io.js';
-console.log('Dependents:', graph.reverseDependencies[target]);
-"
-```
-
-### 3. Code Review
-
-```bash
-# Verificar se PR introduz ciclos
-git checkout main
-npm run analyze:circular > /tmp/main-cycles.txt
-
-git checkout feature-branch
-npm run analyze:circular > /tmp/feature-cycles.txt
-
-diff /tmp/main-cycles.txt /tmp/feature-cycles.txt
-```
-
-### 4. Documentação Automática
-
-```bash
-# Gerar diagrama de arquitetura
-npm run analyze:graph:export
-dot -Tsvg analysis/dependency-graph.dot -o DOCUMENTAÇÃO/architecture-graph.svg
-```
-
-## 🧩 Integração com CI/CD
-
-### GitHub Actions
-
-```yaml
-- name: Analyze Code Graph
-  run: |
-    npm run analyze:circular
-    npm run analyze:graph:export
-
-- name: Check for new cycles
-  run: |
-    if grep -q "Found [1-9]" analyze-output.txt; then
-      echo "⚠️ Circular dependencies detected!"
-      exit 1
-    fi
-```
-
-### Pre-commit Hook
-
-```bash
-#!/bin/bash
-# .git/hooks/pre-commit
-npm run analyze:circular --silent | grep -q "Found 0" || {
-  echo "❌ Commit rejected: introduces circular dependencies"
-  npm run analyze:circular
-  exit 1
-}
-```
-
-## 📚 Comparação com Outras Ferramentas
-
-| Feature        | TypeScript LS     | madge          | dependency-cruiser |
-| -------------- | ----------------- | -------------- | ------------------ |
-| Precisão JS    | ⭐⭐⭐⭐⭐        | ⭐⭐⭐⭐       | ⭐⭐⭐⭐⭐         |
-| Velocidade     | ⭐⭐⭐⭐          | ⭐⭐⭐⭐⭐     | ⭐⭐⭐             |
-| NERV Events    | ✅                | ❌             | ❌                 |
-| AST Analysis   | ✅                | Partial        | ✅                 |
-| Export Formats | JSON, DOT         | JSON, DOT, SVG | JSON, DOT, HTML    |
-| Zero Config    | ✅ (via jsconfig) | ✅             | ❌                 |
-
-## 🐛 Limitações Conhecidas
-
-1. **Falsos Positivos em Orphans**: Módulos re-exportados aparecem como órfãos
-2. **Dynamic Imports**: `require(variable)` não é rastreado
-3. **NERV Events**: Apenas detecta `.emit()` e `.on()` literais (não variáveis)
-
-## 🔗 Recursos Relacionados
-
-- [TypeScript Compiler API](https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API)
-- [jsconfig.json Documentation](https://code.visualstudio.com/docs/languages/jsconfig)
-- [Graphviz DOT Language](https://graphviz.org/doc/info/lang.html)
-
-## 📝 Changelog
-
-### v1.0.0 (2026-01-20)
-
-- ✅ Initial release
-- ✅ TypeScript Language Server integration
-- ✅ Dependency graph analysis
-- ✅ Circular dependency detection
-- ✅ NERV event mapping
-- ✅ JSON and DOT export
-- ✅ npm scripts integration
+Após a alteração, repita os mesmos gates e só aceite o resultado quando parse errors, imports locais
+não resolvidos e ciclos estiverem em zero. Para investigação de acoplamento, use
+`npm run analyze:graph` ou exporte o JSON/DOT em vez de depender de estatísticas hard-coded em
+documentação.

@@ -16,9 +16,13 @@ describe('cloudflared metrics histograms', () => {
             { name: 'cloudflared_rpc_client_latency_secs_sum', labels: {}, value: 20 },
         ]);
 
-        const rpc = /** @type {{ count: number; averageMs: number; p95Ms: number; finiteBucketCoverage: number; hasInfiniteBucket: boolean }} */ (
-            summary['rpcClientLatency']
-        );
+        const rpc = /** @type {{
+    count: number;
+    averageMs: number;
+    p95Ms: number;
+    finiteBucketCoverage: number;
+    hasInfiniteBucket: boolean;
+}} */ (summary['rpcClientLatency']);
         assert.equal(rpc.count, 100);
         assert.equal(rpc.averageMs, 200);
         assert.equal(rpc.p95Ms, 500);

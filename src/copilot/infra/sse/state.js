@@ -9,7 +9,8 @@
  *
  * - `_serverSseClients` / `_serverSseCriticalClients`: Sets legados de clientes raw do terminal.
  * - `_serverReplayBuffer`: buffer de replay compartilhado do stream global. O dono canônico da gravação é
- *   `terminal/dialog/sse.broadcastSse()`, que atribui um ID uma única vez e o propaga via fanout para os pools Express.
+ *   `terminal/dialog/sse.broadcastSse()`, que atribui um ID uma única vez e o propaga via fanout para os pools
+ *   Express.
  *
  * @module copilot/infra/sse/state
  */

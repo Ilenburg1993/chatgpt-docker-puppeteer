@@ -7,6 +7,7 @@
 
 export { buildIoMutationAuditRecord, getIoMutationAuditLogPath, recordIoMutationAudit } from './audit-log.js';
 export { completeIoOperationEnvelope, createIoOperationEnvelope, failIoOperationEnvelope } from './operation.js';
+export { executeIoRollbackToken } from './rollback-executor.js';
 export {
     buildIoRollbackPlan,
     createIoRollbackToken,
@@ -14,7 +15,6 @@ export {
     serializeIoRollbackToken,
     verifyIoRollbackToken,
 } from './rollback.js';
-export { executeIoRollbackToken } from './rollback-executor.js';
 export {
     abortIoChangeSet,
     appendIoChangeSetEntry,

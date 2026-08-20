@@ -9,9 +9,15 @@
  * @module copilot/mcp/tools/company-knowledge
  */
 
-import { errorResult, getMcpWorkspaceRoot, okResult, readOnlyAnnotations, resolveReadPath } from '#copilot/mcp/control-plane';
+import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import {
+    errorResult,
+    getMcpWorkspaceRoot,
+    okResult,
+    readOnlyAnnotations,
+    resolveReadPath,
+} from '#copilot/mcp/control-plane';
 import { createHash } from 'node:crypto';
-import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 
@@ -40,6 +46,8 @@ const DEFAULT_CORPUS_ROOTS = Object.freeze([
     'src/copilot/model-gateway/docs',
     'src/copilot/model-gateway/README.md',
 ]);
+
+const companyKnowledgeWorkspaceIo = createWorkspaceIo({ workspaceRoot: getMcpWorkspaceRoot() });
 
 const DOCUMENT_EXTENSIONS = new Set(['.md', '.mdx', '.txt', '.json', '.jsonc', '.yaml', '.yml']);
 const SKIPPED_DIRECTORY_NAMES = new Set([
@@ -72,6 +80,7 @@ let corpusCache = null;
  *     sha256: string;
  * }} CompanyKnowledgeDocument
  *
+ *
  * @typedef {{ id: string; title: string; url: string }} CompanyKnowledgeSearchResult
  */
 
@@ -90,7 +99,9 @@ export function readCompanyKnowledgeCorpusRoots(env = process.env) {
  * @returns {string}
  */
 function readRepositoryWebBase(env = process.env) {
-    const value = String(env['COPILOT_MCP_COMPANY_KNOWLEDGE_REPOSITORY_WEB_BASE'] ?? DEFAULT_REPOSITORY_WEB_BASE).trim();
+    const value = String(
+        env['COPILOT_MCP_COMPANY_KNOWLEDGE_REPOSITORY_WEB_BASE'] ?? DEFAULT_REPOSITORY_WEB_BASE,
+    ).trim();
     return value.replace(/\/+$/u, '') || DEFAULT_REPOSITORY_WEB_BASE;
 }
 
@@ -99,7 +110,13 @@ function readRepositoryWebBase(env = process.env) {
  * @returns {number}
  */
 function readCorpusCacheTtlMs(env = process.env) {
-    return readPositiveIntegerEnv(env, 'COPILOT_MCP_COMPANY_KNOWLEDGE_CACHE_TTL_MS', DEFAULT_CORPUS_CACHE_TTL_MS, 0, 10 * 60 * 1000);
+    return readPositiveIntegerEnv(
+        env,
+        'COPILOT_MCP_COMPANY_KNOWLEDGE_CACHE_TTL_MS',
+        DEFAULT_CORPUS_CACHE_TTL_MS,
+        0,
+        10 * 60 * 1000,
+    );
 }
 
 /**
@@ -155,7 +172,11 @@ export async function fetchCompanyKnowledgeDocument(id) {
  */
 async function loadCompanyKnowledgeDocuments(env = process.env) {
     const roots = readCompanyKnowledgeCorpusRoots(env);
-    const key = JSON.stringify({ roots, maxDocuments: readMaxDocuments(env), repositoryWebBase: readRepositoryWebBase(env) });
+    const key = JSON.stringify({
+        roots,
+        maxDocuments: readMaxDocuments(env),
+        repositoryWebBase: readRepositoryWebBase(env),
+    });
     const now = Date.now();
     if (corpusCache && corpusCache.key === key && corpusCache.expiresAt >= now) return corpusCache.documents;
     const documents = await buildCompanyKnowledgeCorpus(roots, env);
@@ -212,17 +233,18 @@ async function buildCompanyKnowledgeCorpus(roots, env) {
  */
 async function collectCompanyKnowledgeFiles(directory, files, maxFiles, depth) {
     if (files.length >= maxFiles || depth > 8) return;
-    const entries = await readdir(directory, { withFileTypes: true });
-    for (const entry of entries) {
+    const entries = (await companyKnowledgeWorkspaceIo.listDirectoryNamesFresh(directory)).entries;
+    for (const entryName of entries) {
         if (files.length >= maxFiles) return;
-        if (entry.name.startsWith('.') || SKIPPED_DIRECTORY_NAMES.has(entry.name)) continue;
-        const fullPath = path.join(directory, entry.name);
-        if (entry.isSymbolicLink()) continue;
-        if (entry.isDirectory()) {
+        if (entryName.startsWith('.') || SKIPPED_DIRECTORY_NAMES.has(entryName)) continue;
+        const fullPath = path.join(directory, entryName);
+        const info = (await companyKnowledgeWorkspaceIo.lstatPath(fullPath)).stats;
+        if (info.isSymbolicLink()) continue;
+        if (info.isDirectory()) {
             await collectCompanyKnowledgeFiles(fullPath, files, maxFiles, depth + 1);
             continue;
         }
-        if (entry.isFile() && isCompanyKnowledgeFile(fullPath)) files.push(fullPath);
+        if (info.isFile() && isCompanyKnowledgeFile(fullPath)) files.push(fullPath);
     }
 }
 
@@ -246,10 +268,14 @@ async function readCompanyKnowledgeDocument(filePath, env) {
     const fileStats = await safeStat(filePath);
     if (!fileStats || !fileStats.isFile()) return null;
     const boundedReadBytes = Math.min(fileStats.size, MAX_DOCUMENT_BYTES);
-    const raw = await readFile(filePath);
+    const snapshot = await companyKnowledgeWorkspaceIo.readBytesFresh(filePath, { includeHash: true });
+    const raw = snapshot.content;
     const truncatedByFileBudget = raw.byteLength > boundedReadBytes;
     const readBuffer = truncatedByFileBudget ? raw.subarray(0, boundedReadBytes) : raw;
-    const { text, truncated: truncatedByTextBudget } = truncateTextByBytes(readBuffer.toString('utf8'), MAX_DOCUMENT_TEXT_BYTES);
+    const { text, truncated: truncatedByTextBudget } = truncateTextByBytes(
+        readBuffer.toString('utf8'),
+        MAX_DOCUMENT_TEXT_BYTES,
+    );
     return {
         id: encodeCompanyKnowledgeDocumentId(relativePath),
         title: inferDocumentTitle(relativePath, text),
@@ -259,7 +285,7 @@ async function readCompanyKnowledgeDocument(filePath, env) {
         sizeBytes: fileStats.size,
         mtimeMs: fileStats.mtimeMs,
         truncated: truncatedByFileBudget || truncatedByTextBudget,
-        sha256: createHash('sha256').update(raw).digest('hex'),
+        sha256: snapshot.contentHash ?? createHash('sha256').update(raw).digest('hex'),
     };
 }
 
@@ -334,7 +360,11 @@ function scoreDocument(document, normalizedQuery, tokens) {
         if (haystackPath.includes(token)) score += 8;
         if (haystackText.includes(token)) score += 2;
     }
-    if (tokens.every((token) => haystackText.includes(token) || haystackTitle.includes(token) || haystackPath.includes(token))) {
+    if (
+        tokens.every(
+            (token) => haystackText.includes(token) || haystackTitle.includes(token) || haystackPath.includes(token),
+        )
+    ) {
         score += 10;
     }
     return score;
@@ -359,7 +389,11 @@ function normalizeSearchText(value) {
  * @returns {string[]}
  */
 function tokenize(value) {
-    return uniqueStrings(normalizeSearchText(value).split(/\s+/u).filter((token) => token.length >= 2)).slice(0, MAX_TOKEN_COUNT);
+    return uniqueStrings(
+        normalizeSearchText(value)
+            .split(/\s+/u)
+            .filter((token) => token.length >= 2),
+    ).slice(0, MAX_TOKEN_COUNT);
 }
 
 /**
@@ -378,7 +412,10 @@ function normalizeWorkspaceRelativePath(value) {
 function truncateTextByBytes(text, maxBytes) {
     const bytes = Buffer.byteLength(text, 'utf8');
     if (bytes <= maxBytes) return { text, truncated: false };
-    return { text: `${Buffer.from(text, 'utf8').subarray(0, maxBytes).toString('utf8')}\n\n[truncated]`, truncated: true };
+    return {
+        text: `${Buffer.from(text, 'utf8').subarray(0, maxBytes).toString('utf8')}\n\n[truncated]`,
+        truncated: true,
+    };
 }
 
 /**
@@ -386,8 +423,12 @@ function truncateTextByBytes(text, maxBytes) {
  * @returns {string}
  */
 function truncateMetadataString(value) {
-    const text = String(value).replace(/[\r\n\t]+/gu, ' ').trim();
-    return text.length > MAX_METADATA_STRING_LENGTH ? `${text.slice(0, MAX_METADATA_STRING_LENGTH - 1).trimEnd()}…` : text;
+    const text = String(value)
+        .replace(/[\r\n\t]+/gu, ' ')
+        .trim();
+    return text.length > MAX_METADATA_STRING_LENGTH
+        ? `${text.slice(0, MAX_METADATA_STRING_LENGTH - 1).trimEnd()}…`
+        : text;
 }
 
 /**
@@ -418,7 +459,7 @@ function readPositiveIntegerEnv(env, name, fallback, minimum, maximum) {
  */
 async function safeStat(filePath) {
     try {
-        return await stat(filePath);
+        return (await companyKnowledgeWorkspaceIo.lstatPath(filePath)).stats;
     } catch {
         return null;
     }

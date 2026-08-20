@@ -2,18 +2,14 @@
 /**
  * Low-frequency, non-blocking OpenAI/ChatGPT fixed-endpoint latency monitor.
  *
- * The monitor samples one fresh HTTPS request per fixed endpoint each cycle and
- * persists only the sanitized aggregate snapshot. It never blocks MCP startup or
- * readiness and never accepts arbitrary destinations.
+ * The monitor samples one fresh HTTPS request per fixed endpoint each cycle and persists only the sanitized aggregate
+ * snapshot. It never blocks MCP startup or readiness and never accepts arbitrary destinations.
  *
  * @module copilot/mcp/control-plane/openai-endpoint-monitor
  */
 
-import {
-    appendOpenAiEndpointLatencySnapshot,
-    measureOpenAiEndpointLatency,
-} from './openai-endpoint-latency.js';
 import { logMcp } from './audit.js';
+import { appendOpenAiEndpointLatencySnapshot, measureOpenAiEndpointLatency } from './openai-endpoint-latency.js';
 
 const DEFAULT_INITIAL_DELAY_MS = 30_000;
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
@@ -46,13 +42,13 @@ function createInitialState() {
 
 /**
  * @param {{
- *   enabled?: boolean;
- *   initialDelayMs?: number;
- *   intervalMs?: number;
- *   timeoutMs?: number;
- *   setTimeoutFn?: typeof setTimeout;
- *   measureFn?: typeof measureOpenAiEndpointLatency;
- *   persistFn?: typeof appendOpenAiEndpointLatencySnapshot;
+ *     enabled?: boolean;
+ *     initialDelayMs?: number;
+ *     intervalMs?: number;
+ *     timeoutMs?: number;
+ *     setTimeoutFn?: typeof setTimeout;
+ *     measureFn?: typeof measureOpenAiEndpointLatency;
+ *     persistFn?: typeof appendOpenAiEndpointLatencySnapshot;
  * }} [options]
  */
 export function scheduleOpenAiEndpointLatencyMonitor(options = {}) {
@@ -228,7 +224,9 @@ function boundedDelay(value, fallback, min, max) {
 
 /** @param {string} name @param {boolean} fallback */
 function readBooleanEnv(name, fallback) {
-    const value = String(process.env[name] ?? '').trim().toLowerCase();
+    const value = String(process.env[name] ?? '')
+        .trim()
+        .toLowerCase();
     if (!value) return fallback;
     return ['1', 'true', 'yes', 'on'].includes(value);
 }

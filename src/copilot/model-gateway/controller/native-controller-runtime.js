@@ -57,15 +57,16 @@ async function createDefaultInspectionSession() {
 
 /**
  * @param {{
- *   byokRoutes?: unknown[];
- *   currentController?: Record<string, unknown> | null;
- *   now?: string | number | Date;
- *   minContextWindowTokens?: number;
- *   maxAgentProofAgeMs?: number;
- *   allowOpaqueSdkAutoFallback?: boolean;
- *   deps?: {
- *     createInspectionSession?: () => ModelGatewayControllerInspectionSession | Promise<ModelGatewayControllerInspectionSession>;
- *   };
+ *     byokRoutes?: unknown[];
+ *     currentController?: Record<string, unknown> | null;
+ *     now?: string | number | Date;
+ *     minContextWindowTokens?: number;
+ *     maxAgentProofAgeMs?: number;
+ *     allowOpaqueSdkAutoFallback?: boolean;
+ *     deps?: {
+ *         createInspectionSession?: () =>
+ *             ModelGatewayControllerInspectionSession | Promise<ModelGatewayControllerInspectionSession>;
+ *     };
  * }} [options]
  */
 export async function resolveModelGatewayNativeControllerSelection(options = {}) {
@@ -119,9 +120,7 @@ export async function resolveModelGatewayNativeControllerSelection(options = {})
         ...(typeof options.minContextWindowTokens === 'number'
             ? { minContextWindowTokens: options.minContextWindowTokens }
             : {}),
-        ...(typeof options.maxAgentProofAgeMs === 'number'
-            ? { maxAgentProofAgeMs: options.maxAgentProofAgeMs }
-            : {}),
+        ...(typeof options.maxAgentProofAgeMs === 'number' ? { maxAgentProofAgeMs: options.maxAgentProofAgeMs } : {}),
         allowOpaqueSdkAutoFallback,
     });
     return {

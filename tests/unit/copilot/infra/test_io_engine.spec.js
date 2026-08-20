@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as ioCacheL2Registry from '../../../../src/copilot/infra/io-cache-l2-registry.js';
-import { resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
+import { getIoL1Cache, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
 import {
     copyFileLocked,
     createOrReplaceFileAtomic,
@@ -15,18 +15,21 @@ import {
     moveFileLocked,
     patchTextLocked,
     readBytes,
+    readBytesFresh,
     readLines,
     readText,
     readTextChunks,
+    readTextFresh,
     removePathLocked,
     searchText,
     searchWorkspaceSymbols,
     withIoResourceLock,
     writeFileAtomic,
 } from '../../../../src/copilot/infra/io-engine.js';
+import { acquireIoResourceLock, getIoLockStats } from '../../../../src/copilot/infra/io-locks.js';
 import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
 import { patchTextBatchLocked } from '../../../../src/copilot/infra/io/fs/locked-mutations.js';
-import { acquireIoResourceLock, getIoLockStats } from '../../../../src/copilot/infra/io-locks.js';
+import { getIoReadHashStats, resetIoReadHashStatsForTest } from '../../../../src/copilot/infra/io/fs/read-services.js';
 import { getFileResourceLockPath } from '../../../../src/copilot/infra/locks/file-resource-lock.js';
 import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
 
@@ -37,6 +40,7 @@ afterEach(async () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     resetIoL1CacheForTest();
+    resetIoReadHashStatsForTest();
     while (TEMP_DIRS.length > 0) {
         const dir = TEMP_DIRS.pop();
         if (dir) await rm(dir, { recursive: true, force: true });
@@ -126,11 +130,7 @@ describe('infra/io-engine', () => {
     it('searchWorkspaceSymbols interrompe stdout do rg com lookahead suficiente', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'symbols-early-stop.js');
-        await writeFile(
-            file,
-            Array.from({ length: 80 }, () => 'function runNeedle() {}').join('\n'),
-            'utf8',
-        );
+        await writeFile(file, Array.from({ length: 80 }, () => 'function runNeedle() {}').join('\n'), 'utf8');
 
         const result = await searchWorkspaceSymbols(file, {
             symbolName: 'runNeedle',
@@ -196,6 +196,7 @@ describe('infra/io-engine', () => {
                 durability: expect.objectContaining({
                     durability: 'file-and-directory',
                     fileFlushRequested: true,
+                    fileSync: expect.objectContaining({ attempted: true, ok: true }),
                     directorySync: expect.objectContaining({ attempted: true, ok: true }),
                     capacityPreflight: expect.objectContaining({ checked: false, reason: 'below-threshold' }),
                 }),
@@ -205,21 +206,29 @@ describe('infra/io-engine', () => {
         expect(writeResult.io.advisoryLimits?.['durability']).toEqual(writeResult.durability);
     });
 
-    it.skipIf(process.platform === 'win32')('preserva permissões POSIX existentes quando atomic replace não recebe mode explícito', async () => {
-        const dir = await createTempDir();
-        const file = join(dir, 'executable-script.sh');
-        await writeFile(file, '#!/usr/bin/env bash\necho before\n', 'utf8');
-        await chmod(file, 0o755);
+    it.skipIf(process.platform === 'win32')(
+        'preserva permissões POSIX existentes quando atomic replace não recebe mode explícito',
+        async () => {
+            const dir = await createTempDir();
+            const file = join(dir, 'executable-script.sh');
+            await writeFile(file, '#!/usr/bin/env bash\necho before\n', 'utf8');
+            await chmod(file, 0o755);
 
-        const result = await writeFileAtomic(file, '#!/usr/bin/env bash\necho after\n');
-        const info = await stat(file);
+            const result = await writeFileAtomic(file, '#!/usr/bin/env bash\necho after\n');
+            const info = await stat(file);
 
-        expect(info.mode & 0o777).toBe(0o755);
-        expect(result.durability).toMatchObject({
-            effectiveMode: 0o755,
-            modeSource: 'preserved-existing',
-        });
-    });
+            expect(info.mode & 0o777).toBe(0o755);
+            expect(result.durability).toMatchObject({
+                effectiveMode: 0o755,
+                modeSource: 'preserved-existing',
+                fileSync: expect.objectContaining({ attempted: true, ok: true }),
+                phaseTimings: expect.objectContaining({
+                    modeApplyMs: expect.any(Number),
+                    fileSyncMs: expect.any(Number),
+                }),
+            });
+        },
+    );
 
     it('expõe perfis de durability sem alterar atomic publish, policy ou conteúdo final', async () => {
         const dir = await createTempDir();
@@ -233,6 +242,8 @@ describe('infra/io-engine', () => {
             directorySync: null,
             phaseTimings: expect.objectContaining({
                 tempWriteMs: expect.any(Number),
+                modeApplyMs: expect.any(Number),
+                fileSyncMs: expect.any(Number),
                 publishMs: expect.any(Number),
                 totalMs: expect.any(Number),
             }),
@@ -249,6 +260,8 @@ describe('infra/io-engine', () => {
             directorySync: null,
             phaseTimings: expect.objectContaining({
                 tempWriteMs: expect.any(Number),
+                modeApplyMs: expect.any(Number),
+                fileSyncMs: expect.any(Number),
                 publishMs: expect.any(Number),
                 totalMs: expect.any(Number),
             }),
@@ -261,9 +274,53 @@ describe('infra/io-engine', () => {
         const fileComponent = join(dir, 'not-a-dir');
         await writeFile(fileComponent, 'leaf', 'utf8');
 
-        await expect(writeFileAtomic(join(fileComponent, 'child.txt'), 'payload', { failIfExists: true })).rejects.toMatchObject({
+        await expect(
+            writeFileAtomic(join(fileComponent, 'child.txt'), 'payload', { failIfExists: true }),
+        ).rejects.toMatchObject({
             code: 'ENOTDIR',
         });
+    });
+
+    it('mkdirPathLocked informa criação não recursiva corretamente e expõe durability', async () => {
+        const dir = await createTempDir();
+        const nested = join(dir, 'single-created');
+        /** @type {string[]} */
+        const syncedTargets = [];
+
+        const result = await mkdirPathLocked(nested, {
+            recursive: false,
+            syncDirectory: async (target) => {
+                syncedTargets.push(target);
+                return { attempted: true, ok: true, durationMs: 0 };
+            },
+        });
+
+        expect(result.created).toBe(true);
+        expect(result.createdPath).toBeUndefined();
+        expect(result.durability).toMatchObject({ durability: 'file-and-directory' });
+        expect(result.durability.directorySyncs).toHaveLength(1);
+        expect(syncedTargets).toEqual([nested]);
+    });
+
+    it('mkdirPathLocked sincroniza cada namespace criado em mkdir recursivo', async () => {
+        const dir = await createTempDir();
+        const first = join(dir, 'first');
+        const target = join(first, 'second');
+        /** @type {string[]} */
+        const syncedTargets = [];
+
+        const result = await mkdirPathLocked(target, {
+            recursive: true,
+            syncDirectory: async (entry) => {
+                syncedTargets.push(entry);
+                return { attempted: true, ok: true, durationMs: 0 };
+            },
+        });
+
+        expect(result.created).toBe(true);
+        expect(result.createdPath).toBe(first);
+        expect(syncedTargets).toEqual([first, target]);
+        expect(result.durability.directorySyncs.map((entry) => entry.target)).toEqual([first, target]);
     });
 
     it('mkdirPathLocked informa created=false quando diretório recursivo já existia', async () => {
@@ -287,7 +344,9 @@ describe('infra/io-engine', () => {
         await expect(removePathLocked(target, { recursive: true, force: true })).rejects.toMatchObject({
             code: 'ERECURSIVEREMOVECONFIRMATION',
         });
-        await expect(removePathLocked(target, { recursive: true, force: true, recursiveConfirmation: `${target}-wrong` })).rejects.toMatchObject({
+        await expect(
+            removePathLocked(target, { recursive: true, force: true, recursiveConfirmation: `${target}-wrong` }),
+        ).rejects.toMatchObject({
             code: 'ERECURSIVEREMOVECONFIRMATION',
         });
         await expect(readFile(join(target, 'nested', 'keep.txt'), 'utf8')).resolves.toBe('keep');
@@ -326,6 +385,104 @@ describe('infra/io-engine', () => {
         expect(range.totalLines).toBe(3);
         expect(range.returnedLines).toEqual({ start: 2, end: 2 });
         expect(range.io.cache).toBe('l1-hit');
+    });
+
+    it('readText torna hashMode operacional e elimina hashes redundantes', async () => {
+        const dir = await createTempDir();
+        const fullFile = join(dir, 'hash-full.txt');
+        const returnedFile = join(dir, 'hash-returned.txt');
+        const noneFile = join(dir, 'hash-none.txt');
+        const text = 'one\ntwo\nthree';
+        await Promise.all([
+            writeFile(fullFile, text, 'utf8'),
+            writeFile(returnedFile, text, 'utf8'),
+            writeFile(noneFile, text, 'utf8'),
+        ]);
+
+        resetIoReadHashStatsForTest();
+        const full = await readText(fullFile, { hashMode: 'full' });
+        expect(full.contentHash).toBe(sha256(text));
+        expect(full.returnedContentHash).toBe(full.contentHash);
+        expect(getIoReadHashStats()).toMatchObject({
+            reads: 1,
+            hashComputations: 1,
+            fullHashComputations: 1,
+            returnedSliceHashComputations: 0,
+            fullWindowReturnedHashReuses: 1,
+        });
+
+        resetIoReadHashStatsForTest();
+        const returned = await readText(returnedFile, { startLine: 2, endLine: 2, hashMode: 'returned' });
+        expect(returned.contentHash).toBeUndefined();
+        expect(returned.returnedContentHash).toBe(sha256('two'));
+        expect(getIoReadHashStats()).toMatchObject({
+            reads: 1,
+            hashComputations: 1,
+            fullHashComputations: 0,
+            returnedSliceHashComputations: 1,
+            fullHashOutputSkips: 1,
+        });
+
+        resetIoReadHashStatsForTest();
+        const none = await readText(noneFile, { startLine: 2, endLine: 2, hashMode: 'none' });
+        expect(none.contentHash).toBeUndefined();
+        expect(none.returnedContentHash).toBeUndefined();
+        expect(getIoReadHashStats()).toMatchObject({
+            reads: 1,
+            hashComputations: 0,
+            fullHashComputations: 0,
+            returnedSliceHashComputations: 0,
+            fullHashOutputSkips: 1,
+            returnedHashOutputSkips: 1,
+        });
+    });
+
+    it('fresh reads ignoram L1/L2 e observam imediatamente overwrite externo', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'fresh-state.json');
+        await writeFile(file, '{"version":1}\n', 'utf8');
+
+        const cached = await readText(file);
+        expect(cached.content).toBe('{"version":1}\n');
+        expect(getIoL1Cache().stats().size).toBeGreaterThan(0);
+
+        // Simula writer externo que não publica invalidation no processo atual. O cached read pode continuar dentro de sua
+        // janela de stale-probe; o fresh read deve refletir o snapshot físico sem consultar L1/L2.
+        await writeFile(file, '{"version":2}\n', 'utf8');
+        const fresh = await readTextFresh(file);
+
+        expect(fresh.content).toBe('{"version":2}\n');
+        expect(fresh.contentHash).toBeUndefined();
+        expect(fresh.cacheFingerprintStrategy).toBe('fresh-snapshot');
+        expect(fresh.io.cache).toBe('none');
+        expect(fresh.io.engine).toBe('io-engine.fs.readFile.bytes-fresh');
+    });
+
+    it('fresh reads não preenchem L1 e só calculam hash quando solicitado', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'fresh-no-cache.bin');
+        const payload = Buffer.from('fresh payload', 'utf8');
+        await writeFile(file, payload);
+        const cache = getIoL1Cache();
+        expect(cache.stats().size).toBe(0);
+
+        const unhashed = await readBytesFresh(file);
+        expect(unhashed.content.equals(payload)).toBe(true);
+        expect(unhashed.contentHash).toBeUndefined();
+        expect(cache.stats().size).toBe(0);
+
+        const hashed = await readBytesFresh(file, { includeHash: true });
+        expect(hashed.contentHash).toBe(sha256(payload));
+        expect(cache.stats().size).toBe(0);
+    });
+
+    it('readTextFresh rejeita UTF-8 inválido sem contaminar cache', async () => {
+        const dir = await createTempDir();
+        const file = join(dir, 'fresh-invalid-utf8.bin');
+        await writeFile(file, Buffer.from([0xc3, 0x28]));
+
+        await expect(readTextFresh(file)).rejects.toThrow(/UTF-8/);
+        expect(getIoL1Cache().stats().size).toBe(0);
     });
 
     it('readText e readLines compartilham semântica física para CRLF e CR isolado', async () => {

@@ -14,7 +14,7 @@
  * @see EventBus
  */
 
-import { access, stat } from 'node:fs/promises';
+import { statPathTrusted } from '#copilot/infra/public/trusted-io';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';
@@ -147,8 +147,7 @@ export async function cmdAttach({ println }, arg) {
     // Adicionar arquivo
     const filePath = trimmed;
     try {
-        await access(filePath);
-        const info = await stat(filePath);
+        const info = (await statPathTrusted(filePath, { caller: 'terminal.commands.attach' })).stats;
         if (info.size > MAX_EMBED_BYTES) {
             println(
                 terminalThemeRow(
@@ -165,10 +164,20 @@ export async function cmdAttach({ println }, arg) {
         addAttachment(filePath);
         const queue = getAttachmentQueue();
         println(
-            terminalThemeRow('Adicionado', `${formatTerminalToolPathForOperator(filePath)} (${(info.size / 1024).toFixed(1)} KB)`, { role: 'success' }),
+            terminalThemeRow(
+                'Adicionado',
+                `${formatTerminalToolPathForOperator(filePath)} (${(info.size / 1024).toFixed(1)} KB)`,
+                { role: 'success' },
+            ),
         );
         println(terminalThemeRow('Fila', attachmentQueueNextTurnLabel(queue.length), { role: 'muted' }));
     } catch {
-        println(terminalThemeRow('Erro', `arquivo não encontrado ou sem permissão: ${formatTerminalToolPathForOperator(filePath)}`, { role: 'error' }));
+        println(
+            terminalThemeRow(
+                'Erro',
+                `arquivo não encontrado ou sem permissão: ${formatTerminalToolPathForOperator(filePath)}`,
+                { role: 'error' },
+            ),
+        );
     }
 }

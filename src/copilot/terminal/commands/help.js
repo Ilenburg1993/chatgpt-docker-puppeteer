@@ -165,23 +165,56 @@ function renderAuxiliaryLibsHelp(println) {
     println(terminalThemeDivider(66));
     renderHelpSection(println, 'Inspeção', [
         { command: '/terminal libs', description: 'visão compacta de ferramentas externas opcionais e fallbacks' },
-        { command: '/terminal libs detail [filtro]', description: 'detalhes com política, riscos, path, versão e exemplos' },
-        { command: '/terminal libs json [filtro]', description: 'contrato JSON com schema, timestamp, policy e tools filtradas' },
-        { command: '/terminal libs refresh [filtro]', description: 'redetecta PATH antes de renderizar a superfície solicitada' },
-        { command: '/libs deferred|available|missing|fzf', description: 'filtros rápidos por decisão, disponibilidade ou ferramenta' },
+        {
+            command: '/terminal libs detail [filtro]',
+            description: 'detalhes com política, riscos, path, versão e exemplos',
+        },
+        {
+            command: '/terminal libs json [filtro]',
+            description: 'contrato JSON com schema, timestamp, policy e tools filtradas',
+        },
+        {
+            command: '/terminal libs refresh [filtro]',
+            description: 'redetecta PATH antes de renderizar a superfície solicitada',
+        },
+        {
+            command: '/libs deferred|available|missing|fzf',
+            description: 'filtros rápidos por decisão, disponibilidade ou ferramenta',
+        },
     ]);
     renderHelpSection(println, 'Previews', [
-        { command: '/fs preview <path>', description: 'preview read-only com bat/batcat quando disponível; fallback JS' },
+        {
+            command: '/fs preview <path>',
+            description: 'preview read-only com bat/batcat quando disponível; fallback JS',
+        },
         { command: '/fs preview <path> --markdown', description: 'Markdown via glow por stdin; sem pager automático' },
-        { command: '/fs preview <path> --json --query .x', description: 'JSON via jq quando disponível; parser JS continua canônico' },
-        { command: '/fs preview <path> --yaml --query .x', description: 'YAML via yq com env/file ops bloqueadas; fallback js-yaml' },
-        { command: '/git diff [--plain]', description: 'delta apenas quando a superfície aceita cor; diff bruto permanece canônico' },
+        {
+            command: '/fs preview <path> --json --query .x',
+            description: 'JSON via jq quando disponível; parser JS continua canônico',
+        },
+        {
+            command: '/fs preview <path> --yaml --query .x',
+            description: 'YAML via yq com env/file ops bloqueadas; fallback js-yaml',
+        },
+        {
+            command: '/git diff [--plain]',
+            description: 'delta apenas quando a superfície aceita cor; diff bruto permanece canônico',
+        },
     ]);
     renderHelpSection(println, 'TUI e smoke', [
         { command: '/menu picker', description: 'mostra plano seguro e guardas antes de qualquer TUI externa' },
-        { command: '/menu picker --interactive', description: 'usa fzf/gum somente com TTY exclusivo e sem pergunta pendente' },
-        { command: 'npm run terminal:aux-libs:smoke', description: 'prova fallbacks, renderers reais e envelope JSON limpo' },
-        { command: 'atuin/zoxide', description: 'inventariados, mas adiados por histórico/cwd pessoal e estado fora do produto' },
+        {
+            command: '/menu picker --interactive',
+            description: 'usa fzf/gum somente com TTY exclusivo e sem pergunta pendente',
+        },
+        {
+            command: 'npm run terminal:aux-libs:smoke',
+            description: 'prova fallbacks, renderers reais e envelope JSON limpo',
+        },
+        {
+            command: 'atuin/zoxide',
+            description: 'inventariados, mas adiados por histórico/cwd pessoal e estado fora do produto',
+        },
     ]);
     println(terminalThemeDivider(66));
     println('');
@@ -207,14 +240,20 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/who', description: 'atores e canais ativos' },
         { command: '/count', description: 'estatísticas da sessão' },
         { command: '/terminal libs', description: 'libs auxiliares opcionais, decisões de uso e fallbacks' },
-        { command: '/libs [detail|json|refresh] [filtro]', description: 'atalho para inspecionar capacidades externas por grupo ou tool' },
+        {
+            command: '/libs [detail|json|refresh] [filtro]',
+            description: 'atalho para inspecionar capacidades externas por grupo ou tool',
+        },
     ]);
     renderHelpSection(println, 'Conversa e controle', [
         { command: '/queue <msg>', description: 'guarda intervenção para a próxima pergunta humana' },
         { command: '/queue [status|consume|clear]', description: 'inspeciona, consome ou limpa a fila de intervenção' },
         { command: '/turn <msg>', description: 'abre novo turno explicitamente, podendo consumir PR' },
         { command: '/steer <msg>', description: 'envio SDK immediate explícito, bloqueado por padrão' },
-        { command: '/interrupt <msg>', description: 'aborta turno ativo e guarda substituição para a próxima pergunta' },
+        {
+            command: '/interrupt <msg>',
+            description: 'aborta turno ativo e guarda substituição para a próxima pergunta',
+        },
         { command: '/answer <texto>', description: 'responde pergunta humana pendente' },
         { command: '/abort', description: 'aborta apenas o turno SDK ativo' },
         { command: '/clear', description: 'limpa histórico em memória' },
@@ -233,7 +272,10 @@ function renderFullHelp({ injectPort, println }) {
             description: 'histórico de perguntas, formulários e permissões no arquivo SSE',
         },
         { command: '/session sdk next <new|resume|auto>', description: 'agenda seleção de sessão SDK no próximo boot' },
-        { command: '/session sdk restart <new|resume|auto>', description: 'fecha a sessão atual e reabre via initializer' },
+        {
+            command: '/session sdk restart <new|resume|auto>',
+            description: 'fecha a sessão atual e reabre via initializer',
+        },
         { command: '/session sdk delete <id|#n>', description: 'apaga estado persistido SDK fora da sessão viva' },
     ]);
     renderHelpSection(println, 'Modelo, BYOK e quota', [
@@ -273,20 +315,56 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/search <termo>', description: 'busca textual rápida no workspace' },
     ]);
     renderHelpSection(println, 'Previews e libs auxiliares', [
-        { command: '/terminal libs detail [filtro]', description: 'mostra disponibilidade, política, riscos, fallbacks e exemplos' },
-        { command: '/terminal libs deferred|fzf|bat|jq', description: 'filtros compactos por decisão, disponibilidade ou ferramenta' },
-        { command: '/fs preview <path>', description: 'preview read-only com bat/batcat quando disponível; fallback JS' },
-        { command: '/fs preview <path> --plain', description: 'força fallback textual JS, útil para comparar renderers' },
-        { command: '/fs preview <path> --markdown', description: 'render Markdown com glow quando disponível; sem pager automático' },
-        { command: '/fs preview <path> --json [--query .x]', description: 'pretty/query JSON com jq quando disponível; parser JS é canônico' },
-        { command: '/fs preview <path> --yaml [--query .x]', description: 'pretty/query YAML com yq seguro quando disponível; fallback js-yaml' },
-        { command: '/git diff [--staged] [--plain]', description: 'diff com delta quando disponível; diff bruto continua canônico' },
+        {
+            command: '/terminal libs detail [filtro]',
+            description: 'mostra disponibilidade, política, riscos, fallbacks e exemplos',
+        },
+        {
+            command: '/terminal libs deferred|fzf|bat|jq',
+            description: 'filtros compactos por decisão, disponibilidade ou ferramenta',
+        },
+        {
+            command: '/fs preview <path>',
+            description: 'preview read-only com bat/batcat quando disponível; fallback JS',
+        },
+        {
+            command: '/fs preview <path> --plain',
+            description: 'força fallback textual JS, útil para comparar renderers',
+        },
+        {
+            command: '/fs preview <path> --markdown',
+            description: 'render Markdown com glow quando disponível; sem pager automático',
+        },
+        {
+            command: '/fs preview <path> --json [--query .x]',
+            description: 'pretty/query JSON com jq quando disponível; parser JS é canônico',
+        },
+        {
+            command: '/fs preview <path> --yaml [--query .x]',
+            description: 'pretty/query YAML com yq seguro quando disponível; fallback js-yaml',
+        },
+        {
+            command: '/git diff [--staged] [--plain]',
+            description: 'diff com delta quando disponível; diff bruto continua canônico',
+        },
         { command: '/gh pr diff <n> [--plain]', description: 'preview de patch de PR com o mesmo contrato de diff' },
         { command: '/menu picker', description: 'mostra plano seguro; não abre TUI sem ação explícita' },
-        { command: '/menu picker --interactive', description: 'abre fzf/gum somente com TTY exclusivo e sem pergunta pendente' },
-        { command: 'npm run terminal:aux-libs:smoke', description: 'smoke read-only de renderers externos e fallbacks JS' },
-        { command: 'npm --silent run terminal:aux-libs:smoke -- --json', description: 'JSON pipeável do smoke sem banner do npm' },
-        { command: 'atuin/zoxide', description: 'detectados apenas; adiados por histórico/cwd pessoal e estado fora do produto' },
+        {
+            command: '/menu picker --interactive',
+            description: 'abre fzf/gum somente com TTY exclusivo e sem pergunta pendente',
+        },
+        {
+            command: 'npm run terminal:aux-libs:smoke',
+            description: 'smoke read-only de renderers externos e fallbacks JS',
+        },
+        {
+            command: 'npm --silent run terminal:aux-libs:smoke -- --json',
+            description: 'JSON pipeável do smoke sem banner do npm',
+        },
+        {
+            command: 'atuin/zoxide',
+            description: 'detectados apenas; adiados por histórico/cwd pessoal e estado fora do produto',
+        },
     ]);
     renderHelpSection(println, 'Interações humanas e SDK', [
         {
@@ -297,7 +375,10 @@ function renderFullHelp({ injectPort, println }) {
         { command: '/elicitation [list|show|request|respond]', description: 'formulários e URL estruturados do SDK' },
         { command: '/permission [list|show|mode|respond]', description: 'permissões SDK observadas e governança' },
         { command: '/tools [diag|all|raw]', description: 'telemetria canônica de ferramentas' },
-        { command: '/events [n|sources|trace|tool|--json compact]', description: 'arquivo SSE, JSON compacto e mapa de fontes canônicas' },
+        {
+            command: '/events [n|sources|trace|tool|--json compact]',
+            description: 'arquivo SSE, JSON compacto e mapa de fontes canônicas',
+        },
         { command: '/errors [n]', description: 'últimos erros rastreados' },
         { command: '/audit [n]', description: 'últimas entradas do audit log' },
     ]);

@@ -136,9 +136,8 @@ describe('terminal/dialog/output buildUserPrompt', () => {
 
     it('inclui marcador PERGUNTA quando há request_user_input pendente sem ask_user vivo', async () => {
         getTerminalPendingStructuredUserInputCount.mockReturnValue(1);
-        const { buildUserPrompt, buildWaitingPrompt } = await import(
-            '../../../../src/copilot/terminal/dialog/output.js'
-        );
+        const { buildUserPrompt, buildWaitingPrompt } =
+            await import('../../../../src/copilot/terminal/dialog/output.js');
 
         expect(buildUserPrompt()).toContain('[PERGUNTA]');
         expect(buildWaitingPrompt()).toContain('[PERGUNTA]');
@@ -369,9 +368,8 @@ describe('terminal/dialog/output buildUserPrompt', () => {
         );
 
         try {
-            const { buildUserPrompt, stripAnsiEscapes } = await import(
-                '../../../../src/copilot/terminal/dialog/output.js'
-            );
+            const { buildUserPrompt, stripAnsiEscapes } =
+                await import('../../../../src/copilot/terminal/dialog/output.js');
             const prompt = buildUserPrompt();
             const plain = stripAnsiEscapes(prompt);
 

@@ -1,9 +1,8 @@
 # tools/file/
 
 **Propósito**: expor para a LLM-B as custom tools canônicas de arquivo, busca, índice e scope.
-**Status documental**: Canônico ativo.
-**Público**: mantenedores das tools SDK-first e das integrações de leitura/escrita da LLM-B.
-**Última atualização**: 14 de maio de 2026.
+**Status documental**: Canônico ativo. **Público**: mantenedores das tools SDK-first e das
+integrações de leitura/escrita da LLM-B. **Última atualização**: 14 de maio de 2026.
 
 ## O que esta pasta contém
 
@@ -65,11 +64,12 @@ Para automação shell, use `npm run copilot:index -- ...`.
 - `index.js`: barrel e composição final de `fileTools`.
 - `read-tools.js`: superfície canônica unificada de leitura (`read_file_content`, `list_directory`,
   `search_in_files`, `diff_files`, `workspace_symbol_search`).
-- `read/`: subdomínio interno barrel-first para implementação de tools de leitura grandes. Hoje contém a cadeia
-  especializada de `read_file_content`, separando handler, janela/cursor, metadados canônicos e controle de stream.
+- `read/`: subdomínio interno barrel-first para implementação de tools de leitura grandes. Hoje
+  contém a cadeia especializada de `read_file_content`, separando handler, janela/cursor, metadados
+  canônicos e controle de stream.
 - `write-tools.js`: facade pública das mutações de arquivo com locks, rollback e atomicidade.
-- `write/`: subdomínio interno barrel-first para implementações e helpers grandes de mutação. Hoje contém
-  `patch_file`, feedback de patch e helpers transacionais compartilhados.
+- `write/`: subdomínio interno barrel-first para implementações e helpers grandes de mutação. Hoje
+  contém `patch_file`, feedback de patch e helpers transacionais compartilhados.
 - `index-tools.js`: ferramentas explícitas do índice L2.
 - `scope-tools.js`: ferramentas explícitas de scope LLM-B.
 
@@ -78,8 +78,9 @@ Para automação shell, use `npm run copilot:index -- ...`.
 Até maio/2026 havia uma divisão histórica entre `read-tools-io.js`, `read-tools-search.js` e
 `symbol-search-tool.js`. Essa fragmentação foi removida para evitar múltiplos “planos de leitura”
 paralelos. Agora existe **uma única superfície canônica de read tools** em `read-tools.js`, com
-metadados de I/O uniformes. Implementações que crescerem para uma cadeia própria podem ser extraídas para subdomínios
-internos barrel-first, desde que `read-tools.js` continue sendo a facade pública de composição.
+metadados de I/O uniformes. Implementações que crescerem para uma cadeia própria podem ser extraídas
+para subdomínios internos barrel-first, desde que `read-tools.js` continue sendo a facade pública de
+composição.
 
 ## Links relacionados
 

@@ -13,6 +13,7 @@ const BootstrapStateSchema = z
         server_version: z.string()['regex'](/^V[0-9]+$/),
         protocol: z.number().int().min(1),
         mode: z.enum(['normal', 'degraded', 'maintenance']),
-    })['strict'](); // <-- PROIBIÇÃO DE CAMPOS EXTRAS
+    })
+    ['strict'](); // <-- PROIBIÇÃO DE CAMPOS EXTRAS
 
 export { BootstrapStateSchema };

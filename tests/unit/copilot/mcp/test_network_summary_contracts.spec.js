@@ -68,7 +68,9 @@ describe('network summary contracts validator', () => {
             "status": "canonical"
         }`;
         const parsed = parseJsoncWithDuplicateKeys(source);
-        const result = await validateNetworkSummaryContractsValue(parsed.value, { duplicateKeys: parsed.duplicateKeys });
+        const result = await validateNetworkSummaryContractsValue(parsed.value, {
+            duplicateKeys: parsed.duplicateKeys,
+        });
         assert.equal(result.ok, false);
         assert.ok(result.errors.some((error) => error.includes("Duplicate object key 'status'")));
         assert.ok(result.errors.some((error) => error.includes("unknown format 'missing'")));

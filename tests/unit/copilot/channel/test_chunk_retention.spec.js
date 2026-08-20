@@ -3,10 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import {
-    createChunkRetention,
-    mergeChunkRetentions,
-} from '../../../../src/copilot/channel/chunk-retention.js';
+import { createChunkRetention, mergeChunkRetentions } from '../../../../src/copilot/channel/chunk-retention.js';
 
 describe('channel chunk retention', () => {
     it('bounds auxiliary chunks by physical bytes and item count', () => {

@@ -12,7 +12,6 @@ import {
     summarizeGatewayRuntimeProofFreshness,
 } from '../routing/index.js';
 
-
 /**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
@@ -42,7 +41,18 @@ function modelTags(model) {
 /**
  * @param {Record<string, unknown>} model
  * @param {{ routeProfile?: string | null }} [options]
- * @returns {{ source: 'runtime'; chat: 'ok' | 'failed' | 'unknown'; agent: 'ok' | 'failed' | 'unknown'; proved: boolean; historicalProved: boolean; stale: boolean; proofAgeMs: number | null; proofMaxAgeMs: number; lastChatAt: number | null; lastAgentAt: number | null }}
+ * @returns {{
+ *     source: 'runtime';
+ *     chat: 'ok' | 'failed' | 'unknown';
+ *     agent: 'ok' | 'failed' | 'unknown';
+ *     proved: boolean;
+ *     historicalProved: boolean;
+ *     stale: boolean;
+ *     proofAgeMs: number | null;
+ *     proofMaxAgeMs: number;
+ *     lastChatAt: number | null;
+ *     lastAgentAt: number | null;
+ * }}
  */
 function modelRuntimeHealth(model, options = {}) {
     const health = readGatewayModelHealth(model, options);
@@ -107,18 +117,17 @@ function runtimeHealthTags(runtime) {
  */
 export function buildModelGatewayEffectiveRouteProjection(snapshot) {
     const active = isRecord(snapshot.active) ? snapshot.active : {};
-    const providerId = typeof active['providerId'] === 'string' && active['providerId'].trim() ? active['providerId'] : null;
+    const providerId =
+        typeof active['providerId'] === 'string' && active['providerId'].trim() ? active['providerId'] : null;
     const providerModel =
-        typeof active['providerModel'] === 'string' && active['providerModel'].trim()
-            ? active['providerModel']
-            : null;
+        typeof active['providerModel'] === 'string' && active['providerModel'].trim() ? active['providerModel'] : null;
     const modelId =
         typeof active['modelId'] === 'string' && active['modelId'].trim()
             ? active['modelId']
             : providerId && providerModel
               ? `${providerId}:${providerModel}`
               : null;
-    const label = providerId && providerModel ? `${providerId} · ${providerModel}` : providerModel ?? modelId ?? '-';
+    const label = providerId && providerModel ? `${providerId} · ${providerModel}` : (providerModel ?? modelId ?? '-');
     return {
         enabled: active['enabled'] === true,
         ready: active['ready'] === true,
@@ -141,7 +150,13 @@ export function buildModelGatewayEffectiveRouteProjection(snapshot) {
 }
 
 /**
- * @param {{ providers: Record<string, unknown>[]; models: Record<string, unknown>[]; active?: Record<string, unknown>; source?: string; generatedAt?: string }} snapshot
+ * @param {{
+ *     providers: Record<string, unknown>[];
+ *     models: Record<string, unknown>[];
+ *     active?: Record<string, unknown>;
+ *     source?: string;
+ *     generatedAt?: string;
+ * }} snapshot
  * @param {{
  *     routeProfile?: string | null;
  *     activeRoute?: Record<string, unknown> | null;
@@ -154,15 +169,28 @@ export function buildModelGatewayEffectiveRouteProjection(snapshot) {
  *     modelCount: number;
  *     enabledModelCount: number;
  *     effectiveRoute: ReturnType<typeof buildModelGatewayEffectiveRouteProjection>;
- *     providers: Array<{ id: string; displayName: string; configured: boolean; modelCount: number; baseUrl: string | null }>;
- *     models: Array<{ id: string; providerId: string; providerModel: string; displayName: string; enabled: boolean; tags: string[]; runtime: ReturnType<typeof modelRuntimeHealth> }>;
+ *     providers: {
+ *         id: string;
+ *         displayName: string;
+ *         configured: boolean;
+ *         modelCount: number;
+ *         baseUrl: string | null;
+ *     }[];
+ *     models: {
+ *         id: string;
+ *         providerId: string;
+ *         providerModel: string;
+ *         displayName: string;
+ *         enabled: boolean;
+ *         tags: string[];
+ *         runtime: ReturnType<typeof modelRuntimeHealth>;
+ *     }[];
  * }}
  */
 export function buildModelGatewayOperatorProjection(snapshot, options = {}) {
     const providers = Array.isArray(snapshot.providers) ? snapshot.providers : [];
     const models = Array.isArray(snapshot.models) ? snapshot.models : [];
-    const runtimeRoute =
-        isRecord(options.activeRoute) ? options.activeRoute : null;
+    const runtimeRoute = isRecord(options.activeRoute) ? options.activeRoute : null;
     const active =
         runtimeRoute &&
         typeof runtimeRoute['providerId'] === 'string' &&
@@ -177,7 +205,7 @@ export function buildModelGatewayOperatorProjection(snapshot, options = {}) {
                   modelId: `${runtimeRoute['providerId']}:${runtimeRoute['providerModel']}`,
                   bindingSource: 'runtime_state',
               }
-            : snapshot.active ?? {};
+            : (snapshot.active ?? {});
     const effectiveSnapshot = { ...snapshot, active };
     return {
         source: snapshot.source ?? 'unknown',

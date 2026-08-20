@@ -10,8 +10,9 @@
  * @see EventBus
  */
 
-import { toError } from '#copilot/core';
-import { resolveModelSelectionMismatch } from '#copilot/core';
+import { resolveModelSelectionMismatch, toError } from '#copilot/core';
+import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
+import * as terminalFrontend from '../frontend/index.js';
 import {
     listTerminalAvailableModelsProjection,
     readTerminalConfigProjection,
@@ -20,8 +21,6 @@ import {
     setTerminalModelProjection,
     setTerminalReasoningProjection,
 } from '../frontend/index.js';
-import * as terminalFrontend from '../frontend/index.js';
-import { buildTerminalModelTransitionPresentation } from '../events/presenters/model/index.js';
 import { recordTerminalActivity } from '../state/index.js';
 import { terminalThemeHeadline, terminalThemeRow, terminalThemeText } from '../state/ui/index.js';
 import { callWithRuntimeTarget, extractRuntimeTarget } from './runtime-target.js';
@@ -105,7 +104,10 @@ function renderModelStringList(model, field) {
 }
 
 /**
- * @param {{ capabilities?: { supports?: { reasoningEffort?: boolean; vision?: boolean } } } & Record<string, unknown>} model
+ * @param {{ capabilities?: { supports?: { reasoningEffort?: boolean; vision?: boolean } } } & Record<
+ *     string,
+ *     unknown
+ * >} model
  * @param {boolean} isActive
  * @returns {string}
  */
@@ -166,11 +168,7 @@ function resolveObservedModelState(state) {
 export async function cmdModel({ println }, arg) {
     const { runtimeId, arg: cleanArg } = extractRuntimeTarget(arg);
     const configProjection = callWithRuntimeTarget(readTerminalConfigProjection, runtimeId);
-    const {
-        currentModel: current,
-        modelMeta: meta,
-        autoModelPolicy,
-    } = configProjection;
+    const { currentModel: current, modelMeta: meta, autoModelPolicy } = configProjection;
     const byok = configProjection.byok ?? DISABLED_BYOK_SUMMARY;
 
     if (!cleanArg || cleanArg.trim() === '') {
@@ -196,15 +194,38 @@ export async function cmdModel({ println }, arg) {
         if (meta) {
             const contextWindowLabel =
                 typeof meta.contextWindow === 'number' ? meta.contextWindow.toLocaleString() : 'n/a';
-            println(terminalThemeRow('Perfil', `custo ${meta.costTier} · velocidade ${meta.speedTier} · contexto ${contextWindowLabel}`));
-            println(terminalThemeRow('Recursos', `raciocínio ${yesNoPt(meta.supportsReasoning)} · visão ${yesNoPt(meta.supportsVision)}`));
+            println(
+                terminalThemeRow(
+                    'Perfil',
+                    `custo ${meta.costTier} · velocidade ${meta.speedTier} · contexto ${contextWindowLabel}`,
+                ),
+            );
+            println(
+                terminalThemeRow(
+                    'Recursos',
+                    `raciocínio ${yesNoPt(meta.supportsReasoning)} · visão ${yesNoPt(meta.supportsVision)}`,
+                ),
+            );
         }
         if (byok.enabled) {
-            const ready = byok.ready ? terminalThemeText('success', 'pronto') : terminalThemeText('error', 'incompleto');
-            println(terminalThemeRow('BYOK', `${ready} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · /byok`));
+            const ready = byok.ready
+                ? terminalThemeText('success', 'pronto')
+                : terminalThemeText('error', 'incompleto');
+            println(
+                terminalThemeRow(
+                    'BYOK',
+                    `${ready} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'} · modelo ${byok.model ?? '-'} · /byok`,
+                ),
+            );
         }
         println(
-            terminalThemeRow('Uso', byok.enabled ? '/model list | stats  (/model <id> é governado por COPILOT_BYOK_MODEL)' : '/model list | stats | <id>', { role: 'command' }),
+            terminalThemeRow(
+                'Uso',
+                byok.enabled
+                    ? '/model list | stats  (/model <id> é governado por COPILOT_BYOK_MODEL)'
+                    : '/model list | stats | <id>',
+                { role: 'command' },
+            ),
         );
         println('');
         return;
@@ -244,7 +265,10 @@ export async function cmdModel({ println }, arg) {
         if (byok.enabled) {
             const ready = byok.ready ? 'pronto' : 'incompleto';
             println(
-                terminalThemeRow('BYOK', `${ready}: catálogo vem de onListModels/configuração BYOK quando a sessão SDK usa provedor customizado.`),
+                terminalThemeRow(
+                    'BYOK',
+                    `${ready}: catálogo vem de onListModels/configuração BYOK quando a sessão SDK usa provedor customizado.`,
+                ),
             );
         }
         println(`  ${terminalThemeText('muted', 'Consultando modelos disponíveis...')}`);
@@ -290,8 +314,19 @@ export async function cmdModel({ println }, arg) {
     if (byok.enabled) {
         println('');
         println(terminalThemeRow('BYOK', '/model <id> não troca provedor customizado em runtime.', { role: 'warn' }));
-        println(terminalThemeRow('Modelo', `${byok.model ?? '(ausente)'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'}`));
-        println(terminalThemeRow('Ação', 'Use /byok model <id> no mesmo provedor ou /byok provider <id> para reattach preservando a mesma sessão; nova sessão só por comando humano explícito.', { role: 'command' }));
+        println(
+            terminalThemeRow(
+                'Modelo',
+                `${byok.model ?? '(ausente)'} · preset ${byok.preset ?? '-'} · provedor ${byok.providerType ?? '-'}`,
+            ),
+        );
+        println(
+            terminalThemeRow(
+                'Ação',
+                'Use /byok model <id> no mesmo provedor ou /byok provider <id> para reattach preservando a mesma sessão; nova sessão só por comando humano explícito.',
+                { role: 'command' },
+            ),
+        );
         println('');
         return;
     }
@@ -319,7 +354,9 @@ export async function cmdModel({ println }, arg) {
                 { role: 'error' },
             ),
         );
-        println(terminalThemeRow('Próximo', 'Use /status e /sdk status antes de tentar novamente.', { role: 'command' }));
+        println(
+            terminalThemeRow('Próximo', 'Use /status e /sdk status antes de tentar novamente.', { role: 'command' }),
+        );
         println('');
         return;
     }
@@ -337,7 +374,9 @@ export async function cmdModel({ println }, arg) {
         to: trimmed,
         kind: operation ? 'confirmed' : 'requested',
         source: 'terminal',
-        reason: operation ? 'troca verificada e commitada pelo model-gateway' : 'aguardando confirmação SDK ou próximo uso observado',
+        reason: operation
+            ? 'troca verificada e commitada pelo model-gateway'
+            : 'aguardando confirmação SDK ou próximo uso observado',
     });
     recordTerminalActivity('system', operation ? 'Modelo confirmado' : 'Modelo solicitado', {
         detail: requestPresentation.detail,
@@ -347,35 +386,67 @@ export async function cmdModel({ println }, arg) {
     });
 
     println('');
-    println(terminalThemeHeadline('assistant', operation ? 'Modelo confirmado' : 'Modelo solicitado', [requestPresentation.transition]));
+    println(
+        terminalThemeHeadline('assistant', operation ? 'Modelo confirmado' : 'Modelo solicitado', [
+            requestPresentation.transition,
+        ]),
+    );
     if (trimmed === 'auto') {
         println(
-            terminalThemeRow('Modo automático', 'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.'),
+            terminalThemeRow(
+                'Modo automático',
+                'roteamento nativo do Copilot; gpt-5.4/high é preferência local observável, não parâmetro oficial forçado.',
+            ),
         );
     }
     if (modelMeta) {
         const ctxLabel = typeof modelMeta.contextWindow === 'number' ? modelMeta.contextWindow.toLocaleString() : 'n/a';
-        println(terminalThemeRow('Recursos', `raciocínio ${yesNoPt(modelMeta.supportsReasoning)} · visão ${yesNoPt(modelMeta.supportsVision)} · contexto ${ctxLabel}`));
+        println(
+            terminalThemeRow(
+                'Recursos',
+                `raciocínio ${yesNoPt(modelMeta.supportsReasoning)} · visão ${yesNoPt(modelMeta.supportsVision)} · contexto ${ctxLabel}`,
+            ),
+        );
     }
     if (reasoningAdjusted) {
         println(
-            terminalThemeRow('Raciocínio', `${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).`, { role: 'warn' }),
+            terminalThemeRow(
+                'Raciocínio',
+                `${previousReasoningEffort} → ${currentReasoningEffort} (modelo sem suporte explícito a controle de raciocínio).`,
+                { role: 'warn' },
+            ),
         );
     }
     if (observed.observedModel && observed.observedModel !== trimmed) {
         println(
-            terminalThemeRow('Efetivo', `${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK ou por uso registrado.`, { role: 'warn' }),
+            terminalThemeRow(
+                'Efetivo',
+                `${observed.observedModel}. A troca para ${trimmed} ainda precisa ser confirmada pelo SDK ou por uso registrado.`,
+                { role: 'warn' },
+            ),
         );
     } else if (observed.modelMismatch && observed.configuredModel === trimmed) {
         println(
-            terminalThemeRow('Aviso', 'Há divergência entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.', { role: 'warn' }),
+            terminalThemeRow(
+                'Aviso',
+                'Há divergência entre o modelo configurado e o efetivo observado. Use /status, /sdk status ou um turno curto para revalidar a sessão.',
+                { role: 'warn' },
+            ),
         );
     } else {
         println(
-            terminalThemeRow('Próximo', 'A sessão SDK será revalidada no próximo turno. Use /status ou /sdk status para conferir o modelo efetivo.'),
+            terminalThemeRow(
+                'Próximo',
+                'A sessão SDK será revalidada no próximo turno. Use /status ou /sdk status para conferir o modelo efetivo.',
+            ),
         );
     }
-    println(terminalThemeRow('Nota', 'Use /conversation-restart se quiser reiniciar só a conversa; /restart reinicia a sessão SDK.'));
+    println(
+        terminalThemeRow(
+            'Nota',
+            'Use /conversation-restart se quiser reiniciar só a conversa; /restart reinicia a sessão SDK.',
+        ),
+    );
     println('');
 }
 
@@ -416,7 +487,13 @@ export function cmdReasoning({ println }, arg) {
 
     if (!VALID_EFFORTS.includes(/** @type {ReasoningEffort} */ (trimmed))) {
         println('');
-        println(terminalThemeRow('Erro', `nível de raciocínio inválido "${trimmed}". Use: ${VALID_EFFORTS.join(' | ')} | off`, { role: 'error' }));
+        println(
+            terminalThemeRow(
+                'Erro',
+                `nível de raciocínio inválido "${trimmed}". Use: ${VALID_EFFORTS.join(' | ')} | off`,
+                { role: 'error' },
+            ),
+        );
         println('');
         return;
     }

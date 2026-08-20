@@ -3,8 +3,8 @@
  * CI gate: compiler suppression directives are forbidden in active workspace code.
  *
  * The TypeScript program must model invalid-input tests, optional dependencies and dynamic runtime boundaries through
- * explicit contracts, `unknown` + narrowing, structural fakes, or runtime validation. Silencing the compiler is not
- * an accepted compatibility mechanism.
+ * explicit contracts, `unknown` + narrowing, structural fakes, or runtime validation. Silencing the compiler is not an
+ * accepted compatibility mechanism.
  *
  * @module check-ts-suppressions
  */
@@ -48,7 +48,7 @@ for (const entry of readdirSync(ROOT, { withFileTypes: true })) {
     if (entry.isFile() && CODE_EXTENSIONS.has(extname(entry.name))) files.push(resolve(entry.name));
 }
 
-/** @type {Array<{ file: string; line: number; directive: string }>} */
+/** @type {{ file: string; line: number; directive: string }[]} */
 const violations = [];
 for (const file of [...new Set(files)].sort()) {
     const lines = readFileSync(file, 'utf8').split(/\r?\n/u);
@@ -69,7 +69,9 @@ if (violations.length > 0) {
     for (const violation of violations) {
         console.error(`  ${violation.file}:${violation.line}  ${violation.directive}`);
     }
-    console.error('\nUse explicit types, runtime narrowing or structurally typed test doubles instead of compiler suppression.\n');
+    console.error(
+        '\nUse explicit types, runtime narrowing or structurally typed test doubles instead of compiler suppression.\n',
+    );
     process.exit(1);
 }
 

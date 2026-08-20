@@ -9,7 +9,10 @@
  */
 
 export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
-    Object.freeze({ providerId: 'openai', groups: Object.freeze([anySecret('api_key', ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY'])]) }),
+    Object.freeze({
+        providerId: 'openai',
+        groups: Object.freeze([anySecret('api_key', ['OPENAI_API_KEY', 'COPILOT_OPENAI_API_KEY'])]),
+    }),
     Object.freeze({
         providerId: 'anthropic',
         groups: Object.freeze([anySecret('api_key', ['ANTHROPIC_API_KEY', 'ANTHROPIC_KEY', 'CLAUDE_API_KEY'])]),
@@ -17,10 +20,18 @@ export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
     Object.freeze({
         providerId: 'gemini',
         groups: Object.freeze([
-            anySecret('api_key', ['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_STUDIO_API_KEY']),
+            anySecret('api_key', [
+                'GEMINI_API_KEY',
+                'GOOGLE_API_KEY',
+                'GOOGLE_GENERATIVE_AI_API_KEY',
+                'GOOGLE_AI_STUDIO_API_KEY',
+            ]),
         ]),
     }),
-    Object.freeze({ providerId: 'mistral', groups: Object.freeze([anySecret('api_key', ['MISTRAL_API_KEY', 'MISTRAL_KEY'])]) }),
+    Object.freeze({
+        providerId: 'mistral',
+        groups: Object.freeze([anySecret('api_key', ['MISTRAL_API_KEY', 'MISTRAL_KEY'])]),
+    }),
     Object.freeze({ providerId: 'groq', groups: Object.freeze([anySecret('api_key', ['GROQ_API_KEY', 'GROQ_KEY'])]) }),
     Object.freeze({
         providerId: 'openrouter',
@@ -33,7 +44,9 @@ export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
     }),
     Object.freeze({
         providerId: 'huggingface',
-        groups: Object.freeze([anySecret('api_key', ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN', 'HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY'])]),
+        groups: Object.freeze([
+            anySecret('api_key', ['HF_TOKEN', 'HUGGINGFACE_API_TOKEN', 'HUGGING_FACE_API_KEY', 'HUGGING_FACE_KEY']),
+        ]),
     }),
     Object.freeze({
         providerId: 'cloudflare-workers-ai',
@@ -43,17 +56,31 @@ export const MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS = Object.freeze([
             allConfig('gateway_id', ['CLOUDFLARE_AI_GATEWAY_ID'], { required: false }),
         ]),
     }),
-    Object.freeze({ providerId: 'nvidia-nim', groups: Object.freeze([anySecret('api_key', ['NVIDIA_API_KEY', 'NVIDIA_KEY'])]) }),
-    Object.freeze({ providerId: 'cerebras', groups: Object.freeze([anySecret('api_key', ['CEREBRAS_API_KEY', 'CEREBRAS_KEY'])]) }),
-    Object.freeze({ providerId: 'chutes', groups: Object.freeze([anySecret('api_key', ['CHUTES_API_KEY', 'CHUTES_AI'])]) }),
+    Object.freeze({
+        providerId: 'nvidia-nim',
+        groups: Object.freeze([anySecret('api_key', ['NVIDIA_API_KEY', 'NVIDIA_KEY'])]),
+    }),
+    Object.freeze({
+        providerId: 'cerebras',
+        groups: Object.freeze([anySecret('api_key', ['CEREBRAS_API_KEY', 'CEREBRAS_KEY'])]),
+    }),
+    Object.freeze({
+        providerId: 'chutes',
+        groups: Object.freeze([anySecret('api_key', ['CHUTES_API_KEY', 'CHUTES_AI'])]),
+    }),
     Object.freeze({ providerId: 'zai', groups: Object.freeze([anySecret('api_key', ['ZAI_API_KEY', 'Z_AI_KEY'])]) }),
     Object.freeze({ providerId: 'opencode', groups: Object.freeze([anySecret('api_key', ['OPENCODE_API_KEY'])]) }),
     Object.freeze({
         providerId: 'ollama-local',
         providerAliases: Object.freeze(['ollama']),
-        groups: Object.freeze([allConfig('local_base_url', ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL'], { mode: 'any' })]),
+        groups: Object.freeze([
+            allConfig('local_base_url', ['OLLAMA_BASE_URL', 'OLLAMA_HOST', 'COPILOT_OLLAMA_BASE_URL'], { mode: 'any' }),
+        ]),
     }),
-    Object.freeze({ providerId: 'ollama-cloud', groups: Object.freeze([anySecret('api_key', ['OLLAMA_CLOUD_API_KEY'])]) }),
+    Object.freeze({
+        providerId: 'ollama-cloud',
+        groups: Object.freeze([anySecret('api_key', ['OLLAMA_CLOUD_API_KEY'])]),
+    }),
 ]);
 
 export const MODEL_GATEWAY_GENERIC_BYOK_SECRET_REFS = Object.freeze([
@@ -101,8 +128,8 @@ function providerAliases(entry) {
 /**
  * Resolve the only secret references that may be associated with one provider record.
  *
- * Generic BYOK references are intentionally valid for every active provider. Provider-specific
- * references come exclusively from the provider requirements registry.
+ * Generic BYOK references are intentionally valid for every active provider. Provider-specific references come
+ * exclusively from the provider requirements registry.
  *
  * @param {string | null | undefined} providerId
  * @param {{ requirements?: typeof MODEL_GATEWAY_PROVIDER_ENV_REQUIREMENTS }} [options]
@@ -116,22 +143,15 @@ export function resolveModelGatewayProviderSecretRefs(providerId, options = {}) 
             [candidate.providerId, ...providerAliases(candidate)].some((id) => id.toLowerCase() === normalized),
         ) ?? null;
     const providerRefs = entry
-        ? entry.groups
-              .filter((group) => group.kind === 'secret')
-              .flatMap((group) => [...group.keys])
+        ? entry.groups.filter((group) => group.kind === 'secret').flatMap((group) => [...group.keys])
         : [];
     if (normalized === 'azure') providerRefs.push('AZURE_OPENAI_API_KEY');
 
     const bearerTokenRefs = [
         'COPILOT_BYOK_BEARER_TOKEN',
-        ...(normalized === 'kilo' || normalized === 'kilo-code' || normalized === 'kilo-gateway'
-            ? providerRefs
-            : []),
+        ...(normalized === 'kilo' || normalized === 'kilo-code' || normalized === 'kilo-gateway' ? providerRefs : []),
     ];
-    const apiKeyRefs = [
-        'COPILOT_BYOK_API_KEY',
-        ...providerRefs.filter((ref) => !bearerTokenRefs.includes(ref)),
-    ];
+    const apiKeyRefs = ['COPILOT_BYOK_API_KEY', ...providerRefs.filter((ref) => !bearerTokenRefs.includes(ref))];
     return {
         apiKeyRefs: [...new Set(apiKeyRefs)],
         bearerTokenRefs: [...new Set(bearerTokenRefs)],
@@ -151,7 +171,16 @@ function configuredKeys(env, keys) {
 /**
  * @param {Record<string, string | undefined>} env
  * @param {{ id: string; kind: string; mode: string; keys: readonly string[]; required: boolean }} group
- * @returns {{ id: string; kind: string; mode: string; required: boolean; keys: string[]; configuredKeys: string[]; missingKeys: string[]; satisfied: boolean }}
+ * @returns {{
+ *     id: string;
+ *     kind: string;
+ *     mode: string;
+ *     required: boolean;
+ *     keys: string[];
+ *     configuredKeys: string[];
+ *     missingKeys: string[];
+ *     satisfied: boolean;
+ * }}
  */
 function evaluateGroup(env, group) {
     const configured = configuredKeys(env, group.keys);
@@ -171,21 +200,25 @@ function evaluateGroup(env, group) {
 /**
  * @param {object} [options]
  * @param {Record<string, string | undefined>} [options.env]
- * @param {readonly { providerId: string; providerAliases?: readonly string[]; groups: readonly { id: string; kind: string; mode: string; keys: readonly string[]; required: boolean }[] }[]} [options.requirements]
+ * @param {readonly {
+ *     providerId: string;
+ *     providerAliases?: readonly string[];
+ *     groups: readonly { id: string; kind: string; mode: string; keys: readonly string[]; required: boolean }[];
+ * }[]} [options.requirements]
  * @param {string} [options.providerId]
- * @returns {Array<{
- *   providerId: string;
- *   providerAliases: string[];
- *   status: 'ready' | 'missing' | 'partial';
- *   requiredGroupCount: number;
- *   satisfiedRequiredGroupCount: number;
- *   recommendedGroupCount: number;
- *   satisfiedRecommendedGroupCount: number;
- *   configuredKeys: string[];
- *   missingRequiredKeys: string[];
- *   missingRecommendedKeys: string[];
- *   groups: Array<ReturnType<typeof evaluateGroup>>;
- * }>}
+ * @returns {{
+ *     providerId: string;
+ *     providerAliases: string[];
+ *     status: 'ready' | 'missing' | 'partial';
+ *     requiredGroupCount: number;
+ *     satisfiedRequiredGroupCount: number;
+ *     recommendedGroupCount: number;
+ *     satisfiedRecommendedGroupCount: number;
+ *     configuredKeys: string[];
+ *     missingRequiredKeys: string[];
+ *     missingRecommendedKeys: string[];
+ *     groups: ReturnType<typeof evaluateGroup>[];
+ * }[]}
  */
 export function evaluateModelGatewayProviderEnvRequirements(options = {}) {
     const env = options.env ?? process.env;
@@ -204,9 +237,18 @@ export function evaluateModelGatewayProviderEnvRequirements(options = {}) {
             const satisfiedRequiredGroupCount = requiredGroups.filter((group) => group.satisfied).length;
             const satisfiedRecommendedGroupCount = recommendedGroups.filter((group) => group.satisfied).length;
             const configured = [...new Set(groups.flatMap((group) => group.configuredKeys))].sort();
-            const missingRequired = [...new Set(requiredGroups.filter((group) => !group.satisfied).flatMap((group) => group.keys))].sort();
-            const missingRecommended = [...new Set(recommendedGroups.filter((group) => !group.satisfied).flatMap((group) => group.keys))].sort();
-            const status = satisfiedRequiredGroupCount === requiredGroups.length ? 'ready' : satisfiedRequiredGroupCount > 0 ? 'partial' : 'missing';
+            const missingRequired = [
+                ...new Set(requiredGroups.filter((group) => !group.satisfied).flatMap((group) => group.keys)),
+            ].sort();
+            const missingRecommended = [
+                ...new Set(recommendedGroups.filter((group) => !group.satisfied).flatMap((group) => group.keys)),
+            ].sort();
+            const status =
+                satisfiedRequiredGroupCount === requiredGroups.length
+                    ? 'ready'
+                    : satisfiedRequiredGroupCount > 0
+                      ? 'partial'
+                      : 'missing';
             return {
                 providerId: entry.providerId,
                 providerAliases: providerAliases(entry),
@@ -225,7 +267,14 @@ export function evaluateModelGatewayProviderEnvRequirements(options = {}) {
 
 /**
  * @param {readonly ReturnType<typeof evaluateModelGatewayProviderEnvRequirements>[number][]} rows
- * @returns {{ providerCount: number; readyCount: number; partialCount: number; missingCount: number; missingRequiredKeyCounts: Record<string, number>; missingRecommendedKeyCounts: Record<string, number> }}
+ * @returns {{
+ *     providerCount: number;
+ *     readyCount: number;
+ *     partialCount: number;
+ *     missingCount: number;
+ *     missingRequiredKeyCounts: Record<string, number>;
+ *     missingRecommendedKeyCounts: Record<string, number>;
+ * }}
  */
 export function summarizeModelGatewayProviderEnvRequirements(rows) {
     /** @type {Record<string, number>} */
@@ -233,8 +282,10 @@ export function summarizeModelGatewayProviderEnvRequirements(rows) {
     /** @type {Record<string, number>} */
     const missingRecommendedKeyCounts = {};
     for (const row of rows) {
-        for (const key of row.missingRequiredKeys) missingRequiredKeyCounts[key] = (missingRequiredKeyCounts[key] ?? 0) + 1;
-        for (const key of row.missingRecommendedKeys) missingRecommendedKeyCounts[key] = (missingRecommendedKeyCounts[key] ?? 0) + 1;
+        for (const key of row.missingRequiredKeys)
+            missingRequiredKeyCounts[key] = (missingRequiredKeyCounts[key] ?? 0) + 1;
+        for (const key of row.missingRecommendedKeys)
+            missingRecommendedKeyCounts[key] = (missingRecommendedKeyCounts[key] ?? 0) + 1;
     }
     return {
         providerCount: rows.length,

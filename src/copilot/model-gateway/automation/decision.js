@@ -13,7 +13,9 @@
  * @returns {Record<string, unknown> | null}
  */
 function record(value) {
-    return value && typeof value === 'object' && !Array.isArray(value) ? /** @type {Record<string, unknown>} */ (value) : null;
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? /** @type {Record<string, unknown>} */ (value)
+        : null;
 }
 
 /**
@@ -39,7 +41,12 @@ function textList(value) {
 function selectedPolicyTerms(selected) {
     const policy = record(selected?.['policy']);
     const terms = text(policy?.['terms']);
-    return terms ? terms.split(/\s+/gu).map(text).filter((item) => item !== null) : [];
+    return terms
+        ? terms
+              .split(/\s+/gu)
+              .map(text)
+              .filter((item) => item !== null)
+        : [];
 }
 
 /**
@@ -64,7 +71,13 @@ function routeKey(route) {
  */
 function selectedRouteReasons(route) {
     const selected = selectedRoute(route);
-    return [...new Set([...textList(route?.['reasons']), ...textList(selected?.['reasons']), ...selectedPolicyTerms(selected)])];
+    return [
+        ...new Set([
+            ...textList(route?.['reasons']),
+            ...textList(selected?.['reasons']),
+            ...selectedPolicyTerms(selected),
+        ]),
+    ];
 }
 
 /**
@@ -86,7 +99,13 @@ function selectedRouteConfidence(route) {
 
 /**
  * @param {Record<string, unknown> | null | undefined} route
- * @returns {{ profile: string | null; preset: string | null; providerType: string | null; baseUrl: string | null; model: string | null }}
+ * @returns {{
+ *     profile: string | null;
+ *     preset: string | null;
+ *     providerType: string | null;
+ *     baseUrl: string | null;
+ *     model: string | null;
+ * }}
  */
 function targetBoundary(route) {
     const selected = selectedRoute(route);
@@ -94,9 +113,7 @@ function targetBoundary(route) {
     return {
         profile: text(runtimeEnv?.['profile']) ?? text(selected?.['byokProfile']),
         preset:
-            text(runtimeEnv?.['providerId']) ??
-            text(selected?.['providerId']) ??
-            text(runtimeEnv?.['providerPreset']),
+            text(runtimeEnv?.['providerId']) ?? text(selected?.['providerId']) ?? text(runtimeEnv?.['providerPreset']),
         providerType: text(selected?.['runtimeKind']) ?? text(selected?.['routeLayer']),
         baseUrl: text(selected?.['baseUrl']) ?? text(selected?.['openAICompatibleBaseUrl']),
         model: text(selected?.['selectorSyntax']) ?? text(selected?.['providerModel']) ?? text(selected?.['id']),
@@ -144,7 +161,8 @@ function routeHealthIdentity(route, fallbackProfile) {
             text(selected?.['taskProfile']) ??
             text(fallbackProfile),
         providerId: text(selected?.['providerId']),
-        providerModel: text(selected?.['providerModel']) ?? text(selected?.['selectorSyntax']) ?? text(selected?.['id']),
+        providerModel:
+            text(selected?.['providerModel']) ?? text(selected?.['selectorSyntax']) ?? text(selected?.['id']),
     };
 }
 
@@ -165,7 +183,14 @@ function scopedRuntimeHealthClearCommands(route, routeProfile) {
 
 /**
  * @param {Record<string, unknown> | null | undefined} binding
- * @returns {{ enabled: boolean; profile: string | null; preset: string | null; providerType: string | null; baseUrl: string | null; model: string | null }}
+ * @returns {{
+ *     enabled: boolean;
+ *     profile: string | null;
+ *     preset: string | null;
+ *     providerType: string | null;
+ *     baseUrl: string | null;
+ *     model: string | null;
+ * }}
  */
 function liveBoundary(binding) {
     return {
@@ -231,7 +256,11 @@ function policyBlockers(route, options) {
 function blockedRouteNextCommands(route, routeProfile, blockers, wait) {
     const healthClearCommands = scopedRuntimeHealthClearCommands(route, routeProfile);
     if (wait) {
-        return ['npm run model-gateway:runtime-health:diff', ...healthClearCommands, 'npm run model-gateway:runtime-selector -- --fail'];
+        return [
+            'npm run model-gateway:runtime-health:diff',
+            ...healthClearCommands,
+            'npm run model-gateway:runtime-selector -- --fail',
+        ];
     }
     const profile = routeProfile || 'repo_agent';
     const needsRuntimeProofPlan = blockers.some((blocker) =>
@@ -259,14 +288,22 @@ function blockedRouteNextCommands(route, routeProfile, blockers, wait) {
 function routeMatchesTurnFailure(route, turnFailure) {
     if (!route || !turnFailure) return false;
     const selected = selectedRoute(route);
-    const routeProfile = text(route?.['profileId']) ?? text(selected?.['routeProfile']) ?? text(selected?.['taskProfile']);
+    const routeProfile =
+        text(route?.['profileId']) ?? text(selected?.['routeProfile']) ?? text(selected?.['taskProfile']);
     const providerId = text(selected?.['providerId']);
-    const providerModel = text(selected?.['providerModel']) ?? text(selected?.['selectorSyntax']) ?? text(selected?.['id']);
+    const providerModel =
+        text(selected?.['providerModel']) ?? text(selected?.['selectorSyntax']) ?? text(selected?.['id']);
     const failedProfile = text(turnFailure?.['profile']) ?? text(turnFailure?.['routeProfile']);
     const failedProvider = text(turnFailure?.['provider']) ?? text(turnFailure?.['providerId']);
     const failedModel = text(turnFailure?.['model']) ?? text(turnFailure?.['providerModel']);
     const profileMatches = !failedProfile || !routeProfile || failedProfile === routeProfile;
-    return profileMatches && providerId !== null && providerModel !== null && providerId === failedProvider && providerModel === failedModel;
+    return (
+        profileMatches &&
+        providerId !== null &&
+        providerModel !== null &&
+        providerId === failedProvider &&
+        providerModel === failedModel
+    );
 }
 
 /**
@@ -276,7 +313,8 @@ function routeMatchesTurnFailure(route, turnFailure) {
  */
 function turnFailureBlockers(route, turnFailure) {
     if (!routeMatchesTurnFailure(route, turnFailure)) return [];
-    const failureKind = text(turnFailure?.['failureKind']) ?? text(record(turnFailure?.['failure'])?.['kind']) ?? 'unknown_failure';
+    const failureKind =
+        text(turnFailure?.['failureKind']) ?? text(record(turnFailure?.['failure'])?.['kind']) ?? 'unknown_failure';
     return [`same_route_failed_this_turn:${failureKind}`];
 }
 
@@ -303,7 +341,8 @@ function routeCooldown(route) {
     const providerCooldown = record(route?.['providerCooldown']);
     const runtimeHealth = record(route?.['runtimeHealth']);
     const retryAfterSeconds =
-        typeof providerCooldown?.['retryAfterSeconds'] === 'number' && Number.isFinite(providerCooldown['retryAfterSeconds'])
+        typeof providerCooldown?.['retryAfterSeconds'] === 'number' &&
+        Number.isFinite(providerCooldown['retryAfterSeconds'])
             ? providerCooldown['retryAfterSeconds']
             : null;
     return {
@@ -316,7 +355,14 @@ function routeCooldown(route) {
 
 /**
  * @param {string[]} blockers
- * @returns {'none' | 'quota_hard' | 'rate_limit_resettable' | 'auth_invalid' | 'model_unavailable' | 'local_private_policy' | 'new_session_policy' | 'route_blocked'}
+ * @returns {'none'
+ *     | 'quota_hard'
+ *     | 'rate_limit_resettable'
+ *     | 'auth_invalid'
+ *     | 'model_unavailable'
+ *     | 'local_private_policy'
+ *     | 'new_session_policy'
+ *     | 'route_blocked'}
  */
 function blockerClass(blockers) {
     const textValue = blockers.join(' ').toLowerCase();
@@ -340,7 +386,12 @@ function blockerClass(blockers) {
 function chooseRoute(plan, profileId) {
     const routes = Array.isArray(plan?.['routes']) ? plan['routes'].map(record).filter((item) => item !== null) : [];
     const requested = text(profileId);
-    return routes.find((route) => text(route['profileId']) === requested) ?? routes.find((route) => route['status'] === 'selected') ?? routes[0] ?? null;
+    return (
+        routes.find((route) => text(route['profileId']) === requested) ??
+        routes.find((route) => route['status'] === 'selected') ??
+        routes[0] ??
+        null
+    );
 }
 
 /**
@@ -350,7 +401,9 @@ function chooseRoute(plan, profileId) {
  */
 function routeWithPostTurnFallback(route, turnFailure) {
     if (!routeMatchesTurnFailure(route, turnFailure)) return route;
-    const candidates = Array.isArray(route['candidateAlternatives']) ? route['candidateAlternatives'].map(record).filter((item) => item !== null) : [];
+    const candidates = Array.isArray(route['candidateAlternatives'])
+        ? route['candidateAlternatives'].map(record).filter((item) => item !== null)
+        : [];
     const fallback = candidates.find((candidate) => {
         const selected = record(candidate['selected']);
         if (!selected) return false;
@@ -368,7 +421,10 @@ function routeWithPostTurnFallback(route, turnFailure) {
         runtimeEnv: record(fallback['runtimeEnv']),
         reasons: ['post_turn_fallback_candidate', ...textList(fallback['reasons'])],
         fallbackFromSelectedRouteKey: originalSelectedRouteKey,
-        fallbackReason: text(record(turnFailure)?.['failureKind']) ?? text(record(record(turnFailure)?.['failure'])?.['kind']) ?? 'turn_failure',
+        fallbackReason:
+            text(record(turnFailure)?.['failureKind']) ??
+            text(record(record(turnFailure)?.['failure'])?.['kind']) ??
+            'turn_failure',
     };
 }
 
@@ -376,14 +432,14 @@ function routeWithPostTurnFallback(route, turnFailure) {
  * @param {Record<string, unknown> | null | undefined} runtimeSelectorPlan
  * @param {string | null | undefined} [profileId]
  * @returns {{
- *   schema: 'model-gateway-runtime-automation-route';
- *   route: Record<string, unknown> | null;
- *   routeProfile: string | null;
- *   selectedRouteKey: string | null;
- *   selectedRouteReasons: string[];
- *   selectedRouteConfidence: string | null;
- *   blockers: string[];
- *   waitForReset: boolean;
+ *     schema: 'model-gateway-runtime-automation-route';
+ *     route: Record<string, unknown> | null;
+ *     routeProfile: string | null;
+ *     selectedRouteKey: string | null;
+ *     selectedRouteReasons: string[];
+ *     selectedRouteConfidence: string | null;
+ *     blockers: string[];
+ *     waitForReset: boolean;
  * }}
  */
 export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, profileId) {
@@ -413,34 +469,36 @@ export function selectModelGatewayRuntimeAutomationRoute(runtimeSelectorPlan, pr
  * @param {boolean} [input.policy.allowLocalPrivate]
  * @param {Record<string, unknown> | null | undefined} [input.turnFailure]
  * @returns {{
- *   schema: 'model-gateway-runtime-automation-decision';
- *   ok: boolean;
- *   status: 'ready' | 'blocked';
- *   action: 'keep_current' | 'apply_live_model' | 'apply_live_route' | 'wait_for_reset' | 'manual_intervention';
- *   selectedRouteKey: string | null;
- *   selectedRouteReasons: string[];
- *   selectedRouteConfidence: string | null;
- *   routeProfile: string | null;
- *   fallbackFromSelectedRouteKey: string | null;
- *   fallbackReason: string | null;
- *   canApplyLiveModel: boolean;
- *   canApplyLiveRoute: boolean;
- *   requiresProviderRebind: boolean;
- *   requiresNewSession: boolean;
- *   blockers: string[];
- *   currentBoundary: ReturnType<typeof liveBoundary>;
- *   targetBoundary: ReturnType<typeof targetBoundary>;
- *   targetRoute: ReturnType<typeof liveRouteTarget>;
- *   cooldown: ReturnType<typeof routeCooldown>;
- *   blockerClass: ReturnType<typeof blockerClass>;
- *   nonActionReason: string | null;
- *   nextCommands: string[];
- *   operatorSummary: string;
+ *     schema: 'model-gateway-runtime-automation-decision';
+ *     ok: boolean;
+ *     status: 'ready' | 'blocked';
+ *     action: 'keep_current' | 'apply_live_model' | 'apply_live_route' | 'wait_for_reset' | 'manual_intervention';
+ *     selectedRouteKey: string | null;
+ *     selectedRouteReasons: string[];
+ *     selectedRouteConfidence: string | null;
+ *     routeProfile: string | null;
+ *     fallbackFromSelectedRouteKey: string | null;
+ *     fallbackReason: string | null;
+ *     canApplyLiveModel: boolean;
+ *     canApplyLiveRoute: boolean;
+ *     requiresProviderRebind: boolean;
+ *     requiresNewSession: boolean;
+ *     blockers: string[];
+ *     currentBoundary: ReturnType<typeof liveBoundary>;
+ *     targetBoundary: ReturnType<typeof targetBoundary>;
+ *     targetRoute: ReturnType<typeof liveRouteTarget>;
+ *     cooldown: ReturnType<typeof routeCooldown>;
+ *     blockerClass: ReturnType<typeof blockerClass>;
+ *     nonActionReason: string | null;
+ *     nextCommands: string[];
+ *     operatorSummary: string;
  * }}
  */
 export function buildModelGatewayRuntimeAutomationDecision(input) {
     const automationRoute = selectModelGatewayRuntimeAutomationRoute(input.runtimeSelectorPlan, input.profileId);
-    const route = automationRoute.route ? routeWithPostTurnFallback(automationRoute.route, input.turnFailure) : automationRoute.route;
+    const route = automationRoute.route
+        ? routeWithPostTurnFallback(automationRoute.route, input.turnFailure)
+        : automationRoute.route;
     const target = targetBoundary(route);
     const targetRoute = liveRouteTarget(route);
     const current = liveBoundary(input.liveByokBinding);
@@ -484,7 +542,12 @@ export function buildModelGatewayRuntimeAutomationDecision(input) {
             targetRoute,
             cooldown,
             blockerClass: currentBlockerClass,
-            nonActionReason: sameRouteFailure !== null ? 'same_route_failed_this_turn' : wait ? 'route_wait_for_reset' : 'route_blocked',
+            nonActionReason:
+                sameRouteFailure !== null
+                    ? 'same_route_failed_this_turn'
+                    : wait
+                      ? 'route_wait_for_reset'
+                      : 'route_blocked',
             nextCommands: blockedRouteNextCommands(route, routeProfile, blockers, wait),
             operatorSummary: wait
                 ? 'Rota bloqueada por health/cooldown ou falha recente; aguarde reset ou escolha outra rota.'

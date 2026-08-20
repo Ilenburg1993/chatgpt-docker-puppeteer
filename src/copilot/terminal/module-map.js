@@ -78,7 +78,8 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'stable',
         public: false,
-        summary: 'Side-effect import precoce que carrega .env.local antes das demais leituras de configuração do terminal.',
+        summary:
+            'Side-effect import precoce que carrega .env.local antes das demais leituras de configuração do terminal.',
     },
     {
         path: 'bootstrap-dotenv-loader.js',
@@ -114,7 +115,8 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'watch',
         public: false,
-        summary: 'Monitor passivo de mudanças em src/copilot/** (notify) ou auto-restart supervisionado (auto). Activado por COPILOT_DEV_WATCH. Expõe getDevWatchStatus() para introspection.',
+        summary:
+            'Monitor passivo de mudanças em src/copilot/** (notify) ou auto-restart supervisionado (auto). Activado por COPILOT_DEV_WATCH. Expõe getDevWatchStatus() para introspection.',
     },
     {
         path: 'module-map.js',
@@ -321,7 +323,8 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'hotspot',
         public: false,
-        summary: 'Estado local das interações humanas com elicitation/permissões; consome SDK via gateway terminal-owned.',
+        summary:
+            'Estado local das interações humanas com elicitation/permissões; consome SDK via gateway terminal-owned.',
     },
     {
         path: 'events/tool-activity-presenter.js',
@@ -510,7 +513,8 @@ export const TERMINAL_MODULE_LAYOUT = Object.freeze([
         tier: 'secondary',
         risk: 'hotspot',
         public: false,
-        summary: 'Única ponte runtime do terminal para helpers vanilla da sessão SDK e operações expostas por presentation.',
+        summary:
+            'Única ponte runtime do terminal para helpers vanilla da sessão SDK e operações expostas por presentation.',
     },
     {
         path: 'frontend/operational-guidance/',

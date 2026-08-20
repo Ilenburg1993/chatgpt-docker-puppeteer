@@ -242,7 +242,10 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
         session._emit('extension_context', { extensionName: 'GitHub' });
         session._emit('session.custom_agents_updated', { agents: [{ name: 'Reviewer' }] });
         session._emit('session.custom_notification', { title: 'Aviso', message: 'Ação necessária', severity: 'warn' });
-        session._emit('session.extensions.attachments_pushed', { extensionName: 'GitHub', attachments: [{ id: 'att-1' }] });
+        session._emit('session.extensions.attachments_pushed', {
+            extensionName: 'GitHub',
+            attachments: [{ id: 'att-1' }],
+        });
         session._emit('session.remote_steerable_changed', { enabled: true });
         session._emit('session.schedule_created', { scheduleId: 'sched-1', title: 'Revisão diária' });
         session._emit('session.schedule_cancelled', { scheduleId: 'sched-1', title: 'Revisão diária' });
@@ -262,7 +265,10 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
             'session.extensions.attachments_pushed',
             expect.objectContaining({ count: 1, extensionName: 'GitHub' }),
         );
-        expect(emit).toHaveBeenCalledWith('session.remote_steerable_changed', expect.objectContaining({ enabled: true }));
+        expect(emit).toHaveBeenCalledWith(
+            'session.remote_steerable_changed',
+            expect.objectContaining({ enabled: true }),
+        );
         expect(emit).toHaveBeenCalledWith(
             'session.schedule_created',
             expect.objectContaining({ scheduleId: 'sched-1', title: 'Revisão diária' }),
@@ -271,7 +277,10 @@ describe('Faixa B1 — session-lifecycle handlers', () => {
             'session.schedule_cancelled',
             expect.objectContaining({ scheduleId: 'sched-1', title: 'Revisão diária' }),
         );
-        expect(emit).toHaveBeenCalledWith('new_inbox_message', expect.objectContaining({ message: 'Nova solicitação' }));
+        expect(emit).toHaveBeenCalledWith(
+            'new_inbox_message',
+            expect.objectContaining({ message: 'Nova solicitação' }),
+        );
     });
 });
 

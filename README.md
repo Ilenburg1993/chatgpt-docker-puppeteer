@@ -268,9 +268,9 @@ qualquer desenvolvedor.
 ## 🧩 Usando o daemon LSP integrado
 
 O editor usa diretamente o servidor nativo do TypeScript 7. A antiga integração MCP local foi
-preservada apenas para compatibilidade, permanece desligada por padrão e exige `LSP_ENABLED=true`
-no processo isolado. Seu alias histórico continua em `src/integration/lsp/tsserver-daemon.mjs`.
-Exemplo explícito de manutenção:
+preservada apenas para compatibilidade, permanece desligada por padrão e exige `LSP_ENABLED=true` no
+processo isolado. Seu alias histórico continua em `src/integration/lsp/tsserver-daemon.mjs`. Exemplo
+explícito de manutenção:
 
 ```js
 import { TsserverDaemon } from './src/integration/lsp/tsserver-daemon.mjs';
@@ -362,33 +362,29 @@ npm run build:exe
 
 ### Variáveis de Ambiente
 
-| Variável                              | Descrição                                       | Padrão          |
-| ------------------------------------- | ----------------------------------------------- | --------------- | ------- | ---- |
-| `NODE_ENV`                            | Ambiente (development/production)               | development     |
-| `SERVER_MODE`                         | Modo do servidor (integrated/split/disabled)    | integrated      |
-| `SERVER_AUTHORITY`                    | Autoridade do servidor (standalone/delegated)   | standalone      |
-| `FORCE_HTTPS`                         | Forçar HTTPS em produção                        | true (produção) |
-| `MAX_CONCURRENT_TASKS`                | Máximo de tarefas simultâneas                   | 1               |
-| `OLLAMA_CLOUD_API_KEY`                | Chave API Ollama Cloud                          | -               |
-| `OLLAMA_NON_EMBEDDING_RUNTIME`        | Roteamento de geração/chat (`auto               | cloud           | local`) | auto |
-| `OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK` | Fallback local quando cloud falhar (`true       | false`)         | true    |
-| `OLLAMA_LOCAL_MODEL_PROFILE`          | Perfil de segurança para modelos locais (`light | custom`)        | light   |
-| `OLLAMA_LOCAL_ALLOWED_MODELS`         | Allowlist opcional de modelos locais (CSV)      | -               |
-| `RAG_PROFILE_DEFAULT`                 | Perfil de escopo RAG (`core                     | dev             | full`)  | core |
-| `RAG_DEGRADED_MODE_ENABLED`           | Fallback lexical no RAG (`true                  | false`)         | true    |
-| `RAG_AST_CHUNK_ENABLED`               | Ativa chunking AST-aware em JS/TS (`true        | false`)         | true    |
-| `RAG_CHUNK_TARGET_CHARS`              | Alvo de tamanho de chunk (chars)                | 2400            |
-| `RAG_CHUNK_MAX_CHARS`                 | Limite máximo de chunk (chars)                  | 4200            |
-| `RAG_EXPAND_DEFAULT_LINES`            | Linhas padrão para `rag_expand`                 | 40              |
-| `RAG_EXPAND_MAX_LINES`                | Limite máximo de linhas para `rag_expand`       | 240             |
-| `RAG_WATCH_ENABLED`                   | Liga/desliga watch incremental (`true           | false`)         | true    |
-| `RAG_WATCH_DEBOUNCE_MS`               | Debounce do watch incremental (ms)              | 3000            |
-| `RAG_WATCH_BATCH_MAX`                 | Máximo de arquivos por lote incremental         | 64              |
-| `LSP_ENABLED`                         | Habilita tools MCP semânticas LSP (opt-in)       | false           |
-| `LSP_TOOL_TIMEOUT_MS`                 | Timeout por operação LSP (ms)                   | 15000           |
-| `LSP_MUTATIONS_ENABLED`               | Permite apply de code action (`true             | false`)         | false   |
-| `LSP_MAX_RESULTS`                     | Limite de resultados por ferramenta LSP         | 200             |
-| `GITHUB_PERSONAL_ACCESS_TOKEN`        | Token GitHub                                    | -               |
+| Variável | Descrição | Padrão | | ------------------------------------- |
+----------------------------------------------- | --------------- | ------- | ---- | | `NODE_ENV` |
+Ambiente (development/production) | development | | `SERVER_MODE` | Modo do servidor
+(integrated/split/disabled) | integrated | | `SERVER_AUTHORITY` | Autoridade do servidor
+(standalone/delegated) | standalone | | `FORCE_HTTPS` | Forçar HTTPS em produção | true (produção) |
+| `MAX_CONCURRENT_TASKS` | Máximo de tarefas simultâneas | 1 | | `OLLAMA_CLOUD_API_KEY` | Chave API
+Ollama Cloud | - | | `OLLAMA_NON_EMBEDDING_RUNTIME` | Roteamento de geração/chat
+(`auto               | cloud           | local`) | auto | | `OLLAMA_NON_EMBEDDING_LOCAL_FALLBACK` |
+Fallback local quando cloud falhar (`true       | false`) | true | | `OLLAMA_LOCAL_MODEL_PROFILE` |
+Perfil de segurança para modelos locais (`light | custom`) | light | | `OLLAMA_LOCAL_ALLOWED_MODELS`
+| Allowlist opcional de modelos locais (CSV) | - | | `RAG_PROFILE_DEFAULT` | Perfil de escopo RAG
+(`core                     | dev             | full`) | core | | `RAG_DEGRADED_MODE_ENABLED` |
+Fallback lexical no RAG (`true                  | false`) | true | | `RAG_AST_CHUNK_ENABLED` | Ativa
+chunking AST-aware em JS/TS (`true        | false`) | true | | `RAG_CHUNK_TARGET_CHARS` | Alvo de
+tamanho de chunk (chars) | 2400 | | `RAG_CHUNK_MAX_CHARS` | Limite máximo de chunk (chars) | 4200 |
+| `RAG_EXPAND_DEFAULT_LINES` | Linhas padrão para `rag_expand` | 40 | | `RAG_EXPAND_MAX_LINES` |
+Limite máximo de linhas para `rag_expand` | 240 | | `RAG_WATCH_ENABLED` | Liga/desliga watch
+incremental (`true           | false`) | true | | `RAG_WATCH_DEBOUNCE_MS` | Debounce do watch
+incremental (ms) | 3000 | | `RAG_WATCH_BATCH_MAX` | Máximo de arquivos por lote incremental | 64 | |
+`LSP_ENABLED` | Habilita tools MCP semânticas LSP (opt-in) | false | | `LSP_TOOL_TIMEOUT_MS` |
+Timeout por operação LSP (ms) | 15000 | | `LSP_MUTATIONS_ENABLED` | Permite apply de code action
+(`true             | false`) | false | | `LSP_MAX_RESULTS` | Limite de resultados por ferramenta LSP
+| 200 | | `GITHUB_PERSONAL_ACCESS_TOKEN` | Token GitHub | - |
 
 ### Arquivos de Configuração
 

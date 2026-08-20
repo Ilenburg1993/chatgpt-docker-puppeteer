@@ -8,4 +8,4 @@
  * @module copilot/hooks/permission-controller
  */
 
-export { createConfiguredPermissionHandler, PermissionController } from '#copilot/sdk/session';
+export { PermissionController, createConfiguredPermissionHandler } from '#copilot/sdk/session';
