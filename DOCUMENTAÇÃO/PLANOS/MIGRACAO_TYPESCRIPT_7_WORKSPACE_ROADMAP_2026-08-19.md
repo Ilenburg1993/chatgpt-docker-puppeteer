@@ -1,7 +1,7 @@
 # Migração TypeScript 7 do workspace — diagnóstico, estado-alvo e roadmap
 
-> **Status:** implementação e validação concluídas em 20 de agosto de 2026; falta apenas a
-> verificação pós-rebuild descrita em J.11
+> **Status:** implementação, validação e publicação concluídas em 20 de agosto de 2026; falta apenas
+> a verificação pós-rebuild descrita em J.11
 >
 > **Início desta onda:** 19 de agosto de 2026
 >
@@ -313,8 +313,8 @@ compilador principal. O encerramento exige zero em ambos onde a compatibilidade 
 - [x] **J.6** Madge com zero circularidades.
 - [x] **J.7** DevContainer/Dockerfile/workflows/docs verdes.
 - [x] **J.8** Revisar diff final e confirmar que nenhum tipo falso ou exclusão artificial entrou.
-- [ ] **J.9** Organizar os commits, publicar e comprovar `HEAD == origin/main` com worktree limpo.
-- [ ] **J.10** Somente então instruir o usuário a fazer rebuild do container.
+- [x] **J.9** Organizar os commits, publicar e comprovar `HEAD == origin/main` com worktree limpo.
+- [x] **J.10** Somente então instruir o usuário a fazer rebuild do container.
 - [ ] **J.11** Após rebuild, comprovar `node`, `npm`, `tsc`, LSP/extensão e ausência de `tsserver`
       global stale.
 
@@ -423,11 +423,21 @@ deixaram os fixtures versionados intactos.
   Agent + daemon LSP) e 7/7 testes Vitest (terminal MCP + contrato de dependências), além dos
   recortes já verdes de 50/50 na fronteira MCP e 6/6 no controle de terminal.
 
+### 8.7 Publicação
+
+- A migração foi consolidada no commit `8c7afeaa4` (`feat: consolidar TypeScript 7 no workspace`) e
+  publicada em `origin/main`.
+- O fechamento documental foi mantido em commit separado para preservar a rastreabilidade entre
+  implementação e confirmação operacional.
+- Após a publicação do fechamento, `git fetch origin`, igualdade entre `HEAD` e `origin/main` e
+  worktree limpo são a prova de encerramento pré-rebuild.
+
 ## 9. Única pendência externa: rebuild
 
-O código, a configuração, os testes e a documentação estão fechados. J.11 permanece aberto porque
-somente a imagem reconstruída pode comprovar a remoção física do `tsserver` global stale e a
-reconciliação das extensões instaladas. Depois do rebuild, executar:
+O código, a configuração, os testes, a documentação e a publicação estão fechados. A ação seguinte é
+reconstruir o DevContainer. J.11 permanece aberto porque somente a imagem reconstruída pode
+comprovar a remoção física do `tsserver` global stale e a reconciliação das extensões instaladas.
+Depois do rebuild, executar:
 
 ```bash
 node --version
