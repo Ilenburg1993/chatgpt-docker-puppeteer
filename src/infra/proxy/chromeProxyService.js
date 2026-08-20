@@ -3,10 +3,10 @@
  * @import {
  *   IncomingMessage,
  *   ServerResponse
- * } from "http"
+ * } from 'http'
  */
-/** @import {Socket} from "net" */
-/** @import {RequestOptions} from "node:http" */
+/** @import {Socket} from 'net' */
+/** @import {RequestOptions} from 'node:http' */
 /**
  * @version 3.1.0
  * @file Chrome Proxy Service v3.1 - Production-grade HTTP/WebSocket proxy for Chrome DevTools Protocol
@@ -383,12 +383,16 @@ class ChromeProxyService {
             });
             this.wsProxy.on(
                 'error',
-                /** @type {function(any, any, any): void} */ (
+                /** @type {(
+    err: Error,
+    req: import('node:http').IncomingMessage,
+    res: import('node:http').ServerResponse | import('node:net').Socket,
+) => void} */ (
                     (err, _req, res) => {
                         this.stats.errors++;
                         this._incrementMetric(this.metrics.proxyErrors, { type: 'http_proxy' });
-                        this.log('error', 'Proxy error', { error: /** @type {any} */ (err).message });
-                        if (res && !res.finished) {
+                        this.log('error', 'Proxy error', { error: err.message });
+                        if ('writeHead' in res && !res.finished) {
                             try {
                                 res.writeHead(502, { 'Content-Type': 'text/plain' });
                                 res.end('Proxy error');
@@ -1015,13 +1019,13 @@ class ChromeProxyService {
                     // ✅ P2.7: Handle streaming errors (count failures in circuit breaker)
                     proxyRes.on(
                         'error',
-                        /** @type {function(any): void} */ (
+                        /** @type {(error: Error) => void} */ (
                             (streamErr) => {
                                 this.circuitBreaker.onFailure(); // Count failure in circuit breaker
                                 this.stats.errors++;
                                 this._incrementMetric(this.metrics.proxyErrors, { type: 'stream_error' });
                                 this.log('error', 'Proxy response stream error', {
-                                    error: /** @type {any} */ (streamErr).message,
+                                    error: streamErr.message,
                                 });
 
                                 if (!res.headersSent) {
