@@ -3,6 +3,7 @@
  * Catálogo canônico de extensões VS Code do workspace.
  *
  * Regra de arquitetura:
+ *
  * - `devcontainer`: provisionamento automático e deliberadamente enxuto;
  * - `optional`: capacidades úteis, porém carregadas sob demanda;
  * - `hostOnly`: extensões de transporte/remote que pertencem ao VS Code host, não ao Extension Host remoto;
@@ -33,7 +34,7 @@ export const VSCODE_EXTENSION_PROFILES = Object.freeze({
         'Vue.volar',
     ]),
     github: Object.freeze([
-        'GitHub.copilot',
+        // O VS Code atual entrega chat + completions no builtin unificado GitHub.copilot-chat.
         'GitHub.copilot-chat',
         'github.vscode-github-actions',
         'GitHub.vscode-pull-request-github',
@@ -154,4 +155,24 @@ export function getExtensionProfile(name = 'devcontainer') {
         return [...VSCODE_EXTENSION_PROFILES[/** @type {keyof typeof VSCODE_EXTENSION_PROFILES} */ (name)]];
     }
     throw new Error(`Unknown VS Code extension profile: ${name}`);
+}
+
+/**
+ * Calcula a reconciliação do Extension Host remoto sem confundir extensões opcionais/pessoais com resíduos proibidos. A
+ * remoção é opt-in porque este catálogo também pode ser consultado fora de um DevContainer.
+ *
+ * @param {readonly string[]} installedExtensions
+ * @param {{ profile?: string; prune?: boolean; availableExtensions?: readonly string[] }} [options]
+ */
+export function planExtensionReconciliation(
+    installedExtensions,
+    { profile = 'core', prune = false, availableExtensions = installedExtensions } = {},
+) {
+    const target = getExtensionProfile(profile);
+    const installedLower = new Set(installedExtensions.map((extension) => extension.toLowerCase()));
+    const availableLower = new Set(availableExtensions.map((extension) => extension.toLowerCase()));
+    const install = target.filter((extension) => !availableLower.has(extension.toLowerCase()));
+    const prohibited = unique(VSCODE_UNWANTED_EXTENSIONS, VSCODE_HOST_ONLY_EXTENSIONS);
+    const remove = prune ? prohibited.filter((extension) => installedLower.has(extension.toLowerCase())) : [];
+    return { profile, target, install, remove };
 }

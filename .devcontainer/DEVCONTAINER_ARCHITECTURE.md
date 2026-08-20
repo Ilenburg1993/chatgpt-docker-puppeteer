@@ -1,6 +1,6 @@
 # DevContainer Architecture — ChatGPT Docker Puppeteer
 
-**Versão da imagem**: 1.0 **Data**: 2026-05-11 **Status**: Canônico — fonte única da verdade para
+**Versão da imagem**: 1.5.1 **Data**: 2026-08-20 **Status**: Canônico — fonte única da verdade para
 arquitetura do DevContainer **Gerado por**: Auditoria completa pré-rebuild (Copilot)
 
 ---
@@ -50,16 +50,15 @@ DevContainers) com:
 
 ### Ferramentas Pinadas no Dockerfile
 
-| Ferramenta                 | Versão Pinada | ARG                                  |
-| -------------------------- | ------------- | ------------------------------------ |
-| npm                        | 12.0.2        | `NPM_VERSION`                        |
-| pnpm                       | 11.1.0        | `PNPM_VERSION`                       |
-| @devcontainers/cli         | 0.86.1        | `DEVCONTAINER_CLI_VERSION`           |
-| gh (GitHub CLI)            | 2.92.0        | `GH_VERSION`                         |
-| actionlint                 | 1.7.12        | `ACTIONLINT_VERSION`                 |
-| hadolint                   | 2.14.0        | `HADOLINT_VERSION`                   |
-| TypeScript nativo (compiler + LSP) | 7.0.2 | `TYPESCRIPT_VERSION` |
-| jsonc-parser               | 3.3.1         | (build-time, inline)                 |
+| Ferramenta                         | Versão Pinada | ARG                        |
+| ---------------------------------- | ------------- | -------------------------- |
+| npm                                | 12.0.2        | `NPM_VERSION`              |
+| @devcontainers/cli                 | 0.86.1        | `DEVCONTAINER_CLI_VERSION` |
+| gh (GitHub CLI)                    | 2.92.0        | `GH_VERSION`               |
+| actionlint                         | 1.7.12        | `ACTIONLINT_VERSION`       |
+| hadolint                           | 2.14.0        | `HADOLINT_VERSION`         |
+| TypeScript nativo (compiler + LSP) | 7.0.2         | `TYPESCRIPT_VERSION`       |
+| jsonc-parser                       | 3.3.1         | (build-time, inline)       |
 
 **Como atualizar**: editar os ARGs no topo do Dockerfile e fazer rebuild completo.
 
@@ -125,7 +124,7 @@ Isso reduz significativamente o tempo de rebuild incremental (quando apenas cama
 
 | ARG           | Valor                      | Propósito                    |
 | ------------- | -------------------------- | ---------------------------- |
-| `VERSION`     | `1.0`                      | Versão do contrato da imagem |
+| `VERSION`     | `1.5.1`                    | Versão do contrato da imagem |
 | `REMOTE_USER` | `node`                     | Usuário do container         |
 | `BUILD_ENV`   | `dev`                      | Ambiente de build            |
 | `IMAGE_NAME`  | `chatgpt-docker-puppeteer` | Nome da imagem               |
@@ -144,6 +143,22 @@ Isso reduz significativamente o tempo de rebuild incremental (quando apenas cama
 - `--add-host=host.docker.internal:host-gateway`: permite acesso ao host Windows (`CHROME_HOST`)
 - `--shm-size=4g`: essencial para Chrome/Chromium headless
 - `--ulimit nofile=262144:262144`: previne falhas de file descriptor em workloads intensos
+
+### Extensões VS Code persistentes
+
+O catálogo canônico vive em `config/vscode/extensions.mjs`. Como o volume
+`devcontainer-vscode-server` persiste entre rebuilds, o provisionamento declarativo instala itens
+core, mas não remove resíduos antigos. Após rebuild ou troca do VS Code Server, execute:
+
+```bash
+npm run vscode:extensions:reconcile
+npm run vscode:check:runtime
+```
+
+O reconciliador distingue extensões instaladas pelo usuário dos builtins entregues pelo servidor.
+Ele preserva extensões opcionais/pessoais e, com `--prune`, remove apenas IDs `unwanted` e
+`hostOnly`. O Copilot atual é o builtin unificado `GitHub.copilot-chat`, que inclui chat e
+completions; o ID separado `GitHub.copilot` não integra mais o perfil remoto.
 
 ### containerEnv vs remoteEnv
 
@@ -384,13 +399,16 @@ docker history <imagem>
 Com `# syntax=docker/dockerfile:1` no topo do Dockerfile, cada bloco `apt-get` usa:
 
 ```dockerfile
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked apt-get update && apt-get install -y --no-install-recommends ...
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
+  apt-get update && apt-get install -y --no-install-recommends ...
 ```
 
 O npm global também usa cache mount:
 
 ```dockerfile
-RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked npm install -g ...
+RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm,sharing=locked \
+  npm install -g ...
 ```
 
 **Impacto**: rebuilds com apenas mudanças em camadas tardias (ex: scripts, ENV) se beneficiam do
@@ -453,11 +471,13 @@ polling explicitamente e os demais watchers usam `fs.watch()` nativo.
 ### [DEC-005] npm global canônico + fallback legado
 
 - **Decisão**: `/usr/local/share/npm-global` é o prefixo canônico e prioritário para execução **e**
-  instalação global (`NPM_CONFIG_PREFIX`). O grupo `npm` possui escrita recursiva controlada para permitir
-  upgrades em runtime sem `sudo`. `~/.npm-global` permanece como volume/fallback de migração, depois no `PATH`.
-- **Racional**: o desenho anterior priorizava `/usr/local/share/npm-global/bin` no `PATH`, mas escrevia
-  `npm -g` em `~/.npm-global`; um upgrade podia concluir com sucesso e continuar invisível. A convergência
-  de prefixo elimina esse split-brain sem permitir que um volume masque a camada canônica da imagem.
+  instalação global (`NPM_CONFIG_PREFIX`). O grupo `npm` possui escrita recursiva controlada para
+  permitir upgrades em runtime sem `sudo`. `~/.npm-global` permanece como volume/fallback de
+  migração, depois no `PATH`.
+- **Racional**: o desenho anterior priorizava `/usr/local/share/npm-global/bin` no `PATH`, mas
+  escrevia `npm -g` em `~/.npm-global`; um upgrade podia concluir com sucesso e continuar invisível.
+  A convergência de prefixo elimina esse split-brain sem permitir que um volume masque a camada
+  canônica da imagem.
 
 ### [GAP-001] health.status pode estar vazio
 

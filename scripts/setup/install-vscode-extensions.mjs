@@ -1,38 +1,32 @@
 #!/usr/bin/env node
 // @ts-check
-import { execFileSync, spawnSync } from 'node:child_process';
-import { getExtensionProfile } from '../../config/vscode/extensions.mjs';
+import { spawnSync } from 'node:child_process';
+import { planExtensionReconciliation } from '../../config/vscode/extensions.mjs';
+import { availableExtensions, readBuiltInExtensions, readInstalledExtensions } from './vscode-extension-runtime.mjs';
 
-const profile = process.argv.find((arg) => !arg.startsWith('-') && arg !== process.argv[0] && arg !== process.argv[1]) ?? 'core';
-const dryRun = process.argv.includes('--dry-run');
-const extensions = getExtensionProfile(profile);
+const args = process.argv.slice(2);
+const profile = args.find((arg) => !arg.startsWith('-')) ?? 'core';
+const dryRun = args.includes('--dry-run');
+const prune = args.includes('--prune');
 
-/** @returns {Set<string>} */
-function installedSet() {
-    try {
-        return new Set(
-            execFileSync('code', ['--list-extensions'], { encoding: 'utf8' })
-                .split(/\r?\n/)
-                .map((value) => value.trim().toLowerCase())
-                .filter(Boolean),
-        );
-    } catch (error) {
-        throw new Error(`VS Code CLI indisponível: ${error instanceof Error ? error.message : String(error)}`, {
-            cause: error,
-        });
-    }
-}
-
-const installed = installedSet();
-const missing = extensions.filter((extension) => !installed.has(extension.toLowerCase()));
-console.log(`VS Code profile=${profile}: target=${extensions.length}, missing=${missing.length}, dryRun=${dryRun}`);
-if (dryRun || missing.length === 0) {
-    for (const extension of missing) console.log(`  + ${extension}`);
+const initialInstalled = readInstalledExtensions();
+const initialBuiltIn = readBuiltInExtensions();
+const initial = planExtensionReconciliation(initialInstalled, {
+    profile,
+    prune,
+    availableExtensions: availableExtensions(initialInstalled, initialBuiltIn),
+});
+console.log(
+    `VS Code profile=${profile}: target=${initial.target.length}, builtIn=${initialBuiltIn.length}, missing=${initial.install.length}, remove=${initial.remove.length}, prune=${prune}, dryRun=${dryRun}`,
+);
+for (const extension of initial.install) console.log(`  + ${extension}`);
+for (const extension of initial.remove) console.log(`  - ${extension}`);
+if (dryRun || (initial.install.length === 0 && initial.remove.length === 0)) {
     process.exit(0);
 }
 
 let failures = 0;
-for (const extension of missing) {
+for (const extension of initial.install) {
     process.stdout.write(`Installing ${extension} ... `);
     const result = spawnSync('code', ['--install-extension', extension, '--force'], { stdio: 'ignore' });
     if (result.status === 0) console.log('ok');
@@ -41,4 +35,27 @@ for (const extension of missing) {
         console.log(`failed (${result.status ?? 'signal'})`);
     }
 }
-process.exit(failures ? 1 : 0);
+for (const extension of initial.remove) {
+    process.stdout.write(`Removing ${extension} from remote Extension Host ... `);
+    const result = spawnSync('code', ['--uninstall-extension', extension], { stdio: 'ignore' });
+    if (result.status === 0) console.log('ok');
+    else {
+        failures += 1;
+        console.log(`failed (${result.status ?? 'signal'})`);
+    }
+}
+
+const finalInstalled = readInstalledExtensions();
+const finalBuiltIn = readBuiltInExtensions();
+const remaining = planExtensionReconciliation(finalInstalled, {
+    profile,
+    prune,
+    availableExtensions: availableExtensions(finalInstalled, finalBuiltIn),
+});
+if (remaining.install.length || remaining.remove.length) {
+    failures += remaining.install.length + remaining.remove.length;
+    console.error(
+        `VS Code reconciliation incomplete: missing=${remaining.install.join(',') || '-'} remove=${remaining.remove.join(',') || '-'}`,
+    );
+}
+process.exit(failures === 0 ? 0 : 1);

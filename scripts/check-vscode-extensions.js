@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 // @ts-check
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { parse, printParseErrorCode } from 'jsonc-parser';
 import {
@@ -9,6 +8,11 @@ import {
     VSCODE_OPTIONAL_EXTENSIONS,
     VSCODE_UNWANTED_EXTENSIONS,
 } from '../config/vscode/extensions.mjs';
+import {
+    availableExtensions,
+    readBuiltInExtensions,
+    readInstalledExtensions,
+} from './setup/vscode-extension-runtime.mjs';
 
 const strictRuntime = process.argv.includes('--strict-runtime');
 
@@ -36,16 +40,6 @@ function setDiff(actual, expected) {
     };
 }
 
-/** @returns {string[] | null} */
-function readInstalledExtensions() {
-    try {
-        const output = execFileSync('code', ['--list-extensions'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-        return output.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
-    } catch {
-        return null;
-    }
-}
-
 const devcontainer = readJsonc('.devcontainer/devcontainer.json');
 const recommendations = readJsonc('.vscode/extensions.json');
 const configured = /** @type {string[]} */ (devcontainer?.customizations?.vscode?.extensions ?? []);
@@ -59,7 +53,7 @@ const projectionChecks = [
 ];
 let failed = false;
 for (const [label, diff] of projectionChecks) {
-    const typedDiff = /** @type {{missing: string[]; extra: string[]}} */ (diff);
+    const typedDiff = /** @type {{ missing: string[]; extra: string[] }} */ (diff);
     if (!typedDiff.missing.length && !typedDiff.extra.length) continue;
     failed = true;
     console.error(`✗ ${label} divergiu do catálogo canônico`);
@@ -68,14 +62,21 @@ for (const [label, diff] of projectionChecks) {
 }
 if (!failed) console.log(`✓ Configuração sincronizada: ${configured.length} extensões no auto-install.`);
 
-const installed = readInstalledExtensions();
+let installed = null;
+try {
+    installed = readInstalledExtensions();
+} catch {
+    // A validação estática continua útil fora de um Extension Host remoto.
+}
 if (installed) {
+    const builtIn = readBuiltInExtensions();
+    const availableLower = new Set(availableExtensions(installed, builtIn));
     const installedLower = new Set(installed.map((value) => value.toLowerCase()));
-    const missingCore = VSCODE_DEVCONTAINER_EXTENSIONS.filter((value) => !installedLower.has(value.toLowerCase()));
+    const missingCore = VSCODE_DEVCONTAINER_EXTENSIONS.filter((value) => !availableLower.has(value.toLowerCase()));
     const installedUnwanted = VSCODE_UNWANTED_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
     const installedHostOnly = VSCODE_HOST_ONLY_EXTENSIONS.filter((value) => installedLower.has(value.toLowerCase()));
     console.log(
-        `Runtime: ${installed.length} instaladas; ${missingCore.length} core ausentes; ${installedUnwanted.length} unwanted ainda presentes; ${installedHostOnly.length} host-only no remoto.`,
+        `Runtime: ${installed.length} instaladas pelo usuário; ${builtIn.length} builtins; ${missingCore.length} core ausentes; ${installedUnwanted.length} unwanted ainda presentes; ${installedHostOnly.length} host-only no remoto.`,
     );
     if (missingCore.length) console.warn(`  core ausentes: ${missingCore.join(', ')}`);
     if (installedUnwanted.length) console.warn(`  unwanted presentes: ${installedUnwanted.join(', ')}`);

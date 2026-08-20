@@ -323,6 +323,8 @@
     "check:skills": "node scripts/ci/verify-skills-governance.mjs",
     "check:skills:strict": "node scripts/ci/verify-skills-governance.mjs --strict",
     "check:ts-expect-error": "npm run check:ts-suppressions",
+    "check:ts-suppressions": "node scripts/ci/check-ts-suppressions.mjs",
+    "check:ts7-strict-coverage": "node scripts/ci/check-ts7-strict-coverage.mjs",
     "check:workflows": "node scripts/ci/validate-workflows.mjs",
     "check:workflows:lint": "actionlint -color",
     "check:workflows:remote": "node scripts/ci/verify-github-workflows.mjs",
@@ -738,15 +740,14 @@
     "validate:nerv:strict": "node scripts/validate-nerv-constants.js --strict",
     "vscode:check": "node scripts/check-vscode-extensions.js",
     "vscode:check:runtime": "node scripts/check-vscode-extensions.js --strict-runtime",
-    "vscode:sync": "node scripts/setup/sync-vscode-extensions.mjs --write",
-    "vscode:sync:check": "node scripts/setup/sync-vscode-extensions.mjs",
     "vscode:extensions:core": "node scripts/setup/install-vscode-extensions.mjs core",
     "vscode:extensions:optional": "node scripts/setup/install-vscode-extensions.mjs optional",
     "vscode:extensions:python": "node scripts/setup/install-vscode-extensions.mjs python",
+    "vscode:extensions:reconcile": "node scripts/setup/install-vscode-extensions.mjs core --prune",
     "vscode:list": "code --list-extensions --show-versions",
-    "vscode:update": "code --update-extensions",
-    "check:ts-suppressions": "node scripts/ci/check-ts-suppressions.mjs",
-    "check:ts7-strict-coverage": "node scripts/ci/check-ts7-strict-coverage.mjs"
+    "vscode:sync": "node scripts/setup/sync-vscode-extensions.mjs --write",
+    "vscode:sync:check": "node scripts/setup/sync-vscode-extensions.mjs",
+    "vscode:update": "code --update-extensions"
   },
   "overrides": {
     "qs": "^6.15.0",

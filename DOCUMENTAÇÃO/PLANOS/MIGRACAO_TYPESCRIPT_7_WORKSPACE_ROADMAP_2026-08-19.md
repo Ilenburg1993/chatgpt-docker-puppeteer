@@ -362,8 +362,9 @@ criados durante a correção; todos entraram na cobertura estrita.
   `LSP_MUTATIONS_ENABLED=false` são defaults no DevContainer, PM2, diagnóstico e runtime.
 - `npm run analyze:tsserver-contract` confirmou as dez operações em schema, daemon e skill.
 - `npm run lsp:health` retornou `enabled=false` e `status=disabled-by-policy` sem rede.
-- `npm run vscode:sync:check` confirmou projeções sincronizadas. As extensões ausentes/indesejadas
-  no runtime atual são resíduo esperado da imagem antiga e serão reconciliadas pelo rebuild.
+- `npm run vscode:sync:check` confirmou projeções sincronizadas. A auditoria de continuidade
+  comprovou que o volume do VS Code persiste entre rebuilds; `vscode:extensions:reconcile` agora
+  instala core, reconhece builtins e remove somente resíduos `unwanted`/`hostOnly`.
 
 ### 8.3 Qualidade, arquitetura e performance
 
@@ -432,6 +433,26 @@ deixaram os fixtures versionados intactos.
 - Após a publicação do fechamento, `git fetch origin`, igualdade entre `HEAD` e `origin/main` e
   worktree limpo são a prova de encerramento pré-rebuild.
 
+### 8.8 Auditoria de continuidade antes do rebuild
+
+- O container ativo ainda é o anterior: `/usr/local/share/npm-global/bin/tsserver` resolve para
+  TypeScript 6.0.3 instalado em 19 de maio. Isso confirma que J.11 não pode ser fechado antes do
+  rebuild; o Dockerfile atual continua fixando TypeScript 7.0.2.
+- A consulta ao registro npm confirmou que `typescript` 7.0.2, `@typescript/typescript6` 6.0.2 e
+  `typescript-eslint` 8.67.0 permanecem nas versões mais recentes disponíveis.
+- O VS Code 1.133.0 entrega `GitHub.copilot-chat` como builtin unificado com completions. O catálogo
+  deixou de tentar instalar o ID legado `GitHub.copilot`, e os gates agora distinguem builtins de
+  extensões instaladas pelo usuário.
+- A reconciliação real instalou as capacidades core ausentes e removeu 9 extensões `unwanted` e 10
+  extensões `hostOnly` do Extension Host remoto, sem tocar opcionais/pessoais. O gate final reportou
+  48 extensões de usuário, 35 builtins, zero core ausentes e zero resíduos.
+- A implementação passou TS7 focal, lint focal, 6/6 testes Node, `vscode:sync:check` e
+  `vscode:check:runtime`.
+- O checkpoint `typecheck:strict:all` expôs duas anotações JSDoc legadas na sintaxe `function(any)`,
+  incompatível com o parser TS7, que haviam entrado no fechamento anterior. Elas foram substituídas
+  por contratos Node exatos (`Error`, `IncomingMessage`, `ServerResponse` e `Socket`); o aggregate
+  voltou a zero e 10 cenários focais do Chrome Proxy passaram.
+
 ## 9. Única pendência externa: rebuild
 
 O código, a configuração, os testes, a documentação e a publicação estão fechados. A ação seguinte é
@@ -443,6 +464,7 @@ Depois do rebuild, executar:
 node --version
 npm --version
 npm run -s tsc7 -- --version
+npm run vscode:extensions:reconcile
 npm run vscode:check:runtime
 npm run lsp:health
 command -v tsserver && tsserver --version || true

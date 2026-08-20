@@ -1,7 +1,7 @@
 # TypeScript 7 e serviço de linguagem — arquitetura canônica
 
-**Estado:** executado em 19 de agosto de 2026
-**Regra central:** TypeScript 7 nativo é o único compilador e serviço de linguagem canônico.
+**Estado:** executado em 19 de agosto de 2026 **Regra central:** TypeScript 7 nativo é o único
+compilador e serviço de linguagem canônico.
 
 ## Fluxo normal
 
@@ -9,13 +9,15 @@
 - O workspace instala `@typescript/native` e chama sua entrada por
   `scripts/ci/run-typescript-7.mjs`; os gates não dependem do symlink concorrente `.bin/tsc`.
 - O VS Code usa `TypeScriptTeam.native-preview` com `js/ts.experimental.useTsgo=true`.
+- O perfil remoto reconhece builtins do VS Code; `GitHub.copilot-chat` é a extensão unificada de
+  chat e completions, sem reinstalar o ID legado `GitHub.copilot`.
 - O servidor de linguagem é o próprio `tsc --lsp --stdio`.
 - `typescript-language-server` não é instalado.
 
 ## Compatibilidade TS6
 
-O pacote raiz `typescript` permanece em TS6 somente enquanto `typescript-eslint` não suportar TS7.
-A API estável também é reutilizada por analisadores AST offline através do único ponto
+O pacote raiz `typescript` permanece em TS6 somente enquanto `typescript-eslint` não suportar TS7. A
+API estável também é reutilizada por analisadores AST offline através do único ponto
 `scripts/analysis/typescript-compat.mjs`, porque as APIs equivalentes do pacote nativo ainda são
 marcadas como `unstable/*`. Essa compatibilidade não seleciona compilador, editor ou servidor.
 
@@ -41,6 +43,8 @@ npm run -s tsc7 -- --version
 npm run analyze:tsserver-contract
 npm run check:ts7-strict-coverage
 npm run typecheck:strict:all
+npm run vscode:extensions:reconcile
+npm run vscode:check:runtime
 node --test tests/unit/lsp tests/unit/health/test_diagnose_lsp_policy.spec.js
 ```
 
