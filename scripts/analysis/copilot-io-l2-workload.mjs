@@ -116,7 +116,7 @@ function summarizePayloads(files) {
 }
 
 /**
- * @param {import('../../src/copilot/infra/io-scanner.js').IoScanEntry[]} entries
+ * @param {import('#copilot/infra/public/indexing/scanner').IoScanEntry[]} entries
  * @param {WorkloadFile[]} output
  */
 function collectFiles(entries, output) {
@@ -208,13 +208,16 @@ function runChild(phase, manifestPath, dbPath, concurrency, minBytes) {
  */
 async function executePhase(phase, manifestPath, concurrency) {
     const files = /** @type {WorkloadFile[]} */ (JSON.parse(await readFile(manifestPath, 'utf8')));
-    const [{ readBytes }, l1, l2, db] = await Promise.all([
-        import('../../src/copilot/infra/io-engine.js'),
-        import('../../src/copilot/infra/io-cache.js'),
-        import('../../src/copilot/infra/io-cache-l2-registry.js'),
+    const [{ readBytes }, cache, db, sqlitePort, testing] = await Promise.all([
+        import('#copilot/infra/public/filesystem/read'),
+        import('#copilot/infra/public/cache'),
         import('../../src/copilot/db/sqlite.js'),
+        import('#copilot/infra/public/database'),
+        import('#copilot/infra/public/testing'),
     ]);
-    const l2Cache = l2.getIoL2Cache();
+    await db.ensureCopilotDbDir();
+    sqlitePort.configureInfraSqliteProvider(db.getCopilotDb);
+    const l2Cache = cache.getIoL2Cache();
     if (phase === 'seed') {
         assert.ok(l2Cache, 'seed phase requires the experimental L2 cache');
         l2Cache.clearAll();
@@ -267,7 +270,7 @@ async function executePhase(phase, manifestPath, concurrency) {
         const throughputMiBPerSecond = wallMs > 0 ? bytes / (1024 * 1024) / (wallMs / 1000) : 0;
         const result = {
             phase,
-            profile: l2.getIoL2CacheConfiguration().profile,
+            profile: cache.getIoL2CacheConfiguration().profile,
             files: files.length,
             bytes,
             errors,
@@ -275,13 +278,14 @@ async function executePhase(phase, manifestPath, concurrency) {
             wallMs: rounded(wallMs),
             throughputMiBPerSecond: rounded(throughputMiBPerSecond),
             latencyMs: summarizeLatency(latencies),
-            l1Stats: /** @type {Record<string, unknown> | null} */ (l1.getIoCacheStats()),
-            l2Stats: /** @type {Record<string, unknown>} */ (l2.getIoL2CacheStats()),
+            l1Stats: /** @type {Record<string, unknown> | null} */ (cache.getIoCacheStats()),
+            l2Stats: /** @type {Record<string, unknown>} */ (cache.getIoL2CacheStats()),
         };
         process.stdout.write(`${JSON.stringify(result)}\n`);
     } finally {
-        l1.resetIoL1CacheForTest();
-        l2.resetIoL2CacheForTest();
+        testing.resetIoL1CacheForTest();
+        testing.resetIoL2CacheForTest();
+        testing.resetInfraSqliteProviderForTest();
         db.closeCopilotDb();
     }
 }
@@ -292,7 +296,7 @@ async function executePhase(phase, manifestPath, concurrency) {
  * @param {number} maxFiles
  */
 async function discoverFiles(rootPath, include, maxFiles) {
-    const { scanDirectory } = await import('../../src/copilot/infra/io-scanner.js');
+    const { scanDirectory } = await import('#copilot/infra/public/indexing/scanner');
     const workspaceRoot = process.cwd();
     const scan = await scanDirectory(rootPath, {
         workspaceRoot,

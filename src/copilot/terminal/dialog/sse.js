@@ -10,9 +10,14 @@
 
 import { MAX_SSE_CONTENT_CHARS } from '#copilot/config';
 import { broadcastGlobal, broadcastToSession } from '#copilot/conversation-hub';
+import {
+    attachSseReplayEventId,
+    eventFanout,
+    getSseClients,
+    getSseCriticalClients,
+    getTerminalReplayBuffer,
+} from '#copilot/presentation/realtime';
 import { redactSecretRecord } from '../../core/security/redaction.js';
-import { attachSseReplayEventId, eventFanout } from '../../infra/sse/index.js';
-import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../infra/sse/state.js';
 import { log } from '../../observability/index.js';
 import { CRITICAL_EVENTS, getHubSessionId } from '../../presentation/state/index.js';
 import { recordTerminalSseEventArchive } from '../state/events/index.js';

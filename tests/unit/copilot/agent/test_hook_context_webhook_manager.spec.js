@@ -91,13 +91,13 @@ vi.mock('#copilot/tools/todo/store', async (importOriginal) => ({
     readStore: mocks.readTodoStore,
 }));
 
-vi.mock('#copilot/infra/public/workspace-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
     createWorkspaceIo: () => ({
         readBytesRangeFresh: mocks.readBytesRangeFresh,
         readTextFresh: mocks.readTextFresh,
     }),
 }));
-vi.mock('#copilot/infra/public/skill-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
     readConfiguredSkillCatalog: mocks.readSkillCatalog,
 }));
 
@@ -328,13 +328,13 @@ describe('F44 — buildHookSystemContextSafe', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('F44 — WebhookManager', () => {
-    /** @type {import('#copilot/infra/webhooks').WebhookManager} */
+    /** @type {import('#copilot/agent/infra/webhook-manager').WebhookManager} */
     let wm;
 
     beforeEach(async () => {
         vi.clearAllMocks();
         mocks.validateWebhookUrl.mockImplementation(() => {});
-        const mod = await import('#copilot/infra/webhooks');
+        const mod = await import('#copilot/agent/infra/webhook-manager');
         wm = new mod.WebhookManager();
     });
 

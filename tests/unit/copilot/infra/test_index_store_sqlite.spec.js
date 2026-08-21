@@ -14,10 +14,10 @@ import {
     normalizeRelativePath,
     sanitizeFtsQuery,
     shouldIndexFile,
-} from '../../../../src/copilot/infra/index-store/sqlite/index.js';
-import { countPhysicalTextLines, lineNumberAtTextOffset } from '../../../../src/copilot/infra/shared/text-lines.js';
+} from '../../../../src/copilot/infra/indexing/registry/sqlite/index.js';
+import { countPhysicalTextLines, lineNumberAtTextOffset } from '../../../../src/copilot/infra/platform/text-lines.js';
 
-describe('infra/index-store/sqlite', () => {
+describe('infra/indexing/sqlite', () => {
     it('normaliza paths, extensões e filtros de arquivo', () => {
         const root = normalizeIndexPath('/workspaces/chatgpt-docker-puppeteer/src');
         const file = normalizeIndexPath('/workspaces/chatgpt-docker-puppeteer/src/copilot/index.js');

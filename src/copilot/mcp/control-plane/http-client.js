@@ -9,7 +9,7 @@
  * @module copilot/mcp/control-plane/http-client
  */
 
-import { readBoundedResponseText } from '#copilot/infra/public/http-response';
+import { readBoundedResponseText } from '#copilot/infra/public/platform';
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_ATTEMPTS = 1;

@@ -16,6 +16,7 @@
  * @module copilot/mcp/registry
  */
 
+import { readMutationAppliedState } from '#copilot/infra/public/policy';
 import {
     appendMcpAuditEvent,
     authorizeMcpToolCall,
@@ -95,7 +96,6 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { z } from 'zod';
-import { readMutationAppliedState } from '../infra/io/fs/mutation-state.js';
 import { bindConnectorSmokeLocalToolNamesProvider } from './cloudflare/connector-smoke.js';
 import {
     applyMcpToolSurfacePolicy,

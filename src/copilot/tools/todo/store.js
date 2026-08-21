@@ -24,7 +24,7 @@ import { SCHEMA_VERSION } from './todo-schema.js';
  * @see module:copilot/db/sqlite
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 
 export { MAX_LIST, PRIORITY_ORDER, SCHEMA_VERSION, VALID_TRANSITIONS, zId, zPriority, zStatus } from './todo-schema.js';
 

@@ -1,9 +1,9 @@
 // @ts-check
 
+import { createSseWriter, SseConnectionTracker } from '#copilot/presentation/realtime';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
-import { createSseWriter, SseConnectionTracker } from '../../../../src/copilot/infra/sse/utils.js';
 
 function createRequestResponse() {
     const req = new EventEmitter();
@@ -19,7 +19,7 @@ function createRequestResponse() {
     };
 }
 
-describe('infra/sse/utils', () => {
+describe('presentation/realtime/sse/utils', () => {
     it('libera tracker e stream gzip quando request fecha', () => {
         const { req, res } = createRequestResponse();
         const tracker = new SseConnectionTracker('test', 2, null);

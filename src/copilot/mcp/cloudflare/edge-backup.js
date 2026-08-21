@@ -10,7 +10,7 @@ import {
     lstatPathTrusted,
     readTextFreshTrusted,
     writeFileAtomicTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { DEFAULT_CLOUDFLARE_EDGE_BACKUP_DIR } from './config.js';

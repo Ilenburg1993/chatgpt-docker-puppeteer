@@ -9,7 +9,7 @@
  * @module copilot/server/routes/model-gateway-ingress
  */
 
-import { readBoundedResponseText } from '#copilot/infra/public/http-response';
+import { readBoundedResponseText } from '#copilot/infra/public/platform';
 import express from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';

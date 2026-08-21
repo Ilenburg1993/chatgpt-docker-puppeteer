@@ -14,6 +14,12 @@
  * @see EventBus
  */
 
+import {
+    deleteFileTrusted,
+    listDirectoryNamesFreshTrusted,
+    lstatPathTrusted,
+} from '#copilot/infra/public/filesystem/trusted';
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COPILOT_LOG_DIR, COPILOT_LOG_LEVEL, COPILOT_LOG_MAX_ARCHIVES } from '../config/env.js';
@@ -21,8 +27,6 @@ import { toError } from '../core/error-handlers.js';
 import { redactSecretRecord, redactSecretText } from '../core/security/redaction.js';
 import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';
 import { registerShutdownHandler } from '../core/shutdown.js';
-import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
-import { deleteFileTrusted, listDirectoryNamesFreshTrusted, lstatPathTrusted } from '../infra/public/trusted-io.js';
 
 /** @type {boolean} */
 let _stdoutUnavailable = false;
@@ -122,7 +126,7 @@ function archivePath(prefix, filePath) {
  * @param {string} filePath
  * @param {string} prefix
  * @param {number} maxBytes
- * @param {import('../infra/io/fs/durability.js').IoDurabilityMode} durability
+ * @param {import('#copilot/infra/public/platform/node/filesystem').IoDurabilityMode} durability
  */
 function createLogWriter(filePath, prefix, maxBytes, durability) {
     return createJsonlFileWriter({

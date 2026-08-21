@@ -17,8 +17,8 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import { writeFileAtomic } from '#copilot/infra/public/io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { writeFileAtomic } from '#copilot/infra/public/filesystem/write';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 export const MCP_DEPENDENCY_MAINTENANCE_VERSION = 2;

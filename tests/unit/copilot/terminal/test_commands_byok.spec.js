@@ -1956,15 +1956,13 @@ vi.mock('node:fs/promises', () => ({
     stat,
 }));
 
-vi.mock('#copilot/infra/public/workspace-io', async (importOriginal) => {
-    const actual = /** @type {typeof import('../../../../src/copilot/infra/public/workspace-io.js')} */ (
-        await importOriginal()
-    );
+vi.mock('#copilot/infra/public/filesystem/workspace', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/infra/public/filesystem/workspace')} */ (await importOriginal());
     return {
         ...actual,
         createWorkspaceIo: vi.fn(
             (
-                /** @type {Parameters<typeof import('../../../../src/copilot/infra/public/workspace-io.js').createWorkspaceIo>[0]} */ options,
+                /** @type {Parameters<typeof import('#copilot/infra/public/filesystem/workspace').createWorkspaceIo>[0]} */ options,
             ) => ({
                 ...actual.createWorkspaceIo(options),
                 listDirectoryNamesFresh: workspaceIoListDirectoryNamesFresh,
@@ -1975,10 +1973,8 @@ vi.mock('#copilot/infra/public/workspace-io', async (importOriginal) => {
     };
 });
 
-vi.mock('#copilot/infra/public/trusted-io', async (importOriginal) => {
-    const actual = /** @type {typeof import('../../../../src/copilot/infra/public/trusted-io.js')} */ (
-        await importOriginal()
-    );
+vi.mock('#copilot/infra/public/filesystem/trusted', async (importOriginal) => {
+    const actual = /** @type {typeof import('#copilot/infra/public/filesystem/trusted')} */ (await importOriginal());
     return {
         ...actual,
         listDirectoryNamesFreshTrusted: vi.fn(() => Promise.resolve({ entries: [] })),

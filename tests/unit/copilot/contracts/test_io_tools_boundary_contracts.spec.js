@@ -7,12 +7,11 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = process.cwd();
 const COPILOT_ROOT = resolve(REPO_ROOT, 'src/copilot');
 const TOOLS_ROOT = join(COPILOT_ROOT, 'tools');
-const MCP_TOOLS_ROOT = join(COPILOT_ROOT, 'mcp', 'tools');
-const EXTERNAL_PATH_SURFACE_FILES = [
-    join(COPILOT_ROOT, 'presentation', 'files', 'context.js'),
-    join(COPILOT_ROOT, 'sdk', 'session', 'session-fs.js'),
-];
 const COPILOT_INFRA_ROOT = join(COPILOT_ROOT, 'infra');
+const PACKAGE_JSON = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8'));
+const ALLOWED_INFRA_CAPABILITY_IMPORTS = new Set(
+    Object.keys(PACKAGE_JSON.imports ?? {}).filter((key) => key.startsWith('#copilot/infra/public/')),
+);
 const COPILOT_LAYER_ROOTS = new Map([
     ['core', join(COPILOT_ROOT, 'core')],
     ['config', join(COPILOT_ROOT, 'config')],
@@ -71,12 +70,12 @@ describe('IO/tools boundary contracts', () => {
         expect(violations).toEqual([]);
     });
 
-    it('tools consomem src/copilot/infra somente pelas facades públicas aliasadas', () => {
+    it('tools consomem infra exclusivamente pela membrana public', () => {
         const violations = [];
         for (const filePath of listJsFiles(TOOLS_ROOT)) {
             for (const specifier of collectImportSpecifiers(filePath)) {
                 const rel = relative(REPO_ROOT, filePath).replace(/\\/g, '/');
-                if (specifier.startsWith('#copilot/infra/') && !specifier.startsWith('#copilot/infra/public/')) {
+                if (specifier.startsWith('#copilot/infra/') && !ALLOWED_INFRA_CAPABILITY_IMPORTS.has(specifier)) {
                     violations.push(`${rel}: ${specifier}`);
                     continue;
                 }
@@ -129,37 +128,22 @@ describe('IO/tools boundary contracts', () => {
         expect(violations).toEqual([]);
     });
 
-    it('facades públicas de IO existem como contratos nomeados', () => {
-        for (const facade of [
-            'cache.js',
-            'events.js',
-            'health.js',
-            'indexing.js',
-            'io.js',
-            'policy.js',
-            'runtime.js',
-            'session.js',
-            'skill-io.js',
-            'testing.js',
-            'trusted-io.js',
-            'workspace-io.js',
+    it('membrana public projeta capabilities explícitas sem mega-barrel raiz', () => {
+        const publicRoot = join(COPILOT_INFRA_ROOT, 'public');
+        expect(existsSync(publicRoot)).toBe(true);
+        expect(existsSync(join(publicRoot, 'index.js'))).toBe(false);
+        for (const entrypoint of [
+            'cache/index.js',
+            'concurrency/locks/index.js',
+            'filesystem/read/index.js',
+            'filesystem/write/index.js',
+            'filesystem/workspace/index.js',
+            'indexing/index.js',
+            'operations/index.js',
+            'platform/index.js',
+            'policy/index.js',
         ]) {
-            expect(existsSync(join(COPILOT_INFRA_ROOT, 'public', facade)), facade).toBe(true);
+            expect(existsSync(join(publicRoot, entrypoint))).toBe(true);
         }
-    });
-
-    it('tools não usam a facade operacional irrestrita para acessar paths', () => {
-        const violations = [];
-        for (const filePath of [
-            ...listJsFiles(TOOLS_ROOT),
-            ...listJsFiles(MCP_TOOLS_ROOT),
-            ...EXTERNAL_PATH_SURFACE_FILES,
-        ]) {
-            const source = readFileSync(filePath, 'utf8');
-            if (!source.includes('#copilot/infra/public/io')) continue;
-            violations.push(relative(REPO_ROOT, filePath).replace(/\\/g, '/'));
-        }
-
-        expect(violations).toEqual([]);
     });
 });

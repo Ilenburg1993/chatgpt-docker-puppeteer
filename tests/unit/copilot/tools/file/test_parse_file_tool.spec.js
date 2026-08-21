@@ -40,7 +40,7 @@ vi.mock('../../../../../src/copilot/tools/file/shared.js', () => ({
     WORKSPACE_ROOT: '/workspaces/chatgpt-docker-puppeteer',
 }));
 
-vi.mock('#copilot/infra/public/workspace-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
     createWorkspaceIo: () => ({ readText: mocks.readText }),
 }));
 

@@ -11,9 +11,9 @@
 import { COPILOT_EVENTS_MAX_BYTES, COPILOT_LOG_DIR } from '#copilot/config';
 import { SHUTDOWN_PRIORITY, logSwallowed, redactSecretRecord, registerShutdownHandler } from '#copilot/core';
 import { onSessionEvent } from '#copilot/events';
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import {
     attachAssistantHandlers,
     attachInteractionHandlers,

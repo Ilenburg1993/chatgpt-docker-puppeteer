@@ -6,18 +6,20 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { IO_PATH_POLICY_VERSION } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/internal/filesystem/workspace';
 import {
     createValidatedMutableWorkspacePath,
     createValidatedReadWorkspacePath,
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
-    resetValidatedMutableWorkspacePathStatsForTest,
-    resetValidatedReadWorkspacePathStatsForTest,
     resolveValidatedMutableWorkspacePath,
     resolveValidatedReadWorkspacePath,
-} from '../../../../src/copilot/infra/io/policy/validated-path.js';
+} from '../../../../src/copilot/infra/filesystem/workspace/validated-path.js';
 
+import {
+    resetValidatedMutableWorkspacePathStatsForTest,
+    resetValidatedReadWorkspacePathStatsForTest,
+} from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const cleanupPaths = [];
 
@@ -87,23 +89,6 @@ describe('workspace IO capability', () => {
         expect(snapshot.content).toBe('inside');
         expect(statSnapshot.stats.isFile()).toBe(true);
         expect(getValidatedReadWorkspacePathStats()).toMatchObject({ issued: 1, accepted: 2 });
-    });
-
-    it('aceita capability read-only para scan de diretório sem segunda policy async', async () => {
-        const { workspaceRoot, io } = await createWorkspaceFixture();
-        await mkdir(join(workspaceRoot, 'nested'));
-        await writeFile(join(workspaceRoot, 'nested', 'entry.txt'), 'entry', 'utf8');
-        resetValidatedReadWorkspacePathStatsForTest();
-        const capability = createValidatedReadWorkspacePath({ realPath: join(workspaceRoot, 'nested'), workspaceRoot });
-
-        const scan = await io.scanDirectoryValidated(capability, { depth: 1, maxEntries: 10 });
-
-        expect(scan.entries.some((entry) => entry.name === 'entry.txt')).toBe(true);
-        expect(getValidatedReadWorkspacePathStats()).toMatchObject({
-            issued: 1,
-            accepted: 1,
-            compatibleModes: ['read', 'search', 'stat', 'scan'],
-        });
     });
 
     it('compõe duas capabilities read em diff sem segunda policy async', async () => {

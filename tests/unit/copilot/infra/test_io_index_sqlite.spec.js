@@ -7,14 +7,19 @@ import { mkdir, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { buildIndexPathTreeRange } from '../../../../src/copilot/infra/index-store/sqlite/paths.js';
+import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
+import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';
+import { ensureIoIndexSchema, IO_INDEX_SCHEMA_VERSION } from '../../../../src/copilot/db/io-index-schema.js';
 import {
-    ensureIoIndexSchema,
-    IO_INDEX_SCHEMA_VERSION,
-} from '../../../../src/copilot/infra/index-store/sqlite/schema.js';
-import { createIoIndexSqlite } from '../../../../src/copilot/infra/io-index-sqlite.js';
-import { parseFileSymbols } from '../../../../src/copilot/infra/io-parser.js';
-import { BABEL_PARSER_POLICY_VERSION } from '../../../../src/copilot/infra/parse/babel-policy.js';
+    buildIndexPathTreeRange,
+    createIoIndexSqlite,
+} from '../../../../src/copilot/infra/indexing/registry/sqlite/index.js';
+
+/** @param {Parameters<typeof createIoIndexSqlite>[0]} options */
+function createPreparedIoIndex(options) {
+    ensureIoIndexSchema(options.db);
+    return createIoIndexSqlite(options);
+}
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 
@@ -145,7 +150,7 @@ afterEach(() => {
 });
 
 describe('createIoIndexSqlite', () => {
-    it('migra schema existente adicionando identidade dev/ino', () => {
+    it('consome schema preparado pelo owner DB, inclusive após migração dev/ino', () => {
         const db = new Database(':memory:');
         db.exec(`
             CREATE TABLE copilot_io_index_files (
@@ -170,7 +175,7 @@ describe('createIoIndexSqlite', () => {
             ) STRICT;
         `);
 
-        createIoIndexSqlite({ db });
+        createPreparedIoIndex({ db });
 
         const columns = db
             .prepare('PRAGMA table_info(copilot_io_index_files)')
@@ -266,7 +271,7 @@ describe('createIoIndexSqlite', () => {
     it('indexa diretório com metadados, FTS, símbolos e imports', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
 
         const result = await index.indexDirectory(/** @type {string} */ (tmpDir), {
             extensions: ['.js', '.md'],
@@ -299,7 +304,7 @@ describe('createIoIndexSqlite', () => {
     it('busca substring literal exata no conteúdo bruto sem depender da tokenização FTS', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         const root = /** @type {string} */ (tmpDir);
         await index.indexDirectory(root, { extensions: ['.js', '.md'], recursive: true });
 
@@ -322,7 +327,7 @@ describe('createIoIndexSqlite', () => {
     it('retorna o chunk e a faixa de linhas que contêm o match', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         const content = Array.from({ length: 450 }, (_, index) =>
             index === 204 ? 'localized chunk search token' : `line ${index + 1}`,
         ).join('\n');
@@ -361,7 +366,7 @@ describe('createIoIndexSqlite', () => {
         await writeFile(join(root, 'wanted', 'inside.js'), 'export function sharedSymbol() { return 2; }\n', 'utf8');
 
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(root, { extensions: ['.js'], recursive: true });
 
         const symbols = index.findSymbol('sharedSymbol', {
@@ -378,7 +383,7 @@ describe('createIoIndexSqlite', () => {
     it('respeita exactMatch case-insensitive no índice simbólico', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js'], recursive: true });
 
         const symbols = index.findSymbol('alphahelper', {
@@ -394,7 +399,7 @@ describe('createIoIndexSqlite', () => {
     it('invalida path indexado', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js'], recursive: true });
 
         expect(index.findSymbol('alphaHelper').length).toBeGreaterThanOrEqual(1);
@@ -405,7 +410,7 @@ describe('createIoIndexSqlite', () => {
     it('invalida subárvore quando o path é diretório', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js', '.md'], recursive: true });
 
         expect(index.getStats().files).toBe(3);
@@ -419,7 +424,7 @@ describe('createIoIndexSqlite', () => {
     it('pula reindex quando fingerprint mtime/size continua fresco', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
 
         const first = await index.indexDirectory(/** @type {string} */ (tmpDir), {
             extensions: ['.js', '.md'],
@@ -445,7 +450,7 @@ describe('createIoIndexSqlite', () => {
         const root = /** @type {string} */ (tmpDir);
         const filePath = join(root, 'alpha.js');
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(root, { extensions: ['.js'], recursive: true });
 
         const before = /** @type {{ metadataJson: string }} */ (
@@ -484,7 +489,7 @@ describe('createIoIndexSqlite', () => {
             exports: ['staleOnly'],
         };
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
 
         await index.indexTextFile(
             {
@@ -511,7 +516,7 @@ describe('createIoIndexSqlite', () => {
         await mkdir(root);
         await writeFile(join(root, 'freshness.md'), 'stable\n', 'utf8');
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db, recheckUnchangedSnapshot: true });
+        const index = createPreparedIoIndex({ db, recheckUnchangedSnapshot: true });
         await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
 
         const second = await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
@@ -532,7 +537,7 @@ describe('createIoIndexSqlite', () => {
         await mkdir(root);
         await writeFile(filePath, 'oldfresh\n', 'utf8');
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db, hashVerifyMaxBytes: 1 });
+        const index = createPreparedIoIndex({ db, hashVerifyMaxBytes: 1 });
         await index.indexDirectory(root, { extensions: ['.md'], recursive: false });
         const before = await stat(filePath);
 
@@ -559,7 +564,7 @@ describe('createIoIndexSqlite', () => {
         await writeFile(filePath, 'oldfresh\n', 'utf8');
         let currentTime = 1_000;
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({
+        const index = createPreparedIoIndex({
             db,
             now: () => currentTime,
             hashVerifyIntervalMs: 100,
@@ -609,7 +614,7 @@ describe('createIoIndexSqlite', () => {
         await writeFile(join(root, 'freshness.md'), 'samefresh\n', 'utf8');
         let currentTime = 2_000;
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({
+        const index = createPreparedIoIndex({
             db,
             now: () => currentTime,
             hashVerifyIntervalMs: 100,
@@ -643,7 +648,7 @@ describe('createIoIndexSqlite', () => {
         await writeFile(filePath, 'old-token\n', 'utf8');
         let replaced = false;
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({
+        const index = createPreparedIoIndex({
             db,
             onPhase: async (phase, details) => {
                 if (
@@ -671,7 +676,7 @@ describe('createIoIndexSqlite', () => {
     it('remove do índice arquivos deletados em build completo', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js', '.md'], recursive: true });
 
         await rm(join(/** @type {string} */ (tmpDir), 'notes.md'));
@@ -688,7 +693,7 @@ describe('createIoIndexSqlite', () => {
     it('filtra busca FTS por pathPrefix no SQL', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await writeFile(
             join(/** @type {string} */ (tmpDir), 'nested', 'notes-nested.md'),
             '# Nested\n\nsemantic index token\n',
@@ -724,7 +729,7 @@ describe('createIoIndexSqlite', () => {
     it('limita busca FTS e símbolos com janela explícita', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await writeFile(join(/** @type {string} */ (tmpDir), 'one.md'), 'semantic index token\n', 'utf8');
         await writeFile(join(/** @type {string} */ (tmpDir), 'two.md'), 'semantic index token\n', 'utf8');
         await writeFile(join(/** @type {string} */ (tmpDir), 'gamma-a.js'), 'export const gammaAlpha = 1;\n', 'utf8');
@@ -738,7 +743,7 @@ describe('createIoIndexSqlite', () => {
     it('não poda entradas fora de build parcial com include', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
         await index.indexDirectory(/** @type {string} */ (tmpDir), { extensions: ['.js', '.md'], recursive: true });
 
         const second = await index.indexDirectory(/** @type {string} */ (tmpDir), {
@@ -755,7 +760,7 @@ describe('createIoIndexSqlite', () => {
     it('persiste status failed quando parser retorna parseError no objeto', async () => {
         expect(tmpDir).toBeTruthy();
         const db = new Database(':memory:');
-        const index = createIoIndexSqlite({ db });
+        const index = createPreparedIoIndex({ db });
 
         const result = await index.indexTextFile({
             filePath: join(/** @type {string} */ (tmpDir), 'broken.js'),

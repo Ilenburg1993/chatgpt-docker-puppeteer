@@ -8,18 +8,18 @@ import { join, relative } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+    acquireFileResourceLock,
     acquireIoResourceLock,
     acquireIoResourceLocks,
-    getIoLockStats,
-    withIoResourceLock,
-} from '../../../../src/copilot/infra/io-locks.js';
-import { acquireLock, releaseLock, releaseLockAsync } from '../../../../src/copilot/infra/lockfile.js';
-import {
-    acquireFileResourceLock,
+    acquireLock,
     getFileResourceLockProfile,
+    getIoLockStats,
     hashFileResourceLockKey,
+    releaseLock,
+    releaseLockAsync,
     shouldAcquireFileResourceLock,
-} from '../../../../src/copilot/infra/locks/file-resource-lock.js';
+    withIoResourceLock,
+} from '#copilot/infra/internal/concurrency/locks';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];

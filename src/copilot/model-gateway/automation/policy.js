@@ -8,7 +8,7 @@
  * @module copilot/model-gateway/automation/policy
  */
 
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_RUNTIME_AUTOMATION_POLICY_PATH =

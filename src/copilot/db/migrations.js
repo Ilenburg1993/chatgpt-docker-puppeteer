@@ -20,8 +20,8 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { ensureIoIndexSchema } from '../infra/index-store/sqlite/schema.js';
 import { MODEL_GATEWAY_SQLITE_SCHEMA_SQL } from '../model-gateway/catalog/sqlite-schema.js';
+import { ensureIoIndexSchema } from './io-index-schema.js';
 
 /**
  * @typedef {Object} CopilotMigration

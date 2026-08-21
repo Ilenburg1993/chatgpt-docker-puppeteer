@@ -1,6 +1,6 @@
 // @ts-check
 
-import { runBoundedOperationBatch } from '#copilot/infra';
+import { runBoundedOperationBatch } from '#copilot/infra/internal/concurrency/bulk';
 import { describe, expect, it } from 'vitest';
 
 const delay = (/** @type {number} */ ms) => new Promise((resolve) => setTimeout(resolve, ms));

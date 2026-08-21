@@ -2,9 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { makeBytesKey, makeTextKey, normalizeIoCacheKey } from '../../../../src/copilot/infra/cache/l1/index.js';
+import { makeBytesKey, makeTextKey, normalizeIoCacheKey } from '#copilot/infra/internal/cache';
 
-describe('infra/cache/l1 keys', () => {
+describe('infra/cache/memory keys', () => {
     it('normaliza paths e cria chaves estáveis para bytes/texto', () => {
         const normalized = normalizeIoCacheKey('src/foo/../bar.js');
 

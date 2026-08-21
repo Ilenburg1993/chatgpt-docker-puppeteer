@@ -14,7 +14,7 @@ const ioMocks = vi.hoisted(() => ({
     writeFileAtomicTrusted: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/trusted-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
     deleteFileTrusted: ioMocks.deleteFileTrusted,
     readTextFreshTrusted: ioMocks.readTextFreshTrusted,
     statPathTrusted: ioMocks.statPathTrusted,

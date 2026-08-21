@@ -3,7 +3,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
 
 /** @param {string | Buffer | Uint8Array} value */
 function legacySha256(value) {

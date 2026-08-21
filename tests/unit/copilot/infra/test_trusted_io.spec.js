@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { statPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { statPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/internal/filesystem/trusted';
 
 /** @type {string[]} */
 const cleanupPaths = [];

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "policy": "copilot-direct-fs-read-debt-exact-counts",
-  "generatedAt": "2026-08-20T18:54:35.760Z",
-  "lowLevelRoot": "src/copilot/infra/io/fs/",
+  "generatedAt": "2026-08-21T03:02:20.745Z",
+  "lowLevelRoot": "src/copilot/infra/filesystem/",
   "entries": [
     {
       "file": "src/copilot/boot/workspace.js",
@@ -19,7 +19,7 @@
       }
     },
     {
-      "file": "src/copilot/infra/io-cache.js",
+      "file": "src/copilot/infra/cache/memory/l1-verifier.js",
       "classification": "low-level-exception",
       "operations": {
         "readFile": 1,
@@ -27,36 +27,7 @@
       }
     },
     {
-      "file": "src/copilot/infra/io-prefetch.js",
-      "classification": "low-level-exception",
-      "operations": {
-        "stat": 1
-      }
-    },
-    {
-      "file": "src/copilot/infra/io-scanner.js",
-      "classification": "low-level-exception",
-      "operations": {
-        "lstat": 2,
-        "readdir": 1
-      }
-    },
-    {
-      "file": "src/copilot/infra/io/jsonl-file-writer.js",
-      "classification": "low-level-exception",
-      "operations": {
-        "stat": 1
-      }
-    },
-    {
-      "file": "src/copilot/infra/io/jsonl-reader.js",
-      "classification": "low-level-exception",
-      "operations": {
-        "open:read": 1
-      }
-    },
-    {
-      "file": "src/copilot/infra/lockfile.js",
+      "file": "src/copilot/infra/concurrency/locks/file/legacy.js",
       "classification": "low-level-exception",
       "operations": {
         "existsSync": 1,
@@ -67,7 +38,7 @@
       }
     },
     {
-      "file": "src/copilot/infra/locks/file-resource-lock.js",
+      "file": "src/copilot/infra/concurrency/locks/file/metadata.js",
       "classification": "low-level-exception",
       "operations": {
         "lstat": 1,
@@ -76,24 +47,60 @@
       }
     },
     {
-      "file": "src/copilot/infra/module-map.js",
+      "file": "src/copilot/infra/governance/module-map.js",
       "classification": "bootstrap-boundary",
       "operations": {
         "readdirSync": 1
       }
     },
     {
-      "file": "src/copilot/infra/scan/fingerprint.js",
+      "file": "src/copilot/infra/indexing/context/prefetch/read-through.js",
+      "classification": "low-level-exception",
+      "operations": {
+        "stat": 1
+      }
+    },
+    {
+      "file": "src/copilot/infra/indexing/scanner/fingerprint.js",
       "classification": "low-level-exception",
       "operations": {
         "realpath": 1
       }
     },
     {
-      "file": "src/copilot/infra/scan/gitignore.js",
+      "file": "src/copilot/infra/indexing/scanner/gitignore.js",
       "classification": "low-level-exception",
       "operations": {
         "readFile": 1
+      }
+    },
+    {
+      "file": "src/copilot/infra/indexing/scanner/service.js",
+      "classification": "low-level-exception",
+      "operations": {
+        "lstat": 2,
+        "readdir": 1
+      }
+    },
+    {
+      "file": "src/copilot/infra/persistence/jsonl/tail.js",
+      "classification": "low-level-exception",
+      "operations": {
+        "open:read": 1
+      }
+    },
+    {
+      "file": "src/copilot/infra/persistence/jsonl/writer/size-tracker.js",
+      "classification": "low-level-exception",
+      "operations": {
+        "stat": 1
+      }
+    },
+    {
+      "file": "src/copilot/infra/platform/node/filesystem/durability.js",
+      "classification": "low-level-exception",
+      "operations": {
+        "open:read": 2
       }
     },
     {
@@ -127,5 +134,5 @@
       }
     }
   ],
-  "description": "Exact non-growth baseline for direct node:fs reads outside src/copilot/infra/io/fs. Transitional debt must monotonically shrink; classified exceptions require explicit architectural justification."
+  "description": "Exact non-growth baseline for direct node:fs reads outside src/copilot/infra/filesystem. Transitional debt must monotonically shrink; classified exceptions require explicit architectural justification."
 }

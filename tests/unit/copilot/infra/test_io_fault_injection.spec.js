@@ -1,15 +1,14 @@
 // @ts-check
 
+import { moveFileUnlocked, writeAtomicFileUnlocked } from '#copilot/infra/internal/filesystem/write';
+import { createJsonlFileWriter } from '#copilot/infra/internal/persistence/jsonl';
 import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { copyFileUnlocked } from '../../../../src/copilot/infra/io/fs/copy.js';
-import { moveFileUnlocked } from '../../../../src/copilot/infra/io/fs/move.js';
-import { deleteFileUnlocked } from '../../../../src/copilot/infra/io/fs/remove.js';
-import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/write-atomic.js';
-import { createJsonlFileWriter } from '../../../../src/copilot/infra/io/jsonl-file-writer.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+import { copyFileUnlocked } from '../../../../src/copilot/infra/filesystem/write/copy.js';
+import { deleteFileUnlocked } from '../../../../src/copilot/infra/filesystem/write/remove.js';
+import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
 
 /** @type {string[]} */
 const tempDirs = [];

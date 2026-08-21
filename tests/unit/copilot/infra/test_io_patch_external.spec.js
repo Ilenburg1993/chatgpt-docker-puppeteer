@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { patchTextLocked } from '../../../../src/copilot/infra/io-engine.js';
+import { patchTextLocked } from '#copilot/infra/internal/filesystem/mutation';
 
 const REPLACE_TEXT_CHILD = `
 import { rename, writeFile } from 'node:fs/promises';

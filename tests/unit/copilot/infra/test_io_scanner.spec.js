@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
+import { scanDirectory } from '#copilot/infra/internal/indexing';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];

@@ -19,6 +19,13 @@ export {
 } from './budgets.js';
 export { IO_CAPABILITY, capabilityForCreate } from './capabilities.js';
 export {
+    attachSuppressedMutationError,
+    isMutationAppliedError,
+    markMutationAppliedError,
+    normalizeMutationError,
+    readMutationAppliedState,
+} from './mutation-state.js';
+export {
     limitTextLines,
     normalizeCursorOffset,
     normalizeMaxResults,
@@ -26,11 +33,12 @@ export {
     windowTextLines,
 } from './output-window.js';
 export {
+    assertValidIoFilePath,
     hasNullByte,
     isPathInsideWorkspace,
     normalizePathResourceKey,
     normalizeWorkspaceRoot,
     resolveWorkspaceCandidate,
 } from './path-resource.js';
-export { assertExpectedSha256 } from './preconditions.js';
+export { assertExpectedSha256, assertExpectedSha256Digest } from './preconditions.js';
 export { IO_RISK, riskForDryRun, riskForOverwrite } from './risk.js';

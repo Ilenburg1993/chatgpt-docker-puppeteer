@@ -9,7 +9,7 @@
  */
 
 import { logSwallowed, redactSecretRecord } from '#copilot/core';
-import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 
 /**
  * @typedef {object} JsonlWriterOptions

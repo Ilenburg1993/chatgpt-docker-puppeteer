@@ -2,7 +2,7 @@
 
 **Propósito**: expor para a LLM-B as custom tools canônicas de arquivo, busca, índice e scope.
 **Status documental**: Canônico ativo. **Público**: mantenedores das tools SDK-first e das
-integrações de leitura/escrita da LLM-B. **Última atualização**: 14 de maio de 2026.
+integrações de leitura/escrita da LLM-B. **Última atualização**: 20 de agosto de 2026.
 
 ## O que esta pasta contém
 
@@ -18,7 +18,7 @@ integrações de leitura/escrita da LLM-B. **Última atualização**: 14 de maio
 
 ## O que não deve ficar aqui
 
-- I/O direto em baixo nível. Use `infra/io-engine.js`.
+- I/O direto em baixo nível. Consuma as capabilities via `#copilot/infra/public/filesystem/*`.
 - Cache, scanner, parser ou índice persistente. Eles pertencem a `infra/`.
 - Projeções de UX do terminal ou HTTP. Elas pertencem a `terminal/` e `presentation/`.
 - Reimplementações de capabilities vanilla do SDK. As tools locais ampliam a superfície do SDK, não
@@ -29,20 +29,23 @@ integrações de leitura/escrita da LLM-B. **Última atualização**: 14 de maio
 Todas as tools desta pasta devem convergir para as mesmas bases:
 
 - Segurança de path: `shared.js` + `core/io-policy`.
-- Leitura/escrita: `infra/io-engine.js`.
-- Buffer/cache quente: L1 em `infra/io-cache.js`.
-- Persistência local: L2 blob em `infra/io-cache-l2-sqlite.js`.
-- Busca/símbolos: índice L2 em `infra/io-index-sqlite.js`.
-- Scope LLM-B: `infra/io-session-scope.js`, com prefetch e parser canônicos.
+- Leitura/escrita: `#copilot/infra/public/filesystem/workspace`, com read/write/mutation sob a mesma
+  membrane.
+- Buffer/cache quente: `#copilot/infra/public/cache` (L1/L2).
+- Persistência local: L2 sob `#copilot/infra/public/cache`; o SQLite concreto permanece internal.
+- Busca/símbolos: `#copilot/infra/public/indexing` e `#copilot/infra/public/indexing/workspace`.
+- Scope LLM-B: `#copilot/infra/public/indexing/context`, com prefetch/parser/index convergence
+  canônicos.
 
 ## Regras de manutenção
 
-- `read_file_content` deve fazer read-through: ler via `io-engine`, aquecer L1 texto/bytes,
-  atualizar índice L2 do arquivo e pré-aquecer imports relativos diretos quando aplicável.
+- `read_file_content` deve fazer read-through pelas capabilities públicas de filesystem/indexing,
+  aquecer L1 texto/bytes, atualizar índice L2 do arquivo e pré-aquecer imports relativos diretos
+  quando aplicável.
 - `search_in_files` pode usar FTS5 quando o índice está disponível e a query é simples; regex,
   filtros complexos ou miss do índice caem para `rg`/`grep`.
-- Escritas nunca atualizam cache/índice por fora; elas chamam `io-engine`, que coordena locks e
-  invalidação.
+- Escritas nunca atualizam cache/índice por fora; usam a workspace capability, que converge para
+  locks, mutation, durability e invalidation.
 - Novas tools devem ser exportadas em `index.js` e cobertas por testes unitários.
 - Limites de volume expostos à LLM-B devem permanecer informativos.
 

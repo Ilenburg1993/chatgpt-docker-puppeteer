@@ -3,11 +3,11 @@
  * Contrato: SSE do terminal grava replay global uma única vez por broadcast canônico.
  */
 
+import { getSseClients, getTerminalReplayBuffer } from '#copilot/presentation/realtime';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getSseClients, getTerminalReplayBuffer } from '../../../src/copilot/infra/sse/state.js';
 import {
     flushTerminalSseEventArchive,
     readTerminalSseEventArchiveState,

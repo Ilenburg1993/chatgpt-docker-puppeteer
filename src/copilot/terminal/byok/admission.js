@@ -9,7 +9,7 @@
  * @module copilot/terminal/byok/admission
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { utf8ByteLength } from '#copilot/infra/public/platform';
 
 export const TERMINAL_BYOK_ADMISSION_MODE_ENV = 'COPILOT_BYOK_ADMISSION_MODE';
 export const TERMINAL_BYOK_LOW_REQUEST_TOKEN_LIMIT = 8_000;

@@ -3,14 +3,8 @@
  * Testes unitários para io-parser.js
  */
 
-import * as assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { promisify } from 'node:util';
-import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
+import { BABEL_PARSER_POLICY_VERSION, resolveBabelParserOptions } from '#copilot/infra/internal/code-analysis';
+import { readTextFileSnapshot } from '#copilot/infra/internal/filesystem/read';
 import {
     buildOutline,
     extractJsonSchema,
@@ -21,20 +15,21 @@ import {
     parseAndCacheSymbols,
     parseFileForContext,
     parseFileSymbols,
-    resetParserCacheForTest,
     resolveParserWorkerPoolPolicy,
     resolveParserWorkerQueuePolicy,
     windowFileContext,
-} from '../../../../src/copilot/infra/io-parser.js';
-import { readTextFileSnapshot } from '../../../../src/copilot/infra/io/fs/read-text.js';
-import {
-    BABEL_PARSER_POLICY_VERSION,
-    resolveBabelParserOptions,
-} from '../../../../src/copilot/infra/parse/babel-policy.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+} from '#copilot/infra/internal/indexing/parser';
+import { sha256 } from '#copilot/infra/internal/platform';
+import { resetParserCacheForTest } from '#copilot/infra/public/testing';
+import * as assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { promisify } from 'node:util';
+import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
 
 let tmpDir = '';
-const IO_PARSER_MODULE_URL = pathToFileURL(path.resolve('src/copilot/infra/io-parser.js')).href;
 const execFileAsync = promisify(execFile);
 const JS_CONTENT = `
 // Module principal de teste
@@ -172,7 +167,7 @@ describe('parseFileSymbols - JavaScript', () => {
 
     it('aplica line guard também a arquivos com CR isolado', async () => {
         const script = `
-            import { parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             const result = await parseFileSymbols('/tmp/cr-only.js', 'a\\rb\\rc\\rd');
             await resetParserCacheForTest({ teardownWorkers: true });
             console.log(JSON.stringify({ lines: result.lines, parseError: result.parseError }));
@@ -195,7 +190,7 @@ describe('parseFileSymbols - JavaScript', () => {
 
     it('trunca o source pelo orçamento UTF-8 real', async () => {
         const script = `
-            import { parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             const content = "export const before = 1;\\n// 🚀🚀🚀🚀🚀🚀🚀🚀\\nexport const afterBudget = 1;";
             const result = await parseFileSymbols('/tmp/byte-budget.js', content);
             await resetParserCacheForTest({ teardownWorkers: true });
@@ -375,7 +370,7 @@ describe('Babel parser policy', () => {
         const workerResult = await parseFileSymbols(filePath, content);
         const workerStats = getParserCacheStats();
         const script = `
-            import { parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             const result = await parseFileSymbols(${JSON.stringify(filePath)}, ${JSON.stringify(content)});
             await resetParserCacheForTest({ teardownWorkers: true });
             console.log(JSON.stringify(result));
@@ -577,7 +572,7 @@ describe('parseAndCacheSymbols', () => {
 
     it('remove tarefa abortada da fila de workers', async () => {
         const script = `
-            import { getParserCacheStats, parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             const slowContent = Array.from({ length: 20_000 }, (_, index) => 'export function f' + index + '() { return ' + index + '; }').join('\\n');
             const first = parseFileSymbols('/tmp/abort-holder.js', slowContent);
             const controller = new AbortController();
@@ -617,7 +612,7 @@ describe('parseAndCacheSymbols', () => {
 
     it('rejeita backlog quando a fila de workers atinge o limite configurado', async () => {
         const script = `
-            import { getParserCacheStats, parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             const content = ${JSON.stringify(JS_CONTENT)};
             const results = await Promise.all(
                 Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/queued-' + index + '.js', content)),
@@ -655,7 +650,7 @@ describe('parseAndCacheSymbols', () => {
 
     it('faz fallback síncrono limitado para arquivos pequenos sob overload', async () => {
         const script = `
-            import { getParserCacheStats, parseFileSymbols, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { getParserCacheStats, parseFileSymbols } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             const content = ${JSON.stringify(JS_CONTENT)};
             const results = await Promise.all(
                 Array.from({ length: 8 }, (_, index) => parseFileSymbols('/tmp/fallback-' + index + '.js', content)),
@@ -822,7 +817,7 @@ describe('parseFileForContext', () => {
 
     it('recusa retenção de FileContext maior que o orçamento configurado', async () => {
         const script = `
-            import { getParserCacheStats, parseFileForContext, resetParserCacheForTest } from ${JSON.stringify(IO_PARSER_MODULE_URL)};
+            import { getParserCacheStats, parseFileForContext } from '#copilot/infra/internal/indexing/parser';\n            import { resetParserCacheForTest } from '#copilot/infra/public/testing';
             await parseFileForContext('/tmp/oversized-context.js', 'export const oversizedContext = 1;');
             const stats = getParserCacheStats();
             await resetParserCacheForTest({ teardownWorkers: true });

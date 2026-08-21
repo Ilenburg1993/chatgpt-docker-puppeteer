@@ -8,7 +8,7 @@
  * @module copilot/mcp/tools/restart-control
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,

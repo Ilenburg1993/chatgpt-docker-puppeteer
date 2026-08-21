@@ -5,7 +5,7 @@
  * @module copilot/model-gateway/catalog/importers/response-body
  */
 
-import { readBoundedResponseJson, readBoundedResponseText } from '#copilot/infra/public/http-response';
+import { readBoundedResponseJson, readBoundedResponseText } from '#copilot/infra/public/platform';
 
 export const DEFAULT_CATALOG_RESPONSE_MAX_BYTES = 8 * 1024 * 1024;
 export const MAX_CATALOG_RESPONSE_MAX_BYTES = 32 * 1024 * 1024;

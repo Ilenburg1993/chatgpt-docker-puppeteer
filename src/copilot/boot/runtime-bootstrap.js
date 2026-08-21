@@ -141,8 +141,12 @@ export async function bootCopilot(options) {
                 container.resolve(ERROR_TRACKER).registerGlobalHandlers();
 
                 try {
-                    const { ensureCopilotDbDir, getCopilotDb } = await import('../db/sqlite.js');
+                    const [{ ensureCopilotDbDir, getCopilotDb }, { configureInfraSqliteProvider }] = await Promise.all([
+                        import('../db/sqlite.js'),
+                        import('#copilot/infra/public/database'),
+                    ]);
                     await ensureCopilotDbDir();
+                    configureInfraSqliteProvider(getCopilotDb);
                     bootstrapConvergencePersistence(getCopilotDb());
                 } catch {
                     // SQLite indisponível não deve bloquear o boot; ring-buffer in-memory continua.

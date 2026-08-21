@@ -8,7 +8,9 @@
  * @module copilot/mcp/tools/repo-index
  */
 
-import { normalizeIoCacheKey, registerInvalidationHook } from '#copilot/infra/io-cache';
+import { normalizeIoCacheKey } from '#copilot/infra/public/cache';
+import { registerIoInvalidationHook } from '#copilot/infra/public/filesystem/invalidation';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     buildIoIndexForDirectory,
     filterIndexRowsByGlob,
@@ -25,7 +27,6 @@ import {
     parseFileForContext,
     searchIoIndex,
 } from '#copilot/infra/public/indexing';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     boundedWriteAnnotations,
     createTtlCache,
@@ -35,6 +36,7 @@ import {
     readMcpIndexAutoBuildState,
     readOnlyAnnotations,
     resolveReadPath,
+    resolveValidatedReadPath,
 } from '#copilot/mcp/control-plane';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { dirname, extname, join, relative, resolve as resolvePath } from 'node:path';
@@ -60,7 +62,7 @@ const importTargetExistsCache = createTtlCache({
     maxEntries: IMPORT_TARGET_EXISTS_CACHE_MAX_ENTRIES,
 });
 
-registerInvalidationHook((filePath, event) => {
+registerIoInvalidationHook((filePath, event) => {
     try {
         if (event?.recursive === true) {
             importTargetExistsCache.clear();
@@ -286,7 +288,7 @@ async function classifyCandidateTargets(candidates) {
     let protectedCandidateCount = 0;
     for (const candidate of candidates) {
         const workspaceRelativeCandidate = relative(WORKSPACE_ROOT, candidate);
-        const policy = await resolveReadPath(workspaceRelativeCandidate);
+        const policy = await resolveValidatedReadPath(workspaceRelativeCandidate);
         if (!policy.ok) {
             if (policy.code === 'ERR_PATH_DENIED') protectedCandidateCount += 1;
             continue;
@@ -645,9 +647,9 @@ export const repoIndexTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, recursive, depth, includeDynamic, maxFiles, maxResults, cursor }) => {
-            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH), {
-                issueReadCapability: true,
-            });
+            const resolved = await resolveValidatedReadPath(
+                normalizeOptionalRepoPath(path, DEFAULT_ORPHAN_IMPORT_SCAN_PATH),
+            );
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const stat = await statPathValidated(resolved.validatedReadPath);
             const fileLimit = normalizePositiveInteger(maxFiles, DEFAULT_ORPHAN_IMPORT_MAX_FILES, 5000);

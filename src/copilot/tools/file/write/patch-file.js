@@ -6,9 +6,9 @@
  */
 
 import { withIoMeta } from '#copilot/core';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createIoOperationEnvelope } from '#copilot/infra/public/operations';
 import { IO_CAPABILITY, IO_RISK, riskForDryRun } from '#copilot/infra/public/policy';
-import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import { z } from 'zod';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
@@ -30,7 +30,7 @@ const { patchTextLocked, patchTextLockedValidated } = createWorkspaceIo({ worksp
  * Dispatch a patch through the validated mutable fast path when available, otherwise preserve the canonical string
  * path.
  *
- * @param {{ resolved: string; validatedWritePath?: unknown }} target
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} target
  * @param {Parameters<typeof patchTextLocked>[1]} options
  */
 function patchValidatedOrString(target, options) {

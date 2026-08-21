@@ -13,7 +13,7 @@ import { afterEach, describe, it } from 'vitest';
 import {
     createCrossProcessInvalidationJournal,
     readCrossProcessInvalidationReplay,
-} from '../../../../src/copilot/infra/io/invalidation/cross-process-journal.js';
+} from '#copilot/infra/internal/filesystem/invalidation';
 
 /** @type {string[]} */
 const tempDirs = [];

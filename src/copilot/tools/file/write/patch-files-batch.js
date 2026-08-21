@@ -8,8 +8,8 @@
  * @module copilot/tools/file/write/patch-files-batch
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
 import { validatePath, WORKSPACE_ROOT } from '../shared.js';
@@ -17,7 +17,7 @@ import { validatePath, WORKSPACE_ROOT } from '../shared.js';
 const { patchTextBatchLocked, patchTextBatchLockedValidated } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
- * @param {{ resolved: string; validatedWritePath?: unknown }} target
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} target
  * @param {Parameters<typeof patchTextBatchLocked>[1]} options
  */
 function patchBatchValidatedOrString(target, options) {

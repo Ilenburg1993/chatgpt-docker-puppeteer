@@ -11,8 +11,9 @@
 
 import { readCopilotSessionFsBootConfig } from '#copilot/boot/session-fs';
 import { evaluateIoPathPolicyAsync } from '#copilot/core/io-policy';
-import { statPathTrusted } from '#copilot/infra/public/trusted-io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
 import { basename, dirname, isAbsolute, relative, resolve } from 'node:path';
 import { classifySdkError } from '../errors.js';
 import { log } from '../logger.js';
@@ -213,9 +214,9 @@ export function createLocalSessionFsProvider(rootDir, options = {}) {
         moveFileLocked,
         readText,
         removePathLocked,
-        scanDirectory,
         statPath,
     } = createWorkspaceIo({ workspaceRoot: root });
+    const { scanDirectory } = createWorkspaceIndexing({ workspaceRoot: root });
 
     return {
         async readFile(path) {

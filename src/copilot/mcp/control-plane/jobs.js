@@ -5,14 +5,14 @@
  * @module copilot/mcp/control-plane/jobs
  */
 
-import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/io';
-import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/node-runtime';
 import {
     listDirectoryNamesFreshTrusted,
     lstatPathTrusted,
     readBytesRangeFreshTrusted,
     readTextFreshTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
+import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/filesystem/write';
+import { withCopilotNodeCompileCacheEnv } from '#copilot/infra/public/platform/node';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { availableParallelism, freemem, loadavg, totalmem } from 'node:os';

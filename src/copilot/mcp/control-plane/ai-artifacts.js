@@ -9,9 +9,9 @@
  * @module copilot/mcp/control-plane/ai-artifacts
  */
 
-import { removePathLocked } from '#copilot/infra/public/io';
-import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/runtime';
-import { listDirectoryNamesFreshTrusted, lstatPathTrusted } from '#copilot/infra/public/trusted-io';
+import { removePathLocked } from '#copilot/infra/public/filesystem/mutation';
+import { listDirectoryNamesFreshTrusted, lstatPathTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/operations';
 import path from 'node:path';
 import { getMcpWorkspaceRoot } from './paths.js';
 
@@ -217,7 +217,7 @@ export async function buildAiArtifactsReport(options = {}) {
             overBudgetBytes: Math.max(0, rollbackSidecarBytes - rollbackPolicy.maxBytes),
             purgeCandidateCount: rollbackPolicy.enabled ? 0 : rollbackSidecarCount + rollbackPendingCount,
             purgeCandidateBytes: rollbackPolicy.enabled ? 0 : rollbackSidecarBytes + rollbackPendingBytes,
-            cleanupOwnedBy: 'infra/io/fs/rollback-sidecar.js TTL + bounded retention cleanup',
+            cleanupOwnedBy: 'infra/filesystem/transaction/rollback/maintenance.js TTL + bounded retention cleanup',
             maintenanceMutation: 'explicit-only',
         },
         cleanupPlan: {

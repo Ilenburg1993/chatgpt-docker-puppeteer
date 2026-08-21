@@ -255,14 +255,14 @@ export async function stopDefaultAgentDialogLoopAuthorized() {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('#copilot/agent/infra').HandoffManager | null}
+ * @returns {import('#copilot/agent/facades').HandoffManager | null}
  */
 export function getAgentHandoffManager(runtimeId) {
     return getRuntimeHandoffManager(getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**
- * @returns {import('#copilot/agent/infra').HandoffManager | null}
+ * @returns {import('#copilot/agent/facades').HandoffManager | null}
  */
 export function getDefaultAgentHandoffManager() {
     return getAgentHandoffManager(getDefaultAgentRuntimeId());
@@ -270,14 +270,14 @@ export function getDefaultAgentHandoffManager() {
 
 /**
  * @param {string | null | undefined} [runtimeId]
- * @returns {import('#copilot/agent/infra').HandoffRequest[]}
+ * @returns {import('#copilot/agent/facades').HandoffRequest[]}
  */
 export function readAgentHandoffHistory(runtimeId) {
     return getRuntimeHandoffHistory(getAgentRuntimeControlsTarget(runtimeId));
 }
 
 /**
- * @returns {import('#copilot/agent/infra').HandoffRequest[]}
+ * @returns {import('#copilot/agent/facades').HandoffRequest[]}
  */
 export function readDefaultAgentHandoffHistory() {
     return readAgentHandoffHistory(getDefaultAgentRuntimeId());

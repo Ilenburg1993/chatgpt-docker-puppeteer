@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/tunnel-status
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import {
     isCloudflaredActionableOriginErrorLine,
     isCloudflaredBenignClientOrStreamCancellationLine,

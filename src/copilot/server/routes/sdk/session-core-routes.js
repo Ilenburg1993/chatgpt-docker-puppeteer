@@ -9,13 +9,16 @@
  */
 
 import { resolveModelSelectionMismatch } from '#copilot/core';
-import { createEventFilter, createSseWriter } from '../../../infra/sse/utils.js';
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { validateBody, validateModel, withErrorHandler } from './session-middleware.js';
 import { getActiveSessionEntryOrReply, withRuntimeMeta, withSessionRuntimeMeta } from './session-route-helpers.js';
 import { LogMessageBodySchema, SendMessageBodySchema, SetModelBodySchema } from './session-schemas.js';
 import { sendAndWaitWithoutTimeout } from './session-send-helpers.js';
-import { ensureSessionStreamState, maybeDisposeSessionStreamState, sessionsTracker } from './session-stream-state.js';
+import {
+    ensureSessionStreamState,
+    getSessionsTracker,
+    maybeDisposeSessionStreamState,
+} from './session-stream-state.js';
 
 /**
  * @typedef {import('express').Router} Router
@@ -124,6 +127,7 @@ export function registerSessionCoreRoutes(router) {
     router.get('/sessions/:id/stream', (req, res) => {
         const routeDeps = resolveSdkRouteSharedDeps(req);
         const { id } = req.params;
+        const sessionsTracker = getSessionsTracker(routeDeps);
 
         if (!sessionsTracker.accept()) {
             res.status(503).json(withRuntimeMeta(routeDeps, { ok: false, error: 'Máximo de clientes SSE atingido' }));
@@ -135,7 +139,7 @@ export function registerSessionCoreRoutes(router) {
 
         const state = ensureSessionStreamState(routeDeps, id, entry);
 
-        const sse = createSseWriter(req, res, {
+        const sse = routeDeps.sdkRealtime.createSseWriter(req, res, {
             heartbeatMs: 15_000,
             replayBuffer: state.pool.replayBuffer,
             tracker: sessionsTracker,
@@ -146,7 +150,7 @@ export function registerSessionCoreRoutes(router) {
             skipBuffer: true,
         });
 
-        const eventFilter = createEventFilter(
+        const eventFilter = routeDeps.sdkRealtime.createEventFilter(
             typeof req.query['events'] === 'string' ? req.query['events'] : undefined,
         );
         const sseClient = state.pool.addClient(sse, { filter: eventFilter });

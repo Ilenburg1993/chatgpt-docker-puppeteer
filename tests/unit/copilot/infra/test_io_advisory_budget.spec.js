@@ -1,13 +1,10 @@
 // @ts-check
 
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/internal/observability';
+import { beginIoAdvisoryBudget, getIoAdvisoryBudgetStats } from '#copilot/infra/internal/telemetry';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-    beginIoAdvisoryBudget,
-    getIoAdvisoryBudgetStats,
-    resetIoAdvisoryBudgetForTest,
-} from '../../../../src/copilot/infra/io-advisory-budget.js';
-import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
 
+import { resetIoAdvisoryBudgetForTest } from '#copilot/infra/public/testing';
 afterEach(() => {
     resetIoAdvisoryBudgetForTest();
 });

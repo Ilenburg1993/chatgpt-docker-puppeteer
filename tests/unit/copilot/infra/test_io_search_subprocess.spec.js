@@ -2,9 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { execSearchFile, streamSearchFile } from '../../../../src/copilot/infra/io/search/subprocess.js';
+import { execSearchFile, streamSearchFile } from '#copilot/infra/internal/indexing/search';
 
-describe('infra/io/search/subprocess', () => {
+describe('infra/indexing/search/subprocess', () => {
     it('executa subprocesso com stdout/stderr coletados', async () => {
         const result = await execSearchFile(process.execPath, [
             '-e',

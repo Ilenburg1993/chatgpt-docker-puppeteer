@@ -6,7 +6,7 @@ import {
     readEnvIntAtLeast,
     readEnvNonNegativeInt,
     readEnvPositiveInt,
-} from '../../../../src/copilot/infra/shared/env.js';
+} from '../../../../src/copilot/infra/platform/env.js';
 
 afterEach(() => {
     vi.unstubAllEnvs();

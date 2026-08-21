@@ -1,8 +1,10 @@
 // @ts-check
 
+import { BABEL_PARSER_POLICY_VERSION } from '#copilot/infra/internal/code-analysis';
+import { configureInfraSqliteProvider } from '#copilot/infra/internal/database';
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BABEL_PARSER_POLICY_VERSION } from '../../../../src/copilot/infra/parse/babel-policy.js';
 
 const mocks = vi.hoisted(() => ({
     indexDirectory: vi.fn(),
@@ -19,44 +21,51 @@ const mocks = vi.hoisted(() => ({
     statPathSnapshot: vi.fn(),
     readTextFileSnapshot: vi.fn(),
     loadGitignoreMatcher: vi.fn(),
-    getCopilotDb: vi.fn(() => ({})),
-    registerInvalidationHook: vi.fn(),
-    unregisterInvalidationHook: vi.fn(),
+    registerIoInvalidationHook: vi.fn(),
+    unregisterIoInvalidationHook: vi.fn(),
 }));
 
-vi.mock('#copilot/db', () => ({
-    getCopilotDb: mocks.getCopilotDb,
+vi.mock('#copilot/infra/internal/filesystem/invalidation', () => ({
+    registerIoInvalidationHook: mocks.registerIoInvalidationHook,
 }));
 
-vi.mock('../../../../src/copilot/infra/io-cache.js', () => ({
-    registerInvalidationHook: mocks.registerInvalidationHook,
-}));
+vi.mock('#copilot/infra/internal/filesystem/read', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        statPathSnapshot: mocks.statPathSnapshot,
+        readTextFileSnapshot: mocks.readTextFileSnapshot,
+    };
+});
 
-vi.mock('../../../../src/copilot/infra/io/fs/stat.js', () => ({
-    statPathSnapshot: mocks.statPathSnapshot,
-}));
+vi.mock('#copilot/infra/internal/indexing/scanner', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        loadGitignoreMatcher: mocks.loadGitignoreMatcher,
+    };
+});
 
-vi.mock('../../../../src/copilot/infra/io/fs/read-text.js', () => ({
-    readTextFileSnapshot: mocks.readTextFileSnapshot,
-}));
+vi.mock('../../../../src/copilot/infra/indexing/registry/sqlite/index.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        createIoIndexSqlite: () => ({
+            indexDirectory: mocks.indexDirectory,
+            getStats: mocks.getStats,
+            invalidatePath: mocks.invalidatePath,
+            search: mocks.search,
+            findSymbol: mocks.findSymbol,
+            findImports: mocks.findImports,
+            matchesFileFingerprint: mocks.matchesFileFingerprint,
+            listIndexedFiles: mocks.listIndexedFiles,
+            indexTextFile: mocks.indexTextFile,
+        }),
+    };
+});
 
-vi.mock('../../../../src/copilot/infra/scan/gitignore.js', () => ({
-    loadGitignoreMatcher: mocks.loadGitignoreMatcher,
-}));
-
-vi.mock('../../../../src/copilot/infra/io-index-sqlite.js', () => ({
-    createIoIndexSqlite: () => ({
-        indexDirectory: mocks.indexDirectory,
-        getStats: mocks.getStats,
-        invalidatePath: mocks.invalidatePath,
-        search: mocks.search,
-        findSymbol: mocks.findSymbol,
-        findImports: mocks.findImports,
-        matchesFileFingerprint: mocks.matchesFileFingerprint,
-        listIndexedFiles: mocks.listIndexedFiles,
-        indexTextFile: mocks.indexTextFile,
-    }),
-}));
+/** @type {import('better-sqlite3').Database | null} */
+let testDb = null;
 
 import {
     buildIoIndexForDirectory,
@@ -65,13 +74,16 @@ import {
     getIoIndexStats,
     reconcileIoIndexAutoRefreshDomain,
     refreshIoIndexPaths,
-    resetIoIndexForTest,
-} from '../../../../src/copilot/infra/io-index-registry.js';
+} from '#copilot/infra/internal/indexing/registry';
 
+import { resetInfraSqliteProviderForTest, resetIoIndexForTest } from '#copilot/infra/public/testing';
 beforeEach(() => {
-    mocks.registerInvalidationHook.mockImplementation(() => mocks.unregisterInvalidationHook);
+    mocks.registerIoInvalidationHook.mockImplementation(() => mocks.unregisterIoInvalidationHook);
     resetIoIndexForTest();
-    mocks.registerInvalidationHook.mockClear();
+    resetInfraSqliteProviderForTest();
+    testDb = new Database(':memory:');
+    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    mocks.registerIoInvalidationHook.mockClear();
     mocks.indexDirectory.mockReset();
     mocks.invalidatePath.mockReset().mockReturnValue(true);
     mocks.matchesFileFingerprint.mockReset().mockReturnValue(false);
@@ -96,13 +108,16 @@ beforeEach(() => {
     mocks.loadGitignoreMatcher.mockReset().mockResolvedValue({
         ignores: (/** @type {string} */ value) => String(value).includes('ignored'),
     });
-    mocks.unregisterInvalidationHook.mockReset();
+    mocks.unregisterIoInvalidationHook.mockReset();
     vi.stubEnv('IO_INDEX_AUTO_REFRESH_ENABLED', '1');
     vi.stubEnv('IO_INDEX_AUTO_REFRESH_DEBOUNCE_MS', '10000');
 });
 
 afterEach(() => {
     resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
+    if (testDb?.open) testDb.close();
+    testDb = null;
     vi.unstubAllEnvs();
 });
 
@@ -155,13 +170,13 @@ describe('io-index-registry build coalescing', () => {
         });
 
         await buildIoIndexForDirectory('/tmp/ws-hook');
-        expect(mocks.registerInvalidationHook).toHaveBeenCalledTimes(1);
+        expect(mocks.registerIoInvalidationHook).toHaveBeenCalledTimes(1);
 
         resetIoIndexForTest();
-        expect(mocks.unregisterInvalidationHook).toHaveBeenCalledTimes(1);
+        expect(mocks.unregisterIoInvalidationHook).toHaveBeenCalledTimes(1);
 
         await buildIoIndexForDirectory('/tmp/ws-hook');
-        expect(mocks.registerInvalidationHook).toHaveBeenCalledTimes(2);
+        expect(mocks.registerIoInvalidationHook).toHaveBeenCalledTimes(2);
     });
 
     it('invalida imediatamente e coalesce refresh derivado fora do writer', async () => {
@@ -169,7 +184,7 @@ describe('io-index-registry build coalescing', () => {
         const workspaceRoot = '/tmp/ws-auto-refresh';
         const filePath = `${workspaceRoot}/changed.js`;
         await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
-        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(filePath, { recursive: false, source: 'test-write' });
@@ -195,7 +210,7 @@ describe('io-index-registry build coalescing', () => {
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         const workspaceRoot = '/tmp/ws-recursive-refresh';
         await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
-        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(workspaceRoot, { recursive: true, source: 'test-rm-r' });
@@ -215,7 +230,7 @@ describe('io-index-registry build coalescing', () => {
             respectGitignore: true,
             adoptAutoRefreshDomain: true,
         });
-        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(`${scopeRoot}/.ai/jobs/job.json`, { recursive: false, source: 'validator-artifact' });
@@ -258,7 +273,7 @@ describe('io-index-registry build coalescing', () => {
             respectGitignore: true,
             adoptAutoRefreshDomain: true,
         });
-        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(`${scopeRoot}/ignored.js`, { recursive: false, source: 'ignored-write' });
@@ -296,7 +311,7 @@ describe('io-index-registry build coalescing', () => {
         const filePath = `${workspaceRoot}/src/changed.js`;
         mocks.indexDirectory.mockResolvedValue({ available: true, indexed: 0, skipped: 0, failed: 0, durationMs: 0 });
         await buildIoIndexForDirectory(workspaceRoot, { workspaceRoot, adoptAutoRefreshDomain: true });
-        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(filePath, { recursive: false, source: 'canonical-write' });
@@ -378,7 +393,7 @@ describe('io-index-registry build coalescing', () => {
             adoptAutoRefreshDomain: true,
         });
         await buildIoIndexForDirectory('/tmp/manual-index-slice', { workspaceRoot: '/tmp' });
-        const hook = mocks.registerInvalidationHook.mock.calls[0]?.[0];
+        const hook = mocks.registerIoInvalidationHook.mock.calls[0]?.[0];
         assert.equal(typeof hook, 'function');
 
         hook(`${scopeRoot}/kept.js`, { recursive: false, source: 'canonical-write' });

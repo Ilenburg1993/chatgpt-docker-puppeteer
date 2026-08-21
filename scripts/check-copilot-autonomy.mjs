@@ -360,9 +360,9 @@ if (sdkRouteDeps.trim()) {
     errors++;
 }
 
-// ── Check 15: infra/sse/state.js não importa estado de UI do terminal ───────
+// ── Check 15: presentation/realtime/sse/state.js não importa estado de UI do terminal ──
 
-const SSE_STATE = 'src/copilot/infra/sse/state.js';
+const SSE_STATE = 'src/copilot/presentation/realtime/sse/state.js';
 if (existsSync(resolve(SSE_STATE))) {
     const sseStateSrc = readFileSync(resolve(SSE_STATE), 'utf-8');
     if (/from.*terminal\/state/.test(sseStateSrc)) {

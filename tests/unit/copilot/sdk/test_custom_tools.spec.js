@@ -43,7 +43,7 @@ vi.mock('#copilot/core/error-handlers', () => ({
     logSwallowed: mockLogSwallowed,
     toError: (/** @type {unknown} */ error) => (error instanceof Error ? error : new Error(String(error))),
 }));
-vi.mock('#copilot/infra/public/trusted-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
     readTextFreshTrusted: mockReadTextFreshTrusted,
     writeFileAtomicTrusted: mockWriteFileAtomicTrusted,
 }));

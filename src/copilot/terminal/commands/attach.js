@@ -14,7 +14,7 @@
  * @see EventBus
  */
 
-import { statPathTrusted } from '#copilot/infra/public/trusted-io';
+import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { MAX_EMBED_BYTES } from '../../presentation/files/index.js';
 import { addAttachment, clearAttachments, getAttachmentQueue } from '../../presentation/state/index.js';
 import { formatTerminalToolPathForOperator } from '../events/presenters/tools/index.js';

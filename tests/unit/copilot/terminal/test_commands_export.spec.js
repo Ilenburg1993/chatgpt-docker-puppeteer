@@ -128,14 +128,14 @@ const readTerminalTimelineProjection = /** @type {import('vitest').Mock<
 );
 
 const writeFileAtomicTrusted = /** @type {import('vitest').Mock<
-    typeof import('../../../../src/copilot/infra/public/trusted-io.js').writeFileAtomicTrusted
+    typeof import('#copilot/infra/public/filesystem/trusted').writeFileAtomicTrusted
 >} */ (vi.fn(async () => undefined));
 
 vi.mock('../../../../src/copilot/terminal/frontend/projections/timeline.js', () => ({
     readTerminalTimelineProjection,
 }));
 
-vi.mock('#copilot/infra/public/trusted-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
     writeFileAtomicTrusted,
 }));
 
@@ -148,7 +148,7 @@ function mockCtx() {
     return { println, output: () => lines.join('\n') };
 }
 
-/** @returns {Parameters<typeof import('../../../../src/copilot/infra/public/trusted-io.js').writeFileAtomicTrusted>} */
+/** @returns {Parameters<typeof import('#copilot/infra/public/filesystem/trusted').writeFileAtomicTrusted>} */
 function requireWriteCall() {
     const call = writeFileAtomicTrusted.mock.calls[0];
     if (!call) throw new Error('[fixture] writeFileAtomicTrusted was not called');

@@ -13,7 +13,7 @@ import {
     invalidateScopePath,
     listScopes,
     refreshScope,
-} from '#copilot/infra/public/session';
+} from '#copilot/infra/public/indexing/context';
 
 const ScopeDeclareParameters = z.object({
     sessionId: z.string().min(1).describe('ID da sessão/escopo para rastreamento da LLM-B.'),

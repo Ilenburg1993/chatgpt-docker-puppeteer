@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { patchTextLocked } from '../../../../src/copilot/infra/io-engine.js';
-import { readTextLineChunks } from '../../../../src/copilot/infra/io/fs/index.js';
-import { computeTextPatch } from '../../../../src/copilot/infra/io/patch/index.js';
+import { patchTextLocked } from '#copilot/infra/internal/filesystem/mutation';
+import { readTextLineChunks } from '#copilot/infra/internal/filesystem/read';
+import { computeTextPatch } from '../../../../src/copilot/infra/filesystem/patch/index.js';
 
 const PATCH_SEED = 0x1a2b3c4d;
 const CHUNK_SEED = 0x5e6f7788;

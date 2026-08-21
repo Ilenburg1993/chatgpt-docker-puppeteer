@@ -7,7 +7,7 @@ import {
     readBoundedResponseBytes,
     readBoundedResponseJson,
     readBoundedResponseText,
-} from '../../../../src/copilot/infra/public/http-response.js';
+} from '../../../../src/copilot/infra/platform/http-response.js';
 
 describe('bounded HTTP response bodies', () => {
     it('reads byte, text and JSON bodies within their budget', async () => {

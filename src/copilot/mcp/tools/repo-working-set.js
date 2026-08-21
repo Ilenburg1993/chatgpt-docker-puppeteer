@@ -16,7 +16,7 @@ import {
     getScopeContext,
     getScopeStats,
     refreshScope,
-} from '#copilot/infra/public/session';
+} from '#copilot/infra/public/indexing/context';
 import {
     errorResult,
     getMcpWorkspaceRoot,

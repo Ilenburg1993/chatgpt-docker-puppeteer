@@ -13,8 +13,11 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { formatBabelParserError, resolveBabelParserOptions } from '../../src/copilot/infra/parse/babel-policy.js';
-import { extractBabelFileSymbols } from '../../src/copilot/infra/parse/babel-symbols.js';
+import {
+    extractBabelFileSymbols,
+    formatBabelParserError,
+    resolveBabelParserOptions,
+} from '#copilot/infra/public/code-analysis';
 
 const SOURCE_GLOB = '**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}';
 const DEFAULT_IGNORES = Object.freeze([

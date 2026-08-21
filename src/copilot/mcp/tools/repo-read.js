@@ -6,10 +6,11 @@
  */
 
 import { DEFAULT_BLOCKED_PATH_SEGMENTS } from '#copilot/core';
-import { truncateUtf8String } from '#copilot/infra/public/buffer';
-import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
+import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { parseFileForContext, windowFileContext } from '#copilot/infra/public/indexing';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
+import { truncateUtf8String } from '#copilot/infra/public/platform';
 import {
     errorResult,
     estimateStructuredTextResultBytes,
@@ -17,7 +18,7 @@ import {
     MCP_TOOL_EXECUTION_LIMITS,
     okResult,
     readOnlyAnnotations,
-    resolveReadPath,
+    resolveValidatedReadPath,
     withResultExecutionHint,
     withResultSizeHint,
 } from '#copilot/mcp/control-plane';
@@ -26,16 +27,12 @@ import { z } from 'zod';
 import { readRepoFileChunksWithValidatedResultCache, readRepoFileWithValidatedResultCache } from './repo-read-cache.js';
 import { repoStatusHandler } from './repo-status.js';
 
-const {
-    diffTextValidated,
-    readBytesValidated,
-    readTextValidated,
-    scanDirectoryValidated,
-    searchTextValidated,
-    searchWorkspaceSymbolsValidated,
-    statPathValidated,
-} = createWorkspaceIo({
-    workspaceRoot: getMcpWorkspaceRoot(),
+const workspaceRoot = getMcpWorkspaceRoot();
+const { diffTextValidated, readBytesValidated, readTextValidated, statPathValidated } = createWorkspaceIo({
+    workspaceRoot,
+});
+const { scanDirectoryValidated, searchTextValidated, searchWorkspaceSymbolsValidated } = createWorkspaceIndexing({
+    workspaceRoot,
 });
 
 const DEFAULT_REPO_READ_PATH = 'src/copilot';
@@ -336,7 +333,7 @@ export function applyRepoReadHashMode(structured, hashMode) {
  * }} input
  */
 async function runRepoReadFileCall(input) {
-    const resolved = await resolveReadPath(input.path ?? '', { issueReadCapability: true });
+    const resolved = await resolveValidatedReadPath(input.path ?? '');
     if (!resolved.ok) return errorResult(resolved.reason, resolved);
     if (input.startLine !== undefined && input.endLine !== undefined && input.endLine < input.startLine) {
         return errorResult('endLine must be greater than or equal to startLine.', {
@@ -381,9 +378,7 @@ async function runRepoSearchTextCall(input) {
             hint: 'Provide pattern or query.',
         });
     }
-    const resolved = await resolveReadPath(normalizeOptionalRepoPath(input.path, DEFAULT_REPO_READ_PATH), {
-        issueReadCapability: true,
-    });
+    const resolved = await resolveValidatedReadPath(normalizeOptionalRepoPath(input.path, DEFAULT_REPO_READ_PATH));
     if (!resolved.ok) return errorResult(resolved.reason, resolved);
     const result = await searchTextValidated(resolved.validatedReadPath, {
         workspaceRoot: WORKSPACE_ROOT,
@@ -440,7 +435,7 @@ async function runRepoSearchTextCall(input) {
 
 /** @param {{ path: string; includeHash?: boolean; maxHashBytes?: number }} input */
 async function runRepoFileStatsCall(input) {
-    const resolved = await resolveReadPath(input.path, { issueReadCapability: true });
+    const resolved = await resolveValidatedReadPath(input.path);
     if (!resolved.ok) return errorResult(resolved.reason, resolved);
     const statSnapshot = await statPathValidated(resolved.validatedReadPath);
     const stats = statSnapshot.stats;
@@ -504,9 +499,7 @@ export const repoReadTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, recursive, depth, maxEntries, showHidden }) => {
-            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH), {
-                issueReadCapability: true,
-            });
+            const resolved = await resolveValidatedReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const effectiveMaxEntries = maxEntries ?? 2000;
             const scan = await scanDirectoryValidated(resolved.validatedReadPath, {
@@ -549,7 +542,7 @@ export const repoReadTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ recursive, depth, maxEntries, showHidden }) => {
-            const resolved = await resolveReadPath('.', { issueReadCapability: true });
+            const resolved = await resolveValidatedReadPath('.');
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const effectiveMaxEntries = maxEntries ?? 2000;
             const scan = await scanDirectoryValidated(resolved.validatedReadPath, {
@@ -587,7 +580,7 @@ export const repoReadTools = [
         inputSchema: {},
         annotations: readOnlyAnnotations(),
         handler: async () => {
-            const resolved = await resolveReadPath('.', { issueReadCapability: true });
+            const resolved = await resolveValidatedReadPath('.');
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const visibleScan = await scanDirectoryValidated(resolved.validatedReadPath, {
                 workspaceRoot: WORKSPACE_ROOT,
@@ -932,7 +925,7 @@ export const repoReadTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ path, startLine, endLine, chunkLines, cursor, highWaterMark }) => {
-            const resolved = await resolveReadPath(path, { issueReadCapability: true });
+            const resolved = await resolveValidatedReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const parsedCursorLine = cursor !== undefined ? Number.parseInt(cursor, 10) : null;
             if (parsedCursorLine !== null && (!Number.isFinite(parsedCursorLine) || parsedCursorLine < 1)) {
@@ -978,9 +971,9 @@ export const repoReadTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ pathA, pathB, contextLines, includeDiffPreview }) => {
-            const resolvedA = await resolveReadPath(pathA, { issueReadCapability: true });
+            const resolvedA = await resolveValidatedReadPath(pathA);
             if (!resolvedA.ok) return errorResult(`pathA: ${resolvedA.reason}`, { ...resolvedA, field: 'pathA' });
-            const resolvedB = await resolveReadPath(pathB, { issueReadCapability: true });
+            const resolvedB = await resolveValidatedReadPath(pathB);
             if (!resolvedB.ok) return errorResult(`pathB: ${resolvedB.reason}`, { ...resolvedB, field: 'pathB' });
             const diff = await diffTextValidated(resolvedA.validatedReadPath, resolvedB.validatedReadPath, {
                 contextLines: contextLines ?? 3,
@@ -1194,9 +1187,7 @@ export const repoReadTools = [
             maxResults,
             cursor,
         }) => {
-            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH), {
-                issueReadCapability: true,
-            });
+            const resolved = await resolveValidatedReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const escaped = escapeForRegex(symbol);
             const pattern = wholeWord !== false ? `\\b${escaped}\\b` : escaped;
@@ -1254,9 +1245,7 @@ export const repoReadTools = [
         },
         annotations: readOnlyAnnotations(),
         handler: async ({ name, kind, path, includePattern, caseSensitive, exactMatch, maxResults, cursor }) => {
-            const resolved = await resolveReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH), {
-                issueReadCapability: true,
-            });
+            const resolved = await resolveValidatedReadPath(normalizeOptionalRepoPath(path, DEFAULT_REPO_READ_PATH));
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const result = await searchWorkspaceSymbolsValidated(resolved.validatedReadPath, {
                 symbolName: name,
@@ -1322,7 +1311,7 @@ export const repoReadTools = [
             maxItems,
             maxBytes,
         }) => {
-            const resolved = await resolveReadPath(path, { issueReadCapability: true });
+            const resolved = await resolveValidatedReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readTextValidated(resolved.validatedReadPath);
             const parsed = await parseFileForContext(resolved.resolved, snapshot.content, {

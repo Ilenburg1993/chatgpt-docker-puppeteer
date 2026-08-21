@@ -249,8 +249,8 @@ inexistentes. Os artefatos foram preservados na quarentena reversível do MCP ap
 rastreabilidade histórica; não fazem parte da toolchain canônica.
 
 Transformações sintáticas novas devem reutilizar a policy Babel 8 em
-`src/copilot/infra/parse/babel-policy.js` e somente adotar geração de código quando houver um caso
-de uso atual, testado e explicitamente necessário.
+`src/copilot/infra/code-analysis/babel-policy.js` e somente adotar geração de código quando houver
+um caso de uso atual, testado e explicitamente necessário.
 
 ---
 

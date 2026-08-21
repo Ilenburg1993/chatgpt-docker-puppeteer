@@ -10,8 +10,12 @@
  */
 
 import { getCopilotDb } from '#copilot/db';
-import { openDetachedAppendSinkTrusted, readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/trusted-io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import {
+    openDetachedAppendSinkTrusted,
+    readTextFreshTrusted,
+    statPathTrusted,
+} from '#copilot/infra/public/filesystem/trusted';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,

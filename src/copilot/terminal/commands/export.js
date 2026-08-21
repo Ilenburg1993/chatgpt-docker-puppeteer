@@ -9,7 +9,7 @@
  */
 
 import { WORKSPACE_ROOT } from '#copilot/boot';
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { join, resolve } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretText } from '../../core/security/redaction.js';

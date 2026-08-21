@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readJsonlTail, repairJsonlTrailingPartial } from '../../../../src/copilot/infra/io/jsonl-reader.js';
+import { readJsonlTail, repairJsonlTrailingPartial } from '#copilot/infra/internal/persistence/jsonl';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
@@ -23,7 +23,7 @@ async function createTempDir() {
     return dir;
 }
 
-describe('infra/io/jsonl-reader', () => {
+describe('infra/persistence/jsonl/reader', () => {
     it('valida último registro legítimo maior que a janela rápida de reparo', async () => {
         const dir = await createTempDir();
         const file = join(dir, 'large-valid.jsonl');

@@ -585,7 +585,7 @@ describe('agent health routes', () => {
                     runtimeAuthority: 'agent',
                 },
                 'integration.webhooks': {
-                    provider: 'infra/webhooks',
+                    provider: 'agent/infra/webhook-manager',
                     factory: 'test.createWebhooks',
                     runtimeAuthority: 'agent',
                 },

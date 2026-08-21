@@ -6,28 +6,31 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { invalidateIoCachePath } from '../../../../src/copilot/infra/io-cache.js';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
 import {
-    cleanupExpiredRollbackSidecars,
-    cleanupRollbackSidecars,
     getByteLineIndexStats,
-    getIoRollbackPolicy,
-    persistRollbackSidecar,
-    readBinaryMutationSnapshot,
     readBytesFileRangeSnapshot,
     readBytesFileSnapshot,
     readTextLineChunks,
     readTextLineChunksStream,
     readTextLinesSnapshot,
-    resetByteLineIndexCacheForTest,
-} from '../../../../src/copilot/infra/io/fs/index.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+} from '#copilot/infra/internal/filesystem/read';
+import {
+    cleanupExpiredRollbackSidecars,
+    cleanupRollbackSidecars,
+    getIoRollbackPolicy,
+    persistRollbackSidecar,
+    readBinaryMutationSnapshot,
+} from '#copilot/infra/internal/filesystem/transaction';
+import { sha256 } from '#copilot/infra/internal/platform';
+import { resetByteLineIndexCacheForTest } from '#copilot/infra/public/testing';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
 
 const REPLACE_FILE_CHILD = `
 import { rename, writeFile } from 'node:fs/promises';
+import { resetByteLineIndexCacheForTest } from '#copilot/infra/public/testing';
 process.on('message', async (message) => {
     try {
         const tempPath = message.filePath + '.external-replacement';
@@ -320,7 +323,7 @@ describe('infra/io/fs read line ports', () => {
         expect(stats.hits).toBe(1);
         expect(stats.capturedRangeReuses).toBe(2);
 
-        invalidateIoCachePath(file);
+        invalidateIoCoherencePath(file);
         const invalidated = getByteLineIndexStats();
         expect(invalidated.busInvalidations).toBe(1);
         expect(invalidated.clears).toBe(1);

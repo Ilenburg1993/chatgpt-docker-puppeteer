@@ -1,7 +1,7 @@
 // @ts-check
 import { SERVER_PORT } from '#copilot/config';
 import { toError } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { httpRequest } from '#copilot/sdk';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

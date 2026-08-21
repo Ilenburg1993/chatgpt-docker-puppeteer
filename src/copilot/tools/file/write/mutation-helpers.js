@@ -17,7 +17,7 @@ import {
     getIoRollbackPolicy,
     recordIoMutationAudit,
     serializeIoRollbackToken,
-} from '#copilot/infra/public/runtime';
+} from '#copilot/infra/public/operations';
 import { createToolFailureResult } from '../../infra/tool-feedback.js';
 import {
     buildPatchFailureTerminalSummary,
@@ -41,7 +41,7 @@ export const ADVISORY_PATCH_SEGMENT_CHARS = 200_000;
  */
 
 /**
- * @param {ReturnType<typeof import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
+ * @param {ReturnType<typeof import('#copilot/infra/public/operations').createIoOperationEnvelope>} operation
  * @param {{
  *     status?: 'planned' | 'applied' | 'failed' | 'dry-run';
  *     traceId?: string | null;
@@ -65,7 +65,7 @@ export async function completeAndAuditMutation(operation, result, auditContext) 
 }
 
 /**
- * @param {ReturnType<typeof import('#copilot/infra/public/runtime').createIoOperationEnvelope>} operation
+ * @param {ReturnType<typeof import('#copilot/infra/public/operations').createIoOperationEnvelope>} operation
  * @param {unknown} error
  * @param {{
  *     tool: string;

@@ -1,5 +1,5 @@
+import { createCrossProcessInvalidationJournal } from '#copilot/infra/internal/filesystem/invalidation';
 import Database from 'better-sqlite3';
-import { createCrossProcessInvalidationJournal } from '../../../../../src/copilot/infra/io/invalidation/cross-process-journal.js';
 
 const [dbPath, expectedPath] = process.argv.slice(2);
 if (!dbPath || !expectedPath) process.exit(3);

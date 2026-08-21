@@ -2,12 +2,12 @@
 /**
  * tests/unit/copilot/infra/test_outline_builder.spec.js
  *
- * Testes unitários para src/copilot/infra/parse/outline-builder.js Cobre: buildOutline — seções exports, re-exports,
+ * Testes unitários para src/copilot/infra/code-analysis/outline-builder.js Cobre: buildOutline — seções exports, re-exports,
  * internal, imports e parseError.
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildOutline } from '../../../../src/copilot/infra/parse/outline-builder.js';
+import { buildOutline } from '../../../../src/copilot/infra/code-analysis/outline-builder.js';
 
 // Helpers
 /**

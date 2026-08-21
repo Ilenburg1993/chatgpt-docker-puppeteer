@@ -3,23 +3,21 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-    buildIoRollbackPlan,
-    createIoRollbackToken,
-    parseIoRollbackToken,
-    serializeIoRollbackToken,
-    verifyIoRollbackToken,
-} from '../../../../src/copilot/infra/runtime/rollback.js';
-import {
     abortIoChangeSet,
     appendIoChangeSetEntry,
     applyIoChangeSet,
     beginIoChangeSet,
+    buildIoRollbackPlan,
+    createIoRollbackToken,
     failIoChangeSet,
+    parseIoRollbackToken,
     rollbackIoChangeSet,
-} from '../../../../src/copilot/infra/runtime/transaction.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+    serializeIoRollbackToken,
+    verifyIoRollbackToken,
+} from '#copilot/infra/internal/operations';
+import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
 
-describe('infra/runtime/transaction + rollback', () => {
+describe('infra/operations transaction + rollback', () => {
     it('abre changeSet, agrega entradas e finaliza aplicado', () => {
         const started = beginIoChangeSet({ capability: 'file.write', targets: ['/tmp/a.txt'] });
         expect(started.status).toBe('open');

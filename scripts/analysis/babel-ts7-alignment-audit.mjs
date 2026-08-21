@@ -24,7 +24,7 @@ import {
     BABEL_PARSER_POLICY_VERSION,
     formatBabelParserError,
     resolveBabelParserOptions,
-} from '../../src/copilot/infra/parse/babel-policy.js';
+} from '#copilot/infra/public/code-analysis';
 
 const require = createRequire(import.meta.url);
 const ROOT = path.resolve(import.meta.dirname, '..', '..');

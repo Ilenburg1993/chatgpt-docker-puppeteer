@@ -73,7 +73,7 @@ export class AgentContext {
     dialogLoop;
     /** @type {import('./infra/message-queue.js').MessageQueue} */
     messageQueue;
-    /** @type {import('../infra/webhooks.js').WebhookManager} */
+    /** @type {import('./infra/webhook-manager.js').WebhookManager} */
     webhooks;
     /** @type {import('./ports/index.js').AgentPermissionController} */
     permissions;

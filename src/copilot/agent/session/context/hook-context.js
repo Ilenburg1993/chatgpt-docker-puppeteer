@@ -17,9 +17,9 @@
 import { readBootSkillConfig, resolveHooksStateFile, resolveWorkspacePath } from '#copilot/boot';
 import { HOOK_CONTEXT_MAX_BYTES as _HOOK_CONTEXT_MAX_BYTES } from '#copilot/config/agent';
 import { container, logSwallowed, safeJsonParse, toError } from '#copilot/core';
-import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/buffer';
-import { readConfiguredSkillCatalog } from '#copilot/infra/public/skill-io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { readConfiguredSkillCatalog } from '#copilot/infra/public/filesystem/skills';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { truncateUtf8String, utf8ByteLength } from '#copilot/infra/public/platform';
 import { z } from 'zod';
 import { log } from '../../ports/logging/index.js';
 import { METRICS_STORE } from '../../ports/metrics-port.js';

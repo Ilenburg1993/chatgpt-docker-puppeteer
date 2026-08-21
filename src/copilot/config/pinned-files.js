@@ -14,7 +14,7 @@ import {
     readTextFreshTrusted,
     statPathTrusted,
     watchPathTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
 import { logSwallowed, toError } from '../core/error-handlers.js';

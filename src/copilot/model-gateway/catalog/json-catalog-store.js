@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
-import { readJson, writeJson } from '../../infra/storage/json-store.js';
+import { readJson, writeJson } from '#copilot/infra/public/persistence/json';
 import { MODEL_GATEWAY_CATALOG_SCHEMA_VERSION } from './contracts.js';
 
 export const DEFAULT_MODEL_GATEWAY_CATALOG_PATH = join(

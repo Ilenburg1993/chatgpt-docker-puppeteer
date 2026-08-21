@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { AsyncQueue } from '../../../../src/copilot/infra/queue.js';
+import { AsyncQueue } from '../../../../src/copilot/infra/concurrency/queue/index.js';
 
 describe('infra/queue AsyncQueue', () => {
     it('normaliza concorrência fracionária para inteiro positivo', async () => {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "policy": "copilot-trusted-io-explicit-importers-and-static-callers",
-  "trustedIoSpecifier": "#copilot/infra/public/trusted-io",
+  "trustedIoSpecifier": "#copilot/infra/public/filesystem/trusted",
   "entries": [
     {
       "file": "src/copilot/agent/lifecycle/state/state-file-io.js",
@@ -50,6 +50,12 @@
       "callers": ["config.system-prompt.user-config"],
       "classification": "runtime-config",
       "reason": "Reads the explicit user system-prompt configuration boundary."
+    },
+    {
+      "file": "src/copilot/observability/logger.js",
+      "callers": ["observability.logger.retention"],
+      "classification": "observability-state",
+      "reason": "Owns bounded log retention and cleanup for the process observability sink."
     },
     {
       "file": "src/copilot/mcp/adapters/http2.js",

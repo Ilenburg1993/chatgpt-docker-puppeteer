@@ -89,7 +89,7 @@ Importações autorizadas dentro de `sdk/`:
 
 - `#copilot/core` e `#copilot/core/*`
 - `#copilot/boot` e `#copilot/boot/*`
-- `#copilot/infra` e `#copilot/infra/*`
+- `#copilot/infra/public/*` (membrana externa exclusiva de infra)
 - `#copilot/events`
 - `#copilot/config`
 
@@ -133,7 +133,7 @@ Importações proibidas por design:
   `session.name`, permissões nativas (`setApproveAll`, `resetSessionApprovals`), `mcp.config`,
   `skills.discover/config`, `sessions.fork`, `mcp.oauth.login`, `history.truncate` e
   `usage.getMetrics`.
-- Baseline atual do repositório: `@github/copilot-sdk@1.0.9` instalado via lockfile. Novas mudanças
+- Baseline atual do repositório: `@github/copilot-sdk@1.0.11` instalado via lockfile. Novas mudanças
   devem validar o contrato 1.0.x real antes de preservar compatibilidade histórica por inércia.
 - Billing/usage corrente: o wrapper trata `assistant.usage`, tokens, `copilotUsage.totalNanoAiu` e
   os eventos `session.usage_checkpoint`/`session_limits_*` como sinais canônicos.

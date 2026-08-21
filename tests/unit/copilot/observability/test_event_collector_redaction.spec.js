@@ -23,7 +23,7 @@ const writerMocks = vi.hoisted(() => {
     return { createJsonlFileWriter, instances };
 });
 
-vi.mock('../../../../src/copilot/infra/io/jsonl-file-writer.js', () => ({
+vi.mock('#copilot/infra/public/persistence/jsonl', () => ({
     createJsonlFileWriter: writerMocks.createJsonlFileWriter,
 }));
 

@@ -65,9 +65,9 @@ import { createToolTelemetryStore, defaultToolTelemetryStore } from './tool-stat
 
 // FINDING-P5-3: imports estáticos em vez de dynamic import dentro de setInterval
 import { COPILOT_LOG_DIR, COPILOT_METRICS_SNAPSHOT_INTERVAL } from '#copilot/config';
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import { join as _join } from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
-import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import { createHistogram } from './metrics-histogram.js';
 
 /**

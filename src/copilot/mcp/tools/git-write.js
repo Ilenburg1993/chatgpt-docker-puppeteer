@@ -8,7 +8,7 @@
  * @module copilot/mcp/tools/git-write
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,

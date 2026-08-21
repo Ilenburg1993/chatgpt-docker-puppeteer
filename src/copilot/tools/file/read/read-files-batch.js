@@ -9,8 +9,8 @@
  * @module copilot/tools/file/read/read-files-batch
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
 import { truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../shared.js';

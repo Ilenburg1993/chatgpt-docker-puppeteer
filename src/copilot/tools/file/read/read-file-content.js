@@ -8,9 +8,10 @@
  */
 
 import { sanitizeIoTextOutput, toError, withIoMeta } from '#copilot/core';
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
 import { getIoCacheStats } from '#copilot/infra/public/cache';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
+import { utf8ByteLength } from '#copilot/infra/public/platform';
 import { z } from 'zod';
 import { log } from '../../infra/logger.js';
 import { buildTool } from '../../infra/tool-factory.js';
@@ -28,8 +29,10 @@ import {
 } from './read-through-policy.js';
 import { nextLineCursor, normalizeNonNegativeInteger, normalizePositiveInteger, parseReadCursor } from './window.js';
 
-const { readBytesValidated, readTextChunksValidated, readTextValidated, statPathValidated, warmReadThroughContext } =
-    createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { readBytesValidated, readTextChunksValidated, readTextValidated, statPathValidated } = createWorkspaceIo({
+    workspaceRoot: WORKSPACE_ROOT,
+});
+const { warmReadThroughContext } = createWorkspaceIndexing({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
  * Tamanho mínimo em bytes para disparar warm read-through context em arquivos de texto.

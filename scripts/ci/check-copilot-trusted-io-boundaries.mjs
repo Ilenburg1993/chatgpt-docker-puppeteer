@@ -22,13 +22,14 @@ import { parseCopilotFsSource, walkAst } from './lib/copilot-fs-ast.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SOURCE_ROOT = 'src/copilot';
 const SOURCE_GLOB = `${SOURCE_ROOT}/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}`;
-const TRUSTED_IO_SPECIFIER = '#copilot/infra/public/trusted-io';
+const TRUSTED_IO_SPECIFIER = '#copilot/infra/public/filesystem/trusted';
 const POLICY_PATH = path.join(ROOT, 'config', 'architecture', 'copilot-trusted-io-boundaries.json');
 const CLASSIFICATIONS = new Set([
     'agent-state',
     'runtime-config',
     'mcp-control-plane',
     'model-gateway-state',
+    'observability-state',
     'sdk-state',
     'terminal-operator',
     'tool-state',

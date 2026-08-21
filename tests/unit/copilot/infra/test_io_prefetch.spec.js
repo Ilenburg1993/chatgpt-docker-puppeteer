@@ -3,14 +3,8 @@
  * Testes unitários para io-prefetch.js
  */
 
-import * as assert from 'node:assert/strict';
-import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
-import { getIoCacheStats, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
-import { readBytes, readText } from '../../../../src/copilot/infra/io-engine.js';
-import { getParserCacheStats, resetParserCacheForTest } from '../../../../src/copilot/infra/io-parser.js';
+import { getIoCacheStats } from '#copilot/infra/internal/cache';
+import { readBytes, readText } from '#copilot/infra/internal/filesystem/read';
 import {
     endSessionScope,
     getSessionScopeStats,
@@ -19,8 +13,15 @@ import {
     warmCacheForPaths,
     warmFromDirectory,
     warmReadThroughContext,
-} from '../../../../src/copilot/infra/io-prefetch.js';
+} from '#copilot/infra/internal/indexing/context';
+import { getParserCacheStats } from '#copilot/infra/internal/indexing/parser';
+import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
+import { resetIoL1CacheForTest, resetParserCacheForTest } from '#copilot/infra/public/testing';
 let tmpDir = '';
 
 beforeAll(async () => {

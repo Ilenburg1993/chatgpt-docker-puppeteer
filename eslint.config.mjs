@@ -128,8 +128,8 @@ const TOOLS_IO_SYNTAX_RESTRICTIONS = [
     {
         selector: 'ImportDeclaration[source.value=/^#copilot\\/infra\\/(?!public\\/)/]',
         message:
-            'Boundary tools→infra: tools só podem consumir "#copilot/infra/public/*". ' +
-            'Crie/expanda uma facade pública em infra/public quando a capacidade ainda não existir.',
+            'Boundary tools→infra: consuma exclusivamente entrypoints #copilot/infra/public/*. ' +
+            'Aliases internal, legados e deep imports não são API externa.',
     },
     {
         selector: 'ImportDeclaration[source.value=/^#copilot\\/db(?:$|\\/)/]',
@@ -155,14 +155,14 @@ const TOOLS_IO_SYNTAX_RESTRICTIONS = [
             'ImportDeclaration[source.value="node:fs/promises"] ImportSpecifier[imported.name=/^(readFile|writeFile|appendFile|copyFile|cp|rename|rm|unlink|mkdir|open)$/]',
         message:
             'IO governance: tools não devem chamar fs/promises para leitura/escrita/mutação. ' +
-            'Use "#copilot/infra/public/io" para cache, locks, policy, metadata e invalidação coordenada.',
+            'Use capabilities sob #copilot/infra/public/filesystem/*, public/cache, public/indexing ou public/policy.',
     },
     {
         selector:
             'ImportDeclaration[source.value="node:fs"] ImportSpecifier[imported.name=/^(readFile|readFileSync|writeFile|writeFileSync|appendFile|appendFileSync|copyFile|copyFileSync|cp|rename|rm|unlink|mkdir|open)$/]',
         message:
             'IO governance: tools não devem chamar node:fs diretamente para leitura/escrita/mutação. ' +
-            'Use "#copilot/infra/public/io" ou uma facade pública específica.',
+            'Use uma capability explícita de #copilot/infra/public/*; acesso direto a node:fs permanece proibido em tools.',
     },
 ];
 
@@ -569,9 +569,9 @@ export default tseslint.config(
                 {
                     patterns: [
                         {
-                            regex: '^#copilot/infra(?:$|/)',
+                            regex: '^#copilot/infra(?:$|/(?!public/))',
                             message:
-                                'Evite importar #copilot/infra diretamente em tools/. Prefira ports/capabilities intermediárias.',
+                                'Em tools/, infra só pode ser consumida por #copilot/infra/public/*; internal e aliases legados são proibidos.',
                         },
                         {
                             regex: '^#copilot/db(?:$|/)',
@@ -594,9 +594,9 @@ export default tseslint.config(
                 {
                     patterns: [
                         {
-                            group: ['../../infra/*', '../infra/*', '#copilot/infra/*'],
+                            group: ['../../infra/*', '../infra/*', '#copilot/infra/internal/*'],
                             message:
-                                'Boundary target: evitar dependência direta tools → infra. Use portas/adapters no domínio tools.',
+                                'Boundary target: não atravesse para internals de infra. Use #copilot/infra/public/* ou adapters do domínio tools.',
                         },
                         {
                             group: ['../../db/*', '../db/*', '#copilot/db/*'],
@@ -813,10 +813,10 @@ export default tseslint.config(
             'src/copilot/observability/metrics.js',
             'src/copilot/observability/error-alerting.js',
             'src/copilot/terminal/repl/live-status-line.js',
-            'src/copilot/infra/io-cache-l2-registry.js',
+            'src/copilot/infra/cache/l2/runtime.js',
             'src/copilot/terminal/dialog/engine.js',
             'src/copilot/terminal/wiring/terminal-agent-wiring.js',
-            'src/copilot/infra/sse/utils.js',
+            'src/copilot/presentation/realtime/sse/utils.js',
             'src/copilot/agent/session/boot/boot-runtime-bind.js',
             'src/copilot/agent/dialog/watchdogs/watchdog.js',
             'src/copilot/tools/todo/store.js',

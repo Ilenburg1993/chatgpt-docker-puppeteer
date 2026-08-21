@@ -34,7 +34,7 @@ const workspaceIoMocks = vi.hoisted(() => ({
 
 const mockValidatePath = vi.hoisted(() => vi.fn());
 
-vi.mock('#copilot/infra/public/workspace-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
     createWorkspaceIo: vi.fn(() => workspaceIoMocks),
 }));
 

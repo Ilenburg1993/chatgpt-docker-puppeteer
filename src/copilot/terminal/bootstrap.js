@@ -8,7 +8,7 @@
  * @module copilot/terminal/bootstrap
  */
 
-import { enableCopilotNodeCompileCache, flushCopilotNodeCompileCache } from '#copilot/infra/public/node-runtime';
+import { enableCopilotNodeCompileCache, flushCopilotNodeCompileCache } from '#copilot/infra/public/platform/node';
 
 await import('./bootstrap-dotenv.js');
 enableCopilotNodeCompileCache();

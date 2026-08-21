@@ -8,11 +8,10 @@
  * @module copilot/terminal/state/sse-event-archive
  */
 
+import { createJsonlFileWriter, readJsonlTail } from '#copilot/infra/public/persistence/jsonl';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { redactSecretRecord } from '../../core/security/redaction.js';
-import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
-import { readJsonlTail } from '../../infra/io/jsonl-reader.js';
 
 const DEFAULT_TERMINAL_SSE_EVENT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'sse-events');
 const TERMINAL_SSE_EVENT_ARCHIVE_SOFT_QUEUE = 10_000;

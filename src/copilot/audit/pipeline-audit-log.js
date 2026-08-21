@@ -17,9 +17,8 @@ import {
     registerShutdownHandler,
     toError,
 } from '#copilot/core';
+import { createJsonlFileWriter, readJsonlTail } from '#copilot/infra/public/persistence/jsonl';
 import { join } from 'node:path';
-import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
-import { readJsonlTail } from '../infra/io/jsonl-reader.js';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */

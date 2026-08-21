@@ -9,16 +9,16 @@
  * @module copilot/terminal/commands/workspace-index
  */
 
-import { channel } from 'node:diagnostics_channel';
-import { relative } from 'node:path';
-import { toError } from '../../core/error-handlers.js';
 import {
     buildIoIndexForDirectory,
     findIoIndexSymbol,
     getIoIndex,
     getIoIndexStats,
     searchIoIndex,
-} from '../../infra/index.js';
+} from '#copilot/infra/public/indexing/registry';
+import { channel } from 'node:diagnostics_channel';
+import { relative } from 'node:path';
+import { toError } from '../../core/error-handlers.js';
 import {
     formatTerminalTimeLabel,
     terminalThemeHeadline,

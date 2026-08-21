@@ -5,7 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { closeScope } from '../../../../src/copilot/infra/io-session-scope.js';
+import { closeScope } from '#copilot/infra/public/indexing/context';
 import { cmdScope } from '../../../../src/copilot/terminal/commands/scope.js';
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';

@@ -35,11 +35,13 @@ function printJson(value) {
 }
 
 async function loadL2Modules() {
-    const [registry, db] = await Promise.all([
-        import('../../src/copilot/infra/io-cache-l2-registry.js'),
+    const [registry, db, sqlitePort, testing] = await Promise.all([
+        import('#copilot/infra/public/cache'),
         import('../../src/copilot/db/sqlite.js'),
+        import('#copilot/infra/public/database'),
+        import('#copilot/infra/public/testing'),
     ]);
-    return { registry, db };
+    return { registry, db, sqlitePort, testing };
 }
 
 async function runDefaultPhase() {
@@ -62,7 +64,8 @@ async function runDefaultPhase() {
  */
 async function runSeedPhase(dbPath) {
     assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
-    const { registry, db } = await loadL2Modules();
+    const { registry, db, sqlitePort, testing } = await loadL2Modules();
+    sqlitePort.configureInfraSqliteProvider(db.getCopilotDb);
     try {
         const configuration = registry.getIoL2CacheConfiguration();
         assert.deepEqual(
@@ -114,7 +117,8 @@ async function runSeedPhase(dbPath) {
             stats,
         });
     } finally {
-        registry.resetIoL2CacheForTest();
+        testing.resetIoL2CacheForTest();
+        testing.resetInfraSqliteProviderForTest();
         db.closeCopilotDb();
     }
 }
@@ -124,7 +128,8 @@ async function runSeedPhase(dbPath) {
  */
 async function runReadPhase(dbPath) {
     assert.equal(process.env['COPILOT_DB_PATH'], dbPath);
-    const { registry, db } = await loadL2Modules();
+    const { registry, db, sqlitePort, testing } = await loadL2Modules();
+    sqlitePort.configureInfraSqliteProvider(db.getCopilotDb);
     try {
         const cache = registry.getIoL2Cache();
         assert.ok(cache, 'read process must initialize the experimental L2 cache');
@@ -150,7 +155,8 @@ async function runReadPhase(dbPath) {
             stats,
         });
     } finally {
-        registry.resetIoL2CacheForTest();
+        testing.resetIoL2CacheForTest();
+        testing.resetInfraSqliteProviderForTest();
         db.closeCopilotDb();
     }
 }

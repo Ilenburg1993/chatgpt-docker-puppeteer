@@ -7,10 +7,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-const CACHE_URL = new URL('../../../../src/copilot/infra/io-cache-l2-sqlite.js', import.meta.url).href;
-const REGISTRY_URL = new URL('../../../../src/copilot/infra/io-cache-l2-registry.js', import.meta.url).href;
+const CACHE_URL = new URL('../../../../src/copilot/infra/cache/l2/sqlite/index.js', import.meta.url).href;
+const REGISTRY_URL = new URL('../../../../src/copilot/infra/cache/l2/index.js', import.meta.url).href;
 const CORE_URL = new URL('../../../../src/copilot/core/index.js', import.meta.url).href;
 const DB_URL = new URL('../../../../src/copilot/db/sqlite.js', import.meta.url).href;
+const SQLITE_PORT_URL = new URL('../../../../src/copilot/infra/database/index.js', import.meta.url).href;
 
 const CHILD_SCRIPT = `
 const options = JSON.parse(process.env['COPILOT_L2_MULTIPROCESS_CASE']);
@@ -30,11 +31,14 @@ try {
         print({ ready: true });
         await new Promise(() => {});
     } else if (options.operation === 'graceful') {
-        const [{ runShutdown }, registry, database] = await Promise.all([
+        const [{ runShutdown }, registry, database, sqlitePort] = await Promise.all([
             import(options.coreUrl),
             import(options.registryUrl),
             import(options.dbUrl),
+            import(options.sqlitePortUrl),
         ]);
+        await database.ensureCopilotDbDir();
+        sqlitePort.configureInfraSqliteProvider(database.getCopilotDb);
         const cache = registry.getIoL2Cache();
         if (!cache) throw new Error('L2 cache unavailable');
         cache.clearAll();
@@ -49,11 +53,22 @@ try {
         const nativeSetTimeout = globalThis.setTimeout;
         globalThis.setTimeout = (handler, delay, ...args) =>
             nativeSetTimeout(handler, delay === 25 ? 60_000 : delay, ...args);
-        const [core, registry, database] = await Promise.all([
+        const [core, registry, database, sqlitePort] = await Promise.all([
             import(options.coreUrl),
             import(options.registryUrl),
             import(options.dbUrl),
+            import(options.sqlitePortUrl),
         ]);
+        await database.ensureCopilotDbDir();
+        sqlitePort.configureInfraSqliteProvider(database.getCopilotDb);
+        const shutdownFromSignal = (signal) => {
+            void core.runShutdown(signal).then(
+                () => process.exit(0),
+                () => process.exit(1),
+            );
+        };
+        process.once('SIGTERM', () => shutdownFromSignal('SIGTERM'));
+        process.once('SIGINT', () => shutdownFromSignal('SIGINT'));
         const cache = registry.getIoL2Cache();
         if (!cache) throw new Error('L2 cache unavailable');
         cache.clearAll();
@@ -137,6 +152,7 @@ function spawnCase(options) {
                 registryUrl: REGISTRY_URL,
                 coreUrl: CORE_URL,
                 dbUrl: DB_URL,
+                sqlitePortUrl: SQLITE_PORT_URL,
                 ...options,
             }),
         },
@@ -272,7 +288,7 @@ describe('io-cache-l2 write-behind multiprocess proofs', () => {
         db.close();
     }, 15_000);
 
-    it('routes SIGTERM through cache flush before database close', async () => {
+    it('process signal owner routes SIGTERM through cache flush before database close', async () => {
         const dir = await createTempDir();
         const dbPath = path.join(dir, 'signal-graceful.sqlite');
         const key = 'signal-graceful';
@@ -299,7 +315,7 @@ describe('io-cache-l2 write-behind multiprocess proofs', () => {
         const key = 'contention';
 
         const setup = new Database(dbPath);
-        const { createIoL2SqliteCache } = await import('../../../../src/copilot/infra/io-cache-l2-sqlite.js');
+        const { createIoL2SqliteCache } = await import('../../../../src/copilot/infra/cache/l2/sqlite/index.js');
         createIoL2SqliteCache({ db: setup }).clearAll();
         setup.close();
 

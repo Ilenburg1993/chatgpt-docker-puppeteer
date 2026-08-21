@@ -1,30 +1,56 @@
 // @ts-check
 
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { afterAll, beforeEach, describe, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, it } from 'vitest';
 
-import { resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
-import { refreshIoIndexPaths } from '../../../../src/copilot/infra/io-index-registry.js';
-import { getParserCacheStats, resetParserCacheForTest } from '../../../../src/copilot/infra/io-parser.js';
+import { configureInfraSqliteProvider } from '#copilot/infra/internal/database';
+import { refreshIoIndexPaths } from '#copilot/infra/internal/indexing';
 import {
     closeScope,
     declareScope,
     findSymbol,
     getScopeContext,
     refreshScope,
-} from '../../../../src/copilot/infra/io-session-scope.js';
+} from '#copilot/infra/internal/indexing/context';
+import { getParserCacheStats } from '#copilot/infra/internal/indexing/parser';
+import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
+import {
+    resetInfraSqliteProviderForTest,
+    resetIoIndexForTest,
+    resetIoL1CacheForTest,
+    resetParserCacheForTest,
+} from '#copilot/infra/public/testing';
 const WORKSPACE_ROOT = process.cwd();
 const TOOLS_DIR = join(WORKSPACE_ROOT, 'src/copilot/mcp/tools');
 
+/** @type {import('better-sqlite3').Database | null} */
+let testInfraDb = null;
+
 beforeEach(async () => {
+    closeScope('working-set-integration');
+    closeScope('working-set-symbol-seed');
+    resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
+    testInfraDb = new Database(':memory:');
+    ensureIoIndexSchema(testInfraDb);
+    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testInfraDb));
     resetIoL1CacheForTest();
     await resetParserCacheForTest();
 });
 
-afterAll(async () => {
+afterEach(() => {
     closeScope('working-set-integration');
+    closeScope('working-set-symbol-seed');
+    resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
+    if (testInfraDb?.open) testInfraDb.close();
+    testInfraDb = null;
+});
+
+afterAll(async () => {
     await resetParserCacheForTest({ teardownWorkers: true });
 });
 

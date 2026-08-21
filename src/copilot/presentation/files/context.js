@@ -6,12 +6,14 @@
  *   Esta camada retira de `terminal/` a propriedade semântica sobre leitura, embedding e cache de arquivos.
  */
 
+import { normalizeIoCacheKey } from '#copilot/infra/public/cache';
+import { registerIoInvalidationHook } from '#copilot/infra/public/filesystem/invalidation';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
+import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
+import { decodeBase64ToOwnedBuffer } from '#copilot/infra/public/platform';
 import { extname, resolve as pathResolve, sep } from 'node:path';
 import { logSwallowed, toError } from '../../core/error-handlers.js';
 import { evaluateIoPathPolicyAsync } from '../../core/io-policy.js';
-import { decodeBase64ToOwnedBuffer } from '../../infra/public/buffer.js';
-import { normalizeIoCacheKey, registerInvalidationHook } from '../../infra/public/cache.js';
-import { createWorkspaceIo } from '../../infra/public/workspace-io.js';
 
 /** Limite informativo histórico. Não bloqueia embedding em operações da LLM-B. */
 export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
@@ -20,7 +22,9 @@ export const MAX_EMBED_BYTES = Number.POSITIVE_INFINITY;
 const FILE_CACHE_TTL_MS = 30_000;
 const FILE_CACHE_MAX_ENTRIES = Math.max(1, Number(process.env['FILE_CONTEXT_CACHE_MAX_ENTRIES'] ?? 200));
 const DIRECTORY_CONTEXT_MAX_FILES = Math.max(1, Number(process.env['FILE_CONTEXT_DIRECTORY_MAX_FILES'] ?? 50));
-const { readText, scanDirectory } = createWorkspaceIo({ workspaceRoot: process.cwd() });
+const presentationWorkspaceRoot = process.cwd();
+const { readText } = createWorkspaceIo({ workspaceRoot: presentationWorkspaceRoot });
+const { scanDirectory } = createWorkspaceIndexing({ workspaceRoot: presentationWorkspaceRoot });
 
 /** Mapa de extensão → linguagem para blocos de código markdown. @type {Record<string, string>} */
 const EXT_LANG = {
@@ -143,7 +147,7 @@ function invalidateFileContextCachePath(filePath, options = {}) {
     return removed;
 }
 
-registerInvalidationHook((filePath, event) => {
+registerIoInvalidationHook((filePath, event) => {
     try {
         invalidateFileContextCachePath(filePath, { recursive: event?.recursive === true });
     } catch {

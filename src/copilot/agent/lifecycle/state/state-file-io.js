@@ -14,7 +14,7 @@ import {
     mkdirPathTrusted,
     readTextFreshTrusted,
     writeFileAtomicTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import { dirname, resolve } from 'node:path';
 
 /** @type {string} */

@@ -5,7 +5,7 @@
  * Router canônico do endpoint SSE do servidor copilot.
  *
  * Onda 4.0 — L64.1: substitui o modelo raw de `terminal/dialog/sse.js` (clientes http.ServerResponse) pelo padrão
- * `createSseWriter` de `infra/sse/utils.js` (clientes Express, sem set global).
+ * `createSseWriter` de `presentation/realtime` (clientes Express, sem set global).
  *
  * Rotas expostas: GET /events — stream SSE global de todos os eventos do terminal (padrão §12 / §15.8) GET
  * /events/critical — stream SSE filtrado: somente eventos críticos (CRITICAL_EVENTS)
@@ -20,19 +20,19 @@
 
 import { MAX_SSE_CLIENTS, MAX_SSE_CONTENT_CHARS, MAX_SSE_LIFETIME_MS } from '#copilot/config';
 import { defaultMetrics } from '#copilot/observability';
-import { Router } from 'express';
-import { detachSseReplayEventId } from '../../infra/sse/envelope.js';
-import { eventFanout } from '../../infra/sse/fanout.js';
-import { SseReplayBuffer } from '../../infra/sse/replay-buffer.js';
-import { getTerminalReplayBuffer } from '../../infra/sse/state.js';
-import { SseClientPool } from '../../infra/sse/stream-hub.js';
 import {
+    SseClientPool,
+    SseConnectionTracker,
+    SseReplayBuffer,
     createEventFilter,
     createSseWriter,
+    detachSseReplayEventId,
+    eventFanout,
+    getTerminalReplayBuffer,
     sanitizeSseEvent,
-    SseConnectionTracker,
     standardizeSsePayload,
-} from '../../infra/sse/utils.js';
+} from '#copilot/presentation/realtime';
+import { Router } from 'express';
 import { CRITICAL_EVENTS } from '../../presentation/state/index.js';
 
 /**
@@ -72,7 +72,7 @@ const _criticalPool = new SseClientPool(_criticalReplayBuffer, {
 /**
  * Listener registrado uma única vez no eventFanout. Roteia eventos SSE formatados para todos os clientes conectados.
  *
- * @param {import('../../infra/sse/fanout.js').FanoutEvent} fEvt
+ * @param {import('../../presentation/realtime/sse/fanout.js').FanoutEvent} fEvt
  * @returns {void}
  */
 function _onFanoutEvent(fEvt) {

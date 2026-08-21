@@ -2,7 +2,7 @@
 /** Process supervision helpers for Cloudflare MCP CLI. */
 import { spawn, spawnSync } from 'node:child_process';
 
-import { moveFileLocked } from '#copilot/infra/public/io';
+import { moveFileLocked } from '#copilot/infra/public/filesystem/mutation';
 import {
     deleteFileTrusted,
     mkdirPathTrusted,
@@ -10,7 +10,7 @@ import {
     readTextFreshTrusted,
     statPathTrusted,
     writeFileAtomicTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import path from 'node:path';
 import process from 'node:process';
 

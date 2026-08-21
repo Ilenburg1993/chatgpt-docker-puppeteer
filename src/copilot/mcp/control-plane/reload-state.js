@@ -5,7 +5,7 @@
  * @module copilot/mcp/control-plane/reload-state
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { getMcpWorkspaceRoot } from './paths.js';
 
 export const MCP_RELOAD_STATE_FILE = 'src/copilot/.ai/mcp/mcp-reload-state.json';

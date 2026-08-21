@@ -8,7 +8,7 @@
  * @module copilot/config/system-prompt/live-loader
  */
 
-import { statPathTrusted } from '#copilot/infra/public/trusted-io';
+import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { fileURLToPath } from 'node:url';
 import { SECTIONS, SYSTEM_PROMPT_SECTION_FILES, SYSTEM_PROMPT_SECTION_ORDER } from './sections-registry.js';
 

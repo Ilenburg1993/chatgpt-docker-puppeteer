@@ -3,7 +3,7 @@
 import * as assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { fingerprintMatches } from '../../../../src/copilot/infra/shared/fingerprint-match.js';
+import { fingerprintMatches } from '../../../../src/copilot/infra/platform/fingerprint.js';
 
 describe('infra/shared/fingerprint-match', () => {
     it('retorna true para mtime dentro da tolerância com size idêntico', () => {

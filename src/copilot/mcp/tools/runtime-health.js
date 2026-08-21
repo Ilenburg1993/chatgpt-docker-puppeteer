@@ -6,9 +6,9 @@
  */
 
 import { buildIoCacheTierPlan } from '#copilot/infra/public/cache';
-import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/health';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
-import { getCopilotNodeCompileCacheHealth } from '#copilot/infra/public/node-runtime';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
+import { getCopilotNodeCompileCacheHealth } from '#copilot/infra/public/platform/node';
 import {
     readCloudflareTunnelConfig,
     readConnectorSmokeState,

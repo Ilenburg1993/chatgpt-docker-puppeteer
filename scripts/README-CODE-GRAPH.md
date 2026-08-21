@@ -5,8 +5,8 @@ O grafo de dependências first-party do workspace é construído por
 
 Esta implementação é deliberadamente independente da API do compilador TypeScript. O parsing
 estrutural usa `@babel/parser` sob a policy compartilhada de
-`src/copilot/infra/parse/babel-policy.js`; imports são resolvidos com a semântica de módulos do
-Node; componentes fortemente conexos são calculados com Tarjan. Dessa forma, análise arquitetural
+`src/copilot/infra/code-analysis/babel-policy.js`; imports são resolvidos com a semântica de módulos
+do Node; componentes fortemente conexos são calculados com Tarjan. Dessa forma, análise arquitetural
 não cria uma dependência first-party da ilha TS6 mantida somente por compatibilidade de peers
 upstream.
 

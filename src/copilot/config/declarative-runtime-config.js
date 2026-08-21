@@ -8,7 +8,7 @@
  */
 
 import { resolvePersistentConfigFile } from '#copilot/boot';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { safeJsonParse } from '../core/safe-json.js';
 import {
     BUILTIN_HANDLER_MAP,

@@ -8,8 +8,8 @@
  * @module copilot/terminal/commands/byok
  */
 
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { join, resolve } from 'node:path';
 import { executeModelGatewayProbe } from '../../model-gateway/control-plane/probe-execution.js';
 

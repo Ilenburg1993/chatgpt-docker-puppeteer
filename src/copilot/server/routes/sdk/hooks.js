@@ -16,10 +16,7 @@
  */
 
 import { redactSecretRecord } from '#copilot/core';
-import { defaultMetrics } from '#copilot/observability';
 import { Router } from 'express';
-import { SseClientPool } from '../../../infra/sse/stream-hub.js';
-import { createSseWriter, SseConnectionTracker, standardizeSsePayload } from '../../../infra/sse/utils.js';
 import {
     deleteSdkHooksRuntimeState,
     getSdkHooksRuntimeState,
@@ -28,17 +25,28 @@ import {
 import { resolveSdkRouteSharedDeps } from './deps.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
 
-/** GAP-EVARCH-01 (fix): tracker centralizado para /hooks/events. */
-const _hooksTracker = new SseConnectionTracker('hooks/events');
-
 /**
  * @typedef {{
  *     runtimeId: string;
  *     bus: ReturnType<typeof resolveSdkRouteSharedDeps>['sdkHooks']['bus'];
- *     pool: SseClientPool;
+ *     pool: InstanceType<ReturnType<typeof resolveSdkRouteSharedDeps>['sdkRealtime']['SseClientPool']>;
  *     listener: (ev: unknown) => void;
  * }} HookRuntimeState
  */
+
+/** @type {ReturnType<typeof createHooksTracker> | null} */
+let hooksTracker = null;
+
+/** @param {ReturnType<typeof resolveSdkRouteSharedDeps>} routeDeps */
+function createHooksTracker(routeDeps) {
+    return new routeDeps.sdkRealtime.SseConnectionTracker('hooks/events');
+}
+
+/** @param {ReturnType<typeof resolveSdkRouteSharedDeps>} routeDeps */
+function getHooksTracker(routeDeps) {
+    hooksTracker ??= createHooksTracker(routeDeps);
+    return hooksTracker;
+}
 
 /**
  * @param {ReturnType<typeof resolveSdkRouteSharedDeps>} routeDeps
@@ -55,13 +63,13 @@ function ensureHookRuntimeState(routeDeps) {
         deleteSdkHooksRuntimeState(runtimeKey);
     }
 
-    const pool = new SseClientPool(undefined, {
+    const pool = new routeDeps.sdkRealtime.SseClientPool(undefined, {
         name: `sdk.hooks.events.${runtimeKey}`,
-        metrics: defaultMetrics,
+        metrics: routeDeps.metrics,
     });
 
     const listener = (/** @type {unknown} */ ev) => {
-        const payload = standardizeSsePayload({
+        const payload = routeDeps.sdkRealtime.standardizeSsePayload({
             .../** @type {object} */ (ev ?? {}),
             runtimeId: runtimeKey,
         });
@@ -157,7 +165,8 @@ router.get('/hooks/registry', (_req, res) => {
 router.get('/hooks/events', (req, res) => {
     void withErrorHandler(req, res, async () => {
         const routeDeps = resolveSdkRouteSharedDeps(req);
-        if (!_hooksTracker.accept()) {
+        const hooksTracker = getHooksTracker(routeDeps);
+        if (!hooksTracker.accept()) {
             res.status(429).json({
                 ok: false,
                 ...routeDeps.sdkRuntimeProjection.buildRuntimeRouteMetaPayload(routeDeps),
@@ -169,9 +178,9 @@ router.get('/hooks/events', (req, res) => {
 
         // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
         // FASE-11.1/11.4: replay buffer + max lifetime
-        const sse = createSseWriter(req, res, {
+        const sse = routeDeps.sdkRealtime.createSseWriter(req, res, {
             heartbeatMs: 30_000,
-            tracker: _hooksTracker,
+            tracker: hooksTracker,
             replayBuffer: runtimeState.pool.replayBuffer,
             maxLifetimeMs: 24 * 60 * 60 * 1000,
         });

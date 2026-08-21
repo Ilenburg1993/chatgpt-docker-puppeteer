@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { fileExists, readJson, writeJson } from '../../../../src/copilot/infra/storage.js';
+import { fileExists, readJson, writeJson } from '#copilot/infra/internal/persistence/json';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];

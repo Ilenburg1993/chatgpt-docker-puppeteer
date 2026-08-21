@@ -9,7 +9,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { invalidateIoCachePath } from '../../../../src/copilot/infra/public/cache.js';
+import { invalidateIoCoherencePath } from '#copilot/infra/public/filesystem/invalidation';
 import {
     attachmentToEmbed,
     clearFileCache,
@@ -137,7 +137,7 @@ describe('file-context readFileContext + cache', () => {
             expect(first.content).toContain('value = 1');
 
             await writeFile(filePath, 'export const value = 2;\n');
-            invalidateIoCachePath(relativePath);
+            invalidateIoCoherencePath(relativePath);
 
             const second = await readFileContext(relativePath);
             expect(second.content).toContain('value = 2');

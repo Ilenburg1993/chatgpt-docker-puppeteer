@@ -1,153 +1,547 @@
-# infra/
+# `src/copilot/infra`
 
-**Propósito**: concentrar primitivas técnicas compartilhadas do runtime Copilot local.  
-**Status documental**: Canônico de apoio.  
-**Público**: mantenedores de I/O, cache, indexação, storage, locks, SSE e adapters internos.  
-**Última atualização**: 14 de maio de 2026.
+**Status:** charter arquitetural canônico
 
-## O que esta pasta contém
+**Runtime:** Node.js 24+ / ESM / `@ts-check` / TypeScript 7 strict
 
-- Facades públicas em `public/` para consumidores fora de `infra/`.
-- Engine canônica de I/O local em `io-engine.js`, ainda mantida como facade de compatibilidade
-  durante a migração 2.0/2.1.
-- Cache L1 em memória, cache L2 SQLite, tiering, health e invalidação coordenada.
-- Scanner, parser, prefetch, scope de sessão e índice L2 pesquisável.
-- Subdomínios internos baixos em `shared/`, `policy/`, `scan/`, `parse/`, `index-store/`,
-  `storage/`, `queue/`, `locks/`, `runtime/`, `cache/`, `io/fs/`, `io/patch/`, `io/search/` e
-  `io/invalidation/`.
-- Locks, storage, queue, webhooks e infraestrutura SSE.
+**Data-base desta revisão:** 20 de agosto de 2026
 
-## O que não deve ficar aqui
+`src/copilot/infra` é o package interno de capabilities técnicas compartilhadas do Copilot. Ele
+possui duas faces deliberadamente distintas:
 
-- Custom tools registradas no SDK; elas pertencem a `tools/`.
-- UX de terminal, renderização ou comandos; isso pertence a `terminal/`.
-- Fachadas públicas do runtime para HTTP/terminal; isso pertence a `presentation/`.
-- Semântica vanilla do SDK; a fonte continua em `sdk/`.
+1. **owners internos**, que implementam e compõem as capabilities;
+2. **`public/`**, uma membrana exclusivamente exportadora que é a única superfície permitida para
+   consumidores externos a `infra`.
 
-## Entradas principais de I/O
+A arquitetura não possui mega-barrel `src/copilot/infra/index.js` nem
+`src/copilot/infra/public/index.js`. O objetivo é obter encapsulamento forte sem transformar a API
+externa em uma dependency bag global.
 
-- `public/io.js`: facade pública para leitura, escrita, busca e scan.
-- `public/indexing.js`: facade pública para build/search/status do índice L2.
-- `public/session.js`: facade pública para escopos de sessão e contexto.
-- `public/events.js`: facade pública para telemetria de I/O.
-- `public/cache.js`: facade pública para inspeção/invalidação de cache.
-- `public/policy.js`: facade pública para budgets compartilhados de subprocesso/search.
-- `public/testing.js`: facade pública deliberada para resets em testes.
-- `io-engine.js`: engine de leitura/escrita local com locks, metadados e invalidação; ainda é
-  compatibilidade interna larga.
-- `io-cache.js`: L1 quente do processo, TTL/fingerprint e invalidação ativa.
-- `io-cache-l2-sqlite.js`: L2 blob cache persistente para payloads de leitura.
-- `io-index-sqlite.js`: L2 índice persistente com arquivos, FTS, símbolos e imports.
-- `io-index-registry.js`: registry lazy do índice e bridge de invalidação.
-- `io-observability.js`: canais `diagnostics_channel` para operação, cache, índice, scope e scan.
-- `io-prefetch.js`: aquecimento de bytes/texto e read-through context da LLM-B.
-- `io-session-scope.js`: escopo de trabalho da LLM-B com prefetch, parser e índice.
-- `io-scanner.js`: enumeração canônica de diretórios com ignore/fingerprint.
-- `io-parser.js`: parsing JS/TS/JSON/Markdown e cache simbólico.
-- `io-health.js`: snapshot agregado de L1/L2/índice/scope para observability.
-- `module-map.js`: inventário executável da raiz de `infra/`, com papel, tier, risco e exposição
-  pública.
+---
 
-## Subdomínios internos
+## 1. Invariantes arquiteturais
 
-- `shared/`: helpers sem dependência de domínio, como leitura tipada de ambiente.
-- `policy/`: policies reutilizáveis, incluindo capabilities, risco, janela de saída, budgets de
-  buffer/timeout, path-resource e precondições.
-- `scan/`: glob, gitignore, fingerprint e batching usados por scanner e prefetch.
-- `parse/`: parsers puros de JSON, Markdown, comentários e outline textual.
-- `index-store/`: schema, paths, queries e helpers persistentes do índice L2/SQLite.
-- `cache/l1/`: chaves canônicas de L1 e base para modularização futura do cache em memória.
-- `io/fs/`: portas baixas de filesystem para bytes, texto, linhas, chunks, stat, mkdir, append,
-  remove, copy, move e escrita atômica.
-- `io/patch/`: cálculo puro de patch e diff textual.
-- `io/search/`: adapters puros de busca textual, índice FTS, grep fallback, busca simbólica e
-  paginação de resultados.
-- `io/invalidation/`: bus best-effort e helper de invalidação coordenada de tiers L1/L2.
-- `storage/`: JSON store baixo sem dependência de `io-engine.js`.
-- `queue/`: implementação modular da fila assíncrona.
-- `locks/`: barrels internos de locks em memória e lockfile.
-- `runtime/`: envelope rastreável de operação, audit log opt-in, base para transações e rollback.
-- `sse/`: fanout, replay buffer e estado SSE.
+As regras abaixo são hard constraints de `src/copilot/infra` e possuem enforcement automático.
 
-## Regras de manutenção
+### Regra 1 — dependências unidirecionais
 
-- Consumidores fora de `src/copilot/infra/**` devem importar por `#copilot/infra/public/*` ou pelo
-  barrel raiz de compatibilidade quando a API ainda não tiver facade dedicada.
-- Tools não importam arquivos folha de `infra/`.
-- Toda leitura ou escrita nova em tools/bordas deve partir de uma facade pública; não use
-  `fs.readFile`/`fs.writeFile` diretamente em tools ou adapters.
-- Conversões de bytes devem usar `shared/buffer.js` ou `public/buffer.js`: preserve
-  `byteOffset`/`byteLength` de views, copie payloads de escrita e valide base64/limites antes de
-  chamar portas de IO.
-- Módulos baixos (`shared/`, `policy/`, `scan/`, `io/fs/`) não importam `public/`, `io-engine.js`,
-  registry, tools ou sessão.
-- `parse/` permanece puro: sem `io/`, cache, índice, prefetch ou sessão.
-- `storage.js` é apenas facade de compatibilidade; implementação vive em `storage/`.
-- L1, L2 blob e L2 índice devem ser invalidados pelo mesmo evento de escrita.
-- Mutações textuais devem aceitar precondição por `expectedHash` e simulação `dryRun` quando houver
-  risco de snapshot obsoleto.
-- Prefetch pode aquecer dados, mas não vira fonte de verdade; a verdade segue no filesystem via
-  `io-engine`.
-- Índice responde descoberta, busca e símbolos; quando estiver vazio ou inadequado, a tool deve cair
-  para a engine canônica ou para fallback observável.
-- Fingerprints de scan usam `realpath + mtimeMs + size`; hashes mais caros entram apenas quando o
-  roadmap/benchmark justificar.
-- Chunks persistidos pertencem ao índice L2; o cache L2 blob não deve virar catálogo semântico.
-- Limites de volume para a LLM-B devem ser explícitos e observáveis. Quando a operação for
-  potencialmente grande, use janela de saída (`maxResults`, `maxBytes`, `cursor`) e retorne
-  `nextCursor`, offset e metadados de truncamento sempre que possível.
+Toda dependência entre arquivos e entre capabilities deve formar um DAG. Circularidades são
+proibidas, inclusive quando a aresta existe apenas em JSDoc/type imports.
 
-## Gates arquiteturais
+São verificados dois grafos:
 
-- `tests/unit/copilot/contracts/test_infra_barrel_governance.spec.js`: garante que `module-map.js`
-  cobre todas as entradas raiz de `infra/` e que as facades públicas existem.
-- `tests/unit/copilot/contracts/test_io_tools_boundary_contracts.spec.js`: impede tools de
-  importarem internals de `infra/` fora de `#copilot/infra/public/*`.
-- A análise local de ciclos de `src/copilot/infra` deve permanecer em `cycles 0`.
+- grafo completo de arquivos;
+- grafo entre owners/barrels de capability.
 
-## Operação do índice
+Ambos devem permanecer com **zero SCCs não triviais**.
 
-Comandos humanos no terminal permanente LLM-B:
+### Regra 2 — ownership físico acompanha ownership lógico
 
-- `/index status`: mostra disponibilidade, arquivos, símbolos, imports, chunks e frescor.
-- `/index build src/copilot --concurrency 8`: constrói/atualiza o índice L2 de `src/copilot`.
-- `/index search "termo"`: busca FTS5 quando o índice está disponível.
-- `/index symbol alphaHelper`: consulta símbolos persistidos.
-- `/index clear`: limpa o índice local.
+Quando um componente existe exclusivamente para servir a um owner, ele deve viver sob uma subpasta
+desse owner. Quando é usado por múltiplos owners independentes, deve receber um owner compartilhado
+no nível mais baixo que preserve uma direção limpa de dependências.
 
-Comandos shell equivalentes:
+Exemplos atuais:
 
-- `npm run copilot:index:status`
-- `npm run copilot:index:build`
-- `npm run copilot:index -- build src/copilot --ext js --ext md --concurrency 8 --json`
-- `npm run copilot:index -- search "termo" --json`
+- `filesystem/write/atomic/*` pertence a `write`;
+- `filesystem/write/payload/*` é compartilhado por mais de um protocolo de escrita;
+- `concurrency/locks/local/*` depende de `locks/file/*`, pois o lock local pode escalar para
+  coordenação multiprocess;
+- `indexing/context/scope/*` depende de `context/prefetch/*`, nunca o contrário.
 
-A poda de arquivos removidos é automática em builds completos. Em builds parciais com
-`--include`/`--exclude`, a poda é desativada por segurança para não apagar entradas fora da fatia
-materializada.
+A árvore não deve ser reorganizada apenas para ficar visualmente simétrica.
 
-## Variáveis operacionais de I/O
+### Regra 3 — barrel-first entre diretórios
 
-Os valores inválidos voltam ao default seguro. Limites em bytes usam inteiros decimais.
+Imports relativos diretos são admitidos quando:
 
-| Variável                                   |     Default | Contrato                                                               |
-| ------------------------------------------ | ----------: | ---------------------------------------------------------------------- |
-| `IO_L1_CACHE_TTL_MS`                       |     `60000` | TTL positivo das entradas L1.                                          |
-| `IO_L1_CACHE_MAX_ENTRIES`                  |      `2000` | Máximo positivo de entradas L1.                                        |
-| `IO_L1_CACHE_MAX_BYTES`                    | `134217728` | Budget positivo de memória L1.                                         |
-| `IO_L1_STALE_PROBE_INTERVAL_MS`            |      `2000` | `-1` desativa fingerprint, `0` valida sempre, `>0` define o intervalo. |
-| `IO_CAPACITY_PREFLIGHT_MIN_BYTES`          |  `67108864` | `0` desativa; payloads menores não executam `statfs`.                  |
-| `IO_CAPACITY_PREFLIGHT_RESERVE_BYTES`      |  `67108864` | Reserva advisory exigida além do payload.                              |
-| `IO_CAPACITY_PREFLIGHT_CACHE_TTL_MS`       |      `1000` | Janela curta de reuso de `statfs`; `0` desativa o cache.               |
-| `IO_PARSER_MAIN_THREAD_FALLBACK_MAX_BYTES` |    `131072` | Teto para fallback síncrono após falha do worker.                      |
-| `IO_ADVISORY_BUDGET_WINDOW_MS`             |     `60000` | Janela rolante do budget observável de mutações/builds.                |
-| `IO_ADVISORY_BUDGET_MAX_OPERATIONS`        |       `120` | Pressão advisory por quantidade de operações na janela.                |
-| `IO_ADVISORY_BUDGET_MAX_BYTES`             |  `67108864` | Pressão advisory por bytes estimados na janela.                        |
-| `IO_ADVISORY_BUDGET_MAX_ACTIVE`            |        `12` | Pressão advisory por concorrência ativa.                               |
+- origem e destino estão na mesma pasta; ou
+- um owner acessa uma implementação situada em sua própria subpasta privada.
 
-## Links relacionados
+Travessias laterais ou ascendentes entre diretórios passam por `index.js`.
 
-- Hub superior: `../README.md`.
-- Tools que consomem esta infra: `../tools/file/README.md`.
-- Roadmap ativo:
-  `../../DOCUMENTAÇÃO/COPILOT/AUDITORIA-ARQUITETURAL-AMPLA/2026-05-07-ROADMAP-IO-INTELIGENTE-COMPLETO.md`.
+A única exceção deliberada de test-control é `infra/testing/index.js`, que pode agregar folhas
+`test-control.js` sem poluir barrels runtime.
+
+### Regra 4 — coesão, não tamanho
+
+Número de linhas é apenas um indicador de inspeção. Um arquivo é refatorado quando mistura
+responsabilidades, estados, lifecycles ou policies que podem possuir fronteiras melhores.
+
+Por isso arquivos como `filesystem/workspace/io.js`, `concurrency/locks/local/resource-lock.js`,
+`indexing/scanner/service.js` e `indexing/registry/refresh/scheduler.js` podem permanecer
+relativamente grandes quando representam uma única máquina ou composition root coerente.
+
+### Regra 5 — membrana pública única
+
+Todo consumo de `infra` originado fora de `src/copilot/infra` passa por
+`src/copilot/infra/public/**` e por aliases `#copilot/infra/public/...`.
+
+Fluxo esperado:
+
+```text
+consumer externo
+    ↓
+#copilot/infra/public/<capability>
+    ↓
+infra/public/<capability>/index.js
+    ↓
+barrel interno da capability
+    ↓
+owner / implementação
+```
+
+Internamente o fluxo é diferente:
+
+```text
+owner interno
+    ↓
+#copilot/infra/internal/<capability>
+    ↓
+barrel interno
+    ↓
+owner dependido
+```
+
+Invariantes adicionais da membrana:
+
+- código interno de `infra` **nunca** importa de `infra/public`;
+- código de produção fora de `infra` **nunca** importa `#copilot/infra/internal/*`;
+- não existem aliases legados `#copilot/infra/<capability>`;
+- não existe wildcard `#copilot/infra/*`;
+- `public/` não contém implementação nem lifecycle;
+- todo diretório abaixo de `public/` possui `index.js`;
+- não existe `public/index.js` root;
+- controles `*ForTest` só são projetados pelo entrypoint deliberado `#copilot/infra/public/testing`.
+
+---
+
+## 2. Estrutura canônica
+
+```text
+infra/
+├── public/                 # API membrane; projection barrels only
+├── governance/             # manifests e verificadores arquiteturais
+├── platform/               # primitives técnicas/Node
+├── concurrency/            # bulk, queue, locks
+├── filesystem/             # I/O, transactions, coherence, containment
+├── persistence/            # JSON/JSONL
+├── database/               # composition port para SQLite compartilhado
+├── cache/                  # L1/L2/tiering
+├── code-analysis/          # parsing estrutural puro
+├── indexing/               # scanner/parser/index/search/context/workspace
+├── operations/             # mutation transaction/audit/rollback
+├── telemetry/              # producer-side metrics/events
+├── observability/          # read-side health/alerts
+├── policy/                 # policies realmente transversais
+├── testing/                # agregação privilegiada de test-control
+└── README.md
+```
+
+`governance/architecture-manifest.js` é a fonte de verdade semântica para a raiz. O filesystem é a
+fonte de verdade física.
+
+---
+
+## 3. API pública
+
+A documentação específica da membrana está em [`public/README.md`](./public/README.md).
+
+Principais famílias externas:
+
+```text
+#copilot/infra/public/platform
+#copilot/infra/public/platform/node
+#copilot/infra/public/platform/node/filesystem
+#copilot/infra/public/concurrency/bulk
+#copilot/infra/public/concurrency/locks
+#copilot/infra/public/filesystem/read
+#copilot/infra/public/filesystem/write
+#copilot/infra/public/filesystem/mutation
+#copilot/infra/public/filesystem/invalidation
+#copilot/infra/public/filesystem/workspace
+#copilot/infra/public/filesystem/trusted
+#copilot/infra/public/filesystem/skills
+#copilot/infra/public/persistence/json
+#copilot/infra/public/persistence/jsonl
+#copilot/infra/public/database
+#copilot/infra/public/cache
+#copilot/infra/public/code-analysis
+#copilot/infra/public/indexing
+#copilot/infra/public/indexing/context
+#copilot/infra/public/indexing/parser
+#copilot/infra/public/indexing/registry
+#copilot/infra/public/indexing/scanner
+#copilot/infra/public/indexing/storage
+#copilot/infra/public/indexing/workspace
+#copilot/infra/public/operations
+#copilot/infra/public/telemetry
+#copilot/infra/public/observability
+#copilot/infra/public/policy
+#copilot/infra/public/testing
+```
+
+A lista efetiva é definida por `package.json#imports`. Não duplicar uma nova lista manual em código
+de governança.
+
+`indexing/storage` é deliberadamente mais estreito em intenção: existe para benchmark/auditoria da
+implementação SQLite do índice. Runtime comum deve preferir `public/indexing` ou
+`public/indexing/registry`.
+
+---
+
+## 4. Capabilities internas
+
+### 4.1 `platform/`
+
+Primitives sem semântica de domínio:
+
+- Buffer/views e UTF-8;
+- hash/fingerprints;
+- linhas físicas;
+- parsing bounded de HTTP/process output;
+- env/config helpers;
+- `platform/node/compile-cache`;
+- `platform/node/filesystem` para durability/fsync primitives.
+
+Deve permanecer na base do grafo e evitar dependência de cache, indexing ou filesystem de alto
+nível.
+
+### 4.2 `concurrency/`
+
+- `bulk/`: execução bounded em lote;
+- `queue/`: fila assíncrona de baixo nível;
+- `locks/metrics/`: histogramas bounded compartilhados;
+- `locks/file/`: coordenação L1 multiprocess por lockfile;
+- `locks/local/`: serialização L0 no processo, com escala opcional para `file/`.
+
+Direção central:
+
+```text
+metrics ← file
+metrics ← local → file
+```
+
+O lockfile físico não pode depender do lock lógico local.
+
+### 4.3 `filesystem/read/`
+
+Organizado por responsabilidade:
+
+- `snapshot/`: snapshots crus de bytes/text/stat/directory e consistência;
+- `line-index/`: índice byte → linha;
+- `chunks/`: leitura por ranges/streaming;
+- `cache/`: L1/L2 read-through, hash policy e line-offset cache;
+- `fresh/`: façades frescas de dados/metadata.
+
+O barrel `read/index.js` é composition root; não contém implementação.
+
+### 4.4 `filesystem/write/`
+
+- `append/`: append unlocked, detached sink e façade locked;
+- `atomic/`: protocolo de staged atomic publish;
+- `directory/`: mkdir locked;
+- `metadata/`: chmod unlocked/locked;
+- `move/`: same-device e EXDEV staged move;
+- `payload/`: normalização compartilhada de payload;
+- `copy.js` e `remove.js`: primitives coesas de operação única.
+
+### 4.5 `filesystem/transaction/`
+
+Primitives transacionais compartilhadas:
+
+- capacity preflight;
+- file-handle lifecycle;
+- temp paths;
+- snapshots;
+- `phases/` para mutation phase events;
+- `directory/` para mkdir unlocked;
+- `rollback/` para sidecar/policy/storage/inventory/maintenance.
+
+### 4.6 `filesystem/mutation/`
+
+Orquestra mutações com locks, preconditions, rollback evidence, durability e invalidation:
+
+- delete;
+- `patch/` single/batch/preview/errors;
+- `rollback/` mutation snapshots/preconditions;
+- `transfer/` copy/move locked workflows.
+
+### 4.7 `filesystem/patch/`
+
+- `diff/`: geração/apresentação de diff;
+- `exact/`: cálculo de patch exato e recovery evidence apenas diagnóstico.
+
+Recovery evidence não autoriza mutação.
+
+### 4.8 `filesystem/invalidation/`
+
+Plano de coerência dividido em:
+
+- `bus/`: dispatch canônico local e queue;
+- `cross-process/`: journal/replay multiprocess;
+- `watch/`: primitive do OS;
+- `external-watch/`: policy/filter/debounce de hints externos;
+- `coherence.js`: comandos semânticos de invalidation.
+
+`external-watch` depende de `bus + watch`; as primitives inferiores não dependem do scheduler
+externo.
+
+### 4.9 `filesystem/workspace/`
+
+Composition root de I/O workspace-bound:
+
+- canonical path policy;
+- opaque validated read/mutable capabilities;
+- binders string e validated fast-path;
+- operações simples e de pares de paths.
+
+É intencionalmente um composition module relativamente grande; o critério é manter uma única
+autoridade de containment/policy.
+
+### 4.10 `filesystem/trusted/` e `skills/`
+
+`trusted` é uma capability privilegiada para paths explicitamente configurados fora do containment
+comum. Seu uso externo é auditado por manifesto/CI.
+
+`skills` fornece uma capability estreita de catálogo; consumers de skills não recebem generic
+trusted filesystem.
+
+### 4.11 `database/`
+
+É um **composition port**, não o owner do banco compartilhado. `src/copilot/db` continua responsável
+por:
+
+- path do banco;
+- abertura/fechamento;
+- migration ordering;
+- schema do índice.
+
+O boot injeta o provider em infra. A direção conceitual é:
+
+```text
+boot → db
+boot → infra/database.configure(provider)
+infra consumers → infra/database
+```
+
+Não criar `infra → db` para conveniência.
+
+### 4.12 `cache/`
+
+- `memory/`: L1;
+- `l2/`: config/runtime/health;
+- `l2/sqlite/`: store persistente;
+- `tiering.js`: composição/métricas de tiers.
+
+Cache é estado derivado. Fingerprints/invalidation protegem freshness; cache nunca substitui
+autorização de filesystem.
+
+### 4.13 `code-analysis/`
+
+Análise estrutural pura:
+
+- policy Babel 8 / TS7;
+- symbols/imports/exports;
+- comments;
+- JSON/Markdown outlines;
+- outline builder.
+
+A fronteira Babel usa tipos reais de `@babel/parser`/`@babel/types`; contratos JSDoc opacos `any`
+são proibidos em infra.
+
+### 4.14 `indexing/parser/`
+
+Camadas unidirecionais:
+
+```text
+foundation
+   ↓
+worker
+   ↓
+parse
+   ↓
+cache
+   ↓
+context
+
+health → foundation + cache + worker
+```
+
+- `foundation/`: config/path/contracts/runtime counters;
+- `worker/`: worker pool e entry;
+- `parse/`: parse orchestration;
+- `cache/`: symbol/context caches;
+- `context/`: shaping/windowing;
+- `health/`: read projection.
+
+### 4.15 `indexing/registry/`
+
+- `state/`: singleton e builds in-flight;
+- `refresh/`: domain policy, explicit refresh e debounce scheduler;
+- `runtime/`: invalidation hook e façade runtime;
+- `sqlite/`: materialização persistente/query;
+- `build.js` e `query.js`: composition roots.
+
+Direção essencial: `state → refresh → runtime`, com sqlite como implementação persistente do
+registry.
+
+### 4.16 `indexing/search/`
+
+```text
+shared      subprocess
+   ↑          ↑
+   ├── text ──┘
+   └── symbol
+```
+
+- `shared/`: pagination/output/policy;
+- `subprocess/`: exec/stream/ripgrep runtime;
+- `text/`: index acceleration + rg/grep completeness path;
+- `symbol/`: symbol pattern/query orchestration.
+
+Ausência em estado derivado não é automaticamente prova de ausência no filesystem quando a semântica
+exige completude.
+
+### 4.17 `indexing/context/`
+
+- `prefetch/`: cache warming, directory selection, read-through, lightweight session prefetch;
+- `scope/`: lifecycle de working-set.
+
+`scope` é dividido em declaration, selection, materialization, index-convergence, state, query e
+refresh. Direção `scope → prefetch`, nunca o inverso.
+
+### 4.18 `operations/`
+
+- operation envelope;
+- transaction/change-set contracts;
+- audit log;
+- `rollback/`: token, preflight, apply e executor.
+
+Rollback continua sujeito a autorização, locks, preconditions e durability.
+
+### 4.19 `telemetry/` e `observability/`
+
+`telemetry` é write-side:
+
+- clock;
+- latency;
+- durability;
+- mutation-state;
+- diagnostics-channel publisher;
+- advisory budget.
+
+`observability` é read-side:
+
+- health aggregate;
+- alerts;
+- coherence health;
+- safe-call boundaries.
+
+Producers não dependem do health aggregator.
+
+### 4.20 `policy/`
+
+Somente contracts realmente transversais: budgets, capabilities/risk, mutation applied-state, output
+windows, path-resource e preconditions.
+
+Policy específica deve permanecer com seu owner.
+
+### 4.21 `testing/`
+
+Composition boundary privilegiada para resets. Runtime barrels não devem exportar `*ForTest` apenas
+para facilitar testes.
+
+---
+
+## 5. Lifecycle
+
+Importar um módulo não deve iniciar implicitamente:
+
+- worker pool;
+- filesystem watcher;
+- polling timer;
+- DB connection;
+- invalidation consumer;
+- global scope/session;
+- outro recurso long-lived.
+
+Recursos lazy devem possuir owner e teardown/reset claro. Signal ownership pertence ao process
+host/composition root.
+
+---
+
+## 6. Invariantes de filesystem
+
+Preservar sempre:
+
+```text
+lock
+→ final precondition
+→ mutation
+→ durability barrier
+→ invalidation/coherence
+→ telemetry/result
+```
+
+Além disso:
+
+- writes atômicos preservam sibling-temp/publish semantics;
+- move EXDEV usa protocolo staged recuperável;
+- rollback snapshots/sidecars são bounded;
+- applied-but-unconfirmed não deve provocar reexecução que duplique mutation;
+- fingerprints ricos são safety net contra invalidação perdida;
+- trusted IO permanece explicitamente auditado;
+- leituras/writers low-level fora do owner esperado são inventariados por CI.
+
+---
+
+## 7. Governança automática
+
+Principais gates:
+
+```bash
+npm run -s tsc7 -- --checkers 2 -p config/typing/strict/tsconfig.strict.src.copilot.json
+npx vitest run tests/unit/copilot/contracts/test_infra_barrel_governance.spec.js
+npm run -s check:copilot:fs-read-boundaries:strict
+npm run -s check:copilot:fs-mutation-boundaries
+npm run -s check:copilot:trusted-io-boundaries
+npm run -s lint:copilot
+npm run -s test:copilot:unit
+```
+
+O contrato de barrels verifica, entre outras coisas:
+
+- zero ciclos por arquivo/capability;
+- barrel puro em todo `index.js` de infra;
+- API externa somente por `public`;
+- internal nunca depende de public;
+- todos os diretórios `public/**` possuem barrel;
+- nenhum root mega-barrel público;
+- package aliases sem wildcard/legado;
+- travessias cross-folder respeitam barrel/ownership;
+- nenhum `any` opaco em contratos JSDoc de infra;
+- identidade `@module` acompanha o owner físico;
+- test-control não vaza por entrypoints operacionais.
+
+---
+
+## 8. Critério para novas refatorações
+
+Antes de dividir um arquivo, responder:
+
+1. Há mais de uma responsabilidade que possa ter lifecycle/estado independente?
+2. Há um subconjunto de helpers consumido por owners diferentes?
+3. O arquivo cria dependências em direções conflitantes?
+4. A separação reduz conhecimento entre módulos sem produzir pass-through excessivo?
+5. O novo diretório representa uma capability/subcapability real?
+
+Se a resposta for majoritariamente “não”, tamanho sozinho não justifica split.
+
+---
+
+## 9. Referência de execução
+
+Estado atual, decisões, histórico resumido e roadmap restante:
+
+`src/copilot/docs/WORKSPACE_SRC_COPILOT_INFRA_AUDITORIA_ARQUITETURAL_REFACTOR_ROADMAP_2026-08-20.md`

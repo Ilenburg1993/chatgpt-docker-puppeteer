@@ -9,6 +9,5 @@ export {
     enableCopilotNodeCompileCache,
     flushCopilotNodeCompileCache,
     getCopilotNodeCompileCacheHealth,
-    resetCopilotNodeCompileCacheHealthForTest,
     withCopilotNodeCompileCacheEnv,
-} from '../../infra/runtime/node-compile-cache.js';
+} from '#copilot/infra/public/platform/node';

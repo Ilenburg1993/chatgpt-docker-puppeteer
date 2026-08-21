@@ -85,6 +85,14 @@ import { getAllTools } from '#copilot/tools';
 import { requireAgentRuntimeSelection } from '../../../presentation/agent/index.js';
 import { resolveOptionalDialogTimeout } from '../../../presentation/dialog-timeout-policy.js';
 import {
+    createEventFilter,
+    createSseWriter,
+    SseClientPool,
+    SseConnectionTracker,
+    SseReplayBuffer,
+    standardizeSsePayload,
+} from '../../../presentation/realtime/index.js';
+import {
     buildMissingRuntimeRouteMeta,
     buildRuntimeRouteMetaPayload,
     resolveRequestedRuntimeId,
@@ -267,6 +275,15 @@ const sdkTelemetryOps = Object.freeze({
     emitOperationMetric: emitSdkOperationMetric,
 });
 
+const sdkRealtimeOps = Object.freeze({
+    createEventFilter,
+    createSseWriter,
+    SseClientPool,
+    SseConnectionTracker,
+    SseReplayBuffer,
+    standardizeSsePayload,
+});
+
 /**
  * @returns {import('#copilot/observability/metrics.js').MetricsStore}
  */
@@ -307,6 +324,7 @@ function resolveMetricsStore() {
  *     sdkHooks: typeof sdkHookOps;
  *     sdkSessionPolicy: typeof sdkSessionPolicyOps;
  *     sdkTelemetry: typeof sdkTelemetryOps;
+ *     sdkRealtime: typeof sdkRealtimeOps;
  *     sdkApiToken: string | null;
  *     bridgeAdminToken: string | undefined;
  * }}
@@ -338,6 +356,7 @@ export function buildDefaultSdkRouteSharedDeps(runtimeId) {
         sdkHooks: sdkHookOps,
         sdkSessionPolicy: sdkSessionPolicyOps,
         sdkTelemetry: sdkTelemetryOps,
+        sdkRealtime: sdkRealtimeOps,
         sdkApiToken: SDK_API_TOKEN,
         bridgeAdminToken: BRIDGE_ADMIN_TOKEN,
     };

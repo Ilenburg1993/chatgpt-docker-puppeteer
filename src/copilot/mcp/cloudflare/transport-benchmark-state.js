@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/transport-benchmark-state
  */
 
-import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { fileURLToPath } from 'node:url';
 
 export const TRANSPORT_BENCHMARK_STATE_PATH = 'src/copilot/.ai/mcp/transport-benchmark-state.json';

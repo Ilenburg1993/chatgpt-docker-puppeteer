@@ -168,7 +168,7 @@ export const defaultAgentContextFactories = Object.freeze({
             runtimeAuthority: 'agent',
         },
         'integration.webhooks': {
-            provider: 'infra/webhooks',
+            provider: 'agent/infra/webhook-manager',
             factory: 'defaultAgentContextFactories.createWebhooks',
             runtimeAuthority: 'agent',
         },

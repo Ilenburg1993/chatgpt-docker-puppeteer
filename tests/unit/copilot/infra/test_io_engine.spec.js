@@ -5,34 +5,37 @@ import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import * as ioCacheL2Registry from '../../../../src/copilot/infra/io-cache-l2-registry.js';
-import { getIoL1Cache, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
+import * as ioCacheL2Registry from '#copilot/infra/internal/cache';
+import { getIoL1Cache } from '#copilot/infra/internal/cache';
+import {
+    acquireIoResourceLock,
+    getFileResourceLockPath,
+    getIoLockStats,
+    withIoResourceLock,
+} from '#copilot/infra/internal/concurrency/locks';
 import {
     copyFileLocked,
-    createOrReplaceFileAtomic,
     deleteFileLocked,
-    mkdirPathLocked,
     moveFileLocked,
+    patchTextBatchLocked,
     patchTextLocked,
+    removePathLocked,
+} from '#copilot/infra/internal/filesystem/mutation';
+import {
+    getIoReadHashStats,
     readBytes,
     readBytesFresh,
     readLines,
     readText,
     readTextChunks,
     readTextFresh,
-    removePathLocked,
-    searchText,
-    searchWorkspaceSymbols,
-    withIoResourceLock,
-    writeFileAtomic,
-} from '../../../../src/copilot/infra/io-engine.js';
-import { acquireIoResourceLock, getIoLockStats } from '../../../../src/copilot/infra/io-locks.js';
-import { scanDirectory } from '../../../../src/copilot/infra/io-scanner.js';
-import { patchTextBatchLocked } from '../../../../src/copilot/infra/io/fs/locked-mutations.js';
-import { getIoReadHashStats, resetIoReadHashStatsForTest } from '../../../../src/copilot/infra/io/fs/read-services.js';
-import { getFileResourceLockPath } from '../../../../src/copilot/infra/locks/file-resource-lock.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+} from '#copilot/infra/internal/filesystem/read';
+import { createOrReplaceFileAtomic, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/internal/filesystem/write';
+import { scanDirectory } from '#copilot/infra/internal/indexing';
+import { searchText, searchWorkspaceSymbols } from '#copilot/infra/internal/indexing/search';
+import { sha256 } from '#copilot/infra/internal/platform';
 
+import { resetIoL1CacheForTest, resetIoReadHashStatsForTest } from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const TEMP_DIRS = [];
 

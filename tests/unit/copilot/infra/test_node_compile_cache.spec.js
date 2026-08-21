@@ -3,13 +3,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import {
-    enableCopilotNodeCompileCache,
-    resetCopilotNodeCompileCacheHealthForTest,
-    withCopilotNodeCompileCacheEnv,
-} from '../../../../src/copilot/infra/runtime/node-compile-cache.js';
+import { enableCopilotNodeCompileCache, withCopilotNodeCompileCacheEnv } from '#copilot/infra/internal/platform/node';
 
-describe('infra/runtime/node-compile-cache', () => {
+import { resetCopilotNodeCompileCacheHealthForTest } from '#copilot/infra/public/testing';
+describe('infra/platform/node/compile-cache', () => {
     it('respeita disable explícito sem tornar a otimização obrigatória', () => {
         resetCopilotNodeCompileCacheHealthForTest();
         const summary = enableCopilotNodeCompileCache({

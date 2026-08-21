@@ -17,7 +17,7 @@ import {
     readTextFreshTrusted,
     statPathTrusted,
     writeFileAtomicTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import { isAbsolute, resolve } from 'node:path';
 import { log } from '../logger.js';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';

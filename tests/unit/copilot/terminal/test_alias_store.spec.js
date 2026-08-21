@@ -13,7 +13,7 @@ const { writeFileAtomicTrusted } = vi.hoisted(() => ({
     writeFileAtomicTrusted: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('#copilot/infra/public/trusted-io', () => ({ writeFileAtomicTrusted }));
+vi.mock('#copilot/infra/public/filesystem/trusted', () => ({ writeFileAtomicTrusted }));
 
 import {
     flushAliasPersistence,

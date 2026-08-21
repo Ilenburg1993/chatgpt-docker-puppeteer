@@ -5,7 +5,7 @@
  * @module copilot/mcp/scripts/smoke-http
  */
 
-import { readBoundedResponseText } from '#copilot/infra/public/http-response';
+import { readBoundedResponseText } from '#copilot/infra/public/platform';
 import { normalizeMcpUrl } from '#copilot/mcp/connection';
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { pathToFileURL } from 'node:url';

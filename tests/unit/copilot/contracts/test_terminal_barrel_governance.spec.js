@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 
+import { resolveBabelParserOptions } from '#copilot/infra/public/code-analysis';
 import { parse } from '@babel/parser';
 import { describe, it } from 'vitest';
-import { resolveBabelParserOptions } from '../../../../src/copilot/infra/parse/babel-policy.js';
 
 const COPILOT_ROOT = new URL('../../../../src/copilot/', import.meta.url).pathname;
 const TERMINAL_ROOT = join(COPILOT_ROOT, 'terminal');

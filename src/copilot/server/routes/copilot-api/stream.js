@@ -12,15 +12,15 @@
 import { MAX_SSE_CLIENTS, MAX_SSE_LIFETIME_MS } from '#copilot/config';
 import { AGENT_EVENTS } from '#copilot/events';
 import { defaultMetrics } from '#copilot/observability';
-import { eventFanout } from '../../../infra/sse/fanout.js';
-import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
-import { SseClientPool } from '../../../infra/sse/stream-hub.js';
 import {
     createEventFilter,
     createSseWriter,
+    eventFanout,
+    SseClientPool,
     SseConnectionTracker,
+    SseReplayBuffer,
     standardizeSsePayload,
-} from '../../../infra/sse/utils.js';
+} from '#copilot/presentation/realtime';
 import { buildRuntimeRouteMetaPayload, resolveCopilotApiRouteBinding } from '../../../presentation/routing/index.js';
 import { buildAgentConnectedSsePayloadFromRoute } from '../../../presentation/runtime/index.js';
 import {

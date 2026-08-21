@@ -11,8 +11,8 @@
 
 import { getShellOutputPolicy } from '#copilot/config';
 import { toExecError } from '#copilot/core';
+import { createBoundedProcessOutputCapture } from '#copilot/infra/public/platform';
 import { resolveProcessExecutionBudget } from '#copilot/infra/public/policy';
-import { createBoundedProcessOutputCapture } from '#copilot/infra/public/process-output';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { safeEnv } from './sandbox.js';

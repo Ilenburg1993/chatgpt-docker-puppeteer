@@ -8,6 +8,7 @@
  * @module copilot/terminal/commands/scope
  */
 
+import { statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
 import {
     closeScope,
     declareScope,
@@ -16,8 +17,7 @@ import {
     getScopeStats,
     listScopes,
     refreshScope,
-} from '#copilot/infra/public/session';
-import { statPathTrusted } from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/indexing/context';
 import { relative } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
 import { terminalThemeHeadline, terminalThemeRow } from '../state/index.js';
@@ -259,7 +259,7 @@ async function resolveDeclareTarget(ctx, args) {
 
 /**
  * @param {ScopeCommandContext} ctx
- * @param {import('../../infra/io-session-scope.js').ScopeStats | null} stats
+ * @param {import('#copilot/infra/public/indexing/context').ScopeStats | null} stats
  * @returns {void}
  */
 function printScopeStats(ctx, stats) {
@@ -294,7 +294,7 @@ function printScopeStats(ctx, stats) {
 async function runDeclare(ctx, parts) {
     const args = parseScopeArgs(parts);
     const target = await resolveDeclareTarget(ctx, args);
-    /** @type {import('../../infra/io-session-scope.js').ScopeDeclareOptions} */
+    /** @type {import('#copilot/infra/public/indexing/context').ScopeDeclareOptions} */
     const scopeOptions = {
         sessionId: target.sessionId,
         recursive: args.recursive,

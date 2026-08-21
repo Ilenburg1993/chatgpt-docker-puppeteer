@@ -3,9 +3,6 @@
  * Estado local de SSE para `/sdk/sessions/:id/stream`.
  */
 
-import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
-import { SseClientPool } from '../../../infra/sse/stream-hub.js';
-import { SseConnectionTracker, standardizeSsePayload } from '../../../infra/sse/utils.js';
 import {
     buildSdkSessionStreamKey,
     deleteSdkSessionStreamState,
@@ -23,13 +20,25 @@ import {
  *     runtimeId: string;
  *     sessionId: string;
  *     sessionRef: NonNullable<ReturnType<SdkRouteDeps['sdkSession']['getClientSession']>>['session'];
- *     pool: SseClientPool;
+ *     pool: InstanceType<SdkRouteDeps['sdkRealtime']['SseClientPool']>;
  *     unsubscribe: () => void;
  * }} SessionStreamState
  */
 
-// C14-03: limite de SSE streams simultâneos por /sessions/:id/stream
-export const sessionsTracker = new SseConnectionTracker('sessions/stream');
+// C14-03: limite de SSE streams simultâneos por /sessions/:id/stream.
+/** @type {ReturnType<typeof createSessionsTracker> | null} */
+let sessionsTracker = null;
+
+/** @param {SdkRouteDeps} routeDeps */
+function createSessionsTracker(routeDeps) {
+    return new routeDeps.sdkRealtime.SseConnectionTracker('sessions/stream');
+}
+
+/** @param {SdkRouteDeps} routeDeps */
+export function getSessionsTracker(routeDeps) {
+    sessionsTracker ??= createSessionsTracker(routeDeps);
+    return sessionsTracker;
+}
 
 /**
  * @param {SdkRouteDeps} routeDeps
@@ -52,7 +61,7 @@ export function ensureSessionStreamState(routeDeps, id, entry) {
         deleteSdkSessionStreamState(key);
     }
 
-    const pool = new SseClientPool(new SseReplayBuffer(), {
+    const pool = new routeDeps.sdkRealtime.SseClientPool(new routeDeps.sdkRealtime.SseReplayBuffer(), {
         name: `sdk.session.stream.${runtimeId}.${id}`,
         metrics: routeDeps.metrics,
     });
@@ -61,7 +70,7 @@ export function ensureSessionStreamState(routeDeps, id, entry) {
         entry.session,
         (/** @type {RouteSessionEvent} */ event) => {
             const type = /** @type {string} */ (event?.type ?? 'message');
-            const payload = standardizeSsePayload({ ...event, runtimeId });
+            const payload = routeDeps.sdkRealtime.standardizeSsePayload({ ...event, runtimeId });
             pool.broadcast('message', payload, { replayEvent: 'message', filterEvent: type });
         },
     );

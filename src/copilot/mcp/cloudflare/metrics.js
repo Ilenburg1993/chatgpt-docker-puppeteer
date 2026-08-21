@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/metrics
  */
 
-import { readBoundedResponseText } from '#copilot/infra/public/http-response';
+import { readBoundedResponseText } from '#copilot/infra/public/platform';
 import { readCloudflareTunnelConfig } from './config.js';
 import {
     summarizeCloudflaredLatencyHistograms,

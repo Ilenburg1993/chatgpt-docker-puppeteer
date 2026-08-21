@@ -14,7 +14,7 @@ import {
     normalizeSearchWindow,
     paginateSearchItems,
     paginateSearchText,
-} from '../../../../src/copilot/infra/io/search/index.js';
+} from '#copilot/infra/internal/indexing/search';
 
 describe('infra/io/search', () => {
     it('detecta quando a busca pode usar índice FTS', () => {

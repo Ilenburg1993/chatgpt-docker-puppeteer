@@ -10,8 +10,8 @@
  * @module copilot/mcp/control-plane/dev-oauth
  */
 
-import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/platform';
 import {
     calculateJwkThumbprint,
     createLocalJWKSet,

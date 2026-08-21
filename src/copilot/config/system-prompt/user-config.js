@@ -8,7 +8,7 @@
  * @module copilot/config/system-prompt/user-config
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { isAbsolute, resolve } from 'node:path';
 import { resolvePersistentConfigFile } from '../persistent-paths.js';
 

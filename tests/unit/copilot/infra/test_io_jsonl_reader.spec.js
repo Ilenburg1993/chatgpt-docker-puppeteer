@@ -1,10 +1,10 @@
 // @ts-check
 
+import { readJsonlTail, repairJsonlTrailingPartial } from '#copilot/infra/internal/persistence/jsonl';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readJsonlTail, repairJsonlTrailingPartial } from '../../../../src/copilot/infra/io/jsonl-reader.js';
 
 /** @type {string[]} */
 const tempDirs = [];
@@ -13,7 +13,7 @@ afterEach(async () => {
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-describe('infra/io/jsonl-reader', () => {
+describe('infra/persistence/jsonl/reader', () => {
     it('ignora cauda parcial e preserva registros completos', async () => {
         const dir = await mkdtemp(join(tmpdir(), 'copilot-jsonl-reader-'));
         tempDirs.push(dir);

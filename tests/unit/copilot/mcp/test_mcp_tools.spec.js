@@ -3,23 +3,48 @@
  * Tests for first-band Copilot MCP tools.
  */
 
+import Database from 'better-sqlite3';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { describe, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 
-import { getIoL1Cache, invalidateIoCachePath } from '#copilot/infra/io-cache.js';
+import { getIoL1Cache } from '#copilot/infra/public/cache';
+import { invalidateIoCoherencePath } from '#copilot/infra/public/filesystem/invalidation';
+
+import { configureInfraSqliteProvider } from '#copilot/infra/public/database';
 import { getCanonicalMcpTools } from '#copilot/mcp';
 import {
     getTtlCacheStats,
     recordMcpToolMetric,
     resetMcpMetricsForTests,
     resolveReadPath,
+    resolveValidatedReadPath,
 } from '#copilot/mcp/control-plane';
+import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 import {
     readRepoReadFileResultCacheStats,
     resetRepoReadResponseCacheForTest,
 } from '../../../../src/copilot/mcp/tools/repo-read-cache.js';
+
+import { resetInfraSqliteProviderForTest, resetIoIndexForTest } from '#copilot/infra/public/testing';
+/** @type {import('better-sqlite3').Database | null} */
+let testInfraDb = null;
+
+beforeAll(() => {
+    resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
+    testInfraDb = new Database(':memory:');
+    ensureIoIndexSchema(testInfraDb);
+    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testInfraDb));
+});
+
+afterAll(() => {
+    resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
+    if (testInfraDb?.open) testInfraDb.close();
+    testInfraDb = null;
+});
 
 /** @param {string} name */
 function findTool(name) {
@@ -37,7 +62,7 @@ describe('copilot MCP tools', () => {
             assert.equal(ok.validatedReadPath, undefined);
         }
 
-        const withCapability = await resolveReadPath('src/copilot/mcp/README.md', { issueReadCapability: true });
+        const withCapability = await resolveValidatedReadPath('src/copilot/mcp/README.md');
         assert.equal(withCapability.ok, true);
         if (withCapability.ok) assert.ok(withCapability.validatedReadPath);
 
@@ -263,7 +288,7 @@ describe('copilot MCP tools', () => {
         assert.equal(afterSecond.size, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
-        if (resolved.ok) invalidateIoCachePath(resolved.resolved);
+        if (resolved.ok) invalidateIoCoherencePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
         assert.equal(afterInvalidation['busInvalidations'], 1);
         assert.equal(afterInvalidation['clears'], 1);
@@ -577,7 +602,7 @@ describe('copilot MCP tools', () => {
         assert.equal(afterSecond.chunkSize, 1);
         const resolved = await resolveReadPath(args.path);
         assert.equal(resolved.ok, true);
-        if (resolved.ok) invalidateIoCachePath(resolved.resolved);
+        if (resolved.ok) invalidateIoCoherencePath(resolved.resolved);
         const afterInvalidation = readRepoReadFileResultCacheStats();
         assert.equal(afterInvalidation['busInvalidations'], 1);
         assert.equal(afterInvalidation['chunkClears'], 1);
@@ -696,7 +721,7 @@ describe('copilot MCP tools', () => {
         const buildTool = findTool('repo_index_build');
         const build = await buildTool.handler({
             path: 'src/copilot/mcp/tools',
-            include: ['repo-index.js'],
+            include: ['repo-index.js', 'repo-read.js', 'repo-write.js'],
             maxFiles: 5,
             pruneMissing: false,
         });
@@ -825,7 +850,7 @@ describe('copilot MCP tools', () => {
             assert.equal(first.structuredContent?.['totalOrphans'], 0);
 
             await rm(targetPath);
-            invalidateIoCachePath(relativeTargetPath);
+            invalidateIoCoherencePath(relativeTargetPath);
 
             const second = await orphanImportsTool.handler({
                 path: relativeImporterPath,

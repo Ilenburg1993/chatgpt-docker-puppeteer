@@ -5,7 +5,7 @@
  * @module copilot/channel/chunk-retention
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { utf8ByteLength } from '#copilot/infra/public/platform';
 
 export const DEFAULT_CAPTURED_CHUNK_MAX_BYTES = 2 * 1024 * 1024;
 export const MAX_CAPTURED_CHUNK_MAX_BYTES = 8 * 1024 * 1024;

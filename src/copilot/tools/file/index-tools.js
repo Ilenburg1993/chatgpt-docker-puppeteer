@@ -339,7 +339,7 @@ export const workspaceParseFileTool = buildTool({
         let content;
         let contentHash;
         try {
-            const { createWorkspaceIo } = await import('#copilot/infra/public/workspace-io');
+            const { createWorkspaceIo } = await import('#copilot/infra/public/filesystem/workspace');
             const { readText } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
             const snapshot = await readText(pathCheck.resolved);
             content = snapshot.content;

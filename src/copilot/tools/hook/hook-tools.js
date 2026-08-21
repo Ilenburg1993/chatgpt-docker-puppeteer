@@ -1,7 +1,7 @@
 // @ts-check
 import { getAuditTail } from '#copilot/audit';
 import { normalizeUserInputBridgeContract, toError } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { execFile } from 'node:child_process';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

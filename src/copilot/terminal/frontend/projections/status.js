@@ -5,7 +5,7 @@
 
 import { getWorkspaceContext } from '#copilot/boot';
 import { readSystemPromptStatusSync } from '#copilot/config';
-import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/io';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/public/observability';
 import { buildRuntimeSdkFsRoutingProjection } from '../../../presentation/files/index.js';
 import { buildRuntimeLifecycleSummary, readRuntimeLifecycleSnapshot } from '../../../presentation/runtime/index.js';
 import {

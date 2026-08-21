@@ -8,7 +8,7 @@
  */
 
 import { LLM_B_ALIASES_FILE } from '#copilot/config';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { log } from '#copilot/observability';
 import os from 'node:os';
 import path from 'node:path';

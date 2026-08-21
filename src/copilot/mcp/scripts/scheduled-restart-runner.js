@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/scheduled-restart-runner
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';

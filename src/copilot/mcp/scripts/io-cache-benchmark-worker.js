@@ -6,12 +6,12 @@
  */
 
 import { getIoPathPolicyCacheStats } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { getIoReadHashStats } from '#copilot/infra/public/filesystem/read';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { getIoReadHashStats } from '../../infra/io/fs/read-services.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(__filename), '../../../..');
@@ -22,7 +22,7 @@ const WORKLOAD = Object.freeze([
     'package.json',
     'src/copilot/mcp/tools/runtime-health.js',
     'src/copilot/mcp/tools/jobs.js',
-    'src/copilot/infra/io/fs/read-services.js',
+    'src/copilot/infra/filesystem/read/cache/text.js',
     'src/copilot/docs/WORKSPACE_SRC_COPILOT_DIAGNOSTICO_ESTADO_ALVO_E_ROADMAP_2026-08-14.md',
 ]);
 
@@ -114,10 +114,14 @@ async function main() {
     process.env['IO_L2_CACHE_PROFILE'] = mode === 'l2' || mode === 'l2-prime' ? 'experimental' : 'off';
     delete process.env['IO_L2_CACHE_ENABLED'];
 
-    const [{ getIoL2Cache }, { closeCopilotDb }] = await Promise.all([
-        import('../../infra/io-cache-l2-registry.js'),
-        import('../../db/index.js'),
-    ]);
+    const [{ getIoL2Cache }, { closeCopilotDb, ensureCopilotDbDir, getCopilotDb }, { configureInfraSqliteProvider }] =
+        await Promise.all([
+            import('#copilot/infra/public/cache'),
+            import('../../db/index.js'),
+            import('#copilot/infra/public/database'),
+        ]);
+    await ensureCopilotDbDir();
+    configureInfraSqliteProvider(getCopilotDb);
 
     try {
         if (mode === 'l1') await runPass(workspaceIo);

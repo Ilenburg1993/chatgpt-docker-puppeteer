@@ -5,7 +5,7 @@
  * @module copilot/mcp/control-plane/startup-maintenance
  */
 
-import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/runtime';
+import { cleanupRollbackSidecars, getIoRollbackPolicy } from '#copilot/infra/public/operations';
 import { readCloudflareTunnelConfig } from '../cloudflare/config.js';
 import { cleanupStaleQuickTunnelState } from '../cloudflare/state.js';
 import { logMcp } from './audit.js';

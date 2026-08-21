@@ -16,7 +16,7 @@
  * @module copilot/mcp/scripts/oauth-smoke
  */
 
-import { readBoundedResponseText } from '#copilot/infra/public/http-response';
+import { readBoundedResponseText } from '#copilot/infra/public/platform';
 import { readMcpAuthConfig } from '#copilot/mcp/control-plane';
 import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';

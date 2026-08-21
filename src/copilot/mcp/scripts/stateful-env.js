@@ -1,7 +1,7 @@
 // @ts-check
 /** @module copilot/mcp/scripts/stateful-env */
 
-import { chmodFileTrusted, mkdirPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { chmodFileTrusted, mkdirPathTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';

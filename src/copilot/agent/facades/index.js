@@ -7,6 +7,12 @@
  *   facilitar governança de exports e futuras migrações para runtime façade/queries.
  */
 
+/**
+ * Tipos de handoff projetados por esta seam pública para que presentation/runtime não dependa de `agent/infra`.
+ * @typedef {import('../infra/handoff-manager.js').HandoffManager} HandoffManager
+ * @typedef {import('../infra/handoff-manager.js').HandoffRequest} HandoffRequest
+ */
+
 export {
     dispatchAgentDialogTurn,
     dispatchAgentDialogTurnDetailed,

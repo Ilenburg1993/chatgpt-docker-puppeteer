@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/dependency-native-smoke
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 

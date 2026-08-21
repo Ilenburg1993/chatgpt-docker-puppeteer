@@ -7,13 +7,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
     buildIoMutationAuditRecord,
-    getIoMutationAuditLogPath,
-    recordIoMutationAudit,
-} from '../../../../src/copilot/infra/runtime/audit-log.js';
-import {
     completeIoOperationEnvelope,
     createIoOperationEnvelope,
-} from '../../../../src/copilot/infra/runtime/operation.js';
+    getIoMutationAuditLogPath,
+    recordIoMutationAudit,
+} from '#copilot/infra/internal/operations';
 
 /** @type {string[]} */
 const TEMP_DIRS = [];
@@ -26,7 +24,7 @@ afterEach(async () => {
     }
 });
 
-describe('infra/runtime/audit-log', () => {
+describe('infra/operations/audit-log', () => {
     it('fica desabilitado quando env de audit não está definido', async () => {
         expect(getIoMutationAuditLogPath()).toBe(null);
         const envelope = completeIoOperationEnvelope(createIoOperationEnvelope({ capability: 'file.write' }));

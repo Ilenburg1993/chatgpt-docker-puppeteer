@@ -14,10 +14,10 @@ import {
     makeBytesKey,
     makeTextKey,
     normalizeIoCacheKey,
-    resetIoL1CacheForTest,
-} from '../../../../src/copilot/infra/io-cache.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+} from '#copilot/infra/internal/cache';
+import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
 
+import { resetIoL1CacheForTest } from '#copilot/infra/public/testing';
 afterEach(() => {
     resetIoL1CacheForTest();
 });

@@ -13,8 +13,8 @@ import {
     getIoIndex,
     getIoIndexStats,
     searchIoIndex,
-    shutdownParserWorkerPool,
-} from '../src/copilot/infra/index.js';
+} from '#copilot/infra/public/indexing';
+import { shutdownParserWorkerPool } from '#copilot/infra/public/indexing/parser';
 
 /**
  * @typedef {object} BuildCliArgs

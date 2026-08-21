@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     logSwallowed: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/trusted-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/trusted', () => ({
     readTextFreshTrusted: mocks.readTextFreshTrusted,
     writeFileAtomicTrusted: mocks.writeFileAtomicTrusted,
 }));

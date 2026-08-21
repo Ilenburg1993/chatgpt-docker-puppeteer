@@ -1,17 +1,17 @@
 // @ts-check
 
-import { access, mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
 import {
     cleanupStaleSiblingTemps,
     createSiblingTempPath,
     parseSiblingTempEntry,
-    resetSiblingTempCleanupForTest,
-} from '../../../../src/copilot/infra/io/fs/temp-path.js';
-import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/write-atomic.js';
+} from '#copilot/infra/internal/filesystem/transaction';
+import { writeAtomicFileUnlocked } from '#copilot/infra/internal/filesystem/write';
+import { access, mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { resetSiblingTempCleanupForTest } from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const tempDirs = [];
 

@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
     closeScope: vi.fn(),
 }));
 
-vi.mock('#copilot/infra/public/session', () => ({
+vi.mock('#copilot/infra/public/indexing/context', () => ({
     closeScope: mocks.closeScope,
     declareScope: mocks.declareScope,
     refreshScope: mocks.refreshScope,

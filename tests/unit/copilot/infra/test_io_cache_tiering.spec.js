@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from '#copilot/infra/io-cache-tiering';
+import { aggregateIoCacheTierStats, buildIoCacheTierPlan } from '#copilot/infra/internal/cache';
 
 describe('io-cache-tiering', () => {
     it('builds a conservative tier plan by default', () => {

@@ -9,7 +9,7 @@
  */
 
 import { toError, withIoMeta } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
 import { z } from 'zod';
 import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 import { log } from '../infra/logger.js';
@@ -21,7 +21,7 @@ import {
     normalizeToolFailure,
 } from '../infra/tool-operation-result.js';
 
-const { searchWorkspaceSymbols } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { searchWorkspaceSymbols } = createWorkspaceIndexing({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
  * Tool: workspace_symbol_search — busca símbolos no workspace via infraestrutura canônica de search.

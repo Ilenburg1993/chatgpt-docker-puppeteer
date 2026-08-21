@@ -5,17 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-    publishIoInvalidation,
-    resetIoInvalidationBusForTest,
-} from '../../../../src/copilot/infra/io/invalidation/bus.js';
+import { publishIoInvalidation } from '../../../../src/copilot/infra/filesystem/invalidation/bus/index.js';
 import {
     getIoExternalWatchStats,
-    resetIoExternalWatchForTest,
     startIoExternalWatch,
     stopIoExternalWatch,
-} from '../../../../src/copilot/infra/io/invalidation/external-watch.js';
+} from '../../../../src/copilot/infra/filesystem/invalidation/external-watch/index.js';
 
+import { resetIoExternalWatchForTest, resetIoInvalidationBusForTest } from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const TEMP_DIRS = [];
 
@@ -44,7 +41,7 @@ afterEach(async () => {
     }
 });
 
-describe('infra/io/invalidation/external-watch', () => {
+describe('infra/filesystem/invalidation/external-watch', () => {
     it('publica hint bounded para alteração nested e filtra domínio hidden', async () => {
         const root = await createTempDir();
         const nested = join(root, 'nested');

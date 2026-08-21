@@ -9,7 +9,7 @@
  */
 
 import { toError, withIoMeta } from '#copilot/core';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIndexing } from '#copilot/infra/public/indexing/workspace';
 import { z } from 'zod';
 import { FILE_TOOLS_OUTPUT_POLICY, truncateUtf8Text, validatePath, WORKSPACE_ROOT } from '../file/shared.js';
 import { log } from '../infra/logger.js';
@@ -21,7 +21,7 @@ import {
     normalizeToolFailure,
 } from '../infra/tool-operation-result.js';
 
-const { searchText } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
+const { searchText } = createWorkspaceIndexing({ workspaceRoot: WORKSPACE_ROOT });
 
 /**
  * Escapes a string for use as a literal in a regex pattern.

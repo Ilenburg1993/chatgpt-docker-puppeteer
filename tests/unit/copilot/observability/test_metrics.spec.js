@@ -24,14 +24,22 @@ vi.mock('#copilot/config/env', async (importOriginal) => {
     };
 });
 
-vi.mock('node:fs/promises', () => ({
-    appendFile: vi.fn(async () => {}),
-    mkdir: vi.fn(async () => {}),
-}));
+vi.mock('node:fs/promises', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        appendFile: vi.fn(async () => {}),
+        mkdir: vi.fn(async () => {}),
+    };
+});
 
-vi.mock('../../../../src/copilot/core/error-handlers.js', () => ({
-    logSwallowed: vi.fn(),
-}));
+vi.mock('../../../../src/copilot/core/error-handlers.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        logSwallowed: vi.fn(),
+    };
+});
 
 vi.mock('../../../../src/copilot/core/timer-registry.js', () => ({
     registerTimer: vi.fn(),

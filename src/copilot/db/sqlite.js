@@ -21,12 +21,11 @@
  * @see module:copilot/conversation-hub/store
  */
 
-import { resolveWorkspacePath } from '#copilot/boot';
-import { ConfigError, registerShutdownHandler, runShutdown, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
+import { ConfigError, registerShutdownHandler, SHUTDOWN_PRIORITY, toError } from '#copilot/core';
 import Database from 'better-sqlite3';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { logSwallowed } from '../core/error-handlers.js';
-import { mkdirPathUnlocked } from '../infra/io/fs/mkdir.js';
 import { COPILOT_MIGRATIONS } from './migrations.js';
 
 /**
@@ -49,12 +48,7 @@ export function setDbLogger(logFn) {
     log = logFn;
 }
 
-/**
- * Leitura direta de env para evitar import de config (L2) em db (L0).
- *
- * @type {string}
- */
-const ENV_DB_PATH = process.env['COPILOT_DB_PATH'] || '';
+const DEFAULT_WORKSPACE_ROOT = path.resolve(import.meta.dirname, '../../..');
 
 /** @type {import('better-sqlite3').Database | null} */
 let copilotDb = null;
@@ -91,8 +85,9 @@ function getExitHandlerState() {
  * @returns {string}
  */
 function resolveCopilotDbPath() {
-    const fromEnv = ENV_DB_PATH;
-    const raw = fromEnv || resolveWorkspacePath('data', 'copilot.sqlite');
+    const fromEnv = String(process.env['COPILOT_DB_PATH'] ?? '').trim();
+    const workspaceRoot = String(process.env['COPILOT_WORKING_DIRECTORY'] ?? '').trim() || DEFAULT_WORKSPACE_ROOT;
+    const raw = fromEnv || path.resolve(workspaceRoot, 'data', 'copilot.sqlite');
 
     const looksLikeDir = raw.endsWith(path.sep) || raw.endsWith('/') || raw.endsWith('\\');
     const resolved = looksLikeDir ? path.join(raw, 'copilot.sqlite') : raw;
@@ -232,11 +227,10 @@ function registerExitHandler() {
         }
     };
 
-    // Sinais entram no coordenador central para caches e writers drenarem antes do close do banco.
+    // `exit` is a final synchronous fallback only. Signal ownership belongs to process hosts/CLIs, which route graceful
+    // termination through the central shutdown coordinator before this DATABASE-priority handler runs.
     if (!exitState.registered) {
         process.on('exit', runExitHandlers);
-        process.once('SIGTERM', () => void runShutdown('SIGTERM'));
-        process.once('SIGINT', () => void runShutdown('SIGINT'));
         exitState.registered = true;
     }
 
@@ -245,20 +239,16 @@ function registerExitHandler() {
 }
 
 /**
- * Garante que o diretório do banco exista pela primitive low-level de namespace. O DB não pode depender das facades
- * públicas de IO porque essas facades alimentam journal/L2 que, por sua vez, dependem do próprio DB. O boot chama esta
- * etapa antes de getCopilotDb(); getCopilotDb permanece síncrono e não materializa diretórios implicitamente.
+ * Garante que o diretório do banco exista diretamente sobre a primitive Node L0. O DB não depende de infra: o boot é
+ * o composition root que conecta o banco às capabilities SQLite de infra. A criação é idempotente e recuperável; se o
+ * processo cair antes da abertura do SQLite, o próximo boot repete o mkdir.
  *
  * @returns {Promise<void>}
  */
 async function ensureCopilotDbDir() {
     const dbPath = resolveCopilotDbPath();
     if (dbPath === ':memory:') return;
-    await mkdirPathUnlocked(path.dirname(dbPath), {
-        recursive: true,
-        mode: 0o700,
-        durability: 'file-and-directory',
-    });
+    await mkdir(path.dirname(dbPath), { recursive: true, mode: 0o700 });
 }
 
 export { closeCopilotDb, ensureCopilotDbDir, getCopilotDb, resolveCopilotDbPath };

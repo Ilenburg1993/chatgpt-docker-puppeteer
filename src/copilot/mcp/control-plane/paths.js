@@ -13,9 +13,10 @@ import path from 'node:path';
  *     ok: true;
  *     resolved: string;
  *     relative: string;
- *     validatedReadPath?: unknown;
- *     validatedWritePath?: unknown;
+ *     validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath;
+ *     validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath;
  * }} McpPathOk
+ * @typedef {McpPathOk & { validatedReadPath: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} McpValidatedReadPathOk
  *
  * @typedef {{
  *     ok: false;
@@ -35,16 +36,33 @@ export function getMcpWorkspaceRoot() {
 }
 
 /**
+ * Resolve a read path without issuing a reusable opaque capability.
+ *
  * @param {string} filePath
- * @param {{ issueReadCapability?: boolean }} [options]
  * @returns {Promise<McpPathOk | McpPathError>}
  */
-export async function resolveReadPath(filePath, options = {}) {
-    const result = await validatePath(filePath, {
-        mode: 'read',
-        issueReadCapability: options.issueReadCapability === true,
-    });
+export async function resolveReadPath(filePath) {
+    const result = await validatePath(filePath, { mode: 'read' });
     if (!result.ok) return pathError(filePath, 'read', result.reason ?? 'Path denied.');
+    return {
+        ok: true,
+        resolved: result.resolved,
+        relative: toWorkspaceRelativePath(result.resolved),
+    };
+}
+
+/**
+ * Resolve a read path and require issuance of the branded read-only capability.
+ *
+ * @param {string} filePath
+ * @returns {Promise<McpValidatedReadPathOk | McpPathError>}
+ */
+export async function resolveValidatedReadPath(filePath) {
+    const result = await validatePath(filePath, { mode: 'read', issueReadCapability: true });
+    if (!result.ok) return pathError(filePath, 'read', result.reason ?? 'Path denied.');
+    if (!result.validatedReadPath) {
+        return pathError(filePath, 'read', 'Validated read capability was not issued.');
+    }
     return {
         ok: true,
         resolved: result.resolved,
@@ -68,7 +86,7 @@ export async function resolveWritePath(filePath, options = {}) {
         ok: true,
         resolved: result.resolved,
         relative: toWorkspaceRelativePath(result.resolved),
-        validatedWritePath: result.validatedWritePath,
+        ...(result.validatedWritePath === undefined ? {} : { validatedWritePath: result.validatedWritePath }),
     };
 }
 

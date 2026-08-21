@@ -1,7 +1,7 @@
 // @ts-check
 import { withIoMeta } from '#copilot/core';
-import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/public/buffer';
-import { createIoOperationEnvelope } from '#copilot/infra/public/runtime';
+import { createIoOperationEnvelope } from '#copilot/infra/public/operations';
+import { decodeBase64ToOwnedBuffer, toOwnedBuffer } from '#copilot/infra/public/platform';
 import { z } from 'zod';
 import { log } from '../infra/logger.js';
 import { buildTool } from '../infra/tool-factory.js';
@@ -17,8 +17,8 @@ import { WORKSPACE_ROOT, validatePath } from './shared.js';
  * @see module:copilot/tools/file/shared
  */
 
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { IO_CAPABILITY, IO_RISK, capabilityForCreate, riskForOverwrite } from '#copilot/infra/public/policy';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     ADVISORY_WRITE_CONTENT_BYTES,
     buildMutationChangeSet,
@@ -45,7 +45,7 @@ const {
     writeFileAtomicValidated,
 } = createWorkspaceIo({ workspaceRoot: WORKSPACE_ROOT });
 
-/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof writeFileAtomic>[1]} content
+/** @param {import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath | undefined} validatedWritePath @param {string} resolved @param {Parameters<typeof writeFileAtomic>[1]} content
   @param {Parameters<typeof writeFileAtomic>[2]} options */
 function writeValidatedOrString(validatedWritePath, resolved, content, options) {
     return validatedWritePath
@@ -53,7 +53,7 @@ function writeValidatedOrString(validatedWritePath, resolved, content, options) 
         : writeFileAtomic(resolved, content, options);
 }
 
-/** @param {unknown} validatedWritePath @param {string} resolved @param {Parameters<typeof createOrReplaceFileAtomic>[1]}
+/** @param {import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath | undefined} validatedWritePath @param {string} resolved @param {Parameters<typeof createOrReplaceFileAtomic>[1]}
   content @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options */
 function createValidatedOrString(validatedWritePath, resolved, content, options) {
     return validatedWritePath
@@ -61,16 +61,14 @@ function createValidatedOrString(validatedWritePath, resolved, content, options)
         : createOrReplaceFileAtomic(resolved, content, options);
 }
 
-/** @param {{ resolved: string; validatedReadPath?: unknown }} source @param {{ resolved: string; validatedWritePath?:
-  unknown }} destination @param {Parameters<typeof copyFileLocked>[2]} options */
+/** @param {{ resolved: string; validatedReadPath?: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} source @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} destination @param {Parameters<typeof copyFileLocked>[2]} options */
 function copyValidatedPairOrString(source, destination, options) {
     return source.validatedReadPath && destination.validatedWritePath
         ? copyFileLockedValidated(source.validatedReadPath, destination.validatedWritePath, options)
         : copyFileLocked(source.resolved, destination.resolved, options);
 }
 
-/** @param {{ resolved: string; validatedWritePath?: unknown }} source @param {{ resolved: string; validatedWritePath?:
-  unknown }} destination @param {Parameters<typeof moveFileLocked>[2]} options */
+/** @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} source @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} destination @param {Parameters<typeof moveFileLocked>[2]} options */
 function moveValidatedPairOrString(source, destination, options) {
     return source.validatedWritePath && destination.validatedWritePath
         ? moveFileLockedValidated(source.validatedWritePath, destination.validatedWritePath, options)

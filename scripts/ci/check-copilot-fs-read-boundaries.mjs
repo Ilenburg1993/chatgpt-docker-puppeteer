@@ -23,7 +23,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const SOURCE_ROOT = 'src/copilot';
 const SOURCE_GLOB = `${SOURCE_ROOT}/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}`;
 const BASELINE_PATH = path.join(ROOT, 'config', 'architecture', 'copilot-fs-read-boundaries.json');
-const LOW_LEVEL_ROOT = 'src/copilot/infra/io/fs/';
+const LOW_LEVEL_ROOT = 'src/copilot/infra/filesystem/';
 const READ_OPERATIONS = new Set([
     'readFile',
     'readFileSync',
@@ -151,7 +151,7 @@ function buildBaseline(aggregate, previousBaseline = readBaseline()) {
             operations,
         })),
         description:
-            'Exact non-growth baseline for direct node:fs reads outside src/copilot/infra/io/fs. Transitional debt must monotonically shrink; classified exceptions require explicit architectural justification.',
+            'Exact non-growth baseline for direct node:fs reads outside src/copilot/infra/filesystem. Transitional debt must monotonically shrink; classified exceptions require explicit architectural justification.',
     };
 }
 

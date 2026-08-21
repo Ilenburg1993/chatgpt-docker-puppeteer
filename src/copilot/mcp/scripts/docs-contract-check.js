@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/docs-contract-check
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -85,11 +85,11 @@ export async function runDocsContractCheck() {
         detail: `rootScoped=${scopedPublic} globalBare=${globalPublic}`,
     });
 
-    const publicFacadeExists = await pathExists('src/copilot/infra/public/cache.js');
+    const publicFacadeExists = await pathExists('src/copilot/infra/public/cache/index.js');
     checks.push({
         name: 'infra-public-facade-visible-on-filesystem',
         passed: publicFacadeExists,
-        detail: publicFacadeExists ? 'src/copilot/infra/public/cache.js exists' : 'cache facade missing',
+        detail: publicFacadeExists ? 'src/copilot/infra/public/cache/index.js exists' : 'cache capability missing',
     });
 
     const lock = JSON.parse(await readWorkspaceText('package-lock.json'));

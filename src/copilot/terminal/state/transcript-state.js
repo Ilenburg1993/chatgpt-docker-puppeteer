@@ -9,7 +9,7 @@
  * @module copilot/terminal/state/transcript-state
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { utf8ByteLength } from '#copilot/infra/public/platform';
 import {
     appendTerminalTranscriptArchive,
     readTerminalTranscriptArchiveState,

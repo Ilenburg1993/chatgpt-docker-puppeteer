@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/jobs
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
+import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
 import {
     boundedWriteAnnotations,
     cancelJob,

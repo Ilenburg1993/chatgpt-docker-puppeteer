@@ -6,7 +6,7 @@ import {
     buildSimpleTextDiff,
     buildSimpleTextDiffAroundLineRange,
     computeTextPatch,
-} from '../../../../src/copilot/infra/io/patch/index.js';
+} from '../../../../src/copilot/infra/filesystem/patch/index.js';
 
 describe('infra/io/patch', () => {
     it('calcula patch textual com substituição única', () => {

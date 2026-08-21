@@ -73,7 +73,7 @@ const mocks = vi.hoisted(() => {
     };
 });
 
-vi.mock('#copilot/infra/public/session', () => ({
+vi.mock('#copilot/infra/public/indexing/context', () => ({
     declareScope: mocks.declareScope,
     getScopeStats: mocks.getScopeStats,
     getScopeContext: mocks.getScopeContext,

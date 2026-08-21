@@ -4,19 +4,13 @@ import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ensureIoIndexSchema } from '../../../../src/copilot/db/io-index-schema.js';
 
-const mocks = vi.hoisted(() => ({
-    getCopilotDb: vi.fn(),
-}));
-
-vi.mock('#copilot/db', () => ({
-    getCopilotDb: mocks.getCopilotDb,
-}));
-
-import { resetIoIndexForTest } from '../../../../src/copilot/infra/io-index-registry.js';
+import { configureInfraSqliteProvider } from '#copilot/infra/public/database';
 import { cmdIndex } from '../../../../src/copilot/terminal/commands/workspace-index.js';
 
+import { resetInfraSqliteProviderForTest, resetIoIndexForTest } from '#copilot/infra/public/testing';
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 
 /** @type {string | null} */
@@ -37,8 +31,10 @@ function mockCtx() {
 
 beforeEach(async () => {
     resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
     testDb = new Database(':memory:');
-    mocks.getCopilotDb.mockReturnValue(testDb);
+    ensureIoIndexSchema(testDb);
+    configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
     tmpDir = mkdtempSync(join(WORKSPACE, 'tmp', '.terminal-index-'));
     tmpRel = relative(WORKSPACE, tmpDir).replace(/\\/gu, '/');
     await mkdir(join(tmpDir, 'nested'), { recursive: true });
@@ -48,9 +44,9 @@ beforeEach(async () => {
 
 afterEach(() => {
     resetIoIndexForTest();
+    resetInfraSqliteProviderForTest();
     if (testDb?.open) testDb.close();
     testDb = null;
-    mocks.getCopilotDb.mockReset();
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = null;
     tmpRel = null;
@@ -98,6 +94,7 @@ describe('terminal/commands/index', () => {
         expect(ctx.output()).not.toContain('matches=');
 
         await cmdIndex(ctx, 'clear');
-        expect(ctx.output()).toMatch(/Índice L2\s+limpo/u);
+        const plainOutput = ctx.output().replace(/\u001b\[[0-9;]*m/gu, '');
+        expect(plainOutput).toMatch(/Índice L2\s+limpo/u);
     });
 });

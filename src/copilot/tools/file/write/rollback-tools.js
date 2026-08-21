@@ -10,7 +10,7 @@ import {
     executeIoRollbackToken,
     listRollbackSidecars,
     parseIoRollbackToken,
-} from '#copilot/infra/public/runtime';
+} from '#copilot/infra/public/operations';
 import path from 'node:path';
 import { z } from 'zod';
 import { buildTool } from '../../infra/tool-factory.js';
@@ -21,7 +21,7 @@ import { completeAndAuditMutation, failAndAuditMutation } from './mutation-helpe
 const MAX_ROLLBACK_TOKEN_CHARS = 32 * 1024 * 1024;
 
 /**
- * @param {import('#copilot/infra/runtime/rollback.js').IoRollbackToken} token
+ * @param {ReturnType<typeof parseIoRollbackToken>} token
  */
 function tokenPaths(token) {
     return [

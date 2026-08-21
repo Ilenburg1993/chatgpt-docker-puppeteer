@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
-import { createIoL2SqliteCache } from '#copilot/infra/io-cache-l2-sqlite';
+import { createIoL2SqliteCache } from '#copilot/infra/internal/cache';
 
 function createDb() {
     return new Database(':memory:');

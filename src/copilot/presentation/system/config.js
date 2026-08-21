@@ -22,7 +22,7 @@ import {
 import { conversationHub, conversationStore } from '#copilot/conversation-hub';
 import { container } from '#copilot/core';
 import { METRICS_STORE } from '#copilot/observability';
-import { getSseClients, getSseCriticalClients } from '../../infra/sse/state.js';
+import { getSseClients, getSseCriticalClients } from '../realtime/index.js';
 import { readRuntimeIdFromParams } from '../routing/index.js';
 import {
     readAgentRuntimeOverviewProjection,

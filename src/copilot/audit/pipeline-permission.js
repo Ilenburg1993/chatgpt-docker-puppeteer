@@ -10,9 +10,9 @@
  */
 
 import { SHUTDOWN_PRIORITY, logSwallowed, registerShutdownHandler, toError } from '#copilot/core';
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import { PERMISSION_COMPLETED_KINDS, PERMISSION_RESULTS } from '#copilot/sdk/constants';
 import { join, resolve } from 'node:path';
-import { createJsonlFileWriter } from '../infra/io/jsonl-file-writer.js';
 import { getLogDir, log } from './logger.js';
 
 /** @param {string} key @param {number} def @returns {number} */

@@ -5,7 +5,11 @@
  * @module copilot/mcp/cloudflare/state
  */
 
-import { deleteFileTrusted, readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import {
+    deleteFileTrusted,
+    readTextFreshTrusted,
+    writeFileAtomicTrusted,
+} from '#copilot/infra/public/filesystem/trusted';
 
 /**
  * @typedef {object} QuickTunnelSmokeState

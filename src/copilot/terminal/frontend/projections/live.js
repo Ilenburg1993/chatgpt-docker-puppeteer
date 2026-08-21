@@ -6,7 +6,7 @@
  * activity, turn trace, timeline, I/O real e SSE. Este modulo nao executa operacoes; ele apenas projeta a UX.
  */
 
-import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '../../../infra/sse/index.js';
+import { getSseClients, getSseCriticalClients, getTerminalReplayBuffer } from '#copilot/presentation/realtime';
 import { readTerminalIoActivityProjection } from '../../events/projections/index.js';
 import { readTerminalActivityProjection, readTerminalDisplayProjection } from './now.js';
 import { readTerminalStatusProjection } from './status.js';

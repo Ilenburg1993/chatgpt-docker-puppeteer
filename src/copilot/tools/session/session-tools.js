@@ -1,8 +1,8 @@
 // @ts-check
 import { readBootSkillConfig, resolveHooksStateDir, resolveWorkspacePath } from '#copilot/boot';
 import { logSwallowed, toError } from '#copilot/core';
-import { readConfiguredSkillCatalog } from '#copilot/infra/public/skill-io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { readConfiguredSkillCatalog } from '#copilot/infra/public/filesystem/skills';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -178,7 +178,7 @@ const invokeSkillTool = buildTool({
                 name: z
                     .string()
                     .optional()
-                    ['describe']('Nome da skill a carregar (slug do diretório em .github/skills/)'),
+                    ['describe']('Nome da skill a carregar (slug de um diretório de skills configurado)'),
             })
         )
     ),
@@ -190,7 +190,7 @@ const invokeSkillTool = buildTool({
             ...(name ? { requestedName: name } : {}),
         });
         if (catalog.readableDirectoryCount === 0) {
-            return { error: 'Diretório .github/skills/ não encontrado.' };
+            return { error: 'Nenhum diretório de skills configurado está disponível.' };
         }
         const available = catalog.names;
         if (!name) return { available };

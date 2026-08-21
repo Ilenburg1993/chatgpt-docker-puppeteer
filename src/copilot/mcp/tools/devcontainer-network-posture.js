@@ -5,7 +5,11 @@
  * @module copilot/mcp/tools/devcontainer-network-posture
  */
 
-import { readBytesRangeFreshTrusted, readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/trusted-io';
+import {
+    readBytesRangeFreshTrusted,
+    readTextFreshTrusted,
+    statPathTrusted,
+} from '#copilot/infra/public/filesystem/trusted';
 import { boundedWriteAnnotations, errorResult, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import { execFile } from 'node:child_process';
 import { isAbsolute, resolve } from 'node:path';

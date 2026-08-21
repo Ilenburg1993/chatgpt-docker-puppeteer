@@ -11,7 +11,7 @@
  * @module copilot/mcp/adapters/http2
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { logMcp } from '#copilot/mcp/control-plane';
 import { createPrivateKey, createPublicKey, X509Certificate } from 'node:crypto';
 import { createSecureServer, constants as http2Constants } from 'node:http2';

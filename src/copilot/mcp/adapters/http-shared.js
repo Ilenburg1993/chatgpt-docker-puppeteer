@@ -17,7 +17,7 @@
  * @module copilot/mcp/adapters/http-shared
  */
 
-import { startIoExternalWatch } from '#copilot/infra/public/io';
+import { startIoExternalWatch } from '#copilot/infra/public/filesystem/invalidation';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';

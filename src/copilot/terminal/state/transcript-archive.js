@@ -8,9 +8,9 @@
  * @module copilot/terminal/state/transcript-archive
  */
 
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import { join } from 'node:path';
 import { toError } from '../../core/error-handlers.js';
-import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
 
 const DEFAULT_TERMINAL_TRANSCRIPT_ARCHIVE_DIR = join(process.cwd(), 'data', 'copilot-terminal', 'transcripts');
 const TERMINAL_TRANSCRIPT_ARCHIVE_SOFT_QUEUE = 10_000;

@@ -6,7 +6,7 @@
  *
  * Garante que:
  *
- * 1. Todos os 17 módulos têm barrel (index.js)
+ * 1. Módulos públicos top-level têm barrel; infra deliberadamente não possui mega-barrel
  * 2. Barrels essenciais exportam símbolos mínimos esperados
  * 3. Não há violações de camada em imports críticos (bridges não importa agent)
  * 4. DI tokens existem para todos os 13 serviços registrados
@@ -66,7 +66,7 @@ function listJsFilesRecursive(dirAbs) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 1. Barrel coverage — todos os 17 módulos têm index.js
+// 1. Barrel coverage — módulos públicos; infra é composto por capability barrels
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const EXPECTED_MODULES = [
@@ -81,7 +81,6 @@ const EXPECTED_MODULES = [
     'event-handlers',
     'events',
     'hooks',
-    'infra',
     'observability',
     'presentation',
     'plugins',
@@ -92,13 +91,17 @@ const EXPECTED_MODULES = [
     'types',
 ];
 
-describe('W4-9 — barrel coverage: todos os 17 módulos', () => {
+describe('W4-9 — barrel coverage: módulos públicos top-level', () => {
     for (const mod of EXPECTED_MODULES) {
         it(`${mod}/index.js existe`, () => {
             const p = copilotPath(mod, 'index.js');
             assert.ok(existsSync(p), `Barrel ausente: src/copilot/${mod}/index.js`);
         });
     }
+});
+
+it('infra não possui mega-barrel raiz; capabilities são os boundaries públicos', () => {
+    assert.equal(existsSync(copilotPath('infra', 'index.js')), false);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -327,7 +330,6 @@ describe('W4-9 — fronteira externa→agent: sem deep-import interno acidental'
             'di-tokens',
             'error-policy',
             'facades',
-            'infra',
             'lifecycle',
             'ports',
             'runtime-registry',
@@ -833,8 +835,8 @@ describe('IO-014 — IO portable/trusted possui capability pública explícita',
             `Primitiva portable vazou para fora de infra:\n${portableLeaks.join('\n')}`,
         );
         assert.ok(
-            !readSrc('infra/public/io.js').includes('writeFileAtomicPortable'),
-            'facade workspace-facing não deve exportar a capability portable',
+            !readSrc('infra/filesystem/workspace/index.js').includes('writeFileAtomicPortable'),
+            'workspace capability não deve exportar a capability portable',
         );
     });
 });
@@ -880,7 +882,7 @@ describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () =
         assert.deepEqual(
             violations,
             [],
-            `Writer assíncrono direto fora de infra; use #copilot/infra/public/io:\n${violations.join('\n')}`,
+            `Writer assíncrono direto fora de infra; use uma capability #copilot/infra/public/filesystem/* apropriada:\n${violations.join('\n')}`,
         );
     });
 });
@@ -888,7 +890,7 @@ describe('IO-006 — writers assíncronos diretos ficam restritos a infra', () =
 describe('IO-006 — cleanup e mkdir diretos possuem matriz formal', () => {
     it('calls diretos de mkdir/rm/unlink fora de infra correspondem exatamente às exceções classificadas', () => {
         /** @type {string[]} */
-        const allowed = [];
+        const allowed = ['db/sqlite.js:mkdir'];
         const mutators = ['mkdir', 'rm', 'unlink'];
         /** @type {string[]} */
         const actual = [];

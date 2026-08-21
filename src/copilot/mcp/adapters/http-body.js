@@ -9,7 +9,7 @@
  * @module copilot/mcp/adapters/http-body
  */
 
-import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/buffer';
+import { concatBufferViews, decodeUtf8Buffer } from '#copilot/infra/public/platform';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 export const DEFAULT_MCP_HTTP_BODY_MAX_BYTES = 2 * 1024 * 1024;

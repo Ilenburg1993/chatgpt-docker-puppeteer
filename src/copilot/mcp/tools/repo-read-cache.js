@@ -9,8 +9,8 @@
  * @module copilot/mcp/tools/repo-read-cache
  */
 
-import { registerIoInvalidationHook } from '#copilot/infra/io/invalidation/bus';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { registerIoInvalidationHook } from '#copilot/infra/public/filesystem/invalidation';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { getMcpWorkspaceRoot } from '#copilot/mcp/control-plane';
 import path from 'node:path';
 
@@ -82,10 +82,8 @@ const repoReadFileChunkInflight = new Map();
 /** @type {(() => void) | null} */
 let repoReadCacheInvalidationUnregister = null;
 
-ensureRepoReadCacheInvalidationHook();
-
 /**
- * Return MCP repo read response-cache stats. Kept under the historical function name for runtime-health compatibility.
+ * Return MCP repo read response-cache stats.
  *
  * @returns {Record<string, number> & {
  *     size: number;
@@ -140,13 +138,14 @@ export function clearRepoReadFileResultCacheForResolvedSubtree(resolvedPath) {
 /**
  * Read a UTF-8 file/window and cache the already-shaped MCP payload.
  *
- * @param {{ resolved: string; relative: string; validatedReadPath?: unknown }} resolved
+ * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} resolved
  * @param {number | undefined} startLine
  * @param {number | undefined} endLine
  * @param {'full' | 'returned' | 'none'} [hashMode]
  * @returns {Promise<{ structured: Record<string, unknown>; text: string }>}
  */
 export async function readRepoFileWithValidatedResultCache(resolved, startLine, endLine, hashMode = 'full') {
+    ensureRepoReadCacheInvalidationHook();
     const key = buildRepoReadFileCacheKey(resolved.resolved, startLine, endLine);
     const cached = await getValidatedRepoReadCacheEntry(repoReadFileResultCache, key, resolved.validatedReadPath, {
         hitStat: 'hits',
@@ -210,7 +209,7 @@ export async function readRepoFileWithValidatedResultCache(resolved, startLine, 
 /**
  * Read line chunks and cache the already-shaped MCP payload.
  *
- * @param {{ resolved: string; relative: string; validatedReadPath?: unknown }} resolved
+ * @param {{ resolved: string; relative: string; validatedReadPath: import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath }} resolved
  * @param {number} effectiveStartLine
  * @param {number | undefined} endLine
  * @param {number} chunkLines
@@ -226,6 +225,7 @@ export async function readRepoFileChunksWithValidatedResultCache(
     highWaterMark,
     cursor,
 ) {
+    ensureRepoReadCacheInvalidationHook();
     const key = buildRepoReadFileChunkCacheKey(
         resolved.resolved,
         effectiveStartLine,
@@ -340,7 +340,6 @@ export function resetRepoReadResponseCacheForTest() {
     }
     repoReadCacheInvalidationUnregister?.();
     repoReadCacheInvalidationUnregister = null;
-    ensureRepoReadCacheInvalidationHook();
 }
 
 /**
@@ -383,7 +382,7 @@ function clearRepoReadCacheEntriesByPrefix(prefix) {
 /**
  * @param {Map<string, RepoReadCacheEntry>} cache
  * @param {string} key
- * @param {unknown} validatedReadPath
+ * @param {import('#copilot/infra/public/filesystem/workspace').ValidatedReadWorkspacePath} validatedReadPath
  * @param {{
  *     hitStat: 'hits' | 'chunkHits';
  *     trustWindowHitStat: 'trustWindowHits' | 'chunkTrustWindowHits';

@@ -9,7 +9,7 @@ import {
     lstatPathTrusted,
     readTextFreshTrusted,
     writeFileAtomicTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import { resolve } from 'node:path';
 
 export const DEFAULT_MODEL_GATEWAY_SELECTION_TRACE_DIR = 'data/copilot/model-gateway/selection-traces';

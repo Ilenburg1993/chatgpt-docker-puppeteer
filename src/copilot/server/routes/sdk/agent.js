@@ -21,23 +21,12 @@
  */
 
 import { Router } from 'express';
-import { SseReplayBuffer } from '../../../infra/sse/replay-buffer.js';
-import { SseClientPool } from '../../../infra/sse/stream-hub.js';
-import {
-    createEventFilter,
-    createSseWriter,
-    SseConnectionTracker,
-    standardizeSsePayload,
-} from '../../../infra/sse/utils.js';
 import {
     deleteSdkAgentStreamState,
     getSdkAgentStreamState,
     setSdkAgentStreamState,
 } from '../../runtime-state/sdk-agent-stream.js';
 import { withErrorHandler as _withErrorHandler } from './middleware.js';
-
-/** GAP-EVARCH-01 (fix): tracker centralizado para /agent/stream. */
-const _agentTracker = new SseConnectionTracker('agent/stream');
 
 /**
  * @typedef {import('express').Request} Req
@@ -57,6 +46,7 @@ const _agentTracker = new SseConnectionTracker('agent/stream');
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSystemPrompt']} sdkSystemPrompt
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkSessionOwnership']} sdkSessionOwnership
  * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkObservability']} sdkObservability
+ * @property {ReturnType<typeof import('./deps.js').buildDefaultSdkRouteSharedDeps>['sdkRealtime']} sdkRealtime
  * @property {string} [runtimeId] - Runtime alvo resolvido na borda.
  * @property {string | null} [requestedRuntimeId] - Runtime solicitado antes de fallback.
  * @property {boolean} [runtimeFound] - Se o runtime solicitado foi encontrado.
@@ -140,12 +130,25 @@ function resolveAgentClientState(routeDeps, client = null) {
  */
 export default function createAgentRouter(deps) {
     const router = Router();
+    /** @type {ReturnType<typeof createAgentTracker> | null} */
+    let agentTracker = null;
+
+    /** @param {AgentRouterDeps} routeDeps */
+    function createAgentTracker(routeDeps) {
+        return new routeDeps.sdkRealtime.SseConnectionTracker('agent/stream');
+    }
+
+    /** @param {AgentRouterDeps} routeDeps */
+    function getAgentTracker(routeDeps) {
+        agentTracker ??= createAgentTracker(routeDeps);
+        return agentTracker;
+    }
     /**
      * @typedef {{
      *     key: string;
      *     runtimeId: string | undefined;
      *     client: Awaited<ReturnType<AgentRouterDeps['getClient']>>;
-     *     pool: SseClientPool;
+     *     pool: InstanceType<AgentRouterDeps['sdkRealtime']['SseClientPool']>;
      *     unsubscribe: () => void;
      * }} AgentStreamState
      */
@@ -166,14 +169,14 @@ export default function createAgentRouter(deps) {
             deleteSdkAgentStreamState(key);
         }
 
-        const pool = new SseClientPool(new SseReplayBuffer(), {
+        const pool = new routeDeps.sdkRealtime.SseClientPool(new routeDeps.sdkRealtime.SseReplayBuffer(), {
             name: `sdk.agent.stream.${key}`,
             metrics: routeDeps.metrics,
         });
 
         const unsubscribe = subscribeClientLifecycle(client, (event) => {
             const type = /** @type {string} */ (event?.type ?? 'lifecycle');
-            const payload = standardizeSsePayload({
+            const payload = routeDeps.sdkRealtime.standardizeSsePayload({
                 .../** @type {object} */ (event ?? {}),
                 runtimeId: key,
             });
@@ -370,7 +373,8 @@ export default function createAgentRouter(deps) {
         void withErrorHandler(req, res, async () => {
             const routeDeps = resolveAgentRouterDeps(deps, req);
             const { sdkObservability } = routeDeps;
-            if (!_agentTracker.accept()) {
+            const agentTracker = getAgentTracker(routeDeps);
+            if (!agentTracker.accept()) {
                 res.status(429).json({
                     ok: false,
                     ...buildAgentRuntimeMeta(routeDeps),
@@ -382,9 +386,9 @@ export default function createAgentRouter(deps) {
 
             // GAP-EVARCH-01 (fix): usar createSseWriter para setup padronizado
             // FASE-11.2/11.3/11.4: replay buffer + event filter + max lifetime
-            const sse = createSseWriter(req, res, {
+            const sse = routeDeps.sdkRealtime.createSseWriter(req, res, {
                 heartbeatMs: 30_000,
-                tracker: _agentTracker,
+                tracker: agentTracker,
                 replayBuffer: state.pool.replayBuffer,
                 maxLifetimeMs: 24 * 60 * 60 * 1000,
             });
@@ -400,7 +404,7 @@ export default function createAgentRouter(deps) {
             );
 
             // FASE-11.3: filtro de eventos via ?events= query param
-            const eventFilter = createEventFilter(
+            const eventFilter = routeDeps.sdkRealtime.createEventFilter(
                 typeof req.query['events'] === 'string' ? req.query['events'] : undefined,
             );
 

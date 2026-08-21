@@ -10,7 +10,7 @@
 
 import { join } from 'node:path';
 
-import { readJson, writeJson } from '../../infra/storage/json-store.js';
+import { readJson, writeJson } from '#copilot/infra/public/persistence/json';
 import { MODEL_GATEWAY_SCHEMA_VERSION } from '../contracts/records.js';
 import { ModelGatewayRegistry } from './model-registry.js';
 

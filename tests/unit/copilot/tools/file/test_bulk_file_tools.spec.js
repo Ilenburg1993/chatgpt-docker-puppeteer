@@ -8,13 +8,15 @@ import { describe, it } from 'vitest';
 import {
     getValidatedMutableWorkspacePathStats,
     getValidatedReadWorkspacePathStats,
-    resetValidatedMutableWorkspacePathStatsForTest,
-    resetValidatedReadWorkspacePathStatsForTest,
-} from '../../../../../src/copilot/infra/io/policy/validated-path.js';
+} from '#copilot/infra/public/filesystem/workspace';
 import { readFilesBatchTool } from '../../../../../src/copilot/tools/file/read/index.js';
 import { patchFilesBatchTool } from '../../../../../src/copilot/tools/file/write/index.js';
 import { isToolExecutionFailureResponse } from '../../../../../src/copilot/tools/infra/tool-feedback.js';
 
+import {
+    resetValidatedMutableWorkspacePathStatsForTest,
+    resetValidatedReadWorkspacePathStatsForTest,
+} from '#copilot/infra/public/testing';
 async function createFixture() {
     const jobsDir = join(process.cwd(), 'src/copilot/.ai/jobs');
     await mkdir(jobsDir, { recursive: true });

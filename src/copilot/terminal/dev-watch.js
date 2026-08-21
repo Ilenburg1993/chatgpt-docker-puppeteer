@@ -19,7 +19,7 @@
  */
 
 import { toError } from '#copilot/core';
-import { watchPathTrusted } from '#copilot/infra/public/trusted-io';
+import { watchPathTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SHUTDOWN_PRIORITY } from '../core/shutdown-priorities.js';

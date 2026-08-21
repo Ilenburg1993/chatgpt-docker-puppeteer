@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-const MOVE_URL = new URL('../../../../src/copilot/infra/io/fs/move.js', import.meta.url).href;
+const MOVE_URL = new URL('../../../../src/copilot/infra/filesystem/write/move/index.js', import.meta.url).href;
 const CHILD_SCRIPT = `
 const options = JSON.parse(process.env['COPILOT_MOVE_CRASH_CASE']);
 const { moveFileUnlocked } = await import(options.moveUrl);

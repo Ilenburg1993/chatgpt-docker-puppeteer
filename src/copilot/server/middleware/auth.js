@@ -10,7 +10,7 @@
 
 import { defaultAuditLog } from '#copilot/audit';
 import { readCopilotBootConfig } from '#copilot/boot';
-import { toOwnedBuffer } from '#copilot/infra/public/buffer';
+import { toOwnedBuffer } from '#copilot/infra/public/platform';
 import { timingSafeEqual } from 'node:crypto';
 
 /**

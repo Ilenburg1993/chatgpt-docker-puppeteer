@@ -6,7 +6,7 @@ import {
     matchesGlobPattern,
     matchesPlainPathPattern,
     simpleGlobToRegExp,
-} from '../../../../src/copilot/infra/scan/glob.js';
+} from '../../../../src/copilot/infra/indexing/scanner/index.js';
 
 describe('canonical IO glob policy', () => {
     it('uses minimatch v10 as the shared engine', () => {

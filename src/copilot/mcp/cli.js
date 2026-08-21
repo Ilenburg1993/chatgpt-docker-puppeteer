@@ -9,7 +9,7 @@
  * @module copilot/mcp/cli
  */
 
-import { enableCopilotNodeCompileCache, flushCopilotNodeCompileCache } from '#copilot/infra/public/node-runtime';
+import { enableCopilotNodeCompileCache, flushCopilotNodeCompileCache } from '#copilot/infra/public/platform/node';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 

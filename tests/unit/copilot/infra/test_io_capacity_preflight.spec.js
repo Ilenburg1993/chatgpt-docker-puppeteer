@@ -1,14 +1,12 @@
+import { preflightIoCapacity } from '#copilot/infra/internal/filesystem/transaction';
+import { writeAtomicFileUnlocked } from '#copilot/infra/internal/filesystem/write';
 import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-    preflightIoCapacity,
-    resetIoCapacityPreflightCacheForTest,
-} from '../../../../src/copilot/infra/io/fs/capacity-preflight.js';
-import { copyFileUnlocked } from '../../../../src/copilot/infra/io/fs/copy.js';
-import { writeAtomicFileUnlocked } from '../../../../src/copilot/infra/io/fs/write-atomic.js';
+import { copyFileUnlocked } from '../../../../src/copilot/infra/filesystem/write/copy.js';
 
+import { resetIoCapacityPreflightCacheForTest } from '#copilot/infra/public/testing';
 /** @type {string[]} */
 const tempDirs = [];
 

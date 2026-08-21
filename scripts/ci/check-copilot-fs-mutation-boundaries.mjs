@@ -44,13 +44,15 @@ const OPEN_FUNCTIONS = new Set(['open', 'openSync']);
 const FILE_HANDLE_MUTATIONS = new Set(['write', 'writeFile', 'appendFile', 'truncate', 'chmod']);
 
 const EXACT_ALLOWLIST = new Map([
-    ['src/copilot/infra/io/jsonl-file-writer.js', new Set(['rename'])],
-    ['src/copilot/infra/io/jsonl-reader.js', new Set(['open:mutating', 'fileHandle.truncate'])],
+    ['src/copilot/infra/persistence/jsonl/writer/persistence.js', new Set(['rename'])],
+    ['src/copilot/infra/persistence/jsonl/repair.js', new Set(['open:mutating', 'fileHandle.truncate'])],
     [
-        'src/copilot/infra/locks/file-resource-lock.js',
-        new Set(['open:mutating', 'unlink', 'mkdir', 'fileHandle.writeFile']),
+        'src/copilot/infra/concurrency/locks/file/resource-lock.js',
+        new Set(['open:mutating', 'mkdir', 'fileHandle.writeFile']),
     ],
-    ['src/copilot/infra/lockfile.js', new Set(['unlink', 'unlinkSync'])],
+    ['src/copilot/infra/concurrency/locks/file/legacy.js', new Set(['unlink', 'unlinkSync'])],
+    ['src/copilot/infra/concurrency/locks/file/metadata.js', new Set(['unlink'])],
+    ['src/copilot/db/sqlite.js', new Set(['mkdir'])],
 ]);
 
 /** @param {t.CallExpression} call */
@@ -63,7 +65,7 @@ function openUsesMutatingFlags(call) {
 
 /** @param {string} filePath @param {string} operation */
 function isAllowedMutation(filePath, operation) {
-    if (filePath.startsWith('src/copilot/infra/io/fs/')) return true;
+    if (filePath.startsWith('src/copilot/infra/filesystem/')) return true;
     return EXACT_ALLOWLIST.get(filePath)?.has(operation) === true;
 }
 
@@ -170,7 +172,7 @@ export async function checkCopilotFsMutationBoundaries() {
     console.log(`- scanned source files: ${files.length}`);
     console.log(`- direct mutation sites: ${sites.length}`);
     console.log('- application boundary violations: 0');
-    console.log('- low-level implementation roots: src/copilot/infra/io/fs/**');
+    console.log('- low-level implementation roots: src/copilot/infra/filesystem/**');
     console.log(`- exact exceptions: ${EXACT_ALLOWLIST.size}`);
     return 0;
 }

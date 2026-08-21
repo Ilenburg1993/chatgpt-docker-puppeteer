@@ -9,7 +9,7 @@
  * @module copilot/terminal/state/intent-state
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
+import { utf8ByteLength } from '#copilot/infra/public/platform';
 
 const TERMINAL_INTENT_SOFT_ENTRIES = 10_000;
 const TERMINAL_INTENT_SOFT_BYTES = 16 * 1024 * 1024;

@@ -7,10 +7,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
-const IO_ENGINE_URL = new URL('../../../../src/copilot/infra/io-engine.js', import.meta.url).href;
+const IO_WRITE_MODULE_URL = new URL('../../../../src/copilot/infra/filesystem/write/index.js', import.meta.url).href;
+const IO_MUTATION_MODULE_URL = new URL('../../../../src/copilot/infra/filesystem/mutation/index.js', import.meta.url)
+    .href;
+const IO_LOCKS_MODULE_URL = new URL('../../../../src/copilot/infra/concurrency/locks/index.js', import.meta.url).href;
 const CHILD_SCRIPT = `
 const { operation, args } = JSON.parse(process.env['COPILOT_IO_MULTIPROCESS_CASE']);
-const io = await import(process.env['COPILOT_IO_ENGINE_URL']);
+const [write, mutation, locks] = await Promise.all([
+    import(process.env['COPILOT_IO_WRITE_MODULE_URL']),
+    import(process.env['COPILOT_IO_MUTATION_MODULE_URL']),
+    import(process.env['COPILOT_IO_LOCKS_MODULE_URL']),
+]);
+const io = { ...write, ...mutation, ...locks };
 try {
     if (operation === 'create') {
         await io.createOrReplaceFileAtomic(args.target, args.content, { failIfExists: true, createParentDirs: true });
@@ -56,10 +64,12 @@ afterEach(async () => {
 function runChild(lockDir, operation, args) {
     return new Promise((resolve, reject) => {
         const child = spawn(process.execPath, ['--input-type=module', '-e', CHILD_SCRIPT], {
-            cwd: path.dirname(fileURLToPath(IO_ENGINE_URL)),
+            cwd: path.dirname(fileURLToPath(IO_WRITE_MODULE_URL)),
             env: {
                 ...process.env,
-                COPILOT_IO_ENGINE_URL: IO_ENGINE_URL,
+                COPILOT_IO_WRITE_MODULE_URL: IO_WRITE_MODULE_URL,
+                COPILOT_IO_MUTATION_MODULE_URL: IO_MUTATION_MODULE_URL,
+                COPILOT_IO_LOCKS_MODULE_URL: IO_LOCKS_MODULE_URL,
                 COPILOT_IO_FILE_LOCKS_ENABLED: '1',
                 COPILOT_IO_FILE_LOCK_DIR: lockDir,
                 COPILOT_IO_MULTIPROCESS_CASE: JSON.stringify({ operation, args }),
@@ -103,10 +113,12 @@ function runChild(lockDir, operation, args) {
 function startHoldingChild(lockDir, target) {
     return new Promise((resolve, reject) => {
         const child = spawn(process.execPath, ['--input-type=module', '-e', CHILD_SCRIPT], {
-            cwd: path.dirname(fileURLToPath(IO_ENGINE_URL)),
+            cwd: path.dirname(fileURLToPath(IO_WRITE_MODULE_URL)),
             env: {
                 ...process.env,
-                COPILOT_IO_ENGINE_URL: IO_ENGINE_URL,
+                COPILOT_IO_WRITE_MODULE_URL: IO_WRITE_MODULE_URL,
+                COPILOT_IO_MUTATION_MODULE_URL: IO_MUTATION_MODULE_URL,
+                COPILOT_IO_LOCKS_MODULE_URL: IO_LOCKS_MODULE_URL,
                 COPILOT_IO_FILE_LOCKS_ENABLED: '1',
                 COPILOT_IO_FILE_LOCK_DIR: lockDir,
                 COPILOT_IO_MULTIPROCESS_CASE: JSON.stringify({ operation: 'lock-hold', args: { target } }),

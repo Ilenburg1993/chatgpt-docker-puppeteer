@@ -5,7 +5,7 @@
  * @module copilot/infra/policy/budgets
  */
 
-import { readEnvPositiveInt } from '../shared/env.js';
+import { readEnvPositiveInt } from '#copilot/infra/internal/platform';
 
 export const DEFAULT_IO_SEARCH_TIMEOUT_MS = 15_000;
 export const DEFAULT_IO_SEARCH_MAX_BUFFER_BYTES = 16 * 1024 * 1024;

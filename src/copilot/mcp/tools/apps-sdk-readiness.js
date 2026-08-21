@@ -5,7 +5,7 @@
  * @module copilot/mcp/tools/apps-sdk-readiness
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { getMcpWorkspaceRoot, okResult, readOnlyAnnotations } from '#copilot/mcp/control-plane';
 import path from 'node:path';
 import { buildCompanyKnowledgeWidgetResource } from './apps-sdk-resources.js';

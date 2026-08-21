@@ -5,10 +5,10 @@
  * @module copilot/mcp/control-plane/audit
  */
 
-import { readBytesRangeFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { readBytesRangeFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { createJsonlFileWriter } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createJsonlFileWriter } from '../../infra/io/jsonl-file-writer.js';
 
 const MCP_AUDIT_DIR = fileURLToPath(new URL('../../.ai/audit/', import.meta.url));
 const MAX_AUDIT_QUEUE_LINES = 10_000;

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { createBoundedProcessOutputCapture } from '../../../../src/copilot/infra/public/process-output.js';
+import { createBoundedProcessOutputCapture } from '../../../../src/copilot/infra/platform/process-output.js';
 
 describe('bounded process output capture', () => {
     it('retains a byte-exact head and reports omitted bytes', () => {

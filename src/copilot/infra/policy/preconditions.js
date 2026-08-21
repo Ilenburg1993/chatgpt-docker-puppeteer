@@ -5,7 +5,7 @@
  * @module copilot/infra/policy/preconditions
  */
 
-import { sha256 } from '../shared/hash.js';
+import { sha256 } from '#copilot/infra/internal/platform';
 
 /**
  * @param {string} actualHash

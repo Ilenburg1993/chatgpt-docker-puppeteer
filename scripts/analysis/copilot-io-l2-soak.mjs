@@ -72,12 +72,15 @@ async function main() {
     const startedAt = performance.now();
     let summary;
     try {
-        const [{ default: Database }, registry, database, core] = await Promise.all([
+        const [{ default: Database }, registry, database, sqlitePort, core] = await Promise.all([
             import('better-sqlite3'),
-            import('../../src/copilot/infra/io-cache-l2-registry.js'),
+            import('#copilot/infra/public/cache'),
             import('../../src/copilot/db/sqlite.js'),
+            import('#copilot/infra/public/database'),
             import('../../src/copilot/core/index.js'),
         ]);
+        await database.ensureCopilotDbDir();
+        sqlitePort.configureInfraSqliteProvider(database.getCopilotDb);
 
         const cache = registry.getIoL2Cache();
         assert.ok(cache, 'experimental profile must initialize L2');

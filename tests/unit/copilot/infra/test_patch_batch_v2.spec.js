@@ -5,8 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { patchTextBatchLocked } from '../../../../src/copilot/infra/io/fs/locked-mutations.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+import { patchTextBatchLocked } from '#copilot/infra/internal/filesystem/mutation';
+import { sha256 } from '#copilot/infra/internal/platform';
 
 /** @type {string[]} */
 const tempDirs = [];

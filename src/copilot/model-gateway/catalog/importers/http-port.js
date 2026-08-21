@@ -9,7 +9,7 @@
  */
 
 /**
- * @typedef {Parameters<typeof import('#copilot/infra/public/http-response').readBoundedResponseText>[0] & {
+ * @typedef {Parameters<typeof import('#copilot/infra/public/platform').readBoundedResponseText>[0] & {
  *     ok: boolean;
  *     status: number;
  * }} CatalogHttpResponse

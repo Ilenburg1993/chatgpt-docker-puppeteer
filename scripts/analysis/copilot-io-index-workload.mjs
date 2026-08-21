@@ -7,8 +7,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import { buildIndexPathTreeRange } from '../../src/copilot/infra/index-store/sqlite/paths.js';
-import { createIoIndexSqlite } from '../../src/copilot/infra/io-index-sqlite.js';
+import { buildIndexPathTreeRange, createIoIndexSqlite } from '#copilot/infra/public/indexing/storage';
 
 /**
  * @param {string} name

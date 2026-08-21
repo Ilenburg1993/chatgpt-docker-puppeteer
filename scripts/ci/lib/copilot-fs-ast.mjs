@@ -9,7 +9,7 @@
 import { parse as babelParse } from '@babel/parser';
 import * as t from '@babel/types';
 
-import { formatBabelParserError, resolveBabelParserOptions } from '../../../src/copilot/infra/parse/babel-policy.js';
+import { formatBabelParserError, resolveBabelParserOptions } from '#copilot/infra/public/code-analysis';
 
 export const FS_MODULES = new Set(['node:fs', 'node:fs/promises', 'fs', 'fs/promises']);
 

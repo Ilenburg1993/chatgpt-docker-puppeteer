@@ -1,16 +1,27 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { listShutdownHandlers, SHUTDOWN_PRIORITY } from '../../../../src/copilot/core/index.js';
 import {
     getIoL2Cache,
     getIoL2CacheConfiguration,
     getIoL2CacheHealth,
     getIoL2CacheStats,
-    resetIoL2CacheForTest,
-} from '../../../../src/copilot/infra/io-cache-l2-registry.js';
-import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
+} from '#copilot/infra/internal/cache';
+import { configureInfraSqliteProvider } from '#copilot/infra/internal/database';
+import { listShutdownHandlers, SHUTDOWN_PRIORITY } from '../../../../src/copilot/core/index.js';
+import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/observability/health.js';
+
+import { resetInfraSqliteProviderForTest, resetIoL2CacheForTest } from '#copilot/infra/public/testing';
+/** @type {import('better-sqlite3').Database | null} */
+let testDb = null;
 
 describe('io-cache-l2-registry', () => {
+    beforeEach(() => {
+        resetInfraSqliteProviderForTest();
+        testDb = new Database(':memory:');
+        configureInfraSqliteProvider(() => /** @type {import('better-sqlite3').Database} */ (testDb));
+    });
+
     afterEach(() => {
         delete process.env['IO_L2_CACHE_ENABLED'];
         delete process.env['IO_L2_CACHE_PROFILE'];
@@ -19,6 +30,9 @@ describe('io-cache-l2-registry', () => {
         delete process.env['IO_L2_CACHE_PRUNE_MS'];
         delete process.env['IO_L2_CACHE_MIN_BYTES'];
         resetIoL2CacheForTest();
+        resetInfraSqliteProviderForTest();
+        if (testDb?.open) testDb.close();
+        testDb = null;
     });
 
     it('returns disabled status and health contract by default', () => {

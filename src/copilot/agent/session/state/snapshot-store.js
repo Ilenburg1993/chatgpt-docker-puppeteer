@@ -12,7 +12,7 @@ import {
     listDirectoryNamesFreshTrusted,
     readTextFreshTrusted,
     writeFileAtomicTrusted,
-} from '#copilot/infra/public/trusted-io';
+} from '#copilot/infra/public/filesystem/trusted';
 import { join, resolve } from 'node:path';
 import { logSwallowed } from '../../ports/core-runtime-port.js';
 import { log } from '../../ports/logging/index.js';

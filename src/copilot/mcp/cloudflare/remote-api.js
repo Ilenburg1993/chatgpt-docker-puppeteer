@@ -5,7 +5,7 @@
  * @module copilot/mcp/cloudflare/remote-api
  */
 
-import { readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { createTtlCache } from '#copilot/mcp/control-plane';
 import Cloudflare from 'cloudflare';
 import { createHash } from 'node:crypto';

@@ -3,14 +3,8 @@
  * Testes unitários para io-session-scope.js
  */
 
-import * as assert from 'node:assert/strict';
-import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { afterAll, beforeAll, describe, it } from 'vitest';
-import { invalidateIoCacheSubtree, resetIoL1CacheForTest } from '../../../../src/copilot/infra/io-cache.js';
-import { writeFileAtomic } from '../../../../src/copilot/infra/io-engine.js';
-import { readIoRuntimeHealthSnapshot } from '../../../../src/copilot/infra/io-health.js';
+import { invalidateIoCoherenceSubtree } from '#copilot/infra/internal/filesystem/invalidation';
+import { writeFileAtomic } from '#copilot/infra/internal/filesystem/write';
 import {
     closeScope,
     declareScope,
@@ -20,7 +14,14 @@ import {
     invalidateScopePath,
     listScopes,
     refreshScope,
-} from '../../../../src/copilot/infra/io-session-scope.js';
+} from '#copilot/infra/internal/indexing/context';
+import { readIoRuntimeHealthSnapshot } from '#copilot/infra/internal/observability';
+import { resetIoL1CacheForTest } from '#copilot/infra/public/testing';
+import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { afterAll, beforeAll, describe, it } from 'vitest';
 
 let tmpDir = '';
 const JS_A = `
@@ -365,7 +366,7 @@ describe('refreshScope', () => {
         await handle.awaitReady();
         assert.ok(findSymbol(sessionId, 'nestedChild', { exactMatch: true }).length >= 1);
 
-        invalidateIoCacheSubtree(nestedDir);
+        invalidateIoCoherenceSubtree(nestedDir);
 
         const stats = getScopeStats(sessionId);
         assert.ok(stats !== null);

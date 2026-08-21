@@ -11,7 +11,7 @@
  */
 
 import { redactSecretText } from '#copilot/core';
-import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { join } from 'node:path';
 
 const MAX_BYOK_PROVIDER_HEALTH_RECORDS = 200;

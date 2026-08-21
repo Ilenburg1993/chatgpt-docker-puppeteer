@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/scheduled-transport-benchmark-runner
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { getTransportBenchmarkStateFile, readCloudflaredMetricsSnapshot } from '#copilot/mcp/cloudflare';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';

@@ -9,7 +9,7 @@
  * @module copilot/mcp/cloudflare/config-audit
  */
 
-import { readBoundedResponseJson } from '#copilot/infra/public/http-response';
+import { readBoundedResponseJson } from '#copilot/infra/public/platform';
 import { createTtlCache } from '#copilot/mcp/control-plane';
 import { getCloudflareClient, readCloudflareRemoteApiConfig } from './remote-api.js';
 import { readCloudflareRulesetSnapshot } from './ruleset-snapshot.js';

@@ -5,15 +5,15 @@
  * @module copilot/mcp/tools/repo-write
  */
 
-import { runBoundedOperationBatch } from '#copilot/infra/public/bulk';
+import { runBoundedOperationBatch } from '#copilot/infra/public/concurrency/bulk';
 import {
     listDirectoryNamesFreshTrusted,
     lstatPathTrusted,
     readBytesFreshTrusted,
     readBytesRangeFreshTrusted,
     statPathTrusted,
-} from '#copilot/infra/public/trusted-io';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+} from '#copilot/infra/public/filesystem/trusted';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import {
     appendMcpAuditEvent,
     boundedWriteAnnotations,
@@ -72,7 +72,7 @@ const {
  * Use the opaque validated mutable capability when the upstream path adapter supplied one; keep the canonical string
  * method as a compatibility fallback for internal mocks/legacy callers.
  *
- * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof patchTextLocked>[1]} options
  */
 function patchResolvedTarget(resolved, options) {
@@ -82,7 +82,7 @@ function patchResolvedTarget(resolved, options) {
 }
 
 /**
- * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof patchTextBatchLocked>[1]} options
  */
 function patchResolvedTargetBatch(resolved, options) {
@@ -92,7 +92,7 @@ function patchResolvedTargetBatch(resolved, options) {
 }
 
 /**
- * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof createOrReplaceFileAtomic>[1]} content
  * @param {Parameters<typeof createOrReplaceFileAtomic>[2]} options
  */
@@ -103,7 +103,7 @@ function createResolvedTarget(resolved, content, options) {
 }
 
 /**
- * @param {{ resolved: string; validatedWritePath?: unknown }} resolved
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} resolved
  * @param {Parameters<typeof writeFileAtomic>[1]} content
  * @param {Parameters<typeof writeFileAtomic>[2]} options
  */
@@ -117,8 +117,8 @@ function writeResolvedTarget(resolved, content, options) {
  * Move through the pair-capability path only when both sides were independently authorized by canonical write policy.
  * Legacy/mocked callers without capabilities keep the string facade and therefore retain full policy validation.
  *
- * @param {{ resolved: string; validatedWritePath?: unknown }} source
- * @param {{ resolved: string; validatedWritePath?: unknown }} destination
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} source
+ * @param {{ resolved: string; validatedWritePath?: import('#copilot/infra/public/filesystem/workspace').ValidatedMutableWorkspacePath }} destination
  * @param {Parameters<typeof moveFileLocked>[2]} options
  */
 function moveResolvedTargets(source, destination, options) {
@@ -153,7 +153,7 @@ const durabilitySchema = z
         'Crash-durability profile. Default file-and-directory. file skips parent-directory fsync; none also skips file flush. Atomic publish, locks, path policy and hash preconditions remain enforced.',
     );
 
-/** @param {unknown} value @returns {{ durability: import('#copilot/infra/io/fs/durability.js').IoDurabilityMode } | {}} */
+/** @param {unknown} value @returns {{ durability: import('#copilot/infra/public/platform/node/filesystem').IoDurabilityMode } | {}} */
 function durabilityOption(value) {
     return value === 'file-and-directory' || value === 'file' || value === 'none' ? { durability: value } : {};
 }

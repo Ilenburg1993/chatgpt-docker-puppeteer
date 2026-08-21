@@ -4,15 +4,16 @@ import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { listRollbackSidecars, persistRollbackSidecar } from '../../../../src/copilot/infra/io/fs/rollback-sidecar.js';
-import { executeIoRollbackToken } from '../../../../src/copilot/infra/runtime/rollback-executor.js';
-import { createIoRollbackToken, serializeIoRollbackToken } from '../../../../src/copilot/infra/runtime/rollback.js';
+import { listRollbackSidecars, persistRollbackSidecar } from '#copilot/infra/internal/filesystem/transaction';
 import {
     appendIoChangeSetEntry,
     applyIoChangeSet,
     beginIoChangeSet,
-} from '../../../../src/copilot/infra/runtime/transaction.js';
-import { sha256 } from '../../../../src/copilot/infra/shared/hash.js';
+    createIoRollbackToken,
+    executeIoRollbackToken,
+    serializeIoRollbackToken,
+} from '#copilot/infra/internal/operations';
+import { sha256 } from '../../../../src/copilot/infra/platform/hash.js';
 
 const WORKSPACE = '/workspaces/chatgpt-docker-puppeteer';
 /** @type {string[]} */
@@ -29,7 +30,7 @@ async function tempDirectory() {
 }
 
 /**
- * @param {import('../../../../src/copilot/infra/runtime/transaction.js').IoRollbackHint[]} hints
+ * @param {import('../../../../src/copilot/infra/operations/transaction.js').IoRollbackHint[]} hints
  */
 function tokenFromHints(hints) {
     let changeSet = beginIoChangeSet({ capability: 'file.rollback.test' });
@@ -43,7 +44,7 @@ function tokenFromHints(hints) {
     return createIoRollbackToken(applyIoChangeSet(changeSet));
 }
 
-describe('infra/runtime/rollback-executor', () => {
+describe('infra/operations/rollback-executor', () => {
     it('faz dry-run e restaura write com snapshot inline', async () => {
         const directory = await tempDirectory();
         const filePath = join(directory, 'file.txt');

@@ -5,7 +5,7 @@
  * @module copilot/mcp/control-plane/io-cache-benchmark-state
  */
 
-import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { lstatPathTrusted, readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { fileURLToPath } from 'node:url';
 
 export const IO_CACHE_BENCHMARK_STATE_PATH = 'src/copilot/.ai/mcp/io-cache-benchmark-state.json';

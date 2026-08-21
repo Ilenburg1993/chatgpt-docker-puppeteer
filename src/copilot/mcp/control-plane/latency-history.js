@@ -7,8 +7,10 @@
  * @module copilot/mcp/control-plane/latency-history
  */
 
-import { appendTextLocked, mkdirPathLocked, withIoResourceLock, writeFileAtomic } from '#copilot/infra/public/io';
-import { readJsonlTailTrusted, readTextFreshTrusted } from '#copilot/infra/public/trusted-io';
+import { withIoResourceLock } from '#copilot/infra/public/concurrency/locks';
+import { readTextFreshTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { appendTextLocked, mkdirPathLocked, writeFileAtomic } from '#copilot/infra/public/filesystem/write';
+import { readJsonlTailTrusted } from '#copilot/infra/public/persistence/jsonl';
 import path from 'node:path';
 import { getMcpWorkspaceRoot, toWorkspaceRelativePath } from './paths.js';
 

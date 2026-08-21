@@ -43,12 +43,12 @@ const ioMock = {
     mkdirPathLocked: vi.fn(),
     createOrReplaceFileAtomic: vi.fn(),
 };
-vi.mock('#copilot/infra/public/workspace-io', () => ({
+vi.mock('#copilot/infra/public/filesystem/workspace', () => ({
     createWorkspaceIo: () => ioMock,
 }));
 
 const readConfiguredSkillCatalog = vi.fn();
-vi.mock('#copilot/infra/public/skill-io', () => ({ readConfiguredSkillCatalog }));
+vi.mock('#copilot/infra/public/filesystem/skills', () => ({ readConfiguredSkillCatalog }));
 
 const mockExecFileSync = vi.fn();
 vi.mock('node:child_process', () => ({
@@ -298,7 +298,7 @@ describe('F36 — invoke_skill (F195)', () => {
             selected: null,
         });
         const result = await callTool(handler, { name: 'test' });
-        expect(result.error).toContain('.github/skills/');
+        expect(result.error).toContain('diretório de skills configurado');
     });
 
     it('possui skipPermission=true', () => {

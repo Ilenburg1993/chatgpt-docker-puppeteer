@@ -9,12 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
+import { getValidatedMutableWorkspacePathStats } from '#copilot/infra/public/filesystem/workspace';
 import { repoWriteTestHarness, repoWriteTools } from '#copilot/mcp/tools';
-import {
-    getValidatedMutableWorkspacePathStats,
-    resetValidatedMutableWorkspacePathStatsForTest,
-} from '../../../../src/copilot/infra/io/policy/validated-path.js';
 
+import { resetValidatedMutableWorkspacePathStatsForTest } from '#copilot/infra/public/testing';
 const applyPatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_patch');
 const applyFileBatchPlanTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch_plan');
 const applyFileBatchTool = repoWriteTools.find((tool) => tool.name === 'repo_apply_file_batch');

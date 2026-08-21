@@ -8,8 +8,8 @@
  * @module copilot/config/system-prompt/status
  */
 
-import { utf8ByteLength } from '#copilot/infra/public/buffer';
-import { readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/trusted-io';
+import { readTextFreshTrusted, statPathTrusted } from '#copilot/infra/public/filesystem/trusted';
+import { utf8ByteLength } from '#copilot/infra/public/platform';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadLiveSystemPromptSections } from './live-loader.js';

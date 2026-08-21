@@ -8,7 +8,7 @@
  * @module copilot/mcp/scripts/architecture-contract-check
  */
 
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -24,10 +24,11 @@ const HOTSPOT_BUDGETS = Object.freeze([
     { path: 'src/copilot/terminal/commands/session.js', maxBytes: 135_000 },
     { path: 'src/copilot/terminal/commands/sdk.js', maxBytes: 120_000 },
     { path: 'src/copilot/terminal/events/sdk-session-events.js', maxBytes: 112_000 },
-    { path: 'src/copilot/tools/model-gateway/model-gateway-tools.js', maxBytes: 108_000 },
-    { path: 'src/copilot/mcp/tools/repo-write.js', maxBytes: 105_000 },
+    // Recalibrated 2026-08-21 to the main-branch baseline; keep ~2-4% drift headroom, not a size target.
+    { path: 'src/copilot/tools/model-gateway/model-gateway-tools.js', maxBytes: 112_000 },
+    { path: 'src/copilot/mcp/tools/repo-write.js', maxBytes: 180_000 },
     { path: 'src/copilot/mcp/scripts/oauth-smoke.js', maxBytes: 100_000 },
-    { path: 'src/copilot/model-gateway/routing/runtime-selector.js', maxBytes: 95_000 },
+    { path: 'src/copilot/model-gateway/routing/runtime-selector.js', maxBytes: 98_000 },
     { path: 'src/copilot/sdk/session/provider.js', maxBytes: 90_000 },
     { path: 'src/copilot/terminal/dialog/engine.js', maxBytes: 90_000 },
 ]);

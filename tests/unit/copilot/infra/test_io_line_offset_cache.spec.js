@@ -4,13 +4,13 @@ import { strict as assert } from 'node:assert';
 import path from 'node:path';
 import { afterEach, describe, it } from 'vitest';
 
-import { invalidateIoCachePath } from '../../../../src/copilot/infra/io-cache.js';
+import { invalidateIoCoherencePath } from '#copilot/infra/internal/filesystem/invalidation';
 import {
     getLineOffsetCacheStats,
-    resetLineOffsetCacheForTest,
     sliceTextByCachedLineOffsets,
-} from '../../../../src/copilot/infra/io/fs/line-offset-cache.js';
+} from '../../../../src/copilot/infra/filesystem/read/cache/index.js';
 
+import { resetLineOffsetCacheForTest } from '#copilot/infra/public/testing';
 const FILE = '/tmp/copilot-line-offset-cache.txt';
 
 afterEach(() => {
@@ -53,7 +53,7 @@ describe('infra/io/fs line-offset cache', () => {
         sliceTextByCachedLineOffsets(FILE, text, fingerprint, { startLine: 1, endLine: 2 });
         assert.equal(getLineOffsetCacheStats().size, 1);
 
-        invalidateIoCachePath(FILE);
+        invalidateIoCoherencePath(FILE);
         const stats = getLineOffsetCacheStats();
         assert.equal(stats['busInvalidations'], 1);
         assert.equal(stats['clears'], 1);
@@ -74,7 +74,7 @@ describe('infra/io/fs line-offset cache', () => {
         assert.equal(second.cache, 'line-offset-hit');
         assert.equal(getLineOffsetCacheStats().size, 1);
 
-        invalidateIoCachePath(relativeFile);
+        invalidateIoCoherencePath(relativeFile);
         assert.equal(getLineOffsetCacheStats().size, 0);
     });
 

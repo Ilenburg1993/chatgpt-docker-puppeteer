@@ -1,8 +1,8 @@
 // @ts-check
+import { resolveBabelParserOptions } from '#copilot/infra/public/code-analysis';
 import { parse as babelParse } from '@babel/parser';
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveBabelParserOptions } from '../../src/copilot/infra/parse/babel-policy.js';
 
 /** Schema version for the JSON report emitted by the JSDoc coverage tooling. */
 export const JSDOC_COVERAGE_SCHEMA_VERSION = '3.1.0';

@@ -11,7 +11,7 @@
  * @module copilot/config/system-prompt/sdk-defaults/snapshot
  */
 
-import { writeFileAtomicTrusted } from '#copilot/infra/public/trusted-io';
+import { writeFileAtomicTrusted } from '#copilot/infra/public/filesystem/trusted';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYSTEM_PROMPT_SECTIONS } from '../../sdk-config-port.js';

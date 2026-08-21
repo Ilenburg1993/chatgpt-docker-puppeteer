@@ -5,6 +5,7 @@
  * @module copilot/mcp/control-plane/index-auto-build
  */
 
+import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/filesystem/invalidation';
 import {
     buildIoIndexForDirectory,
     filterIoIndexRefreshDomainPaths,
@@ -12,7 +13,6 @@ import {
     reconcileIoIndexAutoRefreshDomain,
     refreshIoIndexPaths,
 } from '#copilot/infra/public/indexing';
-import { readCrossProcessInvalidationReplay } from '#copilot/infra/public/io';
 import { WORKSPACE_ROOT } from '#copilot/tools';
 import { isAbsolute, relative, resolve } from 'node:path';
 import {

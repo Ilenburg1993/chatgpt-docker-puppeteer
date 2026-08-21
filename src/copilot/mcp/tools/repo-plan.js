@@ -5,8 +5,8 @@
  * @module copilot/mcp/tools/repo-plan
  */
 
+import { createWorkspaceIo } from '#copilot/infra/public/filesystem/workspace';
 import { getIoIndexStats } from '#copilot/infra/public/indexing';
-import { createWorkspaceIo } from '#copilot/infra/public/workspace-io';
 import {
     errorResult,
     getMcpWorkspaceRoot,
@@ -14,6 +14,7 @@ import {
     readOnlyAnnotations,
     resolveFocusedUnitTestCommand,
     resolveReadPath,
+    resolveValidatedReadPath,
     resolveValidatorCommand,
     resolveWritePath,
 } from '#copilot/mcp/control-plane';
@@ -202,7 +203,7 @@ export const repoPlanTools = [
             maxDiffLines,
             includeDiffPreview,
         }) => {
-            const resolved = await resolveReadPath(path, { issueReadCapability: true });
+            const resolved = await resolveValidatedReadPath(path);
             if (!resolved.ok) return errorResult(resolved.reason, resolved);
             const snapshot = await readTextValidated(resolved.validatedReadPath);
             const occurrences = countOccurrences(snapshot.content, old_string);
